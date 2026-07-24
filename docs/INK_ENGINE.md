@@ -367,8 +367,9 @@ InkEngine owns that too, as data rather than as animation code:
   `wordState(position, activeWord, isActiveAyah, dimmed)` (including the
   high-water rule), `inRepeatChain(position, activeWord)`, the bundled
   `word(...) → InkEngine.Word(state, repeat)`,   `sweepMs(activeWord, speed)`
-  with the min/max clamps (the min floor never exceeds the word's lit
-  lifetime — stretching past handoff flickered Arabic-only's paper cover),
+  with the min/max clamps (short holds scale up to `minSweepMs` so tiny
+  words still show a wash; residual progress finishes after handoff
+  instead of snapping — see `rememberLetterSweep`),
   `startRevealed(previous, current)` — always false: every Active entry
   re-runs the ink wash, including Recited→Active when the listener taps a
   word to play it again. (`ActiveWord.activation` bumps on genuine seeks so
