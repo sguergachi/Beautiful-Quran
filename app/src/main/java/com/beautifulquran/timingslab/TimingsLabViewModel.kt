@@ -621,16 +621,30 @@ class TimingsLabViewModel(
 
     // ── Submission ─────────────────────────────────────────────────────────
 
-    private fun buildPatch(): TimingsPatch {
+    /** Build a patch of either the open ayah only, or every on-device override. */
+    private fun buildPatch(currentOnly: Boolean): TimingsPatch {
         persistNow()
         val reciters = recitersCache
-        return TimingsPatchExporter.build(overrides.overrides.value) { id ->
+        val source = if (currentOnly) {
+            val st = _ui.value
+            val reciter = st.reciter
+            if (reciter == null) {
+                emptyMap()
+            } else {
+                val key = OverrideKey(reciter.id, st.surahId, st.ayah)
+                overrides.get(key)?.let { mapOf(key to it) }.orEmpty()
+            }
+        } else {
+            overrides.overrides.value
+        }
+        return TimingsPatchExporter.build(source) { id ->
             reciters.firstOrNull { it.id == id }
         }
     }
 
-    fun submit(context: Context) {
-        val patch = buildPatch()
+    fun submit(context: Context, currentOnly: Boolean = false) {
+        val patch = buildPatch(currentOnly)
+        if (patch.edits.isEmpty()) return
         try {
             context.startActivity(TimingsPatchExporter.newIssueIntent(patch))
         } catch (e: Exception) {
@@ -638,8 +652,10 @@ class TimingsLabViewModel(
         }
     }
 
-    fun copyPatch(context: Context) {
-        TimingsPatchExporter.copyToClipboard(context, buildPatch())
+    fun copyPatch(context: Context, currentOnly: Boolean = false) {
+        val patch = buildPatch(currentOnly)
+        if (patch.edits.isEmpty()) return
+        TimingsPatchExporter.copyToClipboard(context, patch)
     }
 
     override fun onCleared() {
