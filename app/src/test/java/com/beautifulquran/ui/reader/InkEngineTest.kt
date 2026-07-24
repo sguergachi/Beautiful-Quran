@@ -186,12 +186,15 @@ class InkEngineTest {
     }
 
     @Test
-    fun `short hold is not stretched past handoff by the min sweep floor`() {
-        // A 80 ms lit lifetime must sweep in 80 ms — clamping up to minSweepMs
-        // left the wash running into the next word (Arabic-only cover flicker).
-        assertEquals(80, InkEngine.sweepMs(active(1, durationMs = 80), playbackSpeed = 1f))
-        assertEquals(40, InkEngine.sweepMs(active(1, durationMs = 80), playbackSpeed = 2f))
-        assertEquals(10, InkEngine.sweepMs(active(1, durationMs = 10), playbackSpeed = 1f))
+    fun `short hold is scaled up to the min sweep floor`() {
+        // Short holds (and first-word timing with almost no remaining Active
+        // time) still get a visible wash. Renderers finish residual progress
+        // after handoff instead of snapping to full ink.
+        val floor = InkEngine.tuning.minSweepMs
+        assertEquals(floor, InkEngine.sweepMs(active(1, durationMs = 80), playbackSpeed = 1f))
+        assertEquals(floor, InkEngine.sweepMs(active(1, durationMs = 80), playbackSpeed = 2f))
+        assertEquals(floor, InkEngine.sweepMs(active(1, durationMs = 10), playbackSpeed = 1f))
+        assertEquals(floor, InkEngine.sweepMs(active(1, durationMs = 0), playbackSpeed = 1f))
     }
 
     @Test

@@ -113,11 +113,10 @@ export function sweepMs(
   if (!activeWord) return null
   // Kotlin `toInt()` truncates; use the same boundary semantics on web.
   const raw = Math.max(0, Math.trunc(activeWord.durationMs / playbackSpeed))
-  if (raw <= 0) return 1
-  // Never clamp the floor above the lit lifetime — that left the wash running
-  // past handoff and flickered Arabic-only's paper cover on the completed word.
-  const floor = Math.min(tuning.minSweepMs, raw)
-  return Math.min(tuning.maxSweepMs, Math.max(floor, raw))
+  // Floor at minSweepMs so short holds still get a visible wash. Incomplete
+  // washes finish after handoff (WordUnit / HafsWord) rather than snapping.
+  if (raw <= 0) return tuning.minSweepMs
+  return Math.min(tuning.maxSweepMs, Math.max(tuning.minSweepMs, raw))
 }
 
 /**
