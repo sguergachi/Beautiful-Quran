@@ -348,14 +348,24 @@ private fun OverflowMenu(
         }
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             DropdownMenuItem(
-                text = { Text("Submit corrections (${ui.overrideCount})") },
-                enabled = ui.overrideCount > 0,
-                onClick = { expanded = false; viewModel.submit(context) },
+                text = { Text("Submit this ayah") },
+                enabled = ui.isOverridden,
+                onClick = { expanded = false; viewModel.submit(context, currentOnly = true) },
             )
             DropdownMenuItem(
-                text = { Text("Copy patch JSON") },
+                text = { Text("Submit all corrections (${ui.overrideCount})") },
                 enabled = ui.overrideCount > 0,
-                onClick = { expanded = false; viewModel.copyPatch(context) },
+                onClick = { expanded = false; viewModel.submit(context, currentOnly = false) },
+            )
+            DropdownMenuItem(
+                text = { Text("Copy this ayah patch") },
+                enabled = ui.isOverridden,
+                onClick = { expanded = false; viewModel.copyPatch(context, currentOnly = true) },
+            )
+            DropdownMenuItem(
+                text = { Text("Copy all patch JSON") },
+                enabled = ui.overrideCount > 0,
+                onClick = { expanded = false; viewModel.copyPatch(context, currentOnly = false) },
             )
             DropdownMenuItem(
                 text = { Text("Reset ayah to bundled") },
@@ -824,20 +834,38 @@ private fun SubmitRibbon(
             .padding(horizontal = 20.dp, vertical = 6.dp),
     ) {
         Text(
-            text = "${ui.overrideCount} ayah${if (ui.overrideCount == 1) "" else "s"} corrected on this device",
+            text = when {
+                ui.isOverridden && ui.overrideCount == 1 -> "This ayah corrected"
+                ui.isOverridden -> "This ayah · ${ui.overrideCount} on device"
+                else -> "${ui.overrideCount} ayah${if (ui.overrideCount == 1) "" else "s"} corrected on this device"
+            },
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
         )
         Spacer(Modifier.size(10.dp))
-        Text(
-            text = "Submit",
-            style = MaterialTheme.typography.labelMedium,
-            fontWeight = FontWeight.SemiBold,
-            color = accents.gold,
-            modifier = Modifier
-                .quietClickable { viewModel.submit(context) }
-                .padding(horizontal = 6.dp, vertical = 4.dp),
-        )
+        if (ui.isOverridden) {
+            Text(
+                text = "Submit this",
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = accents.gold,
+                modifier = Modifier
+                    .quietClickable { viewModel.submit(context, currentOnly = true) }
+                    .padding(horizontal = 6.dp, vertical = 4.dp),
+            )
+        }
+        if (ui.overrideCount > 1 || !ui.isOverridden) {
+            if (ui.isOverridden) Spacer(Modifier.size(6.dp))
+            Text(
+                text = if (ui.isOverridden) "Submit all" else "Submit",
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = accents.gold,
+                modifier = Modifier
+                    .quietClickable { viewModel.submit(context, currentOnly = false) }
+                    .padding(horizontal = 6.dp, vertical = 4.dp),
+            )
+        }
     }
 }
 

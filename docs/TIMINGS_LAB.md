@@ -173,7 +173,7 @@ in-memory working copy, so you see edits *before* they're persisted.
 │  ▶   ⟲   1×                      [● Re-sync] │  transport: play, restart,
 │                                              │  speed + record pill
 │  "Slide to adjust · zooms in while you work" │  contextual hint line
-│  3 ayahs corrected on this device · Submit   │  pending-corrections ribbon
+│  This ayah · 3 on device · Submit this · all │  pending-corrections ribbon
 └──────────────────────────────────────────────┘
 ```
 
@@ -186,11 +186,14 @@ recited — tap earlier words again for repeats."
 The device is where corrections are *made*; GitHub is how they *travel*.
 Free, no backend, no auth beyond the GitHub account:
 
-1. **Submit** (overflow, or the ribbon) builds a pre-filled
-   `github.com/…/issues/new` deep-link: a human-readable summary, a
-   verification checklist, and the full patch as a fenced ```json``` block.
-   One tap opens it in the browser; **Copy patch** is the clipboard fallback
-   (and covers very large patches that exceed URL limits).
+1. **Submit this** (ribbon when the open ayah is corrected, or overflow
+   *Submit this ayah*) builds a one-edit patch for the open verse only.
+   **Submit all** / *Submit all corrections (N)* includes every on-device
+   override. Both open a pre-filled `github.com/…/issues/new` deep-link:
+   a human-readable summary, a verification checklist, and the patch as a
+   fenced ```json``` block. **Copy this ayah patch** / **Copy all patch JSON**
+   are the clipboard fallbacks (and cover very large patches that exceed
+   URL limits). Prefer one-ayah submits when iterating verse-by-verse.
 2. Maintainer saves the JSON block to `tools/timing_overrides/<anything>.json`
    in the repo and runs `python3 tools/build_db.py`.
 3. `build_db.py` fetches/normalizes the open-dataset timings as usual, then
