@@ -13,7 +13,8 @@ See [docs/TIMINGS_LAB.md](../../docs/TIMINGS_LAB.md) for the full workflow.
 
 | Defect class | Fix where | Verify with |
 |---|---|---|
-| Forward spikes, isolated strays, split slivers, **non-contiguous span phantoms** | `clean_qdc_artifacts` in `tools/build_db.py` | `tools/timing_patch_cases/*.json` + `python3 tools/test_build_db.py` |
+| Forward spikes, isolated strays, split slivers, **non-contiguous / gap phantoms** | `clean_qdc_artifacts` in `tools/build_db.py` | `tools/timing_patch_cases/*.json` + `python3 tools/test_build_db.py` |
+| Drop repair flattening a real multi-word re-say | `apply_timing_repairs` span-protect | `pipeline: erases_span_repeat` case |
 | Repeat-vs-split / CTC disagreement | `tools/timing_repairs/` generator | case in `~/qasr` + rebuild repairs |
 | True one-off (single boundary nudge, no structural rule) | **this directory** | ear-check + commit override; note *why* pipeline cannot fix it |
 

@@ -1,0 +1,17 @@
+{
+  "id": "survive-span-then-continue",
+  "label": "real span-repeat that resumes at HW+1 must not gap-fill",
+  "refs": ["issue #570"],
+  "pipeline": "clean_qdc_artifacts",
+  "notes": "Discriminator for gap phantoms: after re-say of 7,8,9 (which re-covers HW 9), next is 10 — no skip, keep the span.",
+  "input_positions": [
+    1, 2, 3, 4, 5, 6, 7, 8, 9,
+    7, 8, 9,
+    10, 11, 12, 13
+  ],
+  "expected_positions": [
+    1, 2, 3, 4, 5, 6, 7, 8, 9,
+    7, 8, 9,
+    10, 11, 12, 13
+  ]
+}

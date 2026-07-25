@@ -45,16 +45,18 @@ class, and do not merge a cleaner change without a case under this directory.
 |---|---|---|
 | `id` | yes | stable slug; should match the filename stem |
 | `label` | yes | one-line human name (shown on failure) |
-| `pipeline` | yes | which step to run (`clean_qdc_artifacts` today) |
+| `pipeline` | yes | `clean_qdc_artifacts` or `erases_span_repeat` |
 | `input_positions` | * | 1-based word indices in time order (synthetic equal durations) |
 | `expected_positions` | * | positions after the pipeline step |
 | `input_segments` | * | full `[[pos, start_ms, end_ms], …]` when times matter |
 | `expected_segments` | * | full segments after the step (compared when present) |
+| `repair_positions` / `repair_segments` | for `erases_span_repeat` | candidate repair row |
+| `expected_erases` | for `erases_span_repeat` | bool — must the guard refuse this repair? |
 | `refs` | no | issue/PR/doc pointers |
 | `notes` | no | why this shape is real / what must not regress |
 
-\* Provide either the `*_positions` pair **or** the `*_segments` pair (or both;
-when both are present, segments are authoritative).
+\* For `clean_qdc_artifacts`, provide either the `*_positions` pair **or** the
+`*_segments` pair (or both; when both are present, segments are authoritative).
 
 ## Adding a case from a Timings Lab / GitHub patch
 

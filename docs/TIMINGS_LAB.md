@@ -199,7 +199,8 @@ Free, no backend, no auth beyond the GitHub account:
 
    | Class | Where to fix | Unit test |
    |---|---|---|
-   | Structural qdc noise (forward spikes, strays, split slivers, non-contiguous span phantoms) | `clean_qdc_artifacts` in `tools/build_db.py` | Add `tools/timing_patch_cases/<id>.json` — broken `input_*` + expected `expected_*` from the patch; run `python3 tools/test_build_db.py` |
+   | Structural qdc noise (forward spikes, strays, split slivers, non-contiguous span phantoms, **gap phantoms**) | `clean_qdc_artifacts` in `tools/build_db.py` | Add `tools/timing_patch_cases/<id>.json` — broken `input_*` + expected `expected_*` from the patch; run `python3 tools/test_build_db.py` |
+   | Drop repair that flattens a real span-repeat | `apply_timing_repairs` span-protect (and regenerate repairs) | `pipeline: erases_span_repeat` case in `timing_patch_cases/` |
    | Repeat-vs-split / CTC | `tools/timing_repairs/` generator | `~/qasr` tests + rebuild repairs |
    | True one-off boundary only | `tools/timing_overrides/` | Ear-check; `notes` must say why no pipeline rule applies |
 
