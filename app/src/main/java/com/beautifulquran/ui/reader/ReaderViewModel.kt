@@ -237,27 +237,14 @@ class ReaderViewModel(
     private fun outputLatencyMs(): Long =
         InkEngine.outputLatencyOverrideMs?.toLong() ?: outputLatency.latencyMs.value
 
-    /**
-     * The **ear clock**: media playhead adjusted for output lag and optional
-     * highlight lead, so follow-along tracks what the listener is hearing
-     * (Bluetooth is ~80–180 ms behind the playhead) rather than what the
-     * decoder has produced.
-     *
-     * Pure — reads no clock state and mutates none — so every follow-along
-     * surface can share it. Anything that decides *where the recitation is*
-     * must read this and not `player.positionMs`, or it will drift against the
-     * ink by the route latency and silently change when headphones connect.
-     */
-    private fun adjustedPositionMs(): Long = OutputLatency.highlightMs(
-        player.positionMs,
-        outputLatencyMs(),
-        InkEngine.highlightLeadMs.toLong().coerceAtLeast(0L),
-    )
+    /** Media position at the listener's ear, before any word-only ink lead. */
+    private fun heardPositionMs(): Long =
+        OutputLatency.heardMs(player.positionMs, outputLatencyMs())
 
     /**
-     * [adjustedPositionMs] for the ink poll, plus the one piece of clock
-     * bookkeeping only that poll wants: a route or lab change steps query time,
-     * so arm [HighlightClock] to take it rather than hold it as jitter.
+     * The heard position plus the word-only Ink Lab lead. A route or lab change
+     * steps query time, so arm [HighlightClock] to take it rather than hold it
+     * as jitter.
      *
      * Forced word seeks stay on the media timeline so a tap lights the word
      * that was just sought.
@@ -352,7 +339,7 @@ class ReaderViewModel(
         }
         // The pure ear clock: this consumer must not arm the ink clock's
         // "accept next sample" latch on the ink poll's behalf.
-        InkEngine.prefaceWashProgress(adjustedPositionMs(), endMs)
+        InkEngine.prefaceWashProgress(heardPositionMs(), endMs)
     }
 
     /** Advances the lit ayah to the next one during the final
@@ -375,7 +362,7 @@ class ReaderViewModel(
             // player.positionMs here made the effective lead fadeLeadMs + route
             // latency (680 ms instead of 500 ms on A2DP), shifting whenever the
             // listener changed audio output.
-            positionMs = adjustedPositionMs(),
+            positionMs = heardPositionMs(),
             endMs = endMs,
             leadMs = InkEngine.fadeLeadMs.toLong(),
             ayahCount = ayahCount,
@@ -858,4 +845,3 @@ internal object FadeLead {
         return if (remaining <= lead) ayah + 1 else ayah
     }
 }
-

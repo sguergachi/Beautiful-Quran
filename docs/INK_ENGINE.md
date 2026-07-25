@@ -407,8 +407,9 @@ InkEngine owns that too, as data rather than as animation code:
   preset). These move *when* things fire rather than how the ink feels, so they
   stay out of the data class that **Copy values** transcribes — but they persist
   with it via `InkLabStore`. `fadeLeadMs` is how far the ayah focus/recess target
-  runs ahead of the audio; both it and the ink read the same latency-corrected
-  clock, which is a contract enforced in `ReaderViewModel` — see
+  runs ahead of the audio; `highlightLeadMs` advances word ink only. Both start
+  from the same latency-corrected heard position, a contract enforced in
+  `ReaderViewModel` — see
   [OUTPUT_LATENCY.md](OUTPUT_LATENCY.md). `focusEngineEnabled` is a session-only
   lab freeze and is never persisted.
 - **Renderers consume `InkEngine.Word`.** `AyahBlock` derives each ayah's ink
