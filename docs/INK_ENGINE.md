@@ -448,14 +448,16 @@ pure, `InkEngineTest`-covered helpers.
 2. **A persistent `Animatable` means the next word inherits progress 1.** The
    draw phase can read it before the effect's `snapTo(0f)` lands, which showed as
    a one-frame full-ink flash. `sweepEntryAction(…)` classifies each composition
-   as `Arm` / `Keep` / `Clear`. On `Arm`, a **MutableState** entry mask is set
-   so the draw phase shows 0 until `LaunchedEffect` `snapTo(0f)` then clears the
-   mask — unmasking must be State-driven because `activeWord` only recomposes
-   the tree **once per word** (`distinctUntilChanged`); a composition-only
-   Boolean captured in `derivedStateOf` stayed true for the whole Active span
-   and killed the wash. Re-Arm still remasks even when `(active, activation)`
-   keys match a prior pass (repeat / bounce / replay). If Active ends before
-   the reset, the residual only rewinds from the idle full-ink ceiling
+   as `Arm` / `Keep` / `Clear`. On `Arm`, a **MutableState** `applied` flag is
+   set false in `SideEffect` so the draw phase shows 0; `LaunchedEffect`
+   `snapTo(0f)` then sets `applied` true so the wash can run. Unmasking must
+   be State-driven: `activeWord` only recomposes the tree **once per word**
+   (`distinctUntilChanged`). A composition-only Boolean captured in
+   `derivedStateOf` stayed true for the whole Active span and killed every
+   wash after the first word (the first often got a free extra recompose from
+   player startup). Re-Arm still remasks via `SideEffect` even when
+   `(active, activation)` keys match a prior pass. If Active ends before the
+   reset, the residual only rewinds from the idle full-ink ceiling
    (`residualSweepAnchor`) — a mid-wash value is never snapped back to unread.
 3. **The entry snapshot must survive the entry.** Duration, curve, feather, and
    wasl `revealStart` are captured at `Arm` and held for the whole sweep, so

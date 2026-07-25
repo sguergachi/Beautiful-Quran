@@ -418,14 +418,15 @@ internal fun sweepEntryAction(
 }
 
 /**
- * Policy for the entry mask (tests / docs). Runtime uses a MutableState
- * `entryPending`: set true on every [SweepEntryAction.Arm], cleared after
- * `snapTo(0)` in LaunchedEffect so the draw-phase wash can run without a
- * parent recompose (`activeWord` only publishes once per word).
+ * Policy for the entry mask (tests / docs). Runtime uses MutableState
+ * `applied`: SideEffect sets false on every [SweepEntryAction.Arm]; 
+ * LaunchedEffect sets true after `snapTo(0)` so the draw-phase wash runs
+ * without a parent recompose (`activeWord` only publishes once per word).
  *
  * A composition-only Boolean captured in `derivedStateOf` stayed true for the
- * whole Active span and killed the wash. A `remember(active, activation)`
- * flag that only initialized once stayed false on re-Arm and flashed full ink.
+ * whole Active span and killed every word after the first. A
+ * `remember(active, activation)` flag that only initialized once stayed false
+ * on re-Arm and flashed full ink.
  *
  * - [SweepEntryAction.Arm]: always mask to 0 this frame
  * - [SweepEntryAction.Keep] while not yet [applied]: effect has not reset yet
@@ -584,20 +585,18 @@ private fun rememberLetterSweep(
         revealStart = armRevealStart,
         latchedRevealStart = lifecycle.revealStart,
     )
-    // Draw-phase mask: MutableState so LaunchedEffect can unmask after snapTo(0)
-    // without a parent recompose. activeWord only publishes once per word
-    // (distinctUntilChanged), so a composition-only Boolean captured in
-    // derivedStateOf stayed true for the whole Active lifetime and killed the
-    // wash (progress stuck at 0). Re-Arm must still remask even when
-    // (active, activation) keys match a prior pass — set pending on every Arm.
-    val entryPending = remember { mutableStateOf(false) }
-    if (entryAction == SweepEntryAction.Arm) {
-        entryPending.value = true
-        lifecycle.applied = false
-    }
+    // Snapshot mask: activeWord only recomposes once per word, so the wash
+    // must unmask via MutableState (draw-phase) — never a composition Boolean
+    // captured in derivedStateOf (that stayed true for the whole Active span
+    // and killed every word after the first, which often got an extra
+    // recompose from player/ayah startup). SideEffect remasks on Arm;
+    // LaunchedEffect unmasks after snapTo(0).
+    val applied = remember { mutableStateOf(true) }
     val revealStartState = rememberUpdatedState(displayRevealStart)
     SideEffect {
         if (entryAction == SweepEntryAction.Arm) {
+            applied.value = false
+            lifecycle.applied = false
             lifecycle.durationMs = armDurationMs
             lifecycle.pacing = pacing
             lifecycle.feather = armFeather
@@ -626,9 +625,9 @@ private fun rememberLetterSweep(
             lockedFeather.value = armFeather
             sweep.snapTo(0f)
             lifecycle.applied = true
-            // Unmask after the idle full-ink value is gone — draw-phase only;
-            // parent will not recompose until the next word.
-            entryPending.value = false
+            // Unmask after idle full-ink is gone — invalidates draw without
+            // waiting for the next word's parent recompose.
+            applied.value = true
             val easing = if (pacing != null) LinearEasing else InkEngine.sweepEasing
             sweep.animateTo(1f, tween(sweepMs, easing = easing))
         } else if (finishResidual) {
@@ -647,7 +646,7 @@ private fun rememberLetterSweep(
                 if (anchor != sweep.value) sweep.snapTo(anchor)
                 lifecycle.applied = true
             }
-            entryPending.value = false
+            applied.value = true
             val total = lockedMs.value.coerceAtLeast(1)
             if (sweep.value < 1f) {
                 val remain = ((1f - sweep.value) * total).toInt().coerceAtLeast(1)
@@ -668,7 +667,7 @@ private fun rememberLetterSweep(
             if (sweep.value < 1f) sweep.snapTo(1f)
             lifecycle.applied = true
             lifecycle.revealStart = 0f
-            entryPending.value = false
+            applied.value = true
             lockedPacing.value = null
             lockedFeather.value = null
         }
@@ -676,7 +675,7 @@ private fun rememberLetterSweep(
     val progress = remember {
         derivedStateOf {
             val mapped = lockedPacing.value?.at(sweep.value) ?: sweep.value
-            val raw = if (entryPending.value) 0f else mapped
+            val raw = if (!applied.value) 0f else mapped
             continuedSweepProgress(raw, revealStartState.value)
         }
     }
