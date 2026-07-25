@@ -199,9 +199,13 @@ The model is therefore a **gated hint**, built from four parts:
   `waslContinuationStart`) with the same feather as the active word, not a
   one-glyph wipe. The soft edge therefore breathes at the main wash rate and
   hands off on the same spatial leading edge when the timing boundary
-  arrives. The completed edge is the active sweep's starting point, so the
-  opening letter is not replayed and the wash continues through the rest of
-  the word. That continuation is armed only on a natural adjacent-word
+  arrives. Window progress is **smoothstepped**, and on short wasl donors
+  (مِن، مَن) the window **starts earlier** (`waslPrefixStart(sweepMs)`,
+  targeting ~320 ms) so the ink carries into the next opening instead of
+  popping on the last ~18 %. Long donors still open near the absorbed-nūn
+  tail (82 %). The completed edge is the active sweep's starting point, so
+  the opening letter is not replayed and the wash continues through the rest
+  of the word. That continuation is armed only on a natural adjacent-word
   handoff, never a seek. Same-ayah neighbours only (`Hold.connect`, default
   on). Iẓhār and cross-ayah wasl are left alone.
 - **Waqf length scale.** `Hold.waqfLengthScale` (Ink Lab: **Waqf length
@@ -257,7 +261,8 @@ Two refinements built into the curve, not the callers:
   vs `ayah.words.last()`), which arms the waqf hold, and the previous/next
   words' `arabic` for wasl nūn entry and exit. A detected connection also
   drives a main-feather wash overlay on the next shaped word over the prior
-  word's final 18%, advancing only to `waslContinuationStart` (not a full
+  word's wasl window (default final 18%; short donors stretch earlier via
+  `waslPrefixStart`), advancing only to `waslContinuationStart` (not a full
   wipe); on handoff that edge holds and the main wash resumes from the same
   progress, so the wāw/other target never dims or restarts.
 - **Feather** — the make-or-break visual change, and the one the first
@@ -339,10 +344,11 @@ the curve, not the weights, is the module boundary.
   medium closers' run-up;
   wasl entry (`مَن`→`يَقُولُ`, ikhfāʾ, iqlāb) parks on the next opening letter
   and wasl exit finishes the previous word early; the exact 4:163
-  `نُوحٖ`→`وَٱلنَّبِيِّـۧنَ` pair blooms its wāw from 82–100% of the prior
-  word; no segment anywhere outruns the cruise cap; and every knob combination
-  stays monotone and bounded with exact endpoints. **The golden literals must
-  stay byte-identical to the DB** — an
+  `نُوحٖ`→`وَٱلنَّبِيِّـۧنَ` pair blooms its wāw over the prior-word tail
+  (default 82–100 %, smoothstepped; short donors stretch earlier via
+  `waslPrefixStart`); no segment anywhere outruns the cruise cap; and every
+  knob combination stays monotone and bounded with exact endpoints. **The
+  golden literals must stay byte-identical to the DB** — an
   editor or tool that NFC-normalizes the file fuses `ا + ٓ` into precomposed
   `آ` (U+0622) and silently changes the weights (the parser now unfuses U+0622
   defensively, but the DB itself is always decomposed).

@@ -704,6 +704,10 @@ private fun rememberWaslProgress(
     val clock = remember(identity, activation) { Animatable(0f) }
     val entryConnection = remember(identity, activation) { connection }
     val entryMs = remember(identity, activation) { sweepMs }
+    // Capture at Active entry so a mid-word retune cannot jump the edge.
+    val entryPrefixStart = remember(identity, activation) {
+        entryMs?.let { TajweedPacing.waslPrefixStart(it) } ?: 1f
+    }
     LaunchedEffect(identity, activation) {
         if (entryConnection == null || entryMs == null) {
             clock.snapTo(0f)
@@ -713,7 +717,9 @@ private fun rememberWaslProgress(
         }
     }
     return remember(identity, activation) {
-        derivedStateOf { entryConnection?.at(clock.value) ?: 0f }
+        derivedStateOf {
+            entryConnection?.at(clock.value, entryPrefixStart) ?: 0f
+        }
     }
 }
 
