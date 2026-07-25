@@ -23,6 +23,11 @@ import {
 import { HighlightEngine, PreparedTimings } from '../domain/HighlightEngine'
 import { BASMALAH_PLAYLIST_AYAH } from '../domain/Basmalah'
 import { HighlightClock } from '../domain/HighlightClock'
+import {
+  fastForwardAction,
+  midpointMs,
+  nextConsumedAyah,
+} from '../domain/FastForwardPolicy'
 import { player, type PlayerState } from '../playback/player'
 import {
   readerHighlightKey,
@@ -71,8 +76,6 @@ export interface RootViewerState {
   isPlayingWord: boolean
 }
 
-const LONG_AYAH_MIN_WORDS = 20
-const MIDPOINT_SEEK_GRACE_MS = 1_000
 const START_SEEK_GRACE_MS = 1_500
 const WORD_CLIP_POLL_MS = 16
 const WORD_CLIP_READY_TIMEOUT_MS = 4_000
@@ -145,6 +148,12 @@ class AppStore {
   /** Cancels an in-flight word-clip poll / ready wait. */
   private wordClipToken = 0
   private wordClipTimer: ReturnType<typeof setTimeout> | null = null
+  /**
+   * Long-ayah midpoint skip already issued for this ayah (0 = none).
+   * Decided by intent, not positionMs, because seeks are async — a second FF
+   * before position catches up must not re-seek midpoint (#560).
+   */
+  private longAyahMidpointConsumed = 0
 
   state: AppState = {
     ready: false,
@@ -428,6 +437,7 @@ class AppStore {
     // sheet while audio metadata hydrates independently.
     this.timingSegments = new Map()
     this.prepared = new Map()
+    this.longAyahMidpointConsumed = 0
 
     // One state commit: the first reader frame already contains Quran text.
     this.set({
@@ -621,21 +631,23 @@ class AppStore {
     if (!np || np.surahId !== content.surah.id) return
 
     if (np.ayah === BASMALAH_PLAYLIST_AYAH) {
+      this.longAyahMidpointConsumed = 0
       await player.seekToAyah(1)
       return
     }
 
-    const midpointMs = this.midpointForLongAyah(np.ayah)
-    if (
-      midpointMs != null &&
-      this.state.player.positionMs < midpointMs - MIDPOINT_SEEK_GRACE_MS
-    ) {
-      await player.seekToWord(np.ayah, midpointMs)
-      return
-    }
-
-    if (np.ayah < content.surah.ayahCount) {
-      await player.seekToAyah(np.ayah + 1)
+    const action = fastForwardAction({
+      ayah: np.ayah,
+      positionMs: this.state.player.positionMs,
+      ayahCount: content.surah.ayahCount,
+      midpointMs: this.midpointForLongAyah(np.ayah),
+      midpointConsumedForAyah: this.longAyahMidpointConsumed,
+    })
+    this.longAyahMidpointConsumed = nextConsumedAyah(action)
+    if (action.kind === 'midpoint') {
+      await player.seekToWord(action.ayah, action.positionMs)
+    } else if (action.kind === 'ayah') {
+      await player.seekToAyah(action.ayah)
     }
   }
 
@@ -665,9 +677,7 @@ class AppStore {
 
   private midpointForLongAyah(ayah: number): number | null {
     const prepared = this.ensurePrepared(ayah)
-    const segments = prepared?.segments
-    if (!segments || segments.length < LONG_AYAH_MIN_WORDS) return null
-    return segments[Math.floor(segments.length / 2)]!.startMs
+    return prepared ? midpointMs(prepared.segments) : null
   }
 
   /** Dismiss the cover float and end the playback session. */

@@ -612,11 +612,8 @@ class ReaderViewModel(
         }
     }
 
-    private fun midpointForLongAyah(ayah: Int): Long? {
-        val segments = timings[ayah].orEmpty()
-        if (segments.size < FastForwardPolicy.LONG_AYAH_MIN_WORDS) return null
-        return segments[segments.size / 2].startMs
-    }
+    private fun midpointForLongAyah(ayah: Int): Long? =
+        FastForwardPolicy.midpointMs(timings[ayah].orEmpty())
 
     /** Loads this surah as the playlist from [startAyah]; no-op until content
      * and reciter are ready. Returns false when not started.
