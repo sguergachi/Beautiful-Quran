@@ -1,0 +1,48 @@
+{
+  "id": "survive-span-2-33",
+  "label": "real backward span-repeat 2:33 must survive",
+  "refs": [
+    "REPEAT_HIGHLIGHTING.md"
+  ],
+  "pipeline": "clean_qdc_artifacts",
+  "input_positions": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14
+  ],
+  "expected_positions": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14
+  ]
+}

@@ -96,10 +96,10 @@ object ReaderInteraction {
 
     /**
      * Whether lyric-follow should call [ReaderFocusController.focus] for
-     * [target]. When follow just re-enabled, always home (return-to-verse).
-     * While follow stays on, only home when the playback target **changes** —
-     * re-homing the same tall verse on pause/play/seek fights word-band follow
-     * and stutters the page up then down.
+     * [target], after the direct visible-tall-word policy below has been ruled
+     * out. A normal return-to-verse homes when follow just re-enabled. While
+     * follow stays on, only target changes home; re-homing the same tall verse
+     * on pause/play/seek fights word-band follow and stutters up then down.
      */
     fun shouldHomeOntoPlaybackTarget(
         target: Int,
@@ -108,19 +108,29 @@ object ReaderInteraction {
     ): Boolean = justEnabledFollow || target != lastHomedTarget
 
     /**
-     * Word-band keep-in-view must track **actual** play, not the debounced
-     * "reciting chrome" flag. After the last ayah ends, Media3 can snap
-     * position toward the item start while chrome is still recessed for a few
-     * hundred ms — if word-follow stays armed, it scrolls back up to word 1.
+     * Re-enabling follow inside a visible tall ayah should restore its active
+     * word directly. Homing the ayah first moves in the opposite direction,
+     * pins line one, and queues the real word correction behind that glide.
+     */
+    fun shouldRestoreWordOnFollowEnable(
+        justEnabledFollow: Boolean,
+        targetHasLiveTallGeometry: Boolean,
+    ): Boolean = justEnabledFollow && targetHasLiveTallGeometry
+
+    /**
+     * Word-band keep-in-view continuously tracks **actual** play, not the
+     * debounced "reciting chrome" flag. [restoreRequested] is the narrow
+     * exception: opening / foreground resume may reveal the held word once
+     * while paused. Keeping that request one-shot prevents Media3's end-state
+     * position reset from pulling the final ayah back to word one.
      */
     fun shouldKeepWordInView(
-        followEnabled: Boolean,
-        labFocusEnabled: Boolean,
+        followPlayback: Boolean,
         isPlaying: Boolean,
-        annotating: Boolean,
         hasActiveWord: Boolean,
+        restoreRequested: Boolean = false,
     ): Boolean =
-        followEnabled && labFocusEnabled && isPlaying && !annotating && hasActiveWord
+        followPlayback && hasActiveWord && (isPlaying || restoreRequested)
 
     /**
      * Which ayah the transport "play from here" control should use: a pending

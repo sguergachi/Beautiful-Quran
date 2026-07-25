@@ -297,9 +297,6 @@ function RootViewerBleed({ closing, rv }: { closing: boolean; rv: RootViewerStat
                 </a>
               ))}
             </div>
-            <p className="root-reference-caution">
-              Classical dictionary entries describe a broad history of usage; the ayah&apos;s context still determines the intended sense.
-            </p>
           </section>
         </main>
 

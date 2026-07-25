@@ -234,6 +234,29 @@ class ReaderInteractionTest {
     }
 
     @Test
+    fun `follow enable restores word directly when tall target has live geometry`() {
+        assertTrue(
+            ReaderInteraction.shouldRestoreWordOnFollowEnable(
+                justEnabledFollow = true,
+                targetHasLiveTallGeometry = true,
+            ),
+        )
+        assertFalse(
+            ReaderInteraction.shouldRestoreWordOnFollowEnable(
+                justEnabledFollow = false,
+                targetHasLiveTallGeometry = true,
+            ),
+        )
+        // Wholly offscreen and normal-height targets still need verse focus.
+        assertFalse(
+            ReaderInteraction.shouldRestoreWordOnFollowEnable(
+                justEnabledFollow = true,
+                targetHasLiveTallGeometry = false,
+            ),
+        )
+    }
+
+    @Test
     fun `word-play seed skips verse home so tall-ayah bottom taps stay put`() {
         // Screen sets lastHomed = tapped ayah and followWasEnabled = true before
         // EnableFollow so justEnabled is false and the same target does not re-home.
@@ -244,7 +267,7 @@ class ReaderInteractionTest {
                 lastHomedTarget = 141,
             ),
         )
-        // Return-to-verse still homes when follow was off (justEnabled).
+        // Normal/offscreen return still homes once visible-tall restore does not apply.
         assertTrue(
             ReaderInteraction.shouldHomeOntoPlaybackTarget(
                 target = 141,
@@ -255,33 +278,46 @@ class ReaderInteractionTest {
     }
 
     @Test
-    fun `shouldKeepWordInView requires actual play not debounced chrome`() {
+    fun `word follow requires actual play but resume may restore held word once`() {
         // End of last ayah: isPlaying false while chrome may still be recessed.
         assertFalse(
             ReaderInteraction.shouldKeepWordInView(
-                followEnabled = true,
-                labFocusEnabled = true,
+                followPlayback = true,
                 isPlaying = false,
-                annotating = false,
                 hasActiveWord = true,
             ),
         )
         assertTrue(
             ReaderInteraction.shouldKeepWordInView(
-                followEnabled = true,
-                labFocusEnabled = true,
+                followPlayback = true,
                 isPlaying = true,
-                annotating = false,
                 hasActiveWord = true,
+            ),
+        )
+        assertTrue(
+            ReaderInteraction.shouldKeepWordInView(
+                followPlayback = true,
+                isPlaying = false,
+                hasActiveWord = true,
+                restoreRequested = true,
+            ),
+        )
+        // A pending jump, note, hand scroll, or Ink Lab freeze makes the
+        // arbiter's followPlayback false; resume restoration must still yield.
+        assertFalse(
+            ReaderInteraction.shouldKeepWordInView(
+                followPlayback = false,
+                isPlaying = true,
+                hasActiveWord = true,
+                restoreRequested = true,
             ),
         )
         assertFalse(
             ReaderInteraction.shouldKeepWordInView(
-                followEnabled = true,
-                labFocusEnabled = true,
+                followPlayback = true,
                 isPlaying = true,
-                annotating = false,
                 hasActiveWord = false,
+                restoreRequested = true,
             ),
         )
     }

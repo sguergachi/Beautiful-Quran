@@ -186,6 +186,7 @@ class TajweedPacingTest {
         val connection = requireNotNull(
             TajweedPacing.connection("نُوحٖ", "وَٱلنَّبِيِّـۧنَ"),
         )
+        // Default (long-word) junction: rise over the last 18%, smoothstepped.
         assertEquals(0f, connection.at(0.82f), 0f)
         assertTrue(connection.at(0.91f) in 0.49f..0.51f)
         assertEquals(1f, connection.at(1f), 0f)
@@ -202,6 +203,60 @@ class TajweedPacingTest {
         assertTrue(connection.at(0.91f) in 0.49f..0.51f)
         assertEquals(1f, connection.at(1f), 0f)
         assertEquals(1f / 6f, connection.prefixFraction, 0f)
+    }
+
+    @Test
+    fun `short wasl donor starts the next-letter bloom earlier`() {
+        // مِن/مَن-scale (~500 ms): claim 75% of the donor so the next opening
+        // gets ~375 ms of soft carry-in (speed ceiling), not a half-word pop.
+        val start = TajweedPacing.waslPrefixStart(500)
+        assertEquals(0.25f, start, 1e-3f)
+        assertTrue(
+            "short donor bloom window should be at least ~350 ms",
+            (1f - start) * 500f >= 350f,
+        )
+        val connection = requireNotNull(
+            TajweedPacing.connection("مِن", "رَّبِّكُم"),
+        )
+        assertEquals(0f, connection.at(start, start), 0f)
+        // smoothstep(0.5) = 0.5 at the window midpoint.
+        val mid = start + 0.5f * (1f - start)
+        assertEquals(0.5f, connection.at(mid, start), 1e-3f)
+        assertEquals(1f, connection.at(1f, start), 0f)
+        // Soft onset: a little past the start is still well below linear.
+        val early = start + 0.2f * (1f - start)
+        assertTrue(
+            "smoothstep should lag a linear ramp at the toe",
+            connection.at(early, start) < 0.2f * 0.85f,
+        )
+    }
+
+    @Test
+    fun `wasl prefix speed ceiling targets about 480ms when the donor allows`() {
+        // 800 ms donor: 480/800 = 0.60 window → start 0.40.
+        val start = TajweedPacing.waslPrefixStart(800)
+        assertEquals(0.40f, start, 1e-3f)
+        assertEquals(
+            TajweedPacing.DEFAULT_WASL_PREFIX_MS,
+            (1f - start) * 800f,
+            1f,
+        )
+    }
+
+    @Test
+    fun `wasl prefix start respects a lab minPrefixMs override`() {
+        // Ink Lab "Wasl prefix ms" = 600 on an 800 ms donor → 0.75 window.
+        assertEquals(0.25f, TajweedPacing.waslPrefixStart(800, minPrefixMs = 600f), 1e-3f)
+        // Very high ceiling still clamped by MAX_WASL_PREFIX_WINDOW (0.75).
+        assertEquals(0.25f, TajweedPacing.waslPrefixStart(500, minPrefixMs = 900f), 1e-3f)
+    }
+
+    @Test
+    fun `long wasl donor keeps a late junction`() {
+        // 5 s: 480/5000 < min window 0.18 → still 82% junction.
+        assertEquals(0.82f, TajweedPacing.waslPrefixStart(5000), 1e-3f)
+        // 2 s: 480/2000 = 0.24 → slightly earlier than the bare 18% tail.
+        assertEquals(0.76f, TajweedPacing.waslPrefixStart(2000), 1e-3f)
     }
 
     @Test

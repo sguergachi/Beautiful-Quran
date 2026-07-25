@@ -209,6 +209,19 @@ ReaderFocusController ── holds the LazyListState; the sole writer to it
   that chrome. A repeat-aware timing backtrack to word one is a fresh verse
   focus event even though its media item and ayah key did not change, restoring
   the adaptive top anchor before the reciter walks the verse again.
+- Opening or foregrounding a held session runs one exact word-position restore,
+  even while paused. If the ayah is wholly offscreen the controller first
+  materializes it; if a tall ayah is already attached it skips the verse-top
+  anchor and moves directly to the held word. The request is consumed after a
+  real measurement, so normal paused state and end-of-playlist resets cannot
+  keep driving scroll. Display reflow issues the same restore after its
+  verse-level pin settles. The interaction arbiter still makes all of these
+  yield to hand scrolling, search, annotation, pending jumps, and the Ink Lab
+  focus freeze.
+- Re-enabling follow (Play or return-to-ayah) while the current tall ayah still
+  has live geometry skips the verse-top anchor entirely and restores the active
+  word directly. The verse-first path remains only for wholly offscreen targets
+  that must be materialized before their word can be measured.
 - Annotation editing uses the same secondary-focus path: the field reports live
   viewport bounds as it grows and as the IME rises,
   `keyboardOverlapPx` removes any bottom chrome already outside the list before

@@ -50,12 +50,42 @@ object TajweedPacing {
      * before the timing handoff reaches the next word.
      *
      * [prefixFraction] is the opening letter's approximate share of the
-     * shaped word. [at] blooms that prefix over the absorbed nūn's tail.
+     * shaped word. [at] blooms that prefix over the absorbed nūn's tail,
+     * smoothstepped so the letter eases across the junction instead of
+     * popping on the last frames of a short donor (مِن، مَن).
      */
     data class Connection(val prefixFraction: Float) {
-        /** Opening-glyph bloom progress at normalized prior-word time [t]. */
-        fun at(t: Float): Float =
-            ((t - WASL_EXIT_FRACTION) / (1f - WASL_EXIT_FRACTION)).coerceIn(0f, 1f)
+        /**
+         * Opening-glyph bloom progress at normalized prior-word time [t].
+         *
+         * [prefixStart] is where the rise begins (see [waslPrefixStart]).
+         * Default matches a long-word late junction ([WASL_EXIT_FRACTION]).
+         */
+        fun at(t: Float, prefixStart: Float = WASL_EXIT_FRACTION): Float {
+            val span = (1f - prefixStart).coerceAtLeast(1e-4f)
+            val u = ((t - prefixStart) / span).coerceIn(0f, 1f)
+            // smoothstep: zero slope at both ends — soft carry-in, soft settle.
+            return u * u * (3f - 2f * u)
+        }
+    }
+
+    /**
+     * Normalized prior-word time when the next opening letter begins to bloom.
+     *
+     * Enforces a **speed ceiling** on the wasl carry-in: the bloom window aims
+     * for at least [minPrefixMs] of wall-clock (and may claim up to
+     * [MAX_WASL_PREFIX_WINDOW] of a short donor) so pairs like مَن يَشْرِى do
+     * not race the first glyph. Longer words stay near the absorbed-nūn tail
+     * ([WASL_EXIT_FRACTION]). [minPrefixMs] is lab-tunable
+     * (`InkEngine.Tuning.waslPrefixMs`); default matches [DEFAULT_WASL_PREFIX_MS].
+     */
+    fun waslPrefixStart(
+        sweepMs: Int,
+        minPrefixMs: Float = DEFAULT_WASL_PREFIX_MS,
+    ): Float {
+        val window = (minPrefixMs.coerceAtLeast(1f) / sweepMs.coerceAtLeast(1).toFloat())
+            .coerceIn(MIN_WASL_PREFIX_WINDOW, MAX_WASL_PREFIX_WINDOW)
+        return 1f - window
     }
 
     /**
@@ -487,6 +517,19 @@ object TajweedPacing {
     private const val ABSORBED_NOON = 0.25f
     /** Fraction of the spoken span used to finish letters when wasl-exiting. */
     private const val WASL_EXIT_FRACTION = 0.82f
+    /** Floor on the wasl prefix bloom window (matches 1 − [WASL_EXIT_FRACTION]). */
+    private const val MIN_WASL_PREFIX_WINDOW = 1f - WASL_EXIT_FRACTION
+    /**
+     * Max share of a short donor spent on the next-letter bloom. Must be high
+     * enough that [DEFAULT_WASL_PREFIX_MS] is reachable on مَن/مِن-scale holds
+     * (~500 ms); at 0.50 the ceiling never applied (only ~250 ms of fade).
+     */
+    private const val MAX_WASL_PREFIX_WINDOW = 0.75f
+    /**
+     * Shipped speed ceiling (ms) for the next-letter wasl bloom — also the
+     * default for [InkEngine.Tuning.waslPrefixMs] / Ink Lab.
+     */
+    const val DEFAULT_WASL_PREFIX_MS = 480f
 
     private const val ALEF_WASLA = 'ٱ'
     private const val ALEF = 'ا'

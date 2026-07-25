@@ -130,6 +130,12 @@ class ReaderFocusController internal constructor(
         return visible.size > usable
     }
 
+    /** Whether [ayahNumber] currently has live geometry in the list viewport. */
+    fun isLaidOut(ayahNumber: Int): Boolean {
+        val itemIndex = itemIndexOfAyah[ayahNumber] ?: return false
+        return listState.layoutInfo.visibleItemsInfo.any { it.index == itemIndex }
+    }
+
     /**
      * Secondary lyric constraint: scroll so the active word sits inside the
      * comfortable reading band. Serialized with [focus] so verse glides and
@@ -142,12 +148,14 @@ class ReaderFocusController internal constructor(
      *
      * Pass [bandTopMarginPx] = 0 for bottom-only correction — lifts words clear
      * of the player-bar fold without fighting the verse-level top anchor.
+     * Returns true once real word bounds were measured, even if no scroll was
+     * needed; one-shot restore callers use that to consume their request safely.
      */
     suspend fun keepWordInView(
         bandTopMarginPx: Float,
         bandBottomMarginPx: Float,
         measureInViewport: () -> Pair<Float, Float>?,
-    ) {
+    ): Boolean =
         keepBoundsInView(measureInViewport) { bounds, viewportHeight ->
             FocusEngine.wordBandDeltaPx(
                 wordTopPx = bounds.first,
@@ -158,7 +166,6 @@ class ReaderFocusController internal constructor(
                 bandBottomMarginPx = bandBottomMarginPx,
             )
         }
-    }
 
     /** Parks the active note field above the keyboard through the same
      * serialized focus path used by verse and word following. */
@@ -181,14 +188,16 @@ class ReaderFocusController internal constructor(
     private suspend fun keepBoundsInView(
         measureInViewport: () -> Pair<Float, Float>?,
         deltaPx: (Pair<Float, Float>, Int) -> Float,
-    ) {
+    ): Boolean =
         focusMutex.withLock {
+            var measured = false
             repeat(2) { pass ->
                 val viewportHeight = listState.layoutInfo.viewportSize.height
-                if (viewportHeight <= 0) return
-                val bounds = measureInViewport() ?: return
+                if (viewportHeight <= 0) return@withLock measured
+                val bounds = measureInViewport() ?: return@withLock measured
+                measured = true
                 val delta = deltaPx(bounds, viewportHeight)
-                if (abs(delta) < 0.5f) return
+                if (abs(delta) < 0.5f) return@withLock true
                 listState.animateScrollBy(
                     delta,
                     animationSpec = tween(
@@ -197,8 +206,8 @@ class ReaderFocusController internal constructor(
                     ),
                 )
             }
+            measured
         }
-    }
 
     /**
      * Bring [ayahNumber] into focus — the one entry point for every programmatic

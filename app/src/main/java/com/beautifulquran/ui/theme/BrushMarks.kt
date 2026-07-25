@@ -2,16 +2,24 @@ package com.beautifulquran.ui.theme
 
 import android.view.HapticFeedbackConstants
 import android.view.View
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -30,9 +38,12 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.boundsInParent
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import com.beautifulquran.data.BrushCircleStyle
 import kotlin.math.PI
@@ -355,8 +366,20 @@ fun <T> InkCircledChoiceRow(
 
 /**
  * The same vocabulary stacked vertically, for choices whose labels are too long
- * to sit side by side (the reader's repeat sheet). Each line fills the width, so
- * the stroke loops the whole line.
+ * to sit side by side (the reader's repeat sheet).
+ *
+ * Every line is set to the width of the **longest label**, not to the width of
+ * the sheet: the circle's radius comes from each child's measured bounds, so a
+ * line stretched to full width gets looped by a 10:1 lozenge instead of a
+ * hand's loop. One shared width also keeps every mark in the stack identical,
+ * at a ratio close to the one [InkCircledChoiceRow] gets around a single word.
+ * The width is measured from the label text rather than taken from the column's
+ * intrinsics, so that whatever [expanded] puts under a choice — which is free
+ * to be wider — can never change the size of the circle.
+ *
+ * [expanded] is the choice's own detail, revealed directly beneath the line it
+ * belongs to and pushing the rest of the stack down: the question a choice asks
+ * is answered where the choice was made, not at the bottom of the sheet.
  */
 @Composable
 fun <T> InkCircledChoiceColumn(
@@ -368,9 +391,18 @@ fun <T> InkCircledChoiceColumn(
     params: BrushCircleParams = brushCircleParams(BrushCircleStyle.BASELINE),
     paintToken: Int = 0,
     textStyle: TextStyle = MaterialTheme.typography.titleLarge,
+    expanded: @Composable (T) -> Unit = {},
 ) {
     val selectedIndex = entries.indexOfFirst { it == selected }.coerceAtLeast(0)
     val circle = rememberInkBrushCircle(selectedIndex, params, paintToken)
+    val measurer = rememberTextMeasurer()
+    val density = LocalDensity.current
+    val lineWidth = remember(entries, textStyle, measurer, density) {
+        val widest = entries.maxOfOrNull { measurer.measure(label(it), textStyle).size.width } ?: 0
+        // A hair of slack: the measured width is whole pixels, and a label that
+        // lands one pixel short of its own text wraps to two lines.
+        with(density) { widest.toDp() } + 2.dp
+    }
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -385,12 +417,27 @@ fun <T> InkCircledChoiceColumn(
                 textAlign = TextAlign.Center,
                 onSelect = { onSelect(entry) },
                 modifier = Modifier
-                    .fillMaxWidth()
+                    .width(lineWidth)
                     .inkBrushCircleTarget(circle, index),
             )
+            // Kept in the tree for every entry, not just the chosen one, so the
+            // detail can fold away on the way out as well as unfold on the way in.
+            AnimatedVisibility(
+                visible = entry == selected,
+                enter = expandVertically(ChoiceExpandSpec) + fadeIn(ChoiceExpandFadeSpec),
+                exit = shrinkVertically(ChoiceExpandSpec) + fadeOut(ChoiceExpandFadeSpec),
+            ) {
+                expanded(entry)
+            }
         }
     }
 }
+
+/** Unfolding a choice's detail: paper opening, not a drawer sliding. */
+private val ChoiceExpandSpec = tween<IntSize>(300, easing = FastOutSlowInEasing)
+
+/** The same timing for the fade that rides along with the unfold. */
+private val ChoiceExpandFadeSpec = tween<Float>(300, easing = FastOutSlowInEasing)
 
 /** One choice word: full ink when chosen, faint otherwise, quiet to the touch. */
 @Composable

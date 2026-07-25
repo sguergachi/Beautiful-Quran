@@ -1,0 +1,21 @@
+{
+  "id": "gap-phantom-alafasy-5-59",
+  "label": "Alafasy 5:59 gap phantom 8,9 after HW 11 becomes word 12",
+  "refs": ["issue #570", "PR #571"],
+  "pipeline": "clean_qdc_artifacts",
+  "notes": "Raw qdc has real span-repeat 7,8,9 then after HW 11 stamps early 8,9 and jumps to 13 (word 12 missing). Gap phantom: run_max < HW and next > HW+1 → relabel onto gap. Lab #570 ear-check: one re-say of 7–9, then 12.",
+  "input_positions": [
+    1, 2, 3, 4, 5, 6, 7, 8, 9,
+    7, 8, 9,
+    10, 11,
+    8, 9,
+    13, 14, 15, 16, 17, 18, 19, 20
+  ],
+  "expected_positions": [
+    1, 2, 3, 4, 5, 6, 7, 8, 9,
+    7, 8, 9,
+    10, 11,
+    12,
+    13, 14, 15, 16, 17, 18, 19, 20
+  ]
+}
