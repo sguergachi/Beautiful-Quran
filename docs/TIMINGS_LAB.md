@@ -194,8 +194,15 @@ Free, no backend, no auth beyond the GitHub account:
    fenced ```json``` block. **Copy this ayah patch** / **Copy all patch JSON**
    are the clipboard fallbacks (and cover very large patches that exceed
    URL limits). Prefer one-ayah submits when iterating verse-by-verse.
-2. **Maintainer: fix systematically first, verify with a unit test.** Do not
-   paste every Lab issue straight into `tools/timing_overrides/`.
+2. **Maintainer / agent: fix systematically first, verify with a unit test.**
+   Do **not** paste every Lab issue straight into `tools/timing_overrides/`.
+   Agent checklist (mandatory): [AGENTS.md — Landing Timings Lab / GitHub
+   timing patches](../AGENTS.md#landing-timings-lab--github-timing-patches).
+
+   Before classifying, **diff the Lab positions against raw qdc**
+   (`tools/.cache/qdc_<id>.json`) and against the row **after**
+   `clean_qdc_artifacts` and **after** `timing_repairs` — the shipped DB may
+   already be wrong because a `drop` repair flattened a real re-say (#570).
 
    | Class | Where to fix | Unit test |
    |---|---|---|
@@ -208,8 +215,13 @@ Free, no backend, no auth beyond the GitHub account:
    payload supplies the expected shape; the cleaner must reproduce it. See
    [tools/timing_patch_cases/README.md](../tools/timing_patch_cases/README.md)
    and [tools/timing_overrides/README.md](../tools/timing_overrides/README.md).
+
+   **Anti-pattern:** saving the issue fenced JSON under `timing_overrides/`
+   without classifying. That was the first #570 attempt; #571 fixed the class
+   (gap phantoms + span-protect) and deleted the override.
 3. For an **override** (last resort only): save the JSON block to
-   `tools/timing_overrides/<anything>.json` and run `python3 tools/build_db.py`.
+   `tools/timing_overrides/<anything>.json` with a `notes` field that states
+   why no pipeline rule applies, then run `python3 tools/build_db.py`.
 4. `build_db.py` fetches/normalizes the open-dataset timings as usual, runs
    `clean_qdc_artifacts`, applies `tools/timing_repairs/`, then **applies every
    file in `tools/timing_overrides/` on top**, replacing (or adding) the

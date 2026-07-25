@@ -11,10 +11,16 @@ step named in `pipeline` turns `input_*` into `expected_*`.
 
 **Timing patches are fixed systematically, then locked with a unit test.**
 
-1. **Classify** the defect (forward spike, non-contiguous phantom, false split,
-   boundary misalign, …).
+Agents landing a GitHub `Timings patch` issue must follow the full checklist in
+[AGENTS.md](../../AGENTS.md#landing-timings-lab--github-timing-patches)
+(invariant #8). This directory is where that checklist's unit tests live.
+
+1. **Classify** the defect (forward spike, non-contiguous / gap phantom, false
+   split, repair that flattens a span, boundary misalign, …). Diff Lab expected
+   vs raw qdc vs post-clean vs post-repair — not only vs shipped DB.
 2. **Prefer a pipeline fix** that covers the *class*:
    - structural qdc noise → `clean_qdc_artifacts` in `tools/build_db.py`
+   - drop repair erasing a multi-word re-say → `erases_span_repeat` / span-protect
    - repeat-vs-split / CTC disagreement → `tools/timing_repairs/` generator
 3. **Add a case here** whose `input_*` is the broken shape and `expected_*` is
    the corrected shape (from the Lab patch, ASR/ear, or the intended clean
