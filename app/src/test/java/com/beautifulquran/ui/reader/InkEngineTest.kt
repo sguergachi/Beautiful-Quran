@@ -89,8 +89,68 @@ class InkEngineTest {
 
     @Test
     fun `pending sweep entry masks the completed animatable before reset`() {
+        // Arm always masks — including re-Arm with the same activation keys.
+        assertEquals(
+            0f,
+            displayedSweepProgress(
+                entryAction = SweepEntryAction.Arm,
+                applied = true,
+                progress = 1f,
+            ),
+            0f,
+        )
+        // Keep before the reset effect applied still masks the idle 1f.
+        assertEquals(
+            0f,
+            displayedSweepProgress(
+                entryAction = SweepEntryAction.Keep,
+                applied = false,
+                progress = 1f,
+            ),
+            0f,
+        )
+        // Live wash after apply.
+        assertEquals(
+            0.4f,
+            displayedSweepProgress(
+                entryAction = SweepEntryAction.Keep,
+                applied = true,
+                progress = 0.4f,
+            ),
+            0f,
+        )
+        // Recited residual / clear never mask.
+        assertEquals(
+            1f,
+            displayedSweepProgress(
+                entryAction = SweepEntryAction.Clear,
+                applied = true,
+                progress = 1f,
+            ),
+            0f,
+        )
+        // Legacy bool overload.
         assertEquals(0f, displayedSweepProgress(entryPending = true, progress = 1f), 0f)
         assertEquals(0.4f, displayedSweepProgress(entryPending = false, progress = 0.4f), 0f)
+    }
+
+    @Test
+    fun `re-arm after recited with same activation still masks full ink`() {
+        // Same (active=true, activation=N) keys as the first pass — the old
+        // remember() MutableState stayed false and flashed full → unread.
+        val reentry = sweepEntryAction(
+            wasActive = false,
+            previousActivation = 1L,
+            active = true,
+            activation = 1L,
+            hasSweep = true,
+        )
+        assertEquals(SweepEntryAction.Arm, reentry)
+        assertEquals(
+            0f,
+            displayedSweepProgress(reentry, applied = true, progress = 1f),
+            0f,
+        )
     }
 
     @Test
