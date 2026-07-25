@@ -33,9 +33,9 @@ voice, and the two must never be confusable.
    the translation, on the same inner reading spine. Nothing floats, nothing
    is layered, nothing expands a container. (DESIGN.md, "The sheet".)
 2. **The margin lane is the reader's own ink.** The bookmark ribbon already
-   owns the margin opposite the ayah selector. Notes join that lane rather
-   than claiming the other side, so one edge of the sheet holds everything
-   the reader put there and the other stays navigation.
+   owns the margin opposite the ayah selector. For now, its exposed saved
+   ribbon is also the note's entry gesture, so one edge of the sheet holds
+   everything the reader put there and the other stays navigation.
 3. **Writing happens on the verse, in place.** The note is composed at the
    exact position it will permanently occupy. No editor surface, no separate
    screen, no "save" step.
@@ -44,10 +44,11 @@ voice, and the two must never be confusable.
 
 | State | What is on the page |
 |---|---|
-| Verse has no note | Nothing. The margin lane shows only the ribbon tip. |
-| Verse has a note | A small ruby **ḥāshiya tick** in the margin lane, and the note text below the verse's translation. |
+| Verse is not bookmarked | No note UI, even if writing for that verse remains stored. |
+| Bookmarked verse has no note | Only the exposed ruby ribbon. |
+| Bookmarked verse has a note | The exposed ruby ribbon and the note text below the verse's translation. |
 | Note is long | The text truncates to three lines with a quiet ink ellipsis; tapping the note opens it in place (see "Writing"). |
-| Another ayah is reciting | The tick vanishes with the rest of the chrome; the text recesses to upcoming ink with its verse, exactly like the translation. |
+| Another ayah is reciting | The ribbon vanishes with the rest of the chrome; the text recesses to upcoming ink with its verse, exactly like the translation. |
 
 **Type.** **Cormorant Garamond Italic at weight 500**, 16 sp / 23 sp, a very
 light red at 85 % opacity, on the inner spine, 12 dp/px below the translation.
@@ -70,11 +71,10 @@ hue keeps the reader's own hand distinct from the scripture even at 85 %
 opacity. This is a narrow, recorded exception to Cormorant's display-only rule
 in [DESIGN.md](DESIGN.md) — do not generalise it to body copy.
 
-**The tick.** A short ruby stroke in the margin lane, optically inside the
-ribbon's 44 dp/px target lane but never widening it, sitting below the
-ribbon tip. Ruby because a note is the reader's mark, the same family as the
-bookmark ribbon, and ruby is walled off from gold (ornament) and green
-(action) precisely so "my marks" reads as neither. (DESIGN.md, "Color".)
+**The ribbon.** Tap keeps its existing mark/unmark action. Press and hold on
+an exposed saved ribbon opens the verse's note. The same 44 dp target serves
+both gestures without adding a second margin glyph; a retracted unsaved tip
+does not accept note entry.
 
 **Arrival** *(not yet built)*. A note that has just been written should fade in
 word by word with the lyric fade — the ink literally arriving on the page. A
@@ -83,17 +83,11 @@ fade is for the moment of writing, not for every appearance.
 
 ## Writing a note
 
-**Entry: long-press the gold ayah mark `﴿٧﴾`.** The note belongs to the
-verse, and the ayah mark *is* the verse's identity on the page. The gesture
-is unclaimed: word tap seeks, word long-press opens the [Root
-Viewer](ROOT_VIEWER.md), a margin tap toggles the bookmark. Long-pressing an
-existing note's text opens the same editor on that note.
-
-The mark is not a separate control in any reading mode: it is part of the shaped
-ayah line in Arabic-only and English modes, so the shared `wordTapTarget`
-resolves a long-press against the mark's glyph range **before** falling through
-to the word under the finger (which opens the Root Viewer). In gloss mode the
-mark is its own `ArabicAyahNumberUnit`, which takes the gesture directly.
+**Entry: press and hold the exposed bookmark ribbon.** Notes are currently
+available only on bookmarked verses. A tap still marks or unmarks; the hold
+opens the in-place editor without toggling the bookmark. The gold ayah mark
+`﴿٧﴾` has no note gesture. Tapping an existing note's text opens the same
+editor for revision.
 
 Then, in place:
 
@@ -108,8 +102,8 @@ Then, in place:
 3. Tapping anywhere off the note, opening another verse's note, or leaving
    the sheet **commits**. There is no OK, no Save, no Cancel — paper has none
    of them, and an autosaved note cannot be lost to a mis-tap.
-4. Committing an empty (or whitespace-only) note deletes it; its tick
-   retracts and the line closes.
+4. Committing an empty (or whitespace-only) note deletes it and the line
+   closes; the verse remains bookmarked.
 
 The draft is `rememberSaveable` and carries its own `(surah, ayah)`, so it
 survives rotation and process death and can never commit onto whichever verse
@@ -138,11 +132,12 @@ already owned by the Root Viewer, and keying a note to a word requires a
 manuscript-style reference mark above the line that phone type sizes cannot
 carry legibly. Revisit only with a real reading problem to solve.
 
-A note does **not** imply a bookmark. The ribbon means *return here*; the
-note means *I wrote here*. They are different questions and a reader who
-annotates ten verses in a sitting does not want ten ribbons. The ayah
-selector rail keeps its ruby bars for bookmarks only; noted verses are not
-marked on the rail.
+A note is still keyed to the verse, but its current UI is deliberately scoped
+to bookmarks: only an exposed saved ribbon can open it, and only bookmarked
+verses show note text. Unmarking a verse hides rather than deletes its stored
+writing; marking it again restores that writing. The ayah selector rail needs
+no second note mark because every visible note already has the bookmark's ruby
+bar.
 
 ## Where notes are read back
 
@@ -155,13 +150,8 @@ already the app's answer to "what did I mark".
   40 dp/px spine.
 - Tapping the entry returns to the verse in the reader, as it does today.
 
-*Not yet built:*
-
-- A verse with a note but **no** bookmark does not yet appear in the index, so
-  an unbookmarked note is currently reachable only in the reader. This is the
-  most important remaining gap.
-- Index search does not match note text (only reference, chapter name, and
-  verse text).
+*Not yet built:* Index search does not match note text (only reference,
+chapter name, and verse text).
 
 The header stays title + return only; no counts.
 
@@ -210,8 +200,8 @@ own and never a table inside the bundled asset.
 ## Switching it off
 
 Settings → **Verse annotations** hides every annotation and disables the entry
-gesture, so the ayah mark goes back to being only a mark. Stored writing is
-never deleted — switching it back on brings it all back. It exists because a
+gesture on saved ribbons. Stored writing is never deleted — switching it back
+on brings it back wherever its verse is still bookmarked. It exists because a
 reader who only wants the mushaf should be able to have exactly that, and
 because a future scholar's gloss must be refusable too.
 
@@ -249,11 +239,11 @@ resize handle.
 
 ## Open questions
 
-1. **Entry gesture discoverability.** Long-pressing the ayah mark is unclaimed
-   and semantically right, but nothing on the page advertises it. The
-   alternative is a ruby qalam nib on the focused verse's margin lane —
-   discoverable, but a second permanent affordance in a lane meant to stay
-   quiet. Unresolved; the current build ships the hidden gesture.
+1. **Entry gesture discoverability.** The exposed saved ribbon is a stronger
+   target than the small ayah mark, but the hold itself remains learned
+   behavior. A ruby qalam nib would advertise writing more explicitly at the
+   cost of a second permanent affordance. Unresolved; the current build keeps
+   the lane quiet and scopes note entry to bookmarked verses.
 2. **Long notes on a phone.** In-place composition is the truest reading of the
    metaphor, but a 400-word note pushes the verse off-screen while writing.
    If that proves bad in the hand, the fallback is an ink bleed from the ayah
@@ -273,8 +263,7 @@ resize handle.
   geometry constants with is gone, and an annotated verse is marked by its note
   text rather than a margin glyph.
 - `ui/reader/ReaderComponents.kt` — `verseAnnotationStyle` (the reader's hand, shared
-  with the Bookmarks index), `VerseAnnotationField`, and the `wordTapTarget`
-  mark-before-word long-press resolution.
+  with the Bookmarks index) and `VerseAnnotationField`.
 - `ui/theme/Type.kt` — `ScribeFontFamily`, and why it is not the EB italic.
   The face is OFL (same licence as every other bundled font); the Android cut
   is `res/font/cormorant_garamond_italic.ttf`, mirrored for web in

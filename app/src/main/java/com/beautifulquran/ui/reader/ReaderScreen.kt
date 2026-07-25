@@ -1842,6 +1842,7 @@ fun ReaderScreen(
                             val bookmarkFocused by remember(ayah.number) {
                                 derivedStateOf { scrolledAyah.value == ayah.number }
                             }
+                            val bookmarked = ayah.number in bookmarkedAyahs
                             Box(
                                 Modifier.graphicsLayer {
                                     translationY = verseRevealY
@@ -1885,7 +1886,7 @@ fun ReaderScreen(
                                 onKeepWordInView = onKeepWordInView,
                                 onKeepAnnotationInView = onKeepAnnotationInView,
                                 bookmarkSide = bookmarkSide,
-                                bookmarked = ayah.number in bookmarkedAyahs,
+                                bookmarked = bookmarked,
                                 bookmarkFocused = bookmarkFocused,
                                 bookmarkChromeAlpha = bookmarkChromeAlpha,
                                 // Gather mode and open note editors both own taps /
@@ -1953,15 +1954,17 @@ fun ReaderScreen(
                                     }
                                 },
                                 // Switched off, annotations are simply not part
-                                // of the page: nothing renders and the ayah mark
-                                // goes back to being only a mark. Stored writing
-                                // is untouched and returns when it is switched on.
+                                // of the page. Notes are currently also bound to
+                                // saved ribbons, so unmarking hides (but does not
+                                // delete) the stored writing.
                                 annotationText = when {
-                                    gathering || !settings.annotationsEnabled -> null
+                                    gathering || !bookmarked ||
+                                        !settings.annotationsEnabled -> null
                                     editingAnnotationAyah == ayah.number -> editingAnnotationText
                                     else -> annotationsForSurah.value[ayah.number]
                                 },
                                 isEditingAnnotation = !gathering &&
+                                    bookmarked &&
                                     settings.annotationsEnabled &&
                                     editingAnnotationAyah == ayah.number,
                                 onAnnotationChange = { editingAnnotationText = it },
@@ -1972,7 +1975,9 @@ fun ReaderScreen(
                                 onAnnotationEditDone = {
                                     if (editingAnnotationAyah == ayah.number) commitOpenAnnotation()
                                 },
-                                onAyahMarkLongClick = if (gathering || !settings.annotationsEnabled) {
+                                onEditAnnotation = if (
+                                    gathering || !bookmarked || !settings.annotationsEnabled
+                                ) {
                                     null
                                 } else {
                                     {

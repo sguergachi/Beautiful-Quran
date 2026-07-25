@@ -7,8 +7,6 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.width
@@ -35,6 +33,7 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import com.beautifulquran.data.AyahSelectorSide
 import com.beautifulquran.ui.theme.LocalQuranAccents
+import com.beautifulquran.ui.theme.quietClickable
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -89,6 +88,8 @@ internal fun VerseBookmarkRibbon(
     chromeAlpha: () -> Float,
     interactive: Boolean,
     onToggle: () -> Boolean,
+    /** Optional secondary action for an exposed saved ribbon. */
+    onLongClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
     /** False when the ribbon is navigation or asks before changing state. */
     animateOnTap: Boolean = true,
@@ -176,36 +177,40 @@ internal fun VerseBookmarkRibbon(
     }
 
     val latestOnToggle by rememberUpdatedState(onToggle)
+    val latestOnLongClick by rememberUpdatedState(onLongClick)
     val latestChrome by rememberUpdatedState(chromeAlpha)
-    val interaction = remember { MutableInteractionSource() }
 
     // Tap target is the whole strip: clickable is more reliable than a nested
     // empty pointerInput Box, and the strip already sits in the ayah block's
     // outer margin opposite the selector.
     val tapModifier = if (interactive) {
-        Modifier.clickable(
-            interactionSource = interaction,
-            indication = null,
+        Modifier.quietClickable(
             role = Role.Button,
-            onClick = {
-                if (latestChrome() < 0.1f) return@clickable
-                if (!animateOnTap) {
-                    job?.cancel()
-                    animating = false
-                    scope.launch(start = CoroutineStart.UNDISPATCHED) {
-                        unfurl.snapTo(1f)
-                        sway.snapTo(0f)
-                    }
-                    latestOnToggle()
-                    view.performHapticFeedback(HapticFeedbackConstants.CONTEXT_CLICK)
-                    return@clickable
+            onLongClick = onLongClick?.let {
+                {
+                    if (latestChrome() >= 0.1f) latestOnLongClick?.invoke()
                 }
-                job?.cancel()
-                animating = true
-                val nowMarked = latestOnToggle()
-                view.performHapticFeedback(HapticFeedbackConstants.CONTEXT_CLICK)
-                val h = stripSize.height.toFloat().coerceAtLeast(1f)
-                if (nowMarked) playUnfurl(h) else playRetract(h)
+            },
+            onClick = {
+                if (latestChrome() >= 0.1f) {
+                    if (!animateOnTap) {
+                        job?.cancel()
+                        animating = false
+                        scope.launch(start = CoroutineStart.UNDISPATCHED) {
+                            unfurl.snapTo(1f)
+                            sway.snapTo(0f)
+                        }
+                        latestOnToggle()
+                        view.performHapticFeedback(HapticFeedbackConstants.CONTEXT_CLICK)
+                    } else {
+                        job?.cancel()
+                        animating = true
+                        val nowMarked = latestOnToggle()
+                        view.performHapticFeedback(HapticFeedbackConstants.CONTEXT_CLICK)
+                        val h = stripSize.height.toFloat().coerceAtLeast(1f)
+                        if (nowMarked) playUnfurl(h) else playRetract(h)
+                    }
+                }
             },
         )
     } else {

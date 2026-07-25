@@ -101,8 +101,8 @@ becomes share tools; multi is extension) without taxing bookmark.
 
 1. **Bookmark stays the ruby ribbon** — already paper-perfect; do not force
    Mark through a two-tap menu.
-2. **Note stays long-press `﴿N﴾`** — optional colophon **Write** later; do not
-   require “lift mode” to annotate.
+2. **Note stays a saved-ribbon hold** — optional colophon **Write** later; do
+   not require “lift mode” to annotate or give the gold ayah mark a control.
 3. **Share starts with one verse already selected** — gold wash + ordinal `١`.
 4. **Multi-select is the same mode** — tap more verses; tap again to unselect.
 5. **No dual-purpose control** — never one button for enter *and* commit.
