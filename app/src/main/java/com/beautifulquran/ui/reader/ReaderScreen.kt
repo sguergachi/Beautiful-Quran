@@ -717,6 +717,17 @@ fun ReaderScreen(
         val target = playbackFocusTarget ?: return@LaunchedEffect
         val justEnabled = !followWasEnabled
         followWasEnabled = true
+        if (ReaderInteraction.shouldRestoreWordOnFollowEnable(
+                justEnabledFollow = justEnabled,
+                targetHasLiveTallGeometry = focusController.exceedsViewport(target),
+            )
+        ) {
+            // Play / return-follow inside a long ayah: the active word is the
+            // destination. Never glide backward to line one before going there.
+            lastFollowFocusTarget = target
+            restoreFocusGeneration++
+            return@LaunchedEffect
+        }
         // Same verse still following: word-band keep-in-view owns the camera.
         // Re-homing here fights mid-verse position after pause/play/FF/back.
         if (!ReaderInteraction.shouldHomeOntoPlaybackTarget(
