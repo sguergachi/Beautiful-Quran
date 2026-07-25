@@ -772,7 +772,8 @@ brush/check lab state. Web brush helpers add another 959 lines across
 `brushMark.ts` and `brushCheck.ts`; those helpers are separate and have focused
 tests. *(Android has since matched that separation: the marks moved out of
 `SettingsScreen.kt` into `ui/theme/BrushMarks.kt` — ~500 lines — and are now
-shared with the reader's repeat sheet. Android still lacks the focused tests.)* `OrnamentsLab.tsx` adds a hash-selected
+shared with the reader's repeat sheet, and `BrushMarksTest` now covers the pure
+geometry and locks the shipped knobs to the web suite's values.)* `OrnamentsLab.tsx` adds a hash-selected
 developer-only application surface outside the paper stack.
 
 **Simplify safely.** Keep Base UI wrappers as the only place library APIs and

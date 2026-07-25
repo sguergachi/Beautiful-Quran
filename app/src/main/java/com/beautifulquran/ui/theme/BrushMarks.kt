@@ -502,6 +502,29 @@ fun InkDisc(selected: Boolean) {
 // ------------------------------------------------------------ path primitives
 
 /**
+ * The two edges of a filled brush ribbon: the stroke's centreline offset by
+ * ±half its pressure-varying width, in draw order.
+ *
+ * Kept as plain [Offset] lists rather than a [Path] so the geometry is pure and
+ * JVM-testable — the same split `OrnamentGenerator` uses (pure specs out,
+ * Compose drawing separate). `androidx.compose.ui.graphics.Path` wraps
+ * `android.graphics.Path`, which is stubbed in unit tests; [toPath] is the only
+ * Android-bound step and holds no logic.
+ */
+class BrushOutline internal constructor(
+    val top: List<Offset>,
+    val bottom: List<Offset>,
+) {
+    /** Traces the top edge forward and the bottom edge back, then closes. */
+    fun toPath(): Path = Path().apply {
+        moveTo(top[0].x, top[0].y)
+        for (i in 1 until top.size) lineTo(top[i].x, top[i].y)
+        for (i in bottom.lastIndex downTo 0) lineTo(bottom[i].x, bottom[i].y)
+        close()
+    }
+}
+
+/**
  * Real ink-brush loop around a word: filled calligraphic stroke on an oval
  * centerline. Matches web `brushMarkPath`.
  */
@@ -514,7 +537,21 @@ fun inkBrushCirclePath(
     bowPx: Float,
     progress: Float,
     params: BrushCircleParams,
-): Path {
+): Path = inkBrushCircleOutline(
+    cx, cy, rx, ry, peakHalf, bowPx, progress, params,
+).toPath()
+
+/** [inkBrushCirclePath]'s geometry, before it becomes an Android path. */
+internal fun inkBrushCircleOutline(
+    cx: Float,
+    cy: Float,
+    rx: Float,
+    ry: Float,
+    peakHalf: Float,
+    bowPx: Float,
+    progress: Float,
+    params: BrushCircleParams,
+): BrushOutline {
     // Entry tip starts before the join; exit tip runs past a full turn past it.
     val start = Math.toRadians(
         (params.startDeg - params.startOvershoot).toDouble(),
@@ -554,12 +591,7 @@ fun inkBrushCirclePath(
         tops.add(Offset(x + nx * half, y + ny * half))
         bots.add(Offset(x - nx * half, y - ny * half))
     }
-    return Path().apply {
-        moveTo(tops[0].x, tops[0].y)
-        for (i in 1..endStep) lineTo(tops[i].x, tops[i].y)
-        for (i in endStep downTo 0) lineTo(bots[i].x, bots[i].y)
-        close()
-    }
+    return BrushOutline(top = tops, bottom = bots)
 }
 
 /**
@@ -582,7 +614,7 @@ private fun bowOffset(t: Float, bow: Float, span: Float): Float {
     }
 }
 
-private fun brushPressure(t: Float, params: BrushCircleParams): Float {
+internal fun brushPressure(t: Float, params: BrushCircleParams): Float {
     val attack = (t / params.attack).coerceIn(0f, 1f)
     val releaseSpan = (1f - params.releaseStart).coerceAtLeast(0.04f)
     val release = if (t > params.releaseStart) {
@@ -599,7 +631,14 @@ fun inkBrushCheckPath(
     size: Float,
     progress: Float,
     params: BrushCheckParams,
-): Path {
+): Path = inkBrushCheckOutline(size, progress, params).toPath()
+
+/** [inkBrushCheckPath]'s geometry, before it becomes an Android path. */
+internal fun inkBrushCheckOutline(
+    size: Float,
+    progress: Float,
+    params: BrushCheckParams,
+): BrushOutline {
     val prog = progress.coerceIn(0.02f, 1f)
     val center = listOf(
         Offset(params.p0x, params.p0y),
@@ -665,15 +704,10 @@ fun inkBrushCheckPath(
         bots.add(Offset(x0, y0 + peakHalfPx * 0.3f))
         bots.add(Offset(x1, y1 + peakHalfPx * 0.3f))
     }
-    return Path().apply {
-        moveTo(tops[0].x, tops[0].y)
-        for (i in 1 until tops.size) lineTo(tops[i].x, tops[i].y)
-        for (i in bots.lastIndex downTo 0) lineTo(bots[i].x, bots[i].y)
-        close()
-    }
+    return BrushOutline(top = tops, bottom = bots)
 }
 
-private fun brushCheckPressure(t: Float, params: BrushCheckParams): Float {
+internal fun brushCheckPressure(t: Float, params: BrushCheckParams): Float {
     val attack = (t / params.attack).coerceIn(0f, 1f)
     val releaseSpan = (1f - params.releaseStart).coerceAtLeast(0.04f)
     val release = if (t > params.releaseStart) {

@@ -73,8 +73,20 @@ over `paintMs` rather than appearing.
 `BrushCircleParams` / `BrushCheckParams` carry the knobs. Callers that don't care
 get the shipped baseline by default; only Settings → Developer's brush lab passes
 its own, and `SHIPPED_BRUSH_REVISION` / `SHIPPED_CHECK_REVISION` force the lab to
-reseed when a baseline changes. Keep both in lockstep with web `brushMark.ts` /
-`brushCheck.ts`.
+reseed when a baseline changes.
+
+**The two platforms are locked to each other by test, not by good intentions.**
+`BrushMarksTest` pins all 16 circle knobs, all 15 check knobs and both shipped
+revisions to the exact values `web/src/ui/kit/__tests__/brushMark.test.ts` and
+`brushCheck.test.ts` pin. Changing a baseline value fails on both sides until
+both are changed — which is the point. Retuning is a two-file job, always.
+
+The geometry is split the way `OrnamentGenerator` splits its ornaments: the pure
+half (`inkBrushCircleOutline` / `inkBrushCheckOutline`) returns a `BrushOutline`
+— the two edges of the filled ribbon as plain `Offset` lists — and `toPath()` is
+the only Android-bound step, holding no logic. That is what makes the marks
+JVM-testable at all: `androidx.compose.ui.graphics.Path` wraps
+`android.graphics.Path`, which is stubbed in unit tests.
 
 Because the mark is derived from each child's own measured bounds rather than the
 container's, the same code loops a word in a `Row` and a full line in a `Column`.
