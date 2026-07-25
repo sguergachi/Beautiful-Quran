@@ -492,16 +492,27 @@ private fun rememberLetterSweep(
         activation = activation,
         hasSweep = sweepMs != null,
     )
-    if (entryAction == SweepEntryAction.Arm) {
-        lifecycle.applied = false
-        lifecycle.durationMs = sweepMs ?: 1
-        lifecycle.pacing = pacing
-        lifecycle.feather = if (pacing != null) InkEngine.pacedFeather() else null
-    }
+    // Read during composition, applied after it. The entry snapshot has to be
+    // taken from *this* composition's inputs, but writing it here would mutate
+    // remembered state mid-composition — a composition Compose is free to
+    // discard or re-run, which would leave `applied` false with no effect
+    // coming to clear it. So compute now, commit in the SideEffect below.
+    val armDurationMs = sweepMs ?: 1
+    val armFeather = if (pacing != null) InkEngine.pacedFeather() else null
+    // The display mask, by contrast, *must* be resolved during composition —
+    // that is the whole point: the draw phase reads it before any effect runs.
+    // A `remember` calculation is the sanctioned place to do that.
     val entryPending = remember(active, activation) {
         mutableStateOf(entryAction == SweepEntryAction.Arm)
     }
     SideEffect {
+        if (entryAction == SweepEntryAction.Arm) {
+            lifecycle.applied = false
+            lifecycle.durationMs = armDurationMs
+            lifecycle.pacing = pacing
+            lifecycle.feather = armFeather
+        }
+        // Last, so the Arm test above still sees the previous entry.
         lifecycle.active = active
         lifecycle.activation = activation
     }
@@ -509,16 +520,22 @@ private fun rememberLetterSweep(
     // seek (activation bump) and reacts when the leave target changes.
     LaunchedEffect(active, finishResidual, activation) {
         if (active && sweepMs != null) {
-            lockedMs.value = lifecycle.durationMs
-            lockedPacing.value = lifecycle.pacing
-            lockedFeather.value = lifecycle.feather
+            // This launch belongs to the composition that armed (only an Arm
+            // can bring the keys to active-with-a-sweep), so its own captured
+            // values *are* the entry snapshot. Reading them instead of the
+            // tracker keeps the common path independent of whether the
+            // SideEffect above has run yet.
+            lockedMs.value = sweepMs
+            lockedPacing.value = pacing
+            lockedFeather.value = armFeather
             sweep.snapTo(0f)
             lifecycle.applied = true
             entryPending.value = false
-            val easing =
-                if (lifecycle.pacing != null) LinearEasing else InkEngine.sweepEasing
-            sweep.animateTo(1f, tween(lifecycle.durationMs, easing = easing))
+            val easing = if (pacing != null) LinearEasing else InkEngine.sweepEasing
+            sweep.animateTo(1f, tween(sweepMs, easing = easing))
         } else if (finishResidual) {
+            // A residual belongs to an *earlier* frame's entry, so here the
+            // tracker is the only source — see the SideEffect above.
             // If Active ended before its reset coroutine ran, begin the
             // residual at zero instead of exposing the stale completed value.
             if (!lifecycle.applied) {
@@ -535,6 +552,13 @@ private fun rememberLetterSweep(
                     if (lockedPacing.value != null) LinearEasing else InkEngine.sweepEasing
                 sweep.animateTo(1f, tween(remain, easing = easing))
             }
+            // Released only now, never before the residual finishes: the curve
+            // is what maps the Animatable's linear clock to wash position, so
+            // dropping it mid-wash would jump the edge. At progress 1 the
+            // mapping is the identity, so this is invisible — and it stops a
+            // completed word from pinning its TajweedPacing.Curve until the
+            // next arm.
+            lockedPacing.value = null
             lockedFeather.value = null
         } else {
             // Upcoming / Plain / idle: abandon residual so dim ink applies now.
@@ -589,21 +613,6 @@ private fun rememberWaslProgress(
     return remember(identity, activation) {
         derivedStateOf { entryConnection?.at(clock.value) ?: 0f }
     }
-}
-
-/**
- * Compose wrapper over [InkEngine.startRevealed] (the rule and its rationale
- * live there): tracks the word's previous state and captures the decision the
- * moment the word activates, so it stays stable for the whole time the word
- * is lit and is recomputed fresh on the next activation.
- */
-@Composable
-private fun rememberStartRevealed(state: InkEngine.State): Boolean {
-    val active = state == InkEngine.State.Active
-    val previousState = remember { mutableStateOf(state) }
-    val startRevealed = InkEngine.startRevealed(previous = previousState.value, current = state)
-    SideEffect { previousState.value = state }
-    return remember(active) { startRevealed }
 }
 
 /** Comfortable reading band the active word is kept inside while follow mode
@@ -783,10 +792,8 @@ private fun rememberWordHighlight(
     activation: Long = 0L,
 ): WordHighlight {
     val isActive = ink.state == InkEngine.State.Active
-    val startRevealed = rememberStartRevealed(ink.state)
     val glintInk = LocalQuranAccents.current.glintInk
-    val glinting = glintInk != null &&
-        InkEngine.glinting(ink.state, ink.repeat, startRevealed)
+    val glinting = glintInk != null && InkEngine.glinting(ink.state)
     val glintIdentity = rememberGlintIdentity(glinting, ink.repeat)
     // Freeze tajweed curve for this activation so an Ink Lab toggle mid-word
     // cannot remap the wash (or swap feather) and look like a reset.
@@ -1179,8 +1186,7 @@ private data class Glint(
 private fun rememberGlints(inks: List<InkEngine.Word>): List<Glint> {
     val glintInk = LocalQuranAccents.current.glintInk
     return inks.map { ink ->
-        val glinting = glintInk != null &&
-            InkEngine.glinting(ink.state, ink.repeat, rememberStartRevealed(ink.state))
+        val glinting = glintInk != null && InkEngine.glinting(ink.state)
         val identity = rememberGlintIdentity(glinting, ink.repeat)
         Glint(
             alpha = rememberGlintAlpha(glinting),

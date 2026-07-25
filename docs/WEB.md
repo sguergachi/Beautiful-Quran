@@ -169,7 +169,11 @@ updates when a verse is actually recited — not on open, scroll, or rail jump.
 Port exactly:
 
 - `State` { Plain, Upcoming, Active, Recited }
-- `word` / `wordState` / `inRepeatChain` / `sweepMs` / `startRevealed` / `prefaceState`
+- `word` / `wordState` / `inRepeatChain` / `sweepMs` / `prefaceState`
+- `startRevealed` is **web-only now**: it was a constant `false` on both sides and
+  has been deleted from Android's `InkEngine` (its gate collapsed to
+  `glinting(state) = state == Active`). The web copy is harmless dead weight —
+  fold it away next time `WordUnit.tsx` is touched. Behaviour is identical.
 - `Tuning` defaults (upcoming alpha 0.22, ink/mark/recess fade 400 ms, sweep clamps, feather 1.6, easing CPs)
 
 Acceptance: `InkEngineTest` parity. Optional Ink Lab later (session-only

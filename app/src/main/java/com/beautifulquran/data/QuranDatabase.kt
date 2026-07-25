@@ -27,7 +27,13 @@ class QuranDatabase(private val context: Context) {
             context.assets.open("quran.db").use { input ->
                 tmp.outputStream().use { output -> input.copyTo(output) }
             }
-            tmp.renameTo(file)
+            // Fail on the rename rather than on the open: returning a path that
+            // does not exist surfaces as an opaque SQLite error two frames
+            // later. `lazy` does not cache a failed init, so a retry is still
+            // possible — but only if the cause is legible.
+            check(tmp.renameTo(file)) {
+                "Could not install $DB_FILE_NAME from assets (rename failed)"
+            }
             // Clean up databases extracted by older app versions.
             file.parentFile
                 ?.listFiles { f -> f.name.startsWith("quran-v") && f.name != DB_FILE_NAME }

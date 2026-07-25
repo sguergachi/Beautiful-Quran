@@ -4,7 +4,7 @@ import androidx.media3.common.Player
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-class RepeatDialogTest {
+class RepeatSheetTest {
 
     @Test
     fun `retains explicit range choice when range starts at current ayah`() {

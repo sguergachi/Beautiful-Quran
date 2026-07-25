@@ -66,6 +66,15 @@ class OutputLatencyTest {
     }
 
     @Test
+    fun `word lead does not move the heard clock used by non-word surfaces`() {
+        assertEquals(820L, OutputLatency.heardMs(1_000L, latencyMs = 180L))
+        assertEquals(
+            2_020L,
+            OutputLatency.highlightMs(1_000L, latencyMs = 180L, leadMs = 1_200L),
+        )
+    }
+
+    @Test
     fun `preset values are the documented table`() {
         assertEquals(0L, OutputLatency.LOCAL_MS)
         assertEquals(180L, OutputLatency.A2DP_MS)

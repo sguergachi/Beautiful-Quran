@@ -101,58 +101,41 @@ For our product language:
 
 ## Current Status
 
-The bundled font is `KFGQPC HAFS Uthmanic Script`, and the connected branch
-uses `ayah.text` from the database, not a string rebuilt from `ayah.words`.
-That confirms the current renderer is using the expected Unicode Hafs font
-path.
+**The QCF Mushaf renderer was built and then removed. Everything below the
+"Recommended Direction" heading is a plan or a rejected design, not a
+description of the app.** Verified against the tree 2026-07-24.
 
-However, this path still does not produce the desired Mushaf-like connected
-Quran appearance in Arabic-only mode. A short-term layered clipping experiment
-was tried and rejected: it preserved one full ayah text run internally, but the
-visual motion was worse than the previous fade and still did not satisfy the
-connected-script requirement.
+What actually ships in Arabic-only mode:
 
-The app now has an initial QCF/QPC V2 implementation path:
+- One bundled Arabic face: `KFGQPC HAFS Uthmanic Script`
+  (`res/font/hafs_uthmanic.ttf`, `HafsFontFamily` in `ui/theme/Type.kt`). No QCF
+  page fonts are bundled.
+- `ResponsiveHafsAyah` (`ui/reader/ReaderComponents.kt`) builds **one
+  `AnnotatedString` per ayah** from `ayah.words[].arabic`, with one contiguous
+  colour span per word — per-glyph spans break Uthmanic joining (#133).
+- Highlight is the **soft directional ink wash**, not colour animation:
+  `Modifier.shapedWordBloom` paints draw-phase paper covers and washes over the
+  already-shaped run (`UpcomingDim` / `InkReveal` / `ColorReveal`). Glyphs stay
+  full-opacity ink under a paper cover; see AGENTS.md invariant 7 and
+  docs/INK_ENGINE.md.
 
-- `tools/build_db.py` imports public precomputed Mushaf page JSON from
-  `zonetecde/mushaf-layout`.
-- The `words` table stores `qcf_v2`, `qcf_page`, `qcf_line`, and
-  `qcf_span_end`.
-- The alignment step supports many-to-many differences between canonical timing
-  words and QCF visual words.
-- Some canonical timing words intentionally have blank `qcf_v2` because the
-  previous QCF visual glyph spans them through `qcf_span_end`. These are not
-  missing rendered words; they are connected/combined Mushaf glyph cases.
-- Arabic-only no-gloss mode renders QCF V2 glyph tokens using bundled QCF page
-  fonts fetched by `scripts/fetch_qcf_v2_fonts.sh`.
-- The active/recited/upcoming states use opaque color animation only.
-- The reader preloads all QCF page fonts needed for the current surah before
-  mounting Arabic-only no-gloss content. This prevents the visible Hafs-to-QCF
-  font swap that caused sudden text rearrangement while scrolling.
-- QCF glyph words no longer render Hafs fallback text. They render only after
-  the matching QCF page font is cached.
-- Arabic-only no-gloss mode does not render one `Text` composable per word.
-  It renders one QCF `AnnotatedString` text run per Mushaf line, with one span
-  per timed visual word. This keeps Quran pause/stop signs inside the same QCF
-  font run while still allowing word-by-word fade.
-- In QCF mode, the active word must still animate from upcoming ink to full ink
-  over the current timing segment. A single-text-run implementation may use an
-  animated opaque color span instead of a per-letter offscreen mask to avoid
-  glyph clipping/artifacts, but it may not become a static active-word color.
-- Arabic-only QCF mode uses one font size derived from the settings font slider
-  and applies it to every ayah and Mushaf line. Long QCF line runs wrap between
-  words when needed instead of shrinking to fit, so the text stays a consistent
-  Mushaf-like size while avoiding the clipping failure where long connected
-  lines can appear to lose words at the edges.
-- Waqf/pause marks are rendered explicitly from the canonical Unicode Arabic
-  word using the Hafs font. The corresponding trailing QCF private-use pause
-  glyph is stripped from the QCF token first, so the connected Mushaf word stays
-  QCF while Quran reading-rule signs remain visible.
+What remains of the QCF work:
 
-Remaining validation:
+- **Data only.** `tools/build_db.py` still imports Mushaf page JSON from
+  `zonetecde/mushaf-layout`, and the `words` table still carries `qcf_v2`,
+  `qcf_page`, `qcf_line`, `qcf_span_end`. `QuranRepository.surahContent` still
+  selects them into `Word`. **No UI reads any of those four fields** — they are
+  dormant columns kept so the renderer could be revived without a data rebuild.
+- `scripts/fetch_qcf_v2_fonts.sh` still exists but nothing depends on it, and
+  the fonts it fetches are deliberately not committed.
+- Removal history: `430da8dc` / #97 "Remove QCF Mushaf renderer and unbundle
+  page fonts", then `3ed33b68` / #98 "Remove ArabicRenderMode toggle, always use
+  ResponsiveHafs". The rejection reason is unchanged from the notes below — the
+  glyph-span approach fought the ink wash and the font swap rearranged text
+  mid-scroll.
 
-- Visual screenshots on device/emulator.
-- Licensing/provenance review before release distribution.
+Why the plan is kept: the connected-script goal was never achieved, only
+deferred. If it is revisited, the data pipeline half is already done.
 
 ## Recommended Direction
 

@@ -13,8 +13,28 @@ const val WORD_SEARCH_MIN_QUERY_LENGTH = 2
 const val WORD_SEARCH_PREVIEW_LIMIT = 3
 
 /**
+ * The ayah- and surah-level text every word of one ayah shares.
+ *
+ * Held **once per ayah** and referenced by each word's [WordSearchIndexEntry].
+ * The index covers 77,429 word rows across only 6,236 ayahs, so storing these
+ * four strings per *word* — which is what `Cursor.getString()` hands back, a
+ * fresh instance per row — duplicated ~31 M characters and retained tens of
+ * megabytes for the life of the process. One instance per ayah cuts that to
+ * ~2.3 M characters.
+ */
+data class WordSearchAyahContext(
+    val ayahText: String,
+    val ayahTranslation: String,
+    val surahNameTransliteration: String,
+    val surahNameArabic: String,
+)
+
+/**
  * Lightweight word row used to build (and unit-test) Quran-wide search
  * without needing the Android SQLite wrapper.
+ *
+ * Per-word strings are stored inline; everything ayah-wide lives behind
+ * [context] so it is not copied 12× per verse.
  */
 data class WordSearchIndexEntry(
     val surahId: Int,
@@ -26,11 +46,14 @@ data class WordSearchIndexEntry(
     val translationLower: String,
     val transliteration: String,
     val transliterationLower: String,
-    val ayahText: String,
-    val ayahTranslation: String,
-    val surahNameTransliteration: String,
-    val surahNameArabic: String,
-)
+    /** Shared with every other word of this ayah — see [WordSearchAyahContext]. */
+    val context: WordSearchAyahContext,
+) {
+    val ayahText: String get() = context.ayahText
+    val ayahTranslation: String get() = context.ayahTranslation
+    val surahNameTransliteration: String get() = context.surahNameTransliteration
+    val surahNameArabic: String get() = context.surahNameArabic
+}
 
 fun WordSearchIndexEntry.toHit(): WordSearchHit =
     WordSearchHit(

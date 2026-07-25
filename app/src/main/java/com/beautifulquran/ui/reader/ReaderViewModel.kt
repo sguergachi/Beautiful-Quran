@@ -233,22 +233,28 @@ class ReaderViewModel(
      */
     private var forcedHighlight: Pair<Int, Long>? = null
 
+    /** Ink Lab → Highlight can override route detection with an absolute lag. */
+    private fun outputLatencyMs(): Long =
+        InkEngine.outputLatencyOverrideMs?.toLong() ?: outputLatency.latencyMs.value
+
+    /** Media position at the listener's ear, before any word-only ink lead. */
+    private fun heardPositionMs(): Long =
+        OutputLatency.heardMs(player.positionMs, outputLatencyMs())
+
     /**
-     * Media playhead adjusted for output lag and optional highlight lead so
-     * ink tracks the ear (Bluetooth) and can run ahead of segment times
-     * (Ink Lab → Highlight lead). Forced word seeks stay on the media
-     * timeline so a tap lights the word that was just sought.
+     * The heard position plus the word-only Ink Lab lead. A route or lab change
+     * steps query time, so arm [HighlightClock] to take it rather than hold it
+     * as jitter.
+     *
+     * Forced word seeks stay on the media timeline so a tap lights the word
+     * that was just sought.
      */
     private fun highlightPositionMs(forcedMediaMs: Long?): Long {
-        // Ink Lab → Highlight can override route detection with an absolute lag.
-        val latencyMs = InkEngine.outputLatencyOverrideMs?.toLong()
-            ?: outputLatency.latencyMs.value
+        val latencyMs = outputLatencyMs()
         val leadMs = InkEngine.highlightLeadMs.toLong().coerceAtLeast(0L)
         if (latencyMs != lastOutputLatencyMs || leadMs != lastHighlightLeadMs) {
             lastOutputLatencyMs = latencyMs
             lastHighlightLeadMs = leadMs
-            // Route / lab jump in query time; accept it as a real step so
-            // HighlightClock does not hold it as jitter.
             highlightClock.acceptNextSample()
         }
         if (forcedMediaMs != null) return forcedMediaMs
@@ -331,7 +337,9 @@ class ReaderViewModel(
             timed != null -> timed.last().endMs
             else -> 0L
         }
-        InkEngine.prefaceWashProgress(highlightPositionMs(forcedMediaMs = null), endMs)
+        // The pure ear clock: this consumer must not arm the ink clock's
+        // "accept next sample" latch on the ink poll's behalf.
+        InkEngine.prefaceWashProgress(heardPositionMs(), endMs)
     }
 
     /** Advances the lit ayah to the next one during the final
@@ -349,7 +357,12 @@ class ReaderViewModel(
         return FadeLead.ayahWithFadeLead(
             ayah = ayah,
             isPlaying = player.state.value.isPlaying,
-            positionMs = player.positionMs,
+            // The ear clock, not the raw playhead: [endMs] is a segment time,
+            // and the ink it is supposed to lead is latency-corrected. Reading
+            // player.positionMs here made the effective lead fadeLeadMs + route
+            // latency (680 ms instead of 500 ms on A2DP), shifting whenever the
+            // listener changed audio output.
+            positionMs = heardPositionMs(),
             endMs = endMs,
             leadMs = InkEngine.fadeLeadMs.toLong(),
             ayahCount = ayahCount,
@@ -698,7 +711,7 @@ class ReaderViewModel(
     private fun rememberListened(ayah: Int) {
         if (surahId in 1..114 && ayah >= 1) {
             focusedAyah = ayah
-            settings.update { it.copy(lastSurah = surahId, lastAyah = ayah) }
+            settings.updateListeningPosition(surahId, ayah)
         }
     }
 
@@ -832,4 +845,3 @@ internal object FadeLead {
         return if (remaining <= lead) ayah + 1 else ayah
     }
 }
-

@@ -56,6 +56,23 @@ for gloss/English; paper cover for Arabic-only). First-pass pulls the cover back
 on the ink-wash curve; repeat SrcIn-tints the same shaped glyphs orange then
 DstIn-washes. Progress is read only at draw time, so the sweep never reshapes
 the ayah or paints onto neighbouring words.
+
+Because the active word's sweep is read inside that draw scope, the **whole
+bloom list is rebuilt every frame** — one `UpcomingDim` per unread word, up to
+127 of them on 2:282. So each bloom must derive only the geometry it actually
+paints with:
+
+- Paper covers (`UpcomingDim`, `InkReveal`) need per-line word boxes. Those are
+  pure geometry of (layout, range) and change on relayout, not as the wash
+  advances, so they are memoised per `TextLayoutResult` and dropped whole when
+  the layout changes identity.
+- Only `ColorReveal` needs `getPathForRange` — it re-draws and tints the shaped
+  run. Deriving that path for every bloom (which an earlier version did,
+  unconditionally, then discarded for two of the three kinds) cost ~2 selection
+  paths per word per frame for nothing.
+
+Settled inactive ayahs do **not** redraw continuously: their draw-scope state
+reads are static once the 400 ms recess/focus tween finishes.
 Paper-cover bleed is horizontal-only and clipped to each text line's measured
 top/bottom; an unread line therefore cannot fade descenders belonging to the
 read line above it.
@@ -87,9 +104,15 @@ downstream state changes ~2–3×/second during recitation, not 30×. The loop
 runs only while the surah is loaded (`flatMapLatest` + `WhileSubscribed`),
 drops to a gentle 250 ms poll while paused, and stops entirely when the
 reader leaves the screen. Repeat / high-water tables are built once when
-timings load (`HighlightEngine.PreparedTimings`); each poll is a binary
-search + O(1) lookup with **zero allocations** until a word boundary emits
-a new `ActiveWord`.
+timings load (`HighlightEngine.PreparedTimings`); the lookup itself is a
+binary search + O(1) table read that allocates nothing.
+
+The *poll* is not allocation-free, though: every tick builds an
+`ActiveInfo` and an `ActiveWord`, and `distinctUntilChanged` discards them
+only afterwards — two short-lived objects per tick per polling flow, which
+the young generation absorbs. Only the **emission** is boundary-rate
+(~2–3×/second); the sampling and its garbage are 30 Hz. Do not cite this
+loop as allocation-free.
 
 ### 3b. Playlist preload + cache warm
 
@@ -143,6 +166,23 @@ janky", first ask: is this the release APK?
   per-ayah round trips. Timings for one reciter+surah arrive as one query of
   compact JSON rows.
 - Surah and reciter lists are cached in memory after first read.
+
+### 7b. The word-search index is a memory budget, not just a cache
+
+Quran-wide word search builds one entry per **word row: 77,429 of them**, held
+for the life of the process from the first ≥2-character cover-sheet query. At
+that size, per-entry strings are the whole cost, and `Cursor.getString()` hands
+back a *fresh* `String` per row — so binding an ayah's text onto each of its
+words duplicated it ~12×.
+
+Anything ayah-wide therefore lives behind one shared `WordSearchAyahContext` per
+ayah (6,236 instances, ~2.3 M characters) instead of per word (~31 M
+characters). Only genuinely per-word fields — the surface form, its normalized
+and lowercased search keys, the gloss — are stored inline.
+
+**Rule for anything added to this index:** if the value is the same for every
+word of a verse, it belongs in the shared context. A single extra ayah-wide
+`String` field on the entry costs ~12× what it looks like it costs.
 
 ### 8. Streaming audio never blocks rendering
 

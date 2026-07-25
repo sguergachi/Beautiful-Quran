@@ -102,6 +102,16 @@ data class ActiveInfo(
 - **`isRepeat`** — true when the active segment's `position` is `<=` the
   highest position seen *strictly before* it. That means the reciter has
   circled back to a word already recited.
+
+  > **The `<=` is load-bearing — do not tighten it to `<`.** Two real shapes
+  > need the equality: a **single-word** repeat can only appear as two
+  > same-position segments (ear-confirmed Hani 4:163 word 20 is exactly this),
+  > and a multi-word chain's **final** word returns *to* the high-water rather
+  > than below it (in `1,2,3,2,3,4` the second `3` has `position == highWater`),
+  > so `<` would drop the last word of every chain. Alignment artifacts that
+  > would otherwise read as false repeats are removed at build time by duration
+  > and ratio, never by adjacency — see docs/REPEAT_HIGHLIGHTING.md. If a
+  > specific row looks wrong, ear-check it and fix the data, not this predicate.
 - **`highWater`** — the furthest word reached so far. During a repeat the
   active word jumps backward, but everything up to the high-water mark was
   already recited, so the reader keeps it at full ink instead of dimming it

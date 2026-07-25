@@ -112,8 +112,25 @@ class SettingsRepository(context: Context) {
         brushCircleStyle = prefs.enum("brushCircleStyle", BrushCircleStyle.BASELINE),
     )
 
+    /**
+     * Continue Listening only — the one setting written during playback, on
+     * every ayah advance. [update] queues all fifteen keys per call, which is
+     * needless write amplification for two integers that change every few
+     * seconds. No-ops when the position is unchanged.
+     */
+    fun updateListeningPosition(surah: Int, ayah: Int) {
+        val current = _settings.value
+        if (current.lastSurah == surah && current.lastAyah == ayah) return
+        _settings.value = current.copy(lastSurah = surah, lastAyah = ayah)
+        prefs.edit {
+            putInt("lastSurah", surah)
+            putInt("lastAyah", ayah)
+        }
+    }
+
     fun update(transform: (Settings) -> Settings) {
         val next = transform(_settings.value)
+        if (next == _settings.value) return
         _settings.value = next
         prefs.edit {
             putInt("reciterId", next.reciterId)

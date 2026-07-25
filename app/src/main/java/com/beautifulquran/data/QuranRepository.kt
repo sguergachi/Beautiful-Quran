@@ -14,6 +14,7 @@ import com.beautifulquran.data.model.Word
 import com.beautifulquran.data.model.WordMorphology
 import com.beautifulquran.data.model.WordSearchHit
 import com.beautifulquran.domain.WORD_SEARCH_MAX_HITS
+import com.beautifulquran.domain.WordSearchAyahContext
 import com.beautifulquran.domain.WordSearchIndexEntry
 import com.beautifulquran.domain.isWordSearchQuery
 import com.beautifulquran.domain.matchWordSearch
@@ -219,6 +220,12 @@ class QuranRepository(
 
     private fun wordSearchIndex(): List<WordSearchIndexEntry> {
         wordSearchIndex?.let { return it }
+        // One shared context per ayah rather than per word: `Cursor.getString()`
+        // returns a fresh String for every row, so binding the ayah/surah
+        // columns straight onto each of the 77k word entries duplicated ~31 M
+        // characters (see [WordSearchAyahContext]). The map is local — the
+        // contexts stay alive only through the entries that reference them.
+        val contexts = HashMap<Int, WordSearchAyahContext>(7_000)
         val built = queryList(
             """
             SELECT w.surah_id, w.ayah_number, w.position, w.arabic, w.translation_en, w.transliteration,
@@ -231,12 +238,14 @@ class QuranRepository(
             ORDER BY w.surah_id, w.ayah_number, w.position
             """.trimIndent(),
         ) { c ->
+            val surahId = c.getInt(0)
+            val ayahNumber = c.getInt(1)
             val arabic = c.getString(3)
             val translation = c.getString(4)
             val transliteration = c.getString(5)
             WordSearchIndexEntry(
-                surahId = c.getInt(0),
-                ayahNumber = c.getInt(1),
+                surahId = surahId,
+                ayahNumber = ayahNumber,
                 position = c.getInt(2),
                 arabic = arabic,
                 arabicNorm = normalizeArabicForSearch(arabic),
@@ -244,10 +253,14 @@ class QuranRepository(
                 translationLower = translation.lowercase(),
                 transliteration = transliteration,
                 transliterationLower = transliteration.lowercase(),
-                ayahText = c.getString(6),
-                ayahTranslation = c.getString(7),
-                surahNameTransliteration = c.getString(8),
-                surahNameArabic = c.getString(9),
+                context = contexts.getOrPut(surahId * 1_000 + ayahNumber) {
+                    WordSearchAyahContext(
+                        ayahText = c.getString(6),
+                        ayahTranslation = c.getString(7),
+                        surahNameTransliteration = c.getString(8),
+                        surahNameArabic = c.getString(9),
+                    )
+                },
             )
         }
         wordSearchIndex = built

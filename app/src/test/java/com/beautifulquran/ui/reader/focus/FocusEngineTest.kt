@@ -503,6 +503,22 @@ class FocusEngineTest {
     }
 
     @Test
+    fun `a viewport taller than the animated ceiling still plans a jump`() {
+        // The residual floor is one viewport and the ceiling is 48 items, so an
+        // unusually tall viewport (large display, tiny type) used to invert the
+        // coerceIn range and throw IllegalArgumentException mid-jump.
+        val plan = FocusEngine.planJump(
+            fromIndex = 0,
+            toIndex = 250,
+            visibleItemCount = 60,
+            totalItemCount = 300,
+        )
+        assertTrue("residual never exceeds the ceiling", plan.animatedItemSpan <= 48)
+        assertTrue("residual still shows travel", plan.animatedItemSpan > 0)
+        assertEquals(250 - plan.animatedItemSpan, plan.doorstepIndex)
+    }
+
+    @Test
     fun `zero-distance jump is a no-op plan`() {
         val plan = FocusEngine.planJump(
             fromIndex = 10,

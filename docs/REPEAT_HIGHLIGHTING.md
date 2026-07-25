@@ -1,8 +1,42 @@
 # Repeat Highlighting (the orange second fade)
 
 This note describes how the reader highlights words a reciter **repeats**, why
-the default timing data can't express repeats, where the repeat-aware data comes
-from, and the traps we hit making it ship.
+the *original* timing source couldn't express repeats, where the repeat-aware
+data comes from, and the traps we hit making it ship.
+
+> **Most of this document is history, in chronological order.** Sections below
+> narrate a dataset that has since been replaced. Read **Current state** next,
+> before you measure `data/quran.db` against any number further down.
+
+## Current state
+
+Repeat-aware qdc timings are **shipped**. Measured against the committed
+`data/quran.db` (re-verified 2026-07-24):
+
+| Fact | Value |
+|---|---|
+| Timing rows | 43,650 |
+| Genuine backtracks (`position < maxBefore`) | 8,805 |
+| Segments returning to the historical high-water (`position == maxBefore`) | 3,624 |
+| …of those, *consecutive* same-position pairs | 575 |
+| Consecutive pairs in rows with no backtrack at all | 415, across 392 rows |
+
+**`HighlightEngine`'s repeat test is `position <= maxBefore`, and the `<=` is
+load-bearing. Do not "tighten" it to `<`.** Two things depend on it:
+
+1. A genuine **single-word** repeat is two same-position segments — that is the
+   only shape it can have. Ear-confirmed example still live in the DB: Hani
+   **4:163 word 20** (1180 ms + 1510 ms).
+2. A multi-word chain's **final** word returns to the high-water rather than
+   below it (Mishary 2:14 replays 7…11; that closing `11` equals `maxBefore`).
+   Under `<` the chain would drop its last word.
+
+Alignment artifacts that *would* read as false repeats are stripped at **build
+time**, by duration and ratio rather than by adjacency — see
+[Cleanup](#false-repeats-the-qdc-artifacts-we-scrub). Anything surviving into the
+DB is data the pipeline judged real. If you suspect a specific row is wrong,
+ear-check it and fix it in `tools/build_db.py` or a timing override; never with
+an engine-wide heuristic.
 
 ## What it is
 
@@ -18,7 +52,7 @@ back to the standard ink** once the recitation moves past the repeated stretch.
 Nothing dims backward; the orange is a transient overlay that marks "this is a
 repeat," then fades.
 
-## The data problem: quran-align can't encode repeats
+## The data problem: quran-align can't encode repeats *(history)*
 
 Our original timing source is [`cpfair/quran-align`](https://github.com/cpfair/quran-align):
 a **one-pass forced aligner** that maps each Quran word to exactly one time span,
@@ -26,11 +60,19 @@ in order. A repeat would have to appear as a segment whose word index goes
 *backward* (`… 9 10 11 7 8 9 10 11 12 …`). A one-pass aligner structurally cannot
 emit that.
 
-We confirmed this empirically against the shipped DB (37,415 timing rows): a real
-repeat shows a segment `position` dropping below a previously-seen position, and
-there were **zero** such backtracks. (The only 30 non-monotonic rows were a benign
-tokenization artifact — a duplicated final word, time-contiguous, identical across
-all reciters.) So the orange fade was a **data** problem, not a rendering problem.
+We confirmed this empirically **against the DB as it stood in July 2026** (37,415
+rows, quran-align only): a real repeat shows a segment `position` dropping below a
+previously-seen position, and there were **zero** such backtracks. (The only 30
+non-monotonic rows were a benign tokenization artifact — a duplicated final word,
+time-contiguous, identical across all reciters.) So the orange fade was a **data**
+problem, not a rendering problem.
+
+> **Every number in that paragraph is dead.** It describes the pre-qdc dataset,
+> and it is kept only to explain *why* the qdc import happened. The current
+> counts are in [Current state](#current-state); a same-position pair in today's
+> data is a real repeat, not the old artifact. Reading this section as live state
+> and then "fixing" the engine's `<=` deletes ear-confirmed repeats — that has
+> already happened once in review.
 
 ## The data solution: quran.com `qdc` segments
 
@@ -179,34 +221,43 @@ heuristic.
 ## The rendering path
 
 ```
-HighlightEngine.activeInfo(segments, positionMs)
+HighlightEngine.PreparedTimings.activeInfo(positionMs)
     → ActiveWord(wordPosition, durationMs, isRepeat, highWater, repeatStart)   (ReaderViewModel, ~30/s)
-    → AyahBlock: stateFor() uses highWater to hold already-recited words lit;
-                 inRepeatChain(word) = repeatStart..activeWordPosition membership
-    → word units bloom to QuranAccents.repeatInk for chain members, from full ink
+    → InkEngine.wordState(...) uses highWater to hold already-recited words lit;
+      InkEngine.inRepeatChain(position, activeWord) = repeatStart..wordPosition membership
+    → renderers wash chain members in QuranAccents.repeatInk, from full ink
 ```
 
-- `stateFor` / `qcfStateFor` add a `word.position <= highWater → Recited` clause
-  so a backward jump doesn't dim the words ahead of the active one.
-- **Chain membership, not a single word.** `AyahBlock.inRepeatChain(word)` is
-  true when `repeatStart ≤ word.position ≤ activeWordPosition` (for QCF glyphs,
-  when the word's span overlaps that range). Every member holds orange until the
+- `InkEngine.wordState` adds a `position <= activeWord.highWater → Recited`
+  clause so a backward jump doesn't dim the words ahead of the active one.
+- **Chain membership, not a single word.** `InkEngine.inRepeatChain(position,
+  activeWord)` is true when `repeatStart ≤ position ≤ wordPosition`. Every
+  member holds orange until the
   chain releases together, so a repeated *section* stays highlighted as one unit.
   When Active advances to the next member, the previous member only dries its
   glimmer; its completed orange sweep is held and must not restart. Only chain
   entry or a genuine non-zero seek activation can begin that sweep.
 - **The orange blooms from the read (full-ink) colour, not the dim unread one.**
-  A repeated word was already recited, so its members render at **full alpha**
-  (`graphicsLayer { alpha = 1f }`) and only their *colour* animates — they do not
-  re-run the `letterFadeIn` dim→ink sweep that first-pass active words use. Colour
-  is driven by `repeatTint` (non-QCF) or the `animateColorAsState` branch in
-  `QcfGlyphLine` (QCF): **fast bloom-in** (`REPEAT_FADE_IN_MS`, 200 ms) toward
-  `repeatInk`, **slow dissolve** (`REPEAT_FADE_OUT_MS`, 900 ms) back to normal ink
-  when the chain releases. On Nightfall, each newly active repeat word also
+  A repeated word was already recited, so its base ink stays full strength and
+  the orange arrives as its **own directional wash on top** — it does not re-run
+  the base layer's dim→ink sweep, and it is not a colour tween either. Both
+  renderers use the same soft feathered edge as first-pass ink:
+  - Per-word units (gloss / English): `Modifier.repeatInkLayer` =
+    `glyphLayerAlpha { wash.alpha }` over `letterFadeIn(progress = wash.progress,
+    restingAlpha = 0f, feather = Tuning.washFeather)`.
+  - Arabic-only Hafs: `ShapedWordBloom.ColorReveal` — re-draw the shaped run,
+    `BlendMode.SrcIn`-tint it, then `DstIn`-wash it.
+
+  Timing lives in `rememberRepeatWash`: on chain entry the wash sweeps 0→1 over
+  the **active word's own lit lifetime** (`sweepMs`), falling back to
+  `Tuning.repeatSweepMs` (450 ms) for a chain member that is not the active
+  word; on release, progress pins at 1 and alpha dissolves over
+  `Tuning.repeatFadeOutMs` (900 ms). Both are Ink Lab sliders.
+  On Nightfall, each newly active repeat word also
   replays the white-gold glimmer over that orange bloom: the repeat is a new
   event even though the word's base ink was already revealed. This includes
-  same-word repeats and repeat-chain re-entry; `repeat` deliberately overrides
-  the ordinary `startRevealed` suppression. Repeat glimmer normally uses the
+  same-word repeats and repeat-chain re-entry — every Active entry glints, with
+  no replay suppression to override. Repeat glimmer normally uses the
   same dark terracotta as the orange wash. When a single word enters its repeat
   before the first-pass white-gold glimmer has released, that existing glimmer
   instead dries away as the directional terracotta wash replaces it—there is
@@ -237,7 +288,9 @@ read ink together while 12 fades in white as a new word.
   without bumping the suffix means existing installs keep the stale cached copy —
   which is exactly why the orange first "didn't appear." Adding repeats required
   bumping `quran-v5.db` → `quran-v6.db`; the extractor's cleanup step deletes the
-  old file.
+  old file. (That pair is the historical example — the asset has been rebumped
+  many times since. Read the live value from `QuranDatabase.DB_FILE_NAME`, which
+  is `quran-v17.db` as of 2026-07-24, rather than trusting any number here.)
 - **quran.com timestamps are gapless-file offsets**, not per-ayah. Always
   subtract the verse's `timestamp_from`. (The build does this; noted here because
   it's the first thing that looks wrong if you inspect the raw API.)

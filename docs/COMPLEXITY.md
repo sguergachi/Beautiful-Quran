@@ -42,7 +42,9 @@ be safer than a short coordinator with six mutable resources.
 - The largest current source files were inspected by responsibility, not just
   sorted by size. New Android OS integrations and developer visual tooling were
   included explicitly in this pass.
-- `./gradlew testDebugUnitTest` passes: 195 JVM tests.
+- `./gradlew testDebugUnitTest` passes: 195 JVM tests *at the time of this
+  audit*. **333 as of 2026-07-24** — check the current number before quoting it
+  as evidence.
 - `npm test` passes: 42 files and 265 tests. `npm run build` also passes and is
   part of the verification baseline because Vitest alone does not type-check
   the complete web application.
@@ -434,8 +436,8 @@ scroll-frame recomposition.
 ### Reader rendering and ink
 
 **Files:** `ReaderComponents.kt`, `InkEngine.kt`, `Fade.kt`, `PlayerBar.kt`,
-`VerseBookmarkRibbon.kt`, `RepeatDialog.kt`, `InkLabPanel.kt`, basmalah and
-search-flash helpers.
+`VerseBookmarkRibbon.kt`, `RepeatSheet.kt` (was `RepeatDialog.kt` at audit
+time), `InkLabPanel.kt`, basmalah and search-flash helpers.
 
 **Current responsibility.** Three text modes, QCF/Hafs shaping, word hit
 testing, gloss/transliteration/translation, ink state, first-pass/repeat/search
@@ -767,8 +769,11 @@ accessible Base UI-backed paper controls.
 generation is algorithmically large but pure and tested. Root is reasonably
 bounded, but settings is now 740 lines and mirrors much of Android's developer
 brush/check lab state. Web brush helpers add another 959 lines across
-`brushMark.ts` and `brushCheck.ts`; unlike Android, those helpers are at least
-separate and have focused tests. `OrnamentsLab.tsx` adds a hash-selected
+`brushMark.ts` and `brushCheck.ts`; those helpers are separate and have focused
+tests. *(Android has since matched that separation: the marks moved out of
+`SettingsScreen.kt` into `ui/theme/BrushMarks.kt` — ~500 lines — and are now
+shared with the reader's repeat sheet, and `BrushMarksTest` now covers the pure
+geometry and locks the shipped knobs to the web suite's values.)* `OrnamentsLab.tsx` adds a hash-selected
 developer-only application surface outside the paper stack.
 
 **Simplify safely.** Keep Base UI wrappers as the only place library APIs and

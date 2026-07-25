@@ -248,7 +248,7 @@ class PlaybackService : MediaLibraryService() {
         val reciters = app.repository.reciters()
         val reciter = reciters.firstOrNull { it.id == app.settings.settings.value.reciterId }
             ?: reciters.first()
-        app.settings.update { it.copy(lastSurah = surah.id, lastAyah = ayah) }
+        app.settings.updateListeningPosition(surah.id, ayah)
         return recitationQueue(surah, reciter, ayah, startWithBasmalah = ayah == 1)
     }
 
