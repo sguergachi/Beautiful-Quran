@@ -20,7 +20,7 @@ a repair:
 | --- | --- | --- |
 | repeat | repeat | `keep` — qdc timing is trusted |
 | no repeat | no repeat | `keep` |
-| repeat | no repeat | `strip` — qdc alignment artifact |
+| repeat | no repeat | `unsplit` — merge that qdc split, keeping qdc timing |
 | no repeat | repeat | `restore` — qdc flattened a real re-recitation |
 | word missing | word present | `drop` — fill the uncovered position |
 
@@ -82,10 +82,29 @@ re-say), so absence of a CTC repeat is not evidence the repeat is false.
 Therefore a qdc **span-repeat** (two or more consecutive positions re-covered,
 e.g. Hani 4:169 `[1,2,3,1,2,3,…]`) is kept even when CTC does not confirm it.
 
-A lone same-position qdc pair is still judged by CTC — strip it when CTC hears
-one utterance (the false-split class), keep it when CTC confirms (3:21). Only
-`strip` when `qdc has a repeat AND CTC has none AND it is not a span`. Without
-the span clause the generator deleted the correct Hani 4:169 re-recitation.
+A lone same-position qdc pair is still judged by CTC — merge it when CTC hears
+one utterance (the false-split class), keep it when CTC confirms (3:21). Without
+the span protection the generator deleted the correct Hani 4:169 re-recitation.
+
+## Splits are judged PER POSITION (issues #551/#558/#559)
+
+One ayah can hold a real repeat *and* a false split at the same time, so the
+decision cannot be made for the ayah as a whole. Alafasy 5:44 has a genuine
+`[14,15]` span plus a bogus split on word 6 (وَنُورٞ); 5:46 has a genuine repeat
+on 18 plus a bogus split on 17 (وَنُورٞ again — the same word splits at the same
+spot in both ayahs). An earlier whole-ayah rule asked only "does this ayah
+contain any real repeat?", so the real one immunised the false one and both
+shipped.
+
+`unsplit_false_pairs()` therefore walks the same-position pairs one at a time.
+A pair is real when CTC confirms that position, or when it is span-supported
+(a neighbouring re-cover at the consecutive position — CTC collapses spans, so
+they are trusted unconfirmed). Everything else is merged.
+
+The merge is **surgical**: the two spans are folded together inside qdc's own
+timing, and the rest of the ayah is left byte-for-byte alone. This is better
+than the previous behaviour, which re-derived the whole ayah from CTC — a
+rougher clock — just to remove one bad boundary.
 
 ## Re-timing a mis-positioned span (issues #417/#531/#533)
 

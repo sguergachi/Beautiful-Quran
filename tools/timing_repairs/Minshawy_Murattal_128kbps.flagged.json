@@ -12,30 +12,6 @@
   "leadin"
  ],
  [
-  6,
-  109,
-  "strip",
-  "leadin"
- ],
- [
-  6,
-  111,
-  "restore",
-  "leadin"
- ],
- [
-  7,
-  129,
-  "strip",
-  "cov0.68"
- ],
- [
-  7,
-  171,
-  "restore",
-  "leadin"
- ],
- [
   72,
   28,
   "restore",

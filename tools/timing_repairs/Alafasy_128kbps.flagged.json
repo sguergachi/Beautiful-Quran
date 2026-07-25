@@ -1,8 +1,26 @@
 [
  [
-  77,
-  15,
-  "strip",
-  "cov0.67"
+  16,
+  63,
+  "unsplit",
+  "invalid"
+ ],
+ [
+  20,
+  75,
+  "unsplit",
+  "invalid"
+ ],
+ [
+  24,
+  47,
+  "unsplit",
+  "invalid"
+ ],
+ [
+  34,
+  22,
+  "unsplit",
+  "invalid"
  ]
 ]
