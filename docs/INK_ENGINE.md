@@ -359,21 +359,24 @@ If the answer to any of these is no, reduce the scope.
 `ui/reader/InkEngine.kt` is a single object, per Option 2, with one amendment
 to the proposed shape: the review found that the four-state derivation is the
 easy part — the highlight's *feel* lives in the motion policy (400 ms
-tween-vs-snap rules, the start-revealed flicker rule, repeat wash timing, the
+tween-vs-snap rules, sweep entry and residual rules, repeat wash timing, the
 1.6× feather), which was still scattered across five `remember*` helpers. So
 InkEngine owns that too, as data rather than as animation code:
 
-- **Pure policy** (JVM-tested in `InkEngineTest`):
+- **Pure word policy** (JVM-tested in `InkEngineTest`):
   `wordState(position, activeWord, isActiveAyah, dimmed)` (including the
   high-water rule), `inRepeatChain(position, activeWord)`, the bundled
-  `word(...) → InkEngine.Word(state, repeat)`,   `sweepMs(activeWord, speed)`
-  with the min/max clamps (short holds scale up to `minSweepMs` so tiny
-  words still show a wash; residual progress finishes after handoff
-  instead of snapping; a stable entry lifecycle keeps the persistent
-  `Animatable` at visible progress 0 until its coroutine reset runs and starts
-  a residual from 0 if that reset is pre-empted, avoiding a one-frame full-ink
-  flash — see `rememberLetterSweep`),
-  `glinting(state)` — the first-gloss glint rule:
+  `word(...) → InkEngine.Word(state, repeat)`, and
+  `sweepMs(activeWord, speed)`, which clamps the karaoke hold into
+  `minSweepMs..maxSweepMs` — short holds scale **up** so a tiny word still
+  shows a wash, which is why the wash can outlive `Active` (see the sweep
+  lifecycle below).
+- **Pure tajweed policy**: `pacing(arabic, activeWord, isAyahFinal, prev, next)`
+  returns the `TajweedPacing.Curve` for the active word or null for the plain
+  sweep; `connection(prevArabic, arabic)` resolves the cross-word wasl rule;
+  `pacedFeather()` is the paced word's edge width. All gated on
+  `Tuning.tajweedPacing` — see [TAJWEED_PACING.md](TAJWEED_PACING.md).
+- **`glinting(state)`** — the first-gloss glint rule:
   Active words wear the white-gold sheen (including seek/replay and
   repeat events), which then dissolves back to plain recited ink over
   `Tuning.glintFadeMs` (1 s). The glint is theme-gated by
@@ -387,26 +390,77 @@ InkEngine owns that too, as data rather than as animation code:
   without becoming a hard or whole-word glow, adding no new motion—only a
   warm light that cools as the ink dries.
   [GLIMMER.md](GLIMMER.md) is the canonical cross-platform rendering,
-  tuning, and visual-verification specification. InkEngine also owns
-  `prefaceState(isActive, dimmed)` / `prefaceWashProgress(positionMs, durationMs)`
-  for the surah-header basmalah VectorDrawable (Active during the Al-Fatihah
-  1:1 lead-in clip, with an RTL `letterFadeIn` wash paced by the clip clock and
-  settled to full ink before audio ends; Upcoming while recessed; Plain at rest).
+  tuning, and visual-verification specification.
+- **Basmalah preface**: `prefaceState(isActive, dimmed)` /
+  `prefaceWashProgress(positionMs, durationMs)` for the surah-header basmalah
+  VectorDrawable (Active during the Al-Fatihah 1:1 lead-in clip, with an RTL
+  `letterFadeIn` wash paced by the clip clock and settled to full ink before
+  audio ends; Upcoming while recessed; Plain at rest).
 - **`InkEngine.Tuning`**: every feel knob in one data class — upcoming alpha,
   ink/mark fade durations, recess, sweep clamps, repeat sweep/fade-out and
   repeat ink strength, glint tint, glitter time, halo strength/blur, wash
   feather, sweep easing, and tajweed pacing. `InkEngine.tuning` is
   snapshot-backed (`mutableStateOf`), so release builds read constants while
   the Ink Lab can retune a live session.
+- **Sync knobs, deliberately outside `Tuning`**: `highlightLeadMs` (default 0),
+  `fadeLeadMs` (default 500) and `outputLatencyOverrideMs` (null = use the route
+  preset). These move *when* things fire rather than how the ink feels, so they
+  stay out of the data class that **Copy values** transcribes — but they persist
+  with it via `InkLabStore`. `fadeLeadMs` is how far the ayah focus/recess target
+  runs ahead of the audio; both it and the ink read the same latency-corrected
+  clock, which is a contract enforced in `ReaderViewModel` — see
+  [OUTPUT_LATENCY.md](OUTPUT_LATENCY.md). `focusEngineEnabled` is a session-only
+  lab freeze and is never persisted.
 - **Renderers consume `InkEngine.Word`.** `AyahBlock` derives each ayah's ink
-  list once and passes it into all three branches (`WordUnit`,
-  `ResponsiveEnglishAyah`, `ResponsiveHafsAyah`); none of them re-derive highlight
-  semantics. The Compose animation helpers stayed in ReaderComponents.kt but
-  read every duration/alpha/easing from `InkEngine.tuning` — no literal
-  tuning values remain in the renderers.
-- **Draw primitives stayed in `ui/theme/Fade.kt`** per Step 3; the feather
-  became a parameter (`letterFadeIn`/`shapedWordBloom` take `feather`) so the
-  theme layer stays independent of the reader package.
+  list once (the single `InkEngine.word(...)` call site) and passes it into all
+  three branches (`WordUnit`, `ResponsiveEnglishAyah`, `ResponsiveHafsAyah`);
+  none of them re-derive highlight semantics. The Compose animation helpers
+  stayed in ReaderComponents.kt but read every **highlight** duration, alpha and
+  easing from `InkEngine.tuning` — no literal ink-tuning values remain. Literals
+  for motion that is *not* the highlight still live locally (e.g. the block fade
+  when the ayah-selector rail obscures the page); those are not `Tuning`'s job.
+- **Draw primitives stayed in `ui/theme/Fade.kt`** per Step 3; the feather and
+  the reveal fraction became parameters (`letterFadeIn` / `shapedWordBloom` take
+  `feather`; `letterFadeIn` and `ShapedWordBloom.ColorReveal` take
+  `revealFraction`, which the wasl prefix uses to stop the mask short) so the
+  theme layer stays independent of the reader package. `shapedWordBloom` runs its
+  whole bloom list in the draw phase, so what each bloom kind may derive there is
+  a performance contract, not a style preference — see
+  [PERFORMANCE.md](PERFORMANCE.md#1-draw-phase-only-animations-zero-recomposition-fades).
+
+### The sweep lifecycle
+
+The letter sweep is the one piece of motion whose *lifecycle* is subtle enough to
+be worth stating, because three separate requirements pull against each other.
+It lives in `rememberLetterSweep` (ReaderComponents.kt) with its decisions in
+pure, `InkEngineTest`-covered helpers.
+
+1. **The `Animatable` outlives `Active`.** `sweepMs` can floor a short hold up to
+   `minSweepMs`, so the wash may still be running when the word turns Recited.
+   `finishResidual` (true *only* for Active→Recited) lets it finish rather than
+   snap. Leaving Active for Upcoming/Plain instead — a seek, a recess — abandons
+   the residual immediately, because finishing toward full ink and then dimming
+   back would flash.
+2. **A persistent `Animatable` means the next word inherits progress 1.** The
+   draw phase can read it before the effect's `snapTo(0f)` lands, which showed as
+   a one-frame full-ink flash. `sweepEntryAction(…)` classifies each composition
+   as `Arm` / `Keep` / `Clear`, and on `Arm` a mask resolved **during
+   composition** pins the displayed value to 0 (`displayedSweepProgress`) until
+   the reset runs. If Active ends before that reset, the residual starts from 0
+   rather than exposing the stale completed value.
+3. **The entry snapshot must survive the entry.** Duration, curve and feather are
+   captured at `Arm` and held for the whole sweep, so retuning tajweed or speed
+   mid-word cannot remap a half-finished wash (which read as "resetting and
+   playing again"). The residual needs that snapshot after the word is no longer
+   Active, which is why it lives in a tracker rather than the effect's closure —
+   committed in a `SideEffect`, never written during composition. The captured
+   curve is released only once the residual finishes: it is what maps the linear
+   clock to wash position, so dropping it mid-wash would jump the edge.
+
+A **wasl continuation** (`waslContinuationStart` / `continuedSweepProgress`) is
+the fourth case: when the previous word's ink already bloomed this word's opening
+prefix, the sweep starts from that edge instead of 0 — see
+[TAJWEED_PACING.md](TAJWEED_PACING.md).
 
 ### Ink Lab
 
