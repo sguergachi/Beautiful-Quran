@@ -90,9 +90,7 @@ On the pressed word at `(surahId, ayah, wordPosition)`:
    want to continue beyond the bundled data:
    - QAC's segment-by-segment grammar page for the exact `(surah:ayah:word)`.
    - QAC's Quran dictionary for the exact root (using QAC's Buckwalter query).
-   - Lane's classical Arabic–English lexicon entry for the root, with a reminder
-     that historical dictionary entries are broad and context still determines
-     the intended sense.
+   - Lane's classical Arabic–English lexicon entry for the root.
    - The full ayah on Quran.com for translations, recitation, and tafsir.
 
 The viewer does not fetch these pages or depend on them to open. Links are
