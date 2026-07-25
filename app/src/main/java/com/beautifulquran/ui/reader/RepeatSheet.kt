@@ -178,9 +178,9 @@ fun RepeatSheet(
                 onSelect = { choice = it },
             ) { entry ->
                 when (entry) {
-                    RepeatChoice.AYAH_RANGE -> RepeatWheelBlock(
-                        caption = "Ayah $from to $to",
-                    ) {
+                    // No caption: the wheels and the "to" between them already
+                    // spell the range out.
+                    RepeatChoice.AYAH_RANGE -> RepeatWheelBlock {
                         RepeatRangeDials(
                             ayahCount = safeAyahCount,
                             from = from,
@@ -246,15 +246,22 @@ private val WheelHeight = 168.dp
  */
 private val WheelColumnWidth = 110.dp
 
-/** The paper left showing between the two range wheels. */
-private val WheelGutter = 12.dp
+/**
+ * The paper between the two range wheels — wide enough to hold the word "to" on
+ * the reading line, since that word *is* the range's caption.
+ */
+private val WheelGutter = 34.dp
 
 /** Both dials plus the gutter, so the pair can be centred as one block. */
 private val WheelPairWidth = WheelColumnWidth * 2 + WheelGutter
 
 /**
- * A choice's numbers, unfolding under the line that asked for them: the caption
- * that says what they currently mean, then the dial itself.
+ * A choice's numbers, unfolding under the line that asked for them.
+ *
+ * [caption] is only for a dial whose figure cannot speak for itself: a lone
+ * count means nothing without "ayahs from ayah 12" around it. The range pair
+ * needs no caption — it reads "67 to 120" off the wheels themselves, and a line
+ * above them saying the same thing was the same sentence twice.
  *
  * Nothing is drawn under the wheel — **no band, no plate, not even a wash.**
  * The reading line is the row the numbers fade *towards*: rows dissolve into the
@@ -264,19 +271,21 @@ private val WheelPairWidth = WheelColumnWidth * 2 + WheelGutter
  * one sheet of paper rather than a control resting on it.
  */
 @Composable
-private fun RepeatWheelBlock(caption: String, dial: @Composable () -> Unit) {
+private fun RepeatWheelBlock(caption: String? = null, dial: @Composable () -> Unit) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Spacer(Modifier.height(18.dp))
-        Text(
-            text = caption,
-            style = MaterialTheme.typography.labelLarge,
-            textAlign = TextAlign.Center,
-            // Quiet ink rather than the accent: the brush circle just above and
-            // the centred numbers just below both speak in the accent already.
-            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
-            modifier = Modifier.fillMaxWidth(),
-        )
-        Spacer(Modifier.height(10.dp))
+        if (caption != null) {
+            Text(
+                text = caption,
+                style = MaterialTheme.typography.labelLarge,
+                textAlign = TextAlign.Center,
+                // Quiet ink rather than the accent: the brush circle just above
+                // and the centred numbers just below both speak in the accent.
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Spacer(Modifier.height(10.dp))
+        }
         dial()
         Spacer(Modifier.height(18.dp))
     }
@@ -327,6 +336,15 @@ private fun RepeatRangeDials(
                 RepeatNumberItem(index + 1, selected)
             }
         }
+        // The range's whole caption, sitting in the gutter on the reading line:
+        // the two dials and this word read straight across as "67 to 120".
+        // Quiet ink — it is the joint between the figures, not a third figure.
+        Text(
+            text = "to",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f),
+            modifier = Modifier.align(Alignment.Center),
+        )
     }
 }
 
