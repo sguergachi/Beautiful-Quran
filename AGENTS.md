@@ -23,9 +23,9 @@ app/                    The entire Android app (single Gradle module)
   src/test/             JVM unit tests (JUnit 4)
 data/quran.db           Canonical committed SQLite database consumed by both apps
 tools/build_db.py       Data pipeline that generates quran.db (build-time, not app code)
-tools/timing_overrides/ Last-resort per-ayah patches only (NOT default for Lab issues)
+tools/timing_overrides/ Local timing-report scratch; CI rejects committed JSON
 tools/timing_patch_cases/ Unit tests for systematic cleaner / span-protect fixes
-tools/timing_repairs/   CTC auto-repairs applied before overrides
+tools/timing_repairs/   CTC auto-repairs rebased onto current source timing
 scripts/                Linux emulator setup / run helpers
 docs/                   Architecture, design language, performance, timings docs
                         …and the GitHub Pages product page (index.html + styles.css)
@@ -101,10 +101,9 @@ Requires **JDK 21**. No Android device/emulator is needed for tests.
    first (raw qdc vs cleaned vs repairs vs Lab expected), fix the **class** in
    `clean_qdc_artifacts` or the repairs span-protect / generator, and lock it
    with `tools/timing_patch_cases/*.json` + `python3 tools/test_build_db.py`.
-   Overrides are last resort for true one-off boundary nudges only — see
-   [Landing Timings Lab / GitHub timing patches](#landing-timings-lab--github-timing-patches)
-   below. Canonical anti-pattern: the first #570 attempt (one-off override);
-   the correct fix is #571 (gap phantoms + span-protect).
+   Override JSON is local reproduction scratch only and must not be committed.
+   Canonical anti-pattern: the first #570 attempt (one-off override); the
+   correct fix is #571 (gap phantoms + span-protect).
 
 ## Landing Timings Lab / GitHub timing patches
 
@@ -122,14 +121,13 @@ close a `Timings patch — …` GitHub issue, **do this checklist in order**:
    | Forward spike, stray, split sliver, non-contiguous phantom, **gap phantom** (`…11,8,9,13…` missing 12) | `clean_qdc_artifacts` in `tools/build_db.py` | `tools/timing_patch_cases/<id>.json` + `python3 tools/test_build_db.py` |
    | Repair flattens a multi-word re-say that cleaned qdc still has | `apply_timing_repairs` span-protect (`erases_span_repeat`) | `pipeline: "erases_span_repeat"` case |
    | CTC repeat-vs-split / restore / drop quality | regenerate `tools/timing_repairs/` (`~/qasr`) | generator tests + rebuild |
-   | Single boundary steal, no structural signal | `tools/timing_overrides/` **only** | `notes` must say why no rule applies |
+   | Single boundary steal, no structural signal | weighted source-conflict validation + systematic repair/generator change | focused regression case |
 4. **Implement the class fix** + add the patch case (input = broken shape,
    expected = Lab/ear topology). Run `python3 tools/test_build_db.py`.
 5. **Rebuild**: `python3 tools/build_db.py`, bump `DB_FILE_NAME`, commit DB +
-   cases (and override only if step 3 landed there).
-6. **Do not** land a per-ayah override for a defect that already has a cleaner
-   class. If an override exists for something the pipeline now handles, delete
-   the override.
+   cases.
+6. **Do not** land per-ayah overrides. Delete any local reproduction JSON
+   before committing.
 
 Full write-ups: [docs/TIMINGS_LAB.md](docs/TIMINGS_LAB.md),
 [tools/timing_patch_cases/README.md](tools/timing_patch_cases/README.md),
@@ -171,7 +169,7 @@ Full write-ups: [docs/TIMINGS_LAB.md](docs/TIMINGS_LAB.md),
 | `docs/VERSE_ACTIONS.md` | Bookmark · note · share UX — verse-first share plan (designed, not implemented) |
 | `docs/TIMINGS_LAB.md` | In-app timing editor + maintainer apply path (systematic first) |
 | `tools/timing_patch_cases/README.md` | **Required** unit tests when landing a Lab/GitHub timing patch systematically |
-| `tools/timing_overrides/README.md` | Last-resort per-ayah overrides only — stop and classify first |
+| `tools/timing_overrides/README.md` | Local patch reproduction; committed JSON is rejected |
 | This file § Landing Timings Lab… | Agent checklist when asked to fix/close a timings issue |
 | `PLAN.md` | Historical product/engineering plan — context, not current spec |
 | `docs/WEB.md` | Web port plan — Focus / Highlight / Ink engines + paper reader in the browser |

@@ -1,0 +1,35 @@
+{
+  "id": "repair-rebase-alafasy-5-52",
+  "label": "Alafasy 5:52 stale drop repair preserves current word 11-12 boundary",
+  "refs": ["issue #564", "PR #567"],
+  "pipeline": "rebase_timing_repair",
+  "notes": "The repair restores words 24-25; its stale word 11-12 boundary must not overwrite current qdc timing.",
+  "input_segments": [
+    [10, 13345, 14365],
+    [11, 14365, 15605],
+    [12, 15605, 18285],
+    [13, 18305, 19005],
+    [23, 29035, 31855],
+    [26, 31855, 33935]
+  ],
+  "repair_segments": [
+    [10, 11960, 13380],
+    [11, 13380, 17680],
+    [12, 17680, 18380],
+    [13, 18380, 18980],
+    [23, 29140, 29720],
+    [24, 29720, 31400],
+    [25, 31400, 32440],
+    [26, 32440, 33960]
+  ],
+  "expected_segments": [
+    [10, 13345, 14365],
+    [11, 14365, 15605],
+    [12, 15605, 18285],
+    [13, 18305, 19005],
+    [23, 29140, 29720],
+    [24, 29720, 31400],
+    [25, 31400, 32440],
+    [26, 32440, 33960]
+  ]
+}

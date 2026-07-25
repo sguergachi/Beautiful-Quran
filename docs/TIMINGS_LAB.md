@@ -209,7 +209,7 @@ Free, no backend, no auth beyond the GitHub account:
    | Structural qdc noise (forward spikes, strays, split slivers, non-contiguous span phantoms, **gap phantoms**) | `clean_qdc_artifacts` in `tools/build_db.py` | Add `tools/timing_patch_cases/<id>.json` — broken `input_*` + expected `expected_*` from the patch; run `python3 tools/test_build_db.py` |
    | Drop repair that flattens a real span-repeat | `apply_timing_repairs` span-protect (and regenerate repairs) | `pipeline: erases_span_repeat` case in `timing_patch_cases/` |
    | Repeat-vs-split / CTC | `tools/timing_repairs/` generator | `~/qasr` tests + rebuild repairs |
-   | True one-off boundary only | `tools/timing_overrides/` | Ear-check; `notes` must say why no pipeline rule applies |
+   | Boundary displacement without a topology change | weighted qdc / quran-align evidence, then the repair generator | focused regression case |
 
    The patch case **is** the verification for systematic fixes: the Lab/GitHub
    payload supplies the expected shape; the cleaner must reproduce it. See
@@ -219,19 +219,21 @@ Free, no backend, no auth beyond the GitHub account:
    **Anti-pattern:** saving the issue fenced JSON under `timing_overrides/`
    without classifying. That was the first #570 attempt; #571 fixed the class
    (gap phantoms + span-protect) and deleted the override.
-3. For an **override** (last resort only): save the JSON block to
-   `tools/timing_overrides/<anything>.json` with a `notes` field that states
-   why no pipeline rule applies, then run `python3 tools/build_db.py`.
-4. `build_db.py` fetches/normalizes the open-dataset timings as usual, runs
-   `clean_qdc_artifacts`, applies `tools/timing_repairs/`, then **applies every
-   file in `tools/timing_overrides/` on top**, replacing (or adding) the
-   matching `(reciter, surah, ayah)` rows — with position-range validation —
-   before writing `quran.db`. Committed override files are permanent: every
-   future DB rebuild reapplies them.
-5. Ship: bump `DB_FILE_NAME` (`quran-vN.db`) in `QuranDatabase.kt`, commit
-   the regenerated DB + any new override or patch case. Once the fixed DB is
-   bundled, the on-device override for that ayah can be cleared (or simply left
-   — it now matches the DB).
+3. A JSON may be placed in `tools/timing_overrides/` temporarily to reproduce
+   the report, but CI rejects committed one-off overrides. Pacing validation
+   uses the actual karaoke window (`start_ms` to the next `start_ms`) and
+   compares normalized word length. Candidate boundaries are checked against
+   the bundled/CTC row and independent quran-align timing after removing the
+   per-ayah median clock offset. Quran-align has weight 2 and the bundled row
+   weight 1; ≤250 ms supports a boundary and >500 ms conflicts. Timestamps are
+   never averaged, and one-pass evidence never judges repeat backtracks.
+4. Structural repairs are rebased onto the latest source row. Only changed
+   topology and its immediate neighbours use the repair clock; equal spans
+   retain current source timings. Existing span-repeat protection still rejects
+   repairs that would flatten a real re-recitation.
+5. Run `python3 tools/test_build_db.py`, rebuild `quran.db`, bump
+   `DB_FILE_NAME`, and commit the systematic code, regression case, and DB.
+   Delete any local override JSON first.
 
 The patch JSON shape (also the shape `tools/timing_overrides/*.json` accepts):
 
@@ -264,10 +266,10 @@ timingslab/
     TimingsPatch.kt         overrides → GitHub issue deep-link / clipboard
 data/QuranRepository.kt     timings() fuses overrides over the DB
 ui/reader/ReaderComponents  AyahBlock — reused as-is for the live preview
-tools/build_db.py           clean_qdc_artifacts + repairs + timing_overrides
+tools/build_db.py           cleaner + span-protect + repair rebase + validation
 tools/timing_patch_cases/   unit-test fixtures: Lab/GitHub patches → pipeline expectations
 tools/test_build_db.py      runs every timing_patch_cases/*.json (no network)
-tools/timing_overrides/     last-resort per-ayah patches (when no structural rule)
+tools/timing_overrides/     local reproduction scratch; empty in commits
 ```
 
 ## Conventions kept

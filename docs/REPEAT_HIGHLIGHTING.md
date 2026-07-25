@@ -35,7 +35,7 @@ Alignment artifacts that *would* read as false repeats are stripped at **build
 time**, by duration and ratio rather than by adjacency — see
 [Cleanup](#false-repeats-the-qdc-artifacts-we-scrub). Anything surviving into the
 DB is data the pipeline judged real. If you suspect a specific row is wrong,
-ear-check it and fix it in `tools/build_db.py` or a timing override; never with
+ear-check it and fix its class in `tools/build_db.py`; never with
 an engine-wide heuristic.
 
 ## What it is
@@ -232,10 +232,9 @@ When a real repeat is still missed or a false one slips through:
    [`tools/timing_patch_cases/`](../tools/timing_patch_cases/README.md) whose
    expected output is the Timings Lab / ear-verified fix. Run
    `python3 tools/test_build_db.py`.
-2. **Override last.** The per-ayah **Timings Lab override**
-   (`tools/timing_overrides/`) replaces an ayah's segments verbatim at build
-   time and always wins over the heuristic — use it only when no structural
-   rule applies (document why in the file `notes`).
+2. **No one-off shipping.** A Timings Lab JSON may reproduce the issue locally,
+   but it must be deleted before commit. Permanent corrections change the
+   systematic repair/cleanup pipeline and run across the full corpus.
 
 ## The rendering path
 
@@ -321,7 +320,7 @@ read ink together while 12 fades in white as a new word.
   bumping `quran-v5.db` → `quran-v6.db`; the extractor's cleanup step deletes the
   old file. (That pair is the historical example — the asset has been rebumped
   many times since. Read the live value from `QuranDatabase.DB_FILE_NAME`, which
-  is `quran-v17.db` as of 2026-07-24, rather than trusting any number here.)
+  is `quran-v22.db` as of 2026-07-25, rather than trusting any number here.)
 - **quran.com timestamps are gapless-file offsets**, not per-ayah. Always
   subtract the verse's `timestamp_from`. (The build does this; noted here because
   it's the first thing that looks wrong if you inspect the raw API.)

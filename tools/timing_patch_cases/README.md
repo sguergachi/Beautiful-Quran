@@ -21,17 +21,16 @@ Agents landing a GitHub `Timings patch` issue must follow the full checklist in
 2. **Prefer a pipeline fix** that covers the *class*:
    - structural qdc noise → `clean_qdc_artifacts` in `tools/build_db.py`
    - drop repair erasing a multi-word re-say → `erases_span_repeat` / span-protect
+   - stale full-row repair timing → `rebase_timing_repair`
    - repeat-vs-split / CTC disagreement → `tools/timing_repairs/` generator
 3. **Add a case here** whose `input_*` is the broken shape and `expected_*` is
    the corrected shape (from the Lab patch, ASR/ear, or the intended clean
    positions). The case *is* the patch verification.
-4. **Only then** use `tools/timing_overrides/` for true one-offs the pipeline
-   cannot express (e.g. a single word-boundary nudge with no structural rule).
-   Overrides still need a reason in the file `notes` and are not a substitute
-   for a missing cleaner rule.
+4. A local `tools/timing_overrides/` JSON may reproduce the report, but delete
+   it before committing. CI rejects shipped one-off overrides.
 
-Do **not** land a per-ayah override for a defect that already has a cleaner
-class, and do not merge a cleaner change without a case under this directory.
+Do **not** land per-ayah overrides, and do not merge a cleaner change without
+a case under this directory.
 
 ## Case shape
 
@@ -51,12 +50,12 @@ class, and do not merge a cleaner change without a case under this directory.
 |---|---|---|
 | `id` | yes | stable slug; should match the filename stem |
 | `label` | yes | one-line human name (shown on failure) |
-| `pipeline` | yes | `clean_qdc_artifacts` or `erases_span_repeat` |
+| `pipeline` | yes | `clean_qdc_artifacts`, `erases_span_repeat`, or `rebase_timing_repair` |
 | `input_positions` | * | 1-based word indices in time order (synthetic equal durations) |
 | `expected_positions` | * | positions after the pipeline step |
 | `input_segments` | * | full `[[pos, start_ms, end_ms], …]` when times matter |
 | `expected_segments` | * | full segments after the step (compared when present) |
-| `repair_positions` / `repair_segments` | for `erases_span_repeat` | candidate repair row |
+| `repair_positions` / `repair_segments` | for repair pipelines | candidate repair row |
 | `expected_erases` | for `erases_span_repeat` | bool — must the guard refuse this repair? |
 | `refs` | no | issue/PR/doc pointers |
 | `notes` | no | why this shape is real / what must not regress |

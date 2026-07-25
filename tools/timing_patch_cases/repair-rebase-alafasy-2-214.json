@@ -1,0 +1,36 @@
+{
+  "id": "repair-rebase-alafasy-2-214",
+  "label": "Alafasy 2:214 stale drop repair preserves current boundaries",
+  "refs": ["issue #589"],
+  "pipeline": "rebase_timing_repair",
+  "notes": "The repair adds missing word 13; its stale full row must not overwrite current word 25-28 boundaries.",
+  "input_segments": [
+    [12, 10095, 10995],
+    [14, 10995, 14985],
+    [15, 14985, 17555],
+    [24, 24425, 24925],
+    [25, 24925, 27145],
+    [26, 27145, 29175],
+    [27, 29175, 30255]
+  ],
+  "repair_segments": [
+    [12, 10120, 11520],
+    [13, 11520, 12540],
+    [14, 12540, 15000],
+    [15, 15000, 17620],
+    [24, 24460, 25000],
+    [25, 25000, 25240],
+    [26, 25240, 27200],
+    [27, 27200, 30300]
+  ],
+  "expected_segments": [
+    [12, 10120, 11520],
+    [13, 11520, 12540],
+    [14, 12540, 14985],
+    [15, 14985, 17555],
+    [24, 24425, 24925],
+    [25, 24925, 27145],
+    [26, 27145, 29175],
+    [27, 29175, 30255]
+  ]
+}

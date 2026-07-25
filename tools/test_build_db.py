@@ -12,14 +12,25 @@ See ``tools/timing_patch_cases/README.md``.
 from __future__ import annotations
 
 import json
+import sqlite3
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-from build_db import clean_qdc_artifacts, erases_span_repeat  # noqa: E402
+TOOLS = Path(__file__).resolve().parent
+ROOT = TOOLS.parent
+sys.path.insert(0, str(TOOLS))
+from build_db import (  # noqa: E402
+    boundary_conflicts,
+    clean_qdc_artifacts,
+    erases_span_repeat,
+    rebase_timing_repair,
+    suspicious_pacing,
+)
 
-CASES_DIR = Path(__file__).resolve().parent / "timing_patch_cases"
-PIPELINES = frozenset({"clean_qdc_artifacts", "erases_span_repeat"})
+CASES_DIR = TOOLS / "timing_patch_cases"
+PIPELINES = frozenset(
+    {"clean_qdc_artifacts", "erases_span_repeat", "rebase_timing_repair"}
+)
 
 
 def segs_from_positions(positions, dur=800):
@@ -108,7 +119,73 @@ def run_pipeline(case, segs):
         if got == bool(want):
             return True, None
         return False, f"want erases_span_repeat={want!r} got {got!r}"
+    if pipeline == "rebase_timing_repair":
+        return rebase_timing_repair(segs, resolve_repair(case))
     raise AssertionError("unreachable")
+
+
+def check_confidence():
+    words = {24: "نَصۡرُ", 25: "ٱللَّهِۗ", 26: "أَلَآ", 27: "إِنَّ", 28: "نَصۡرَ"}
+    bad = [[24, 24460, 25000], [25, 25000, 25240], [26, 25240, 27200]]
+    fixed = [[24, 24460, 25000], [25, 25000, 27160], [26, 27160, 28740]]
+    baseline = bad + [[27, 27200, 30300], [28, 30300, 30800]]
+    reference = [
+        [24, 24440, 25030], [25, 25030, 27170], [26, 27170, 28740],
+        [27, 28740, 30290], [28, 30290, 30790],
+    ]
+    conflict = [
+        [24, 24460, 25000], [25, 25000, 25240], [26, 26981, 29443],
+        [27, 29443, 30300], [28, 30300, 30800],
+    ]
+    pacing = [x[0][0] for x in suspicious_pacing(bad, words)] == [25]
+    pacing &= suspicious_pacing(fixed, words) == []
+    boundaries = [
+        x[0] for x in boundary_conflicts(
+            conflict, {"bundled": baseline, "quran-align": reference}
+        )
+    ] == [27]
+    repeats = [[1, 0, 500], [2, 500, 1000], [1, 1000, 1500]]
+    return pacing and boundaries and boundary_conflicts(
+        repeats, {"quran-align": reference}
+    ) == []
+
+
+def audit_bundled_db():
+    db = sqlite3.connect(ROOT / "data/quran.db")
+    counts = {
+        (s, a): n for s, a, n in db.execute(
+            "SELECT surah_id,ayah_number,COUNT(*) FROM words GROUP BY 1,2"
+        )
+    }
+    bad = []
+    for rid, s, a, raw in db.execute(
+        "SELECT reciter_id,surah_id,ayah_number,segments FROM timings"
+    ):
+        segs = json.loads(raw)
+        starts = [x[1] for x in segs]
+        if not segs or starts != sorted(set(starts)) or any(
+            len(x) != 3 or not 1 <= x[0] <= counts[(s, a)] or x[2] <= x[1]
+            for x in segs
+        ):
+            bad.append((rid, s, a))
+    row = db.execute(
+        "SELECT segments FROM timings WHERE reciter_id=1 "
+        "AND surah_id=2 AND ayah_number=214"
+    ).fetchone()
+    starts = {x[0]: x[1] for x in json.loads(row[0])}
+    exact = [starts[p] for p in (25, 26, 27, 28)] == [
+        24_925, 27_145, 29_175, 30_255
+    ]
+    row = db.execute(
+        "SELECT segments FROM timings WHERE reciter_id=1 "
+        "AND surah_id=5 AND ayah_number=52"
+    ).fetchone()
+    starts = {x[0]: x[1] for x in json.loads(row[0])}
+    exact &= [starts[p] for p in (11, 12)] == [14_365, 15_605]
+    overrides = list((TOOLS / "timing_overrides").glob("*.json"))
+    return not bad and exact and not overrides and db.execute(
+        "PRAGMA integrity_check"
+    ).fetchone()[0] == "ok"
 
 
 def main():
@@ -142,14 +219,23 @@ def main():
         print(f"  {'ok  ' if ok else 'FAIL'} {label}")
         if case.get("input_positions") is not None:
             print(f"        in={case['input_positions']}")
-        if pipeline == "erases_span_repeat":
+        if pipeline in {"erases_span_repeat", "rebase_timing_repair"}:
             print(f"        repair={case.get('repair_positions')}")
-            print(f"        erases={case.get('expected_erases')}")
+            if pipeline == "erases_span_repeat":
+                print(f"        erases={case.get('expected_erases')}")
         elif got_order is not None:
             print(f"        out={got_order}")
         if not ok and detail:
             for line in detail.splitlines():
                 print(f"        {line}")
+    confidence_ok = check_confidence()
+    database_ok = audit_bundled_db()
+    print(f"  {'ok  ' if confidence_ok else 'FAIL'} weighted 2:214 confidence checks")
+    print(f"  {'ok  ' if database_ok else 'FAIL'} bundled timing database invariants")
+    if not confidence_ok:
+        failures.append(("weighted confidence", "2:214 checks failed", None))
+    if not database_ok:
+        failures.append(("bundled database", "timing audit failed", None))
     print()
     if failures:
         print(f"{len(failures)} FAILURE(S):")
@@ -159,7 +245,7 @@ def main():
                 for line in str(detail).splitlines():
                     print(f"    {line}")
         return 1
-    print(f"all {len(cases)} cases pass ({CASES_DIR.relative_to(Path.cwd())})")
+    print(f"all {len(cases) + 2} cases pass ({CASES_DIR.relative_to(Path.cwd())})")
     return 0
 
 
