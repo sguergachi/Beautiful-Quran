@@ -123,6 +123,13 @@ object InkEngine {
         /** Cross-word idghām (nūn/tanwīn + يرملون): hold the next word's
          *  opening letter. See [TajweedPacing.Hold.connect]. */
         val holdConnect: Boolean = true,
+        /**
+         * Wasl next-letter bloom speed ceiling (ms). Short donors (مَن، مِن)
+         * stretch their carry-in window toward this wall-clock so the next
+         * opening fades instead of racing. See
+         * [docs/TAJWEED_PACING.md] Short wasl donors.
+         */
+        val waslPrefixMs: Int = 480,
         /** Ceiling on ordinary-letter speed while a hold is bought, as a
          *  multiple of the plain sweep rate. Word timings are contiguous, so
          *  hold length and this cap are the same dial; 1 means ordinary

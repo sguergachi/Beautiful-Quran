@@ -712,9 +712,13 @@ private fun rememberWaslProgress(
     val clock = remember(identity, activation) { Animatable(0f) }
     val entryConnection = remember(identity, activation) { connection }
     val entryMs = remember(identity, activation) { sweepMs }
-    // Capture at Active entry so a mid-word retune cannot jump the edge.
-    val entryPrefixStart = remember(identity, activation) {
-        entryMs?.let { TajweedPacing.waslPrefixStart(it) } ?: 1f
+    // Capture at Active entry (incl. lab waslPrefixMs) so a mid-word retune
+    // cannot jump the edge; the next wasl handoff picks up the new value.
+    val waslPrefixMs = InkEngine.tuning.waslPrefixMs
+    val entryPrefixStart = remember(identity, activation, waslPrefixMs) {
+        entryMs?.let {
+            TajweedPacing.waslPrefixStart(it, waslPrefixMs.toFloat())
+        } ?: 1f
     }
     LaunchedEffect(identity, activation) {
         if (entryConnection == null || entryMs == null) {

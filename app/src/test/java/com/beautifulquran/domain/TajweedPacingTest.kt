@@ -207,10 +207,14 @@ class TajweedPacingTest {
 
     @Test
     fun `short wasl donor starts the next-letter bloom earlier`() {
-        // مِن-scale holds (~500 ms): stretch to a half-word window so the
-        // opening letter of the next word eases in instead of popping.
+        // مِن/مَن-scale (~500 ms): claim 75% of the donor so the next opening
+        // gets ~375 ms of soft carry-in (speed ceiling), not a half-word pop.
         val start = TajweedPacing.waslPrefixStart(500)
-        assertEquals(0.50f, start, 1e-3f)
+        assertEquals(0.25f, start, 1e-3f)
+        assertTrue(
+            "short donor bloom window should be at least ~350 ms",
+            (1f - start) * 500f >= 350f,
+        )
         val connection = requireNotNull(
             TajweedPacing.connection("مِن", "رَّبِّكُم"),
         )
@@ -228,9 +232,31 @@ class TajweedPacingTest {
     }
 
     @Test
+    fun `wasl prefix speed ceiling targets about 480ms when the donor allows`() {
+        // 800 ms donor: 480/800 = 0.60 window → start 0.40.
+        val start = TajweedPacing.waslPrefixStart(800)
+        assertEquals(0.40f, start, 1e-3f)
+        assertEquals(
+            TajweedPacing.DEFAULT_WASL_PREFIX_MS,
+            (1f - start) * 800f,
+            1f,
+        )
+    }
+
+    @Test
+    fun `wasl prefix start respects a lab minPrefixMs override`() {
+        // Ink Lab "Wasl prefix ms" = 600 on an 800 ms donor → 0.75 window.
+        assertEquals(0.25f, TajweedPacing.waslPrefixStart(800, minPrefixMs = 600f), 1e-3f)
+        // Very high ceiling still clamped by MAX_WASL_PREFIX_WINDOW (0.75).
+        assertEquals(0.25f, TajweedPacing.waslPrefixStart(500, minPrefixMs = 900f), 1e-3f)
+    }
+
+    @Test
     fun `long wasl donor keeps a late junction`() {
-        assertEquals(0.82f, TajweedPacing.waslPrefixStart(2000), 1e-3f)
+        // 5 s: 480/5000 < min window 0.18 → still 82% junction.
         assertEquals(0.82f, TajweedPacing.waslPrefixStart(5000), 1e-3f)
+        // 2 s: 480/2000 = 0.24 → slightly earlier than the bare 18% tail.
+        assertEquals(0.76f, TajweedPacing.waslPrefixStart(2000), 1e-3f)
     }
 
     @Test

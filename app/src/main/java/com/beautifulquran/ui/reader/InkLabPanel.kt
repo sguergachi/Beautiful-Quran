@@ -184,6 +184,20 @@ fun InkLabPanel(modifier: Modifier = Modifier) {
                         TuningToggle("Hold: wasl connect", t.holdConnect) {
                             InkEngine.tuning = t.copy(holdConnect = it)
                         }
+                        TuningSlider(
+                            "Wasl prefix ms",
+                            t.waslPrefixMs.toFloat(),
+                            120f..900f,
+                            integer = true,
+                        ) {
+                            InkEngine.tuning = t.copy(waslPrefixMs = it.roundToInt())
+                        }
+                        LabCaption(
+                            "Speed ceiling for the next-letter wasl bloom " +
+                                "(مَن يَشْرِى, مِن رَّبِّكُم). Higher = slower " +
+                                "fade into the next opening. Short donors may " +
+                                "use up to 75% of their span.",
+                        )
                         TuningSlider("Cruise cap", t.cruiseCap, 1f..2f) {
                             InkEngine.tuning = t.copy(cruiseCap = it)
                         }
@@ -346,6 +360,7 @@ internal fun formatTuningCopy(t: InkEngine.Tuning): String {
         appendLine("    holdGhunnah = ${t.holdGhunnah},")
         appendLine("    holdWaqf = ${t.holdWaqf},")
         appendLine("    holdConnect = ${t.holdConnect},")
+        appendLine("    waslPrefixMs = ${t.waslPrefixMs},")
         appendLine("    cruiseCap = ${f(t.cruiseCap)},")
         appendLine("    waqfShare = ${f(t.waqfShare)},")
         appendLine("    waqfLengthScale = ${f(t.waqfLengthScale)},")
