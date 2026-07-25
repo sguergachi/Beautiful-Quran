@@ -373,9 +373,10 @@ InkEngine owns that too, as data rather than as animation code:
   can outlive `Active` (see the sweep lifecycle below). The highlight lead
   already starts word ink early; that early budget lengthens short and wasl
   washes instead of leaving idle full ink before the voice.
-- **Pure tajweed policy**: `pacing(arabic, activeWord, isAyahFinal, prev, next)`
+- **Pure tajweed policy**: `pacing(arabic, activeWord, isAyahFinal, prev)`
   returns the `TajweedPacing.Curve` for the active word or null for the plain
-  sweep; `connection(prevArabic, arabic)` resolves the cross-word wasl rule;
+  sweep; `connection(prevArabic, arabic)` resolves the cross-word wasl rule
+  without accelerating the donor word;
   `pacedFeather()` is the paced word's edge width. All gated on
   `Tuning.tajweedPacing` — see [TAJWEED_PACING.md](TAJWEED_PACING.md).
 - **`glinting(state)`** — the first-gloss glint rule:
