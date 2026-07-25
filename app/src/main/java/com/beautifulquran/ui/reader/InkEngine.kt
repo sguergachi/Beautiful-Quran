@@ -393,6 +393,13 @@ object InkEngine {
         )
     }
 
+    /** Cross-word prefix bloom for a nūn/tanwīn connection, when enabled. */
+    fun connection(prevArabic: String, arabic: String): TajweedPacing.Connection? {
+        val t = tuning
+        if (!t.tajweedPacing || !t.holdConnect) return null
+        return TajweedPacing.connection(prevArabic, arabic)
+    }
+
     /**
      * Feather width for a tajweed-paced wash. Paced words keep the whole-word
      * breath by default: the hold reads as the bloom *stopping*, so sharpening

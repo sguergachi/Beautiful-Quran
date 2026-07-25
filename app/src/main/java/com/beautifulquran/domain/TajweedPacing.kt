@@ -46,6 +46,19 @@ package com.beautifulquran.domain
 object TajweedPacing {
 
     /**
+     * A cross-word nūn/tanwīn connection whose opening letter is spoken
+     * before the timing handoff reaches the next word.
+     *
+     * [prefixFraction] is the opening letter's approximate share of the
+     * shaped word. [at] blooms that prefix over the absorbed nūn's tail.
+     */
+    data class Connection(val prefixFraction: Float) {
+        /** Opening-glyph bloom progress at normalized prior-word time [t]. */
+        fun at(t: Float): Float =
+            ((t - WASL_EXIT_FRACTION) / (1f - WASL_EXIT_FRACTION)).coerceIn(0f, 1f)
+    }
+
+    /**
      * Which moments deserve a hold, and what the hold may cost.
      *
      * [cruiseCap] is the honest trade: with no slack inside a word, hold
@@ -266,6 +279,17 @@ object TajweedPacing {
         return Curve(times.toFloatArray(), positions.toFloatArray(), letters)
     }
 
+    /**
+     * Describes the visible handoff from [prevArabic] into [arabic], or null
+     * when the pair has no idghām, iqlāb, or ikhfāʾ connection.
+     */
+    fun connection(prevArabic: String, arabic: String): Connection? {
+        if (!endsWithNoonSakinOrTanween(prevArabic)) return null
+        val events = tokenize(arabic)
+        if (events.isEmpty() || !isWaslNoonTarget(events.first().base)) return null
+        return Connection(prefixFraction = 1f / events.size)
+    }
+
     /** Plain early finish when the only wasl signal is an absorbed trailing nūn. */
     private fun earlyExitCurve(layoutSpoken: Float, spoken: Float, letterCount: Int): Curve {
         val times = ArrayList<Float>(4)
@@ -323,8 +347,13 @@ object TajweedPacing {
      */
     private fun endsWithNoonSakinOrTanween(arabic: String): Boolean {
         val events = tokenize(arabic)
-        val last = events.lastOrNull { !it.silent } ?: return false
+        val lastIndex = events.indexOfLast { !it.silent }
+        if (lastIndex < 0) return false
+        val last = events[lastIndex]
         if (last.tanween) return true
+        // Open fatḥatan can sit on the preceding letter with a written,
+        // unvoiced carrier alif after it: رُّسُلٗا → مُّبَشِّرِينَ.
+        if (last.base == ALEF && events.getOrNull(lastIndex - 1)?.tanween == true) return true
         return last.base == NOON && !last.haraka
     }
 

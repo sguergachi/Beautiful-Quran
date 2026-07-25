@@ -181,6 +181,38 @@ class TajweedPacingTest {
     }
 
     @Test
+    fun `wasl connection blooms the next waw during the prior word tail`() {
+        // 4:163 نُوحٖ وَٱلنَّبِيِّـۧنَ — the reported tanwīn + wāw handoff.
+        val connection = requireNotNull(
+            TajweedPacing.connection("نُوحٖ", "وَٱلنَّبِيِّـۧنَ"),
+        )
+        assertEquals(0f, connection.at(0.82f), 0f)
+        assertTrue(connection.at(0.91f) in 0.49f..0.51f)
+        assertEquals(1f, connection.at(1f), 0f)
+        assertEquals(1f / 7f, connection.prefixFraction, 0f)
+    }
+
+    @Test
+    fun `wasl connection blooms the next meem during the prior word tail`() {
+        // 4:165 رُّسُلٗا مُّبَشِّرِينَ — the reported tanwīn + mīm handoff.
+        val connection = requireNotNull(
+            TajweedPacing.connection("رُّسُلٗا", "مُّبَشِّرِينَ"),
+        )
+        assertEquals(0f, connection.at(0.82f), 0f)
+        assertTrue(connection.at(0.91f) in 0.49f..0.51f)
+        assertEquals(1f, connection.at(1f), 0f)
+        assertEquals(1f / 6f, connection.prefixFraction, 0f)
+    }
+
+    @Test
+    fun `wasl connection excludes plain endings and izhar`() {
+        assertNull(TajweedPacing.connection("قَالَ", "وَرَعۡدٞ"))
+        assertNull(TajweedPacing.connection("مِن", "عَلِيمٌ"))
+        // Fatḥatan before its carrier alif is still iẓhār before ʿayn.
+        assertNull(TajweedPacing.connection("رُّسُلٗا", "عَلِيمٌ"))
+    }
+
+    @Test
     fun `wasl ikhfa holds the next word's opening letter`() {
         // 2:26 مِن قَبۡلُ — nūn + qāf (ikhfāʾ): sustain the qāf.
         val qablu = "قَبۡلُ"
@@ -214,6 +246,23 @@ class TajweedPacingTest {
         assertEquals(1f, curve.at(0.95f), 0f)
         // Without a next-word absorb, nothing dramatic → plain sweep (null).
         assertNull(TajweedPacing.curve(thulumat, 1f, Hold(madd = false)))
+
+        // 4:165 writes fatḥatan on lām before a silent carrier alif.
+        val rusulan = "رُّسُلٗا"
+        val carrierCurve = curveOf(
+            rusulan,
+            hold = Hold(madd = false),
+            nextArabic = "مُّبَشِّرِينَ",
+        )
+        assertEquals(1f, carrierCurve.at(0.82f), 1e-4f)
+        assertNull(
+            TajweedPacing.curve(
+                rusulan,
+                1f,
+                Hold(madd = false),
+                nextArabic = "عَلِيمٌ",
+            ),
+        )
     }
 
     @Test
