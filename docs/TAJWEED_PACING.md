@@ -194,22 +194,22 @@ The model is therefore a **gated hint**, built from four parts:
   `رُّسُلٗا مُّبَشِّرِينَ`). `prevArabic` arms that entry hold;
   `nextArabic` softens the previous word's exit (letters finish by ~82 % of
   the spoken span so the trailing nūn is not settled at handoff). During the
-  freed tail, a narrow soft wash blooms only the next word's opening glyph;
-  it remains inked across the word-timing boundary while the ordinary
-  whole-word wash continues from the same spatial leading edge. The prefix
-  uses its one-letter fraction for both travel and feather, retaining the
-  smootherstep edge without brightening the following glyph. Its rise is
-  **smoothstepped** and, on short wasl donors (مِن، مَن), **starts earlier**
-  (`waslPrefixStart(sweepMs)`, targeting ~320 ms of bloom) so the ink carries
-  into the next opening letter instead of popping on the last ~18 %. Long
-  donors still open near the absorbed-nūn tail (82 %). Its completed edge
-  becomes the active sweep's starting point, so the opening letter is not
-  replayed and the wash immediately advances through the remaining word.
-  That continuation is armed only on a natural adjacent-word handoff, never
-  a seek. Same-ayah neighbours only (`Hold.connect`, default on).
-  Iẓhār and cross-ayah wasl are left alone.
+  freed tail, the next word's ordinary ink wash begins early: window time
+  over the tail maps onto a short main-wash segment (`waslWashProgress` →
+  `waslContinuationStart`) with the same feather as the active word, not a
+  one-glyph wipe. The soft edge therefore breathes at the main wash rate and
+  hands off on the same spatial leading edge when the timing boundary
+  arrives. Window progress is **smoothstepped**, and on short wasl donors
+  (مِن، مَن) the window **starts earlier** (`waslPrefixStart(sweepMs)`,
+  targeting ~320 ms) so the ink carries into the next opening instead of
+  popping on the last ~18 %. Long donors still open near the absorbed-nūn
+  tail (82 %). The completed edge is the active sweep's starting point, so
+  the opening letter is not replayed and the wash continues through the rest
+  of the word. That continuation is armed only on a natural adjacent-word
+  handoff, never a seek. Same-ayah neighbours only (`Hold.connect`, default
+  on). Iẓhār and cross-ayah wasl are left alone.
 - **Waqf length scale.** `Hold.waqfLengthScale` (Ink Lab: **Waqf length
-  scale**, default 0.7) multiplies `waqfShare` by a letter-count ramp: 0 =
+  scale**, shipped default 1) multiplies `waqfShare` by a letter-count ramp: 0 =
   full share on every closer; 1 = linear from ~0 at 3 letters to full share
   at 8+ pronounced letters. Medium closers like `عَظِيمًا` keep a readable
   run-up when the hold slider is high; long closers still park hard.
@@ -239,7 +239,7 @@ Two refinements built into the curve, not the callers:
 
 - **`InkEngine`** — `sweepMs` unchanged.
   `InkEngine.pacing(arabic, activeWord, isAyahFinal, prevArabic, nextArabic)`
-  returns the nullable curve (gated on `Tuning.tajweedPacing`, default off)
+  returns the nullable curve (gated on `Tuning.tajweedPacing`, default on)
   and assembles a `TajweedPacing.Hold` from the tuning;
   `InkEngine.pacedFeather()` supplies the paced edge. Knobs on the Ink Lab's
   **Tajweed** tab: the `tajweedPacing` master toggle, `holdMadd` /
@@ -260,9 +260,11 @@ Two refinements built into the curve, not the callers:
   activation. `AyahBlock` also passes `isAyahFinal` (the active word's position
   vs `ayah.words.last()`), which arms the waqf hold, and the previous/next
   words' `arabic` for wasl nūn entry and exit. A detected connection also
-  drives a prefix-only overlay on the next shaped word over the prior word's
-  final 18%; on handoff that prefix stays full and the main wash resumes from
-  its completed edge, so the wāw/other target never dims or restarts.
+  drives a main-feather wash overlay on the next shaped word over the prior
+  word's wasl window (default final 18%; short donors stretch earlier via
+  `waslPrefixStart`), advancing only to `waslContinuationStart` (not a full
+  wipe); on handoff that edge holds and the main wash resumes from the same
+  progress, so the wāw/other target never dims or restarts.
 - **Feather** — the make-or-break visual change, and the one the first
   revision got wrong. `letterFadeIn`'s wide edge is *what makes the reveal
   ethereal*: at 1.6× the word width the wash reads "closer to a whole-word
@@ -270,9 +272,10 @@ Two refinements built into the curve, not the callers:
   pacing was too subtle to see at that width, so it narrowed the edge to
   0.3–0.8 — up to 3× sharper — and the softness went with it. A hold does not
   need a sharp edge: the bloom visibly *stopping* is legible at any feather.
-  So `pacedFeather` now defaults to 1.6, identical to `washFeather`, and stays
-  a slider for auditioning. `ShapedWordBloom.InkReveal` keeps its optional
-  per-bloom `feather` override for that path.
+  So `pacedFeather` ships slightly sharper than `washFeather` (1.1857 vs 1.6)
+  so holds stay legible without a hard edge, and remains a slider for
+  auditioning. `ShapedWordBloom.InkReveal` keeps its optional per-bloom
+  `feather` override for that path.
 - **Web renderer (pending)** — `runWash` accepts a `(t: number) => number`
   easing in place of the bezier tuple (Motion supports custom easing
   functions); the active-word wash passes the curve, everything else keeps

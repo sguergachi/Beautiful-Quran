@@ -7,11 +7,14 @@ import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -355,8 +358,16 @@ fun <T> InkCircledChoiceRow(
 
 /**
  * The same vocabulary stacked vertically, for choices whose labels are too long
- * to sit side by side (the reader's repeat sheet). Each line fills the width, so
- * the stroke loops the whole line.
+ * to sit side by side (the reader's repeat sheet).
+ *
+ * The stack is only as wide as its **longest label**, not as wide as the sheet:
+ * the circle's radius comes from each child's measured bounds, so a line
+ * stretched to the full width would be looped by a 10:1 lozenge instead of a
+ * hand's loop. Sizing the column to `IntrinsicSize.Max` keeps every mark
+ * identical down the stack (one shared width) at a ratio close to the one
+ * [InkCircledChoiceRow] gets around a single word. Incoming constraints still
+ * clamp the intrinsic width, so a long label on a narrow screen wraps rather
+ * than overflowing.
  */
 @Composable
 fun <T> InkCircledChoiceColumn(
@@ -371,23 +382,28 @@ fun <T> InkCircledChoiceColumn(
 ) {
     val selectedIndex = entries.indexOfFirst { it == selected }.coerceAtLeast(0)
     val circle = rememberInkBrushCircle(selectedIndex, params, paintToken)
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .inkBrushCircleMark(circle, selectedIndex),
-        horizontalAlignment = Alignment.CenterHorizontally,
+    Box(
+        modifier = modifier.fillMaxWidth(),
+        contentAlignment = Alignment.Center,
     ) {
-        entries.forEachIndexed { index, entry ->
-            InkCircledChoiceLabel(
-                text = label(entry),
-                selected = entry == selected,
-                textStyle = textStyle,
-                textAlign = TextAlign.Center,
-                onSelect = { onSelect(entry) },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .inkBrushCircleTarget(circle, index),
-            )
+        Column(
+            modifier = Modifier
+                .width(IntrinsicSize.Max)
+                .inkBrushCircleMark(circle, selectedIndex),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            entries.forEachIndexed { index, entry ->
+                InkCircledChoiceLabel(
+                    text = label(entry),
+                    selected = entry == selected,
+                    textStyle = textStyle,
+                    textAlign = TextAlign.Center,
+                    onSelect = { onSelect(entry) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .inkBrushCircleTarget(circle, index),
+                )
+            }
         }
     }
 }
