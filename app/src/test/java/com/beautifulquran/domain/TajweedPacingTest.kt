@@ -186,6 +186,7 @@ class TajweedPacingTest {
         val connection = requireNotNull(
             TajweedPacing.connection("نُوحٖ", "وَٱلنَّبِيِّـۧنَ"),
         )
+        // Default (long-word) junction: rise over the last 18%, smoothstepped.
         assertEquals(0f, connection.at(0.82f), 0f)
         assertTrue(connection.at(0.91f) in 0.49f..0.51f)
         assertEquals(1f, connection.at(1f), 0f)
@@ -202,6 +203,34 @@ class TajweedPacingTest {
         assertTrue(connection.at(0.91f) in 0.49f..0.51f)
         assertEquals(1f, connection.at(1f), 0f)
         assertEquals(1f / 6f, connection.prefixFraction, 0f)
+    }
+
+    @Test
+    fun `short wasl donor starts the next-letter bloom earlier`() {
+        // مِن-scale holds (~500 ms): stretch to a half-word window so the
+        // opening letter of the next word eases in instead of popping.
+        val start = TajweedPacing.waslPrefixStart(500)
+        assertEquals(0.50f, start, 1e-3f)
+        val connection = requireNotNull(
+            TajweedPacing.connection("مِن", "رَّبِّكُم"),
+        )
+        assertEquals(0f, connection.at(start, start), 0f)
+        // smoothstep(0.5) = 0.5 at the window midpoint.
+        val mid = start + 0.5f * (1f - start)
+        assertEquals(0.5f, connection.at(mid, start), 1e-3f)
+        assertEquals(1f, connection.at(1f, start), 0f)
+        // Soft onset: a little past the start is still well below linear.
+        val early = start + 0.2f * (1f - start)
+        assertTrue(
+            "smoothstep should lag a linear ramp at the toe",
+            connection.at(early, start) < 0.2f * 0.85f,
+        )
+    }
+
+    @Test
+    fun `long wasl donor keeps a late junction`() {
+        assertEquals(0.82f, TajweedPacing.waslPrefixStart(2000), 1e-3f)
+        assertEquals(0.82f, TajweedPacing.waslPrefixStart(5000), 1e-3f)
     }
 
     @Test

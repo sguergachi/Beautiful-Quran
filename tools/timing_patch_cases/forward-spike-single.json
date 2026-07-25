@@ -1,0 +1,27 @@
+{
+  "id": "forward-spike-single",
+  "label": "single-segment forward spike",
+  "refs": [],
+  "pipeline": "clean_qdc_artifacts",
+  "input_positions": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    20,
+    6,
+    7,
+    8
+  ],
+  "expected_positions": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8
+  ]
+}

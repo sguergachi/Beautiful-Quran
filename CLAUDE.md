@@ -15,6 +15,12 @@ Quick essentials (details and rationale in AGENTS.md):
   Read `docs/DESIGN.md` before any UI change.
 - Ink karaoke fidelity is non-negotiable: soft directional wash with a visible
   faded leading edge (never hard peels / whole-word opacity for "perf").
+- **Timings Lab / GitHub timing patches: systematic first.** Do **not** paste
+  issue JSON into `tools/timing_overrides/` by default. Classify (raw qdc →
+  clean → repairs → Lab), fix the class in `clean_qdc_artifacts` or span-protect
+  / repairs, lock with `tools/timing_patch_cases/` + `python3 tools/test_build_db.py`.
+  Overrides are last resort for true one-off boundaries only. Full checklist:
+  AGENTS.md invariant #8 and "Landing Timings Lab / GitHub timing patches".
 
 ## PR Workflow
 

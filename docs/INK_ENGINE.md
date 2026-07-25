@@ -368,9 +368,11 @@ InkEngine owns that too, as data rather than as animation code:
   high-water rule), `inRepeatChain(position, activeWord)`, the bundled
   `word(...) → InkEngine.Word(state, repeat)`, and
   `sweepMs(activeWord, speed)`, which clamps the karaoke hold into
-  `minSweepMs..maxSweepMs` — short holds scale **up** so a tiny word still
-  shows a wash, which is why the wash can outlive `Active` (see the sweep
-  lifecycle below).
+  `minSweepFloorMs()..maxSweepMs` — short holds scale **up** so a tiny word
+  still shows a wash (`minSweepMs + highlightLeadMs`), which is why the wash
+  can outlive `Active` (see the sweep lifecycle below). The highlight lead
+  already starts word ink early; that early budget lengthens short and wasl
+  washes instead of leaving idle full ink before the voice.
 - **Pure tajweed policy**: `pacing(arabic, activeWord, isAyahFinal, prev, next)`
   returns the `TajweedPacing.Curve` for the active word or null for the plain
   sweep; `connection(prevArabic, arabic)` resolves the cross-word wasl rule;
@@ -402,7 +404,7 @@ InkEngine owns that too, as data rather than as animation code:
   feather, sweep easing, and tajweed pacing. `InkEngine.tuning` is
   snapshot-backed (`mutableStateOf`), so release builds read constants while
   the Ink Lab can retune a live session.
-- **Sync knobs, deliberately outside `Tuning`**: `highlightLeadMs` (default 0),
+- **Sync knobs, deliberately outside `Tuning`**: `highlightLeadMs` (default 114),
   `fadeLeadMs` (default 500) and `outputLatencyOverrideMs` (null = use the route
   preset). These move *when* things fire rather than how the ink feels, so they
   stay out of the data class that **Copy values** transcribes — but they persist
@@ -437,7 +439,8 @@ It lives in `rememberLetterSweep` (ReaderComponents.kt) with its decisions in
 pure, `InkEngineTest`-covered helpers.
 
 1. **The `Animatable` outlives `Active`.** `sweepMs` can floor a short hold up to
-   `minSweepMs`, so the wash may still be running when the word turns Recited.
+   `minSweepFloorMs()` (`minSweepMs + highlightLeadMs`), so the wash may still
+   be running when the word turns Recited.
    `finishResidual` (true *only* for Active→Recited) lets it finish rather than
    snap. Leaving Active for Upcoming/Plain instead — a seek, a recess — abandons
    the residual immediately, because finishing toward full ink and then dimming
@@ -445,23 +448,32 @@ pure, `InkEngineTest`-covered helpers.
 2. **A persistent `Animatable` means the next word inherits progress 1.** The
    draw phase can read it before the effect's `snapTo(0f)` lands, which showed as
    a one-frame full-ink flash. `sweepEntryAction(…)` classifies each composition
-   as `Arm` / `Keep` / `Clear`, and on `Arm` a mask resolved **during
-   composition** pins the displayed value to 0 (`displayedSweepProgress`) until
-   the reset runs. If Active ends before that reset, the residual starts from 0
-   rather than exposing the stale completed value.
-3. **The entry snapshot must survive the entry.** Duration, curve and feather are
-   captured at `Arm` and held for the whole sweep, so retuning tajweed or speed
-   mid-word cannot remap a half-finished wash (which read as "resetting and
-   playing again"). The residual needs that snapshot after the word is no longer
-   Active, which is why it lives in a tracker rather than the effect's closure —
-   committed in a `SideEffect`, never written during composition. The captured
-   curve is released only once the residual finishes: it is what maps the linear
-   clock to wash position, so dropping it mid-wash would jump the edge.
+   as `Arm` / `Keep` / `Clear`, and the display mask (`displayedSweepProgress`)
+   is derived from that action **every composition** (Arm → 0, Keep while not
+   yet applied → 0). It must not be a `remember(active, activation)` MutableState:
+   re-entering Active with the same keys (repeat pass, bounce, replay) reused a
+   cleared flag and flashed full ink then unread. If Active ends before the
+   reset, the residual only rewinds from the idle full-ink ceiling
+   (`residualSweepAnchor`) — a mid-wash value is never snapped back to unread.
+3. **The entry snapshot must survive the entry.** Duration, curve, feather, and
+   wasl `revealStart` are captured at `Arm` and held for the whole sweep, so
+   retuning tajweed or speed mid-word cannot remap a half-finished wash (which
+   read as "resetting and playing again"). The residual needs that snapshot after
+   the word is no longer Active, which is why it lives in a tracker rather than
+   the effect's closure — committed in a `SideEffect`, never written during
+   composition. The captured curve is released only once the residual finishes:
+   it is what maps the linear clock to wash position, so dropping it mid-wash
+   would jump the edge. The wasl edge is latched the same way
+   (`effectiveRevealStart`) so Active→Recited cannot drop an already-bloomed
+   prefix back to unread for a frame.
 
-A **wasl continuation** (`waslContinuationStart` / `continuedSweepProgress`) is
-the fourth case: when the previous word's ink already bloomed this word's opening
-prefix, the sweep starts from that edge instead of 0 — see
-[TAJWEED_PACING.md](TAJWEED_PACING.md).
+A **wasl continuation** (`waslWashProgress` / `waslContinuationStart` /
+`continuedSweepProgress`) is the fourth case: the prior word's freed tail runs
+the first segment of this word's ordinary ink wash (same feather), and the
+sweep starts from that edge instead of 0 — see
+[TAJWEED_PACING.md](TAJWEED_PACING.md). Continued progress is applied inside
+`rememberLetterSweep` (not at each draw site) so residual and glint share one
+latched edge.
 
 ### Ink Lab
 
@@ -483,6 +495,9 @@ auditioning keeps the last dial positions; **Reset** clears the store and
 restores shipped defaults (so future default changes apply cleanly). Focus
 is never persisted. **Copy values** still puts a paste-ready
 `InkEngine.Tuning(…)` constructor on the clipboard (and Logcat tag `InkLab`)
-so a tuned feel can be transcribed into the defaults in InkEngine.kt. Slider
+so a tuned feel can be transcribed into the defaults in InkEngine.kt. Every
+slider uses a **log track** (equal thumb travel ≈ equal ratios when the range
+starts above zero; more precision near the floor when it includes zero) so
+small values stay fine-grained while large ends stay reachable. Slider
 meanings, defaults, ranges, and the halo artifact stress check are documented
 in [GLIMMER.md](GLIMMER.md#ink-lab-controls).

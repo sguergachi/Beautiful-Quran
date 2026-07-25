@@ -6,6 +6,9 @@ import {
   wordState,
   inRepeatChain,
   word,
+  minSweepFloorMs,
+  setHighlightLeadMs,
+  DEFAULT_HIGHLIGHT_LEAD_MS,
   sweepMs,
   startRevealed,
   glinting,
@@ -119,19 +122,29 @@ describe('InkEngine', () => {
   })
 
   it('sweep clamps to the tuned floor and ceiling', () => {
-    const tuning = getTuning()
-    expect(sweepMs(active(1, tuning.minSweepMs), 1)).toBe(tuning.minSweepMs)
+    const floor = minSweepFloorMs()
+    expect(sweepMs(active(1, floor), 1)).toBe(floor)
     expect(sweepMs(active(1, 500), 1)).toBe(500)
-    expect(sweepMs(active(1, 60_000), 1)).toBe(tuning.maxSweepMs)
+    expect(sweepMs(active(1, 60_000), 1)).toBe(getTuning().maxSweepMs)
   })
 
   it('short hold is scaled up to the min sweep floor', () => {
     // Residual wash finishes after handoff so short words still breathe.
-    const floor = getTuning().minSweepMs
+    // Floor includes highlight lead so early-started short words breathe longer.
+    const floor = minSweepFloorMs()
     expect(sweepMs(active(1, 80), 1)).toBe(floor)
     expect(sweepMs(active(1, 80), 2)).toBe(floor)
     expect(sweepMs(active(1, 10), 1)).toBe(floor)
     expect(sweepMs(active(1, 0), 1)).toBe(floor)
+  })
+
+  it('highlight lead raises the short-hold sweep floor', () => {
+    setHighlightLeadMs(0)
+    expect(minSweepFloorMs()).toBe(getTuning().minSweepMs)
+    setHighlightLeadMs(114)
+    expect(minSweepFloorMs()).toBe(getTuning().minSweepMs + 114)
+    expect(sweepMs(active(1, 80), 1)).toBe(minSweepFloorMs())
+    setHighlightLeadMs(DEFAULT_HIGHLIGHT_LEAD_MS)
   })
 
   it('no active word means no sweep', () => {

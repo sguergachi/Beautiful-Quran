@@ -50,12 +50,36 @@ object TajweedPacing {
      * before the timing handoff reaches the next word.
      *
      * [prefixFraction] is the opening letter's approximate share of the
-     * shaped word. [at] blooms that prefix over the absorbed nūn's tail.
+     * shaped word. [at] blooms that prefix over the absorbed nūn's tail,
+     * smoothstepped so the letter eases across the junction instead of
+     * popping on the last frames of a short donor (مِن، مَن).
      */
     data class Connection(val prefixFraction: Float) {
-        /** Opening-glyph bloom progress at normalized prior-word time [t]. */
-        fun at(t: Float): Float =
-            ((t - WASL_EXIT_FRACTION) / (1f - WASL_EXIT_FRACTION)).coerceIn(0f, 1f)
+        /**
+         * Opening-glyph bloom progress at normalized prior-word time [t].
+         *
+         * [prefixStart] is where the rise begins (see [waslPrefixStart]).
+         * Default matches a long-word late junction ([WASL_EXIT_FRACTION]).
+         */
+        fun at(t: Float, prefixStart: Float = WASL_EXIT_FRACTION): Float {
+            val span = (1f - prefixStart).coerceAtLeast(1e-4f)
+            val u = ((t - prefixStart) / span).coerceIn(0f, 1f)
+            // smoothstep: zero slope at both ends — soft carry-in, soft settle.
+            return u * u * (3f - 2f * u)
+        }
+    }
+
+    /**
+     * Normalized prior-word time when the next opening letter begins to bloom.
+     *
+     * Short wasl donors stretch the window so the handoff has enough wall-clock
+     * time to feel continuous; longer words keep a late junction near the
+     * absorbed-nūn tail ([WASL_EXIT_FRACTION]).
+     */
+    fun waslPrefixStart(sweepMs: Int): Float {
+        val window = (MIN_WASL_PREFIX_MS / sweepMs.coerceAtLeast(1).toFloat())
+            .coerceIn(MIN_WASL_PREFIX_WINDOW, MAX_WASL_PREFIX_WINDOW)
+        return 1f - window
     }
 
     /**
@@ -487,6 +511,12 @@ object TajweedPacing {
     private const val ABSORBED_NOON = 0.25f
     /** Fraction of the spoken span used to finish letters when wasl-exiting. */
     private const val WASL_EXIT_FRACTION = 0.82f
+    /** Floor on the wasl prefix bloom window (matches 1 − [WASL_EXIT_FRACTION]). */
+    private const val MIN_WASL_PREFIX_WINDOW = 1f - WASL_EXIT_FRACTION
+    /** Cap so a short donor still spends most of its span on its own letters. */
+    private const val MAX_WASL_PREFIX_WINDOW = 0.50f
+    /** Target wall-clock length of the next-letter bloom when the donor allows. */
+    private const val MIN_WASL_PREFIX_MS = 320f
 
     private const val ALEF_WASLA = 'ٱ'
     private const val ALEF = 'ا'

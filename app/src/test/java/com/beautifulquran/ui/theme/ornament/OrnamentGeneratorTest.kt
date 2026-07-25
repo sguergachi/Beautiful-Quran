@@ -5,6 +5,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import kotlin.math.PI
 import kotlin.math.abs
+import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.sin
 
@@ -150,6 +151,33 @@ class OrnamentGeneratorTest {
                 assertTrue(
                     "closed triangle found (seed $seed)",
                     !(s.closed && s.points.size == 3),
+                )
+            }
+        }
+    }
+
+    @Test
+    fun `never draws pentagrams - no 5-2 compounds stacked into occult seals`() {
+        // A pentagram ({5/2}) is a closed 5-gon whose consecutive vertices
+        // skip one angular neighbour (~144° on the circle). Two of those
+        // interlaced is the pentacle compound ({10/4}); a convex pentagon
+        // (~72°) is fine.
+        val pentagramStep = 2.0 * Math.PI * 2.0 / 5.0
+        for (seed in 0 until 400) {
+            val o = generateCoverOrnament(seed * 104729 + 13)
+            val everyStroke = o.medallion.strokes + o.cornerSeal.strokes +
+                o.border.strokes + o.field.strokes
+            for (s in everyStroke) {
+                if (!s.closed || s.points.size != 5) continue
+                val p0 = s.points[0]
+                val p1 = s.points[1]
+                val a0 = atan2(p0.y - 0.5, p0.x - 0.5)
+                val a1 = atan2(p1.y - 0.5, p1.x - 0.5)
+                var d = abs(a1 - a0)
+                if (d > Math.PI) d = 2.0 * Math.PI - d
+                assertTrue(
+                    "pentagram 5-gon found (seed $seed)",
+                    abs(d - pentagramStep) >= 0.05,
                 )
             }
         }
