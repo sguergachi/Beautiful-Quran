@@ -49,6 +49,10 @@ Hard rules:
 > compact centred block, so a range reads as one phrase — and they unfold
 > **directly under the choice that asked for them**, pushing the rest of the
 > list down, so the numbers belong to that line rather than trailing the sheet.
+> The range carries no caption: the word **"to" sits in the gutter on the
+> reading line**, so the two dials and that word read straight across as
+> "67 to 120". Only the lone count dial keeps a caption, because a bare figure
+> cannot say "ayahs from ayah 12" by itself.
 >
 > Nothing is drawn under the wheel: no band, no plate, no wash. The reading line
 > is the row the numbers fade *towards* — rows dissolve into the sheet as they
