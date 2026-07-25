@@ -94,6 +94,79 @@ class InkEngineTest {
     }
 
     @Test
+    fun `residual only rewinds an idle full-ink animatable not a mid-wash`() {
+        // Unapplied arm still sitting at the idle ceiling → start residual at 0.
+        assertEquals(0f, residualSweepAnchor(applied = false, currentProgress = 1f), 0f)
+        // Wash already advanced: never snap back to unread (prior-word flash).
+        assertEquals(0.35f, residualSweepAnchor(applied = false, currentProgress = 0.35f), 0f)
+        assertEquals(0.9f, residualSweepAnchor(applied = false, currentProgress = 0.9f), 0f)
+        // Applied residual always continues from the live value.
+        assertEquals(1f, residualSweepAnchor(applied = true, currentProgress = 1f), 0f)
+        assertEquals(0.5f, residualSweepAnchor(applied = true, currentProgress = 0.5f), 0f)
+    }
+
+    @Test
+    fun `reveal start stays latched through Active to Recited residual`() {
+        val waslEdge = 0.22f
+        assertEquals(
+            waslEdge,
+            effectiveRevealStart(
+                active = true,
+                finishResidual = false,
+                revealStart = waslEdge,
+                latchedRevealStart = 0f,
+            ),
+            0f,
+        )
+        // Handoff: caller passes 0 for non-active words; residual keeps the edge.
+        assertEquals(
+            waslEdge,
+            effectiveRevealStart(
+                active = false,
+                finishResidual = true,
+                revealStart = 0f,
+                latchedRevealStart = waslEdge,
+            ),
+            0f,
+        )
+        // Seek / recess clears the edge.
+        assertEquals(
+            0f,
+            effectiveRevealStart(
+                active = false,
+                finishResidual = false,
+                revealStart = 0f,
+                latchedRevealStart = waslEdge,
+            ),
+            0f,
+        )
+    }
+
+    @Test
+    fun `latched reveal start prevents wasl prefix unread flash on residual`() {
+        val start = 0.2f
+        // Mid residual raw progress after handoff — without the latch this
+        // would display as 0.1 (rewound); with it the edge holds continuity.
+        assertEquals(
+            continuedSweepProgress(progress = 0.1f, start = start),
+            continuedSweepProgress(
+                progress = 0.1f,
+                start = effectiveRevealStart(
+                    active = false,
+                    finishResidual = true,
+                    revealStart = 0f,
+                    latchedRevealStart = start,
+                ),
+            ),
+            0f,
+        )
+        assertTrue(
+            continuedSweepProgress(progress = 0.1f, start = start) >
+                continuedSweepProgress(progress = 0.1f, start = 0f),
+        )
+    }
+
+    @Test
     fun `wasl handoff continues from the completed prefix edge`() {
         val prefix = 1f / 7f
         val mainFeather = 1.6f
