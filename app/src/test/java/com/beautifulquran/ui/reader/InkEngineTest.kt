@@ -29,6 +29,12 @@ class InkEngineTest {
             InkEngine.wordState(it, activeWord, isActiveAyah = true, dimmed = false)
         }
 
+    @Test
+    fun `new word entry masks the completed animatable before reset`() {
+        assertEquals(0f, displayedSweepProgress(entryPending = true, progress = 1f), 0f)
+        assertEquals(0.4f, displayedSweepProgress(entryPending = false, progress = 0.4f), 0f)
+    }
+
     // --- wordState ---
 
     @Test

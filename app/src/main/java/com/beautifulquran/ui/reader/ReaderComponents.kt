@@ -403,6 +403,9 @@ private class LetterSweep(
     val feather: State<Float?>,
 )
 
+internal fun displayedSweepProgress(entryPending: Boolean, progress: Float): Float =
+    if (entryPending) 0f else progress
+
 /**
  * Drives the letter-fade sweep for the active word: restarts at 0 each time
  * the word lights up and runs for [sweepMs] — usually the karaoke hold, but
@@ -446,6 +449,12 @@ private fun rememberLetterSweep(
     val lockedMs = remember { mutableStateOf(0) }
     val lockedPacing = remember { mutableStateOf<TajweedPacing.Curve?>(null) }
     val lockedFeather = remember { mutableStateOf<Float?>(null) }
+    // Animatable survives handoff for residual washes, so a new Active entry
+    // initially still holds its previous 1f. Mask that first composition at
+    // zero until LaunchedEffect has snapped the backing animation to zero.
+    val entryPending = remember(active, activation) {
+        mutableStateOf(active && sweepMs != null)
+    }
     // Key on active + residual policy + activation — restarts on word-tap /
     // seek (activation bump) and reacts when the leave target changes.
     LaunchedEffect(active, finishResidual, activation) {
@@ -455,6 +464,7 @@ private fun rememberLetterSweep(
             lockedFeather.value =
                 if (pacing != null) InkEngine.pacedFeather() else null
             sweep.snapTo(0f)
+            entryPending.value = false
             val easing = if (pacing != null) LinearEasing else InkEngine.sweepEasing
             sweep.animateTo(1f, tween(sweepMs, easing = easing))
         } else if (finishResidual && sweep.value < 1f) {
@@ -473,7 +483,10 @@ private fun rememberLetterSweep(
         }
     }
     val progress = remember {
-        derivedStateOf { lockedPacing.value?.at(sweep.value) ?: sweep.value }
+        derivedStateOf {
+            val mapped = lockedPacing.value?.at(sweep.value) ?: sweep.value
+            displayedSweepProgress(entryPending.value, mapped)
+        }
     }
     return remember { LetterSweep(progress = progress, feather = lockedFeather) }
 }
