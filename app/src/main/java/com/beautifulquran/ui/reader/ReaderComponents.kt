@@ -652,7 +652,14 @@ private fun Modifier.shapedActiveWordInView(
     onKeepWordInView: OnKeepWordInView?,
 ): Modifier {
     var textCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
-    LaunchedEffect(keepInView, activeIndex, layoutResult, wordRanges, textCoordinates) {
+    LaunchedEffect(
+        keepInView,
+        activeIndex,
+        layoutResult,
+        wordRanges,
+        textCoordinates,
+        onKeepWordInView,
+    ) {
         if (!keepInView || activeIndex < 0 || onKeepWordInView == null) return@LaunchedEffect
         // Snapshot the index/layout the effect was launched for; measure is
         // re-invoked inside the focus lock after any competing scroll settles.
@@ -837,7 +844,7 @@ private fun Modifier.wordUnitBehavior(
     onLongClick: (() -> Unit)? = null,
 ): Modifier {
     var wordCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
-    LaunchedEffect(active, keepInView, wordCoordinates) {
+    LaunchedEffect(active, keepInView, wordCoordinates, onKeepWordInView) {
         if (!active || !keepInView || onKeepWordInView == null) return@LaunchedEffect
         onKeepWordInView {
             val wordCoords = wordCoordinates?.takeIf { it.isAttached } ?: return@onKeepWordInView null

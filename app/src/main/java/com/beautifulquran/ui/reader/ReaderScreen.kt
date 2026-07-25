@@ -106,6 +106,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -122,8 +125,25 @@ import com.beautifulquran.ui.theme.absorbPointerEvents
 import com.beautifulquran.ui.theme.contrastingOverlayColorScheme
 import com.beautifulquran.ui.theme.verticalFadingEdges
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlin.math.abs
+
+/** Paused highlight polling is 250 ms; leave one scheduling beat for a fresh sample. */
+private const val HELD_WORD_REFRESH_MS = 300L
+
+/** One-shot request to reveal a held word after opening or foreground resume. */
+private data class WordFocusRequest(
+    val generation: Int,
+    val ayah: Int,
+    val wordPosition: Int,
+    val activation: Long,
+) {
+    fun matches(word: ActiveWord?): Boolean =
+        word?.ayah == ayah &&
+            word.wordPosition == wordPosition &&
+            word.activation == activation
+}
 
 /** Flying next-chapter opening while it slides from footer → header slot. */
 private data class FlyingChapterHeader(
@@ -489,21 +509,42 @@ fun ReaderScreen(
         lastAyahNumber = lastAyahNumber,
         bottomGuardPx = wordBandBottomGuardPx,
     )
+    var initialFocusSettled by remember { mutableStateOf(false) }
+    var restoreFocusGeneration by remember { mutableIntStateOf(1) }
+    var wordFocusRequest by remember { mutableStateOf<WordFocusRequest?>(null) }
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        // Composition can attach before Activity.onResume (cold open) or while
+        // already resumed (opening the reader from another sheet). Generation 1
+        // owns that initial restore; only later foreground resumes need a new one.
+        var currentResumeSeen =
+            lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                if (currentResumeSeen) restoreFocusGeneration++ else currentResumeSeen = true
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
     var listCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
     val scope = rememberCoroutineScope()
     val onKeepWordInView: (() -> Pair<Float, Float>?) -> Unit = remember(
         focusController,
         wordBandBottomMarginPx,
+        wordFocusRequest,
     ) {
+        val request = wordFocusRequest
         { measure ->
             scope.launch {
-                focusController.keepWordInView(
+                val measured = focusController.keepWordInView(
                     // Bottom-only: lift words clear of the play-bar fold; do not
                     // pull short verses down from their reading-line anchor.
                     bandTopMarginPx = 0f,
                     bandBottomMarginPx = wordBandBottomMarginPx,
                     measureInViewport = measure,
                 )
+                if (measured && wordFocusRequest == request) wordFocusRequest = null
             }
         }
     }
@@ -717,13 +758,61 @@ fun ReaderScreen(
     // Opening from "Continue listening": settle on the saved ayah once.
     var didInitialScroll by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(uiState.content) {
-        val content = uiState.content ?: return@LaunchedEffect
-        if (!didInitialScroll) {
-            didInitialScroll = true
-            if (startAyah != null && startAyah in 1..content.ayahs.size) {
-                focusController.focus(startAyah, animate = false)
+        initialFocusSettled = false
+        val content = uiState.content
+        if (content != null) {
+            if (!didInitialScroll) {
+                didInitialScroll = true
+                if (startAyah != null && startAyah in 1..content.ayahs.size) {
+                    focusController.focus(startAyah, animate = false)
+                }
             }
+            initialFocusSettled = true
         }
+    }
+
+    // Verse focus alone is not enough for a paused long ayah: its adaptive
+    // anchor deliberately shows line one, while the held word may be many
+    // screens lower. On initial open, foreground resume, and display reflow,
+    // restore the exact active word once. Continuous tracking remains play-only
+    // so an ended playlist cannot snap from the final word back to word one.
+    LaunchedEffect(
+        restoreFocusGeneration,
+        initialFocusSettled,
+        uiState.content?.surah?.id,
+        isThisSurahPlaying,
+        followPlayback,
+    ) {
+        val content = uiState.content
+        if (!initialFocusSettled || content == null || !isThisSurahPlaying || !followPlayback) {
+            return@LaunchedEffect
+        }
+        val playlistAyah = playerState.nowPlaying?.ayah?.takeIf { it >= 1 }
+            ?: return@LaunchedEffect
+        // An explicit word-search open owns its requested orange hit on the
+        // first pass; a later app resume may restore playback normally.
+        if (restoreFocusGeneration == 1 && startWordPosition != null) return@LaunchedEffect
+        // The highlight StateFlow retains its last value while the lifecycle is
+        // stopped. If playback was paused from outside the app, wait through one
+        // 250 ms paused poll so a same-ayah stale word cannot win this restore.
+        if (!playerState.isPlaying) delay(HELD_WORD_REFRESH_MS)
+        val word = snapshotFlow { activeWordState.value }
+            .first { it?.ayah == playlistAyah }
+            ?: return@LaunchedEffect
+        if (word.ayah !in 1..content.surah.ayahCount) return@LaunchedEffect
+        // If the ayah is wholly offscreen, materialize it first. When a tall
+        // ayah is already attached, skip the top-anchor pass to avoid the old
+        // up/down stutter and let the word correction move directly.
+        if (!focusController.isLaidOut(word.ayah)) {
+            focusController.focus(word.ayah, animate = false)
+            withFrameNanos { }
+        }
+        wordFocusRequest = WordFocusRequest(
+            generation = restoreFocusGeneration,
+            ayah = word.ayah,
+            wordPosition = word.wordPosition,
+            activation = word.activation,
+        )
     }
 
     // Home word-search hit: orange repeat wash (wash in → dissolve × 2) on the
@@ -796,6 +885,9 @@ fun ReaderScreen(
         withFrameNanos { }
         delay(48)
         focusController.focus(pin, animate = true, preRoll = false)
+        // A paused tall ayah needs its held word restored after the verse-level
+        // reflow anchor settles; while playing, this is a harmless exact check.
+        restoreFocusGeneration++
         lastLayoutSignature = layoutSignature
     }
 
@@ -1875,11 +1967,11 @@ fun ReaderScreen(
                                 // toward the item start while chrome is still
                                 // recessed — word-follow would scroll back up.
                                 keepActiveWordInView = ReaderInteraction.shouldKeepWordInView(
-                                    followEnabled = followEnabled,
-                                    labFocusEnabled = labFocusEnabled,
+                                    followPlayback = followPlayback,
                                     isPlaying = playingNow,
-                                    annotating = editingAnnotationAyah != 0,
                                     hasActiveWord = activeWord != null,
+                                    restoreRequested =
+                                        wordFocusRequest?.matches(activeWord) == true,
                                 ),
                                 listCoordinates = { listCoordinates },
                                 onKeepWordInView = onKeepWordInView,

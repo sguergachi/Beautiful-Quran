@@ -255,33 +255,46 @@ class ReaderInteractionTest {
     }
 
     @Test
-    fun `shouldKeepWordInView requires actual play not debounced chrome`() {
+    fun `word follow requires actual play but resume may restore held word once`() {
         // End of last ayah: isPlaying false while chrome may still be recessed.
         assertFalse(
             ReaderInteraction.shouldKeepWordInView(
-                followEnabled = true,
-                labFocusEnabled = true,
+                followPlayback = true,
                 isPlaying = false,
-                annotating = false,
                 hasActiveWord = true,
             ),
         )
         assertTrue(
             ReaderInteraction.shouldKeepWordInView(
-                followEnabled = true,
-                labFocusEnabled = true,
+                followPlayback = true,
                 isPlaying = true,
-                annotating = false,
                 hasActiveWord = true,
+            ),
+        )
+        assertTrue(
+            ReaderInteraction.shouldKeepWordInView(
+                followPlayback = true,
+                isPlaying = false,
+                hasActiveWord = true,
+                restoreRequested = true,
+            ),
+        )
+        // A pending jump, note, hand scroll, or Ink Lab freeze makes the
+        // arbiter's followPlayback false; resume restoration must still yield.
+        assertFalse(
+            ReaderInteraction.shouldKeepWordInView(
+                followPlayback = false,
+                isPlaying = true,
+                hasActiveWord = true,
+                restoreRequested = true,
             ),
         )
         assertFalse(
             ReaderInteraction.shouldKeepWordInView(
-                followEnabled = true,
-                labFocusEnabled = true,
+                followPlayback = true,
                 isPlaying = true,
-                annotating = false,
                 hasActiveWord = false,
+                restoreRequested = true,
             ),
         )
     }
