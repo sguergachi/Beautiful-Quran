@@ -479,6 +479,44 @@ private fun rememberLetterSweep(
 }
 
 /**
+ * A one-glyph continuation wash. [fraction] deliberately bounds both its
+ * travel and feather so the following letter stays at upcoming ink.
+ */
+private data class WaslPrefix(
+    val fraction: Float,
+    val progress: State<Float>,
+)
+
+private class ActiveWordEntry(
+    var index: Int,
+    var activation: Long,
+)
+
+/** Blooms the next opening letter over the connected tail of this word. */
+@Composable
+private fun rememberWaslProgress(
+    connection: TajweedPacing.Connection?,
+    sweepMs: Int?,
+    identity: Int?,
+    activation: Long,
+): State<Float> {
+    val clock = remember(identity, activation) { Animatable(0f) }
+    val entryConnection = remember(identity, activation) { connection }
+    val entryMs = remember(identity, activation) { sweepMs }
+    LaunchedEffect(identity, activation) {
+        if (entryConnection == null || entryMs == null) {
+            clock.snapTo(0f)
+        } else {
+            clock.snapTo(0f)
+            clock.animateTo(1f, tween(entryMs, easing = LinearEasing))
+        }
+    }
+    return remember(identity, activation) {
+        derivedStateOf { entryConnection?.at(clock.value) ?: 0f }
+    }
+}
+
+/**
  * Compose wrapper over [InkEngine.startRevealed] (the rule and its rationale
  * live there): tracks the word's previous state and captures the decision the
  * moment the word activates, so it stays stable for the whole time the word
@@ -776,6 +814,7 @@ private fun HighlightLayeredText(
     style: TextStyle,
     modifier: Modifier = Modifier,
     searchHitWash: RepeatWash? = null,
+    waslPrefix: WaslPrefix? = null,
 ) {
     val repeatInk = LocalQuranAccents.current.repeatInk
     val glintInk = LocalQuranAccents.current.glintInk
@@ -810,6 +849,20 @@ private fun HighlightLayeredText(
             overflow = TextOverflow.Visible,
             modifier = highlight.baseLayer(rtl),
         )
+        if (waslPrefix != null) {
+            InkOverlayText(
+                text = text,
+                style = style,
+                color = color,
+                modifier = Modifier.letterFadeIn(
+                    progress = { waslPrefix.progress.value },
+                    rtl = rtl,
+                    restingAlpha = 0f,
+                    feather = waslPrefix.fraction,
+                    revealFraction = waslPrefix.fraction,
+                ),
+            )
+        }
         if (orangeWash != null) {
             InkOverlayText(
                 text = text,
@@ -835,7 +888,7 @@ private fun HighlightLayeredText(
 }
 
 @Composable
-fun WordUnit(
+private fun WordUnit(
     word: Word,
     ink: InkEngine.Word,
     fontScale: Float,
@@ -852,6 +905,8 @@ fun WordUnit(
     showFlash: Boolean = false,
     /** Tajweed pacing of the active word's sweep — null for the plain sweep. */
     pacing: TajweedPacing.Curve? = null,
+    /** Opening-letter ink handed across from a connected previous word. */
+    waslPrefix: WaslPrefix? = null,
     /** Seek-generation so replaying this Active word restarts the wash. */
     activation: Long = 0L,
 ) {
@@ -879,6 +934,7 @@ fun WordUnit(
             color = MaterialTheme.colorScheme.onBackground,
             style = ArabicWordStyle.copy(fontSize = ArabicWordStyle.fontSize * fontScale),
             searchHitWash = searchHitWash,
+            waslPrefix = waslPrefix,
         )
         if (showGloss) {
             Box {
@@ -1319,6 +1375,7 @@ private fun ResponsiveHafsAyah(
     activeSweepMs: Int?,
     /** Tajweed pacing of the active word's sweep — null for the plain sweep. */
     pacing: TajweedPacing.Curve? = null,
+    waslPrefixes: List<WaslPrefix?> = emptyList(),
     activation: Long = 0L,
     flashWordPosition: Int? = null,
     /** When the verse is taller than the viewport, keep the active word in the
@@ -1468,6 +1525,20 @@ private fun ResponsiveHafsAyah(
                             // Locked at Active entry so residual handoff keeps
                             // the paced edge width (not only while activeIndex).
                             feather = sweepState.feather.value,
+                        )
+                    }
+                    waslPrefixes.forEachIndexed { index, prefix ->
+                        if (prefix == null || prefix.progress.value <= 0f) {
+                            return@forEachIndexed
+                        }
+                        val range = rendered.wordRanges.getOrNull(index)
+                            ?: return@forEachIndexed
+                        blooms += ShapedWordBloom.ColorReveal(
+                            range = range,
+                            progress = prefix.progress.value,
+                            color = palette.fullInkColor,
+                            feather = prefix.fraction,
+                            revealFraction = prefix.fraction,
                         )
                     }
                     // Orange directional bloom: SrcIn-tint the shaped glyphs,
@@ -2024,6 +2095,50 @@ fun AyahBlock(
             dimmed = dimmed,
         )
     }
+    val activeIndex = inks.indexOfFirst { it.state == InkEngine.State.Active }
+    val incomingConnection = if (activeIndex > 0) {
+        InkEngine.connection(
+            prevArabic = ayah.words[activeIndex - 1].arabic,
+            arabic = ayah.words[activeIndex].arabic,
+        )
+    } else {
+        null
+    }
+    val outgoingConnection = if (activeIndex in 0 until ayah.words.lastIndex) {
+        InkEngine.connection(
+            prevArabic = ayah.words[activeIndex].arabic,
+            arabic = ayah.words[activeIndex + 1].arabic,
+        )
+    } else {
+        null
+    }
+    val outgoingProgress = rememberWaslProgress(
+        connection = outgoingConnection,
+        sweepMs = sweepMs,
+        identity = activeWord?.wordPosition,
+        activation = activation,
+    )
+    val previousActive = remember { ActiveWordEntry(activeIndex, activation) }
+    val carriedIncoming = remember(activeIndex, activation) {
+        previousActive.index == activeIndex - 1 &&
+            previousActive.activation == activation
+    }
+    SideEffect {
+        previousActive.index = activeIndex
+        previousActive.activation = activation
+    }
+    val fullWaslProgress = remember { mutableStateOf(1f) }
+    val waslPrefixes = ayah.words.indices.map { index ->
+        when {
+            // Preserve a completed outgoing bloom only across the natural
+            // adjacent handoff. A seek bumps activation and starts clean.
+            index == activeIndex && carriedIncoming && incomingConnection != null ->
+                WaslPrefix(incomingConnection.prefixFraction, fullWaslProgress)
+            index == activeIndex + 1 && outgoingConnection != null ->
+                WaslPrefix(outgoingConnection.prefixFraction, outgoingProgress)
+            else -> null
+        }
+    }
 
     // Shared across gloss, English, and Arabic-only: mark sits at upcoming
     // ink while recessed, then fades up to full when this verse is in focus.
@@ -2092,6 +2207,7 @@ fun AyahBlock(
                                 fontScale = fontScale,
                                 sweepMs = sweepMs.takeIf { isActiveWord },
                                 pacing = pacing.takeIf { isActiveWord },
+                                waslPrefix = waslPrefixes[index],
                                 activation = if (isActiveWord) activation else 0L,
                                 showGloss = showGloss,
                                 showTransliteration = showTransliteration,
@@ -2123,6 +2239,7 @@ fun AyahBlock(
                         fontSize = ArabicWordStyle.fontSize * fontScale * ARABIC_ONLY_HAFS_FONT_MULTIPLIER,
                         activeSweepMs = sweepMs,
                         pacing = pacing,
+                        waslPrefixes = waslPrefixes,
                         activation = activation,
                         flashWordPosition = flashWordPosition,
                         keepActiveWordInView = keepActiveWordInView,

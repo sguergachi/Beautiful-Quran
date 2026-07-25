@@ -44,6 +44,8 @@ fun Modifier.letterFadeIn(
     restingAlpha: Float = 0.35f,
     /** Feather width relative to the word; see [InkWashFeather]. */
     feather: Float = InkWashFeather,
+    /** How much of the word the wash may reveal; 1 reveals the whole word. */
+    revealFraction: Float = 1f,
 ): Modifier {
     // Alpha profile across the feathered edge, sampled into gradient stops.
     // The seam-free smootherstep shape lives in [inkSmootherstep].
@@ -55,7 +57,7 @@ fun Modifier.letterFadeIn(
     }
     return drawWithContent {
         val p = progress().coerceIn(0f, 1f)
-        if (p >= 1f) {
+        if (p >= 1f && revealFraction >= 1f) {
             drawContent()
             return@drawWithContent
         }
@@ -79,7 +81,7 @@ fun Modifier.letterFadeIn(
             // travels one edge-width past the end so the final letter
             // finishes exactly at p = 1.
             val edge = (w * feather).coerceAtLeast(1f)
-            val head = p * (w + edge)
+            val head = p * (w * revealFraction.coerceIn(0f, 1f) + edge)
             val brush = if (rtl) {
                 Brush.horizontalGradient(
                     colors = washColors,
@@ -189,6 +191,8 @@ sealed class ShapedWordBloom {
         /** Subtle blurred glyph-outline halo used by Nightfall's glimmer. */
         val glowAlpha: Float = 0f,
         val glowRadius: Float = 3.5f,
+        /** How much of the word the directional mask may reveal. */
+        val revealFraction: Float = 1f,
     ) : ShapedWordBloom()
 }
 
@@ -328,7 +332,8 @@ fun Modifier.shapedWordBloom(
                     val bounds = path.getBounds()
                     val w = bounds.width
                     val edge = (w * (bloom.feather ?: feather)).coerceAtLeast(1f)
-                    val head = p * (w + edge)
+                    val head = p *
+                        (w * bloom.revealFraction.coerceIn(0f, 1f) + edge)
                     val colorBleed = maxOf(
                         bleed,
                         bloom.glowRadius.dp.toPx() * 3f,
@@ -376,7 +381,7 @@ fun Modifier.shapedWordBloom(
                             blendMode = BlendMode.SrcIn,
                         )
                     }
-                    if (p < 1f) {
+                    if (p < 1f || bloom.revealFraction < 1f) {
                         val brush = if (rtl) {
                             Brush.horizontalGradient(
                                 colors = washColors,
