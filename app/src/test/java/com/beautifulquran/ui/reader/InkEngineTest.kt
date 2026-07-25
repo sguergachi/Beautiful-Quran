@@ -29,6 +29,91 @@ class InkEngineTest {
             InkEngine.wordState(it, activeWord, isActiveAyah = true, dimmed = false)
         }
 
+    @Test
+    fun `sweep entry lifecycle arms only for a new active generation`() {
+        assertEquals(
+            SweepEntryAction.Arm,
+            sweepEntryAction(
+                wasActive = false,
+                previousActivation = 0L,
+                active = true,
+                activation = 0L,
+                hasSweep = true,
+            ),
+        )
+        assertEquals(
+            SweepEntryAction.Keep,
+            sweepEntryAction(
+                wasActive = true,
+                previousActivation = 4L,
+                active = true,
+                activation = 4L,
+                hasSweep = true,
+            ),
+        )
+        assertEquals(
+            SweepEntryAction.Arm,
+            sweepEntryAction(
+                wasActive = true,
+                previousActivation = 4L,
+                active = true,
+                activation = 5L,
+                hasSweep = true,
+            ),
+        )
+    }
+
+    @Test
+    fun `sweep entry lifecycle clears outside a runnable active word`() {
+        assertEquals(
+            SweepEntryAction.Clear,
+            sweepEntryAction(
+                wasActive = true,
+                previousActivation = 4L,
+                active = false,
+                activation = 4L,
+                hasSweep = true,
+            ),
+        )
+        assertEquals(
+            SweepEntryAction.Clear,
+            sweepEntryAction(
+                wasActive = false,
+                previousActivation = 0L,
+                active = true,
+                activation = 0L,
+                hasSweep = false,
+            ),
+        )
+    }
+
+    @Test
+    fun `pending sweep entry masks the completed animatable before reset`() {
+        assertEquals(0f, displayedSweepProgress(entryPending = true, progress = 1f), 0f)
+        assertEquals(0.4f, displayedSweepProgress(entryPending = false, progress = 0.4f), 0f)
+    }
+
+    @Test
+    fun `wasl handoff continues from the completed prefix edge`() {
+        val prefix = 1f / 7f
+        val feather = 1.6f
+        val start = waslContinuationStart(prefix, feather)
+
+        assertEquals(2f * prefix / (1f + feather), start, 1e-4f)
+        assertEquals(start, continuedSweepProgress(progress = 0f, start = start), 0f)
+        assertEquals(
+            start + 0.5f * (1f - start),
+            continuedSweepProgress(progress = 0.5f, start = start),
+            0f,
+        )
+        assertEquals(1f, continuedSweepProgress(progress = 1f, start = start), 0f)
+    }
+
+    @Test
+    fun `ordinary and sought words start their sweep at zero`() {
+        assertEquals(0.4f, continuedSweepProgress(progress = 0.4f, start = 0f), 0f)
+    }
+
     // --- wordState ---
 
     @Test

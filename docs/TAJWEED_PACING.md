@@ -196,11 +196,14 @@ The model is therefore a **gated hint**, built from four parts:
   the spoken span so the trailing nūn is not settled at handoff). During the
   freed tail, a narrow soft wash blooms only the next word's opening glyph;
   it remains inked across the word-timing boundary while the ordinary
-  whole-word wash catches up. The prefix uses its one-letter fraction for
-  both travel and feather, retaining the smootherstep edge without brightening
-  the following glyph. It is carried across only on a natural adjacent-word
-  handoff, never a seek. Same-ayah neighbours only (`Hold.connect`, default
-  on). Iẓhār and cross-ayah wasl are left alone.
+  whole-word wash continues from the same spatial leading edge. The prefix
+  uses its one-letter fraction for both travel and feather, retaining the
+  smootherstep edge without brightening the following glyph. Its completed
+  edge becomes the active sweep's starting point, so the opening letter is
+  not replayed and the wash immediately advances through the remaining word.
+  That continuation is armed only on a natural adjacent-word handoff, never
+  a seek. Same-ayah neighbours only (`Hold.connect`, default on).
+  Iẓhār and cross-ayah wasl are left alone.
 - **Waqf length scale.** `Hold.waqfLengthScale` (Ink Lab: **Waqf length
   scale**, default 0.7) multiplies `waqfShare` by a letter-count ramp: 0 =
   full share on every closer; 1 = linear from ~0 at 3 letters to full share
@@ -254,8 +257,8 @@ Two refinements built into the curve, not the callers:
   vs `ayah.words.last()`), which arms the waqf hold, and the previous/next
   words' `arabic` for wasl nūn entry and exit. A detected connection also
   drives a prefix-only overlay on the next shaped word over the prior word's
-  final 18%; on handoff that prefix stays full so the wāw/other target never
-  dims or restarts.
+  final 18%; on handoff that prefix stays full and the main wash resumes from
+  its completed edge, so the wāw/other target never dims or restarts.
 - **Feather** — the make-or-break visual change, and the one the first
   revision got wrong. `letterFadeIn`'s wide edge is *what makes the reveal
   ethereal*: at 1.6× the word width the wash reads "closer to a whole-word

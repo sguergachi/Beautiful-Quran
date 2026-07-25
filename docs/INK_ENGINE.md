@@ -369,7 +369,10 @@ InkEngine owns that too, as data rather than as animation code:
   `word(...) → InkEngine.Word(state, repeat)`,   `sweepMs(activeWord, speed)`
   with the min/max clamps (short holds scale up to `minSweepMs` so tiny
   words still show a wash; residual progress finishes after handoff
-  instead of snapping — see `rememberLetterSweep`),
+  instead of snapping; a stable entry lifecycle keeps the persistent
+  `Animatable` at visible progress 0 until its coroutine reset runs and starts
+  a residual from 0 if that reset is pre-empted, avoiding a one-frame full-ink
+  flash — see `rememberLetterSweep`),
   `glinting(state)` — the first-gloss glint rule:
   Active words wear the white-gold sheen (including seek/replay and
   repeat events), which then dissolves back to plain recited ink over
