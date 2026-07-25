@@ -52,6 +52,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.staticCompositionLocalOf
+
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
@@ -236,6 +239,12 @@ private data class RepeatWash(
     val alpha: State<Float>,
 )
 
+/**
+ * Per-ayah gate so orange chain washes run **one word at a time**, in
+ * **word-position order**. Plain FIFO mutexes can invert on same-frame entry.
+ */
+internal val LocalRepeatWashGate = staticCompositionLocalOf<OrderedWashGate?> { null }
+
 internal enum class RepeatWashAction { Hold, Reveal, Release }
 
 internal fun repeatWashAction(
@@ -255,47 +264,84 @@ private class RepeatWashLifecycle(
     var activation: Long = 0L,
 )
 
+/**
+ * Orange wash for one word in a repeat chain.
+ *
+ * **Sequential residual finish (law):**
+ * - Wash duration is always [InkEngine.Tuning.repeatSweepMs], never the audio
+ *   sliver — short words still get a full soft edge.
+ * - A shared per-ayah [OrderedWashGate] runs members **one after another by
+ *   word position**; N+1 cannot start until N's 0→1 completes.
+ * - [snapshotFlow] + collect (not `LaunchedEffect(activation)`) so Active
+ *   advancing (activation → 0) **does not cancel** an in-flight wash. The
+ *   feather always runs out; Hold is a no-op after completion.
+ * - Never snap incomplete → full. Release finishes any residual progress by
+ *   animating the remainder, then dissolves alpha.
+ */
 @Composable
 private fun rememberRepeatWash(
     repeat: Boolean,
-    sweepMs: Int?,
+    /** 1-based word position — orders the per-ayah gate. */
+    position: Int,
     /** Bumps on seek for the active word so replaying it re-runs orange too. */
     activation: Long = 0L,
 ): RepeatWash {
     val progress = remember { Animatable(if (repeat) 0f else 1f) }
     val alpha = remember { Animatable(if (repeat) 1f else 0f) }
     val lifecycle = remember { RepeatWashLifecycle() }
-    LaunchedEffect(repeat, activation) {
-        val action = repeatWashAction(
-            wasRepeat = lifecycle.repeat,
-            previousActivation = lifecycle.activation,
-            repeat = repeat,
-            activation = activation,
-        )
-        lifecycle.repeat = repeat
-        lifecycle.activation = activation
-        when (action) {
-            RepeatWashAction.Reveal -> {
-                // Chain entry always reveals, including a same-word repeat
-                // whose already-non-zero activation generation is unchanged.
-                // A new non-zero generation also replays an active repeat.
-                alpha.snapTo(1f)
-                progress.snapTo(0f)
-                progress.animateTo(
-                    1f,
-                    tween(sweepMs ?: InkEngine.tuning.repeatSweepMs, easing = InkEngine.sweepEasing),
-                )
+    val sharedGate = LocalRepeatWashGate.current
+    val localGate = remember { OrderedWashGate() }
+    val gate = sharedGate ?: localGate
+    // Local gate needs a pump when no ayah-level provider is present.
+    if (sharedGate == null) {
+        LaunchedEffect(localGate) { localGate.pump() }
+    }
+    val repeatState = rememberUpdatedState(repeat)
+    val activationState = rememberUpdatedState(activation)
+    LaunchedEffect(Unit) {
+        snapshotFlow { repeatState.value to activationState.value }.collect { (rep, act) ->
+            val action = repeatWashAction(
+                wasRepeat = lifecycle.repeat,
+                previousActivation = lifecycle.activation,
+                repeat = rep,
+                activation = act,
+            )
+            lifecycle.repeat = rep
+            lifecycle.activation = act
+            val sweepMs = InkEngine.tuning.repeatSweepMs
+            val easing = InkEngine.sweepEasing
+            when (action) {
+                RepeatWashAction.Reveal -> {
+                    gate.run(position) {
+                        // Dropped from the chain while queued — skip start.
+                        if (!repeatState.value) return@run
+                        alpha.snapTo(1f)
+                        progress.snapTo(0f)
+                        progress.animateTo(1f, tween(sweepMs, easing = easing))
+                    }
+                }
+                RepeatWashAction.Release -> {
+                    // Residual under the gate (no overlap with next reveal);
+                    // alpha dissolve is outside so chain clear doesn't serialize
+                    // N× fadeMs on the ordered queue.
+                    if (progress.value < 1f && alpha.value > 0f) {
+                        gate.run(position) {
+                            if (progress.value < 1f) {
+                                val remain =
+                                    ((1f - progress.value) * sweepMs).toInt().coerceAtLeast(1)
+                                progress.animateTo(1f, tween(remain, easing = easing))
+                            }
+                        }
+                    }
+                    if (alpha.value > 0f) {
+                        alpha.animateTo(
+                            0f,
+                            tween(InkEngine.tuning.repeatFadeOutMs, easing = easing),
+                        )
+                    }
+                }
+                RepeatWashAction.Hold -> Unit
             }
-            RepeatWashAction.Release -> {
-                progress.snapTo(1f)
-                alpha.animateTo(
-                    0f,
-                    tween(InkEngine.tuning.repeatFadeOutMs, easing = InkEngine.sweepEasing),
-                )
-            }
-            // Active moving to the next word drops this word's activation to
-            // zero; hold its completed orange instead of restarting the wash.
-            RepeatWashAction.Hold -> Unit
         }
     }
     return RepeatWash(progress = progress.asState(), alpha = alpha.asState())
@@ -911,6 +957,8 @@ private class WordHighlight(
 @Composable
 private fun rememberWordHighlight(
     ink: InkEngine.Word,
+    /** 1-based word position for ordered orange chain washes. */
+    position: Int,
     sweepMs: Int?,
     pacing: TajweedPacing.Curve? = null,
     revealStart: Float = 0f,
@@ -937,7 +985,9 @@ private fun rememberWordHighlight(
         ),
         repeatWash = rememberRepeatWash(
             repeat = ink.repeat,
-            sweepMs = sweepMs.takeIf { isActive },
+            position = position,
+            // Only the active word carries a non-zero seek generation so a
+            // mid-chain handoff (activation → 0) is Hold, not a re-Reveal.
             activation = if (isActive) activation else 0L,
         ),
         glintAlpha = rememberGlintAlpha(glinting),
@@ -1125,6 +1175,7 @@ private fun WordUnit(
 ) {
     val highlight = rememberWordHighlight(
         ink = ink,
+        position = word.position,
         sweepMs = sweepMs,
         pacing = pacing,
         revealStart = revealStart,
@@ -1217,7 +1268,12 @@ fun ConnectedArabicWordUnit(
     onLongClick: (() -> Unit)? = null,
     activation: Long = 0L,
 ) {
-    val highlight = rememberWordHighlight(ink, sweepMs, activation = activation)
+    val highlight = rememberWordHighlight(
+        ink = ink,
+        position = word.position,
+        sweepMs = sweepMs,
+        activation = activation,
+    )
     HighlightLayeredText(
         text = word.arabic,
         highlight = highlight,
@@ -1287,19 +1343,28 @@ private fun rememberLetterSweeps(
     )
 }
 
-/** Orange wash per word in the repeat chain — same timing as gloss mode. */
+/**
+ * Orange washes for a shaped/English line — **same** [rememberRepeatWash] +
+ * [LocalRepeatWashGate] path as gloss [WordUnit]. One law, one implementation
+ * (no second hand-rolled sequencer that serialized N× fadeMs on release).
+ */
 @Composable
 private fun rememberRepeatWashes(
     inks: List<InkEngine.Word>,
-    activeSweepMs: Int?,
+    positions: List<Int>,
     activation: Long = 0L,
-): List<RepeatWash> = inks.map { ink ->
-    val active = ink.state == InkEngine.State.Active
-    rememberRepeatWash(
-        repeat = ink.repeat,
-        sweepMs = activeSweepMs.takeIf { active },
-        activation = if (active) activation else 0L,
-    )
+): List<RepeatWash> {
+    require(inks.size == positions.size) {
+        "inks (${inks.size}) and positions (${positions.size}) must align"
+    }
+    return inks.mapIndexed { index, ink ->
+        val active = ink.state == InkEngine.State.Active
+        rememberRepeatWash(
+            repeat = ink.repeat,
+            position = positions[index],
+            activation = if (active) activation else 0L,
+        )
+    }
 }
 
 private data class Glint(
@@ -1352,7 +1417,8 @@ private fun ResponsiveEnglishAyah(
     val gold = LocalQuranAccents.current.gold
     val glintInk = LocalQuranAccents.current.glintInk
     val sweeps = rememberLetterSweeps(inks, activeSweepMs, activation = activation)
-    val repeatWashes = rememberRepeatWashes(inks, activeSweepMs, activation)
+    val wordPositions = remember(ayah) { ayah.words.map { it.position } }
+    val repeatWashes = rememberRepeatWashes(inks, wordPositions, activation)
     val glints = rememberGlints(inks)
     val searchHitWash = rememberSearchHitWash(flashWordPosition != null)
     val activeIndex = inks.indexOfFirst { it.state == InkEngine.State.Active }
@@ -1625,7 +1691,8 @@ private fun ResponsiveHafsAyah(
         activation = activation,
         activeRevealStart = activeRevealStart,
     )
-    val repeatWashes = rememberRepeatWashes(inks, activeSweepMs, activation)
+    val wordPositions = remember(ayah) { ayah.words.map { it.position } }
+    val repeatWashes = rememberRepeatWashes(inks, wordPositions, activation)
     val glints = rememberGlints(inks)
     val searchHitWash = rememberSearchHitWash(flashWordPosition != null)
     val activeIndex = inks.indexOfFirst { it.state == InkEngine.State.Active }
@@ -2406,10 +2473,17 @@ fun AyahBlock(
         label = "translationRecess",
     )
 
+    // Position-ordered gate so orange chain washes run one word at a time
+    // (word N finishes before N+1 starts), even when every member enters on
+    // the same frame (seek into an open chain).
+    val repeatWashGate = remember { OrderedWashGate() }
+    LaunchedEffect(repeatWashGate) { repeatWashGate.pump() }
+
     // The ribbon is part of the verse block itself — same Box, same height —
     // so it never "follows" from a floating overlay. Text keeps the existing
     // horizontal inset; the ribbon sits in the outer margin opposite the
     // ayah selector.
+    CompositionLocalProvider(LocalRepeatWashGate provides repeatWashGate) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -2610,6 +2684,7 @@ fun AyahBlock(
             }
         }
     }
+    } // LocalRepeatWashGate
 }
 
 /**

@@ -8,6 +8,7 @@ import { formatReaderDigits } from '../util/digits'
 import { WordUnit } from './WordUnit'
 import { HafsWord } from './HafsWord'
 import { VerseBookmarkRibbon } from './VerseBookmarkRibbon'
+import { RepeatWashGateProvider } from './RepeatWashContext'
 
 interface Props {
   ayah: Ayah
@@ -94,6 +95,7 @@ function AyahBlockInner({
   }, [keepActiveWordInView, onKeepWordInView, activeWord?.wordPosition])
 
   return (
+    <RepeatWashGateProvider>
     <article
       className="ayah-block"
       data-ayah={ayah.number}
@@ -193,6 +195,7 @@ function AyahBlockInner({
         </p>
       ) : null}
     </article>
+    </RepeatWashGateProvider>
   )
 }
 

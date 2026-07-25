@@ -158,6 +158,7 @@ Full write-ups: [docs/TIMINGS_LAB.md](docs/TIMINGS_LAB.md),
 | `docs/ASSISTANT.md` | Android voice work — media hooks, App Actions, Gemini AppFunctions, testing, and release gates |
 | `docs/COMPLEXITY.md` | Complexity hotspots, subsystem ownership, and safe simplification roadmap |
 | `docs/quality-reviews/` | Multi-agent Android quality audits (summary + Grok/Codex; Claude when available) |
+| `docs/quality-reviews/AGENT_REVIEWS.md` | **How to run real Codex (`gpt-5.6-sol`) and Claude Opus reviews** — CLI flags, gotchas; do not fake them with Grok |
 | `docs/HIGHLIGHT_ENGINE.md` | The pure word-sync engine — karaoke model, binary search, repeat/high-water logic |
 | `docs/OUTPUT_LATENCY.md` | Route-based Bluetooth/output lag presets applied before the highlight clock |
 | `docs/DESIGN.md` | Any UI/visual change — the paper metaphor and its hard rules |
