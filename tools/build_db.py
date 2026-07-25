@@ -368,6 +368,18 @@ def load_qdc_timings(qdc_id: int):
 #   * mislabeled strays — a single segment carrying the wrong word index
 #     (often a sound-alike of an earlier word, e.g. 49:9 فَإِن tagged as وَإِن),
 #     an isolated backjump the recitation never follows up on;
+#   * non-contiguous span phantoms — the aligner stamps an early function word
+#     at the *onset* of a real re-say (Alafasy 5:54: long يُجَٰهِدُونَ labeled
+#     as word 4 مَن, so the chain reads [4, 21, 22, 23] after high-water 23).
+#     HighlightEngine then paints orange from 4 through 23. The real re-say is
+#     the contiguous component nearest the high water; the isolated earlier
+#     index is a mislabel and is relabeled onto that component's start;
+#   * gap phantoms — a backtrack run of early positions that does *not* re-cover
+#     the high-water tip, immediately followed by a first-pass resume that
+#     *skips* one or more words (Alafasy 5:59 after HW 11: [8, 9, 13…] with
+#     word 12 missing). The early labels sit on the skipped words' time and are
+#     not a re-say (a real re-say of the tip re-covers HW; a real earlier re-say
+#     resumes at HW+1). Relabel the run onto the gap (issue #570);
 #   * forward spikes — the same mislabel in the other direction; the too-large
 #     index inflates the high-water mark so every following normal word until
 #     that index reads as a repeat.
@@ -401,6 +413,204 @@ QDC_SPLIT_FRAGMENT_CEIL_MS = 500  # in [FRAGMENT_MS, CEIL) it is a fragment only
 QDC_SPLIT_FRAGMENT_RATIO = 0.35  # shorter/longer below this = a split fragment,
 #                                  not a peer utterance
 QDC_SPIKE_JUMP = 3  # a forward jump this large that instantly retreats is noise
+# Positions in a backtrack run within this distance count as one contiguous
+# span-repeat (allows one dropped word inside a real re-say, e.g. 9,10,12,13).
+QDC_SPAN_CONNECT_GAP = 2
+
+
+def _position_components(positions, gap=QDC_SPAN_CONNECT_GAP):
+    """Connected components of word positions under |a−b| ≤ gap adjacency."""
+    uniq = sorted(set(positions))
+    if not uniq:
+        return []
+    comps = []
+    cur = {uniq[0]}
+    for p in uniq[1:]:
+        if p <= max(cur) + gap:
+            cur.add(p)
+        else:
+            comps.append(cur)
+            cur = {p}
+    comps.append(cur)
+    return comps
+
+
+def _dephantom_noncontiguous_run(run_segs, stats):
+    """Within one time-contiguous backtrack run, keep the component nearest the
+    high water and relabel orphan components onto it.
+
+    A real span-repeat is a near-contiguous block of positions (allowing one
+    dropped word). An early isolated index in the same run is a mislabel of the
+    real chain's onset — relabel it to the next kept segment so the time stays
+    on the word being said (not folded into the previous first-pass word).
+    Single-position runs (same-word re-say) are left alone.
+    """
+    if len(run_segs) <= 1:
+        return run_segs
+    positions = [s[0] for s in run_segs]
+    comps = _position_components(positions)
+    if len(comps) <= 1:
+        return run_segs
+    def score(c):
+        return sum(1 for p in positions if p in c)
+    # Prefer the component nearest high water: real re-says restart near where
+    # the reciter left off; phantoms jump to early function words.
+    keep = max(comps, key=lambda c: (max(c), score(c)))
+    out = []
+    for pos, start, end in run_segs:
+        if pos in keep:
+            out.append([pos, start, end])
+            continue
+        stats["noncontiguous_orphans"] += 1
+        later = [s for s in run_segs if s[0] in keep and s[1] >= start]
+        earlier = [s for s in run_segs if s[0] in keep and s[1] < start]
+        if later:
+            out.append([later[0][0], start, end])
+        elif earlier:
+            out.append([earlier[-1][0], start, end])
+        # else drop (no kept peer — should not happen)
+    if not out:
+        return run_segs
+    merged = [out[0]]
+    for pos, start, end in out[1:]:
+        if pos == merged[-1][0] and start <= merged[-1][2] + QDC_SPLIT_MERGE_GAP_MS:
+            merged[-1][2] = max(merged[-1][2], end)
+        else:
+            merged.append([pos, start, end])
+    return merged
+
+
+def dephantom_noncontiguous_spans(segs, stats):
+    """Relabel early orphan positions inside multi-component backtrack runs.
+
+    Returns (new_segs, changed).
+    """
+    if not segs:
+        return segs, False
+    out = []
+    running_max = -1
+    i = 0
+    changed = False
+    while i < len(segs):
+        pos, start, end = segs[i]
+        if running_max >= 0 and pos <= running_max:
+            j = i
+            while j < len(segs) and segs[j][0] <= running_max:
+                j += 1
+            run = segs[i:j]
+            fixed = _dephantom_noncontiguous_run(run, stats)
+            if [s[0] for s in fixed] != [s[0] for s in run]:
+                changed = True
+            out.extend(fixed)
+            i = j
+            continue
+        out.append([pos, start, end])
+        running_max = max(running_max, pos)
+        i += 1
+    return out, changed
+
+
+def _map_run_onto_gap(run, gap):
+    """Assign backtrack-run segments onto skipped first-pass positions in order."""
+    if len(gap) == 1:
+        g = gap[0]
+        return [[g, s, e] for _, s, e in run]
+    out = []
+    for i, (_, s, e) in enumerate(run):
+        out.append([gap[i] if i < len(gap) else gap[-1], s, e])
+    return out
+
+
+def _merge_adjacent_same_pos(segs):
+    if not segs:
+        return segs
+    merged = [list(segs[0])]
+    for pos, start, end in segs[1:]:
+        if pos == merged[-1][0] and start <= merged[-1][2] + QDC_SPLIT_MERGE_GAP_MS:
+            merged[-1][2] = max(merged[-1][2], end)
+        else:
+            merged.append([pos, start, end])
+    return merged
+
+
+def relabel_gap_phantoms(segs, stats):
+    """Relabel a backtrack run that is actually a mislabel of skipped words.
+
+    Alafasy 5:59 (issue #570): after high-water 11, qdc emits [8, 9, 13…] —
+    word 12 is missing and the early labels sit on its time. A real re-say of
+    the tip re-covers the high-water word; a real earlier re-say resumes at
+    HW+1. Only runs that fail both (run_max < HW and next > HW+1) are remapped.
+
+    Returns (new_segs, changed).
+    """
+    if not segs:
+        return segs, False
+    out = []
+    running_max = -1
+    i = 0
+    changed = False
+    while i < len(segs):
+        pos, start, end = segs[i]
+        if running_max >= 0 and pos <= running_max:
+            j = i
+            while j < len(segs) and segs[j][0] <= running_max:
+                j += 1
+            run = segs[i:j]
+            next_pos = segs[j][0] if j < len(segs) else None
+            run_max = max(s[0] for s in run)
+            if (
+                next_pos is not None
+                and next_pos > running_max + 1
+                and run_max < running_max
+            ):
+                gap = list(range(running_max + 1, next_pos))
+                out.extend(_map_run_onto_gap(run, gap))
+                stats["gap_phantoms"] = stats.get("gap_phantoms", 0) + 1
+                changed = True
+            else:
+                out.extend(run)
+            i = j
+            continue
+        out.append([pos, start, end])
+        running_max = max(running_max, pos)
+        i += 1
+    if changed:
+        out = _merge_adjacent_same_pos(out)
+    return out, changed
+
+
+def multi_position_span_repeat(segs):
+    """True if any backtrack run covers two or more distinct word positions.
+
+    Matches the generator's span-repeat protection invariant (see
+    tools/timing_repairs/README.md): a multi-word re-cover must not be erased.
+    """
+    if not segs:
+        return False
+    running_max = -1
+    i = 0
+    while i < len(segs):
+        pos = segs[i][0]
+        if running_max >= 0 and pos <= running_max:
+            j = i
+            seen = set()
+            while j < len(segs) and segs[j][0] <= running_max:
+                seen.add(segs[j][0])
+                j += 1
+            if len(seen) >= 2:
+                return True
+            i = j
+            continue
+        running_max = max(running_max, pos)
+        i += 1
+    return False
+
+
+def erases_span_repeat(pre_segs, repair_segs):
+    """True when a repair would delete a multi-position span-repeat present in pre."""
+    return multi_position_span_repeat(pre_segs) and not multi_position_span_repeat(
+        repair_segs
+    )
 
 
 def clean_qdc_artifacts(segs, stats):
@@ -408,10 +618,14 @@ def clean_qdc_artifacts(segs, stats):
     segments. Dropped spans are folded into the neighbouring segment so the
     karaoke sweep has no holes. Runs to a fixpoint because a dropped spike can
     reunite a word with its stray sliver."""
+    stats.setdefault("noncontiguous_orphans", 0)
+    stats.setdefault("gap_phantoms", 0)
+    if not segs:
+        return segs
     changed = True
     while changed:
         changed = False
-        merged = [segs[0]]
+        merged = [list(segs[0])]
         for pos, start, end in segs[1:]:
             last = merged[-1]
             shorter = min(last[2] - last[1], end - start)
@@ -476,6 +690,12 @@ def clean_qdc_artifacts(segs, stats):
             kept.append([pos, start, end])
             running_max = max(running_max, pos)
             i += 1
+        kept, nc_changed = dephantom_noncontiguous_spans(kept, stats)
+        if nc_changed:
+            changed = True
+        kept, gap_changed = relabel_gap_phantoms(kept, stats)
+        if gap_changed:
+            changed = True
         segs = kept
     return segs
 
@@ -488,6 +708,8 @@ def adjust_qdc_segments(segs, n_words, stats):
         return None
     adjusted = []
     for pos, start, end in sorted(segs, key=lambda s: s[1]):
+        if start < 0:
+            start = 0
         if end <= start:
             stats["zero_len"] += 1
             continue
@@ -556,7 +778,14 @@ def apply_timing_repairs(timing_rows, word_counts):
     """Apply auto-generated CTC-arbitrated repairs (tools/timing_repairs/*.json)
     on top of the qdc/quran-align timing rows. Same edit shape as overrides plus
     an ignored ``kind`` tag; validated identically. Runs before overrides so a
-    manual patch wins. Summary-only output (there can be thousands of edits)."""
+    manual patch wins. Summary-only output (there can be thousands of edits).
+
+    Span-repeat protection: a repair that would erase a multi-position
+    span-repeat already present in the cleaned qdc row is skipped (see
+    tools/timing_repairs/README.md — CTC must never delete a span-repeat).
+    Bad ``drop`` repairs that flatten real re-recitations (Alafasy 5:59 / #570)
+    are the main hit class.
+    """
     slug_by_id = {r[0]: r[1] for r in RECITERS}
     by_key = {(rid, sid, ay): segs for (rid, sid, ay, segs) in timing_rows}
     files = sorted(REPAIRS_DIR.glob("*.json")) if REPAIRS_DIR.is_dir() else []
@@ -565,6 +794,7 @@ def apply_timing_repairs(timing_rows, word_counts):
         return timing_rows
     by_kind = {}
     applied = 0
+    span_protected = 0
     for path in files:
         try:
             payload = json.loads(path.read_text(encoding="utf-8"))
@@ -588,11 +818,18 @@ def apply_timing_repairs(timing_rows, word_counts):
                     sys.exit(1)
                 segs.append([pos, start, end])
             segs.sort(key=lambda s: s[1])
+            pre_raw = by_key.get((rid, sid, ay))
+            if pre_raw is not None:
+                pre = json.loads(pre_raw) if isinstance(pre_raw, str) else pre_raw
+                if erases_span_repeat(pre, segs):
+                    span_protected += 1
+                    continue
             by_key[(rid, sid, ay)] = json.dumps(segs, separators=(",", ":"))
             by_kind[edit.get("kind", "repair")] = by_kind.get(edit.get("kind", "repair"), 0) + 1
             applied += 1
     new_rows = [(rid, sid, ay, segs) for (rid, sid, ay), segs in sorted(by_key.items())]
-    print(f"  repairs: {applied} ayah(s) across {len(files)} file(s) — {by_kind}")
+    extra = f", span-protected {span_protected}" if span_protected else ""
+    print(f"  repairs: {applied} ayah(s) across {len(files)} file(s) — {by_kind}{extra}")
     return new_rows
 
 
@@ -981,6 +1218,7 @@ def main():
                 stats = {
                     "zero_len": 0, "clamped": 0, "repeats": 0, "missing": 0,
                     "merged_splits": 0, "dropped_strays": 0,
+                    "noncontiguous_orphans": 0, "gap_phantoms": 0,
                 }
                 covered = ingest_reciter_timings(
                     rid, word_counts, timing_rows, stats,
@@ -991,7 +1229,9 @@ def main():
                     f"repeat spans {stats['repeats']}, clamped {stats['clamped']}, "
                     f"zero-len {stats['zero_len']}, missing {stats['missing']}, "
                     f"split-words merged {stats['merged_splits']}, "
-                    f"stray mislabels dropped {stats['dropped_strays']}"
+                    f"stray mislabels dropped {stats['dropped_strays']}, "
+                    f"noncontiguous orphans {stats['noncontiguous_orphans']}, "
+                    f"gap phantoms {stats.get('gap_phantoms', 0)}"
                 )
             else:
                 data = load_timings(zp, slug)

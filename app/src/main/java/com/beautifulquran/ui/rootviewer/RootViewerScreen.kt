@@ -576,12 +576,6 @@ private fun OnlineReferences(
                 )
             }
         }
-        Text(
-            text = "Classical dictionary entries describe a broad history of usage; the ayah's context still determines the intended sense.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.62f),
-            modifier = Modifier.padding(top = 6.dp),
-        )
     }
 }
 
