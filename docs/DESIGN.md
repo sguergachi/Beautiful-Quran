@@ -410,9 +410,11 @@ image, so it is crisp at any density and nearly free to render.
   tooling rather than illumination. The **surah header's rosette and field
   are likewise static** — fixed page typography, not a ceremony. One
   absolute rule, enforced everywhere this generator draws: no composition
-  may read as a hexagram — star indices that decompose into triangles
-  ({12/4}), 6-fold seals, and 6-fold field tilings are all excluded by
-  construction and guarded by tests on both platforms.
+  may read as an occult compound — star indices that decompose into
+  triangles ({12/4} → hexagram) or into interlaced pentagrams
+  ({10/4} → two {5/2} pentacles stacked), 6-fold seals, and 6-fold field
+  tilings are all excluded by construction and guarded by tests on both
+  platforms.
 - **Gilding.** Gold is never a flat color. Gilded elements (the surah
   rosette, ayah number marks, the home mark) carry a three-stop leaf
   gradient (deep bronze → bright gilt → deep bronze). On the reader, the
