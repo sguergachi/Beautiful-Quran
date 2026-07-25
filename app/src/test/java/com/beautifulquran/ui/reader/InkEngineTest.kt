@@ -97,10 +97,9 @@ class InkEngineTest {
     fun `wasl handoff continues from the completed prefix edge`() {
         val prefix = 1f / 7f
         val mainFeather = 1.6f
-        val waslFeather = waslPrefixFeather(prefix)
         val start = waslContinuationStart(prefix, mainFeather)
 
-        assertEquals((prefix + waslFeather) / (1f + mainFeather), start, 1e-4f)
+        assertEquals(waslHeadTravel(prefix) / (1f + mainFeather), start, 1e-4f)
         assertEquals(start, continuedSweepProgress(progress = 0f, start = start), 0f)
         assertEquals(
             start + 0.5f * (1f - start),
@@ -111,13 +110,19 @@ class InkEngineTest {
     }
 
     @Test
-    fun `wasl prefix feather is slightly wider than the letter span`() {
+    fun `wasl wash maps the freed tail onto a short main-wash segment`() {
         val prefix = 1f / 7f
-        val feather = waslPrefixFeather(prefix)
-        assertTrue(feather > prefix)
-        assertTrue(feather <= 0.55f)
-        // Short words stay capped so the soft tail does not wash half the word.
-        assertEquals(0.55f, waslPrefixFeather(0.5f), 0f)
+        val mainFeather = 1.6f
+        val end = waslContinuationStart(prefix, mainFeather)
+        // Window 0→1 only advances the main wash to the handoff edge — not a
+        // full 0→1 wipe — so the soft edge has time to breathe.
+        assertTrue(end < 0.35f)
+        assertEquals(0f, waslWashProgress(windowProgress = 0f, endProgress = end), 0f)
+        assertEquals(end * 0.5f, waslWashProgress(windowProgress = 0.5f, endProgress = end), 1e-4f)
+        assertEquals(end, waslWashProgress(windowProgress = 1f, endProgress = end), 0f)
+        // Head travel is one glyph plus a soft lead under main geometry.
+        assertTrue(waslHeadTravel(prefix) > prefix)
+        assertEquals(0.5f + 0.55f, waslHeadTravel(0.5f), 0f)
     }
 
     @Test

@@ -426,22 +426,26 @@ internal fun continuedSweepProgress(progress: Float, start: Float): Float {
 }
 
 /**
- * Soft edge for the wasl opening-letter bloom. Travel stays one glyph
- * ([prefixFraction]); the edge is a little wider so ink breathes in with the
- * same smootherstep toe as the main wash rather than peeling hard. Capped so
- * the soft tail does not wash half the following word.
+ * Soft head travel (word-widths) for a completed wasl bloom: one opening
+ * glyph plus a modest lead so the letter is clearly entering ink. Used only
+ * to place the main-wash progress handoff — the drawn edge is the main
+ * feather, not this lead.
  */
-internal fun waslPrefixFeather(prefixFraction: Float): Float =
-    (prefixFraction + 0.25f).coerceAtMost(0.55f)
+internal fun waslHeadTravel(prefixFraction: Float): Float =
+    prefixFraction + (prefixFraction + 0.25f).coerceAtMost(0.55f)
 
 /**
- * Matches the completed prefix wash's leading-edge position in the main wash.
- * Head at progress 1 is [prefixFraction] + [waslPrefixFeather].
+ * Main-wash progress already laid down during the prior word's wasl tail.
+ * Wasl is the first segment of the ordinary ink wash (same feather, full-word
+ * geometry): window time 0→1 maps onto progress 0→this value, so the soft
+ * edge breathes at the main wash rate instead of racing a one-glyph wipe.
  */
-internal fun waslContinuationStart(prefixFraction: Float, mainFeather: Float): Float {
-    val edge = waslPrefixFeather(prefixFraction)
-    return ((prefixFraction + edge) / (1f + mainFeather)).coerceIn(0f, 1f)
-}
+internal fun waslContinuationStart(prefixFraction: Float, mainFeather: Float): Float =
+    (waslHeadTravel(prefixFraction) / (1f + mainFeather)).coerceIn(0f, 1f)
+
+/** Window progress (0→1 over the freed tail) → main-wash progress. */
+internal fun waslWashProgress(windowProgress: Float, endProgress: Float): Float =
+    windowProgress.coerceIn(0f, 1f) * endProgress.coerceIn(0f, 1f)
 
 private class SweepEntryLifecycle(
     var active: Boolean = false,
@@ -589,13 +593,18 @@ private fun rememberLetterSweep(
 }
 
 /**
- * A one-glyph continuation wash. [fraction] bounds how far the wash may
- * travel; [waslPrefixFeather] supplies a slightly wider soft leading edge.
+ * Wasl bloom on the next word during this word's connected tail.
+ * [windowProgress] is 0→1 over the freed tail; [endProgress] is the
+ * main-wash progress that maps onto (see [waslWashProgress]). [feather] is
+ * the ordinary ink edge so the handoff is a faded continuation, not a wipe.
  */
 private data class WaslPrefix(
-    val fraction: Float,
-    val progress: State<Float>,
-)
+    val windowProgress: State<Float>,
+    val endProgress: Float,
+    val feather: Float,
+) {
+    fun displayProgress(): Float = waslWashProgress(windowProgress.value, endProgress)
+}
 
 private class ActiveWordEntry(
     var index: Int,
@@ -953,11 +962,10 @@ private fun HighlightLayeredText(
                 style = style,
                 color = color,
                 modifier = Modifier.letterFadeIn(
-                    progress = { waslPrefix.progress.value },
+                    progress = { waslPrefix.displayProgress() },
                     rtl = rtl,
                     restingAlpha = 0f,
-                    feather = waslPrefixFeather(waslPrefix.fraction),
-                    revealFraction = waslPrefix.fraction,
+                    feather = waslPrefix.feather,
                 ),
             )
         }
@@ -1637,17 +1645,17 @@ private fun ResponsiveHafsAyah(
                         )
                     }
                     waslPrefixes.forEachIndexed { index, prefix ->
-                        if (prefix == null || prefix.progress.value <= 0f) {
+                        val wash = prefix?.displayProgress() ?: 0f
+                        if (prefix == null || wash <= 0f) {
                             return@forEachIndexed
                         }
                         val range = rendered.wordRanges.getOrNull(index)
                             ?: return@forEachIndexed
                         blooms += ShapedWordBloom.ColorReveal(
                             range = range,
-                            progress = prefix.progress.value,
+                            progress = wash,
                             color = palette.fullInkColor,
-                            feather = waslPrefixFeather(prefix.fraction),
-                            revealFraction = prefix.fraction,
+                            feather = prefix.feather,
                         )
                     }
                     // Orange directional bloom: SrcIn-tint the shaped glyphs,
@@ -2241,27 +2249,40 @@ fun AyahBlock(
         previousActive.index = activeIndex
         previousActive.activation = activation
     }
+    val waslMainFeather = if (pacing != null) {
+        InkEngine.pacedFeather()
+    } else {
+        InkEngine.tuning.washFeather
+    }
     val activeRevealStart = if (carriedIncoming && incomingConnection != null) {
         waslContinuationStart(
             prefixFraction = incomingConnection.prefixFraction,
-            mainFeather = if (pacing != null) {
-                InkEngine.pacedFeather()
-            } else {
-                InkEngine.tuning.washFeather
-            },
+            mainFeather = waslMainFeather,
         )
     } else {
         0f
     }
-    val fullWaslProgress = remember { mutableStateOf(1f) }
+    // Window complete (1) × endProgress = handoff edge under main geometry.
+    val fullWaslWindow = remember { mutableStateOf(1f) }
     val waslPrefixes = ayah.words.indices.map { index ->
         when {
             // Preserve a completed outgoing bloom only across the natural
             // adjacent handoff. A seek bumps activation and starts clean.
             index == activeIndex && carriedIncoming && incomingConnection != null ->
-                WaslPrefix(incomingConnection.prefixFraction, fullWaslProgress)
+                WaslPrefix(
+                    windowProgress = fullWaslWindow,
+                    endProgress = activeRevealStart,
+                    feather = waslMainFeather,
+                )
             index == activeIndex + 1 && outgoingConnection != null ->
-                WaslPrefix(outgoingConnection.prefixFraction, outgoingProgress)
+                WaslPrefix(
+                    windowProgress = outgoingProgress,
+                    endProgress = waslContinuationStart(
+                        prefixFraction = outgoingConnection.prefixFraction,
+                        mainFeather = waslMainFeather,
+                    ),
+                    feather = waslMainFeather,
+                )
             else -> null
         }
     }

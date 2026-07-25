@@ -458,9 +458,10 @@ pure, `InkEngineTest`-covered helpers.
    curve is released only once the residual finishes: it is what maps the linear
    clock to wash position, so dropping it mid-wash would jump the edge.
 
-A **wasl continuation** (`waslContinuationStart` / `continuedSweepProgress`) is
-the fourth case: when the previous word's ink already bloomed this word's opening
-prefix, the sweep starts from that edge instead of 0 — see
+A **wasl continuation** (`waslWashProgress` / `waslContinuationStart` /
+`continuedSweepProgress`) is the fourth case: the prior word's freed tail runs
+the first segment of this word's ordinary ink wash (same feather), and the
+sweep starts from that edge instead of 0 — see
 [TAJWEED_PACING.md](TAJWEED_PACING.md).
 
 ### Ink Lab
