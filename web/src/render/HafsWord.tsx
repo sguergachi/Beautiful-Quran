@@ -78,11 +78,24 @@ export function HafsWord({
   if (ink.repeat && glintEnabled() && !glintMounted) setGlintMounted(true)
   if (searchFlash && !flashMounted) setFlashMounted(true)
 
+  /**
+   * In-flight first-pass wash. Residual short-hold washes finish after
+   * Active→Recited (Android rememberLetterSweep); cancel only on new Active
+   * entry, recess, repeat, or unmount.
+   */
+  const washStopRef = useRef<(() => void) | null>(null)
+  const washingRef = useRef(false)
+  const stopWash = () => {
+    washStopRef.current?.()
+    washStopRef.current = null
+    washingRef.current = false
+  }
+
   /*
    * Paper-cover bloom on Active entry (Android shapedWordBloom / InkReveal).
    * useLayoutEffect so progress-0 lands before paint. The wash is a
    * smootherstep directional mask — soft faded edge is required fidelity.
-   * Snap-clear on leave to avoid a solid paper flash after handoff.
+   * Leaving Active mid-wash does not snap-clear: residual finishes after handoff.
    */
   useLayoutEffect(() => {
     const cover = coverRef.current
@@ -112,23 +125,27 @@ export function HafsWord({
     }
 
     if (ink.state === InkState.Upcoming) {
+      stopWash()
       clearPaperCover(cover)
       cover.style.transition = `opacity ${t.recessMs}ms cubic-bezier(0.4, 0, 0.2, 1)`
       cover.style.opacity = String(1 - resting)
       return
     }
 
-    if (ink.state !== InkState.Active) {
+    if (ink.repeat) {
+      stopWash()
       clearPaperCover(cover)
       return
     }
 
-    if (ink.repeat) {
-      clearPaperCover(cover)
+    if (ink.state !== InkState.Active) {
+      // Recited / Plain: let residual short-hold wash finish; idle only clear.
+      if (!washingRef.current) clearPaperCover(cover)
       return
     }
 
     if (revealedOnEntry.current) {
+      stopWash()
       clearPaperCover(cover)
       return
     }
@@ -139,10 +156,27 @@ export function HafsWord({
     // (Nightfall): the white-gold sheen rides this wash, then dries after it.
     if (glintEnabled()) setGlintMounted(true)
 
+    stopWash()
     const duration = activeSweepMs ?? t.repeatSweepMs
-    return runPaperCoverWash(cover, true, duration, ease, resting)
+    washingRef.current = true
+    washStopRef.current = runPaperCoverWash(cover, true, duration, ease, resting, undefined, () => {
+      washingRef.current = false
+      washStopRef.current = null
+    })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ink.state, ink.repeat, activation])
+
+  // Unmount only — residual washes must survive Active→Recited handoff.
+  // Reset prevState so React StrictMode's remount restarts an Active wash
+  // (cleanup cancels the first pass; without reset, remount sees prev=Active
+  // and skips enteredActive).
+  useLayoutEffect(
+    () => () => {
+      stopWash()
+      prevState.current = null
+    },
+    [],
+  )
 
   // Fresh-ink glint (Nightfall/Royal Green, InkEngine.glinting): transparent-fill
   // halo rises with the paper-cover wash. Never add a second filled Hafs glyph:

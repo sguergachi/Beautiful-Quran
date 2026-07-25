@@ -43,6 +43,29 @@ enum class RepeatChoice(val label: String) {
     NEXT_N_AYAHS("From this ayah"),
 }
 
+/** Retains an explicit choice when multiple controls describe the same range. */
+internal fun repeatChoice(
+    repeatMode: Int,
+    repeatRange: IntRange?,
+    currentAyah: Int,
+    retainedChoice: RepeatChoice?,
+): RepeatChoice {
+    val retainedRangeChoice = retainedChoice?.takeIf {
+        it == RepeatChoice.AYAH_RANGE || it == RepeatChoice.NEXT_N_AYAHS
+    }
+    return when {
+        repeatRange != null && retainedRangeChoice != null -> retainedRangeChoice
+        repeatRange != null &&
+            repeatRange.first == currentAyah &&
+            repeatRange.first < repeatRange.last -> RepeatChoice.NEXT_N_AYAHS
+        repeatRange != null && repeatRange.first == repeatRange.last -> RepeatChoice.ONE_AYAH
+        repeatRange != null -> RepeatChoice.AYAH_RANGE
+        repeatMode == Player.REPEAT_MODE_ONE -> RepeatChoice.ONE_AYAH
+        repeatMode == Player.REPEAT_MODE_ALL -> RepeatChoice.WHOLE_SURAH
+        else -> RepeatChoice.OFF
+    }
+}
+
 /**
  * Choosing how the recitation repeats — **not a dialog**.
  *
@@ -71,9 +94,11 @@ fun RepeatSheet(
     repeatMode: Int,
     repeatRange: IntRange?,
     currentAyah: Int?,
+    retainedChoice: RepeatChoice?,
     onDismiss: () -> Unit,
     onRepeatMode: (Int) -> Unit,
     onRepeatRange: (Int, Int) -> Unit,
+    onChoiceApplied: (RepeatChoice) -> Unit,
 ) {
     val safeAyahCount = ayahCount.coerceAtLeast(1)
     val safeCurrentAyah = (currentAyah ?: 1).coerceIn(1, safeAyahCount)
@@ -82,14 +107,7 @@ fun RepeatSheet(
         repeatRange.first < repeatRange.last
     var choice by remember {
         mutableStateOf(
-            when {
-                isNextNRange -> RepeatChoice.NEXT_N_AYAHS
-                repeatRange != null && repeatRange.first == repeatRange.last -> RepeatChoice.ONE_AYAH
-                repeatRange != null -> RepeatChoice.AYAH_RANGE
-                repeatMode == Player.REPEAT_MODE_ONE -> RepeatChoice.ONE_AYAH
-                repeatMode == Player.REPEAT_MODE_ALL -> RepeatChoice.WHOLE_SURAH
-                else -> RepeatChoice.OFF
-            },
+            repeatChoice(repeatMode, repeatRange, safeCurrentAyah, retainedChoice),
         )
     }
     var from by remember {
@@ -115,6 +133,10 @@ fun RepeatSheet(
                 safeCurrentAyah + nextNCount - 1,
             )
         }
+        // Remember the *choice*, not just the resulting range: "a range of
+        // ayahs" and "from this ayah" can describe the same IntRange, so
+        // reopening must show the one the reader actually picked (#548).
+        onChoiceApplied(choice)
         onDismiss()
     }
 

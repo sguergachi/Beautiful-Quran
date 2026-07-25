@@ -147,6 +147,20 @@ export function WordUnit({
   if (ink.repeat && glintEnabled() && !glintMounted) setGlintMounted(true)
   if (searchFlash && !flashMounted) setFlashMounted(true)
 
+  /**
+   * In-flight first-pass wash. Not returned as the effect cleanup on every
+   * dep change — short holds must finish after Active→Recited handoff (same
+   * as Android rememberLetterSweep). Cancel only on new Active entry, recess,
+   * repeat takeover, or unmount.
+   */
+  const washStopRef = useRef<(() => void) | null>(null)
+  const washingRef = useRef(false)
+  const stopWash = () => {
+    washStopRef.current?.()
+    washStopRef.current = null
+    washingRef.current = false
+  }
+
   /*
    * Active-entry wash — Android fidelity is law.
    *
@@ -160,6 +174,7 @@ export function WordUnit({
    * flashes full ink for a frame then snaps faint when the wash arrives.
    *
    * While repeating, the base layer stays untouched — orange carries the motion.
+   * Leaving Active mid-wash does not snap-clear: residual finishes after handoff.
    */
   useLayoutEffect(() => {
     const prev = prevState.current
@@ -192,6 +207,7 @@ export function WordUnit({
       if (!cover) return
 
       if (ink.state === InkState.Upcoming) {
+        stopWash()
         clearPaperCover(cover)
         cover.style.transition = `opacity ${t.recessMs}ms cubic-bezier(0.4, 0, 0.2, 1)`
         cover.style.opacity = String(1 - resting)
@@ -199,19 +215,24 @@ export function WordUnit({
         return
       }
 
-      if (ink.state !== InkState.Active) {
+      if (ink.repeat) {
+        stopWash()
         clearPaperCover(cover)
         paintSecondary(glossRef.current, translitRef.current, ink, null, false)
         return
       }
 
-      if (ink.repeat) {
-        clearPaperCover(cover)
-        paintSecondary(glossRef.current, translitRef.current, ink, null, false)
+      if (ink.state !== InkState.Active) {
+        // Recited / Plain: let a residual short-hold wash finish; idle only clear.
+        if (!washingRef.current) {
+          clearPaperCover(cover)
+          paintSecondary(glossRef.current, translitRef.current, ink, null, false)
+        }
         return
       }
 
       if (revealedOnEntry.current) {
+        stopWash()
         clearPaperCover(cover)
         paintSecondary(glossRef.current, translitRef.current, ink, 1, false)
         return
@@ -223,9 +244,11 @@ export function WordUnit({
       // (Nightfall): the white-gold sheen rides this wash, drying after it.
       if (glintEnabled()) setGlintMounted(true)
 
+      stopWash()
       const duration = activeSweepMs ?? t.repeatSweepMs
       paintSecondary(glossRef.current, translitRef.current, ink, 0, false)
-      return runPaperCoverWash(
+      washingRef.current = true
+      washStopRef.current = runPaperCoverWash(
         cover,
         true,
         duration,
@@ -235,30 +258,37 @@ export function WordUnit({
           paintSecondary(glossRef.current, translitRef.current, ink, eased, false)
         },
         () => {
+          washingRef.current = false
+          washStopRef.current = null
           paintSecondary(glossRef.current, translitRef.current, ink, 1, false)
         },
       )
+      return
     }
 
     // ── English: directional letterFadeIn mask ───────────────────────────
     const el = baseRef.current
     if (!el) return
 
-    if (ink.state !== InkState.Active) {
+    if (ink.repeat) {
+      stopWash()
       applyMask(el, 'none')
       el.style.removeProperty('opacity')
       paintSecondary(glossRef.current, translitRef.current, ink, null, true)
       return
     }
 
-    if (ink.repeat) {
-      applyMask(el, 'none')
-      el.style.removeProperty('opacity')
-      paintSecondary(glossRef.current, translitRef.current, ink, null, true)
+    if (ink.state !== InkState.Active) {
+      if (!washingRef.current) {
+        applyMask(el, 'none')
+        el.style.removeProperty('opacity')
+        paintSecondary(glossRef.current, translitRef.current, ink, null, true)
+      }
       return
     }
 
     if (revealedOnEntry.current) {
+      stopWash()
       applyMask(el, 'none')
       el.style.opacity = '1'
       paintSecondary(glossRef.current, translitRef.current, ink, 1, true)
@@ -270,9 +300,11 @@ export function WordUnit({
     // Same glint mount as the Arabic branch — English lyric ink glints too.
     if (glintEnabled()) setGlintMounted(true)
 
+    stopWash()
     const duration = activeSweepMs ?? t.repeatSweepMs
     paintSecondary(glossRef.current, translitRef.current, ink, 0, true)
-    return runLetterWash(
+    washingRef.current = true
+    washStopRef.current = runLetterWash(
       el,
       false,
       duration,
@@ -282,6 +314,8 @@ export function WordUnit({
         paintSecondary(glossRef.current, translitRef.current, ink, eased, true)
       },
       () => {
+        washingRef.current = false
+        washStopRef.current = null
         paintSecondary(glossRef.current, translitRef.current, ink, 1, true)
       },
     )
@@ -290,6 +324,18 @@ export function WordUnit({
     // activation restarts when the same word is re-sought.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ink.state, ink.repeat, englishMode, activation])
+
+  // Unmount only — residual washes must survive Active→Recited handoff.
+  // Reset prevState so React StrictMode's remount restarts an Active wash
+  // (cleanup cancels the first pass; without reset, remount sees prev=Active
+  // and skips enteredActive).
+  useLayoutEffect(
+    () => () => {
+      stopWash()
+      prevState.current = null
+    },
+    [],
+  )
 
   // Fresh-ink glint (Nightfall/Royal Green, InkEngine.glinting): halo rises with
   // the base wash; English also gets a masked tint twin. Arabic keeps one

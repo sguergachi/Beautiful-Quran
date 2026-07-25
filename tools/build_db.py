@@ -432,27 +432,50 @@ def clean_qdc_artifacts(segs, stats):
                 merged.append([pos, start, end])
         kept = []
         running_max = -1
-        for i, (pos, start, end) in enumerate(merged):
+        i = 0
+        while i < len(merged):
+            pos, start, end = merged[i]
             prev = kept[-1] if kept else None
+            # Forward-spike RUN: one or more ascending segments that leap
+            # >= QDC_SPIKE_JUMP past the running max and are then followed by a
+            # retreat below where the run began — words the aligner emitted
+            # prematurely that the recitation actually reaches later (they
+            # re-appear, in order, further on). A single-segment run is the
+            # original spike; a multi-word run needs the lookahead (16:61 emits
+            # [17,18] before word 11; 28:32 emits [16,17,18] before word 8). A
+            # real dropped word makes a forward jump too, but it keeps going
+            # forward — only a jump that RETREATS is spurious.
+            if prev is not None and pos >= running_max + QDC_SPIKE_JUMP:
+                j = i
+                while (
+                    j + 1 < len(merged)
+                    and merged[j + 1][0] > running_max
+                    and merged[j + 1][0] >= merged[j][0]
+                ):
+                    j += 1
+                after = merged[j + 1][0] if j + 1 < len(merged) else None
+                if after is not None and after < pos:
+                    for k in range(i, j + 1):
+                        prev[2] = max(prev[2], merged[k][2])
+                        stats["dropped_strays"] += 1
+                    changed = True
+                    i = j + 1
+                    continue
             next_pos = merged[i + 1][0] if i + 1 < len(merged) else None
             stray = (
                 prev is not None
                 and pos < prev[0]
                 and (next_pos is None or next_pos > running_max)
             )
-            spike = (
-                prev is not None
-                and pos >= running_max + QDC_SPIKE_JUMP
-                and next_pos is not None
-                and next_pos < pos
-            )
-            if stray or spike:
+            if stray:
                 prev[2] = max(prev[2], end)
                 stats["dropped_strays"] += 1
                 changed = True
+                i += 1
                 continue
             kept.append([pos, start, end])
             running_max = max(running_max, pos)
+            i += 1
         segs = kept
     return segs
 

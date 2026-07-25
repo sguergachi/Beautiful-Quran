@@ -190,11 +190,17 @@ The model is therefore a **gated hint**, built from four parts:
   or tanwīn and **this** word starts with idghām (`يرملون`), iqlāb (`ب`), or
   ikhfāʾ (the fifteen letters), the nūn is absorbed under wasl and the
   reciter sustains **this word's opening letter** (e.g. `مَن يَقُولُ`,
-  `مِن قَبۡلُ`, tanwīn + `وَ…`). `prevArabic` arms that entry hold;
+  `مِن قَبۡلُ`, `نُوحٖ وَٱلنَّبِيِّـۧنَ`,
+  `رُّسُلٗا مُّبَشِّرِينَ`). `prevArabic` arms that entry hold;
   `nextArabic` softens the previous word's exit (letters finish by ~82 % of
-  the spoken span so the trailing nūn is not settled at handoff). Same-ayah
-  neighbours only (`Hold.connect`, default on). Iẓhār and cross-ayah wasl are
-  left alone.
+  the spoken span so the trailing nūn is not settled at handoff). During the
+  freed tail, a narrow soft wash blooms only the next word's opening glyph;
+  it remains inked across the word-timing boundary while the ordinary
+  whole-word wash catches up. The prefix uses its one-letter fraction for
+  both travel and feather, retaining the smootherstep edge without brightening
+  the following glyph. It is carried across only on a natural adjacent-word
+  handoff, never a seek. Same-ayah neighbours only (`Hold.connect`, default
+  on). Iẓhār and cross-ayah wasl are left alone.
 - **Waqf length scale.** `Hold.waqfLengthScale` (Ink Lab: **Waqf length
   scale**, default 0.7) multiplies `waqfShare` by a letter-count ramp: 0 =
   full share on every closer; 1 = linear from ~0 at 3 letters to full share
@@ -246,7 +252,10 @@ Two refinements built into the curve, not the callers:
   knob reshapes the word already on screen instead of waiting for the next
   activation. `AyahBlock` also passes `isAyahFinal` (the active word's position
   vs `ayah.words.last()`), which arms the waqf hold, and the previous/next
-  words' `arabic` for wasl nūn entry and exit.
+  words' `arabic` for wasl nūn entry and exit. A detected connection also
+  drives a prefix-only overlay on the next shaped word over the prior word's
+  final 18%; on handoff that prefix stays full so the wāw/other target never
+  dims or restarts.
 - **Feather** — the make-or-break visual change, and the one the first
   revision got wrong. `letterFadeIn`'s wide edge is *what makes the reveal
   ethereal*: at 1.6× the word width the wash reads "closer to a whole-word
@@ -324,9 +333,11 @@ the curve, not the weights, is the module boundary.
   `waqfShare` buys a longer stillness and `waqfLengthScale` protects short /
   medium closers' run-up;
   wasl entry (`مَن`→`يَقُولُ`, ikhfāʾ, iqlāb) parks on the next opening letter
-  and wasl exit finishes the previous word early; no segment anywhere outruns
-  the cruise cap; and every knob combination stays monotone and bounded with
-  exact endpoints. **The golden literals must stay byte-identical to the DB** — an
+  and wasl exit finishes the previous word early; the exact 4:163
+  `نُوحٖ`→`وَٱلنَّبِيِّـۧنَ` pair blooms its wāw from 82–100% of the prior
+  word; no segment anywhere outruns the cruise cap; and every knob combination
+  stays monotone and bounded with exact endpoints. **The golden literals must
+  stay byte-identical to the DB** — an
   editor or tool that NFC-normalizes the file fuses `ا + ٓ` into precomposed
   `آ` (U+0622) and silently changes the weights (the parser now unfuses U+0622
   defensively, but the DB itself is always decomposed).

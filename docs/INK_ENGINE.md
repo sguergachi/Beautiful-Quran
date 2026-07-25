@@ -367,8 +367,9 @@ InkEngine owns that too, as data rather than as animation code:
   `wordState(position, activeWord, isActiveAyah, dimmed)` (including the
   high-water rule), `inRepeatChain(position, activeWord)`, the bundled
   `word(...) → InkEngine.Word(state, repeat)`,   `sweepMs(activeWord, speed)`
-  with the min/max clamps (the min floor never exceeds the word's lit
-  lifetime — stretching past handoff flickered Arabic-only's paper cover),
+  with the min/max clamps (short holds scale up to `minSweepMs` so tiny
+  words still show a wash; residual progress finishes after handoff
+  instead of snapping — see `rememberLetterSweep`),
   `glinting(state)` — the first-gloss glint rule:
   Active words wear the white-gold sheen (including seek/replay and
   repeat events), which then dissolves back to plain recited ink over

@@ -125,10 +125,13 @@ describe('InkEngine', () => {
     expect(sweepMs(active(1, 60_000), 1)).toBe(tuning.maxSweepMs)
   })
 
-  it('short hold is not stretched past handoff by the min sweep floor', () => {
-    expect(sweepMs(active(1, 80), 1)).toBe(80)
-    expect(sweepMs(active(1, 80), 2)).toBe(40)
-    expect(sweepMs(active(1, 10), 1)).toBe(10)
+  it('short hold is scaled up to the min sweep floor', () => {
+    // Residual wash finishes after handoff so short words still breathe.
+    const floor = getTuning().minSweepMs
+    expect(sweepMs(active(1, 80), 1)).toBe(floor)
+    expect(sweepMs(active(1, 80), 2)).toBe(floor)
+    expect(sweepMs(active(1, 10), 1)).toBe(floor)
+    expect(sweepMs(active(1, 0), 1)).toBe(floor)
   })
 
   it('no active word means no sweep', () => {

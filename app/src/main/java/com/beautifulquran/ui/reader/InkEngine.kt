@@ -335,17 +335,18 @@ object InkEngine {
     /**
      * How long the active word's letter sweep should run: the time the
      * word stays lit (karaoke hold until the next word), corrected for
-     * playback speed. Clamped up to [Tuning.minSweepMs] only when the hold
-     * is long enough — never past the handoff, or the wash outlives Active
-     * and Arabic-only's paper cover flickers on the completed word. Long
-     * holds are capped by [Tuning.maxSweepMs]. Null when nothing is lit.
+     * playback speed, floored at [Tuning.minSweepMs] so short holds (and
+     * first-word timing quirks with near-zero remaining Active time) still
+     * get a visible wash. The renderers finish an incomplete wash after
+     * handoff rather than snapping to full ink — so scaling past the lit
+     * lifetime no longer flickers Arabic-only paper cover. Long holds are
+     * capped by [Tuning.maxSweepMs]. Null when nothing is lit.
      */
     fun sweepMs(activeWord: ActiveWord?, playbackSpeed: Float): Int? {
         val word = activeWord ?: return null
         val raw = (word.durationMs / playbackSpeed).toInt().coerceAtLeast(0)
-        if (raw <= 0) return 1
-        val floor = minOf(tuning.minSweepMs, raw)
-        return raw.coerceIn(floor, tuning.maxSweepMs)
+        if (raw <= 0) return tuning.minSweepMs
+        return raw.coerceIn(tuning.minSweepMs, tuning.maxSweepMs)
     }
 
     /**
@@ -391,6 +392,13 @@ object InkEngine {
             prevArabic = prevArabic,
             nextArabic = nextArabic,
         )
+    }
+
+    /** Cross-word prefix bloom for a nūn/tanwīn connection, when enabled. */
+    fun connection(prevArabic: String, arabic: String): TajweedPacing.Connection? {
+        val t = tuning
+        if (!t.tajweedPacing || !t.holdConnect) return null
+        return TajweedPacing.connection(prevArabic, arabic)
     }
 
     /**
