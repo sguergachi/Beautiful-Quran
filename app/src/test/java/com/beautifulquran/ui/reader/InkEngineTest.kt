@@ -30,7 +30,65 @@ class InkEngineTest {
         }
 
     @Test
-    fun `new word entry masks the completed animatable before reset`() {
+    fun `sweep entry lifecycle arms only for a new active generation`() {
+        assertEquals(
+            SweepEntryAction.Arm,
+            sweepEntryAction(
+                wasActive = false,
+                previousActivation = 0L,
+                active = true,
+                activation = 0L,
+                hasSweep = true,
+            ),
+        )
+        assertEquals(
+            SweepEntryAction.Keep,
+            sweepEntryAction(
+                wasActive = true,
+                previousActivation = 4L,
+                active = true,
+                activation = 4L,
+                hasSweep = true,
+            ),
+        )
+        assertEquals(
+            SweepEntryAction.Arm,
+            sweepEntryAction(
+                wasActive = true,
+                previousActivation = 4L,
+                active = true,
+                activation = 5L,
+                hasSweep = true,
+            ),
+        )
+    }
+
+    @Test
+    fun `sweep entry lifecycle clears outside a runnable active word`() {
+        assertEquals(
+            SweepEntryAction.Clear,
+            sweepEntryAction(
+                wasActive = true,
+                previousActivation = 4L,
+                active = false,
+                activation = 4L,
+                hasSweep = true,
+            ),
+        )
+        assertEquals(
+            SweepEntryAction.Clear,
+            sweepEntryAction(
+                wasActive = false,
+                previousActivation = 0L,
+                active = true,
+                activation = 0L,
+                hasSweep = false,
+            ),
+        )
+    }
+
+    @Test
+    fun `pending sweep entry masks the completed animatable before reset`() {
         assertEquals(0f, displayedSweepProgress(entryPending = true, progress = 1f), 0f)
         assertEquals(0.4f, displayedSweepProgress(entryPending = false, progress = 0.4f), 0f)
     }

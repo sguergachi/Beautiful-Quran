@@ -403,8 +403,31 @@ private class LetterSweep(
     val feather: State<Float?>,
 )
 
+internal enum class SweepEntryAction { Arm, Keep, Clear }
+
+internal fun sweepEntryAction(
+    wasActive: Boolean,
+    previousActivation: Long,
+    active: Boolean,
+    activation: Long,
+    hasSweep: Boolean,
+): SweepEntryAction = when {
+    !active || !hasSweep -> SweepEntryAction.Clear
+    !wasActive || activation != previousActivation -> SweepEntryAction.Arm
+    else -> SweepEntryAction.Keep
+}
+
 internal fun displayedSweepProgress(entryPending: Boolean, progress: Float): Float =
     if (entryPending) 0f else progress
+
+private class SweepEntryLifecycle(
+    var active: Boolean = false,
+    var activation: Long = 0L,
+    var applied: Boolean = true,
+    var durationMs: Int = 1,
+    var pacing: TajweedPacing.Curve? = null,
+    var feather: Float? = null,
+)
 
 /**
  * Drives the letter-fade sweep for the active word: restarts at 0 each time
@@ -449,46 +472,73 @@ private fun rememberLetterSweep(
     val lockedMs = remember { mutableStateOf(0) }
     val lockedPacing = remember { mutableStateOf<TajweedPacing.Curve?>(null) }
     val lockedFeather = remember { mutableStateOf<Float?>(null) }
-    // Animatable survives handoff for residual washes, so a new Active entry
-    // initially still holds its previous 1f. Mask that first composition at
-    // zero until LaunchedEffect has snapped the backing animation to zero.
+    val lifecycle = remember { SweepEntryLifecycle() }
+    val entryAction = sweepEntryAction(
+        wasActive = lifecycle.active,
+        previousActivation = lifecycle.activation,
+        active = active,
+        activation = activation,
+        hasSweep = sweepMs != null,
+    )
+    if (entryAction == SweepEntryAction.Arm) {
+        lifecycle.applied = false
+        lifecycle.durationMs = sweepMs ?: 1
+        lifecycle.pacing = pacing
+        lifecycle.feather = if (pacing != null) InkEngine.pacedFeather() else null
+    }
     val entryPending = remember(active, activation) {
-        mutableStateOf(active && sweepMs != null)
+        mutableStateOf(entryAction == SweepEntryAction.Arm)
+    }
+    SideEffect {
+        lifecycle.active = active
+        lifecycle.activation = activation
     }
     // Key on active + residual policy + activation — restarts on word-tap /
     // seek (activation bump) and reacts when the leave target changes.
     LaunchedEffect(active, finishResidual, activation) {
         if (active && sweepMs != null) {
-            lockedMs.value = sweepMs
-            lockedPacing.value = pacing
-            lockedFeather.value =
-                if (pacing != null) InkEngine.pacedFeather() else null
+            lockedMs.value = lifecycle.durationMs
+            lockedPacing.value = lifecycle.pacing
+            lockedFeather.value = lifecycle.feather
             sweep.snapTo(0f)
+            lifecycle.applied = true
             entryPending.value = false
-            val easing = if (pacing != null) LinearEasing else InkEngine.sweepEasing
-            sweep.animateTo(1f, tween(sweepMs, easing = easing))
-        } else if (finishResidual && sweep.value < 1f) {
-            // Recited handoff mid-wash: finish residual rather than snap.
-            val total = lockedMs.value.coerceAtLeast(1)
-            val remain = ((1f - sweep.value) * total).toInt().coerceAtLeast(1)
             val easing =
-                if (lockedPacing.value != null) LinearEasing else InkEngine.sweepEasing
-            sweep.animateTo(1f, tween(remain, easing = easing))
+                if (lifecycle.pacing != null) LinearEasing else InkEngine.sweepEasing
+            sweep.animateTo(1f, tween(lifecycle.durationMs, easing = easing))
+        } else if (finishResidual) {
+            // If Active ended before its reset coroutine ran, begin the
+            // residual at zero instead of exposing the stale completed value.
+            if (!lifecycle.applied) {
+                lockedMs.value = lifecycle.durationMs
+                lockedPacing.value = lifecycle.pacing
+                lockedFeather.value = lifecycle.feather
+                sweep.snapTo(0f)
+                lifecycle.applied = true
+            }
+            val total = lockedMs.value.coerceAtLeast(1)
+            if (sweep.value < 1f) {
+                val remain = ((1f - sweep.value) * total).toInt().coerceAtLeast(1)
+                val easing =
+                    if (lockedPacing.value != null) LinearEasing else InkEngine.sweepEasing
+                sweep.animateTo(1f, tween(remain, easing = easing))
+            }
             lockedFeather.value = null
         } else {
             // Upcoming / Plain / idle: abandon residual so dim ink applies now.
             if (sweep.value < 1f) sweep.snapTo(1f)
+            lifecycle.applied = true
             lockedPacing.value = null
             lockedFeather.value = null
         }
     }
-    val progress = remember {
+    val progress = remember(entryPending) {
         derivedStateOf {
             val mapped = lockedPacing.value?.at(sweep.value) ?: sweep.value
             displayedSweepProgress(entryPending.value, mapped)
         }
     }
-    return remember { LetterSweep(progress = progress, feather = lockedFeather) }
+    return remember(progress) { LetterSweep(progress = progress, feather = lockedFeather) }
 }
 
 /**
