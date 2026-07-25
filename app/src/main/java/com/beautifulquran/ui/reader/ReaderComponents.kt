@@ -1410,8 +1410,6 @@ private fun ResponsiveEnglishAyah(
     onAyahClick: () -> Unit,
     onWordClick: ((Word) -> Unit)?,
     onWordLongClick: ((Word) -> Unit)?,
-    /** Hold the trailing ﴿N﴾ mark to write this verse's note. */
-    onMarkLongClick: (() -> Unit)? = null,
 ) {
     val palette = rememberWordInkPalette()
     val gold = LocalQuranAccents.current.gold
@@ -1598,8 +1596,7 @@ private fun ResponsiveEnglishAyah(
                         onWordClick = onWordClick,
                         onWordLongClick = onWordLongClick,
                         onMiss = onAyahClick,
-                        markRange = rendered.markRange,
-                        onMarkLongClick = onMarkLongClick,
+                        inertLongPressRange = rendered.markRange,
                     )
                 },
             ),
@@ -1610,11 +1607,8 @@ private fun ResponsiveEnglishAyah(
 /**
  * Resolves taps on an annotated ayah line to the word whose glyph bounds
  * (inflated by [hitSlopPx]) contain the tap; taps that miss every word go to
- * [onMiss] (null = ignored).
- *
- * A long-press is checked against the trailing ﴿N﴾ [markRange] *first*: the mark
- * is the verse's own identity on the page, so holding it opens the verse note
- * rather than a word's lexicon (docs/NOTES.md).
+ * [onMiss] (null = ignored). [inertLongPressRange] prevents the trailing ayah
+ * mark from borrowing the nearby final word's hold action.
  */
 private fun Modifier.wordTapTarget(
     words: List<Word>,
@@ -1624,23 +1618,18 @@ private fun Modifier.wordTapTarget(
     onWordClick: (Word) -> Unit,
     onWordLongClick: ((Word) -> Unit)? = null,
     onMiss: (() -> Unit)? = null,
-    markRange: IntRange = IntRange.EMPTY,
-    onMarkLongClick: (() -> Unit)? = null,
-): Modifier = pointerInput(ranges, words, layoutResult, onWordLongClick, onMarkLongClick) {
+    inertLongPressRange: IntRange = IntRange.EMPTY,
+): Modifier = pointerInput(ranges, words, layoutResult, onWordLongClick, inertLongPressRange) {
     detectTapGestures(
         onTap = { tap ->
             val wordIndex = layoutResult?.wordIndexAt(tap, ranges, hitSlopPx) ?: -1
             if (wordIndex >= 0) onWordClick(words[wordIndex]) else onMiss?.invoke()
         },
-        onLongPress = if (onWordLongClick == null && onMarkLongClick == null) {
+        onLongPress = if (onWordLongClick == null) {
             null
         } else {
             { pos ->
-                val onMark = onMarkLongClick != null &&
-                    layoutResult?.rangeContains(pos, markRange, hitSlopPx) == true
-                if (onMark) {
-                    onMarkLongClick!!()
-                } else if (onWordLongClick != null) {
+                if (layoutResult?.rangeContains(pos, inertLongPressRange, hitSlopPx) != true) {
                     val wordIndex = layoutResult?.wordIndexAt(pos, ranges, hitSlopPx) ?: -1
                     if (wordIndex >= 0) onWordLongClick(words[wordIndex])
                 }
@@ -1675,8 +1664,6 @@ private fun ResponsiveHafsAyah(
     onAyahClick: () -> Unit,
     onWordClick: ((Word) -> Unit)?,
     onWordLongClick: ((Word) -> Unit)? = null,
-    /** Hold the trailing ﴿N﴾ mark to write this verse's note. */
-    onMarkLongClick: (() -> Unit)? = null,
 ) {
     val palette = rememberWordInkPalette()
     val ayahMarkInk = LocalQuranAccents.current.gold
@@ -1925,8 +1912,7 @@ private fun ResponsiveHafsAyah(
                         onWordClick = onWordClick,
                         onWordLongClick = onWordLongClick,
                         onMiss = onAyahClick,
-                        markRange = rendered.markRange,
-                        onMarkLongClick = onMarkLongClick,
+                        inertLongPressRange = rendered.markRange,
                     )
                 },
             ),
@@ -1973,7 +1959,6 @@ fun AyahNumberMark(
 private fun ArabicAyahNumberUnit(
     number: Int,
     fontScale: Float,
-    onLongClick: (() -> Unit)? = null,
 ) {
     val density = LocalDensity.current
     val arabicLineHeight = with(density) {
@@ -1982,14 +1967,7 @@ private fun ArabicAyahNumberUnit(
     Box(
         modifier = Modifier
             .padding(horizontal = 6.dp)
-            .requiredHeight(arabicLineHeight)
-            .then(
-                if (onLongClick != null) {
-                    Modifier.pointerInput(onLongClick) {
-                        detectTapGestures(onLongPress = { onLongClick() })
-                    }
-                } else Modifier,
-            ),
+            .requiredHeight(arabicLineHeight),
         contentAlignment = Alignment.Center,
     ) {
         AyahNumberMark(number, fontScale)
@@ -2321,9 +2299,8 @@ fun AyahBlock(
     onAnnotationChange: ((String) -> Unit)? = null,
     /** Called when the editor loses focus — caller should commit and clear edit state. */
     onAnnotationEditDone: (() -> Unit)? = null,
-    /** Opens the editor: long-press on the gold ayah mark, or a tap on a
-     * settled note to revise it. */
-    onAyahMarkLongClick: (() -> Unit)? = null,
+    /** Opens the editor from a saved ribbon hold or a settled note tap. */
+    onEditAnnotation: (() -> Unit)? = null,
     /** True while recitation is running: annotations leave the page entirely, the
      * same rule the ribbon and rail marks follow. */
     annotationsHidden: Boolean = false,
@@ -2517,7 +2494,6 @@ fun AyahBlock(
                     onAyahClick = onAyahClick,
                     onWordClick = onWordClick,
                     onWordLongClick = onWordLongClick,
-                    onMarkLongClick = onAyahMarkLongClick,
                 )
             } else if (showGloss) {
                 CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
@@ -2555,7 +2531,7 @@ fun AyahBlock(
                         Box(
                             modifier = Modifier.graphicsLayer { alpha = ayahMarkAlpha.value },
                         ) {
-                            ArabicAyahNumberUnit(ayah.number, fontScale, onLongClick = onAyahMarkLongClick)
+                            ArabicAyahNumberUnit(ayah.number, fontScale)
                         }
                     }
                 }
@@ -2581,7 +2557,6 @@ fun AyahBlock(
                         onAyahClick = onAyahClick,
                         onWordClick = onWordClick?.let { handler -> { word -> handler(word) } },
                         onWordLongClick = onWordLongClick?.let { handler -> { word -> handler(word) } },
-                        onMarkLongClick = onAyahMarkLongClick,
                     )
                 }
             }
@@ -2612,7 +2587,8 @@ fun AyahBlock(
             // Editing always wins — writing in progress never vanishes because
             // playback happened to start.
             AnimatedVisibility(
-                visible = (isEditingAnnotation || annotationText != null) &&
+                visible = bookmarked &&
+                    (isEditingAnnotation || annotationText != null) &&
                     (isEditingAnnotation || !annotationsHidden),
                 enter = fadeIn(tween(ANNOTATION_FADE_MS)) +
                     expandVertically(tween(ANNOTATION_FADE_MS)),
@@ -2630,7 +2606,7 @@ fun AyahBlock(
                         translationRecess = { translationRecess.value },
                         onAnnotationChange = onAnnotationChange,
                         onEditDone = { onAnnotationEditDone?.invoke() },
-                        onStartEdit = onAyahMarkLongClick,
+                        onStartEdit = onEditAnnotation,
                         onDelete = onAnnotationDelete,
                         listCoordinates = listCoordinates,
                         onKeepInView = onKeepAnnotationInView,
@@ -2671,6 +2647,7 @@ fun AyahBlock(
                     chromeAlpha = bookmarkChromeAlpha,
                     interactive = bookmarkInteractive,
                     onToggle = onToggleBookmark,
+                    onLongClick = if (bookmarked) onEditAnnotation else null,
                     modifier = Modifier
                         .align(
                             if (bookmarkSide == AyahSelectorSide.RIGHT) {

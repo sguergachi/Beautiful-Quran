@@ -590,7 +590,8 @@ vanish entirely while reciting.
   verse's tip so consecutive ribbons never touch.
 - **Marking is where you tap.** A tap on the verse's ribbon margin marks (or
   unmarks) *that* verse — the tip on the verse you are reading burns a little
-  brighter so the affordance finds your eye.
+  brighter so the affordance finds your eye. On an exposed saved ribbon,
+  press and hold opens that verse's note; unsaved tips do not offer notes.
 - **The unfurl.** On mark, the tip *spills down the block* with a gravity drop
   (slow peel, then accelerates), a traveling cloth wave, a soft overshoot past
   the block bottom, then a spring settle and a single underdamped flutter.
