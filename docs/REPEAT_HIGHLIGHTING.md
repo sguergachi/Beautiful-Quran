@@ -150,8 +150,10 @@ of quran-align:
   repeats, and caches the assembled result in `tools/.cache/qdc_<id>.json`.
 - `adjust_qdc_segments()` clamps word positions to our canonical word count,
   drops zero-length spans, keeps repeats, and counts the repeat spans.
-- `clean_qdc_artifacts()` scrubs three aligner artifact classes that would
-  otherwise render as repeats the reciter never made (see below).
+- `clean_qdc_artifacts()` scrubs aligner artifact classes that would otherwise
+  render as repeats the reciter never made (see below). New structural classes
+  go here — not into one-off overrides — and each is locked by a case under
+  [`tools/timing_patch_cases/`](../tools/timing_patch_cases/README.md).
 
 After cleanup, Mishary yields **3,142 repeat spans** at full 6,236/6,236
 coverage; Hani yields **2,037 repeat spans** at 6,235/6,236 (one ayah has no
@@ -161,7 +163,9 @@ quran.com segments and falls back to whole-ayah highlighting). Everyone not in
 ## False repeats: the qdc artifacts we scrub
 
 The raw qdc segments are aligner output, and some of their apparent backtracks
-are **not audible repeats**. Three artifact classes are scrubbed:
+are **not audible repeats**. Artifact classes scrubbed in `clean_qdc_artifacts`
+(see also non-contiguous span phantoms in
+[tools/timing_repairs/README.md](../tools/timing_repairs/README.md)):
 
 1. **Split slivers.** The aligner sometimes emits a word's onset or tail as a
    tiny extra segment sharing that word's position (`… [18, 0, 1410],
@@ -189,6 +193,13 @@ are **not audible repeats**. Three artifact classes are scrubbed:
    normal word after it (3–7 here) satisfied the backtrack test and a long
    false orange chain appeared. Fix: drop a segment that jumps ≥
    `QDC_SPIKE_JUMP` past the high-water mark and immediately retreats.
+4. **Non-contiguous span phantoms.** The aligner stamps an early function-word
+   index at the *onset* of a real near-high-water re-say (Alafasy 5:54:
+   `… 21, 22, 23, [4], 21, 22, 23, 24 …` — long يُجَٰهِدُونَ labeled as مَن).
+   CTC span protection trusts the multi-position run; the reader paints orange
+   from 4 through 23. Fix: within each backtrack run, keep the position
+   component nearest the high water and relabel orphan components onto it
+   (`QDC_SPAN_CONNECT_GAP`). Locked by `tools/timing_patch_cases/noncontiguous-*.json`.
 
 > **⚠️ A genuine single-word repeat looks exactly like a split sliver — same
 > position, ~0 ms gap — so the merge must key on *duration*, not the gap.**
@@ -213,10 +224,18 @@ ear-verified repeats (Mishary 2:14, Hani 2:38's `12,13,14 — 12,13,14`, Hani
 because dropping a spike can reunite a word with its stray sliver (9:51:
 `4, [7], 4` → `4, 4`, then merged only if one `4` is a sliver).
 
-When a real repeat is still missed or a false one slips through, the per-ayah
-**Timings Lab override** (`tools/timing_overrides/`) is the escape hatch: it
-replaces an ayah's segments verbatim at build time and always wins over the
-heuristic.
+When a real repeat is still missed or a false one slips through:
+
+1. **Systematic first.** If the shape is a class (spikes, non-contiguous
+   phantoms, false splits), extend `clean_qdc_artifacts` or the CTC repair
+   generator and add a unit test under
+   [`tools/timing_patch_cases/`](../tools/timing_patch_cases/README.md) whose
+   expected output is the Timings Lab / ear-verified fix. Run
+   `python3 tools/test_build_db.py`.
+2. **Override last.** The per-ayah **Timings Lab override**
+   (`tools/timing_overrides/`) replaces an ayah's segments verbatim at build
+   time and always wins over the heuristic — use it only when no structural
+   rule applies (document why in the file `notes`).
 
 ## The rendering path
 
