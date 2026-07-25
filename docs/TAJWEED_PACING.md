@@ -205,7 +205,7 @@ The model is therefore a **gated hint**, built from four parts:
   a seek. Same-ayah neighbours only (`Hold.connect`, default on).
   Iẓhār and cross-ayah wasl are left alone.
 - **Waqf length scale.** `Hold.waqfLengthScale` (Ink Lab: **Waqf length
-  scale**, default 0.7) multiplies `waqfShare` by a letter-count ramp: 0 =
+  scale**, shipped default 1) multiplies `waqfShare` by a letter-count ramp: 0 =
   full share on every closer; 1 = linear from ~0 at 3 letters to full share
   at 8+ pronounced letters. Medium closers like `عَظِيمًا` keep a readable
   run-up when the hold slider is high; long closers still park hard.
@@ -235,7 +235,7 @@ Two refinements built into the curve, not the callers:
 
 - **`InkEngine`** — `sweepMs` unchanged.
   `InkEngine.pacing(arabic, activeWord, isAyahFinal, prevArabic, nextArabic)`
-  returns the nullable curve (gated on `Tuning.tajweedPacing`, default off)
+  returns the nullable curve (gated on `Tuning.tajweedPacing`, default on)
   and assembles a `TajweedPacing.Hold` from the tuning;
   `InkEngine.pacedFeather()` supplies the paced edge. Knobs on the Ink Lab's
   **Tajweed** tab: the `tajweedPacing` master toggle, `holdMadd` /
@@ -266,9 +266,10 @@ Two refinements built into the curve, not the callers:
   pacing was too subtle to see at that width, so it narrowed the edge to
   0.3–0.8 — up to 3× sharper — and the softness went with it. A hold does not
   need a sharp edge: the bloom visibly *stopping* is legible at any feather.
-  So `pacedFeather` now defaults to 1.6, identical to `washFeather`, and stays
-  a slider for auditioning. `ShapedWordBloom.InkReveal` keeps its optional
-  per-bloom `feather` override for that path.
+  So `pacedFeather` ships slightly sharper than `washFeather` (1.1857 vs 1.6)
+  so holds stay legible without a hard edge, and remains a slider for
+  auditioning. `ShapedWordBloom.InkReveal` keeps its optional per-bloom
+  `feather` override for that path.
 - **Web renderer (pending)** — `runWash` accepts a `(t: number) => number`
   easing in place of the bezier tuple (Motion supports custom easing
   functions); the active-word wash passes the curve, everything else keeps
