@@ -44,8 +44,7 @@ class TajweedPacingTest {
         spoken: Float = 1f,
         hold: Hold = Hold(),
         prevArabic: String? = null,
-        nextArabic: String? = null,
-    ) = requireNotNull(TajweedPacing.curve(word, spoken, hold, prevArabic, nextArabic))
+    ) = requireNotNull(TajweedPacing.curve(word, spoken, hold, prevArabic))
 
     @Test
     fun `words with nothing dramatic take the plain sweep`() {
@@ -289,35 +288,15 @@ class TajweedPacingTest {
     }
 
     @Test
-    fun `wasl exit finishes the previous word early`() {
-        // Word ends in tanwīn feeding و… — ink reaches full before the handoff.
+    fun `wasl connection leaves the donor on its ordinary sweep`() {
         val thulumat = "ظُلُمَٰتٞ"
-        val curve = curveOf(
-            thulumat,
-            hold = Hold(madd = false),
-            nextArabic = "وَرَعۡدٞ",
-        )
-        assertEquals(1f, curve.at(0.82f), 1e-4f)
-        assertEquals(1f, curve.at(0.95f), 0f)
-        // Without a next-word absorb, nothing dramatic → plain sweep (null).
+        assertNotNull(TajweedPacing.connection(thulumat, "وَرَعۡدٞ"))
         assertNull(TajweedPacing.curve(thulumat, 1f, Hold(madd = false)))
 
         // 4:165 writes fatḥatan on lām before a silent carrier alif.
         val rusulan = "رُّسُلٗا"
-        val carrierCurve = curveOf(
-            rusulan,
-            hold = Hold(madd = false),
-            nextArabic = "مُّبَشِّرِينَ",
-        )
-        assertEquals(1f, carrierCurve.at(0.82f), 1e-4f)
-        assertNull(
-            TajweedPacing.curve(
-                rusulan,
-                1f,
-                Hold(madd = false),
-                nextArabic = "عَلِيمٌ",
-            ),
-        )
+        assertNotNull(TajweedPacing.connection(rusulan, "مُّبَشِّرِينَ"))
+        assertNull(TajweedPacing.curve(rusulan, 1f, Hold(madd = false)))
     }
 
     @Test

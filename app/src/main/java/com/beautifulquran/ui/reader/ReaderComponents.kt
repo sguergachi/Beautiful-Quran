@@ -2353,7 +2353,6 @@ fun AyahBlock(
                     activeWord = aw,
                     isAyahFinal = word.position == ayah.words.lastOrNull()?.position,
                     prevArabic = ayah.words.getOrNull(idx - 1)?.arabic,
-                    nextArabic = ayah.words.getOrNull(idx + 1)?.arabic,
                 )
             }
         }

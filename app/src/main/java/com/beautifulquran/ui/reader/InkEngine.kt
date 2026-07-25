@@ -375,9 +375,8 @@ object InkEngine {
      *
      * [arabic] is the active word's Hafs Uthmani text and [isAyahFinal] marks
      * the verse-closing word, whose waqf carries the only slack that is not
-     * borrowed from its neighbours. [prevArabic] / [nextArabic] are same-ayah
-     * neighbours for wasl nūn rules (entry hold on this opening letter; early
-     * exit when this trailing nūn is absorbed next). The voiced share comes
+     * borrowed from its neighbours. [prevArabic] is the same-ayah predecessor
+     * for a wasl entry hold on this opening letter. The voiced share comes
      * from [ActiveWord.spokenMs] vs the karaoke hold, so the ink settles
      * rather than smearing across a breath gap.
      */
@@ -386,7 +385,6 @@ object InkEngine {
         activeWord: ActiveWord,
         isAyahFinal: Boolean,
         prevArabic: String? = null,
-        nextArabic: String? = null,
     ): TajweedPacing.Curve? {
         val t = tuning
         if (!t.tajweedPacing) return null
@@ -408,7 +406,6 @@ object InkEngine {
                 creep = t.holdCreep,
             ),
             prevArabic = prevArabic,
-            nextArabic = nextArabic,
         )
     }
 
