@@ -95,6 +95,22 @@ component's start (so the time stays on the word being said). Real contiguous
 spans, same-word re-says, and spans with a single internal drop survive.
 Regression cases live in `tools/test_build_db.py`.
 
+## Gap phantoms (Alafasy 5:59 class)
+
+A backtrack run that does **not** re-cover the high-water tip, immediately
+followed by a first-pass resume that **skips** words, is a mislabel of the
+skipped span — not a re-say. Example (raw Alafasy 5:59 after high-water 11):
+
+```
+… 10, 11,  8, 9,  13 …
+              ^   ^  word 12 missing; 8/9 sit on its time
+```
+
+`relabel_gap_phantoms` in `clean_qdc_artifacts` remaps the run onto
+`HW+1 … next−1` when `run_max < HW` and `next > HW+1`. A real re-say of the tip
+re-covers HW; a real earlier re-say resumes at HW+1 — both are untouched.
+Case: `tools/timing_patch_cases/gap-phantom-alafasy-5-59.json`.
+
 ## Trusting a qdc span-repeat CTC collapsed (issue #533)
 
 CTC confirms or restores a repeat, but it must never **erase** one. CTC
@@ -106,6 +122,16 @@ e.g. Hani 4:169 `[1,2,3,1,2,3,…]`) is kept even when CTC does not confirm it.
 A lone same-position qdc pair is still judged by CTC — merge it when CTC hears
 one utterance (the false-split class), keep it when CTC confirms (3:21). Without
 the span protection the generator deleted the correct Hani 4:169 re-recitation.
+
+### Apply-time guard (issue #570)
+
+Older committed repair files still contain `drop` rows that flattened real
+span-repeats (Alafasy 5:59 is the archetype: raw qdc had `[…7,8,9,7,8,9,…]`,
+the drop repair shipped a monotonic 20-word row). `build_db.apply_timing_repairs`
+skips any repair whose segments would erase a multi-position span-repeat
+already present in the cleaned qdc row (`erases_span_repeat`). Counts show as
+`span-protected N` in the build log. Prefer regenerating repairs with the
+generator invariant; the guard is the safety net for committed files.
 
 ## Splits are judged PER POSITION (issues #551/#558/#559)
 

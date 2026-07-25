@@ -16,10 +16,10 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from build_db import clean_qdc_artifacts  # noqa: E402
+from build_db import clean_qdc_artifacts, erases_span_repeat  # noqa: E402
 
 CASES_DIR = Path(__file__).resolve().parent / "timing_patch_cases"
-PIPELINES = frozenset({"clean_qdc_artifacts"})
+PIPELINES = frozenset({"clean_qdc_artifacts", "erases_span_repeat"})
 
 
 def segs_from_positions(positions, dur=800):
@@ -55,6 +55,16 @@ def resolve_input(case):
     raise SystemExit(f"{case.get('_path')}: need input_segments or input_positions")
 
 
+def resolve_repair(case):
+    if case.get("repair_segments"):
+        return [list(s) for s in case["repair_segments"]]
+    if case.get("repair_positions") is not None:
+        return segs_from_positions(case["repair_positions"])
+    raise SystemExit(
+        f"{case.get('_path')}: erases_span_repeat needs repair_segments or repair_positions"
+    )
+
+
 def check_expected(case, got_segs):
     """Return (ok, detail). Prefer full segments when expected_segments is set."""
     if case.get("expected_segments") is not None:
@@ -86,8 +96,18 @@ def run_pipeline(case, segs):
             "merged_splits": 0,
             "dropped_strays": 0,
             "noncontiguous_orphans": 0,
+            "gap_phantoms": 0,
         }
         return clean_qdc_artifacts(segs, stats)
+    if pipeline == "erases_span_repeat":
+        repair = resolve_repair(case)
+        got = erases_span_repeat(segs, repair)
+        want = case.get("expected_erases")
+        if want is None:
+            raise SystemExit(f"{case.get('_path')}: need expected_erases bool")
+        if got == bool(want):
+            return True, None
+        return False, f"want erases_span_repeat={want!r} got {got!r}"
     raise AssertionError("unreachable")
 
 
@@ -103,20 +123,30 @@ def main():
             )
             print(f"  FAIL {label} (id/filename mismatch)")
             continue
+        pipeline = case.get("pipeline") or "clean_qdc_artifacts"
         try:
             segs = resolve_input(case)
-            got = run_pipeline(case, segs)
-            ok, detail = check_expected(case, got)
+            if pipeline == "erases_span_repeat":
+                ok, detail = run_pipeline(case, segs)
+                got_order = None
+            else:
+                got = run_pipeline(case, segs)
+                ok, detail = check_expected(case, got)
+                got_order = order(got)
         except SystemExit as e:
             failures.append((label, str(e), None))
             print(f"  FAIL {label}: {e}")
             continue
         if not ok:
-            failures.append((label, detail, order(got)))
+            failures.append((label, detail, got_order))
         print(f"  {'ok  ' if ok else 'FAIL'} {label}")
         if case.get("input_positions") is not None:
             print(f"        in={case['input_positions']}")
-        print(f"        out={order(got)}")
+        if pipeline == "erases_span_repeat":
+            print(f"        repair={case.get('repair_positions')}")
+            print(f"        erases={case.get('expected_erases')}")
+        elif got_order is not None:
+            print(f"        out={got_order}")
         if not ok and detail:
             for line in detail.splitlines():
                 print(f"        {line}")

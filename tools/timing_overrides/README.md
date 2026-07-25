@@ -1,5 +1,10 @@
 # Timing overrides
 
+> **Agents: stop.** If you are about to save a GitHub "Timings patch" JSON
+> here, you are almost certainly on the wrong path. Read
+> [AGENTS.md — Landing Timings Lab / GitHub timing patches](../../AGENTS.md#landing-timings-lab--github-timing-patches)
+> first. Overrides are **last resort**, not the default apply step.
+
 Correction patches produced by the in-app **Timings Lab** live here. Every
 `*.json` file in this directory is applied on top of the open-dataset timings
 when `python3 tools/build_db.py` runs — so a committed override is permanent:
@@ -11,9 +16,21 @@ See [docs/TIMINGS_LAB.md](../../docs/TIMINGS_LAB.md) for the full workflow.
 
 **Do not default to a one-off override for every Timings Lab / GitHub patch.**
 
+### Anti-pattern (do not repeat)
+
+Issue #570 (Alafasy 5:59) was first landed as a one-off file in this directory.
+That was wrong: raw qdc already had the re-say, a **gap phantom** mislabeled
+word 12, and a CTC **`drop` repair** had flattened the span. The correct fix
+(#571) is pipeline rules + `timing_patch_cases`, with **no** override.
+
+If the Lab/GitHub positions differ from shipped DB by **topology** (extra /
+missing backtracks, skipped word indices, collapsed long spans), it is a class
+bug until proven otherwise — not an override.
+
 | Defect class | Fix where | Verify with |
 |---|---|---|
-| Forward spikes, isolated strays, split slivers, **non-contiguous span phantoms** | `clean_qdc_artifacts` in `tools/build_db.py` | `tools/timing_patch_cases/*.json` + `python3 tools/test_build_db.py` |
+| Forward spikes, isolated strays, split slivers, **non-contiguous / gap phantoms** | `clean_qdc_artifacts` in `tools/build_db.py` | `tools/timing_patch_cases/*.json` + `python3 tools/test_build_db.py` |
+| Drop repair flattening a real multi-word re-say | `apply_timing_repairs` span-protect | `pipeline: erases_span_repeat` case |
 | Repeat-vs-split / CTC disagreement | `tools/timing_repairs/` generator | case in `~/qasr` + rebuild repairs |
 | True one-off (single boundary nudge, no structural rule) | **this directory** | ear-check + commit override; note *why* pipeline cannot fix it |
 

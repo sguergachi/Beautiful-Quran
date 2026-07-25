@@ -11,10 +11,16 @@ step named in `pipeline` turns `input_*` into `expected_*`.
 
 **Timing patches are fixed systematically, then locked with a unit test.**
 
-1. **Classify** the defect (forward spike, non-contiguous phantom, false split,
-   boundary misalign, …).
+Agents landing a GitHub `Timings patch` issue must follow the full checklist in
+[AGENTS.md](../../AGENTS.md#landing-timings-lab--github-timing-patches)
+(invariant #8). This directory is where that checklist's unit tests live.
+
+1. **Classify** the defect (forward spike, non-contiguous / gap phantom, false
+   split, repair that flattens a span, boundary misalign, …). Diff Lab expected
+   vs raw qdc vs post-clean vs post-repair — not only vs shipped DB.
 2. **Prefer a pipeline fix** that covers the *class*:
    - structural qdc noise → `clean_qdc_artifacts` in `tools/build_db.py`
+   - drop repair erasing a multi-word re-say → `erases_span_repeat` / span-protect
    - repeat-vs-split / CTC disagreement → `tools/timing_repairs/` generator
 3. **Add a case here** whose `input_*` is the broken shape and `expected_*` is
    the corrected shape (from the Lab patch, ASR/ear, or the intended clean
@@ -45,16 +51,18 @@ class, and do not merge a cleaner change without a case under this directory.
 |---|---|---|
 | `id` | yes | stable slug; should match the filename stem |
 | `label` | yes | one-line human name (shown on failure) |
-| `pipeline` | yes | which step to run (`clean_qdc_artifacts` today) |
+| `pipeline` | yes | `clean_qdc_artifacts` or `erases_span_repeat` |
 | `input_positions` | * | 1-based word indices in time order (synthetic equal durations) |
 | `expected_positions` | * | positions after the pipeline step |
 | `input_segments` | * | full `[[pos, start_ms, end_ms], …]` when times matter |
 | `expected_segments` | * | full segments after the step (compared when present) |
+| `repair_positions` / `repair_segments` | for `erases_span_repeat` | candidate repair row |
+| `expected_erases` | for `erases_span_repeat` | bool — must the guard refuse this repair? |
 | `refs` | no | issue/PR/doc pointers |
 | `notes` | no | why this shape is real / what must not regress |
 
-\* Provide either the `*_positions` pair **or** the `*_segments` pair (or both;
-when both are present, segments are authoritative).
+\* For `clean_qdc_artifacts`, provide either the `*_positions` pair **or** the
+`*_segments` pair (or both; when both are present, segments are authoritative).
 
 ## Adding a case from a Timings Lab / GitHub patch
 
