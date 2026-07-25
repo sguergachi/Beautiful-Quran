@@ -65,9 +65,9 @@ wrote ḥawāshī in, and what italic type was first cut from.
 Two constraints make it work at reading size. Cormorant is a display face and
 goes wispy small, so the note uses **weight 500** (a static instance cut from
 the variable font, subset to latin + latin-ext at 132 KB) and sits a step
-larger than the old EB italic at 16 sp with 0.15 sp letterspacing. Its pale red
-hue keeps the reader's own hand distinct from the scripture even at 85 %
-opacity. This is a narrow, recorded exception to Cormorant's display-only rule
+larger than the old EB italic at 16 sp with 0.15 sp letterspacing. Its dark
+maroon inky red keeps the reader's own hand distinct from the scripture even
+at 85 % opacity. This is a narrow, recorded exception to Cormorant's display-only rule
 in [DESIGN.md](DESIGN.md) — do not generalise it to body copy.
 
 **The tick.** A short ruby stroke in the margin lane, optically inside the
