@@ -448,11 +448,13 @@ pure, `InkEngineTest`-covered helpers.
 2. **A persistent `Animatable` means the next word inherits progress 1.** The
    draw phase can read it before the effect's `snapTo(0f)` lands, which showed as
    a one-frame full-ink flash. `sweepEntryAction(…)` classifies each composition
-   as `Arm` / `Keep` / `Clear`, and on `Arm` a mask resolved **during
-   composition** pins the displayed value to 0 (`displayedSweepProgress`) until
-   the reset runs. If Active ends before that reset, the residual only rewinds
-   from the idle full-ink ceiling (`residualSweepAnchor`) — a mid-wash value is
-   never snapped back to unread (that was the prior-word flash on handoff).
+   as `Arm` / `Keep` / `Clear`, and the display mask (`displayedSweepProgress`)
+   is derived from that action **every composition** (Arm → 0, Keep while not
+   yet applied → 0). It must not be a `remember(active, activation)` MutableState:
+   re-entering Active with the same keys (repeat pass, bounce, replay) reused a
+   cleared flag and flashed full ink then unread. If Active ends before the
+   reset, the residual only rewinds from the idle full-ink ceiling
+   (`residualSweepAnchor`) — a mid-wash value is never snapped back to unread.
 3. **The entry snapshot must survive the entry.** Duration, curve, feather, and
    wasl `revealStart` are captured at `Arm` and held for the whole sweep, so
    retuning tajweed or speed mid-word cannot remap a half-finished wash (which

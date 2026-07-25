@@ -417,6 +417,32 @@ internal fun sweepEntryAction(
     else -> SweepEntryAction.Keep
 }
 
+/**
+ * Composition-time mask so a new Active entry never paints the idle full-ink
+ * Animatable (1f) for a frame.
+ *
+ * Must be derived from [entryAction] every composition — not a `remember`ed
+ * MutableState keyed on (active, activation). Re-entering Active with the same
+ * keys (repeat pass, clock bounce, replay after seek with the same generation)
+ * reuses that state still cleared to false, so the completed wash showed full
+ * ink then `snapTo(0)` — full → unread flash on the word.
+ *
+ * - [SweepEntryAction.Arm]: always mask to 0 this frame
+ * - [SweepEntryAction.Keep] while not yet [applied]: effect has not reset the
+ *   Animatable; keep masking until it does
+ * - otherwise: live progress
+ */
+internal fun displayedSweepProgress(
+    entryAction: SweepEntryAction,
+    applied: Boolean,
+    progress: Float,
+): Float = when {
+    entryAction == SweepEntryAction.Arm -> 0f
+    entryAction == SweepEntryAction.Keep && !applied -> 0f
+    else -> progress
+}
+
+/** @deprecated Use the entryAction overload — kept for intermediate call sites. */
 internal fun displayedSweepProgress(entryPending: Boolean, progress: Float): Float =
     if (entryPending) 0f else progress
 
@@ -559,12 +585,12 @@ private fun rememberLetterSweep(
         revealStart = armRevealStart,
         latchedRevealStart = lifecycle.revealStart,
     )
-    // The display mask, by contrast, *must* be resolved during composition —
-    // that is the whole point: the draw phase reads it before any effect runs.
-    // A `remember` calculation is the sanctioned place to do that.
-    val entryPending = remember(active, activation) {
-        mutableStateOf(entryAction == SweepEntryAction.Arm)
-    }
+    // Mask must recompute on every Arm — including re-entry with the same
+    // (active, activation) keys after Recited (repeats, bounce, replay). A
+    // remember(active, activation) MutableState only initialized once and
+    // stayed false on re-Arm, flashing full ink then unread.
+    val entryMask = entryAction == SweepEntryAction.Arm ||
+        (entryAction == SweepEntryAction.Keep && !lifecycle.applied)
     SideEffect {
         if (entryAction == SweepEntryAction.Arm) {
             lifecycle.applied = false
@@ -596,7 +622,6 @@ private fun rememberLetterSweep(
             lockedFeather.value = armFeather
             sweep.snapTo(0f)
             lifecycle.applied = true
-            entryPending.value = false
             val easing = if (pacing != null) LinearEasing else InkEngine.sweepEasing
             sweep.animateTo(1f, tween(sweepMs, easing = easing))
         } else if (finishResidual) {
@@ -639,10 +664,10 @@ private fun rememberLetterSweep(
             lockedFeather.value = null
         }
     }
-    val progress = remember(entryPending, displayRevealStart) {
+    val progress = remember(entryMask, displayRevealStart) {
         derivedStateOf {
             val mapped = lockedPacing.value?.at(sweep.value) ?: sweep.value
-            val raw = displayedSweepProgress(entryPending.value, mapped)
+            val raw = if (entryMask) 0f else mapped
             continuedSweepProgress(raw, displayRevealStart)
         }
     }
