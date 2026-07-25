@@ -300,6 +300,11 @@ internal fun SearchDialWheel(
     edgePadding: Dp,
     onSelectedIndexChange: (Int) -> Unit,
     modifier: Modifier = Modifier,
+    // The rows dissolve into whatever paper the wheel is standing on. That is
+    // this sheet's `surface` here, but the reader's repeat sheet is painted in
+    // `background` — pass the wrong one and the gradient stops being a fade and
+    // becomes a visible rectangle over the top and bottom rows.
+    fadeColor: Color = MaterialTheme.colorScheme.surface,
     itemContent: @Composable (index: Int, selected: Boolean) -> Unit,
 ) {
     val maxIndex = (itemCount - 1).coerceAtLeast(0)
@@ -307,8 +312,7 @@ internal fun SearchDialWheel(
         initialFirstVisibleItemIndex = selectedIndex.coerceIn(0, maxIndex),
     )
     val snapBehavior = rememberSnapFlingBehavior(lazyListState = listState)
-    val fadeColor = MaterialTheme.colorScheme.surface
-    val clearColor = MaterialTheme.colorScheme.surface.copy(alpha = 0f)
+    val clearColor = fadeColor.copy(alpha = 0f)
 
     // Pull the dial to a row chosen from outside (e.g. ayah clamped to a surah).
     LaunchedEffect(selectedIndex, itemCount) {

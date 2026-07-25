@@ -45,8 +45,20 @@ Hard rules:
 > `InkRevealOverlay`: ink bleeds from the player bar's repeat control and the
 > reader sheet becomes the question. Selection is the ink-brush circle plus ink
 > strength, Done is one quiet text line, and the margins dismiss. The ayah
-> wheels are the same `SearchDialWheel` the cover sheet's search uses, under a
-> soft gilt reading band.
+> wheels are the same `SearchDialWheel` the cover sheet's search uses — a
+> compact centred block, so a range reads as one phrase — and they unfold
+> **directly under the choice that asked for them**, pushing the rest of the
+> list down, so the numbers belong to that line rather than trailing the sheet.
+>
+> Nothing is drawn under the wheel: no band, no plate, no wash. The reading line
+> is the row the numbers fade *towards* — rows dissolve into the sheet as they
+> leave the centre, and the centred figure holds full ink in the accent while
+> its neighbours sit faint. That is the same "hierarchy from ink and spacing
+> only" rule the rest of the page obeys, and it is what keeps the dial part of
+> the paper instead of a control resting on it. For that dissolve to work,
+> `SearchDialWheel` takes the paper it is standing on as `fadeColor`: this sheet
+> is painted in `background`, and fading to `surface` here turned the wheel's
+> own dissolve into a visible plate over its top and bottom rows.
 
 ### The selection marks (`ui/theme/BrushMarks.kt`)
 
@@ -91,10 +103,13 @@ JVM-testable at all: `androidx.compose.ui.graphics.Path` wraps
 Because the mark is derived from each child's own measured bounds rather than the
 container's, the same code loops a word in a `Row` and a stacked choice in a
 `Column`. That is also why neither container stretches its children to the full
-sheet width: `InkCircledChoiceColumn` sizes itself to its longest label
-(`IntrinsicSize.Max`) so every mark in the stack shares one width and keeps a
+sheet width: `InkCircledChoiceColumn` sets every line to the measured width of
+its longest label, so each mark in the stack shares one width and keeps a
 hand-drawn ~4:1 loop. Stretched to the sheet, the same stroke came out 10:1 — two
-parallel rules with caps, a lozenge rather than a loop.
+parallel rules with caps, a lozenge rather than a loop. The width is *measured*
+from the label text rather than taken from the column's intrinsics so that
+`expanded` — the slot each choice can unfold beneath itself, and which is free to
+be wider than the labels — can never change the size of the circle.
 
 ### Turning the sheet
 
@@ -410,9 +425,11 @@ image, so it is crisp at any density and nearly free to render.
   tooling rather than illumination. The **surah header's rosette and field
   are likewise static** — fixed page typography, not a ceremony. One
   absolute rule, enforced everywhere this generator draws: no composition
-  may read as a hexagram — star indices that decompose into triangles
-  ({12/4}), 6-fold seals, and 6-fold field tilings are all excluded by
-  construction and guarded by tests on both platforms.
+  may read as an occult compound — star indices that decompose into
+  triangles ({12/4} → hexagram) or into interlaced pentagrams
+  ({10/4} → two {5/2} pentacles stacked), 6-fold seals, and 6-fold field
+  tilings are all excluded by construction and guarded by tests on both
+  platforms.
 - **Gilding.** Gold is never a flat color. Gilded elements (the surah
   rosette, ayah number marks, the home mark) carry a three-stop leaf
   gradient (deep bronze → bright gilt → deep bronze). On the reader, the
