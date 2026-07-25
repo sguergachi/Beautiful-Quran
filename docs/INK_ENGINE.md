@@ -450,22 +450,28 @@ pure, `InkEngineTest`-covered helpers.
    a one-frame full-ink flash. `sweepEntryAction(…)` classifies each composition
    as `Arm` / `Keep` / `Clear`, and on `Arm` a mask resolved **during
    composition** pins the displayed value to 0 (`displayedSweepProgress`) until
-   the reset runs. If Active ends before that reset, the residual starts from 0
-   rather than exposing the stale completed value.
-3. **The entry snapshot must survive the entry.** Duration, curve and feather are
-   captured at `Arm` and held for the whole sweep, so retuning tajweed or speed
-   mid-word cannot remap a half-finished wash (which read as "resetting and
-   playing again"). The residual needs that snapshot after the word is no longer
-   Active, which is why it lives in a tracker rather than the effect's closure —
-   committed in a `SideEffect`, never written during composition. The captured
-   curve is released only once the residual finishes: it is what maps the linear
-   clock to wash position, so dropping it mid-wash would jump the edge.
+   the reset runs. If Active ends before that reset, the residual only rewinds
+   from the idle full-ink ceiling (`residualSweepAnchor`) — a mid-wash value is
+   never snapped back to unread (that was the prior-word flash on handoff).
+3. **The entry snapshot must survive the entry.** Duration, curve, feather, and
+   wasl `revealStart` are captured at `Arm` and held for the whole sweep, so
+   retuning tajweed or speed mid-word cannot remap a half-finished wash (which
+   read as "resetting and playing again"). The residual needs that snapshot after
+   the word is no longer Active, which is why it lives in a tracker rather than
+   the effect's closure — committed in a `SideEffect`, never written during
+   composition. The captured curve is released only once the residual finishes:
+   it is what maps the linear clock to wash position, so dropping it mid-wash
+   would jump the edge. The wasl edge is latched the same way
+   (`effectiveRevealStart`) so Active→Recited cannot drop an already-bloomed
+   prefix back to unread for a frame.
 
 A **wasl continuation** (`waslWashProgress` / `waslContinuationStart` /
 `continuedSweepProgress`) is the fourth case: the prior word's freed tail runs
 the first segment of this word's ordinary ink wash (same feather), and the
 sweep starts from that edge instead of 0 — see
-[TAJWEED_PACING.md](TAJWEED_PACING.md).
+[TAJWEED_PACING.md](TAJWEED_PACING.md). Continued progress is applied inside
+`rememberLetterSweep` (not at each draw site) so residual and glint share one
+latched edge.
 
 ### Ink Lab
 
