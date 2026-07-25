@@ -199,33 +199,19 @@ class InkEngineTest {
         assertNull(InkEngine.sweepMs(activeWord = null, playbackSpeed = 1f))
     }
 
-    // --- startRevealed ---
-
-    @Test
-    fun `every active entry re-runs the ink wash including replayed words`() {
-        // Tap-to-play / seek / loop restart must never skip the reveal — full
-        // ink already on the page is not a substitute for the wash motion.
-        assertFalse(InkEngine.startRevealed(previous = State.Recited, current = State.Active))
-        assertFalse(InkEngine.startRevealed(previous = State.Plain, current = State.Active))
-        assertFalse(InkEngine.startRevealed(previous = State.Upcoming, current = State.Active))
-        assertFalse(InkEngine.startRevealed(previous = State.Recited, current = State.Recited))
-        assertFalse(InkEngine.startRevealed(previous = State.Active, current = State.Recited))
-    }
-
     // --- glinting ---
 
     @Test
-    fun `new and repeated active words wear the fresh-ink glint`() {
-        assertTrue(InkEngine.glinting(State.Active, repeat = false, startRevealed = false))
-        // A repeat glints again over its orange wash, including re-entry.
-        assertTrue(InkEngine.glinting(State.Active, repeat = true, startRevealed = false))
-        assertTrue(InkEngine.glinting(State.Active, repeat = true, startRevealed = true))
-        // startRevealed still gates non-repeat glint for API callers that set it.
-        assertFalse(InkEngine.glinting(State.Active, repeat = false, startRevealed = true))
+    fun `every active word wears the fresh-ink glint, replays included`() {
+        // Tap-to-play / seek / loop restart must never skip the reveal — full
+        // ink already on the page is not a substitute for the wash motion — so
+        // being Active is the whole gate. A repeat glints over its orange wash
+        // on the same terms.
+        assertTrue(InkEngine.glinting(State.Active))
         // Resting states never glint.
-        assertFalse(InkEngine.glinting(State.Plain, repeat = false, startRevealed = false))
-        assertFalse(InkEngine.glinting(State.Upcoming, repeat = false, startRevealed = false))
-        assertFalse(InkEngine.glinting(State.Recited, repeat = false, startRevealed = false))
+        assertFalse(InkEngine.glinting(State.Plain))
+        assertFalse(InkEngine.glinting(State.Upcoming))
+        assertFalse(InkEngine.glinting(State.Recited))
     }
 
     @Test

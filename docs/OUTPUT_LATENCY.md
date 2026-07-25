@@ -41,6 +41,27 @@ HighlightClock.sample(...)
 PreparedTimings.activeInfo(...)   ← unchanged engine
 ```
 
+## One ear clock, every follow-along surface
+
+`ReaderViewModel.adjustedPositionMs()` is the single pure reader of that
+adjusted position. **Anything that decides where the recitation is must go
+through it, never `player.positionMs`.** Three consumers do:
+
+| Consumer | Why it must be the ear clock |
+|---|---|
+| Word ink (`activeWord`) | Lights the word the listener is hearing |
+| Ayah fade lead (`ayahWithFadeLead`) | Compared against a *segment* end time; on raw playhead the effective lead became `fadeLeadMs + latency` (680 ms instead of 500 ms on A2DP) and shifted whenever the audio route changed |
+| Basmalah calligraphy wash | Shares the lead-in clip's clock with the ink |
+
+Only the ink poll additionally arms `HighlightClock.acceptNextSample()` when the
+route or lab value steps, so a latency change is taken as a real jump instead of
+held as jitter. That latch is *not* part of `adjustedPositionMs`: a second
+consumer must never be able to consume it on the ink poll's behalf.
+
+**Continue Listening reads neither clock.** It persists the *playing media
+item*, because the fade-led ayah names the next verse before a note of it is
+heard — persisting that recorded verses the listener never reached.
+
 **Highlight lead** (Ink Lab → Highlight, default 0; persists with other lab numbers) advances the
 query time so each word’s wash can start *before* its segment `startMs`. It is
 the opposite direction of output lag: lag delays ink to match late audio; lead

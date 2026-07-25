@@ -16,7 +16,7 @@ motion policy lives in [INK_ENGINE.md](INK_ENGINE.md).
 The word half of the gate is:
 
 ```text
-state == Active && (repeat || !startRevealed)
+state == Active
 ```
 
 The theme half requires the white-gold glimmer accent (`#F8E9BE`) provided by
@@ -31,8 +31,12 @@ This produces three deliberate cases:
 | A word becomes active because the reciter repeats it | Yes, every repeat event | The repeated utterance is a new performance event even though its base ink is already revealed. |
 | A previously recited word becomes active after a seek / word tap | Yes | Replay re-runs the ink wash; the sheen rides that wash so the word reads as being recited again. |
 
-`startRevealed` no longer suppresses the wash (or the glimmer) on seek/replay —
-tapping a word must restart the directional ink animation.
+There is no seek/replay suppression: tapping a word must restart the directional
+ink animation, so being Active *is* the whole word-side gate. (Android once had a
+`startRevealed(previous, current)` predicate for this; it had degenerated to a
+constant `false` — sampling jitter is filtered upstream by `HighlightClock` — and
+was removed along with its Compose wrapper. The web port still carries the
+constant-false version; see docs/WEB.md.)
 
 ## Motion and layer order
 

@@ -69,7 +69,7 @@ word.arabic (Hafs Uthmani, committed DB) ──► letter events + tajweed weigh
                                                     │  time fractions  t₀..tₙ
 shaped layout (per platform) ──────────────► width fractions  x₀..xₙ
                                                     │
-                              PacingCurve: monotone u∈[0,1] → position∈[0,1]
+                              TajweedPacing.Curve: monotone u∈[0,1] → position∈[0,1]
                                                     │
         sweep animates *linear* time; draw maps through the curve
 ```
@@ -264,8 +264,8 @@ Two refinements built into the curve, not the callers:
   plateaus render as repeated identical masks — free.
 - **Unchanged** — repeat wash (decorative, stays constant-rate bezier),
   `secondaryAlpha` gloss/translit tracking (it reads the paced sweep value,
-  so the gloss breath follows the dwell), `startRevealed`, all
-  `HighlightEngine` semantics, the 33 ms poll.
+  so the gloss breath follows the dwell), all `HighlightEngine` semantics,
+  the 33 ms poll.
 
 **No DB or pipeline change.** Weights derive at runtime from `word.arabic`
 (a one-pass scan of ~10 chars per word boundary), so there is no
@@ -309,7 +309,7 @@ shipping, use it offline to:
 
 If the heuristic proves too coarse for some reciters, v2 ships *measured*
 per-word letter fractions as a compact DB column (per reciter, quantized
-bytes) — same `PacingCurve` consumer, different producer, and only then does
+bytes) — same `TajweedPacing.Curve` consumer, different producer, and only then does
 the DB version bump. The engine design is identical either way, which is why
 the curve, not the weights, is the module boundary.
 

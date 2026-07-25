@@ -7,15 +7,15 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.RadioButton
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -25,25 +25,48 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
 import androidx.media3.common.Player
 import com.beautifulquran.ui.home.SearchDialWheel
+import com.beautifulquran.ui.theme.InkCircledChoiceColumn
 import com.beautifulquran.ui.theme.LocalQuranAccents
+import com.beautifulquran.ui.theme.UnselectedChoiceInk
 import com.beautifulquran.ui.theme.quietClickable
 
 /** How playback should loop, chosen on the repeat sheet. */
-enum class RepeatChoice { OFF, ONE_AYAH, WHOLE_SURAH, AYAH_RANGE, NEXT_N_AYAHS }
+enum class RepeatChoice(val label: String) {
+    OFF("Off"),
+    ONE_AYAH("This ayah"),
+    WHOLE_SURAH("Whole surah"),
+    AYAH_RANGE("A range of ayahs"),
+    NEXT_N_AYAHS("From this ayah"),
+}
 
 /**
- * A quiet sheet for choosing how the recitation repeats. Picking "a range of
- * ayahs" reveals two vertical wheels to bound the loop; picking "from this
- * ayah" reveals a single wheel that counts forward from the current ayah.
- * Everything applies on Done.
+ * Choosing how the recitation repeats — **not a dialog**.
+ *
+ * The reader sheet itself becomes the question: `ReaderScreen` hosts this inside
+ * an [com.beautifulquran.ui.theme.InkRevealOverlay], so ink bleeds out from the
+ * player bar's repeat control and soaks the page, the same shared reveal the Root
+ * Word Viewer and the word-hold chooser use. Nothing floats above the paper and
+ * there is no scrim.
+ *
+ * Selection uses the app's own vocabulary rather than Material's: the chosen
+ * line holds full ink while the others sit faint, and
+ * [com.beautifulquran.ui.theme.InkCircledChoiceColumn] paints the shared
+ * ink-brush circle around it — the same mark the Settings sheet loops around its
+ * inline choices. No radio buttons, no card, no Material buttons.
+ *
+ * Picking "a range of ayahs" reveals two vertical wheels to bound the loop;
+ * picking "from this ayah" reveals a single wheel counting forward from the
+ * current ayah. Everything applies on Done; the quiet margins dismiss.
+ *
+ * This replaced a stock Material `Dialog` that had been violating AGENTS.md
+ * invariant 4 (recorded, and now resolved, in docs/DESIGN.md).
  */
 @Composable
-fun RepeatDialog(
+fun RepeatSheet(
     ayahCount: Int,
     repeatMode: Int,
     repeatRange: IntRange?,
@@ -77,134 +100,120 @@ fun RepeatDialog(
     }
     val maxNextNCount = (safeAyahCount - safeCurrentAyah + 1).coerceAtLeast(1)
     var nextNCount by remember {
-        mutableIntStateOf(
-            if (isNextNRange) {
-                repeatRange!!.count().coerceIn(1, maxNextNCount)
-            } else {
-                2.coerceIn(1, maxNextNCount)
-            },
-        )
+        val opening = if (isNextNRange) repeatRange.count() else 2
+        mutableIntStateOf(opening.coerceIn(1, maxNextNCount))
     }
 
-    Dialog(onDismissRequest = onDismiss) {
-        Surface(
-            shape = MaterialTheme.shapes.extraLarge,
-            color = MaterialTheme.colorScheme.surface,
+    fun commit() {
+        when (choice) {
+            RepeatChoice.OFF -> onRepeatMode(Player.REPEAT_MODE_OFF)
+            RepeatChoice.ONE_AYAH -> onRepeatMode(Player.REPEAT_MODE_ONE)
+            RepeatChoice.WHOLE_SURAH -> onRepeatMode(Player.REPEAT_MODE_ALL)
+            RepeatChoice.AYAH_RANGE -> onRepeatRange(from, to)
+            RepeatChoice.NEXT_N_AYAHS -> onRepeatRange(
+                safeCurrentAyah,
+                safeCurrentAyah + nextNCount - 1,
+            )
+        }
+        onDismiss()
+    }
+
+    // The margins are quiet paper: tapping them puts the question away.
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .quietClickable(onClick = onDismiss),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier
+                .fillMaxWidth()
+                // Centred while it fits, scrollable once a wheel opens on a
+                // short screen — the sheet never clips its own Done line.
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 32.dp, vertical = 40.dp)
+                // Absorb the column's own taps so only the margins dismiss.
+                .quietClickable(onClick = {}),
         ) {
-            Column(Modifier.padding(horizontal = 24.dp, vertical = 20.dp)) {
-                Text(
-                    text = "Repeat",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurface,
+            Text(
+                text = "Repeat",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f),
+            )
+            Spacer(Modifier.height(24.dp))
+
+            // The shared ink-brush circle loops the chosen line — the same mark
+            // the Settings sheet paints around its inline choices.
+            InkCircledChoiceColumn(
+                entries = RepeatChoice.entries,
+                selected = choice,
+                label = { it.label },
+                onSelect = { choice = it },
+            )
+
+            if (choice == RepeatChoice.AYAH_RANGE) {
+                Spacer(Modifier.height(20.dp))
+                RepeatWheelCaption("Ayah $from to $to")
+                Spacer(Modifier.height(10.dp))
+                RepeatRangeDials(
+                    ayahCount = safeAyahCount,
+                    from = from,
+                    to = to,
+                    onFromChange = {
+                        from = it
+                        if (to < it) to = it
+                    },
+                    onToChange = {
+                        to = it
+                        if (from > it) from = it
+                    },
                 )
-                Spacer(Modifier.height(8.dp))
-
-                RepeatOption("Off", choice == RepeatChoice.OFF) { choice = RepeatChoice.OFF }
-                RepeatOption("This ayah", choice == RepeatChoice.ONE_AYAH) {
-                    choice = RepeatChoice.ONE_AYAH
-                }
-                RepeatOption("Whole surah", choice == RepeatChoice.WHOLE_SURAH) {
-                    choice = RepeatChoice.WHOLE_SURAH
-                }
-                RepeatOption("A range of ayahs", choice == RepeatChoice.AYAH_RANGE) {
-                    choice = RepeatChoice.AYAH_RANGE
-                }
-                RepeatOption("From this ayah", choice == RepeatChoice.NEXT_N_AYAHS) {
-                    choice = RepeatChoice.NEXT_N_AYAHS
-                }
-
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(
-                            when (choice) {
-                                RepeatChoice.AYAH_RANGE -> 298.dp
-                                RepeatChoice.NEXT_N_AYAHS -> 298.dp
-                                else -> 0.dp
-                            },
-                        ),
-                ) {
-                    if (choice == RepeatChoice.AYAH_RANGE) {
-                        Column(Modifier.padding(top = 8.dp)) {
-                            Text(
-                                text = "Ayah $from to $to",
-                                style = MaterialTheme.typography.labelLarge,
-                                color = MaterialTheme.colorScheme.primary,
-                            )
-                            Spacer(Modifier.height(10.dp))
-                            RepeatRangeDials(
-                                ayahCount = safeAyahCount,
-                                from = from,
-                                to = to,
-                                onFromChange = {
-                                    from = it
-                                    if (to < it) to = it
-                                },
-                                onToChange = {
-                                    to = it
-                                    if (from > it) from = it
-                                },
-                            )
-                        }
-                    } else if (choice == RepeatChoice.NEXT_N_AYAHS) {
-                        Column(Modifier.padding(top = 8.dp)) {
-                            Text(
-                                text = "Repeat $nextNCount ayah${if (nextNCount == 1) "" else "s"} from ayah $safeCurrentAyah",
-                                style = MaterialTheme.typography.labelLarge,
-                                color = MaterialTheme.colorScheme.primary,
-                            )
-                            Spacer(Modifier.height(10.dp))
-                            RepeatCountDial(
-                                count = nextNCount,
-                                maxCount = maxNextNCount,
-                                onCountChange = { nextNCount = it },
-                            )
-                        }
-                    }
-                }
-
-                Spacer(Modifier.height(8.dp))
-                Row(
-                    horizontalArrangement = Arrangement.End,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    TextButton(onClick = onDismiss) { Text("Cancel") }
-                    TextButton(
-                        onClick = {
-                            when (choice) {
-                                RepeatChoice.OFF -> onRepeatMode(Player.REPEAT_MODE_OFF)
-                                RepeatChoice.ONE_AYAH -> onRepeatMode(Player.REPEAT_MODE_ONE)
-                                RepeatChoice.WHOLE_SURAH -> onRepeatMode(Player.REPEAT_MODE_ALL)
-                                RepeatChoice.AYAH_RANGE -> onRepeatRange(from, to)
-                                RepeatChoice.NEXT_N_AYAHS -> onRepeatRange(
-                                    safeCurrentAyah,
-                                    safeCurrentAyah + nextNCount - 1,
-                                )
-                            }
-                            onDismiss()
-                        },
-                    ) { Text("Done") }
-                }
+            } else if (choice == RepeatChoice.NEXT_N_AYAHS) {
+                Spacer(Modifier.height(20.dp))
+                RepeatWheelCaption(
+                    "Repeat $nextNCount ayah${if (nextNCount == 1) "" else "s"} " +
+                        "from ayah $safeCurrentAyah",
+                )
+                Spacer(Modifier.height(10.dp))
+                RepeatCountDial(
+                    count = nextNCount,
+                    maxCount = maxNextNCount,
+                    onCountChange = { nextNCount = it },
+                )
             }
+
+            Spacer(Modifier.height(32.dp))
+            Text(
+                text = "Done",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier
+                    .quietClickable(onClick = ::commit)
+                    .padding(horizontal = 16.dp, vertical = 10.dp),
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                text = "Not now",
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
+                modifier = Modifier
+                    .quietClickable(onClick = onDismiss)
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+            )
         }
     }
 }
 
 @Composable
-private fun RepeatOption(label: String, selected: Boolean, onSelect: () -> Unit) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier
-            .fillMaxWidth()
-            .quietClickable(onClick = onSelect),
-    ) {
-        RadioButton(selected = selected, onClick = onSelect)
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurface,
-        )
-    }
+private fun RepeatWheelCaption(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.labelLarge,
+        textAlign = TextAlign.Center,
+        color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier.fillMaxWidth(),
+    )
 }
 
 @Composable
@@ -235,6 +244,8 @@ private fun RepeatRangeDials(
                 .height(208.dp),
         ) {
             val wheelEdgePadding = ((maxHeight - itemHeight) / 2).coerceAtLeast(0.dp)
+            // A soft gilt band marks the reading line of the wheel — an ink
+            // wash on the page, not a selected-item container.
             Box(
                 modifier = Modifier
                     .align(Alignment.Center)
@@ -324,7 +335,7 @@ private fun RepeatWheelLabel(text: String, modifier: Modifier = Modifier) {
         Text(
             text = text,
             style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
         )
     }
 }
@@ -341,9 +352,8 @@ private fun RepeatNumberItem(value: Int, selected: Boolean) {
             color = if (selected) {
                 MaterialTheme.colorScheme.primary
             } else {
-                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                MaterialTheme.colorScheme.onSurface.copy(alpha = UnselectedChoiceInk)
             },
-            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
         )
     }
 }

@@ -103,12 +103,6 @@ object FocusEngine {
     private const val NEAR_EXTRA_ITEMS = 2
 
     /**
-     * Shortest animated residual for a far jump, in items — at least roughly
-     * one viewport so even a modest jump shows real travel.
-     */
-    private const val ANIMATED_SPAN_MIN_VIEWPORTS = 1
-
-    /**
      * Longest animated residual (far jumps saturate here), in items. Sized so
      * a max-distance jump rushes through a long stretch of verses in one
      * second — enough to read as "we scrolled a long way".
@@ -166,7 +160,9 @@ object FocusEngine {
         // Residual length scales with how far we're jumping: a short hop still
         // shows ~one viewport of travel; a ~200-verse jump rushes through the
         // full [ANIMATED_SPAN_MAX_ITEMS] stretch over a full second.
-        val minSpan = (visible * ANIMATED_SPAN_MIN_VIEWPORTS).coerceAtLeast(visible)
+        // Capped at the ceiling: an unusually tall viewport could otherwise
+        // make the floor exceed it, and coerceIn throws on an empty range.
+        val minSpan = visible.coerceAtMost(ANIMATED_SPAN_MAX_ITEMS)
         val t = (distance.toFloat() / JUMP_DISTANCE_SATURATE_ITEMS).coerceIn(0f, 1f)
         val desiredSpan = (minSpan + (ANIMATED_SPAN_MAX_ITEMS - minSpan) * t)
             .roundToInt()

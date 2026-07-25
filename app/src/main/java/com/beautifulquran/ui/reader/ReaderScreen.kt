@@ -116,6 +116,7 @@ import com.beautifulquran.ui.reader.focus.FocusEngine
 import com.beautifulquran.ui.reader.focus.rememberReaderFocusController
 import com.beautifulquran.ui.theme.FloatingPaperControl
 import com.beautifulquran.ui.theme.IslamicReturnToAyahButton
+import com.beautifulquran.ui.theme.InkRevealOverlay
 import com.beautifulquran.ui.theme.absorbPointerEvents
 import com.beautifulquran.ui.theme.contrastingOverlayColorScheme
 import com.beautifulquran.ui.theme.verticalFadingEdges
@@ -634,10 +635,19 @@ fun ReaderScreen(
     var lastFollowFocusTarget by remember { mutableStateOf<Int?>(null) }
 
     // Continue Listening tracks recited ayahs without driving scroll.
-    LaunchedEffect(playbackFocusTarget, playerState.isPlaying) {
-        val target = playbackFocusTarget ?: return@LaunchedEffect
-        if (target >= 1 && playerState.isPlaying) {
-            viewModel.onListenedAyah(target)
+    //
+    // Keyed on the *playing media item*, never [playbackFocusTarget]: that
+    // target is fade-led, so it names the next verse up to InkEngine.fadeLeadMs
+    // before a note of it is heard. Persisting it meant pausing inside the lead
+    // recorded a verse the listener never reached — breaking the repository's
+    // "only verses actually recited" contract. Ayah 0 is the basmalah lead-in
+    // and is filtered by the >= 1 guard.
+    val listeningAyah = playerState.nowPlaying?.ayah
+    LaunchedEffect(listeningAyah, isThisSurahPlaying, playerState.isPlaying) {
+        if (listeningAyah != null && listeningAyah >= 1 &&
+            isThisSurahPlaying && playerState.isPlaying
+        ) {
+            viewModel.onListenedAyah(listeningAyah)
         }
     }
 
@@ -2173,35 +2183,67 @@ fun ReaderScreen(
                 onAllow = notifPermission::allow,
             )
         }
-    }
 
-    val dialogContent = uiState.content
-    if (showRepeatDialog && dialogContent != null) {
-        val repeatRangeForThisSurah = playerState.repeatRange
-            .takeIf { playerState.nowPlaying?.surahId == surahId }
-        val repeatStartAyah = (
-            activeAyah
-                ?: requestedJumpAyah.takeIf { it > 0 }
-                ?: startAyah
-                ?: scrolledAyah.value
-            ).coerceIn(1, dialogContent.surah.ayahCount)
-        RepeatDialog(
-            ayahCount = dialogContent.surah.ayahCount,
-            repeatMode = playerState.repeatMode,
-            repeatRange = repeatRangeForThisSurah,
-            currentAyah = repeatStartAyah,
-            onDismiss = { showRepeatDialog = false },
-            onRepeatMode = viewModel::setRepeatMode,
-            onRepeatRange = { from, to ->
-                notifPermission.request {
-                    dispatch(ReaderInteractionEvent.EnableFollow)
-                    viewModel.setRepeatRange(from, to)
+        // The repeat question is an ink bleed on this sheet, not a dialog: the
+        // shared InkRevealOverlay soaks the reader paper from the player bar's
+        // repeat control, exactly as the Root Word Viewer opens. It must live
+        // inside this Box so the bleed has the sheet to spread across, and below
+        // the notification prompt's zIndex — choosing a range can raise that
+        // prompt next.
+        val repeatContent = uiState.content
+        val repeatOverlayColors = contrastingOverlayColorScheme(settings.themeMode)
+        val repeatStartAyah = repeatContent?.let {
+            (
+                activeAyah
+                    ?: requestedJumpAyah.takeIf { n -> n > 0 }
+                    ?: startAyah
+                    ?: scrolledAyah.value
+                ).coerceIn(1, it.surah.ayahCount)
+        }
+        InkRevealOverlay(
+            visible = showRepeatDialog && repeatContent != null,
+            backgroundColor = repeatOverlayColors.background,
+            modifier = Modifier.zIndex(1.8f),
+            originX = REPEAT_BLEED_ORIGIN_X,
+            originY = REPEAT_BLEED_ORIGIN_Y,
+        ) {
+            MaterialTheme(
+                colorScheme = repeatOverlayColors,
+                typography = MaterialTheme.typography,
+            ) {
+                Box(Modifier.fillMaxSize()) {
+                    // Nothing beneath the bleed may be touched through it.
+                    Box(Modifier.matchParentSize().absorbPointerEvents())
+                    if (repeatContent != null && repeatStartAyah != null) {
+                        RepeatSheet(
+                            ayahCount = repeatContent.surah.ayahCount,
+                            repeatMode = playerState.repeatMode,
+                            repeatRange = playerState.repeatRange
+                                .takeIf { playerState.nowPlaying?.surahId == surahId },
+                            currentAyah = repeatStartAyah,
+                            onDismiss = { showRepeatDialog = false },
+                            onRepeatMode = viewModel::setRepeatMode,
+                            onRepeatRange = { from, to ->
+                                notifPermission.request {
+                                    dispatch(ReaderInteractionEvent.EnableFollow)
+                                    viewModel.setRepeatRange(from, to)
+                                }
+                            },
+                        )
+                    }
                 }
-            },
-        )
+            }
+        }
     }
-
 }
+
+/**
+ * Where the repeat bleed starts, as a fraction of the reader sheet: low and
+ * centred, on the player bar that carries the repeat control, so the ink reads
+ * as spreading out of the thing that was touched.
+ */
+private const val REPEAT_BLEED_ORIGIN_X = 0.5f
+private const val REPEAT_BLEED_ORIGIN_Y = 0.88f
 
 private tailrec fun Context.findActivity(): Activity? = when (this) {
     is Activity -> this

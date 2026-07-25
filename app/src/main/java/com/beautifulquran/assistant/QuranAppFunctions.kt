@@ -294,7 +294,7 @@ abstract class BaseQuranAppFunctionService : AppFunctionService() {
     }
 
     private fun QuranApp.startRecitation(surah: Surah, ayah: Int, reciter: Reciter) {
-        settings.update { it.copy(lastSurah = surah.id, lastAyah = ayah) }
+        settings.updateListeningPosition(surah.id, ayah)
         player.playSurah(
             surahId = surah.id,
             ayahCount = surah.ayahCount,

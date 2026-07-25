@@ -240,7 +240,7 @@ class TimingsLabViewModel(
                 overrideCount = _ui.value.overrideCount,
                 speed = player.state.value.speed,
             )
-            settingsRepo.update { it.copy(lastSurah = surahId, lastAyah = ayahRow.number) }
+            settingsRepo.updateListeningPosition(surahId, ayahRow.number)
             // Long-pressed word from the reader: jump straight into tuning it.
             if (focusWordPosition != null) selectWord(focusWordPosition)
         }

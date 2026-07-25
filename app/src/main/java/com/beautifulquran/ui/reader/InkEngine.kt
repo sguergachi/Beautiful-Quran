@@ -408,27 +408,14 @@ object InkEngine {
      * on. Themes opt in via a non-null `QuranAccents.glintInk` (Nightfall and
      * Royal Green); this predicate is the *word* half of the gate.
      *
-     * Active repeat words glint over their orange wash too. [startRevealed]
-     * is retained for API parity with older call sites; wash always restarts
-     * on Active entry, so ordinary seeks also glint as a fresh play of the word.
+     * Every Active entry glints, including a replay: the wash always restarts
+     * on Active entry — Recited → Active when the listener taps a word again,
+     * seeks backward, or a loop restarts — because skipping it made replayed
+     * words look inert (full ink already, no motion). Sampling jitter that
+     * used to need suppressing here is filtered upstream by
+     * [com.beautifulquran.domain.HighlightClock].
      */
-    fun glinting(state: State, repeat: Boolean, startRevealed: Boolean): Boolean =
-        state == State.Active && (repeat || !startRevealed)
-
-    /**
-     * Whether a word entering [current] from [previous] should start its
-     * letter sweep already fully revealed (progress 1) instead of snapping to
-     * the faint upcoming floor.
-     *
-     * Always false: every Active entry re-runs the ink wash — including
-     * Recited → Active when the listener taps a word to play it again, seeks
-     * backward, or a loop restarts. Skipping that wash made replayed words
-     * look inert (full ink already, no motion). Sampling jitter is filtered
-     * by [com.beautifulquran.domain.HighlightClock] so accidental bounce no
-     * longer needs this suppression.
-     */
-    @Suppress("UNUSED_PARAMETER")
-    fun startRevealed(previous: State, current: State): Boolean = false
+    fun glinting(state: State): Boolean = state == State.Active
 
     /**
      * Ink for the surah-header basmalah calligraphy (a VectorDrawable, not

@@ -29,10 +29,12 @@ class WordSearchTest {
             translationLower = translation.lowercase(),
             transliteration = transliteration,
             transliterationLower = transliteration.lowercase(),
-            ayahText = ayahText,
-            ayahTranslation = ayahTranslation,
-            surahNameTransliteration = "Surah$surahId",
-            surahNameArabic = "س$surahId",
+            context = WordSearchAyahContext(
+                ayahText = ayahText,
+                ayahTranslation = ayahTranslation,
+                surahNameTransliteration = "Surah$surahId",
+                surahNameArabic = "س$surahId",
+            ),
         )
     }
 
@@ -164,21 +166,24 @@ class WordSearchTest {
                 position = 4,
                 arabic = "ٱلۡأَرۡضَ",
                 translation = "the earth",
-            ).copy(ayahTranslation = "[He] who made for you the earth a bed [spread out]"),
+                ayahTranslation = "[He] who made for you the earth a bed [spread out]",
+            ),
             entry(
                 surahId = 2,
                 ayah = 22,
                 position = 5,
                 arabic = "فِرَٰشٗا",
                 translation = "a resting place",
-            ).copy(ayahTranslation = "[He] who made for you the earth a bed [spread out]"),
+                ayahTranslation = "[He] who made for you the earth a bed [spread out]",
+            ),
             entry(
                 surahId = 2,
                 ayah = 22,
                 position = 6,
                 arabic = "وَٱلسَّمَآءَ",
                 translation = "and the sky",
-            ).copy(ayahTranslation = "[He] who made for you the earth a bed [spread out]"),
+                ayahTranslation = "[He] who made for you the earth a bed [spread out]",
+            ),
         )
         val hits = matchWordSearch(entries, "rest")
         assertEquals(1, hits.size)

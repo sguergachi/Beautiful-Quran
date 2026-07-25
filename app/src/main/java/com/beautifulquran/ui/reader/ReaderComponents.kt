@@ -442,21 +442,6 @@ private fun rememberLetterSweep(
     }
 }
 
-/**
- * Compose wrapper over [InkEngine.startRevealed] (the rule and its rationale
- * live there): tracks the word's previous state and captures the decision the
- * moment the word activates, so it stays stable for the whole time the word
- * is lit and is recomputed fresh on the next activation.
- */
-@Composable
-private fun rememberStartRevealed(state: InkEngine.State): Boolean {
-    val active = state == InkEngine.State.Active
-    val previousState = remember { mutableStateOf(state) }
-    val startRevealed = InkEngine.startRevealed(previous = previousState.value, current = state)
-    SideEffect { previousState.value = state }
-    return remember(active) { startRevealed }
-}
-
 /** Comfortable reading band the active word is kept inside while follow mode
  * scrolls the sheet (see [wordUnitBehavior] / [shapedActiveWordInView]).
  * Shared with [ReaderScreen] so the focus engine's bottom guard matches. */
@@ -615,10 +600,8 @@ private fun rememberWordHighlight(
     activation: Long = 0L,
 ): WordHighlight {
     val isActive = ink.state == InkEngine.State.Active
-    val startRevealed = rememberStartRevealed(ink.state)
     val glintInk = LocalQuranAccents.current.glintInk
-    val glinting = glintInk != null &&
-        InkEngine.glinting(ink.state, ink.repeat, startRevealed)
+    val glinting = glintInk != null && InkEngine.glinting(ink.state)
     val glintIdentity = rememberGlintIdentity(glinting, ink.repeat)
     // Freeze tajweed curve for this activation so an Ink Lab toggle mid-word
     // cannot remap the wash (or swap feather) and look like a reset.
@@ -983,8 +966,7 @@ private data class Glint(
 private fun rememberGlints(inks: List<InkEngine.Word>): List<Glint> {
     val glintInk = LocalQuranAccents.current.glintInk
     return inks.map { ink ->
-        val glinting = glintInk != null &&
-            InkEngine.glinting(ink.state, ink.repeat, rememberStartRevealed(ink.state))
+        val glinting = glintInk != null && InkEngine.glinting(ink.state)
         val identity = rememberGlintIdentity(glinting, ink.repeat)
         Glint(
             alpha = rememberGlintAlpha(glinting),

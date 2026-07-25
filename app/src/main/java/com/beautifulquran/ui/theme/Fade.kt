@@ -204,6 +204,7 @@ fun Modifier.shapedWordBloom(
     feather: Float = InkWashFeather,
 ): Modifier {
     val stops = FloatArray(InkProfileStops) { i -> i / (InkProfileStops - 1f) }
+    val lineBoundsCache = LineBoundsCache()
     return drawWithContent {
         drawContent()
         val textLayout = layout() ?: return@drawWithContent
@@ -216,37 +217,17 @@ fun Modifier.shapedWordBloom(
             val start = range.first.coerceIn(0, length)
             val endExclusive = (range.last + 1).coerceIn(start, length)
             if (endExclusive <= start) return@forEach
-            val path = textLayout.getPathForRange(start, endExclusive)
-            val lineBounds = buildList {
-                val firstLine = textLayout.getLineForOffset(start)
-                val lastLine = textLayout.getLineForOffset((endExclusive - 1).coerceAtLeast(start))
-                for (line in firstLine..lastLine) {
-                    val lineStart = maxOf(start, textLayout.getLineStart(line))
-                    val lineEnd = minOf(endExclusive, textLayout.getLineEnd(line, visibleEnd = true))
-                    if (lineEnd <= lineStart) continue
-                    val selectionBounds = textLayout.getPathForRange(lineStart, lineEnd).getBounds()
-                    if (!selectionBounds.isEmpty && selectionBounds.width > 0f) {
-                        // Selection paths can stop above a Latin descender at
-                        // a wrapped range edge. Keep the word-local horizontal
-                        // bounds, but cover the text layout's full line height
-                        // so g/j/p/q/y never escape the upcoming-ink mask.
-                        add(
-                            Rect(
-                                left = selectionBounds.left,
-                                top = textLayout.getLineTop(line),
-                                right = selectionBounds.right,
-                                bottom = textLayout.getLineBottom(line),
-                            ),
-                        )
-                    }
-                }
-            }
-            if (lineBounds.isEmpty()) return@forEach
 
+            // Each bloom kind derives only the geometry it paints with:
+            // the paper covers work off line boxes (memoised — they change on
+            // relayout, not as the wash advances), and only [ColorReveal] needs
+            // the shaped glyph path. Deriving both for every bloom meant a long
+            // ayah rebuilt ~2 paths per word on every animation frame.
             when (bloom) {
                 is ShapedWordBloom.UpcomingDim -> {
                     val a = bloom.coverAlpha.coerceIn(0f, 1f)
                     if (a <= 0f) return@forEach
+                    val lineBounds = lineBoundsCache.boundsFor(textLayout, start, endExclusive)
                     // The bounds already span the layout's full line height.
                     // Bleed only horizontally: vertical padding lets an
                     // unread line's paper mask climb into the preceding line
@@ -274,6 +255,7 @@ fun Modifier.shapedWordBloom(
                     // overhangs (same as UpcomingDim).
                     val p = bloom.progress.coerceIn(0f, 1f)
                     if (p >= 1f) return@forEach
+                    val lineBounds = lineBoundsCache.boundsFor(textLayout, start, endExclusive)
                     val paperColors = stops.map { t ->
                         val s = inkSmootherstep(t)
                         val glyphAlpha = bloom.restingAlpha +
@@ -324,8 +306,11 @@ fun Modifier.shapedWordBloom(
                     if (bloom.layerAlpha <= 0f) return@forEach
                     // Re-draw the same shaped glyphs, tint them orange with
                     // SrcIn (keeps harf shapes), then DstIn-wash like letterFadeIn.
+                    // The glyph path is needed here and nowhere else.
+                    val path = textLayout.getPathForRange(start, endExclusive)
                     val p = bloom.progress.coerceIn(0f, 1f)
                     val bounds = path.getBounds()
+                    if (bounds.isEmpty || bounds.width <= 0f) return@forEach
                     val w = bounds.width
                     val edge = (w * (bloom.feather ?: feather)).coerceAtLeast(1f)
                     val head = p * (w + edge)
@@ -400,6 +385,61 @@ fun Modifier.shapedWordBloom(
                     drawIntoCanvas { canvas -> canvas.restore() }
                 }
             }
+        }
+    }
+}
+
+/**
+ * Per-word line boxes for one [TextLayoutResult], memoised across draw frames.
+ *
+ * The boxes are pure geometry of (layout, character range): they move only when
+ * the ayah re-lays out, never as the wash advances. Without this, a recessed
+ * 128-word ayah re-derived every word's boxes on every frame of the active
+ * word's sweep — the wash itself is untouched, only the arithmetic behind it.
+ * Bounded by the word count of one ayah and dropped whole when the layout
+ * changes identity (font scale, width, text).
+ */
+private class LineBoundsCache {
+    private var layout: TextLayoutResult? = null
+    private val byRange = HashMap<Long, List<Rect>>()
+
+    fun boundsFor(textLayout: TextLayoutResult, start: Int, endExclusive: Int): List<Rect> {
+        if (layout !== textLayout) {
+            layout = textLayout
+            byRange.clear()
+        }
+        val key = (start.toLong() shl 32) or endExclusive.toLong()
+        byRange[key]?.let { return it }
+        return computeLineBounds(textLayout, start, endExclusive).also { byRange[key] = it }
+    }
+}
+
+/** Word-local horizontal bounds per line, at the layout's full line height. */
+private fun computeLineBounds(
+    textLayout: TextLayoutResult,
+    start: Int,
+    endExclusive: Int,
+): List<Rect> = buildList {
+    val firstLine = textLayout.getLineForOffset(start)
+    val lastLine = textLayout.getLineForOffset((endExclusive - 1).coerceAtLeast(start))
+    for (line in firstLine..lastLine) {
+        val lineStart = maxOf(start, textLayout.getLineStart(line))
+        val lineEnd = minOf(endExclusive, textLayout.getLineEnd(line, visibleEnd = true))
+        if (lineEnd <= lineStart) continue
+        val selectionBounds = textLayout.getPathForRange(lineStart, lineEnd).getBounds()
+        if (!selectionBounds.isEmpty && selectionBounds.width > 0f) {
+            // Selection paths can stop above a Latin descender at a wrapped
+            // range edge. Keep the word-local horizontal bounds, but cover the
+            // text layout's full line height so g/j/p/q/y never escape the
+            // upcoming-ink mask.
+            add(
+                Rect(
+                    left = selectionBounds.left,
+                    top = textLayout.getLineTop(line),
+                    right = selectionBounds.right,
+                    bottom = textLayout.getLineBottom(line),
+                ),
+            )
         }
     }
 }

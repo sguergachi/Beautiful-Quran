@@ -38,6 +38,47 @@ Hard rules:
 - **Taps have no ripple.** Touch feedback is the content's own motion
   (a word lighting, a page turning), never Material ink splash.
 
+> **Fixed 2026-07-24: the repeat picker.** It used to be the one live violation
+> of the two rules above — a stock `androidx.compose.ui.window.Dialog` with a
+> `Surface`, `RadioButton`s and `TextButton`s. It is now
+> `ui/reader/RepeatSheet.kt`, hosted by `ReaderScreen` inside the shared
+> `InkRevealOverlay`: ink bleeds from the player bar's repeat control and the
+> reader sheet becomes the question. Selection is the ink-brush circle plus ink
+> strength, Done/Not now are quiet text lines, and the margins dismiss. The ayah
+> wheels are the same `SearchDialWheel` the cover sheet's search uses, under a
+> soft gilt reading band.
+
+### The selection marks (`ui/theme/BrushMarks.kt`)
+
+Material's radio buttons, checkboxes and segmented containers are all forbidden
+above, so the app draws its own marks. They live in one place and **any surface
+may use them** — they are not Settings-only, which is where they started.
+
+| Use | Component |
+|---|---|
+| Pick one of a few short options, side by side | `InkCircledChoiceRow` |
+| Pick one of several longer options, stacked | `InkCircledChoiceColumn` |
+| On / off | `InkCheck` — an empty ring that a brush check paints into |
+| A quiet "this one" dot | `InkDisc` |
+| Circle something that is *not* a plain text choice | `rememberInkBrushCircle` + `Modifier.inkBrushCircleTarget` / `Modifier.inkBrushCircleMark` |
+| Raw geometry (custom canvases) | `inkBrushCirclePath`, `inkBrushCheckPath` |
+| Touch feedback on a pick / toggle | `View.paperSelectHaptic()`, `View.paperToggleHaptic(turningOn)` |
+
+The circle is a filled calligraphic stroke on an oval centreline: it overshoots
+its own join at both ends and bows outward on entry / inward on exit, so the tips
+cross like a real hand's loop instead of closing into a ring. Pressure varies
+along the stroke (`attack`, `releaseStart`, `bodyAmp`), and it **paints itself**
+over `paintMs` rather than appearing.
+
+`BrushCircleParams` / `BrushCheckParams` carry the knobs. Callers that don't care
+get the shipped baseline by default; only Settings → Developer's brush lab passes
+its own, and `SHIPPED_BRUSH_REVISION` / `SHIPPED_CHECK_REVISION` force the lab to
+reseed when a baseline changes. Keep both in lockstep with web `brushMark.ts` /
+`brushCheck.ts`.
+
+Because the mark is derived from each child's own measured bounds rather than the
+container's, the same code loops a word in a `Row` and a full line in a `Column`.
+
 ### Turning the sheet
 
 Sheets turn with a horizontal swipe, handled by one stack-level detector

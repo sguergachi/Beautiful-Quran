@@ -5,10 +5,6 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.os.Build
 import android.util.Log
-import android.view.HapticFeedbackConstants
-import android.view.View
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -50,7 +46,6 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -58,16 +53,13 @@ import kotlinx.coroutines.delay
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathMeasure
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.boundsInParent
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
@@ -87,28 +79,25 @@ import com.beautifulquran.data.ReadingMode
 import com.beautifulquran.data.Settings
 import com.beautifulquran.data.ThemeMode
 import com.beautifulquran.ui.PageTurnSounds
+import com.beautifulquran.ui.theme.BrushCheckParams
+import com.beautifulquran.ui.theme.BrushCircleParams
 import com.beautifulquran.ui.theme.DisclosureChevron
+import com.beautifulquran.ui.theme.InkCheck
+import com.beautifulquran.ui.theme.InkCircledChoiceRow
+import com.beautifulquran.ui.theme.InkDisc
+import com.beautifulquran.ui.theme.SHIPPED_BRUSH_REVISION
+import com.beautifulquran.ui.theme.SHIPPED_CHECK_REVISION
+import com.beautifulquran.ui.theme.brushCircleParams
+import com.beautifulquran.ui.theme.inkBrushCheckPath
+import com.beautifulquran.ui.theme.inkBrushCirclePath
+import com.beautifulquran.ui.theme.paperSelectHaptic
+import com.beautifulquran.ui.theme.paperToggleHaptic
 import com.beautifulquran.ui.theme.quietClickable
+import com.beautifulquran.ui.theme.shippedCheckParams
 import com.beautifulquran.ui.theme.themePreviewColors
 import com.beautifulquran.ui.theme.verticalFadingEdges
-import kotlin.math.PI
-import kotlin.math.cos
-import kotlin.math.hypot
 import kotlin.math.roundToInt
-import kotlin.math.sin
 
-/** Soft selection tick — same family as ayah-rail commits, not a heavy long-press. */
-private fun View.paperSelectHaptic() {
-    performHapticFeedback(HapticFeedbackConstants.CONTEXT_CLICK)
-}
-
-/** Toggle tick — confirm when turning on, lighter clock tick when off. */
-private fun View.paperToggleHaptic(turningOn: Boolean) {
-    performHapticFeedback(
-        if (turningOn) HapticFeedbackConstants.CONTEXT_CLICK
-        else HapticFeedbackConstants.CLOCK_TICK,
-    )
-}
 
 private val ATTRIBUTIONS = """
 Quran text (Uthmani script) and Saheeh International translation via the quran-json project, from Tanzil and Al Quran Cloud.
@@ -240,10 +229,10 @@ fun SettingsScreen(
             }
 
             Section("Reading")
-            InlineChoiceRow(
+            InkCircledChoiceRow(
                 entries = ReadingMode.entries,
                 selected = settings.readingMode,
-                brushParams = brushParams,
+                params = brushParams,
                 paintToken = paintToken,
                 label = { mode ->
                     when (mode) {
@@ -294,10 +283,10 @@ fun SettingsScreen(
             )
 
             Section("Ayah selector")
-            InlineChoiceRow(
+            InkCircledChoiceRow(
                 entries = AyahSelectorSide.entries,
                 selected = settings.ayahSelectorSide,
-                brushParams = brushParams,
+                params = brushParams,
                 paintToken = paintToken,
                 label = { side ->
                     when (side) {
@@ -896,251 +885,8 @@ private fun ToggleRow(
     }
 }
 
-/** The on/off mark: empty ring at rest; lab-tunable brush check paints on. */
-@Composable
-private fun InkCheck(
-    checked: Boolean,
-    params: BrushCheckParams = shippedCheckParams(),
-    paintToken: Int = 0,
-) {
-    val paint = remember { Animatable(if (checked) 1f else 0f) }
-    LaunchedEffect(checked, paintToken, params) {
-        if (!checked) {
-            paint.snapTo(0f)
-            return@LaunchedEffect
-        }
-        paint.snapTo(0.02f)
-        paint.animateTo(
-            1f,
-            tween(durationMillis = params.paintMs, easing = FastOutSlowInEasing),
-        )
-    }
-    val progress = paint.value
-    val accent = MaterialTheme.colorScheme.primary
-    val outline = MaterialTheme.colorScheme.outline
-    val sizeDp = params.sizeDp.dp
-    Canvas(Modifier.size(sizeDp)) {
-        val c = Offset(size.width / 2f, size.height / 2f)
-        val r = size.minDimension / 2f
-        drawCircle(
-            color = outline.copy(alpha = 0.5f * (1f - progress.coerceIn(0f, 1f))),
-            radius = r - 1.2.dp.toPx(),
-            center = c,
-            style = Stroke(width = 1.4.dp.toPx()),
-        )
-        if (progress > 0.02f) {
-            val mark = inkBrushCheckPath(
-                size = size.minDimension,
-                progress = progress,
-                params = params,
-            )
-            drawPath(path = mark, color = accent.copy(alpha = params.alpha))
-        }
-    }
-}
 
-/**
- * Filled brush check from lab [BrushCheckParams]. Matches web [brushCheckPath].
- */
-private fun inkBrushCheckPath(
-    size: Float,
-    progress: Float,
-    params: BrushCheckParams,
-): Path {
-    val prog = progress.coerceIn(0.02f, 1f)
-    val center = listOf(
-        Offset(params.p0x, params.p0y),
-        Offset(params.p1x, params.p1y),
-        Offset(params.p2x, params.p2y),
-    )
-    val segs = 24
-    val raw = ArrayList<Offset>((center.size - 1) * segs + 1)
-    for (s in 0 until center.lastIndex) {
-        val a = center[s]
-        val b = center[s + 1]
-        for (i in 0 until segs) {
-            val u = i / segs.toFloat()
-            raw.add(Offset(a.x + (b.x - a.x) * u, a.y + (b.y - a.y) * u))
-        }
-    }
-    raw.add(center.last())
 
-    var total = 0f
-    val lens = FloatArray(raw.size)
-    for (i in 1 until raw.size) {
-        total += hypot(raw[i].x - raw[i - 1].x, raw[i].y - raw[i - 1].y)
-        lens[i] = total
-    }
-    // peakHalfDp is absolute in the same unit system as sizeDp (web: peakHalf vs size px).
-    val peakHalfPx = params.peakHalfDp * (size / params.sizeDp.coerceAtLeast(1f))
-    val tops = ArrayList<Offset>()
-    val bots = ArrayList<Offset>()
-    for (i in raw.indices) {
-        val t = if (total > 0f) lens[i] / total else 0f
-        if (t > prog && tops.isNotEmpty()) break
-        val prev = raw[maxOf(0, i - 1)]
-        val next = raw[minOf(raw.lastIndex, i + 1)]
-        var tx = next.x - prev.x
-        var ty = next.y - prev.y
-        val tLen = hypot(tx, ty).coerceAtLeast(1e-4f)
-        tx /= tLen
-        ty /= tLen
-        var nx = -ty
-        var ny = tx
-        val bx = nx + (-ny) * params.nibBias
-        val by = ny + nx * params.nibBias
-        val nLen = hypot(bx, by).coerceAtLeast(1e-4f)
-        nx = bx / nLen
-        ny = by / nLen
-        val half = peakHalfPx * brushCheckPressure(t, params)
-        val x = raw[i].x * size
-        val y = raw[i].y * size
-        tops.add(Offset(x + nx * half, y + ny * half))
-        bots.add(Offset(x - nx * half, y - ny * half))
-    }
-    if (tops.size < 2) {
-        val a = raw[0]
-        val b = raw[1]
-        val x0 = a.x * size
-        val y0 = a.y * size
-        val x1 = (a.x + (b.x - a.x) * 0.08f) * size
-        val y1 = (a.y + (b.y - a.y) * 0.08f) * size
-        tops.clear()
-        bots.clear()
-        tops.add(Offset(x0, y0 - peakHalfPx * 0.3f))
-        tops.add(Offset(x1, y1 - peakHalfPx * 0.3f))
-        bots.add(Offset(x0, y0 + peakHalfPx * 0.3f))
-        bots.add(Offset(x1, y1 + peakHalfPx * 0.3f))
-    }
-    return Path().apply {
-        moveTo(tops[0].x, tops[0].y)
-        for (i in 1 until tops.size) lineTo(tops[i].x, tops[i].y)
-        for (i in bots.lastIndex downTo 0) lineTo(bots[i].x, bots[i].y)
-        close()
-    }
-}
-
-private fun brushCheckPressure(t: Float, params: BrushCheckParams): Float {
-    val attack = (t / params.attack).coerceIn(0f, 1f)
-    val releaseSpan = (1f - params.releaseStart).coerceAtLeast(0.04f)
-    val release = if (t > params.releaseStart) {
-        ((1f - t) / releaseSpan).coerceAtLeast(0.12f)
-    } else {
-        1f
-    }
-    val body = 0.78f + params.bodyAmp * sin(t * PI.toFloat() * params.bodyFreq + 0.3f)
-    return (attack * release * body).coerceAtLeast(0.1f)
-}
-
-/** The shared selection mark: a green disc that inks in when chosen and
- * settles to a faint hollow ring when not — one vocabulary for every choice on
- * the sheet. */
-@Composable
-private fun InkDisc(selected: Boolean) {
-    val fill by animateFloatAsState(if (selected) 1f else 0f, label = "discFill")
-    val accent = MaterialTheme.colorScheme.primary
-    val outline = MaterialTheme.colorScheme.outline
-    Canvas(Modifier.size(18.dp)) {
-        val c = Offset(size.width / 2f, size.height / 2f)
-        val r = size.minDimension / 2f
-        // Faint resting ring, fading out as the fill arrives.
-        drawCircle(
-            color = outline.copy(alpha = 0.5f * (1f - fill)),
-            radius = r - 1.2.dp.toPx(),
-            center = c,
-            style = Stroke(width = 1.4.dp.toPx()),
-        )
-        // Green disc, inked in on selection.
-        drawCircle(
-            color = accent.copy(alpha = fill),
-            radius = (r - 2.dp.toPx()) * fill,
-            center = c,
-        )
-    }
-}
-
-/** A short enum laid out side by side. The chosen word is *circled* by a green
- * ink-brush stroke that paints itself around the letters. [brushParams] are
- * live lab knobs; [paintToken] re-triggers the paint without a selection change. */
-@Composable
-private fun <T> InlineChoiceRow(
-    entries: List<T>,
-    selected: T,
-    brushParams: BrushCircleParams = brushCircleParams(BrushCircleStyle.BASELINE),
-    paintToken: Int = 0,
-    label: (T) -> String,
-    onSelect: (T) -> Unit,
-) {
-    val view = LocalView.current
-    val bounds = remember { mutableStateMapOf<Int, Pair<Float, Float>>() }
-    val selectedIndex = entries.indexOfFirst { it == selected }.coerceAtLeast(0)
-    val target = bounds[selectedIndex]
-    val left = target?.first ?: 0f
-    val width = target?.second ?: 0f
-    val accent = MaterialTheme.colorScheme.primary
-
-    // Fresh Animatable per pick/token so the first frame is empty, then paints.
-    val paint = remember(selectedIndex, paintToken) { Animatable(0f) }
-    val hasBounds = width > 0f
-    LaunchedEffect(selectedIndex, hasBounds, paintToken, brushParams) {
-        if (!hasBounds) return@LaunchedEffect
-        paint.snapTo(0f)
-        paint.animateTo(
-            targetValue = 1f,
-            animationSpec = tween(
-                durationMillis = brushParams.paintMs,
-                easing = FastOutSlowInEasing,
-            ),
-        )
-    }
-
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .drawBehind {
-                val progress = paint.value
-                if (width <= 0f || progress <= 0f) return@drawBehind
-                val padX = brushParams.padXDp.dp.toPx()
-                val padY = brushParams.padYDp.dp.toPx()
-                val mark = inkBrushCirclePath(
-                    cx = left + width / 2f,
-                    cy = size.height / 2f,
-                    rx = width / 2f + padX,
-                    ry = (size.height / 2f - padY).coerceAtLeast(10.dp.toPx()),
-                    peakHalf = brushParams.peakHalfDp.dp.toPx(),
-                    bowPx = brushParams.bow.dp.toPx(),
-                    progress = progress,
-                    params = brushParams,
-                )
-                drawPath(path = mark, color = accent.copy(alpha = brushParams.alpha))
-            },
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(28.dp),
-    ) {
-        entries.forEachIndexed { index, entry ->
-            val isSel = entry == selected
-            val textAlpha by animateFloatAsState(
-                if (isSel) 1f else 0.42f,
-                label = "choiceInk",
-            )
-            Text(
-                text = label(entry),
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = textAlpha),
-                modifier = Modifier
-                    .onGloballyPositioned { coords ->
-                        val rect = coords.boundsInParent()
-                        bounds[index] = rect.left to rect.width
-                    }
-                    .quietClickable {
-                        if (entry != selected) view.paperSelectHaptic()
-                        onSelect(entry)
-                    }
-                    .padding(horizontal = 4.dp, vertical = 10.dp),
-            )
-        }
-    }
-}
 
 @Composable
 private fun CheckLabSliders(
@@ -1546,252 +1292,6 @@ private fun parseBrushParamsFromText(text: String, base: BrushCircleParams): Bru
     return if (hits > 0) next else null
 }
 
-/**
- * Shipped ink-brush circle. Bump when defaults change so the lab reseeds.
- * Keep in lockstep with web [SHIPPED_BRUSH_REVISION] / BASE in brushMark.ts.
- */
-private const val SHIPPED_BRUSH_REVISION = 9
-
-/** Dimensionless (dp-valued) knobs for one ink-brush circle style. */
-/** Lab-tunable ink check. Keep in lockstep with web brushCheck.ts. */
-private data class BrushCheckParams(
-    val p0x: Float = 0.1f,
-    val p0y: Float = 0.49f,
-    val p1x: Float = 0.39f,
-    val p1y: Float = 0.8f,
-    val p2x: Float = 0.73f,
-    val p2y: Float = 0.11f,
-    val sizeDp: Float = 24f,
-    val peakHalfDp: Float = 1.68f,
-    val nibBias: Float = 0.56f,
-    val attack: Float = 0.184f,
-    val releaseStart: Float = 0.74f,
-    val bodyAmp: Float = 0.1f,
-    val bodyFreq: Float = 2.2f,
-    val paintMs: Int = 833,
-    val alpha: Float = 0.75f,
-)
-
-/** Bump when [BrushCheckParams] defaults change so the lab reseeds. */
-private const val SHIPPED_CHECK_REVISION = 2
-
-private fun shippedCheckParams() = BrushCheckParams()
-
-private data class BrushCircleParams(
-    val label: String,
-    val padXDp: Float = 15.5f,
-    val padYDp: Float = 6f,
-    val peakHalfDp: Float = 2.2f,
-    /** Nominal join angle. Tips overshoot past this join. */
-    val startDeg: Float = 254f,
-    /** Degrees the entry tip begins *before* the join. */
-    val startOvershoot: Float = 43f,
-    /** Degrees the exit tip continues past a full turn past the join. */
-    val endOvershoot: Float = 22f,
-    /**
-     * Radial bow at the tips (dp): entry tip eases outward, exit tip eases
-     * inward so the ends cross in a bow rather than riding the same track.
-     */
-    val bow: Float = 4.25f,
-    /** Fraction of stroke length used to ease the bow in/out at each tip. */
-    val bowSpan: Float = 0.19f,
-    val breath: Float = 0.025f,
-    val nibBias: Float = 0.58f,
-    val attack: Float = 0.195f,
-    val releaseStart: Float = 0.6f,
-    val bodyAmp: Float = 0.34f,
-    val bodyFreq: Float = 5f,
-    val paintMs: Int = 620,
-    val alpha: Float = 0.9f,
-)
-
-/** Baseline + 10 developer variants — keep labels aligned with web brushMark.ts. */
-private fun brushCircleParams(style: BrushCircleStyle): BrushCircleParams = when (style) {
-    BrushCircleStyle.BASELINE -> BrushCircleParams(
-        label = "Baseline · current",
-        padXDp = 15.5f,
-        padYDp = 6f,
-        peakHalfDp = 2.2f,
-        startDeg = 254f,
-        startOvershoot = 43f,
-        endOvershoot = 22f,
-        bow = 4.25f,
-        bowSpan = 0.19f,
-        breath = 0.025f,
-        nibBias = 0.58f,
-        attack = 0.195f,
-        releaseStart = 0.6f,
-        bodyAmp = 0.34f,
-        bodyFreq = 5f,
-        paintMs = 620,
-        alpha = 0.9f,
-    )
-    BrushCircleStyle.HAIRLINE -> BrushCircleParams(
-        label = "Hairline",
-        peakHalfDp = 1.35f,
-        alpha = 0.82f,
-        bodyAmp = 0.12f,
-    )
-    BrushCircleStyle.HEAVY -> BrushCircleParams(
-        label = "Heavy ink",
-        peakHalfDp = 3.2f,
-        alpha = 0.95f,
-        bodyAmp = 0.18f,
-    )
-    BrushCircleStyle.TIGHT -> BrushCircleParams(
-        label = "Tight frame",
-        padXDp = 6f,
-        padYDp = 1f,
-        peakHalfDp = 1.9f,
-    )
-    BrushCircleStyle.LOOSE -> BrushCircleParams(
-        label = "Loose frame",
-        padXDp = 16f,
-        padYDp = 5f,
-        peakHalfDp = 2.3f,
-    )
-    BrushCircleStyle.SHARP_NIB -> BrushCircleParams(
-        label = "Sharp nib",
-        nibBias = 0.42f,
-        peakHalfDp = 2.0f,
-    )
-    BrushCircleStyle.SOFT_NIB -> BrushCircleParams(
-        label = "Soft nib",
-        nibBias = 0.06f,
-        peakHalfDp = 2.3f,
-        bodyAmp = 0.1f,
-    )
-    BrushCircleStyle.LONG_OVERSHOOT -> BrushCircleParams(
-        label = "Long overshoot",
-        startOvershoot = 22f,
-        endOvershoot = 40f,
-        bow = 6.5f,
-        bowSpan = 0.22f,
-        releaseStart = 0.82f,
-        paintMs = 640,
-    )
-    BrushCircleStyle.CLOSED_RING -> BrushCircleParams(
-        label = "Nearly closed",
-        startOvershoot = 6f,
-        endOvershoot = 6f,
-        bow = 2.2f,
-        bowSpan = 0.12f,
-        releaseStart = 0.92f,
-        attack = 0.06f,
-    )
-    BrushCircleStyle.LIVELY -> BrushCircleParams(
-        label = "Lively breath",
-        breath = 0.038f,
-        bodyAmp = 0.32f,
-        bodyFreq = 4.5f,
-        peakHalfDp = 2.25f,
-        bow = 5.5f,
-    )
-    BrushCircleStyle.DRY_BRUSH -> BrushCircleParams(
-        label = "Dry brush",
-        peakHalfDp = 1.7f,
-        bodyAmp = 0.45f,
-        bodyFreq = 7.0f,
-        attack = 0.14f,
-        releaseStart = 0.8f,
-        alpha = 0.78f,
-        paintMs = 520,
-        bow = 3.5f,
-    )
-}
-
-/**
- * Real ink-brush loop around a word: filled calligraphic stroke on an oval
- * centerline. Matches web `brushMarkPath`.
- */
-private fun inkBrushCirclePath(
-    cx: Float,
-    cy: Float,
-    rx: Float,
-    ry: Float,
-    peakHalf: Float,
-    bowPx: Float,
-    progress: Float,
-    params: BrushCircleParams,
-): Path {
-    // Entry tip starts before the join; exit tip runs past a full turn past it.
-    val start = Math.toRadians(
-        (params.startDeg - params.startOvershoot).toDouble(),
-    ).toFloat()
-    val sweep = Math.toRadians(
-        (360f + params.startOvershoot + params.endOvershoot).toDouble(),
-    ).toFloat()
-    val steps = 72
-    val endStep = (steps * progress.coerceIn(0.02f, 1f)).toInt().coerceAtLeast(1)
-    val tops = ArrayList<Offset>(endStep + 1)
-    val bots = ArrayList<Offset>(endStep + 1)
-    for (i in 0..endStep) {
-        val t = i / steps.toFloat()
-        val a = start + sweep * t
-        val breath = 1f + params.breath * sin(a * 2f + 0.4f)
-        val cosA = cos(a)
-        val sinA = sin(a)
-        val bow = bowOffset(t, bowPx, params.bowSpan)
-        var x = cx + cosA * (rx * breath + bow)
-        var y = cy + sinA * (ry * breath + bow)
-        val tx = -sinA * rx
-        val ty = cosA * ry
-        val tLen = hypot(tx, ty).coerceAtLeast(1f)
-        var nx = -ty / tLen
-        var ny = tx / tLen
-        val bx = nx + (-ny) * params.nibBias
-        val by = ny + nx * params.nibBias
-        val nLen = hypot(bx, by).coerceAtLeast(1f)
-        nx = bx / nLen
-        ny = by / nLen
-        // A touch of normal offset at the tips tightens the X of the bow.
-        val cross = bow * 0.28f
-        x += nx * cross
-        y += ny * cross
-
-        val half = peakHalf * brushPressure(t, params)
-        tops.add(Offset(x + nx * half, y + ny * half))
-        bots.add(Offset(x - nx * half, y - ny * half))
-    }
-    return Path().apply {
-        moveTo(tops[0].x, tops[0].y)
-        for (i in 1..endStep) lineTo(tops[i].x, tops[i].y)
-        for (i in endStep downTo 0) lineTo(bots[i].x, bots[i].y)
-        close()
-    }
-}
-
-/**
- * Radial tip offset: positive near t=0 (entry out), negative near t=1 (exit in),
- * so the overshooting tips cross in a bow instead of stacking on one curve.
- */
-private fun bowOffset(t: Float, bow: Float, span: Float): Float {
-    if (bow <= 0f || span <= 0f) return 0f
-    val s = span.coerceIn(0.04f, 0.45f)
-    return when {
-        t < s -> {
-            val u = 1f - t / s
-            bow * u * u
-        }
-        t > 1f - s -> {
-            val u = (t - (1f - s)) / s
-            -bow * u * u
-        }
-        else -> 0f
-    }
-}
-
-private fun brushPressure(t: Float, params: BrushCircleParams): Float {
-    val attack = (t / params.attack).coerceIn(0f, 1f)
-    val releaseSpan = (1f - params.releaseStart).coerceAtLeast(0.04f)
-    val release = if (t > params.releaseStart) {
-        ((1f - t) / releaseSpan).coerceAtLeast(0.12f)
-    } else {
-        1f
-    }
-    val body = 0.78f + params.bodyAmp * sin(t * PI.toFloat() * params.bodyFreq + 0.3f)
-    return (attack * release * body).coerceAtLeast(0.1f)
-}
 
 /** Text size as ink, not a Material slider: an "A" at each size flanks a thin
  * paper track with a green dot; tap or drag the track to choose. The letters

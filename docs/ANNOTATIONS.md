@@ -268,8 +268,10 @@ resize handle.
 - [DESIGN.md](DESIGN.md) — the paper metaphor, the ruby rule, the bookmark
   ribbon and its margin lane, the bookmark index's alignment anchors.
 - `data/AnnotationRepository.kt` — the store, mirroring `BookmarkRepository`'s shape.
-- `ui/reader/VerseBookmarkRibbon.kt` — the margin lane: ribbon *and*
-  `VerseNoteTick`, which shares its geometry constants.
+- `ui/reader/VerseBookmarkRibbon.kt` — the margin lane. Only
+  `VerseBookmarkRibbon` lives here now; the separate note tick it once shared
+  geometry constants with is gone, and an annotated verse is marked by its note
+  text rather than a margin glyph.
 - `ui/reader/ReaderComponents.kt` — `verseAnnotationStyle` (the reader's hand, shared
   with the Bookmarks index), `VerseAnnotationField`, and the `wordTapTarget`
   mark-before-word long-press resolution.

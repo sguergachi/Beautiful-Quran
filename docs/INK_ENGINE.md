@@ -369,12 +369,7 @@ InkEngine owns that too, as data rather than as animation code:
   `word(...) → InkEngine.Word(state, repeat)`,   `sweepMs(activeWord, speed)`
   with the min/max clamps (the min floor never exceeds the word's lit
   lifetime — stretching past handoff flickered Arabic-only's paper cover),
-  `startRevealed(previous, current)` — always false: every Active entry
-  re-runs the ink wash, including Recited→Active when the listener taps a
-  word to play it again. (`ActiveWord.activation` bumps on genuine seeks so
-  the same Active word can restart too.) Sampling jitter is filtered by
-  HighlightClock, so this skip is no longer needed for accidental bounce.
-  `glinting(state, repeat, startRevealed)` — the first-gloss glint rule:
+  `glinting(state)` — the first-gloss glint rule:
   Active words wear the white-gold sheen (including seek/replay and
   repeat events), which then dissolves back to plain recited ink over
   `Tuning.glintFadeMs` (1 s). The glint is theme-gated by
