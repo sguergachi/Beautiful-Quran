@@ -197,8 +197,10 @@ The model is therefore a **gated hint**, built from four parts:
   freed tail, a narrow soft wash blooms only the next word's opening glyph;
   it remains inked across the word-timing boundary while the ordinary
   whole-word wash continues from the same spatial leading edge. The prefix
-  uses its one-letter fraction for both travel and feather, retaining the
-  smootherstep edge without brightening the following glyph. Its completed
+  travels one letter (`prefixFraction`) but feathers slightly wider
+  (`waslPrefixFeather`) so the opening glyph breathes with the same
+  smootherstep toe as the main wash rather than peeling hard — still local
+  enough that the following letter stays near upcoming ink. Its completed
   edge becomes the active sweep's starting point, so the opening letter is
   not replayed and the wash immediately advances through the remaining word.
   That continuation is armed only on a natural adjacent-word handoff, never

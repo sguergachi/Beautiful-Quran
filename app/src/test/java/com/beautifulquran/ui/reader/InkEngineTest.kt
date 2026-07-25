@@ -96,10 +96,11 @@ class InkEngineTest {
     @Test
     fun `wasl handoff continues from the completed prefix edge`() {
         val prefix = 1f / 7f
-        val feather = 1.6f
-        val start = waslContinuationStart(prefix, feather)
+        val mainFeather = 1.6f
+        val waslFeather = waslPrefixFeather(prefix)
+        val start = waslContinuationStart(prefix, mainFeather)
 
-        assertEquals(2f * prefix / (1f + feather), start, 1e-4f)
+        assertEquals((prefix + waslFeather) / (1f + mainFeather), start, 1e-4f)
         assertEquals(start, continuedSweepProgress(progress = 0f, start = start), 0f)
         assertEquals(
             start + 0.5f * (1f - start),
@@ -107,6 +108,16 @@ class InkEngineTest {
             0f,
         )
         assertEquals(1f, continuedSweepProgress(progress = 1f, start = start), 0f)
+    }
+
+    @Test
+    fun `wasl prefix feather is slightly wider than the letter span`() {
+        val prefix = 1f / 7f
+        val feather = waslPrefixFeather(prefix)
+        assertTrue(feather > prefix)
+        assertTrue(feather <= 0.55f)
+        // Short words stay capped so the soft tail does not wash half the word.
+        assertEquals(0.55f, waslPrefixFeather(0.5f), 0f)
     }
 
     @Test

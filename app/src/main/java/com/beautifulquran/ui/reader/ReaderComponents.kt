@@ -426,11 +426,22 @@ internal fun continuedSweepProgress(progress: Float, start: Float): Float {
 }
 
 /**
- * Matches the completed prefix wash's leading-edge position in the main wash.
- * The prefix travels one [prefixFraction] with an equally wide feather.
+ * Soft edge for the wasl opening-letter bloom. Travel stays one glyph
+ * ([prefixFraction]); the edge is a little wider so ink breathes in with the
+ * same smootherstep toe as the main wash rather than peeling hard. Capped so
+ * the soft tail does not wash half the following word.
  */
-internal fun waslContinuationStart(prefixFraction: Float, mainFeather: Float): Float =
-    (2f * prefixFraction / (1f + mainFeather)).coerceIn(0f, 1f)
+internal fun waslPrefixFeather(prefixFraction: Float): Float =
+    (prefixFraction + 0.25f).coerceAtMost(0.55f)
+
+/**
+ * Matches the completed prefix wash's leading-edge position in the main wash.
+ * Head at progress 1 is [prefixFraction] + [waslPrefixFeather].
+ */
+internal fun waslContinuationStart(prefixFraction: Float, mainFeather: Float): Float {
+    val edge = waslPrefixFeather(prefixFraction)
+    return ((prefixFraction + edge) / (1f + mainFeather)).coerceIn(0f, 1f)
+}
 
 private class SweepEntryLifecycle(
     var active: Boolean = false,
@@ -578,8 +589,8 @@ private fun rememberLetterSweep(
 }
 
 /**
- * A one-glyph continuation wash. [fraction] deliberately bounds both its
- * travel and feather so the following letter stays at upcoming ink.
+ * A one-glyph continuation wash. [fraction] bounds how far the wash may
+ * travel; [waslPrefixFeather] supplies a slightly wider soft leading edge.
  */
 private data class WaslPrefix(
     val fraction: Float,
@@ -945,7 +956,7 @@ private fun HighlightLayeredText(
                     progress = { waslPrefix.progress.value },
                     rtl = rtl,
                     restingAlpha = 0f,
-                    feather = waslPrefix.fraction,
+                    feather = waslPrefixFeather(waslPrefix.fraction),
                     revealFraction = waslPrefix.fraction,
                 ),
             )
@@ -1635,7 +1646,7 @@ private fun ResponsiveHafsAyah(
                             range = range,
                             progress = prefix.progress.value,
                             color = palette.fullInkColor,
-                            feather = prefix.fraction,
+                            feather = waslPrefixFeather(prefix.fraction),
                             revealFraction = prefix.fraction,
                         )
                     }
