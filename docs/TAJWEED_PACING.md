@@ -198,9 +198,13 @@ The model is therefore a **gated hint**, built from four parts:
   it remains inked across the word-timing boundary while the ordinary
   whole-word wash continues from the same spatial leading edge. The prefix
   uses its one-letter fraction for both travel and feather, retaining the
-  smootherstep edge without brightening the following glyph. Its completed
-  edge becomes the active sweep's starting point, so the opening letter is
-  not replayed and the wash immediately advances through the remaining word.
+  smootherstep edge without brightening the following glyph. Its rise is
+  **smoothstepped** and, on short wasl donors (مِن، مَن), **starts earlier**
+  (`waslPrefixStart(sweepMs)`, targeting ~320 ms of bloom) so the ink carries
+  into the next opening letter instead of popping on the last ~18 %. Long
+  donors still open near the absorbed-nūn tail (82 %). Its completed edge
+  becomes the active sweep's starting point, so the opening letter is not
+  replayed and the wash immediately advances through the remaining word.
   That continuation is armed only on a natural adjacent-word handoff, never
   a seek. Same-ayah neighbours only (`Hold.connect`, default on).
   Iẓhār and cross-ayah wasl are left alone.
@@ -337,10 +341,11 @@ the curve, not the weights, is the module boundary.
   medium closers' run-up;
   wasl entry (`مَن`→`يَقُولُ`, ikhfāʾ, iqlāb) parks on the next opening letter
   and wasl exit finishes the previous word early; the exact 4:163
-  `نُوحٖ`→`وَٱلنَّبِيِّـۧنَ` pair blooms its wāw from 82–100% of the prior
-  word; no segment anywhere outruns the cruise cap; and every knob combination
-  stays monotone and bounded with exact endpoints. **The golden literals must
-  stay byte-identical to the DB** — an
+  `نُوحٖ`→`وَٱلنَّبِيِّـۧنَ` pair blooms its wāw over the prior-word tail
+  (default 82–100 %, smoothstepped; short donors stretch earlier via
+  `waslPrefixStart`); no segment anywhere outruns the cruise cap; and every
+  knob combination stays monotone and bounded with exact endpoints. **The
+  golden literals must stay byte-identical to the DB** — an
   editor or tool that NFC-normalizes the file fuses `ا + ٓ` into precomposed
   `آ` (U+0622) and silently changes the weights (the parser now unfuses U+0622
   defensively, but the DB itself is always decomposed).
