@@ -368,6 +368,12 @@ def load_qdc_timings(qdc_id: int):
 #   * mislabeled strays — a single segment carrying the wrong word index
 #     (often a sound-alike of an earlier word, e.g. 49:9 فَإِن tagged as وَإِن),
 #     an isolated backjump the recitation never follows up on;
+#   * non-contiguous span phantoms — the aligner stamps an early function word
+#     at the *onset* of a real re-say (Alafasy 5:54: long يُجَٰهِدُونَ labeled
+#     as word 4 مَن, so the chain reads [4, 21, 22, 23] after high-water 23).
+#     HighlightEngine then paints orange from 4 through 23. The real re-say is
+#     the contiguous component nearest the high water; the isolated earlier
+#     index is a mislabel and is relabeled onto that component's start;
 #   * forward spikes — the same mislabel in the other direction; the too-large
 #     index inflates the high-water mark so every following normal word until
 #     that index reads as a repeat.
@@ -401,6 +407,101 @@ QDC_SPLIT_FRAGMENT_CEIL_MS = 500  # in [FRAGMENT_MS, CEIL) it is a fragment only
 QDC_SPLIT_FRAGMENT_RATIO = 0.35  # shorter/longer below this = a split fragment,
 #                                  not a peer utterance
 QDC_SPIKE_JUMP = 3  # a forward jump this large that instantly retreats is noise
+# Positions in a backtrack run within this distance count as one contiguous
+# span-repeat (allows one dropped word inside a real re-say, e.g. 9,10,12,13).
+QDC_SPAN_CONNECT_GAP = 2
+
+
+def _position_components(positions, gap=QDC_SPAN_CONNECT_GAP):
+    """Connected components of word positions under |a−b| ≤ gap adjacency."""
+    uniq = sorted(set(positions))
+    if not uniq:
+        return []
+    comps = []
+    cur = {uniq[0]}
+    for p in uniq[1:]:
+        if p <= max(cur) + gap:
+            cur.add(p)
+        else:
+            comps.append(cur)
+            cur = {p}
+    comps.append(cur)
+    return comps
+
+
+def _dephantom_noncontiguous_run(run_segs, stats):
+    """Within one time-contiguous backtrack run, keep the component nearest the
+    high water and relabel orphan components onto it.
+
+    A real span-repeat is a near-contiguous block of positions (allowing one
+    dropped word). An early isolated index in the same run is a mislabel of the
+    real chain's onset — relabel it to the next kept segment so the time stays
+    on the word being said (not folded into the previous first-pass word).
+    Single-position runs (same-word re-say) are left alone.
+    """
+    if len(run_segs) <= 1:
+        return run_segs
+    positions = [s[0] for s in run_segs]
+    comps = _position_components(positions)
+    if len(comps) <= 1:
+        return run_segs
+    def score(c):
+        return sum(1 for p in positions if p in c)
+    # Prefer the component nearest high water: real re-says restart near where
+    # the reciter left off; phantoms jump to early function words.
+    keep = max(comps, key=lambda c: (max(c), score(c)))
+    out = []
+    for pos, start, end in run_segs:
+        if pos in keep:
+            out.append([pos, start, end])
+            continue
+        stats["noncontiguous_orphans"] += 1
+        later = [s for s in run_segs if s[0] in keep and s[1] >= start]
+        earlier = [s for s in run_segs if s[0] in keep and s[1] < start]
+        if later:
+            out.append([later[0][0], start, end])
+        elif earlier:
+            out.append([earlier[-1][0], start, end])
+        # else drop (no kept peer — should not happen)
+    if not out:
+        return run_segs
+    merged = [out[0]]
+    for pos, start, end in out[1:]:
+        if pos == merged[-1][0] and start <= merged[-1][2] + QDC_SPLIT_MERGE_GAP_MS:
+            merged[-1][2] = max(merged[-1][2], end)
+        else:
+            merged.append([pos, start, end])
+    return merged
+
+
+def dephantom_noncontiguous_spans(segs, stats):
+    """Relabel early orphan positions inside multi-component backtrack runs.
+
+    Returns (new_segs, changed).
+    """
+    if not segs:
+        return segs, False
+    out = []
+    running_max = -1
+    i = 0
+    changed = False
+    while i < len(segs):
+        pos, start, end = segs[i]
+        if running_max >= 0 and pos <= running_max:
+            j = i
+            while j < len(segs) and segs[j][0] <= running_max:
+                j += 1
+            run = segs[i:j]
+            fixed = _dephantom_noncontiguous_run(run, stats)
+            if [s[0] for s in fixed] != [s[0] for s in run]:
+                changed = True
+            out.extend(fixed)
+            i = j
+            continue
+        out.append([pos, start, end])
+        running_max = max(running_max, pos)
+        i += 1
+    return out, changed
 
 
 def clean_qdc_artifacts(segs, stats):
@@ -408,6 +509,7 @@ def clean_qdc_artifacts(segs, stats):
     segments. Dropped spans are folded into the neighbouring segment so the
     karaoke sweep has no holes. Runs to a fixpoint because a dropped spike can
     reunite a word with its stray sliver."""
+    stats.setdefault("noncontiguous_orphans", 0)
     changed = True
     while changed:
         changed = False
@@ -476,6 +578,9 @@ def clean_qdc_artifacts(segs, stats):
             kept.append([pos, start, end])
             running_max = max(running_max, pos)
             i += 1
+        kept, nc_changed = dephantom_noncontiguous_spans(kept, stats)
+        if nc_changed:
+            changed = True
         segs = kept
     return segs
 
@@ -981,6 +1086,7 @@ def main():
                 stats = {
                     "zero_len": 0, "clamped": 0, "repeats": 0, "missing": 0,
                     "merged_splits": 0, "dropped_strays": 0,
+                    "noncontiguous_orphans": 0,
                 }
                 covered = ingest_reciter_timings(
                     rid, word_counts, timing_rows, stats,
@@ -991,7 +1097,8 @@ def main():
                     f"repeat spans {stats['repeats']}, clamped {stats['clamped']}, "
                     f"zero-len {stats['zero_len']}, missing {stats['missing']}, "
                     f"split-words merged {stats['merged_splits']}, "
-                    f"stray mislabels dropped {stats['dropped_strays']}"
+                    f"stray mislabels dropped {stats['dropped_strays']}, "
+                    f"noncontiguous orphans {stats['noncontiguous_orphans']}"
                 )
             else:
                 data = load_timings(zp, slug)

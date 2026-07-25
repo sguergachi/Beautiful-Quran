@@ -74,6 +74,27 @@ The discriminator is span-vs-isolated, **not** word length: 2:33 أَلَمۡ أ
 لَّكُمۡ is a genuine re-recitation on 3-char words and survives because it is a
 span; Hani 4:157 وَمَا / مِنۡ are lone short-word re-covers and are dropped.
 
+## Non-contiguous span phantoms (Alafasy 5:54 class)
+
+A different phantom shape slips past both the isolated-stray rule and CTC span
+protection: qdc stamps an **early** function-word index at the *onset* of a real
+near-high-water re-say. Example (raw Alafasy 5:54 after high-water 23):
+
+```
+… 21, 22, 23,  4, 21, 22, 23, 24 …
+               ^ mislabel of the long يُجَٰهِدُونَ onset as مَن
+```
+
+The run is multi-position so CTC `dephantom` treats it as a trusted span-repeat;
+`HighlightEngine` paints orange from word 4 through 23 ("repeated more than it
+should"). This is fixed **in `tools/build_db.py` → `clean_qdc_artifacts`**, not
+in the CTC repair generator: within each backtrack run, position components
+separated by more than `QDC_SPAN_CONNECT_GAP` (2) are split, the component
+nearest the high water is kept, and orphan positions are relabeled onto that
+component's start (so the time stays on the word being said). Real contiguous
+spans, same-word re-says, and spans with a single internal drop survive.
+Regression cases live in `tools/test_build_db.py`.
+
 ## Trusting a qdc span-repeat CTC collapsed (issue #533)
 
 CTC confirms or restores a repeat, but it must never **erase** one. CTC

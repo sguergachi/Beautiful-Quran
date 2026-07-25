@@ -6,6 +6,10 @@ Each case is a real defect (or a shape that must survive untouched). The
 forward-spike cases came from Timings-Lab reports — e.g. Alafasy 16:61, where
 qdc stamps words [17,18] at ~9.5 s (right after word 10) and then backtracks to
 word 11, so the ink teleports to جَآءَ أَجَلُهُمْ and jumps back.
+
+Non-contiguous span phantoms (Alafasy 5:54): qdc labels the onset of a real
+re-say with an early function-word index, so the backtrack run is
+[4, 21, 22, 23] after high-water 23 — orange from مَن through سبيل.
 """
 import sys
 from pathlib import Path
@@ -48,10 +52,33 @@ CASES = [
     ("single-segment spike (original rule still holds)",
      [1, 2, 3, 4, 5, 20, 6, 7, 8],
      [1, 2, 3, 4, 5, 6, 7, 8]),
+    # --- non-contiguous span phantoms (early orphan + real near-HW chain) ---
+    ("5:54 phantom 4 then 21-23 re-say",
+     [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 9, 10, 11, 12, 13, 14, 15, 16, 17,
+      15, 16, 17, 18, 19, 20, 21, 22, 23, 4, 21, 22, 23, 24, 25],
+     [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 9, 10, 11, 12, 13, 14, 15, 16, 17,
+      15, 16, 17, 18, 19, 20, 21, 22, 23, 21, 22, 23, 24, 25]),
+    ("16:26-class early 4 before 11-15 chain",
+     [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 4, 11, 12, 13, 14, 15, 16],
+     [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 11, 12, 13, 14, 15, 16]),
+    ("8:42-class early 2,3 before 22-25 chain",
+     [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20,
+      21, 22, 23, 24, 25, 2, 3, 22, 23, 24, 25, 26],
+     [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20,
+      21, 22, 23, 24, 25, 22, 23, 24, 25, 26]),
+    ("4:112-class early 2,3 before resume at 6",
+     [1, 2, 3, 4, 5, 6, 2, 3, 6, 7, 8],
+     [1, 2, 3, 4, 5, 6, 6, 7, 8]),
     # --- shapes that must survive untouched ---
     ("real backward span-repeat 2:33",
      [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 8, 9, 10, 11, 12, 13, 14],
      [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 8, 9, 10, 11, 12, 13, 14]),
+    ("real span with one internal drop (9,10,12,13,14)",
+     [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 9, 10, 12, 13, 14, 15],
+     [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 9, 10, 12, 13, 14, 15]),
+    ("real single-word repeat",
+     [1, 2, 3, 4, 5, 5, 6],
+     [1, 2, 3, 4, 5, 5, 6]),
     ("real dropped word (forward jump, no retreat)",
      [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 14, 15, 16, 17, 18],
      [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 14, 15, 16, 17, 18]),
@@ -64,7 +91,7 @@ CASES = [
 def main():
     failures = []
     for label, pos_in, want in CASES:
-        stats = {"merged_splits": 0, "dropped_strays": 0}
+        stats = {"merged_splits": 0, "dropped_strays": 0, "noncontiguous_orphans": 0}
         got = order(clean_qdc_artifacts(segs(pos_in), stats))
         ok = got == want
         if not ok:
