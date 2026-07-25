@@ -128,7 +128,8 @@ Requires **JDK 21**. No Android device/emulator is needed for tests.
 | `docs/SHARE.md` | Gather mode and verse sharing — text + full-ink image shipped; video proposed |
 | `docs/VERSE_ACTIONS.md` | Bookmark · note · share UX — verse-first share plan (designed, not implemented) |
 | `docs/TIMINGS_LAB.md` | The in-app timing editor and its patch workflow (developer mode) |
-| `tools/timing_overrides/README.md` | Committed timing-correction patch format |
+| `tools/timing_patch_cases/README.md` | Timing patches: systematic fix + unit-test fixtures (run `python3 tools/test_build_db.py`) |
+| `tools/timing_overrides/README.md` | Last-resort per-ayah overrides (not the default for Lab patches) |
 | `PLAN.md` | Historical product/engineering plan — context, not current spec |
 | `docs/WEB.md` | Web port plan — Focus / Highlight / Ink engines + paper reader in the browser |
 
