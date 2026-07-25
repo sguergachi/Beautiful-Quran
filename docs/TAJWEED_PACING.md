@@ -199,13 +199,13 @@ The model is therefore a **gated hint**, built from four parts:
   `waslContinuationStart`) with the same feather as the active word, not a
   one-glyph wipe. The soft edge therefore breathes at the main wash rate and
   hands off on the same spatial leading edge when the timing boundary
-  arrives. Window progress is **smoothstepped**, and on short wasl donors
-  (مِن، مَن) the window **starts earlier** (`waslPrefixStart(sweepMs)`,
-  targeting ~320 ms) so the ink carries into the next opening instead of
-  popping on the last ~18 %. Long donors still open near the absorbed-nūn
-  tail (82 %). The completed edge is the active sweep's starting point, so
-  the opening letter is not replayed and the wash continues through the rest
-  of the word. That continuation is armed only on a natural adjacent-word
+  arrives. Window progress is **smoothstepped**, and a **speed ceiling**
+  stretches short wasl donors (مِن، مَن) via `waslPrefixStart(sweepMs)`:
+  target ~480 ms of bloom (up to 75 % of a short donor) so the next opening
+  fades instead of racing. Longer donors stay near the absorbed-nūn tail
+  (~18–24 % window). The completed edge is the active sweep's starting point,
+  so the opening letter is not replayed and the wash continues through the
+  rest of the word. That continuation is armed only on a natural adjacent-word
   handoff, never a seek. Same-ayah neighbours only (`Hold.connect`, default
   on). Iẓhār and cross-ayah wasl are left alone.
 - **Waqf length scale.** `Hold.waqfLengthScale` (Ink Lab: **Waqf length
@@ -345,7 +345,7 @@ the curve, not the weights, is the module boundary.
   wasl entry (`مَن`→`يَقُولُ`, ikhfāʾ, iqlāb) parks on the next opening letter
   and wasl exit finishes the previous word early; the exact 4:163
   `نُوحٖ`→`وَٱلنَّبِيِّـۧنَ` pair blooms its wāw over the prior-word tail
-  (default 82–100 %, smoothstepped; short donors stretch earlier via
+  (smoothstepped; ~480 ms speed ceiling / up to 75 % of short donors via
   `waslPrefixStart`); no segment anywhere outruns the cruise cap; and every
   knob combination stays monotone and bounded with exact endpoints. **The
   golden literals must stay byte-identical to the DB** — an

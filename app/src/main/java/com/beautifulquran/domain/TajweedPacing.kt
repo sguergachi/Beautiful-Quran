@@ -72,9 +72,11 @@ object TajweedPacing {
     /**
      * Normalized prior-word time when the next opening letter begins to bloom.
      *
-     * Short wasl donors stretch the window so the handoff has enough wall-clock
-     * time to feel continuous; longer words keep a late junction near the
-     * absorbed-nūn tail ([WASL_EXIT_FRACTION]).
+     * Enforces a **speed ceiling** on the wasl carry-in: the bloom window aims
+     * for at least [MIN_WASL_PREFIX_MS] of wall-clock (and may claim up to
+     * [MAX_WASL_PREFIX_WINDOW] of a short donor) so pairs like مَن يَشْرِى do
+     * not race the first glyph. Longer words stay near the absorbed-nūn tail
+     * ([WASL_EXIT_FRACTION]).
      */
     fun waslPrefixStart(sweepMs: Int): Float {
         val window = (MIN_WASL_PREFIX_MS / sweepMs.coerceAtLeast(1).toFloat())
@@ -513,10 +515,17 @@ object TajweedPacing {
     private const val WASL_EXIT_FRACTION = 0.82f
     /** Floor on the wasl prefix bloom window (matches 1 − [WASL_EXIT_FRACTION]). */
     private const val MIN_WASL_PREFIX_WINDOW = 1f - WASL_EXIT_FRACTION
-    /** Cap so a short donor still spends most of its span on its own letters. */
-    private const val MAX_WASL_PREFIX_WINDOW = 0.50f
-    /** Target wall-clock length of the next-letter bloom when the donor allows. */
-    private const val MIN_WASL_PREFIX_MS = 320f
+    /**
+     * Max share of a short donor spent on the next-letter bloom. Must be high
+     * enough that [MIN_WASL_PREFIX_MS] is reachable on مَن/مِن-scale holds
+     * (~500 ms); at 0.50 the ceiling never applied (only ~250 ms of fade).
+     */
+    private const val MAX_WASL_PREFIX_WINDOW = 0.75f
+    /**
+     * Speed ceiling: target wall-clock for the next-letter wasl bloom.
+     * Near the main min-sweep floor so wasl-on does not outrun wasl-off.
+     */
+    private const val MIN_WASL_PREFIX_MS = 480f
 
     private const val ALEF_WASLA = 'ٱ'
     private const val ALEF = 'ا'
