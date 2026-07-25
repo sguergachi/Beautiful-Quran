@@ -15,18 +15,21 @@ import {
 import type { Word } from '../data/models'
 import { InkState, getTuning, startRevealed, type InkWord } from '../ui/reader/InkEngine'
 import {
-  applyMask,
   clearPaperCover,
   glintEnabled,
   runGlintFadeOut,
   runGlintWashIn,
   runPaperCoverWash,
-  runRepeatFadeOut,
-  runRepeatWashIn,
+  hasRepeatWashProgress,
+  runRepeatFadeOutAsync,
+  runRepeatResidualAsync,
+  runRepeatWashInAsync,
   runSearchHitDoubleWash,
+  type CancellablePromise,
 } from './inkWash'
 import { SearchHitFlash } from '../ui/reader/SearchHitFlash'
 import { useWordInteraction } from './useWordInteraction'
+import { useRepeatWashGate } from './RepeatWashContext'
 
 interface Props {
   word: Word
@@ -226,6 +229,15 @@ export function HafsWord({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ink.state, ink.repeat, glintMounted, activation])
 
+  const repeatGate = useRepeatWashGate()
+  const repeatLive = useRef(ink.repeat)
+  repeatLive.current = ink.repeat
+  const fadeCancelRef = useRef<(() => void) | null>(null)
+  const cancelLeaveFade = () => {
+    fadeCancelRef.current?.()
+    fadeCancelRef.current = null
+  }
+  // Sequential residual orange wash — see WordUnit (same law).
   useLayoutEffect(() => {
     if (!repeatMounted) {
       prevRepeat.current = ink.repeat
@@ -236,30 +248,75 @@ export function HafsWord({
     const was = prevRepeat.current
     const enteredRepeat = ink.repeat && !was
     const leftRepeat = !ink.repeat && was
-    prevRepeat.current = ink.repeat
+    const duration = getTuning().repeatSweepMs
 
+    const pos = word.position
     if (enteredRepeat) {
-      const duration = activeSweepMs ?? getTuning().repeatSweepMs
-      return runRepeatWashIn(overlay, true, duration)
-    }
-    // Same-word seek while still in the chain: re-run the orange wash.
-    if (ink.repeat && was && ink.state === InkState.Active) {
-      const duration = activeSweepMs ?? getTuning().repeatSweepMs
-      return runRepeatWashIn(overlay, true, duration)
+      prevRepeat.current = true
+      cancelLeaveFade()
+      let stillQueued = true
+      void repeatGate.run(pos, async () => {
+        if (!stillQueued || !overlayRef.current) return
+        if (!repeatLive.current) return
+        stillQueued = false
+        await runRepeatWashInAsync(overlayRef.current, true, duration)
+      })
+      return () => {
+        if (stillQueued) {
+          stillQueued = false
+          if (repeatLive.current) prevRepeat.current = false
+        }
+      }
     }
     if (leftRepeat) {
-      return runRepeatFadeOut(overlay, () => setRepeatMounted(false))
-    }
-    if (ink.repeat) {
-      overlay.style.opacity = '1'
-      applyMask(overlay, 'none')
-    } else {
-      overlay.style.opacity = '0'
-      applyMask(overlay, 'none')
-      setRepeatMounted(false)
+      prevRepeat.current = false
+      void (async () => {
+        await repeatGate.run(pos, async () => {
+          const el = overlayRef.current
+          if (!el) return
+          await runRepeatResidualAsync(el, true)
+        })
+        if (repeatLive.current) return
+        const el = overlayRef.current
+        if (!el) {
+          setRepeatMounted(false)
+          return
+        }
+        if (!hasRepeatWashProgress(el)) {
+          setRepeatMounted(false)
+          return
+        }
+        const fade: CancellablePromise = runRepeatFadeOutAsync(el)
+        fadeCancelRef.current = () => fade.cancel()
+        await fade
+        fadeCancelRef.current = null
+        if (!repeatLive.current) setRepeatMounted(false)
+      })()
+      return
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ink.repeat, repeatMounted, activation, ink.state])
+  }, [ink.repeat, repeatMounted])
+
+  const prevSeekActivation = useRef(activation)
+  useLayoutEffect(() => {
+    if (!ink.repeat || ink.state !== InkState.Active) {
+      prevSeekActivation.current = activation
+      return
+    }
+    if (activation === 0 || activation === prevSeekActivation.current) {
+      prevSeekActivation.current = activation
+      return
+    }
+    prevSeekActivation.current = activation
+    cancelLeaveFade()
+    if (!overlayRef.current || !repeatMounted) return
+    const duration = getTuning().repeatSweepMs
+    void repeatGate.run(word.position, async () => {
+      if (!overlayRef.current || !repeatLive.current) return
+      await runRepeatWashInAsync(overlayRef.current, true, duration)
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activation, ink.repeat, ink.state, repeatMounted])
 
   // Search-hit pulse: mount overlay only while flashing.
   useLayoutEffect(() => {

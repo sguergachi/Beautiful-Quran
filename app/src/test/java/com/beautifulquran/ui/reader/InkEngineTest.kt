@@ -490,6 +490,8 @@ class InkEngineTest {
 
     @Test
     fun `repeat wash holds on chain advance and restarts on seek`() {
+        // Active handoff drops activation to 0 — must be Hold so the residual
+        // 0→1 wash is not cancelled/restarted (sequential finish law).
         assertEquals(
             RepeatWashAction.Hold,
             repeatWashAction(
@@ -506,6 +508,19 @@ class InkEngineTest {
                 previousActivation = 4L,
                 repeat = true,
                 activation = 5L,
+            ),
+        )
+    }
+
+    @Test
+    fun `leaving the chain releases after a completed hold`() {
+        assertEquals(
+            RepeatWashAction.Release,
+            repeatWashAction(
+                wasRepeat = true,
+                previousActivation = 0L,
+                repeat = false,
+                activation = 0L,
             ),
         )
     }

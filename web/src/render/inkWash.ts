@@ -287,9 +287,32 @@ export function glintEnabled(): boolean {
 }
 
 /**
+ * Last eased orange-wash progress per overlay (0→1).
+ * **Absent** from the map means the word never started a wash — residual
+ * release must no-op (do not treat missing as progress 0 and bloom orange).
+ */
+const repeatWashProgress = new WeakMap<HTMLElement, number>()
+
+export function hasRepeatWashProgress(el: HTMLElement): boolean {
+  return repeatWashProgress.has(el)
+}
+
+export function getRepeatWashProgress(el: HTMLElement): number {
+  return repeatWashProgress.get(el) ?? 0
+}
+
+function setRepeatWashProgress(el: HTMLElement, progress: number) {
+  repeatWashProgress.set(el, progress)
+}
+
+function clearRepeatWashProgress(el: HTMLElement) {
+  repeatWashProgress.delete(el)
+}
+
+/**
  * Tinted overlay wash-in (orange repeat, white-gold glint): directional
  * ink-engine mask (restingAlpha 0) over the overlay, then clear the mask so
- * the full tint holds.
+ * the full tint holds. Tracks progress for residual finish on release.
  */
 export function runRepeatWashIn(
   el: HTMLElement,
@@ -297,21 +320,49 @@ export function runRepeatWashIn(
   durationMs: number,
   onDone?: () => void,
 ): () => void {
+  return runRepeatWashFrom(el, rtl, 0, durationMs, onDone)
+}
+
+/**
+ * Continue (or start) a directional orange wash from [fromProgress]→1.
+ * Never snaps incomplete→full; the soft edge always travels the remainder.
+ */
+export function runRepeatWashFrom(
+  el: HTMLElement,
+  rtl: boolean,
+  fromProgress: number,
+  totalDurationMs: number,
+  onDone?: () => void,
+): () => void {
   const t = getTuning()
+  const from = Math.min(1, Math.max(0, fromProgress))
   el.style.opacity = '1'
   el.style.removeProperty('transform')
   el.style.removeProperty('transform-origin')
   el.classList.remove('ink-cover-peel')
   el.removeAttribute('data-peel')
-  applyMask(el, cachedWashMask(0, 0, rtl, t.washFeather))
+
+  if (from >= 1) {
+    setRepeatWashProgress(el, 1)
+    applyMask(el, 'none')
+    onDone?.()
+    return () => {}
+  }
+
+  const remainMs = Math.max(1, (1 - from) * totalDurationMs)
+  setRepeatWashProgress(el, from)
+  applyMask(el, cachedWashMask(from, 0, rtl, t.washFeather))
   return runWash(
-    durationMs,
+    remainMs,
     sweepEase(),
     cubicBezierEase,
     (_p, eased) => {
-      applyMask(el, cachedWashMask(eased, 0, rtl, t.washFeather))
+      const progress = from + eased * (1 - from)
+      setRepeatWashProgress(el, progress)
+      applyMask(el, cachedWashMask(progress, 0, rtl, t.washFeather))
     },
     () => {
+      setRepeatWashProgress(el, 1)
       applyMask(el, 'none')
       onDone?.()
     },
@@ -319,8 +370,72 @@ export function runRepeatWashIn(
 }
 
 /**
- * Orange repeat dissolve: clear the wash mask, then fade overlay opacity to 0
- * over [InkTuning.repeatFadeOutMs] with the ink sweep easing.
+ * Promise form of [runRepeatWashIn] for sequential chain washes.
+ * Resolves when the soft edge reaches full orange. Does **not** cancel on
+ * handoff — callers only abandon *queued* work still waiting on the gate.
+ */
+export function runRepeatWashInAsync(
+  el: HTMLElement,
+  rtl: boolean,
+  durationMs: number,
+): Promise<void> {
+  return new Promise((resolve) => {
+    runRepeatWashIn(el, rtl, durationMs, () => resolve())
+  })
+}
+
+/**
+ * Finish residual orange edge only (animate remainder — never snap).
+ * No-ops when the overlay never started a wash (absent progress) so a
+ * queued-then-dropped chain member cannot bloom orange after release.
+ * Call under the ordered gate; alpha dissolve stays outside the gate.
+ */
+export function runRepeatResidualAsync(
+  el: HTMLElement,
+  rtl: boolean,
+): Promise<void> {
+  if (!hasRepeatWashProgress(el)) return Promise.resolve()
+  const t = getTuning()
+  const from = getRepeatWashProgress(el)
+  if (from >= 1) {
+    applyMask(el, 'none')
+    return Promise.resolve()
+  }
+  return new Promise((resolve) => {
+    runRepeatWashFrom(el, rtl, from, t.repeatSweepMs, () => resolve())
+  })
+}
+
+export type CancellablePromise = Promise<void> & { cancel: () => void }
+
+/** Opacity dissolve after residual is complete (or was already full). */
+export function runRepeatFadeOutAsync(el: HTMLElement): CancellablePromise {
+  let cancelFn: (() => void) | null = null
+  let settled = false
+  let resolvePromise: (() => void) | null = null
+  const promise = new Promise<void>((resolve) => {
+    resolvePromise = resolve
+    cancelFn = runRepeatFadeOut(el, () => {
+      if (settled) return
+      settled = true
+      resolve()
+    })
+  }) as CancellablePromise
+  promise.cancel = () => {
+    if (settled) return
+    settled = true
+    cancelFn?.()
+    cancelFn = null
+    // Leave opacity alone — re-entry wash-in will set it to 1.
+    resolvePromise?.()
+  }
+  return promise
+}
+
+/**
+ * Orange dissolve after a **completed** wash (search-hit flash). Snaps mask
+ * clear then fades opacity — only valid when progress is already 1.
+ * Chain release: residual under gate + [runRepeatFadeOutAsync] outside.
  */
 export function runRepeatFadeOut(
   el: HTMLElement,
@@ -328,6 +443,7 @@ export function runRepeatFadeOut(
 ): () => void {
   const t = getTuning()
   applyMask(el, 'none')
+  setRepeatWashProgress(el, 1)
   return runWash(
     t.repeatFadeOutMs,
     sweepEase(),
@@ -337,6 +453,7 @@ export function runRepeatFadeOut(
     },
     () => {
       el.style.opacity = '0'
+      clearRepeatWashProgress(el)
       onDone?.()
     },
   )

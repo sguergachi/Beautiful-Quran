@@ -256,6 +256,15 @@ HighlightEngine.PreparedTimings.activeInfo(positionMs)
   When Active advances to the next member, the previous member only dries its
   glimmer; its completed orange sweep is held and must not restart. Only chain
   entry or a genuine non-zero seek activation can begin that sweep.
+- **Sequential residual wash (law).** Members wash **one after another** in
+  **word-position order** via a per-ayah gate (`OrderedWashGate` /
+  web `createRepeatWashGate` — sorted by position, not mere enqueue FIFO).
+  Word *N+1* cannot start its orange feather until word *N* has finished 0→1.
+  Duration is always `Tuning.repeatSweepMs` — never the audio sliver — so a
+  short Active window still gets a full soft edge. Active handoff must **not**
+  cancel an in-flight wash (no `LaunchedEffect(activation)` cancel; no snap
+  incomplete→full). Release finishes any residual progress by animating the
+  remainder, then dissolves alpha (web: `runRepeatReleaseAsync`).
 - **The orange blooms from the read (full-ink) colour, not the dim unread one.**
   A repeated word was already recited, so its base ink stays full strength and
   the orange arrives as its **own directional wash on top** — it does not re-run
@@ -267,11 +276,14 @@ HighlightEngine.PreparedTimings.activeInfo(positionMs)
   - Arabic-only Hafs: `ShapedWordBloom.ColorReveal` — re-draw the shaped run,
     `BlendMode.SrcIn`-tint it, then `DstIn`-wash it.
 
-  Timing lives in `rememberRepeatWash`: on chain entry the wash sweeps 0→1 over
-  the **active word's own lit lifetime** (`sweepMs`), falling back to
-  `Tuning.repeatSweepMs` (450 ms) for a chain member that is not the active
-  word; on release, progress pins at 1 and alpha dissolves over
-  `Tuning.repeatFadeOutMs` (900 ms). Both are Ink Lab sliders.
+  Timing lives in `rememberRepeatWash` (gloss, Hafs, and English — one path)
+  and web `WordUnit` / `HafsWord`: on chain entry the wash sweeps 0→1 over
+  **`Tuning.repeatSweepMs` (450 ms)** for every member (sequential under the
+  per-ayah position-ordered gate); on release, residual progress finishes
+  under the gate (`runRepeatResidualAsync` — no-op if the word never washed),
+  then alpha dissolves **outside** the gate (`runRepeatFadeOutAsync`,
+  cancellable on re-entry) over `Tuning.repeatFadeOutMs` (900 ms). Both are
+  Ink Lab sliders.
   On Nightfall, each newly active repeat word also
   replays the white-gold glimmer over that orange bloom: the repeat is a new
   event even though the word's base ink was already revealed. This includes
