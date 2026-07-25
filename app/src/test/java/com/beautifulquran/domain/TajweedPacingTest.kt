@@ -234,8 +234,21 @@ class TajweedPacingTest {
     @Test
     fun `wasl prefix speed ceiling targets about 480ms when the donor allows`() {
         // 800 ms donor: 480/800 = 0.60 window → start 0.40.
-        assertEquals(0.40f, TajweedPacing.waslPrefixStart(800), 1e-3f)
-        assertEquals(480f, (1f - TajweedPacing.waslPrefixStart(800)) * 800f, 1f)
+        val start = TajweedPacing.waslPrefixStart(800)
+        assertEquals(0.40f, start, 1e-3f)
+        assertEquals(
+            TajweedPacing.DEFAULT_WASL_PREFIX_MS,
+            (1f - start) * 800f,
+            1f,
+        )
+    }
+
+    @Test
+    fun `wasl prefix start respects a lab minPrefixMs override`() {
+        // Ink Lab "Wasl prefix ms" = 600 on an 800 ms donor → 0.75 window.
+        assertEquals(0.25f, TajweedPacing.waslPrefixStart(800, minPrefixMs = 600f), 1e-3f)
+        // Very high ceiling still clamped by MAX_WASL_PREFIX_WINDOW (0.75).
+        assertEquals(0.25f, TajweedPacing.waslPrefixStart(500, minPrefixMs = 900f), 1e-3f)
     }
 
     @Test

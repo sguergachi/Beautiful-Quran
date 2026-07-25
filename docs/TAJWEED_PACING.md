@@ -236,11 +236,14 @@ reported: wasl-aware mode looked *worse* than plain wash on these pairs.
 **Speed ceiling (shipped).** `TajweedPacing.waslPrefixStart(sweepMs)` chooses
 when the next-letter bloom begins:
 
-| Constant | Role | Shipped |
-|----------|------|---------|
-| `MIN_WASL_PREFIX_MS` | Target wall-clock for the bloom | **480 ms** |
+| Constant / knob | Role | Shipped |
+|-----------------|------|---------|
+| `DEFAULT_WASL_PREFIX_MS` / `Tuning.waslPrefixMs` | Target wall-clock for the bloom | **480 ms** |
 | `MAX_WASL_PREFIX_WINDOW` | Max fraction of a short donor spent on the bloom | **0.75** |
 | `MIN_WASL_PREFIX_WINDOW` | Floor (= 1 − wasl exit 0.82) for long donors | **0.18** |
+
+Ink Lab → **Tajweed** → **Wasl prefix ms** (120–900) live-tunes
+`waslPrefixMs` (persisted with other lab numbers; **Copy values** includes it).
 
 So a ~500 ms `مَن` claims ~75 % of its span (~375 ms) for a smoothstepped
 fade into `يَشْرِى` / `رَّبِّكُم`; an 800 ms donor hits the full ~480 ms
