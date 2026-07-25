@@ -268,11 +268,11 @@ class InkEngineTest {
 
     @Test
     fun `sweep clamps to the tuned floor and ceiling`() {
-        val tuning = InkEngine.tuning
+        val floor = InkEngine.minSweepFloorMs()
         assertEquals(
-            tuning.minSweepMs,
+            floor,
             InkEngine.sweepMs(
-                active(1, durationMs = tuning.minSweepMs.toLong()),
+                active(1, durationMs = floor.toLong()),
                 playbackSpeed = 1f,
             ),
         )
@@ -281,7 +281,7 @@ class InkEngineTest {
             InkEngine.sweepMs(active(1, durationMs = 500), playbackSpeed = 1f),
         )
         assertEquals(
-            tuning.maxSweepMs,
+            InkEngine.tuning.maxSweepMs,
             InkEngine.sweepMs(active(1, durationMs = 60_000), playbackSpeed = 1f),
         )
     }
@@ -290,12 +290,36 @@ class InkEngineTest {
     fun `short hold is scaled up to the min sweep floor`() {
         // Short holds (and first-word timing with almost no remaining Active
         // time) still get a visible wash. Renderers finish residual progress
-        // after handoff instead of snapping to full ink.
-        val floor = InkEngine.tuning.minSweepMs
+        // after handoff instead of snapping to full ink. Floor includes the
+        // highlight lead so early-started short words breathe longer.
+        val floor = InkEngine.minSweepFloorMs()
         assertEquals(floor, InkEngine.sweepMs(active(1, durationMs = 80), playbackSpeed = 1f))
         assertEquals(floor, InkEngine.sweepMs(active(1, durationMs = 80), playbackSpeed = 2f))
         assertEquals(floor, InkEngine.sweepMs(active(1, durationMs = 10), playbackSpeed = 1f))
         assertEquals(floor, InkEngine.sweepMs(active(1, durationMs = 0), playbackSpeed = 1f))
+    }
+
+    @Test
+    fun `highlight lead raises the short-hold sweep floor`() {
+        val savedLead = InkEngine.highlightLeadMs
+        try {
+            InkEngine.highlightLeadMs = 0
+            assertEquals(
+                InkEngine.tuning.minSweepMs,
+                InkEngine.minSweepFloorMs(),
+            )
+            InkEngine.highlightLeadMs = 114
+            assertEquals(
+                InkEngine.tuning.minSweepMs + 114,
+                InkEngine.minSweepFloorMs(),
+            )
+            assertEquals(
+                InkEngine.minSweepFloorMs(),
+                InkEngine.sweepMs(active(1, durationMs = 80), playbackSpeed = 1f),
+            )
+        } finally {
+            InkEngine.highlightLeadMs = savedLead
+        }
     }
 
     @Test

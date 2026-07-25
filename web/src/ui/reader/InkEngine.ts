@@ -64,6 +64,7 @@ export function setTuning(next: Partial<InkTuning> | InkTuning): void {
 
 export function resetTuning(): void {
   tuning = { ...DEFAULT_TUNING }
+  highlightLeadMs = DEFAULT_HIGHLIGHT_LEAD_MS
 }
 
 export function inkAlpha(state: InkState): number {
@@ -106,6 +107,32 @@ export function word(
   }
 }
 
+/** Port of Android `InkEngine.DEFAULT_HIGHLIGHT_LEAD_MS`. */
+export const DEFAULT_HIGHLIGHT_LEAD_MS = 114
+
+/** Word-ink lead (ms). Live-tunable on Android; web keeps the shipped default. */
+let highlightLeadMs = DEFAULT_HIGHLIGHT_LEAD_MS
+
+export function getHighlightLeadMs(): number {
+  return highlightLeadMs
+}
+
+export function setHighlightLeadMs(ms: number): void {
+  highlightLeadMs = Math.max(0, Math.trunc(ms))
+}
+
+/**
+ * Effective min letter-sweep duration. Short holds scale up to this so the
+ * wash still breathes; highlight lead already starts word ink early, so that
+ * lead is spent on a longer soft reveal. Port of Android `minSweepFloorMs`.
+ */
+export function minSweepFloorMs(): number {
+  return Math.min(
+    tuning.maxSweepMs,
+    Math.max(1, tuning.minSweepMs + Math.max(0, highlightLeadMs)),
+  )
+}
+
 export function sweepMs(
   activeWord: ActiveWord | null | undefined,
   playbackSpeed: number,
@@ -113,10 +140,11 @@ export function sweepMs(
   if (!activeWord) return null
   // Kotlin `toInt()` truncates; use the same boundary semantics on web.
   const raw = Math.max(0, Math.trunc(activeWord.durationMs / playbackSpeed))
-  // Floor at minSweepMs so short holds still get a visible wash. Incomplete
+  // Floor at minSweep + lead so short holds / wasl still breathe. Incomplete
   // washes finish after handoff (WordUnit / HafsWord) rather than snapping.
-  if (raw <= 0) return tuning.minSweepMs
-  return Math.min(tuning.maxSweepMs, Math.max(tuning.minSweepMs, raw))
+  const floor = minSweepFloorMs()
+  if (raw <= 0) return floor
+  return Math.min(tuning.maxSweepMs, Math.max(floor, raw))
 }
 
 /**
@@ -195,6 +223,7 @@ export const InkEngine = {
   wordState,
   inRepeatChain,
   word,
+  minSweepFloorMs,
   sweepMs,
   startRevealed,
   glinting,
@@ -202,6 +231,9 @@ export const InkEngine = {
   prefaceWashProgress,
   advancePrefaceWashProgress,
   PREFACE_WASH_SETTLE_FRACTION,
+  DEFAULT_HIGHLIGHT_LEAD_MS,
+  getHighlightLeadMs,
+  setHighlightLeadMs,
   inkAlpha,
   resetTuning,
   setTuning,

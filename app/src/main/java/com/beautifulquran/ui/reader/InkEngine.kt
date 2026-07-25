@@ -333,9 +333,19 @@ object InkEngine {
         )
 
     /**
+     * Effective min letter-sweep duration. Short holds (and wasl tails that
+     * inherit this word's sweep) scale up to this so the wash still breathes.
+     * [highlightLeadMs] already starts word ink early; that lead is spent on
+     * a longer soft reveal rather than idle full-ink before the voice arrives.
+     */
+    fun minSweepFloorMs(): Int =
+        (tuning.minSweepMs + highlightLeadMs.coerceAtLeast(0))
+            .coerceIn(1, tuning.maxSweepMs)
+
+    /**
      * How long the active word's letter sweep should run: the time the
      * word stays lit (karaoke hold until the next word), corrected for
-     * playback speed, floored at [Tuning.minSweepMs] so short holds (and
+     * playback speed, floored at [minSweepFloorMs] so short holds (and
      * first-word timing quirks with near-zero remaining Active time) still
      * get a visible wash. The renderers finish an incomplete wash after
      * handoff rather than snapping to full ink — so scaling past the lit
@@ -345,8 +355,9 @@ object InkEngine {
     fun sweepMs(activeWord: ActiveWord?, playbackSpeed: Float): Int? {
         val word = activeWord ?: return null
         val raw = (word.durationMs / playbackSpeed).toInt().coerceAtLeast(0)
-        if (raw <= 0) return tuning.minSweepMs
-        return raw.coerceIn(tuning.minSweepMs, tuning.maxSweepMs)
+        val floor = minSweepFloorMs()
+        if (raw <= 0) return floor
+        return raw.coerceIn(floor, tuning.maxSweepMs)
     }
 
     /**

@@ -459,7 +459,7 @@ private class SweepEntryLifecycle(
 /**
  * Drives the letter-fade sweep for the active word: restarts at 0 each time
  * the word lights up and runs for [sweepMs] — usually the karaoke hold, but
- * floored at [InkEngine.Tuning.minSweepMs] so short words still breathe.
+ * floored at [InkEngine.minSweepFloorMs] so short words still breathe.
  *
  * [activation] bumps on a genuine seek so replaying the *same* Active word
  * (tap it again) restarts the wash; mid-word retunes of [sweepMs] alone must

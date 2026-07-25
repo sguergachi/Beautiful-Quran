@@ -368,9 +368,11 @@ InkEngine owns that too, as data rather than as animation code:
   high-water rule), `inRepeatChain(position, activeWord)`, the bundled
   `word(...) → InkEngine.Word(state, repeat)`, and
   `sweepMs(activeWord, speed)`, which clamps the karaoke hold into
-  `minSweepMs..maxSweepMs` — short holds scale **up** so a tiny word still
-  shows a wash, which is why the wash can outlive `Active` (see the sweep
-  lifecycle below).
+  `minSweepFloorMs()..maxSweepMs` — short holds scale **up** so a tiny word
+  still shows a wash (`minSweepMs + highlightLeadMs`), which is why the wash
+  can outlive `Active` (see the sweep lifecycle below). The highlight lead
+  already starts word ink early; that early budget lengthens short and wasl
+  washes instead of leaving idle full ink before the voice.
 - **Pure tajweed policy**: `pacing(arabic, activeWord, isAyahFinal, prev, next)`
   returns the `TajweedPacing.Curve` for the active word or null for the plain
   sweep; `connection(prevArabic, arabic)` resolves the cross-word wasl rule;
@@ -437,7 +439,8 @@ It lives in `rememberLetterSweep` (ReaderComponents.kt) with its decisions in
 pure, `InkEngineTest`-covered helpers.
 
 1. **The `Animatable` outlives `Active`.** `sweepMs` can floor a short hold up to
-   `minSweepMs`, so the wash may still be running when the word turns Recited.
+   `minSweepFloorMs()` (`minSweepMs + highlightLeadMs`), so the wash may still
+   be running when the word turns Recited.
    `finishResidual` (true *only* for Active→Recited) lets it finish rather than
    snap. Leaving Active for Upcoming/Plain instead — a seek, a recess — abandons
    the residual immediately, because finishing toward full ink and then dimming
