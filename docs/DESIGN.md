@@ -44,7 +44,7 @@ Hard rules:
 > `ui/reader/RepeatSheet.kt`, hosted by `ReaderScreen` inside the shared
 > `InkRevealOverlay`: ink bleeds from the player bar's repeat control and the
 > reader sheet becomes the question. Selection is the ink-brush circle plus ink
-> strength, Done/Not now are quiet text lines, and the margins dismiss. The ayah
+> strength, Done is one quiet text line, and the margins dismiss. The ayah
 > wheels are the same `SearchDialWheel` the cover sheet's search uses, under a
 > soft gilt reading band.
 
@@ -89,7 +89,12 @@ JVM-testable at all: `androidx.compose.ui.graphics.Path` wraps
 `android.graphics.Path`, which is stubbed in unit tests.
 
 Because the mark is derived from each child's own measured bounds rather than the
-container's, the same code loops a word in a `Row` and a full line in a `Column`.
+container's, the same code loops a word in a `Row` and a stacked choice in a
+`Column`. That is also why neither container stretches its children to the full
+sheet width: `InkCircledChoiceColumn` sizes itself to its longest label
+(`IntrinsicSize.Max`) so every mark in the stack shares one width and keeps a
+hand-drawn ~4:1 loop. Stretched to the sheet, the same stroke came out 10:1 — two
+parallel rules with caps, a lozenge rather than a loop.
 
 ### Turning the sheet
 

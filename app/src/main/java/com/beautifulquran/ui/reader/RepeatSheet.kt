@@ -83,7 +83,10 @@ internal fun repeatChoice(
  *
  * Picking "a range of ayahs" reveals two vertical wheels to bound the loop;
  * picking "from this ayah" reveals a single wheel counting forward from the
- * current ayah. Everything applies on Done; the quiet margins dismiss.
+ * current ayah. Everything applies on Done, the sheet's one action; the quiet
+ * margins are the only way out. A second "Not now" line used to sit 4 dp under
+ * Done — same type vocabulary as the choices, so the sheet read as one long
+ * list, and discarding the pick was a thumb-width from committing it.
  *
  * This replaced a stock Material `Dialog` that had been violating AGENTS.md
  * invariant 4 (recorded, and now resolved, in docs/DESIGN.md).
@@ -205,23 +208,17 @@ fun RepeatSheet(
                 )
             }
 
-            Spacer(Modifier.height(32.dp))
+            // Done sits well clear of the last choice — a 20 dp gap would read
+            // as one more line in the list — and carries the sheet's strongest
+            // ink, so the action is never quieter than the options above it.
+            Spacer(Modifier.height(48.dp))
             Text(
                 text = "Done",
-                style = MaterialTheme.typography.titleMedium,
+                style = MaterialTheme.typography.titleLarge,
                 color = MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier
                     .quietClickable(onClick = ::commit)
                     .padding(horizontal = 16.dp, vertical = 10.dp),
-            )
-            Spacer(Modifier.height(4.dp))
-            Text(
-                text = "Not now",
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
-                modifier = Modifier
-                    .quietClickable(onClick = onDismiss)
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
             )
         }
     }
