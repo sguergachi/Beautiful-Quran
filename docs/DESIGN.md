@@ -49,10 +49,13 @@ Hard rules:
 > compact centred block, so a range reads as one phrase — and they unfold
 > **directly under the choice that asked for them**, pushing the rest of the
 > list down, so the numbers belong to that line rather than trailing the sheet.
-> The range carries no caption: the word **"to" sits in the gutter on the
-> reading line**, so the two dials and that word read straight across as
-> "67 to 120". Only the lone count dial keeps a caption, because a bare figure
-> cannot say "ayahs from ayah 12" by itself.
+> Neither dial carries a caption: the word **"to" sits in the gutter on the
+> reading line**, so each one reads straight across as "67 to 120". "From this
+> ayah" is written as the *same* pair with its left figure pinned — the start is
+> where the reader already is, so it is set once in quieter ink and only the last
+> ayah is left to choose. That was a count wheel (1, 2, 3 …) needing a line of
+> prose to say what the number counted; naming the last ayah says it without the
+> prose, and the two choices now differ only in how many figures move.
 >
 > Nothing is drawn under the wheel: no band, no plate, no wash. The reading line
 > is the row the numbers fade *towards* — rows dissolve into the sheet as they
