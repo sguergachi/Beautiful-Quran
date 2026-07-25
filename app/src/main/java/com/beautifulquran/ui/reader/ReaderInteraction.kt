@@ -96,16 +96,26 @@ object ReaderInteraction {
 
     /**
      * Whether lyric-follow should call [ReaderFocusController.focus] for
-     * [target]. When follow just re-enabled, always home (return-to-verse).
-     * While follow stays on, only home when the playback target **changes** —
-     * re-homing the same tall verse on pause/play/seek fights word-band follow
-     * and stutters the page up then down.
+     * [target], after the direct visible-tall-word policy below has been ruled
+     * out. A normal return-to-verse homes when follow just re-enabled. While
+     * follow stays on, only target changes home; re-homing the same tall verse
+     * on pause/play/seek fights word-band follow and stutters up then down.
      */
     fun shouldHomeOntoPlaybackTarget(
         target: Int,
         justEnabledFollow: Boolean,
         lastHomedTarget: Int?,
     ): Boolean = justEnabledFollow || target != lastHomedTarget
+
+    /**
+     * Re-enabling follow inside a visible tall ayah should restore its active
+     * word directly. Homing the ayah first moves in the opposite direction,
+     * pins line one, and queues the real word correction behind that glide.
+     */
+    fun shouldRestoreWordOnFollowEnable(
+        justEnabledFollow: Boolean,
+        targetHasLiveTallGeometry: Boolean,
+    ): Boolean = justEnabledFollow && targetHasLiveTallGeometry
 
     /**
      * Word-band keep-in-view continuously tracks **actual** play, not the

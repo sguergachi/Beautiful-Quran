@@ -234,6 +234,29 @@ class ReaderInteractionTest {
     }
 
     @Test
+    fun `follow enable restores word directly when tall target has live geometry`() {
+        assertTrue(
+            ReaderInteraction.shouldRestoreWordOnFollowEnable(
+                justEnabledFollow = true,
+                targetHasLiveTallGeometry = true,
+            ),
+        )
+        assertFalse(
+            ReaderInteraction.shouldRestoreWordOnFollowEnable(
+                justEnabledFollow = false,
+                targetHasLiveTallGeometry = true,
+            ),
+        )
+        // Wholly offscreen and normal-height targets still need verse focus.
+        assertFalse(
+            ReaderInteraction.shouldRestoreWordOnFollowEnable(
+                justEnabledFollow = true,
+                targetHasLiveTallGeometry = false,
+            ),
+        )
+    }
+
+    @Test
     fun `word-play seed skips verse home so tall-ayah bottom taps stay put`() {
         // Screen sets lastHomed = tapped ayah and followWasEnabled = true before
         // EnableFollow so justEnabled is false and the same target does not re-home.
@@ -244,7 +267,7 @@ class ReaderInteractionTest {
                 lastHomedTarget = 141,
             ),
         )
-        // Return-to-verse still homes when follow was off (justEnabled).
+        // Normal/offscreen return still homes once visible-tall restore does not apply.
         assertTrue(
             ReaderInteraction.shouldHomeOntoPlaybackTarget(
                 target = 141,

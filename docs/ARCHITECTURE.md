@@ -218,6 +218,10 @@ ReaderFocusController ── holds the LazyListState; the sole writer to it
   verse-level pin settles. The interaction arbiter still makes all of these
   yield to hand scrolling, search, annotation, pending jumps, and the Ink Lab
   focus freeze.
+- Re-enabling follow (Play or return-to-ayah) while the current tall ayah still
+  has live geometry skips the verse-top anchor entirely and restores the active
+  word directly. The verse-first path remains only for wholly offscreen targets
+  that must be materialized before their word can be measured.
 - Annotation editing uses the same secondary-focus path: the field reports live
   viewport bounds as it grows and as the IME rises,
   `keyboardOverlapPx` removes any bottom chrome already outside the list before
