@@ -479,6 +479,11 @@ sweep starts from that edge instead of 0 — see
 `rememberLetterSweep` (not at each draw site) so residual and glint share one
 latched edge.
 
+**Short wasl donors** (`مَن يَشْرِى`, `مِن رَّبِّكُم`, …) need a **speed
+ceiling** on that early bloom so the next opening does not race: details and
+constants in
+[TAJWEED_PACING.md — Short wasl donors](TAJWEED_PACING.md#short-wasl-donors--speed-ceiling).
+
 ### Ink Lab
 
 Settings → Developer (triple-tap the logo) → **Ink Lab overlay** floats a

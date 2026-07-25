@@ -200,12 +200,10 @@ The model is therefore a **gated hint**, built from four parts:
   one-glyph wipe. The soft edge therefore breathes at the main wash rate and
   hands off on the same spatial leading edge when the timing boundary
   arrives. Window progress is **smoothstepped**, and a **speed ceiling**
-  stretches short wasl donors (مِن، مَن) via `waslPrefixStart(sweepMs)`:
-  target ~480 ms of bloom (up to 75 % of a short donor) so the next opening
-  fades instead of racing. Longer donors stay near the absorbed-nūn tail
-  (~18–24 % window). The completed edge is the active sweep's starting point,
-  so the opening letter is not replayed and the wash continues through the
-  rest of the word. That continuation is armed only on a natural adjacent-word
+  stretches short wasl donors (see [Short wasl donors](#short-wasl-donors--speed-ceiling)
+  below). The completed edge is the active sweep's starting point, so the
+  opening letter is not replayed and the wash continues through the rest of
+  the word. That continuation is armed only on a natural adjacent-word
   handoff, never a seek. Same-ayah neighbours only (`Hold.connect`, default
   on). Iẓhār and cross-ayah wasl are left alone.
 - **Waqf length scale.** `Hold.waqfLengthScale` (Ink Lab: **Waqf length
@@ -213,6 +211,55 @@ The model is therefore a **gated hint**, built from four parts:
   full share on every closer; 1 = linear from ~0 at 3 letters to full share
   at 8+ pronounced letters. Medium closers like `عَظِيمًا` keep a readable
   run-up when the hold slider is high; long closers still park hard.
+
+### Short wasl donors — speed ceiling
+
+**Product case.** Short nūn donors (`مَن`, `مِن`, and similar ~400–600 ms
+holds) feed idghām / ikhfāʾ / iqlāb into the next word. The reciter is already
+on the **next** opening letter during the donor's tail, so ink must start
+blooming that opening **before** the word-timing handoff. Concrete audition
+pairs:
+
+| Pair | Where | Rule |
+|------|--------|------|
+| `مَن يَشْرِى` | 2:207 | idghām (ن + ي) |
+| `مِن رَّبِّكُم` | 5:68 | idghām (ن + ر) |
+| `مِن قَبۡلُ` | e.g. 2:26 | ikhfāʾ (ن + ق) |
+
+**What went wrong without a ceiling.** The carry-in is a main-wash segment
+over the donor's freed tail (`waslWashProgress` → `waslContinuationStart`),
+not a full-word sweep. Mapping that segment only onto the last ~18 % of a
+~500 ms donor left ~90–250 ms of motion — the next opening **popped** while
+wasl **off** still looked soft (whole-word min-sweep). Users correctly
+reported: wasl-aware mode looked *worse* than plain wash on these pairs.
+
+**Speed ceiling (shipped).** `TajweedPacing.waslPrefixStart(sweepMs)` chooses
+when the next-letter bloom begins:
+
+| Constant | Role | Shipped |
+|----------|------|---------|
+| `MIN_WASL_PREFIX_MS` | Target wall-clock for the bloom | **480 ms** |
+| `MAX_WASL_PREFIX_WINDOW` | Max fraction of a short donor spent on the bloom | **0.75** |
+| `MIN_WASL_PREFIX_WINDOW` | Floor (= 1 − wasl exit 0.82) for long donors | **0.18** |
+
+So a ~500 ms `مَن` claims ~75 % of its span (~375 ms) for a smoothstepped
+fade into `يَشْرِى` / `رَّبِّكُم`; an 800 ms donor hits the full ~480 ms
+target; multi-second donors stay near the late junction (~18–24 % window).
+An earlier 50 % cap made the old 320 ms floor **unreachable** on short holds
+(only ~250 ms actual) — do not reintroduce that without re-checking 2:207.
+
+**Handoff.** When the next word becomes Active on a natural adjacent pass,
+the main sweep starts at the completed prefix edge (`waslContinuationStart`)
+so the opening letter is not replayed. Seek / activation bump does not arm
+continuation.
+
+**Regression checks.** With Tajweed + Connect on: play 2:207 through
+`مَن يَشْرِى` and 5:68 through `مِن رَّبِّكُم` — the next opening must
+*ease* in during the donor's end, not snap; the rest of the second word then
+continues the same soft edge. With Connect off, behavior matches a plain
+word wash (no early prefix). JVM: `TajweedPacingTest` short/long
+`waslPrefixStart` cases and connection bloom tests.
+
 
 Breakpoints `(tᵢ, xᵢ)` — time fraction → width fraction, two per hold and one
 per plain letter — are evaluated as a **monotone piecewise-linear** map (a
