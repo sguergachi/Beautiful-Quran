@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
 import android.view.WindowManager
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.CubicBezierEasing
@@ -288,6 +289,8 @@ fun ReaderScreen(
     val followEnabled = interaction.followEnabled
     val requestedJumpAyah = interaction.pendingJumpAyah
     var showRepeatDialog by remember { mutableStateOf(false) }
+    /** True while the repeat bleed is still on screen (including close wash). */
+    var repeatRendered by remember { mutableStateOf(false) }
     var retainedRepeatChoice by rememberSaveable { mutableStateOf<RepeatChoice?>(null) }
     val haptics = LocalHapticFeedback.current
     val onRootReturnUserMovedLatest = rememberUpdatedState(onRootReturnUserMoved)
@@ -544,12 +547,20 @@ fun ReaderScreen(
 
     val notifPermission = rememberPlaybackPermissionState()
     val onInkOverlayVisibilityChangeLatest = rememberUpdatedState(onInkOverlayVisibilityChange)
-    LaunchedEffect(notifPermission.sheetVisible) {
-        onInkOverlayVisibilityChangeLatest.value(notifPermission.sheetVisible)
+    // Union of reader-owned ink surfaces. Report open *and* still-rendered so
+    // MainActivity keeps stackGesturesBlocked through the close wash (same
+    // pattern as ShareHost + shareSendRendered).
+    LaunchedEffect(notifPermission.sheetVisible, showRepeatDialog, repeatRendered) {
+        onInkOverlayVisibilityChangeLatest.value(
+            notifPermission.sheetVisible || showRepeatDialog || repeatRendered,
+        )
     }
     DisposableEffect(Unit) {
         onDispose { onInkOverlayVisibilityChangeLatest.value(false) }
     }
+    // System Back must dismiss the bleed, not pop the paper stack beneath it
+    // (MainActivity's stack BackHandlers fire otherwise — see overlay backs there).
+    BackHandler(enabled = showRepeatDialog) { showRepeatDialog = false }
 
     // The permission prompt is not a dialog — it is an ink bleed that turns
     // this very sheet into the question. See PlaybackNotificationSheet and the
@@ -2207,6 +2218,7 @@ fun ReaderScreen(
             modifier = Modifier.zIndex(1.8f),
             originX = REPEAT_BLEED_ORIGIN_X,
             originY = REPEAT_BLEED_ORIGIN_Y,
+            onRenderedChange = { repeatRendered = it },
         ) {
             MaterialTheme(
                 colorScheme = repeatOverlayColors,
