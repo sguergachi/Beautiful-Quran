@@ -174,7 +174,7 @@ Port exactly:
   has been deleted from Android's `InkEngine` (its gate collapsed to
   `glinting(state) = state == Active`). The web copy is harmless dead weight —
   fold it away next time `WordUnit.tsx` is touched. Behaviour is identical.
-- `Tuning` defaults (upcoming alpha 0.22, ink/mark/recess fade 400 ms, sweep clamps, feather 1.6, easing CPs)
+- `Tuning` defaults (upcoming alpha 0.2661, ink/mark/recess fade 400 ms, sweep clamps, feather 1.6, easing CPs)
 
 Acceptance: `InkEngineTest` parity. Optional Ink Lab later (session-only
 tuning, same as Android).

@@ -35,6 +35,8 @@ import androidx.compose.ui.unit.dp
 import com.beautifulquran.ui.theme.DisclosureChevron
 import com.beautifulquran.ui.theme.quietClickable
 import java.util.Locale
+import kotlin.math.ln
+import kotlin.math.pow
 import kotlin.math.roundToInt
 
 /**
@@ -488,6 +490,50 @@ private fun LabCaption(text: String) {
     )
 }
 
+/**
+ * Decade base for the zero-including exponential map. Higher → more track
+ * spent near the low end (finer small-value control, coarser large values).
+ */
+private const val LOG_SLIDER_BASE = 10f
+
+/**
+ * Map a real [value] in [range] to a 0..1 slider thumb position on a log
+ * scale: equal thumb travel ≈ equal *ratios* when [range.start] > 0, or more
+ * precision near the floor when the range includes 0.
+ */
+internal fun inkLabValueToPosition(
+    value: Float,
+    range: ClosedFloatingPointRange<Float>,
+): Float {
+    val min = range.start
+    val max = range.endInclusive
+    if (max <= min) return 0f
+    val v = value.coerceIn(min, max)
+    return if (min > 0f) {
+        ln(v / min) / ln(max / min)
+    } else {
+        val u = (v - min) / (max - min)
+        ln(1f + u * (LOG_SLIDER_BASE - 1f)) / ln(LOG_SLIDER_BASE)
+    }
+}
+
+/** Inverse of [inkLabValueToPosition]: 0..1 thumb → real value in [range]. */
+internal fun inkLabPositionToValue(
+    position: Float,
+    range: ClosedFloatingPointRange<Float>,
+): Float {
+    val min = range.start
+    val max = range.endInclusive
+    if (max <= min) return min
+    val t = position.coerceIn(0f, 1f)
+    return if (min > 0f) {
+        min * (max / min).pow(t)
+    } else {
+        val u = (LOG_SLIDER_BASE.pow(t) - 1f) / (LOG_SLIDER_BASE - 1f)
+        min + (max - min) * u
+    }
+}
+
 @Composable
 private fun TuningSlider(
     label: String,
@@ -496,6 +542,9 @@ private fun TuningSlider(
     integer: Boolean = false,
     onChange: (Float) -> Unit,
 ) {
+    // Log track: fine grain near the low end, still reaches the high end.
+    // Material Slider is linear in its valueRange; we feed it 0..1 positions.
+    val position = inkLabValueToPosition(value, range)
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier.fillMaxWidth(),
@@ -507,9 +556,12 @@ private fun TuningSlider(
             modifier = Modifier.width(112.dp),
         )
         Slider(
-            value = value,
-            onValueChange = onChange,
-            valueRange = range,
+            value = position,
+            onValueChange = { t ->
+                val raw = inkLabPositionToValue(t, range)
+                onChange(if (integer) raw.roundToInt().toFloat() else raw)
+            },
+            valueRange = 0f..1f,
             colors = SliderDefaults.colors(
                 thumbColor = MaterialTheme.colorScheme.primary,
                 activeTrackColor = MaterialTheme.colorScheme.primary,

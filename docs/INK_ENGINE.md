@@ -402,7 +402,7 @@ InkEngine owns that too, as data rather than as animation code:
   feather, sweep easing, and tajweed pacing. `InkEngine.tuning` is
   snapshot-backed (`mutableStateOf`), so release builds read constants while
   the Ink Lab can retune a live session.
-- **Sync knobs, deliberately outside `Tuning`**: `highlightLeadMs` (default 0),
+- **Sync knobs, deliberately outside `Tuning`**: `highlightLeadMs` (default 114),
   `fadeLeadMs` (default 500) and `outputLatencyOverrideMs` (null = use the route
   preset). These move *when* things fire rather than how the ink feels, so they
   stay out of the data class that **Copy values** transcribes — but they persist
@@ -484,6 +484,9 @@ auditioning keeps the last dial positions; **Reset** clears the store and
 restores shipped defaults (so future default changes apply cleanly). Focus
 is never persisted. **Copy values** still puts a paste-ready
 `InkEngine.Tuning(…)` constructor on the clipboard (and Logcat tag `InkLab`)
-so a tuned feel can be transcribed into the defaults in InkEngine.kt. Slider
+so a tuned feel can be transcribed into the defaults in InkEngine.kt. Every
+slider uses a **log track** (equal thumb travel ≈ equal ratios when the range
+starts above zero; more precision near the floor when it includes zero) so
+small values stay fine-grained while large ends stay reachable. Slider
 meanings, defaults, ranges, and the halo artifact stress check are documented
 in [GLIMMER.md](GLIMMER.md#ink-lab-controls).

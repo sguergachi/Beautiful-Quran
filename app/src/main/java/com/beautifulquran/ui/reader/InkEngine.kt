@@ -71,7 +71,7 @@ object InkEngine {
      */
     data class Tuning(
         /** Resting ink of an upcoming / recessed word. */
-        val upcomingAlpha: Float = 0.22f,
+        val upcomingAlpha: Float = 0.2661f,
         /** State tween between resting inks (Active snaps — see
          *  ReaderComponents.animatedInkAlpha for why). */
         val inkFadeMs: Int = 400,
@@ -109,17 +109,16 @@ object InkEngine {
         val sweepEaseY2: Float = 0.78f,
         /** Letter-level tajweed pacing of the active word's sweep — the ink
          *  dwells on held letters (madd, ghunnah) instead of sweeping at a
-         *  constant rate. Off by default; auditioned via the Ink Lab.
+         *  constant rate. On by default; still auditionable via the Ink Lab.
          *  See docs/TAJWEED_PACING.md. */
-        val tajweedPacing: Boolean = false,
-        /** Feather of a paced word. Defaults to [washFeather]'s whole-word
-         *  breath: the hold now reads through the wash *stopping*, so the
-         *  edge no longer has to be sharpened (which is what cost the reveal
-         *  its softness the first time round). */
-        val pacedFeather: Float = 1.6f,
+        val tajweedPacing: Boolean = true,
+        /** Feather of a paced word. Slightly sharper than [washFeather] so
+         *  holds read clearly while the edge stays soft (see
+         *  docs/TAJWEED_PACING.md). */
+        val pacedFeather: Float = 1.1857f,
         /** Which moments earn a hold — see [TajweedPacing.Hold]. */
         val holdMadd: Boolean = true,
-        val holdGhunnah: Boolean = false,
+        val holdGhunnah: Boolean = true,
         val holdWaqf: Boolean = true,
         /** Cross-word idghām (nūn/tanwīn + يرملون): hold the next word's
          *  opening letter. See [TajweedPacing.Hold.connect]. */
@@ -128,15 +127,15 @@ object InkEngine {
          *  multiple of the plain sweep rate. Word timings are contiguous, so
          *  hold length and this cap are the same dial; 1 means ordinary
          *  letters are never hurried and only [holdWaqf] can hold. */
-        val cruiseCap: Float = 1.25f,
+        val cruiseCap: Float = 2f,
         /** Share of a verse-closing word spent sustaining its final letter
          *  when the word is long enough (see [waqfLengthScale]). */
-        val waqfShare: Float = 0.55f,
+        val waqfShare: Float = 0.5932f,
         /** How strongly shorter closers reduce effective [waqfShare] — see
          *  [TajweedPacing.Hold.waqfLengthScale]. */
-        val waqfLengthScale: Float = 0.7f,
+        val waqfLengthScale: Float = 1f,
         /** How far the wash still creeps while holding, so it breathes. */
-        val holdCreep: Float = 0.08f,
+        val holdCreep: Float = 0.1076f,
     )
 
     /**
@@ -171,7 +170,8 @@ object InkEngine {
     /**
      * How early word ink runs ahead of [com.beautifulquran.domain.HighlightEngine]
      * segment times (ms). Added to the playhead before the engine query so
-     * the next word's wash can start before the timed startMs. Default 0.
+     * the next word's wash can start before the timed startMs.
+     * Default [DEFAULT_HIGHLIGHT_LEAD_MS].
      */
     private var highlightLeadState by mutableStateOf(DEFAULT_HIGHLIGHT_LEAD_MS)
     var highlightLeadMs: Int
@@ -218,7 +218,7 @@ object InkEngine {
         }
 
     /** Shipped defaults for highlight sync (lab knobs start here). */
-    const val DEFAULT_HIGHLIGHT_LEAD_MS = 0
+    const val DEFAULT_HIGHLIGHT_LEAD_MS = 114
     const val DEFAULT_FADE_LEAD_MS = 500
 
     /**
