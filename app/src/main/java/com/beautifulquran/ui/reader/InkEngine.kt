@@ -126,10 +126,16 @@ object InkEngine {
         /**
          * Wasl next-letter bloom speed ceiling (ms). Short donors (مَن، مِن)
          * stretch their carry-in window toward this wall-clock so the next
-         * opening fades instead of racing. See
+         * opening fades instead of racing; if the donor is still too short,
+         * the unfinished edge continues after handoff. See
          * [docs/TAJWEED_PACING.md] Short wasl donors.
          */
         val waslPrefixMs: Int = 480,
+        /**
+         * Maximum wasl bloom clock laid down before the connected word becomes
+         * active. Lower leaves more of its opening wash visible after handoff.
+         */
+        val waslHandoff: Float = TajweedPacing.DEFAULT_WASL_HANDOFF,
         /** Ceiling on ordinary-letter speed while a hold is bought, as a
          *  multiple of the plain sweep rate. Word timings are contiguous, so
          *  hold length and this cap are the same dial; 1 means ordinary

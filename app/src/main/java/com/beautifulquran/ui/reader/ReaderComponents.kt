@@ -796,6 +796,12 @@ private data class WaslPrefix(
 private class ActiveWordEntry(
     var index: Int,
     var activation: Long,
+    var outgoingHandoff: Float = 0f,
+)
+
+private data class WaslProgress(
+    val value: State<Float>,
+    val atHandoff: Float,
 )
 
 /** Blooms the next opening letter over the connected tail of this word. */
@@ -805,17 +811,27 @@ private fun rememberWaslProgress(
     sweepMs: Int?,
     identity: Int?,
     activation: Long,
-): State<Float> {
+): WaslProgress {
     val clock = remember(identity, activation) { Animatable(0f) }
     val entryConnection = remember(identity, activation) { connection }
     val entryMs = remember(identity, activation) { sweepMs }
-    // Capture at Active entry (incl. lab waslPrefixMs) so a mid-word retune
-    // cannot jump the edge; the next wasl handoff picks up the new value.
+    // Capture at Active entry so a mid-word retune cannot jump the edge; the
+    // next wasl handoff picks up new lab values.
     val waslPrefixMs = InkEngine.tuning.waslPrefixMs
+    val waslHandoff = InkEngine.tuning.waslHandoff
     val entryPrefixStart = remember(identity, activation, waslPrefixMs) {
         entryMs?.let {
             TajweedPacing.waslPrefixStart(it, waslPrefixMs.toFloat())
         } ?: 1f
+    }
+    val entryCompletion = remember(identity, activation, waslPrefixMs, waslHandoff) {
+        entryMs?.let {
+            TajweedPacing.waslPrefixCompletion(
+                sweepMs = it,
+                minPrefixMs = waslPrefixMs.toFloat(),
+                maxCompletion = waslHandoff,
+            )
+        } ?: 0f
     }
     LaunchedEffect(identity, activation) {
         if (entryConnection == null || entryMs == null) {
@@ -825,10 +841,16 @@ private fun rememberWaslProgress(
             clock.animateTo(1f, tween(entryMs, easing = LinearEasing))
         }
     }
-    return remember(identity, activation) {
+    val progress = remember(identity, activation) {
         derivedStateOf {
-            entryConnection?.at(clock.value, entryPrefixStart) ?: 0f
+            entryConnection?.at(clock.value, entryPrefixStart, entryCompletion) ?: 0f
         }
+    }
+    return remember(identity, activation) {
+        WaslProgress(
+            value = progress,
+            atHandoff = entryConnection?.at(1f, entryPrefixStart, entryCompletion) ?: 0f,
+        )
     }
 }
 
@@ -2470,9 +2492,11 @@ fun AyahBlock(
         previousActive.index == activeIndex - 1 &&
             previousActive.activation == activation
     }
+    val incomingHandoff = if (carriedIncoming) previousActive.outgoingHandoff else 0f
     SideEffect {
         previousActive.index = activeIndex
         previousActive.activation = activation
+        previousActive.outgoingHandoff = outgoingProgress.atHandoff
     }
     val waslMainFeather = if (pacing != null) {
         InkEngine.pacedFeather()
@@ -2480,18 +2504,22 @@ fun AyahBlock(
         InkEngine.tuning.washFeather
     }
     val activeRevealStart = if (carriedIncoming && incomingConnection != null) {
-        waslContinuationStart(
-            prefixFraction = incomingConnection.prefixFraction,
-            mainFeather = waslMainFeather,
+        waslWashProgress(
+            windowProgress = incomingHandoff,
+            endProgress = waslContinuationStart(
+                prefixFraction = incomingConnection.prefixFraction,
+                mainFeather = waslMainFeather,
+            ),
         )
     } else {
         0f
     }
-    // Window complete (1) × endProgress = handoff edge under main geometry.
+    // A latched window (1) redraws exactly the partial edge carried across
+    // handoff while the active word's ordinary sweep continues from it.
     val fullWaslWindow = remember { mutableStateOf(1f) }
     val waslPrefixes = ayah.words.indices.map { index ->
         when {
-            // Preserve a completed outgoing bloom only across the natural
+            // Preserve the outgoing bloom's reached edge only across a natural
             // adjacent handoff. A seek bumps activation and starts clean.
             index == activeIndex && carriedIncoming && incomingConnection != null ->
                 WaslPrefix(
@@ -2501,7 +2529,7 @@ fun AyahBlock(
                 )
             index == activeIndex + 1 && outgoingConnection != null ->
                 WaslPrefix(
-                    windowProgress = outgoingProgress,
+                    windowProgress = outgoingProgress.value,
                     endProgress = waslContinuationStart(
                         prefixFraction = outgoingConnection.prefixFraction,
                         mainFeather = waslMainFeather,

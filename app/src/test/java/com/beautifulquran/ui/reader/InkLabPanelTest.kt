@@ -26,6 +26,7 @@ class InkLabPanelTest {
         assertTrue(text.contains("cruiseCap = 1.55f"))
         assertTrue(text.contains("holdGhunnah = true"))
         assertTrue(text.contains("holdConnect ="))
+        assertTrue(text.contains("waslHandoff ="))
         assertTrue(text.contains("waqfShare ="))
         assertTrue(text.contains("waqfLengthScale ="))
         // Fields without lab sliders still snapshot so nothing is lost on apply.

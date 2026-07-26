@@ -3,6 +3,7 @@ package com.beautifulquran.ui.reader
 import android.content.Context
 import android.content.SharedPreferences
 import androidx.core.content.edit
+import com.beautifulquran.domain.TajweedPacing
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
@@ -73,6 +74,7 @@ data class InkLabSnapshot(
     val holdWaqf: Boolean = true,
     val holdConnect: Boolean = true,
     val waslPrefixMs: Int = 480,
+    val waslHandoff: Float = TajweedPacing.DEFAULT_WASL_HANDOFF,
     val cruiseCap: Float = 2f,
     val waqfShare: Float = 0.5932f,
     val waqfLengthScale: Float = 1f,
@@ -108,6 +110,7 @@ data class InkLabSnapshot(
         holdWaqf = holdWaqf,
         holdConnect = holdConnect,
         waslPrefixMs = waslPrefixMs,
+        waslHandoff = waslHandoff,
         cruiseCap = cruiseCap,
         waqfShare = waqfShare,
         waqfLengthScale = waqfLengthScale,
@@ -153,6 +156,7 @@ data class InkLabSnapshot(
             holdWaqf = tuning.holdWaqf,
             holdConnect = tuning.holdConnect,
             waslPrefixMs = tuning.waslPrefixMs,
+            waslHandoff = tuning.waslHandoff,
             cruiseCap = tuning.cruiseCap,
             waqfShare = tuning.waqfShare,
             waqfLengthScale = tuning.waqfLengthScale,

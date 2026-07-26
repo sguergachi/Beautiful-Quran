@@ -240,6 +240,45 @@ class TajweedPacingTest {
             (1f - start) * 800f,
             1f,
         )
+        assertEquals(
+            TajweedPacing.DEFAULT_WASL_HANDOFF,
+            TajweedPacing.waslPrefixCompletion(800),
+            0f,
+        )
+    }
+
+    @Test
+    fun `very short wasl donor hands off an unfinished slower bloom`() {
+        // Alafasy 2:207 مَن is 220 ms; the wash floor makes it 254 ms.
+        // Its capped 75% tail cannot honestly fit a 480 ms fade, so preserve
+        // the initial quarter-word pause and carry partial progress forward.
+        val sweepMs = 254
+        val start = TajweedPacing.waslPrefixStart(sweepMs)
+        val completion = TajweedPacing.waslPrefixCompletion(sweepMs)
+        val connection = requireNotNull(
+            TajweedPacing.connection("مَن", "يَشۡرِي"),
+        )
+
+        assertEquals(0.25f, start, 1e-3f)
+        assertEquals(0.75f * sweepMs / TajweedPacing.DEFAULT_WASL_PREFIX_MS, completion, 1e-3f)
+        assertEquals(0f, connection.at(start, start, completion), 0f)
+        assertTrue("handoff must remain a partial fade", connection.at(1f, start, completion) < 0.5f)
+    }
+
+    @Test
+    fun `long wasl donor still leaves visible fade after handoff`() {
+        // Alafasy 2:231 بِمَعۡرُوفٖۚ → وَلَا: the 2.22 s donor has ample
+        // room for 480 ms, but pre-forming the whole wāw snaps across a line.
+        val sweepMs = 2_220
+        val start = TajweedPacing.waslPrefixStart(sweepMs)
+        val completion = TajweedPacing.waslPrefixCompletion(sweepMs)
+        val connection = requireNotNull(
+            TajweedPacing.connection("بِمَعۡرُوفٖۚ", "وَلَا"),
+        )
+
+        assertEquals(1f - 480f / sweepMs, start, 1e-3f)
+        assertEquals(TajweedPacing.DEFAULT_WASL_HANDOFF, completion, 0f)
+        assertTrue(connection.at(1f, start, completion) < 0.5f)
     }
 
     @Test
