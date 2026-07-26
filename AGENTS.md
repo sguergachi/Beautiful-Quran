@@ -26,6 +26,8 @@ tools/build_db.py       Data pipeline that generates quran.db (build-time, not a
 tools/timing_overrides/ Local timing-report scratch; CI rejects committed JSON
 tools/timing_patch_cases/ Unit tests for systematic cleaner / span-protect fixes
 tools/timing_repairs/   CTC auto-repairs rebased onto current source timing
+tools/audio_onsets/     Generated leading-silence evidence from everyayah audio
+tools/detect_audio_onsets.py  Opening-range scanner that regenerates that evidence
 scripts/                Linux emulator setup / run helpers
 docs/                   Architecture, design language, performance, timings docs
                         …and the GitHub Pages product page (index.html + styles.css)
@@ -120,8 +122,9 @@ close a `Timings patch — …` GitHub issue, **do this checklist in order**:
    |---|---|---|
 | Forward spike, stray, split sliver, non-contiguous / **gap phantom** (`…11,8,9,13…` missing 12), recurring false phrase loop | `clean_qdc_artifacts` in `tools/build_db.py` | `tools/timing_patch_cases/<id>.json` + `python3 tools/test_build_db.py` |
    | Repair flattens a multi-word re-say that cleaned qdc still has | `apply_timing_repairs` span-protect (`erases_span_repeat`) | `pipeline: "erases_span_repeat"` case |
-   | CTC repeat-vs-split / restore / drop quality | regenerate `tools/timing_repairs/` (`~/qasr`) | generator tests + rebuild |
+| CTC repeat-vs-split / restore / drop quality | regenerate `tools/timing_repairs/` (`~/qasr`) | generator tests + rebuild |
 | Single boundary steal, no structural signal | weighted source-conflict validation + surgical `kind: "boundary"` repair | `pipeline: "boundary_repair"` case |
+| Whole ayah starts early because its MP3 has encoded silence | regenerate the reciter with `tools/detect_audio_onsets.py` | `pipeline: "leading_silence_offset"` case |
 4. **Implement the class fix** + add the patch case (input = broken shape,
    expected = Lab/ear topology). Run `python3 tools/test_build_db.py`.
 5. **Rebuild**: `python3 tools/build_db.py`, bump `DB_FILE_NAME`, commit DB +

@@ -14,19 +14,25 @@ from __future__ import annotations
 import json
 import sqlite3
 import sys
+import tempfile
 from pathlib import Path
+from unittest.mock import patch
 
 TOOLS = Path(__file__).resolve().parent
 ROOT = TOOLS.parent
 sys.path.insert(0, str(TOOLS))
 from build_db import (  # noqa: E402
+    AUDIO_ONSETS_DIR,
+    apply_audio_onsets,
     apply_boundary_repair,
     boundary_conflicts,
     clean_qdc_artifacts,
     erases_span_repeat,
+    offset_for_audio_onset,
     rebase_timing_repair,
     suspicious_pacing,
 )
+import detect_audio_onsets as onset_detector  # noqa: E402
 
 CASES_DIR = TOOLS / "timing_patch_cases"
 PIPELINES = frozenset(
@@ -34,6 +40,7 @@ PIPELINES = frozenset(
         "boundary_repair",
         "clean_qdc_artifacts",
         "erases_span_repeat",
+        "leading_silence_offset",
         "rebase_timing_repair",
     }
 )
@@ -131,6 +138,11 @@ def run_pipeline(case, segs):
         return False, f"want erases_span_repeat={want!r} got {got!r}"
     if pipeline == "rebase_timing_repair":
         return rebase_timing_repair(segs, resolve_repair(case))
+    if pipeline == "leading_silence_offset":
+        onset = case.get("audio_onset_ms")
+        if onset is None:
+            raise SystemExit(f"{case.get('_path')}: need audio_onset_ms")
+        return offset_for_audio_onset(segs, onset)
     raise AssertionError("unreachable")
 
 
@@ -154,10 +166,58 @@ def check_confidence():
             conflict, {"bundled": baseline, "quran-align": reference}
         )
     ] == [27]
+    onset = offset_for_audio_onset([], 850) == []
+    onset &= offset_for_audio_onset([[1, 850, 1_250]], 850) == [[1, 850, 1_250]]
+    onset &= offset_for_audio_onset([[1, 500, 900]], 850) == [[1, 850, 1_250]]
     repeats = [[1, 0, 500], [2, 500, 1000], [1, 1000, 1500]]
-    return pacing and boundaries and boundary_conflicts(
+    return pacing and boundaries and onset and boundary_conflicts(
         repeats, {"quran-align": reference}
     ) == []
+
+
+def check_audio_onset_pipeline():
+    normal_log = "silence_start: 0\nsilence_end: 1.179 | silence_duration: 1.179"
+    eof_log = "silence_start: 0\nsilence_end: 4.101224 | silence_duration: 4.101224"
+    parser = onset_detector.parse_onset(normal_log, "out_time_us=8000000") == 1_179
+    parser &= onset_detector.parse_onset("no opening silence", "") == 0
+    try:
+        onset_detector.parse_onset(eof_log, "out_time_us=4101224")
+        parser = False
+    except onset_detector.IncompletePrefix:
+        pass
+
+    with (
+        patch.object(onset_detector, "fetch_prefix", side_effect=[b"short", b"long"]) as fetch,
+        patch.object(
+            onset_detector,
+            "analyze_prefix",
+            side_effect=[onset_detector.IncompletePrefix("EOF"), 6_636],
+        ),
+    ):
+        retry = onset_detector.detect_onset("Hani_Rifai_192kbps", (5, 109))
+    retry_ok = retry == ((5, 109), 6_636) and [
+        call.args[1] for call in fetch.call_args_list
+    ] == [
+        onset_detector.INITIAL_RANGE_BYTES,
+        onset_detector.RETRY_RANGE_BYTES,
+    ]
+
+    segments = [[1, 500, 900], [2, 900, 1_200], [1, 1_200, 1_500]]
+    with tempfile.TemporaryDirectory() as temp_dir:
+        evidence = Path(temp_dir)
+        (evidence / "test.json").write_text(json.dumps({
+            "reciterId": 1,
+            "reciterSlug": "Alafasy_128kbps",
+            "offsets": {"2:253": 1_179},
+        }))
+        rows = apply_audio_onsets([(1, 2, 253, segments)], evidence)
+    shifted = json.loads(rows[0][3])
+    integration = shifted == [
+        [1, 1_179, 1_579],
+        [2, 1_579, 1_879],
+        [1, 1_879, 2_179],
+    ]
+    return parser and retry_ok and integration
 
 
 def audit_bundled_db():
@@ -168,10 +228,12 @@ def audit_bundled_db():
         )
     }
     bad = []
+    timings = {}
     for rid, s, a, raw in db.execute(
         "SELECT reciter_id,surah_id,ayah_number,segments FROM timings"
     ):
         segs = json.loads(raw)
+        timings[(rid, s, a)] = segs
         starts = [x[1] for x in segs]
         if not segs or starts != sorted(set(starts)) or any(
             len(x) != 3 or not 1 <= x[0] <= counts[(s, a)] or x[2] <= x[1]
@@ -216,6 +278,31 @@ def audit_bundled_db():
         for i in range(len(repaired[(4, 19)]) - 3)
     )
     exact &= order(repaired[(6, 145)]) == list(range(1, 40))
+    exact &= timings[(1, 2, 253)][:2] == [
+        [1, 1_179, 2_094], [2, 2_094, 2_814]
+    ]
+    exact &= {
+        key: timings[key][0][1]
+        for key in ((4, 3, 113), (4, 4, 88), (7, 5, 109))
+    } == {
+        (4, 3, 113): 6_009,
+        (4, 4, 88): 5_968,
+        (7, 5, 109): 6_636,
+    }
+    for path in AUDIO_ONSETS_DIR.glob("*.json"):
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        exact &= payload["detector"] == {
+            "noiseDb": onset_detector.NOISE_DB,
+            "sustainedMs": onset_detector.SUSTAINED_MS,
+            "minimumOffsetMs": onset_detector.MIN_OFFSET_MS,
+            "analysisMs": onset_detector.ANALYSIS_SECONDS * 1000,
+            "initialRangeBytes": onset_detector.INITIAL_RANGE_BYTES,
+            "retryRangeBytes": onset_detector.RETRY_RANGE_BYTES,
+        }
+        rid = payload["reciterId"]
+        for verse, onset in payload["offsets"].items():
+            s, a = map(int, verse.split(":"))
+            exact &= timings[(rid, s, a)][0][1] >= onset
     overrides = list((TOOLS / "timing_overrides").glob("*.json"))
     return not bad and exact and not overrides and db.execute(
         "PRAGMA integrity_check"
@@ -265,11 +352,15 @@ def main():
             for line in detail.splitlines():
                 print(f"        {line}")
     confidence_ok = check_confidence()
+    audio_onset_ok = check_audio_onset_pipeline()
     database_ok = audit_bundled_db()
     print(f"  {'ok  ' if confidence_ok else 'FAIL'} weighted 2:214 confidence checks")
+    print(f"  {'ok  ' if audio_onset_ok else 'FAIL'} audio-onset detector and apply checks")
     print(f"  {'ok  ' if database_ok else 'FAIL'} bundled timing database invariants")
     if not confidence_ok:
         failures.append(("weighted confidence", "2:214 checks failed", None))
+    if not audio_onset_ok:
+        failures.append(("audio onsets", "detector/apply checks failed", None))
     if not database_ok:
         failures.append(("bundled database", "timing audit failed", None))
     print()
@@ -281,7 +372,7 @@ def main():
                 for line in str(detail).splitlines():
                     print(f"    {line}")
         return 1
-    print(f"all {len(cases) + 2} cases pass ({CASES_DIR.relative_to(Path.cwd())})")
+    print(f"all {len(cases) + 3} cases pass ({CASES_DIR.relative_to(Path.cwd())})")
     return 0
 
 

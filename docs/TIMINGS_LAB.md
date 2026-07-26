@@ -10,6 +10,12 @@ notice a mistimed word while reading → open the Lab (developer mode) →
 fix it in seconds → the reader is corrected immediately → submit the
 correction upstream when convenient.
 
+Whole-ayah drift caused by silence encoded at the beginning of an everyayah
+MP3 is handled systematically outside the Lab. `tools/detect_audio_onsets.py`
+measures the first sustained voice sample and `build_db.py` shifts the complete
+row, preserving every internal boundary and repeat. Lab overrides are applied
+afterward because their taps already live on the real file timeline.
+
 > **Entry is developer-only.** Default readers long-press a word to open the
 > [Root Word Viewer](ROOT_VIEWER.md), not the Lab. See *Where it lives*
 > below.
