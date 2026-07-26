@@ -20,6 +20,7 @@ TOOLS = Path(__file__).resolve().parent
 ROOT = TOOLS.parent
 sys.path.insert(0, str(TOOLS))
 from build_db import (  # noqa: E402
+    apply_boundary_repair,
     boundary_conflicts,
     clean_qdc_artifacts,
     erases_span_repeat,
@@ -29,7 +30,12 @@ from build_db import (  # noqa: E402
 
 CASES_DIR = TOOLS / "timing_patch_cases"
 PIPELINES = frozenset(
-    {"clean_qdc_artifacts", "erases_span_repeat", "rebase_timing_repair"}
+    {
+        "boundary_repair",
+        "clean_qdc_artifacts",
+        "erases_span_repeat",
+        "rebase_timing_repair",
+    }
 )
 
 
@@ -108,8 +114,12 @@ def run_pipeline(case, segs):
             "dropped_strays": 0,
             "noncontiguous_orphans": 0,
             "gap_phantoms": 0,
+            "false_phrase_loops": 0,
         }
-        return clean_qdc_artifacts(segs, stats)
+        words = {int(pos): word for pos, word in case.get("words", {}).items()}
+        return clean_qdc_artifacts(segs, stats, words)
+    if pipeline == "boundary_repair":
+        return apply_boundary_repair(segs, resolve_repair(case))
     if pipeline == "erases_span_repeat":
         repair = resolve_repair(case)
         got = erases_span_repeat(segs, repair)
@@ -182,6 +192,30 @@ def audit_bundled_db():
     ).fetchone()
     starts = {x[0]: x[1] for x in json.loads(row[0])}
     exact &= [starts[p] for p in (11, 12)] == [14_365, 15_605]
+    repaired = {}
+    for s, a in ((2, 229), (2, 235), (4, 19), (5, 66), (6, 145)):
+        row = db.execute(
+            "SELECT segments FROM timings WHERE reciter_id=1 "
+            "AND surah_id=? AND ayah_number=?",
+            (s, a),
+        ).fetchone()
+        repaired[(s, a)] = json.loads(row[0])
+    exact &= order(repaired[(2, 229)]) == list(range(1, 47))
+    exact &= [s for s in repaired[(2, 229)] if s[0] in (16, 17)] == [
+        [16, 20_275, 21_105], [17, 22_680, 23_705]
+    ]
+    exact &= order(repaired[(2, 235)]) == list(range(1, 48))
+    exact &= [s for s in repaired[(2, 235)] if s[0] in (22, 23)] == [
+        [22, 23_195, 23_966], [23, 26_200, 26_975]
+    ]
+    exact &= [s for s in repaired[(5, 66)] if s[0] == 13] == [
+        [13, 14_786, 15_865]
+    ]
+    exact &= not any(
+        order(repaired[(4, 19)])[i : i + 4] == [17, 18, 17, 18]
+        for i in range(len(repaired[(4, 19)]) - 3)
+    )
+    exact &= order(repaired[(6, 145)]) == list(range(1, 40))
     overrides = list((TOOLS / "timing_overrides").glob("*.json"))
     return not bad and exact and not overrides and db.execute(
         "PRAGMA integrity_check"
@@ -219,8 +253,10 @@ def main():
         print(f"  {'ok  ' if ok else 'FAIL'} {label}")
         if case.get("input_positions") is not None:
             print(f"        in={case['input_positions']}")
-        if pipeline in {"erases_span_repeat", "rebase_timing_repair"}:
-            print(f"        repair={case.get('repair_positions')}")
+        if pipeline in {"boundary_repair", "erases_span_repeat", "rebase_timing_repair"}:
+            print(
+                f"        repair={case.get('repair_positions') or case.get('repair_segments')}"
+            )
             if pipeline == "erases_span_repeat":
                 print(f"        erases={case.get('expected_erases')}")
         elif got_order is not None:

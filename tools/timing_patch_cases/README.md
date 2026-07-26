@@ -22,6 +22,7 @@ Agents landing a GitHub `Timings patch` issue must follow the full checklist in
    - structural qdc noise → `clean_qdc_artifacts` in `tools/build_db.py`
    - drop repair erasing a multi-word re-say → `erases_span_repeat` / span-protect
    - stale full-row repair timing → `rebase_timing_repair`
+   - independently supported local boundary → `boundary_repair`
    - repeat-vs-split / CTC disagreement → `tools/timing_repairs/` generator
 3. **Add a case here** whose `input_*` is the broken shape and `expected_*` is
    the corrected shape (from the Lab patch, ASR/ear, or the intended clean
@@ -50,7 +51,7 @@ a case under this directory.
 |---|---|---|
 | `id` | yes | stable slug; should match the filename stem |
 | `label` | yes | one-line human name (shown on failure) |
-| `pipeline` | yes | `clean_qdc_artifacts`, `erases_span_repeat`, or `rebase_timing_repair` |
+| `pipeline` | yes | `clean_qdc_artifacts`, `erases_span_repeat`, `rebase_timing_repair`, or `boundary_repair` |
 | `input_positions` | * | 1-based word indices in time order (synthetic equal durations) |
 | `expected_positions` | * | positions after the pipeline step |
 | `input_segments` | * | full `[[pos, start_ms, end_ms], …]` when times matter |

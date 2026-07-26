@@ -41000,6 +41000,68 @@
      10340
     ]
    ]
+  },
+  {
+   "reciterId": 1,
+   "reciterSlug": "Alafasy_128kbps",
+   "surahId": 2,
+   "ayah": 229,
+   "kind": "boundary",
+   "refs": [
+    "GitHub issue #594"
+   ],
+   "segments": [
+    [
+     16,
+     20275,
+     21105
+    ],
+    [
+     17,
+     22680,
+     23705
+    ]
+   ]
+  },
+  {
+   "reciterId": 1,
+   "reciterSlug": "Alafasy_128kbps",
+   "surahId": 2,
+   "ayah": 235,
+   "kind": "boundary",
+   "refs": [
+    "GitHub issue #598"
+   ],
+   "segments": [
+    [
+     22,
+     23195,
+     23966
+    ],
+    [
+     23,
+     26200,
+     26975
+    ]
+   ]
+  },
+  {
+   "reciterId": 1,
+   "reciterSlug": "Alafasy_128kbps",
+   "surahId": 5,
+   "ayah": 66,
+   "kind": "boundary",
+   "refs": [
+    "GitHub issue #572",
+    "quran-align boundary witness"
+   ],
+   "segments": [
+    [
+     13,
+     14786,
+     15865
+    ]
+   ]
   }
  ]
 }

@@ -206,10 +206,10 @@ Free, no backend, no auth beyond the GitHub account:
 
    | Class | Where to fix | Unit test |
    |---|---|---|
-   | Structural qdc noise (forward spikes, strays, split slivers, non-contiguous span phantoms, **gap phantoms**) | `clean_qdc_artifacts` in `tools/build_db.py` | Add `tools/timing_patch_cases/<id>.json` — broken `input_*` + expected `expected_*` from the patch; run `python3 tools/test_build_db.py` |
+   | Structural qdc noise (forward spikes, strays, split slivers, non-contiguous / gap phantoms, recurring false phrase loops) | `clean_qdc_artifacts` in `tools/build_db.py` | Add `tools/timing_patch_cases/<id>.json` — broken `input_*` + expected `expected_*` from the patch; run `python3 tools/test_build_db.py` |
    | Drop repair that flattens a real span-repeat | `apply_timing_repairs` span-protect (and regenerate repairs) | `pipeline: erases_span_repeat` case in `timing_patch_cases/` |
    | Repeat-vs-split / CTC | `tools/timing_repairs/` generator | `~/qasr` tests + rebuild repairs |
-   | Boundary displacement without a topology change | weighted qdc / quran-align evidence, then the repair generator | focused regression case |
+   | Boundary displacement without a topology change | weighted qdc / quran-align evidence, then a surgical `kind: "boundary"` repair | `pipeline: boundary_repair` focused case |
 
    The patch case **is** the verification for systematic fixes: the Lab/GitHub
    payload supplies the expected shape; the cleaner must reproduce it. See
@@ -230,7 +230,8 @@ Free, no backend, no auth beyond the GitHub account:
 4. Structural repairs are rebased onto the latest source row. Only changed
    topology and its immediate neighbours use the repair clock; equal spans
    retain current source timings. Existing span-repeat protection still rejects
-   repairs that would flatten a real re-recitation.
+   repairs that would flatten a real re-recitation. Boundary repairs replace
+   only their listed, uniquely occurring positions.
 5. Run `python3 tools/test_build_db.py`, rebuild `quran.db`, bump
    `DB_FILE_NAME`, and commit the systematic code, regression case, and DB.
    Delete any local override JSON first.

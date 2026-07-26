@@ -124,6 +124,19 @@ skipped span — not a re-say. Example (raw Alafasy 5:59 after high-water 11):
 re-covers HW; a real earlier re-say resumes at HW+1 — both are untouched.
 Case: `tools/timing_patch_cases/gap-phantom-alafasy-5-59.json`.
 
+## False إِلَّا أَن phrase loops (issues #594/#598)
+
+Qdc labels four Alafasy occurrences of stretched `إِلَّا أَن` as
+`A,B,A,B`. The two Lab reports, cached CTC, and the monotonic quran-align
+witness all identify the middle labels as fragments, not a re-recited span.
+`collapse_false_phrase_loops` fixes the exact recurring text/topology class
+to the first A and final B. Other alternating phrases still pass through the
+ordinary span-repeat protection unchanged.
+
+The Lab boundary clock is then applied surgically with `kind: "boundary"`
+repair entries. Such entries contain only the uniquely occurring positions
+they replace; `apply_boundary_repair` cannot alter the rest of the ayah.
+
 ## Trusting a qdc span-repeat CTC collapsed (issue #533)
 
 CTC confirms or restores a repeat, but it must never **erase** one. CTC

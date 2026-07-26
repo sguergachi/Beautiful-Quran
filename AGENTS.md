@@ -118,10 +118,10 @@ close a `Timings patch — …` GitHub issue, **do this checklist in order**:
 3. **Classify** the topology difference:
    | Symptom | Fix where | Test |
    |---|---|---|
-   | Forward spike, stray, split sliver, non-contiguous phantom, **gap phantom** (`…11,8,9,13…` missing 12) | `clean_qdc_artifacts` in `tools/build_db.py` | `tools/timing_patch_cases/<id>.json` + `python3 tools/test_build_db.py` |
+| Forward spike, stray, split sliver, non-contiguous / **gap phantom** (`…11,8,9,13…` missing 12), recurring false phrase loop | `clean_qdc_artifacts` in `tools/build_db.py` | `tools/timing_patch_cases/<id>.json` + `python3 tools/test_build_db.py` |
    | Repair flattens a multi-word re-say that cleaned qdc still has | `apply_timing_repairs` span-protect (`erases_span_repeat`) | `pipeline: "erases_span_repeat"` case |
    | CTC repeat-vs-split / restore / drop quality | regenerate `tools/timing_repairs/` (`~/qasr`) | generator tests + rebuild |
-   | Single boundary steal, no structural signal | weighted source-conflict validation + systematic repair/generator change | focused regression case |
+| Single boundary steal, no structural signal | weighted source-conflict validation + surgical `kind: "boundary"` repair | `pipeline: "boundary_repair"` case |
 4. **Implement the class fix** + add the patch case (input = broken shape,
    expected = Lab/ear topology). Run `python3 tools/test_build_db.py`.
 5. **Rebuild**: `python3 tools/build_db.py`, bump `DB_FILE_NAME`, commit DB +
