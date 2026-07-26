@@ -13,6 +13,14 @@ class ReaderInteractionTest {
 
     private val idle = ReaderInteractionState()
 
+    private data class ReflowCase(
+        val changed: Boolean,
+        val ownsPlayback: Boolean,
+        val playingAyah: Int?,
+        val playingTall: Boolean,
+        val expected: LayoutReflowRecovery?,
+    )
+
     @Test
     fun `hand scroll disables follow`() {
         val next = ReaderInteraction.reduce(idle, ReaderInteractionEvent.UserMovedPage)
@@ -254,6 +262,36 @@ class ReaderInteractionTest {
                 playingAyahHasLiveTallGeometry = false,
             ),
         )
+    }
+
+    @Test
+    fun `display reflow recovery follows the latest focus owner`() {
+        listOf(
+            ReflowCase(false, true, 12, true, null),
+            ReflowCase(true, false, 12, true, LayoutReflowRecovery(4, false)),
+            ReflowCase(true, true, null, true, LayoutReflowRecovery(4, false)),
+            ReflowCase(true, true, 12, false, LayoutReflowRecovery(12, false)),
+            ReflowCase(true, true, 12, true, LayoutReflowRecovery(12, true)),
+            ReflowCase(true, true, 0, false, LayoutReflowRecovery(0, false)),
+        ).forEach { case ->
+            assertEquals(
+                case.expected,
+                ReaderInteraction.layoutReflowRecovery(
+                    layoutChanged = case.changed,
+                    playbackOwnsFocus = case.ownsPlayback,
+                    playingAyah = case.playingAyah,
+                    stickyAyah = 4,
+                    playingAyahHasLiveTallGeometry = case.playingTall,
+                ),
+            )
+        }
+    }
+
+    @Test
+    fun `layout sticky ayah ignores other surah playback and basmalah`() {
+        assertEquals(12, ReaderInteraction.layoutStickyAyah(true, 12, 4))
+        assertEquals(4, ReaderInteraction.layoutStickyAyah(false, 12, 4))
+        assertEquals(4, ReaderInteraction.layoutStickyAyah(true, 0, 4))
     }
 
     @Test

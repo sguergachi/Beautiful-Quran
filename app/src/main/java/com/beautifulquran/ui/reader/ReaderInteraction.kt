@@ -17,6 +17,12 @@ data class ReaderInteractionState(
     val annotating: Boolean = false,
 )
 
+/** Pure recovery chosen after a display reflow has finished measuring. */
+internal data class LayoutReflowRecovery(
+    val focusAyah: Int,
+    val restoreWordDirectly: Boolean,
+)
+
 sealed class ReaderInteractionEvent {
     /** Vertical hand drag on the page — reader is navigating by eye. */
     data object UserMovedPage : ReaderInteractionEvent()
@@ -117,6 +123,34 @@ object ReaderInteraction {
         verseHomeRequested: Boolean,
         playingAyahHasLiveTallGeometry: Boolean,
     ): Boolean = verseHomeRequested && playingAyahHasLiveTallGeometry
+
+    /** Keep the media ayah sticky only while playback owns this reader. */
+    internal fun layoutStickyAyah(
+        playbackOwnsFocus: Boolean,
+        playingAyah: Int?,
+        scrolledAyah: Int,
+    ): Int = playingAyah?.takeIf { playbackOwnsFocus && it > 0 } ?: scrolledAyah
+
+    /**
+     * Resolve display-reflow recovery without leaking Compose timing into the
+     * policy. Playback pins the actual media ayah, never the fade-led visual
+     * target; a live tall ayah restores its current word without homing first.
+     */
+    internal fun layoutReflowRecovery(
+        layoutChanged: Boolean,
+        playbackOwnsFocus: Boolean,
+        playingAyah: Int?,
+        stickyAyah: Int,
+        playingAyahHasLiveTallGeometry: Boolean,
+    ): LayoutReflowRecovery? {
+        if (!layoutChanged) return null
+        val playbackAyah = playingAyah?.takeIf { playbackOwnsFocus }
+        return LayoutReflowRecovery(
+            focusAyah = playbackAyah ?: stickyAyah,
+            restoreWordDirectly =
+                playbackAyah != null && playingAyahHasLiveTallGeometry,
+        )
+    }
 
     /**
      * Word-band keep-in-view continuously tracks **actual** play, not the

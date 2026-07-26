@@ -198,9 +198,10 @@ ReaderFocusController ── holds the LazyListState; the sole writer to it
   transliteration, translation, font scale) recover the pinned verse after the
   LazyColumn remasures, so the reading line stays on the ayah the reader was
   looking at instead of drifting with the resize. A Play intent supersedes any
-  older manual-reading recovery; when the actual playing ayah is now taller
-  than the viewport, recovery goes directly to its active word instead of
-  first pinning line one.
+  older manual-reading recovery. Playback-owned reflow pins the actual media
+  ayah rather than the fade-led visual target; when that ayah is now taller
+  than the viewport, recovery goes directly to its active word instead of first
+  pinning line one.
 - Word-level follow is the engine's *secondary* constraint: while follow is on,
   each active word reports its list-viewport bounds and
   `ReaderFocusController.keepWordInView` applies a **bottom-only** reading-band
