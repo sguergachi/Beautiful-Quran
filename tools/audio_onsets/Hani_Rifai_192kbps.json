@@ -6,7 +6,9 @@
     "noiseDb": -40,
     "sustainedMs": 80,
     "minimumOffsetMs": 250,
-    "rangeBytes": 98304
+    "analysisMs": 8000,
+    "initialRangeBytes": 98304,
+    "retryRangeBytes": 262144
   },
   "scannedAyahs": 6236,
   "offsets": {
@@ -34,7 +36,7 @@
     "5:12": 1854,
     "5:67": 1951,
     "5:82": 397,
-    "5:109": 4101,
+    "5:109": 6636,
     "6:1": 989,
     "7:1": 1076,
     "7:127": 486,

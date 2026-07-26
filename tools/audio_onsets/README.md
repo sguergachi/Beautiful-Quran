@@ -15,6 +15,9 @@ Generate a complete reciter file:
 python3 tools/detect_audio_onsets.py --reciter Alafasy_128kbps
 ```
 
-The scanner fetches only the opening 96 KiB of each MP3. Silence must sustain
-for 80 ms to register, and only voice onsets of at least 250 ms are recorded.
-It requires `ffmpeg`; `build_db.py` does not.
+The scanner analyzes up to the opening eight seconds of each MP3. It starts
+with a 96 KiB range and retries ambiguous prefixes with 256 KiB; a silence end
+at the decoded byte-range boundary is rejected as ffmpeg's end-of-input flush,
+not mistaken for voice. Silence must sustain for 80 ms to register, and only
+voice onsets of at least 250 ms are recorded. It requires `ffmpeg`;
+`build_db.py` does not.

@@ -50,6 +50,7 @@ REPAIRS_DIR = Path(__file__).resolve().parent / "timing_repairs"
 # tools/detect_audio_onsets.py. Applied after structural repairs so every pass
 # moves together, and before Lab overrides (whose marks already use file time).
 AUDIO_ONSETS_DIR = Path(__file__).resolve().parent / "audio_onsets"
+MAX_AUDIO_ONSET_MS = 7_900
 
 QURAN_JSON_TGZ = "https://registry.npmjs.org/quran-json/-/quran-json-3.1.2.tgz"
 WBW_TGZ = (
@@ -1070,11 +1071,11 @@ def offset_for_audio_onset(segs, onset_ms):
     return [[pos, start + delta, end + delta] for pos, start, end in segs]
 
 
-def apply_audio_onsets(timing_rows):
+def apply_audio_onsets(timing_rows, evidence_dir=AUDIO_ONSETS_DIR):
     """Apply generated everyayah voice-onset evidence to timing rows."""
     slug_by_id = {r[0]: r[1] for r in RECITERS}
     by_key = {(rid, sid, ay): segs for rid, sid, ay, segs in timing_rows}
-    files = sorted(AUDIO_ONSETS_DIR.glob("*.json")) if AUDIO_ONSETS_DIR.is_dir() else []
+    files = sorted(evidence_dir.glob("*.json")) if evidence_dir.is_dir() else []
     shifted = 0
     for path in files:
         try:
@@ -1100,7 +1101,7 @@ def apply_audio_onsets(timing_rows):
                     file=sys.stderr,
                 )
                 sys.exit(1)
-            if onset < 0 or onset > 5_500:
+            if onset < 0 or onset > MAX_AUDIO_ONSET_MS:
                 print(
                     f"  !! audio onset {path.name}: {verse_key} onset {onset} ms out of range",
                     file=sys.stderr,

@@ -19,52 +19,78 @@ import urllib.request
 
 from build_db import AUDIO_ONSETS_DIR, OUT, RECITERS
 
-RANGE_BYTES = 96 * 1024
+INITIAL_RANGE_BYTES = 96 * 1024
+RETRY_RANGE_BYTES = 256 * 1024
+ANALYSIS_SECONDS = 8
 NOISE_DB = -40
 SUSTAINED_MS = 80
 MIN_OFFSET_MS = 250
 SILENCE_END = re.compile(r"silence_end: ([0-9.]+)")
+OUT_TIME_US = re.compile(r"out_time_us=(\d+)")
+
+
+class IncompletePrefix(RuntimeError):
+    """The decoded prefix ended before the opening silence did."""
 
 
 def audio_url(slug, surah, ayah):
     return f"https://everyayah.com/data/{slug}/{surah:03d}{ayah:03d}.mp3"
 
 
-def fetch_prefix(url):
+def fetch_prefix(url, range_bytes):
     request = urllib.request.Request(
         url,
         headers={
-            "Range": f"bytes=0-{RANGE_BYTES - 1}",
+            "Range": f"bytes=0-{range_bytes - 1}",
             "User-Agent": "beautiful-quran-onset-scan/1.0",
         },
     )
     with urllib.request.urlopen(request, timeout=30) as response:
-        return response.read(RANGE_BYTES)
+        return response.read(range_bytes)
 
 
-def detect_onset(slug, verse):
-    surah, ayah = verse
-    audio = fetch_prefix(audio_url(slug, surah, ayah))
+def parse_onset(log, progress):
+    """Read a real silence transition, rejecting ffmpeg's EOF flush."""
+    if not re.search(r"silence_start: 0(?:\.0+)?(?:\s|$)", log):
+        return 0
+    match = SILENCE_END.search(log)
+    decoded = OUT_TIME_US.findall(progress)
+    if not match or not decoded:
+        raise IncompletePrefix("leading silence exceeds decoded prefix")
+    onset = round(float(match.group(1)) * 1000)
+    decoded_ms = max(map(int, decoded)) / 1000
+    if decoded_ms - onset < SUSTAINED_MS:
+        raise IncompletePrefix("leading silence reaches decoded prefix end")
+    return onset
+
+
+def analyze_prefix(audio):
     result = subprocess.run(
         [
             "ffmpeg", "-hide_banner", "-nostats", "-f", "mp3", "-i", "pipe:0",
             "-af", f"silencedetect=noise={NOISE_DB}dB:d={SUSTAINED_MS / 1000}",
-            "-t", "5", "-f", "null", "-",
+            "-t", str(ANALYSIS_SECONDS), "-f", "null", "-", "-progress", "pipe:1",
         ],
         input=audio,
-        stdout=subprocess.DEVNULL,
+        stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         check=False,
     )
     log = result.stderr.decode(errors="replace")
     if result.returncode:
         raise RuntimeError(log.strip().splitlines()[-1] if log.strip() else "ffmpeg failed")
-    if not re.search(r"silence_start: 0(?:\.0+)?(?:\s|$)", log):
-        return verse, 0
-    match = SILENCE_END.search(log)
-    if not match:
-        raise RuntimeError("leading silence exceeds decoded prefix")
-    return verse, round(float(match.group(1)) * 1000)
+    return parse_onset(log, result.stdout.decode(errors="replace"))
+
+
+def detect_onset(slug, verse):
+    surah, ayah = verse
+    url = audio_url(slug, surah, ayah)
+    for range_bytes in (INITIAL_RANGE_BYTES, RETRY_RANGE_BYTES):
+        try:
+            return verse, analyze_prefix(fetch_prefix(url, range_bytes))
+        except IncompletePrefix:
+            continue
+    raise RuntimeError("leading silence exceeds extended decoded prefix")
 
 
 def verses(selected):
@@ -125,7 +151,9 @@ def main():
             "noiseDb": NOISE_DB,
             "sustainedMs": SUSTAINED_MS,
             "minimumOffsetMs": MIN_OFFSET_MS,
-            "rangeBytes": RANGE_BYTES,
+            "analysisMs": ANALYSIS_SECONDS * 1000,
+            "initialRangeBytes": INITIAL_RANGE_BYTES,
+            "retryRangeBytes": RETRY_RANGE_BYTES,
         },
         "scannedAyahs": len(work),
         "offsets": dict(sorted(offsets.items(), key=lambda item: tuple(map(int, item[0].split(":"))))),

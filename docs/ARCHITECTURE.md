@@ -78,8 +78,10 @@ The other two sources are mapped onto it by position:
   a phrase, driving the orange second fade. The segments are rebased from
   gapless-file offsets to ayah-relative ms (`adjust_qdc_segments`). Full detail:
   [REPEAT_HIGHLIGHTING.md](REPEAT_HIGHLIGHTING.md).
-- `tools/detect_audio_onsets.py` scans only the opening byte range of the exact
-  everyayah files the app streams. Silence must sustain for 80 ms to register;
+- `tools/detect_audio_onsets.py` scans up to the opening eight seconds of the
+  exact everyayah files the app streams. It retries a larger byte range when
+  the first range ends during silence, rather than treating ffmpeg's
+  end-of-input flush as voice. Silence must sustain for 80 ms to register;
   voice onsets of at least 250 ms are committed as compact evidence under
   `tools/audio_onsets/`; `build_db.py`
   shifts all segments for that ayah together after structural repairs and
