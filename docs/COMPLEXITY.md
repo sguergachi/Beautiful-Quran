@@ -41,9 +41,20 @@ than a short coordinator with six mutable resources.
 - Do not replace the existing raw SQLite, hand-rolled dependency injection,
   paper stack, or external store with a framework solely to reduce boilerplate.
   No pass has ever produced evidence justifying Hilt, Room, Navigation Compose,
-  Redux, or Zustand here.
+  Redux, or Zustand here. **Avoid DataStore** too: `SharedPreferences` behind a
+  `StateFlow` is the settings/bookmark contract, and a migration would add more
+  code than it removes unless asynchronous persistence is shown to fix a
+  *measured* startup cost.
 - Preserve draw-phase animation and boundary-only state publication. A shorter
   implementation that rerenders at 30/60/120 Hz is a regression.
+- **Check generic "Modern Android" advice against this repo before acting on
+  it.** Recurring false positives: stability annotations (`@Immutable` /
+  `@Stable`) are near-moot here because Kotlin 2.4 with no `composeCompiler {}`
+  block runs **strong skipping** by default, so unstable params already skip on
+  instance equality; and the reader's active word is published through
+  `distinctUntilChanged`, so it changes on **word boundaries, not 33 ms poll
+  ticks** — any argument premised on per-tick UI updates is wrong. Measure, or
+  cite the code, before landing a "modernization".
 - Finish or delete experiments. Developer mode is a runtime preference, not a
   debug source set, so all lab code ships in release builds. Every lab must
   justify its binary, maintenance, and app-shell lifecycle cost.

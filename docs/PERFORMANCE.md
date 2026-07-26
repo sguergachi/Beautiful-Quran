@@ -219,6 +219,12 @@ Investigate in measured order. Each trades memory, shaping correctness, or
 animation appearance for speed, so none should change without a representative
 device trace and a pixel/motion comparison.
 
+- Cold-start main-thread disk I/O: `SettingsRepository` and `BookmarkRepository`
+  are constructed in `QuranApp.onCreate()`, and their initial `read()` does
+  synchronous `SharedPreferences` reads. Trace it before changing anything —
+  the whole prefs file is parsed once and then served from memory, so this may
+  well be noise. If a trace shows a real stall, move the *first read* off the
+  main thread; do not migrate to DataStore (see `COMPLEXITY.md`).
 - Allocation inside per-frame custom draw lambdas — especially temporary bloom
   lists and gradient construction.
 - The number and retained memory of per-word graphics layers in gloss mode.
