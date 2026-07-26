@@ -108,14 +108,15 @@ object ReaderInteraction {
     ): Boolean = justEnabledFollow || target != lastHomedTarget
 
     /**
-     * Re-enabling follow inside a visible tall ayah should restore its active
-     * word directly. Homing the ayah first moves in the opposite direction,
-     * pins line one, and queues the real word correction behind that glide.
+     * A playback-owned recovery inside the visible, tall **playing** ayah
+     * should restore its active word directly. Homing the fade-led verse target
+     * first can move in the opposite direction, pin line one, and queue the
+     * real word correction behind that glide.
      */
-    fun shouldRestoreWordOnFollowEnable(
-        justEnabledFollow: Boolean,
-        targetHasLiveTallGeometry: Boolean,
-    ): Boolean = justEnabledFollow && targetHasLiveTallGeometry
+    fun shouldRestoreWordBeforeVerseHome(
+        verseHomeRequested: Boolean,
+        playingAyahHasLiveTallGeometry: Boolean,
+    ): Boolean = verseHomeRequested && playingAyahHasLiveTallGeometry
 
     /**
      * Word-band keep-in-view continuously tracks **actual** play, not the

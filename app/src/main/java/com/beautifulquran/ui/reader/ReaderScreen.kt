@@ -721,9 +721,10 @@ fun ReaderScreen(
         val target = playbackFocusTarget ?: return@LaunchedEffect
         val justEnabled = !followWasEnabled
         followWasEnabled = true
-        if (ReaderInteraction.shouldRestoreWordOnFollowEnable(
-                justEnabledFollow = justEnabled,
-                targetHasLiveTallGeometry = focusController.exceedsViewport(target),
+        if (ReaderInteraction.shouldRestoreWordBeforeVerseHome(
+                verseHomeRequested = justEnabled,
+                playingAyahHasLiveTallGeometry =
+                    listeningAyah?.let(focusController::exceedsViewport) == true,
             )
         ) {
             // Play / return-follow inside a long ayah: the active word is the
@@ -871,6 +872,9 @@ fun ReaderScreen(
     var lastLayoutSignature by remember { mutableStateOf(layoutSignature) }
     var stickyAyah by remember { mutableIntStateOf(1) }
     var layoutFocusSeeded by remember { mutableStateOf(false) }
+    val playbackOwnsReflow = followPlayback && isThisSurahPlaying
+    val latestPlaybackFocusTarget = rememberUpdatedState(playbackFocusTarget)
+    val latestListeningAyah = rememberUpdatedState(listeningAyah)
     SideEffect {
         if (layoutSignature == lastLayoutSignature) {
             stickyAyah = when {
@@ -881,27 +885,36 @@ fun ReaderScreen(
             }.coerceIn(1, lastAyahNumber)
         }
     }
-    LaunchedEffect(layoutSignature) {
+    LaunchedEffect(layoutSignature, playbackOwnsReflow) {
         if (!layoutFocusSeeded) {
             // First composition matches the initial settle above; don't fight it.
             layoutFocusSeeded = true
             lastLayoutSignature = layoutSignature
             return@LaunchedEffect
         }
-        val pin = when {
-            followPlayback &&
-                playbackFocusTarget != null -> playbackFocusTarget
-            else -> stickyAyah.coerceIn(1, lastAyahNumber)
-        }
+        // A playback-ownership change restarts an in-flight reflow recovery so
+        // its older manual-reading target cannot scroll after Play. If no
+        // layout change is pending, playback follow already owns the move.
+        if (layoutSignature == lastLayoutSignature) return@LaunchedEffect
         // Two frames + a short beat so sibling ayahs finish remasuring before
         // we glide against the final geometry (otherwise the home lands on a
         // height that is still shifting).
         withFrameNanos { }
         withFrameNanos { }
         delay(48)
-        focusController.focus(pin, animate = true, preRoll = false)
-        // A paused tall ayah needs its held word restored after the verse-level
-        // reflow anchor settles; while playing, this is a harmless exact check.
+        val pin = latestPlaybackFocusTarget.value
+            ?.takeIf { playbackOwnsReflow }
+            ?: stickyAyah.coerceIn(1, lastAyahNumber)
+        val restoreWordDirectly = ReaderInteraction.shouldRestoreWordBeforeVerseHome(
+            verseHomeRequested = playbackOwnsReflow,
+            playingAyahHasLiveTallGeometry =
+                latestListeningAyah.value?.let(focusController::exceedsViewport) == true,
+        )
+        if (!restoreWordDirectly) {
+            focusController.focus(pin, animate = true, preRoll = false)
+        }
+        // Tall playback ayahs go straight to their current word; other reflows
+        // restore it after the verse-level anchor settles.
         restoreFocusGeneration++
         lastLayoutSignature = layoutSignature
     }

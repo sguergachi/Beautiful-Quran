@@ -234,24 +234,24 @@ class ReaderInteractionTest {
     }
 
     @Test
-    fun `follow enable restores word directly when tall target has live geometry`() {
+    fun `playback recovery restores word directly when playing ayah is visibly tall`() {
         assertTrue(
-            ReaderInteraction.shouldRestoreWordOnFollowEnable(
-                justEnabledFollow = true,
-                targetHasLiveTallGeometry = true,
+            ReaderInteraction.shouldRestoreWordBeforeVerseHome(
+                verseHomeRequested = true,
+                playingAyahHasLiveTallGeometry = true,
             ),
         )
         assertFalse(
-            ReaderInteraction.shouldRestoreWordOnFollowEnable(
-                justEnabledFollow = false,
-                targetHasLiveTallGeometry = true,
+            ReaderInteraction.shouldRestoreWordBeforeVerseHome(
+                verseHomeRequested = false,
+                playingAyahHasLiveTallGeometry = true,
             ),
         )
-        // Wholly offscreen and normal-height targets still need verse focus.
+        // Wholly offscreen and normal-height playing ayahs still need verse focus.
         assertFalse(
-            ReaderInteraction.shouldRestoreWordOnFollowEnable(
-                justEnabledFollow = true,
-                targetHasLiveTallGeometry = false,
+            ReaderInteraction.shouldRestoreWordBeforeVerseHome(
+                verseHomeRequested = true,
+                playingAyahHasLiveTallGeometry = false,
             ),
         )
     }
