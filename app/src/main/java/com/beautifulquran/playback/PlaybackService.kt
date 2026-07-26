@@ -2,6 +2,7 @@ package com.beautifulquran.playback
 
 import android.content.Context
 import android.content.Intent
+import android.media.AudioManager
 import android.net.ConnectivityManager
 import androidx.core.content.getSystemService
 import androidx.media3.common.AudioAttributes
@@ -43,6 +44,7 @@ class PlaybackService : MediaLibraryService() {
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var mediaSession: MediaLibrarySession? = null
     private var prefetcher: AudioPrefetcher? = null
+    private var assistantAudioResume: AssistantAudioResume? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -86,6 +88,10 @@ class PlaybackService : MediaLibraryService() {
 
         player.addListener(PrefetchListener(player, prefetcher))
         player.addListener(BasmalahSkipListener(player))
+        assistantAudioResume = AssistantAudioResume(
+            player,
+            getSystemService(AudioManager::class.java),
+        )
 
         mediaSession = MediaLibrarySession.Builder(this, player, LibraryCallback()).build()
     }
@@ -338,6 +344,8 @@ class PlaybackService : MediaLibraryService() {
         serviceScope.cancel()
         prefetcher?.release()
         prefetcher = null
+        assistantAudioResume?.release()
+        assistantAudioResume = null
         mediaSession?.run {
             player.release()
             release()
