@@ -27,6 +27,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.media3.common.Player
@@ -53,6 +54,7 @@ fun PlayerBar(
     onSpeed: () -> Unit,
     onReciterClick: () -> Unit,
 ) {
+    val compact = LocalConfiguration.current.screenWidthDp < 340
     Surface(color = MaterialTheme.colorScheme.background) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -75,11 +77,18 @@ fun PlayerBar(
             }
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally),
+                horizontalArrangement = Arrangement.spacedBy(
+                    if (compact) 4.dp else 12.dp,
+                    Alignment.CenterHorizontally,
+                ),
                 modifier = Modifier
                     .widthIn(max = 680.dp)
                     .fillMaxWidth()
-                    .padding(start = 12.dp, end = 12.dp, bottom = 4.dp),
+                    .padding(
+                        start = if (compact) 8.dp else 12.dp,
+                        end = if (compact) 8.dp else 12.dp,
+                        bottom = 4.dp,
+                    ),
             ) {
                 val rangeActive = state.repeatRange != null
                 val singleAyahRange = state.repeatRange?.let { it.first == it.last } == true

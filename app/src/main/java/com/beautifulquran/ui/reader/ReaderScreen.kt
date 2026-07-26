@@ -27,6 +27,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.ime
@@ -37,6 +39,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.statusBarsIgnoringVisibility
@@ -1014,19 +1018,25 @@ fun ReaderScreen(
                     }
                 },
                 navigationIcon = {
-                    IconButton(
-                        onClick = { if (search.active) search.close() else onBack() },
-                        enabled = search.active || !recitingActive,
-                    ) {
-                        Icon(
-                            imageVector = if (search.active) {
-                                Icons.Rounded.Close
-                            } else {
-                                Icons.AutoMirrored.Rounded.ArrowBack
-                            },
-                            contentDescription = if (search.active) "Close search" else "Back",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
-                        )
+                    Row {
+                        IconButton(
+                            onClick = { if (search.active) search.close() else onBack() },
+                            enabled = search.active || !recitingActive,
+                        ) {
+                            Icon(
+                                imageVector = if (search.active) {
+                                    Icons.Rounded.Close
+                                } else {
+                                    Icons.AutoMirrored.Rounded.ArrowBack
+                                },
+                                contentDescription = if (search.active) "Close search" else "Back",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                    .copy(alpha = 0.55f),
+                            )
+                        }
+                        // Match the two trailing buttons so Material's title
+                        // slot stays on the physical centre line at narrow widths.
+                        if (!search.active) Spacer(Modifier.width(48.dp))
                     }
                 },
                 actions = {
@@ -1080,6 +1090,9 @@ fun ReaderScreen(
                                 Icons.Rounded.Search,
                                 contentDescription = "Search in surah",
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
+                                modifier = Modifier
+                                    .offset(x = 4.dp)
+                                    .size(26.dp),
                             )
                         }
                         IconButton(
@@ -1090,6 +1103,9 @@ fun ReaderScreen(
                                 Icons.Rounded.Tune,
                                 contentDescription = "Settings",
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
+                                modifier = Modifier
+                                    .offset(x = (-4).dp)
+                                    .size(26.dp),
                             )
                         }
                     }
