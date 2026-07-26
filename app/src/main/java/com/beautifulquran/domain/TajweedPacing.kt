@@ -60,11 +60,17 @@ object TajweedPacing {
          * Opening-glyph bloom progress at normalized prior-word time [t].
          *
          * [prefixStart] is where the rise begins (see [waslPrefixStart]).
+         * [completion] is how much of the target bloom clock fits before
+         * handoff; values below one leave a soft edge for the next word.
          * Default matches a long-word late junction ([WASL_EXIT_FRACTION]).
          */
-        fun at(t: Float, prefixStart: Float = WASL_EXIT_FRACTION): Float {
+        fun at(
+            t: Float,
+            prefixStart: Float = WASL_EXIT_FRACTION,
+            completion: Float = 1f,
+        ): Float {
             val span = (1f - prefixStart).coerceAtLeast(1e-4f)
-            val u = ((t - prefixStart) / span).coerceIn(0f, 1f)
+            val u = (((t - prefixStart) / span) * completion).coerceIn(0f, 1f)
             // smoothstep: zero slope at both ends — soft carry-in, soft settle.
             return u * u * (3f - 2f * u)
         }
@@ -87,6 +93,26 @@ object TajweedPacing {
         val window = (minPrefixMs.coerceAtLeast(1f) / sweepMs.coerceAtLeast(1).toFloat())
             .coerceIn(MIN_WASL_PREFIX_WINDOW, MAX_WASL_PREFIX_WINDOW)
         return 1f - window
+    }
+
+    /**
+     * Share of the target wasl bloom clock available before word handoff.
+     *
+     * Very short donors keep the initial pause imposed by
+     * [MAX_WASL_PREFIX_WINDOW], then hand off an incomplete bloom rather than
+     * compressing the whole fade into that tail. The incoming word continues
+     * from the same edge. [maxCompletion] also keeps long donors from
+     * pre-forming the whole opening before activation.
+     */
+    fun waslPrefixCompletion(
+        sweepMs: Int,
+        minPrefixMs: Float = DEFAULT_WASL_PREFIX_MS,
+        maxCompletion: Float = DEFAULT_WASL_HANDOFF,
+    ): Float {
+        val start = waslPrefixStart(sweepMs, minPrefixMs)
+        val availableMs = (1f - start) * sweepMs.coerceAtLeast(1)
+        return (availableMs / minPrefixMs.coerceAtLeast(1f))
+            .coerceIn(0f, maxCompletion.coerceIn(0f, 1f))
     }
 
     /**
@@ -471,6 +497,12 @@ object TajweedPacing {
      * default for [InkEngine.Tuning.waslPrefixMs] / Ink Lab.
      */
     const val DEFAULT_WASL_PREFIX_MS = 480f
+    /**
+     * Max share of the wasl bloom clock laid down before the next word becomes
+     * active. Smoothstep maps 0.45 clock progress to ~0.43 visible progress,
+     * leaving most of the incoming word's wash observable after handoff.
+     */
+    const val DEFAULT_WASL_HANDOFF = 0.45f
 
     private const val ALEF_WASLA = 'ٱ'
     private const val ALEF = 'ا'

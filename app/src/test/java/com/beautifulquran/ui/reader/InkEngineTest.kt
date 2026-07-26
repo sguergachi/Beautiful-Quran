@@ -227,7 +227,7 @@ class InkEngineTest {
     }
 
     @Test
-    fun `wasl handoff continues from the completed prefix edge`() {
+    fun `wasl handoff continues from a supplied prefix edge`() {
         val prefix = 1f / 7f
         val mainFeather = 1.6f
         val start = waslContinuationStart(prefix, mainFeather)
@@ -256,6 +256,16 @@ class InkEngineTest {
         // Head travel is one glyph plus a soft lead under main geometry.
         assertTrue(waslHeadTravel(prefix) > prefix)
         assertEquals(0.5f + 0.55f, waslHeadTravel(0.5f), 0f)
+    }
+
+    @Test
+    fun `unfinished wasl bloom keeps the same edge across handoff`() {
+        val fullEnd = waslContinuationStart(prefixFraction = 0.25f, mainFeather = 1.6f)
+        val partialWindow = 0.35f
+        val carried = waslWashProgress(partialWindow, fullEnd)
+
+        assertTrue(carried in 0f..fullEnd)
+        assertEquals(carried, continuedSweepProgress(progress = 0f, start = carried), 0f)
     }
 
     @Test

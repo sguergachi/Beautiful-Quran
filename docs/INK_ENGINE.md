@@ -477,7 +477,9 @@ pure, `InkEngineTest`-covered helpers.
 A **wasl continuation** (`waslWashProgress` / `waslContinuationStart` /
 `continuedSweepProgress`) is the fourth case: the prior word's freed tail runs
 the first segment of this word's ordinary ink wash (same feather), and the
-sweep starts from that edge instead of 0 — see
+sweep starts from the edge actually reached instead of 0. A donor too short
+for the wasl speed ceiling carries an unfinished edge into the active word
+rather than forcing its opening letter complete at handoff — see
 [TAJWEED_PACING.md](TAJWEED_PACING.md). Continued progress is applied inside
 `rememberLetterSweep` (not at each draw site) so residual and glint share one
 latched edge.
@@ -486,6 +488,9 @@ latched edge.
 ceiling** on that early bloom so the next opening does not race: details and
 constants in
 [TAJWEED_PACING.md — Short wasl donors](TAJWEED_PACING.md#short-wasl-donors--speed-ceiling).
+Long donors are capped too: `Tuning.waslHandoff` limits pre-activation ink so
+a wrapped connection such as `بِمَعۡرُوفٖۚ → وَلَا` cannot present the next
+line's opening fully formed. Ink Lab exposes it as **Wasl pre-ink**.
 
 ### Ink Lab
 

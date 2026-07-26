@@ -53,6 +53,7 @@ class InkLabStoreTest {
         assertEquals(defaults.repeatInkAlpha, snap.repeatInkAlpha, 0.0001f)
         assertEquals(defaults.washFeather, snap.washFeather, 0.0001f)
         assertEquals(defaults.tajweedPacing, snap.tajweedPacing)
+        assertEquals(defaults.waslHandoff, snap.waslHandoff, 0.0001f)
     }
 
     @Test

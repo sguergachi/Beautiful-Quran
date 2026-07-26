@@ -202,9 +202,10 @@ The model is therefore a **gated hint**, built from four parts:
   hands off on the same spatial leading edge when the timing boundary
   arrives. Window progress is **smoothstepped**, and a **speed ceiling**
   stretches short wasl donors (see [Short wasl donors](#short-wasl-donors--speed-ceiling)
-  below). The completed edge is the active sweep's starting point, so the
-  opening letter is not replayed and the wash continues through the rest of
-  the word. That continuation is armed only on a natural adjacent-word
+  below). When the donor is too short to fit that ceiling, its first 25 %
+  remains untouched and only the progress honestly reached is handed to the
+  active sweep; the incoming word finishes the same fade instead of snapping
+  its opening letter on. That continuation is armed only on a natural adjacent-word
   handoff, never a seek. Same-ayah neighbours only (`Hold.connect`, default
   on). Iẓhār and cross-ayah wasl are left alone.
 - **Waqf length scale.** `Hold.waqfLengthScale` (Ink Lab: **Waqf length
@@ -242,20 +243,37 @@ when the next-letter bloom begins:
 | `DEFAULT_WASL_PREFIX_MS` / `Tuning.waslPrefixMs` | Target wall-clock for the bloom | **480 ms** |
 | `MAX_WASL_PREFIX_WINDOW` | Max fraction of a short donor spent on the bloom | **0.75** |
 | `MIN_WASL_PREFIX_WINDOW` | Floor (= final 18% junction) for long donors | **0.18** |
+| `DEFAULT_WASL_HANDOFF` / `Tuning.waslHandoff` | Max bloom clock laid before activation | **0.45** |
 
 Ink Lab → **Tajweed** → **Wasl prefix ms** (120–900) live-tunes
-`waslPrefixMs` (persisted with other lab numbers; **Copy values** includes it).
+`waslPrefixMs`; **Wasl pre-ink** (0–1) controls how much may arrive before
+activation. Both persist with the other lab numbers and **Copy values**
+includes them.
 
 So a ~500 ms `مَن` claims ~75 % of its span (~375 ms) for a smoothstepped
-fade into `يَشْرِى` / `رَّبِّكُم`; an 800 ms donor hits the full ~480 ms
-target; multi-second donors stay near the late junction (~18–24 % window).
+fade into `يَشْرِى` / `رَّبِّكُم` and carries its unfinished edge
+forward; an 800 ms donor hits the full ~480 ms target; multi-second donors
+stay near the late junction (~18–24 % window).
+No connection completes its prefix before activation: the shipped 0.45 clock
+cap becomes roughly 0.43 after smoothstep, leaving most of the word's ordinary
+wash visible. This matters for wrapped connections such as Alafasy 2:231
+`بِمَعۡرُوفٖۚ → وَلَا`: its 2.22 s donor easily fits the old 480 ms bloom and
+used to present the opening of `وَلَا` fully formed across the line break.
+
+The default Alafasy timing at 2:207 is shorter still: `مَن` has a 220 ms
+segment (254 ms after the sweep floor), leaving only ~190 ms after the initial
+quarter-word pause. That tail now reaches roughly 35 % of the eased bloom and
+the active `يَشۡرِي` sweep continues from exactly that edge. It is never
+normalized to 100 % merely because the timing boundary arrived.
 An earlier 50 % cap made the old 320 ms floor **unreachable** on short holds
 (only ~250 ms actual) — do not reintroduce that without re-checking 2:207.
 
 **Handoff.** When the next word becomes Active on a natural adjacent pass,
-the main sweep starts at the completed prefix edge (`waslContinuationStart`)
-so the opening letter is not replayed. Seek / activation bump does not arm
-continuation.
+the main sweep starts at the prefix edge actually reached. Donors with at
+least the target window reach `waslContinuationStart`; shorter donors carry a
+partial `waslWashProgress` and finish softly inside the incoming sweep. The
+opening letter is neither replayed nor forced complete. Seek / activation bump
+does not arm continuation.
 
 **Regression checks.** With Tajweed + Connect on: play 2:207 through
 `مَن يَشْرِى` and 5:68 through `مِن رَّبِّكُم` — the next opening must
