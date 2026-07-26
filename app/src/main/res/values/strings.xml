@@ -2,10 +2,6 @@
 <resources>
     <string name="app_name">Beautiful Quran</string>
     <string name="appfunctions_description">Control Quran reading and recitation hands-free</string>
-    <string name="notification_permission_title">Keep playback controls visible</string>
-    <string name="notification_permission_message">Allow notifications so you can pause, resume, and skip recitation from the lock screen or while using other apps.</string>
-    <string name="notification_permission_allow">Allow</string>
-    <string name="notification_permission_not_now">Not now</string>
 
     <!-- Launcher / App Actions shortcuts -->
     <string name="shortcut_continue_short">Continue</string>

@@ -8,10 +8,10 @@ one-tap jumps into those ayahs.
 
 It is **not** a floating popup, dialog, or sheet in the Material sense. It
 is an **ink bleed on the reader sheet** — the same surface primitive as the
-notification-permission prompt. The wash soaks *that* paper only (hosted
-inside the reader `PaperPage` / web `.sheet`), never a full-screen layer
-above the stack. See [DESIGN.md](DESIGN.md) ("The ink bleed") and the shared
-composable `InkRevealOverlay` in `ui/theme/InkReveal.kt`.
+repeat question. The wash soaks *that* paper only (hosted inside the reader
+`PaperPage` / web `.sheet`), never a full-screen layer above the stack. See
+[DESIGN.md](DESIGN.md) ("The ink bleed") and the shared composable
+`InkRevealOverlay` in `ui/theme/InkReveal.kt`.
 
 ## Why it exists
 

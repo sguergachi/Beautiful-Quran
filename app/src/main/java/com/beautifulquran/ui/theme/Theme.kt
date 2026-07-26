@@ -242,10 +242,10 @@ fun themePreviewColors(themeMode: ThemeMode): List<Color> {
     }
 }
 
-/** The contrasting "overlay" palette shared by the Timings Lab and the
- * notification prompt, so the two look the same: always Royal Green so it reads
- * as a distinct surface over the reader — except under the Royal Green theme
- * itself, where Nightfall provides the contrast instead. */
+/** Contrasting overlay palette for ink-bleed surfaces (repeat, lab, root viewer
+ * overlays on the reader): always Royal Green so they read as a distinct
+ * surface — except under the Royal Green theme itself, where Nightfall
+ * provides the contrast instead. */
 fun contrastingOverlayColorScheme(themeMode: ThemeMode): ColorScheme = when (themeMode) {
     ThemeMode.ROYAL_GREEN -> DarkColors
     else -> RoyalGreenColors

@@ -301,11 +301,13 @@ horizontal page turn — draggable, fling-able, with page-turn audio
   toggles, theme, attributions; developer mode unlocks the Timings Lab.
 
 Ink-bleed overlays soak **the sheet they belong to**, not a full-screen
-layer above the stack: the notification-permission prompt and the
+layer above the stack: the repeat question and the
 [Root Word Viewer](ROOT_VIEWER.md) (default word long-press) live on the
 reader sheet; the [Timings Lab](TIMINGS_LAB.md) (developer mode) stays
 stack-level because Settings can open it too. Shared primitive:
-`InkRevealOverlay`.
+`InkRevealOverlay`. Media-session notifications are platform-exempt from
+`POST_NOTIFICATIONS`, so playback never gates on a notification-permission
+prompt.
 
 On a cold start the whole stack sits behind the **entrance cover**
 (`entrance/EntranceCover` on Android; `web/src/ui/entrance/` on web) — the

@@ -1,5 +1,6 @@
 package com.beautifulquran.playback
 
+import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.media.AudioManager
@@ -24,6 +25,7 @@ import androidx.media3.session.MediaLibraryService
 import androidx.media3.session.MediaLibraryService.LibraryParams
 import androidx.media3.session.MediaLibraryService.MediaLibrarySession
 import androidx.media3.session.MediaSession
+import com.beautifulquran.MainActivity
 import com.beautifulquran.QuranApp
 import com.beautifulquran.assistant.AssistantAction
 import com.beautifulquran.assistant.AssistantIntents
@@ -93,7 +95,17 @@ class PlaybackService : MediaLibraryService() {
             getSystemService(AudioManager::class.java),
         )
 
-        mediaSession = MediaLibrarySession.Builder(this, player, LibraryCallback()).build()
+        // Notification / lock-screen content tap opens the app. Without this,
+        // Media3 still shows transport controls but the body tap is a no-op.
+        val sessionActivity = PendingIntent.getActivity(
+            this,
+            /* requestCode = */ 0,
+            Intent(this, MainActivity::class.java),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+        )
+        mediaSession = MediaLibrarySession.Builder(this, player, LibraryCallback())
+            .setSessionActivity(sessionActivity)
+            .build()
     }
 
     /**
