@@ -25,6 +25,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.media3.common.Player
@@ -259,15 +261,18 @@ private val WheelGutter = 34.dp
 /** Both dials plus the gutter, so the pair can be centred as one block. */
 private val WheelPairWidth = WheelColumnWidth * 2 + WheelGutter
 
-/** Room for the widest range a surah can spell out — "231 to 234". */
-private val FromHereLabelWidth = 132.dp
+/** The word that joins the two figures of a written range. */
+private const val RangeJoinWord = " to "
 
 /** Paper between the range it lands on and the dial that sets the distance. */
-private val FromHereGutterWidth = 24.dp
+private val FromHereGutterWidth = 12.dp
 
-/** Label plus dial, so this one can be centred as a block too. */
-private val FromHereBlockWidth =
-    FromHereLabelWidth + FromHereGutterWidth + WheelColumnWidth
+/**
+ * The distance dial runs narrower than a range wheel: it holds a count, not an
+ * ayah number, and every dp of column width is another dp of daylight between
+ * the figure and the range it produces.
+ */
+private val FromHereWheelWidth = 68.dp
 
 /**
  * A choice's numbers, unfolding under the line that asked for them.
@@ -383,32 +388,66 @@ private fun RepeatFromHereDial(
     val maxCount = (ayahCount - first + 1).coerceAtLeast(1)
     val safeCount = count.coerceIn(1, maxCount)
 
-    BoxWithConstraints(
-        modifier = Modifier
-            .width(FromHereBlockWidth)
-            .height(WheelHeight),
-    ) {
-        val wheelEdgePadding = ((maxHeight - WheelItemHeight) / 2).coerceAtLeast(0.dp)
-        Row(modifier = Modifier.fillMaxWidth()) {
+    // Hold exactly the widest range *this surah* can spell out: fixed, so the
+    // dial never shifts as the figures gain a digit under the reader's thumb,
+    // but no wider, so a fifteen-ayah surah does not reserve room for "286 to
+    // 286" and push the whole block off centre.
+    val measurer = rememberTextMeasurer()
+    val density = LocalDensity.current
+    val numberStyle = MaterialTheme.typography.titleMedium
+    val joinStyle = MaterialTheme.typography.bodyMedium
+    val labelWidth = remember(ayahCount, numberStyle, joinStyle, measurer, density) {
+        val widestFigure = measurer.measure(ayahCount.toString(), numberStyle).size.width
+        val join = measurer.measure(RangeJoinWord, joinStyle).size.width
+        with(density) { (widestFigure * 2 + join).toDp() } + 2.dp
+    }
+    val blockWidth = labelWidth + FromHereGutterWidth + FromHereWheelWidth
+
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        // Names the dial without crowding the reading line: the two figures
+        // there are the sentence, this only says what the turning one counts.
+        Row(modifier = Modifier.width(blockWidth)) {
+            Spacer(Modifier.width(labelWidth + FromHereGutterWidth))
             Box(
-                modifier = Modifier
-                    .width(FromHereLabelWidth)
-                    .fillMaxHeight(),
+                modifier = Modifier.width(FromHereWheelWidth),
                 contentAlignment = Alignment.Center,
             ) {
-                RepeatRangeLabel(from = first, to = first + safeCount - 1)
+                Text(
+                    text = "ayahs",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f),
+                )
             }
-            Spacer(Modifier.width(FromHereGutterWidth))
-            SearchDialWheel(
-                itemCount = maxCount,
-                selectedIndex = safeCount - 1,
-                itemHeight = WheelItemHeight,
-                edgePadding = wheelEdgePadding,
-                onSelectedIndexChange = { onCountChange(it + 1) },
-                modifier = Modifier.width(WheelColumnWidth),
-                fadeColor = paper,
-            ) { index, selected ->
-                RepeatNumberItem(index + 1, selected)
+        }
+        Spacer(Modifier.height(6.dp))
+        BoxWithConstraints(
+            modifier = Modifier
+                .width(blockWidth)
+                .height(WheelHeight),
+        ) {
+            val wheelEdgePadding = ((maxHeight - WheelItemHeight) / 2).coerceAtLeast(0.dp)
+            Row(modifier = Modifier.fillMaxWidth()) {
+                Box(
+                    modifier = Modifier
+                        .width(labelWidth)
+                        .fillMaxHeight(),
+                    // Flush right, so the range closes on the dial that sets it.
+                    contentAlignment = Alignment.CenterEnd,
+                ) {
+                    RepeatRangeLabel(from = first, to = first + safeCount - 1)
+                }
+                Spacer(Modifier.width(FromHereGutterWidth))
+                SearchDialWheel(
+                    itemCount = maxCount,
+                    selectedIndex = safeCount - 1,
+                    itemHeight = WheelItemHeight,
+                    edgePadding = wheelEdgePadding,
+                    onSelectedIndexChange = { onCountChange(it + 1) },
+                    modifier = Modifier.width(FromHereWheelWidth),
+                    fadeColor = paper,
+                ) { index, selected ->
+                    RepeatNumberItem(index + 1, selected)
+                }
             }
         }
     }
@@ -429,7 +468,7 @@ private fun RepeatRangeLabel(from: Int, to: Int) {
         )
         if (to != from) {
             Text(
-                text = " to ",
+                text = RangeJoinWord,
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f),
             )
