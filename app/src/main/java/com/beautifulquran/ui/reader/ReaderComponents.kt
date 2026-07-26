@@ -16,6 +16,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -2979,48 +2980,73 @@ fun OrnateSurahTitle(
     sheen: State<Float>,
 ) {
     val accents = LocalQuranAccents.current
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.Center,
-    ) {
-        GildedFlourish(
-            width = 36.dp,
-            height = 13.dp,
-            brightGold = accents.goldBright,
-            deepGold = accents.goldDeep,
-            embossDark = accents.embossDark,
-            embossLight = accents.embossLight,
-            sheen = sheen,
-        )
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.padding(horizontal = 12.dp),
-        ) {
-            Text(
-                text = "سُورَةُ $nameArabic",
-                style = ArabicTitleStyle,
-                fontSize = 19.sp,
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 1,
-            )
-            Text(
-                text = "$chapterNumber · ${nameTransliteration.uppercase()}",
-                style = MaterialTheme.typography.labelSmall.copy(letterSpacing = 2.sp),
-                fontSize = 9.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                maxLines = 1,
-            )
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        val showFlourishes = maxWidth >= 200.dp
+        val titlePadding = if (showFlourishes) 12.dp else 2.dp
+        val arabicFontSize = if (maxWidth < 150.dp) 17.sp else 19.sp
+        val transliterationSpacing = when {
+            maxWidth >= 200.dp -> 2.sp
+            maxWidth >= 150.dp -> 1.2.sp
+            else -> 0.8.sp
         }
-        GildedFlourish(
-            width = 36.dp,
-            height = 13.dp,
-            brightGold = accents.goldBright,
-            deepGold = accents.goldDeep,
-            embossDark = accents.embossDark,
-            embossLight = accents.embossLight,
-            sheen = sheen,
-            mirrored = true,
-        )
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            if (showFlourishes) {
+                GildedFlourish(
+                    width = 36.dp,
+                    height = 13.dp,
+                    brightGold = accents.goldBright,
+                    deepGold = accents.goldDeep,
+                    embossDark = accents.embossDark,
+                    embossLight = accents.embossLight,
+                    sheen = sheen,
+                )
+            }
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(horizontal = titlePadding),
+            ) {
+                Text(
+                    text = "سُورَةُ $nameArabic",
+                    style = ArabicTitleStyle,
+                    fontSize = arabicFontSize,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    textAlign = TextAlign.Center,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Text(
+                    text = "$chapterNumber · ${nameTransliteration.uppercase()}",
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        letterSpacing = transliterationSpacing,
+                    ),
+                    fontSize = 9.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                    textAlign = TextAlign.Center,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+            if (showFlourishes) {
+                GildedFlourish(
+                    width = 36.dp,
+                    height = 13.dp,
+                    brightGold = accents.goldBright,
+                    deepGold = accents.goldDeep,
+                    embossDark = accents.embossDark,
+                    embossLight = accents.embossLight,
+                    sheen = sheen,
+                    mirrored = true,
+                )
+            }
+        }
     }
 }
 
