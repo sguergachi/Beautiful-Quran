@@ -165,7 +165,9 @@ Key points, detailed in [PERFORMANCE.md](PERFORMANCE.md) and
 [ARCHITECTURE.md](ARCHITECTURE.md#the-sync-engine):
 
 - The 33 ms poll runs only while this surah is audible and drops to a gentle
-  250 ms while paused; the flow publishes only *word boundaries*
+  250 ms while paused. A play/pause transition restarts that poll immediately,
+  so a paused word tap publishes its forced ink restart on the resume callback
+  instead of waiting up to 250 ms; the flow publishes only *word boundaries*
   (`distinctUntilChanged`), so downstream recomposition happens ~2–3×/sec, not
   30×.
 - Source-data word accuracy is ±73 ms on average — inside the ~150 ms window
