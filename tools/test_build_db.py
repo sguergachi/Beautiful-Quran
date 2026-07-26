@@ -20,10 +20,12 @@ TOOLS = Path(__file__).resolve().parent
 ROOT = TOOLS.parent
 sys.path.insert(0, str(TOOLS))
 from build_db import (  # noqa: E402
+    AUDIO_ONSETS_DIR,
     apply_boundary_repair,
     boundary_conflicts,
     clean_qdc_artifacts,
     erases_span_repeat,
+    offset_for_audio_onset,
     rebase_timing_repair,
     suspicious_pacing,
 )
@@ -34,6 +36,7 @@ PIPELINES = frozenset(
         "boundary_repair",
         "clean_qdc_artifacts",
         "erases_span_repeat",
+        "leading_silence_offset",
         "rebase_timing_repair",
     }
 )
@@ -131,6 +134,11 @@ def run_pipeline(case, segs):
         return False, f"want erases_span_repeat={want!r} got {got!r}"
     if pipeline == "rebase_timing_repair":
         return rebase_timing_repair(segs, resolve_repair(case))
+    if pipeline == "leading_silence_offset":
+        onset = case.get("audio_onset_ms")
+        if onset is None:
+            raise SystemExit(f"{case.get('_path')}: need audio_onset_ms")
+        return offset_for_audio_onset(segs, onset)
     raise AssertionError("unreachable")
 
 
@@ -154,8 +162,9 @@ def check_confidence():
             conflict, {"bundled": baseline, "quran-align": reference}
         )
     ] == [27]
+    onset = offset_for_audio_onset([[1, 850, 1_250]], 850) == [[1, 850, 1_250]]
     repeats = [[1, 0, 500], [2, 500, 1000], [1, 1000, 1500]]
-    return pacing and boundaries and boundary_conflicts(
+    return pacing and boundaries and onset and boundary_conflicts(
         repeats, {"quran-align": reference}
     ) == []
 
@@ -168,10 +177,12 @@ def audit_bundled_db():
         )
     }
     bad = []
+    timings = {}
     for rid, s, a, raw in db.execute(
         "SELECT reciter_id,surah_id,ayah_number,segments FROM timings"
     ):
         segs = json.loads(raw)
+        timings[(rid, s, a)] = segs
         starts = [x[1] for x in segs]
         if not segs or starts != sorted(set(starts)) or any(
             len(x) != 3 or not 1 <= x[0] <= counts[(s, a)] or x[2] <= x[1]
@@ -216,6 +227,12 @@ def audit_bundled_db():
         for i in range(len(repaired[(4, 19)]) - 3)
     )
     exact &= order(repaired[(6, 145)]) == list(range(1, 40))
+    for path in AUDIO_ONSETS_DIR.glob("*.json"):
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        rid = payload["reciterId"]
+        for verse, onset in payload["offsets"].items():
+            s, a = map(int, verse.split(":"))
+            exact &= timings[(rid, s, a)][0][1] >= onset
     overrides = list((TOOLS / "timing_overrides").glob("*.json"))
     return not bad and exact and not overrides and db.execute(
         "PRAGMA integrity_check"

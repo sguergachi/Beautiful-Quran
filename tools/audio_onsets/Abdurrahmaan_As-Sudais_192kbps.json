@@ -1,0 +1,13 @@
+{
+  "schema": 1,
+  "reciterId": 5,
+  "reciterSlug": "Abdurrahmaan_As-Sudais_192kbps",
+  "detector": {
+    "noiseDb": -40,
+    "sustainedMs": 80,
+    "minimumOffsetMs": 250,
+    "rangeBytes": 98304
+  },
+  "scannedAyahs": 6236,
+  "offsets": {}
+}

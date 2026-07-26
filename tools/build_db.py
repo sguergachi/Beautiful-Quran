@@ -13,6 +13,8 @@ Sources (all fetched over HTTPS, cached in tools/.cache):
                         (CC-BY 4.0).  Skipped with --skip-timings (e.g. in a
                         sandbox without GitHub access); the app then falls back
                         to whole-ayah highlighting.
+  * tools/audio_onsets — generated voice onsets from the streamed everyayah MP3s
+                        (only the compact committed measurements are consumed).
 
 Output: data/quran.db (the canonical asset consumed by Android and web builds)
 
@@ -44,6 +46,10 @@ OVERRIDES_DIR = Path(__file__).resolve().parent / "timing_overrides"
 # re-recitations, and fill dropped words. The override layer after this is local
 # reproduction scratch only; CI rejects committed override JSON.
 REPAIRS_DIR = Path(__file__).resolve().parent / "timing_repairs"
+# Audio-grounded leading-silence measurements produced by
+# tools/detect_audio_onsets.py. Applied after structural repairs so every pass
+# moves together, and before Lab overrides (whose marks already use file time).
+AUDIO_ONSETS_DIR = Path(__file__).resolve().parent / "audio_onsets"
 
 QURAN_JSON_TGZ = "https://registry.npmjs.org/quran-json/-/quran-json-3.1.2.tgz"
 WBW_TGZ = (
@@ -1051,6 +1057,72 @@ def apply_timing_repairs(timing_rows, word_counts):
     return new_rows
 
 
+def offset_for_audio_onset(segs, onset_ms):
+    """Move a timing row onto the first voiced sample of its everyayah file.
+
+    Sources sometimes pin the first word to zero even when the individual MP3
+    has encoded silence. Preserve a source that already starts later: the
+    correction is only the still-unaccounted-for part of the measured onset.
+    """
+    if not segs:
+        return segs
+    delta = max(0, int(onset_ms) - int(segs[0][1]))
+    return [[pos, start + delta, end + delta] for pos, start, end in segs]
+
+
+def apply_audio_onsets(timing_rows):
+    """Apply generated everyayah voice-onset evidence to timing rows."""
+    slug_by_id = {r[0]: r[1] for r in RECITERS}
+    by_key = {(rid, sid, ay): segs for rid, sid, ay, segs in timing_rows}
+    files = sorted(AUDIO_ONSETS_DIR.glob("*.json")) if AUDIO_ONSETS_DIR.is_dir() else []
+    shifted = 0
+    for path in files:
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+            rid = int(payload["reciterId"])
+            slug = payload["reciterSlug"]
+        except (OSError, json.JSONDecodeError, KeyError, TypeError, ValueError) as e:
+            print(f"  !! audio onset {path.name}: invalid file ({e})", file=sys.stderr)
+            sys.exit(1)
+        if slug_by_id.get(rid) != slug:
+            print(
+                f"  !! audio onset {path.name}: reciter {rid}/{slug!r} does not match",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+        for verse_key, raw_onset in (payload.get("offsets") or {}).items():
+            try:
+                sid, ay = (int(part) for part in verse_key.split(":"))
+                onset = int(raw_onset)
+            except (AttributeError, TypeError, ValueError) as e:
+                print(
+                    f"  !! audio onset {path.name}: bad entry {verse_key!r}: {raw_onset!r} ({e})",
+                    file=sys.stderr,
+                )
+                sys.exit(1)
+            if onset < 0 or onset > 5_500:
+                print(
+                    f"  !! audio onset {path.name}: {verse_key} onset {onset} ms out of range",
+                    file=sys.stderr,
+                )
+                sys.exit(1)
+            key = (rid, sid, ay)
+            raw = by_key.get(key)
+            if raw is None:
+                print(
+                    f"  !! audio onset {path.name}: timing row {verse_key} missing",
+                    file=sys.stderr,
+                )
+                sys.exit(1)
+            current = json.loads(raw) if isinstance(raw, str) else raw
+            corrected = offset_for_audio_onset(current, onset)
+            if corrected != current:
+                shifted += 1
+                by_key[key] = json.dumps(corrected, separators=(",", ":"))
+    print(f"  audio onsets: {shifted} ayah(s) shifted across {len(files)} file(s)")
+    return [(rid, sid, ay, segs) for (rid, sid, ay), segs in sorted(by_key.items())]
+
+
 def apply_timing_overrides(
     timing_rows, reciter_rows, word_counts, word_text, alignment_references=None
 ):
@@ -1547,6 +1619,9 @@ def main():
 
     print("[repairs] applying tools/timing_repairs/*.json")
     timing_rows = apply_timing_repairs(timing_rows, word_counts)
+
+    print("[audio onsets] aligning timings to encoded leading silence")
+    timing_rows = apply_audio_onsets(timing_rows)
 
     print("[overrides] applying tools/timing_overrides/*.json")
     timing_rows, reciter_rows = apply_timing_overrides(

@@ -1,0 +1,24 @@
+{
+  "schema": 1,
+  "reciterId": 6,
+  "reciterSlug": "Saood_ash-Shuraym_128kbps",
+  "detector": {
+    "noiseDb": -40,
+    "sustainedMs": 80,
+    "minimumOffsetMs": 250,
+    "rangeBytes": 98304
+  },
+  "scannedAyahs": 6236,
+  "offsets": {
+    "2:253": 799,
+    "2:264": 387,
+    "9:38": 605,
+    "25:21": 423,
+    "26:170": 352,
+    "27:89": 359,
+    "28:81": 554,
+    "35:5": 767,
+    "44:15": 396,
+    "51:43": 287
+  }
+}

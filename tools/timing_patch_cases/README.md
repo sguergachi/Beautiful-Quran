@@ -24,6 +24,7 @@ Agents landing a GitHub `Timings patch` issue must follow the full checklist in
    - stale full-row repair timing → `rebase_timing_repair`
    - independently supported local boundary → `boundary_repair`
    - repeat-vs-split / CTC disagreement → `tools/timing_repairs/` generator
+   - whole-ayah encoded lead-in → `tools/detect_audio_onsets.py`
 3. **Add a case here** whose `input_*` is the broken shape and `expected_*` is
    the corrected shape (from the Lab patch, ASR/ear, or the intended clean
    positions). The case *is* the patch verification.
@@ -51,13 +52,14 @@ a case under this directory.
 |---|---|---|
 | `id` | yes | stable slug; should match the filename stem |
 | `label` | yes | one-line human name (shown on failure) |
-| `pipeline` | yes | `clean_qdc_artifacts`, `erases_span_repeat`, `rebase_timing_repair`, or `boundary_repair` |
+| `pipeline` | yes | `clean_qdc_artifacts`, `erases_span_repeat`, `rebase_timing_repair`, `boundary_repair`, or `leading_silence_offset` |
 | `input_positions` | * | 1-based word indices in time order (synthetic equal durations) |
 | `expected_positions` | * | positions after the pipeline step |
 | `input_segments` | * | full `[[pos, start_ms, end_ms], …]` when times matter |
 | `expected_segments` | * | full segments after the step (compared when present) |
 | `repair_positions` / `repair_segments` | for repair pipelines | candidate repair row |
 | `expected_erases` | for `erases_span_repeat` | bool — must the guard refuse this repair? |
+| `audio_onset_ms` | for `leading_silence_offset` | measured first sustained voice onset |
 | `refs` | no | issue/PR/doc pointers |
 | `notes` | no | why this shape is real / what must not regress |
 
