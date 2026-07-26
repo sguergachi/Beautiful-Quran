@@ -42,8 +42,9 @@ allowed to call it.
 is a Media3 `MediaLibraryService` and advertises both the Media3 and platform
 `MediaBrowserService` actions. It exposes all 114 surahs as browsable and
 searchable media, expands a match into a full ayah queue, and uses the selected
-reciter. `MainActivity` also accepts the legacy
-`android.media.action.MEDIA_PLAY_FROM_SEARCH` action.
+reciter. The media session sets a `sessionActivity` `PendingIntent` so tapping
+the notification or lock-screen player opens `MainActivity`. `MainActivity`
+also accepts the legacy `android.media.action.MEDIA_PLAY_FROM_SEARCH` action.
 
 This is the correct Android route for playback and transport commands. It does
 not implement non-media requests such as “open without playing” or “bookmark

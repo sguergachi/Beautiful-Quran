@@ -172,30 +172,21 @@ While an ink bleed is entering, open, or receding, paper-stack swipes are
 disabled. The gesture gate follows the overlay's rendered lifetime rather than
 only its requested visibility, so a page cannot turn underneath a closing wash.
 
-The shared composable is `InkRevealOverlay` (`ui/theme/InkReveal.kt`). Three
-surfaces use it today / by design:
+The shared composable is `InkRevealOverlay` (`ui/theme/InkReveal.kt`). Surfaces
+that use it today / by design:
 
 | Surface | Origin | What settles after the bloom |
 |---|---|---|
-| Notification permission | Play control | The allow / not-now question (word-by-word lyric fade) |
+| Repeat range | Player-bar repeat control | The repeat-mode / range question |
 | [Root Word Viewer](ROOT_VIEWER.md) | Long-pressed word | Root, form, and concordance for that word |
 | [Timings Lab](TIMINGS_LAB.md) | Long-pressed word (developer mode only) | The timing workbench |
 | Ornaments Lab | Settings → Developer (developer mode only) | The procedural ornament generator workbench — explore/design/save seeds |
 | [Share Send page](SHARE.md) | Share host / gather mode (not on player bar) | Ordered selection + text/image share (video later) |
 
-For the notification prompt specifically:
-
-- **Top** — a large display-face title (Cormorant Garamond), the way a
-  chapter opens.
-- **Middle** — the body, written in word by word with the Apple-Music lyric
-  fade, so the ink literally *arrives* on the page.
-- **Bottom** — the two answers, *Not now* (quiet, ink-only) and *Allow*
-  (the single green accent), which fade up only after the words have landed,
-  so the reader reads before deciding.
-
-This is the *only* place the app borrows Material's ink-spread gesture, and
-it is justified because here the spreading ink *is* the paper metaphor, not
-a tap ripple (taps still never ripple — see Motion).
+The spreading ink *is* the paper metaphor here, not a tap ripple (taps still
+never ripple — see Motion). Media-session playback controls do **not** need
+`POST_NOTIFICATIONS` (Android exempts media sessions), so play never raises a
+permission bleed.
 
 ## Ink
 

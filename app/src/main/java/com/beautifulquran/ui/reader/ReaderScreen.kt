@@ -590,15 +590,12 @@ fun ReaderScreen(
         label = "topBarAlpha",
     )
 
-    val notifPermission = rememberPlaybackPermissionState()
     val onInkOverlayVisibilityChangeLatest = rememberUpdatedState(onInkOverlayVisibilityChange)
     // Union of reader-owned ink surfaces. Report open *and* still-rendered so
     // MainActivity keeps stackGesturesBlocked through the close wash (same
     // pattern as ShareHost + shareSendRendered).
-    LaunchedEffect(notifPermission.sheetVisible, showRepeatDialog, repeatRendered) {
-        onInkOverlayVisibilityChangeLatest.value(
-            notifPermission.sheetVisible || showRepeatDialog || repeatRendered,
-        )
+    LaunchedEffect(showRepeatDialog, repeatRendered) {
+        onInkOverlayVisibilityChangeLatest.value(showRepeatDialog || repeatRendered)
     }
     DisposableEffect(Unit) {
         onDispose { onInkOverlayVisibilityChangeLatest.value(false) }
@@ -606,11 +603,6 @@ fun ReaderScreen(
     // System Back must dismiss the bleed, not pop the paper stack beneath it
     // (MainActivity's stack BackHandlers fire otherwise — see overlay backs there).
     BackHandler(enabled = showRepeatDialog) { showRepeatDialog = false }
-
-    // The permission prompt is not a dialog — it is an ink bleed that turns
-    // this very sheet into the question. See PlaybackNotificationSheet and the
-    // "ink bleed" section of docs/DESIGN.md. Rendered as a full-screen overlay
-    // over the Scaffold below.
 
     // Reading by hand pauses the follow mode via pointerInput.
 
@@ -1144,21 +1136,17 @@ fun ReaderScreen(
                             if (playerState.isPlaying) {
                                 viewModel.player.togglePlayPause()
                             } else {
-                                notifPermission.request {
-                                    dispatch(ReaderInteractionEvent.EnableFollow)
-                                    if (requestedJumpAyah > 0) {
-                                        val selectedAyah = selectedPlaybackAyah()
-                                        viewModel.playLoadedFromAyah(selectedAyah)
-                                    } else {
-                                        viewModel.player.togglePlayPause()
-                                    }
+                                dispatch(ReaderInteractionEvent.EnableFollow)
+                                if (requestedJumpAyah > 0) {
+                                    val selectedAyah = selectedPlaybackAyah()
+                                    viewModel.playLoadedFromAyah(selectedAyah)
+                                } else {
+                                    viewModel.player.togglePlayPause()
                                 }
                             }
                         } else {
-                            notifPermission.request {
-                                dispatch(ReaderInteractionEvent.EnableFollow)
-                                viewModel.playFromAyah(selectedPlaybackAyah())
-                            }
+                            dispatch(ReaderInteractionEvent.EnableFollow)
+                            viewModel.playFromAyah(selectedPlaybackAyah())
                         }
                     },
                     onFastBackward = viewModel::fastBackward,
@@ -1926,10 +1914,8 @@ fun ReaderScreen(
                                     dimmed = recitingActive && activeBasmalah != true,
                                     washProgress = viewModel.basmalahWashProgress,
                                     onClick = {
-                                        notifPermission.request {
-                                            dispatch(ReaderInteractionEvent.EnableFollow)
-                                            viewModel.playFromAyah(1)
-                                        }
+                                        dispatch(ReaderInteractionEvent.EnableFollow)
+                                        viewModel.playFromAyah(1)
                                     },
                                 )
                             }
@@ -2032,20 +2018,18 @@ fun ReaderScreen(
                                         if (editingAnnotationAyah != 0) return@wordClick
                                         val segment = viewModel.segmentsFor(ayah.number)
                                             ?.firstOrNull { it.position == word.position }
-                                        notifPermission.request {
-                                            // Mid-verse word play must not verse-home: for tall
-                                            // ayahs that pins the top, un-lays-out the bottom
-                                            // line the reader tapped, and word-band follow cannot
-                                            // measure it — so the page jumps up. Seed follow as
-                                            // already on this ayah so shouldHomeOnto skips.
-                                            lastFollowFocusTarget = ayah.number
-                                            followWasEnabled = true
-                                            dispatch(ReaderInteractionEvent.EnableFollow)
-                                            if (segment != null) {
-                                                viewModel.playFromWord(ayah.number, segment.startMs)
-                                            } else {
-                                                viewModel.playFromAyah(ayah.number)
-                                            }
+                                        // Mid-verse word play must not verse-home: for tall
+                                        // ayahs that pins the top, un-lays-out the bottom
+                                        // line the reader tapped, and word-band follow cannot
+                                        // measure it — so the page jumps up. Seed follow as
+                                        // already on this ayah so shouldHomeOnto skips.
+                                        lastFollowFocusTarget = ayah.number
+                                        followWasEnabled = true
+                                        dispatch(ReaderInteractionEvent.EnableFollow)
+                                        if (segment != null) {
+                                            viewModel.playFromWord(ayah.number, segment.startMs)
+                                        } else {
+                                            viewModel.playFromAyah(ayah.number)
                                         }
                                     }
                                 },
@@ -2054,10 +2038,8 @@ fun ReaderScreen(
                                 } else {
                                     ayahClick@{
                                         if (editingAnnotationAyah != 0) return@ayahClick
-                                        notifPermission.request {
-                                            dispatch(ReaderInteractionEvent.EnableFollow)
-                                            viewModel.playFromAyah(ayah.number)
-                                        }
+                                        dispatch(ReaderInteractionEvent.EnableFollow)
+                                        viewModel.playFromAyah(ayah.number)
                                     }
                                 },
                                 onWordLongClick = if (gathering) {
@@ -2307,25 +2289,10 @@ fun ReaderScreen(
             )
         }
 
-        // The notification-permission prompt: ink bleeds across this sheet and
-        // it becomes the question. Answering runs the bleed in reverse, back
-        // into the pressed button (the sheet owns that exit), then hands off —
-        // so the callbacks fire only once the paper has receded.
-        if (notifPermission.sheetVisible) {
-            PlaybackNotificationSheet(
-                colors = contrastingOverlayColorScheme(settings.themeMode),
-                modifier = Modifier.zIndex(2f),
-                onDismiss = notifPermission::dismiss,
-                onAllow = notifPermission::allow,
-            )
-        }
-
         // The repeat question is an ink bleed on this sheet, not a dialog: the
         // shared InkRevealOverlay soaks the reader paper from the player bar's
         // repeat control, exactly as the Root Word Viewer opens. It must live
-        // inside this Box so the bleed has the sheet to spread across, and below
-        // the notification prompt's zIndex — choosing a range can raise that
-        // prompt next.
+        // inside this Box so the bleed has the sheet to spread across.
         val repeatContent = uiState.content
         val repeatOverlayColors = contrastingOverlayColorScheme(settings.themeMode)
         val repeatStartAyah = repeatContent?.let {
@@ -2362,10 +2329,8 @@ fun ReaderScreen(
                             onDismiss = { showRepeatDialog = false },
                             onRepeatMode = viewModel::setRepeatMode,
                             onRepeatRange = { from, to ->
-                                notifPermission.request {
-                                    dispatch(ReaderInteractionEvent.EnableFollow)
-                                    viewModel.setRepeatRange(from, to)
-                                }
+                                dispatch(ReaderInteractionEvent.EnableFollow)
+                                viewModel.setRepeatRange(from, to)
                             },
                             onChoiceApplied = { retainedRepeatChoice = it },
                         )

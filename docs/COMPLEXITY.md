@@ -403,10 +403,10 @@ override invalidation.
 `ReaderFocusController.kt`, `AyahSelectorRail.kt`.
 
 **Current responsibility.** `ReaderScreen` assembles the reader and coordinates
-search, notification permission, initial jump, follow enable/disable, active
-playback focus, reflow correction, system chrome, selector rail, and overlays.
-`FocusEngine` computes geometry; `ReaderFocusController` is the sole
-`LazyListState` writer; the rail has its own dial/settle/grace state machine.
+search, initial jump, follow enable/disable, active playback focus, reflow
+correction, system chrome, selector rail, and overlays. `FocusEngine` computes
+geometry; `ReaderFocusController` is the sole `LazyListState` writer; the rail
+has its own dial/settle/grace state machine.
 
 **Complexity.** Very high in the screen, intentionally medium-high in focus.
 The many `LaunchedEffect`s are individually justified but their ordering and
@@ -420,8 +420,7 @@ Extract these screen-level state holders:
 - `ReaderJumpSession`: requested target, pending playback ayah, search flash,
   and completion acknowledgement;
 - `ReaderFollowSession`: user-interruption detection, enabled state, and
-  current playback focus target;
-- existing `PlaybackPermissionState`, kept with its sheet.
+  current playback focus target.
 
 Each holder should expose events, not its mutable fields. Move the reader list
 body into `ReaderContent` only after those lifecycles are named; a purely visual

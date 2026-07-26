@@ -492,7 +492,6 @@ sans.
 **Explicitly out of v1 web (unless pulled in later):**
 - Timings Lab / timing patch export
 - QCF V2 mushaf fonts
-- Notification-permission ink bleed (no Android notification prompt)
 - Exact Media3 preload configuration
 - Sharing / accounts / analytics (never)
 
