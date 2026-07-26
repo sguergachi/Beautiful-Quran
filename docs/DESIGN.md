@@ -56,11 +56,13 @@ Hard rules:
 > Those two dials are not the same instrument, because the reader does not
 > arrive with the same knowledge. For a range they have both ayah numbers, so
 > both figures are wheels. For "from this ayah" they have *a distance* — "about
-> four ayahs on" — and specifically **not** the ayah number, so the wheel turns
-> the **count** and the figure on the right is **derived**: not a second wheel,
-> but the sheet's answer, moving as the count turns. Both figures carry the
-> accent, because they are one fact said twice. Naming what the reader cannot
-> know, and asking for what they can, is the whole design of that line.
+> four ayahs on" — and specifically **not** the ayah numbers, so the sides
+> swap roles: the **dial on the right takes the distance**, and the **label on
+> the left is derived** — the whole range it lands on, "5 to 9", written in the
+> same grammar the range dial above it uses and moving as the wheel turns. The
+> label leads because it is the answer being checked; the wheel follows because
+> it is the question being asked. Asking for what the reader can know and
+> writing out what they cannot is the whole design of that line.
 >
 > Nothing is drawn under the wheel: no band, no plate, no wash. The reading line
 > is the row the numbers fade *towards* — rows dissolve into the sheet as they
