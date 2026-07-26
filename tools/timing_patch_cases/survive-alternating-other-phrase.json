@@ -1,0 +1,11 @@
+{
+  "id": "survive-alternating-other-phrase",
+  "label": "A genuine alternating repeat on another phrase survives",
+  "pipeline": "clean_qdc_artifacts",
+  "words": {
+    "1": "مِن",
+    "2": "رَّبِّهِمۡ"
+  },
+  "input_positions": [1, 2, 1, 2, 3],
+  "expected_positions": [1, 2, 1, 2, 3]
+}

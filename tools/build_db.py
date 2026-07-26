@@ -99,6 +99,7 @@ QDC_REPEAT_RECITERS = {
     # Saud Ash-Shuraym (qdc 10) is one-pass on quran.com too — no repeats to add,
     # so he stays on quran-align.
 }
+QDC_FALSE_PHRASE_LOOP_RECITERS = {1}  # Alafasy, issues #594/#598 + CTC sweep
 
 
 def fetch(url: str, name: str) -> Path:
@@ -382,6 +383,10 @@ def load_qdc_timings(qdc_id: int):
 #     word 12 missing). The early labels sit on the skipped words' time and are
 #     not a re-say (a real re-say of the tip re-covers HW; a real earlier re-say
 #     resumes at HW+1). Relabel the run onto the gap (issue #570);
+#   * false phrase loops — Alafasy's stretched إِلَّا أَن is sometimes labeled
+#     A,B,A,B even though the audio and independent witnesses are one pass.
+#     This exact recurring text/topology signature collapses to the first A and
+#     final B; other alternating span-repeats remain protected;
 #   * forward spikes — the same mislabel in the other direction; the too-large
 #     index inflates the high-water mark so every following normal word until
 #     that index reads as a repeat.
@@ -615,7 +620,37 @@ def erases_span_repeat(pre_segs, repair_segs):
     )
 
 
-def clean_qdc_artifacts(segs, stats):
+def collapse_false_phrase_loops(segs, words, stats):
+    """Collapse qdc's false إِلَّا أَن alternating loop to one pass.
+
+    Alafasy sometimes labels one recitation of this phrase A,B,A,B while
+    stretching إِلَّا. The first A and final B own the trustworthy boundaries;
+    the two middle labels are aligner fragments.
+    """
+    if not words:
+        return segs, False
+    out = []
+    i = 0
+    changed = False
+    while i < len(segs):
+        positions = [s[0] for s in segs[i : i + 4]]
+        if (
+            len(positions) == 4
+            and positions == [positions[0], positions[0] + 1] * 2
+            and normalize_for_alignment(words.get(positions[0], "")) == "الا"
+            and normalize_for_alignment(words.get(positions[0] + 1, "")) == "ان"
+        ):
+            out.extend((list(segs[i]), list(segs[i + 3])))
+            stats["false_phrase_loops"] = stats.get("false_phrase_loops", 0) + 1
+            changed = True
+            i += 4
+            continue
+        out.append(list(segs[i]))
+        i += 1
+    return out, changed
+
+
+def clean_qdc_artifacts(segs, stats, words=None):
     """Remove aligner artifacts (see above) from one ayah's time-sorted
     segments. Dropped spans are folded into the neighbouring segment so the
     karaoke sweep has no holes. Runs to a fixpoint because a dropped spike can
@@ -698,11 +733,14 @@ def clean_qdc_artifacts(segs, stats):
         kept, gap_changed = relabel_gap_phantoms(kept, stats)
         if gap_changed:
             changed = True
+        kept, phrase_changed = collapse_false_phrase_loops(kept, words, stats)
+        if phrase_changed:
+            changed = True
         segs = kept
     return segs
 
 
-def adjust_qdc_segments(segs, n_words, stats):
+def adjust_qdc_segments(segs, n_words, stats, words=None):
     """Clamp quran.com segments (already 1-based, ayah-relative) to our canonical
     word count while PRESERVING repeats; scrub aligner artifacts that would read
     as repeats that aren't in the audio; count the re-recited spans."""
@@ -721,7 +759,7 @@ def adjust_qdc_segments(segs, n_words, stats):
         adjusted.append([pos, start, end])
     if not adjusted:
         return None
-    adjusted = clean_qdc_artifacts(adjusted, stats)
+    adjusted = clean_qdc_artifacts(adjusted, stats, words)
     running_max = -1
     for pos, _, _ in adjusted:
         if pos <= running_max:
@@ -913,6 +951,27 @@ def rebase_timing_repair(current, repaired):
     return merged
 
 
+def apply_boundary_repair(current, repaired):
+    """Replace only the explicitly supplied segments in a timing row."""
+    if not repaired:
+        raise ValueError("boundary repair must name at least one position")
+    replacement = {seg[0]: list(seg) for seg in repaired}
+    if len(replacement) != len(repaired):
+        raise ValueError("boundary repair positions must be unique")
+    current_positions = [seg[0] for seg in current]
+    if any(current_positions.count(pos) != 1 for pos in replacement):
+        raise ValueError("boundary repair positions must occur once in the source row")
+    out = [replacement.get(seg[0], list(seg)) for seg in current]
+    starts = [seg[1] for seg in out]
+    if starts != sorted(set(starts)):
+        raise ValueError("boundary repair must preserve unique start order")
+    if any(out[i][2] > out[i + 1][1] for i in range(len(out) - 1)):
+        raise ValueError("boundary repair overlaps its neighbouring segment")
+    if any(seg[2] <= seg[1] for seg in out):
+        raise ValueError("boundary repair creates an empty segment")
+    return out
+
+
 def apply_timing_repairs(timing_rows, word_counts):
     """Apply auto-generated CTC-arbitrated repairs (tools/timing_repairs/*.json)
     on top of the current source rows. Structural differences and their
@@ -954,6 +1013,24 @@ def apply_timing_repairs(timing_rows, word_counts):
             segs.sort(key=lambda s: s[1])
             key = (rid, sid, ay)
             pre_raw = by_key.get(key)
+            kind = edit.get("kind", "repair")
+            if kind == "boundary":
+                if pre_raw is None:
+                    print(
+                        f"  !! repair {path.name}: boundary source row {sid}:{ay} missing",
+                        file=sys.stderr,
+                    )
+                    sys.exit(1)
+                current = json.loads(pre_raw) if isinstance(pre_raw, str) else pre_raw
+                try:
+                    merged = apply_boundary_repair(current, segs)
+                except ValueError as e:
+                    print(f"  !! repair {path.name}: surah {sid} ayah {ay}: {e}", file=sys.stderr)
+                    sys.exit(1)
+                by_key[key] = json.dumps(merged, separators=(",", ":"))
+                by_kind[kind] = by_kind.get(kind, 0) + 1
+                applied += 1
+                continue
             if pre_raw is not None:
                 pre = json.loads(pre_raw) if isinstance(pre_raw, str) else pre_raw
                 if erases_span_repeat(pre, segs):
@@ -964,7 +1041,7 @@ def apply_timing_repairs(timing_rows, word_counts):
             if merged != segs:
                 rebased += 1
             by_key[key] = json.dumps(merged, separators=(",", ":"))
-            by_kind[edit.get("kind", "repair")] = by_kind.get(edit.get("kind", "repair"), 0) + 1
+            by_kind[kind] = by_kind.get(kind, 0) + 1
             applied += 1
     new_rows = [(rid, sid, ay, segs) for (rid, sid, ay), segs in sorted(by_key.items())]
     print(
@@ -1426,10 +1503,16 @@ def main():
                     "zero_len": 0, "clamped": 0, "repeats": 0, "missing": 0,
                     "merged_splits": 0, "dropped_strays": 0,
                     "noncontiguous_orphans": 0, "gap_phantoms": 0,
+                    "false_phrase_loops": 0,
                 }
                 covered = ingest_reciter_timings(
                     rid, word_counts, timing_rows, stats,
-                    lambda key, n: adjust_qdc_segments(data.get(key), n, stats),
+                    lambda key, n: adjust_qdc_segments(
+                        data.get(key),
+                        n,
+                        stats,
+                        word_text[key] if rid in QDC_FALSE_PHRASE_LOOP_RECITERS else None,
+                    ),
                 )
                 print(
                     f"  {slug}: ayahs covered {covered}/6236, "
@@ -1438,7 +1521,8 @@ def main():
                     f"split-words merged {stats['merged_splits']}, "
                     f"stray mislabels dropped {stats['dropped_strays']}, "
                     f"noncontiguous orphans {stats['noncontiguous_orphans']}, "
-                    f"gap phantoms {stats.get('gap_phantoms', 0)}"
+                    f"gap phantoms {stats.get('gap_phantoms', 0)}, "
+                    f"false phrase loops {stats.get('false_phrase_loops', 0)}"
                 )
             else:
                 data = load_timings(zp, slug)

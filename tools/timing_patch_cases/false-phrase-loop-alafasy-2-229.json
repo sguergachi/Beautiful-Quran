@@ -1,0 +1,24 @@
+{
+  "id": "false-phrase-loop-alafasy-2-229",
+  "label": "Alafasy 2:229 false إِلَّا أَن alternating loop",
+  "refs": ["GitHub issue #594", "CTC", "quran-align"],
+  "pipeline": "clean_qdc_artifacts",
+  "words": {
+    "16": "إِلَّآ",
+    "17": "أَن"
+  },
+  "input_segments": [
+    [15, 19545, 20275],
+    [16, 20275, 21105],
+    [17, 21105, 21625],
+    [16, 21625, 23705],
+    [17, 23705, 23915],
+    [18, 23915, 26615]
+  ],
+  "expected_segments": [
+    [15, 19545, 20275],
+    [16, 20275, 21105],
+    [17, 23705, 23915],
+    [18, 23915, 26615]
+  ]
+}

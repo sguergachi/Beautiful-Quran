@@ -1,0 +1,19 @@
+{
+  "id": "boundary-alafasy-5-66",
+  "label": "Alafasy 5:66 delayed فَوۡقِهِمۡ boundary",
+  "refs": ["GitHub issue #572", "quran-align"],
+  "pipeline": "boundary_repair",
+  "input_segments": [
+    [12, 13895, 14235],
+    [13, 14235, 15865],
+    [14, 15865, 17165]
+  ],
+  "repair_segments": [
+    [13, 14786, 15865]
+  ],
+  "expected_segments": [
+    [12, 13895, 14235],
+    [13, 14786, 15865],
+    [14, 15865, 17165]
+  ]
+}
