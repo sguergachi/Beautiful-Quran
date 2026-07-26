@@ -102,6 +102,21 @@ data class ReaderPlaybackSnapshot(
     val speed: Float,
 )
 
+internal data class PollingIdentity<K : Any>(
+    val sampleKey: K,
+    /** Cancels a sleeping paused poll so resume samples immediately. */
+    val isPlaying: Boolean,
+)
+
+internal fun <K : Any> pollingIdentity(
+    state: PlayerUiState,
+    loadedSurahId: Int,
+    key: (NowPlaying) -> K?,
+): PollingIdentity<K>? = state.nowPlaying
+    ?.takeIf { it.surahId == loadedSurahId }
+    ?.let(key)
+    ?.let { PollingIdentity(it, state.isPlaying) }
+
 class ReaderViewModel(
     private val repository: QuranRepository,
     val settings: SettingsRepository,
@@ -186,12 +201,13 @@ class ReaderViewModel(
         key: (NowPlaying) -> K?,
         sample: (K) -> T?,
     ): StateFlow<T?> = player.state
-        .map { s -> s.nowPlaying?.takeIf { it.surahId == surahId }?.let(key) }
+        .map { pollingIdentity(it, surahId, key) }
         .distinctUntilChanged()
-        .flatMapLatest { k ->
-            if (k == null) {
+        .flatMapLatest { identity ->
+            if (identity == null) {
                 flowOf<T?>(null)
             } else {
+                val k = identity.sampleKey
                 flow<T?> {
                     while (true) {
                         // At an ayah handoff the controller's item (and its
