@@ -224,6 +224,11 @@ ear-verified repeats (Mishary 2:14, Hani 2:38's `12,13,14 — 12,13,14`, Hani
 because dropping a spike can reunite a word with its stray sliver (9:51:
 `4, [7], 4` → `4, 4`, then merged only if one `4` is a sliver).
 
+**Bias any residual error toward *missed* orange, never *false* orange.** A
+repeat that fails to bloom goes unnoticed; a word blooming orange when the
+reciter never repeated it is the failure users report. When tuning these
+thresholds, err on the side of leaving a real repeat unmarked.
+
 When a real repeat is still missed or a false one slips through:
 
 1. **Systematic first.** If the shape is a class (spikes, non-contiguous

@@ -157,8 +157,7 @@ Full write-ups: [docs/TIMINGS_LAB.md](docs/TIMINGS_LAB.md),
 |---|---|
 | `docs/ARCHITECTURE.md` | First stop for any change — pipeline, sync engine, modules, conventions |
 | `docs/ASSISTANT.md` | Android voice work — media hooks, App Actions, Gemini AppFunctions, testing, and release gates |
-| `docs/COMPLEXITY.md` | Complexity hotspots, subsystem ownership, and safe simplification roadmap |
-| `docs/MODERN_ANDROID_DEV_REVIEW.md` | Modern Android development (MAD) code review, strengths, & prioritized recommendations |
+| `docs/COMPLEXITY.md` | Before any refactor — complexity rules, current hotspots, open decompositions, and the invariants a refactor must preserve |
 | `docs/quality-reviews/` | Multi-agent Android quality audits (summary + Grok/Codex; Claude when available) |
 | `docs/quality-reviews/AGENT_REVIEWS.md` | **How to run real Codex (`gpt-5.6-sol`) and Claude Opus reviews** — CLI flags, gotchas; do not fake them with Grok |
 | `docs/HIGHLIGHT_ENGINE.md` | The pure word-sync engine — karaoke model, binary search, repeat/high-water logic |
@@ -175,7 +174,6 @@ Full write-ups: [docs/TIMINGS_LAB.md](docs/TIMINGS_LAB.md),
 | `tools/timing_patch_cases/README.md` | **Required** unit tests when landing a Lab/GitHub timing patch systematically |
 | `tools/timing_overrides/README.md` | Local patch reproduction; committed JSON is rejected |
 | This file § Landing Timings Lab… | Agent checklist when asked to fix/close a timings issue |
-| `PLAN.md` | Historical product/engineering plan — context, not current spec |
 | `docs/WEB.md` | Web port plan — Focus / Highlight / Ink engines + paper reader in the browser |
 
 ## Working style
