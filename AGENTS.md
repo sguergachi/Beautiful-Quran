@@ -155,6 +155,7 @@ Full write-ups: [docs/TIMINGS_LAB.md](docs/TIMINGS_LAB.md),
 | `docs/ARCHITECTURE.md` | First stop for any change — pipeline, sync engine, modules, conventions |
 | `docs/ASSISTANT.md` | Android voice work — media hooks, App Actions, Gemini AppFunctions, testing, and release gates |
 | `docs/COMPLEXITY.md` | Complexity hotspots, subsystem ownership, and safe simplification roadmap |
+| `docs/MODERN_ANDROID_DEV_REVIEW.md` | Modern Android development (MAD) code review, strengths, & prioritized recommendations |
 | `docs/quality-reviews/` | Multi-agent Android quality audits (summary + Grok/Codex; Claude when available) |
 | `docs/quality-reviews/AGENT_REVIEWS.md` | **How to run real Codex (`gpt-5.6-sol`) and Claude Opus reviews** — CLI flags, gotchas; do not fake them with Grok |
 | `docs/HIGHLIGHT_ENGINE.md` | The pure word-sync engine — karaoke model, binary search, repeat/high-water logic |
