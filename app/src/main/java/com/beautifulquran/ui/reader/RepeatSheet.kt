@@ -81,11 +81,11 @@ internal fun repeatChoice(
  * inline choices. No radio buttons, no card, no Material buttons.
  *
  * Picking "a range of ayahs" reveals two vertical wheels to bound the loop;
- * picking "from this ayah" reveals a wheel of *counts* beside the ayah that
- * count lands on — the reader knows how far on they want to go, not which ayah
- * that is. Neither is captioned: the joining words sit in the gutter, so each
- * dial reads straight across. Everything applies on Done, the sheet's one
- * action; the quiet margins are the only way out. A second "Not now" line used to sit 4 dp under
+ * picking "from this ayah" reveals a wheel of *distances* beside a label of the
+ * range it lands on — the reader knows how far on they want to go, not which
+ * ayahs those are. Neither is captioned: both write themselves out on the
+ * reading line. Everything applies on Done, the sheet's one action; the quiet
+ * margins are the only way out. A second "Not now" line used to sit 4 dp under
  * Done — same type vocabulary as the choices, so the sheet read as one long
  * list, and discarding the pick was a thumb-width from committing it.
  *
@@ -259,14 +259,15 @@ private val WheelGutter = 34.dp
 /** Both dials plus the gutter, so the pair can be centred as one block. */
 private val WheelPairWidth = WheelColumnWidth * 2 + WheelGutter
 
-/**
- * "From this ayah" needs a wider gutter than the range's bare "to": it names
- * the wheel's unit as well as joining the two figures ("4 · ayahs, to · 234").
- */
-private val FromHereGutterWidth = 78.dp
+/** Room for the widest range a surah can spell out — "231 to 234". */
+private val FromHereLabelWidth = 132.dp
 
-/** That dial's three slots, so it too can be centred as one block. */
-private val FromHereBlockWidth = WheelColumnWidth * 2 + FromHereGutterWidth
+/** Paper between the range it lands on and the dial that sets the distance. */
+private val FromHereGutterWidth = 24.dp
+
+/** Label plus dial, so this one can be centred as a block too. */
+private val FromHereBlockWidth =
+    FromHereLabelWidth + FromHereGutterWidth + WheelColumnWidth
 
 /**
  * A choice's numbers, unfolding under the line that asked for them.
@@ -354,18 +355,20 @@ private fun RepeatRangeDials(
 }
 
 /**
- * "From this ayah": you turn a **count**, the sheet answers with the **ayah**.
+ * "From this ayah": the reader turns a **distance**, the sheet writes the
+ * **range** it lands on.
  *
- * This is the one dial whose two figures are not the same kind of thing. What
- * the reader has is "about four ayahs on" — the number they can feel from where
- * they are sitting; what they have to hand the player is an ayah number they do
- * not know. So the wheel carries the count, the gutter names its unit, and the
- * figure on the right is *derived*: it is not a second wheel, it is the answer,
- * moving as the count turns. Both ends of the sentence hold the accent because
- * they are one fact said twice — "4 ayahs, to 234".
+ * This is the one dial whose two sides are not the same kind of thing. What the
+ * reader has is "about four ayahs on" — the number they can feel from where they
+ * are sitting; what the player needs is a pair of ayah numbers they do not know.
+ * So the dial on the right takes the distance, and the label on the left is
+ * *derived*: the whole range, written out in the same "67 to 120" grammar the
+ * range dial above it uses, moving as the wheel turns.
  *
- * (Turning the wheel through ayah numbers instead reads more tidily, but it
- * asks the reader for the one number they came here without.)
+ * The label leads because it is the answer being checked; the wheel follows
+ * because it is the question being asked. Turning the wheel through ayah
+ * numbers instead reads more tidily, but asks the reader for the one number
+ * they came here without.
  */
 @Composable
 private fun RepeatFromHereDial(
@@ -387,43 +390,54 @@ private fun RepeatFromHereDial(
     ) {
         val wheelEdgePadding = ((maxHeight - WheelItemHeight) / 2).coerceAtLeast(0.dp)
         Row(modifier = Modifier.fillMaxWidth()) {
+            Box(
+                modifier = Modifier
+                    .width(FromHereLabelWidth)
+                    .fillMaxHeight(),
+                contentAlignment = Alignment.Center,
+            ) {
+                RepeatRangeLabel(from = first, to = first + safeCount - 1)
+            }
+            Spacer(Modifier.width(FromHereGutterWidth))
             SearchDialWheel(
                 itemCount = maxCount,
                 selectedIndex = safeCount - 1,
                 itemHeight = WheelItemHeight,
                 edgePadding = wheelEdgePadding,
                 onSelectedIndexChange = { onCountChange(it + 1) },
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.width(WheelColumnWidth),
                 fadeColor = paper,
             ) { index, selected ->
                 RepeatNumberItem(index + 1, selected)
             }
-            // Fixed width, so naming the unit can never shift the figures on
-            // either side of it as the count crosses from "ayah" to "ayahs".
-            Box(
-                modifier = Modifier
-                    .width(FromHereGutterWidth)
-                    .fillMaxHeight(),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    text = if (safeCount == 1) "ayah, to" else "ayahs, to",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f),
-                )
-            }
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxHeight(),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    text = (first + safeCount - 1).toString(),
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.primary,
-                )
-            }
+        }
+    }
+}
+
+/**
+ * The range a distance lands on, written the way the range dial reads: figures
+ * in the accent, the joining word quiet. One ayah is written as one figure —
+ * "16", not "16 to 16".
+ */
+@Composable
+private fun RepeatRangeLabel(from: Int, to: Int) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text(
+            text = from.toString(),
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.primary,
+        )
+        if (to != from) {
+            Text(
+                text = " to ",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f),
+            )
+            Text(
+                text = to.toString(),
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.primary,
+            )
         }
     }
 }
