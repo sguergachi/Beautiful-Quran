@@ -50,6 +50,14 @@ not implement non-media requests such as “open without playing” or “bookma
 this.” Named cold-start requests can still go to YouTube Music when Assistant
 does not identify Beautiful Quran as the intended media provider.
 
+Media3 owns normal audio-focus behavior: spoken-content recitation pauses on a
+transient Assistant interruption and resumes when focus returns. If an Assistant
+build instead labels its brief speech as a permanent focus loss, Android sends
+no later gain callback. `AssistantAudioResume` handles that narrow case by
+matching the focus-loss pause to an active platform audio player with
+`USAGE_ASSISTANT`, then resuming after that player goes quiet. User and remote
+pauses remain paused.
+
 ### Classic Google Assistant App Actions
 
 [`shortcuts.xml`](../app/src/main/res/xml/shortcuts.xml) declares:
