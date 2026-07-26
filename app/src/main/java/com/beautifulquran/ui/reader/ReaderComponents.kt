@@ -48,6 +48,7 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -237,6 +238,7 @@ private const val AYAH_MARK_SIZE_RATIO = 20f / 30f
 private data class RepeatWash(
     val progress: State<Float>,
     val alpha: State<Float>,
+    val feather: State<Float?>,
 )
 
 /**
@@ -264,12 +266,17 @@ private class RepeatWashLifecycle(
     var activation: Long = 0L,
 )
 
+internal fun repeatWashDurationMs(activeSweepMs: Int?, minimumMs: Int): Int =
+    maxOf(activeSweepMs ?: 0, minimumMs)
+
 /**
  * Orange wash for one word in a repeat chain.
  *
  * **Sequential residual finish (law):**
- * - Wash duration is always [InkEngine.Tuning.repeatSweepMs], never the audio
- *   sliver — short words still get a full soft edge.
+ * - [InkEngine.Tuning.repeatSweepMs] is the minimum duration, so short words
+ *   still get a full soft edge while longer words follow the reciter's dwell.
+ * - Tajweed-paced entries map that clock through the same captured curve and
+ *   feather as first-pass ink.
  * - A shared per-ayah [OrderedWashGate] runs members **one after another by
  *   word position**; N+1 cannot start until N's 0→1 completes.
  * - [snapshotFlow] + collect (not `LaunchedEffect(activation)`) so Active
@@ -283,11 +290,18 @@ private fun rememberRepeatWash(
     repeat: Boolean,
     /** 1-based word position — orders the per-ayah gate. */
     position: Int,
+    /** Active word dwell; null for queued members revealed by a seek. */
+    activeSweepMs: Int? = null,
+    /** Tajweed curve for the active repeated word. */
+    pacing: TajweedPacing.Curve? = null,
     /** Bumps on seek for the active word so replaying it re-runs orange too. */
     activation: Long = 0L,
 ): RepeatWash {
-    val progress = remember { Animatable(if (repeat) 0f else 1f) }
+    val clock = remember { Animatable(if (repeat) 0f else 1f) }
     val alpha = remember { Animatable(if (repeat) 1f else 0f) }
+    val lockedPacing = remember { mutableStateOf<TajweedPacing.Curve?>(null) }
+    val lockedFeather = remember { mutableStateOf<Float?>(null) }
+    val lockedDurationMs = remember { mutableIntStateOf(InkEngine.tuning.repeatSweepMs) }
     val lifecycle = remember { RepeatWashLifecycle() }
     val sharedGate = LocalRepeatWashGate.current
     val localGate = remember { OrderedWashGate() }
@@ -298,6 +312,8 @@ private fun rememberRepeatWash(
     }
     val repeatState = rememberUpdatedState(repeat)
     val activationState = rememberUpdatedState(activation)
+    val activeSweepState = rememberUpdatedState(activeSweepMs)
+    val pacingState = rememberUpdatedState(pacing)
     LaunchedEffect(Unit) {
         snapshotFlow { repeatState.value to activationState.value }.collect { (rep, act) ->
             val action = repeatWashAction(
@@ -308,43 +324,73 @@ private fun rememberRepeatWash(
             )
             lifecycle.repeat = rep
             lifecycle.activation = act
-            val sweepMs = InkEngine.tuning.repeatSweepMs
-            val easing = InkEngine.sweepEasing
             when (action) {
                 RepeatWashAction.Reveal -> {
+                    // Capture at chain entry: this word can stop being Active
+                    // while it waits behind an earlier member in the gate.
+                    val entryPacing = pacingState.value
+                    val sweepMs = repeatWashDurationMs(
+                        activeSweepMs = activeSweepState.value,
+                        minimumMs = InkEngine.tuning.repeatSweepMs,
+                    )
+                    val easing =
+                        if (entryPacing != null) LinearEasing else InkEngine.sweepEasing
                     gate.run(position) {
                         // Dropped from the chain while queued — skip start.
                         if (!repeatState.value) return@run
+                        lockedDurationMs.intValue = sweepMs
+                        lockedPacing.value = entryPacing
+                        lockedFeather.value =
+                            if (entryPacing != null) InkEngine.pacedFeather() else null
                         alpha.snapTo(1f)
-                        progress.snapTo(0f)
-                        progress.animateTo(1f, tween(sweepMs, easing = easing))
+                        clock.snapTo(0f)
+                        clock.animateTo(1f, tween(sweepMs, easing = easing))
                     }
                 }
                 RepeatWashAction.Release -> {
                     // Residual under the gate (no overlap with next reveal);
                     // alpha dissolve is outside so chain clear doesn't serialize
                     // N× fadeMs on the ordered queue.
-                    if (progress.value < 1f && alpha.value > 0f) {
+                    if (clock.value < 1f && alpha.value > 0f) {
                         gate.run(position) {
-                            if (progress.value < 1f) {
+                            if (clock.value < 1f) {
                                 val remain =
-                                    ((1f - progress.value) * sweepMs).toInt().coerceAtLeast(1)
-                                progress.animateTo(1f, tween(remain, easing = easing))
+                                    ((1f - clock.value) * lockedDurationMs.intValue)
+                                        .toInt()
+                                        .coerceAtLeast(1)
+                                val easing = if (lockedPacing.value != null) {
+                                    LinearEasing
+                                } else {
+                                    InkEngine.sweepEasing
+                                }
+                                clock.animateTo(1f, tween(remain, easing = easing))
                             }
                         }
                     }
                     if (alpha.value > 0f) {
                         alpha.animateTo(
                             0f,
-                            tween(InkEngine.tuning.repeatFadeOutMs, easing = easing),
+                            tween(
+                                InkEngine.tuning.repeatFadeOutMs,
+                                easing = InkEngine.sweepEasing,
+                            ),
                         )
                     }
+                    lockedPacing.value = null
+                    lockedFeather.value = null
                 }
                 RepeatWashAction.Hold -> Unit
             }
         }
     }
-    return RepeatWash(progress = progress.asState(), alpha = alpha.asState())
+    val progress = remember {
+        derivedStateOf { lockedPacing.value?.at(clock.value) ?: clock.value }
+    }
+    return RepeatWash(
+        progress = progress,
+        alpha = alpha.asState(),
+        feather = lockedFeather,
+    )
 }
 
 /**
@@ -357,6 +403,7 @@ private fun rememberRepeatWash(
 private fun rememberSearchHitWash(active: Boolean): RepeatWash {
     val progress = remember { Animatable(1f) }
     val alpha = remember { Animatable(0f) }
+    val feather = remember { mutableStateOf<Float?>(null) }
     LaunchedEffect(active) {
         if (!active) {
             progress.snapTo(1f)
@@ -372,7 +419,11 @@ private fun rememberSearchHitWash(active: Boolean): RepeatWash {
             alpha.animateTo(0f, tween(fadeMs, easing = InkEngine.sweepEasing))
         }
     }
-    return RepeatWash(progress = progress.asState(), alpha = alpha.asState())
+    return RepeatWash(
+        progress = progress.asState(),
+        alpha = alpha.asState(),
+        feather = feather,
+    )
 }
 
 /**
@@ -436,7 +487,7 @@ private fun Modifier.repeatInkLayer(
             progress = { wash.progress.value },
             rtl = rtl,
             restingAlpha = 0f,
-            feather = InkEngine.tuning.washFeather,
+            feather = wash.feather.value ?: InkEngine.tuning.washFeather,
         )
 
 /**
@@ -986,6 +1037,8 @@ private fun rememberWordHighlight(
         repeatWash = rememberRepeatWash(
             repeat = ink.repeat,
             position = position,
+            activeSweepMs = sweepMs.takeIf { isActive },
+            pacing = entryPacing,
             // Only the active word carries a non-zero seek generation so a
             // mid-chain handoff (activation → 0) is Hold, not a re-Reveal.
             activation = if (isActive) activation else 0L,
@@ -1352,6 +1405,8 @@ private fun rememberLetterSweeps(
 private fun rememberRepeatWashes(
     inks: List<InkEngine.Word>,
     positions: List<Int>,
+    activeSweepMs: Int? = null,
+    pacing: TajweedPacing.Curve? = null,
     activation: Long = 0L,
 ): List<RepeatWash> {
     require(inks.size == positions.size) {
@@ -1362,6 +1417,8 @@ private fun rememberRepeatWashes(
         rememberRepeatWash(
             repeat = ink.repeat,
             position = positions[index],
+            activeSweepMs = activeSweepMs.takeIf { active },
+            pacing = pacing.takeIf { active },
             activation = if (active) activation else 0L,
         )
     }
@@ -1416,7 +1473,12 @@ private fun ResponsiveEnglishAyah(
     val glintInk = LocalQuranAccents.current.glintInk
     val sweeps = rememberLetterSweeps(inks, activeSweepMs, activation = activation)
     val wordPositions = remember(ayah) { ayah.words.map { it.position } }
-    val repeatWashes = rememberRepeatWashes(inks, wordPositions, activation)
+    val repeatWashes = rememberRepeatWashes(
+        inks = inks,
+        positions = wordPositions,
+        activeSweepMs = activeSweepMs,
+        activation = activation,
+    )
     val glints = rememberGlints(inks)
     val searchHitWash = rememberSearchHitWash(flashWordPosition != null)
     val activeIndex = inks.indexOfFirst { it.state == InkEngine.State.Active }
@@ -1534,6 +1596,7 @@ private fun ResponsiveEnglishAyah(
                             color = palette.repeatInkColor,
                             restingAlpha = 0f,
                             layerAlpha = wash.alpha.value,
+                            feather = wash.feather.value,
                             colorAlpha = InkEngine.tuning.repeatInkAlpha,
                         )
                     }
@@ -1563,7 +1626,11 @@ private fun ResponsiveEnglishAyah(
                                 } else InkEngine.tuning.glintTintAlpha,
                                 glowAlpha = InkEngine.tuning.glintGlowAlpha,
                                 glowRadius = InkEngine.tuning.glintGlowRadius,
-                                feather = if (glint.repeat) null else sweeps[index].feather.value,
+                                feather = if (glint.repeat) {
+                                    repeatWashes[index].feather.value
+                                } else {
+                                    sweeps[index].feather.value
+                                },
                             )
                         }
                     }
@@ -1679,7 +1746,13 @@ private fun ResponsiveHafsAyah(
         activeRevealStart = activeRevealStart,
     )
     val wordPositions = remember(ayah) { ayah.words.map { it.position } }
-    val repeatWashes = rememberRepeatWashes(inks, wordPositions, activation)
+    val repeatWashes = rememberRepeatWashes(
+        inks = inks,
+        positions = wordPositions,
+        activeSweepMs = activeSweepMs,
+        pacing = entryPacing,
+        activation = activation,
+    )
     val glints = rememberGlints(inks)
     val searchHitWash = rememberSearchHitWash(flashWordPosition != null)
     val activeIndex = inks.indexOfFirst { it.state == InkEngine.State.Active }
@@ -1838,6 +1911,7 @@ private fun ResponsiveHafsAyah(
                             color = palette.repeatInkColor,
                             restingAlpha = 0f,
                             layerAlpha = wash.alpha.value,
+                            feather = wash.feather.value,
                             colorAlpha = InkEngine.tuning.repeatInkAlpha,
                         )
                     }
@@ -1870,7 +1944,7 @@ private fun ResponsiveHafsAyah(
                                 glowAlpha = InkEngine.tuning.glintGlowAlpha,
                                 glowRadius = InkEngine.tuning.glintGlowRadius,
                                 feather = if (glint.repeat) {
-                                    null
+                                    repeatWashes[index].feather.value
                                 } else {
                                     sweeps[index].feather.value
                                 },

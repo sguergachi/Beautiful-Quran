@@ -1,6 +1,6 @@
 # Tajweed-paced ink
 
-**Status: implemented on Android, off by default behind the Ink Lab's
+**Status: implemented on Android, on by default and tunable behind the Ink Lab's
 "Tajweed pacing" toggle (Settings → Developer → Ink Lab overlay → Tajweed
 tab). The web port and measured letter widths are not yet built — the design
 for those lives below.**
@@ -332,7 +332,10 @@ Two refinements built into the curve, not the callers:
   functions); the active-word wash passes the curve, everything else keeps
   the bezier. The 48-step mask quantization is applied *after* the curve, so
   plateaus render as repeated identical masks — free.
-- **Unchanged** — repeat wash (decorative, stays constant-rate bezier),
+- **Repeat wash** — a repeated active word captures the same curve and paced
+  feather as first-pass ink. Its clock follows the measured word sweep with
+  `repeatSweepMs` as a minimum, preserving the sequential residual finish for
+  short segments while long madd/waqf repeats visibly sustain.
   `secondaryAlpha` gloss/translit tracking (it reads the paced sweep value,
   so the gloss breath follows the dwell), all `HighlightEngine` semantics,
   the 33 ms poll.

@@ -526,6 +526,13 @@ class InkEngineTest {
     }
 
     @Test
+    fun `repeat wash follows long dwell but keeps a soft minimum`() {
+        assertEquals(450, repeatWashDurationMs(activeSweepMs = null, minimumMs = 450))
+        assertEquals(450, repeatWashDurationMs(activeSweepMs = 140, minimumMs = 450))
+        assertEquals(1_800, repeatWashDurationMs(activeSweepMs = 1_800, minimumMs = 450))
+    }
+
+    @Test
     fun `initial glint keeps its identity and recedes behind a same-word repeat`() {
         val identity = GlintIdentity(repeat = false)
         assertFalse(identity.update(glinting = true, repeat = false))
