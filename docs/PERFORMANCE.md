@@ -5,9 +5,6 @@ display's native refresh rate (90/120 Hz where available) with nothing on the
 UI thread that doesn't belong there. This file documents every technique in
 use and the reasoning, so future changes don't regress them.
 
-The latest whole-pipeline review and its profiling constraints are recorded in
-[Android rendering performance audit — 2026-07-12](PERFORMANCE_AUDIT_2026-07-12.md).
-
 Web-specific GPU / paint findings (2026-07-16) live in
 [§ Web rendering and GPU](#web-rendering-and-gpu) below.
 
@@ -218,6 +215,14 @@ user journeys on stable hardware. See [Profiling](PROFILING.md).
 
 ## Future headroom (not yet done)
 
+Investigate in measured order. Each trades memory, shaping correctness, or
+animation appearance for speed, so none should change without a representative
+device trace and a pixel/motion comparison.
+
+- Allocation inside per-frame custom draw lambdas — especially temporary bloom
+  lists and gradient construction.
+- The number and retained memory of per-word graphics layers in gloss mode.
+- Long-ayah text shaping / prefetch on first exposure.
 - Replace the conservative seed Baseline/Startup rules with output captured on
   a stable physical Android 17 device, then retain them only if Macrobenchmark
   confirms an improvement.

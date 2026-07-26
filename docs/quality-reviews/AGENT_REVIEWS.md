@@ -130,5 +130,5 @@ wait
 ## Related
 
 - Stock Grok `/review` skill: orchestrated local/branch/PR review (Grok only).
-- Older one-shot prompts: `docs/quality-reviews/CLAUDE_PROMPT.md` and the
-  `ANDROID_QUALITY_*.md` audits under this directory.
+- Prior multi-agent pass: the `ANDROID_QUALITY_*.md` audits under this
+  directory (2026-07-22).

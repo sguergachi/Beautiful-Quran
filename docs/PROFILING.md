@@ -77,6 +77,29 @@ Run the included cold-start Macrobenchmark with:
 Benchmark a release-like build on physical hardware. Emulator timings measure
 the host and are not release evidence.
 
+### Comparing two revisions with `gfxinfo`
+
+```bash
+./gradlew assembleRelease
+adb install -r app/build/outputs/apk/release/app-release.apk
+adb shell dumpsys gfxinfo com.beautifulquran reset
+# Perform repeated cover ↔ reader and reader ↔ settings turns.
+adb shell dumpsys gfxinfo com.beautifulquran > gfxinfo.txt
+```
+
+Hold everything constant across both revisions: same device, refresh rate,
+thermal state, release APK, navigation path, and gesture duration. `gfxinfo`
+confirms frame timing but cannot attribute Compose work — capture a Perfetto
+system trace with frame timeline (and Compose tracing where available) when you
+need to know *which* work missed the budget.
+
+Never attach a numerical frame claim collected from this repository's headless
+emulator. Its renderer terminates mid-gesture (both `swiftshader_indirect` and
+`swiftshader` have exited with status 139 after rendering, and the host backend
+cannot create an EGL display in a headless session), which yields `No process
+found` rather than a measurement. Emulator-renderer instability is not an app
+regression, and a fabricated before/after must not enter the performance record.
+
 ## Debug ProfilingManager workflow
 
 `DevProfiling` has source-set-specific implementations:
