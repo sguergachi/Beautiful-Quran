@@ -49,9 +49,9 @@ Hard rules:
 > compact centred block, so a range reads as one phrase — and they unfold
 > **directly under the choice that asked for them**, pushing the rest of the
 > list down, so the numbers belong to that line rather than trailing the sheet.
-> Neither dial carries a caption: the joining words sit **in the gutter, on the
-> reading line**, so each one reads straight across — "67 to 120", and
-> "4 ayahs, to 234".
+> Neither dial carries a caption: each writes itself out **on the reading line**,
+> so it reads straight across — "67 to 120", and "5 to 9" beside the distance
+> that produced it.
 >
 > Those two dials are not the same instrument, because the reader does not
 > arrive with the same knowledge. For a range they have both ayah numbers, so
@@ -62,7 +62,13 @@ Hard rules:
 > same grammar the range dial above it uses and moving as the wheel turns. The
 > label leads because it is the answer being checked; the wheel follows because
 > it is the question being asked. Asking for what the reader can know and
-> writing out what they cannot is the whole design of that line.
+> writing out what they cannot is the whole design of that line. One word,
+> **"ayahs"**, sits over the dial to name what it counts — the only column
+> heading left on the sheet, and it earns its place because that wheel is the
+> one figure the reading line does not explain. The label's column is measured
+> from the widest range *that surah* can spell out, so the dial never shifts as
+> the figures gain a digit, and a fifteen-ayah surah never reserves room for
+> "286 to 286".
 >
 > Nothing is drawn under the wheel: no band, no plate, no wash. The reading line
 > is the row the numbers fade *towards* — rows dissolve into the sheet as they
