@@ -299,11 +299,10 @@ not the app's.
   0.78 em. Web uses a calibrated paint lift for its browser font metrics;
   Compose shares the English prose baseline because Android reports different
   metrics for the same Hafs ornament.
-- **English gloss punctuation**: display-only periods close each ayah and
-  precede genuine capitalized sentence starts. Proper and reverential capitals
-  (Allah, His, Lord, etc.), speech cues, and known source-capitalization
-  artifacts such as mid-phrase “Guidance” are excluded. This policy never
-  mutates the database text or the timing/search identity of a word.
+- **English gloss punctuation**: a display-only period closes each ayah.
+  Existing source punctuation is preserved, but capitalization never creates
+  an inferred sentence boundary. This policy never mutates the database text
+  or the timing/search identity of a word.
 - **Translations**: EB Garamond, 17 sp, 26 sp leading, at 66 % ink.
 - **UI text**: the same serif at small sizes with letterspacing and reduced
   alpha; labels never compete with scripture. Nothing in the app is sans.

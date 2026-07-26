@@ -5,41 +5,31 @@ import org.junit.Test
 
 class EnglishTypographyTest {
     @Test
-    fun `adds stops at capitalized sentence boundaries and ayah end`() {
+    fun `adds a stop only at the ayah end`() {
         assertEquals(
-            listOf("And said", "a group", "(of) the Book.", "Believe", "in what."),
+            listOf("and killed", "Dawood", "Jalut", "And if not."),
             EnglishTypography.punctuate(
-                listOf("And said", "a group", "(of) the Book", "Believe", "in what"),
+                listOf("and killed", "Dawood", "Jalut", "And if not"),
             ),
         )
     }
 
     @Test
-    fun `proper and reverential capitals do not create false stops`() {
+    fun `does not infer internal sentence boundaries from capitals`() {
         assertEquals(
-            listOf("Indeed", "Allah", "He gives it", "to whom", "He wills."),
+            listOf("that which", "He willed", "And if not", "the worlds."),
             EnglishTypography.punctuate(
-                listOf("Indeed", "Allah", "He gives it", "to whom", "He wills"),
+                listOf("that which", "He willed", "And if not", "the worlds"),
             ),
         )
     }
 
     @Test
-    fun `speech cues stay attached to capitalized content`() {
+    fun `preserves existing punctuation`() {
         assertEquals(
-            listOf("your Lord.", "Say", "Indeed", "He said", "O my people."),
+            listOf("Why?", "Then", "listen!"),
             EnglishTypography.punctuate(
-                listOf("your Lord", "Say", "Indeed", "He said", "O my people"),
-            ),
-        )
-    }
-
-    @Test
-    fun `capitalized guidance remains part of its prepositional phrase`() {
-        assertEquals(
-            listOf("Those", "(are) on", "Guidance", "from their Lord."),
-            EnglishTypography.punctuate(
-                listOf("Those", "(are) on", "Guidance", "from their Lord"),
+                listOf("Why?", "Then", "listen!"),
             ),
         )
     }
