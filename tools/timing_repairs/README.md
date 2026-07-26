@@ -1,12 +1,25 @@
 # timing_repairs/
 
 Auto-generated structural repairs for reciter word timings. `build_db.py`
-applies every `*.json` here **before** `tools/timing_overrides/`, so a manual
-ear-verified patch always wins over an automatic repair.
+applies every `*.json` here before the local `tools/timing_overrides/` scratch
+layer. CI rejects shipping scratch overrides; permanent corrections belong in
+this systematic repair path.
 
 `*.flagged.json` files are **not** applied — they list the ayahs the generator
 refused to auto-repair (low CTC coverage or an implausible lead-in). They are
 the manual review queue.
+
+## Repairs are structural, not frozen ayah clocks
+
+Repair files contain whole rows for reproducibility, but `build_db.py` does not
+blindly replace the current source row. It sequence-diffs the word positions,
+uses repair timing only for changed structural spans plus one neighbour on each
+side, and keeps current qdc timing everywhere else. This is systematic across
+all repair files and prevents an old missing-word/repeat repair from
+reintroducing unrelated stale boundaries when qdc later improves them.
+
+Regression fixtures pin the stale-repair failures from Alafasy 2:214 and 5:52,
+alongside the existing cleaner and span-protection cases.
 
 ## How these are produced
 

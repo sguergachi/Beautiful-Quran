@@ -545,14 +545,14 @@ interaction modifiers centralized.
 geometry described in code, live screen-corner alignment, one-shot entrance,
 and draw-phase animation.
 
-### Timings Lab and overrides
+### Timings Lab and timing reports
 
 **Files:** `timingslab/*`, `docs/TIMINGS_LAB.md`,
 `tools/timing_overrides/`.
 
 **Current responsibility.** Developer playback, per-word boundary adjustment,
 recording marks, undo/reset, local override persistence, and export to a
-committable patch consumed by the DB builder.
+reproducible report that becomes a systematic pipeline regression.
 
 **Complexity.** Very high. The view model (669 lines) is an editor, recorder,
 player coordinator, persistence adapter, and exporter. The screen (839 lines)
@@ -851,8 +851,9 @@ filenames, and copy rather than fork the canonical DB.
 
 **Current responsibility.** Fetch/caches five source families, normalizes text,
 aligns QCF visual and canonical words, parses quran-align and QDC timings,
-cleans repeat artifacts, applies committed overrides, imports QAC morphology,
-defines schema/indexes, validates coverage/counts, and atomically writes the DB.
+cleans repeat artifacts, rebases structural repairs onto current source timing,
+rejects shipped one-off overrides, imports QAC morphology, defines
+schema/indexes, validates coverage/counts, and atomically writes the DB.
 
 **Complexity.** Very high and correctness-critical. Source-specific heuristics
 and schema orchestration share one namespace. Validation is mostly embedded in

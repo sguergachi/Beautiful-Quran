@@ -22,6 +22,7 @@ source disagrees (10 known ayahs differ by one word — logged, not fatal).
 """
 
 import argparse
+from difflib import SequenceMatcher
 import io
 import json
 import re
@@ -32,6 +33,7 @@ import unicodedata
 import urllib.request
 import zipfile
 from pathlib import Path
+from statistics import median
 
 ROOT = Path(__file__).resolve().parent.parent
 CACHE = Path(__file__).resolve().parent / ".cache"
@@ -39,8 +41,8 @@ OUT = ROOT / "data" / "quran.db"
 OVERRIDES_DIR = Path(__file__).resolve().parent / "timing_overrides"
 # Auto-generated CTC-arbitrated structural repairs (tools/gen_repairs.py). These
 # strip qdc alignment artifacts (split/mislabel false-repeats), restore flattened
-# re-recitations, and fill dropped words. Applied BEFORE timing_overrides so a
-# manual patch always wins over an automatic repair.
+# re-recitations, and fill dropped words. The override layer after this is local
+# reproduction scratch only; CI rejects committed override JSON.
 REPAIRS_DIR = Path(__file__).resolve().parent / "timing_repairs"
 
 QURAN_JSON_TGZ = "https://registry.npmjs.org/quran-json/-/quran-json-3.1.2.tgz"
@@ -756,6 +758,99 @@ def adjust_segments(segs, n_words, surah, ayah, stats):
 # source file; fail the build instead of shipping silent gaps.
 COVERAGE_THRESHOLD = 6000
 
+# A short word window running at less than a quarter of its immediate
+# neighbour's milliseconds-per-letter is usually a boundary stamped inside
+# the word. Keep this deliberately conservative: it is a review gate for
+# hand-authored overrides, not an attempt to retime source data.
+PACING_RATIO = 4
+PACING_SHORT_MS = 400
+
+
+def suspicious_pacing(segs, words):
+    """Return high-confidence adjacent word-duration outliers.
+
+    Each result is ``(fast_segment, fast_word, fast_units, slow_segment,
+    slow_word, slow_units)``. Repeats and non-consecutive positions are skipped
+    because their neighbouring timeline spans need not be neighbouring text.
+    """
+    found = []
+    windows = [
+        (seg, segs[i + 1][1] if i + 1 < len(segs) else seg[2])
+        for i, seg in enumerate(segs)
+    ]
+    for (left, left_end), (right, right_end) in zip(windows, windows[1:]):
+        if right[0] != left[0] + 1:
+            continue
+        left_word, right_word = words.get(left[0], ""), words.get(right[0], "")
+        left_units = max(1, len(normalize_for_alignment(left_word)))
+        right_units = max(1, len(normalize_for_alignment(right_word)))
+        left_pace = (left_end - left[1]) / left_units
+        right_pace = (right_end - right[1]) / right_units
+        fast, fast_word, fast_units, fast_pace, slow, slow_word, slow_units, slow_pace = (
+            ([left[0], left[1], left_end], left_word, left_units, left_pace,
+             [right[0], right[1], right_end], right_word, right_units, right_pace)
+            if left_pace < right_pace
+            else ([right[0], right[1], right_end], right_word, right_units, right_pace,
+                  [left[0], left[1], left_end], left_word, left_units, left_pace)
+        )
+        if fast[2] - fast[1] <= PACING_SHORT_MS and fast_pace * PACING_RATIO < slow_pace:
+            found.append((fast, fast_word, fast_units, slow, slow_word, slow_units))
+    return found
+
+
+BOUNDARY_SUPPORT_MS = 250
+BOUNDARY_CONFLICT_MS = 500
+BOUNDARY_SOURCE_WEIGHTS = {"bundled": 1, "quran-align": 2}
+
+
+def boundary_evidence(delta):
+    if abs(delta) <= BOUNDARY_SUPPORT_MS:
+        return "supports"
+    return "conflicts" if abs(delta) > BOUNDARY_CONFLICT_MS else "uncertain"
+
+
+def boundary_conflicts(segs, sources):
+    """Find proposed word starts that strongly conflict with an independent source.
+
+    Sources are compared after removing their median per-ayah clock offset.
+    Repeat rows are skipped: one-pass quran-align cannot arbitrate a backtrack.
+    Results are ``(position, proposed_start, evidence)``, where evidence maps
+    each source name to its signed residual from the proposed boundary.
+    """
+    positions = [s[0] for s in segs]
+    if positions != sorted(set(positions)):
+        return []
+    proposed = {pos: start for pos, start, _ in segs}
+    residuals = {}
+    for name, source in sources.items():
+        source_positions = [s[0] for s in source]
+        if source_positions != sorted(set(source_positions)):
+            continue
+        starts = {pos: start for pos, start, _ in source}
+        common = proposed.keys() & starts.keys()
+        if len(common) < 3:
+            continue
+        offset = median(proposed[pos] - starts[pos] for pos in common)
+        residuals[name] = {
+            pos: proposed[pos] - starts[pos] - offset for pos in common
+        }
+    found = []
+    for pos in positions[1:]:
+        evidence = {name: values[pos] for name, values in residuals.items() if pos in values}
+        support = sum(
+            BOUNDARY_SOURCE_WEIGHTS.get(name, 1)
+            for name, delta in evidence.items()
+            if abs(delta) <= BOUNDARY_SUPPORT_MS
+        )
+        conflict = sum(
+            BOUNDARY_SOURCE_WEIGHTS.get(name, 1)
+            for name, delta in evidence.items()
+            if abs(delta) > BOUNDARY_CONFLICT_MS
+        )
+        if conflict > support:
+            found.append((pos, proposed[pos], evidence))
+    return found
+
 
 def ingest_reciter_timings(rid, word_counts, timing_rows, stats, adjust):
     """Adjust + store one reciter's segments; returns ayahs covered.
@@ -774,18 +869,56 @@ def ingest_reciter_timings(rid, word_counts, timing_rows, stats, adjust):
     return covered
 
 
+def alignment_reference(zip_path, rid, slug, word_counts):
+    """Load quran-align as an independent monotonic boundary witness."""
+    data = load_timings(zip_path, slug)
+    if data is None:
+        return {}
+    out = {}
+    stats = {"basmalah_shift": 0, "clamped": 0, "missing": 0}
+    for (surah, ayah), n_words in word_counts.items():
+        segs = adjust_segments(data.get((surah, ayah)), n_words, surah, ayah, stats)
+        if segs:
+            out[(rid, surah, ayah)] = segs
+    return out
+
+
+def rebase_timing_repair(current, repaired):
+    """Apply a structural repair without replacing unrelated current timings."""
+    current_positions = [s[0] for s in current]
+    repaired_positions = [s[0] for s in repaired]
+    use_repair = set()
+    current_index = {}
+    for tag, i1, i2, j1, j2 in SequenceMatcher(
+        a=current_positions, b=repaired_positions, autojunk=False
+    ).get_opcodes():
+        if tag == "equal":
+            current_index.update((j1 + offset, i1 + offset) for offset in range(j2 - j1))
+        else:
+            use_repair.update(range(max(0, j1 - 1), min(len(repaired), j2 + 1)))
+    merged = [
+        list(repaired[j] if j in use_repair or j not in current_index else current[current_index[j]])
+        for j in range(len(repaired))
+    ]
+    starts = [max(0, seg[1]) for seg in merged]
+    if starts != sorted(set(starts)):
+        return repaired
+    for i, seg in enumerate(merged):
+        seg[1] = starts[i]
+        next_start = starts[i + 1] if i + 1 < len(starts) else None
+        if next_start is not None and seg[2] > next_start:
+            seg[2] = next_start
+        if seg[2] <= seg[1]:
+            seg[2] = next_start if next_start is not None else seg[1] + 1
+    return merged
+
+
 def apply_timing_repairs(timing_rows, word_counts):
     """Apply auto-generated CTC-arbitrated repairs (tools/timing_repairs/*.json)
-    on top of the qdc/quran-align timing rows. Same edit shape as overrides plus
-    an ignored ``kind`` tag; validated identically. Runs before overrides so a
-    manual patch wins. Summary-only output (there can be thousands of edits).
-
-    Span-repeat protection: a repair that would erase a multi-position
-    span-repeat already present in the cleaned qdc row is skipped (see
-    tools/timing_repairs/README.md — CTC must never delete a span-repeat).
-    Bad ``drop`` repairs that flatten real re-recitations (Alafasy 5:59 / #570)
-    are the main hit class.
-    """
+    on top of the current source rows. Structural differences and their
+    immediate neighbours use the repair; matching segments retain current
+    timing so stale full-row patches cannot overwrite unrelated improvements.
+    Repairs that erase an existing multi-position span-repeat are skipped."""
     slug_by_id = {r[0]: r[1] for r in RECITERS}
     by_key = {(rid, sid, ay): segs for (rid, sid, ay, segs) in timing_rows}
     files = sorted(REPAIRS_DIR.glob("*.json")) if REPAIRS_DIR.is_dir() else []
@@ -795,6 +928,7 @@ def apply_timing_repairs(timing_rows, word_counts):
     by_kind = {}
     applied = 0
     span_protected = 0
+    rebased = 0
     for path in files:
         try:
             payload = json.loads(path.read_text(encoding="utf-8"))
@@ -818,22 +952,31 @@ def apply_timing_repairs(timing_rows, word_counts):
                     sys.exit(1)
                 segs.append([pos, start, end])
             segs.sort(key=lambda s: s[1])
-            pre_raw = by_key.get((rid, sid, ay))
+            key = (rid, sid, ay)
+            pre_raw = by_key.get(key)
             if pre_raw is not None:
                 pre = json.loads(pre_raw) if isinstance(pre_raw, str) else pre_raw
                 if erases_span_repeat(pre, segs):
                     span_protected += 1
                     continue
-            by_key[(rid, sid, ay)] = json.dumps(segs, separators=(",", ":"))
+            current = json.loads(pre_raw) if isinstance(pre_raw, str) else pre_raw or []
+            merged = rebase_timing_repair(current, segs) if current else segs
+            if merged != segs:
+                rebased += 1
+            by_key[key] = json.dumps(merged, separators=(",", ":"))
             by_kind[edit.get("kind", "repair")] = by_kind.get(edit.get("kind", "repair"), 0) + 1
             applied += 1
     new_rows = [(rid, sid, ay, segs) for (rid, sid, ay), segs in sorted(by_key.items())]
-    extra = f", span-protected {span_protected}" if span_protected else ""
-    print(f"  repairs: {applied} ayah(s) across {len(files)} file(s) — {by_kind}{extra}")
+    print(
+        f"  repairs: {applied} ayah(s) across {len(files)} file(s), "
+        f"{rebased} rebased, {span_protected} span-protected — {by_kind}"
+    )
     return new_rows
 
 
-def apply_timing_overrides(timing_rows, reciter_rows, word_counts):
+def apply_timing_overrides(
+    timing_rows, reciter_rows, word_counts, word_text, alignment_references=None
+):
     """Apply every JSON file in tools/timing_overrides/ on top of the built
     timing rows, replacing or adding (reciter, surah, ayah) rows.
 
@@ -846,12 +989,15 @@ def apply_timing_overrides(timing_rows, reciter_rows, word_counts):
           "surahId": 2, "ayah": 14,
           "segments": [[pos, start_ms, end_ms], ...]}, ...]}
 
-    Positions are validated against the canonical word count for that ayah;
-    an out-of-range position fails the build rather than shipping a bad patch.
+    Positions and suspicious adjacent duration/word-length ratios are
+    validated; either fails the build rather than shipping a bad patch.
+    Ear-verified pacing outliers may be listed in ``reviewedShortPositions``;
+    independent-source conflicts use ``reviewedBoundaryPositions``.
     Slug mismatches warn but still apply — the reciterId is authoritative.
     """
     slug_by_id = {r[0]: r[1] for r in RECITERS}
     by_key = {(rid, sid, ay): segs for (rid, sid, ay, segs) in timing_rows}
+    alignment_references = alignment_references or {}
     applied = 0
     files = sorted(OVERRIDES_DIR.glob("*.json")) if OVERRIDES_DIR.is_dir() else []
     if not files:
@@ -899,7 +1045,60 @@ def apply_timing_overrides(timing_rows, reciter_rows, word_counts):
                     sys.exit(1)
                 segs.append([pos, start, end])
             segs.sort(key=lambda s: s[1])
-            by_key[(rid, sid, ay)] = json.dumps(segs, separators=(",", ":"))
+            reviewed = {int(pos) for pos in edit.get("reviewedShortPositions", [])}
+            words = word_text[(sid, ay)]
+            unreviewed = [
+                outlier for outlier in suspicious_pacing(segs, words)
+                if outlier[0][0] not in reviewed
+            ]
+            if unreviewed:
+                for fast, fast_word, fast_units, slow, slow_word, slow_units in unreviewed:
+                    fast_ms, slow_ms = fast[2] - fast[1], slow[2] - slow[1]
+                    print(
+                        f"  !! override {path.name}: surah {sid} ayah {ay} "
+                        f"position {fast[0]} {fast_word} has {fast_ms} ms/{fast_units} letters "
+                        f"beside position {slow[0]} {slow_word} with {slow_ms} ms/{slow_units} letters",
+                        file=sys.stderr,
+                    )
+                print(
+                    "     Re-listen and fix the boundary, or add the intentional "
+                    "position to reviewedShortPositions after ear verification.",
+                    file=sys.stderr,
+                )
+                sys.exit(1)
+            key = (rid, sid, ay)
+            sources = {}
+            if key in by_key:
+                sources["bundled"] = json.loads(by_key[key])
+            if key in alignment_references:
+                sources["quran-align"] = alignment_references[key]
+            reviewed_boundaries = {
+                int(pos) for pos in edit.get("reviewedBoundaryPositions", [])
+            }
+            conflicts = [
+                conflict for conflict in boundary_conflicts(segs, sources)
+                if conflict[0] not in reviewed_boundaries
+            ]
+            if conflicts:
+                for pos, start, evidence in conflicts:
+                    detail = ", ".join(
+                        f"{name} {delta:+.0f} ms"
+                        f" ({boundary_evidence(delta)}, "
+                        f"weight {BOUNDARY_SOURCE_WEIGHTS.get(name, 1)})"
+                        for name, delta in evidence.items()
+                    )
+                    print(
+                        f"  !! override {path.name}: surah {sid} ayah {ay} "
+                        f"boundary {pos - 1}->{pos} at {start} ms: {detail}",
+                        file=sys.stderr,
+                    )
+                print(
+                    "     Re-listen to each boundary; if intentional, add its "
+                    "destination position to reviewedBoundaryPositions.",
+                    file=sys.stderr,
+                )
+                sys.exit(1)
+            by_key[key] = json.dumps(segs, separators=(",", ":"))
             applied += 1
             print(f"  override {path.name}: {expected_slug} surah {sid} ayah {ay} -> {len(segs)} segments")
     new_rows = [(rid, sid, ay, segs) for (rid, sid, ay), segs in sorted(by_key.items())]
@@ -1194,8 +1393,10 @@ def main():
         print(f"    surah {m[0]} ayah {m[1]}: text={m[2]} wbw={m[3]}")
 
     word_counts = {}
-    for s, a, pos, *_ in words:
+    word_text = {}
+    for s, a, pos, arabic, *_ in words:
         word_counts[(s, a)] = max(word_counts.get((s, a), 0), pos)
+        word_text.setdefault((s, a), {})[pos] = arabic
 
     print("[4b/6] fetching Quranic Arabic Corpus morphology")
     qac_path = fetch(QAC_MORPHOLOGY_URL, "quranic-corpus-morphology-0.4.txt")
@@ -1203,6 +1404,8 @@ def main():
 
     timing_rows = []
     reciter_rows = []
+    alignment_references = {}
+    needs_alignment_evidence = any(OVERRIDES_DIR.glob("*.json"))
     if args.skip_timings:
         print("[5/6] SKIPPING timings (--skip-timings)")
         reciter_rows = [(r[0], r[1], r[2], r[3], 0) for r in RECITERS]
@@ -1212,6 +1415,10 @@ def main():
         for rid, slug, name, style in RECITERS:
             qdc_id = QDC_REPEAT_RECITERS.get(rid)
             if qdc_id is not None:
+                if needs_alignment_evidence:
+                    alignment_references.update(
+                        alignment_reference(zp, rid, slug, word_counts)
+                    )
                 # Repeat-aware timings from quran.com instead of quran-align.
                 print(f"  {slug}: repeat-aware timings from quran.com (qdc {qdc_id})")
                 data = load_qdc_timings(qdc_id)
@@ -1258,7 +1465,9 @@ def main():
     timing_rows = apply_timing_repairs(timing_rows, word_counts)
 
     print("[overrides] applying tools/timing_overrides/*.json")
-    timing_rows, reciter_rows = apply_timing_overrides(timing_rows, reciter_rows, word_counts)
+    timing_rows, reciter_rows = apply_timing_overrides(
+        timing_rows, reciter_rows, word_counts, word_text, alignment_references
+    )
 
     OUT.parent.mkdir(parents=True, exist_ok=True)
     if OUT.exists():

@@ -1,18 +1,17 @@
-# Timing overrides
+# Timing override scratch space
 
 > **Agents: stop.** If you are about to save a GitHub "Timings patch" JSON
 > here, you are almost certainly on the wrong path. Read
 > [AGENTS.md — Landing Timings Lab / GitHub timing patches](../../AGENTS.md#landing-timings-lab--github-timing-patches)
-> first. Overrides are **last resort**, not the default apply step.
+> first. Override JSON is local reproduction scratch and is never shipped.
 
-Correction patches produced by the in-app **Timings Lab** live here. Every
-`*.json` file in this directory is applied on top of the open-dataset timings
-when `python3 tools/build_db.py` runs — so a committed override is permanent:
-every future DB rebuild reapplies it.
+Correction patches produced by the in-app **Timings Lab** may be placed here
+temporarily to reproduce a report. CI requires this directory to contain no
+`*.json`: the report becomes a regression fixture for its defect class.
 
 See [docs/TIMINGS_LAB.md](../../docs/TIMINGS_LAB.md) for the full workflow.
 
-## Systematic first — overrides are the last resort
+## Systematic fixes only
 
 **Do not default to a one-off override for every Timings Lab / GitHub patch.**
 
@@ -32,7 +31,7 @@ bug until proven otherwise — not an override.
 | Forward spikes, isolated strays, split slivers, **non-contiguous / gap phantoms** | `clean_qdc_artifacts` in `tools/build_db.py` | `tools/timing_patch_cases/*.json` + `python3 tools/test_build_db.py` |
 | Drop repair flattening a real multi-word re-say | `apply_timing_repairs` span-protect | `pipeline: erases_span_repeat` case |
 | Repeat-vs-split / CTC disagreement | `tools/timing_repairs/` generator | case in `~/qasr` + rebuild repairs |
-| True one-off (single boundary nudge, no structural rule) | **this directory** | ear-check + commit override; note *why* pipeline cannot fix it |
+| Boundary nudge without a topology change | weighted source evidence + repair generator | focused regression case |
 
 When a Lab patch reveals a **class** of bugs (same wrong topology on many
 ayahs), implement the rule in the pipeline and add a
@@ -40,14 +39,8 @@ ayahs), implement the rule in the pipeline and add a
 the broken shape and whose expected output is the corrected shape from the
 patch. The unit test *is* the patch verification — not a manual checklist alone.
 
-Overrides remain correct for:
-
-* word-boundary misalignments with no reliable structural signal (e.g. one word
-  stealing time from its neighbour without a backtrack artifact);
-* ear-verified corrections the CTC repair generator cannot yet reproduce.
-
-If you add an override for something the cleaner already handles, delete the
-override and extend the cleaner + patch case instead.
+Local overrides remain useful for reproducing a word-boundary report before
+the systematic fix exists. Delete them before committing.
 
 ## File shape
 
@@ -76,18 +69,16 @@ with the orange wash).
 
 `reciterId` is authoritative; a mismatched `reciterSlug` warns but still
 applies. Out-of-range positions fail the build rather than shipping a bad row.
+So do unreviewed pacing outliers and high-confidence quran-align conflicts.
+Pacing uses the real karaoke window from one start to the next; repeat rows are
+never judged by one-pass evidence. These checks help classify a local report,
+but the permanent result is still a systematic pipeline fix.
 
-## How to land a Lab / GitHub patch
+## How to process a Lab / GitHub patch
 
 1. **Classify** — structural (spikes, phantoms, false splits) vs boundary-only.
-2. **Systematic path (preferred)**
-   1. Fix `clean_qdc_artifacts` or regenerate timing repairs.
-   2. Add `tools/timing_patch_cases/<id>.json` from the broken input + expected
-      fix (see [timing_patch_cases/README.md](../timing_patch_cases/README.md)).
-   3. `python3 tools/test_build_db.py` must pass.
-   4. `python3 tools/build_db.py`, bump `DB_FILE_NAME`, commit.
-3. **Override path (last resort)**
-   1. Tap **Submit** in the Timings Lab (or **Copy patch JSON**).
-   2. Save under this directory with a `notes` field explaining why no pipeline
-      rule applies.
-   3. `python3 tools/build_db.py`, bump `DB_FILE_NAME`, commit the DB + file.
+2. Fix `clean_qdc_artifacts`, repair rebasing, or the repair generator.
+3. Add `tools/timing_patch_cases/<id>.json` from the broken input and expected
+   fix (see [timing_patch_cases/README.md](../timing_patch_cases/README.md)).
+4. Delete the local override, run `python3 tools/test_build_db.py`, rebuild the
+   database, and bump `DB_FILE_NAME`.
