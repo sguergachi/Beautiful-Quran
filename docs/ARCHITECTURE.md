@@ -195,10 +195,12 @@ ReaderFocusController ── holds the LazyListState; the sole writer to it
   instead of jumping. Concurrent `focus()` calls are serialized on a mutex
   so a sibling effect cannot cancel the slide mid-flight.
 - Display settings that reflow ayah heights (reading mode, word gloss,
-  transliteration, translation, font scale) trigger a gentle re-`focus` of
-  the pinned verse after the LazyColumn remasures, so the reading line
-  stays on the ayah the reader was looking at instead of drifting with the
-  resize.
+  transliteration, translation, font scale) recover the pinned verse after the
+  LazyColumn remasures, so the reading line stays on the ayah the reader was
+  looking at instead of drifting with the resize. A Play intent supersedes any
+  older manual-reading recovery; when the actual playing ayah is now taller
+  than the viewport, recovery goes directly to its active word instead of
+  first pinning line one.
 - Word-level follow is the engine's *secondary* constraint: while follow is on,
   each active word reports its list-viewport bounds and
   `ReaderFocusController.keepWordInView` applies a **bottom-only** reading-band
@@ -214,14 +216,16 @@ ReaderFocusController ── holds the LazyListState; the sole writer to it
   materializes it; if a tall ayah is already attached it skips the verse-top
   anchor and moves directly to the held word. The request is consumed after a
   real measurement, so normal paused state and end-of-playlist resets cannot
-  keep driving scroll. Display reflow issues the same restore after its
-  verse-level pin settles. The interaction arbiter still makes all of these
-  yield to hand scrolling, search, annotation, pending jumps, and the Ink Lab
-  focus freeze.
-- Re-enabling follow (Play or return-to-ayah) while the current tall ayah still
-  has live geometry skips the verse-top anchor entirely and restores the active
-  word directly. The verse-first path remains only for wholly offscreen targets
-  that must be materialized before their word can be measured.
+  keep driving scroll. Display reflow issues the same restore directly for a
+  visible tall playback ayah, or after the verse-level pin when materialization
+  is still needed. The interaction arbiter still makes all of these yield to
+  hand scrolling, search, annotation, pending jumps, and the Ink Lab focus
+  freeze.
+- Re-enabling follow (Play or return-to-ayah), including during a display
+  reflow, while the actual playing ayah is tall and still has live geometry
+  skips the verse-top anchor entirely and restores the active word directly.
+  The verse-first path remains only for wholly offscreen targets that must be
+  materialized before their word can be measured.
 - Annotation editing uses the same secondary-focus path: the field reports live
   viewport bounds as it grows and as the IME rises,
   `keyboardOverlapPx` removes any bottom chrome already outside the list before
