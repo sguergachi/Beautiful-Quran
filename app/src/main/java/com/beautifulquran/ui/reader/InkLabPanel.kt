@@ -155,7 +155,7 @@ fun InkLabPanel(modifier: Modifier = Modifier) {
                     }
 
                     InkLabTab.Repeat -> {
-                        TuningSlider("Repeat sweep ms", t.repeatSweepMs.toFloat(), 100f..1500f, integer = true) {
+                        TuningSlider("Repeat minimum ms", t.repeatSweepMs.toFloat(), 100f..1500f, integer = true) {
                             InkEngine.tuning = t.copy(repeatSweepMs = it.roundToInt())
                         }
                         TuningSlider("Repeat fade ms", t.repeatFadeOutMs.toFloat(), 100f..2400f, integer = true) {

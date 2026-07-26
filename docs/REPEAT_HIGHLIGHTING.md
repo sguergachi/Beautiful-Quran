@@ -259,9 +259,11 @@ HighlightEngine.PreparedTimings.activeInfo(positionMs)
   **word-position order** via a per-ayah gate (`OrderedWashGate` /
   web `createRepeatWashGate` — sorted by position, not mere enqueue FIFO).
   Word *N+1* cannot start its orange feather until word *N* has finished 0→1.
-  Duration is always `Tuning.repeatSweepMs` — never the audio sliver — so a
-  short Active window still gets a full soft edge. Active handoff must **not**
-  cancel an in-flight wash (no `LaunchedEffect(activation)` cancel; no snap
+  On Android, duration follows the active word's measured sweep with
+  `Tuning.repeatSweepMs` as a floor, so a held word keeps its tajweed timing
+  while a short Active window still gets a full soft edge. Web, pending its
+  tajweed pacing port, uses `repeatSweepMs`. Active handoff must **not** cancel
+  an in-flight wash (no `LaunchedEffect(activation)` cancel; no snap
   incomplete→full). Release finishes any residual progress by animating the
   remainder, then dissolves alpha (web: `runRepeatReleaseAsync`).
 - **The orange blooms from the read (full-ink) colour, not the dim unread one.**
@@ -276,13 +278,13 @@ HighlightEngine.PreparedTimings.activeInfo(positionMs)
     `BlendMode.SrcIn`-tint it, then `DstIn`-wash it.
 
   Timing lives in `rememberRepeatWash` (gloss, Hafs, and English — one path)
-  and web `WordUnit` / `HafsWord`: on chain entry the wash sweeps 0→1 over
-  **`Tuning.repeatSweepMs` (450 ms)** for every member (sequential under the
-  per-ayah position-ordered gate); on release, residual progress finishes
-  under the gate (`runRepeatResidualAsync` — no-op if the word never washed),
-  then alpha dissolves **outside** the gate (`runRepeatFadeOutAsync`,
-  cancellable on re-entry) over `Tuning.repeatFadeOutMs` (900 ms). Both are
-  Ink Lab sliders.
+  and web `WordUnit` / `HafsWord`. On Android, chain entry captures the active
+  word's sweep duration, tajweed curve, and paced feather; the duration is
+  `max(sweepMs, Tuning.repeatSweepMs)` (450 ms by default). The capture happens
+  before the word waits in the position-ordered gate, so an Active handoff
+  cannot erase its pacing. On release, residual progress finishes under the
+  gate, then alpha dissolves over `Tuning.repeatFadeOutMs` (900 ms). Web keeps
+  the constant 450 ms clock until tajweed pacing is ported.
   On Nightfall, each newly active repeat word also
   replays the white-gold glimmer over that orange bloom: the repeat is a new
   event even though the word's base ink was already revealed. This includes

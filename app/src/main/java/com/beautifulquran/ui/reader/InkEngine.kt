@@ -83,7 +83,7 @@ object InkEngine {
         /** Letter-sweep duration clamps around the reciter's actual dwell. */
         val minSweepMs: Int = 140,
         val maxSweepMs: Int = 8_000,
-        /** Repeat wash sweep when the active word carries no timing. */
+        /** Minimum repeat sweep (and fallback when no active timing exists). */
         val repeatSweepMs: Int = 450,
         /** Dissolve of the orange wash once the repeat chain releases. */
         val repeatFadeOutMs: Int = 900,

@@ -377,8 +377,10 @@ InkEngine owns that too, as data rather than as animation code:
   returns the `TajweedPacing.Curve` for the active word or null for the plain
   sweep; `connection(prevArabic, arabic)` resolves the cross-word wasl rule
   without accelerating the donor word;
-  `pacedFeather()` is the paced word's edge width. All gated on
-  `Tuning.tajweedPacing` — see [TAJWEED_PACING.md](TAJWEED_PACING.md).
+  `pacedFeather()` is the paced word's edge width. Repeat ink captures that
+  same curve and feather, and uses the measured sweep with `repeatSweepMs` as
+  its soft minimum. All gated on `Tuning.tajweedPacing` — see
+  [TAJWEED_PACING.md](TAJWEED_PACING.md).
 - **`glinting(state)`** — the first-gloss glint rule:
   Active words wear the white-gold sheen (including seek/replay and
   repeat events), which then dissolves back to plain recited ink over
