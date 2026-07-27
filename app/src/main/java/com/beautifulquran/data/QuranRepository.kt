@@ -26,6 +26,14 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 
+/** Preserve editable word spacing while keeping it behind immutable MP3 silence. */
+internal fun alignToAudioOnset(segments: List<Segment>, onsetMs: Long): List<Segment> {
+    val firstStartMs = segments.firstOrNull()?.startMs ?: return segments
+    val shiftMs = (onsetMs - firstStartMs).coerceAtLeast(0L)
+    if (shiftMs == 0L) return segments
+    return segments.map { it.copy(startMs = it.startMs + shiftMs, endMs = it.endMs + shiftMs) }
+}
+
 class QuranRepository(
     private val database: QuranDatabase,
     /** Optional on-device override store produced by the Timings Lab. When
@@ -324,39 +332,56 @@ class QuranRepository(
         )
     }
 
+    private data class BundledTimingRows(
+        val segments: Map<Int, List<Segment>>,
+        val audioOnsets: Map<Int, Long>,
+    )
+
+    private fun bundledTimingRows(reciterId: Int, surahId: Int): BundledTimingRows =
+        database.db.rawQuery(
+            "SELECT ayah_number, segments, audio_onset_ms FROM timings " +
+                "WHERE reciter_id = ? AND surah_id = ?",
+            arrayOf(reciterId.toString(), surahId.toString()),
+        ).use { c ->
+            val segments = mutableMapOf<Int, List<Segment>>()
+            val audioOnsets = mutableMapOf<Int, Long>()
+            while (c.moveToNext()) {
+                val ayah = c.getInt(0)
+                segments[ayah] = parseSegments(c.getString(1))
+                c.getLong(2).takeIf { it > 0L }?.let { audioOnsets[ayah] = it }
+            }
+            BundledTimingRows(segments, audioOnsets)
+        }
+
     /** The bundled DB timings for a reciter+surah, with **no** Lab overrides
      * fused in — the shipped defaults. The Lab uses this to reset a single word
      * back to how the app shipped it. */
     suspend fun bundledTimings(reciterId: Int, surahId: Int): Map<Int, List<Segment>> =
         withContext(Dispatchers.IO) {
-            database.db.rawQuery(
-                "SELECT ayah_number, segments FROM timings WHERE reciter_id = ? AND surah_id = ?",
-                arrayOf(reciterId.toString(), surahId.toString()),
-            ).use { c ->
-                buildMap {
-                    while (c.moveToNext()) {
-                        put(c.getInt(0), parseSegments(c.getString(1)))
-                    }
-                }
-            }
+            bundledTimingRows(reciterId, surahId).segments
         }
 
     /** ayah number -> word segments, for one reciter and surah. Any
      * hand-corrected override from the Timings Lab takes precedence over the
-     * bundled DB row, so the reader immediately reflects edits. */
+     * bundled DB row, so the reader immediately reflects edits. The MP3 voice
+     * onset remains authoritative: it shifts an old relative-to-speech edit
+     * without changing any of its word spacing. */
     suspend fun timings(reciterId: Int, surahId: Int): Map<Int, List<Segment>> =
         withContext(Dispatchers.IO) {
-            val dbTimings = bundledTimings(reciterId, surahId)
-            if (timingOverrides == null) return@withContext dbTimings
+            val bundled = bundledTimingRows(reciterId, surahId)
+            if (timingOverrides == null) return@withContext bundled.segments
             val overrides = timingOverrides.overrides.value
             if (overrides.isEmpty() || !overrides.keys.any { it.reciterId == reciterId && it.surahId == surahId }) {
-                return@withContext dbTimings
+                return@withContext bundled.segments
             }
-            val merged = dbTimings.toMutableMap()
+            val merged = bundled.segments.toMutableMap()
             for (entry in overrides) {
                 val key = entry.key
                 if (key.reciterId == reciterId && key.surahId == surahId) {
-                    merged[key.ayah] = entry.value
+                    merged[key.ayah] = alignToAudioOnset(
+                        entry.value,
+                        bundled.audioOnsets[key.ayah] ?: 0L,
+                    )
                 }
             }
             merged
