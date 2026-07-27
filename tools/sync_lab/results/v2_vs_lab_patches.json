@@ -1,0 +1,67 @@
+{
+  "historical_valid": 369,
+  "historical_invalid": 40,
+  "v2_covered": 290,
+  "v2_structure_exact": 199,
+  "v2_structure_exact_pct_of_covered": 68.62,
+  "v2_structure_exact_pct_of_valid": 53.93,
+  "v2_onsets_structure_exact": {
+    "count": 3852,
+    "medianMs": 95.0,
+    "p90Ms": 702,
+    "within25Pct": 10.7736240913811,
+    "within60Pct": 29.33541017653167,
+    "within100Pct": 53.81619937694704,
+    "within150Pct": 72.22222222222223
+  },
+  "alafasy_valid": 307,
+  "alafasy_v2_covered": 290,
+  "alafasy_struct_exact": 199,
+  "alafasy_onsets": {
+    "count": 3852,
+    "medianMs": 95.0,
+    "p90Ms": 702,
+    "within25Pct": 10.7736240913811,
+    "within60Pct": 29.33541017653167,
+    "within100Pct": 53.81619937694704,
+    "within150Pct": 72.22222222222223
+  },
+  "alafasy_row_centered": {
+    "count": 3852,
+    "medianMs": 36.0,
+    "p90Ms": 466.0,
+    "within25Pct": 38.29179646936656,
+    "within60Pct": 68.76947040498442,
+    "within100Pct": 81.69781931464175,
+    "within150Pct": 84.99480789200415
+  },
+  "v1_onsets_structure_exact": {
+    "count": 2871,
+    "medianMs": 0,
+    "p90Ms": 0,
+    "within25Pct": 96.65621734587252,
+    "within60Pct": 96.90003483106932,
+    "within100Pct": 97.35283873214908,
+    "within150Pct": 97.66631835597353
+  },
+  "patch_cases_onset": {
+    "count": 38,
+    "medianMs": 75.0,
+    "p90Ms": 1291,
+    "within25Pct": 26.31578947368421,
+    "within60Pct": 34.21052631578947,
+    "within100Pct": 52.63157894736842,
+    "within150Pct": 71.05263157894737
+  },
+  "patch_cases_struct_ok": 8,
+  "patch_cases_struct_miss": 0,
+  "patch_cases_no_v2": 0,
+  "claim": "On grammar-valid Alafasy Lab patches where V2 structure matches (199/290 covered rows): 53.8% onsets within 100ms (med 95.0ms, p90 702ms, n=3852). Coverage of valid Lab patches: 290/307.",
+  "confirmed_99_vs_lab_patches": false,
+  "conclusion": "NOT 99% vs Timings Lab / historical patches. Alafasy structure-exact Lab rows: 53.8% onsets within 100ms (med 95ms, p90 702ms). Row-centered: 81.7% within 100ms. Lab mono structure exact only 193/288; Lab repeat structure exact 6/59. V1 appears ~97% within 100ms because Lab patches were edits of V1 (circular). Post-pause energy bar (100% within 100ms) is a different metric and does not equal Lab patch match.",
+  "hard_cases": {
+    "5:54": "V2 mono loses Lab/V1 repeats",
+    "3:21": "V2 mono loses Lab re-say",
+    "5:59": "structure OK; onset med 122ms vs Lab"
+  }
+}

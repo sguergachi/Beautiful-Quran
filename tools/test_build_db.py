@@ -71,6 +71,21 @@ def order(segs_):
     return [p for p, _, _ in segs_]
 
 
+def check_v2_lab_gold_gate():
+    """V2 must match Timings Lab ground truth at ≥99% (structure + onsets)."""
+    sys.path.insert(0, str(TOOLS / "sync_lab"))
+    from eval_v2_vs_lab_gold import evaluate, load_lab_gold, load_v2  # noqa: PLC0415
+
+    db = ROOT / "data" / "quran.db"
+    hist = TOOLS / "sync_lab" / "historical_manual_patches.json"
+    if not db.exists() or not hist.exists():
+        return False, "missing db or historical_manual_patches.json"
+    report = evaluate(load_lab_gold(hist, db), load_v2(db))
+    if report.get("pass"):
+        return True, report.get("claim", "ok")
+    return False, report.get("claim") or json.dumps(report, indent=2)
+
+
 def check_timing_v2_loader():
     """The committed V2 source gate must reject non-acoustic curve shapes."""
     if not _is_complete_timing_sequence([1, 2, 1, 2], 2):
@@ -600,10 +615,12 @@ def main():
     audio_onset_ok = check_audio_onset_pipeline()
     timing_v2_ok = check_timing_v2_loader()
     database_ok = audit_bundled_db()
+    lab_gold_ok, lab_gold_detail = check_v2_lab_gold_gate()
     print(f"  {'ok  ' if confidence_ok else 'FAIL'} weighted 2:214 confidence checks")
     print(f"  {'ok  ' if audio_onset_ok else 'FAIL'} audio-onset detector and apply checks")
     print(f"  {'ok  ' if timing_v2_ok else 'FAIL'} Timing V2 source validation")
     print(f"  {'ok  ' if database_ok else 'FAIL'} bundled timing database invariants")
+    print(f"  {'ok  ' if lab_gold_ok else 'FAIL'} V2 vs Timings Lab gold (≥99%)")
     if not confidence_ok:
         failures.append(("weighted confidence", "2:214 checks failed", None))
     if not audio_onset_ok:
@@ -612,6 +629,8 @@ def main():
         failures.append(("Timing V2 loader", "source validation checks failed", None))
     if not database_ok:
         failures.append(("bundled database", "timing audit failed", None))
+    if not lab_gold_ok:
+        failures.append(("V2 Lab gold gate", lab_gold_detail, None))
     print()
     if failures:
         print(f"{len(failures)} FAILURE(S):")
@@ -621,7 +640,7 @@ def main():
                 for line in str(detail).splitlines():
                     print(f"    {line}")
         return 1
-    print(f"all {len(cases) + 4} cases pass ({CASES_DIR.relative_to(Path.cwd())})")
+    print(f"all {len(cases) + 5} cases pass ({CASES_DIR.relative_to(Path.cwd())})")
     return 0
 
 

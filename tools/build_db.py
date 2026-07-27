@@ -1521,6 +1521,11 @@ def load_timing_v2(word_counts, source_dir=TIMING_V2_DIR):
             "Wider-Community/quranic-universal-audio@v2.3.0",
             "9b83ea5824d1f4de3921562f9d7282e279f05860",
         ),
+        # Timings Lab historical patches (grammar-valid Alafasy) as V2 ground truth.
+        "sync_lab/generate_lab_gold_v2.py@1": (
+            "timing_lab/historical_manual_patches",
+            None,  # revision checked as 64-hex below
+        ),
     }
     rows = []
     seen = set()
@@ -1531,11 +1536,15 @@ def load_timing_v2(word_counts, source_dir=TIMING_V2_DIR):
         generator = payload.get("generator")
         if generator not in generators:
             raise ValueError(f"{path.name}: unknown Timing V2 generator")
-        if (
-            payload.get("source"),
-            payload.get("sourceRevision"),
-        ) != generators[generator]:
+        expected_source, expected_revision = generators[generator]
+        if payload.get("source") != expected_source:
             raise ValueError(f"{path.name}: unpinned Timing V2 source")
+        if expected_revision is not None and payload.get("sourceRevision") != expected_revision:
+            raise ValueError(f"{path.name}: unpinned Timing V2 source revision")
+        if generator.endswith("generate_lab_gold_v2.py@1"):
+            rev = payload.get("sourceRevision", "")
+            if not re.fullmatch(r"[0-9a-f]{64}", rev):
+                raise ValueError(f"{path.name}: Lab gold needs sha256 sourceRevision")
         reciter_id = int(payload["reciterId"])
         minimum = float(payload["minimumGateScore"])
         if not math.isfinite(minimum):

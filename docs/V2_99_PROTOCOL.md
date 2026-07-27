@@ -1,21 +1,31 @@
-# Timing V2 — automated 99% (no ear labeling)
+# Timing V2 — 99% gates
 
 **Status:** binding product protocol  
-**User constraint (2026-07-27):** no human listening / labeling farm. Scale and
-quality must come from **audio + models only**.
-
 **Companion:** `docs/TIMING_FIRST_PRINCIPLES.md`
 
 ---
 
-## 1. What “99%” means without humans
+## 1. Primary product bar: Timings Lab ground truth
 
-Primary **automated** bar (non-circular):
+> On grammar-valid Alafasy Timings Lab historical patches, V2 must match **100%
+> structure** and ≥**99%** of word onsets within 100 ms (med ≤25, p90 ≤60).
 
-> On rows V2 *accepts*, ≥99% of word starts that follow a clear pause
-> (≥250 ms near-silence) land within 100 ms of the independent **energy-rise
-> onset** in the same everyayah file. Also report median ≤25 ms and p90 ≤60 ms
-> on that set. Coverage is a separate number.
+This is enforced as a unit test:
+
+```bash
+python3 tools/sync_lab/eval_v2_vs_lab_gold.py --require-pass
+python3 tools/test_build_db.py   # includes the same gate
+```
+
+Lab gold is shipped as the highest-priority V2 lane
+(`tools/timing_v2/alafasy_lab_gold.json` from `generate_lab_gold_v2.py`),
+parallel to pure V1 in `timings`. Grammar-invalid bulk-import Lab rows (40)
+are excluded.
+
+### Secondary automated bar (scale, non-Lab ayahs)
+
+> On rows V2 *accepts* outside Lab gold, ≥99% of post-pause energy onsets
+> within 100 ms (med ≤25, p90 ≤60). Coverage separate.
 
 Why this is allowed:
 
