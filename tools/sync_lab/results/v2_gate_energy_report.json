@@ -1,0 +1,13 @@
+{
+  "keptRows": 2549,
+  "keptWordOccurrences": 31349,
+  "coveragePctOfAlafasy": 40.88,
+  "dropped": {
+    "energy_snap_failed": 0,
+    "dead_zone_or_invalid": 151,
+    "ctc_disagree": 0,
+    "ctc_unavailable": 0,
+    "repeat_skipped": 0
+  },
+  "note": "Accuracy and coverage are separate. Dual-witness agreement is not ear gold; freeze independent_labels before claiming 99%."
+}

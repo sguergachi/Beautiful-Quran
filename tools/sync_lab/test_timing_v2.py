@@ -248,6 +248,15 @@ def test_repeat_detection_and_payload_coverage_separate_from_accuracy():
     assert "note" in summary
 
 
+def test_wilson_and_protocol_claim_shape():
+    from eval_v2_against_labels import wilson_lower_bound
+
+    # 99% of 1200 with 8 misses → LCB still around 98%+
+    assert wilson_lower_bound(1192, 1200) > 0.98
+    assert wilson_lower_bound(990, 1000) > 0.98
+    assert wilson_lower_bound(50, 100) < 0.6
+
+
 def test_historical_overlap_reports_structure_not_gold():
     payload = {
         "reciterId": 1,
@@ -301,6 +310,7 @@ if __name__ == "__main__":
     test_qua_keyframes_animate_shared_and_silent_letters_without_fake_time()
     test_objective_flags_catch_past_duration_and_empty_spans()
     test_repeat_detection_and_payload_coverage_separate_from_accuracy()
+    test_wilson_and_protocol_claim_shape()
     test_historical_overlap_reports_structure_not_gold()
     print("timing V2 keyframe tests pass")
 
