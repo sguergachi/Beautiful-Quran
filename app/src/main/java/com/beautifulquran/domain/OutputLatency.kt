@@ -71,8 +71,20 @@ object OutputLatency {
      *
      * Net form (not sequential clamp) so lag and lead cancel cleanly:
      * `max(0, media − latency + lead)`.
+     *
+     * When [leadNotBeforeMs] is positive, encoded opening silence stays on the
+     * heard clock. The lead becomes eligible only when the first word actually
+     * starts, so it cannot arm word 1 while the reciter is still silent.
      */
-    fun highlightMs(mediaPositionMs: Long, latencyMs: Long, leadMs: Long = 0L): Long =
-        (mediaPositionMs - latencyMs.coerceAtLeast(0L) + leadMs.coerceAtLeast(0L))
+    fun highlightMs(
+        mediaPositionMs: Long,
+        latencyMs: Long,
+        leadMs: Long = 0L,
+        leadNotBeforeMs: Long = 0L,
+    ): Long {
+        val heardPositionMs = heardMs(mediaPositionMs, latencyMs)
+        if (heardPositionMs < leadNotBeforeMs.coerceAtLeast(0L)) return heardPositionMs
+        return (mediaPositionMs - latencyMs.coerceAtLeast(0L) + leadMs.coerceAtLeast(0L))
             .coerceAtLeast(0L)
+    }
 }

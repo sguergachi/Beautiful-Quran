@@ -47,7 +47,7 @@ the other consumers must not:
 
 | Consumer | Clock |
 |---|---|
-| Word ink (`activeWord`) | Heard position + `highlightLeadMs` |
+| Word ink (`activeWord`) | Heard position; + `highlightLeadMs` after word 1 starts |
 | Ayah fade lead (`ayahWithFadeLead`) | Heard position + its own `fadeLeadMs` |
 | Basmalah calligraphy wash | Heard position |
 
@@ -66,7 +66,9 @@ the opposite direction of output lag: lag delays ink to match late audio; lead
 runs ink ahead of the timing table. That early budget also raises the short-hold
 sweep floor (`minSweepMs + highlightLeadMs`) so small words and wasl tails can
 breathe longer instead of racing. It does not move the ayah handoff or basmalah
-wash. Neither lag nor lead is baked into `HighlightEngine`.
+wash. During encoded silence before word 1, the lead is gated off completely:
+the first wash starts only when the latency-corrected heard clock reaches the
+first segment. Neither lag nor lead is baked into `HighlightEngine`.
 
 ## Presets
 

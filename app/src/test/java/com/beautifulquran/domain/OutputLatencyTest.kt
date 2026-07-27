@@ -1,5 +1,6 @@
 package com.beautifulquran.domain
 
+import com.beautifulquran.data.model.Segment
 import com.beautifulquran.domain.OutputLatency.OutputKind
 import com.beautifulquran.domain.OutputLatency.Route
 import org.junit.Assert.assertEquals
@@ -72,6 +73,30 @@ class OutputLatencyTest {
             2_020L,
             OutputLatency.highlightMs(1_000L, latencyMs = 180L, leadMs = 1_200L),
         )
+    }
+
+    @Test
+    fun `word lead cannot cross encoded opening silence`() {
+        val segments = listOf(
+            Segment(position = 1, startMs = 1_179, endMs = 2_094),
+            Segment(position = 2, startMs = 2_094, endMs = 2_814),
+        )
+        val duringSilence = OutputLatency.highlightMs(
+            mediaPositionMs = 1_100,
+            latencyMs = 0,
+            leadMs = 114,
+            leadNotBeforeMs = segments.first().startMs,
+        )
+        assertEquals(1_100L, duringSilence)
+        assertEquals(null, HighlightEngine.activeWord(segments, duringSilence))
+
+        val voiceStart = OutputLatency.highlightMs(
+            mediaPositionMs = 1_179,
+            latencyMs = 0,
+            leadMs = 114,
+            leadNotBeforeMs = segments.first().startMs,
+        )
+        assertEquals(1, HighlightEngine.activeWord(segments, voiceStart))
     }
 
     @Test

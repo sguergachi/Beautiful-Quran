@@ -177,8 +177,9 @@ Key points, detailed in [PERFORMANCE.md](PERFORMANCE.md) and
   A2DP (and similar) deliver sound after the media playhead; Android has no
   reliable ear-delay API, so the reader subtracts a coarse route preset
   (`OutputLatency` / `AudioOutputLatency`) before `HighlightClock`. See
-  [OUTPUT_LATENCY.md](OUTPUT_LATENCY.md). Do not bake device lag into segments
-  or into `HighlightEngine`.
+  [OUTPUT_LATENCY.md](OUTPUT_LATENCY.md). The optional visual lead is gated
+  until the first segment starts, so it cannot cross encoded opening silence.
+  Do not bake device lag into segments or into `HighlightEngine`.
 - The lit word's `startMs`/`endMs` drive the letter-by-letter fade in the UI,
   which interpolates at the display's full refresh rate independently of the
   poll.
