@@ -1,0 +1,20 @@
+{
+  "split": "test",
+  "labeledRowsInSplit": 0,
+  "pendingRowsInSplit": 90,
+  "v2AcceptedAmongLabeled": 0,
+  "coverageAmongLabeledPct": 0.0,
+  "structureExact": 0,
+  "structureCompared": 0,
+  "structureExactPct": 0.0,
+  "onsets": {
+    "count": 0,
+    "medianMs": null,
+    "p90Ms": null,
+    "within100Pct": null
+  },
+  "within100WilsonLcb95": null,
+  "signedMedianMs": null,
+  "claimSentence": "0.00% of V2-timed onsets within 100ms (med=None, p90=None) on split=test; V2 accepted 0/1 labeled rows (0.0% of labeled). NOT a claim \u2014 labels pending.",
+  "note": "99% claim allowed only when test labels are done and bars in V2_99_PROTOCOL.md hold."
+}

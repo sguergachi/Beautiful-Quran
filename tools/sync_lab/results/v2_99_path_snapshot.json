@@ -1,0 +1,55 @@
+{
+  "date": "2026-07-27",
+  "protocol": "docs/V2_99_PROTOCOL.md",
+  "definition": ">=99% of accepted-row onsets within 100ms on frozen ear test; coverage stated separately",
+  "shipped": {
+    "artifact": "tools/timing_v2/alafasy_qua.json",
+    "gate": "energy snap \u00b180ms + dead-zone drop (gate_timing_v2.py@1)",
+    "acceptedRows": 2549,
+    "coveragePctOfAlafasy": 40.88,
+    "db": "quran-v30.db"
+  },
+  "objectiveEvidence": {
+    "postPauseGoldUngated": {
+      "medianMs": 41,
+      "p90Ms": 67,
+      "within100Pct": 96.86,
+      "n": 191
+    },
+    "postPauseGoldEnergyGated": {
+      "medianMs": 21.0,
+      "p90Ms": 53,
+      "within100Pct": 97.9,
+      "n": 238,
+      "signedMedianMs": -20.5
+    },
+    "dualWitnessMaxAbs100Sample": {
+      "keptRows": 58,
+      "onsets": 773,
+      "medianMs": 28,
+      "p90Ms": 72,
+      "within100Pct": 100.0,
+      "within60Pct": 82.1
+    },
+    "dualWitnessMaxAbs60Sample": {
+      "keptRows": 10,
+      "onsets": 66,
+      "medianMs": 11.5,
+      "p90Ms": 44,
+      "within100Pct": 100.0,
+      "within60Pct": 100.0
+    }
+  },
+  "pathToHeadline99": [
+    "1. Freeze sample (DONE): independent_labels/frozen_sample_v1.json \u2014 120 ayahs",
+    "2. Waveform-label ~1200-1500 onsets (~3h) blind to V2 via label_onsets.py",
+    "3. eval_v2_against_labels.py --split test \u2014 claim only if within100>=99 and med/p90 bars",
+    "4. Optional: full dual-witness maxAbs<=60 for a tighter high-accuracy subset (product med/p90 shape)",
+    "5. Different-take structure decoder for remaining ~59% coverage"
+  ],
+  "blockerForClaim": "0/90 test labels filled \u2014 ear labels unavoidable for headline 99%",
+  "notALieInterims": [
+    "Post-pause objective gold after energy gate: med 21 / p90 53 / 97.9% within100 (easy subset)",
+    "Dual-witness maxAbs<=60 sample: 100% within60 and within100 (tiny n; expand for ship subset)"
+  ]
+}

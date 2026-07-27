@@ -406,19 +406,24 @@ Audio auto-downloads from `https://everyayah.com/data/<slug>/SSSAAA.mp3`.
 
 ## 10. Immediate next task for the continuing agent
 
-**Done (2026-07-27 scale pass):** land 2,700 same-take QUA rows; duration +
-multi-window clock falsification; mono CTC witness; metrics snapshot under
-`tools/sync_lab/results/v2_scale_snapshot.json`.
+**Binding 99% protocol:** [`docs/V2_99_PROTOCOL.md`](V2_99_PROTOCOL.md)  
+**Path snapshot:** `tools/sync_lab/results/v2_99_path_snapshot.json`
 
-**Priority 1:** Create the frozen independent structure/onset labels and
-adjudicate the 40 incompatible historical rows. Without this, 99% is
-undefendable.
+**Done (2026-07-27):**
+- Land same-take QUA + energy-snap/dead-zone gate → **2,549** rows (~40.9% Alafasy), DB **v30**
+- Post-pause objective gold after gate: **med 21 / p90 53 / 97.9% ≤100 ms** (easy subset)
+- Dual-witness sample maxAbs≤60: **100% ≤60 ms** (tiny n; expand for high-accuracy subset)
+- Freeze **120-ayah** independent sample (`independent_labels/frozen_sample_v1.json`)
+- Label tooling: `label_onsets.py`, `eval_v2_against_labels.py`
 
-**Priority 2:** Time-localized constrained CTC for the ~57% different-take
-ayahs; retire flattened substring/edit scoring as the primary path.
+**Priority 1 (blocks headline 99%):** Fill frozen ear labels (~3h waveform work).  
+Then `eval_v2_against_labels.py --split test`. Claim only if protocol bars hold.
 
-**Priority 3:** Calibrate abstention on ear validation; publish accuracy and
-coverage separately; only then raise coverage toward full-reciter cutover.
+**Priority 2:** Full dual-witness maxAbs≤60 regen for a product-bar subset; keep
+energy-only as broader coverage lane.
+
+**Priority 3:** Time-localized CTC for different-take ~59%; structure labels for
+repeat P/R.
 
 ---
 
