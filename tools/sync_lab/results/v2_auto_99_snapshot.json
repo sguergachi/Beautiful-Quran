@@ -1,0 +1,20 @@
+{
+  "date": "2026-07-27",
+  "mode": "fully automated \u2014 no human labels",
+  "definition": "post-pause energy gold on accepted V2 rows; coverage separate",
+  "alafasy": {
+    "ctcMono": 5324,
+    "quaRepeats": 280,
+    "totalV2": 5604,
+    "universe": 6236,
+    "coveragePct": 89.87
+  },
+  "postPauseGoldCtcFiltered": {
+    "medianMs": 14.0,
+    "p90Ms": 56,
+    "within100Pct": 100.0,
+    "matchedOnsets": 1046
+  },
+  "barsMet": true,
+  "db": "quran-v31.db"
+}

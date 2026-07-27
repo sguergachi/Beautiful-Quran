@@ -257,6 +257,30 @@ def test_wilson_and_protocol_claim_shape():
     assert wilson_lower_bound(50, 100) < 0.6
 
 
+def test_auto_confidence_rejects_dead_zone_and_scores_onsets():
+    import numpy as np
+    from auto_confidence import accept_row, dead_zone, row_confidence
+
+    sr = 16_000
+    # deep silence, then a loud burst so peak >> local silence
+    y = np.full(sr * 2, 1e-6, dtype=np.float32)
+    t = np.arange(sr) / sr
+    y[sr:] = 0.8 * np.sin(2 * np.pi * 220 * t).astype(np.float32)
+    assert dead_zone(y, sr, 200) is True
+    assert dead_zone(y, sr, 1100) is False
+    conf = row_confidence([1100], y, sr, match_ms=40)
+    assert conf["deadZones"] == 0
+    assert accept_row({"deadZones": 1, "onsetMatchFrac": 1.0, "onsetHitFrac": 1.0, "n": 1}) is False
+    assert accept_row(
+        {"deadZones": 0, "onsetMatchFrac": 0.9, "onsetHitFrac": 0.9, "n": 10},
+        min_onset_match_frac=0.85,
+    )
+    assert not accept_row(
+        {"deadZones": 0, "onsetMatchFrac": 0.5, "onsetHitFrac": 0.5, "n": 10},
+        min_onset_match_frac=0.85,
+    )
+
+
 def test_historical_overlap_reports_structure_not_gold():
     payload = {
         "reciterId": 1,
@@ -311,6 +335,7 @@ if __name__ == "__main__":
     test_objective_flags_catch_past_duration_and_empty_spans()
     test_repeat_detection_and_payload_coverage_separate_from_accuracy()
     test_wilson_and_protocol_claim_shape()
+    test_auto_confidence_rejects_dead_zone_and_scores_onsets()
     test_historical_overlap_reports_structure_not_gold()
     print("timing V2 keyframe tests pass")
 
