@@ -60,6 +60,13 @@ data class ActiveWord(
     val spokenMs: Long = durationMs,
     /** Machine-generated acoustic reveal points; empty on the V1 lane. */
     val subwordKeyframes: List<SubwordKeyframe> = emptyList(),
+    /**
+     * Acoustic wasl budget into this word (ms), measured at build time.
+     * Non-zero only on true V2 occurrences with a continuous nūn-rule join.
+     */
+    val waslFromPrevMs: Long = 0L,
+    /** Acoustic wasl into the next occurrence (for outgoing bloom on this word). */
+    val nextWaslFromPrevMs: Long = 0L,
     val isRepeat: Boolean = false,
     val highWater: Int = wordPosition,
     /** First word of the active repeat chain: while repeating, words
@@ -428,6 +435,8 @@ class ReaderViewModel(
                     spokenMs = (it.endMs - it.startMs)
                         .coerceIn(0L, (it.holdEndMs - it.startMs).coerceAtLeast(0L)),
                     subwordKeyframes = it.subwordKeyframes,
+                    waslFromPrevMs = it.waslFromPrevMs,
+                    nextWaslFromPrevMs = it.nextWaslFromPrevMs,
                     isRepeat = it.isRepeat,
                     highWater = it.highWater,
                     repeatStart = it.repeatStart,

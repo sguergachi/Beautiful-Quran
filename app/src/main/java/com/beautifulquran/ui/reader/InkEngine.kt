@@ -426,22 +426,41 @@ object InkEngine {
         )
     }
 
-    /** V1-only cross-word prefix bloom for a nūn/tanwīn connection. */
+    /**
+     * Cross-word nūn-rule prefix bloom.
+     *
+     * V1: orthographic wasl only (when Tajweed is enabled).
+     * V2: only when build-time audio measured a continuous wasl into this word
+     * ([waslFromPrevMs] > 0); still uses the next word's opening-letter share
+     * for bloom geometry, with the measured budget driving duration via
+     * [waslPrefixStart].
+     */
     fun connection(
         prevArabic: String,
         arabic: String,
         timingScheme: TimingScheme = TimingScheme.V1,
+        waslFromPrevMs: Long = 0L,
     ): TajweedPacing.Connection? {
         val t = tuning
-        if (
-            timingScheme != TimingScheme.V1 ||
-            !t.tajweedPacing ||
-            !t.holdConnect
-        ) {
-            return null
+        if (timingScheme == TimingScheme.V2) {
+            if (waslFromPrevMs <= 0L || !t.holdConnect) return null
+            // Geometry still from text; existence is acoustic.
+            return TajweedPacing.connection(prevArabic, arabic)
         }
+        if (!t.tajweedPacing || !t.holdConnect) return null
         return TajweedPacing.connection(prevArabic, arabic)
     }
+
+    /**
+     * Speed-ceiling target for wasl bloom. V2 uses the measured acoustic
+     * budget when present; V1 keeps the shipped default.
+     */
+    fun waslPrefixTargetMs(waslFromPrevMs: Long = 0L): Int =
+        if (waslFromPrevMs > 0L) {
+            waslFromPrevMs.toInt().coerceIn(40, 800)
+        } else {
+            tuning.waslPrefixMs
+        }
 
     /**
      * Feather width for a tajweed-paced wash. Paced words keep the whole-word

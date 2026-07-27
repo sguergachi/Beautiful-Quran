@@ -257,6 +257,35 @@ def test_wilson_and_protocol_claim_shape():
     assert wilson_lower_bound(50, 100) < 0.6
 
 
+def test_wasl_acoustic_requires_text_and_continuous_energy():
+    import numpy as np
+    from wasl_acoustic import detect_wasl_links, text_wasl_candidate
+
+    assert text_wasl_candidate("مِن", "رَبِّهِم")
+    assert not text_wasl_candidate("فِي", "رَبِّهِم")
+    sr = 8_000
+    # Continuous tone across a zero-gap boundary → wasl when text matches.
+    y = (0.2 * np.sin(2 * np.pi * 180 * np.arange(sr) / sr)).astype(np.float32)
+    segs = [
+        {"position": 1, "startMs": 0, "endMs": 400},
+        {"position": 2, "startMs": 400, "endMs": 900},
+    ]
+    words = ["مِن", "رَبِّهِم"]
+    links = detect_wasl_links(y, sr, segs, words)
+    assert len(links) == 1
+    assert links[0].next_index == 1
+    assert links[0].wasl_from_prev_ms >= 40
+    # Silence gap → no acoustic wasl
+    y2 = np.zeros(sr, dtype=np.float32)
+    y2[: int(0.35 * sr)] = 0.2
+    y2[int(0.55 * sr) :] = 0.2
+    segs2 = [
+        {"position": 1, "startMs": 0, "endMs": 350},
+        {"position": 2, "startMs": 550, "endMs": 900},
+    ]
+    assert detect_wasl_links(y2, sr, segs2, words) == []
+
+
 def test_auto_confidence_rejects_dead_zone_and_scores_onsets():
     import numpy as np
     from auto_confidence import accept_row, dead_zone, row_confidence
@@ -335,6 +364,7 @@ if __name__ == "__main__":
     test_objective_flags_catch_past_duration_and_empty_spans()
     test_repeat_detection_and_payload_coverage_separate_from_accuracy()
     test_wilson_and_protocol_claim_shape()
+    test_wasl_acoustic_requires_text_and_continuous_energy()
     test_auto_confidence_rejects_dead_zone_and_scores_onsets()
     test_historical_overlap_reports_structure_not_gold()
     print("timing V2 keyframe tests pass")

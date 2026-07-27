@@ -591,9 +591,15 @@ class InkEngineTest {
             assertNotNull(
                 InkEngine.connection("مِن", "رَّبِّكُم", TimingScheme.V1),
             )
+            // No measured wasl → no bloom (unlike V1 text-only wasl).
             assertNull(
-                InkEngine.connection("مِن", "رَّبِّكُم", TimingScheme.V2),
+                InkEngine.connection("مِن", "رَّبِّكُم", TimingScheme.V2, waslFromPrevMs = 0L),
             )
+            // Acoustic wasl budget enables the connection bloom for V2.
+            assertNotNull(
+                InkEngine.connection("مِن", "رَّبِّكُم", TimingScheme.V2, waslFromPrevMs = 200L),
+            )
+            assertEquals(200, InkEngine.waslPrefixTargetMs(200L))
         } finally {
             InkEngine.tuning = saved
         }

@@ -69,6 +69,12 @@ data class Segment(
     val endMs: Long,
     /** Empty for V1; machine-generated acoustic keyframes for Timing V2. */
     val subwordKeyframes: List<SubwordKeyframe> = emptyList(),
+    /**
+     * Measured wasl bloom budget (ms) donated by the previous word when audio
+     * shows a continuous nūn-rule connection into this occurrence. 0 = none.
+     * V1 ignores this field (text-rule wasl only).
+     */
+    val waslFromPrevMs: Long = 0L,
 )
 
 data class SurahContent(
