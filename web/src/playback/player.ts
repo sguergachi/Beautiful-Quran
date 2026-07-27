@@ -792,7 +792,8 @@ export class PlayerController {
       // media element (and so a mid-await pause still sees isPlaying).
       this.publishNowPlaying({ playing: true })
       this.active.loop = this.state.repeatMode === 'ayah'
-      this.active.playbackRate = this.state.speed
+      // Prefer transport helper so defaultPlaybackRate stays in sync.
+      this.transport.setSpeed(this.state.speed)
       this.updateMediaSession()
       try {
         this.setBuffering(false)
@@ -907,6 +908,10 @@ export class PlayerController {
           this.setBuffering(false)
           return
         }
+        // After canplay: src/load can leave rate at 1 even when state.speed is
+        // a restored 0.75. Cycling speed worked because it set rate on ready
+        // media — do that here so the first Play is already correct.
+        this.transport.setSpeed(this.state.speed)
         this.seekActiveToAudibleStart(i)
         await this.active.play()
         if (token !== this.playToken) return
@@ -1130,6 +1135,8 @@ export class PlayerController {
         await this.transport.waitForCanPlay()
       }
       if (token !== this.playToken || !this.state.isPlaying) return
+      // Restored non-1× must stick on resume of a quiet-open clip too.
+      this.transport.setSpeed(this.state.speed)
       this.seekActiveToAudibleStart(this.index)
       await this.active.play()
       if (token !== this.playToken || !this.state.isPlaying) return
