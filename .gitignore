@@ -1,21 +1,24 @@
-.gradle/
+
+.android-emulator.log
+# as app/src/main/assets/quran.db so normal app builds are offline.
 build/
-local.properties
+captures/
+.cxx/
+.externalNativeBuild/
+.gradle/
 .idea/
+images/
 *.iml
 .kotlin/
-captures/
-.externalNativeBuild/
-.cxx/
-.android-emulator.log
-web/node_modules/
-web/dist/
-web/public/quran.db
-_site/
-
-# Source data cache for tools/build_db.py. The built database is committed
-# as app/src/main/assets/quran.db so normal app builds are offline.
-tools/.cache/
+local.properties
 __pycache__/
 release.keystore
-images/
+_site/
+# Source data cache for tools/build_db.py. The built database is committed
+tools/.cache/
+tools/sync_lab/audio/
+tools/sync_lab/cache/
+web/dist/
+web/node_modules/
+web/public/quran.db
+tools/sync_lab/results/lab_*.json

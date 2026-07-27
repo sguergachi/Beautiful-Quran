@@ -94,6 +94,10 @@ Requires **JDK 21**. No Android device/emulator is needed for tests.
    one active word, recess via ayah veil) but do not degrade the wash itself.
    Arabic glyphs stay full opaque ink under a paper cover; never dim Hafs via
    glyph alpha. Web and Android must feel like the same product.
+8. **Word↔recitation sync is the product core.** The app exists so written
+   words and the reciter's voice feel like one act — millisecond-accurate,
+   word-by-word timing in total sync. Timing data quality and felt sync beat
+   every secondary feature. See [docs/SYNC_FIDELITY.md](docs/SYNC_FIDELITY.md).
 
 ## Code conventions
 
@@ -117,6 +121,9 @@ Requires **JDK 21**. No Android device/emulator is needed for tests.
 | `docs/ASSISTANT.md` | Android voice work — media hooks, App Actions, Gemini AppFunctions, testing, and release gates |
 | `docs/COMPLEXITY.md` | Complexity hotspots, subsystem ownership, and safe simplification roadmap |
 | `docs/quality-reviews/` | Multi-agent Android quality audits (summary + Grok/Codex; Claude when available) |
+| `docs/SYNC_FIDELITY.md` | **Product core** — word↔recitation sync is the app; ms/sub-word timing roadmap |
+| `docs/TIMING_FIRST_PRINCIPLES.md` | **Handoff** — first-principles timing plan, lab results, 409-patch gate, roadmap |
+| `tools/sync_lab/RESULTS.md` | Automated aligner bake-off (scale+quality) and winner pipeline |
 | `docs/HIGHLIGHT_ENGINE.md` | The pure word-sync engine — karaoke model, binary search, repeat/high-water logic |
 | `docs/OUTPUT_LATENCY.md` | Route-based Bluetooth/output lag presets applied before the highlight clock |
 | `docs/DESIGN.md` | Any UI/visual change — the paper metaphor and its hard rules |

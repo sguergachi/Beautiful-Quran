@@ -15,6 +15,8 @@ Quick essentials (details and rationale in AGENTS.md):
   Read `docs/DESIGN.md` before any UI change.
 - Ink karaoke fidelity is non-negotiable: soft directional wash with a visible
   faded leading edge (never hard peels / whole-word opacity for "perf").
+- **Word↔recitation sync is the product core** — timing fidelity first; see
+  `docs/SYNC_FIDELITY.md`.
 
 ## PR Workflow
 
