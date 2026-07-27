@@ -90,6 +90,14 @@ def densify_keyframes_from_ctc(
     return rebuilt
 
 
+def _already_letter_dense(segments: list[dict]) -> bool:
+    """True when most spans already carry multi-point acoustic keyframes."""
+    if not segments:
+        return False
+    multi = sum(1 for s in segments if len(s.get("keyframes") or []) > 1)
+    return multi >= max(1, int(0.7 * len(segments)))
+
+
 def enrich_row(
     row: dict,
     words: list[str],
@@ -97,11 +105,17 @@ def enrich_row(
     model_id: str,
     y: np.ndarray | None = None,
     sr: int | None = None,
+    *,
+    force_letter: bool = False,
 ) -> dict:
     segs = row["segments"]
-    dense = densify_keyframes_from_ctc(audio, words, segs, model_id)
-    if dense is not None:
-        segs = dense
+    letter_ok = _already_letter_dense(segs)
+    dense = None
+    if force_letter or not letter_ok:
+        dense = densify_keyframes_from_ctc(audio, words, segs, model_id)
+        if dense is not None:
+            segs = dense
+            letter_ok = True
     if y is None:
         y, sr = load_mono_16k(audio)
     links = detect_wasl_links(y, sr, segs, words)
@@ -109,7 +123,7 @@ def enrich_row(
     out = dict(row)
     out["segments"] = segs
     out["precision"] = {
-        "letterKeyframes": dense is not None,
+        "letterKeyframes": letter_ok,
         "waslLinks": len(links),
         "tool": GENERATOR_NOTE,
     }
@@ -132,6 +146,16 @@ def main() -> int:
     )
     parser.add_argument("--limit", type=int, default=0)
     parser.add_argument("--surah", type=int)
+    parser.add_argument(
+        "--force-letter",
+        action="store_true",
+        help="Re-run CTC letter densify even when multi-point keyframes already exist",
+    )
+    parser.add_argument(
+        "--checkpoint",
+        type=Path,
+        help="JSONL resume file (surah:ayah lines already done)",
+    )
     args = parser.parse_args()
 
     payload = json.loads(args.inp.read_text(encoding="utf-8"))
@@ -141,16 +165,36 @@ def main() -> int:
     if args.limit:
         rows_in = rows_in[: args.limit]
 
+    done: dict[tuple[int, int], dict] = {}
+    if args.checkpoint and args.checkpoint.exists():
+        for line in args.checkpoint.read_text(encoding="utf-8").splitlines():
+            if not line.strip():
+                continue
+            rec = json.loads(line)
+            done[(int(rec["surah"]), int(rec["ayah"]))] = rec["row"]
+        print(f"resumed {len(done)} rows from {args.checkpoint}")
+
     out_rows = []
     letter_ok = wasl_n = 0
+    ckpt = args.checkpoint.open("a", encoding="utf-8") if args.checkpoint else None
     for i, row in enumerate(rows_in):
         surah, ayah = int(row["surah"]), int(row["ayah"])
+        key = (surah, ayah)
+        if key in done:
+            enriched = done[key]
+            out_rows.append(enriched)
+            if enriched.get("precision", {}).get("letterKeyframes"):
+                letter_ok += 1
+            wasl_n += int(enriched.get("precision", {}).get("waslLinks") or 0)
+            continue
         words = load_words(args.db, surah, ayah)
         audio = args.audio_dir / f"{surah:03d}{ayah:03d}.mp3"
         if not audio.exists() or len(words) == 0:
             out_rows.append(row)
             continue
-        enriched = enrich_row(row, words, audio, args.model)
+        enriched = enrich_row(
+            row, words, audio, args.model, force_letter=args.force_letter
+        )
         if enriched.get("precision", {}).get("letterKeyframes"):
             letter_ok += 1
         wasl_n += int(enriched.get("precision", {}).get("waslLinks") or 0)
@@ -158,11 +202,18 @@ def main() -> int:
         if not enriched.get("audioSha256"):
             enriched["audioSha256"] = hashlib.sha256(audio.read_bytes()).hexdigest()
         out_rows.append(enriched)
-        if (i + 1) % 25 == 0:
+        if ckpt:
+            ckpt.write(
+                json.dumps({"surah": surah, "ayah": ayah, "row": enriched}) + "\n"
+            )
+            ckpt.flush()
+        if (i + 1) % 50 == 0:
             print(
                 f"progress {i+1}/{len(rows_in)} letter={letter_ok} wasl_links={wasl_n}",
                 flush=True,
             )
+    if ckpt:
+        ckpt.close()
 
     payload = dict(payload)
     payload["rows"] = out_rows
