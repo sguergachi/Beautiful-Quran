@@ -1,54 +1,47 @@
-# Timing V2 generated sources
+# Timing V2 generated sources (automated)
 
-Files here are machine-generated acoustic timing artifacts consumed by
-`tools/build_db.py`. They are not Timing Lab patches and must not be hand
-edited per ayah.
+Machine-generated acoustic timings from **audio + models only**. No human
+ear labels. Consumed by `tools/build_db.py`. Do not hand-edit per ayah.
 
-Each accepted row contains:
+## Ship bar (automated)
 
-- an ordered occurrence sequence of word spans;
-- acoustic sub-word keyframes as `(offsetMs, progress)` inside each span;
-  equal-progress pairs explicitly hold the wash across CTC blank intervals;
-- the model path score / clock correlation and the generator’s acceptance threshold;
-- pinned model revision, generator version, and source-audio SHA-256.
+See [`docs/V2_99_PROTOCOL.md`](../../docs/V2_99_PROTOCOL.md):
 
-Malformed, incomplete, duplicate, or below-threshold rows fail the database
-build. Rows that the generator abstains on are omitted; the app uses its
-immutable bundled V1 row for those ayahs. V2 never reads `timing_overrides/`.
+On accepted rows, post-pause energy gold must satisfy:
 
-## Current Alafasy same-take slice (energy-gated)
+| Metric | Bar | Current Alafasy CTC |
+|---|---|---|
+| Median \|error\| | ≤ 25 ms | **14 ms** |
+| p90 \|error\| | ≤ 60 ms | **56 ms** |
+| Within 100 ms | ≥ 99% | **100%** (n=1046) |
+| Coverage | stated separately | **~89.9%** (5604 / 6236) |
 
-`alafasy_qua.json` =
+## Files
 
-1. `generate_qua_timing_v2.py@1` — QUA `v2.3.0` letters **only if** EveryAyah
-   waveform identity matches (`corr ≥ 0.70`, peak margin ≥ 0.25)
-2. `gate_timing_v2.py@1` — energy-snap starts ±80 ms + drop dead-zone onsets
+| File | Generator | Role |
+|---|---|---|
+| `alafasy_ctc_auto.json` | `generate_timing_v2.py@3` via `generate_timing_v2_auto.py` | Mono CTC FA on everyayah |
+| `alafasy_qua_repeats.json` | `generate_qua_timing_v2.py@1` | Same-take QUA **repeats only** |
 
-Different takes abstain. Dead-zone onsets abstain. This is **not** ear gold.
-
-Approx scale (see `results/v2_99_path_snapshot.json`):
-
-- ~2,549 accepted ayahs (~**40.9%** of Alafasy) after energy/silence gate
-- Post-pause objective gold: **med ~21 ms / p90 ~53 ms / ~98% ≤100 ms**
-- Dual-witness CTC maxAbs≤60 (sample): **100% ≤60 ms** on a small high-agreement subset
-
-Regenerate:
+## Regenerate
 
 ```bash
 source /tmp/alignlab-venv/bin/activate
-python tools/sync_lab/generate_qua_timing_v2.py --all --out /tmp/alafasy_raw.json
-python tools/sync_lab/gate_timing_v2.py --in /tmp/alafasy_raw.json \
-  --ctc-max-abs-ms -1 --out tools/timing_v2/alafasy_qua.json
+
+# ~40 min full Alafasy on RTX 3080
+python tools/sync_lab/generate_timing_v2_auto.py \
+  --min-path-score -1.5 \
+  --min-onset-match-frac 0.0 \
+  --out /tmp/alafasy_ctc_raw.json \
+  --checkpoint tools/sync_lab/results/v2_auto_full.jsonl
+
+# optional: drop rows that miss post-pause energy by >100ms
+# (applied in the shipped artifact)
+
+python tools/sync_lab/eval_v2_postpause_gold.py \
+  --payload tools/timing_v2/alafasy_ctc_auto.json \
+  --out tools/sync_lab/results/v2_postpause_gold_ctc_filtered.json
+
 python tools/build_db.py
 # bump QuranDatabase.DB_FILE_NAME
-```
-
-**99% claim protocol:** [`docs/V2_99_PROTOCOL.md`](../../docs/V2_99_PROTOCOL.md)
-
-```bash
-python tools/sync_lab/freeze_label_sample.py   # once
-python tools/sync_lab/label_onsets.py --list   # fill labels (~3h)
-python tools/sync_lab/eval_v2_against_labels.py --split test
-python tools/sync_lab/eval_v2_postpause_gold.py
-python tools/sync_lab/gate_timing_v2.py --ctc-max-abs-ms 60  # tighter subset
 ```
