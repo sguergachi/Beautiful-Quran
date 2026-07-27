@@ -47,8 +47,8 @@ OVERRIDES_DIR = Path(__file__).resolve().parent / "timing_overrides"
 # reproduction scratch only; CI rejects committed override JSON.
 REPAIRS_DIR = Path(__file__).resolve().parent / "timing_repairs"
 # Audio-grounded leading-silence measurements produced by
-# tools/detect_audio_onsets.py. Applied after structural repairs so every pass
-# moves together, and before Lab overrides (whose marks already use file time).
+# tools/detect_audio_onsets.py. Applied after structural repairs so the opening
+# wash uses final topology, and before Lab overrides (whose marks use file time).
 AUDIO_ONSETS_DIR = Path(__file__).resolve().parent / "audio_onsets"
 MAX_AUDIO_ONSET_MS = 7_900
 
@@ -775,6 +775,56 @@ def adjust_qdc_segments(segs, n_words, stats, words=None):
     return adjusted
 
 
+def qdc_clock_offset(segs, reference):
+    """Return the robust qdc-to-everyayah clock translation for one ayah."""
+    if not segs or not reference:
+        return None
+    qdc_first = {}
+    for pos, start, end in segs:
+        qdc_first.setdefault(pos, (start, end))
+    reference_first = {pos: (start, end) for pos, start, end in reference}
+    first_position = segs[0][0]
+    offsets = [
+        reference_first[pos][0] - start
+        for pos, (start, _) in qdc_first.items()
+        if pos != first_position and pos in reference_first
+    ]
+    if first_position in reference_first:
+        offsets.append(reference_first[first_position][1] - segs[0][2])
+    offsets.sort()
+    if len(offsets) == 2 and offsets[0] != offsets[1]:
+        return min(offsets, key=abs)
+    return offsets[len(offsets) // 2] if offsets else None
+
+
+def rebase_qdc_clock(segs, reference):
+    """Translate a repeat-aware qdc row onto its everyayah MP3 clock.
+
+    Quran-align cannot preserve repeats, but its monotonic boundaries use the
+    exact files streamed by the app. The median first-pass boundary difference
+    gives one robust per-ayah translation without altering qdc topology.
+    """
+    offset = qdc_clock_offset(segs, reference)
+    if offset is None:
+        return segs
+    rebased = []
+    for pos, start, end in segs:
+        shifted_start = max(0, start + offset)
+        shifted_end = max(shifted_start + 1, end + offset)
+        rebased.append([pos, shifted_start, shifted_end])
+    if [s[1] for s in rebased] != sorted({s[1] for s in rebased}):
+        return segs
+    reference_by_pos = {pos: (start, end) for pos, start, end in reference}
+    first_reference = reference_by_pos.get(rebased[0][0])
+    if first_reference and rebased[0][1] < first_reference[0] < rebased[0][2]:
+        # qdc sometimes clamps a negative first-word start to zero. Restore
+        # only that opening boundary; every later boundary keeps one offset.
+        rebased[0][1] = first_reference[0]
+    if [s[1] for s in rebased] != sorted({s[1] for s in rebased}):
+        return segs
+    return rebased
+
+
 def adjust_segments(segs, n_words, surah, ayah, stats):
     """Map quran-align 0-based word indices onto 1-based positions of our
     canonical words; strip basmalah words prefixed to first-ayah audio."""
@@ -979,12 +1029,36 @@ def apply_boundary_repair(current, repaired):
     return out
 
 
-def apply_timing_repairs(timing_rows, word_counts):
+def sanitize_timing_row(segs):
+    """Clamp a translated opening to zero, or reject a collapsed timing row."""
+    out = []
+    for pos, start, end in segs:
+        start = max(0, start)
+        out.append([pos, start, max(start + 1, end)])
+    starts = [seg[1] for seg in out]
+    valid = starts == sorted(set(starts)) and not any(
+        out[i][2] > out[i + 1][1] for i in range(len(out) - 1)
+    )
+    return out if valid else None
+
+
+def apply_clocked_timing_repair(current, repaired, clock_offset):
+    """Merge one structural repair on the current clock, failing open safely."""
+    translated = [
+        [pos, start + clock_offset, end + clock_offset]
+        for pos, start, end in repaired
+    ]
+    merged = rebase_timing_repair(current, translated) if current else translated
+    return sanitize_timing_row(merged) or current
+
+
+def apply_timing_repairs(timing_rows, word_counts, clock_offsets=None):
     """Apply auto-generated CTC-arbitrated repairs (tools/timing_repairs/*.json)
     on top of the current source rows. Structural differences and their
     immediate neighbours use the repair; matching segments retain current
     timing so stale full-row patches cannot overwrite unrelated improvements.
     Repairs that erase an existing multi-position span-repeat are skipped."""
+    clock_offsets = clock_offsets or {}
     slug_by_id = {r[0]: r[1] for r in RECITERS}
     by_key = {(rid, sid, ay): segs for (rid, sid, ay, segs) in timing_rows}
     files = sorted(REPAIRS_DIR.glob("*.json")) if REPAIRS_DIR.is_dir() else []
@@ -995,6 +1069,7 @@ def apply_timing_repairs(timing_rows, word_counts):
     applied = 0
     span_protected = 0
     rebased = 0
+    clock_rejected = 0
     for path in files:
         try:
             payload = json.loads(path.read_text(encoding="utf-8"))
@@ -1019,6 +1094,7 @@ def apply_timing_repairs(timing_rows, word_counts):
                 segs.append([pos, start, end])
             segs.sort(key=lambda s: s[1])
             key = (rid, sid, ay)
+            offset = clock_offsets.get(key, 0)
             pre_raw = by_key.get(key)
             kind = edit.get("kind", "repair")
             if kind == "boundary":
@@ -1030,7 +1106,15 @@ def apply_timing_repairs(timing_rows, word_counts):
                     sys.exit(1)
                 current = json.loads(pre_raw) if isinstance(pre_raw, str) else pre_raw
                 try:
-                    merged = apply_boundary_repair(current, segs)
+                    translated = [
+                        [pos, start + offset, end + offset]
+                        for pos, start, end in segs
+                    ]
+                    merged = sanitize_timing_row(
+                        apply_boundary_repair(current, translated)
+                    )
+                    if merged is None:
+                        raise ValueError("clock translation collapses segment starts")
                 except ValueError as e:
                     print(f"  !! repair {path.name}: surah {sid} ayah {ay}: {e}", file=sys.stderr)
                     sys.exit(1)
@@ -1044,8 +1128,16 @@ def apply_timing_repairs(timing_rows, word_counts):
                     span_protected += 1
                     continue
             current = json.loads(pre_raw) if isinstance(pre_raw, str) else pre_raw or []
-            merged = rebase_timing_repair(current, segs) if current else segs
-            if merged != segs:
+            translated = [
+                [pos, start + offset, end + offset]
+                for pos, start, end in segs
+            ]
+            candidate = rebase_timing_repair(current, translated) if current else translated
+            merged = sanitize_timing_row(candidate)
+            if merged is None:
+                clock_rejected += 1
+                continue
+            if merged != translated:
                 rebased += 1
             by_key[key] = json.dumps(merged, separators=(",", ":"))
             by_kind[kind] = by_kind.get(kind, 0) + 1
@@ -1053,31 +1145,44 @@ def apply_timing_repairs(timing_rows, word_counts):
     new_rows = [(rid, sid, ay, segs) for (rid, sid, ay), segs in sorted(by_key.items())]
     print(
         f"  repairs: {applied} ayah(s) across {len(files)} file(s), "
-        f"{rebased} rebased, {span_protected} span-protected — {by_kind}"
+        f"{rebased} rebased, {span_protected} span-protected, "
+        f"{clock_rejected} unsafe-clock skipped — {by_kind}"
     )
     return new_rows
 
 
-def offset_for_audio_onset(segs, onset_ms):
-    """Move a timing row onto the first voiced sample of its everyayah file.
+def offset_for_audio_onset(segs, onset_ms, exact_file_clock=True):
+    """Hold the first wash until the first voiced sample of its everyayah file.
 
-    Sources sometimes pin the first word to zero even when the individual MP3
-    has encoded silence. Preserve a source that already starts later: the
-    correction is only the still-unaccounted-for part of the measured onset.
+    The row has already been rebased to the file clock, so an opening boundary
+    that spans the onset is clamped without moving any later word. Fall back to
+    translating the row only when its whole first segment predates the voice.
     """
     if not segs:
         return segs
-    delta = max(0, int(onset_ms) - int(segs[0][1]))
+    onset_ms = int(onset_ms)
+    if exact_file_clock:
+        out = [list(seg) for seg in segs]
+        out[0][1] = onset_ms
+        if out[0][2] <= onset_ms:
+            next_start = out[1][1] if len(out) > 1 else onset_ms + 1
+            out[0][2] = max(onset_ms + 1, next_start)
+        return out
+    delta = max(0, onset_ms - int(segs[0][1]))
+    if delta == 0:
+        return segs
     return [[pos, start + delta, end + delta] for pos, start, end in segs]
 
 
-def apply_audio_onsets(timing_rows, evidence_dir=AUDIO_ONSETS_DIR):
+def apply_audio_onsets(
+    timing_rows, evidence_dir=AUDIO_ONSETS_DIR, file_clock_rows=None
+):
     """Apply everyayah voice onsets and return rows plus immutable media metadata."""
     slug_by_id = {r[0]: r[1] for r in RECITERS}
     by_key = {(rid, sid, ay): segs for rid, sid, ay, segs in timing_rows}
     onsets = {}
     files = sorted(evidence_dir.glob("*.json")) if evidence_dir.is_dir() else []
-    shifted = 0
+    aligned = 0
     for path in files:
         try:
             payload = json.loads(path.read_text(encoding="utf-8"))
@@ -1118,11 +1223,18 @@ def apply_audio_onsets(timing_rows, evidence_dir=AUDIO_ONSETS_DIR):
                 sys.exit(1)
             onsets[key] = onset
             current = json.loads(raw) if isinstance(raw, str) else raw
-            corrected = offset_for_audio_onset(current, onset)
+            exact_file_clock = file_clock_rows is None or key in file_clock_rows
+            if exact_file_clock and len(current) > 1 and onset >= current[1][1]:
+                exact_file_clock = False
+            corrected = offset_for_audio_onset(
+                current,
+                onset,
+                exact_file_clock=exact_file_clock,
+            )
             if corrected != current:
-                shifted += 1
+                aligned += 1
                 by_key[key] = json.dumps(corrected, separators=(",", ":"))
-    print(f"  audio onsets: {shifted} ayah(s) shifted across {len(files)} file(s)")
+    print(f"  audio onsets: {aligned} first wash(es) aligned across {len(files)} file(s)")
     rows = [(rid, sid, ay, segs) for (rid, sid, ay), segs in sorted(by_key.items())]
     return rows, onsets
 
@@ -1559,6 +1671,8 @@ def main():
     timing_rows = []
     reciter_rows = []
     alignment_references = {}
+    timing_clock_offsets = {}
+    file_clock_rows = set()
     needs_alignment_evidence = any(OVERRIDES_DIR.glob("*.json"))
     if args.skip_timings:
         print("[5/6] SKIPPING timings (--skip-timings)")
@@ -1569,10 +1683,9 @@ def main():
         for rid, slug, name, style in RECITERS:
             qdc_id = QDC_REPEAT_RECITERS.get(rid)
             if qdc_id is not None:
+                reciter_alignment = alignment_reference(zp, rid, slug, word_counts)
                 if needs_alignment_evidence:
-                    alignment_references.update(
-                        alignment_reference(zp, rid, slug, word_counts)
-                    )
+                    alignment_references.update(reciter_alignment)
                 # Repeat-aware timings from quran.com instead of quran-align.
                 print(f"  {slug}: repeat-aware timings from quran.com (qdc {qdc_id})")
                 data = load_qdc_timings(qdc_id)
@@ -1580,16 +1693,33 @@ def main():
                     "zero_len": 0, "clamped": 0, "repeats": 0, "missing": 0,
                     "merged_splits": 0, "dropped_strays": 0,
                     "noncontiguous_orphans": 0, "gap_phantoms": 0,
-                    "false_phrase_loops": 0,
+                    "false_phrase_loops": 0, "clock_rebased": 0,
                 }
-                covered = ingest_reciter_timings(
-                    rid, word_counts, timing_rows, stats,
-                    lambda key, n: adjust_qdc_segments(
+
+                def adjust_qdc(key, n):
+                    cleaned = adjust_qdc_segments(
                         data.get(key),
                         n,
                         stats,
                         word_text[key] if rid in QDC_FALSE_PHRASE_LOOP_RECITERS else None,
-                    ),
+                    )
+                    reference = reciter_alignment.get((rid, key[0], key[1]))
+                    offset = qdc_clock_offset(cleaned, reference)
+                    rebased = rebase_qdc_clock(
+                        cleaned,
+                        reference,
+                    )
+                    if offset is not None and (offset == 0 or rebased != cleaned):
+                        file_clock_rows.add((rid, key[0], key[1]))
+                    if rebased != cleaned:
+                        stats["clock_rebased"] += 1
+                        if offset:
+                            timing_clock_offsets[(rid, key[0], key[1])] = offset
+                    return rebased
+
+                covered = ingest_reciter_timings(
+                    rid, word_counts, timing_rows, stats,
+                    adjust_qdc,
                 )
                 print(
                     f"  {slug}: ayahs covered {covered}/6236, "
@@ -1599,7 +1729,8 @@ def main():
                     f"stray mislabels dropped {stats['dropped_strays']}, "
                     f"noncontiguous orphans {stats['noncontiguous_orphans']}, "
                     f"gap phantoms {stats.get('gap_phantoms', 0)}, "
-                    f"false phrase loops {stats.get('false_phrase_loops', 0)}"
+                    f"false phrase loops {stats.get('false_phrase_loops', 0)}, "
+                    f"clock-rebased {stats['clock_rebased']}"
                 )
             else:
                 data = load_timings(zp, slug)
@@ -1608,9 +1739,18 @@ def main():
                     reciter_rows.append((rid, slug, name, style, 0))
                     continue
                 stats = {"basmalah_shift": 0, "clamped": 0, "missing": 0}
+
+                def adjust_aligned(key, n):
+                    segs = adjust_segments(
+                        data.get(key), n, key[0], key[1], stats
+                    )
+                    if segs:
+                        file_clock_rows.add((rid, key[0], key[1]))
+                    return segs
+
                 covered = ingest_reciter_timings(
                     rid, word_counts, timing_rows, stats,
-                    lambda key, n: adjust_segments(data.get(key), n, key[0], key[1], stats),
+                    adjust_aligned,
                 )
                 print(
                     f"  {slug}: ayahs covered {covered}/6236, "
@@ -1623,10 +1763,12 @@ def main():
             reciter_rows.append((rid, slug, name, style, 1))
 
     print("[repairs] applying tools/timing_repairs/*.json")
-    timing_rows = apply_timing_repairs(timing_rows, word_counts)
+    timing_rows = apply_timing_repairs(timing_rows, word_counts, timing_clock_offsets)
 
     print("[audio onsets] aligning timings to encoded leading silence")
-    timing_rows, audio_onsets = apply_audio_onsets(timing_rows)
+    timing_rows, audio_onsets = apply_audio_onsets(
+        timing_rows, file_clock_rows=file_clock_rows
+    )
 
     print("[overrides] applying tools/timing_overrides/*.json")
     timing_rows, reciter_rows = apply_timing_overrides(

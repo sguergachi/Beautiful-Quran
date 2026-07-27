@@ -150,6 +150,12 @@ of quran-align:
   repeats, and caches the assembled result in `tools/.cache/qdc_<id>.json`.
 - `adjust_qdc_segments()` clamps word positions to our canonical word count,
   drops zero-length spans, keeps repeats, and counts the repeat spans.
+- `rebase_qdc_clock()` translates the complete repeat-aware row by the upper
+  median of matching later-word starts plus the first-word end. Quran-align
+  supplies the exact everyayah MP3 clock; qdc continues to supply repeat
+  topology. Excluding the first start prevents a malformed opening from
+  dragging every later word behind the voice; conflicting two-word witnesses
+  prefer the offset closest to zero.
 - `clean_qdc_artifacts()` scrubs aligner artifact classes that would otherwise
   render as repeats the reciter never made (see below). New structural classes
   go here — not into one-off overrides — and each is locked by a case under

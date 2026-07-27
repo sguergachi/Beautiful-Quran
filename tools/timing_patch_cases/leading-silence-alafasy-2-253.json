@@ -1,21 +1,21 @@
 {
   "id": "leading-silence-alafasy-2-253",
-  "label": "Alafasy 2:253 encoded leading silence",
+  "label": "Alafasy 2:253 first wash waits without moving later words",
   "refs": [
     "everyayah Alafasy_128kbps/002253.mp3",
     "Timings Lab ear report"
   ],
   "pipeline": "leading_silence_offset",
-  "notes": "The MP3 has 1179 ms of sustained leading silence while qdc starts word 1 at zero.",
+  "notes": "After the row is on the MP3 clock, only word 1 is clamped to the 1179 ms sustained voice onset.",
   "audio_onset_ms": 1179,
   "input_segments": [
-    [1, 0, 915],
-    [2, 915, 1635],
-    [3, 1635, 2765]
+    [1, 1200, 1650],
+    [2, 1650, 2370],
+    [3, 2370, 3500]
   ],
   "expected_segments": [
-    [1, 1179, 2094],
-    [2, 2094, 2814],
-    [3, 2814, 3944]
+    [1, 1179, 1650],
+    [2, 1650, 2370],
+    [3, 2370, 3500]
   ]
 }

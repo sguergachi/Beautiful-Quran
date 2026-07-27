@@ -1,0 +1,20 @@
+{
+  "id": "clock-shifted-repair-overlap",
+  "label": "translated repair overlap is trimmed to its next start",
+  "pipeline": "clock_shifted_repair",
+  "clock_offset_ms": -100,
+  "input_segments": [
+    [1, 0, 300],
+    [2, 300, 600],
+    [3, 600, 900]
+  ],
+  "repair_segments": [
+    [1, 0, 500],
+    [3, 400, 800]
+  ],
+  "expected_segments": [
+    [1, 0, 300],
+    [3, 300, 700]
+  ],
+  "notes": "The repair merge trims an overlapping end before the non-negative row is accepted."
+}

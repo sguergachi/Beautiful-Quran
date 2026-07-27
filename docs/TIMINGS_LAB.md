@@ -12,11 +12,17 @@ correction upstream when convenient.
 
 Whole-ayah drift caused by silence encoded at the beginning of an everyayah
 MP3 is handled systematically outside the Lab. `tools/detect_audio_onsets.py`
-measures the first sustained voice sample and `build_db.py` shifts the complete
-row, preserving every internal boundary and repeat. The onset is also stored
-separately as immutable MP3 metadata. When an older Lab edit starts at zero,
-the repository shifts the whole edit behind that onset without changing its
-internal boundaries, so the first wash still waits for speech.
+measures the first sustained voice sample. Repeat-aware qdc rows are translated
+as a whole onto the exact MP3 clock by the median matching quran-align
+boundary; only the first wash is then clamped to the voice onset, leaving every
+later valid boundary and repeat unchanged. A row whose second word also
+predates voice is instead shifted uniformly. The onset is also stored
+separately as immutable MP3 metadata. The repository median-rebases older Lab edits against
+the current bundled row, so every word keeps its correction rather than fixing
+only the opening wash. Override schema 2 records a clock version per row:
+unversioned schema-1 rows migrate once at read time, while every newly saved
+Lab row keeps its intentional word boundaries and receives only the opening
+voice floor.
 
 > **Entry is developer-only.** Default readers long-press a word to open the
 > [Root Word Viewer](ROOT_VIEWER.md), not the Lab. See *Where it lives*
@@ -153,7 +159,7 @@ read the same corrected numbers with no extra wiring:
 ```
 db timings + audio onset  ─┐
 TimingOverrides[key]      ─┴─►  Map<ayah, List<Segment>>  ─►  HighlightEngine
-                                (edit wins; onset remains a floor)
+                                (edit wins; whole row rebased to MP3 clock)
 ```
 
 The Lab's live preview additionally runs `HighlightEngine` directly over its

@@ -26,12 +26,68 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 
-/** Preserve editable word spacing while keeping it behind immutable MP3 silence. */
-internal fun alignToAudioOnset(segments: List<Segment>, onsetMs: Long): List<Segment> {
-    val firstStartMs = segments.firstOrNull()?.startMs ?: return segments
-    val shiftMs = (onsetMs - firstStartMs).coerceAtLeast(0L)
-    if (shiftMs == 0L) return segments
-    return segments.map { it.copy(startMs = it.startMs + shiftMs, endMs = it.endMs + shiftMs) }
+/** Align a saved edit to its MP3 clock without rewriting current Lab boundaries. */
+internal fun alignToAudioClock(
+    segments: List<Segment>,
+    bundled: List<Segment>,
+    onsetMs: Long,
+    migrateWholeRow: Boolean,
+): List<Segment> {
+    if (segments.isEmpty() || bundled.isEmpty()) return segments
+    val bundledStarts = buildMap {
+        bundled.forEach { putIfAbsent(it.position, it.startMs) }
+    }
+    val firstPosition = segments.first().position
+    val startOffsets = segments
+        .distinctBy { it.position }
+        .mapNotNull { segment ->
+            bundledStarts[segment.position]
+                ?.takeIf { segment.position != firstPosition }
+                ?.minus(segment.startMs)
+        }
+    val offsets = if (!migrateWholeRow || startOffsets.isEmpty()) {
+        emptyList()
+    } else {
+        (startOffsets + (bundled.first().endMs - segments.first().endMs)).sorted()
+    }
+    val shiftMs = when {
+        offsets.size == 2 && offsets[0] != offsets[1] ->
+            offsets.minBy { kotlin.math.abs(it) }
+        else -> offsets.getOrElse(offsets.size / 2) { 0L }
+    }
+    val shifted = if (shiftMs == 0L) {
+        segments
+    } else {
+        segments.map {
+            it.copy(startMs = it.startMs + shiftMs, endMs = it.endMs + shiftMs)
+        }
+    }
+    val openingFloorMs = maxOf(onsetMs, bundled.first().startMs)
+    return if (shifted.first().startMs < openingFloorMs) {
+        val nextStartMs = shifted.getOrNull(1)?.startMs
+        if (nextStartMs != null && nextStartMs <= openingFloorMs) {
+            val floorShiftMs = openingFloorMs - shifted.first().startMs
+            return shifted.map {
+                it.copy(
+                    startMs = it.startMs + floorShiftMs,
+                    endMs = it.endMs + floorShiftMs,
+                )
+            }
+        }
+        shifted.toMutableList().apply {
+            val firstEndMs = if (first().endMs > openingFloorMs) {
+                nextStartMs?.let { minOf(first().endMs, it) } ?: first().endMs
+            } else {
+                nextStartMs ?: openingFloorMs + 1
+            }
+            this[0] = first().copy(
+                startMs = openingFloorMs,
+                endMs = maxOf(openingFloorMs + 1, firstEndMs),
+            )
+        }
+    } else {
+        shifted
+    }
 }
 
 class QuranRepository(
@@ -364,8 +420,8 @@ class QuranRepository(
     /** ayah number -> word segments, for one reciter and surah. Any
      * hand-corrected override from the Timings Lab takes precedence over the
      * bundled DB row, so the reader immediately reflects edits. The MP3 voice
-     * onset remains authoritative: it shifts an old relative-to-speech edit
-     * without changing any of its word spacing. */
+     * onset remains authoritative; only legacy clock versions are rebased as
+     * a whole, while current Lab boundaries remain exact. */
     suspend fun timings(reciterId: Int, surahId: Int): Map<Int, List<Segment>> =
         withContext(Dispatchers.IO) {
             val bundled = bundledTimingRows(reciterId, surahId)
@@ -378,9 +434,11 @@ class QuranRepository(
             for (entry in overrides) {
                 val key = entry.key
                 if (key.reciterId == reciterId && key.surahId == surahId) {
-                    merged[key.ayah] = alignToAudioOnset(
-                        entry.value,
-                        bundled.audioOnsets[key.ayah] ?: 0L,
+                    merged[key.ayah] = alignToAudioClock(
+                        segments = entry.value,
+                        bundled = bundled.segments[key.ayah].orEmpty(),
+                        onsetMs = bundled.audioOnsets[key.ayah] ?: 0L,
+                        migrateWholeRow = timingOverrides.needsClockMigration(key),
                     )
                 }
             }

@@ -1,0 +1,21 @@
+{
+  "id": "clock-shifted-repair-negative",
+  "label": "unsafe negative repair translation fails open to current timings",
+  "pipeline": "clock_shifted_repair",
+  "clock_offset_ms": -600,
+  "input_segments": [
+    [1, 0, 500],
+    [2, 500, 1000],
+    [3, 1000, 1500]
+  ],
+  "repair_segments": [
+    [1, 0, 400],
+    [3, 400, 800]
+  ],
+  "expected_segments": [
+    [1, 0, 500],
+    [2, 500, 1000],
+    [3, 1000, 1500]
+  ],
+  "notes": "A translated structural repair must never create duplicate zero starts or negative timestamps."
+}

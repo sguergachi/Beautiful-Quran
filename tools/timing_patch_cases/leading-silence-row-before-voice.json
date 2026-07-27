@@ -1,0 +1,18 @@
+{
+  "id": "leading-silence-row-before-voice",
+  "label": "row whose second word predates voice shifts uniformly",
+  "pipeline": "leading_silence_offset",
+  "audio_onset_ms": 250,
+  "exact_file_clock": false,
+  "input_segments": [
+    [1, 0, 20],
+    [2, 20, 100],
+    [3, 100, 200]
+  ],
+  "expected_segments": [
+    [1, 250, 270],
+    [2, 270, 350],
+    [3, 350, 450]
+  ],
+  "notes": "When word 2 also lies before measured speech, the complete row—not only word 1—is on the wrong clock."
+}
