@@ -437,9 +437,11 @@ class QuranRepository(
         }
 
     /**
-     * Machine-generated V2 rows over the pure bundled V1 clock. Missing or
-     * rejected V2 ayahs retain V1 segments, keeping coverage and confidence
-     * separate without admitting Timing Lab patches into the experiment.
+     * Parallel timing fork: pure V1 rows from [timings], overlaid with
+     * machine-generated rows from [timings_v2] where present. The V1 table is
+     * never written by the V2 pipeline — both lanes ship in one DB so the app
+     * can A/B live via [TimingScheme]. Missing V2 ayahs keep bundled V1.
+     * Timing Lab patches never enter this path.
      */
     private suspend fun bundledV2Timings(
         reciterId: Int,

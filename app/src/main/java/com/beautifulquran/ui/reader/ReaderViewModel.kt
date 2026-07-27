@@ -117,6 +117,16 @@ data class ReaderUiState(
     val currentReciter: Reciter? = null,
     val hasTimings: Boolean = false,
     val isLoading: Boolean = true,
+    /**
+     * Timing lane for the installed surah map. V1 and V2 are parallel DB forks
+     * ([timings] / [timings_v2]); switching reloads this map in place so live
+     * A/B comparison keeps playback position.
+     */
+    val timingScheme: TimingScheme = TimingScheme.V1,
+    /** Ayahs in the loaded map that carry true acoustic V2 keyframes (not V1 fallback). */
+    val v2AcousticAyahCount: Int = 0,
+    /** Ayahs with any timing rows in the loaded map. */
+    val timedAyahCount: Int = 0,
 )
 
 /** Off-screen chapter payload for continuous chapter advance. */
@@ -637,6 +647,9 @@ class ReaderViewModel(
             currentReciter = prepared.reciter,
             hasTimings = prepared.timings.isNotEmpty(),
             isLoading = false,
+            timingScheme = prepared.timingScheme,
+            v2AcousticAyahCount = acousticV2AyahCount(prepared.timings),
+            timedAyahCount = prepared.timings.size,
         )
     }
 
@@ -658,6 +671,9 @@ class ReaderViewModel(
             _uiState.value = _uiState.value.copy(
                 currentReciter = reciter,
                 hasTimings = timings.isNotEmpty(),
+                timingScheme = scheme,
+                v2AcousticAyahCount = acousticV2AyahCount(refreshed),
+                timedAyahCount = refreshed.size,
             )
             val np = player.state.value.nowPlaying
             if (np != null && np.surahId == id && np.reciterId != reciter.id) {
@@ -985,6 +1001,10 @@ class ReaderViewModel(
         private const val TICK_MS = 33L
         private const val PAUSED_TICK_MS = 250L
         private const val START_SEEK_GRACE_MS = 1_500L
+
+        /** True V2 rows carry measured keyframes; V1 fallback rows do not. */
+        internal fun acousticV2AyahCount(timings: Map<Int, List<Segment>>): Int =
+            timings.values.count { segs -> segs.any { it.subwordKeyframes.isNotEmpty() } }
     }
 }
 
