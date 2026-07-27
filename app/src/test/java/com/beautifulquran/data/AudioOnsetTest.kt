@@ -216,4 +216,30 @@ class AudioOnsetTest {
             ),
         )
     }
+
+    @Test
+    fun `a migrated row is written back once and never migrates again`() {
+        val legacy = listOf(
+            Segment(1, 0, 915),
+            Segment(2, 915, 1_635),
+            Segment(3, 1_635, 2_765),
+        )
+        val bundled = listOf(
+            Segment(1, 1_179, 1_650),
+            Segment(2, 1_650, 2_370),
+            Segment(3, 2_370, 3_500),
+        )
+
+        // What QuranRepository.timings() stores back after the one migration.
+        val migrated = alignToAudioClock(
+            legacy, bundled, onsetMs = 1_179, migrateWholeRow = true
+        )
+        assertEquals(bundled, migrated)
+        assertEquals(
+            migrated,
+            alignToAudioClock(
+                migrated, bundled, onsetMs = 1_179, migrateWholeRow = false
+            ),
+        )
+    }
 }

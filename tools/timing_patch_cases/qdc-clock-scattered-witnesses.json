@@ -1,0 +1,31 @@
+{
+  "id": "qdc-clock-scattered-witnesses",
+  "label": "a broken reference row cannot translate the ayah",
+  "refs": [
+    "everyayah Hani_Rifai_192kbps/008036.mp3",
+    "quran-align"
+  ],
+  "pipeline": "qdc_clock_rebase",
+  "notes": "quran-align stretches one word across a long pause and every later boundary drifts, so the per-word witnesses disagree by seconds instead of clustering. No single translation is true — the source row stands rather than being shifted by whichever median fell out.",
+  "input_segments": [
+    [1, 0, 1000],
+    [2, 1000, 2000],
+    [3, 2000, 3000],
+    [4, 3000, 4000],
+    [5, 4000, 5000]
+  ],
+  "reference_segments": [
+    [1, 300, 1300],
+    [2, 1300, 8000],
+    [3, 8000, 20000],
+    [4, 20000, 23000],
+    [5, 23000, 24000]
+  ],
+  "expected_segments": [
+    [1, 0, 1000],
+    [2, 1000, 2000],
+    [3, 2000, 3000],
+    [4, 3000, 4000],
+    [5, 4000, 5000]
+  ]
+}

@@ -65,6 +65,7 @@ a case under this directory.
 | `audio_onset_ms` | for `leading_silence_offset` | measured first sustained voice onset |
 | `exact_file_clock` | no | false when word 2 proves the complete row predates voice |
 | `reference_segments` | for `qdc_clock_rebase` | quran-align boundaries on the everyayah MP3 clock |
+| `audio_duration_ms` | no | measured recording length; a translation past it is refused |
 | `refs` | no | issue/PR/doc pointers |
 | `notes` | no | why this shape is real / what must not regress |
 

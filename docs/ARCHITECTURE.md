@@ -58,7 +58,7 @@ Sources (all fetched over HTTPS, cached in `tools/.cache/`):
 | `@kmaslesa/holy-quran-word-by-word-full-data` (npm) | Per-word English gloss + transliteration (Quran.com data) | Only per-word English dataset on an open registry |
 | `cpfair/quran-align` release zip | Word-level timestamps per reciter, CC-BY 4.0 | The canonical open word-alignment dataset, matched to everyayah.com audio |
 | quran.com `qdc` audio API | **Repeat-aware** word timestamps for reciters in `QDC_REPEAT_RECITERS` | quran-align is one-pass and cannot encode a repeated phrase; quran.com's segments backtrack when the reciter repeats. Same everyayah audio. See [REPEAT_HIGHLIGHTING.md](REPEAT_HIGHLIGHTING.md) |
-| everyayah MP3 opening ranges | Encoded leading-silence measurements in `tools/audio_onsets/` | Some individual ayah files begin with silence. The offline scanner holds the first wash until sustained voice without moving valid later word boundaries. |
+| everyayah MP3 ranges | Leading-silence and duration measurements in `tools/audio_onsets/` | Some individual ayah files begin with silence. The offline scanner holds the first wash until sustained voice without moving valid later word boundaries, and records each file's length as the ceiling no timing row may cross. |
 | Quranic Arabic Corpus (QAC) v0.4 | Per-word root, lemma, POS, morphology; root concordance | Standard open Quranic morphology / root dictionary. Powers the [Root Word Viewer](ROOT_VIEWER.md) |
 
 The **canonical word segmentation** is the space-split of the Uthmani text.
@@ -77,7 +77,8 @@ The other two sources are mapped onto it by position:
   instead: same schema, but the word index backtracks where the reciter repeats
   a phrase, driving the orange second fade. `rebase_qdc_clock` translates each
   row onto the everyayah MP3 clock using the median matching quran-align
-  boundary while preserving those backtracks. Full detail:
+  boundary while preserving those backtracks, and abstains when those witnesses
+  scatter or the result would run past the end of the recording. Full detail:
   [REPEAT_HIGHLIGHTING.md](REPEAT_HIGHLIGHTING.md).
 - `tools/detect_audio_onsets.py` scans up to the opening eight seconds of the
   exact everyayah files the app streams. It retries a larger byte range when

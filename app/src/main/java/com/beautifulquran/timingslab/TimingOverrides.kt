@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import java.io.File
+import java.util.concurrent.ConcurrentHashMap
 
 private const val CURRENT_CLOCK_VERSION = 2
 
@@ -67,7 +68,9 @@ class TimingOverrides(context: Context) {
     }
 
     private val loaded = load()
-    private val clockVersions = loaded.clockVersions.toMutableMap()
+
+    /** Reads run on the repository's IO dispatcher while the Lab writes. */
+    private val clockVersions = ConcurrentHashMap(loaded.clockVersions)
     private val _overrides = MutableStateFlow(loaded.edits)
     val overrides: StateFlow<Map<OverrideKey, List<Segment>>> = _overrides.asStateFlow()
 

@@ -7,7 +7,8 @@
     "Timings Lab ear report"
   ],
   "pipeline": "qdc_clock_rebase",
-  "notes": "The qdc opening segment is malformed; median matching boundaries translate every word while quran-align restores only word 1's start.",
+  "notes": "The qdc opening segment is malformed; median matching boundaries translate every word while quran-align restores only word 1's start. The duration is the file's real measured length, so the ceiling admits the fix.",
+  "audio_duration_ms": 53820,
   "input_segments": [
     [1, 0, 915],
     [2, 915, 1635],

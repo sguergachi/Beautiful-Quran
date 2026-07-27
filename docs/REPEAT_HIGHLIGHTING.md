@@ -155,7 +155,11 @@ of quran-align:
   supplies the exact everyayah MP3 clock; qdc continues to supply repeat
   topology. Excluding the first start prevents a malformed opening from
   dragging every later word behind the voice; conflicting two-word witnesses
-  prefer the offset closest to zero.
+  prefer the offset closest to zero. The translation is refused outright when
+  the witnesses disagree by more than `MAX_CLOCK_DISAGREEMENT_MS`, or when the
+  result would run past the recording's measured duration — quran-align
+  sometimes stretches a word across a long pause and every later boundary in
+  that row drifts, and no median of scattered witnesses is a real clock.
 - `clean_qdc_artifacts()` scrubs aligner artifact classes that would otherwise
   render as repeats the reciter never made (see below). New structural classes
   go here — not into one-off overrides — and each is locked by a case under

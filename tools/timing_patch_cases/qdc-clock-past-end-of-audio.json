@@ -1,0 +1,25 @@
+{
+  "id": "qdc-clock-past-end-of-audio",
+  "label": "a translation past the end of the recording is refused",
+  "refs": [
+    "tools/audio_onsets durations"
+  ],
+  "pipeline": "qdc_clock_rebase",
+  "notes": "Agreeing witnesses still cannot move an ayah beyond its own file: marks after the last sample are unreachable, so the reader would freeze on word 1 for the whole verse. The measured duration is the ceiling and the source row stands.",
+  "audio_duration_ms": 6000,
+  "input_segments": [
+    [1, 0, 1000],
+    [2, 1000, 2000],
+    [3, 2000, 3000]
+  ],
+  "reference_segments": [
+    [1, 5000, 6000],
+    [2, 6000, 7000],
+    [3, 7000, 8000]
+  ],
+  "expected_segments": [
+    [1, 0, 1000],
+    [2, 1000, 2000],
+    [3, 2000, 3000]
+  ]
+}

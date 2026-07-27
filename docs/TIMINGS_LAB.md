@@ -20,9 +20,10 @@ predates voice is instead shifted uniformly. The onset is also stored
 separately as immutable MP3 metadata. The repository median-rebases older Lab edits against
 the current bundled row, so every word keeps its correction rather than fixing
 only the opening wash. Override schema 2 records a clock version per row:
-unversioned schema-1 rows migrate once at read time, while every newly saved
-Lab row keeps its intentional word boundaries and receives only the opening
-voice floor.
+unversioned schema-1 rows migrate once at read time and are written straight
+back, so the reader, the Lab and an exported patch all describe the same marks.
+Every newly saved Lab row keeps its intentional word boundaries and receives
+only the opening voice floor.
 
 > **Entry is developer-only.** Default readers long-press a word to open the
 > [Root Word Viewer](ROOT_VIEWER.md), not the Lab. See *Where it lives*

@@ -29,9 +29,11 @@ from build_db import (  # noqa: E402
     boundary_conflicts,
     clean_qdc_artifacts,
     erases_span_repeat,
+    load_audio_durations,
     offset_for_audio_onset,
     rebase_qdc_clock,
     rebase_timing_repair,
+    rows_past_audio,
     suspicious_pacing,
 )
 import detect_audio_onsets as onset_detector  # noqa: E402
@@ -158,7 +160,8 @@ def run_pipeline(case, segs):
         reference = case.get("reference_segments")
         if reference is None:
             raise SystemExit(f"{case.get('_path')}: need reference_segments")
-        return rebase_qdc_clock(segs, reference)
+        rebased, _ = rebase_qdc_clock(segs, reference, case.get("audio_duration_ms"))
+        return rebased
     raise AssertionError("unreachable")
 
 
@@ -217,7 +220,11 @@ def check_audio_onset_pipeline():
         pass
 
     with (
-        patch.object(onset_detector, "fetch_prefix", side_effect=[b"short", b"long"]) as fetch,
+        patch.object(
+            onset_detector,
+            "fetch_prefix",
+            side_effect=[(b"short", 159_264), (b"long", 159_264)],
+        ) as fetch,
         patch.object(
             onset_detector,
             "analyze_prefix",
@@ -225,12 +232,14 @@ def check_audio_onset_pipeline():
         ),
     ):
         retry = onset_detector.detect_onset("Hani_Rifai_192kbps", (5, 109))
-    retry_ok = retry == ((5, 109), 6_636) and [
+    retry_ok = retry == (6_636, 159_264) and [
         call.args[1] for call in fetch.call_args_list
     ] == [
         onset_detector.INITIAL_RANGE_BYTES,
         onset_detector.RETRY_RANGE_BYTES,
     ]
+    # A constant-bitrate byte length is the recording's playable ceiling.
+    retry_ok &= onset_detector.duration_ms(159_264, "Hani_Rifai_192kbps") == 6_636
 
     segments = [[1, 500, 900], [2, 900, 1_200], [1, 1_200, 1_500]]
     with tempfile.TemporaryDirectory() as temp_dir:
@@ -239,17 +248,22 @@ def check_audio_onset_pipeline():
             "reciterId": 1,
             "reciterSlug": "Alafasy_128kbps",
             "offsets": {"2:253": 1_179},
+            "durations": {"2:253": 53_820, "2:254": 2_000},
         }))
         rows, onsets = apply_audio_onsets(
             [(1, 2, 253, segments)], evidence, file_clock_rows=set()
         )
+        durations = load_audio_durations(evidence)
     shifted = json.loads(rows[0][3])
     integration = onsets == {(1, 2, 253): 1_179} and shifted == [
         [1, 1_179, 1_579],
         [2, 1_579, 1_879],
         [1, 1_879, 2_179],
     ]
-    return parser and retry_ok and integration
+    ceilings = durations == {(1, 2, 253): 53_820, (1, 2, 254): 2_000} and rows_past_audio(
+        [(1, 2, 253, shifted), (1, 2, 254, [[1, 0, 2_400]])], durations
+    ) == [(1, 2, 254)]
+    return parser and retry_ok and integration and ceilings
 
 
 def audit_bundled_db():
@@ -338,7 +352,10 @@ def audit_bundled_db():
             "analysisMs": onset_detector.ANALYSIS_SECONDS * 1000,
             "initialRangeBytes": onset_detector.INITIAL_RANGE_BYTES,
             "retryRangeBytes": onset_detector.RETRY_RANGE_BYTES,
+            "bitrateBps": onset_detector.bitrate_bps(payload["reciterSlug"]),
         }
+        # Every scanned ayah carries the duration ceiling the build gates on.
+        exact &= len(payload["durations"]) == payload["scannedAyahs"]
         rid = payload["reciterId"]
         for verse, onset in payload["offsets"].items():
             s, a = map(int, verse.split(":"))
