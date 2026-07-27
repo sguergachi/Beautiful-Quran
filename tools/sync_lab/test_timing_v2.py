@@ -12,6 +12,12 @@ from qua_timing import (
     source_groups,
 )
 from timing_v2_metrics import summarize_clock_conventions, summarize_errors
+from validate_timing_v2 import (
+    historical_overlap,
+    is_repeat_row,
+    objective_row_flags,
+    summarize_payload,
+)
 
 
 def test_rebases_keyframes_inside_final_spans():
@@ -175,6 +181,113 @@ def test_qua_keyframes_animate_shared_and_silent_letters_without_fake_time():
     assert acoustic_keyframes(100, 500, [[1, "ا", 500, 600]], [[0]]) == []
 
 
+def test_objective_flags_catch_past_duration_and_empty_spans():
+    row = {
+        "segments": [
+            {
+                "position": 1,
+                "startMs": 0,
+                "endMs": 500,
+                "keyframes": [{"offsetMs": 250, "progress": 1.0}],
+            },
+            {
+                "position": 2,
+                "startMs": 500,
+                "endMs": 1200,
+                "keyframes": [{"offsetMs": 700, "progress": 1.0}],
+            },
+        ]
+    }
+    assert "past_duration" in objective_row_flags(row, duration_ms=1000)
+    empty = {
+        "segments": [
+            {
+                "position": 1,
+                "startMs": 100,
+                "endMs": 100,
+                "keyframes": [{"offsetMs": 1, "progress": 1.0}],
+            }
+        ]
+    }
+    assert "empty_span" in objective_row_flags(empty, duration_ms=5000)
+
+
+def test_repeat_detection_and_payload_coverage_separate_from_accuracy():
+    mono = {
+        "segments": [
+            {"position": 1, "startMs": 0, "endMs": 100,
+             "keyframes": [{"offsetMs": 50, "progress": 1.0}]},
+            {"position": 2, "startMs": 100, "endMs": 200,
+             "keyframes": [{"offsetMs": 50, "progress": 1.0}]},
+        ]
+    }
+    rep = {
+        "segments": [
+            {"position": 1, "startMs": 0, "endMs": 100,
+             "keyframes": [{"offsetMs": 50, "progress": 1.0}]},
+            {"position": 1, "startMs": 100, "endMs": 200,
+             "keyframes": [{"offsetMs": 50, "progress": 1.0}]},
+            {"position": 2, "startMs": 200, "endMs": 300,
+             "keyframes": [{"offsetMs": 50, "progress": 1.0}]},
+        ]
+    }
+    assert not is_repeat_row(mono)
+    assert is_repeat_row(rep)
+    payload = {
+        "reciter": "Alafasy_128kbps",
+        "reciterId": 1,
+        "rows": [
+            {"surah": 1, "ayah": 1, "segments": mono["segments"]},
+            {"surah": 1, "ayah": 2, "segments": rep["segments"]},
+        ],
+    }
+    summary = summarize_payload(payload)
+    assert summary["acceptedRows"] == 2
+    assert summary["repeatRows"] == 1
+    assert summary["coveragePctOfAlafasy"] == round(100 * 2 / 6236, 2)
+    assert "note" in summary
+
+
+def test_historical_overlap_reports_structure_not_gold():
+    payload = {
+        "reciterId": 1,
+        "rows": [
+            {
+                "surah": 2,
+                "ayah": 14,
+                "segments": [
+                    {"position": 1, "startMs": 10, "endMs": 100,
+                     "keyframes": [{"offsetMs": 50, "progress": 1.0}]},
+                    {"position": 2, "startMs": 100, "endMs": 200,
+                     "keyframes": [{"offsetMs": 50, "progress": 1.0}]},
+                ],
+            }
+        ],
+    }
+    hist = {
+        "edits": [
+            {
+                "reciterId": 1,
+                "surahId": 2,
+                "ayah": 14,
+                "segments": [[1, 0, 90], [2, 90, 180]],
+            },
+            {
+                "reciterId": 1,
+                "surahId": 2,
+                "ayah": 15,
+                "segments": [[1, 0, 50]],
+            },
+        ]
+    }
+    path = __import__("pathlib").Path("/tmp/v2-hist-overlap-test.json")
+    path.write_text(__import__("json").dumps(hist))
+    got = historical_overlap(payload, path)
+    assert got["overlapRows"] == 1
+    assert got["structureExact"] == 1
+    assert got["onsets"]["count"] == 2
+
+
 if __name__ == "__main__":
     test_rebases_keyframes_inside_final_spans()
     test_preserves_acoustic_plateaus()
@@ -186,4 +299,8 @@ if __name__ == "__main__":
     test_qua_clock_transfer_requires_a_unique_same_take_match()
     test_qua_letters_preserve_repeats_and_rendered_slots()
     test_qua_keyframes_animate_shared_and_silent_letters_without_fake_time()
+    test_objective_flags_catch_past_duration_and_empty_spans()
+    test_repeat_detection_and_payload_coverage_separate_from_accuracy()
+    test_historical_overlap_reports_structure_not_gold()
     print("timing V2 keyframe tests pass")
+
