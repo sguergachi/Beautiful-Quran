@@ -831,13 +831,15 @@ private fun rememberWaslProgress(
     sweepMs: Int?,
     identity: Int?,
     activation: Long,
+    /** V2 measured wasl budget (ms); 0 keeps the shipped V1 default ceiling. */
+    waslBudgetMs: Long = 0L,
 ): WaslProgress {
     val clock = remember(identity, activation) { Animatable(0f) }
     val entryConnection = remember(identity, activation) { connection }
     val entryMs = remember(identity, activation) { sweepMs }
     // Capture at Active entry so a mid-word retune cannot jump the edge; the
     // next wasl handoff picks up new lab values.
-    val waslPrefixMs = InkEngine.tuning.waslPrefixMs
+    val waslPrefixMs = InkEngine.waslPrefixTargetMs(waslBudgetMs)
     val waslHandoff = InkEngine.tuning.waslHandoff
     val entryPrefixStart = remember(identity, activation, waslPrefixMs) {
         entryMs?.let {
@@ -2535,11 +2537,13 @@ fun AyahBlock(
         )
     }
     val activeIndex = inks.indexOfFirst { it.state == InkEngine.State.Active }
+    val scheme = activeWord?.timingScheme ?: TimingScheme.V1
     val incomingConnection = if (activeIndex > 0) {
         InkEngine.connection(
             prevArabic = ayah.words[activeIndex - 1].arabic,
             arabic = ayah.words[activeIndex].arabic,
-            timingScheme = activeWord?.timingScheme ?: TimingScheme.V1,
+            timingScheme = scheme,
+            waslFromPrevMs = activeWord?.waslFromPrevMs ?: 0L,
         )
     } else {
         null
@@ -2548,7 +2552,9 @@ fun AyahBlock(
         InkEngine.connection(
             prevArabic = ayah.words[activeIndex].arabic,
             arabic = ayah.words[activeIndex + 1].arabic,
-            timingScheme = activeWord?.timingScheme ?: TimingScheme.V1,
+            timingScheme = scheme,
+            // V2: next occurrence's measured wasl budget (0 disables bloom).
+            waslFromPrevMs = activeWord?.nextWaslFromPrevMs ?: 0L,
         )
     } else {
         null
@@ -2558,6 +2564,7 @@ fun AyahBlock(
         sweepMs = sweepMs,
         identity = activeWord?.wordPosition,
         activation = activation,
+        waslBudgetMs = activeWord?.nextWaslFromPrevMs ?: 0L,
     )
     val previousActive = remember { ActiveWordEntry(activeIndex, activation) }
     val carriedIncoming = remember(activeIndex, activation) {

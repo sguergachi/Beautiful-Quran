@@ -42,6 +42,8 @@ private data class TimingV2Segment(
     val startMs: Long,
     val endMs: Long,
     val keyframes: List<TimingV2Keyframe>,
+    /** Optional; absent in older V2 artifacts means no acoustic wasl. */
+    val waslFromPrevMs: Long = 0L,
 )
 
 @Serializable
@@ -482,11 +484,13 @@ class QuranRepository(
                             SubwordKeyframe(keyframe.offsetMs, keyframe.progress)
                         }
                         require(keyframes.isNotEmpty() && keyframes.last().progress == 1f)
+                        require(segment.waslFromPrevMs >= 0L)
                         Segment(
                             position = segment.position,
                             startMs = segment.startMs,
                             endMs = segment.endMs,
                             subwordKeyframes = keyframes,
+                            waslFromPrevMs = segment.waslFromPrevMs,
                         )
                     }
                 require(parsed.zipWithNext().all { (left, right) ->

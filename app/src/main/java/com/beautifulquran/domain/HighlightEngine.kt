@@ -43,6 +43,10 @@ object HighlightEngine {
          * fade until the chain completes (playback advances past [highWater]).
          * Equals [position] when not repeating. */
         val repeatStart: Int,
+        /** Acoustic wasl into this occurrence (ms); 0 if none. */
+        val waslFromPrevMs: Long = 0L,
+        /** Acoustic wasl into the *next* occurrence (ms); for outgoing bloom. */
+        val nextWaslFromPrevMs: Long = 0L,
     )
 
     /**
@@ -77,6 +81,12 @@ object HighlightEngine {
                 isRepeat = seg.position <= maxBefore,
                 highWater = maxOf(maxBefore, seg.position),
                 repeatStart = repeatStartByIndex[idx],
+                waslFromPrevMs = seg.waslFromPrevMs,
+                nextWaslFromPrevMs = if (idx + 1 < segments.size) {
+                    segments[idx + 1].waslFromPrevMs
+                } else {
+                    0L
+                },
             )
         }
 
