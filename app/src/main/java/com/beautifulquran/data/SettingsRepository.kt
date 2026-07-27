@@ -14,6 +14,9 @@ enum class ReadingMode { ARABIC_ENGLISH, ENGLISH_ONLY }
 /** Which screen edge the ayah selector rail lives on. */
 enum class AyahSelectorSide { LEFT, RIGHT }
 
+/** Developer-selectable source for recitation timing data. */
+enum class TimingScheme { V1, V2 }
+
 /** Developer-selectable bookmark treatment on the Chapters sheet. */
 enum class HomeBookmarkStyle { TOP_BOUND, SAVED_PASSAGES }
 
@@ -56,6 +59,8 @@ data class Settings(
      *  repeatedly tapping the Settings logo; persisted so the reader can
      *  honour it. See docs/ROOT_VIEWER.md and docs/TIMINGS_LAB.md. */
     val developerModeEnabled: Boolean = false,
+    /** Experimental acoustic, sub-word timing. V1 remains the shipped default. */
+    val timingScheme: TimingScheme = TimingScheme.V1,
     /** Shows the Ink Lab overlay on the reader — live sliders over the
      *  highlight tuning (see docs/INK_ENGINE.md). Only honoured while
      *  [developerModeEnabled] is on. Lab numbers persist via
@@ -66,6 +71,11 @@ data class Settings(
     /** Developer-only: which ink-brush circle to paint around selected enums. */
     val brushCircleStyle: BrushCircleStyle = BrushCircleStyle.BASELINE,
 )
+
+/** The timing lane the app may actually consume. V2 is a developer tool, so a
+ * persisted selection becomes inert whenever developer mode is locked again. */
+val Settings.effectiveTimingScheme: TimingScheme
+    get() = if (developerModeEnabled) timingScheme else TimingScheme.V1
 
 /** Maps a persisted ordinal back to an enum entry, falling back to [default]
  * when it no longer maps (e.g. after an entry was removed in an update). */
@@ -107,6 +117,7 @@ class SettingsRepository(context: Context) {
         lastSurah = prefs.getInt("lastSurah", 0),
         lastAyah = prefs.getInt("lastAyah", 1),
         developerModeEnabled = prefs.getBoolean("developerModeEnabled", false),
+        timingScheme = prefs.enum("timingScheme", TimingScheme.V1),
         inkLabEnabled = prefs.getBoolean("inkLabEnabled", false),
         homeBookmarkStyle = prefs.homeBookmarkStyle(),
         brushCircleStyle = prefs.enum("brushCircleStyle", BrushCircleStyle.BASELINE),
@@ -145,6 +156,7 @@ class SettingsRepository(context: Context) {
             putInt("lastSurah", next.lastSurah)
             putInt("lastAyah", next.lastAyah)
             putBoolean("developerModeEnabled", next.developerModeEnabled)
+            putInt("timingScheme", next.timingScheme.ordinal)
             putBoolean("inkLabEnabled", next.inkLabEnabled)
             putString("homeBookmarkStyleV2", next.homeBookmarkStyle.name)
             remove("homeBookmarkStyle")

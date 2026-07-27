@@ -1,5 +1,6 @@
 package com.beautifulquran.domain
 
+import com.beautifulquran.data.model.SubwordKeyframe
 import com.beautifulquran.domain.TajweedPacing.Hold
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -450,5 +451,53 @@ class TajweedPacingTest {
                 }
             }
         }
+    }
+
+    @Test
+    fun `acoustic curve follows keyframes then holds full ink`() {
+        val curve = requireNotNull(
+            TajweedPacing.acousticCurve(
+                keyframes = listOf(
+                    SubwordKeyframe(200, 0.4f),
+                    SubwordKeyframe(600, 1f),
+                ),
+                durationMs = 1_000,
+            ),
+        )
+
+        assertEquals(0.4f, curve.at(0.2f), 1e-4f)
+        assertEquals(0.7f, curve.at(0.4f), 1e-4f)
+        assertEquals(1f, curve.at(0.8f), 0f)
+    }
+
+    @Test
+    fun `acoustic curve holds the revealed glyph across a CTC blank`() {
+        val curve = requireNotNull(
+            TajweedPacing.acousticCurve(
+                keyframes = listOf(
+                    SubwordKeyframe(200, 0.5f),
+                    SubwordKeyframe(800, 0.5f),
+                    SubwordKeyframe(900, 1f),
+                ),
+                durationMs = 1_000,
+            ),
+        )
+
+        assertEquals(0.5f, curve.at(0.2f), 0f)
+        assertEquals(0.5f, curve.at(0.5f), 0f)
+        assertEquals(0.75f, curve.at(0.85f), 1e-4f)
+    }
+
+    @Test
+    fun `acoustic curve rejects an initial progress jump at time zero`() {
+        assertNull(
+            TajweedPacing.acousticCurve(
+                keyframes = listOf(
+                    SubwordKeyframe(0, 0.25f),
+                    SubwordKeyframe(400, 1f),
+                ),
+                durationMs = 500,
+            ),
+        )
     }
 }

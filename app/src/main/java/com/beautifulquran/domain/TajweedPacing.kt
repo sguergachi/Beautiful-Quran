@@ -1,5 +1,7 @@
 package com.beautifulquran.domain
 
+import com.beautifulquran.data.model.SubwordKeyframe
+
 /**
  * Letter-level pacing of the active word's ink sweep, derived from tajweed
  * rules (docs/TAJWEED_PACING.md).
@@ -180,6 +182,34 @@ object TajweedPacing {
             val f = (c - times[i]) / span
             return positions[i] + (positions[i + 1] - positions[i]) * f
         }
+    }
+
+    /**
+     * Converts machine-aligned acoustic keyframes into the renderer's pacing
+     * curve. The word clock remains authoritative; a final plateau preserves
+     * the karaoke hold after the last voiced sub-word unit.
+     */
+    fun acousticCurve(
+        keyframes: List<SubwordKeyframe>,
+        durationMs: Long,
+    ): Curve? {
+        if (
+            keyframes.isEmpty() ||
+            durationMs <= 0L ||
+            keyframes.first().offsetMs <= 0L
+        ) return null
+        val appendTail = keyframes.last().offsetMs < durationMs
+        val times = FloatArray(keyframes.size + 1 + if (appendTail) 1 else 0)
+        val positions = FloatArray(times.size)
+        for (i in keyframes.indices) {
+            times[i + 1] = keyframes[i].offsetMs.toFloat() / durationMs
+            positions[i + 1] = keyframes[i].progress
+        }
+        if (appendTail) {
+            times[times.lastIndex] = 1f
+            positions[positions.lastIndex] = 1f
+        }
+        return Curve(times, positions, letterCount = keyframes.size)
     }
 
     /**

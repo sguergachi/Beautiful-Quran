@@ -23,11 +23,13 @@ ROOT = TOOLS.parent
 sys.path.insert(0, str(TOOLS))
 from build_db import (  # noqa: E402
     AUDIO_ONSETS_DIR,
+    _is_complete_timing_sequence,
     apply_audio_onsets,
     apply_boundary_repair,
     boundary_conflicts,
     clean_qdc_artifacts,
     erases_span_repeat,
+    load_timing_v2,
     offset_for_audio_onset,
     rebase_timing_repair,
     suspicious_pacing,
@@ -54,6 +56,88 @@ def segs_from_positions(positions, dur=800):
 
 def order(segs_):
     return [p for p, _, _ in segs_]
+
+
+def check_timing_v2_loader():
+    """The committed V2 source gate must reject non-acoustic curve shapes."""
+    if not _is_complete_timing_sequence([1, 2, 1, 2], 2):
+        return False
+    if _is_complete_timing_sequence([1, 3, 2, 3], 3):
+        return False
+    payload = {
+        "schema": 2,
+        "generator": "sync_lab/generate_timing_v2.py@3",
+        "source": "jonatasgrosman/wav2vec2-large-xlsr-53-arabic",
+        "sourceRevision": "af46c2d8531b8dcbb5e23b952f739b372c2e5d2d",
+        "reciterId": 1,
+        "minimumGateScore": -1.0,
+        "rows": [{
+            "surah": 1,
+            "ayah": 1,
+            "gateScore": 0.0,
+            "audioSha256": "b" * 64,
+            "segments": [{
+                "position": 1,
+                "startMs": 100,
+                "endMs": 500,
+                "keyframes": [{"offsetMs": 100, "progress": 1.0}],
+            }],
+        }],
+    }
+
+    with tempfile.TemporaryDirectory() as raw_dir:
+        source_dir = Path(raw_dir)
+        path = source_dir / "case.json"
+
+        def loads(candidate):
+            path.write_text(json.dumps(candidate), encoding="utf-8")
+            return load_timing_v2({(1, 1): 1}, source_dir)
+
+        if len(loads(payload)) != 1:
+            return False
+        for mutate in (
+            lambda p: p["rows"][0].update(gateScore=-2.0),
+            lambda p: p["rows"][0]["segments"][0]["keyframes"][0].update(offsetMs=0),
+            lambda p: p["rows"][0]["segments"][0]["keyframes"][0].update(progress=0.5),
+            lambda p: p["rows"][0].update(audioSha256="z" * 64),
+            lambda p: p["rows"][0]["segments"][0]["keyframes"][0].update(
+                progress=float("nan")
+            ),
+        ):
+            candidate = json.loads(json.dumps(payload))
+            mutate(candidate)
+            try:
+                loads(candidate)
+                return False
+            except ValueError:
+                pass
+
+        qua = json.loads(json.dumps(payload))
+        qua.update({
+            "generator": "sync_lab/generate_qua_timing_v2.py@1",
+            "source": "Wider-Community/quranic-universal-audio@v2.3.0",
+            "sourceRevision": "9b83ea5824d1f4de3921562f9d7282e279f05860",
+            "sourceAssetSha256":
+                "8a05209a022ad4410ce39f74f374ec09fb5bae6a019b1e2b054fda8342bf0df7",
+            "minimumGateScore": 0.7,
+            "minimumPeakMargin": 0.25,
+        })
+        qua["rows"][0].update({
+            "gateScore": 0.8,
+            "clockCorrelation": 0.8,
+            "clockPeakMargin": 0.5,
+            "sourceZeroMs": 120.0,
+            "sourceAudioSha256": "c" * 64,
+        })
+        if len(loads(qua)) != 1:
+            return False
+        qua["rows"][0]["clockPeakMargin"] = 0.24
+        try:
+            loads(qua)
+            return False
+        except ValueError:
+            pass
+    return True
 
 
 def load_cases():
@@ -240,12 +324,29 @@ def audit_bundled_db():
             for x in segs
         ):
             bad.append((rid, s, a))
+    v2_rows = list(db.execute(
+        "SELECT reciter_id,surah_id,ayah_number,segments FROM timings_v2"
+    ))
+    expected_v2 = {
+        (rid, surah, ayah)
+        for rid, surah, ayah, _ in load_timing_v2(counts)
+    }
+    exact = {(rid, s, a) for rid, s, a, _ in v2_rows} == expected_v2
+    for rid, s, a, raw in v2_rows:
+        segments = json.loads(raw)
+        exact &= rid == 1 and bool(segments)
+        for segment in segments:
+            points = segment["keyframes"]
+            exact &= bool(points) and points[-1]["progress"] == 1.0
+            exact &= [p["offsetMs"] for p in points] == sorted(
+                p["offsetMs"] for p in points
+            )
     row = db.execute(
         "SELECT segments FROM timings WHERE reciter_id=1 "
         "AND surah_id=2 AND ayah_number=214"
     ).fetchone()
     starts = {x[0]: x[1] for x in json.loads(row[0])}
-    exact = [starts[p] for p in (25, 26, 27, 28)] == [
+    exact &= [starts[p] for p in (25, 26, 27, 28)] == [
         24_925, 27_145, 29_175, 30_255
     ]
     row = db.execute(
@@ -358,14 +459,18 @@ def main():
                 print(f"        {line}")
     confidence_ok = check_confidence()
     audio_onset_ok = check_audio_onset_pipeline()
+    timing_v2_ok = check_timing_v2_loader()
     database_ok = audit_bundled_db()
     print(f"  {'ok  ' if confidence_ok else 'FAIL'} weighted 2:214 confidence checks")
     print(f"  {'ok  ' if audio_onset_ok else 'FAIL'} audio-onset detector and apply checks")
+    print(f"  {'ok  ' if timing_v2_ok else 'FAIL'} Timing V2 source validation")
     print(f"  {'ok  ' if database_ok else 'FAIL'} bundled timing database invariants")
     if not confidence_ok:
         failures.append(("weighted confidence", "2:214 checks failed", None))
     if not audio_onset_ok:
         failures.append(("audio onsets", "detector/apply checks failed", None))
+    if not timing_v2_ok:
+        failures.append(("Timing V2 loader", "source validation checks failed", None))
     if not database_ok:
         failures.append(("bundled database", "timing audit failed", None))
     print()
@@ -377,7 +482,7 @@ def main():
                 for line in str(detail).splitlines():
                     print(f"    {line}")
         return 1
-    print(f"all {len(cases) + 3} cases pass ({CASES_DIR.relative_to(Path.cwd())})")
+    print(f"all {len(cases) + 4} cases pass ({CASES_DIR.relative_to(Path.cwd())})")
     return 0
 
 

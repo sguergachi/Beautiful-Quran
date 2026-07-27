@@ -169,7 +169,7 @@ fun InkLabPanel(modifier: Modifier = Modifier) {
                     // Letter-level tajweed hold on the active sweep —
                     // experimental (docs/TAJWEED_PACING.md).
                     InkLabTab.Tajweed -> {
-                        TuningToggle("Tajweed pacing", t.tajweedPacing) {
+                        TuningToggle("V1 Tajweed pacing", t.tajweedPacing) {
                             InkEngine.tuning = t.copy(tajweedPacing = it)
                         }
                         TuningToggle("Hold: madd", t.holdMadd) {

@@ -142,7 +142,7 @@ def force_align_slice(
     if T < max(1, len(flat) // 2):
         return float("-inf"), None
     spans, path_score = _ctc_token_spans(log_probs, flat, cm.blank_id)
-    if not spans:
+    if len(spans) != len(flat):
         return float("-inf"), None
     ms_per = (1000.0 * len(y_chunk) / sr) / max(T, 1)
     segs = _merge_char_spans_to_words(spans, [len(m) for m in mapped], ms_per)

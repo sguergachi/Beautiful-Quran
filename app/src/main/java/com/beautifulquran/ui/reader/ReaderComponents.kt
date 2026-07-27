@@ -49,6 +49,7 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -56,6 +57,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.runtime.withFrameNanos
 
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -119,6 +121,7 @@ import androidx.compose.ui.unit.sp
 import com.beautifulquran.QuranApp
 import com.beautifulquran.data.AyahSelectorSide
 import com.beautifulquran.data.ReadingMode
+import com.beautifulquran.data.TimingScheme
 import com.beautifulquran.data.model.Ayah
 import com.beautifulquran.data.model.Word
 import com.beautifulquran.domain.EnglishTypography
@@ -649,10 +652,26 @@ private fun rememberLetterSweep(
     finishResidual: Boolean,
     sweepMs: Int?,
     pacing: TajweedPacing.Curve? = null,
+    /** True V2 phase sampled from the listener-corrected media clock. */
+    clockProgress: State<Float>? = null,
     activation: Long = 0L,
     /** Main-wash progress already laid by a wasl prefix on this word. */
     revealStart: Float = 0f,
 ): LetterSweep {
+    if (clockProgress != null) {
+        val progress = remember(clockProgress, pacing) {
+            derivedStateOf {
+                val clock = clockProgress.value.coerceIn(0f, 1f)
+                pacing?.at(clock) ?: clock
+            }
+        }
+        val feather = rememberUpdatedState<Float?>(
+            if (pacing != null) InkEngine.pacedFeather() else null,
+        )
+        return remember(progress, feather) {
+            LetterSweep(progress = progress, feather = feather)
+        }
+    }
     // Survives Active → Recited so a short hold can finish its wash after
     // handoff instead of recreating at progress 1 (the old hard snap).
     val sweep = remember { Animatable(1f) }
@@ -1035,6 +1054,7 @@ private fun rememberWordHighlight(
     position: Int,
     sweepMs: Int?,
     pacing: TajweedPacing.Curve? = null,
+    clockProgress: State<Float>? = null,
     revealStart: Float = 0f,
     activation: Long = 0L,
 ): WordHighlight {
@@ -1054,6 +1074,7 @@ private fun rememberWordHighlight(
             finishResidual = ink.state == InkEngine.State.Recited,
             sweepMs = sweepMs,
             pacing = entryPacing,
+            clockProgress = clockProgress.takeIf { isActive },
             activation = activation,
             revealStart = revealStart,
         ),
@@ -1242,6 +1263,8 @@ private fun WordUnit(
     showFlash: Boolean = false,
     /** Tajweed pacing of the active word's sweep — null for the plain sweep. */
     pacing: TajweedPacing.Curve? = null,
+    /** Listener-clock phase for a true V2 occurrence. */
+    clockProgress: State<Float>? = null,
     /** Main-wash progress already laid down by a connected previous word. */
     revealStart: Float = 0f,
     /** Opening-letter ink handed across from a connected previous word. */
@@ -1254,6 +1277,7 @@ private fun WordUnit(
         position = word.position,
         sweepMs = sweepMs,
         pacing = pacing,
+        clockProgress = clockProgress,
         revealStart = revealStart,
         activation = activation,
     )
@@ -1404,6 +1428,7 @@ private fun rememberLetterSweeps(
     inks: List<InkEngine.Word>,
     activeSweepMs: Int?,
     pacing: TajweedPacing.Curve? = null,
+    clockProgress: State<Float>? = null,
     activation: Long = 0L,
     activeRevealStart: Float = 0f,
 ): List<LetterSweep> = inks.map { ink ->
@@ -1413,6 +1438,7 @@ private fun rememberLetterSweeps(
         finishResidual = ink.state == InkEngine.State.Recited,
         sweepMs = activeSweepMs.takeIf { active },
         pacing = if (active) pacing else null,
+        clockProgress = clockProgress.takeIf { active },
         activation = if (active) activation else 0L,
         // Only the lit word receives the wasl edge; residual keeps it latched.
         revealStart = if (active) activeRevealStart else 0f,
@@ -1481,6 +1507,7 @@ private fun ResponsiveEnglishAyah(
     markAlpha: () -> Float,
     fontScale: Float,
     activeSweepMs: Int?,
+    clockProgress: State<Float>? = null,
     activation: Long = 0L,
     searchQuery: String?,
     flashWordPosition: Int?,
@@ -1494,7 +1521,12 @@ private fun ResponsiveEnglishAyah(
     val palette = rememberWordInkPalette()
     val gold = LocalQuranAccents.current.gold
     val glintInk = LocalQuranAccents.current.glintInk
-    val sweeps = rememberLetterSweeps(inks, activeSweepMs, activation = activation)
+    val sweeps = rememberLetterSweeps(
+        inks,
+        activeSweepMs,
+        clockProgress = clockProgress,
+        activation = activation,
+    )
     val wordPositions = remember(ayah) { ayah.words.map { it.position } }
     val repeatWashes = rememberRepeatWashes(
         inks = inks,
@@ -1742,6 +1774,8 @@ private fun ResponsiveHafsAyah(
     activeSweepMs: Int?,
     /** Tajweed pacing of the active word's sweep — null for the plain sweep. */
     pacing: TajweedPacing.Curve? = null,
+    /** Listener-clock phase for a true V2 occurrence. */
+    clockProgress: State<Float>? = null,
     activeRevealStart: Float = 0f,
     waslPrefixes: List<WaslPrefix?> = emptyList(),
     activation: Long = 0L,
@@ -1765,6 +1799,7 @@ private fun ResponsiveHafsAyah(
         inks = inks,
         activeSweepMs = activeSweepMs,
         pacing = entryPacing,
+        clockProgress = clockProgress,
         activation = activation,
         activeRevealStart = activeRevealStart,
     )
@@ -2341,6 +2376,34 @@ internal fun VerseAnnotationField(
 }
 
 /**
+ * Extrapolates the sampled listener clock on each rendered frame. Re-anchors
+ * never rewind one occurrence; an anchor for the next word completes the old
+ * wash while the independently collected [ActiveWord] catches up.
+ */
+@Composable
+private fun rememberAcousticProgress(
+    activeWord: ActiveWord?,
+    anchors: StateFlow<AcousticClockAnchor?>,
+): State<Float> {
+    val epoch = activeWord?.acousticEpoch ?: 0L
+    val progress = remember(epoch) { mutableFloatStateOf(0f) }
+    LaunchedEffect(epoch, anchors) {
+        progress.floatValue = 0f
+        while (true) {
+            withFrameNanos { frameNanos ->
+                progress.floatValue = acousticProgressFrame(
+                    current = progress.floatValue,
+                    activeEpoch = epoch,
+                    anchor = anchors.value,
+                    frameNanos = frameNanos,
+                )
+            }
+        }
+    }
+    return progress
+}
+
+/**
  * One ayah on the sheet. In Arabic mode the words flow right-to-left with the
  * English gloss beneath each word; in English mode the gloss itself becomes
  * the lyric line, flowing left-to-right. Either way the letters fade in and
@@ -2352,6 +2415,8 @@ fun AyahBlock(
     ayah: Ayah,
     readingMode: ReadingMode,
     activeWord: ActiveWord?,
+    /** Draw-only listener clock; non-null only for a true V2 occurrence. */
+    acousticWordClock: StateFlow<AcousticClockAnchor?>? = null,
     playbackSpeed: Float,
     isActiveAyah: Boolean,
     dimmed: Boolean,
@@ -2434,9 +2499,13 @@ fun AyahBlock(
     // word, corrected for the chosen playback speed.
     val sweepMs = InkEngine.sweepMs(activeWord, playbackSpeed)
     val activation = activeWord?.activation ?: 0L
+    val acousticProgress = acousticWordClock?.let { anchors ->
+        rememberAcousticProgress(activeWord, anchors)
+    }
 
-    // Letter-level tajweed pacing of that sweep (Ink Lab toggle,
-    // docs/TAJWEED_PACING.md): null keeps the plain constant-rate wash.
+    // Sole within-word pacing authority: measured acoustic keyframes for V2,
+    // inferred Tajwīd for V1. InkEngine never blends the two; null keeps the
+    // plain constant-rate wash.
     // Gated on this ayah owning the active word — not the fade-led
     // isActiveAyah — so a waqf hold is not dropped 500 ms before the audio
     // boundary (see InkEngine.wordState). The verse-closing word is flagged
@@ -2470,6 +2539,7 @@ fun AyahBlock(
         InkEngine.connection(
             prevArabic = ayah.words[activeIndex - 1].arabic,
             arabic = ayah.words[activeIndex].arabic,
+            timingScheme = activeWord?.timingScheme ?: TimingScheme.V1,
         )
     } else {
         null
@@ -2478,6 +2548,7 @@ fun AyahBlock(
         InkEngine.connection(
             prevArabic = ayah.words[activeIndex].arabic,
             arabic = ayah.words[activeIndex + 1].arabic,
+            timingScheme = activeWord?.timingScheme ?: TimingScheme.V1,
         )
     } else {
         null
@@ -2587,6 +2658,7 @@ fun AyahBlock(
                     markAlpha = { ayahMarkAlpha.value },
                     fontScale = fontScale,
                     activeSweepMs = sweepMs,
+                    clockProgress = acousticProgress,
                     activation = activation,
                     searchQuery = searchQuery,
                     flashWordPosition = flashWordPosition,
@@ -2614,6 +2686,7 @@ fun AyahBlock(
                                 fontScale = fontScale,
                                 sweepMs = sweepMs.takeIf { isActiveWord },
                                 pacing = pacing.takeIf { isActiveWord },
+                                clockProgress = acousticProgress.takeIf { isActiveWord },
                                 revealStart = activeRevealStart.takeIf {
                                     isActiveWord
                                 } ?: 0f,
@@ -2649,6 +2722,7 @@ fun AyahBlock(
                         fontSize = ArabicWordStyle.fontSize * fontScale * ARABIC_ONLY_HAFS_FONT_MULTIPLIER,
                         activeSweepMs = sweepMs,
                         pacing = pacing,
+                        clockProgress = acousticProgress,
                         activeRevealStart = activeRevealStart,
                         waslPrefixes = waslPrefixes,
                         activation = activation,

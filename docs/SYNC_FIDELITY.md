@@ -117,11 +117,56 @@ runtime: positionMs − outputLatency  →  HighlightEngine  →  InkEngine wash
 | Letter wash | Interpolated inside the word span | Linear/smootherstep over time; **not** phoneme-timed |
 | Poll rate | ~33 ms | Engine lookup is O(log n); not the bottleneck |
 | Output latency | Route presets (0 / 80 / 180 ms) | BT lag is a *playback path* problem, not timing data |
-| Human correction | Timings Lab + overrides | Gold standard for hard cases |
+| Human correction | Timings Lab + overrides | V1 correction and eval-label source; never V2 input |
 
 **Invariant:** the app never runs ASR or alignment at runtime. Timing is
 precomputed, validated, and bundled. Offline-first and purity of
 `HighlightEngine` stay intact.
+
+### Timing V2 calibration lane
+
+V2 is now an isolated developer experiment:
+
+```text
+canonical Uthmani words + everyayah MP3
+        → pinned QUA letter spans + decoded same-take clock match
+          OR offline acoustic model on unmatched takes
+        → confidence gate / abstain
+        → timings_v2
+        → Segment.subwordKeyframes
+        → existing soft ink-wash curve
+```
+
+- Enable **Settings → Developer → Timing engine V2**.
+- V2 bypasses every on-device Timing Lab override. A missing or rejected V2
+  ayah falls back to the immutable bundled V1 row.
+- Acoustic keyframes are occurrence-specific `(offsetMs, progress)` points.
+  QUA letter intervals animate across their measured duration; letters that
+  share one acoustic interval share one continuous spatial sweep. Silent
+  written marks fold into a measured boundary rather than inventing a time.
+  The earlier CTC path retains equal-progress blank intervals, so a long
+  vowel parks the wash instead of creeping toward the following consonant.
+  The renderer extrapolates a listener-clock anchor on each draw frame; pause,
+  seek, and playback speed remain media-authoritative without a 33 ms
+  within-word stair-step. V2 uses no aesthetic early lead and does not
+  floor/cap the aligned duration.
+- A true V2 occurrence never runs the inferred Tajwīd pacing model: its
+  acoustic curve is the sole animation clock. When confidence abstains, that
+  occurrence is explicitly V1 fallback data and may use the V1 heuristic.
+- The first bundled same-take slice contains six Alafasy Fātiḥah ayahs plus
+  repeat-heavy 5:54. Fātiḥah 1:7 is intentionally V1 fallback because its
+  source and EveryAyah files did not pass the waveform identity gate. The
+  5:54 row preserves three full backward repeat episodes and independent
+  sub-word curves for every occurrence.
+- `tools/sync_lab/generate_qua_timing_v2.py` and
+  `generate_timing_v2.py` create source artifacts under
+  `tools/timing_v2/`; `tools/build_db.py` validates and imports them. These
+  artifacts are generated data, never per-ayah hand patches.
+
+Accuracy and coverage are separate. V2 may claim 99% only after its acceptance
+threshold is calibrated on independent ear-labeled sub-word boundaries. The
+QUA release is forced-aligned external evidence and a valid input, but cannot
+also be called independent gold for rows copied from it.
 
 ---
 

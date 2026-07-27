@@ -1,8 +1,11 @@
 package com.beautifulquran.ui.reader
 
+import com.beautifulquran.data.TimingScheme
+import com.beautifulquran.data.model.SubwordKeyframe
 import com.beautifulquran.ui.reader.InkEngine.State
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -15,10 +18,14 @@ class InkEngineTest {
         isRepeat: Boolean = false,
         highWater: Int = wordPosition,
         repeatStart: Int = wordPosition,
+        timingScheme: TimingScheme = TimingScheme.V1,
+        keyframes: List<SubwordKeyframe> = emptyList(),
     ) = ActiveWord(
         ayah = 1,
         wordPosition = wordPosition,
         durationMs = durationMs,
+        timingScheme = timingScheme,
+        subwordKeyframes = keyframes,
         isRepeat = isRepeat,
         highWater = highWater,
         repeatStart = repeatStart,
@@ -468,6 +475,80 @@ class InkEngineTest {
     @Test
     fun `no active word means no sweep`() {
         assertNull(InkEngine.sweepMs(activeWord = null, playbackSpeed = 1f))
+    }
+
+    @Test
+    fun `V2 follows exact duration without V1 sweep clamps`() {
+        assertEquals(
+            80,
+            InkEngine.sweepMs(
+                active(1, durationMs = 80, timingScheme = TimingScheme.V2),
+                playbackSpeed = 1f,
+            ),
+        )
+        assertEquals(
+            60_000,
+            InkEngine.sweepMs(
+                active(1, durationMs = 60_000, timingScheme = TimingScheme.V2),
+                playbackSpeed = 1f,
+            ),
+        )
+    }
+
+    @Test
+    fun `V2 acoustic pacing does not depend on the V1 Tajweed toggle`() {
+        val saved = InkEngine.tuning
+        try {
+            InkEngine.tuning = saved.copy(tajweedPacing = false)
+            val curve = InkEngine.pacing(
+                arabic = "ٱلضَّآلِّينَ",
+                activeWord = active(
+                    1,
+                    durationMs = 1_000,
+                    timingScheme = TimingScheme.V2,
+                    keyframes = listOf(
+                        SubwordKeyframe(200, 0.4f),
+                        SubwordKeyframe(600, 1f),
+                    ),
+                ),
+                isAyahFinal = true,
+            )
+            assertNotNull(curve)
+            assertEquals(0.4f, curve!!.at(0.2f), 1e-4f)
+        } finally {
+            InkEngine.tuning = saved
+        }
+    }
+
+    @Test
+    fun `V2 never borrows inferred Tajweed pacing when keyframes are absent`() {
+        val saved = InkEngine.tuning
+        try {
+            InkEngine.tuning = saved.copy(tajweedPacing = true)
+            val v1 = active(1, durationMs = 1_000, timingScheme = TimingScheme.V1)
+            val v2 = active(1, durationMs = 1_000, timingScheme = TimingScheme.V2)
+
+            assertNotNull(InkEngine.pacing("ٱلضَّآلِّينَ", v1, isAyahFinal = true))
+            assertNull(InkEngine.pacing("ٱلضَّآلِّينَ", v2, isAyahFinal = true))
+        } finally {
+            InkEngine.tuning = saved
+        }
+    }
+
+    @Test
+    fun `V2 never borrows the V1 cross word Tajweed connection`() {
+        val saved = InkEngine.tuning
+        try {
+            InkEngine.tuning = saved.copy(tajweedPacing = true, holdConnect = true)
+            assertNotNull(
+                InkEngine.connection("مِن", "رَّبِّكُم", TimingScheme.V1),
+            )
+            assertNull(
+                InkEngine.connection("مِن", "رَّبِّكُم", TimingScheme.V2),
+            )
+        } finally {
+            InkEngine.tuning = saved
+        }
     }
 
     // --- glinting ---

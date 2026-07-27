@@ -118,6 +118,7 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import com.beautifulquran.data.AyahSelectorSide
 import com.beautifulquran.data.ReadingMode
+import com.beautifulquran.data.TimingScheme
 import com.beautifulquran.data.model.Surah
 import com.beautifulquran.domain.BASMALAH_PLAYLIST_AYAH
 import com.beautifulquran.ui.reader.focus.FocusEngine
@@ -1969,6 +1970,9 @@ fun ReaderScreen(
                                 ayah = ayah,
                                 readingMode = settings.readingMode,
                                 activeWord = activeWord,
+                                acousticWordClock = viewModel.acousticWordClock.takeIf {
+                                    activeWord?.timingScheme == TimingScheme.V2
+                                },
                                 playbackSpeed = playerState.speed,
                                 isActiveAyah = policyActive,
                                 dimmed = recitingActive && !policyActive,

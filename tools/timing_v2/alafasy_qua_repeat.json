@@ -1,0 +1,1109 @@
+{
+  "schema": 2,
+  "reciterId": 1,
+  "reciter": "Alafasy_128kbps",
+  "generator": "sync_lab/generate_qua_timing_v2.py@1",
+  "source": "Wider-Community/quranic-universal-audio@v2.3.0",
+  "sourceRevision": "9b83ea5824d1f4de3921562f9d7282e279f05860",
+  "sourceAssetSha256": "8a05209a022ad4410ce39f74f374ec09fb5bae6a019b1e2b054fda8342bf0df7",
+  "minimumGateScore": 0.7,
+  "minimumPeakMargin": 0.25,
+  "rows": [
+    {
+      "surah": 5,
+      "ayah": 54,
+      "gateScore": 0.8780337829081659,
+      "clockCorrelation": 0.8780337829081659,
+      "clockPeakMargin": 0.7852794538644079,
+      "sourceZeroMs": 1893230.625,
+      "audioSha256": "ed415c1ce1d668d031acda56ae0288e32f2652f739c88b285b3d0db841b41fce",
+      "sourceAudioSha256": "3cc6ead8b888517f0c5b22faaf19c336244af03f6a8946df279638ec4290280c",
+      "segments": [
+        {
+          "position": 1,
+          "startMs": 184,
+          "endMs": 3224,
+          "keyframes": [
+            {
+              "offsetMs": 270,
+              "progress": 0.1
+            },
+            {
+              "offsetMs": 2250,
+              "progress": 0.2
+            },
+            {
+              "offsetMs": 2400,
+              "progress": 0.4
+            },
+            {
+              "offsetMs": 2870,
+              "progress": 0.6
+            },
+            {
+              "offsetMs": 3040,
+              "progress": 1.0
+            }
+          ]
+        },
+        {
+          "position": 2,
+          "startMs": 3224,
+          "endMs": 4264,
+          "keyframes": [
+            {
+              "offsetMs": 400,
+              "progress": 0.4
+            },
+            {
+              "offsetMs": 490,
+              "progress": 0.6
+            },
+            {
+              "offsetMs": 860,
+              "progress": 0.8
+            },
+            {
+              "offsetMs": 1040,
+              "progress": 1.0
+            }
+          ]
+        },
+        {
+          "position": 3,
+          "startMs": 4264,
+          "endMs": 5324,
+          "keyframes": [
+            {
+              "offsetMs": 80,
+              "progress": 0.166667
+            },
+            {
+              "offsetMs": 420,
+              "progress": 0.333333
+            },
+            {
+              "offsetMs": 630,
+              "progress": 0.5
+            },
+            {
+              "offsetMs": 710,
+              "progress": 0.666667
+            },
+            {
+              "offsetMs": 1060,
+              "progress": 1.0
+            }
+          ]
+        },
+        {
+          "position": 4,
+          "startMs": 5324,
+          "endMs": 6304,
+          "keyframes": [
+            {
+              "offsetMs": 200,
+              "progress": 0.5
+            },
+            {
+              "offsetMs": 980,
+              "progress": 1.0
+            }
+          ]
+        },
+        {
+          "position": 5,
+          "startMs": 6304,
+          "endMs": 7184,
+          "keyframes": [
+            {
+              "offsetMs": 80,
+              "progress": 0.25
+            },
+            {
+              "offsetMs": 220,
+              "progress": 0.5
+            },
+            {
+              "offsetMs": 490,
+              "progress": 0.75
+            },
+            {
+              "offsetMs": 880,
+              "progress": 1.0
+            }
+          ]
+        },
+        {
+          "position": 6,
+          "startMs": 7184,
+          "endMs": 8474,
+          "keyframes": [
+            {
+              "offsetMs": 200,
+              "progress": 0.25
+            },
+            {
+              "offsetMs": 920,
+              "progress": 0.5
+            },
+            {
+              "offsetMs": 1090,
+              "progress": 0.75
+            },
+            {
+              "offsetMs": 1290,
+              "progress": 1.0
+            }
+          ]
+        },
+        {
+          "position": 7,
+          "startMs": 8474,
+          "endMs": 9444,
+          "keyframes": [
+            {
+              "offsetMs": 260,
+              "progress": 0.5
+            },
+            {
+              "offsetMs": 970,
+              "progress": 1.0
+            }
+          ]
+        },
+        {
+          "position": 8,
+          "startMs": 9444,
+          "endMs": 10394,
+          "keyframes": [
+            {
+              "offsetMs": 50,
+              "progress": 0.2
+            },
+            {
+              "offsetMs": 410,
+              "progress": 0.4
+            },
+            {
+              "offsetMs": 600,
+              "progress": 0.6
+            },
+            {
+              "offsetMs": 680,
+              "progress": 0.8
+            },
+            {
+              "offsetMs": 950,
+              "progress": 1.0
+            }
+          ]
+        },
+        {
+          "position": 9,
+          "startMs": 10394,
+          "endMs": 11324,
+          "keyframes": [
+            {
+              "offsetMs": 240,
+              "progress": 0.25
+            },
+            {
+              "offsetMs": 490,
+              "progress": 0.5
+            },
+            {
+              "offsetMs": 650,
+              "progress": 0.75
+            },
+            {
+              "offsetMs": 930,
+              "progress": 1.0
+            }
+          ]
+        },
+        {
+          "position": 10,
+          "startMs": 11324,
+          "endMs": 11944,
+          "keyframes": [
+            {
+              "offsetMs": 200,
+              "progress": 0.25
+            },
+            {
+              "offsetMs": 410,
+              "progress": 0.5
+            },
+            {
+              "offsetMs": 620,
+              "progress": 1.0
+            }
+          ]
+        },
+        {
+          "position": 11,
+          "startMs": 11944,
+          "endMs": 12764,
+          "keyframes": [
+            {
+              "offsetMs": 620,
+              "progress": 0.75
+            },
+            {
+              "offsetMs": 820,
+              "progress": 1.0
+            }
+          ]
+        },
+        {
+          "position": 12,
+          "startMs": 12764,
+          "endMs": 15154,
+          "keyframes": [
+            {
+              "offsetMs": 200,
+              "progress": 0.25
+            },
+            {
+              "offsetMs": 560,
+              "progress": 0.5
+            },
+            {
+              "offsetMs": 2250,
+              "progress": 0.75
+            },
+            {
+              "offsetMs": 2390,
+              "progress": 1.0
+            }
+          ]
+        },
+        {
+          "position": 9,
+          "startMs": 15574,
+          "endMs": 16404,
+          "keyframes": [
+            {
+              "offsetMs": 190,
+              "progress": 0.25
+            },
+            {
+              "offsetMs": 430,
+              "progress": 0.5
+            },
+            {
+              "offsetMs": 580,
+              "progress": 0.75
+            },
+            {
+              "offsetMs": 830,
+              "progress": 1.0
+            }
+          ]
+        },
+        {
+          "position": 10,
+          "startMs": 16404,
+          "endMs": 17054,
+          "keyframes": [
+            {
+              "offsetMs": 220,
+              "progress": 0.25
+            },
+            {
+              "offsetMs": 440,
+              "progress": 0.5
+            },
+            {
+              "offsetMs": 650,
+              "progress": 1.0
+            }
+          ]
+        },
+        {
+          "position": 11,
+          "startMs": 17054,
+          "endMs": 17884,
+          "keyframes": [
+            {
+              "offsetMs": 620,
+              "progress": 0.75
+            },
+            {
+              "offsetMs": 830,
+              "progress": 1.0
+            }
+          ]
+        },
+        {
+          "position": 12,
+          "startMs": 17884,
+          "endMs": 19704,
+          "keyframes": [
+            {
+              "offsetMs": 200,
+              "progress": 0.25
+            },
+            {
+              "offsetMs": 460,
+              "progress": 0.5
+            },
+            {
+              "offsetMs": 620,
+              "progress": 0.75
+            },
+            {
+              "offsetMs": 800,
+              "progress": 1.0
+            }
+          ]
+        },
+        {
+          "position": 13,
+          "startMs": 19704,
+          "endMs": 20834,
+          "keyframes": [
+            {
+              "offsetMs": 70,
+              "progress": 0.2
+            },
+            {
+              "offsetMs": 270,
+              "progress": 0.4
+            },
+            {
+              "offsetMs": 700,
+              "progress": 0.6
+            },
+            {
+              "offsetMs": 980,
+              "progress": 0.8
+            },
+            {
+              "offsetMs": 1130,
+              "progress": 1.0
+            }
+          ]
+        },
+        {
+          "position": 14,
+          "startMs": 20834,
+          "endMs": 24054,
+          "keyframes": [
+            {
+              "offsetMs": 220,
+              "progress": 0.125
+            },
+            {
+              "offsetMs": 390,
+              "progress": 0.25
+            },
+            {
+              "offsetMs": 590,
+              "progress": 0.375
+            },
+            {
+              "offsetMs": 880,
+              "progress": 0.5
+            },
+            {
+              "offsetMs": 1240,
+              "progress": 0.625
+            },
+            {
+              "offsetMs": 1440,
+              "progress": 0.75
+            },
+            {
+              "offsetMs": 1540,
+              "progress": 0.875
+            },
+            {
+              "offsetMs": 3220,
+              "progress": 1.0
+            }
+          ]
+        },
+        {
+          "position": 15,
+          "startMs": 24054,
+          "endMs": 25234,
+          "keyframes": [
+            {
+              "offsetMs": 160,
+              "progress": 0.25
+            },
+            {
+              "offsetMs": 340,
+              "progress": 0.5
+            },
+            {
+              "offsetMs": 780,
+              "progress": 0.75
+            },
+            {
+              "offsetMs": 1180,
+              "progress": 1.0
+            }
+          ]
+        },
+        {
+          "position": 16,
+          "startMs": 25234,
+          "endMs": 25664,
+          "keyframes": [
+            {
+              "offsetMs": 260,
+              "progress": 0.333333
+            },
+            {
+              "offsetMs": 430,
+              "progress": 1.0
+            }
+          ]
+        },
+        {
+          "position": 17,
+          "startMs": 25664,
+          "endMs": 28884,
+          "keyframes": [
+            {
+              "offsetMs": 110,
+              "progress": 0.25
+            },
+            {
+              "offsetMs": 430,
+              "progress": 0.375
+            },
+            {
+              "offsetMs": 580,
+              "progress": 0.5
+            },
+            {
+              "offsetMs": 850,
+              "progress": 0.625
+            },
+            {
+              "offsetMs": 930,
+              "progress": 0.75
+            },
+            {
+              "offsetMs": 3120,
+              "progress": 0.875
+            },
+            {
+              "offsetMs": 3220,
+              "progress": 1.0
+            }
+          ]
+        },
+        {
+          "position": 15,
+          "startMs": 28914,
+          "endMs": 30154,
+          "keyframes": [
+            {
+              "offsetMs": 230,
+              "progress": 0.25
+            },
+            {
+              "offsetMs": 410,
+              "progress": 0.5
+            },
+            {
+              "offsetMs": 840,
+              "progress": 0.75
+            },
+            {
+              "offsetMs": 1240,
+              "progress": 1.0
+            }
+          ]
+        },
+        {
+          "position": 16,
+          "startMs": 30154,
+          "endMs": 30584,
+          "keyframes": [
+            {
+              "offsetMs": 270,
+              "progress": 0.333333
+            },
+            {
+              "offsetMs": 430,
+              "progress": 1.0
+            }
+          ]
+        },
+        {
+          "position": 17,
+          "startMs": 30584,
+          "endMs": 32054,
+          "keyframes": [
+            {
+              "offsetMs": 180,
+              "progress": 0.25
+            },
+            {
+              "offsetMs": 400,
+              "progress": 0.375
+            },
+            {
+              "offsetMs": 530,
+              "progress": 0.5
+            },
+            {
+              "offsetMs": 850,
+              "progress": 0.625
+            },
+            {
+              "offsetMs": 930,
+              "progress": 0.75
+            },
+            {
+              "offsetMs": 1320,
+              "progress": 0.875
+            },
+            {
+              "offsetMs": 1470,
+              "progress": 1.0
+            }
+          ]
+        },
+        {
+          "position": 18,
+          "startMs": 32054,
+          "endMs": 33294,
+          "keyframes": [
+            {
+              "offsetMs": 230,
+              "progress": 0.25
+            },
+            {
+              "offsetMs": 420,
+              "progress": 0.5
+            },
+            {
+              "offsetMs": 840,
+              "progress": 0.75
+            },
+            {
+              "offsetMs": 1240,
+              "progress": 1.0
+            }
+          ]
+        },
+        {
+          "position": 19,
+          "startMs": 33294,
+          "endMs": 33754,
+          "keyframes": [
+            {
+              "offsetMs": 300,
+              "progress": 0.333333
+            },
+            {
+              "offsetMs": 460,
+              "progress": 1.0
+            }
+          ]
+        },
+        {
+          "position": 20,
+          "startMs": 33754,
+          "endMs": 35304,
+          "keyframes": [
+            {
+              "offsetMs": 200,
+              "progress": 0.285714
+            },
+            {
+              "offsetMs": 400,
+              "progress": 0.357143
+            },
+            {
+              "offsetMs": 680,
+              "progress": 0.428571
+            },
+            {
+              "offsetMs": 930,
+              "progress": 0.571429
+            },
+            {
+              "offsetMs": 1050,
+              "progress": 0.714286
+            },
+            {
+              "offsetMs": 1360,
+              "progress": 0.857143
+            },
+            {
+              "offsetMs": 1550,
+              "progress": 1.0
+            }
+          ]
+        },
+        {
+          "position": 21,
+          "startMs": 35304,
+          "endMs": 36784,
+          "keyframes": [
+            {
+              "offsetMs": 180,
+              "progress": 0.166667
+            },
+            {
+              "offsetMs": 360,
+              "progress": 0.25
+            },
+            {
+              "offsetMs": 630,
+              "progress": 0.333333
+            },
+            {
+              "offsetMs": 850,
+              "progress": 0.5
+            },
+            {
+              "offsetMs": 960,
+              "progress": 0.666667
+            },
+            {
+              "offsetMs": 1300,
+              "progress": 0.833333
+            },
+            {
+              "offsetMs": 1480,
+              "progress": 1.0
+            }
+          ]
+        },
+        {
+          "position": 22,
+          "startMs": 36784,
+          "endMs": 37184,
+          "keyframes": [
+            {
+              "offsetMs": 120,
+              "progress": 0.5
+            },
+            {
+              "offsetMs": 400,
+              "progress": 1.0
+            }
+          ]
+        },
+        {
+          "position": 23,
+          "startMs": 37184,
+          "endMs": 38034,
+          "keyframes": [
+            {
+              "offsetMs": 250,
+              "progress": 0.25
+            },
+            {
+              "offsetMs": 380,
+              "progress": 0.5
+            },
+            {
+              "offsetMs": 680,
+              "progress": 0.75
+            },
+            {
+              "offsetMs": 850,
+              "progress": 1.0
+            }
+          ]
+        },
+        {
+          "position": 24,
+          "startMs": 38034,
+          "endMs": 40604,
+          "keyframes": [
+            {
+              "offsetMs": 2120,
+              "progress": 0.75
+            },
+            {
+              "offsetMs": 2570,
+              "progress": 1.0
+            }
+          ]
+        },
+        {
+          "position": 21,
+          "startMs": 40664,
+          "endMs": 42174,
+          "keyframes": [
+            {
+              "offsetMs": 220,
+              "progress": 0.166667
+            },
+            {
+              "offsetMs": 420,
+              "progress": 0.25
+            },
+            {
+              "offsetMs": 660,
+              "progress": 0.333333
+            },
+            {
+              "offsetMs": 880,
+              "progress": 0.5
+            },
+            {
+              "offsetMs": 1000,
+              "progress": 0.666667
+            },
+            {
+              "offsetMs": 1330,
+              "progress": 0.833333
+            },
+            {
+              "offsetMs": 1510,
+              "progress": 1.0
+            }
+          ]
+        },
+        {
+          "position": 22,
+          "startMs": 42174,
+          "endMs": 42554,
+          "keyframes": [
+            {
+              "offsetMs": 130,
+              "progress": 0.5
+            },
+            {
+              "offsetMs": 380,
+              "progress": 1.0
+            }
+          ]
+        },
+        {
+          "position": 23,
+          "startMs": 42554,
+          "endMs": 43424,
+          "keyframes": [
+            {
+              "offsetMs": 250,
+              "progress": 0.25
+            },
+            {
+              "offsetMs": 340,
+              "progress": 0.5
+            },
+            {
+              "offsetMs": 720,
+              "progress": 0.75
+            },
+            {
+              "offsetMs": 870,
+              "progress": 1.0
+            }
+          ]
+        },
+        {
+          "position": 24,
+          "startMs": 43424,
+          "endMs": 44294,
+          "keyframes": [
+            {
+              "offsetMs": 660,
+              "progress": 0.75
+            },
+            {
+              "offsetMs": 870,
+              "progress": 1.0
+            }
+          ]
+        },
+        {
+          "position": 25,
+          "startMs": 44294,
+          "endMs": 44924,
+          "keyframes": [
+            {
+              "offsetMs": 230,
+              "progress": 0.333333
+            },
+            {
+              "offsetMs": 330,
+              "progress": 0.666667
+            },
+            {
+              "offsetMs": 630,
+              "progress": 1.0
+            }
+          ]
+        },
+        {
+          "position": 26,
+          "startMs": 44924,
+          "endMs": 46254,
+          "keyframes": [
+            {
+              "offsetMs": 190,
+              "progress": 0.166667
+            },
+            {
+              "offsetMs": 310,
+              "progress": 0.333333
+            },
+            {
+              "offsetMs": 690,
+              "progress": 0.5
+            },
+            {
+              "offsetMs": 790,
+              "progress": 0.666667
+            },
+            {
+              "offsetMs": 1130,
+              "progress": 0.833333
+            },
+            {
+              "offsetMs": 1330,
+              "progress": 1.0
+            }
+          ]
+        },
+        {
+          "position": 27,
+          "startMs": 46254,
+          "endMs": 47134,
+          "keyframes": [
+            {
+              "offsetMs": 210,
+              "progress": 0.25
+            },
+            {
+              "offsetMs": 400,
+              "progress": 0.5
+            },
+            {
+              "offsetMs": 620,
+              "progress": 0.75
+            },
+            {
+              "offsetMs": 880,
+              "progress": 1.0
+            }
+          ]
+        },
+        {
+          "position": 28,
+          "startMs": 47134,
+          "endMs": 49474,
+          "keyframes": [
+            {
+              "offsetMs": 70,
+              "progress": 0.25
+            },
+            {
+              "offsetMs": 1960,
+              "progress": 0.5
+            },
+            {
+              "offsetMs": 2110,
+              "progress": 0.75
+            },
+            {
+              "offsetMs": 2340,
+              "progress": 1.0
+            }
+          ]
+        },
+        {
+          "position": 29,
+          "startMs": 49824,
+          "endMs": 50774,
+          "keyframes": [
+            {
+              "offsetMs": 200,
+              "progress": 0.166667
+            },
+            {
+              "offsetMs": 560,
+              "progress": 0.333333
+            },
+            {
+              "offsetMs": 710,
+              "progress": 0.666667
+            },
+            {
+              "offsetMs": 950,
+              "progress": 1.0
+            }
+          ]
+        },
+        {
+          "position": 30,
+          "startMs": 50774,
+          "endMs": 51414,
+          "keyframes": [
+            {
+              "offsetMs": 200,
+              "progress": 0.333333
+            },
+            {
+              "offsetMs": 420,
+              "progress": 0.666667
+            },
+            {
+              "offsetMs": 640,
+              "progress": 1.0
+            }
+          ]
+        },
+        {
+          "position": 31,
+          "startMs": 51414,
+          "endMs": 52264,
+          "keyframes": [
+            {
+              "offsetMs": 650,
+              "progress": 0.75
+            },
+            {
+              "offsetMs": 850,
+              "progress": 1.0
+            }
+          ]
+        },
+        {
+          "position": 32,
+          "startMs": 52264,
+          "endMs": 53314,
+          "keyframes": [
+            {
+              "offsetMs": 260,
+              "progress": 0.2
+            },
+            {
+              "offsetMs": 420,
+              "progress": 0.4
+            },
+            {
+              "offsetMs": 500,
+              "progress": 0.6
+            },
+            {
+              "offsetMs": 840,
+              "progress": 0.8
+            },
+            {
+              "offsetMs": 1050,
+              "progress": 1.0
+            }
+          ]
+        },
+        {
+          "position": 33,
+          "startMs": 53314,
+          "endMs": 54544,
+          "keyframes": [
+            {
+              "offsetMs": 200,
+              "progress": 0.5
+            },
+            {
+              "offsetMs": 1230,
+              "progress": 1.0
+            }
+          ]
+        },
+        {
+          "position": 34,
+          "startMs": 54544,
+          "endMs": 57094,
+          "keyframes": [
+            {
+              "offsetMs": 70,
+              "progress": 0.25
+            },
+            {
+              "offsetMs": 330,
+              "progress": 0.5
+            },
+            {
+              "offsetMs": 2390,
+              "progress": 0.75
+            },
+            {
+              "offsetMs": 2550,
+              "progress": 1.0
+            }
+          ]
+        },
+        {
+          "position": 35,
+          "startMs": 57274,
+          "endMs": 58304,
+          "keyframes": [
+            {
+              "offsetMs": 180,
+              "progress": 0.2
+            },
+            {
+              "offsetMs": 840,
+              "progress": 0.8
+            },
+            {
+              "offsetMs": 1030,
+              "progress": 1.0
+            }
+          ]
+        },
+        {
+          "position": 36,
+          "startMs": 58304,
+          "endMs": 59374,
+          "keyframes": [
+            {
+              "offsetMs": 150,
+              "progress": 0.166667
+            },
+            {
+              "offsetMs": 430,
+              "progress": 0.333333
+            },
+            {
+              "offsetMs": 660,
+              "progress": 0.666667
+            },
+            {
+              "offsetMs": 1070,
+              "progress": 1.0
+            }
+          ]
+        },
+        {
+          "position": 37,
+          "startMs": 59374,
+          "endMs": 61654,
+          "keyframes": [
+            {
+              "offsetMs": 250,
+              "progress": 0.25
+            },
+            {
+              "offsetMs": 330,
+              "progress": 0.5
+            },
+            {
+              "offsetMs": 1980,
+              "progress": 0.75
+            },
+            {
+              "offsetMs": 2280,
+              "progress": 1.0
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

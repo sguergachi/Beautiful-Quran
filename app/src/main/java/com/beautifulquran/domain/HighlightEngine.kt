@@ -1,6 +1,7 @@
 package com.beautifulquran.domain
 
 import com.beautifulquran.data.model.Segment
+import com.beautifulquran.data.model.SubwordKeyframe
 
 /**
  * Pure mapping from a playback position to the word that should be lit.
@@ -26,6 +27,8 @@ object HighlightEngine {
         val position: Int,
         val startMs: Long,
         val endMs: Long,
+        /** Acoustic reveal points for this exact occurrence; empty in V1. */
+        val subwordKeyframes: List<SubwordKeyframe>,
         /**
          * When the karaoke hold ends: the next segment's [Segment.startMs], or
          * [endMs] for the last word. The letter sweep must finish by this time
@@ -52,6 +55,10 @@ object HighlightEngine {
         private val maxBeforeByIndex: IntArray,
         private val repeatStartByIndex: IntArray,
     ) {
+        /** True when this ayah is wholly owned by measured Timing V2 data. */
+        val hasAcousticKeyframes: Boolean =
+            segments.isNotEmpty() && segments.all { it.subwordKeyframes.isNotEmpty() }
+
         fun activeInfo(positionMs: Long): ActiveInfo? {
             val idx = activeIndex(segments, positionMs) ?: return null
             val seg = segments[idx]
@@ -65,6 +72,7 @@ object HighlightEngine {
                 position = seg.position,
                 startMs = seg.startMs,
                 endMs = seg.endMs,
+                subwordKeyframes = seg.subwordKeyframes,
                 holdEndMs = holdEndMs.coerceAtLeast(seg.startMs),
                 isRepeat = seg.position <= maxBefore,
                 highWater = maxOf(maxBefore, seg.position),
