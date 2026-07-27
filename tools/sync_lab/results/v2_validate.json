@@ -1,0 +1,37 @@
+{
+  "acceptedRows": 2700,
+  "wordOccurrences": 34421,
+  "keyframes": 137155,
+  "repeatRows": 321,
+  "coveragePctOfAlafasy": 43.3,
+  "audioRowsChecked": 300,
+  "flaggedRows": 48,
+  "flaggedPctOfAccepted": 1.78,
+  "flagCounts": {
+    "onset_in_silence": 44,
+    "span_crosses_pause": 8
+  },
+  "repeatSelfCorrDiagnostic": {
+    "count": 233,
+    "median": 0.10581351847632921,
+    "p10": 0.04703430199024892,
+    "below0_25": 220,
+    "note": "max-lag waveform xcorr; tajweed re-says are often low \u2014 not a hard gate"
+  },
+  "multiWindowClockDeltaMs": {
+    "count": 0
+  },
+  "note": "coverage and accuracy are separate; objective flags are not ear gold; 99% requires frozen independent labels",
+  "historicalOverlap": {
+    "overlapRows": 142,
+    "structureExact": 50,
+    "structureExactPct": 35.21,
+    "onsets": {
+      "count": 950,
+      "medianMs": 57.0,
+      "p90Ms": 639,
+      "within100Pct": 72.3157894736842
+    },
+    "note": "historical patches are regression evidence, not independent gold"
+  }
+}

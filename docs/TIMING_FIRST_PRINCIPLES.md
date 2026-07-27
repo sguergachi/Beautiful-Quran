@@ -290,9 +290,17 @@ energy-rise composite, pad recovery alone, or “word count match.”
 - [x] Pure runtime keyframe path with V1 fallback and no Lab overrides
 - [x] Machine-generated same-take Alafasy slice with a real repeat-heavy row
 - [x] Pinned QUA letter/repeat importer with waveform identity abstention
+- [x] Full Alafasy same-take expansion landed in `tools/timing_v2/alafasy_qua.json`
+      (~2,700 ayahs / ~43% coverage / 321 repeat rows) with DB `timings_v2`
+- [x] Objective validators + independent mono CTC onset witness
+      (`validate_timing_v2.py`, `eval_v2_ctc_witness.py`,
+      `results/v2_scale_snapshot.json`)
 
-The slice validates plumbing and exact source transfer only. It is not the
-independent human calibration required by the definition of done.
+The same-take lane is scale-tested, not human-calibrated. Snapshot
+(2026-07-27): hard duration flags **0/2700**; multi-window `sourceZeroMs`
+spread p90 **0.25 ms** on n=40; mono CTC witness onsets **med 36.5 ms /
+p90 91 ms / 93.3% ≤100 ms** (n=56 rows, 616 onsets). Still **not** a 99%
+claim — coverage is 43%, witness ≠ ear gold, repeats need structure labels.
 
 ### Phase 1 — valid labels + time-localized structure
 
@@ -301,15 +309,14 @@ independent human calibration required by the definition of done.
    them.
 2. Label a stratified random structure set (≥300) and a separate
    repeat-enriched challenge set. Freeze held-out splits before tuning.
-3. Use QUA structure directly on same-take matches. For unmatched takes,
-   replace substring generation + global edit score with a constrained
-   time-localized CTC graph/beam.
+3. [partial] Use QUA structure directly on same-take matches (**done at
+   scale**). For unmatched takes (~57%), replace substring generation +
+   global edit score with a constrained time-localized CTC graph/beam.
 4. Calibrate abstention and second-model disagreement on validation data.
    Measure accepted accuracy, coverage, repeat P/R, and clean FP separately.
 5. **Shadow one full reciter** (e.g. Alafasy)
-   - No DB write.  
-   - Log winner, local episode likelihood ratio, flag, disagree-with-shipped.
-   - Report flag rate.
+   - Same-take accept/abstain already logged via QUA generator.
+   - Remaining: different-take decoder + flag rate vs shipped structure.
 
 ### Phase 2 — onset gold + clock
 
@@ -399,13 +406,19 @@ Audio auto-downloads from `https://everyayah.com/data/<slug>/SSSAAA.mp3`.
 
 ## 10. Immediate next task for the continuing agent
 
-**Priority 1:** Create the frozen independent structure labels and adjudicate
-the 40 incompatible historical rows.
+**Done (2026-07-27 scale pass):** land 2,700 same-take QUA rows; duration +
+multi-window clock falsification; mono CTC witness; metrics snapshot under
+`tools/sync_lab/results/v2_scale_snapshot.json`.
 
-**Priority 2:** Implement the time-localized constrained CTC decoder; retire
-the flattened substring/edit scorer as the primary path.
+**Priority 1:** Create the frozen independent structure/onset labels and
+adjudicate the 40 incompatible historical rows. Without this, 99% is
+undefendable.
 
-**Priority 3:** Calibrate abstention, then shadow full Alafasy generation.
+**Priority 2:** Time-localized constrained CTC for the ~57% different-take
+ayahs; retire flattened substring/edit scoring as the primary path.
+
+**Priority 3:** Calibrate abstention on ear validation; publish accuracy and
+coverage separately; only then raise coverage toward full-reciter cutover.
 
 ---
 

@@ -27,7 +27,10 @@ Supporting notes (evidence, not the plan):
 | `qua_timing.py` | Pure waveform-match, text-map, repeat, and letter-curve gates |
 | `quran_phoneme_aligner.py` | Pinned Quran-phoneme CTC experiment with Uthmani→glyph mapping |
 | `eval_v2_onsets.py` | V1/V2 onset, structure, accuracy, and coverage report |
-| `test_timing_v2.py` | Pure keyframe rebase/rejection tests |
+| `eval_v2_ctc_witness.py` | Independent mono CTC onset witness vs accepted QUA V2 |
+| `validate_timing_v2.py` | Duration / dead-zone / multi-window / historical overlap gates |
+| `results/v2_scale_snapshot.json` | Frozen 2026-07-27 scale metrics (coverage ≠ accuracy) |
+| `test_timing_v2.py` | Pure keyframe rebase/rejection + objective-flag tests |
 | `test_decode_structure.py` | Gold hard-case gate (repair regression suite) |
 | `gold_structure_cases.json` | Cases that created timing_repairs rules |
 | `batch_align.py` | Earlier mono clock dry-run |
@@ -47,10 +50,15 @@ python tools/sync_lab/batch_align.py \
   --reciter Alafasy_128kbps --surah 1 \
   --out tools/sync_lab/results/out.json
 
-# regenerate the first app-testable same-take V2 slice
-python tools/sync_lab/generate_qua_timing_v2.py \
-  --surah 1 --ayah-to 7 \
-  --out tools/timing_v2/alafasy_fatiha.json
+# regenerate same-take Alafasy V2 (full reciter is slow)
+python tools/sync_lab/generate_qua_timing_v2.py --all \
+  --out tools/timing_v2/alafasy_qua.json
+
+# objective gates + independent CTC witness (not ear gold)
+python tools/sync_lab/validate_timing_v2.py \
+  --max-audio-rows 300 --out tools/sync_lab/results/v2_validate.json
+python tools/sync_lab/eval_v2_ctc_witness.py --sample 60 \
+  --out tools/sync_lab/results/v2_ctc_witness.json
 
 # compare V2 with historical regression evidence (not independent gold)
 python tools/sync_lab/eval_v2_onsets.py \
@@ -66,9 +74,11 @@ audio-hashed frozen splits documented in `independent_labels/README.md`.
 The preferred high-confidence source is the pinned CC-BY-4.0 Qur'anic
 Universal Audio `v2.3.0` release. Its 42-token letter intervals and repeat
 positions are transferred only when decoded waveform correlation proves that
-the source chapter and EveryAyah clip are the same take. On the 313 cached
-Alafasy rows, 166 passed the deliberately bimodal gate; different takes
-abstained instead of inheriting another recording's clock.
+the source chapter and EveryAyah clip are the same take. Full Alafasy
+expansion (2026-07-27): **2,700 / 6,236 accepted (~43%)**, 321 repeat rows,
+hard duration flags 0/2700, multi-window clock spread p90 ~0 ms, mono CTC
+witness ~37 ms median / ~93% ≤100 ms on a 56-row sample. Different takes
+abstain. Snapshot: `results/v2_scale_snapshot.json`.
 
 The next candidate for unmatched takes is the MIT-licensed
 `obadx/muaalem-model-v3_2` phoneme
