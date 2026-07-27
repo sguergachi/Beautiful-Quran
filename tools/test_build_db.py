@@ -210,9 +210,9 @@ def check_audio_onset_pipeline():
             "reciterSlug": "Alafasy_128kbps",
             "offsets": {"2:253": 1_179},
         }))
-        rows = apply_audio_onsets([(1, 2, 253, segments)], evidence)
+        rows, onsets = apply_audio_onsets([(1, 2, 253, segments)], evidence)
     shifted = json.loads(rows[0][3])
-    integration = shifted == [
+    integration = onsets == {(1, 2, 253): 1_179} and shifted == [
         [1, 1_179, 1_579],
         [2, 1_579, 1_879],
         [1, 1_879, 2_179],
@@ -303,6 +303,11 @@ def audit_bundled_db():
         for verse, onset in payload["offsets"].items():
             s, a = map(int, verse.split(":"))
             exact &= timings[(rid, s, a)][0][1] >= onset
+            exact &= db.execute(
+                "SELECT audio_onset_ms FROM timings "
+                "WHERE reciter_id=? AND surah_id=? AND ayah_number=?",
+                (rid, s, a),
+            ).fetchone() == (onset,)
     overrides = list((TOOLS / "timing_overrides").glob("*.json"))
     return not bad and exact and not overrides and db.execute(
         "PRAGMA integrity_check"
