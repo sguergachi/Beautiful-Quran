@@ -414,7 +414,8 @@ InkEngine owns that too, as data rather than as animation code:
   with it via `InkLabStore`. `fadeLeadMs` is how far the ayah focus/recess target
   runs ahead of the audio; `highlightLeadMs` advances word ink only. Both start
   from the same latency-corrected heard position, a contract enforced in
-  `ReaderViewModel` — see
+  `ReaderViewModel`; the highlight lead is suppressed during encoded silence
+  before the first word — see
   [OUTPUT_LATENCY.md](OUTPUT_LATENCY.md). `focusEngineEnabled` is a session-only
   lab freeze and is never persisted.
 - **Renderers consume `InkEngine.Word`.** `AyahBlock` derives each ayah's ink
