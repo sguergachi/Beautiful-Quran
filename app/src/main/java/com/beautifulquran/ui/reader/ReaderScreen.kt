@@ -1138,6 +1138,29 @@ fun ReaderScreen(
                             .padding(vertical = 6.dp),
                     )
                 }
+                // Live V1/V2 A/B: show which fork is driving ink for this chapter.
+                if (settings.developerModeEnabled) {
+                    val lane = when (uiState.timingScheme) {
+                        TimingScheme.V1 -> "Timing V1 (shipped)"
+                        TimingScheme.V2 ->
+                            "Timing V2 · ${uiState.v2AcousticAyahCount}/" +
+                                "${uiState.timedAyahCount} acoustic" +
+                                if (uiState.v2AcousticAyahCount < uiState.timedAyahCount) {
+                                    " · rest V1 fallback"
+                                } else {
+                                    ""
+                                }
+                    }
+                    Text(
+                        text = lane,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 4.dp),
+                    )
+                }
                 PlayerBar(
                     state = playerState,
                     isThisSurahLoaded = isThisSurahPlaying,
