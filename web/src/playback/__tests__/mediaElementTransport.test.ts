@@ -64,4 +64,41 @@ describe('MediaElementTransport', () => {
     audio.emit('error')
     await expect(failed).rejects.toThrow('Audio failed to load')
   })
+
+  it('seeds defaultPlaybackRate so src/load cannot wipe a non-1× preference', () => {
+    const audio = new FakeAudio()
+    // Simulate browser re-seed from defaultPlaybackRate during load().
+    audio.load.mockImplementation(() => {
+      audio.playbackRate = audio.defaultPlaybackRate
+    })
+    const transport = new MediaElementTransport(true, events(), () => audio.asAudio())
+
+    transport.loadActive({
+      src: 'https://example.test/001001.mp3',
+      loop: false,
+      playbackRate: 0.75,
+      volume: 1,
+    })
+
+    expect(audio.defaultPlaybackRate).toBe(0.75)
+    expect(audio.playbackRate).toBe(0.75)
+  })
+
+  it('updates standby rate when the same clip is re-prepared at a new speed', () => {
+    const created: FakeAudio[] = []
+    const transport = new MediaElementTransport(false, events(), () => {
+      const audio = new FakeAudio()
+      created.push(audio)
+      return audio.asAudio()
+    })
+    const standby = created[1]!
+
+    transport.prepareStandby(1, 'blob:ayah-2', 1)
+    transport.setSpeed(0.75)
+    // prepareStandby early-returns on same source; must still honor the rate.
+    transport.prepareStandby(1, 'blob:ayah-2', 0.75)
+
+    expect(standby.defaultPlaybackRate).toBe(0.75)
+    expect(standby.playbackRate).toBe(0.75)
+  })
 })

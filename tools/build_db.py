@@ -1072,9 +1072,10 @@ def offset_for_audio_onset(segs, onset_ms):
 
 
 def apply_audio_onsets(timing_rows, evidence_dir=AUDIO_ONSETS_DIR):
-    """Apply generated everyayah voice-onset evidence to timing rows."""
+    """Apply everyayah voice onsets and return rows plus immutable media metadata."""
     slug_by_id = {r[0]: r[1] for r in RECITERS}
     by_key = {(rid, sid, ay): segs for rid, sid, ay, segs in timing_rows}
+    onsets = {}
     files = sorted(evidence_dir.glob("*.json")) if evidence_dir.is_dir() else []
     shifted = 0
     for path in files:
@@ -1115,13 +1116,15 @@ def apply_audio_onsets(timing_rows, evidence_dir=AUDIO_ONSETS_DIR):
                     file=sys.stderr,
                 )
                 sys.exit(1)
+            onsets[key] = onset
             current = json.loads(raw) if isinstance(raw, str) else raw
             corrected = offset_for_audio_onset(current, onset)
             if corrected != current:
                 shifted += 1
                 by_key[key] = json.dumps(corrected, separators=(",", ":"))
     print(f"  audio onsets: {shifted} ayah(s) shifted across {len(files)} file(s)")
-    return [(rid, sid, ay, segs) for (rid, sid, ay), segs in sorted(by_key.items())]
+    rows = [(rid, sid, ay, segs) for (rid, sid, ay), segs in sorted(by_key.items())]
+    return rows, onsets
 
 
 def apply_timing_overrides(
@@ -1303,6 +1306,7 @@ CREATE TABLE timings (
   surah_id INTEGER NOT NULL,
   ayah_number INTEGER NOT NULL,
   segments TEXT NOT NULL,
+  audio_onset_ms INTEGER NOT NULL,
   PRIMARY KEY (reciter_id, surah_id, ayah_number)
 );
 CREATE TABLE word_morphology (
@@ -1622,7 +1626,7 @@ def main():
     timing_rows = apply_timing_repairs(timing_rows, word_counts)
 
     print("[audio onsets] aligning timings to encoded leading silence")
-    timing_rows = apply_audio_onsets(timing_rows)
+    timing_rows, audio_onsets = apply_audio_onsets(timing_rows)
 
     print("[overrides] applying tools/timing_overrides/*.json")
     timing_rows, reciter_rows = apply_timing_overrides(
@@ -1641,7 +1645,13 @@ def main():
     )
     db.executemany("INSERT INTO words VALUES (?,?,?,?,?,?,?,?,?,?)", words)
     db.executemany("INSERT INTO reciters VALUES (?,?,?,?,?)", reciter_rows)
-    db.executemany("INSERT INTO timings VALUES (?,?,?,?)", timing_rows)
+    db.executemany(
+        "INSERT INTO timings VALUES (?,?,?,?,?)",
+        [
+            (rid, sid, ay, segments, audio_onsets.get((rid, sid, ay), 0))
+            for rid, sid, ay, segments in timing_rows
+        ],
+    )
     write_morphology(db, morph_rows, roots_rows, occ_rows)
     db.execute("CREATE INDEX idx_words_ayah ON words(surah_id, ayah_number)")
     db.execute("CREATE INDEX idx_timings ON timings(reciter_id, surah_id)")

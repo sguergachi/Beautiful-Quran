@@ -258,14 +258,15 @@ class ReaderViewModel(
         OutputLatency.heardMs(player.positionMs, outputLatencyMs())
 
     /**
-     * The heard position plus the word-only Ink Lab lead. A route or lab change
-     * steps query time, so arm [HighlightClock] to take it rather than hold it
-     * as jitter.
+     * The heard position plus the word-only Ink Lab lead. [firstWordStartMs]
+     * keeps that lead from crossing encoded opening silence. A route or lab
+     * change steps query time, so arm [HighlightClock] to take it rather than
+     * hold it as jitter.
      *
      * Forced word seeks stay on the media timeline so a tap lights the word
      * that was just sought.
      */
-    private fun highlightPositionMs(forcedMediaMs: Long?): Long {
+    private fun highlightPositionMs(forcedMediaMs: Long?, firstWordStartMs: Long): Long {
         val latencyMs = outputLatencyMs()
         val leadMs = InkEngine.highlightLeadMs.toLong().coerceAtLeast(0L)
         if (latencyMs != lastOutputLatencyMs || leadMs != lastHighlightLeadMs) {
@@ -274,7 +275,12 @@ class ReaderViewModel(
             highlightClock.acceptNextSample()
         }
         if (forcedMediaMs != null) return forcedMediaMs
-        return OutputLatency.highlightMs(player.positionMs, latencyMs, leadMs)
+        return OutputLatency.highlightMs(
+            mediaPositionMs = player.positionMs,
+            latencyMs = latencyMs,
+            leadMs = leadMs,
+            leadNotBeforeMs = firstWordStartMs,
+        )
     }
 
     /** Emits the active word ~30x/sec while this surah is playing, but only
@@ -289,7 +295,12 @@ class ReaderViewModel(
         } else {
             null
         }
-        val rawMs = highlightPositionMs(forcedMs)
+        val firstWordStartMs = preparedTimings[np.ayah]
+            ?.segments
+            ?.firstOrNull()
+            ?.startMs
+            ?: 0L
+        val rawMs = highlightPositionMs(forcedMs, firstWordStartMs)
         val clockMs = highlightClock.sample(np, rawMs)
         if (lastInkSampleKey != np) {
             lastInkSampleKey = np

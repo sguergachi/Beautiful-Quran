@@ -8,6 +8,7 @@ export class FakeAudio extends EventTarget {
   duration = 10
   readyState = 4
   playbackRate = 1
+  defaultPlaybackRate = 1
   volume = 1
   loop = false
   paused = true
