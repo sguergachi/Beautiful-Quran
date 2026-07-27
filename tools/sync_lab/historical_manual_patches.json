@@ -1,5 +1,5 @@
 {
-  "description": "Historical manual timing_overrides recovered from git; eval gold for first-principles pipeline",
+  "description": "Historical timing_overrides recovered from git; mixed-provenance regression evidence, not independent eval gold",
   "files": [
     {
       "file": "alafasy-2-214.json",

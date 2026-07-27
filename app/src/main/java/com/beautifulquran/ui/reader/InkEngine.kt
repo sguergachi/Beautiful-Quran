@@ -6,6 +6,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.beautifulquran.data.model.Segment
 import com.beautifulquran.domain.BasmalahWash
+import com.beautifulquran.data.TimingScheme
 import com.beautifulquran.domain.TajweedPacing
 
 /**
@@ -370,16 +371,18 @@ object InkEngine {
     fun sweepMs(activeWord: ActiveWord?, playbackSpeed: Float): Int? {
         val word = activeWord ?: return null
         val raw = (word.durationMs / playbackSpeed).toInt().coerceAtLeast(0)
+        // A true V2 occurrence follows its acoustic clock exactly and never
+        // inherits V1's visual floor/cap.
+        if (word.timingScheme == TimingScheme.V2) return raw.coerceAtLeast(1)
         val floor = minSweepFloorMs()
         if (raw <= 0) return floor
         return raw.coerceIn(floor, tuning.maxSweepMs)
     }
 
     /**
-     * The active word's tajweed pacing curve — how the sweep's linear clock
-     * maps to wash position so the ink sustains the letter the reciter is
-     * sustaining — or null for the plain sweep (toggle off, no dramatic
-     * letter in the word, no dwell affordable, or nothing recognisable).
+     * The active word's sole within-word pacing curve. V2 consumes only its
+     * measured acoustic keyframes; missing keyframes return null rather than
+     * borrowing V1's inferred Tajwīd. V1 may use the Tajwīd heuristic.
      *
      * [arabic] is the active word's Hafs Uthmani text and [isAyahFinal] marks
      * the verse-closing word, whose waqf carries the only slack that is not
@@ -394,6 +397,12 @@ object InkEngine {
         isAyahFinal: Boolean,
         prevArabic: String? = null,
     ): TajweedPacing.Curve? {
+        if (activeWord.timingScheme == TimingScheme.V2) {
+            return TajweedPacing.acousticCurve(
+                keyframes = activeWord.subwordKeyframes,
+                durationMs = activeWord.durationMs,
+            )
+        }
         val t = tuning
         if (!t.tajweedPacing) return null
         val spokenFraction =
@@ -417,10 +426,20 @@ object InkEngine {
         )
     }
 
-    /** Cross-word prefix bloom for a nūn/tanwīn connection, when enabled. */
-    fun connection(prevArabic: String, arabic: String): TajweedPacing.Connection? {
+    /** V1-only cross-word prefix bloom for a nūn/tanwīn connection. */
+    fun connection(
+        prevArabic: String,
+        arabic: String,
+        timingScheme: TimingScheme = TimingScheme.V1,
+    ): TajweedPacing.Connection? {
         val t = tuning
-        if (!t.tajweedPacing || !t.holdConnect) return null
+        if (
+            timingScheme != TimingScheme.V1 ||
+            !t.tajweedPacing ||
+            !t.holdConnect
+        ) {
+            return null
+        }
         return TajweedPacing.connection(prevArabic, arabic)
     }
 

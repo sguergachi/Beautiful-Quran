@@ -77,6 +77,7 @@ import com.beautifulquran.data.BrushCircleStyle
 import com.beautifulquran.data.HomeBookmarkStyle
 import com.beautifulquran.data.ReadingMode
 import com.beautifulquran.data.Settings
+import com.beautifulquran.data.TimingScheme
 import com.beautifulquran.data.ThemeMode
 import com.beautifulquran.ui.PageTurnSounds
 import com.beautifulquran.ui.theme.BrushCheckParams
@@ -487,6 +488,24 @@ private fun DeveloperSection(
         color = MaterialTheme.colorScheme.primary,
     )
     Caption("Edit word-level timing marks; also opens from a word long-press.")
+
+    Spacer(Modifier.height(18.dp))
+    ToggleRow(
+        label = "Timing engine V2",
+        checked = settings.timingScheme == TimingScheme.V2,
+        onChange = { enabled ->
+            viewModel.settings.update {
+                it.copy(timingScheme = if (enabled) TimingScheme.V2 else TimingScheme.V1)
+            }
+        },
+        checkParams = checkParams,
+        checkPaintToken = checkPaintToken,
+    )
+    Caption(
+        "Acoustic sub-word keyframes where confidence passes; pure bundled V1 " +
+            "fallback elsewhere. Current test slice: Alafasy · Al-Fātiḥah. " +
+            "Timing Lab edits never enter V2.",
+    )
 
     Spacer(Modifier.height(20.dp))
     Text(

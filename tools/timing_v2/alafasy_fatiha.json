@@ -1,0 +1,565 @@
+{
+  "schema": 2,
+  "reciterId": 1,
+  "reciter": "Alafasy_128kbps",
+  "generator": "sync_lab/generate_qua_timing_v2.py@1",
+  "source": "Wider-Community/quranic-universal-audio@v2.3.0",
+  "sourceRevision": "9b83ea5824d1f4de3921562f9d7282e279f05860",
+  "sourceAssetSha256": "8a05209a022ad4410ce39f74f374ec09fb5bae6a019b1e2b054fda8342bf0df7",
+  "minimumGateScore": 0.7,
+  "minimumPeakMargin": 0.25,
+  "rows": [
+    {
+      "surah": 1,
+      "ayah": 1,
+      "gateScore": 0.8189275501972755,
+      "clockCorrelation": 0.8189275501972755,
+      "clockPeakMargin": 0.5829667093665728,
+      "sourceZeroMs": 6299.5,
+      "audioSha256": "8808f3fc313d9df87b6090ee9efc8c11859da58b0100ad92621c5ee9a93d7280",
+      "sourceAudioSha256": "3ac2fd2b9313dee8c69c78ebbf71ac10e5bff9223b7829bff84a8f0ffc165ee1",
+      "segments": [
+        {
+          "position": 1,
+          "startMs": 60,
+          "endMs": 600,
+          "keyframes": [
+            {
+              "offsetMs": 160,
+              "progress": 0.333333
+            },
+            {
+              "offsetMs": 390,
+              "progress": 0.666667
+            },
+            {
+              "offsetMs": 540,
+              "progress": 1.0
+            }
+          ]
+        },
+        {
+          "position": 2,
+          "startMs": 600,
+          "endMs": 1380,
+          "keyframes": [
+            {
+              "offsetMs": 610,
+              "progress": 0.75
+            },
+            {
+              "offsetMs": 780,
+              "progress": 1.0
+            }
+          ]
+        },
+        {
+          "position": 3,
+          "startMs": 1380,
+          "endMs": 2510,
+          "keyframes": [
+            {
+              "offsetMs": 390,
+              "progress": 0.5
+            },
+            {
+              "offsetMs": 610,
+              "progress": 0.666667
+            },
+            {
+              "offsetMs": 680,
+              "progress": 0.75
+            },
+            {
+              "offsetMs": 1010,
+              "progress": 0.833333
+            },
+            {
+              "offsetMs": 1130,
+              "progress": 1.0
+            }
+          ]
+        },
+        {
+          "position": 4,
+          "startMs": 2510,
+          "endMs": 5970,
+          "keyframes": [
+            {
+              "offsetMs": 420,
+              "progress": 0.5
+            },
+            {
+              "offsetMs": 580,
+              "progress": 0.666667
+            },
+            {
+              "offsetMs": 3180,
+              "progress": 0.833333
+            },
+            {
+              "offsetMs": 3460,
+              "progress": 1.0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "surah": 1,
+      "ayah": 2,
+      "gateScore": 0.871070481084587,
+      "clockCorrelation": 0.871070481084587,
+      "clockPeakMargin": 0.5745861393005738,
+      "sourceZeroMs": 12330.5,
+      "audioSha256": "7056ff0c287ee428272e12d16fb8f10b2786487f5d553841a828396750906b6b",
+      "sourceAudioSha256": "3ac2fd2b9313dee8c69c78ebbf71ac10e5bff9223b7829bff84a8f0ffc165ee1",
+      "segments": [
+        {
+          "position": 1,
+          "startMs": 50,
+          "endMs": 970,
+          "keyframes": [
+            {
+              "offsetMs": 130,
+              "progress": 0.2
+            },
+            {
+              "offsetMs": 270,
+              "progress": 0.4
+            },
+            {
+              "offsetMs": 510,
+              "progress": 0.6
+            },
+            {
+              "offsetMs": 710,
+              "progress": 0.8
+            },
+            {
+              "offsetMs": 920,
+              "progress": 1.0
+            }
+          ]
+        },
+        {
+          "position": 2,
+          "startMs": 970,
+          "endMs": 1890,
+          "keyframes": [
+            {
+              "offsetMs": 160,
+              "progress": 0.333333
+            },
+            {
+              "offsetMs": 740,
+              "progress": 0.666667
+            },
+            {
+              "offsetMs": 920,
+              "progress": 1.0
+            }
+          ]
+        },
+        {
+          "position": 3,
+          "startMs": 1890,
+          "endMs": 2460,
+          "keyframes": [
+            {
+              "offsetMs": 150,
+              "progress": 0.5
+            },
+            {
+              "offsetMs": 570,
+              "progress": 1.0
+            }
+          ]
+        },
+        {
+          "position": 4,
+          "startMs": 2460,
+          "endMs": 5450,
+          "keyframes": [
+            {
+              "offsetMs": 160,
+              "progress": 0.285714
+            },
+            {
+              "offsetMs": 320,
+              "progress": 0.357143
+            },
+            {
+              "offsetMs": 610,
+              "progress": 0.428571
+            },
+            {
+              "offsetMs": 770,
+              "progress": 0.571429
+            },
+            {
+              "offsetMs": 1100,
+              "progress": 0.714286
+            },
+            {
+              "offsetMs": 2760,
+              "progress": 0.857143
+            },
+            {
+              "offsetMs": 2990,
+              "progress": 1.0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "surah": 1,
+      "ayah": 3,
+      "gateScore": 0.8342552041527183,
+      "clockCorrelation": 0.8342552041527183,
+      "clockPeakMargin": 0.5078624689240918,
+      "sourceZeroMs": 17864.25,
+      "audioSha256": "3bd5bb13dcdf6ab178b6c6cb2810ad2aaac8d4dfb371e553ca78021f56c93abd",
+      "sourceAudioSha256": "3ac2fd2b9313dee8c69c78ebbf71ac10e5bff9223b7829bff84a8f0ffc165ee1",
+      "segments": [
+        {
+          "position": 1,
+          "startMs": 31,
+          "endMs": 1291,
+          "keyframes": [
+            {
+              "offsetMs": 120,
+              "progress": 0.166667
+            },
+            {
+              "offsetMs": 530,
+              "progress": 0.5
+            },
+            {
+              "offsetMs": 730,
+              "progress": 0.666667
+            },
+            {
+              "offsetMs": 820,
+              "progress": 0.75
+            },
+            {
+              "offsetMs": 1140,
+              "progress": 0.833333
+            },
+            {
+              "offsetMs": 1260,
+              "progress": 1.0
+            }
+          ]
+        },
+        {
+          "position": 2,
+          "startMs": 1291,
+          "endMs": 4471,
+          "keyframes": [
+            {
+              "offsetMs": 400,
+              "progress": 0.5
+            },
+            {
+              "offsetMs": 520,
+              "progress": 0.666667
+            },
+            {
+              "offsetMs": 2700,
+              "progress": 0.833333
+            },
+            {
+              "offsetMs": 3180,
+              "progress": 1.0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "surah": 1,
+      "ayah": 4,
+      "gateScore": 0.8582097960737111,
+      "clockCorrelation": 0.8582097960737111,
+      "clockPeakMargin": 0.5208297916298725,
+      "sourceZeroMs": 22436.875,
+      "audioSha256": "dca0c09844dd0e9ebf558b25a24352ae8517a9543094d0b1380e962b2bac201a",
+      "sourceAudioSha256": "3ac2fd2b9313dee8c69c78ebbf71ac10e5bff9223b7829bff84a8f0ffc165ee1",
+      "segments": [
+        {
+          "position": 1,
+          "startMs": 43,
+          "endMs": 853,
+          "keyframes": [
+            {
+              "offsetMs": 130,
+              "progress": 0.166667
+            },
+            {
+              "offsetMs": 440,
+              "progress": 0.333333
+            },
+            {
+              "offsetMs": 560,
+              "progress": 0.666667
+            },
+            {
+              "offsetMs": 810,
+              "progress": 1.0
+            }
+          ]
+        },
+        {
+          "position": 2,
+          "startMs": 853,
+          "endMs": 1413,
+          "keyframes": [
+            {
+              "offsetMs": 200,
+              "progress": 0.333333
+            },
+            {
+              "offsetMs": 360,
+              "progress": 0.666667
+            },
+            {
+              "offsetMs": 560,
+              "progress": 1.0
+            }
+          ]
+        },
+        {
+          "position": 3,
+          "startMs": 1413,
+          "endMs": 4313,
+          "keyframes": [
+            {
+              "offsetMs": 310,
+              "progress": 0.6
+            },
+            {
+              "offsetMs": 1810,
+              "progress": 0.8
+            },
+            {
+              "offsetMs": 2900,
+              "progress": 1.0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "surah": 1,
+      "ayah": 5,
+      "gateScore": 0.8265426369040069,
+      "clockCorrelation": 0.8265426369040069,
+      "clockPeakMargin": 0.5779901407437728,
+      "sourceZeroMs": 27013.625,
+      "audioSha256": "7828eb8f7400b04181d2c08885b9409dbe18037e4e4cfa08153692f25bb252fd",
+      "sourceAudioSha256": "3ac2fd2b9313dee8c69c78ebbf71ac10e5bff9223b7829bff84a8f0ffc165ee1",
+      "segments": [
+        {
+          "position": 1,
+          "startMs": 26,
+          "endMs": 986,
+          "keyframes": [
+            {
+              "offsetMs": 180,
+              "progress": 0.25
+            },
+            {
+              "offsetMs": 500,
+              "progress": 0.5
+            },
+            {
+              "offsetMs": 730,
+              "progress": 0.75
+            },
+            {
+              "offsetMs": 960,
+              "progress": 1.0
+            }
+          ]
+        },
+        {
+          "position": 2,
+          "startMs": 986,
+          "endMs": 1746,
+          "keyframes": [
+            {
+              "offsetMs": 160,
+              "progress": 0.25
+            },
+            {
+              "offsetMs": 350,
+              "progress": 0.5
+            },
+            {
+              "offsetMs": 540,
+              "progress": 0.75
+            },
+            {
+              "offsetMs": 760,
+              "progress": 1.0
+            }
+          ]
+        },
+        {
+          "position": 3,
+          "startMs": 1746,
+          "endMs": 2886,
+          "keyframes": [
+            {
+              "offsetMs": 180,
+              "progress": 0.2
+            },
+            {
+              "offsetMs": 340,
+              "progress": 0.4
+            },
+            {
+              "offsetMs": 700,
+              "progress": 0.6
+            },
+            {
+              "offsetMs": 920,
+              "progress": 0.8
+            },
+            {
+              "offsetMs": 1140,
+              "progress": 1.0
+            }
+          ]
+        },
+        {
+          "position": 4,
+          "startMs": 2886,
+          "endMs": 6556,
+          "keyframes": [
+            {
+              "offsetMs": 150,
+              "progress": 0.166667
+            },
+            {
+              "offsetMs": 330,
+              "progress": 0.333333
+            },
+            {
+              "offsetMs": 550,
+              "progress": 0.5
+            },
+            {
+              "offsetMs": 1170,
+              "progress": 0.666667
+            },
+            {
+              "offsetMs": 3510,
+              "progress": 0.833333
+            },
+            {
+              "offsetMs": 3670,
+              "progress": 1.0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "surah": 1,
+      "ayah": 6,
+      "gateScore": 0.8509514596441151,
+      "clockCorrelation": 0.8509514596441151,
+      "clockPeakMargin": 0.5986368084042453,
+      "sourceZeroMs": 33665.875,
+      "audioSha256": "44afd93fa73f7fe363c75146a9b28c59a2cbdbf70bfb7ed71d823ed51c5b6327",
+      "sourceAudioSha256": "3ac2fd2b9313dee8c69c78ebbf71ac10e5bff9223b7829bff84a8f0ffc165ee1",
+      "segments": [
+        {
+          "position": 1,
+          "startMs": 24,
+          "endMs": 754,
+          "keyframes": [
+            {
+              "offsetMs": 130,
+              "progress": 0.2
+            },
+            {
+              "offsetMs": 320,
+              "progress": 0.4
+            },
+            {
+              "offsetMs": 560,
+              "progress": 0.6
+            },
+            {
+              "offsetMs": 730,
+              "progress": 1.0
+            }
+          ]
+        },
+        {
+          "position": 2,
+          "startMs": 754,
+          "endMs": 1654,
+          "keyframes": [
+            {
+              "offsetMs": 370,
+              "progress": 0.6
+            },
+            {
+              "offsetMs": 450,
+              "progress": 0.7
+            },
+            {
+              "offsetMs": 750,
+              "progress": 0.8
+            },
+            {
+              "offsetMs": 900,
+              "progress": 1.0
+            }
+          ]
+        },
+        {
+          "position": 3,
+          "startMs": 1654,
+          "endMs": 5424,
+          "keyframes": [
+            {
+              "offsetMs": 200,
+              "progress": 0.25
+            },
+            {
+              "offsetMs": 360,
+              "progress": 0.375
+            },
+            {
+              "offsetMs": 550,
+              "progress": 0.5
+            },
+            {
+              "offsetMs": 740,
+              "progress": 0.625
+            },
+            {
+              "offsetMs": 900,
+              "progress": 0.75
+            },
+            {
+              "offsetMs": 3360,
+              "progress": 0.875
+            },
+            {
+              "offsetMs": 3770,
+              "progress": 1.0
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

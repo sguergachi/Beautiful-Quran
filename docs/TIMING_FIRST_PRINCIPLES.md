@@ -1,6 +1,6 @@
 # Word timing from first principles — handoff doc
 
-**Status:** research + lab prototype; not production cutover  
+**Status:** research + developer V2 calibration lane; not production cutover
 **Owner goal:** clean dataset from **audio + Uthmani text only** — no permanent manual patches, no growing systematic repair rules; accept **~1% residual** error (flags), not a patch farm.  
 **Last lab run:** 2026-07-26/27 (RTX 3080)
 
@@ -12,7 +12,8 @@ This is the **single handoff document**. Other files under `tools/sync_lab/` are
 
 Beautiful Quran’s core is **word ↔ recitation lock**: each Arabic word lights in total sync with the reciter. Timing quality is the product, not a feature.
 
-- Runtime stays offline: pure `HighlightEngine` over bundled `Segment(position, startMs, endMs)`.
+- Runtime stays offline: pure `HighlightEngine` over bundled word spans plus
+  optional occurrence-specific acoustic keyframes.
 - **Never** rewrite sacred Arabic text with ASR output.
 - Alignment is **build-time only**.
 - Ink karaoke fidelity (soft wash) is separate and non-negotiable; better timings feed it.
@@ -78,35 +79,44 @@ Gold = post-repair shipped DB structure on famous defect cases.
 
 \*Circular if gold *is* QDC+repairs; useful as arbitration demo, not as 99% proof.
 
-### 3.4 Historical **manual** patches as true handoff gold
+### 3.4 Historical overrides are regression evidence, not gold
 
 Recovered from git all unique `timing_overrides` edits → **409 ayahs**  
 (`tools/sync_lab/historical_manual_patches.json`).
 
-| Slice | Count | Intent |
+The audit on 2026-07-26 found that the corpus is mixed provenance:
+
+| Slice | Count | Status |
 |---|---:|---|
-| Mono structure (mostly false-split **unsplits**) | 319 | Remove bogus backtracks |
-| With real backtracks | 90 | Keep/fix re-say structure |
-| Files | e.g. `alafasy-split-merges` (342), `hani-asr-drops` (40), `hani-asr-repeats` (19), `patches-from-417` (4 ear cases), one-offs | |
+| Grammar-valid mono | 295 | Useful regression evidence |
+| Grammar-valid repeat | 74 | Useful repeat challenge evidence |
+| Grammar-incompatible | **40** | Quarantine pending ear adjudication |
 
-**Eval vs those 409 (audio-only, no repairs) — 2026-07-27:**
+All 40 incompatible rows come from the bulk `alafasy-split-merges` import.
+Twenty-four skip canonical positions; sixteen also contain jumps/backtracks
+that cannot satisfy the decoder invariant that the first pass covers `1..N`.
+Therefore exact match on all 409 has a hard ceiling of **369/409 = 90.2%** for
+this architecture. The earlier “≥99% on all 409” gate was impossible.
 
-| Method | All 409 exact | Mono-gold 319 exact | Repeat-gold 90 exact |
+**Eval after audit (audio-only, no repairs):**
+
+| Method | Valid 369 exact | Valid mono 295 | Valid repeat 74 |
 |---|---:|---:|---:|
-| mono | 72.1% | **92.5%** | 0% |
-| **audio_only** | **51.6%** | 63.0% | **11.1%** |
+| mono | 295 (79.9%) | **295 (100%)** | 0 |
+| **audio_only** | **211 (57.2%)** | 201 (68.1%) | **10 (13.5%)** |
 
-Famous:
+The failure is not a margin-tuning problem:
 
-| Case | audio_only matches patch structure? |
-|---|---|
-| Alafasy 3:21 | **yes** |
-| Hani 2:14 | **yes** |
-| Hani 2:33 | no |
-| Alafasy 5:59 / 5:44 | no |
-| Several mono unsplits | mono yes; audio sometimes invents false resays |
+- Raising the margin enough to retain 294/295 valid mono rows recovers only
+  **1/74** repeat rows.
+- Even when the correct repeat sequence is injected as an oracle candidate,
+  flattened decode edit similarity prefers it over mono on only **59/74**.
+- Exact-only substring evidence reduces some false positives but does not
+  separate true from false repeats.
 
-**Conclusion:** current audio-only is **not shippable**. It is **too eager** on false resays (hurts the bulk unsplit set) and **too weak** on real re-says (~11% of 90).
+**Conclusion:** current audio-only is **not shippable**, and the flattened
+decode-string scorer is a negative result. Keep the decode model as acoustic
+evidence; replace the structure objective with time-localized episode scoring.
 
 ### 3.5 Clock (ms)
 
@@ -115,10 +125,13 @@ Famous:
 - Prefer **global fixed-sequence FA** over letter-weight run slicing until true episode anchors exist.
 - Product bar (med ≤25 ms, p90 ≤60 ms, ≥99% within 100 ms) needs **ear-labeled onsets** — not done.
 
-### 3.6 Scoring pitfall fixed once
+### 3.6 Structure scoring verdict
 
-Penalizing “extra words” in decode-similarity **rejected true multi-word re-says** when decode was noisy.  
-**Gate with a small mono margin on raw similarity**, not a per-extra-token tax.
+Global edit similarity loses where in time a phrase was emitted. False
+substrings and real re-says have overlapping score gains, so no scalar margin
+can supply both near-zero false repeats and high recall. The next scorer must
+retain CTC frame times/log-probabilities and compare a repeat episode against
+the corresponding local audio interval.
 
 ### 3.7 QDC role
 
@@ -128,7 +141,78 @@ Penalizing “extra words” in decode-similarity **rejected true multi-word re-
 | Delete QDC day one | Lose weak supervision early |
 | **QDC as scored candidate** among mono + audio inserts | Clean arbitration; can override QDC when audio is clearer |
 
-Long-term: drop QDC if audio-only clears 99% on eval gates.
+Long-term: drop QDC only after the time-localized decoder clears independent
+ear-labeled gates.
+
+### 3.8 V2 clock-convention regression run (2026-07-27)
+
+`tools/sync_lab/eval_v2_onsets.py` ran the current mono CTC V2 generator over
+all 369 grammar-valid historical edits. These are structure regression
+evidence, not onset gold: 398/409 recovered rows start word 1 at zero and
+318/409 are wholly contiguous. Most came from machine-merging QDC topology,
+so a V2 acoustic onset is being compared with the prior word's machine end.
+The absolute numbers are **clock-convention distance**, not accuracy:
+
+| Metric | Current V2 |
+|---|---:|
+| Row coverage at provisional path score ≥ −1.0 | 89.7% |
+| End-to-end exact structure | 71.8% |
+| Accepted-row exact structure | 80.1% |
+| Word-onset median absolute error | 93 ms |
+| Word-onset p90 absolute error | 742 ms |
+| Word onsets within 100 ms, structure-exact rows | 54.3% |
+| Word onsets within 100 ms, end to end | 36.0% |
+
+Re-analysis keeps the sign and removes each row's median clock offset. On 265
+threshold-accepted, structure-exact rows, the interior-word residual is 36 ms
+median, 594 ms p90, and 78.7% within 100 ms (Alafasy: 37 ms / 81.2%; Hani:
+10.5 ms / 60.7%). The convention bias is real, and so are catastrophic
+within-row failures. All 74 repeat rows still fail exact structure because the
+bundled slice is a mono `1..N` generator. Path score does not separate the
+outliers.
+
+Widening the energy-onset refinement on 50 Alafasy mono rows leaves the
+absolute QDC-convention delta flat (100–102 ms median, 654–658 ms p90). Stop
+tuning that window against this corpus; only independent acoustic-onset labels
+can rank it.
+
+A second-witness experiment on the same 50 rows compared the Arabic CTC model
+with `MahmoudAshraf/mms-300m-1130-forced-aligner` (research only; production
+licensing not approved). Raw onset agreement is 115 ms median / 423 ms p90,
+with only 8.3% within 30 ms. Removing each row's signed offset improves the
+interior-word residual to 35 ms median / 317 ms p90 and 45.8% within 30 ms —
+still far below the 70% coverage gate proposed for disagreement-based
+acceptance. Two-model agreement is not yet a usable confidence gate.
+
+The next clock experiment must preserve these frozen diagnostics and compare
+on the same rows. The independent label format and audio-hash gate live under
+`tools/sync_lab/independent_labels/`.
+
+### 3.9 Quran-phoneme and QUA evidence (2026-07-27)
+
+The pinned Quran-specific `muaalem-model-v3_2` phoneme head exactly
+free-decodes all seven Fātiḥah ayahs. Full-ayah forced alignment still drifts
+on long verses. Re-aligning phonemes inside general-Arabic CTC word windows
+raises low-PER model agreement to 98.94% within 100 ms, but only at 38.2% word
+coverage. That is useful evidence, not a 99% gate.
+
+Qur'anic Universal Audio release `v2.3.0` adds a stronger deterministic lane:
+
+- 6,236 Alafasy rows, 80,135 word occurrences, 350,603 timed letters;
+- 836 rows contain 2,706 repeat occurrences;
+- 6 rows fail the app's complete first-pass position grammar;
+- QUA QPC text maps strictly to the app's rendered base slots on 99.84% of
+  rows; the rest abstain instead of using a text exception;
+- decoded waveform matching proved 166/313 cached EveryAyah files are the
+  same take. Other files are different recordings and must not inherit the
+  QUA clock.
+
+For accepted same-take rows, the source chapter clock transfers automatically
+through normalized cross-correlation with a unique-peak gate. This removes
+manual patches and preserves QUA repeat topology plus letter intervals. It
+does **not** prove QUA's forced-aligned letter labels are human-correct, and
+QUA cannot validate a row generated from QUA. A frozen human audit remains
+the final accuracy authority.
 
 ---
 
@@ -139,19 +223,19 @@ BUILD-TIME only
 ──────────────
 everyayah MP3 + canonical words[1..N]
         │
-        ├─► free CTC decode (timed characters)     [evidence]
-        ├─► candidates:
-        │     • mono 1..N
-        │     • grammar inserts (contiguous re-say spans from decode evidence)
-        │     • optional: QDC / second model paths as candidates only
-        ├─► score = similarity(decode, concat(norm(words[pos])))
-        ├─► pick best; non-mono needs score ≥ mono + margin
-        ├─► if top-2 too close → FLAG (do not invent a rule)
+        ├─► CTC emissions with frame times/log-probabilities
+        ├─► constrained graph/beam:
+        │     • monotonic canonical path 1..N
+        │     • contiguous backtrack episodes
+        │     • optional QDC / second-model episode proposals
+        ├─► score repeat-vs-mono on the local episode interval
+        ├─► calibrate confidence on held-out ear labels
+        ├─► uncertain or model-disagreeing rows → FLAG
         ├─► CLOCK: force-align chosen positions on same audio → start_ms
         ├─► holdEndMs = next start (display policy)
         └─► validate invariants → quran.db row  |  flag queue
 
-RUNTIME: unchanged (HighlightEngine + OutputLatency)
+RUNTIME: HighlightEngine + OutputLatency + optional keyframe-paced ink curve
 ```
 
 **Invariants for a shipped row**
@@ -178,15 +262,19 @@ Measure **separately** (never one composite score):
 
 | Metric | Bar | Against |
 |---|---|---|
-| Structure exact on **historical 409 patches** | **≥99%** | `historical_manual_patches.json` |
 | Structure exact on **random** sample (≥300 ayah×reciter) | ≥99% | Independent ear labels (not circular DB) |
 | Repeat-event P/R on **hard/re-say** set | ≥99% | Ear / challenge set |
 | Clean FP (false new backtracks) on non-repeat sample | ~0 | Ear / mono truth |
 | Onset med / p90 | ≤25 / ≤60 ms (or agreed bar) | Ear Lab taps |
 | Onsets within 100 ms | ≥99% | Ear Lab taps |
 | Flag rate | Documented; Lab residual only | Full reciter shadow run |
+| Historical override compatibility | Report valid 369 separately; never train on test | Regression evidence after adjudication |
 
-**Do not claim 99% from:** 11 circular cases, energy-rise composite, pad recovery alone, or “word count match.”
+Report **accuracy and coverage separately**: a 99% accurate accepted subset
+with 40% coverage is not a 99%-accurate full-Quran generator.
+
+**Do not claim 99% from:** 11 circular cases, the unadjudicated 409 overrides,
+energy-rise composite, pad recovery alone, or “word count match.”
 
 ---
 
@@ -198,47 +286,50 @@ Measure **separately** (never one composite score):
 - [x] Historical patch inventory + eval vs audio_only
 - [x] Hard-suite + Codex review captured
 - [x] This handoff doc
+- [x] Developer V2 toggle and separate `timings_v2` table
+- [x] Pure runtime keyframe path with V1 fallback and no Lab overrides
+- [x] Machine-generated same-take Alafasy slice with a real repeat-heavy row
+- [x] Pinned QUA letter/repeat importer with waveform identity abstention
 
-### Phase 1 — beat the 409-patch gate (next agent priority)
+The slice validates plumbing and exact source transfer only. It is not the
+independent human calibration required by the definition of done.
 
-1. **False-resay control**  
-   - audio_only must reach **≥99% exact on the 319 mono-gold patches** (should be near mono; stop inventing BT).  
-   - Margin / evidence thresholds only — **no per-ayah rules**.
+### Phase 1 — valid labels + time-localized structure
 
-2. **True-resay recall**  
-   - Raise exact match on the **90** repeat-gold patches toward 99%.  
-   - Multi-episode + span length >4 (production DB has multi-episode and long spans).  
-   - Timed decode + grammar DP/beam as in Codex review.
-
-3. **Re-run**  
-   `python tools/sync_lab/eval_vs_manual_patches.py`  
-   Gate: **≥99% exact on all 409**.
-
-4. **Shadow one full reciter** (e.g. Alafasy)  
+1. Add provenance/adjudication status to the historical corpus; ear-check the
+   40 incompatible rows rather than weakening the sacred-text grammar to fit
+   them.
+2. Label a stratified random structure set (≥300) and a separate
+   repeat-enriched challenge set. Freeze held-out splits before tuning.
+3. Use QUA structure directly on same-take matches. For unmatched takes,
+   replace substring generation + global edit score with a constrained
+   time-localized CTC graph/beam.
+4. Calibrate abstention and second-model disagreement on validation data.
+   Measure accepted accuracy, coverage, repeat P/R, and clean FP separately.
+5. **Shadow one full reciter** (e.g. Alafasy)
    - No DB write.  
-   - Log winner, mono_sim, flag, disagree-with-shipped.  
+   - Log winner, local episode likelihood ratio, flag, disagree-with-shipped.
    - Report flag rate.
 
-### Phase 2 — independent gold + clock
+### Phase 2 — onset gold + clock
 
-1. Ear-label structure on random ~100–300 + all remaining misses.  
-2. Ear-label onsets on ≥50 ayahs / ≥1000 words (double-label 10%).  
-3. Clock: global FA; then anchor-bounded windows from decode char times.  
-4. Ablate lead-in / onset±40 / trailing trim **only if** ear gold improves.
+1. Ear-label onsets on ≥50 ayahs / ≥1000 words (double-label 10%).
+2. Clock: global FA; then anchor-bounded windows from decode char times.
+3. Ablate lead-in / onset±40 / trailing trim **only if** ear gold improves.
 
 ### Phase 3 — cutover
 
 1. Integrate generator into `tools/build_db.py` (or sibling job writing same schema).  
 2. Regenerate `data/quran.db`, bump `QuranDatabase.DB_FILE_NAME`.  
 3. Freeze/delete `timing_repairs` generator and override pipeline as truth.  
-4. CI: regression on `historical_manual_patches.json` + smoke suite.
+4. CI: adjudicated historical regression + frozen independent smoke suite.
 
 ### Explicit non-goals for now
 
 - Whisper / seq2seq text for structure (LM erases re-says).  
 - MFA as structure judge (clock/sub-word later).  
 - More FA path multi-hyp for structure.  
-- Deleting repairs before 409-gate + shadow metrics are green.  
+- Deleting repairs before independent gates + shadow metrics are green.
 - Claiming 99% without random ear sample.
 
 ---
@@ -247,8 +338,8 @@ Measure **separately** (never one composite score):
 
 | Path | Role |
 |---|---|
-| `historical_manual_patches.json` | **409-patch regression gold** (from git overrides) |
-| `eval_vs_manual_patches.py` | Score methods vs that gold |
+| `historical_manual_patches.json` | 409 historical overrides; mixed-provenance regression evidence |
+| `eval_vs_manual_patches.py` | Audit grammar compatibility and score methods |
 | `results/eval_vs_manual_patches.json` | Latest 409-run numbers |
 | `grammar_structure.py` | Timed free decode, candidates, score, select, reclock stub |
 | `decode_structure.py` | Earlier unique-span insert (baseline) |
@@ -281,6 +372,7 @@ source /tmp/alignlab-venv/bin/activate
 cd <repo>
 python tools/sync_lab/eval_vs_manual_patches.py      # full 409 (~6–10 min GPU)
 python tools/sync_lab/eval_vs_manual_patches.py 20   # smoke
+python tools/sync_lab/eval_vs_manual_patches.py --reuse-decodes  # CPU rescore
 python tools/sync_lab/test_codex_path.py             # hard suite + clock proxy
 python tools/sync_lab/test_decode_structure.py
 ```
@@ -294,27 +386,36 @@ Audio auto-downloads from `https://everyayah.com/data/<slug>/SSSAAA.mp3`.
 1. **Structure ≠ clock** — separate modules and metrics.  
 2. **FA path score is not for structure** — proven on 3:21.  
 3. **Free decode is structure evidence** — foundation, incomplete.  
-4. **Historical 409 patches are the primary engineering gate** for “no more manual/systematic patches.”  
+4. **Historical overrides are regression evidence, not independent gold.**
+   Quarantine grammar-incompatible rows until ear-adjudicated.
 5. **QDC is optional candidate**, never unconditional truth.  
 6. **1% residual = flags**, not a new rule file per bug.  
-7. **Ship only after ≥99% on 409 + independent sample** — current audio_only ~52% on 409.
+7. **Ship only after ≥99% on frozen independent samples**, with accuracy and
+   coverage reported separately.
+8. **Global decode edit similarity is not the structure objective** — oracle
+   repeats lose to mono on 15/74 valid repeat cases.
 
 ---
 
 ## 10. Immediate next task for the continuing agent
 
-**Priority 1:** Improve `grammar_structure.select_structure` / evidence so that:
+**Priority 1:** Create the frozen independent structure labels and adjudicate
+the 40 incompatible historical rows.
 
-1. On **319 mono-gold** historical patches → **≥99% exact** (fix false resay rate).  
-2. On **90 repeat-gold** → maximize exact without regressing (1).  
-3. Re-run `eval_vs_manual_patches.py` and update numbers in this doc §3.4 if they change materially.
+**Priority 2:** Implement the time-localized constrained CTC decoder; retire
+the flattened substring/edit scorer as the primary path.
 
-**Priority 2:** Shadow full Alafasy generation (structure + global reclock), write disagreement/flag report — still no DB cutover.
-
-**Priority 3:** Only then design ear-gold sampling and build_db integration.
+**Priority 3:** Calibrate abstention, then shadow full Alafasy generation.
 
 ---
 
 ## 11. One-paragraph summary for humans
 
-We want word timings derived purely from reciter audio and the known Quran text, without maintaining manual Lab patches or a thick stack of structural repair heuristics. Lab work showed that forced-alignment path scores cannot decide re-recitation structure, but free CTC decode can expose re-says; a candidate scorer (mono vs audio-derived vs optional QDC) plus force-aligned clocks is the clean architecture. Against 409 historical manual patch ayahs, pure audio-only is only ~52% exact today—too many false resays on bulk unsplits and too few true resays recovered—so we are not ready to delete repairs. The continuing work is to clear a ≥99% match on that patch suite without per-ayah rules, then reclock, shadow a full reciter, ear-validate, and cut over to a first-principles `quran.db`.
+We want word timings derived from reciter audio and known Quran text without a
+patch farm. The lab correctly split structure from clock, but its 409-row
+“gold” gate was impossible: 40 bulk-import rows violate the canonical grammar,
+and the current flattened decode score cannot distinguish real repeats from
+false ones even with oracle candidates. The credible path to 99% is frozen
+independent ear labels, a time-localized constrained CTC decoder, calibrated
+abstention with coverage reported, then fixed-structure reclocking and a full
+reciter shadow run. Existing repairs stay until those gates pass.

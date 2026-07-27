@@ -1,6 +1,7 @@
 package com.beautifulquran.domain
 
 import com.beautifulquran.data.model.Segment
+import com.beautifulquran.data.model.SubwordKeyframe
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -178,5 +179,16 @@ class HighlightEngineTest {
         }
         // Same instance answers every tick — no per-call IntArray rebuild.
         assertEquals(withRepeat, prepared.segments)
+    }
+
+    @Test
+    fun `active occurrence preserves its V2 acoustic keyframes`() {
+        val points = listOf(SubwordKeyframe(120, 0.5f), SubwordKeyframe(400, 1f))
+        val info = HighlightEngine.activeInfo(
+            listOf(Segment(1, 100, 500, points)),
+            200,
+        )
+
+        assertEquals(points, info?.subwordKeyframes)
     }
 }

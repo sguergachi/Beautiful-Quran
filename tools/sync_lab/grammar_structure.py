@@ -332,15 +332,22 @@ def select_structure(
     margin: float = 0.003,
     device: str | None = None,
 ) -> tuple[StructureCandidate, DecodeResult, list[StructureCandidate]]:
-    """
-    Returns (winner, decode, all_scored_sorted).
-
-    margin: non-mono must beat mono by this decode-similarity margin
-    (false-positive gate). Tuned small: real re-says often only gain ~0.004–0.02
-    sim when decode is noisy.
-    """
     dec = timed_free_decode(y, sr, device=device)
-    raw_cands = build_candidates(words, dec.text, priors=priors)
+    winner, scored = select_structure_from_decode(
+        dec, words, priors=priors, margin=margin
+    )
+    return winner, dec, scored
+
+
+def select_structure_from_decode(
+    decode: DecodeResult,
+    words: Sequence[str],
+    *,
+    priors: list[tuple[str, list[int]]] | None = None,
+    margin: float = 0.003,
+) -> tuple[StructureCandidate, list[StructureCandidate]]:
+    """Score structure candidates without repeating the expensive CTC pass."""
+    raw_cands = build_candidates(words, decode.text, priors=priors)
     mono_seq = mono_positions(len(words))
     scored: list[StructureCandidate] = []
     for seq in raw_cands:
@@ -353,19 +360,19 @@ def select_structure(
                     if list(seq) == list(pseq):
                         src = f"prior:{name}"
                         break
-        scored.append(score_candidate(seq, words, dec.text, source=src))
+        scored.append(score_candidate(seq, words, decode.text, source=src))
 
     scored.sort(key=lambda c: -c.score)
     mono = next((c for c in scored if c.source == "mono"), None)
     if mono is None:
-        mono = score_candidate(mono_seq, words, dec.text, source="mono")
+        mono = score_candidate(mono_seq, words, decode.text, source="mono")
         scored.append(mono)
         scored.sort(key=lambda c: -c.score)
     best = scored[0]
     # Non-mono must beat mono by margin (abstention → mono)
     if best.source != "mono" and best.score < mono.score + margin:
         best = mono
-    return best, dec, scored
+    return best, scored
 
 
 def reclock_anchored(

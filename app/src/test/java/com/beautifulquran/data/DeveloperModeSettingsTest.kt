@@ -32,6 +32,22 @@ class DeveloperModeSettingsTest {
     }
 
     @Test
+    fun `timing V2 is an explicit developer opt in`() {
+        assertEquals(TimingScheme.V1, Settings().effectiveTimingScheme)
+        assertEquals(
+            TimingScheme.V1,
+            Settings().copy(timingScheme = TimingScheme.V2).effectiveTimingScheme,
+        )
+        assertEquals(
+            TimingScheme.V2,
+            Settings(
+                developerModeEnabled = true,
+                timingScheme = TimingScheme.V2,
+            ).effectiveTimingScheme,
+        )
+    }
+
+    @Test
     fun `home bookmark style defaults to top bound and survives developer mode`() {
         val alternative = Settings().copy(
             homeBookmarkStyle = HomeBookmarkStyle.SAVED_PASSAGES,

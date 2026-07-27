@@ -7,8 +7,11 @@ import com.beautifulquran.data.BookmarkRepository
 import com.beautifulquran.data.AnnotationRepository
 import com.beautifulquran.data.QuranRepository
 import com.beautifulquran.data.SettingsRepository
+import com.beautifulquran.data.TimingScheme
+import com.beautifulquran.data.effectiveTimingScheme
 import com.beautifulquran.data.model.Reciter
 import com.beautifulquran.data.model.Segment
+import com.beautifulquran.data.model.SubwordKeyframe
 import com.beautifulquran.data.model.Surah
 import com.beautifulquran.data.model.SurahContent
 import com.beautifulquran.domain.BASMALAH_PLAYLIST_AYAH
@@ -47,22 +50,62 @@ data class ActiveWord(
     val ayah: Int,
     val wordPosition: Int,
     val durationMs: Long,
+    /** Actual timing source for this occurrence, not merely the selected lane:
+     * inferred Tajwīd for a V1 fallback, acoustic [subwordKeyframes] for V2.
+     * The two are never blended. */
+    val timingScheme: TimingScheme = TimingScheme.V1,
     /** Voiced span of the word (segment end − start), without the karaoke
-     * hold across the gap to the next word. Tajweed pacing distributes the
-     * letters over this share of [durationMs] and rests for the remainder. */
+     * hold across the gap to the next word. V1 Tajwīd inference uses this
+     * share; V2 follows its measured keyframes directly. */
     val spokenMs: Long = durationMs,
+    /** Machine-generated acoustic reveal points; empty on the V1 lane. */
+    val subwordKeyframes: List<SubwordKeyframe> = emptyList(),
     val isRepeat: Boolean = false,
     val highWater: Int = wordPosition,
     /** First word of the active repeat chain: while repeating, words
      * [repeatStart]..[wordPosition] all hold the orange fade until the chain
      * completes. Equals [wordPosition] when not repeating. */
     val repeatStart: Int = wordPosition,
+    /** Matches this occurrence to its draw-phase acoustic clock anchor. */
+    val acousticEpoch: Long = 0L,
     /**
      * Bumps on a genuine backward seek so the ink wash restarts even when the
      * same word stays Active (tap the current word to play it from the start).
      */
     val activation: Long = 0L,
 )
+
+/** Media-clock anchor extrapolated at draw time for one V2 occurrence. */
+data class AcousticClockAnchor(
+    val ayah: Int,
+    val wordPosition: Int,
+    val epoch: Long,
+    val mediaPositionMs: Long,
+    val realtimeNanos: Long,
+    val playbackSpeed: Float,
+    val startMs: Long,
+    val holdEndMs: Long,
+) {
+    fun progressAt(frameNanos: Long): Float {
+        val duration = holdEndMs - startMs
+        if (duration <= 0L) return 1f
+        val elapsedMs = ((frameNanos - realtimeNanos).coerceAtLeast(0L) / 1_000_000f)
+        val positionMs = mediaPositionMs + elapsedMs * playbackSpeed
+        return ((positionMs - startMs) / duration).coerceIn(0f, 1f)
+    }
+}
+
+internal fun acousticProgressFrame(
+    current: Float,
+    activeEpoch: Long,
+    anchor: AcousticClockAnchor?,
+    frameNanos: Long,
+): Float = when {
+    anchor == null -> current
+    anchor.epoch > activeEpoch -> 1f
+    anchor.epoch < activeEpoch -> 0f
+    else -> maxOf(current, anchor.progressAt(frameNanos))
+}
 
 data class ReaderUiState(
     val content: SurahContent? = null,
@@ -84,6 +127,8 @@ data class PreparedSurah(
     val reciters: List<Reciter>,
     val reciter: Reciter,
     val timings: Map<Int, List<Segment>>,
+    /** Timing lane used to materialize [timings]. */
+    val timingScheme: TimingScheme = TimingScheme.V1,
     /**
      * [ReaderSessionGate.generation] when [materialize] started. [installPrepared]
      * no-ops if navigation has advanced since then, so a late continuous-scroll
@@ -166,6 +211,14 @@ class ReaderViewModel(
     /** Per-ayah repeat/high-water tables built once at load — hot-path lookups
      * allocate nothing (see [HighlightEngine.PreparedTimings]). */
     private var preparedTimings: Map<Int, HighlightEngine.PreparedTimings> = emptyMap()
+    private val _acousticWordClock = MutableStateFlow<AcousticClockAnchor?>(null)
+    /** Sampled on the same listener-corrected clock as word membership. */
+    val acousticWordClock: StateFlow<AcousticClockAnchor?> = _acousticWordClock
+    private var acousticEpoch = 0L
+    private var lastAcousticAyah = -1
+    private var lastAcousticPosition = -1
+    private var lastAcousticStartMs = -1L
+    private var lastAcousticActivation = -1L
     private var loadJob: Job? = null
 
     private fun installTimings(loaded: Map<Int, List<Segment>>) {
@@ -183,10 +236,11 @@ class ReaderViewModel(
     private suspend fun timingsWithBasmalahLeadIn(
         reciterId: Int,
         surahId: Int,
+        scheme: TimingScheme,
     ): Map<Int, List<Segment>> {
-        val loaded = repository.timings(reciterId, surahId)
+        val loaded = repository.timings(reciterId, surahId, scheme)
         if (!surahOpensWithBasmalahPreface(surahId)) return loaded
-        val basmalah = repository.timings(reciterId, SURAH_FATIHA)[1] ?: return loaded
+        val basmalah = repository.timings(reciterId, SURAH_FATIHA, scheme)[1] ?: return loaded
         return loaded + (BASMALAH_PLAYLIST_AYAH to basmalah)
     }
 
@@ -266,15 +320,24 @@ class ReaderViewModel(
      * Forced word seeks stay on the media timeline so a tap lights the word
      * that was just sought.
      */
-    private fun highlightPositionMs(forcedMediaMs: Long?, firstWordStartMs: Long): Long {
+    private fun highlightPositionMs(ayah: Int, forcedMediaMs: Long?): Long {
         val latencyMs = outputLatencyMs()
-        val leadMs = InkEngine.highlightLeadMs.toLong().coerceAtLeast(0L)
+        val leadMs = if (preparedTimings[ayah]?.hasAcousticKeyframes == true) {
+            0L
+        } else {
+            InkEngine.highlightLeadMs.toLong().coerceAtLeast(0L)
+        }
         if (latencyMs != lastOutputLatencyMs || leadMs != lastHighlightLeadMs) {
             lastOutputLatencyMs = latencyMs
             lastHighlightLeadMs = leadMs
             highlightClock.acceptNextSample()
         }
         if (forcedMediaMs != null) return forcedMediaMs
+        val firstWordStartMs = preparedTimings[ayah]
+            ?.segments
+            ?.firstOrNull()
+            ?.startMs
+            ?: 0L
         return OutputLatency.highlightMs(
             mediaPositionMs = player.positionMs,
             latencyMs = latencyMs,
@@ -295,12 +358,7 @@ class ReaderViewModel(
         } else {
             null
         }
-        val firstWordStartMs = preparedTimings[np.ayah]
-            ?.segments
-            ?.firstOrNull()
-            ?.startMs
-            ?: 0L
-        val rawMs = highlightPositionMs(forcedMs, firstWordStartMs)
+        val rawMs = highlightPositionMs(np.ayah, forcedMs)
         val clockMs = highlightClock.sample(np, rawMs)
         if (lastInkSampleKey != np) {
             lastInkSampleKey = np
@@ -312,20 +370,58 @@ class ReaderViewModel(
             inkActivation++
         }
         lastInkClockMs = clockMs
-        preparedTimings[np.ayah]
-            ?.activeInfo(clockMs)
+        val info = preparedTimings[np.ayah]?.activeInfo(clockMs)
+        val acousticInfo = info?.takeIf { it.subwordKeyframes.isNotEmpty() }
+        if (acousticInfo != null) {
+            if (
+                np.ayah != lastAcousticAyah ||
+                acousticInfo.position != lastAcousticPosition ||
+                acousticInfo.startMs != lastAcousticStartMs ||
+                inkActivation != lastAcousticActivation
+            ) {
+                acousticEpoch++
+            }
+            lastAcousticAyah = np.ayah
+            lastAcousticPosition = acousticInfo.position
+            lastAcousticStartMs = acousticInfo.startMs
+            lastAcousticActivation = inkActivation
+        } else {
+            lastAcousticAyah = -1
+        }
+        _acousticWordClock.value = acousticInfo
             ?.let {
+                AcousticClockAnchor(
+                    ayah = np.ayah,
+                    wordPosition = it.position,
+                    epoch = acousticEpoch,
+                    mediaPositionMs = clockMs,
+                    realtimeNanos = System.nanoTime(),
+                    playbackSpeed = playerState.value
+                        .takeIf { state -> state.isPlaying }
+                        ?.speed ?: 0f,
+                    startMs = it.startMs,
+                    holdEndMs = it.holdEndMs,
+                )
+            }
+        info?.let {
                 ActiveWord(
                     ayah = np.ayah,
                     wordPosition = it.position,
                     // Karaoke hold lifetime — sweep finishes as the next word
                     // lights, not merely when this segment's endMs elapses.
                     durationMs = (it.holdEndMs - it.startMs).coerceAtLeast(0L),
+                    timingScheme = if (it.subwordKeyframes.isEmpty()) {
+                        TimingScheme.V1
+                    } else {
+                        TimingScheme.V2
+                    },
                     spokenMs = (it.endMs - it.startMs)
                         .coerceIn(0L, (it.holdEndMs - it.startMs).coerceAtLeast(0L)),
+                    subwordKeyframes = it.subwordKeyframes,
                     isRepeat = it.isRepeat,
                     highWater = it.highWater,
                     repeatStart = it.repeatStart,
+                    acousticEpoch = if (it.subwordKeyframes.isEmpty()) 0L else acousticEpoch,
                     activation = inkActivation,
                 )
             }
@@ -402,26 +498,38 @@ class ReaderViewModel(
     }
 
     init {
-        // React when the reciter is changed on the settings sheet: reload the
-        // timing data and, if this surah is playing, continue with the new voice.
+        // Reload when either the voice or timing lane changes. Switching only
+        // the lane keeps playback in place; changing reciter continues in the
+        // new voice as before.
         viewModelScope.launch {
             settings.settings
-                .map { it.reciterId }
+                .map { it.reciterId to it.effectiveTimingScheme }
                 .distinctUntilChanged()
                 .drop(1)
-                .collect { onReciterChanged() }
+                .collect { onTimingSourceChanged() }
         }
         // Timings Lab corrections land immediately: whenever the override
         // store changes, re-pull this surah's fused timings so the highlight
         // follows the edit the moment the Lab sheet is lowered.
         viewModelScope.launch {
             repository.timingOverridesChanged?.drop(1)?.collect {
+                if (settings.settings.value.effectiveTimingScheme == TimingScheme.V2) {
+                    return@collect
+                }
                 val gen = sessions.generation
                 val id = sessions.surahId.takeIf { it != 0 } ?: return@collect
                 val reciter = _uiState.value.currentReciter ?: return@collect
-                val refreshed = timingsWithBasmalahLeadIn(reciter.id, id)
+                val refreshed = timingsWithBasmalahLeadIn(
+                    reciter.id,
+                    id,
+                    TimingScheme.V1,
+                )
                 // Drop if navigation moved on while the DB re-read ran.
-                if (!sessions.isCurrent(gen, id)) return@collect
+                if (
+                    !sessions.isCurrent(gen, id) ||
+                    settings.settings.value.effectiveTimingScheme != TimingScheme.V1 ||
+                    settings.settings.value.reciterId != reciter.id
+                ) return@collect
                 installTimings(refreshed)
                 _uiState.value = _uiState.value.copy(hasTimings = refreshed.isNotEmpty())
             }
@@ -459,7 +567,7 @@ class ReaderViewModel(
         )
         loadJob?.cancel()
         loadJob = viewModelScope.launch {
-            val prepared = materialize(surahId) ?: return@launch
+            val prepared = materialize(surahId)?.withCurrentTimingSource() ?: return@launch
             if (!sessions.isCurrent(gen, surahId)) return@launch
             commitPrepared(prepared)
             val playAyah = sessions.takePendingPlay(gen)
@@ -480,7 +588,8 @@ class ReaderViewModel(
         val originGeneration = sessions.generation
         val reciters = repository.reciters()
         val reciter = currentReciter(reciters)
-        val loadedTimings = timingsWithBasmalahLeadIn(reciter.id, surahId)
+        val scheme = settings.settings.value.effectiveTimingScheme
+        val loadedTimings = timingsWithBasmalahLeadIn(reciter.id, surahId, scheme)
         val content = repository.surahContent(surahId)
         val surahs = repository.surahs()
         val nextSurah = surahs.firstOrNull { it.id == surahId + 1 }
@@ -492,6 +601,7 @@ class ReaderViewModel(
             reciters = reciters,
             reciter = reciter,
             timings = loadedTimings,
+            timingScheme = scheme,
             originGeneration = originGeneration,
         )
     }
@@ -503,12 +613,14 @@ class ReaderViewModel(
      * When still current, cancels any in-flight [load] for the same session
      * window and starts a new generation for the committed chapter.
      */
-    fun installPrepared(prepared: PreparedSurah) {
+    suspend fun installPrepared(prepared: PreparedSurah) {
+        if (!sessions.isCurrent(prepared.originGeneration)) return
+        val current = prepared.withCurrentTimingSource()
         if (!sessions.isCurrent(prepared.originGeneration)) return
         loadJob?.cancel()
         loadJob = null
-        sessions.begin(prepared.content.surah.id, pendingPlayAyah = null)
-        commitPrepared(prepared)
+        sessions.begin(current.content.surah.id, pendingPlayAyah = null)
+        commitPrepared(current)
     }
 
     /** Applies [prepared] to UI + timings. Caller must already own the live session. */
@@ -528,38 +640,70 @@ class ReaderViewModel(
         )
     }
 
-    private suspend fun onReciterChanged() {
+    private suspend fun onTimingSourceChanged() {
         val gen = sessions.generation
         val id = sessions.surahId
         if (id == 0) return
         val reciters = _uiState.value.reciters.ifEmpty { repository.reciters() }
-        val reciter = currentReciter(reciters)
-        val refreshed = timingsWithBasmalahLeadIn(reciter.id, id)
-        if (!sessions.isCurrent(gen, id)) return
-        installTimings(refreshed)
-        _uiState.value = _uiState.value.copy(
-            currentReciter = reciter,
-            hasTimings = timings.isNotEmpty(),
-        )
-        val np = player.state.value.nowPlaying
-        if (np != null && np.surahId == id && np.reciterId != reciter.id) {
-            val preservedRange = player.state.value.repeatRange
-            // Basmalah lead-in (ayah 0) restarts as a chapter opening.
-            val resumeAyah = np.ayah.coerceAtLeast(1)
-            playFromAyah(resumeAyah)
-            if (preservedRange != null) {
-                player.setRepeatRange(
-                    preservedRange.first,
-                    preservedRange.last,
-                    repeatEndPositionFor(preservedRange.last),
-                )
+        while (sessions.isCurrent(gen, id)) {
+            val reciter = currentReciter(reciters)
+            val scheme = settings.settings.value.effectiveTimingScheme
+            val refreshed = timingsWithBasmalahLeadIn(reciter.id, id, scheme)
+            if (
+                currentReciter(reciters).id != reciter.id ||
+                settings.settings.value.effectiveTimingScheme != scheme
+            ) continue
+            if (!sessions.isCurrent(gen, id)) return
+            installTimings(refreshed)
+            _uiState.value = _uiState.value.copy(
+                currentReciter = reciter,
+                hasTimings = timings.isNotEmpty(),
+            )
+            val np = player.state.value.nowPlaying
+            if (np != null && np.surahId == id && np.reciterId != reciter.id) {
+                val preservedRange = player.state.value.repeatRange
+                // Basmalah lead-in (ayah 0) restarts as a chapter opening.
+                val resumeAyah = np.ayah.coerceAtLeast(1)
+                playFromAyah(resumeAyah)
+                if (preservedRange != null) {
+                    player.setRepeatRange(
+                        preservedRange.first,
+                        preservedRange.last,
+                        repeatEndPositionFor(preservedRange.last),
+                    )
+                }
             }
+            return
         }
     }
 
     private fun currentReciter(reciters: List<Reciter>): Reciter {
         val id = settings.settings.value.reciterId
         return reciters.firstOrNull { it.id == id } ?: reciters.first()
+    }
+
+    /**
+     * Refreshes only the timing-bearing portion of an off-screen payload when
+     * reciter or timing lane changed while it was suspended or animated.
+     */
+    private suspend fun PreparedSurah.withCurrentTimingSource(): PreparedSurah {
+        var current = this
+        while (true) {
+            val reciter = currentReciter(reciters)
+            val scheme = settings.settings.value.effectiveTimingScheme
+            if (current.reciter.id == reciter.id && current.timingScheme == scheme) {
+                return current
+            }
+            current = current.copy(
+                reciter = reciter,
+                timings = timingsWithBasmalahLeadIn(
+                    reciter.id,
+                    content.surah.id,
+                    scheme,
+                ),
+                timingScheme = scheme,
+            )
+        }
     }
 
     fun segmentsFor(ayah: Int): List<Segment>? = timings[ayah]

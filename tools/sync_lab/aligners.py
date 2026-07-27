@@ -117,49 +117,22 @@ def _ctc_token_spans(
     except Exception:
         # fallback CPU
         from torchaudio.functional import forced_align
-        labels, scores = forced_align(lp.cpu(), tgt.cpu(), blank=blank)
+        try:
+            labels, scores = forced_align(lp.cpu(), tgt.cpu(), blank=blank)
+        except Exception:
+            return [], float("-inf")
         labels = labels.to(log_probs.device)
         scores = scores.to(log_probs.device)
-    labels = labels[0].tolist()  # length T
+    labels = labels[0]
     scores = scores[0]
     path_score = float(scores.mean().item()) if scores.numel() else float("-inf")
 
-    # Map path labels onto successive target tokens.
-    # Path emits blanks and repeated token ids; walk targets in order.
-    spans: list[tuple[int, int]] = []
-    ti = 0
-    cur_start = None
-    T = len(labels)
-    for t, lab in enumerate(labels):
-        if ti >= len(targets):
-            break
-        if lab == blank:
-            if cur_start is not None:
-                spans.append((cur_start, t - 1))
-                cur_start = None
-                ti += 1
-            continue
-        if lab == targets[ti]:
-            if cur_start is None:
-                cur_start = t
-        else:
-            # moved to next token without blank
-            if cur_start is not None:
-                spans.append((cur_start, t - 1))
-                cur_start = None
-                ti += 1
-            if ti < len(targets) and lab == targets[ti]:
-                cur_start = t
-    if cur_start is not None and ti < len(targets):
-        spans.append((cur_start, T - 1))
-        ti += 1
-    # If path under-produced spans, fill remaining by proportional split of tail
-    while len(spans) < len(targets):
-        last_end = spans[-1][1] if spans else 0
-        spans.append((last_end, last_end))
-    if len(spans) > len(targets):
-        spans = spans[: len(targets)]
-    return spans, path_score
+    from torchaudio.functional import merge_tokens
+
+    merged = merge_tokens(labels, scores, blank=blank)
+    if [span.token for span in merged] != targets:
+        return [], path_score
+    return [(span.start, span.end - 1) for span in merged], path_score
 
 
 def _merge_char_spans_to_words(
@@ -193,6 +166,30 @@ def _merge_char_spans_to_words(
     return segs
 
 
+def _char_keyframes(
+    char_spans: list[tuple[int, int]],
+    word_char_counts: list[int],
+    ms_per_frame: float,
+) -> list[list[list[float]]]:
+    """Absolute CTC character edges, including blank-span reveal plateaus."""
+    out = []
+    idx = 0
+    for n in word_char_counts:
+        chunk = char_spans[idx : idx + n]
+        idx += n
+        points = []
+        previous_end = None
+        for i, (start_f, end_f) in enumerate(chunk):
+            start_ms = round(start_f * ms_per_frame)
+            end_ms = round((end_f + 1) * ms_per_frame)
+            if previous_end is None or start_ms > previous_end:
+                points.append([start_ms, i / max(n, 1)])
+            points.append([end_ms, (i + 1) / max(n, 1)])
+            previous_end = end_ms
+        out.append(points)
+    return out
+
+
 # ── model wrappers ─────────────────────────────────────────────────────────
 
 @dataclass
@@ -214,9 +211,11 @@ def get_ctc_model(model_id: str, device: str | None = None) -> CtcModel:
         return _MODEL_CACHE[model_id]
     from transformers import Wav2Vec2ForCTC, Wav2Vec2Processor
 
+    repository, separator, revision = model_id.partition("@")
+    revision_arg = revision if separator else None
     device = device or ("cuda" if torch.cuda.is_available() else "cpu")
-    processor = Wav2Vec2Processor.from_pretrained(model_id)
-    model = Wav2Vec2ForCTC.from_pretrained(model_id)
+    processor = Wav2Vec2Processor.from_pretrained(repository, revision=revision_arg)
+    model = Wav2Vec2ForCTC.from_pretrained(repository, revision=revision_arg)
     model.eval().to(device)
     vocab = processor.tokenizer.get_vocab()
     blank = model.config.pad_token_id if model.config.pad_token_id is not None else 0
@@ -227,7 +226,12 @@ def get_ctc_model(model_id: str, device: str | None = None) -> CtcModel:
     return cm
 
 
-def _map_chars_to_ids(text: str, vocab: dict[str, int]) -> list[int]:
+def _map_chars_to_ids(
+    text: str,
+    vocab: dict[str, int],
+    *,
+    strict: bool = False,
+) -> list[int] | None:
     ids = []
     for ch in text:
         if ch == " ":
@@ -237,7 +241,8 @@ def _map_chars_to_ids(text: str, vocab: dict[str, int]) -> list[int]:
             ids.append(vocab[ch])
         elif ch.lower() in vocab:
             ids.append(vocab[ch.lower()])
-        # drop unknown chars rather than crash
+        elif strict:
+            return None
     return ids
 
 
@@ -250,10 +255,14 @@ def ctc_force_align_words(
     return_score: bool = False,
     waveform: np.ndarray | None = None,
     sr: int | None = None,
+    return_keyframes: bool = False,
+    strict_target: bool = False,
 ) -> list[list[int]] | tuple[list[list[int]], float]:
     """Align known words via CTC; return [[pos, start_ms, end_ms], ...].
 
     If return_score=True, also return mean CTC path log-prob (higher=better).
+    If return_keyframes=True, returns ``segments, score, keyframes`` where each
+    keyframe is ``[absolute_end_ms, word_progress]`` for one acoustic CTC unit.
     Optional waveform/sr avoids reloading audio (used for pad-shift tests).
     """
     cm = get_ctc_model(model_id)
@@ -267,6 +276,8 @@ def ctc_force_align_words(
         n = max(1, len(words))
         step = dur // n
         segs = [[i + 1, i * step, (i + 1) * step if i + 1 < n else dur] for i in range(n)]
+        if return_keyframes:
+            return segs, float("-inf"), [[[seg[2], 1.0]] for seg in segs]
         return (segs, float("-inf")) if return_score else segs
 
     inputs = cm.processor(y, sampling_rate=sr, return_tensors="pt", padding=True)
@@ -278,14 +289,18 @@ def ctc_force_align_words(
     for w in words:
         nw = letters_only(w) if not keep_diacritics else strip_tashkeel(w)
         nw = nw.replace(" ", "")
-        if not nw:
+        if not nw and not strict_target:
             nw = "ا"
         norm_words.append(nw)
 
-    mapped_words = []
+    mapped_words: list[list[int] | None] = []
     for nw in norm_words:
-        ids = _map_chars_to_ids(nw, cm.vocab)
+        ids = _map_chars_to_ids(nw, cm.vocab, strict=strict_target)
         mapped_words.append(ids if ids else None)
+    if strict_target and any(ids is None for ids in mapped_words):
+        if return_keyframes:
+            return [], float("-inf"), []
+        return ([], float("-inf")) if return_score else []
     # if a word maps to nothing, use alef id if present
     fallback = _map_chars_to_ids("ا", cm.vocab) or [1]
     mapped_words = [m if m else fallback for m in mapped_words]
@@ -295,6 +310,8 @@ def ctc_force_align_words(
         n = len(words)
         step = max(1, dur // max(n, 1))
         segs = [[i + 1, i * step, (i + 1) * step if i + 1 < n else dur] for i in range(n)]
+        if return_keyframes:
+            return segs, float("-inf"), [[[seg[2], 1.0]] for seg in segs]
         return (segs, float("-inf")) if return_score else segs
 
     # Estimate real frame shift from T vs audio length
@@ -302,8 +319,13 @@ def ctc_force_align_words(
     ms_per_frame = (1000.0 * len(y) / sr) / max(T, 1)
 
     spans, path_score = _ctc_token_spans(log_probs, flat_ids, cm.blank_id)
+    if len(spans) != len(flat_ids):
+        if return_keyframes:
+            return [], float("-inf"), []
+        return ([], float("-inf")) if return_score else []
     counts = [len(w) for w in mapped_words]
     segs = _merge_char_spans_to_words(spans, counts, ms_per_frame)
+    keyframes = _char_keyframes(spans, counts, ms_per_frame)
 
     dur = int(1000 * len(y) / sr)
     for s in segs:
@@ -311,6 +333,8 @@ def ctc_force_align_words(
         s[2] = max(s[1] + 1, min(s[2], dur))
     if segs:
         segs[-1][2] = max(segs[-1][2], segs[-1][1] + 1)
+    if return_keyframes:
+        return segs, path_score, keyframes
     return (segs, path_score) if return_score else segs
 
 
