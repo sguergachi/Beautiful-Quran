@@ -139,6 +139,28 @@ describe('PlayerController event sequences', () => {
     await vi.waitFor(() => expect(player.isGapless5Enabled()).toBe(false))
   })
 
+  it('keeps a saved non-1× rate after the first loadActive (not only after cycling)', async () => {
+    const audio = new FakeAudio()
+    // Browser-like: load() re-seeds playbackRate from defaultPlaybackRate.
+    audio.load.mockImplementation(() => {
+      audio.playbackRate = audio.defaultPlaybackRate
+    })
+    const player = new PlayerController(
+      instantPrefetcher(),
+      true,
+      null,
+      () => audio.asAudio(),
+    )
+    // Preference applied before any clip is loaded (boot path).
+    player.setSpeed(0.75)
+    player.loadSurah(content, reciter, 1, { quiet: true, warm: false })
+    await player.play()
+
+    expect(player.getState().speed).toBe(0.75)
+    expect(audio.defaultPlaybackRate).toBe(0.75)
+    expect(audio.playbackRate).toBe(0.75)
+  })
+
   it('ignores a stale pause event from the retired element after a join', async () => {
     const created: FakeAudio[] = []
     const player = new PlayerController(
