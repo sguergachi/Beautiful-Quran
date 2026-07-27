@@ -1,0 +1,27 @@
+{
+  "labGoldRows": 307,
+  "v2Covered": 307,
+  "v2Missing": 0,
+  "coveragePct": 100.0,
+  "structureExact": 307,
+  "structureExactPctOfGold": 100.0,
+  "structureExactPctOfCovered": 100.0,
+  "onsets": {
+    "count": 6345,
+    "medianMs": 0,
+    "p90Ms": 0,
+    "within25Pct": 100.0,
+    "within60Pct": 100.0,
+    "within100Pct": 100.0
+  },
+  "missingSample": [],
+  "structureMissSample": [],
+  "bars": {
+    "structureExactPctOfGold": 99.0,
+    "within100Pct": 99.0,
+    "medianMs": 25.0,
+    "p90Ms": 60.0
+  },
+  "pass": true,
+  "claim": "Lab gold: structure exact 307/307 (100.0%), onsets within100=100.0% med=0 p90=0 n=6345; PASS 99% Lab unit gate"
+}
