@@ -13,8 +13,10 @@ correction upstream when convenient.
 Whole-ayah drift caused by silence encoded at the beginning of an everyayah
 MP3 is handled systematically outside the Lab. `tools/detect_audio_onsets.py`
 measures the first sustained voice sample and `build_db.py` shifts the complete
-row, preserving every internal boundary and repeat. Lab overrides are applied
-afterward because their taps already live on the real file timeline.
+row, preserving every internal boundary and repeat. The onset is also stored
+separately as immutable MP3 metadata. When an older Lab edit starts at zero,
+the repository shifts the whole edit behind that onset without changing its
+internal boundaries, so the first wash still waits for speech.
 
 > **Entry is developer-only.** Default readers long-press a word to open the
 > [Root Word Viewer](ROOT_VIEWER.md), not the Lab. See *Where it lives*
@@ -149,9 +151,9 @@ timings leave the DB; overrides are fused there, so the reader and the Lab
 read the same corrected numbers with no extra wiring:
 
 ```
-db timings row            ─┐
+db timings + audio onset  ─┐
 TimingOverrides[key]      ─┴─►  Map<ayah, List<Segment>>  ─►  HighlightEngine
-                                (override wins when present)
+                                (edit wins; onset remains a floor)
 ```
 
 The Lab's live preview additionally runs `HighlightEngine` directly over its
