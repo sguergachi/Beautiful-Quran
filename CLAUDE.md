@@ -15,6 +15,8 @@ Quick essentials (details and rationale in AGENTS.md):
   Read `docs/DESIGN.md` before any UI change.
 - Ink karaoke fidelity is non-negotiable: soft directional wash with a visible
   faded leading edge (never hard peels / whole-word opacity for "perf").
+- **Word↔recitation sync is the product core** — timing fidelity first; see
+  `docs/SYNC_FIDELITY.md`.
 - **Timings Lab / GitHub timing patches: systematic first.** Do **not** paste
   issue JSON into `tools/timing_overrides/` by default. Classify (raw qdc →
   clean → repairs → Lab), fix the class in `clean_qdc_artifacts` or span-protect

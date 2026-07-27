@@ -179,6 +179,10 @@ Full write-ups: [docs/TIMINGS_LAB.md](docs/TIMINGS_LAB.md),
 [tools/timing_patch_cases/README.md](tools/timing_patch_cases/README.md),
 [tools/timing_overrides/README.md](tools/timing_overrides/README.md),
 [tools/timing_repairs/README.md](tools/timing_repairs/README.md).
+9. **Word↔recitation sync is the product core.** The app exists so written
+   words and the reciter's voice feel like one act — millisecond-accurate,
+   word-by-word timing in total sync. Timing data quality and felt sync beat
+   every secondary feature. See [docs/SYNC_FIDELITY.md](docs/SYNC_FIDELITY.md).
 
 ## Code conventions
 
@@ -203,6 +207,9 @@ Full write-ups: [docs/TIMINGS_LAB.md](docs/TIMINGS_LAB.md),
 | `docs/COMPLEXITY.md` | Before any refactor — complexity rules, current hotspots, open decompositions, and the invariants a refactor must preserve |
 | `docs/quality-reviews/` | Multi-agent Android quality audits (summary + Grok/Codex; Claude when available) |
 | `docs/quality-reviews/AGENT_REVIEWS.md` | **How to run real Codex (`gpt-5.6-sol`) and Claude Opus reviews** — CLI flags, gotchas; do not fake them with Grok |
+| `docs/SYNC_FIDELITY.md` | **Product core** — word↔recitation sync is the app; ms/sub-word timing roadmap |
+| `docs/TIMING_FIRST_PRINCIPLES.md` | **Handoff** — first-principles timing plan, lab results, 409-patch gate, roadmap |
+| `tools/sync_lab/RESULTS.md` | Automated aligner bake-off (scale+quality) and winner pipeline |
 | `docs/HIGHLIGHT_ENGINE.md` | The pure word-sync engine — karaoke model, binary search, repeat/high-water logic |
 | `docs/OUTPUT_LATENCY.md` | Route-based Bluetooth/output lag presets applied before the highlight clock |
 | `docs/DESIGN.md` | Any UI/visual change — the paper metaphor and its hard rules |

@@ -9,6 +9,10 @@ open Quran datasets) feeds a **single-module Compose app** whose signature
 feature — words lighting up in time with the reciter — is driven by a
 **pure-function sync engine** polling a **Media3 player** 30 times a second.
 
+**Product core:** that word↔recitation lock is not one feature among many — it
+*is* the app. Millisecond-accurate timing so the user feels text and voice as
+one act of attention. See [SYNC_FIDELITY.md](SYNC_FIDELITY.md).
+
 ```
 tools/build_db.py  (build time, runs in CI)
    quran-json (npm) ─┐
