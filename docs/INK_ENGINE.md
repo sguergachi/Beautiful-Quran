@@ -465,6 +465,13 @@ InkEngine owns that too, as data rather than as animation code:
 
 ### The sweep lifecycle
 
+**Law: no mid-animation reset.** While any wash overlay is still visible,
+progress is monotonic (finish or hold only). Hard-restart to empty is allowed
+only when the overlay is invisible. Intentional seek dissolves first, then
+cold-starts. Orange chain handoff is Hold, not re-Reveal. See AGENTS.md
+invariant #8 and `washMayHardRestart` in `ReaderComponents.kt`.
+
+
 The letter sweep is the one piece of motion whose *lifecycle* is subtle enough to
 be worth stating, because three separate requirements pull against each other.
 It lives in `rememberLetterSweep` (ReaderComponents.kt) with its decisions in
