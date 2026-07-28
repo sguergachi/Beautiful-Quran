@@ -32,6 +32,7 @@ from build_db import (  # noqa: E402
     erases_span_repeat,
     load_audio_durations,
     offset_for_audio_onset,
+    refit_displaced_rows,
     rebase_qdc_clock,
     rebase_timing_repair,
     rows_past_audio,
@@ -282,6 +283,18 @@ def check_audio_onset_pipeline():
         [(1, 2, 253, late), (1, 2, 254, unplayable)], durations
     )
     ceilings &= dropped == [(1, 2, 254)] and [row[2] for row in kept] == [253]
+    # A row sitting seconds past the voice that overruns the file is displaced,
+    # so it re-anchors; one already on its onset keeps its correct opening.
+    displaced = [[1, 7_110, 9_000], [2, 9_000, 21_500]]
+    anchored = [[1, 1_500, 2_000], [2, 2_000, 2_600]]
+    rows, refitted = refit_displaced_rows(
+        [(1, 2, 253, displaced), (1, 2, 254, anchored)],
+        {(1, 2, 253): 21_290, (1, 2, 254): 2_400},
+        {(1, 2, 253): 190, (1, 2, 254): 1_500},
+    )
+    ceilings &= refitted == [(1, 2, 253)]
+    ceilings &= json.loads(rows[0][3]) == [[1, 190, 2_080], [2, 2_080, 14_580]]
+    ceilings &= rows[1][3] == anchored
     ceilings &= trim_to_next_start(
         [[13, 11_950, 12_550], [15, 12_540, 15_040]]
     ) == [[13, 11_950, 12_540], [15, 12_540, 15_040]]

@@ -1115,6 +1115,35 @@ def rows_past_audio(timing_rows, durations):
     ]
 
 
+def refit_displaced_rows(timing_rows, durations, onsets):
+    """Re-anchor a row that overruns its recording because it starts too late.
+
+    A row whose marks run off the end may simply sit at the wrong offset —
+    quran-align occasionally places an ayah seconds into a file that opens on
+    the voice. Pulling it back to the measured onset (or to the start, which
+    the absent onset evidence puts within `MIN_OFFSET_MS`) makes every word
+    reachable again. Rows already sitting on their onset do not move, so a row
+    that merely trails a little past the end keeps its correct opening.
+    """
+    out = []
+    refitted = []
+    for rid, sid, ay, segs in timing_rows:
+        key = (rid, sid, ay)
+        row = json.loads(segs) if isinstance(segs, str) else segs
+        duration = durations.get(key)
+        shift = onsets.get(key, 0) - row[0][1] if row else 0
+        if fits_audio(row, duration) or shift >= 0:
+            out.append((rid, sid, ay, segs))
+            continue
+        shifted = translate_segments(row, shift)
+        if fits_audio(shifted, duration) and strictly_increasing(shifted):
+            out.append((rid, sid, ay, json.dumps(shifted, separators=(",", ":"))))
+            refitted.append(key)
+        else:
+            out.append((rid, sid, ay, segs))
+    return out, refitted
+
+
 def drop_rows_longer_than_audio(timing_rows, durations):
     """Withhold word marks that no offset could fit inside their recording.
 
@@ -1918,6 +1947,13 @@ def main():
     )
 
     if audio_durations:
+        timing_rows, refitted = refit_displaced_rows(
+            timing_rows, audio_durations, audio_onsets
+        )
+        if refitted:
+            print(f"[audit] {len(refitted)} displaced row(s) re-anchored on the voice")
+            for rid, sid, ay in refitted:
+                print(f"    re-anchored: reciter {rid} {sid}:{ay}")
         timing_rows, dropped = drop_rows_longer_than_audio(timing_rows, audio_durations)
         past_audio = rows_past_audio(timing_rows, audio_durations)
         print(
