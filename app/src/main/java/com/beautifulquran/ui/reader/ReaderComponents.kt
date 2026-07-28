@@ -302,33 +302,40 @@ internal fun repeatWashDurationMs(activeSweepMs: Int?, minimumMs: Int): Int =
 /**
  * Orange wash for one word in a repeat chain.
  *
- * **Soul = first-pass ink edge.** Progress is the same [inkProgress] that
- * drives black ink (media letter parks, peels, acousticWashStep). No second
- * wall-clock animation — those always felt linear / empty.
+ * **Same soft-ink engine as first-pass black ink** (not a tween, not a wipe):
+ * 1. Media phase (or residual ink target)
+ * 2. Letter curve parks/peels when [pacing] is softWash/tajweed
+ * 3. [InkEngine.acousticWashStep] ease-in/out keep-up from 0
+ * 4. Soft [letterFadeIn] feather
  *
- * - Live (Active or residual): orange edge **is** the ink edge
- * - Settled in chain: hold full orange
- * - Leave chain: soft dissolve
- * - Soft wash feather always (ethereal edge, not paced-sharp)
+ * Settled chain members hold full orange; leave dissolves alpha.
  */
 @Composable
 private fun rememberRepeatWash(
     repeat: Boolean,
     isActive: Boolean,
     finishResidual: Boolean,
+    /** Residual / fallback ink edge from [rememberLetterSweep]. */
     inkProgress: State<Float>,
     @Suppress("UNUSED_PARAMETER") inkFeather: State<Float?>,
+    /** True V2 listener phase 0..1 for this Active word; null when not live. */
+    clockProgress: State<Float>? = null,
     @Suppress("UNUSED_PARAMETER") activeSweepMs: Int? = null,
-    @Suppress("UNUSED_PARAMETER") pacing: TajweedPacing.Curve? = null,
+    /** SoftWash / tajweed curve for letter parks (same as first-pass). */
+    pacing: TajweedPacing.Curve? = null,
     @Suppress("UNUSED_PARAMETER") activation: Long = 0L,
     @Suppress("UNUSED_PARAMETER") position: Int = 0,
 ): RepeatWash {
     val chainAlpha = remember { Animatable(0f) }
     val wasRepeat = remember { mutableStateOf(false) }
+    val bloom = remember { mutableFloatStateOf(0f) }
 
     val repeatLive = rememberUpdatedState(repeat)
     val isActiveLive = rememberUpdatedState(isActive)
     val residualLive = rememberUpdatedState(finishResidual)
+    val inkLive = rememberUpdatedState(inkProgress)
+    val clockLive = rememberUpdatedState(clockProgress)
+    val pacingLive = rememberUpdatedState(pacing)
 
     LaunchedEffect(Unit) {
         snapshotFlow { repeatLive.value }.collect { rep ->
@@ -336,7 +343,10 @@ private fun rememberRepeatWash(
             val left = !rep && wasRepeat.value
             wasRepeat.value = rep
             when {
-                joined -> chainAlpha.snapTo(1f)
+                joined -> {
+                    bloom.floatValue = 0f
+                    chainAlpha.snapTo(1f)
+                }
                 left -> {
                     if (chainAlpha.value > 0f) {
                         chainAlpha.animateTo(
@@ -347,24 +357,69 @@ private fun rememberRepeatWash(
                             ),
                         )
                     }
+                    bloom.floatValue = 0f
                 }
             }
         }
     }
 
-    // Exact first-pass ink progress while the word is live — that motion is
-    // the product soul (holds, peels, soft keep-up). Never substitute a tween.
-    val progress = remember {
-        derivedStateOf {
-            when {
-                !repeatLive.value && chainAlpha.value <= 0.001f -> 1f
-                isActiveLive.value || residualLive.value ->
-                    inkProgress.value.coerceIn(0f, 1f)
-                else -> 1f
+    // First-pass soft ink loop: curve.at(phase) → acousticWashStep from 0.
+    LaunchedEffect(Unit) {
+        var lastNanos = 0L
+        var lastTarget = 0f
+        var wasLive = false
+        while (true) {
+            withFrameNanos { now ->
+                val dt = if (lastNanos == 0L) {
+                    0f
+                } else {
+                    ((now - lastNanos).coerceAtLeast(0L)) / 1_000_000_000f
+                }
+                lastNanos = now
+                if (!repeatLive.value) {
+                    wasLive = false
+                    lastTarget = 0f
+                    return@withFrameNanos
+                }
+                val live = isActiveLive.value || residualLive.value
+                val phase = clockLive.value?.value
+                val curve = pacingLive.value
+                // Soul target: letter curve on media phase when available;
+                // else residual ink edge; settled → full.
+                val target = when {
+                    !live -> 1f
+                    phase != null && curve != null ->
+                        curve.at(phase.coerceIn(0f, 1f))
+                    phase != null -> phase.coerceIn(0f, 1f)
+                    else -> inkLive.value.value.coerceIn(0f, 1f)
+                }
+                if (live && !wasLive) {
+                    // Soft start empty — never inherit a mid-word wipe position.
+                    bloom.floatValue = 0f
+                    lastTarget = 0f
+                }
+                val targetVel =
+                    if (dt > 1e-4f) {
+                        ((target - lastTarget) / dt).coerceAtLeast(0f)
+                    } else {
+                        0f
+                    }
+                lastTarget = target
+                bloom.floatValue = InkEngine.acousticWashStep(
+                    current = bloom.floatValue,
+                    target = target,
+                    dtSec = dt,
+                    targetVelocity = targetVel,
+                )
+                wasLive = live
             }
         }
     }
-    // Soft ethereal feather (null → Tuning.washFeather in letterFadeIn).
+
+    val progress = remember(bloom) {
+        derivedStateOf { bloom.floatValue.coerceIn(0f, 1f) }
+    }
+    // Soft ethereal feather (null → Tuning.washFeather).
     val softFeather = remember { mutableStateOf<Float?>(null) }
     return RepeatWash(
         progress = progress,
@@ -1170,6 +1225,7 @@ private fun rememberWordHighlight(
             finishResidual = finishResidual,
             inkProgress = sweep.progress,
             inkFeather = sweep.feather,
+            clockProgress = clockProgress.takeIf { isActive },
             activeSweepMs = sweepMs.takeIf { isActive },
             pacing = entryPacing,
             activation = if (isActive) activation else 0L,
@@ -1534,14 +1590,14 @@ private fun rememberLetterSweeps(
 }
 
 /**
- * Orange washes for a shaped/English line — same soft-bloom [rememberRepeatWash]
- * as gloss (dwell + sweepEasing + optional letter curve).
+ * Orange washes for a shaped/English line — same soft-ink engine as gloss.
  */
 @Composable
 private fun rememberRepeatWashes(
     inks: List<InkEngine.Word>,
     positions: List<Int>,
     sweeps: List<LetterSweep>,
+    clockProgress: State<Float>? = null,
     activeSweepMs: Int? = null,
     pacing: TajweedPacing.Curve? = null,
     activation: Long = 0L,
@@ -1557,6 +1613,7 @@ private fun rememberRepeatWashes(
             finishResidual = ink.state == InkEngine.State.Recited,
             inkProgress = sweeps[index].progress,
             inkFeather = sweeps[index].feather,
+            clockProgress = clockProgress.takeIf { active },
             activeSweepMs = activeSweepMs.takeIf { active },
             pacing = pacing.takeIf { active },
             activation = if (active) activation else 0L,
@@ -1625,6 +1682,7 @@ private fun ResponsiveEnglishAyah(
         inks = inks,
         positions = wordPositions,
         sweeps = sweeps,
+        clockProgress = clockProgress,
         activeSweepMs = activeSweepMs,
         activation = activation,
     )
@@ -1902,6 +1960,7 @@ private fun ResponsiveHafsAyah(
         inks = inks,
         positions = wordPositions,
         sweeps = sweeps,
+        clockProgress = clockProgress,
         activeSweepMs = activeSweepMs,
         pacing = entryPacing,
         activation = activation,
