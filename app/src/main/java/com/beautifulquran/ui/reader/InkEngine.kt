@@ -400,17 +400,20 @@ object InkEngine {
     }
 
     /**
-     * One frame of reciter-timed wash with **ease-in / ease-out** motion that
-     * still **keeps up**.
+     * One frame of **chasing the spoken letter**.
      *
-     * [target] comes from the softWash curve (continuous through syllables;
-     * only long pauses park). Speed is:
-     * - **ease-in** as a peel opens
-     * - **cruise / keep-up** while the reciter is moving
-     * - **ease-out** as the gap closes
+     * [target] is the letter-timed curve: it jumps/peels to the letter the
+     * reciter is on and parks there while that letter is held. This step
+     * eases the visible edge toward that target so motion feels continuous
+     * while still arriving with the voice (reading along), never leading
+     * past the spoken letter.
      *
-     * Never rewinds. Never snaps on dt=0. True park only when target stalls
-     * (long pause in the curve).
+     * - **ease-in** as a peel opens (leave previous letter)
+     * - **keep-up** while the reciter advances
+     * - **ease-out** into the letter park
+     * - **park** when already on the spoken letter (target stalled)
+     *
+     * Never rewinds. Never snaps on dt=0.
      */
     fun acousticWashStep(
         current: Float,
@@ -420,17 +423,16 @@ object InkEngine {
     ): Float {
         val cur = current.coerceIn(0f, 1f)
         val tgt = target.coerceIn(0f, 1f)
-        if (tgt <= cur) return cur // long-pause park / never rewind
+        // On the spoken letter: stay. Continuous chase resumes on the next peel.
+        if (tgt <= cur) return cur
         if (dtSec <= 0f) return cur
         val gap = tgt - cur
-        // Keep up with the reciter's peel speed, with a soft cruise floor so
-        // small continuous creeps still move (not freeze on every micro-gap).
         val motion = targetVelocity.coerceAtLeast(0f)
-        val maxSpeed = maxOf(ACOUSTIC_WASH_CRUISE, motion * 1.35f + 0.2f)
-            .coerceAtMost(2.4f)
+        // Slight lag vs reciter velocity so the edge *chases* rather than leads.
+        val maxSpeed = maxOf(ACOUSTIC_WASH_CRUISE, motion * 1.15f + 0.15f)
+            .coerceAtMost(2.2f)
         val g = (gap / ACOUSTIC_WASH_EASE_GAP).coerceIn(0f, 1f)
-        // Floor the ease so tiny gaps (syllable creeps) still advance.
-        val ease = (g * g * (3f - 2f * g)).coerceAtLeast(0.12f)
+        val ease = g * g * (3f - 2f * g) // smoothstep — soft approach into the letter
         val step = maxSpeed * ease * dtSec
         return (cur + step.coerceAtLeast(0f)).coerceAtMost(tgt)
     }

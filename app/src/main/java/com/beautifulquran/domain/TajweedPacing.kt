@@ -173,10 +173,14 @@ object TajweedPacing {
      * Monotone map from normalized sweep time (0..1 of the karaoke hold) to
      * wash position (0..1 across the word).
      *
-     * [softWash] (Timing V2 acoustic) aims for **almost-constant ink motion**:
-     * short letter/syllable freezes become soft creeps; only **long pauses**
-     * (breath, long waqf / sustained hold ≥ [LONG_PAUSE_PARK_MS]) stay parked.
-     * Letter advances use cosine ease so peels accelerate and decelerate.
+     * [softWash] (Timing V2 acoustic) is **letter-timed for reading along**:
+     * - Progress lands on each letter when it is spoken and **parks there**
+     *   for the measured hold (madd, ghunnah, waqf) so the highlight sits on
+     *   the sound the reciter is making.
+     * - Peels to the next letter use cosine ease — the display layer then
+     *   *chases* that target so motion feels continuous without leaving the
+     *   spoken letter early.
+     * - Only sub-perceptual CTC freezes (&lt; [MICRO_HOLD_MS]) are absorbed.
      */
     class Curve internal constructor(
         private val times: FloatArray,
@@ -212,9 +216,9 @@ object TajweedPacing {
     /**
      * Acoustic keyframes → reciter-timed wash curve.
      *
-     * CTC is arrive → hold → peel. Short letter freezes are softened into
-     * continuous creeps so the ink keeps moving through syllables; only
-     * **long** holds/pauses stay parked (see [continuousSyllableFlow]).
+     * CTC is arrive → hold → peel. Holds **park on the spoken letter** so
+     * reading follows the voice. Micro CTC freezes only are absorbed
+     * ([absorbMicroHolds]); real letter timing is preserved for the chase.
      */
     fun acousticCurve(
         keyframes: List<SubwordKeyframe>,
@@ -249,7 +253,7 @@ object TajweedPacing {
 
         val flow = holdParkFlow(raw, durationMs)
         expandMicroAdvances(flow, durationMs)
-        continuousSyllableFlow(flow)
+        absorbMicroHolds(flow)
 
         val times = FloatArray(flow.size)
         val positions = FloatArray(flow.size)
@@ -357,54 +361,31 @@ object TajweedPacing {
     private const val MAX_PEEL_STEAL_MS = 40L
 
     /**
-     * Flat freezes shorter than this are syllable/letter noise — convert to
-     * soft creeps so the wash does not start/stop on every letter. At or
-     * above this, park (long breath, long madd, waqf).
+     * Sub-perceptual CTC freezes only. Real letter holds stay flat so the
+     * wash remains on the spoken letter (reading-along). Continuous motion
+     * comes from chasing that target in the display step, not from leaving
+     * the letter early.
      */
-    const val LONG_PAUSE_PARK_MS = 400L
-
-    /** How much of the next peel a short hold may pre-consume as continuous creep. */
-    private const val SHORT_HOLD_CREEP_FRAC = 0.45f
+    const val MICRO_HOLD_MS = 80L
 
     /**
-     * Turn short letter parks into gentle upward creeps. Long flats stay
-     * parked so a real pause can still rest the edge.
+     * Drop flat freezes shorter than [MICRO_HOLD_MS] by collapsing them into
+     * the surrounding timeline. Does **not** advance progress during a real
+     * letter hold — that would desync the highlight from the reciter.
      */
-    private fun continuousSyllableFlow(points: ArrayList<Pair<Long, Float>>) {
+    private fun absorbMicroHolds(points: ArrayList<Pair<Long, Float>>) {
+        if (points.size < 3) return
         var i = 0
         while (i < points.size - 1) {
             val (t0, p0) = points[i]
             val (t1, p1) = points[i + 1]
             val span = t1 - t0
-            if (p0 == p1 && p0 < 1f - 1e-4f && span in 1L until LONG_PAUSE_PARK_MS) {
-                var flatEnd = i + 1
-                while (
-                    flatEnd + 1 < points.size &&
-                    points[flatEnd + 1].second <= p0 + 1e-5f
-                ) {
-                    flatEnd++
-                }
-                val nextP = if (flatEnd + 1 < points.size) {
-                    points[flatEnd + 1].second
-                } else {
-                    1f
-                }
-                val rise = (nextP - p0).coerceAtLeast(0f)
-                if (rise > 1e-4f) {
-                    val crept = (p0 + rise * SHORT_HOLD_CREEP_FRAC).coerceAtMost(nextP)
-                    val tFlatEnd = points[flatEnd].first
-                    val flatSpan = (tFlatEnd - t0).coerceAtLeast(1L)
-                    for (k in i + 1..flatEnd) {
-                        val tk = points[k].first
-                        val f = (tk - t0).toFloat() / flatSpan.toFloat()
-                        val pk = p0 + (crept - p0) * f
-                        points[k] = tk to pk.coerceIn(p0, nextP)
-                    }
-                }
-                i = flatEnd
-            } else {
-                i++
+            if (p0 == p1 && p0 < 1f - 1e-4f && span in 1L until MICRO_HOLD_MS) {
+                // Remove the micro park end; next peel (if any) absorbs the time.
+                points.removeAt(i + 1)
+                continue
             }
+            i++
         }
         for (k in 1 until points.size) {
             val (t, p) = points[k]
