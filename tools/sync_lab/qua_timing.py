@@ -162,7 +162,11 @@ def acoustic_keyframes(
     letters: list[list],
     groups: list[list[int]],
 ) -> list[dict]:
-    """Convert measured letter intervals into a monotone spatial wash curve."""
+    """Convert measured letter intervals into a monotone spatial wash curve.
+
+    Tolerates QUA letters that slightly overhang the word span (clamped) and
+    zero-width clamped slices so short words still emit a valid curve.
+    """
     if word_end_ms <= word_start_ms or not letters or not groups:
         return []
     progress = {}
@@ -174,7 +178,11 @@ def acoustic_keyframes(
 
     intervals = []
     for token_index, (_, _, start, end) in enumerate(letters):
-        item = [max(word_start_ms, int(start)), min(word_end_ms, int(end)), progress[token_index]]
+        lo = max(word_start_ms, int(start))
+        hi = min(word_end_ms, int(end))
+        if hi < lo:
+            continue
+        item = [lo, hi, progress[token_index]]
         if intervals and item[:2] == intervals[-1][:2]:
             intervals[-1][2] = item[2]
         else:
@@ -193,24 +201,48 @@ def acoustic_keyframes(
 
     last_time = word_start_ms
     last_progress = 0.0
-    measured = False
     for start, end, end_progress in intervals:
         if end < start or start < last_time:
-            return []
-        if end == start and not measured:
-            return []
+            # Overhang / reorder — snap progress at last_time then continue.
+            if end < last_time:
+                last_progress = max(last_progress, end_progress)
+                continue
+            start = last_time
+        if end == start:
+            # Instantaneous (clamped) letter: record progress, no span.
+            append(end, end_progress)
+            last_progress = end_progress
+            continue
         if start > last_time:
             append(start, last_progress)
         append(end, end_progress)
         last_time = max(last_time, end)
         last_progress = end_progress
-        measured = measured or end > start
 
+    append(word_end_ms, 1.0)
     while points and points[0][0] == 0 and points[0][1] == 0:
         points.pop(0)
-    if not points or points[0][0] <= 0 or points[-1][1] != 1.0:
+    if not points:
+        return []
+    if points[0][0] <= 0:
+        # Must not start with a hard pop at t=0 — nudge first positive offset.
+        if len(points) == 1:
+            points = [[max(1, (word_end_ms - word_start_ms) // 2), 1.0]]
+        else:
+            points[0][0] = max(1, points[0][0])
+    if points[-1][1] < 1.0:
+        append(word_end_ms, 1.0)
+    if not points or points[-1][1] != 1.0:
         return []
     return [
         {"offsetMs": int(offset), "progress": round(float(value), 6)}
         for offset, value in points
     ]
+
+
+def fallback_word_keyframe(word_start_ms: int, word_end_ms: int) -> list[dict]:
+    """Single end-anchor when letter mapping fails — structure still ships."""
+    if word_end_ms <= word_start_ms:
+        return []
+    mid = max(1, (word_end_ms - word_start_ms) // 2)
+    return [{"offsetMs": mid, "progress": 1.0}]

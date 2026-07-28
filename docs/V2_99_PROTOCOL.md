@@ -1,7 +1,21 @@
 # Timing V2 — 99% gates
 
 **Status:** binding product protocol  
-**Companion:** `docs/TIMING_FIRST_PRINCIPLES.md`
+**Companions:** `docs/TIMING_FIRST_PRINCIPLES.md`, **`docs/V2_STRUCTURE.md`**
+(rebuild charter after mono-CTC structure failure — **read that first**).
+
+---
+
+## 0. Structure before Lab onsets (hard)
+
+Lab-gold onset scores **do not** prove product quality if phrase re-says are
+missing. Canonical fail: **6:10** V1/QUA `…6,7,8,6,7,8…` vs shipped CTC V2
+mono `1…13`. See `docs/V2_STRUCTURE.md`.
+
+**Primary structure bar (binding for rebuild):**
+
+> Backtrack / occurrence structure must match gold (QUA∪V1∪Lab). Free mono CTC
+> is **not** a structure source. Golden case `6:10` must be exact.
 
 ---
 

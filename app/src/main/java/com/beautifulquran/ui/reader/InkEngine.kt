@@ -359,6 +359,24 @@ object InkEngine {
             .coerceIn(1, tuning.maxSweepMs)
 
     /**
+     * Soft residual floor when a V2 word hands off before the edge is done.
+     */
+    const val MIN_ACOUSTIC_WASH_MS = 1_000
+
+    /**
+     * Gap (0..1 of the word) over which wash speed eases in/out via smoothstep.
+     * Farther than this → full keep-up speed; nearer → decelerate into park.
+     */
+    const val ACOUSTIC_WASH_EASE_GAP = 0.22f
+
+    /**
+     * Cruise speed (word-fraction / sec) when the reciter is still — enough to
+     * finish a peel softly without racing. Real peels raise this via
+     * [targetVelocity] so the edge keeps up.
+     */
+    const val ACOUSTIC_WASH_CRUISE = 0.85f
+
+    /**
      * How long the active word's letter sweep should run: the time the
      * word stays lit (karaoke hold until the next word), corrected for
      * playback speed, floored at [minSweepFloorMs] so short holds (and
@@ -371,12 +389,51 @@ object InkEngine {
     fun sweepMs(activeWord: ActiveWord?, playbackSpeed: Float): Int? {
         val word = activeWord ?: return null
         val raw = (word.durationMs / playbackSpeed).toInt().coerceAtLeast(0)
-        // A true V2 occurrence follows its acoustic clock exactly and never
-        // inherits V1's visual floor/cap.
-        if (word.timingScheme == TimingScheme.V2) return raw.coerceAtLeast(1)
+        if (word.timingScheme == TimingScheme.V2) {
+            // V2 wash follows letter timing; residual uses duration as budget.
+            if (raw <= 0) return MIN_ACOUSTIC_WASH_MS
+            return raw.coerceIn(1, tuning.maxSweepMs)
+        }
         val floor = minSweepFloorMs()
         if (raw <= 0) return floor
         return raw.coerceIn(floor, tuning.maxSweepMs)
+    }
+
+    /**
+     * One frame of reciter-timed wash with **ease-in / ease-out** motion that
+     * still **keeps up**.
+     *
+     * [target] is the letter curve at the media phase (parks on holds/waqf,
+     * advances between letters). Speed is:
+     * - **ease-in** as a peel opens (gap grows from a park)
+     * - **cruise / keep-up** while the reciter is moving (tracks
+     *   [targetVelocity] so short words don't leave the edge behind)
+     * - **ease-out** as the gap closes into the next park
+     *
+     * Smoothstep on the gap shapes the ease. Never rewinds. Never snaps on
+     * dt=0.
+     */
+    fun acousticWashStep(
+        current: Float,
+        target: Float,
+        dtSec: Float,
+        targetVelocity: Float = 0f,
+    ): Float {
+        val cur = current.coerceIn(0f, 1f)
+        val tgt = target.coerceIn(0f, 1f)
+        if (tgt <= cur) return cur // park / never rewind
+        if (dtSec <= 0f) return cur
+        val gap = tgt - cur
+        // Keep up with the reciter's peel speed, with a soft cruise floor.
+        val motion = targetVelocity.coerceAtLeast(0f)
+        val maxSpeed = maxOf(ACOUSTIC_WASH_CRUISE, motion * 1.35f + 0.2f)
+            .coerceAtMost(2.4f)
+        // smoothstep(gap / EASE_GAP): 0 at park, 1 when far — ease-in then
+        // full speed, ease-out as we approach the destination.
+        val g = (gap / ACOUSTIC_WASH_EASE_GAP).coerceIn(0f, 1f)
+        val ease = g * g * (3f - 2f * g) // smoothstep = ease-in-out
+        val step = maxSpeed * ease * dtSec
+        return (cur + step.coerceAtLeast(0f)).coerceAtMost(tgt)
     }
 
     /**

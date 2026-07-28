@@ -3,8 +3,10 @@
 
 Priority (high → low):
   1. Lab gold (Timings Lab ground truth)
-  2. QUA same-take repeats
-  3. CTC mono auto
+  2. Full QUA Alafasy (structure + letters; phrase re-says preserved)
+  3. CTC mono auto — gap-fill only (never invents structure over QUA)
+
+Mono CTC must not override QUA/Lab structure — see docs/V2_STRUCTURE.md.
 
 Writes non-overlapping JSON files into --out-dir for build_db load_timing_v2.
 """
@@ -39,12 +41,15 @@ def main() -> int:
     lab_rows = lab["rows"]
     claimed = keys_of(lab_rows)
 
-    qua_rep = [
+    # Full QUA structure+letters (not repeats-only). Lab still wins ties.
+    qua_rows = [
         r for r in qua["rows"]
-        if is_repeat(r) and (int(r["surah"]), int(r["ayah"])) not in claimed
+        if (int(r["surah"]), int(r["ayah"])) not in claimed
     ]
-    claimed |= keys_of(qua_rep)
+    claimed |= keys_of(qua_rows)
+    n_qua_repeats = sum(1 for r in qua_rows if is_repeat(r))
 
+    # CTC only fills keys neither Lab nor QUA claimed.
     ctc_rows = [
         r for r in ctc["rows"]
         if (int(r["surah"]), int(r["ayah"])) not in claimed
@@ -59,18 +64,23 @@ def main() -> int:
         json.dumps(lab_out, ensure_ascii=False, indent=2) + "\n"
     )
     qua_out = dict(qua)
-    qua_out["rows"] = qua_rep
-    (args.out_dir / "alafasy_qua_repeats.json").write_text(
+    qua_out["rows"] = qua_rows
+    (args.out_dir / "alafasy_qua_full.json").write_text(
         json.dumps(qua_out, ensure_ascii=False, indent=2) + "\n"
     )
+    # Retire the old repeats-only artifact so load_timing_v2 does not double-load.
+    stale = args.out_dir / "alafasy_qua_repeats.json"
+    if stale.exists():
+        stale.unlink()
     ctc_out = dict(ctc)
     ctc_out["rows"] = ctc_rows
     (args.out_dir / "alafasy_ctc_auto.json").write_text(
         json.dumps(ctc_out, ensure_ascii=False, indent=2) + "\n"
     )
+    total = len(lab_rows) + len(qua_rows) + len(ctc_rows)
     print(
-        f"lab_gold={len(lab_rows)} qua_repeats={len(qua_rep)} "
-        f"ctc={len(ctc_rows)} total={len(lab_rows)+len(qua_rep)+len(ctc_rows)}"
+        f"lab_gold={len(lab_rows)} qua_full={len(qua_rows)} "
+        f"(repeats={n_qua_repeats}) ctc_gap={len(ctc_rows)} total={total}"
     )
     return 0
 

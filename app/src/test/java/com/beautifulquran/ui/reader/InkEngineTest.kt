@@ -526,20 +526,78 @@ class InkEngineTest {
     }
 
     @Test
-    fun `V2 follows exact duration without V1 sweep clamps`() {
+    fun `V2 wash eases in-out and keeps up with the reciter`() {
+        // Hold: already on the letter → stays parked.
         assertEquals(
-            80,
-            InkEngine.sweepMs(
-                active(1, durationMs = 80, timingScheme = TimingScheme.V2),
-                playbackSpeed = 1f,
+            0.5f,
+            InkEngine.acousticWashStep(
+                current = 0.5f,
+                target = 0.5f,
+                dtSec = 0.05f,
+                targetVelocity = 0f,
             ),
+            1e-3f,
         )
+
+        // Near park: ease-out — small step only.
+        val near = InkEngine.acousticWashStep(
+            current = 0.48f,
+            target = 0.5f,
+            dtSec = 0.05f,
+            targetVelocity = 0f,
+        )
+        assertTrue("ease-out near park (got $near)", near in 0.48f..0.505f)
+
+        // Far peel with reciter moving: keep-up step is larger, still not a snap.
+        val after = InkEngine.acousticWashStep(
+            current = 0.2f,
+            target = 0.8f,
+            dtSec = 0.05f,
+            targetVelocity = 1.2f,
+        )
+        assertTrue("should advance (got $after)", after > 0.2f + 0.03f)
+        assertTrue("must not snap full gap (got $after)", after < 0.55f)
+
+        // Leaving a park (small gap open): ease-in slower than mid-peel.
+        val leave = InkEngine.acousticWashStep(
+            current = 0.5f,
+            target = 0.55f,
+            dtSec = 0.05f,
+            targetVelocity = 0.5f,
+        )
+        val mid = InkEngine.acousticWashStep(
+            current = 0.5f,
+            target = 0.75f,
+            dtSec = 0.05f,
+            targetVelocity = 0.5f,
+        )
+        assertTrue(
+            "ease-in should be slower than mid cruise (${leave - 0.5f} vs ${mid - 0.5f})",
+            (leave - 0.5f) < (mid - 0.5f),
+        )
+
+        // dt=0 never snaps.
         assertEquals(
-            60_000,
-            InkEngine.sweepMs(
-                active(1, durationMs = 60_000, timingScheme = TimingScheme.V2),
-                playbackSpeed = 1f,
+            0.2f,
+            InkEngine.acousticWashStep(
+                current = 0.2f,
+                target = 0.9f,
+                dtSec = 0f,
+                targetVelocity = 2f,
             ),
+            1e-4f,
+        )
+
+        // Never rewinds.
+        assertEquals(
+            0.7f,
+            InkEngine.acousticWashStep(
+                current = 0.7f,
+                target = 0.4f,
+                dtSec = 0.05f,
+                targetVelocity = 0f,
+            ),
+            1e-4f,
         )
     }
 

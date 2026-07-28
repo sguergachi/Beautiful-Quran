@@ -1,6 +1,7 @@
 package com.beautifulquran.ui.reader
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class AcousticWordClockTest {
@@ -20,6 +21,24 @@ class AcousticWordClockTest {
 
         assertEquals(0.5f, anchor.progressAt(1_000_000_000), 0f)
         assertEquals(1f, anchor.progressAt(1_100_000_000), 0f)
+    }
+
+    @Test
+    fun `anchor phase is raw segment progress for momentum pressure`() {
+        val anchor = AcousticClockAnchor(
+            ayah = 1,
+            wordPosition = 1,
+            epoch = 1,
+            mediaPositionMs = 300,
+            realtimeNanos = 0,
+            playbackSpeed = 0f,
+            startMs = 100,
+            holdEndMs = 500,
+        )
+        // 200ms into a 400ms segment → 0.5 (no pre-roll stretch).
+        assertEquals(0.5f, anchor.progressAt(0), 0f)
+        assertEquals(0f, anchor.copy(mediaPositionMs = 100).progressAt(0), 0f)
+        assertEquals(1f, anchor.copy(mediaPositionMs = 500).progressAt(0), 0f)
     }
 
     @Test
