@@ -3,12 +3,12 @@
 
 Only the opening HTTP byte range is fetched. ffmpeg decodes that prefix and
 reports the first sustained non-silent sample; results at or above 250 ms are
-written to tools/audio_onsets/ for build_db.py to apply. The same request
-reports each file's byte length, which becomes the recording's playable
-duration — the hard ceiling build_db.py holds every timing row inside.
+written to tools/audio_onsets/ for build_db.py to apply. The same bytes carry
+the file's own MPEG header, which gives its playable duration — the hard
+ceiling build_db.py holds every timing row inside.
 
-`--durations-only` refreshes just those ceilings from HEAD requests, so the
-guard can be re-measured without decoding every recording again.
+`--durations-only` refreshes just those ceilings from an 8 KiB range request,
+so the guard can be re-measured without decoding every recording again.
 """
 
 import argparse
@@ -32,9 +32,14 @@ SUSTAINED_MS = 80
 MIN_OFFSET_MS = 250
 SILENCE_END = re.compile(r"silence_end: ([0-9.]+)")
 OUT_TIME_US = re.compile(r"out_time_us=(\d+)")
-SLUG_BITRATE = re.compile(r"_(\d+)kbps$")
 CONTENT_RANGE_TOTAL = re.compile(r"/(\d+)$")
 USER_AGENT = "beautiful-quran-onset-scan/1.0"
+# Enough of the file to hold an ID3v2 tag and the first audio frame's Xing tag.
+DURATION_RANGE_BYTES = 8 * 1024
+FRAME_HEADER_BYTES = 4
+SAMPLE_RATES = {3: (44100, 48000, 32000), 2: (22050, 24000, 16000), 0: (11025, 12000, 8000)}
+BITRATES_MPEG1 = (0, 32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320, 0)
+BITRATES_MPEG2 = (0, 8, 16, 24, 32, 40, 48, 56, 64, 80, 96, 112, 128, 144, 160, 0)
 
 
 class IncompletePrefix(RuntimeError):
@@ -45,21 +50,61 @@ def audio_url(slug, surah, ayah):
     return f"https://everyayah.com/data/{slug}/{surah:03d}{ayah:03d}.mp3"
 
 
-def bitrate_bps(slug):
-    """everyayah publishes one constant bitrate per reciter, named in the slug."""
-    match = SLUG_BITRATE.search(slug)
-    if not match:
-        raise SystemExit(f"cannot read a bitrate from {slug}")
-    return int(match.group(1)) * 1000
+def id3_size(data):
+    """Length of a leading ID3v2 tag, whose size field is seven bits per byte."""
+    if data[:3] != b"ID3":
+        return 0
+    size = 0
+    for byte in data[6:10]:
+        size = (size << 7) | (byte & 0x7F)
+    return 10 + size
 
 
-def duration_ms(total_bytes, slug):
-    """Playable length of a constant-bitrate file, from its byte length.
+def parse_frame_header(data, i):
+    """Read one MPEG Layer III frame header, or None if this is not one."""
+    if data[i] != 0xFF or (data[i + 1] & 0xE0) != 0xE0:
+        return None
+    version = (data[i + 1] >> 3) & 3  # 3=MPEG1, 2=MPEG2, 0=MPEG2.5
+    if version == 1 or (data[i + 1] >> 1) & 3 != 1:  # layer III only
+        return None
+    bitrate_index = (data[i + 2] >> 4) & 15
+    rate_index = (data[i + 2] >> 2) & 3
+    if bitrate_index in (0, 15) or rate_index == 3:
+        return None
+    bitrates = BITRATES_MPEG1 if version == 3 else BITRATES_MPEG2
+    return (
+        version,
+        bitrates[bitrate_index] * 1000,
+        SAMPLE_RATES[version][rate_index],
+        ((data[i + 3] >> 6) & 3) == 3,  # mono
+    )
 
-    ID3 tags round this ~130 ms long, which only ever widens the ceiling the
-    build guard checks against, never narrows it below the real audio.
+
+def duration_ms(prefix, total_bytes):
+    """Playable length of an everyayah MP3, read from its own header.
+
+    The directory name's bitrate is not reliable — some files are encoded well
+    away from it — so the length comes from the file itself: an exact frame
+    count when the encoder wrote a Xing/Info tag (which everyayah's do), else
+    the constant-bitrate length of the first frame. Both round a tenth of a
+    second long, which only ever widens the ceiling the build gates on.
     """
-    return total_bytes * 8000 // bitrate_bps(slug)
+    start = id3_size(prefix)
+    for i in range(start, len(prefix) - 4):
+        frame = parse_frame_header(prefix, i)
+        if frame is None:
+            continue
+        version, bitrate, sample_rate, mono = frame
+        samples = 1152 if version == 3 else 576
+        side_info = (17 if mono else 32) if version == 3 else (9 if mono else 17)
+        tag = i + FRAME_HEADER_BYTES + side_info
+        if prefix[tag:tag + 4] in (b"Xing", b"Info"):
+            flags = int.from_bytes(prefix[tag + 4:tag + 8], "big")
+            frames = int.from_bytes(prefix[tag + 8:tag + 12], "big")
+            if flags & 1 and frames:
+                return round(frames * samples * 1000 / sample_rate)
+        return round((total_bytes - start) * 8000 / bitrate)
+    raise RuntimeError("no MPEG audio frame in the opening bytes")
 
 
 def fetch_prefix(url, range_bytes):
@@ -108,24 +153,23 @@ def analyze_prefix(audio):
 
 
 def detect_onset(slug, verse):
-    """Return this verse's (onset ms, total byte length)."""
+    """Return this verse's (onset ms, playable duration ms)."""
     url = audio_url(slug, *verse)
     for range_bytes in (INITIAL_RANGE_BYTES, RETRY_RANGE_BYTES):
         prefix, total_bytes = fetch_prefix(url, range_bytes)
         try:
-            return analyze_prefix(prefix), total_bytes
+            return analyze_prefix(prefix), duration_ms(prefix, total_bytes)
         except IncompletePrefix:
             continue
     raise RuntimeError("leading silence exceeds extended decoded prefix")
 
 
-def measure_length(slug, verse):
-    """Return this verse's total byte length without decoding any audio."""
-    request = urllib.request.Request(
-        audio_url(slug, *verse), method="HEAD", headers={"User-Agent": USER_AGENT}
+def measure_duration(slug, verse):
+    """Return this verse's playable duration without decoding any audio."""
+    prefix, total_bytes = fetch_prefix(
+        audio_url(slug, *verse), DURATION_RANGE_BYTES
     )
-    with urllib.request.urlopen(request, timeout=30) as response:
-        return int(response.headers["Content-Length"])
+    return duration_ms(prefix, total_bytes)
 
 
 def scan(slug, work, workers, measure):
@@ -171,16 +215,28 @@ def verses(selected):
         return list(db.execute("SELECT surah_id,ayah_number FROM ayahs ORDER BY 1,2"))
 
 
+def detector_metadata():
+    """The settings this scan was produced with, recorded beside its results."""
+    return {
+        "noiseDb": NOISE_DB,
+        "sustainedMs": SUSTAINED_MS,
+        "minimumOffsetMs": MIN_OFFSET_MS,
+        "analysisMs": ANALYSIS_SECONDS * 1000,
+        "initialRangeBytes": INITIAL_RANGE_BYTES,
+        "retryRangeBytes": RETRY_RANGE_BYTES,
+    }
+
+
 def refresh_durations(slug, work, workers, output):
     """Re-measure only the duration ceilings, leaving recorded onsets alone."""
     if not output.exists():
         raise SystemExit(f"{output} is missing — run a full scan first")
     payload = json.loads(output.read_text())
-    lengths = scan(slug, work, workers, measure_length)
+    measured = scan(slug, work, workers, measure_duration)
     payload["schema"] = 2
-    payload["detector"]["bitrateBps"] = bitrate_bps(slug)
+    payload["detector"] = detector_metadata()
     payload["durations"] = sorted_by_verse(
-        {verse_key(verse): duration_ms(total, slug) for verse, total in lengths.items()}
+        {verse_key(verse): ms for verse, ms in measured.items()}
     )
     output.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n")
     print(f"wrote {len(payload['durations'])} durations to {output}")
@@ -204,8 +260,10 @@ def main():
     output = AUDIO_ONSETS_DIR / f"{args.reciter}.json"
     if args.durations_only:
         if args.verse:
-            total = measure_length(args.reciter, work[0])
-            print(f"{verse_key(work[0])} duration: {duration_ms(total, args.reciter)} ms")
+            print(
+                f"{verse_key(work[0])} duration: "
+                f"{measure_duration(args.reciter, work[0])} ms"
+            )
             return
         refresh_durations(args.reciter, work, args.workers, output)
         return
@@ -227,22 +285,11 @@ def main():
         "schema": 2,
         "reciterId": next(r[0] for r in RECITERS if r[1] == args.reciter),
         "reciterSlug": args.reciter,
-        "detector": {
-            "noiseDb": NOISE_DB,
-            "sustainedMs": SUSTAINED_MS,
-            "minimumOffsetMs": MIN_OFFSET_MS,
-            "analysisMs": ANALYSIS_SECONDS * 1000,
-            "initialRangeBytes": INITIAL_RANGE_BYTES,
-            "retryRangeBytes": RETRY_RANGE_BYTES,
-            "bitrateBps": bitrate_bps(args.reciter),
-        },
+        "detector": detector_metadata(),
         "scannedAyahs": len(work),
         "offsets": sorted_by_verse(onsets),
         "durations": sorted_by_verse(
-            {
-                verse_key(verse): duration_ms(total, args.reciter)
-                for verse, (_, total) in measured.items()
-            }
+            {verse_key(verse): ms for verse, (_, ms) in measured.items()}
         ),
     }
     output.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n")

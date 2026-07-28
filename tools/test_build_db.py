@@ -28,6 +28,7 @@ from build_db import (  # noqa: E402
     apply_clocked_timing_repair,
     boundary_conflicts,
     clean_qdc_artifacts,
+    drop_rows_longer_than_audio,
     erases_span_repeat,
     load_audio_durations,
     offset_for_audio_onset,
@@ -35,6 +36,7 @@ from build_db import (  # noqa: E402
     rebase_timing_repair,
     rows_past_audio,
     suspicious_pacing,
+    trim_to_next_start,
 )
 import detect_audio_onsets as onset_detector  # noqa: E402
 
@@ -219,11 +221,22 @@ def check_audio_onset_pipeline():
     except onset_detector.IncompletePrefix:
         pass
 
+    # An MPEG1 Layer III 128 kbps 44.1 kHz stereo frame carrying a Xing count.
+    xing = (
+        b"ID3\x04\x00\x00\x00\x00\x00\x0a" + b"\x00" * 10
+        + b"\xff\xfb\x90\x00" + b"\x00" * 32
+        + b"Xing" + (1).to_bytes(4, "big") + (100).to_bytes(4, "big")
+    )
+    # 100 frames x 1152 samples at 44.1 kHz, not the 128 kbps the name implies.
+    parser &= onset_detector.duration_ms(xing, 999_999) == 2_612
+    cbr = b"\xff\xfb\x90\x00" + b"\x00" * 64
+    parser &= onset_detector.duration_ms(cbr, 160_000) == 10_000
+
     with (
         patch.object(
             onset_detector,
             "fetch_prefix",
-            side_effect=[(b"short", 159_264), (b"long", 159_264)],
+            side_effect=[(xing, 999_999), (xing, 999_999)],
         ) as fetch,
         patch.object(
             onset_detector,
@@ -232,14 +245,12 @@ def check_audio_onset_pipeline():
         ),
     ):
         retry = onset_detector.detect_onset("Hani_Rifai_192kbps", (5, 109))
-    retry_ok = retry == (6_636, 159_264) and [
+    retry_ok = retry == (6_636, 2_612) and [
         call.args[1] for call in fetch.call_args_list
     ] == [
         onset_detector.INITIAL_RANGE_BYTES,
         onset_detector.RETRY_RANGE_BYTES,
     ]
-    # A constant-bitrate byte length is the recording's playable ceiling.
-    retry_ok &= onset_detector.duration_ms(159_264, "Hani_Rifai_192kbps") == 6_636
 
     segments = [[1, 500, 900], [2, 900, 1_200], [1, 1_200, 1_500]]
     with tempfile.TemporaryDirectory() as temp_dir:
@@ -263,6 +274,17 @@ def check_audio_onset_pipeline():
     ceilings = durations == {(1, 2, 253): 53_820, (1, 2, 254): 2_000} and rows_past_audio(
         [(1, 2, 253, shifted), (1, 2, 254, [[1, 0, 2_400]])], durations
     ) == [(1, 2, 254)]
+    # Running a little past the end still lights every word, so it is kept; a
+    # row longer than the whole file could never light its tail, so it is not.
+    late = [[1, 1_500, 2_100]]
+    unplayable = [[1, 0, 1_500], [2, 1_500, 3_000]]
+    kept, dropped = drop_rows_longer_than_audio(
+        [(1, 2, 253, late), (1, 2, 254, unplayable)], durations
+    )
+    ceilings &= dropped == [(1, 2, 254)] and [row[2] for row in kept] == [253]
+    ceilings &= trim_to_next_start(
+        [[13, 11_950, 12_550], [15, 12_540, 15_040]]
+    ) == [[13, 11_950, 12_540], [15, 12_540, 15_040]]
     return parser and retry_ok and integration and ceilings
 
 
@@ -352,10 +374,14 @@ def audit_bundled_db():
             "analysisMs": onset_detector.ANALYSIS_SECONDS * 1000,
             "initialRangeBytes": onset_detector.INITIAL_RANGE_BYTES,
             "retryRangeBytes": onset_detector.RETRY_RANGE_BYTES,
-            "bitrateBps": onset_detector.bitrate_bps(payload["reciterSlug"]),
         }
-        # Every scanned ayah carries the duration ceiling the build gates on.
+        # Every scanned ayah carries the duration ceiling the build gates on,
+        # and no shipped row spans more time than its own recording holds.
         exact &= len(payload["durations"]) == payload["scannedAyahs"]
+        for verse, length in payload["durations"].items():
+            s, a = map(int, verse.split(":"))
+            row = timings.get((payload["reciterId"], s, a))
+            exact &= row is None or row[-1][2] - row[0][1] <= length
         rid = payload["reciterId"]
         for verse, onset in payload["offsets"].items():
             s, a = map(int, verse.split(":"))

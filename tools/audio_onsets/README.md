@@ -29,9 +29,13 @@ not mistaken for voice. Silence must sustain for 80 ms to register, and only
 voice onsets of at least 250 ms are recorded. It requires `ffmpeg`;
 `build_db.py` does not.
 
-Durations come from the same request: everyayah publishes one constant bitrate
-per reciter (named in the slug), so the byte length is the clock. ID3 tags
-round it ~130 ms long, which only ever widens the ceiling. Re-measure them
+Durations come from the same bytes, read out of each file's own MPEG header —
+the exact frame count in its Xing/Info tag, or the first frame's constant
+bitrate when no tag is present. **Do not derive them from the bitrate in the
+directory name:** a number of files are encoded well away from it (Hani 16:1
+sits at 64 kbps in a `192kbps` directory), which understated its length by 7.7
+seconds and made correct rows look broken. Header-derived lengths measure exact
+or up to ~80 ms long, and long only ever widens the ceiling. Re-measure them
 without decoding any audio:
 
 ```bash

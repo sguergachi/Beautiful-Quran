@@ -799,6 +799,24 @@ def fits_audio(segs, duration_ms):
     return not duration_ms or not segs or segs[-1][2] <= duration_ms
 
 
+def describes_audio(segs, duration_ms):
+    """True unless the row is longer than the whole recording.
+
+    A row that spans more time than the file holds cannot be a description of
+    it at any offset: some of its words could never be reached, so the wash
+    would stall mid-ayah and the words before it would already be wrong.
+    """
+    return not duration_ms or not segs or segs[-1][2] - segs[0][1] <= duration_ms
+
+
+def trim_to_next_start(segs):
+    """Clip each end at the following start so neighbouring spans never overlap."""
+    out = [list(seg) for seg in segs]
+    for i in range(len(out) - 1):
+        out[i][2] = min(out[i][2], out[i + 1][1])
+    return out
+
+
 def qdc_clock_offset(segs, reference):
     """Return the robust qdc-to-everyayah clock translation for one ayah.
 
@@ -1095,6 +1113,25 @@ def rows_past_audio(timing_rows, durations):
             durations.get((rid, sid, ay)),
         )
     ]
+
+
+def drop_rows_longer_than_audio(timing_rows, durations):
+    """Withhold word marks that no offset could fit inside their recording.
+
+    A handful of source rows describe a longer recitation than the file the app
+    streams — a different take, or an ayah the publisher split differently. The
+    reader falls back to lighting the whole ayah for these, which stays honest,
+    rather than washing words at times the audio never reaches.
+    """
+    kept = []
+    dropped = []
+    for rid, sid, ay, segs in timing_rows:
+        row = json.loads(segs) if isinstance(segs, str) else segs
+        if describes_audio(row, durations.get((rid, sid, ay))):
+            kept.append((rid, sid, ay, segs))
+        else:
+            dropped.append((rid, sid, ay))
+    return kept, dropped
 
 
 def apply_timing_repairs(timing_rows, word_counts, clock_offsets=None, durations=None):
@@ -1780,7 +1817,7 @@ def main():
                     "merged_splits": 0, "dropped_strays": 0,
                     "noncontiguous_orphans": 0, "gap_phantoms": 0,
                     "false_phrase_loops": 0, "clock_rebased": 0,
-                    "clock_abstained": 0,
+                    "clock_abstained": 0, "quran_align_fallback": 0,
                 }
 
                 def adjust_qdc(key, n):
@@ -1792,17 +1829,30 @@ def main():
                     )
                     row_key = (rid, key[0], key[1])
                     reference = reciter_alignment.get(row_key)
-                    rebased, offset = rebase_qdc_clock(
-                        cleaned, reference, audio_durations.get(row_key)
-                    )
-                    if offset is None:
-                        if cleaned and reference:
-                            stats["clock_abstained"] += 1
+                    duration = audio_durations.get(row_key)
+                    rebased, offset = rebase_qdc_clock(cleaned, reference, duration)
+                    if offset is not None:
+                        file_clock_rows.add(row_key)
+                        if offset:
+                            stats["clock_rebased"] += 1
+                            timing_clock_offsets[row_key] = offset
                         return rebased
-                    file_clock_rows.add(row_key)
-                    if offset:
-                        stats["clock_rebased"] += 1
-                        timing_clock_offsets[row_key] = offset
+                    if cleaned and reference:
+                        stats["clock_abstained"] += 1
+                    if (
+                        reference
+                        and not fits_audio(cleaned, duration)
+                        and fits_audio(reference, duration)
+                    ):
+                        # No translation reconciles this row with the recording,
+                        # but quran-align was aligned against the very file we
+                        # stream. Trade this ayah's repeat topology for a row
+                        # that actually tracks the voice.
+                        witness = sanitize_timing_row(trim_to_next_start(reference))
+                        if witness:
+                            stats["quran_align_fallback"] += 1
+                            file_clock_rows.add(row_key)
+                            return witness
                     return rebased
 
                 covered = ingest_reciter_timings(
@@ -1819,7 +1869,8 @@ def main():
                     f"gap phantoms {stats.get('gap_phantoms', 0)}, "
                     f"false phrase loops {stats.get('false_phrase_loops', 0)}, "
                     f"clock-rebased {stats['clock_rebased']}, "
-                    f"clock-abstained {stats['clock_abstained']}"
+                    f"clock-abstained {stats['clock_abstained']}, "
+                    f"quran-align fallback {stats['quran_align_fallback']}"
                 )
             else:
                 data = load_timings(zp, slug)
@@ -1867,13 +1918,17 @@ def main():
     )
 
     if audio_durations:
+        timing_rows, dropped = drop_rows_longer_than_audio(timing_rows, audio_durations)
         past_audio = rows_past_audio(timing_rows, audio_durations)
         print(
-            f"[audit] {len(past_audio)} row(s) end past their recording "
-            f"of {len(audio_durations)} measured"
+            f"[audit] {len(dropped)} row(s) longer than their recording withheld, "
+            f"{len(past_audio)} still end past it, of {len(audio_durations)} measured"
         )
-        for rid, sid, ay in past_audio[:5]:
-            print(f"    reciter {rid} {sid}:{ay}")
+        for rid, sid, ay in dropped:
+            print(f"    withheld: reciter {rid} {sid}:{ay}")
+        audio_onsets = {
+            key: onset for key, onset in audio_onsets.items() if key not in set(dropped)
+        }
 
     OUT.parent.mkdir(parents=True, exist_ok=True)
     if OUT.exists():
