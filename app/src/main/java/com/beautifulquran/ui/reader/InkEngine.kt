@@ -403,15 +403,14 @@ object InkEngine {
      * One frame of reciter-timed wash with **ease-in / ease-out** motion that
      * still **keeps up**.
      *
-     * [target] is the letter curve at the media phase (parks on holds/waqf,
-     * advances between letters). Speed is:
-     * - **ease-in** as a peel opens (gap grows from a park)
-     * - **cruise / keep-up** while the reciter is moving (tracks
-     *   [targetVelocity] so short words don't leave the edge behind)
-     * - **ease-out** as the gap closes into the next park
+     * [target] comes from the softWash curve (continuous through syllables;
+     * only long pauses park). Speed is:
+     * - **ease-in** as a peel opens
+     * - **cruise / keep-up** while the reciter is moving
+     * - **ease-out** as the gap closes
      *
-     * Smoothstep on the gap shapes the ease. Never rewinds. Never snaps on
-     * dt=0.
+     * Never rewinds. Never snaps on dt=0. True park only when target stalls
+     * (long pause in the curve).
      */
     fun acousticWashStep(
         current: Float,
@@ -421,17 +420,17 @@ object InkEngine {
     ): Float {
         val cur = current.coerceIn(0f, 1f)
         val tgt = target.coerceIn(0f, 1f)
-        if (tgt <= cur) return cur // park / never rewind
+        if (tgt <= cur) return cur // long-pause park / never rewind
         if (dtSec <= 0f) return cur
         val gap = tgt - cur
-        // Keep up with the reciter's peel speed, with a soft cruise floor.
+        // Keep up with the reciter's peel speed, with a soft cruise floor so
+        // small continuous creeps still move (not freeze on every micro-gap).
         val motion = targetVelocity.coerceAtLeast(0f)
         val maxSpeed = maxOf(ACOUSTIC_WASH_CRUISE, motion * 1.35f + 0.2f)
             .coerceAtMost(2.4f)
-        // smoothstep(gap / EASE_GAP): 0 at park, 1 when far — ease-in then
-        // full speed, ease-out as we approach the destination.
         val g = (gap / ACOUSTIC_WASH_EASE_GAP).coerceIn(0f, 1f)
-        val ease = g * g * (3f - 2f * g) // smoothstep = ease-in-out
+        // Floor the ease so tiny gaps (syllable creeps) still advance.
+        val ease = (g * g * (3f - 2f * g)).coerceAtLeast(0.12f)
         val step = maxSpeed * ease * dtSec
         return (cur + step.coerceAtLeast(0f)).coerceAtMost(tgt)
     }

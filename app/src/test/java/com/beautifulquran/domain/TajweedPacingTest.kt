@@ -504,8 +504,8 @@ class TajweedPacingTest {
     }
 
     @Test
-    fun `acoustic curve parks on a long letter hold then peels`() {
-        // 1:5-style madd: ~3s on penultimate letter, then final peel.
+    fun `acoustic curve parks on a long pause then peels`() {
+        // 1:5-style madd: ~3s on penultimate letter (≥ LONG_PAUSE_PARK_MS).
         val curve = requireNotNull(
             TajweedPacing.acousticCurve(
                 keyframes = listOf(
@@ -521,7 +521,7 @@ class TajweedPacingTest {
         )
 
         assertEquals(0.833333f, curve.at(742f / 3747f), 1e-3f)
-        // Deep in the hold — parked on that letter for the full dwell.
+        // Long pause stays parked (breath / long madd).
         assertEquals(0.833333f, curve.at(2000f / 3747f), 1e-3f)
         assertEquals(0.833333f, curve.at(3600f / 3747f), 1e-3f)
         assertEquals(1f, curve.at(1f), 0f)
@@ -541,13 +541,13 @@ class TajweedPacingTest {
     }
 
     @Test
-    fun `acoustic curve parks holds and eases letter peels`() {
+    fun `acoustic curve creeps through short syllable freezes`() {
         val curve = requireNotNull(
             TajweedPacing.acousticCurve(
                 keyframes = listOf(
                     SubwordKeyframe(75, 0f),
                     SubwordKeyframe(95, 0.333f),
-                    SubwordKeyframe(296, 0.333f),
+                    SubwordKeyframe(296, 0.333f), // ~200ms freeze < LONG_PAUSE
                     SubwordKeyframe(316, 0.666f),
                     SubwordKeyframe(416, 0.666f),
                     SubwordKeyframe(436, 1f),
@@ -555,8 +555,13 @@ class TajweedPacingTest {
                 durationMs = 536,
             ),
         )
-        // Mid-hold parks at first letter progress.
-        assertEquals(0.333f, curve.at(200f / 536f), 1e-3f)
+        // Short hold must not freeze the edge — continuous creep toward next peel.
+        val midHold = curve.at(200f / 536f)
+        assertTrue(
+            "short hold should creep past letter land (got $midHold)",
+            midHold > 0.333f + 0.02f,
+        )
+        assertTrue("must not skip the whole peel (got $midHold)", midHold < 0.666f)
         var prev = curve.at(0f)
         for (i in 1..64) {
             val p = curve.at(i.toFloat() / 64f)
@@ -564,5 +569,36 @@ class TajweedPacingTest {
             prev = p
         }
         assertEquals(1f, prev, 1e-4f)
+    }
+
+    @Test
+    fun `acoustic curve keeps almost-constant advance across short freezes`() {
+        val curve = requireNotNull(
+            TajweedPacing.acousticCurve(
+                keyframes = listOf(
+                    SubwordKeyframe(50, 0.25f),
+                    SubwordKeyframe(150, 0.25f), // 100ms freeze
+                    SubwordKeyframe(200, 0.5f),
+                    SubwordKeyframe(280, 0.5f), // 80ms freeze
+                    SubwordKeyframe(350, 0.75f),
+                    SubwordKeyframe(420, 0.75f),
+                    SubwordKeyframe(500, 1f),
+                ),
+                durationMs = 500,
+            ),
+        )
+        // Sample densely: progress should keep rising through the freezes
+        // (no multi-step plateaus of identical progress mid-word).
+        var plateau = 0
+        var prev = curve.at(0f)
+        for (i in 1..100) {
+            val p = curve.at(i / 100f)
+            if (p <= prev + 1e-5f && p < 0.99f) plateau++
+            else plateau = 0
+            // Allow a short plateau only near the very end.
+            assertTrue("stuck plateau at step $i p=$p", plateau < 8 || p >= 0.99f)
+            assertTrue(p + 1e-5f >= prev)
+            prev = p
+        }
     }
 }
