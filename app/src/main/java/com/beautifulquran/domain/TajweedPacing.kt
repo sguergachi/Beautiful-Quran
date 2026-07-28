@@ -159,11 +159,10 @@ object TajweedPacing {
      * Monotone map from normalized sweep time (0..1 of the karaoke hold) to
      * wash position (0..1 across the word).
      *
-     * [softWash] (Timing V2 acoustic) encodes the reciter's letter motion:
-     * - **Hold / waqf / madd:** flat progress (park on that letter).
-     * - **Letter advance:** cosine ease — accelerate out of the hold, coast,
-     *   decelerate into the next park. Soft peels without robotic freezes
-     *   between unrelated frames; parks stay parked for their measured dwell.
+     * [softWash] (Timing V2 acoustic) aims for **almost-constant ink motion**:
+     * short letter/syllable freezes become soft creeps; only **long pauses**
+     * (breath, long waqf / sustained hold ≥ [LONG_PAUSE_PARK_MS]) stay parked.
+     * Letter advances use cosine ease so peels accelerate and decelerate.
      */
     class Curve internal constructor(
         private val times: FloatArray,
@@ -199,9 +198,9 @@ object TajweedPacing {
     /**
      * Acoustic keyframes → reciter-timed wash curve.
      *
-     * CTC is arrive → hold → peel. We keep **holds as parks** (same progress
-     * for the measured dwell — madd, ghunnah, waqf) and ease only the peels
-     * between letters so the wash accelerates and decelerates with the voice.
+     * CTC is arrive → hold → peel. Short letter freezes are softened into
+     * continuous creeps so the ink keeps moving through syllables; only
+     * **long** holds/pauses stay parked (see [continuousSyllableFlow]).
      */
     fun acousticCurve(
         keyframes: List<SubwordKeyframe>,
@@ -236,6 +235,7 @@ object TajweedPacing {
 
         val flow = holdParkFlow(raw, durationMs)
         expandMicroAdvances(flow, durationMs)
+        continuousSyllableFlow(flow)
 
         val times = FloatArray(flow.size)
         val positions = FloatArray(flow.size)
@@ -341,6 +341,65 @@ object TajweedPacing {
     }
 
     private const val MAX_PEEL_STEAL_MS = 40L
+
+    /**
+     * Flat freezes shorter than this are syllable/letter noise — convert to
+     * soft creeps so the wash does not start/stop on every letter. At or
+     * above this, park (long breath, long madd, waqf).
+     */
+    const val LONG_PAUSE_PARK_MS = 400L
+
+    /** How much of the next peel a short hold may pre-consume as continuous creep. */
+    private const val SHORT_HOLD_CREEP_FRAC = 0.45f
+
+    /**
+     * Turn short letter parks into gentle upward creeps. Long flats stay
+     * parked so a real pause can still rest the edge.
+     */
+    private fun continuousSyllableFlow(points: ArrayList<Pair<Long, Float>>) {
+        var i = 0
+        while (i < points.size - 1) {
+            val (t0, p0) = points[i]
+            val (t1, p1) = points[i + 1]
+            val span = t1 - t0
+            if (p0 == p1 && p0 < 1f - 1e-4f && span in 1L until LONG_PAUSE_PARK_MS) {
+                var flatEnd = i + 1
+                while (
+                    flatEnd + 1 < points.size &&
+                    points[flatEnd + 1].second <= p0 + 1e-5f
+                ) {
+                    flatEnd++
+                }
+                val nextP = if (flatEnd + 1 < points.size) {
+                    points[flatEnd + 1].second
+                } else {
+                    1f
+                }
+                val rise = (nextP - p0).coerceAtLeast(0f)
+                if (rise > 1e-4f) {
+                    val crept = (p0 + rise * SHORT_HOLD_CREEP_FRAC).coerceAtMost(nextP)
+                    val tFlatEnd = points[flatEnd].first
+                    val flatSpan = (tFlatEnd - t0).coerceAtLeast(1L)
+                    for (k in i + 1..flatEnd) {
+                        val tk = points[k].first
+                        val f = (tk - t0).toFloat() / flatSpan.toFloat()
+                        val pk = p0 + (crept - p0) * f
+                        points[k] = tk to pk.coerceIn(p0, nextP)
+                    }
+                }
+                i = flatEnd
+            } else {
+                i++
+            }
+        }
+        for (k in 1 until points.size) {
+            val (t, p) = points[k]
+            val (pt, pp) = points[k - 1]
+            val tt = t.coerceAtLeast(pt)
+            val pp2 = p.coerceAtLeast(pp)
+            if (tt != t || pp2 != p) points[k] = tt to pp2
+        }
+    }
 
     /** Cosine ease-in-out: accelerate mid-peel, decelerate into the next park. */
     private fun cosineEase(t: Float): Float {
