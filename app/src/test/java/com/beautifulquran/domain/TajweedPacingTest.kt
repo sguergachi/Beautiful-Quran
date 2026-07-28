@@ -454,7 +454,7 @@ class TajweedPacingTest {
     }
 
     @Test
-    fun `acoustic curve follows keyframes then holds full ink`() {
+    fun `acoustic curve lands on letter arrivals and finishes full ink`() {
         val curve = requireNotNull(
             TajweedPacing.acousticCurve(
                 keyframes = listOf(
@@ -465,27 +465,35 @@ class TajweedPacingTest {
             ),
         )
 
-        assertEquals(0.4f, curve.at(0.2f), 1e-4f)
-        assertEquals(0.7f, curve.at(0.4f), 1e-4f)
-        assertEquals(1f, curve.at(0.8f), 0f)
+        assertTrue(curve.softWash)
+        assertEquals(0f, curve.at(0f), 0f)
+        assertEquals(0.4f, curve.at(0.2f), 1e-3f)
+        assertEquals(1f, curve.at(0.6f), 1e-3f)
+        assertEquals(1f, curve.at(1f), 0f)
     }
 
     @Test
-    fun `acoustic curve holds the revealed glyph across a CTC blank`() {
+    fun `acoustic curve parks on a long letter hold then peels`() {
+        // 1:5-style madd: ~3s on penultimate letter, then final peel.
         val curve = requireNotNull(
             TajweedPacing.acousticCurve(
                 keyframes = listOf(
-                    SubwordKeyframe(200, 0.5f),
-                    SubwordKeyframe(800, 0.5f),
-                    SubwordKeyframe(900, 1f),
+                    SubwordKeyframe(20, 0.166667f),
+                    SubwordKeyframe(201, 0.166667f),
+                    SubwordKeyframe(221, 0.333333f),
+                    SubwordKeyframe(742, 0.833333f),
+                    SubwordKeyframe(3727, 0.833333f),
+                    SubwordKeyframe(3747, 1f),
                 ),
-                durationMs = 1_000,
+                durationMs = 3_747,
             ),
         )
 
-        assertEquals(0.5f, curve.at(0.2f), 0f)
-        assertEquals(0.5f, curve.at(0.5f), 0f)
-        assertEquals(0.75f, curve.at(0.85f), 1e-4f)
+        assertEquals(0.833333f, curve.at(742f / 3747f), 1e-3f)
+        // Deep in the hold — parked on that letter for the full dwell.
+        assertEquals(0.833333f, curve.at(2000f / 3747f), 1e-3f)
+        assertEquals(0.833333f, curve.at(3600f / 3747f), 1e-3f)
+        assertEquals(1f, curve.at(1f), 0f)
     }
 
     @Test
@@ -499,5 +507,31 @@ class TajweedPacingTest {
                 durationMs = 500,
             ),
         )
+    }
+
+    @Test
+    fun `acoustic curve parks holds and eases letter peels`() {
+        val curve = requireNotNull(
+            TajweedPacing.acousticCurve(
+                keyframes = listOf(
+                    SubwordKeyframe(75, 0f),
+                    SubwordKeyframe(95, 0.333f),
+                    SubwordKeyframe(296, 0.333f),
+                    SubwordKeyframe(316, 0.666f),
+                    SubwordKeyframe(416, 0.666f),
+                    SubwordKeyframe(436, 1f),
+                ),
+                durationMs = 536,
+            ),
+        )
+        // Mid-hold parks at first letter progress.
+        assertEquals(0.333f, curve.at(200f / 536f), 1e-3f)
+        var prev = curve.at(0f)
+        for (i in 1..64) {
+            val p = curve.at(i.toFloat() / 64f)
+            assertTrue("rewind at step $i: $p < $prev", p + 1e-5f >= prev)
+            prev = p
+        }
+        assertEquals(1f, prev, 1e-4f)
     }
 }

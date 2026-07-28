@@ -82,7 +82,11 @@ data class ActiveWord(
     val activation: Long = 0L,
 )
 
-/** Media-clock anchor extrapolated at draw time for one V2 occurrence. */
+/**
+ * Media-clock anchor for one V2 occurrence. [progressAt] is the raw 0..1
+ * phase through the timed segment (timing pressure for momentum catch-up).
+ * The wash itself is a fixed wall-clock ease from arm, not this phase.
+ */
 data class AcousticClockAnchor(
     val ayah: Int,
     val wordPosition: Int,
@@ -94,11 +98,11 @@ data class AcousticClockAnchor(
     val holdEndMs: Long,
 ) {
     fun progressAt(frameNanos: Long): Float {
-        val duration = holdEndMs - startMs
-        if (duration <= 0L) return 1f
+        val segment = holdEndMs - startMs
+        if (segment <= 0L) return 1f
         val elapsedMs = ((frameNanos - realtimeNanos).coerceAtLeast(0L) / 1_000_000f)
         val positionMs = mediaPositionMs + elapsedMs * playbackSpeed
-        return ((positionMs - startMs) / duration).coerceIn(0f, 1f)
+        return ((positionMs - startMs) / segment).coerceIn(0f, 1f)
     }
 }
 
@@ -339,6 +343,8 @@ class ReaderViewModel(
      */
     private fun highlightPositionMs(ayah: Int, forcedMediaMs: Long?): Long {
         val latencyMs = outputLatencyMs()
+        // V2 wash is a fixed 1s ease from the timing hit — no highlight lead
+        // (lead made short words feel early then rushed). V1 keeps the lab lead.
         val leadMs = if (preparedTimings[ayah]?.hasAcousticKeyframes == true) {
             0L
         } else {

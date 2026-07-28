@@ -156,60 +156,196 @@ object TajweedPacing {
     )
 
     /**
-     * Monotone piecewise-linear map from normalized sweep time (0..1 of the
-     * karaoke hold) to wash position (0..1 across the word). Silent letters
-     * contribute width but no time of their own — their slice is folded into
-     * the neighbouring pronounced letter's glide so the edge crosses them in
-     * motion rather than teleporting; the plateau after the spoken span keeps
-     * the ink settled while the reciter breathes before the next word.
+     * Monotone map from normalized sweep time (0..1 of the karaoke hold) to
+     * wash position (0..1 across the word).
+     *
+     * [softWash] (Timing V2 acoustic) encodes the reciter's letter motion:
+     * - **Hold / waqf / madd:** flat progress (park on that letter).
+     * - **Letter advance:** cosine ease — accelerate out of the hold, coast,
+     *   decelerate into the next park. Soft peels without robotic freezes
+     *   between unrelated frames; parks stay parked for their measured dwell.
      */
     class Curve internal constructor(
         private val times: FloatArray,
         private val positions: FloatArray,
         /** Pronounced letters — drives the paced feather width. */
         val letterCount: Int,
+        /**
+         * True for measured acoustic curves: hold parks + eased advances +
+         * full wash feather.
+         */
+        val softWash: Boolean = false,
     ) {
         fun at(t: Float): Float {
             if (t >= 1f) return 1f
             val c = t.coerceAtLeast(0f)
-            // Last breakpoint at or before c (a duplicate time collapses to
-            // the furthest position — the settle point when spoken == 1).
             var i = times.size - 1
             while (i > 0 && times[i] > c) i--
             if (i >= times.size - 1) return 1f
             val span = times[i + 1] - times[i]
             if (span <= 0f) return positions[i + 1]
+            val p0 = positions[i]
+            val p1 = positions[i + 1]
+            // Flat = letter hold / waqf park for the measured dwell.
+            if (p0 == p1) return p0
             val f = (c - times[i]) / span
-            return positions[i] + (positions[i + 1] - positions[i]) * f
+            // Cosine: zero velocity at both ends → decelerate into the next
+            // hold, accelerate when leaving one.
+            val u = if (softWash) cosineEase(f) else f
+            return p0 + (p1 - p0) * u
         }
     }
 
     /**
-     * Converts machine-aligned acoustic keyframes into the renderer's pacing
-     * curve. The word clock remains authoritative; a final plateau preserves
-     * the karaoke hold after the last voiced sub-word unit.
+     * Acoustic keyframes → reciter-timed wash curve.
+     *
+     * CTC is arrive → hold → peel. We keep **holds as parks** (same progress
+     * for the measured dwell — madd, ghunnah, waqf) and ease only the peels
+     * between letters so the wash accelerates and decelerates with the voice.
      */
     fun acousticCurve(
         keyframes: List<SubwordKeyframe>,
         durationMs: Long,
     ): Curve? {
-        if (
-            keyframes.isEmpty() ||
-            durationMs <= 0L ||
-            keyframes.first().offsetMs <= 0L
-        ) return null
-        val appendTail = keyframes.last().offsetMs < durationMs
-        val times = FloatArray(keyframes.size + 1 + if (appendTail) 1 else 0)
-        val positions = FloatArray(times.size)
-        for (i in keyframes.indices) {
-            times[i + 1] = keyframes[i].offsetMs.toFloat() / durationMs
-            positions[i + 1] = keyframes[i].progress
+        if (keyframes.isEmpty() || durationMs <= 0L) return null
+        if (keyframes.first().offsetMs <= 0L && keyframes.first().progress > 0f) {
+            return null
         }
-        if (appendTail) {
-            times[times.lastIndex] = 1f
-            positions[positions.lastIndex] = 1f
+
+        val raw = ArrayList<Pair<Long, Float>>(keyframes.size + 2)
+        raw.add(0L to 0f)
+        var lastProgress = 0f
+        for (kf in keyframes) {
+            val t = kf.offsetMs.coerceIn(0L, durationMs)
+            val p = kf.progress.coerceIn(0f, 1f)
+            if (p < lastProgress) continue
+            if (p == 0f && lastProgress == 0f) continue
+            val prevT = raw.last().first
+            if (t < prevT) continue
+            if (t == prevT) {
+                raw[raw.lastIndex] = t to p
+            } else {
+                raw.add(t to p)
+            }
+            lastProgress = p
         }
-        return Curve(times, positions, letterCount = keyframes.size)
+        when {
+            raw.last().first == durationMs -> raw[raw.lastIndex] = durationMs to 1f
+            else -> raw.add(durationMs to 1f)
+        }
+
+        val flow = holdParkFlow(raw, durationMs)
+        expandMicroAdvances(flow, durationMs)
+
+        val times = FloatArray(flow.size)
+        val positions = FloatArray(flow.size)
+        val inv = 1f / durationMs.toFloat()
+        for (i in flow.indices) {
+            times[i] = (flow[i].first * inv).coerceIn(0f, 1f)
+            positions[i] = flow[i].second.coerceIn(0f, 1f)
+        }
+        times[0] = 0f
+        positions[0] = 0f
+        times[times.lastIndex] = 1f
+        positions[positions.lastIndex] = 1f
+
+        val letterCount = keyframes.count { it.progress > 0f }.coerceAtLeast(1)
+        return Curve(times, positions, letterCount = letterCount, softWash = true)
+    }
+
+    /**
+     * Keep measured holds as flat parks; only rising edges are letter peels.
+     */
+    private fun holdParkFlow(
+        raw: ArrayList<Pair<Long, Float>>,
+        durationMs: Long,
+    ): ArrayList<Pair<Long, Float>> {
+        val flow = ArrayList<Pair<Long, Float>>(raw.size + 2)
+        flow.add(0L to 0f)
+        var i = 0
+        while (i < raw.size) {
+            val p = raw[i].second
+            var j = i
+            while (j + 1 < raw.size && raw[j + 1].second == p) j++
+            val arriveT = raw[i].first
+            val holdEndT = raw[j].first
+            // Land on the letter.
+            if (p > flow.last().second) {
+                appendFlow(flow, arriveT, p)
+            }
+            // Park for the full hold (waqf / madd / CTC freeze).
+            if (holdEndT > arriveT && p < 1f) {
+                appendFlow(flow, holdEndT, p)
+            }
+            i = j + 1
+        }
+        appendFlow(flow, durationMs, 1f)
+        return flow
+    }
+
+    /**
+     * Widen ~20ms CTC peels so cosine ease has room to accelerate/decelerate,
+     * stealing at most [MAX_PEEL_STEAL_MS] from neighbouring parks.
+     */
+    private fun expandMicroAdvances(
+        points: ArrayList<Pair<Long, Float>>,
+        durationMs: Long,
+    ) {
+        val minSpan = 72L
+        var i = 0
+        while (i < points.size - 1) {
+            val (t0, p0) = points[i]
+            val (t1, p1) = points[i + 1]
+            val span = t1 - t0
+            if (p1 > p0 && span in 1 until minSpan) {
+                var need = minSpan - span
+                if (need > 0L && i + 2 < points.size) {
+                    val (t2, p2) = points[i + 2]
+                    if (p2 == p1 && t2 > t1) {
+                        val steal = minOf(need, (t2 - t1) / 4, MAX_PEEL_STEAL_MS)
+                        if (steal > 0L) {
+                            points[i + 1] = (t1 + steal) to p1
+                            need -= steal
+                        }
+                    }
+                }
+                if (need > 0L && i > 0) {
+                    val (tPrev, pPrev) = points[i - 1]
+                    if (pPrev == p0 && t0 > tPrev) {
+                        val steal = minOf(need, (t0 - tPrev) / 4, MAX_PEEL_STEAL_MS)
+                        if (steal > 0L) {
+                            points[i] = (t0 - steal) to p0
+                        }
+                    }
+                }
+            }
+            i++
+        }
+    }
+
+    private fun appendFlow(
+        flow: ArrayList<Pair<Long, Float>>,
+        t: Long,
+        p: Float,
+    ) {
+        val prevT = flow.last().first
+        val prevP = flow.last().second
+        val tt = t.coerceAtLeast(prevT)
+        val pp = p.coerceAtLeast(prevP)
+        if (tt == prevT && pp == prevP) return
+        if (tt == prevT) {
+            flow[flow.lastIndex] = tt to pp
+        } else {
+            flow.add(tt to pp)
+        }
+    }
+
+    private const val MAX_PEEL_STEAL_MS = 40L
+
+    /** Cosine ease-in-out: accelerate mid-peel, decelerate into the next park. */
+    private fun cosineEase(t: Float): Float {
+        val c = t.coerceIn(0f, 1f)
+        return 0.5f - 0.5f * kotlin.math.cos(Math.PI.toFloat() * c)
     }
 
     /**

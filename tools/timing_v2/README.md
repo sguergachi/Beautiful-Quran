@@ -1,10 +1,33 @@
 # Timing V2 sources (parallel fork of V1)
 
-`timings_v2` never overwrites `timings`. Priority when building:
+`timings_v2` never overwrites `timings`. Priority when building
+(see `docs/V2_STRUCTURE.md`):
 
 1. **`alafasy_lab_gold.json`** — Timings Lab ground truth (grammar-valid historical patches)
-2. **`alafasy_qua_repeats.json`** — same-take QUA repeats
-3. **`alafasy_ctc_auto.json`** — mono CTC for scale
+2. **`alafasy_qua_full.json`** — full QUA Alafasy structure + letters (phrase re-says preserved)
+3. **`alafasy_ctc_auto.json`** — mono CTC **gap-fill only** (never invents structure over QUA)
+
+Regenerate QUA full + re-merge:
+
+```bash
+python3 tools/sync_lab/generate_qua_full_v2.py --all \
+  --out tools/timing_v2/alafasy_qua_full_raw.json
+python3 tools/sync_lab/merge_v2_priority.py \
+  --lab-gold tools/timing_v2/alafasy_lab_gold.json \
+  --ctc tools/timing_v2/alafasy_ctc_auto.json \
+  --qua tools/timing_v2/alafasy_qua_full_raw.json \
+  --out-dir tools/timing_v2
+# then rebuild DB + bump QuranDatabase.DB_FILE_NAME
+```
+
+## Structure gate (must not flatten 6:10)
+
+```bash
+python3 tools/test_build_db.py   # includes V2 structure gate (6:10)
+```
+
+Hard case: Alafasy 6:10 positions must be
+`1…8, 6,7,8, 9…13` (phrase re-say), not mono `1…13`.
 
 ## Lab gold unit gate (≥99%)
 

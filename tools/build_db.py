@@ -1157,6 +1157,12 @@ def load_timing_v2(word_counts, source_dir=TIMING_V2_DIR):
             "Wider-Community/quranic-universal-audio@v2.3.0",
             "9b83ea5824d1f4de3921562f9d7282e279f05860",
         ),
+        # Full QUA Alafasy: structure + letters, verse-relative EveryAyah reclock.
+        # Structure lane (phrase re-says); not gated on same-take xcorr.
+        "sync_lab/generate_qua_full_v2.py@1": (
+            "Wider-Community/quranic-universal-audio@v2.3.0",
+            "9b83ea5824d1f4de3921562f9d7282e279f05860",
+        ),
         # Timings Lab historical patches (grammar-valid Alafasy) as V2 ground truth.
         "sync_lab/generate_lab_gold_v2.py@1": (
             "timing_lab/historical_manual_patches",
@@ -1192,6 +1198,10 @@ def load_timing_v2(word_counts, source_dir=TIMING_V2_DIR):
             != "8a05209a022ad4410ce39f74f374ec09fb5bae6a019b1e2b054fda8342bf0df7"
         ):
             raise ValueError(f"{path.name}: invalid QUA identity gate")
+        if generator.endswith("generate_qua_full_v2.py@1") and payload.get(
+            "sourceAssetSha256"
+        ) != "8a05209a022ad4410ce39f74f374ec09fb5bae6a019b1e2b054fda8342bf0df7":
+            raise ValueError(f"{path.name}: invalid QUA full-lane asset pin")
         for row in payload.get("rows", []):
             surah, ayah = int(row["surah"]), int(row["ayah"])
             key = reciter_id, surah, ayah

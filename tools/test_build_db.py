@@ -73,6 +73,36 @@ def check_v2_lab_gold_gate():
     return False, report.get("claim") or json.dumps(report, indent=2)
 
 
+# Hard golden structures — wrong topology is a product failure (docs/V2_STRUCTURE.md).
+V2_STRUCTURE_CASES = {
+    (6, 10): [1, 2, 3, 4, 5, 6, 7, 8, 6, 7, 8, 9, 10, 11, 12, 13],
+}
+
+
+def check_v2_structure_gate():
+    """Shipped V2 (and committed sources) must not flatten known phrase re-says."""
+    db = ROOT / "data" / "quran.db"
+    if not db.exists():
+        return False, "missing data/quran.db"
+    failures = []
+    with sqlite3.connect(db) as conn:
+        for (surah, ayah), want in V2_STRUCTURE_CASES.items():
+            row = conn.execute(
+                "SELECT segments FROM timings_v2 "
+                "WHERE reciter_id=1 AND surah_id=? AND ayah_number=?",
+                (surah, ayah),
+            ).fetchone()
+            if row is None:
+                failures.append(f"{surah}:{ayah} missing from timings_v2")
+                continue
+            got = [int(s["position"]) for s in json.loads(row[0])]
+            if got != want:
+                failures.append(f"{surah}:{ayah} got={got} want={want}")
+    if failures:
+        return False, "; ".join(failures)
+    return True, "structure cases exact"
+
+
 def check_timing_v2_loader():
     """The committed V2 source gate must reject non-acoustic curve shapes."""
     if not _is_complete_timing_sequence([1, 2, 1, 2], 2):
@@ -477,11 +507,13 @@ def main():
     timing_v2_ok = check_timing_v2_loader()
     database_ok = audit_bundled_db()
     lab_gold_ok, lab_gold_detail = check_v2_lab_gold_gate()
+    structure_ok, structure_detail = check_v2_structure_gate()
     print(f"  {'ok  ' if confidence_ok else 'FAIL'} weighted 2:214 confidence checks")
     print(f"  {'ok  ' if audio_onset_ok else 'FAIL'} audio-onset detector and apply checks")
     print(f"  {'ok  ' if timing_v2_ok else 'FAIL'} Timing V2 source validation")
     print(f"  {'ok  ' if database_ok else 'FAIL'} bundled timing database invariants")
     print(f"  {'ok  ' if lab_gold_ok else 'FAIL'} V2 vs Timings Lab gold (≥99%)")
+    print(f"  {'ok  ' if structure_ok else 'FAIL'} V2 structure gate (6:10 phrase re-say)")
     if not confidence_ok:
         failures.append(("weighted confidence", "2:214 checks failed", None))
     if not audio_onset_ok:
@@ -492,6 +524,8 @@ def main():
         failures.append(("bundled database", "timing audit failed", None))
     if not lab_gold_ok:
         failures.append(("V2 Lab gold gate", lab_gold_detail, None))
+    if not structure_ok:
+        failures.append(("V2 structure gate", structure_detail, None))
     print()
     if failures:
         print(f"{len(failures)} FAILURE(S):")
@@ -501,7 +535,7 @@ def main():
                 for line in str(detail).splitlines():
                     print(f"    {line}")
         return 1
-    print(f"all {len(cases) + 5} cases pass ({CASES_DIR.relative_to(Path.cwd())})")
+    print(f"all {len(cases) + 6} cases pass ({CASES_DIR.relative_to(Path.cwd())})")
     return 0
 
 

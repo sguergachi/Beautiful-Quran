@@ -288,6 +288,9 @@ internal fun repeatWashDurationMs(activeSweepMs: Int?, minimumMs: Int): Int =
  *   feather always runs out; Hold is a no-op after completion.
  * - Never snap incomplete → full. Release finishes any residual progress by
  *   animating the remainder, then dissolves alpha.
+ * - V1 and V2 share this path. A prior V2-only media-clock branch re-entered
+ *   the Animatable path on Active handoff and re-fired Reveal (orange reset
+ *   after each word in the chain).
  */
 @Composable
 private fun rememberRepeatWash(
@@ -296,7 +299,7 @@ private fun rememberRepeatWash(
     position: Int,
     /** Active word dwell; null for queued members revealed by a seek. */
     activeSweepMs: Int? = null,
-    /** Tajweed curve for the active repeated word. */
+    /** Tajweed / acoustic curve for the active repeated word. */
     pacing: TajweedPacing.Curve? = null,
     /** Bumps on seek for the active word so replaying it re-runs orange too. */
     activation: Long = 0L,
@@ -306,6 +309,7 @@ private fun rememberRepeatWash(
     val lockedPacing = remember { mutableStateOf<TajweedPacing.Curve?>(null) }
     val lockedFeather = remember { mutableStateOf<Float?>(null) }
     val lockedDurationMs = remember { mutableIntStateOf(InkEngine.tuning.repeatSweepMs) }
+    // Seeded false so the first true edge is Reveal; later activation→0 is Hold.
     val lifecycle = remember { RepeatWashLifecycle() }
     val sharedGate = LocalRepeatWashGate.current
     val localGate = remember { OrderedWashGate() }
@@ -337,6 +341,9 @@ private fun rememberRepeatWash(
                         activeSweepMs = activeSweepState.value,
                         minimumMs = InkEngine.tuning.repeatSweepMs,
                     )
+                    // Soft acoustic curves already ease inside Curve.at; linear
+                    // wall-clock keeps those anchors on time. Plain washes use
+                    // the soft-end bezier.
                     val easing =
                         if (entryPacing != null) LinearEasing else InkEngine.sweepEasing
                     gate.run(position) {
@@ -344,8 +351,11 @@ private fun rememberRepeatWash(
                         if (!repeatState.value) return@run
                         lockedDurationMs.intValue = sweepMs
                         lockedPacing.value = entryPacing
-                        lockedFeather.value =
-                            if (entryPacing != null) InkEngine.pacedFeather() else null
+                        lockedFeather.value = when {
+                            entryPacing == null -> null
+                            entryPacing.softWash -> null
+                            else -> InkEngine.pacedFeather()
+                        }
                         alpha.snapTo(1f)
                         clock.snapTo(0f)
                         clock.animateTo(1f, tween(sweepMs, easing = easing))
@@ -658,18 +668,115 @@ private fun rememberLetterSweep(
     /** Main-wash progress already laid by a wasl prefix on this word. */
     revealStart: Float = 0f,
 ): LetterSweep {
-    if (clockProgress != null) {
-        val progress = remember(clockProgress, pacing) {
-            derivedStateOf {
-                val clock = clockProgress.value.coerceIn(0f, 1f)
-                pacing?.at(clock) ?: clock
+    // V2 acoustic wash — follows the reciter's letter timing:
+    // - Target = acoustic curve at media phase (park on holds/waqf, ease peels).
+    // - Edge accelerates when the reciter advances, decelerates into parks.
+    // - Arm only on Active rising edge / seek (never re-arm on handoff).
+    val acousticDisplay = remember { mutableFloatStateOf(0f) }
+    val acousticFeather = remember { mutableStateOf<Float?>(null) }
+    val acousticLatched = remember { mutableStateOf(false) }
+    val armedActivation = remember { mutableStateOf<Long?>(null) }
+    val wasClockActive = remember { mutableStateOf(false) }
+
+    val isClockActive = active && clockProgress != null
+    if (isClockActive) acousticLatched.value = true
+    val runAcoustic =
+        isClockActive || (acousticLatched.value && (active || finishResidual))
+
+    if (runAcoustic) {
+        val soft = pacing?.softWash != false
+        val clockState = rememberUpdatedState(clockProgress)
+        val pacingState = rememberUpdatedState(pacing)
+        val activeState = rememberUpdatedState(active)
+        val residualState = rememberUpdatedState(finishResidual)
+        val revealState = rememberUpdatedState(revealStart)
+
+        val needsArm = isClockActive &&
+            (!wasClockActive.value || armedActivation.value != activation)
+        SideEffect {
+            if (needsArm) {
+                acousticDisplay.floatValue = revealStart.coerceIn(0f, 1f)
+                acousticFeather.value =
+                    if (soft) null else InkEngine.pacedFeather()
+                armedActivation.value = activation
+                wasClockActive.value = true
+            } else if (isClockActive) {
+                wasClockActive.value = true
+            } else if (!active && !finishResidual) {
+                wasClockActive.value = false
+                armedActivation.value = null
+            } else if (!isClockActive) {
+                wasClockActive.value = false
             }
         }
-        val feather = rememberUpdatedState<Float?>(
-            if (pacing != null) InkEngine.pacedFeather() else null,
-        )
-        return remember(progress, feather) {
-            LetterSweep(progress = progress, feather = feather)
+
+        LaunchedEffect(Unit) {
+            var lastNanos = 0L
+            var lastTarget = 0f
+            while (true) {
+                withFrameNanos { now ->
+                    val dt = if (lastNanos == 0L) {
+                        0f
+                    } else {
+                        ((now - lastNanos).coerceAtLeast(0L)) / 1_000_000_000f
+                    }
+                    lastNanos = now
+                    val clock = clockState.value
+                    val clockActive = activeState.value && clock != null
+                    when {
+                        clockActive -> {
+                            val phase = clock.value.coerceIn(0f, 1f)
+                            val curve = pacingState.value
+                            // Reciter letter position: parks on holds, eases peels.
+                            val target = when {
+                                curve != null -> curve.at(phase)
+                                else -> phase
+                            }.coerceAtLeast(revealState.value.coerceIn(0f, 1f))
+                            val targetVel =
+                                if (dt > 1e-4f) {
+                                    ((target - lastTarget) / dt).coerceAtLeast(0f)
+                                } else {
+                                    0f
+                                }
+                            lastTarget = target
+                            acousticDisplay.floatValue = InkEngine.acousticWashStep(
+                                current = acousticDisplay.floatValue,
+                                target = target,
+                                dtSec = dt,
+                                targetVelocity = targetVel,
+                            )
+                        }
+                        residualState.value && acousticDisplay.floatValue < 0.999f -> {
+                            // Same slow glide to full ink after handoff — no rush.
+                            lastTarget = 1f
+                            acousticDisplay.floatValue = InkEngine.acousticWashStep(
+                                current = acousticDisplay.floatValue,
+                                target = 1f,
+                                dtSec = dt,
+                                targetVelocity = 0f,
+                            )
+                        }
+                        residualState.value -> {
+                            acousticDisplay.floatValue = 1f
+                            acousticLatched.value = false
+                            armedActivation.value = null
+                            lastTarget = 1f
+                        }
+                        else -> {
+                            acousticDisplay.floatValue = 1f
+                            acousticLatched.value = false
+                            armedActivation.value = null
+                            lastTarget = 0f
+                        }
+                    }
+                }
+            }
+        }
+        val progress = remember(acousticDisplay) {
+            derivedStateOf { acousticDisplay.floatValue.coerceIn(0f, 1f) }
+        }
+        return remember(progress, acousticFeather) {
+            LetterSweep(progress = progress, feather = acousticFeather)
         }
     }
     // Survives Active → Recited so a short hold can finish its wash after
@@ -692,7 +799,10 @@ private fun rememberLetterSweep(
     // discard or re-run, which would leave `applied` false with no effect
     // coming to clear it. So compute now, commit in the SideEffect below.
     val armDurationMs = sweepMs ?: 1
-    val armFeather = if (pacing != null) InkEngine.pacedFeather() else null
+    val armFeather = when {
+        pacing == null || pacing.softWash -> null
+        else -> InkEngine.pacedFeather()
+    }
     val armRevealStart = revealStart.coerceIn(0f, 1f)
     // Composition-time edge so draw sees wasl continuity before SideEffect.
     // Residual reads the latched value from the last Active frame.
@@ -745,6 +855,9 @@ private fun rememberLetterSweep(
             // Unmask after idle full-ink is gone — invalidates draw without
             // waiting for the next word's parent recompose.
             applied.value = true
+            // Acoustic softWash eases inside Curve.at; tajweed keeps linear
+            // wall-clock so letter slots stay exact; plain wash uses the
+            // soft-end bezier.
             val easing = if (pacing != null) LinearEasing else InkEngine.sweepEasing
             sweep.animateTo(1f, tween(sweepMs, easing = easing))
         } else if (finishResidual) {
@@ -1470,6 +1583,7 @@ private fun rememberRepeatWashes(
             position = positions[index],
             activeSweepMs = activeSweepMs.takeIf { active },
             pacing = pacing.takeIf { active },
+            // Active-only activation so mid-chain handoff is Hold, not Reveal.
             activation = if (active) activation else 0L,
         )
     }
@@ -2577,10 +2691,9 @@ fun AyahBlock(
         previousActive.activation = activation
         previousActive.outgoingHandoff = outgoingProgress.atHandoff
     }
-    val waslMainFeather = if (pacing != null) {
-        InkEngine.pacedFeather()
-    } else {
-        InkEngine.tuning.washFeather
+    val waslMainFeather = when {
+        pacing == null || pacing.softWash -> InkEngine.tuning.washFeather
+        else -> InkEngine.pacedFeather()
     }
     val activeRevealStart = if (carriedIncoming && incomingConnection != null) {
         waslWashProgress(
