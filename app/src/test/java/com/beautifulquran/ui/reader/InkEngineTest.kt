@@ -478,8 +478,8 @@ class InkEngineTest {
     }
 
     @Test
-    fun `V2 wash eases in-out and keeps up with the reciter`() {
-        // Hold: already on the letter → stays parked.
+    fun `V2 wash feed-forward chases without leading past the letter`() {
+        // On target: no overshoot.
         assertEquals(
             0.5f,
             InkEngine.acousticWashStep(
@@ -491,41 +491,32 @@ class InkEngineTest {
             1e-3f,
         )
 
-        // Near park: ease-out — small step only.
-        val near = InkEngine.acousticWashStep(
-            current = 0.48f,
-            target = 0.5f,
-            dtSec = 0.05f,
-            targetVelocity = 0f,
-        )
-        assertTrue("ease-out near park (got $near)", near in 0.48f..0.505f)
-
-        // Far peel with reciter moving: keep-up step is larger, still not a snap.
+        // Large gap + reciter peel velocity: keep-up (feed-forward), not crawl.
         val after = InkEngine.acousticWashStep(
             current = 0.2f,
             target = 0.8f,
             dtSec = 0.05f,
             targetVelocity = 1.2f,
         )
-        assertTrue("should advance (got $after)", after > 0.2f + 0.03f)
-        assertTrue("must not snap full gap (got $after)", after < 0.55f)
+        assertTrue("should keep up on peel (got $after)", after > 0.2f + 0.08f)
+        assertTrue("must not lead past target (got $after)", after <= 0.8f + 1e-4f)
 
-        // Leaving a park (small gap open): ease-in slower than mid-peel.
-        val leave = InkEngine.acousticWashStep(
+        // Bigger gap → faster catch-up than small gap (same v_target).
+        val smallGap = InkEngine.acousticWashStep(
             current = 0.5f,
             target = 0.55f,
             dtSec = 0.05f,
             targetVelocity = 0.5f,
         )
-        val mid = InkEngine.acousticWashStep(
+        val bigGap = InkEngine.acousticWashStep(
             current = 0.5f,
             target = 0.75f,
             dtSec = 0.05f,
             targetVelocity = 0.5f,
         )
         assertTrue(
-            "ease-in should be slower than mid cruise (${leave - 0.5f} vs ${mid - 0.5f})",
-            (leave - 0.5f) < (mid - 0.5f),
+            "gap term should speed catch-up (${smallGap - 0.5f} vs ${bigGap - 0.5f})",
+            (bigGap - 0.5f) > (smallGap - 0.5f),
         )
 
         // dt=0 never snaps.
@@ -551,6 +542,17 @@ class InkEngineTest {
             ),
             1e-4f,
         )
+    }
+
+    @Test
+    fun `letter feather scales with letter count for visible chase`() {
+        assertTrue(InkEngine.letterFeather(2) in 0.35f..0.9f)
+        assertTrue(InkEngine.letterFeather(5) < InkEngine.letterFeather(3))
+        assertEquals(0.35f, InkEngine.letterFeather(20), 1e-3f) // floor
+        // Front on letter mid-word maps inside mask progress.
+        val f = InkEngine.letterFeather(5)
+        val p = InkEngine.maskProgressForLetterFront(0.5f, f)
+        assertTrue("mask p in (0,1) got $p", p in 0.2f..0.8f)
     }
 
     @Test

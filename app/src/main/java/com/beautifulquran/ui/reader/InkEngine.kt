@@ -362,17 +362,16 @@ object InkEngine {
     const val MIN_ACOUSTIC_WASH_MS = 1_000
 
     /**
-     * Gap (0..1 of the word) over which wash speed eases in/out via smoothstep.
-     * Farther than this → full keep-up speed; nearer → decelerate into park.
+     * Chase time-constant (seconds): display speed ≈ v_target + gap/τ.
+     * ~0.12s keeps peels in the 50–150ms "in sync" window without buzz.
      */
-    const val ACOUSTIC_WASH_EASE_GAP = 0.22f
+    const val ACOUSTIC_CHASE_TAU_SEC = 0.12f
 
-    /**
-     * Cruise speed (word-fraction / sec) when the reciter is still — enough to
-     * finish a peel softly without racing. Real peels raise this via
-     * [targetVelocity] so the edge keeps up.
-     */
-    const val ACOUSTIC_WASH_CRUISE = 0.85f
+    /** Floor chase speed (word-fraction / sec) while behind the target. */
+    const val ACOUSTIC_CHASE_FLOOR = 0.35f
+
+    /** Cap chase speed so a large gap cannot snap a whole word in one frame. */
+    const val ACOUSTIC_CHASE_MAX = 2.5f
 
     /**
      * How long the active word's letter sweep should run: the time the
@@ -398,18 +397,11 @@ object InkEngine {
     }
 
     /**
-     * One frame of **chasing the spoken letter**.
+     * One frame of **feed-forward letter chase** (Claude chase law).
      *
-     * [target] is the letter-timed curve: it jumps/peels to the letter the
-     * reciter is on and parks there while that letter is held. This step
-     * eases the visible edge toward that target so motion feels continuous
-     * while still arriving with the voice (reading along), never leading
-     * past the spoken letter.
-     *
-     * - **ease-in** as a peel opens (leave previous letter)
-     * - **keep-up** while the reciter advances
-     * - **ease-out** into the letter park
-     * - **park** when already on the spoken letter (target stalled)
+     * [target] is the letter-timed mask progress (already feather-corrected).
+     * Speed = reciter velocity + gap/τ so peels keep up without a standing lag,
+     * with a floor while behind and a never-lead clamp at [target].
      *
      * Never rewinds. Never snaps on dt=0.
      */
@@ -421,18 +413,39 @@ object InkEngine {
     ): Float {
         val cur = current.coerceIn(0f, 1f)
         val tgt = target.coerceIn(0f, 1f)
-        // On the spoken letter: stay. Continuous chase resumes on the next peel.
-        if (tgt <= cur) return cur
+        if (tgt <= cur) return cur // never lead past the spoken letter front
         if (dtSec <= 0f) return cur
         val gap = tgt - cur
-        val motion = targetVelocity.coerceAtLeast(0f)
-        // Slight lag vs reciter velocity so the edge *chases* rather than leads.
-        val maxSpeed = maxOf(ACOUSTIC_WASH_CRUISE, motion * 1.15f + 0.15f)
-            .coerceAtMost(2.2f)
-        val g = (gap / ACOUSTIC_WASH_EASE_GAP).coerceIn(0f, 1f)
-        val ease = g * g * (3f - 2f * g) // smoothstep — soft approach into the letter
-        val step = maxSpeed * ease * dtSec
-        return (cur + step.coerceAtLeast(0f)).coerceAtMost(tgt)
+        val vTarget = targetVelocity.coerceAtLeast(0f)
+        val speed = (vTarget + gap / ACOUSTIC_CHASE_TAU_SEC)
+            .coerceAtLeast(ACOUSTIC_CHASE_FLOOR)
+            .coerceAtMost(ACOUSTIC_CHASE_MAX)
+        return (cur + speed * dtSec).coerceAtMost(tgt)
+    }
+
+    /**
+     * Letter-scaled soft feather for V2/softWash: ~one letter wide so the
+     * chase can be *seen*. Floor keeps the paper-soft edge; ceiling avoids
+     * whole-word breath that erases letter timing.
+     */
+    fun letterFeather(letterCount: Int): Float {
+        val n = letterCount.coerceAtLeast(1)
+        return (2f / n.toFloat()).coerceIn(0.35f, 0.9f)
+    }
+
+    /**
+     * Map letter-front position [q] (0..1 word) to [letterFadeIn] progress
+     * so the **faded front** sits on the spoken letter for feather [f].
+     *
+     * letterFadeIn: head = p·(w+edge), front ≈ head − edge/2
+     * → q = p(1+f) − f/2  ⇒  p = (q + f/2) / (1+f)
+     *
+     * At q=1 the map is still <1; residual chase finishes p→1 (shoulder settle).
+     */
+    fun maskProgressForLetterFront(letterFront: Float, feather: Float): Float {
+        val q = letterFront.coerceIn(0f, 1f)
+        val f = feather.coerceAtLeast(0.01f)
+        return ((q + f * 0.5f) / (1f + f)).coerceIn(0f, 1f)
     }
 
     /**
