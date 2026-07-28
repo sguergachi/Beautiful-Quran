@@ -685,6 +685,37 @@ class InkEngineTest {
     }
 
     @Test
+    fun `repeat wash only hard-restarts on cold entry or seek`() {
+        // Mid-wash re-fire must not snap the edge back to 0.
+        assertFalse(
+            repeatWashShouldRestart(
+                previousActivation = 0L,
+                activation = 4L,
+                clockProgress = 0.4f,
+                alpha = 1f,
+            ),
+        )
+        // Cold entry (settled full clock).
+        assertTrue(
+            repeatWashShouldRestart(
+                previousActivation = 0L,
+                activation = 4L,
+                clockProgress = 1f,
+                alpha = 0f,
+            ),
+        )
+        // Seek N→M while Active.
+        assertTrue(
+            repeatWashShouldRestart(
+                previousActivation = 4L,
+                activation = 5L,
+                clockProgress = 0.4f,
+                alpha = 1f,
+            ),
+        )
+    }
+
+    @Test
     fun `leaving the chain releases after a completed hold`() {
         assertEquals(
             RepeatWashAction.Release,
