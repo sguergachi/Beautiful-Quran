@@ -259,8 +259,15 @@ internal fun repeatWashAction(
     repeat: Boolean,
     activation: Long,
 ): RepeatWashAction = when {
-    repeat && (!wasRepeat || activation != 0L && activation != previousActivation) ->
-        RepeatWashAction.Reveal
+    // First join to the orange chain (queued or already Active).
+    repeat && !wasRepeat -> RepeatWashAction.Reveal
+    // Seek / replay while Active: generation bumps N→M. Must not treat
+    // 0→N (handoff into Active after a queued chain join) as a seek — that
+    // re-snapped every word and looked like the orange wash "reset" per step.
+    repeat && wasRepeat &&
+        previousActivation != 0L &&
+        activation != 0L &&
+        activation != previousActivation -> RepeatWashAction.Reveal
     !repeat && wasRepeat -> RepeatWashAction.Release
     else -> RepeatWashAction.Hold
 }
@@ -288,9 +295,9 @@ internal fun repeatWashDurationMs(activeSweepMs: Int?, minimumMs: Int): Int =
  *   feather always runs out; Hold is a no-op after completion.
  * - Never snap incomplete → full. Release finishes any residual progress by
  *   animating the remainder, then dissolves alpha.
- * - V1 and V2 share this path. A prior V2-only media-clock branch re-entered
- *   the Animatable path on Active handoff and re-fired Reveal (orange reset
- *   after each word in the chain).
+ * - V1 and V2 share this path. Reveal only on chain join or a true seek
+ *   (non-zero activation → new generation). Becoming Active after a queued
+ *   join (0→N) is Hold — otherwise every word of a multi-word re-say re-snaps.
  */
 @Composable
 private fun rememberRepeatWash(

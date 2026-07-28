@@ -656,6 +656,17 @@ class InkEngineTest {
                 activation = 0L,
             ),
         )
+        // Queued chain member becomes Active (0→N): still Hold — re-Reveal
+        // would snap orange back to 0 on every word of a multi-word re-say.
+        assertEquals(
+            RepeatWashAction.Hold,
+            repeatWashAction(
+                wasRepeat = true,
+                previousActivation = 0L,
+                repeat = true,
+                activation = 4L,
+            ),
+        )
         assertEquals(
             RepeatWashAction.Reveal,
             repeatWashAction(
