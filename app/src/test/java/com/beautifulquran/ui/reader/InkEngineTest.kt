@@ -695,6 +695,22 @@ class InkEngineTest {
     }
 
     @Test
+    fun `drawn wash progress never rewinds while the overlay is visible`() {
+        // Visible: peak holds even if raw clock snaps backward (flash source).
+        val (mid, peakMid) = monotonicWashProgress(raw = 0.4f, visibleAlpha = 1f, peak = 0f)
+        assertEquals(0.4f, mid, 1e-5f)
+        val (held, peakHeld) = monotonicWashProgress(raw = 0f, visibleAlpha = 1f, peak = peakMid)
+        assertEquals(0.4f, held, 1e-5f)
+        assertEquals(0.4f, peakHeld, 1e-5f)
+        val (advanced, peakAdv) = monotonicWashProgress(raw = 0.7f, visibleAlpha = 1f, peak = peakHeld)
+        assertEquals(0.7f, advanced, 1e-5f)
+        // Invisible: may return to 0 for a true cold start.
+        val (cold, peakCold) = monotonicWashProgress(raw = 0f, visibleAlpha = 0f, peak = peakAdv)
+        assertEquals(0f, cold, 1e-5f)
+        assertEquals(0f, peakCold, 1e-5f)
+    }
+
+    @Test
     fun `repeat wash never hard-restarts a visible overlay — even on seek`() {
         // Mid-wash re-fire must not snap the edge back to 0.
         assertFalse(

@@ -274,16 +274,36 @@ internal fun repeatWashAction(
 }
 
 /**
- * Product law — **no mid-animation reset**:
- * while a wash overlay is still visible, its progress must be monotonic
+ * Product law — **no mid-animation reset / no flash**:
+ * while a wash overlay is still visible, drawn progress is **monotonic**
  * (only finish or hold). Hard-restart to 0 is allowed **only** when the
- * overlay is invisible. Seek does not override this; intentional replay
- * must dissolve first, then cold-start.
+ * overlay is invisible. Seek dissolves first, then cold-starts.
  */
 internal const val WASH_INVISIBLE_ALPHA = 0.05f
 
 internal fun washMayHardRestart(visibleAlpha: Float): Boolean =
     visibleAlpha < WASH_INVISIBLE_ALPHA
+
+/**
+ * Drawn wash progress under the no-flash law.
+ *
+ * - Invisible: follow [raw] (may return to 0 for a cold start).
+ * - Visible: never below the previous peak — even if the raw clock rewinds,
+ *   the mask cannot flash full→empty.
+ */
+internal fun monotonicWashProgress(
+    raw: Float,
+    visibleAlpha: Float,
+    peak: Float,
+): Pair<Float, Float> {
+    val r = raw.coerceIn(0f, 1f)
+    return if (washMayHardRestart(visibleAlpha)) {
+        r to r
+    } else {
+        val next = maxOf(peak, r)
+        next to next
+    }
+}
 
 /**
  * Whether [rememberRepeatWash] may snap the edge to 0 right now.
@@ -310,9 +330,9 @@ internal fun repeatWashDurationMs(activeSweepMs: Int?, minimumMs: Int): Int =
  * Feel: dwell-timed directional wash (`max(activeSweepMs, repeatSweepMs)`),
  * curve parks, soft letterFadeIn.
  *
- * Law (never break): **no mid-animation reset.** Progress never rewinds while
- * alpha is visible. Cold start only when invisible; intentional seek dissolves
- * first, then restarts. Active starts immediately; 0→N is Hold.
+ * Law (never break): **no flash, no mid-animation reset.** Drawn progress is
+ * monotonic while visible ([monotonicWashProgress]). Clock may only snap to 0
+ * after alpha is invisible. Active starts immediately; 0→N is Hold.
  */
 @Composable
 private fun rememberRepeatWash(
@@ -329,6 +349,7 @@ private fun rememberRepeatWash(
     // Always start empty so cold join never inherits a settled full edge.
     val clock = remember { Animatable(0f) }
     val alpha = remember { Animatable(0f) }
+    val peakProgress = remember { mutableFloatStateOf(0f) }
     val lockedPacing = remember { mutableStateOf<TajweedPacing.Curve?>(null) }
     val lockedFeather = remember { mutableStateOf<Float?>(null) }
     val lockedDurationMs = remember { mutableIntStateOf(InkEngine.tuning.repeatSweepMs) }
@@ -343,6 +364,16 @@ private fun rememberRepeatWash(
     val activationState = rememberUpdatedState(activation)
     val activeSweepState = rememberUpdatedState(activeSweepMs)
     val pacingState = rememberUpdatedState(pacing)
+
+    suspend fun hardRestartToEmpty() {
+        // Alpha must be invisible before the edge may return to 0.
+        if (alpha.value >= WASH_INVISIBLE_ALPHA) {
+            alpha.snapTo(0f)
+        }
+        clock.snapTo(0f)
+        peakProgress.floatValue = 0f
+    }
+
     LaunchedEffect(Unit) {
         snapshotFlow { repeatState.value to activationState.value }.collect { (rep, act) ->
             val previousActivation = lifecycle.activation
@@ -369,8 +400,8 @@ private fun rememberRepeatWash(
                             act != previousActivation
                     suspend fun runWash() {
                         if (!repeatState.value) return
-                        // Intentional seek while still painted: dissolve first.
-                        // Never snap progress backward under a visible overlay.
+                        // Seek while painted: dissolve fully, then cold-start.
+                        // Never leave alpha high across a clock rewind.
                         if (intentionalReplay && !washMayHardRestart(alpha.value)) {
                             if (alpha.value > 0f) {
                                 alpha.animateTo(
@@ -381,10 +412,9 @@ private fun rememberRepeatWash(
                                     ),
                                 )
                             }
-                            clock.snapTo(0f)
+                            hardRestartToEmpty()
                         }
                         if (washMayHardRestart(alpha.value)) {
-                            // Cold start — edge at 0 *before* alpha rises.
                             lockedDurationMs.intValue = sweepMs
                             lockedPacing.value = entryPacing
                             lockedFeather.value = when {
@@ -392,11 +422,12 @@ private fun rememberRepeatWash(
                                 entryPacing.softWash -> null
                                 else -> InkEngine.pacedFeather()
                             }
-                            clock.snapTo(0f)
+                            // Edge + peak empty *before* any paint.
+                            hardRestartToEmpty()
                             alpha.snapTo(1f)
                             clock.animateTo(1f, tween(sweepMs, easing = easing))
                         } else {
-                            // Mid-animation re-entry: finish residual only.
+                            // Mid-animation: finish residual only — never rewind.
                             if (alpha.value < 1f) alpha.snapTo(1f)
                             if (clock.value < 1f) {
                                 val remain =
@@ -423,7 +454,7 @@ private fun rememberRepeatWash(
                     }
                 }
                 RepeatWashAction.Release -> {
-                    // Dissolve first; never flash a residual snap under high alpha.
+                    // Dissolve while holding the peak edge; only then clear.
                     if (alpha.value > 0f) {
                         alpha.animateTo(
                             0f,
@@ -436,6 +467,7 @@ private fun rememberRepeatWash(
                     if (clock.value < 1f) {
                         clock.snapTo(1f)
                     }
+                    peakProgress.floatValue = 0f
                     lockedPacing.value = null
                     lockedFeather.value = null
                 }
@@ -443,11 +475,32 @@ private fun rememberRepeatWash(
             }
         }
     }
-    val progress = remember {
-        derivedStateOf { lockedPacing.value?.at(clock.value) ?: clock.value }
+    // Draw progress is a separate monotonic channel: even if [clock] rewinds
+    // under a bug, the mask never goes backward while alpha is visible.
+    val displayProgress = remember { mutableFloatStateOf(0f) }
+    LaunchedEffect(Unit) {
+        snapshotFlow {
+            Triple(
+                lockedPacing.value?.at(clock.value) ?: clock.value,
+                alpha.value,
+                peakProgress.floatValue,
+            )
+        }.collect { (raw, a, peak) ->
+            val (drawn, nextPeak) = monotonicWashProgress(
+                raw = raw,
+                visibleAlpha = a,
+                peak = peak,
+            )
+            if (nextPeak != peakProgress.floatValue) {
+                peakProgress.floatValue = nextPeak
+            }
+            if (drawn != displayProgress.floatValue) {
+                displayProgress.floatValue = drawn
+            }
+        }
     }
     return RepeatWash(
-        progress = progress,
+        progress = displayProgress,
         alpha = alpha.asState(),
         feather = lockedFeather,
     )
@@ -1222,7 +1275,10 @@ private fun rememberWordHighlight(
 ): WordHighlight {
     val isActive = ink.state == InkEngine.State.Active
     val glintInk = LocalQuranAccents.current.glintInk
-    val glinting = glintInk != null && InkEngine.glinting(ink.state)
+    // No glint on repeat: a full-strength glint snap over a mid-edge orange
+    // wash reads as a flash. First-pass Active still glints.
+    val glinting =
+        glintInk != null && InkEngine.glinting(ink.state) && !ink.repeat
     val glintIdentity = rememberGlintIdentity(glinting, ink.repeat)
     // Freeze tajweed curve for this activation so an Ink Lab toggle mid-word
     // cannot remap the wash (or swap feather) and look like a reset.
@@ -1644,7 +1700,8 @@ private data class Glint(
 private fun rememberGlints(inks: List<InkEngine.Word>): List<Glint> {
     val glintInk = LocalQuranAccents.current.glintInk
     return inks.map { ink ->
-        val glinting = glintInk != null && InkEngine.glinting(ink.state)
+        val glinting =
+            glintInk != null && InkEngine.glinting(ink.state) && !ink.repeat
         val identity = rememberGlintIdentity(glinting, ink.repeat)
         Glint(
             alpha = rememberGlintAlpha(glinting),
