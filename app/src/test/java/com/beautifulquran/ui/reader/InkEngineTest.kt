@@ -594,22 +594,28 @@ class InkEngineTest {
     }
 
     @Test
-    fun `V2 never borrows the V1 cross word Tajweed connection`() {
+    fun `V2 wasl blooms the next opening letter like V1 geometry`() {
         val saved = InkEngine.tuning
         try {
             InkEngine.tuning = saved.copy(tajweedPacing = true, holdConnect = true)
             assertNotNull(
                 InkEngine.connection("مِن", "رَّبِّكُم", TimingScheme.V1),
             )
-            // No measured wasl → no bloom (unlike V1 text-only wasl).
-            assertNull(
+            // Missing measured budget must not kill wasl — ink still starts on
+            // the next word's opening letter during the donor tail.
+            assertNotNull(
                 InkEngine.connection("مِن", "رَّبِّكُم", TimingScheme.V2, waslFromPrevMs = 0L),
             )
-            // Acoustic wasl budget enables the connection bloom for V2.
             assertNotNull(
                 InkEngine.connection("مِن", "رَّبِّكُم", TimingScheme.V2, waslFromPrevMs = 200L),
             )
+            // Measured budget only refines duration.
             assertEquals(200, InkEngine.waslPrefixTargetMs(200L))
+            assertEquals(InkEngine.tuning.waslPrefixMs, InkEngine.waslPrefixTargetMs(0L))
+            InkEngine.tuning = saved.copy(holdConnect = false)
+            assertNull(
+                InkEngine.connection("مِن", "رَّبِّكُم", TimingScheme.V2, waslFromPrevMs = 200L),
+            )
         } finally {
             InkEngine.tuning = saved
         }
