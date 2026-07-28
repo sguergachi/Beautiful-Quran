@@ -642,44 +642,63 @@ class InkEngineTest {
             RepeatWashAction.Reveal,
             repeatWashAction(
                 wasRepeat = false,
+                wasActive = false,
                 previousActivation = 4L,
                 repeat = true,
+                active = true,
                 activation = 4L,
             ),
         )
     }
 
     @Test
-    fun `repeat wash holds on chain advance and restarts on seek`() {
-        // Active handoff drops activation to 0 — must be Hold so the residual
-        // 0→1 wash is not cancelled/restarted (sequential finish law).
+    fun `repeat wash holds on chain handoff and reveals multi-loop re-say`() {
+        // Active ends while still in chain — Hold so residual is not cancelled.
         assertEquals(
             RepeatWashAction.Hold,
             repeatWashAction(
                 wasRepeat = true,
+                wasActive = true,
                 previousActivation = 4L,
                 repeat = true,
-                activation = 0L,
-            ),
-        )
-        // Queued chain member becomes Active (0→N): still Hold — re-Reveal
-        // would snap orange back to 0 on every word of a multi-word re-say.
-        assertEquals(
-            RepeatWashAction.Hold,
-            repeatWashAction(
-                wasRepeat = true,
-                previousActivation = 0L,
-                repeat = true,
+                active = false,
                 activation = 4L,
             ),
         )
+        // Multi-loop re-say: still in open chain, becomes Active again → Reveal.
         assertEquals(
             RepeatWashAction.Reveal,
             repeatWashAction(
                 wasRepeat = true,
+                wasActive = false,
                 previousActivation = 4L,
                 repeat = true,
+                active = true,
+                activation = 4L,
+            ),
+        )
+        // Seek / generation bump while in chain → Reveal.
+        assertEquals(
+            RepeatWashAction.Reveal,
+            repeatWashAction(
+                wasRepeat = true,
+                wasActive = true,
+                previousActivation = 4L,
+                repeat = true,
+                active = true,
                 activation = 5L,
+            ),
+        )
+        // Activation unchanged and still Active → Hold (no re-snap every frame).
+        assertEquals(
+            RepeatWashAction.Hold,
+            repeatWashAction(
+                wasRepeat = true,
+                wasActive = true,
+                previousActivation = 4L,
+                repeat = true,
+                active = true,
+                activation = 4L,
             ),
         )
     }
@@ -764,8 +783,10 @@ class InkEngineTest {
             RepeatWashAction.Release,
             repeatWashAction(
                 wasRepeat = true,
+                wasActive = false,
                 previousActivation = 0L,
                 repeat = false,
+                active = false,
                 activation = 0L,
             ),
         )
@@ -773,8 +794,7 @@ class InkEngineTest {
 
     @Test
     fun `repeat wash duration helper floors short dwells`() {
-        // Helper retained for callers; orange bloom itself always uses
-        // Tuning.repeatSweepMs (not the multi-second karaoke hold).
+        // Duration follows reciter dwell with repeatSweepMs as the soft floor.
         assertEquals(450, repeatWashDurationMs(activeSweepMs = null, minimumMs = 450))
         assertEquals(450, repeatWashDurationMs(activeSweepMs = 140, minimumMs = 450))
         assertEquals(1_800, repeatWashDurationMs(activeSweepMs = 1_800, minimumMs = 450))
