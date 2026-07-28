@@ -141,7 +141,15 @@ Requires **JDK 21**. No Android device/emulator is needed for tests.
    one active word, recess via ayah veil) but do not degrade the wash itself.
    Arabic glyphs stay full opaque ink under a paper cover; never dim Hafs via
    glyph alpha. Web and Android must feel like the same product.
-8. **Timing Lab / GitHub timing patches are fixed systematically.** Never
+8. **No mid-animation reset — ever.** While a wash (first-pass ink, orange
+   repeat, glint, wasl) is still **visible**, its progress is **monotonic**:
+   only finish or hold — never `snapTo(0)`, never flash full→empty→fill.
+   Hard-restart is allowed only when the overlay is invisible (`alpha` below
+   the invisible threshold). Intentional seek/replay dissolves first, then
+   cold-starts. Chain handoff is Hold, not re-Reveal. Unit-tested via
+   `washMayHardRestart` / `repeatWashShouldRestart`. Breaking this is a
+   product failure, not a polish bug.
+9. **Timing Lab / GitHub timing patches are fixed systematically.** Never
    default to dropping the issue JSON into `tools/timing_overrides/`. Classify
    first (raw qdc vs cleaned vs repairs vs Lab expected), fix the **class** in
    `clean_qdc_artifacts` or the repairs span-protect / generator, and lock it

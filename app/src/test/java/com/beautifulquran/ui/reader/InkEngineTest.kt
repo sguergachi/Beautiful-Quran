@@ -685,7 +685,17 @@ class InkEngineTest {
     }
 
     @Test
-    fun `repeat wash only hard-restarts on cold entry or seek`() {
+    fun `wash may hard-restart only when the overlay is invisible`() {
+        // Product law: never rewind progress while still painted.
+        assertFalse(washMayHardRestart(visibleAlpha = 1f))
+        assertFalse(washMayHardRestart(visibleAlpha = 0.4f))
+        assertFalse(washMayHardRestart(visibleAlpha = WASH_INVISIBLE_ALPHA))
+        assertTrue(washMayHardRestart(visibleAlpha = 0f))
+        assertTrue(washMayHardRestart(visibleAlpha = WASH_INVISIBLE_ALPHA - 0.001f))
+    }
+
+    @Test
+    fun `repeat wash never hard-restarts a visible overlay — even on seek`() {
         // Mid-wash re-fire must not snap the edge back to 0.
         assertFalse(
             repeatWashShouldRestart(
@@ -704,7 +714,16 @@ class InkEngineTest {
                 alpha = 1f,
             ),
         )
-        // Cold entry (overlay invisible).
+        // Seek while still painted also cannot hard-restart; dissolve first.
+        assertFalse(
+            repeatWashShouldRestart(
+                previousActivation = 4L,
+                activation = 5L,
+                clockProgress = 0.4f,
+                alpha = 1f,
+            ),
+        )
+        // Cold entry (overlay invisible) — only then may progress return to 0.
         assertTrue(
             repeatWashShouldRestart(
                 previousActivation = 0L,
@@ -713,13 +732,12 @@ class InkEngineTest {
                 alpha = 0f,
             ),
         )
-        // Seek N→M while Active.
         assertTrue(
             repeatWashShouldRestart(
                 previousActivation = 4L,
                 activation = 5L,
                 clockProgress = 0.4f,
-                alpha = 1f,
+                alpha = 0f,
             ),
         )
     }

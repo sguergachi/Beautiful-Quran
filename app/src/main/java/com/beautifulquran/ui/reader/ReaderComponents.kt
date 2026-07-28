@@ -255,8 +255,8 @@ internal val LocalRepeatWashGate = staticCompositionLocalOf<OrderedWashGate?> { 
 internal enum class RepeatWashAction { Hold, Reveal, Release }
 
 /**
- * First-install orange lifecycle (restored). Only join + real seek re-Reveal;
- * Active handoff 0→N is Hold so the residual does not re-snap.
+ * Orange lifecycle. Only chain join + real seek re-Reveal; Active handoff
+ * 0→N is Hold so residual wash is never cancelled into a re-snap.
  */
 internal fun repeatWashAction(
     wasRepeat: Boolean,
@@ -274,23 +274,27 @@ internal fun repeatWashAction(
 }
 
 /**
- * Hard-restart the orange edge only on seek (N→M) or cold entry (alpha ~0).
- * Never restart a settled full-orange hold or a mid-wash residual — that is
- * the per-word flash/reset (full ink → snap empty → wash again).
+ * Product law — **no mid-animation reset**:
+ * while a wash overlay is still visible, its progress must be monotonic
+ * (only finish or hold). Hard-restart to 0 is allowed **only** when the
+ * overlay is invisible. Seek does not override this; intentional replay
+ * must dissolve first, then cold-start.
+ */
+internal const val WASH_INVISIBLE_ALPHA = 0.05f
+
+internal fun washMayHardRestart(visibleAlpha: Float): Boolean =
+    visibleAlpha < WASH_INVISIBLE_ALPHA
+
+/**
+ * Whether [rememberRepeatWash] may snap the edge to 0 right now.
+ * Solely visibility — not seek, not activation. See [washMayHardRestart].
  */
 internal fun repeatWashShouldRestart(
-    previousActivation: Long,
-    activation: Long,
+    @Suppress("UNUSED_PARAMETER") previousActivation: Long,
+    @Suppress("UNUSED_PARAMETER") activation: Long,
     @Suppress("UNUSED_PARAMETER") clockProgress: Float,
     alpha: Float,
-): Boolean {
-    val seek =
-        previousActivation != 0L &&
-            activation != 0L &&
-            activation != previousActivation
-    if (seek) return true
-    return alpha < 0.05f
-}
+): Boolean = washMayHardRestart(alpha)
 
 private class RepeatWashLifecycle(
     var repeat: Boolean = false,
@@ -303,13 +307,12 @@ internal fun repeatWashDurationMs(activeSweepMs: Int?, minimumMs: Int): Int =
 /**
  * Orange wash for one word in a repeat chain.
  *
- * First-install feel (dwell + curve + soft letterFadeIn), with handoff safety:
- * - Duration: `max(activeSweepMs, repeatSweepMs)`
- * - Soft acoustic / tajweed curve parks via [pacing]; plain soft cubic otherwise
- * - Edge before alpha (never paint full progress at alpha 1 for a frame)
- * - Hard restart only cold/seek ([repeatWashShouldRestart])
- * - Active starts immediately; 0→N handoff is Hold (see [repeatWashAction])
- * - Queued members still serialize under [OrderedWashGate]
+ * Feel: dwell-timed directional wash (`max(activeSweepMs, repeatSweepMs)`),
+ * curve parks, soft letterFadeIn.
+ *
+ * Law (never break): **no mid-animation reset.** Progress never rewinds while
+ * alpha is visible. Cold start only when invisible; intentional seek dissolves
+ * first, then restarts. Active starts immediately; 0→N is Hold.
  */
 @Composable
 private fun rememberRepeatWash(
@@ -323,8 +326,7 @@ private fun rememberRepeatWash(
     /** Bumps on seek for the active word so replaying it re-runs orange too. */
     activation: Long = 0L,
 ): RepeatWash {
-    // Always start empty. Idle clock=1 + alpha=0 flashes full orange when
-    // Reveal raised alpha before the edge snapped to 0.
+    // Always start empty so cold join never inherits a settled full edge.
     val clock = remember { Animatable(0f) }
     val alpha = remember { Animatable(0f) }
     val lockedPacing = remember { mutableStateOf<TajweedPacing.Curve?>(null) }
@@ -359,34 +361,59 @@ private fun rememberRepeatWash(
                         activeSweepMs = activeSweepState.value,
                         minimumMs = InkEngine.tuning.repeatSweepMs,
                     ).coerceAtLeast(1)
-                    // Soft acoustic curves ease inside Curve.at; linear wall-clock
-                    // keeps letter anchors on time. Plain washes use soft cubic.
                     val easing =
                         if (entryPacing != null) LinearEasing else InkEngine.sweepEasing
-                    val restart = repeatWashShouldRestart(
-                        previousActivation = previousActivation,
-                        activation = act,
-                        clockProgress = clock.value,
-                        alpha = alpha.value,
-                    )
+                    val intentionalReplay =
+                        previousActivation != 0L &&
+                            act != 0L &&
+                            act != previousActivation
                     suspend fun runWash() {
                         if (!repeatState.value) return
-                        lockedDurationMs.intValue = sweepMs
-                        lockedPacing.value = entryPacing
-                        lockedFeather.value = when {
-                            entryPacing == null -> null
-                            entryPacing.softWash -> null
-                            else -> InkEngine.pacedFeather()
+                        // Intentional seek while still painted: dissolve first.
+                        // Never snap progress backward under a visible overlay.
+                        if (intentionalReplay && !washMayHardRestart(alpha.value)) {
+                            if (alpha.value > 0f) {
+                                alpha.animateTo(
+                                    0f,
+                                    tween(
+                                        InkEngine.tuning.repeatFadeOutMs,
+                                        easing = InkEngine.sweepEasing,
+                                    ),
+                                )
+                            }
+                            clock.snapTo(0f)
                         }
-                        // Edge first, then opacity — never one full-orange frame.
-                        if (restart) clock.snapTo(0f)
-                        alpha.snapTo(1f)
-                        val remain = if (restart || clock.value <= 0f) {
-                            sweepMs
+                        if (washMayHardRestart(alpha.value)) {
+                            // Cold start — edge at 0 *before* alpha rises.
+                            lockedDurationMs.intValue = sweepMs
+                            lockedPacing.value = entryPacing
+                            lockedFeather.value = when {
+                                entryPacing == null -> null
+                                entryPacing.softWash -> null
+                                else -> InkEngine.pacedFeather()
+                            }
+                            clock.snapTo(0f)
+                            alpha.snapTo(1f)
+                            clock.animateTo(1f, tween(sweepMs, easing = easing))
                         } else {
-                            ((1f - clock.value) * sweepMs).toInt().coerceAtLeast(1)
+                            // Mid-animation re-entry: finish residual only.
+                            if (alpha.value < 1f) alpha.snapTo(1f)
+                            if (clock.value < 1f) {
+                                val remain =
+                                    ((1f - clock.value) * lockedDurationMs.intValue)
+                                        .toInt()
+                                        .coerceAtLeast(1)
+                                val residualEasing = if (lockedPacing.value != null) {
+                                    LinearEasing
+                                } else {
+                                    InkEngine.sweepEasing
+                                }
+                                clock.animateTo(
+                                    1f,
+                                    tween(remain, easing = residualEasing),
+                                )
+                            }
                         }
-                        clock.animateTo(1f, tween(remain, easing = easing))
                     }
                     // Active: start with the reciter. Queued: position gate.
                     if (act != 0L) {
@@ -396,8 +423,7 @@ private fun rememberRepeatWash(
                     }
                 }
                 RepeatWashAction.Release -> {
-                    // Dissolve first so a residual finish cannot flash full
-                    // orange under a late progress snap.
+                    // Dissolve first; never flash a residual snap under high alpha.
                     if (alpha.value > 0f) {
                         alpha.animateTo(
                             0f,
