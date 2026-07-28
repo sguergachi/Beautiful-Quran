@@ -272,6 +272,26 @@ internal fun repeatWashAction(
     else -> RepeatWashAction.Hold
 }
 
+/**
+ * Whether a Reveal should hard-restart the orange edge at 0.
+ *
+ * True for a real seek (N→M) or a cold entry (settled full / invisible).
+ * False mid-wash so a re-fired Reveal cannot snap the edge back to unread.
+ */
+internal fun repeatWashShouldRestart(
+    previousActivation: Long,
+    activation: Long,
+    clockProgress: Float,
+    alpha: Float,
+): Boolean {
+    val seek =
+        previousActivation != 0L &&
+            activation != 0L &&
+            activation != previousActivation
+    if (seek) return true
+    return clockProgress >= 0.99f || alpha < 0.05f
+}
+
 private class RepeatWashLifecycle(
     var repeat: Boolean = false,
     var activation: Long = 0L,
@@ -288,21 +308,20 @@ internal fun repeatWashDurationMs(activeSweepMs: Int?, minimumMs: Int): Int =
  *   still get a full soft edge while longer words follow the reciter's dwell.
  * - Tajweed-paced entries map that clock through the same captured curve and
  *   feather as first-pass ink.
- * - A shared per-ayah [OrderedWashGate] runs members **one after another by
- *   word position**; N+1 cannot start until N's 0→1 completes.
+ * - [OrderedWashGate] serializes **queued** (non-Active) members only — seek
+ *   into a chain, catch-up. The **Active** word always starts immediately:
+ *   waiting on a prior residual forced a late `snapTo(0)` and looked like the
+ *   orange wash "reset" on every word of a multi-word re-say.
  * - [snapshotFlow] + collect (not `LaunchedEffect(activation)`) so Active
- *   advancing (activation → 0) **does not cancel** an in-flight wash. The
- *   feather always runs out; Hold is a no-op after completion.
- * - Never snap incomplete → full. Release finishes any residual progress by
- *   animating the remainder, then dissolves alpha.
- * - V1 and V2 share this path. Reveal only on chain join or a true seek
- *   (non-zero activation → new generation). Becoming Active after a queued
- *   join (0→N) is Hold — otherwise every word of a multi-word re-say re-snaps.
+ *   advancing (activation → 0) **does not cancel** an in-flight wash.
+ * - Never snap incomplete → full on handoff. Hard restart only on cold entry
+ *   or a true seek ([repeatWashShouldRestart]).
+ * - Release finishes residual progress, then dissolves alpha.
  */
 @Composable
 private fun rememberRepeatWash(
     repeat: Boolean,
-    /** 1-based word position — orders the per-ayah gate. */
+    /** 1-based word position — orders the per-ayah gate for queued members. */
     position: Int,
     /** Active word dwell; null for queued members revealed by a seek. */
     activeSweepMs: Int? = null,
@@ -331,9 +350,10 @@ private fun rememberRepeatWash(
     val pacingState = rememberUpdatedState(pacing)
     LaunchedEffect(Unit) {
         snapshotFlow { repeatState.value to activationState.value }.collect { (rep, act) ->
+            val previousActivation = lifecycle.activation
             val action = repeatWashAction(
                 wasRepeat = lifecycle.repeat,
-                previousActivation = lifecycle.activation,
+                previousActivation = previousActivation,
                 repeat = rep,
                 activation = act,
             )
@@ -342,7 +362,7 @@ private fun rememberRepeatWash(
             when (action) {
                 RepeatWashAction.Reveal -> {
                     // Capture at chain entry: this word can stop being Active
-                    // while it waits behind an earlier member in the gate.
+                    // while a queued sibling still waits on the gate.
                     val entryPacing = pacingState.value
                     val sweepMs = repeatWashDurationMs(
                         activeSweepMs = activeSweepState.value,
@@ -353,9 +373,15 @@ private fun rememberRepeatWash(
                     // the soft-end bezier.
                     val easing =
                         if (entryPacing != null) LinearEasing else InkEngine.sweepEasing
-                    gate.run(position) {
+                    val restart = repeatWashShouldRestart(
+                        previousActivation = previousActivation,
+                        activation = act,
+                        clockProgress = clock.value,
+                        alpha = alpha.value,
+                    )
+                    suspend fun runWash() {
                         // Dropped from the chain while queued — skip start.
-                        if (!repeatState.value) return@run
+                        if (!repeatState.value) return
                         lockedDurationMs.intValue = sweepMs
                         lockedPacing.value = entryPacing
                         lockedFeather.value = when {
@@ -364,8 +390,21 @@ private fun rememberRepeatWash(
                             else -> InkEngine.pacedFeather()
                         }
                         alpha.snapTo(1f)
-                        clock.snapTo(0f)
-                        clock.animateTo(1f, tween(sweepMs, easing = easing))
+                        if (restart) clock.snapTo(0f)
+                        // From mid-wash: finish without snapping the edge back.
+                        val remain = if (restart) {
+                            sweepMs
+                        } else {
+                            ((1f - clock.value) * sweepMs).toInt().coerceAtLeast(1)
+                        }
+                        clock.animateTo(1f, tween(remain, easing = easing))
+                    }
+                    // Active word (non-zero activation) must not wait on a prior
+                    // member's residual — that delay + snap was the per-word reset.
+                    if (act != 0L) {
+                        runWash()
+                    } else {
+                        gate.run(position) { runWash() }
                     }
                 }
                 RepeatWashAction.Release -> {
