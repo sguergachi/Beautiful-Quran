@@ -743,7 +743,16 @@ class InkEngineTest {
                 alpha = 1f,
             ),
         )
-        // Cold entry (settled full clock).
+        // Already-settled full orange must not restart (that flashed full→0).
+        assertFalse(
+            repeatWashShouldRestart(
+                previousActivation = 0L,
+                activation = 4L,
+                clockProgress = 1f,
+                alpha = 1f,
+            ),
+        )
+        // Cold entry (overlay invisible).
         assertTrue(
             repeatWashShouldRestart(
                 previousActivation = 0L,

@@ -275,8 +275,10 @@ internal fun repeatWashAction(
 /**
  * Whether a Reveal should hard-restart the orange edge at 0.
  *
- * True for a real seek (N→M) or a cold entry (settled full / invisible).
- * False mid-wash so a re-fired Reveal cannot snap the edge back to unread.
+ * True for a real seek (N→M) or a cold entry (overlay still invisible).
+ * False when the bloom is already running or already settled full orange —
+ * restarting from `progress == 1` with alpha high flashes a full-orange
+ * frame before the snap to 0.
  */
 internal fun repeatWashShouldRestart(
     previousActivation: Long,
@@ -289,7 +291,9 @@ internal fun repeatWashShouldRestart(
             activation != 0L &&
             activation != previousActivation
     if (seek) return true
-    return clockProgress >= 0.99f || alpha < 0.05f
+    // Cold only: not yet showing. Do NOT key off clock≈1 while alpha is high
+    // (completed hold) — that re-snapped full orange every spurious re-fire.
+    return alpha < 0.05f
 }
 
 private class RepeatWashLifecycle(
@@ -329,8 +333,10 @@ private fun rememberRepeatWash(
     /** Bumps on seek for the active word so replaying it re-runs orange too. */
     activation: Long = 0L,
 ): RepeatWash {
-    val clock = remember { Animatable(if (repeat) 0f else 1f) }
-    val alpha = remember { Animatable(if (repeat) 1f else 0f) }
+    // Always start empty. Idle clock=1 + alpha=0 used to flash full orange when
+    // Reveal did alpha=1 before clock snapped to 0.
+    val clock = remember { Animatable(0f) }
+    val alpha = remember { Animatable(0f) }
     // null feather → Tuning.washFeather in the draw layer (soft first-pass edge).
     val lockedFeather = remember { mutableStateOf<Float?>(null) }
     val lockedDurationMs = remember { mutableIntStateOf(InkEngine.tuning.repeatSweepMs) }
@@ -368,9 +374,11 @@ private fun rememberRepeatWash(
                         if (!repeatState.value) return
                         lockedDurationMs.intValue = sweepMs
                         lockedFeather.value = null
-                        alpha.snapTo(1f)
+                        // Edge first, then opacity — never paint full progress
+                        // at alpha 1 for a frame (that was the flash).
                         if (restart) clock.snapTo(0f)
-                        val remain = if (restart) {
+                        alpha.snapTo(1f)
+                        val remain = if (restart || clock.value <= 0f) {
                             sweepMs
                         } else {
                             ((1f - clock.value) * sweepMs).toInt().coerceAtLeast(1)
@@ -388,17 +396,8 @@ private fun rememberRepeatWash(
                     }
                 }
                 RepeatWashAction.Release -> {
-                    // Finish residual without blocking sibling dissolves.
-                    if (clock.value < 1f && alpha.value > 0f) {
-                        val remain =
-                            ((1f - clock.value) * lockedDurationMs.intValue)
-                                .toInt()
-                                .coerceAtLeast(1)
-                        clock.animateTo(
-                            1f,
-                            tween(remain, easing = InkEngine.sweepEasing),
-                        )
-                    }
+                    // Dissolve first so a residual finish cannot flash full
+                    // orange again under a late progress snap.
                     if (alpha.value > 0f) {
                         alpha.animateTo(
                             0f,
@@ -407,6 +406,9 @@ private fun rememberRepeatWash(
                                 easing = InkEngine.sweepEasing,
                             ),
                         )
+                    }
+                    if (clock.value < 1f) {
+                        clock.snapTo(1f)
                     }
                     lockedFeather.value = null
                 }
