@@ -58,7 +58,7 @@ Sources (all fetched over HTTPS, cached in `tools/.cache/`):
 | `@kmaslesa/holy-quran-word-by-word-full-data` (npm) | Per-word English gloss + transliteration (Quran.com data) | Only per-word English dataset on an open registry |
 | `cpfair/quran-align` release zip | Word-level timestamps per reciter, CC-BY 4.0 | The canonical open word-alignment dataset, matched to everyayah.com audio |
 | quran.com `qdc` audio API | **Repeat-aware** word timestamps for reciters in `QDC_REPEAT_RECITERS` | quran-align is one-pass and cannot encode a repeated phrase; quran.com's segments backtrack when the reciter repeats. Same everyayah audio. See [REPEAT_HIGHLIGHTING.md](REPEAT_HIGHLIGHTING.md) |
-| everyayah MP3 opening ranges | Encoded leading-silence measurements in `tools/audio_onsets/` | Some individual ayah files begin with silence although their source timing starts at zero. The offline scanner shifts the whole row onto the first sustained voice sample. |
+| everyayah MP3 ranges | Leading-silence and duration measurements in `tools/audio_onsets/` | Some individual ayah files begin with silence. The offline scanner holds the first wash until sustained voice without moving valid later word boundaries, and records each file's length as the ceiling no timing row may cross. |
 | Quranic Arabic Corpus (QAC) v0.4 | Per-word root, lemma, POS, morphology; root concordance | Standard open Quranic morphology / root dictionary. Powers the [Root Word Viewer](ROOT_VIEWER.md) |
 
 The **canonical word segmentation** is the space-split of the Uthmani text.
@@ -75,18 +75,21 @@ The other two sources are mapped onto it by position:
   plays audio for that reciter without word highlighting.
 - Reciters in `QDC_REPEAT_RECITERS` take **repeat-aware** timings from quran.com
   instead: same schema, but the word index backtracks where the reciter repeats
-  a phrase, driving the orange second fade. The segments are rebased from
-  gapless-file offsets to ayah-relative ms (`adjust_qdc_segments`). Full detail:
+  a phrase, driving the orange second fade. `rebase_qdc_clock` translates each
+  row onto the everyayah MP3 clock using the median matching quran-align
+  boundary while preserving those backtracks, and abstains when those witnesses
+  scatter or the result would run past the end of the recording. Full detail:
   [REPEAT_HIGHLIGHTING.md](REPEAT_HIGHLIGHTING.md).
 - `tools/detect_audio_onsets.py` scans up to the opening eight seconds of the
   exact everyayah files the app streams. It retries a larger byte range when
   the first range ends during silence, rather than treating ffmpeg's
   end-of-input flush as voice. Silence must sustain for 80 ms to register;
   voice onsets of at least 250 ms are committed as compact evidence under
-  `tools/audio_onsets/`; `build_db.py`
-  shifts all segments for that ayah together after structural repairs and
-  records the onset separately as immutable MP3 metadata. The repository
-  reapplies that floor to on-device Timing Lab edits, so a saved zero-based
+  `tools/audio_onsets/`; `build_db.py` clamps the first wash to that onset after
+  the complete row is on the MP3 clock, leaving words 2 onward unchanged. If
+  word 2 itself predates the voice, the complete malformed row shifts by one
+  offset instead. The onset is recorded separately as immutable MP3 metadata.
+  The repository reapplies that clock to on-device Timing Lab edits, so a saved zero-based
   row cannot restart the wash during encoded silence. `ffmpeg` is needed only
   to regenerate the evidence, never to build or run the app.
 

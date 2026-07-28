@@ -19,19 +19,78 @@ import com.beautifulquran.domain.WordSearchIndexEntry
 import com.beautifulquran.domain.isWordSearchQuery
 import com.beautifulquran.domain.matchWordSearch
 import com.beautifulquran.domain.normalizeArabicForSearch
+import com.beautifulquran.timingslab.OverrideEntry
 import com.beautifulquran.timingslab.OverrideKey
 import com.beautifulquran.timingslab.TimingOverrides
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
+import kotlin.math.abs
 
-/** Preserve editable word spacing while keeping it behind immutable MP3 silence. */
-internal fun alignToAudioOnset(segments: List<Segment>, onsetMs: Long): List<Segment> {
-    val firstStartMs = segments.firstOrNull()?.startMs ?: return segments
-    val shiftMs = (onsetMs - firstStartMs).coerceAtLeast(0L)
-    if (shiftMs == 0L) return segments
-    return segments.map { it.copy(startMs = it.startMs + shiftMs, endMs = it.endMs + shiftMs) }
+private fun Segment.shiftBy(ms: Long) = copy(startMs = startMs + ms, endMs = endMs + ms)
+
+/** Move a legacy edit onto the bundled MP3 clock, keeping its word spacing.
+ *
+ * Every position the edit shares with the bundled row witnesses the same
+ * translation, so the median of those differences carries the whole row. Two
+ * conflicting witnesses cannot be arbitrated, so the smaller move wins.
+ */
+private fun shiftToBundledClock(
+    segments: List<Segment>,
+    bundled: List<Segment>,
+): List<Segment> {
+    val bundledStarts = buildMap {
+        bundled.forEach { putIfAbsent(it.position, it.startMs) }
+    }
+    val firstPosition = segments.first().position
+    val startOffsets = segments
+        .distinctBy { it.position }
+        .mapNotNull { segment ->
+            bundledStarts[segment.position]
+                ?.takeIf { segment.position != firstPosition }
+                ?.minus(segment.startMs)
+        }
+    if (startOffsets.isEmpty()) return segments
+    val offsets = (startOffsets + (bundled.first().endMs - segments.first().endMs)).sorted()
+    val shiftMs = if (offsets.size == 2 && offsets[0] != offsets[1]) {
+        offsets.minBy { abs(it) }
+    } else {
+        offsets[offsets.size / 2]
+    }
+    return if (shiftMs == 0L) segments else segments.map { it.shiftBy(shiftMs) }
+}
+
+/** Hold the opening wash behind the encoded silence without moving later words. */
+private fun holdOpeningBehind(segments: List<Segment>, floorMs: Long): List<Segment> {
+    val first = segments.first()
+    if (first.startMs >= floorMs) return segments
+    val nextStartMs = segments.getOrNull(1)?.startMs
+    if (nextStartMs != null && nextStartMs <= floorMs) {
+        // The second word also predates the voice, so the row itself is early.
+        return segments.map { it.shiftBy(floorMs - first.startMs) }
+    }
+    val endMs = if (first.endMs > floorMs) {
+        nextStartMs?.let { minOf(first.endMs, it) } ?: first.endMs
+    } else {
+        nextStartMs ?: floorMs + 1
+    }
+    return segments.toMutableList().apply {
+        this[0] = first.copy(startMs = floorMs, endMs = maxOf(floorMs + 1, endMs))
+    }
+}
+
+/** Align a saved edit to its MP3 clock without rewriting current Lab boundaries. */
+internal fun alignToAudioClock(
+    segments: List<Segment>,
+    bundled: List<Segment>,
+    onsetMs: Long,
+    migrateWholeRow: Boolean,
+): List<Segment> {
+    if (segments.isEmpty() || bundled.isEmpty()) return segments
+    val shifted =
+        if (migrateWholeRow) shiftToBundledClock(segments, bundled) else segments
+    return holdOpeningBehind(shifted, maxOf(onsetMs, bundled.first().startMs))
 }
 
 class QuranRepository(
@@ -364,8 +423,10 @@ class QuranRepository(
     /** ayah number -> word segments, for one reciter and surah. Any
      * hand-corrected override from the Timings Lab takes precedence over the
      * bundled DB row, so the reader immediately reflects edits. The MP3 voice
-     * onset remains authoritative: it shifts an old relative-to-speech edit
-     * without changing any of its word spacing. */
+     * onset remains authoritative; only legacy clock versions are rebased as
+     * a whole, while current Lab boundaries remain exact. A rebased row is
+     * written back once, so the Lab, the reader and an exported patch all
+     * describe the same marks. */
     suspend fun timings(reciterId: Int, surahId: Int): Map<Int, List<Segment>> =
         withContext(Dispatchers.IO) {
             val bundled = bundledTimingRows(reciterId, surahId)
@@ -377,11 +438,18 @@ class QuranRepository(
             val merged = bundled.segments.toMutableMap()
             for (entry in overrides) {
                 val key = entry.key
-                if (key.reciterId == reciterId && key.surahId == surahId) {
-                    merged[key.ayah] = alignToAudioOnset(
-                        entry.value,
-                        bundled.audioOnsets[key.ayah] ?: 0L,
-                    )
+                if (key.reciterId != reciterId || key.surahId != surahId) continue
+                val bundledRow = bundled.segments[key.ayah].orEmpty()
+                val migrating = timingOverrides.needsClockMigration(key)
+                val aligned = alignToAudioClock(
+                    segments = entry.value,
+                    bundled = bundledRow,
+                    onsetMs = bundled.audioOnsets[key.ayah] ?: 0L,
+                    migrateWholeRow = migrating,
+                )
+                merged[key.ayah] = aligned
+                if (migrating && bundledRow.isNotEmpty()) {
+                    timingOverrides.set(OverrideEntry(key, aligned))
                 }
             }
             merged

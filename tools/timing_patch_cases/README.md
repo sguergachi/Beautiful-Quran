@@ -22,6 +22,8 @@ Agents landing a GitHub `Timings patch` issue must follow the full checklist in
    - structural qdc noise → `clean_qdc_artifacts` in `tools/build_db.py`
    - drop repair erasing a multi-word re-say → `erases_span_repeat` / span-protect
    - stale full-row repair timing → `rebase_timing_repair`
+   - repair row on a translated source clock → `clock_shifted_repair`
+   - qdc row on the wrong MP3 clock → `qdc_clock_rebase`
    - independently supported local boundary → `boundary_repair`
    - repeat-vs-split / CTC disagreement → `tools/timing_repairs/` generator
    - whole-ayah encoded lead-in → `tools/detect_audio_onsets.py`
@@ -52,14 +54,18 @@ a case under this directory.
 |---|---|---|
 | `id` | yes | stable slug; should match the filename stem |
 | `label` | yes | one-line human name (shown on failure) |
-| `pipeline` | yes | `clean_qdc_artifacts`, `erases_span_repeat`, `rebase_timing_repair`, `boundary_repair`, or `leading_silence_offset` |
+| `pipeline` | yes | `clean_qdc_artifacts`, `erases_span_repeat`, `rebase_timing_repair`, `clock_shifted_repair`, `qdc_clock_rebase`, `boundary_repair`, or `leading_silence_offset` |
 | `input_positions` | * | 1-based word indices in time order (synthetic equal durations) |
 | `expected_positions` | * | positions after the pipeline step |
 | `input_segments` | * | full `[[pos, start_ms, end_ms], …]` when times matter |
 | `expected_segments` | * | full segments after the step (compared when present) |
 | `repair_positions` / `repair_segments` | for repair pipelines | candidate repair row |
+| `clock_offset_ms` | for `clock_shifted_repair` | source-to-MP3 translation applied before merge |
 | `expected_erases` | for `erases_span_repeat` | bool — must the guard refuse this repair? |
 | `audio_onset_ms` | for `leading_silence_offset` | measured first sustained voice onset |
+| `exact_file_clock` | no | false when word 2 proves the complete row predates voice |
+| `reference_segments` | for `qdc_clock_rebase` | quran-align boundaries on the everyayah MP3 clock |
+| `audio_duration_ms` | no | measured recording length; a translation past it is refused |
 | `refs` | no | issue/PR/doc pointers |
 | `notes` | no | why this shape is real / what must not regress |
 

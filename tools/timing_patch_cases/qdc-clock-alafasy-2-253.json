@@ -1,0 +1,30 @@
+{
+  "id": "qdc-clock-alafasy-2-253",
+  "label": "Alafasy 2:253 qdc row rebased to everyayah clock",
+  "refs": [
+    "everyayah Alafasy_128kbps/002253.mp3",
+    "quran-align",
+    "Timings Lab ear report"
+  ],
+  "pipeline": "qdc_clock_rebase",
+  "notes": "The qdc opening segment is malformed; median matching boundaries translate every word while quran-align restores only word 1's start. The duration is the file's real measured length, so the ceiling admits the fix.",
+  "audio_duration_ms": 53820,
+  "input_segments": [
+    [1, 0, 915],
+    [2, 915, 1635],
+    [3, 1635, 2765],
+    [4, 2765, 3665]
+  ],
+  "reference_segments": [
+    [1, 1200, 1600],
+    [2, 1610, 2340],
+    [3, 2350, 3480],
+    [4, 3490, 4370]
+  ],
+  "expected_segments": [
+    [1, 1200, 1630],
+    [2, 1630, 2350],
+    [3, 2350, 3480],
+    [4, 3480, 4380]
+  ]
+}
