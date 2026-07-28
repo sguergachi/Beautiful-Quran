@@ -35,6 +35,7 @@ from qua_timing import (
     occurrence_letters,
     source_groups,
 )
+from wasl_acoustic import text_wasl_candidate
 
 LAB = Path(__file__).resolve().parent
 ROOT = LAB.parents[1]
@@ -139,6 +140,44 @@ def build_segments_verse_relative(
     return segments
 
 
+def tag_wasl_from_letters(
+    segments: list[dict],
+    rendered_words: list[str],
+    *,
+    max_gap_ms: int = 120,
+) -> int:
+    """Orthographic nūn-rule wasl + contiguous clock → waslFromPrevMs.
+
+    Bloom geometry is still the next word's opening letter (app-side); this
+    only tags a duration budget so V2 can pace the donor-tail bloom.
+    """
+    tagged = 0
+    for i in range(len(segments) - 1):
+        left, right = segments[i], segments[i + 1]
+        prev_pos, next_pos = int(left["position"]), int(right["position"])
+        if prev_pos < 1 or next_pos > len(rendered_words):
+            continue
+        if not text_wasl_candidate(
+            rendered_words[prev_pos - 1],
+            rendered_words[next_pos - 1],
+        ):
+            right.pop("waslFromPrevMs", None)
+            continue
+        gap = int(right["startMs"]) - int(left["endMs"])
+        if gap > max_gap_ms:
+            right.pop("waslFromPrevMs", None)
+            continue
+        kfs = right.get("keyframes") or []
+        if kfs:
+            budget = int(kfs[0]["offsetMs"])
+        else:
+            budget = (int(right["endMs"]) - int(right["startMs"])) // 4
+        budget = max(40, min(480, budget if budget > 0 else 200))
+        right["waslFromPrevMs"] = budget
+        tagged += 1
+    return tagged
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--all", action="store_true", help="All QUA ayahs")
@@ -231,6 +270,7 @@ def main() -> int:
         if not segments:
             n_fail += 1
             continue
+        tag_wasl_from_letters(segments, rendered)
         rows.append({
             "surah": surah,
             "ayah": ayah,

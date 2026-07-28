@@ -484,24 +484,25 @@ object InkEngine {
     }
 
     /**
-     * Cross-word nūn-rule prefix bloom.
+     * Cross-word nūn-rule prefix bloom into the **next word's opening letter**.
      *
-     * V1: orthographic wasl only (when Tajweed is enabled).
-     * V2: only when build-time audio measured a continuous wasl into this word
-     * ([waslFromPrevMs] > 0); still uses the next word's opening-letter share
-     * for bloom geometry, with the measured budget driving duration via
-     * [waslPrefixStart].
+     * Eligibility and geometry are orthographic (idghām / iqlāb / ikhfāʾ) for
+     * both V1 and V2 — the reciter is already on that letter during the donor
+     * tail, so ink must start there before word handoff. V2 still prefers a
+     * measured [waslFromPrevMs] for the bloom **duration** when present; a
+     * missing tag must not kill the connection (that left full-QUA V2 with
+     * almost no wasl after mono CTC enrichment was replaced).
      */
     fun connection(
         prevArabic: String,
         arabic: String,
         timingScheme: TimingScheme = TimingScheme.V1,
-        waslFromPrevMs: Long = 0L,
+        @Suppress("UNUSED_PARAMETER") waslFromPrevMs: Long = 0L,
     ): TajweedPacing.Connection? {
         val t = tuning
         if (timingScheme == TimingScheme.V2) {
-            if (waslFromPrevMs <= 0L || !t.holdConnect) return null
-            // Geometry still from text; existence is acoustic.
+            // V2: holdConnect alone — not tajweedPacing (that toggle is V1-only).
+            if (!t.holdConnect) return null
             return TajweedPacing.connection(prevArabic, arabic)
         }
         if (!t.tajweedPacing || !t.holdConnect) return null
@@ -509,8 +510,8 @@ object InkEngine {
     }
 
     /**
-     * Speed-ceiling target for wasl bloom. V2 uses the measured acoustic
-     * budget when present; V1 keeps the shipped default.
+     * Speed-ceiling target for wasl bloom. Measured acoustic budget when the
+     * pipeline tagged the link; otherwise the shipped/lab [Tuning.waslPrefixMs].
      */
     fun waslPrefixTargetMs(waslFromPrevMs: Long = 0L): Int =
         if (waslFromPrevMs > 0L) {

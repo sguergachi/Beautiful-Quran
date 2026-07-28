@@ -94,8 +94,7 @@
               "offsetMs": 821,
               "progress": 1.0
             }
-          ],
-          "waslFromPrevMs": 0
+          ]
         },
         {
           "position": 3,
@@ -130,8 +129,7 @@
               "offsetMs": 521,
               "progress": 1.0
             }
-          ],
-          "waslFromPrevMs": 0
+          ]
         },
         {
           "position": 4,
@@ -166,8 +164,7 @@
               "offsetMs": 821,
               "progress": 1.0
             }
-          ],
-          "waslFromPrevMs": 0
+          ]
         },
         {
           "position": 5,
@@ -186,8 +183,7 @@
               "offsetMs": 221,
               "progress": 1.0
             }
-          ],
-          "waslFromPrevMs": 0
+          ]
         },
         {
           "position": 6,
@@ -222,8 +218,7 @@
               "offsetMs": 521,
               "progress": 1.0
             }
-          ],
-          "waslFromPrevMs": 0
+          ]
         },
         {
           "position": 7,
@@ -266,8 +261,7 @@
               "offsetMs": 781,
               "progress": 1.0
             }
-          ],
-          "waslFromPrevMs": 0
+          ]
         },
         {
           "position": 8,
@@ -302,8 +296,7 @@
               "offsetMs": 561,
               "progress": 1.0
             }
-          ],
-          "waslFromPrevMs": 0
+          ]
         },
         {
           "position": 9,
@@ -322,8 +315,7 @@
               "offsetMs": 160,
               "progress": 1.0
             }
-          ],
-          "waslFromPrevMs": 0
+          ]
         },
         {
           "position": 10,
@@ -362,8 +354,7 @@
               "offsetMs": 1342,
               "progress": 1.0
             }
-          ],
-          "waslFromPrevMs": 0
+          ]
         },
         {
           "position": 11,
@@ -414,8 +405,7 @@
               "offsetMs": 2783,
               "progress": 1.0
             }
-          ],
-          "waslFromPrevMs": 0
+          ]
         }
       ],
       "precision": {
@@ -499,8 +489,7 @@
               "offsetMs": 1161,
               "progress": 1.0
             }
-          ],
-          "waslFromPrevMs": 0
+          ]
         },
         {
           "position": 3,
@@ -551,8 +540,7 @@
               "offsetMs": 3301,
               "progress": 1.0
             }
-          ],
-          "waslFromPrevMs": 0
+          ]
         },
         {
           "position": 4,
@@ -571,8 +559,7 @@
               "offsetMs": 240,
               "progress": 1.0
             }
-          ],
-          "waslFromPrevMs": 0
+          ]
         },
         {
           "position": 5,
@@ -615,8 +602,7 @@
               "offsetMs": 780,
               "progress": 1.0
             }
-          ],
-          "waslFromPrevMs": 0
+          ]
         },
         {
           "position": 6,
@@ -651,8 +637,7 @@
               "offsetMs": 660,
               "progress": 1.0
             }
-          ],
-          "waslFromPrevMs": 0
+          ]
         },
         {
           "position": 7,
@@ -679,8 +664,7 @@
               "offsetMs": 440,
               "progress": 1.0
             }
-          ],
-          "waslFromPrevMs": 0
+          ]
         },
         {
           "position": 8,
@@ -715,8 +699,7 @@
               "offsetMs": 640,
               "progress": 1.0
             }
-          ],
-          "waslFromPrevMs": 0
+          ]
         },
         {
           "position": 9,
@@ -767,8 +750,7 @@
               "offsetMs": 1341,
               "progress": 1.0
             }
-          ],
-          "waslFromPrevMs": 0
+          ]
         },
         {
           "position": 10,
@@ -819,8 +801,7 @@
               "offsetMs": 800,
               "progress": 1.0
             }
-          ],
-          "waslFromPrevMs": 0
+          ]
         },
         {
           "position": 11,
@@ -839,8 +820,7 @@
               "offsetMs": 220,
               "progress": 1.0
             }
-          ],
-          "waslFromPrevMs": 0
+          ]
         },
         {
           "position": 12,
@@ -899,8 +879,7 @@
               "offsetMs": 1180,
               "progress": 1.0
             }
-          ],
-          "waslFromPrevMs": 0
+          ]
         },
         {
           "position": 13,
@@ -919,8 +898,7 @@
               "offsetMs": 540,
               "progress": 1.0
             }
-          ],
-          "waslFromPrevMs": 0
+          ]
         },
         {
           "position": 14,
@@ -948,7 +926,7 @@
               "progress": 1.0
             }
           ],
-          "waslFromPrevMs": 480
+          "waslFromPrevMs": 40
         },
         {
           "position": 15,
@@ -983,8 +961,7 @@
               "offsetMs": 660,
               "progress": 1.0
             }
-          ],
-          "waslFromPrevMs": 0
+          ]
         },
         {
           "position": 16,
@@ -1007,8 +984,7 @@
               "offsetMs": 861,
               "progress": 1.0
             }
-          ],
-          "waslFromPrevMs": 0
+          ]
         },
         {
           "position": 17,
@@ -1044,7 +1020,7 @@
               "progress": 1.0
             }
           ],
-          "waslFromPrevMs": 0
+          "waslFromPrevMs": 40
         },
         {
           "position": 18,
@@ -1087,8 +1063,7 @@
               "offsetMs": 2601,
               "progress": 1.0
             }
-          ],
-          "waslFromPrevMs": 0
+          ]
         }
       ],
       "precision": {
@@ -1192,8 +1167,7 @@
               "offsetMs": 962,
               "progress": 1.0
             }
-          ],
-          "waslFromPrevMs": 0
+          ]
         },
         {
           "position": 3,
@@ -1260,8 +1234,7 @@
               "offsetMs": 2866,
               "progress": 1.0
             }
-          ],
-          "waslFromPrevMs": 0
+          ]
         },
         {
           "position": 4,
@@ -1280,8 +1253,7 @@
               "offsetMs": 601,
               "progress": 1.0
             }
-          ],
-          "waslFromPrevMs": 0
+          ]
         },
         {
           "position": 5,
@@ -1313,7 +1285,7 @@
               "progress": 1.0
             }
           ],
-          "waslFromPrevMs": 480
+          "waslFromPrevMs": 40
         },
         {
           "position": 6,
@@ -1332,8 +1304,7 @@
               "offsetMs": 220,
               "progress": 1.0
             }
-          ],
-          "waslFromPrevMs": 0
+          ]
         },
         {
           "position": 7,
@@ -1388,8 +1359,7 @@
               "offsetMs": 2285,
               "progress": 1.0
             }
-          ],
-          "waslFromPrevMs": 0
+          ]
         }
       ],
       "precision": {
@@ -1493,8 +1463,7 @@
               "offsetMs": 741,
               "progress": 1.0
             }
-          ],
-          "waslFromPrevMs": 0
+          ]
         },
         {
           "position": 3,
@@ -1529,8 +1498,7 @@
               "offsetMs": 700,
               "progress": 1.0
             }
-          ],
-          "waslFromPrevMs": 0
+          ]
         },
         {
           "position": 4,
@@ -1565,8 +1533,7 @@
               "offsetMs": 600,
               "progress": 1.0
             }
-          ],
-          "waslFromPrevMs": 0
+          ]
         },
         {
           "position": 5,
@@ -1585,8 +1552,7 @@
               "offsetMs": 521,
               "progress": 1.0
             }
-          ],
-          "waslFromPrevMs": 0
+          ]
         },
         {
           "position": 6,
@@ -1613,8 +1579,7 @@
               "offsetMs": 320,
               "progress": 1.0
             }
-          ],
-          "waslFromPrevMs": 0
+          ]
         },
         {
           "position": 7,
@@ -1665,8 +1630,7 @@
               "offsetMs": 921,
               "progress": 1.0
             }
-          ],
-          "waslFromPrevMs": 0
+          ]
         },
         {
           "position": 8,
@@ -1689,8 +1653,7 @@
               "offsetMs": 246,
               "progress": 1.0
             }
-          ],
-          "waslFromPrevMs": 0
+          ]
         },
         {
           "position": 9,
@@ -1717,8 +1680,7 @@
               "offsetMs": 481,
               "progress": 1.0
             }
-          ],
-          "waslFromPrevMs": 0
+          ]
         },
         {
           "position": 10,
@@ -1738,7 +1700,7 @@
               "progress": 1.0
             }
           ],
-          "waslFromPrevMs": 480
+          "waslFromPrevMs": 40
         },
         {
           "position": 11,
@@ -1805,8 +1767,7 @@
               "offsetMs": 4544,
               "progress": 1.0
             }
-          ],
-          "waslFromPrevMs": 0
+          ]
         }
       ],
       "precision": {
