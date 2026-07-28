@@ -302,14 +302,12 @@ internal fun repeatWashDurationMs(activeSweepMs: Int?, minimumMs: Int): Int =
 /**
  * Orange wash for one word in a repeat chain.
  *
- * Soft directional bloom — same edge as first-pass ink:
- * - Progress tracks [inkProgress] (media letter parks/peels) for the whole
- *   Active **and** residual window — never snap to 1 on handoff (that made a
- *   hard wipe instead of a soft bloom).
- * - Feather is always the soft [InkEngine.Tuning.washFeather] (not the sharper
- *   paced feather).
- * - Alpha is on for the chain; the *edge* does the bloom (letterFadeIn).
- * - Settled chain members hold at progress 1; leave dissolves alpha.
+ * Soft bloom (not a linear wipe):
+ * - Target = first-pass ink progress (media letter parks/peels when V2).
+ * - Display follows with [InkEngine.acousticWashStep] — ease-in/out toward
+ *   the ink edge (same soft follow as black ink), never a raw linear phase.
+ * - Soft [washFeather] always. Residual keeps following until the edge
+ *   finishes; settled chain members hold full orange.
  */
 @Composable
 private fun rememberRepeatWash(
@@ -326,7 +324,8 @@ private fun rememberRepeatWash(
 ): RepeatWash {
     val alpha = remember { Animatable(0f) }
     val wasRepeat = remember { mutableStateOf(false) }
-    val peakInk = remember { mutableFloatStateOf(0f) }
+    // Soft-followed edge (not raw inkProgress — that reads as a linear wipe).
+    val bloom = remember { mutableFloatStateOf(0f) }
 
     val repeatState = rememberUpdatedState(repeat)
     val isActiveState = rememberUpdatedState(isActive)
@@ -340,8 +339,7 @@ private fun rememberRepeatWash(
             wasRepeat.value = rep
             when {
                 joined -> {
-                    peakInk.floatValue = 0f
-                    // Edge blooms via progress; layer is fully tinted under the mask.
+                    bloom.floatValue = 0f
                     alpha.snapTo(1f)
                 }
                 left -> {
@@ -354,53 +352,66 @@ private fun rememberRepeatWash(
                             ),
                         )
                     }
-                    peakInk.floatValue = 0f
+                    bloom.floatValue = 0f
                 }
             }
         }
     }
 
-    // Follow the letter wash while live. Allow re-arm (seek / new Active) when
-    // ink drops; otherwise stay monotone so residual never hard-snaps forward.
-    val wasLive = remember { mutableStateOf(false) }
+    // Soft-follow the ink edge every frame (parks + eased peels).
     LaunchedEffect(Unit) {
-        snapshotFlow {
-            val live = isActiveState.value || residualLive.value
-            live to inkLive.value.value
-        }.collect { (live, ink) ->
-            if (!repeatState.value) {
-                wasLive.value = false
-                return@collect
+        var lastNanos = 0L
+        var lastTarget = 0f
+        var wasLive = false
+        while (true) {
+            withFrameNanos { now ->
+                val dt = if (lastNanos == 0L) {
+                    0f
+                } else {
+                    ((now - lastNanos).coerceAtLeast(0L)) / 1_000_000_000f
+                }
+                lastNanos = now
+                if (!repeatState.value) {
+                    wasLive = false
+                    lastTarget = 0f
+                    return@withFrameNanos
+                }
+                val live = isActiveState.value || residualLive.value
+                val target = if (live) {
+                    inkLive.value.value.coerceIn(0f, 1f)
+                } else {
+                    1f // settled in chain — soft catch-up to full, then hold
+                }
+                if (live && !wasLive) {
+                    // New Active/residual: start with the ink edge (usually ~0).
+                    bloom.floatValue = target
+                    lastTarget = target
+                } else {
+                    val targetVel =
+                        if (dt > 1e-4f) {
+                            ((target - lastTarget) / dt).coerceAtLeast(0f)
+                        } else {
+                            0f
+                        }
+                    lastTarget = target
+                    // Soft ease toward target — same step as first-pass ink.
+                    bloom.floatValue = InkEngine.acousticWashStep(
+                        current = bloom.floatValue,
+                        target = target,
+                        dtSec = dt,
+                        targetVelocity = targetVel,
+                    )
+                }
+                wasLive = live
             }
-            val p = ink.coerceIn(0f, 1f)
-            if (live) {
-                // Rising Active/residual after a rest — start bloom with ink.
-                if (!wasLive.value) peakInk.floatValue = p
-                // Seek re-arm: letter sweep jumped back toward 0.
-                else if (p + 0.12f < peakInk.floatValue) peakInk.floatValue = p
-                else if (p > peakInk.floatValue) peakInk.floatValue = p
-            }
-            wasLive.value = live
         }
     }
 
-    val progress = remember {
-        derivedStateOf {
-            when {
-                !repeatState.value && alpha.value <= 0.001f -> 1f
-                // Soft bloom: stay on the ink edge for Active *and* residual.
-                // Never jump to 1 when Active ends — residual finishes soft.
-                isActiveState.value || residualLive.value ->
-                    peakInk.floatValue.coerceIn(0f, 1f)
-                // Resting in the open chain after the bloom finished.
-                else -> 1f
-            }
-        }
+    val progress = remember(bloom) {
+        derivedStateOf { bloom.floatValue.coerceIn(0f, 1f) }
     }
-    // Always the soft first-pass feather — never the sharper paced edge.
-    val softFeather = remember {
-        mutableStateOf<Float?>(null) // null → Tuning.washFeather in letterFadeIn
-    }
+    // Soft first-pass feather (null → Tuning.washFeather).
+    val softFeather = remember { mutableStateOf<Float?>(null) }
     return RepeatWash(
         progress = progress,
         alpha = alpha.asState(),
