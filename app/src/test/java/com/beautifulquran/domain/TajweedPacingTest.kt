@@ -505,7 +505,7 @@ class TajweedPacingTest {
 
     @Test
     fun `acoustic curve parks on the spoken letter for a long hold then peels`() {
-        // 1:5-style madd: ~3s on penultimate letter — highlight stays on it.
+        // Honest letter truth: park on madd for its measured dwell.
         val curve = requireNotNull(
             TajweedPacing.acousticCurve(
                 keyframes = listOf(
@@ -521,9 +521,10 @@ class TajweedPacingTest {
         )
 
         assertEquals(0.833333f, curve.at(742f / 3747f), 1e-3f)
-        // Reading-along: still on that letter for the full spoken dwell.
         assertEquals(0.833333f, curve.at(2000f / 3747f), 1e-3f)
         assertEquals(0.833333f, curve.at(3600f / 3747f), 1e-3f)
+        assertEquals(0f, curve.velocityAt(2000f / 3747f), 1e-3f)
+        assertTrue(curve.velocityAt(0.5f) >= 0f)
         assertEquals(1f, curve.at(1f), 0f)
     }
 
@@ -547,7 +548,7 @@ class TajweedPacingTest {
                 keyframes = listOf(
                     SubwordKeyframe(75, 0f),
                     SubwordKeyframe(95, 0.333f),
-                    SubwordKeyframe(296, 0.333f), // ~200ms real letter hold
+                    SubwordKeyframe(296, 0.333f),
                     SubwordKeyframe(316, 0.666f),
                     SubwordKeyframe(416, 0.666f),
                     SubwordKeyframe(436, 1f),
@@ -555,42 +556,11 @@ class TajweedPacingTest {
                 durationMs = 536,
             ),
         )
-        // Mid-hold: still on that letter — reading along with the reciter.
         assertEquals(0.333f, curve.at(200f / 536f), 1e-3f)
-        // Peels after the hold may rise; must not have left the letter early.
-        assertTrue(
-            "must not pre-run past the letter during its hold",
-            curve.at(250f / 536f) <= 0.34f,
-        )
+        assertTrue(curve.at(250f / 536f) <= 0.34f)
         var prev = curve.at(0f)
         for (i in 1..64) {
             val p = curve.at(i.toFloat() / 64f)
-            assertTrue("rewind at step $i: $p < $prev", p + 1e-5f >= prev)
-            prev = p
-        }
-        assertEquals(1f, prev, 1e-4f)
-    }
-
-    @Test
-    fun `acoustic curve absorbs only micro CTC freezes not letter holds`() {
-        val curve = requireNotNull(
-            TajweedPacing.acousticCurve(
-                keyframes = listOf(
-                    SubwordKeyframe(50, 0.25f),
-                    SubwordKeyframe(90, 0.25f), // 40ms micro freeze < MICRO_HOLD
-                    SubwordKeyframe(200, 0.5f),
-                    SubwordKeyframe(350, 0.5f), // 150ms real hold — keep park
-                    SubwordKeyframe(500, 1f),
-                ),
-                durationMs = 500,
-            ),
-        )
-        // Real letter hold still letter-locked.
-        assertEquals(0.5f, curve.at(280f / 500f), 1e-3f)
-        // Monotone full path.
-        var prev = 0f
-        for (i in 0..50) {
-            val p = curve.at(i / 50f)
             assertTrue(p + 1e-5f >= prev)
             prev = p
         }

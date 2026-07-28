@@ -171,25 +171,19 @@ object TajweedPacing {
 
     /**
      * Monotone map from normalized sweep time (0..1 of the karaoke hold) to
-     * wash position (0..1 across the word).
+     * **letter-front position** (0..1 across the word) — the reciter truth.
      *
-     * [softWash] (Timing V2 acoustic) is **letter-timed for reading along**:
-     * - Progress lands on each letter when it is spoken and **parks there**
-     *   for the measured hold (madd, ghunnah, waqf) so the highlight sits on
-     *   the sound the reciter is making.
-     * - Peels to the next letter use cosine ease — the display layer then
-     *   *chases* that target so motion feels continuous without leaving the
-     *   spoken letter early.
-     * - Only sub-perceptual CTC freezes (&lt; [MICRO_HOLD_MS]) are absorbed.
+     * [softWash]: land on each spoken letter and park for its measured hold;
+     * peels use cosine ease. Display chase / feather live outside this curve
+     * so lag is measurable (see [InkEngine.acousticWashStep]).
      */
     class Curve internal constructor(
         private val times: FloatArray,
         private val positions: FloatArray,
-        /** Pronounced letters — drives the paced feather width. */
+        /** Pronounced letters — drives the letter-scaled wash feather. */
         val letterCount: Int,
         /**
-         * True for measured acoustic curves: hold parks + eased advances +
-         * full wash feather.
+         * True for measured acoustic curves: letter parks + eased peels.
          */
         val softWash: Boolean = false,
     ) {
@@ -203,22 +197,44 @@ object TajweedPacing {
             if (span <= 0f) return positions[i + 1]
             val p0 = positions[i]
             val p1 = positions[i + 1]
-            // Flat = letter hold / waqf park for the measured dwell.
+            // Flat = spoken-letter hold (truth). Chase step supplies continuous feel.
             if (p0 == p1) return p0
             val f = (c - times[i]) / span
-            // Cosine: zero velocity at both ends → decelerate into the next
-            // hold, accelerate when leaving one.
             val u = if (softWash) cosineEase(f) else f
             return p0 + (p1 - p0) * u
+        }
+
+        /**
+         * Approximate d(position)/d(normalizedTime) at [t] for feed-forward chase.
+         * Zero on letter holds; positive on peels.
+         */
+        fun velocityAt(t: Float): Float {
+            if (t >= 1f) return 0f
+            val c = t.coerceIn(0f, 1f)
+            var i = times.size - 1
+            while (i > 0 && times[i] > c) i--
+            if (i >= times.size - 1) return 0f
+            val span = times[i + 1] - times[i]
+            if (span <= 1e-6f) return 0f
+            val rise = positions[i + 1] - positions[i]
+            if (rise <= 0f) return 0f
+            // Cosine ease derivative peaks mid-span at π/2 * average slope.
+            return if (softWash) {
+                val f = ((c - times[i]) / span).coerceIn(0f, 1f)
+                val du = 0.5f * Math.PI.toFloat() * kotlin.math.sin(Math.PI.toFloat() * f)
+                (rise / span) * du
+            } else {
+                rise / span
+            }
         }
     }
 
     /**
-     * Acoustic keyframes → reciter-timed wash curve.
+     * Acoustic keyframes → **honest letter-timed** wash curve (reciter truth).
      *
-     * CTC is arrive → hold → peel. Holds **park on the spoken letter** so
-     * reading follows the voice. Micro CTC freezes only are absorbed
-     * ([absorbMicroHolds]); real letter timing is preserved for the chase.
+     * CTC is arrive → hold → peel. Holds park on the spoken letter; peels
+     * ease between letters. Micro CTC freezes only are absorbed. Continuous
+     * chase feel is [InkEngine.acousticWashStep], not invented curve creep.
      */
     fun acousticCurve(
         keyframes: List<SubwordKeyframe>,
@@ -360,18 +376,12 @@ object TajweedPacing {
 
     private const val MAX_PEEL_STEAL_MS = 40L
 
-    /**
-     * Sub-perceptual CTC freezes only. Real letter holds stay flat so the
-     * wash remains on the spoken letter (reading-along). Continuous motion
-     * comes from chasing that target in the display step, not from leaving
-     * the letter early.
-     */
+    /** Sub-perceptual CTC freezes only — not real spoken letter holds. */
     const val MICRO_HOLD_MS = 80L
 
     /**
-     * Drop flat freezes shorter than [MICRO_HOLD_MS] by collapsing them into
-     * the surrounding timeline. Does **not** advance progress during a real
-     * letter hold — that would desync the highlight from the reciter.
+     * Drop flat freezes shorter than [MICRO_HOLD_MS]. Real letter holds stay
+     * parked so the chase target remains the spoken letter.
      */
     private fun absorbMicroHolds(points: ArrayList<Pair<Long, Float>>) {
         if (points.size < 3) return
@@ -381,7 +391,6 @@ object TajweedPacing {
             val (t1, p1) = points[i + 1]
             val span = t1 - t0
             if (p0 == p1 && p0 < 1f - 1e-4f && span in 1L until MICRO_HOLD_MS) {
-                // Remove the micro park end; next peel (if any) absorbs the time.
                 points.removeAt(i + 1)
                 continue
             }

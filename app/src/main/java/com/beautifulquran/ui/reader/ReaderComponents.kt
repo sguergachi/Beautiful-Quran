@@ -453,7 +453,11 @@ private fun rememberRepeatWash(
                             lockedPacing.value = entryPacing
                             lockedFeather.value = when {
                                 entryPacing == null -> null
-                                entryPacing.softWash -> null
+                                entryPacing.softWash ->
+                                    // Slightly tighter than first-pass for contrast
+                                    // on already-black ink (Claude tip 7).
+                                    InkEngine.letterFeather(entryPacing.letterCount)
+                                        .coerceAtMost(0.75f)
                                 else -> InkEngine.pacedFeather()
                             }
                             hardRestartToEmpty()
@@ -479,11 +483,17 @@ private fun rememberRepeatWash(
                                                 val phase =
                                                     phaseState.value.coerceIn(0f, 1f)
                                                 val curve = lockedPacing.value
-                                                if (curve != null) {
+                                                val letterFront = if (curve != null) {
                                                     curve.at(phase)
                                                 } else {
                                                     phase
                                                 }
+                                                val feather = lockedFeather.value
+                                                    ?: InkEngine.tuning.washFeather
+                                                InkEngine.maskProgressForLetterFront(
+                                                    letterFront = letterFront,
+                                                    feather = feather,
+                                                )
                                             }
                                             displayProgress.floatValue < 0.999f -> 1f
                                             else -> 1f
@@ -886,8 +896,10 @@ private fun rememberLetterSweep(
         SideEffect {
             if (needsArm) {
                 acousticDisplay.floatValue = revealStart.coerceIn(0f, 1f)
-                acousticFeather.value =
-                    if (soft) null else InkEngine.pacedFeather()
+                acousticFeather.value = when {
+                    soft -> InkEngine.letterFeather(pacing?.letterCount ?: 4)
+                    else -> InkEngine.pacedFeather()
+                }
                 armedActivation.value = activation
                 wasClockActive.value = true
             } else if (isClockActive) {
@@ -917,17 +929,31 @@ private fun rememberLetterSweep(
                         clockActive -> {
                             val phase = clock.value.coerceIn(0f, 1f)
                             val curve = pacingState.value
-                            // Reciter letter position: parks on holds, eases peels.
-                            val target = when {
+                            val feather = acousticFeather.value
+                                ?: InkEngine.tuning.washFeather
+                            // Letter-front truth → mask progress so the *front*
+                            // sits on the spoken letter (feather-corrected).
+                            val letterFront = when {
                                 curve != null -> curve.at(phase)
                                 else -> phase
-                            }.coerceAtLeast(revealState.value.coerceIn(0f, 1f))
-                            val targetVel =
-                                if (dt > 1e-4f) {
+                            }
+                            val target = InkEngine.maskProgressForLetterFront(
+                                letterFront = letterFront,
+                                feather = feather,
+                            ).coerceAtLeast(revealState.value.coerceIn(0f, 1f))
+                            // Feed-forward velocity from the letter curve (word/s).
+                            val targetVel = when {
+                                curve != null && dt > 1e-4f -> {
+                                    // d(letterFront)/dt, mapped roughly to mask space.
+                                    val vLetter = curve.velocityAt(phase) // per unit phase
+                                    // phase advances ~1 over word duration; use finite Δ.
                                     ((target - lastTarget) / dt).coerceAtLeast(0f)
-                                } else {
-                                    0f
+                                        .coerceAtLeast(vLetter * 0.5f)
                                 }
+                                dt > 1e-4f ->
+                                    ((target - lastTarget) / dt).coerceAtLeast(0f)
+                                else -> 0f
+                            }
                             lastTarget = target
                             acousticDisplay.floatValue = InkEngine.acousticWashStep(
                                 current = acousticDisplay.floatValue,
