@@ -303,36 +303,35 @@ internal fun repeatWashDurationMs(activeSweepMs: Int?, minimumMs: Int): Int =
 /**
  * Orange wash for one word in a repeat chain.
  *
- * **Sequential residual finish (law):**
- * - [InkEngine.Tuning.repeatSweepMs] is the minimum duration, so short words
- *   still get a full soft edge while longer words follow the reciter's dwell.
- * - Tajweed-paced entries map that clock through the same captured curve and
- *   feather as first-pass ink.
- * - [OrderedWashGate] serializes **queued** (non-Active) members only — seek
- *   into a chain, catch-up. The **Active** word always starts immediately:
- *   waiting on a prior residual forced a late `snapTo(0)` and looked like the
- *   orange wash "reset" on every word of a multi-word re-say.
- * - [snapshotFlow] + collect (not `LaunchedEffect(activation)`) so Active
- *   advancing (activation → 0) **does not cancel** an in-flight wash.
- * - Never snap incomplete → full on handoff. Hard restart only on cold entry
- *   or a true seek ([repeatWashShouldRestart]).
- * - Release finishes residual progress, then dissolves alpha.
+ * Product motion is a **short soft bloom to full orange, then hold** while the
+ * chain stays open — not a second multi-second letter karaoke. Mapping V2
+ * acoustic / tajweed curves onto orange re-ran a full letter wash on every
+ * chain step and read as "resets each word."
+ *
+ * Law:
+ * - Duration is always [InkEngine.Tuning.repeatSweepMs] (plain soft edge).
+ * - Active members start immediately (no gate wait on a prior residual).
+ * - Gate only serializes **queued** members (seek into a chain).
+ * - Reveal only on chain join or a true seek; 0→N Active handoff is Hold.
+ * - Hard snap-to-0 only on cold entry / seek ([repeatWashShouldRestart]).
+ * - Handoff does not cancel an in-flight bloom; Release finishes residual
+ *   then dissolves alpha.
  */
 @Composable
 private fun rememberRepeatWash(
     repeat: Boolean,
     /** 1-based word position — orders the per-ayah gate for queued members. */
     position: Int,
-    /** Active word dwell; null for queued members revealed by a seek. */
-    activeSweepMs: Int? = null,
-    /** Tajweed / acoustic curve for the active repeated word. */
-    pacing: TajweedPacing.Curve? = null,
+    /** Unused: orange bloom is always [InkEngine.Tuning.repeatSweepMs]. */
+    @Suppress("UNUSED_PARAMETER") activeSweepMs: Int? = null,
+    /** Unused: orange never borrows first-pass acoustic/tajweed curves. */
+    @Suppress("UNUSED_PARAMETER") pacing: TajweedPacing.Curve? = null,
     /** Bumps on seek for the active word so replaying it re-runs orange too. */
     activation: Long = 0L,
 ): RepeatWash {
     val clock = remember { Animatable(if (repeat) 0f else 1f) }
     val alpha = remember { Animatable(if (repeat) 1f else 0f) }
-    val lockedPacing = remember { mutableStateOf<TajweedPacing.Curve?>(null) }
+    // null feather → Tuning.washFeather in the draw layer (soft first-pass edge).
     val lockedFeather = remember { mutableStateOf<Float?>(null) }
     val lockedDurationMs = remember { mutableIntStateOf(InkEngine.tuning.repeatSweepMs) }
     // Seeded false so the first true edge is Reveal; later activation→0 is Hold.
@@ -340,14 +339,11 @@ private fun rememberRepeatWash(
     val sharedGate = LocalRepeatWashGate.current
     val localGate = remember { OrderedWashGate() }
     val gate = sharedGate ?: localGate
-    // Local gate needs a pump when no ayah-level provider is present.
     if (sharedGate == null) {
         LaunchedEffect(localGate) { localGate.pump() }
     }
     val repeatState = rememberUpdatedState(repeat)
     val activationState = rememberUpdatedState(activation)
-    val activeSweepState = rememberUpdatedState(activeSweepMs)
-    val pacingState = rememberUpdatedState(pacing)
     LaunchedEffect(Unit) {
         snapshotFlow { repeatState.value to activationState.value }.collect { (rep, act) ->
             val previousActivation = lifecycle.activation
@@ -361,18 +357,7 @@ private fun rememberRepeatWash(
             lifecycle.activation = act
             when (action) {
                 RepeatWashAction.Reveal -> {
-                    // Capture at chain entry: this word can stop being Active
-                    // while a queued sibling still waits on the gate.
-                    val entryPacing = pacingState.value
-                    val sweepMs = repeatWashDurationMs(
-                        activeSweepMs = activeSweepState.value,
-                        minimumMs = InkEngine.tuning.repeatSweepMs,
-                    )
-                    // Soft acoustic curves already ease inside Curve.at; linear
-                    // wall-clock keeps those anchors on time. Plain washes use
-                    // the soft-end bezier.
-                    val easing =
-                        if (entryPacing != null) LinearEasing else InkEngine.sweepEasing
+                    val sweepMs = InkEngine.tuning.repeatSweepMs.coerceAtLeast(1)
                     val restart = repeatWashShouldRestart(
                         previousActivation = previousActivation,
                         activation = act,
@@ -380,27 +365,22 @@ private fun rememberRepeatWash(
                         alpha = alpha.value,
                     )
                     suspend fun runWash() {
-                        // Dropped from the chain while queued — skip start.
                         if (!repeatState.value) return
                         lockedDurationMs.intValue = sweepMs
-                        lockedPacing.value = entryPacing
-                        lockedFeather.value = when {
-                            entryPacing == null -> null
-                            entryPacing.softWash -> null
-                            else -> InkEngine.pacedFeather()
-                        }
+                        lockedFeather.value = null
                         alpha.snapTo(1f)
                         if (restart) clock.snapTo(0f)
-                        // From mid-wash: finish without snapping the edge back.
                         val remain = if (restart) {
                             sweepMs
                         } else {
                             ((1f - clock.value) * sweepMs).toInt().coerceAtLeast(1)
                         }
-                        clock.animateTo(1f, tween(remain, easing = easing))
+                        clock.animateTo(
+                            1f,
+                            tween(remain, easing = InkEngine.sweepEasing),
+                        )
                     }
-                    // Active word (non-zero activation) must not wait on a prior
-                    // member's residual — that delay + snap was the per-word reset.
+                    // Active: start with the reciter. Queued: position-ordered gate.
                     if (act != 0L) {
                         runWash()
                     } else {
@@ -408,24 +388,16 @@ private fun rememberRepeatWash(
                     }
                 }
                 RepeatWashAction.Release -> {
-                    // Residual under the gate (no overlap with next reveal);
-                    // alpha dissolve is outside so chain clear doesn't serialize
-                    // N× fadeMs on the ordered queue.
+                    // Finish residual without blocking sibling dissolves.
                     if (clock.value < 1f && alpha.value > 0f) {
-                        gate.run(position) {
-                            if (clock.value < 1f) {
-                                val remain =
-                                    ((1f - clock.value) * lockedDurationMs.intValue)
-                                        .toInt()
-                                        .coerceAtLeast(1)
-                                val easing = if (lockedPacing.value != null) {
-                                    LinearEasing
-                                } else {
-                                    InkEngine.sweepEasing
-                                }
-                                clock.animateTo(1f, tween(remain, easing = easing))
-                            }
-                        }
+                        val remain =
+                            ((1f - clock.value) * lockedDurationMs.intValue)
+                                .toInt()
+                                .coerceAtLeast(1)
+                        clock.animateTo(
+                            1f,
+                            tween(remain, easing = InkEngine.sweepEasing),
+                        )
                     }
                     if (alpha.value > 0f) {
                         alpha.animateTo(
@@ -436,18 +408,14 @@ private fun rememberRepeatWash(
                             ),
                         )
                     }
-                    lockedPacing.value = null
                     lockedFeather.value = null
                 }
                 RepeatWashAction.Hold -> Unit
             }
         }
     }
-    val progress = remember {
-        derivedStateOf { lockedPacing.value?.at(clock.value) ?: clock.value }
-    }
     return RepeatWash(
-        progress = progress,
+        progress = clock.asState(),
         alpha = alpha.asState(),
         feather = lockedFeather,
     )

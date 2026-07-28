@@ -777,7 +777,9 @@ class InkEngineTest {
     }
 
     @Test
-    fun `repeat wash follows long dwell but keeps a soft minimum`() {
+    fun `repeat wash duration helper floors short dwells`() {
+        // Helper retained for callers; orange bloom itself always uses
+        // Tuning.repeatSweepMs (not the multi-second karaoke hold).
         assertEquals(450, repeatWashDurationMs(activeSweepMs = null, minimumMs = 450))
         assertEquals(450, repeatWashDurationMs(activeSweepMs = 140, minimumMs = 450))
         assertEquals(1_800, repeatWashDurationMs(activeSweepMs = 1_800, minimumMs = 450))
