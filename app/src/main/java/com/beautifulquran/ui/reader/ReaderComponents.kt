@@ -274,10 +274,8 @@ internal fun repeatWashAction(
 }
 
 /**
- * Whether a Reveal should re-run the orange bloom from empty.
- *
- * Seek always restarts. Otherwise only a cold entry (nothing on screen).
- * Never restart a settled or mid-bloom overlay — that was the full→empty flash.
+ * Hard-restart the directional edge only on seek or cold entry (alpha ~0).
+ * Never restart a settled full-orange hold — that flashed full→empty.
  */
 internal fun repeatWashShouldRestart(
     previousActivation: Long,
@@ -302,81 +300,134 @@ internal fun repeatWashDurationMs(activeSweepMs: Int?, minimumMs: Int): Int =
     maxOf(activeSweepMs ?: 0, minimumMs)
 
 /**
- * Orange wash for one word in a repeat chain.
+ * Orange wash for one word in a repeat chain — **same motion as first-pass ink**.
  *
- * **One opacity channel. No rewinds. No gate.**
+ * Restored to the first-good install feel:
+ * - Directional [letterFadeIn] soft edge (not whole-word opacity pop)
+ * - Duration follows the reciter: `max(activeSweepMs, repeatSweepMs)`
+ * - Tajweed / V2 acoustic curves park and peel the edge with the voice
  *
- * Prior designs kept flashing because they rewound a directional mask or
- * re-armed Animatables on Active handoff. This path only does:
- * - join chain → ease opacity 0→1 once ([InkEngine.Tuning.repeatSweepMs])
- * - stay in chain → hold (LaunchedEffect does not re-run)
- * - leave chain → ease opacity 1→0
- * - seek while Active → bump [generation], fresh 0→1 ease
- *
- * Whole-word opacity only (no letterFadeIn). Coverage progress is always 1.
+ * Lifecycle fixes kept so multi-word re-says do not re-snap each step:
+ * - Reveal only on chain join or true seek (not Active 0→N handoff)
+ * - Active word starts immediately (does not wait on prior residual gate)
+ * - Edge snaps to 0 only when cold/seek, and **before** alpha rises
  */
 @Composable
 private fun rememberRepeatWash(
     repeat: Boolean,
-    @Suppress("UNUSED_PARAMETER") position: Int,
-    @Suppress("UNUSED_PARAMETER") activeSweepMs: Int? = null,
-    @Suppress("UNUSED_PARAMETER") pacing: TajweedPacing.Curve? = null,
-    /** Bumps on seek so replaying the active word re-blooms orange. */
+    /** 1-based word position — orders the per-ayah gate for queued members. */
+    position: Int,
+    /** Active word dwell; null for queued members revealed by a seek. */
+    activeSweepMs: Int? = null,
+    /** Tajweed / acoustic curve for the active repeated word. */
+    pacing: TajweedPacing.Curve? = null,
+    /** Bumps on seek for the active word so replaying it re-runs orange too. */
     activation: Long = 0L,
 ): RepeatWash {
-    val prevRepeat = remember { mutableStateOf(false) }
-    val prevActivation = remember { mutableLongStateOf(0L) }
-    var generation by remember { mutableIntStateOf(0) }
-
-    // Seek N→M while already in the chain: new bloom generation.
-    // Must not treat 0→N (becoming Active mid-chain) as seek.
-    SideEffect {
-        val seek =
-            repeat &&
-                prevRepeat.value &&
-                prevActivation.longValue != 0L &&
-                activation != 0L &&
-                activation != prevActivation.longValue
-        if (seek) generation += 1
-        prevRepeat.value = repeat
-        prevActivation.longValue = activation
+    val clock = remember { Animatable(0f) }
+    val alpha = remember { Animatable(0f) }
+    val lockedPacing = remember { mutableStateOf<TajweedPacing.Curve?>(null) }
+    val lockedFeather = remember { mutableStateOf<Float?>(null) }
+    val lockedDurationMs = remember { mutableIntStateOf(InkEngine.tuning.repeatSweepMs) }
+    val lifecycle = remember { RepeatWashLifecycle() }
+    val sharedGate = LocalRepeatWashGate.current
+    val localGate = remember { OrderedWashGate() }
+    val gate = sharedGate ?: localGate
+    if (sharedGate == null) {
+        LaunchedEffect(localGate) { localGate.pump() }
     }
-
-    // New Animatable per generation so a seek starts from empty without
-    // ever snapping a visible full-orange layer back to 0.
-    val opacity = remember(generation) { Animatable(0f) }
-    LaunchedEffect(repeat, generation) {
-        if (repeat) {
-            // Join / re-seek: ease up. Never snap down while becoming visible.
-            if (opacity.value < 1f) {
-                opacity.animateTo(
-                    1f,
-                    tween(
-                        InkEngine.tuning.repeatSweepMs.coerceAtLeast(1),
-                        easing = InkEngine.sweepEasing,
-                    ),
-                )
-            }
-        } else {
-            // Leave chain: ease out. Do not snap progress mid-dissolve.
-            if (opacity.value > 0f) {
-                opacity.animateTo(
-                    0f,
-                    tween(
-                        InkEngine.tuning.repeatFadeOutMs.coerceAtLeast(1),
-                        easing = InkEngine.sweepEasing,
-                    ),
-                )
+    val repeatState = rememberUpdatedState(repeat)
+    val activationState = rememberUpdatedState(activation)
+    val activeSweepState = rememberUpdatedState(activeSweepMs)
+    val pacingState = rememberUpdatedState(pacing)
+    LaunchedEffect(Unit) {
+        snapshotFlow { repeatState.value to activationState.value }.collect { (rep, act) ->
+            val previousActivation = lifecycle.activation
+            val action = repeatWashAction(
+                wasRepeat = lifecycle.repeat,
+                previousActivation = previousActivation,
+                repeat = rep,
+                activation = act,
+            )
+            lifecycle.repeat = rep
+            lifecycle.activation = act
+            when (action) {
+                RepeatWashAction.Reveal -> {
+                    val entryPacing = pacingState.value
+                    val sweepMs = repeatWashDurationMs(
+                        activeSweepMs = activeSweepState.value,
+                        minimumMs = InkEngine.tuning.repeatSweepMs,
+                    ).coerceAtLeast(1)
+                    val easing =
+                        if (entryPacing != null) LinearEasing else InkEngine.sweepEasing
+                    val restart = repeatWashShouldRestart(
+                        previousActivation = previousActivation,
+                        activation = act,
+                        clockProgress = clock.value,
+                        alpha = alpha.value,
+                    )
+                    suspend fun runWash() {
+                        if (!repeatState.value) return
+                        lockedDurationMs.intValue = sweepMs
+                        lockedPacing.value = entryPacing
+                        lockedFeather.value = when {
+                            entryPacing == null -> null
+                            entryPacing.softWash -> null // full wash feather
+                            else -> InkEngine.pacedFeather()
+                        }
+                        // Edge before opacity — never paint full progress at α=1.
+                        if (restart) clock.snapTo(0f)
+                        alpha.snapTo(1f)
+                        val remain = if (restart || clock.value <= 0f) {
+                            sweepMs
+                        } else {
+                            ((1f - clock.value) * sweepMs).toInt().coerceAtLeast(1)
+                        }
+                        clock.animateTo(1f, tween(remain, easing = easing))
+                    }
+                    // Active: with the reciter. Queued (seek into chain): gate.
+                    if (act != 0L) {
+                        runWash()
+                    } else {
+                        gate.run(position) { runWash() }
+                    }
+                }
+                RepeatWashAction.Release -> {
+                    if (clock.value < 1f && alpha.value > 0f) {
+                        val remain =
+                            ((1f - clock.value) * lockedDurationMs.intValue)
+                                .toInt()
+                                .coerceAtLeast(1)
+                        val easing = if (lockedPacing.value != null) {
+                            LinearEasing
+                        } else {
+                            InkEngine.sweepEasing
+                        }
+                        clock.animateTo(1f, tween(remain, easing = easing))
+                    }
+                    if (alpha.value > 0f) {
+                        alpha.animateTo(
+                            0f,
+                            tween(
+                                InkEngine.tuning.repeatFadeOutMs,
+                                easing = InkEngine.sweepEasing,
+                            ),
+                        )
+                    }
+                    lockedPacing.value = null
+                    lockedFeather.value = null
+                }
+                RepeatWashAction.Hold -> Unit
             }
         }
     }
-
-    val fullCoverage = remember { mutableFloatStateOf(1f) }
-    val feather = remember { mutableStateOf<Float?>(null) }
+    val progress = remember {
+        derivedStateOf { lockedPacing.value?.at(clock.value) ?: clock.value }
+    }
     return RepeatWash(
-        progress = fullCoverage,
-        alpha = opacity.asState(),
-        feather = feather,
+        progress = progress,
+        alpha = alpha.asState(),
+        feather = lockedFeather,
     )
 }
 
@@ -422,15 +473,10 @@ private fun rememberSearchHitWash(active: Boolean): RepeatWash {
  */
 @Composable
 private fun rememberGlintAlpha(glinting: Boolean): State<Float> {
-    val alpha = remember { Animatable(0f) }
+    val alpha = remember { Animatable(if (glinting) 1f else 0f) }
     LaunchedEffect(glinting) {
         if (glinting) {
-            // Soft rise — snapTo(1) on every Active word flashed the sheen
-            // on multi-word re-says (looked like the orange wash blinking).
-            alpha.animateTo(
-                1f,
-                tween(120, easing = InkEngine.sweepEasing),
-            )
+            alpha.snapTo(1f)
         } else if (alpha.value > 0f) {
             alpha.animateTo(
                 0f,
@@ -470,18 +516,18 @@ private fun rememberGlintIdentity(glinting: Boolean, repeat: Boolean): GlintIden
 internal fun glintCarryAlpha(replacedByRepeat: Boolean, repeatProgress: Float): Float =
     if (replacedByRepeat) 1f - inkSmootherstep(repeatProgress) else 1f
 
-/**
- * Orange overlay: whole-word opacity only.
- *
- * A directional [letterFadeIn] mask rewound progress on restarts and painted
- * one full-orange frame before the snap — the flash on each re-say step.
- * Soft bloom is [RepeatWash.alpha] (already eased); coverage stays full.
- */
+/** Orange overlay: same soft directional ink wash as first-pass letter reveal. */
 private fun Modifier.repeatInkLayer(
     wash: RepeatWash,
-    @Suppress("UNUSED_PARAMETER") rtl: Boolean,
+    rtl: Boolean,
 ): Modifier =
     glyphLayerAlpha { wash.alpha.value }
+        .letterFadeIn(
+            progress = { wash.progress.value },
+            rtl = rtl,
+            restingAlpha = 0f,
+            feather = wash.feather.value ?: InkEngine.tuning.washFeather,
+        )
 
 /**
  * Progress + optional feather locked for one word's letter sweep. [feather]
@@ -1154,10 +1200,7 @@ private fun rememberWordHighlight(
 ): WordHighlight {
     val isActive = ink.state == InkEngine.State.Active
     val glintInk = LocalQuranAccents.current.glintInk
-    // Orange alone carries repeat motion. A fresh glint on every Active word
-    // of a multi-word re-say read as the wash "flashing."
-    val glinting =
-        glintInk != null && InkEngine.glinting(ink.state) && !ink.repeat
+    val glinting = glintInk != null && InkEngine.glinting(ink.state)
     val glintIdentity = rememberGlintIdentity(glinting, ink.repeat)
     // Freeze tajweed curve for this activation so an Ink Lab toggle mid-word
     // cannot remap the wash (or swap feather) and look like a reset.
@@ -1583,8 +1626,7 @@ private data class Glint(
 private fun rememberGlints(inks: List<InkEngine.Word>): List<Glint> {
     val glintInk = LocalQuranAccents.current.glintInk
     return inks.map { ink ->
-        val glinting =
-            glintInk != null && InkEngine.glinting(ink.state) && !ink.repeat
+        val glinting = glintInk != null && InkEngine.glinting(ink.state)
         val identity = rememberGlintIdentity(glinting, ink.repeat)
         Glint(
             alpha = rememberGlintAlpha(glinting),
