@@ -175,8 +175,12 @@ Proceed with **Dir 1 first** (full QUA Alafasy structure+letter import + reclock
 | Merge Lab > full QUA > CTC gap | `tools/sync_lab/merge_v2_priority.py` |
 | Committed V2 sources | `tools/timing_v2/alafasy_{lab_gold,qua_full,ctc_auto}.json` |
 | Loader pin | `load_timing_v2` accepts `generate_qua_full_v2.py@1` |
-| Structure gate | `tools/test_build_db.py` → 6:10 exact |
-| DB | `quran-v35.db` (`QuranDatabase.DB_FILE_NAME`) |
+| Structure gate | `tools/test_build_db.py` → Fatiha mono + 5:54 multi-loop + 6:10 exact |
+| Backtrack metrics | `tools/sync_lab/eval_v2_structure_metrics.py` (no-regression floors) |
+| Orange wash | Whole-word opacity ease on chain join; hold; dissolve (no glint on repeat) |
+| DB | `quran-v36.db` (`QuranDatabase.DB_FILE_NAME`) |
 
 **6:10:** V2 positions = V1 = `1…8,6,7,8,9…13`.  
-**Scale:** ~6229 QUA accepted / 7 fail; merged totals Lab 307 + QUA full ~5925 (≈622 backtrack ayahs) + CTC gap few; full mushaf 6236 V2 rows.
+**5:54:** V2 multi-loop locked (QUA topology; slight V1 delta on 21–24).  
+**Scale:** ~6229 QUA accepted / 7 fail; merged Lab 307 + QUA full ~5925 + CTC gap few = 6236 V2 rows.  
+**Backtrack recall vs V1 (measured):** ~77% of V1-backtrack ayahs still have a backtrack in V2 (~624/808); exact topology match ~62% among V1-bt. Floors: recall ≥75%, V2 bt ayahs ≥600, Fatiha mono.

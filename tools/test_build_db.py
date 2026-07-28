@@ -74,13 +74,26 @@ def check_v2_lab_gold_gate():
 
 
 # Hard golden structures — wrong topology is a product failure (docs/V2_STRUCTURE.md).
+# 5:54 locks QUA/V2 multi-loop (differs slightly from V1 on the 21–24 span).
 V2_STRUCTURE_CASES = {
+    (1, 1): [1, 2, 3, 4],
+    (1, 2): [1, 2, 3, 4],
+    (1, 3): [1, 2],
+    (1, 4): [1, 2, 3],
+    (1, 5): [1, 2, 3, 4],
+    (1, 6): [1, 2, 3],
+    (1, 7): [1, 2, 3, 4, 5, 6, 7, 8, 9],
+    (5, 54): [
+        1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 9, 10, 11, 12, 13, 14, 15, 16, 17,
+        15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 21, 22, 23, 24, 25, 26, 27, 28,
+        29, 30, 31, 32, 33, 34, 35, 36, 37,
+    ],
     (6, 10): [1, 2, 3, 4, 5, 6, 7, 8, 6, 7, 8, 9, 10, 11, 12, 13],
 }
 
 
 def check_v2_structure_gate():
-    """Shipped V2 (and committed sources) must not flatten known phrase re-says."""
+    """Shipped V2 must not flatten known re-says or invent Fatiha backtracks."""
     db = ROOT / "data" / "quran.db"
     if not db.exists():
         return False, "missing data/quran.db"
@@ -100,7 +113,21 @@ def check_v2_structure_gate():
                 failures.append(f"{surah}:{ayah} got={got} want={want}")
     if failures:
         return False, "; ".join(failures)
-    return True, "structure cases exact"
+    return True, f"{len(V2_STRUCTURE_CASES)} structure cases exact"
+
+
+def check_v2_backtrack_metrics():
+    """No-regression floors on V2 vs V1 backtrack recall (Dir1 metrics)."""
+    sys.path.insert(0, str(TOOLS / "sync_lab"))
+    from eval_v2_structure_metrics import evaluate  # noqa: PLC0415
+
+    db = ROOT / "data" / "quran.db"
+    if not db.exists():
+        return False, "missing data/quran.db"
+    report = evaluate(db)
+    if report.get("pass"):
+        return True, report.get("claim", "ok")
+    return False, report.get("claim") or json.dumps(report, indent=2)
 
 
 def check_timing_v2_loader():
@@ -508,12 +535,14 @@ def main():
     database_ok = audit_bundled_db()
     lab_gold_ok, lab_gold_detail = check_v2_lab_gold_gate()
     structure_ok, structure_detail = check_v2_structure_gate()
+    backtrack_ok, backtrack_detail = check_v2_backtrack_metrics()
     print(f"  {'ok  ' if confidence_ok else 'FAIL'} weighted 2:214 confidence checks")
     print(f"  {'ok  ' if audio_onset_ok else 'FAIL'} audio-onset detector and apply checks")
     print(f"  {'ok  ' if timing_v2_ok else 'FAIL'} Timing V2 source validation")
     print(f"  {'ok  ' if database_ok else 'FAIL'} bundled timing database invariants")
     print(f"  {'ok  ' if lab_gold_ok else 'FAIL'} V2 vs Timings Lab gold (≥99%)")
-    print(f"  {'ok  ' if structure_ok else 'FAIL'} V2 structure gate (6:10 phrase re-say)")
+    print(f"  {'ok  ' if structure_ok else 'FAIL'} V2 structure gate (Fatiha + 5:54 + 6:10)")
+    print(f"  {'ok  ' if backtrack_ok else 'FAIL'} V2 backtrack recall floors")
     if not confidence_ok:
         failures.append(("weighted confidence", "2:214 checks failed", None))
     if not audio_onset_ok:
@@ -526,6 +555,8 @@ def main():
         failures.append(("V2 Lab gold gate", lab_gold_detail, None))
     if not structure_ok:
         failures.append(("V2 structure gate", structure_detail, None))
+    if not backtrack_ok:
+        failures.append(("V2 backtrack metrics", backtrack_detail, None))
     print()
     if failures:
         print(f"{len(failures)} FAILURE(S):")
@@ -535,7 +566,7 @@ def main():
                 for line in str(detail).splitlines():
                     print(f"    {line}")
         return 1
-    print(f"all {len(cases) + 6} cases pass ({CASES_DIR.relative_to(Path.cwd())})")
+    print(f"all {len(cases) + 7} cases pass ({CASES_DIR.relative_to(Path.cwd())})")
     return 0
 
 
