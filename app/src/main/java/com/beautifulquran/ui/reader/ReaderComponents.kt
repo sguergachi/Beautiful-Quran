@@ -51,6 +51,7 @@ import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -303,124 +304,79 @@ internal fun repeatWashDurationMs(activeSweepMs: Int?, minimumMs: Int): Int =
 /**
  * Orange wash for one word in a repeat chain.
  *
- * **Whole-word soft bloom** (opacity 0→1 over [InkEngine.Tuning.repeatSweepMs]),
- * then hold full orange until the chain releases. No directional letter mask
- * and no progress rewind while visible — both caused full→empty flashes on
- * multi-word re-says.
+ * **One opacity channel. No rewinds. No gate.**
  *
- * - Active members bloom immediately (no residual gate wait).
- * - Gate only for queued members (seek into a chain).
- * - Reveal only on chain join / seek; handoff is Hold.
- * - Progress is **monotonic while visible** (only restarts after alpha is 0).
+ * Prior designs kept flashing because they rewound a directional mask or
+ * re-armed Animatables on Active handoff. This path only does:
+ * - join chain → ease opacity 0→1 once ([InkEngine.Tuning.repeatSweepMs])
+ * - stay in chain → hold (LaunchedEffect does not re-run)
+ * - leave chain → ease opacity 1→0
+ * - seek while Active → bump [generation], fresh 0→1 ease
+ *
+ * Whole-word opacity only (no letterFadeIn). Coverage progress is always 1.
  */
 @Composable
 private fun rememberRepeatWash(
     repeat: Boolean,
-    /** 1-based word position — orders the per-ayah gate for queued members. */
-    position: Int,
+    @Suppress("UNUSED_PARAMETER") position: Int,
     @Suppress("UNUSED_PARAMETER") activeSweepMs: Int? = null,
     @Suppress("UNUSED_PARAMETER") pacing: TajweedPacing.Curve? = null,
-    /** Bumps on seek for the active word so replaying it re-runs orange too. */
+    /** Bumps on seek so replaying the active word re-blooms orange. */
     activation: Long = 0L,
 ): RepeatWash {
-    // bloom 0..1 = how far the soft orange has come in (drives opacity).
-    val bloom = remember { Animatable(0f) }
-    // chainAlpha stays 1 while in the chain after first paint; only Release
-    // brings it down (dissolve out).
-    val chainAlpha = remember { Animatable(0f) }
-    val lockedFeather = remember { mutableStateOf<Float?>(null) }
-    val lifecycle = remember { RepeatWashLifecycle() }
-    val sharedGate = LocalRepeatWashGate.current
-    val localGate = remember { OrderedWashGate() }
-    val gate = sharedGate ?: localGate
-    if (sharedGate == null) {
-        LaunchedEffect(localGate) { localGate.pump() }
+    val prevRepeat = remember { mutableStateOf(false) }
+    val prevActivation = remember { mutableLongStateOf(0L) }
+    var generation by remember { mutableIntStateOf(0) }
+
+    // Seek N→M while already in the chain: new bloom generation.
+    // Must not treat 0→N (becoming Active mid-chain) as seek.
+    SideEffect {
+        val seek =
+            repeat &&
+                prevRepeat.value &&
+                prevActivation.longValue != 0L &&
+                activation != 0L &&
+                activation != prevActivation.longValue
+        if (seek) generation += 1
+        prevRepeat.value = repeat
+        prevActivation.longValue = activation
     }
-    val repeatState = rememberUpdatedState(repeat)
-    val activationState = rememberUpdatedState(activation)
-    LaunchedEffect(Unit) {
-        snapshotFlow { repeatState.value to activationState.value }.collect { (rep, act) ->
-            val previousActivation = lifecycle.activation
-            val action = repeatWashAction(
-                wasRepeat = lifecycle.repeat,
-                previousActivation = previousActivation,
-                repeat = rep,
-                activation = act,
-            )
-            lifecycle.repeat = rep
-            lifecycle.activation = act
-            when (action) {
-                RepeatWashAction.Reveal -> {
-                    val sweepMs = InkEngine.tuning.repeatSweepMs.coerceAtLeast(1)
-                    val restart = repeatWashShouldRestart(
-                        previousActivation = previousActivation,
-                        activation = act,
-                        clockProgress = bloom.value,
-                        alpha = chainAlpha.value * bloom.value,
-                    )
-                    suspend fun runWash() {
-                        if (!repeatState.value) return
-                        lockedFeather.value = null
-                        if (restart) {
-                            // Hide completely before any rewind — never paint
-                            // full orange then clear (the flash).
-                            chainAlpha.snapTo(0f)
-                            bloom.snapTo(0f)
-                            chainAlpha.snapTo(1f)
-                            bloom.animateTo(
-                                1f,
-                                tween(sweepMs, easing = InkEngine.sweepEasing),
-                            )
-                        } else if (bloom.value < 1f) {
-                            // Finish an interrupted bloom; never go backwards.
-                            chainAlpha.snapTo(1f)
-                            val remain =
-                                ((1f - bloom.value) * sweepMs).toInt().coerceAtLeast(1)
-                            bloom.animateTo(
-                                1f,
-                                tween(remain, easing = InkEngine.sweepEasing),
-                            )
-                        } else {
-                            // Already full orange — hold. No snap, no re-bloom.
-                            chainAlpha.snapTo(1f)
-                        }
-                    }
-                    if (act != 0L) {
-                        runWash()
-                    } else {
-                        gate.run(position) { runWash() }
-                    }
-                }
-                RepeatWashAction.Release -> {
-                    if (chainAlpha.value > 0f || bloom.value > 0f) {
-                        chainAlpha.animateTo(
-                            0f,
-                            tween(
-                                InkEngine.tuning.repeatFadeOutMs,
-                                easing = InkEngine.sweepEasing,
-                            ),
-                        )
-                    }
-                    bloom.snapTo(0f)
-                    lockedFeather.value = null
-                }
-                RepeatWashAction.Hold -> Unit
+
+    // New Animatable per generation so a seek starts from empty without
+    // ever snapping a visible full-orange layer back to 0.
+    val opacity = remember(generation) { Animatable(0f) }
+    LaunchedEffect(repeat, generation) {
+        if (repeat) {
+            // Join / re-seek: ease up. Never snap down while becoming visible.
+            if (opacity.value < 1f) {
+                opacity.animateTo(
+                    1f,
+                    tween(
+                        InkEngine.tuning.repeatSweepMs.coerceAtLeast(1),
+                        easing = InkEngine.sweepEasing,
+                    ),
+                )
+            }
+        } else {
+            // Leave chain: ease out. Do not snap progress mid-dissolve.
+            if (opacity.value > 0f) {
+                opacity.animateTo(
+                    0f,
+                    tween(
+                        InkEngine.tuning.repeatFadeOutMs.coerceAtLeast(1),
+                        easing = InkEngine.sweepEasing,
+                    ),
+                )
             }
         }
     }
-    // progress=1 → full glyph coverage; opacity is bloom × chainAlpha.
+
     val fullCoverage = remember { mutableFloatStateOf(1f) }
-    val bloomState = bloom.asState()
-    val chainState = chainAlpha.asState()
-    val alpha = remember {
-        derivedStateOf {
-            (chainState.value * inkSmootherstep(bloomState.value)).coerceIn(0f, 1f)
-        }
-    }
+    val feather = remember { mutableStateOf<Float?>(null) }
     return RepeatWash(
         progress = fullCoverage,
-        alpha = alpha,
-        feather = lockedFeather,
+        alpha = opacity.asState(),
+        feather = feather,
     )
 }
 
@@ -1198,7 +1154,10 @@ private fun rememberWordHighlight(
 ): WordHighlight {
     val isActive = ink.state == InkEngine.State.Active
     val glintInk = LocalQuranAccents.current.glintInk
-    val glinting = glintInk != null && InkEngine.glinting(ink.state)
+    // Orange alone carries repeat motion. A fresh glint on every Active word
+    // of a multi-word re-say read as the wash "flashing."
+    val glinting =
+        glintInk != null && InkEngine.glinting(ink.state) && !ink.repeat
     val glintIdentity = rememberGlintIdentity(glinting, ink.repeat)
     // Freeze tajweed curve for this activation so an Ink Lab toggle mid-word
     // cannot remap the wash (or swap feather) and look like a reset.
@@ -1624,7 +1583,8 @@ private data class Glint(
 private fun rememberGlints(inks: List<InkEngine.Word>): List<Glint> {
     val glintInk = LocalQuranAccents.current.glintInk
     return inks.map { ink ->
-        val glinting = glintInk != null && InkEngine.glinting(ink.state)
+        val glinting =
+            glintInk != null && InkEngine.glinting(ink.state) && !ink.repeat
         val identity = rememberGlintIdentity(glinting, ink.repeat)
         Glint(
             alpha = rememberGlintAlpha(glinting),
