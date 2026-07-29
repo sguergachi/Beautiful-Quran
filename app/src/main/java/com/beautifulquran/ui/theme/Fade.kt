@@ -638,16 +638,12 @@ private fun DrawScope.drawWashBands(
 ) {
     if (width <= 0f || height <= 0f) return
     val bandH = height / InkWashBandCount
-    // Word-level lean: top leads or trails bottom (diagonal ink, not UI wipe).
-    val lean = washBandOffsetFraction(seed, band = 0)
     for (band in 0 until InkWashBandCount) {
         val bandTop = top + band * bandH
         val bandBottom =
             if (band == InkWashBandCount - 1) top + height else bandTop + bandH
         val headB = (head + washBandHeadDelta(seed, band, edge)).coerceAtLeast(0f)
-        // Skew: how far the top of this band's front leads its bottom.
-        val skew = lean * bandH * 0.85f + washBandHeadDelta(seed, band + 17, bandH)
-        val brush = washDiagonalBrush(
+        val brush = washDirectionalBrush(
             colors = colors,
             headOriginLeft = headOriginLeft,
             contentWidth = contentWidth,
@@ -656,7 +652,6 @@ private fun DrawScope.drawWashBands(
             bandTop = bandTop,
             bandBottom = bandBottom,
             rtl = rtl,
-            skew = skew,
         )
         clipRect(
             left = left,
@@ -675,10 +670,13 @@ private fun DrawScope.drawWashBands(
 }
 
 /**
- * Diagonal feather brush: iso-alpha lines run at an angle, so the front reads
- * as liquid soak rather than a vertical wipe bar.
+ * Directional feather brush. X order matches the proven horizontal wash
+ * (letterFadeIn) so RTL never runs reverse; Y span adds a mild diagonal tilt.
+ *
+ * RTL: startX = w−head, endX = w−head+edge (ahead/resting → inked left→right in layout).
+ * LTR: startX = head−edge, endX = head.
  */
-private fun washDiagonalBrush(
+private fun washDirectionalBrush(
     colors: List<Color>,
     headOriginLeft: Float,
     contentWidth: Float,
@@ -687,23 +685,22 @@ private fun washDiagonalBrush(
     bandTop: Float,
     bandBottom: Float,
     rtl: Boolean,
-    skew: Float,
 ): Brush {
-    // Gradient travels along the feather (ahead → behind), diagonal in y.
     return if (rtl) {
-        // RTL: ink from the right; front near contentWidth - head.
-        val front = headOriginLeft + contentWidth - head
+        val startX = headOriginLeft + contentWidth - head
+        val endX = startX + edge
         Brush.linearGradient(
             colors = colors,
-            start = Offset(front + edge, bandTop),
-            end = Offset(front - skew, bandBottom),
+            start = Offset(startX, bandTop),
+            end = Offset(endX, bandBottom),
         )
     } else {
-        val front = headOriginLeft + head
+        val endX = headOriginLeft + head
+        val startX = endX - edge
         Brush.linearGradient(
             colors = colors,
-            start = Offset(front - edge, bandTop),
-            end = Offset(front + skew, bandBottom),
+            start = Offset(startX, bandTop),
+            end = Offset(endX, bandBottom),
         )
     }
 }

@@ -74,13 +74,12 @@ export function wholeWordInkAlpha(progress: number, restingAlpha: number): numbe
 }
 
 /**
- * Diagonal angle so iso-alpha lines aren't vertical (wipe bar).
- * RTL reads right→left; a slight counter-angle keeps the front liquid.
+ * Mild diagonal so iso-alpha isn't a perfect vertical bar.
+ * Always ~left→right (80–100°) so stop order matches L→R pos sampling —
+ * reversing the angle was making RTL look like a reverse wipe.
  */
-function washAngleDeg(rtl: boolean, lean: number): number {
-  // Base diagonal + lean (±12°) per word/band.
-  const base = rtl ? 108 : 72
-  return base + lean * 12
+function washAngleDeg(lean: number): number {
+  return 90 + lean * 10
 }
 
 function singleWashGradient(
@@ -104,7 +103,7 @@ function singleWashGradient(
       : glyphA
     stops.push(`rgba(0,0,0,${a.toFixed(4)}) ${(pos * 100).toFixed(2)}%`)
   }
-  const angle = washAngleDeg(rtl, lean)
+  const angle = washAngleDeg(lean)
   return `linear-gradient(${angle.toFixed(1)}deg, ${stops.join(', ')})`
 }
 
@@ -138,7 +137,8 @@ function bandedMask(
     const offset = washBandOffsetFraction(seed, b) * INK_WASH_BAND_JITTER
     // head' = head + offset*feather → progress' = head' / travel
     const bp = Math.min(1, Math.max(0, p + (offset * feather) / travel))
-    const lean = wordLean * 0.6 + washBandOffsetFraction(seed, b + 17) * 0.4
+    // Keep lean small so angle stays near 90° (never reverse).
+    const lean = (wordLean * 0.6 + washBandOffsetFraction(seed, b + 17) * 0.4) * 0.5
     const g = singleWashGradient(
       bp,
       restingAlpha,
