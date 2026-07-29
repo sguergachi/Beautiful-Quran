@@ -54,6 +54,30 @@ sealed class ReaderInteractionEvent {
 
 object ReaderInteraction {
 
+    /**
+     * Initial focus ownership for a freshly opened reader. An explicit verse
+     * in the same paused playlist is a manual selection: when it differs from
+     * the held media item, park it as a jump so playback cannot reclaim focus
+     * before the playlist seeks there. An autoplay request already owns focus
+     * through playback and must not be mistaken for a paused selection.
+     */
+    fun initialState(
+        requestedAyah: Int?,
+        isThisSurahPlaying: Boolean,
+        isPlaying: Boolean,
+        playbackAyah: Int?,
+        playbackRequested: Boolean = false,
+    ): ReaderInteractionState {
+        val target = requestedAyah?.takeIf {
+            it > 0 && isThisSurahPlaying && !isPlaying &&
+                !playbackRequested && it != playbackAyah
+        } ?: return ReaderInteractionState()
+        return reduce(
+            ReaderInteractionState(),
+            ReaderInteractionEvent.JumpRequested(target, resumeFollowIfPlaying = false),
+        )
+    }
+
     fun reduce(
         state: ReaderInteractionState,
         event: ReaderInteractionEvent,

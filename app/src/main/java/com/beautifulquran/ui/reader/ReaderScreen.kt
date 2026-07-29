@@ -188,6 +188,8 @@ private sealed interface LazyItem {
 fun ReaderScreen(
     surahId: Int,
     startAyah: Int?,
+    /** True when [startAyah] came from an autoplay intent, not a bare focus selection. */
+    startPlaybackRequested: Boolean = false,
     /** 1-based word from a home word-search hit — triggers the orange flash. */
     startWordPosition: Int? = null,
     viewModel: ReaderViewModel,
@@ -306,7 +308,18 @@ fun ReaderScreen(
     }
     val sheen = remember { derivedStateOf { sheenAnim.value } }
     // Follow / jump / annotation precedence — pure rules in ReaderInteraction.
-    var interaction by remember { mutableStateOf(ReaderInteractionState()) }
+    var didInitialScroll by rememberSaveable { mutableStateOf(false) }
+    var interaction by remember {
+        mutableStateOf(
+            ReaderInteraction.initialState(
+                requestedAyah = startAyah.takeUnless { didInitialScroll },
+                isThisSurahPlaying = playerState.nowPlaying?.surahId == surahId,
+                isPlaying = playerState.isPlaying,
+                playbackAyah = playerState.nowPlaying?.ayah,
+                playbackRequested = startPlaybackRequested,
+            ),
+        )
+    }
     fun dispatch(event: ReaderInteractionEvent) {
         interaction = ReaderInteraction.reduce(interaction, event)
     }
@@ -631,10 +644,10 @@ fun ReaderScreen(
 
     LaunchedEffect(requestedJumpAyah) {
         val content = uiState.content ?: return@LaunchedEffect
-        val target = requestedJumpAyah
+        val request = requestedJumpAyah
             .takeIf { it > 0 }
-            ?.coerceIn(1, content.surah.ayahCount)
             ?: return@LaunchedEffect
+        val target = request.coerceIn(1, content.surah.ayahCount)
         // Do NOT clear pendingJump before focus() finishes: this effect is
         // keyed on it, so settling early cancels the coroutine mid-slide and the
         // jump reads as a pop. Clear in finally once the approach has landed (or
@@ -646,7 +659,7 @@ fun ReaderScreen(
         try {
             focusController.focus(target, animate = true, preRoll = true)
         } finally {
-            dispatch(ReaderInteractionEvent.JumpSettled(target))
+            dispatch(ReaderInteractionEvent.JumpSettled(request))
         }
     }
 
@@ -764,14 +777,18 @@ fun ReaderScreen(
     }
 
     // Opening from "Continue listening": settle on the saved ayah once.
-    var didInitialScroll by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(uiState.content) {
         initialFocusSettled = false
         val content = uiState.content
         if (content != null) {
             if (!didInitialScroll) {
                 didInitialScroll = true
-                if (startAyah != null && startAyah in 1..content.ayahs.size) {
+                // A different verse in this paused playlist was seeded into
+                // pendingJump above; that path both focuses it and moves the
+                // held media item without starting playback.
+                if (requestedJumpAyah == 0 &&
+                    startAyah != null && startAyah in 1..content.ayahs.size
+                ) {
                     focusController.focus(startAyah, animate = false)
                 }
             }
