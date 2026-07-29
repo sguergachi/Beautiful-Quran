@@ -102,7 +102,8 @@ rules** (idghām / iqlāb / ikhfāʾ) use same-ayah `prevArabic` to hold on the
 next word's first letter. The donor keeps its ordinary sweep while the
 separate prefix bloom carries ink across the junction; Wasl never accelerates
 the donor. Iẓhār (ءهعحغخ) and cross-ayah wasl are not connected. Madd ʿāriḍ
-letter choice at waqf remains a force-weight on the final letter.
+letter choice at waqf force-weights the final letter, unless the caller asks
+for `Hold.maddAaridWaqf` (see Waqf below).
 Counts live as named constants in `TajweedPacing`.
 
 **The counts pick the moment, not the tempo.** An earlier revision spread
@@ -187,6 +188,12 @@ The model is therefore a **gated hint**, built from four parts:
   actually sustaining. This is the one case that deliberately cruises past
   `cruiseCap` (up to ~2.2× the word's own uniform rate, still slower in
   absolute terms than an ordinary word because the word is so much longer).
+  `Hold.maddAaridWaqf` moves that park onto the **madd letter the stop
+  lengthens** — the ي of "ar-raḥīīīm", with the closing م crossed after the
+  park — which is what madd ʿāriḍ actually is. Off by default: the two letters
+  are adjacent and the wash feather blurs most of the difference, so flipping it
+  page-wide is a pacing change that wants its own review. The basmalah preface
+  (`BasmalahWash`) opts in, where that one park is over half the clip.
 - **Wasl connect (nūn rules).** When the **previous** word ends in nūn sākinah
   or tanwīn and **this** word starts with idghām (`يرملون`), iqlāb (`ب`), or
   ikhfāʾ (the fifteen letters), the nūn is absorbed under wasl and the
@@ -379,7 +386,8 @@ Known approximations, accepted for v1:
 - Widths are uniform per letter event (see the width-fractions section).
 - Cross-word nūn rules (idghām / iqlāb / ikhfāʾ) are implemented same-ayah;
   cross-ayah wasl and iẓhār are not. Madd ʿāriḍ at waqf still force-weights
-  the final letter rather than detecting the madd letter. Hamzat wasl is
+  the final letter by default; `Hold.maddAaridWaqf` detects the madd letter and
+  is on only for the basmalah preface. Hamzat wasl is
   always treated as elided (true mid-flow, slightly early at an utterance
   start).
 - Word-level `startMs`/`endMs` are themselves ±73 ms — letter pacing inherits

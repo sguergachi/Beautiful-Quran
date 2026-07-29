@@ -21,7 +21,11 @@ import {
   type Settings,
 } from '../data/settings'
 import { HighlightEngine, PreparedTimings } from '../domain/HighlightEngine'
-import { BASMALAH_PLAYLIST_AYAH } from '../domain/Basmalah'
+import {
+  BASMALAH_PLAYLIST_AYAH,
+  SURAH_FATIHA,
+  surahOpensWithBasmalahPreface,
+} from '../domain/Basmalah'
 import { HighlightClock } from '../domain/HighlightClock'
 import {
   fastForwardAction,
@@ -122,6 +126,23 @@ type Listener = () => void
 
 function deriveSheet(stackLayer: StackLayer, hasReader: boolean): Sheet {
   return sheetAtLayer(stackLayer, hasReader)
+}
+
+/**
+ * Surah timings plus, for preface surahs, Al-Fatihah 1:1 segments under
+ * [BASMALAH_PLAYLIST_AYAH] so the lead-in clip and the calligraphy wash share
+ * the same word clock. Android `ReaderViewModel.timingsWithBasmalahLeadIn`.
+ */
+function withBasmalahLeadIn(
+  map: Map<number, Segment[]>,
+  reciterId: number,
+  surahId: number,
+): Map<number, Segment[]> {
+  if (!surahOpensWithBasmalahPreface(surahId)) return map
+  const basmalah = QuranRepository.timings(reciterId, SURAH_FATIHA).get(1)
+  if (!basmalah) return map
+  // The repository caches its maps, so copy before adding the sentinel.
+  return new Map(map).set(BASMALAH_PLAYLIST_AYAH, basmalah)
 }
 
 class AppStore {
@@ -358,7 +379,12 @@ class AppStore {
 
   private reloadTimingsAndReciter(reciter: Reciter) {
     if (!this.state.content) return
-    const map = QuranRepository.timings(reciter.id, this.state.content.surah.id)
+    const surahId = this.state.content.surah.id
+    const map = withBasmalahLeadIn(
+      QuranRepository.timings(reciter.id, surahId),
+      reciter.id,
+      surahId,
+    )
     this.timingSegments = map
     this.prepared = new Map()
     const ayah = this.state.player.nowPlaying?.ayah ?? this.state.settings.lastAyah
@@ -468,7 +494,11 @@ class AppStore {
       // idle task and refresh the current highlight if Play was tapped first.
       const loadTimings = () => {
         if (token !== this.openToken) return
-        const map = QuranRepository.timings(reciter.id, surahId)
+        const map = withBasmalahLeadIn(
+          QuranRepository.timings(reciter.id, surahId),
+          reciter.id,
+          surahId,
+        )
         if (token !== this.openToken) return
         this.timingSegments = map
         this.ensurePrepared(ayah)
@@ -606,6 +636,15 @@ class AppStore {
     const surahId = this.state.content?.surah.id
     if (surahId != null) this.rememberListened(surahId, ayah)
     this.set({ followEnabled: true })
+  }
+
+  /**
+   * Word timings of the basmalah lead-in clip (Al-Fatihah 1:1) for the open
+   * chapter's reciter, so the calligraphy wash can ride the same word clock the
+   * clip does — Android `ReaderViewModel.timingsWithBasmalahLeadIn` parity.
+   */
+  basmalahSegments(): Segment[] | null {
+    return this.timingSegments.get(BASMALAH_PLAYLIST_AYAH) ?? null
   }
 
   /** First timing segment start for [ayah]/[wordPosition], if timings are loaded. */
