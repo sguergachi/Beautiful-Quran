@@ -556,10 +556,9 @@ internal fun linePaperCoverBounds(lineBounds: Rect, horizontalPad: Float): Rect 
         bottom = lineBounds.bottom,
     )
 
-// The ink wash feathers over 1.6× the word's own width, so the reveal reads as a
-// whole-word breath with a gentle directional lead rather than a hard moving
-// edge. The wash head therefore travels the word plus that feather (see below).
-internal const val InkWashFeather = 1.6f
+// Feather relative to word width: ~1–2 letters (not whole-word breath).
+// Wider values read as a directional crossfade; see INK_WASH_FEEL_CLAUDE R1.
+internal const val InkWashFeather = 0.5f
 
 /**
  * smootherstep (6t⁵−15t⁴+10t³): zero first *and* second derivative at both ends,

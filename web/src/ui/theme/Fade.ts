@@ -4,7 +4,7 @@
 
 /** smootherstep (6t⁵−15t⁴+10t³): zero first and second derivative at both ends. */
 export const INK_PROFILE_STOPS = 9
-export const INK_WASH_FEATHER = 1.6
+export const INK_WASH_FEATHER = 0.5
 
 export function inkSmootherstep(t: number): number {
   const c = t < 0 ? 0 : t > 1 ? 1 : t

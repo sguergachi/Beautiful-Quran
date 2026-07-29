@@ -1,9 +1,9 @@
 /* Beautiful Quran — web port of ui/theme/Fade.kt ink bloom.
  *
- * The reader highlight is a smootherstep wash (letterFadeIn). With
- * InkWashFeather = 1.6 the wash is deliberately a whole-word breath with only
- * a gentle directional lead — for the marketing site (accelerated, not
- * audio-timed) we animate that breath as per-word opacity on the same curve:
+ * The reader highlight is a smootherstep wash (letterFadeIn) with a
+ * ~0.5 word-width feather (visible travelling front, ~1–2 letters). For the
+ * marketing site (accelerated, not audio-timed) we animate that as per-word
+ * opacity on the same curve:
  *
  *   alpha(p) = resting + (1 − resting) × inkSmootherstep(p)
  *
