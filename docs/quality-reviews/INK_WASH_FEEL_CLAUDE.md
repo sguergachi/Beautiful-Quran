@@ -80,4 +80,7 @@ Horizontal-only gradients mean the dot of a bāʾ and the bowl of the same bāʾ
 ## Status
 - **R1 landed** — `InkWashFeather` / paced defaults at 0.5 / 0.45 (Android + web).
 - **R2 landed** — shared `inkWashProfile` = `smootherstep(√t)` on all wash stop builders + `inkWashAlpha` (Android + web). Symmetric `inkSmootherstep` kept for glint / whole-word breath only.
-- **Next:** R3 (seeded band irregularity) if the front still reads too machine-straight; then R4 dilute tint.
+- **R3 landed** — 4 seeded horizontal fibre bands stagger the wash head (Android draw + web stacked `mask-image`; seed folded to 8 cache variants).
+- **R4 landed** — `QuranAccents.diluteInk` warms mid-feather paper cover (Android `paperWashColors`); CSS `--dilute-ink` token on web.
+- **R5 landed** — `InkProfileStops` / `INK_PROFILE_STOPS` 9 → 17.
+- **Next:** tune dilute chroma / band jitter by eye; wet-edge overshoot rim only if still flat.

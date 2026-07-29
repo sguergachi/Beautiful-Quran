@@ -1737,19 +1737,28 @@ private class WordInkPalette(
     private val fullInk: Color,
     private val paper: Color,
     private val repeatInk: Color,
+    private val diluteInk: Color,
 ) {
     val fullInkColor: Color get() = fullInk
     val paperColor: Color get() = paper
     val repeatInkColor: Color get() = repeatInk
+    val diluteInkColor: Color get() = diluteInk
 }
 
 @Composable
 private fun rememberWordInkPalette(): WordInkPalette {
     val fullInk = MaterialTheme.colorScheme.onBackground
     val paper = MaterialTheme.colorScheme.background
-    val repeatInk = LocalQuranAccents.current.repeatInk
-    return remember(fullInk, paper, repeatInk) {
-        WordInkPalette(fullInk = fullInk, paper = paper, repeatInk = repeatInk)
+    val accents = LocalQuranAccents.current
+    val repeatInk = accents.repeatInk
+    val diluteInk = accents.diluteInk
+    return remember(fullInk, paper, repeatInk, diluteInk) {
+        WordInkPalette(
+            fullInk = fullInk,
+            paper = paper,
+            repeatInk = repeatInk,
+            diluteInk = diluteInk,
+        )
     }
 }
 
@@ -1978,6 +1987,7 @@ private fun ResponsiveEnglishAyah(
                             paper = palette.paperColor,
                             restingAlpha = InkEngine.State.Upcoming.inkAlpha(),
                             feather = sweepState.feather.value,
+                            diluteInk = palette.diluteInkColor,
                         )
                     }
                     repeatWashes.forEachIndexed { index, wash ->
@@ -2278,6 +2288,7 @@ private fun ResponsiveHafsAyah(
                             // Locked at Active entry so residual handoff keeps
                             // the paced edge width (not only while activeIndex).
                             feather = sweepState.feather.value,
+                            diluteInk = palette.diluteInkColor,
                         )
                     }
                     waslPrefixes.forEachIndexed { index, prefix ->

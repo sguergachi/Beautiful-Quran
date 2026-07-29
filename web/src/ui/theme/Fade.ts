@@ -2,10 +2,14 @@
  * Ink wash math — port of Android `ui/theme/Fade.kt` helpers.
  */
 
-/** Sample count for directional wash gradients (Android `InkProfileStops`). */
-export const INK_PROFILE_STOPS = 9
+/** Gradient samples across the feather (Android `InkProfileStops`, R5). */
+export const INK_PROFILE_STOPS = 17
 /** Feather relative to word width (~1–2 letters; see INK_WASH_FEEL R1). */
 export const INK_WASH_FEATHER = 0.5
+/** Horizontal fibre bands that stagger the wash head (R3). */
+export const INK_WASH_BAND_COUNT = 4
+/** Max head stagger as a fraction of feather width (R3). */
+export const INK_WASH_BAND_JITTER = 0.15
 
 /** smootherstep — non-wash easing (glint, whole-word breath). */
 export function inkSmootherstep(t: number): number {
@@ -21,6 +25,18 @@ export function inkSmootherstep(t: number): number {
 export function inkWashProfile(t: number): number {
   const c = t < 0 ? 0 : t > 1 ? 1 : t
   return inkSmootherstep(Math.sqrt(c))
+}
+
+/**
+ * Deterministic band stagger in [-1, 1]. Seed is per-word; band index varies
+ * the front even when seed is fixed. Never use frame time.
+ */
+export function washBandOffsetFraction(seed: number, band: number): number {
+  let h = (Math.imul(seed | 0, 374761393) + Math.imul(band | 0, 668265263) + 1013904223) | 0
+  h = (h ^ (h >>> 13)) | 0
+  h = Math.imul(h, 127412617)
+  h = (h ^ (h >>> 16)) | 0
+  return ((h & 0xffff) / 65535) * 2 - 1
 }
 
 /**
@@ -40,7 +56,7 @@ export function inkWashAlpha(
   // Head travels one edge past the end so the final letter finishes at p=1.
   const travel = 1 + edge
   const head = p * travel
-  const local = rtl ? (1 - pos) : pos
+  const local = rtl ? 1 - pos : pos
   // Distance behind the wash head, normalized by feather width.
   const behind = (head - local) / edge
   const s = inkWashProfile(behind)
@@ -53,17 +69,13 @@ export function wholeWordInkAlpha(progress: number, restingAlpha: number): numbe
   return restingAlpha + (1 - restingAlpha) * inkSmootherstep(p)
 }
 
-/**
- * CSS mask-image for the directional ink wash.
- * Samples [inkWashAlpha] across the word (layout L→R) so the reveal matches
- * Android's asymmetric wash bloom instead of a blunt 3-stop wipe.
- */
-export function washMaskImage(
+function singleWashGradient(
   progress: number,
   restingAlpha: number,
   rtl: boolean,
-  feather = INK_WASH_FEATHER,
-  stopCount = INK_PROFILE_STOPS,
+  feather: number,
+  stopCount: number,
+  paperCover: boolean,
 ): string {
   const p = Math.min(1, Math.max(0, progress))
   if (p >= 1) return 'none'
@@ -71,10 +83,77 @@ export function washMaskImage(
   const stops: string[] = []
   for (let i = 0; i < n; i++) {
     const pos = i / (n - 1)
-    const a = inkWashAlpha(pos, p, restingAlpha, rtl, feather)
+    const glyphA = inkWashAlpha(pos, p, restingAlpha, rtl, feather)
+    const a = paperCover
+      ? Math.min(1, Math.max(0, 1 - glyphA))
+      : glyphA
     stops.push(`rgba(0,0,0,${a.toFixed(4)}) ${(pos * 100).toFixed(2)}%`)
   }
   return `linear-gradient(to right, ${stops.join(', ')})`
+}
+
+/**
+ * Banded CSS mask: stacked horizontal strips with seeded head offsets (R3).
+ * Returns a multi-layer mask-image string plus size/position for applyMask.
+ */
+export type BandedMask = {
+  image: string
+  size: string
+  position: string
+}
+
+function bandedMask(
+  progress: number,
+  restingAlpha: number,
+  rtl: boolean,
+  feather: number,
+  seed: number,
+  paperCover: boolean,
+  stopCount = INK_PROFILE_STOPS,
+): BandedMask | 'none' {
+  const p = Math.min(1, Math.max(0, progress))
+  if (p >= 1) return 'none'
+  const travel = 1 + feather
+  const layers: string[] = []
+  const positions: string[] = []
+  const bandPct = 100 / INK_WASH_BAND_COUNT
+  for (let b = 0; b < INK_WASH_BAND_COUNT; b++) {
+    const offset = washBandOffsetFraction(seed, b) * INK_WASH_BAND_JITTER
+    // head' = head + offset*feather → progress' = head' / travel
+    const bp = Math.min(1, Math.max(0, p + (offset * feather) / travel))
+    const g = singleWashGradient(bp, restingAlpha, rtl, feather, stopCount, paperCover)
+    if (g === 'none') {
+      // Fully revealed band: opaque (glyph) or transparent (paper cover).
+      layers.push(
+        paperCover
+          ? 'linear-gradient(to right, rgba(0,0,0,0), rgba(0,0,0,0))'
+          : 'linear-gradient(to right, rgba(0,0,0,1), rgba(0,0,0,1))',
+      )
+    } else {
+      layers.push(g)
+    }
+    positions.push(`0% ${(b * bandPct).toFixed(4)}%`)
+  }
+  return {
+    image: layers.join(', '),
+    size: `100% ${bandPct.toFixed(4)}%`,
+    position: positions.join(', '),
+  }
+}
+
+/**
+ * CSS mask-image for the directional ink wash (glyph DstIn path).
+ * Banded fibre front (R3) + inkWashProfile (R2).
+ */
+export function washMaskImage(
+  progress: number,
+  restingAlpha: number,
+  rtl: boolean,
+  feather = INK_WASH_FEATHER,
+  stopCount = INK_PROFILE_STOPS,
+  seed = 0,
+): BandedMask | 'none' {
+  return bandedMask(progress, restingAlpha, rtl, feather, seed, false, stopCount)
 }
 
 /**
@@ -88,18 +167,20 @@ export function paperCoverMaskImage(
   rtl: boolean,
   feather = INK_WASH_FEATHER,
   stopCount = INK_PROFILE_STOPS,
+  seed = 0,
+): BandedMask | 'none' {
+  return bandedMask(progress, restingAlpha, rtl, feather, seed, true, stopCount)
+}
+
+/** @deprecated single-layer form for tests that only care about alpha math. */
+export function washMaskImageFlat(
+  progress: number,
+  restingAlpha: number,
+  rtl: boolean,
+  feather = INK_WASH_FEATHER,
+  stopCount = INK_PROFILE_STOPS,
 ): string {
-  const p = Math.min(1, Math.max(0, progress))
-  if (p >= 1) return 'none'
-  const n = Math.max(2, stopCount)
-  const stops: string[] = []
-  for (let i = 0; i < n; i++) {
-    const pos = i / (n - 1)
-    const glyphA = inkWashAlpha(pos, p, restingAlpha, rtl, feather)
-    const paperA = Math.min(1, Math.max(0, 1 - glyphA))
-    stops.push(`rgba(0,0,0,${paperA.toFixed(4)}) ${(pos * 100).toFixed(2)}%`)
-  }
-  return `linear-gradient(to right, ${stops.join(', ')})`
+  return singleWashGradient(progress, restingAlpha, rtl, feather, stopCount, false)
 }
 
 /** Cubic-bezier sample for sweep easing (matches InkEngine tuning defaults). */

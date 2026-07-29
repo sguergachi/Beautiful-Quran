@@ -4,8 +4,11 @@ import {
   inkWashAlpha,
   inkWashProfile,
   INK_PROFILE_STOPS,
+  INK_WASH_BAND_COUNT,
   paperCoverMaskImage,
+  washBandOffsetFraction,
   washMaskImage,
+  washMaskImageFlat,
   wholeWordInkAlpha,
 } from '../Fade'
 
@@ -53,17 +56,38 @@ describe('fade math', () => {
     expect(washMaskImage(1, 0.22, true)).toBe('none')
   })
 
-  it('washMaskImage builds a multi-stop gradient at mid progress', () => {
+  it('washMaskImage builds banded multi-stop gradients at mid progress (R3+R5)', () => {
     const mask = washMaskImage(0.4, 0.22, true)
-    expect(mask.startsWith('linear-gradient(to right,')).toBe(true)
-    expect(mask.split('rgba').length - 1).toBe(INK_PROFILE_STOPS)
+    expect(mask).not.toBe('none')
+    if (mask === 'none') return
+    expect(mask.image.split('linear-gradient').length - 1).toBe(INK_WASH_BAND_COUNT)
+    // Each band has INK_PROFILE_STOPS rgba stops.
+    expect(mask.image.split('rgba').length - 1).toBe(
+      INK_WASH_BAND_COUNT * INK_PROFILE_STOPS,
+    )
+    expect(mask.size).toContain('%')
+    expect(mask.position.split(',').length).toBe(INK_WASH_BAND_COUNT)
   })
 
-  it('paperCoverMaskImage is the inverse of glyph wash alpha', () => {
+  it('wash bands stagger deterministically and stay in [-1,1] (R3)', () => {
+    const a = washBandOffsetFraction(12, 0)
+    const b = washBandOffsetFraction(12, 1)
+    expect(a).not.toBe(b)
+    expect(a).toBeGreaterThanOrEqual(-1)
+    expect(a).toBeLessThanOrEqual(1)
+    expect(washBandOffsetFraction(12, 0)).toBe(a) // stable
+  })
+
+  it('paperCoverMaskImage is banded; flat progress 0 is full cover alpha', () => {
     expect(paperCoverMaskImage(1, 0.22, true)).toBe('none')
+    const flat = washMaskImageFlat(0, 0.22, true)
+    // Progress 0 → glyph at resting → paper cover (1 − resting) on flat path.
+    expect(flat).toContain('rgba(0,0,0,0.2200)')
     const mask = paperCoverMaskImage(0, 0.22, true)
-    expect(mask.startsWith('linear-gradient(to right,')).toBe(true)
-    // Progress 0 → uniform paper cover of (1 − restingAlpha).
-    expect(mask).toContain('rgba(0,0,0,0.7800)')
+    expect(mask).not.toBe('none')
+    if (mask === 'none') return
+    expect(mask.image.startsWith('linear-gradient')).toBe(true)
+    // Paper cover at progress 0 → uniform (1 − resting) = 0.78.
+    expect(mask.image).toContain('rgba(0,0,0,0.7800)')
   })
 })

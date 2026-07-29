@@ -90,4 +90,40 @@ class InkWashAlphaTest {
         assertTrue("median should be early (toe), got $t50", t50 < 0.5f)
         assertTrue(abs(inkWashProfile(t50) - 0.5f) < 0.02f)
     }
+
+    @Test
+    fun washBands_staggerDeterministicallyWithinJitter( ) {
+        val a = washBandOffsetFraction(12, 0)
+        val b = washBandOffsetFraction(12, 1)
+        assertTrue(a != b)
+        assertTrue(a in -1f..1f)
+        assertEquals(a, washBandOffsetFraction(12, 0), 0f)
+        val edge = 100f
+        val delta = washBandHeadDelta(12, 0, edge)
+        assertTrue(abs(delta) <= edge * InkWashBandJitter + 1e-4f)
+    }
+
+    @Test
+    fun paperWashColors_warmMidFeatherTowardDilute() {
+        val paper = androidx.compose.ui.graphics.Color(0xFFFAF3E8)
+        val dilute = androidx.compose.ui.graphics.Color(0xFF4A3728)
+        val colors = paperWashColors(
+            stops = FloatArray(17) { i -> i / 16f },
+            paper = paper,
+            diluteInk = dilute,
+            restingAlpha = 0.22f,
+            rtl = true,
+        )
+        assertEquals(17, colors.size)
+        // Ahead end of RTL gradient (t=0): full paper cover at resting glyph.
+        assertEquals(1f - 0.22f, colors.first().alpha, 1e-3f)
+        // Mid-feather pulls cover hue toward dilute (not pure paper grey-out).
+        val mid = colors[colors.size / 2]
+        assertTrue(
+            "mid should warm toward dilute ink",
+            mid.red < paper.red || mid.green < paper.green,
+        )
+        // Full glyph end of feather: paper cover alpha ~0.
+        assertEquals(0f, colors.last().alpha, 1e-3f)
+    }
 }

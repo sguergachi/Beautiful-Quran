@@ -68,12 +68,23 @@ function applyWash(
   if (progress >= 1) {
     el.style.maskImage = 'none'
     el.style.webkitMaskImage = 'none'
+    el.style.removeProperty('mask-size')
+    el.style.removeProperty('mask-position')
+    el.style.removeProperty('mask-repeat')
     el.style.opacity = '1'
     return
   }
   const mask = washMaskImage(progress, restingAlpha, true)
-  el.style.maskImage = mask
-  el.style.webkitMaskImage = mask
+  if (mask === 'none') {
+    el.style.maskImage = 'none'
+    el.style.webkitMaskImage = 'none'
+  } else {
+    el.style.maskImage = mask.image
+    el.style.webkitMaskImage = mask.image
+    el.style.maskSize = mask.size
+    el.style.maskPosition = mask.position
+    el.style.maskRepeat = 'no-repeat'
+  }
   el.style.opacity = '1'
 }
 

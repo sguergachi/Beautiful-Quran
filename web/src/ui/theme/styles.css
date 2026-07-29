@@ -16,6 +16,8 @@
   --emboss-dark: rgba(0, 0, 0, 0.14);
   --emboss-light: rgba(255, 255, 255, 0.35);
   --repeat: #c2622a;
+  /* Warm umber dilute for wash mid-feather (R4); keep chroma low. */
+  --dilute-ink: #4a3728;
   --bookmark: #b3122f;
   --font-display: 'Cormorant Garamond', 'Times New Roman', serif;
   --font-body: 'EB Garamond', 'Times New Roman', serif;
@@ -59,6 +61,8 @@
   --emboss-light: rgba(255, 255, 255, 0.12);
   /* Deep saturated orange — warm ink on charcoal, not a pale peach wash. */
   --repeat: #e06a18;
+  /* Warm parchment dilute on charcoal (R4). */
+  --dilute-ink: #9a8b72;
   --bookmark: #d64358;
   /* Fresh-ink glint: white gold a breath brighter and warmer than the
    * parchment ink, so a newly read word glints on dark themes without

@@ -12,11 +12,16 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Canvas
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Paint
+import androidx.compose.ui.graphics.asAndroidPath
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.unit.Dp
@@ -31,8 +36,9 @@ import kotlin.math.floor
  * the sweep animates every frame without a single recomposition or relayout.
  *
  * Across the feather the alpha follows [inkWashProfile]: a steep toe (crisp
- * arrival) and a long shoulder (soak behind the front) — density as wash, not
- * a symmetric fade. The edge is ~1–2 letters ([InkWashFeather]).
+ * arrival) and a long shoulder (soak behind the front). The front is split into
+ * seeded horizontal bands so it reads as fibre, not a machine wipe. The edge
+ * is ~1–2 letters ([InkWashFeather]).
  *
  * Letters ahead of the wash rest at [restingAlpha] (the "upcoming" ink);
  * letters behind it are fully inked. The mask uses a small bleed around the
@@ -75,28 +81,26 @@ fun Modifier.letterFadeIn(
             )
         }
         drawContent()
-            // Head travels one edge past the end so the final letter finishes
-            // exactly at p = 1; feather width is ~1–2 letters (see R1).
-            val edge = (w * feather).coerceAtLeast(1f)
-            val head = p * (w * revealFraction.coerceIn(0f, 1f) + edge)
-            val brush = if (rtl) {
-                Brush.horizontalGradient(
-                    colors = washColors,
-                    startX = w - head,
-                    endX = w - head + edge,
-                )
-            } else {
-                Brush.horizontalGradient(
-                    colors = washColors,
-                    startX = head - edge,
-                    endX = head,
-                )
-            }
-        drawRect(
-            brush = brush,
-            topLeft = Offset(-bleed, -bleed),
-            size = Size(size.width + bleed * 2f, size.height + bleed * 2f),
+        // Head travels one edge past the end so the final letter finishes
+        // exactly at p = 1; feather width is ~1–2 letters (see R1).
+        val edge = (w * feather).coerceAtLeast(1f)
+        val head = p * (w * revealFraction.coerceIn(0f, 1f) + edge)
+        // Seed 0 still varies by band index — enough to break a straight wipe.
+        drawWashBands(
+            left = -bleed,
+            top = -bleed,
+            width = size.width + bleed * 2f,
+            height = size.height + bleed * 2f,
+            edge = edge,
+            head = head,
+            rtl = rtl,
+            colors = washColors,
+            seed = 0,
             blendMode = BlendMode.DstIn,
+            // letterFadeIn head is already in the local (0..w+edge) frame with
+            // RTL measured from the right edge of the *content* width.
+            headOriginLeft = 0f,
+            contentWidth = w,
         )
         drawIntoCanvas { canvas -> canvas.restore() }
     }
@@ -164,13 +168,15 @@ sealed class ShapedWordBloom {
     /** First-pass ink: paper cover over full-ink glyphs, wash from
      * [restingAlpha] → 1 (same curve as [letterFadeIn]). [feather] overrides
      * the modifier-level feather when set — a tajweed-paced word narrows its
-     * edge so letter dwell stays visible. */
+     * edge so letter dwell stays visible. [diluteInk] warms the mid-feather
+     * cover so the transition reads as thin pigment, not grey paper. */
     data class InkReveal(
         override val range: IntRange,
         val progress: Float,
         val paper: Color,
         val restingAlpha: Float,
         val feather: Float? = null,
+        val diluteInk: Color = paper,
     ) : ShapedWordBloom()
 
     /** Tinted ink (orange repeat, white-gold glint): shaped glyphs tinted to
@@ -254,17 +260,21 @@ fun Modifier.shapedWordBloom(
                 is ShapedWordBloom.InkReveal -> {
                     // Full ink is already on the page; pull paper back along the
                     // wash so glyphs breathe in. Padded clip covers mark/AA
-                    // overhangs (same as UpcomingDim).
+                    // overhangs (same as UpcomingDim). Seeded horizontal bands
+                    // break the straight wipe (R3); mid-feather warms toward
+                    // dilute ink so the transition is pigment, not grey (R4).
                     val p = bloom.progress.coerceIn(0f, 1f)
                     if (p >= 1f) return@forEach
                     val lineBounds = lineBoundsCache.boundsFor(textLayout, start, endExclusive)
-                    val paperColors = stops.map { t ->
-                        val s = inkWashProfile(t)
-                        val glyphAlpha = bloom.restingAlpha +
-                            (1f - bloom.restingAlpha) * (if (rtl) s else 1f - s)
-                        bloom.paper.copy(alpha = (1f - glyphAlpha).coerceIn(0f, 1f))
-                    }
+                    val paperColors = paperWashColors(
+                        stops = stops,
+                        paper = bloom.paper,
+                        diluteInk = bloom.diluteInk,
+                        restingAlpha = bloom.restingAlpha,
+                        rtl = rtl,
+                    )
                     val pad = PaperCoverPad.toPx()
+                    val seed = start
                     lineBounds.forEach { bounds ->
                         val cover = linePaperCoverBounds(bounds, pad)
                         // The clip/draw rect already includes [pad] for glyph
@@ -277,29 +287,24 @@ fun Modifier.shapedWordBloom(
                         val w = cover.width
                         val edge = (w * (bloom.feather ?: feather)).coerceAtLeast(1f)
                         val head = p * (w + edge)
-                        val brush = if (rtl) {
-                            Brush.horizontalGradient(
-                                colors = paperColors,
-                                startX = washLeft + (w - head),
-                                endX = washLeft + (w - head) + edge,
-                            )
-                        } else {
-                            Brush.horizontalGradient(
-                                colors = paperColors,
-                                startX = washLeft + head - edge,
-                                endX = washLeft + head,
-                            )
-                        }
                         clipRect(
                             left = cover.left,
                             top = cover.top,
                             right = cover.right,
                             bottom = cover.bottom,
                         ) {
-                            drawRect(
-                                brush = brush,
-                                topLeft = Offset(washLeft, cover.top),
-                                size = Size(w, cover.height),
+                            drawWashBands(
+                                left = washLeft,
+                                top = cover.top,
+                                width = w,
+                                height = cover.height,
+                                edge = edge,
+                                head = head,
+                                rtl = rtl,
+                                colors = paperColors,
+                                seed = seed,
+                                headOriginLeft = washLeft,
+                                contentWidth = w,
                             )
                         }
                     }
@@ -376,24 +381,19 @@ fun Modifier.shapedWordBloom(
                         )
                     }
                     if (p < 1f || bloom.revealFraction < 1f) {
-                        val brush = if (rtl) {
-                            Brush.horizontalGradient(
-                                colors = washColors,
-                                startX = bounds.left + (w - head),
-                                endX = bounds.left + (w - head) + edge,
-                            )
-                        } else {
-                            Brush.horizontalGradient(
-                                colors = washColors,
-                                startX = bounds.left + head - edge,
-                                endX = bounds.left + head,
-                            )
-                        }
-                        drawRect(
-                            brush = brush,
-                            topLeft = Offset(bounds.left - bleed, bounds.top - bleed),
-                            size = Size(bounds.width + bleed * 2f, bounds.height + bleed * 2f),
+                        drawWashBands(
+                            left = bounds.left - bleed,
+                            top = bounds.top - bleed,
+                            width = bounds.width + bleed * 2f,
+                            height = bounds.height + bleed * 2f,
+                            edge = edge,
+                            head = head,
+                            rtl = rtl,
+                            colors = washColors,
+                            seed = start,
                             blendMode = BlendMode.DstIn,
+                            headOriginLeft = bounds.left,
+                            contentWidth = w,
                         )
                     }
                     drawIntoCanvas { canvas -> canvas.restore() }
@@ -529,13 +529,26 @@ private fun computeLineBounds(
     }
 }
 
-private const val InkProfileStops = 9
+/** Gradient samples across the feather — denser than 9 to kill digital banding (R5). */
+private const val InkProfileStops = 17
+
+/** Horizontal fibre bands that stagger the wash head (R3). */
+internal const val InkWashBandCount = 4
+
+/**
+ * Max head stagger as a fraction of feather width. ~0.15 keeps the front
+ * irregular without looking torn (Claude: >0.25 letter is glitchy).
+ */
+internal const val InkWashBandJitter = 0.15f
+
+/** Peak mix of [diluteInk] into the paper cover at mid-feather (R4). */
+internal const val InkDilutePeak = 0.4f
+
 /** Extra room around this word's measured box so Hafs marks/overhangs aren't
  * clipped by the offscreen [letterFadeIn] / [shapedWordBloom] mask. Local to
  * the word's draw scope — does not paint onto neighbours. */
 private val FadeLayerBleed = 14.dp
 
-/** Visible but still ink-like halo around Nightfall's active glimmer. */
 /** Horizontal pad beyond [TextLayoutResult.getPathForRange] when painting
  * paper covers. Vertical expansion is forbidden because it masks glyphs on
  * adjacent lines. */
@@ -553,6 +566,105 @@ internal fun linePaperCoverBounds(lineBounds: Rect, horizontalPad: Float): Rect 
 // Feather relative to word width: ~1–2 letters (not whole-word breath).
 // Wider values read as a directional crossfade; see INK_WASH_FEEL_CLAUDE R1.
 internal const val InkWashFeather = 0.5f
+
+/**
+ * Deterministic band stagger in [-1, 1]. Seed is per-word (character start);
+ * band index varies the front even when seed is fixed. Never use frame time —
+ * that would shimmer.
+ */
+internal fun washBandOffsetFraction(seed: Int, band: Int): Float {
+    var h = seed * 374_761_393 + band * 668_265_263 + 1_013_904_223
+    h = h xor (h ushr 13)
+    h *= 127_412_617
+    h = h xor (h ushr 16)
+    return ((h and 0xFFFF) / 65_535f) * 2f - 1f
+}
+
+/** Head delta in px for one fibre band. */
+internal fun washBandHeadDelta(seed: Int, band: Int, edge: Float): Float =
+    washBandOffsetFraction(seed, band) * edge * InkWashBandJitter
+
+/**
+ * Paper-cover stop colors: glyph alpha via [inkWashProfile], cover hue
+ * warmed toward [diluteInk] mid-feather so the wet edge is thin pigment
+ * rather than 50% grey paper over black (R4).
+ */
+internal fun paperWashColors(
+    stops: FloatArray,
+    paper: Color,
+    diluteInk: Color,
+    restingAlpha: Float,
+    rtl: Boolean,
+): List<Color> = stops.map { t ->
+    val s = inkWashProfile(t)
+    val glyphAlpha = restingAlpha + (1f - restingAlpha) * (if (rtl) s else 1f - s)
+    val paperAlpha = (1f - glyphAlpha).coerceIn(0f, 1f)
+    // Peak wetness mid-feather (t=0.5 → 1); soft at both ends of the edge.
+    val wet = 4f * t * (1f - t)
+    val cover = lerp(paper, diluteInk, (wet * InkDilutePeak).coerceIn(0f, 1f))
+    cover.copy(alpha = paperAlpha)
+}
+
+/**
+ * Draw a horizontal wash as [InkWashBandCount] stacked strips, each with a
+ * seeded head offset so the front is fibre-irregular (R3), not a wipe bar.
+ *
+ * [head] is distance the wash has travelled in content space (0 → width+edge).
+ * [headOriginLeft] / [contentWidth] locate the content box when the draw rect
+ * is larger (bleed) or offset (paper cover pad).
+ */
+private fun DrawScope.drawWashBands(
+    left: Float,
+    top: Float,
+    width: Float,
+    height: Float,
+    edge: Float,
+    head: Float,
+    rtl: Boolean,
+    colors: List<Color>,
+    seed: Int,
+    blendMode: BlendMode = DefaultBlendMode,
+    headOriginLeft: Float,
+    contentWidth: Float,
+) {
+    if (width <= 0f || height <= 0f) return
+    val bandH = height / InkWashBandCount
+    for (band in 0 until InkWashBandCount) {
+        val bandTop = top + band * bandH
+        val bandBottom =
+            if (band == InkWashBandCount - 1) top + height else bandTop + bandH
+        val headB = (head + washBandHeadDelta(seed, band, edge)).coerceAtLeast(0f)
+        val brush = if (rtl) {
+            Brush.horizontalGradient(
+                colors = colors,
+                startX = headOriginLeft + (contentWidth - headB),
+                endX = headOriginLeft + (contentWidth - headB) + edge,
+            )
+        } else {
+            Brush.horizontalGradient(
+                colors = colors,
+                startX = headOriginLeft + headB - edge,
+                endX = headOriginLeft + headB,
+            )
+        }
+        clipRect(
+            left = left,
+            top = bandTop,
+            right = left + width,
+            bottom = bandBottom,
+        ) {
+            drawRect(
+                brush = brush,
+                topLeft = Offset(left, bandTop),
+                size = Size(width, bandBottom - bandTop),
+                blendMode = blendMode,
+            )
+        }
+    }
+}
+
+/** [BlendMode] default for non-DstIn paper covers. */
+private val DefaultBlendMode: BlendMode = BlendMode.SrcOver
 
 /**
  * smootherstep (6t⁵−15t⁴+10t³): zero first *and* second derivative at both ends.

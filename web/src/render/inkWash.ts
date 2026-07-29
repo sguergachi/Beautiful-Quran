@@ -5,27 +5,38 @@
  * Progress timelines run through Motion (`animate`) so wash easing matches
  * the rest of the reader (and Android's cubic-bezier curves).
  *
- * **Fidelity law:** the active-word wash MUST use the smootherstep directional
+ * **Fidelity law:** the active-word wash MUST use the banded directional
  * mask (`washMaskImage` / `paperCoverMaskImage`) so the reader sees the soft
  * faded leading edge — the same `letterFadeIn` / `shapedWordBloom` look as
  * Android. Never replace this with whole-word opacity or a hard `scaleX` cut
  * for "performance". Quantize + cache mask strings so the hot path stays cheap.
  */
 import { animate, type AnimationPlaybackControls } from 'motion'
-import { cubicBezierEase, paperCoverMaskImage, washMaskImage } from '../ui/theme/Fade'
+import {
+  cubicBezierEase,
+  paperCoverMaskImage,
+  washMaskImage,
+  type BandedMask,
+} from '../ui/theme/Fade'
 import { getTuning } from '../ui/reader/InkEngine'
 import { cubicBezierTuple, type CubicBezierEase } from '../ui/motion/easing'
 
 /** Quantize wash progress to ~48 steps — visually identical, far fewer strings. */
 const WASH_STEPS = 48
 
-const washMaskCache = new Map<string, string>()
-const paperMaskCache = new Map<string, string>()
+type CachedMask = BandedMask | 'none'
+const washMaskCache = new Map<string, CachedMask>()
+const paperMaskCache = new Map<string, CachedMask>()
 
 function quantizeProgress(p: number): number {
   if (p >= 1) return 1
   if (p <= 0) return 0
   return Math.round(p * WASH_STEPS) / WASH_STEPS
+}
+
+/** Fold word seed into 8 variants so the mask cache stays small (R3 parity). */
+function seedVariant(seed: number): number {
+  return ((seed % 8) + 8) % 8
 }
 
 function sweepEase() {
@@ -43,13 +54,15 @@ export function cachedWashMask(
   restingAlpha: number,
   rtl: boolean,
   feather: number,
-): string {
+  seed = 0,
+): CachedMask {
   const q = quantizeProgress(progress)
   if (q >= 1) return 'none'
-  const key = `${q}|${restingAlpha}|${rtl ? 1 : 0}|${feather}`
+  const v = seedVariant(seed)
+  const key = `${q}|${restingAlpha}|${rtl ? 1 : 0}|${feather}|${v}`
   let mask = washMaskCache.get(key)
   if (mask == null) {
-    mask = washMaskImage(q, restingAlpha, rtl, feather)
+    mask = washMaskImage(q, restingAlpha, rtl, feather, undefined, v)
     washMaskCache.set(key, mask)
   }
   return mask
@@ -60,34 +73,48 @@ export function cachedPaperCoverMask(
   restingAlpha: number,
   rtl: boolean,
   feather: number,
-): string {
+  seed = 0,
+): CachedMask {
   const q = quantizeProgress(progress)
   if (q >= 1) return 'none'
-  const key = `${q}|${restingAlpha}|${rtl ? 1 : 0}|${feather}`
+  const v = seedVariant(seed)
+  const key = `${q}|${restingAlpha}|${rtl ? 1 : 0}|${feather}|${v}`
   let mask = paperMaskCache.get(key)
   if (mask == null) {
-    mask = paperCoverMaskImage(q, restingAlpha, rtl, feather)
+    mask = paperCoverMaskImage(q, restingAlpha, rtl, feather, undefined, v)
     paperMaskCache.set(key, mask)
   }
   return mask
 }
 
-export function applyMask(el: HTMLElement | SVGElement, mask: string) {
+export function applyMask(el: HTMLElement | SVGElement, mask: CachedMask) {
   if (mask === 'none') {
     if (el.style.maskImage || el.style.webkitMaskImage) {
       el.style.removeProperty('mask-image')
       el.style.removeProperty('-webkit-mask-image')
+      el.style.removeProperty('mask-size')
+      el.style.removeProperty('-webkit-mask-size')
+      el.style.removeProperty('mask-position')
+      el.style.removeProperty('-webkit-mask-position')
+      el.style.removeProperty('mask-repeat')
+      el.style.removeProperty('-webkit-mask-repeat')
     }
     el.classList.remove('word-wash')
     return
   }
   // Skip redundant writes when the quantized mask hasn't changed.
-  if (el.style.maskImage === mask) {
+  if (el.style.maskImage === mask.image) {
     if (!el.classList.contains('word-wash')) el.classList.add('word-wash')
     return
   }
-  el.style.setProperty('mask-image', mask)
-  el.style.setProperty('-webkit-mask-image', mask)
+  el.style.setProperty('mask-image', mask.image)
+  el.style.setProperty('-webkit-mask-image', mask.image)
+  el.style.setProperty('mask-size', mask.size)
+  el.style.setProperty('-webkit-mask-size', mask.size)
+  el.style.setProperty('mask-position', mask.position)
+  el.style.setProperty('-webkit-mask-position', mask.position)
+  el.style.setProperty('mask-repeat', 'no-repeat')
+  el.style.setProperty('-webkit-mask-repeat', 'no-repeat')
   el.classList.add('word-wash')
 }
 
