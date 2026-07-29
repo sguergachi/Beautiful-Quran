@@ -2,10 +2,15 @@ import { describe, expect, it } from 'vitest'
 import type { Segment } from '../../data/models'
 import {
   BASMALAH_WASH_WORDS,
+  MAX_FEATHER,
   WORD_END_PROGRESS,
   basmalahWashProgress,
 } from '../BasmalahWash'
-import { prefaceRampProgress, prefaceWashProgress } from '../../ui/reader/InkEngine'
+import {
+  prefaceFeather,
+  prefaceRampProgress,
+  prefaceWashProgress,
+} from '../../ui/reader/InkEngine'
 
 /** Alafasy's `001001.mp3` word timings, straight out of the shipped DB. */
 const alafasy: Segment[] = [
@@ -77,6 +82,37 @@ describe('BasmalahWash', () => {
     const settled = at(659, gapped)
     expect(settled).toBeGreaterThan(WORD_END_PROGRESS[0] * 0.99)
     expect(settled).toBeLessThanOrEqual(WORD_END_PROGRESS[0])
+  })
+
+  it('caps the feather so the closing word is untouched until its turn', () => {
+    // The gradient runs one feather ahead of the front, so the faint edge first
+    // reaches the end of the artwork at 1 / (1 + feather).
+    expect(1 / (1 + MAX_FEATHER)).toBeCloseTo(WORD_END_PROGRESS[2], 5)
+    expect(MAX_FEATHER).toBeLessThan(0.4)
+    expect(MAX_FEATHER).toBeGreaterThan(0.15)
+    expect(prefaceFeather()).toBe(MAX_FEATHER)
+  })
+
+  it('fits a row that overruns its own clip inside it', () => {
+    // Hani Ar-Rifai's row ends 945 ms after his 001001.mp3 does.
+    const hani: Segment[] = [
+      { position: 1, startMs: 945, endMs: 2285 },
+      { position: 2, startMs: 2285, endMs: 2865 },
+      { position: 3, startMs: 2865, endMs: 3685 },
+      { position: 4, startMs: 3685, endMs: 5417 },
+    ]
+    const clipMs = 4472
+    expect(at(clipMs, hani)).toBeLessThan(0.95)
+    expect(basmalahWashProgress(clipMs, hani, clipMs)).toBe(1)
+    expect(basmalahWashProgress(944, hani, clipMs)).toBe(0)
+    let previous = -1
+    for (let ms = 0; ms <= clipMs; ms += 8) {
+      const progress = basmalahWashProgress(ms, hani, clipMs) as number
+      expect(progress).toBeGreaterThanOrEqual(previous - 1e-6)
+      previous = progress
+    }
+    // Rows that fit their audio are untouched by the ceiling.
+    expect(basmalahWashProgress(3000, alafasy, 6087)).toBe(at(3000))
   })
 
   it('returns null for timings it cannot map', () => {

@@ -147,6 +147,52 @@ class BasmalahWashTest {
     }
 
     @Test
+    fun `the feather cap keeps the closing word untouched until its turn`() {
+        // The wash gradient runs one feather ahead of the solid front, so the
+        // faint edge first reaches the end of the artwork at 1 / (1 + feather).
+        // Capped, that is exactly when ٱلرَّحِيمِ begins.
+        assertEquals(
+            BasmalahWash.WORD_END_PROGRESS[2],
+            1f / (1f + BasmalahWash.MAX_FEATHER),
+            1e-5f,
+        )
+        // The verse-word feather would have touched it at 38% of the clip.
+        assertTrue(BasmalahWash.MAX_FEATHER < 0.4f)
+        assertTrue("must stay soft, not a hard peel", BasmalahWash.MAX_FEATHER > 0.15f)
+    }
+
+    @Test
+    fun `a row that overruns its own clip is fitted inside it`() {
+        // Hani Ar-Rifai: the row ends 945 ms after his 001001.mp3 does, so
+        // without the fit the wash would stall at ~87% with the audio over.
+        val hani = listOf(
+            Segment(1, 945, 2285),
+            Segment(2, 2285, 2865),
+            Segment(3, 2865, 3685),
+            Segment(4, 3685, 5417),
+        )
+        val clipMs = 4472L
+        assertTrue("unfitted, the clip ends mid-wash", at(clipMs, hani) < 0.95f)
+        assertEquals(1f, BasmalahWash.progress(clipMs, hani, clipMs)!!, 1e-6f)
+        // The measured onset is kept — no ink before the voice.
+        assertEquals(0f, BasmalahWash.progress(944, hani, clipMs)!!, 1e-6f)
+        var previous = -1f
+        for (ms in 0L..clipMs step 8L) {
+            val progress = BasmalahWash.progress(ms, hani, clipMs)!!
+            assertTrue("regressed at $ms", progress >= previous - 1e-6f)
+            previous = progress
+        }
+        // Rows that fit their audio are untouched by the ceiling.
+        for (ms in longArrayOf(0, 1000, 3000, 5000)) {
+            assertEquals(
+                at(ms),
+                BasmalahWash.progress(ms, alafasy, 6087)!!,
+                1e-6f,
+            )
+        }
+    }
+
+    @Test
     fun `timings that cannot be mapped fall back to the caller`() {
         assertNull(BasmalahWash.progress(100, emptyList()))
         assertNull(BasmalahWash.progress(100, alafasy.dropLast(1)))

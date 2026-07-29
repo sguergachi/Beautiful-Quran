@@ -55,6 +55,22 @@ object BasmalahWash {
     }
 
     /**
+     * Widest wash feather this artwork can carry, as a fraction of its width.
+     *
+     * `letterFadeIn` runs its gradient one feather *ahead* of the solid front,
+     * so the faint edge first touches the far end of the element at progress
+     * `1 / (1 + feather)`. A verse word's feather is 1.6× the word — deliberately
+     * wider than the word, so a word reads as a breath rather than a wipe. This
+     * artwork is **four words plus a kashida** wide, and at 1.6 that first touch
+     * lands at 38 % of the clip: the whole basmalah is inked while the reciter is
+     * still on ٱللَّهِ, which is why the wash read as a crossfade and looked
+     * finished long before the voice was. Capping the feather here puts the first
+     * touch of the far end exactly where ٱلرَّحِيمِ begins, so no part of the
+     * calligraphy is even faintly washed before its word's turn.
+     */
+    val MAX_FEATHER: Float = 1f / WORD_END_PROGRESS[WORD_END_PROGRESS.size - 2] - 1f
+
+    /**
      * Wash progress 0..1 at [positionMs] of the lead-in clip, or null when
      * [segments] cannot time the four words (missing / repeated / non-monotone
      * timings) and the caller should fall back to the plain clip ramp.
@@ -67,12 +83,14 @@ object BasmalahWash {
     fun progress(
         positionMs: Long,
         segments: List<Segment>,
+        clipDurationMs: Long = 0L,
         hold: TajweedPacing.Hold? = TajweedPacing.Hold(maddAaridWaqf = true),
     ): Float? {
         if (!timesTheWholeBasmalah(segments)) return null
+        val rowMs = onRowClock(positionMs, segments, clipDurationMs)
         val last = segments.last()
-        if (positionMs >= last.endMs) return 1f
-        val index = segments.indexOfLast { positionMs >= it.startMs }
+        if (rowMs >= last.endMs) return 1f
+        val index = segments.indexOfLast { rowMs >= it.startMs }
         // Before the voice: encoded opening silence, and any reciter whose
         // basmalah starts a second into the file (audio_onset_ms).
         if (index < 0) return 0f
@@ -86,7 +104,7 @@ object BasmalahWash {
         val holdMs = (holdEndMs - segment.startMs).coerceAtLeast(0L)
         val phase =
             if (holdMs <= 0L) 1f
-            else ((positionMs - segment.startMs).toFloat() / holdMs).coerceIn(0f, 1f)
+            else ((rowMs - segment.startMs).toFloat() / holdMs).coerceIn(0f, 1f)
 
         val curve = hold?.let {
             TajweedPacing.curve(
@@ -100,6 +118,31 @@ object BasmalahWash {
         }
         val inBand = (curve?.at(phase) ?: phase).coerceIn(0f, 1f)
         return bandStart + (bandEnd - bandStart) * inBand
+    }
+
+    /**
+     * [positionMs] translated onto the timing row's clock, for rows that run
+     * past the end of the clip they describe.
+     *
+     * Hani Ar-Rifai's Al-Fatihah 1:1 row ends 945 ms after his own `001001.mp3`
+     * does: a source take slower than the file the app streams, shifted onto the
+     * measured onset. Left alone the calligraphy would stall around 87 % with the
+     * audio already finished. The onset is measured from *this* file, so it is
+     * kept; the rest of the row is stretched across what remains of the clip, so
+     * the wash still lands its last word as the voice stops. Rows that fit their
+     * audio — every other reciter — pass through untouched.
+     */
+    private fun onRowClock(
+        positionMs: Long,
+        segments: List<Segment>,
+        clipDurationMs: Long,
+    ): Long {
+        val startMs = segments.first().startMs
+        val rowEndMs = segments.last().endMs
+        if (clipDurationMs <= 0L || rowEndMs <= clipDurationMs) return positionMs
+        val clipSpanMs = clipDurationMs - startMs
+        if (clipSpanMs <= 0L || positionMs <= startMs) return positionMs
+        return startMs + ((positionMs - startMs) * (rowEndMs - startMs) / clipSpanMs)
     }
 
     /**

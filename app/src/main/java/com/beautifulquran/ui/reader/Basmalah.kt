@@ -88,7 +88,7 @@ fun BasmalahCalligraphy(
                         progress = { washState.value?.coerceIn(0f, 1f) ?: 0f },
                         rtl = true,
                         restingAlpha = InkEngine.State.Upcoming.inkAlpha(),
-                        feather = InkEngine.tuning.washFeather,
+                        feather = InkEngine.prefaceFeather(),
                     )
                 } else {
                     Modifier.graphicsLayer { alpha = lyricInk }

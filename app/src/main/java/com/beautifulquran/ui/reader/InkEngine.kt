@@ -481,10 +481,18 @@ object InkEngine {
         segments: List<Segment>? = null,
     ): Float {
         segments
-            ?.let { BasmalahWash.progress(positionMs, it, prefaceHold()) }
+            ?.let { BasmalahWash.progress(positionMs, it, durationMs, prefaceHold()) }
             ?.let { return it }
         return prefaceRampProgress(positionMs, durationMs)
     }
+
+    /**
+     * Feather of the calligraphy wash — the Ink Lab's [Tuning.washFeather],
+     * capped by what this four-word-wide artwork can carry without inking the
+     * closing word before the reciter reaches it ([BasmalahWash.MAX_FEATHER]).
+     * A verse word is one word wide, so it takes the uncapped value.
+     */
+    fun prefaceFeather(): Float = minOf(tuning.washFeather, BasmalahWash.MAX_FEATHER)
 
     /**
      * Tajweed pacing for the preface words, or null when Ink Lab has pacing

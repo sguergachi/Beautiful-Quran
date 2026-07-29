@@ -410,6 +410,17 @@ InkEngine owns that too, as data rather than as animation code:
   missing or are not the plain four words: the old clip-clock ramp settling at
   `PREFACE_WASH_SETTLE_FRACTION`. The web port has the bands but not yet the
   letter pacing (no `TajweedPacing` on web).
+- **Preface feather** (`prefaceFeather()` / `BasmalahWash.MAX_FEATHER`): the
+  wash gradient runs one feather *ahead* of its solid front, so with the
+  verse-word feather (1.6× the **word**) a four-word-wide artwork was faintly
+  inked end to end by 38 % of the clip — the wash read as a crossfade and looked
+  finished while the reciter was still on ٱللَّهِ. The preface caps `washFeather`
+  so the far end is first touched exactly as ٱلرَّحِيمِ begins; the Ink Lab can
+  still sharpen it, never widen past that.
+- **Clip ceiling**: a source row that ends after its own MP3 (Hani Ar-Rifai's
+  Al-Fatihah 1:1 overruns by 945 ms) is fitted inside the measured media
+  duration, keeping its onset, so the wash cannot stall unfinished with the
+  audio already over.
 - **`InkEngine.Tuning`**: every feel knob in one data class — upcoming alpha,
   ink/mark fade durations, recess, sweep clamps, repeat sweep/fade-out and
   repeat ink strength, glint tint, glitter time, halo strength/blur, wash

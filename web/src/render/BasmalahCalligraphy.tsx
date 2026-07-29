@@ -8,6 +8,7 @@ import type { Segment } from '../data/models'
 import {
   advancePrefaceWashProgress,
   getTuning,
+  prefaceFeather,
   prefaceState,
   prefaceWashProgress,
   InkState,
@@ -97,7 +98,7 @@ export function BasmalahCalligraphy({
       cover.style.opacity = '1'
       applyMask(
         cover,
-        cachedPaperCoverMask(p, resting, true, t.washFeather),
+        cachedPaperCoverMask(p, resting, true, prefaceFeather()),
       )
     }
 
