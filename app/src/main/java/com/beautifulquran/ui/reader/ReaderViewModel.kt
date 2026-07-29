@@ -357,10 +357,12 @@ class ReaderViewModel(
      */
     val basmalahWashProgress: StateFlow<Float?> = pollingWhileLoaded(key = { it.ayah }) { ayah ->
         if (ayah != BASMALAH_PLAYLIST_AYAH) return@pollingWhileLoaded null
-        val duration = player.durationMs
         val timed = timings[BASMALAH_PLAYLIST_AYAH]
-        // Fallback ramp only: prefer the real media duration once known, and
-        // until then the timing span so the wash still advances on first ticks.
+        // The real media duration once known: it is both the fallback ramp's
+        // span and the ceiling the paced wash is fitted inside (a source row
+        // that overruns its own MP3 must still finish). Until then the timing
+        // span, so the wash still advances on the first ticks.
+        val duration = player.durationMs
         val endMs = when {
             duration > 0L -> duration
             timed != null -> timed.last().endMs

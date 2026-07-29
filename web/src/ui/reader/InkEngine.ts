@@ -3,7 +3,7 @@
  * Pure decision functions; no DOM.
  */
 import type { ActiveWord, Segment } from '../../data/models'
-import { basmalahWashProgress } from '../../domain/BasmalahWash'
+import { MAX_FEATHER, basmalahWashProgress } from '../../domain/BasmalahWash'
 
 export enum InkState {
   Plain = 'Plain',
@@ -200,9 +200,18 @@ export function prefaceWashProgress(
   durationMs: number,
   segments?: Segment[] | null,
 ): number {
-  const paced = basmalahWashProgress(positionMs, segments)
+  const paced = basmalahWashProgress(positionMs, segments, durationMs)
   if (paced != null) return paced
   return prefaceRampProgress(positionMs, durationMs)
+}
+
+/**
+ * Feather of the calligraphy wash: the tuned `washFeather`, capped by what this
+ * four-word-wide artwork can carry without inking the closing word before the
+ * reciter reaches it. Port of Android `InkEngine.prefaceFeather`.
+ */
+export function prefaceFeather(): number {
+  return Math.min(tuning.washFeather, MAX_FEATHER)
 }
 
 /** Plain clip-clock ramp — the no-timings fallback of [prefaceWashProgress]. */
@@ -248,6 +257,7 @@ export const InkEngine = {
   prefaceState,
   prefaceWashProgress,
   prefaceRampProgress,
+  prefaceFeather,
   advancePrefaceWashProgress,
   PREFACE_WASH_SETTLE_FRACTION,
   DEFAULT_HIGHLIGHT_LEAD_MS,

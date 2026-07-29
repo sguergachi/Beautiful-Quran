@@ -410,6 +410,23 @@ InkEngine owns that too, as data rather than as animation code:
   missing or are not the plain four words: the old clip-clock ramp settling at
   `PREFACE_WASH_SETTLE_FRACTION`. The web port has the bands but not yet the
   letter pacing (no `TajweedPacing` on web).
+- **Preface feather** (`prefaceFeather()` / `BasmalahWash.MAX_FEATHER`): the
+  wash gradient runs one feather *ahead* of its solid front, so with the
+  verse-word feather (1.6× the **word**) a four-word-wide artwork was faintly
+  inked end to end by 38 % of the clip — the wash read as a crossfade and looked
+  finished while the reciter was still on ٱللَّهِ. The preface caps `washFeather`
+  so the far end is first touched exactly as ٱلرَّحِيمِ begins; the Ink Lab can
+  still sharpen it, never widen past that.
+- **The closing word ends with the clip** (`BasmalahWash.settleMs` /
+  `onRowClock`), not with its own mark, because **late ink beats early ink**: a
+  wash that completes while the reciter is still sustaining ٱلرَّحِيمِ reads as
+  broken, one that finishes into the file's closing silence reads as calm. Rows
+  that stop marking early (As-Sudais by 345 ms, then Minshawi, Ash-Shuraym and
+  Alafasy by ~150 ms) extend into the clip — capped at the closer's own marked
+  length so a long tail of room tone cannot make the ink crawl. A row that ends
+  *after* its MP3 (Hani Ar-Rifai overruns by 945 ms) is fitted inside the
+  measured duration, keeping its onset. Measured settle: +11 to +711 ms after the
+  voice, never before it.
 - **`InkEngine.Tuning`**: every feel knob in one data class — upcoming alpha,
   ink/mark fade durations, recess, sweep clamps, repeat sweep/fade-out and
   repeat ink strength, glint tint, glitter time, halo strength/blur, wash

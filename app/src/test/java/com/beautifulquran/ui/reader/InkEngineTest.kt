@@ -321,9 +321,14 @@ class InkEngineTest {
         )
         assertTrue(closer >= BasmalahWash.WORD_END_PROGRESS[2])
         assertTrue(closer < 1f)
+        // The closing word settles with the clip, not with its own mark: late
+        // ink is better than ink that finishes mid-madd.
+        assertTrue(
+            InkEngine.prefaceWashProgress(positionMs = 5870, durationMs = 6031, segments = segments) < 1f,
+        )
         assertEquals(
             1f,
-            InkEngine.prefaceWashProgress(positionMs = 5870, durationMs = 7000, segments = segments),
+            InkEngine.prefaceWashProgress(positionMs = 6031, durationMs = 6031, segments = segments),
             1e-4f,
         )
         // Unmappable timings fall back to the clip ramp.
