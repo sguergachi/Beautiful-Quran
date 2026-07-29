@@ -99,9 +99,10 @@ object InkEngine {
         val glintTintAlpha: Float = 0.62f,
         val glintGlowAlpha: Float = 0.49f,
         val glintGlowRadius: Float = 10f,
-        /** Width of the ink feather relative to the word (see
-         *  ui/theme/Fade.kt: the wash reads as a whole-word breath). */
-        val washFeather: Float = 1.6f,
+        /** Width of the ink feather relative to the word — ~1–2 letters so
+         *  the front is a travelling wash edge, not a whole-word crossfade
+         *  (see docs/quality-reviews/INK_WASH_FEEL_CLAUDE.md R1). */
+        val washFeather: Float = 0.5f,
         /** Control points of the sweep easing: a steady glide, softened only
          *  at the very ends so it never snaps into or out of motion. */
         val sweepEaseX1: Float = 0.3f,
@@ -116,7 +117,7 @@ object InkEngine {
         /** Feather of a paced word. Slightly sharper than [washFeather] so
          *  holds read clearly while the edge stays soft (see
          *  docs/TAJWEED_PACING.md). */
-        val pacedFeather: Float = 1.1857f,
+        val pacedFeather: Float = 0.45f,
         /** Which moments earn a hold — see [TajweedPacing.Hold]. */
         val holdMadd: Boolean = true,
         val holdGhunnah: Boolean = true,

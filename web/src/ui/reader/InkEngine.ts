@@ -45,7 +45,7 @@ export const DEFAULT_TUNING: InkTuning = {
   repeatSweepMs: 450,
   repeatFadeOutMs: 900,
   glintFadeMs: 1_000,
-  washFeather: 1.6,
+  washFeather: 0.5,
   sweepEaseX1: 0.3,
   sweepEaseY1: 0.24,
   sweepEaseX2: 0.7,
