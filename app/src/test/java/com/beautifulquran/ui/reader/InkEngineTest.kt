@@ -527,7 +527,7 @@ class InkEngineTest {
 
     @Test
     fun `V2 wash feed-forward chases without leading past the letter`() {
-        // On target: no overshoot.
+        // At ceiling: no motion.
         assertEquals(
             0.5f,
             InkEngine.acousticWashStep(
@@ -535,6 +535,7 @@ class InkEngineTest {
                 target = 0.5f,
                 dtSec = 0.05f,
                 targetVelocity = 0f,
+                ceiling = 0.5f,
             ),
             1e-3f,
         )
@@ -545,9 +546,10 @@ class InkEngineTest {
             target = 0.8f,
             dtSec = 0.05f,
             targetVelocity = 1.2f,
+            ceiling = 0.8f,
         )
         assertTrue("should keep up on peel (got $after)", after > 0.2f + 0.08f)
-        assertTrue("must not lead past target (got $after)", after <= 0.8f + 1e-4f)
+        assertTrue("must not lead past ceiling (got $after)", after <= 0.8f + 1e-4f)
 
         // Bigger gap → faster catch-up than small gap (same v_target).
         val smallGap = InkEngine.acousticWashStep(
@@ -555,27 +557,32 @@ class InkEngineTest {
             target = 0.55f,
             dtSec = 0.05f,
             targetVelocity = 0.5f,
+            ceiling = 0.55f,
         )
         val bigGap = InkEngine.acousticWashStep(
             current = 0.5f,
             target = 0.75f,
             dtSec = 0.05f,
             targetVelocity = 0.5f,
+            ceiling = 0.75f,
         )
         assertTrue(
             "gap term should speed catch-up (${smallGap - 0.5f} vs ${bigGap - 0.5f})",
             (bigGap - 0.5f) > (smallGap - 0.5f),
         )
 
-        // Near-target: gap-scaled floor fades so we don't crawl robotically.
-        val near = InkEngine.acousticWashStep(
-            current = 0.90f,
-            target = 0.91f,
+        // Hold: target parked, ceiling ahead → soft drift (no mid-word freeze).
+        val held = InkEngine.acousticWashStep(
+            current = 0.40f,
+            target = 0.40f,
             dtSec = 0.05f,
             targetVelocity = 0f,
+            ceiling = 0.55f,
         )
-        // Pure gap/τ step: 0.01/0.16 * 0.05 ≈ 0.0031
-        assertTrue("near-target step should be tiny (got ${near - 0.90f})", near - 0.90f < 0.02f)
+        assertTrue("hold should drift toward ceiling (got $held)", held > 0.40f)
+        assertTrue("hold must not pass ceiling (got $held)", held <= 0.55f + 1e-4f)
+        val expectedDrift = 0.40f + InkEngine.ACOUSTIC_HOLD_DRIFT * 0.05f
+        assertEquals(expectedDrift.coerceAtMost(0.55f), held, 1e-4f)
 
         // dt=0 never snaps.
         assertEquals(
@@ -585,11 +592,12 @@ class InkEngineTest {
                 target = 0.9f,
                 dtSec = 0f,
                 targetVelocity = 2f,
+                ceiling = 0.9f,
             ),
             1e-4f,
         )
 
-        // Never rewinds.
+        // Never rewinds when target drops behind current.
         assertEquals(
             0.7f,
             InkEngine.acousticWashStep(
@@ -597,6 +605,7 @@ class InkEngineTest {
                 target = 0.4f,
                 dtSec = 0.05f,
                 targetVelocity = 0f,
+                ceiling = 0.4f,
             ),
             1e-4f,
         )

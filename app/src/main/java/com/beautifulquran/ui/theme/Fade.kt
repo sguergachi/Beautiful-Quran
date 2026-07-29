@@ -612,8 +612,11 @@ internal fun paperWashColors(
 }
 
 /**
- * Draw a horizontal wash as [InkWashBandCount] stacked strips, each with a
- * seeded head offset so the front is fibre-irregular (R3), not a wipe bar.
+ * Draw a **diagonal liquid front** as [InkWashBandCount] stacked strips.
+ *
+ * A pure horizontal gradient is a wipe bar no matter how soft — iso-alpha
+ * lines are vertical. Each band uses a diagonal [Brush.linearGradient] with a
+ * seeded head offset so the front is a curved, angled soak, not a sliding bar.
  *
  * [head] is distance the wash has travelled in content space (0 → width+edge).
  * [headOriginLeft] / [contentWidth] locate the content box when the draw rect
@@ -635,24 +638,26 @@ private fun DrawScope.drawWashBands(
 ) {
     if (width <= 0f || height <= 0f) return
     val bandH = height / InkWashBandCount
+    // Word-level lean: top leads or trails bottom (diagonal ink, not UI wipe).
+    val lean = washBandOffsetFraction(seed, band = 0)
     for (band in 0 until InkWashBandCount) {
         val bandTop = top + band * bandH
         val bandBottom =
             if (band == InkWashBandCount - 1) top + height else bandTop + bandH
         val headB = (head + washBandHeadDelta(seed, band, edge)).coerceAtLeast(0f)
-        val brush = if (rtl) {
-            Brush.horizontalGradient(
-                colors = colors,
-                startX = headOriginLeft + (contentWidth - headB),
-                endX = headOriginLeft + (contentWidth - headB) + edge,
-            )
-        } else {
-            Brush.horizontalGradient(
-                colors = colors,
-                startX = headOriginLeft + headB - edge,
-                endX = headOriginLeft + headB,
-            )
-        }
+        // Skew: how far the top of this band's front leads its bottom.
+        val skew = lean * bandH * 0.85f + washBandHeadDelta(seed, band + 17, bandH)
+        val brush = washDiagonalBrush(
+            colors = colors,
+            headOriginLeft = headOriginLeft,
+            contentWidth = contentWidth,
+            head = headB,
+            edge = edge,
+            bandTop = bandTop,
+            bandBottom = bandBottom,
+            rtl = rtl,
+            skew = skew,
+        )
         clipRect(
             left = left,
             top = bandTop,
@@ -666,6 +671,40 @@ private fun DrawScope.drawWashBands(
                 blendMode = blendMode,
             )
         }
+    }
+}
+
+/**
+ * Diagonal feather brush: iso-alpha lines run at an angle, so the front reads
+ * as liquid soak rather than a vertical wipe bar.
+ */
+private fun washDiagonalBrush(
+    colors: List<Color>,
+    headOriginLeft: Float,
+    contentWidth: Float,
+    head: Float,
+    edge: Float,
+    bandTop: Float,
+    bandBottom: Float,
+    rtl: Boolean,
+    skew: Float,
+): Brush {
+    // Gradient travels along the feather (ahead → behind), diagonal in y.
+    return if (rtl) {
+        // RTL: ink from the right; front near contentWidth - head.
+        val front = headOriginLeft + contentWidth - head
+        Brush.linearGradient(
+            colors = colors,
+            start = Offset(front + edge, bandTop),
+            end = Offset(front - skew, bandBottom),
+        )
+    } else {
+        val front = headOriginLeft + head
+        Brush.linearGradient(
+            colors = colors,
+            start = Offset(front - edge, bandTop),
+            end = Offset(front + skew, bandBottom),
+        )
     }
 }
 

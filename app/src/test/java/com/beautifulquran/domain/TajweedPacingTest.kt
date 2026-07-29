@@ -529,6 +529,27 @@ class TajweedPacingTest {
     }
 
     @Test
+    fun `ceiling is the next letter onset past the parked front`() {
+        val curve = requireNotNull(
+            TajweedPacing.acousticCurve(
+                keyframes = listOf(
+                    SubwordKeyframe(50, 0.25f),
+                    SubwordKeyframe(400, 0.25f), // hold
+                    SubwordKeyframe(450, 0.5f),
+                    SubwordKeyframe(800, 0.5f),
+                    SubwordKeyframe(850, 1f),
+                ),
+                durationMs = 1_000,
+            ),
+        )
+        // Mid-hold on first letter: front parked at 0.25, ceiling is next onset 0.5.
+        assertEquals(0.25f, curve.at(0.2f), 1e-3f)
+        assertEquals(0.5f, curve.ceilingAt(0.2f), 1e-3f)
+        assertTrue(curve.ceilingAt(0.2f) > curve.at(0.2f))
+        assertEquals(1f, curve.ceilingAt(0.99f), 1e-3f)
+    }
+
+    @Test
     fun `acoustic peels are linear — no cosine zero at peel ends`() {
         // Two knots only: peel spans the whole word. Linear = constant velocity;
         // cosine would be ~0 at both ends (the robotic syllable pulse).

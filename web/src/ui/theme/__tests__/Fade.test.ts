@@ -56,11 +56,13 @@ describe('fade math', () => {
     expect(washMaskImage(1, 0.22, true)).toBe('none')
   })
 
-  it('washMaskImage builds banded multi-stop gradients at mid progress (R3+R5)', () => {
+  it('washMaskImage builds banded diagonal gradients at mid progress', () => {
     const mask = washMaskImage(0.4, 0.22, true)
     expect(mask).not.toBe('none')
     if (mask === 'none') return
     expect(mask.image.split('linear-gradient').length - 1).toBe(INK_WASH_BAND_COUNT)
+    // Diagonal (not "to right") so iso-alpha isn't a vertical wipe bar.
+    expect(mask.image).toMatch(/linear-gradient\(\d+\.\d+deg/)
     // Each band has INK_PROFILE_STOPS rgba stops.
     expect(mask.image.split('rgba').length - 1).toBe(
       INK_WASH_BAND_COUNT * INK_PROFILE_STOPS,

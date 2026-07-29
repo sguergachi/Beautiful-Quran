@@ -222,6 +222,23 @@ object TajweedPacing {
             if (rise <= 0f) return 0f
             return rise / span
         }
+
+        /**
+         * Next letter-front position the ink may finish into (Claude ceiling).
+         *
+         * Truth [at] parks on the spoken letter; the display may drift from that
+         * park toward this ceiling so a madd *completes* instead of freezing the
+         * edge mid-word. Never past an unspoken letter onset.
+         */
+        fun ceilingAt(t: Float): Float {
+            val q = at(t)
+            if (q >= 1f - 1e-4f) return 1f
+            var best = 1f
+            for (p in positions) {
+                if (p > q + 1e-4f && p < best) best = p
+            }
+            return best.coerceIn(q, 1f)
+        }
     }
 
     /**

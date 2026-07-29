@@ -478,7 +478,9 @@ private fun rememberRepeatWash(
                                         lastNanos = now
                                         val phaseState = clockProgressState.value
                                         val live = activeState.value && phaseState != null
-                                        val rawTarget = when {
+                                        val feather = lockedFeather.value
+                                            ?: InkEngine.tuning.washFeather
+                                        val (rawTarget, rawCeil) = when {
                                             live -> {
                                                 val phase =
                                                     phaseState.value.coerceIn(0f, 1f)
@@ -488,15 +490,23 @@ private fun rememberRepeatWash(
                                                 } else {
                                                     phase
                                                 }
-                                                val feather = lockedFeather.value
-                                                    ?: InkEngine.tuning.washFeather
-                                                InkEngine.maskProgressForLetterFront(
+                                                val letterCeil = if (curve != null) {
+                                                    curve.ceilingAt(phase)
+                                                } else {
+                                                    1f
+                                                }
+                                                val t = InkEngine.maskProgressForLetterFront(
                                                     letterFront = letterFront,
                                                     feather = feather,
                                                 )
+                                                val c = InkEngine.maskProgressForLetterFront(
+                                                    letterFront = letterCeil,
+                                                    feather = feather,
+                                                ).coerceAtLeast(t)
+                                                t to c
                                             }
-                                            displayProgress.floatValue < 0.999f -> 1f
-                                            else -> 1f
+                                            displayProgress.floatValue < 0.999f -> 1f to 1f
+                                            else -> 1f to 1f
                                         }
                                         val targetVel =
                                             if (dt > 1e-4f) {
@@ -511,6 +521,7 @@ private fun rememberRepeatWash(
                                             target = rawTarget,
                                             dtSec = dt,
                                             targetVelocity = targetVel,
+                                            ceiling = rawCeil,
                                         )
                                         val (drawn, nextPeak) = monotonicWashProgress(
                                             raw = stepped,
@@ -937,14 +948,21 @@ private fun rememberLetterSweep(
                                 curve != null -> curve.at(phase)
                                 else -> phase
                             }
+                            val letterCeil = when {
+                                curve != null -> curve.ceilingAt(phase)
+                                else -> 1f
+                            }
+                            val reveal = revealState.value.coerceIn(0f, 1f)
                             val target = InkEngine.maskProgressForLetterFront(
                                 letterFront = letterFront,
                                 feather = feather,
-                            ).coerceAtLeast(revealState.value.coerceIn(0f, 1f))
-                            // Feed-forward: prefer the finite Δ of the *mask*
-                            // target (letter→feather mapped). Linear peels make
-                            // this smooth; cosine per letter used to inject a
-                            // start/stop pulse into the chase every syllable.
+                            ).coerceAtLeast(reveal)
+                            val ceil = InkEngine.maskProgressForLetterFront(
+                                letterFront = letterCeil,
+                                feather = feather,
+                            ).coerceAtLeast(target)
+                            // Feed-forward on peels; ceiling drift on holds
+                            // (no metronomic freeze while the voice sustains).
                             val targetVel = if (dt > 1e-4f) {
                                 ((target - lastTarget) / dt).coerceAtLeast(0f)
                             } else {
@@ -956,6 +974,7 @@ private fun rememberLetterSweep(
                                 target = target,
                                 dtSec = dt,
                                 targetVelocity = targetVel,
+                                ceiling = ceil,
                             )
                         }
                         residualState.value && acousticDisplay.floatValue < 0.999f -> {

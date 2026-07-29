@@ -73,6 +73,16 @@ export function wholeWordInkAlpha(progress: number, restingAlpha: number): numbe
   return restingAlpha + (1 - restingAlpha) * inkSmootherstep(p)
 }
 
+/**
+ * Diagonal angle so iso-alpha lines aren't vertical (wipe bar).
+ * RTL reads right→left; a slight counter-angle keeps the front liquid.
+ */
+function washAngleDeg(rtl: boolean, lean: number): number {
+  // Base diagonal + lean (±12°) per word/band.
+  const base = rtl ? 108 : 72
+  return base + lean * 12
+}
+
 function singleWashGradient(
   progress: number,
   restingAlpha: number,
@@ -80,6 +90,7 @@ function singleWashGradient(
   feather: number,
   stopCount: number,
   paperCover: boolean,
+  lean = 0,
 ): string {
   const p = Math.min(1, Math.max(0, progress))
   if (p >= 1) return 'none'
@@ -93,7 +104,8 @@ function singleWashGradient(
       : glyphA
     stops.push(`rgba(0,0,0,${a.toFixed(4)}) ${(pos * 100).toFixed(2)}%`)
   }
-  return `linear-gradient(to right, ${stops.join(', ')})`
+  const angle = washAngleDeg(rtl, lean)
+  return `linear-gradient(${angle.toFixed(1)}deg, ${stops.join(', ')})`
 }
 
 /**
@@ -121,11 +133,21 @@ function bandedMask(
   const layers: string[] = []
   const positions: string[] = []
   const bandPct = 100 / INK_WASH_BAND_COUNT
+  const wordLean = washBandOffsetFraction(seed, 0)
   for (let b = 0; b < INK_WASH_BAND_COUNT; b++) {
     const offset = washBandOffsetFraction(seed, b) * INK_WASH_BAND_JITTER
     // head' = head + offset*feather → progress' = head' / travel
     const bp = Math.min(1, Math.max(0, p + (offset * feather) / travel))
-    const g = singleWashGradient(bp, restingAlpha, rtl, feather, stopCount, paperCover)
+    const lean = wordLean * 0.6 + washBandOffsetFraction(seed, b + 17) * 0.4
+    const g = singleWashGradient(
+      bp,
+      restingAlpha,
+      rtl,
+      feather,
+      stopCount,
+      paperCover,
+      lean,
+    )
     if (g === 'none') {
       // Fully revealed band: opaque (glyph) or transparent (paper cover).
       layers.push(

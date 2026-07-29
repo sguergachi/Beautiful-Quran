@@ -381,6 +381,13 @@ object InkEngine {
     const val ACOUSTIC_CHASE_MAX = 2.2f
 
     /**
+     * Hold drift (word-fraction / sec): while the voice parks on a letter, the
+     * ink slowly finishes that letter toward the next onset (ceiling). Never
+     * zero mid-word — kills the metronomic freeze without inventing peels.
+     */
+    const val ACOUSTIC_HOLD_DRIFT = 0.07f
+
+    /**
      * How long the active word's letter sweep should run: the time the
      * word stays lit (karaoke hold until the next word), corrected for
      * playback speed, floored at [minSweepFloorMs] so short holds (and
@@ -404,33 +411,40 @@ object InkEngine {
     }
 
     /**
-     * One frame of **feed-forward letter chase** (Claude chase law).
+     * One frame of **ceiling-aware letter chase** (Claude chase law).
      *
-     * [target] is the letter-timed mask progress (already feather-corrected).
-     * Speed = reciter velocity + gap/τ so peels keep up without a standing lag.
-     * Floor is **gap-scaled** (zero when nearly on target) so parks are still
-     * and catch-up is a glide — not a constant-rate crawl. Never leads past
-     * [target]. Never rewinds. Never snaps on dt=0.
+     * [target] is the spoken letter front (may park on a hold).
+     * [ceiling] is the next letter onset — ink may finish the current letter
+     * into that ceiling during a hold (soft drift), but never past it.
+     *
+     * Behind target: feed-forward v + gap/τ (peels keep up).
+     * At/past target, below ceiling: [ACOUSTIC_HOLD_DRIFT] (no mid-word freeze).
+     * Never rewinds. Never snaps on dt=0.
      */
     fun acousticWashStep(
         current: Float,
         target: Float,
         dtSec: Float,
         targetVelocity: Float = 0f,
+        ceiling: Float = target,
     ): Float {
         val cur = current.coerceIn(0f, 1f)
         val tgt = target.coerceIn(0f, 1f)
-        if (tgt <= cur) return cur // never lead past the spoken letter front
+        val ceil = ceiling.coerceIn(0f, 1f).coerceAtLeast(tgt)
+        // Never rewind (seek/reorder can drop target below current).
+        if (cur >= ceil) return cur
         if (dtSec <= 0f) return cur
-        val gap = tgt - cur
-        val vTarget = targetVelocity.coerceAtLeast(0f)
-        // Full floor only when ≥~0.15 word behind; near target the floor fades
-        // so the edge settles instead of humming forward at fixed speed.
-        val floor = ACOUSTIC_CHASE_FLOOR * (gap / 0.15f).coerceIn(0f, 1f)
-        val speed = (vTarget + gap / ACOUSTIC_CHASE_TAU_SEC)
-            .coerceAtLeast(floor)
-            .coerceAtMost(ACOUSTIC_CHASE_MAX)
-        return (cur + speed * dtSec).coerceAtMost(tgt)
+        if (cur < tgt) {
+            val gap = tgt - cur
+            val vTarget = targetVelocity.coerceAtLeast(0f)
+            val floor = ACOUSTIC_CHASE_FLOOR * (gap / 0.15f).coerceIn(0f, 1f)
+            val speed = (vTarget + gap / ACOUSTIC_CHASE_TAU_SEC)
+                .coerceAtLeast(floor)
+                .coerceAtMost(ACOUSTIC_CHASE_MAX)
+            return (cur + speed * dtSec).coerceAtMost(ceil)
+        }
+        // Hold: spoken front is parked; finish the letter toward next onset.
+        return (cur + ACOUSTIC_HOLD_DRIFT * dtSec).coerceAtMost(ceil)
     }
 
     /**
