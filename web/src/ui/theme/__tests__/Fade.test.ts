@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   inkSmootherstep,
   inkWashAlpha,
+  inkWashProfile,
   INK_PROFILE_STOPS,
   paperCoverMaskImage,
   washMaskImage,
@@ -13,6 +14,16 @@ describe('fade math', () => {
     expect(inkSmootherstep(0)).toBe(0)
     expect(inkSmootherstep(1)).toBe(1)
     expect(inkSmootherstep(0.5)).toBeCloseTo(0.5, 5)
+  })
+
+  it('wash profile is soft at ends and front-loads density (R2)', () => {
+    expect(inkWashProfile(0)).toBe(0)
+    expect(inkWashProfile(1)).toBe(1)
+    expect(inkWashProfile(0.5)).toBeGreaterThan(0.5)
+    expect(inkWashProfile(0.5)).toBeGreaterThan(inkSmootherstep(0.5))
+    expect(inkWashProfile(0.25)).toBeGreaterThan(inkSmootherstep(0.25))
+    expect(inkWashProfile(0.75)).toBeLessThan(1)
+    expect(inkWashProfile(0.75)).toBeGreaterThan(inkWashProfile(0.5))
   })
 
   it('whole-word breath interpolates resting to full', () => {

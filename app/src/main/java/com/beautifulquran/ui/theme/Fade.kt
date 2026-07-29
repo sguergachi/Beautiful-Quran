@@ -30,10 +30,9 @@ import kotlin.math.floor
  * in turn. [progress] is 0..1 across the word and is read only at draw time —
  * the sweep animates every frame without a single recomposition or relayout.
  *
- * The wash is painterly rather than mechanical: across the feathered edge the
- * alpha follows a smootherstep curve (zero slope at both ends), so ink blooms
- * in with a soft toe and settles with a soft shoulder — a wash drawn onto
- * paper, not a wipe. The edge itself is wide, about half the word.
+ * Across the feather the alpha follows [inkWashProfile]: a steep toe (crisp
+ * arrival) and a long shoulder (soak behind the front) — density as wash, not
+ * a symmetric fade. The edge is ~1–2 letters ([InkWashFeather]).
  *
  * Letters ahead of the wash rest at [restingAlpha] (the "upcoming" ink);
  * letters behind it are fully inked. The mask uses a small bleed around the
@@ -51,10 +50,9 @@ fun Modifier.letterFadeIn(
     revealFraction: Float = 1f,
 ): Modifier {
     // Alpha profile across the feathered edge, sampled into gradient stops.
-    // The seam-free smootherstep shape lives in [inkSmootherstep].
     val stops = FloatArray(InkProfileStops) { i -> i / (InkProfileStops - 1f) }
     val washColors = stops.map { t ->
-        val s = inkSmootherstep(t)
+        val s = inkWashProfile(t)
         val a = restingAlpha + (1f - restingAlpha) * (if (rtl) s else 1f - s)
         Color.White.copy(alpha = a)
     }
@@ -77,12 +75,8 @@ fun Modifier.letterFadeIn(
             )
         }
         drawContent()
-            // The feather is far wider than the word itself, so every letter
-            // spends most of the word's dwell time mid-bloom: the reveal is
-            // closer to a whole-word breath than a moving edge, with only a
-            // gentle directional lead in the reading direction. The wash
-            // travels one edge-width past the end so the final letter
-            // finishes exactly at p = 1.
+            // Head travels one edge past the end so the final letter finishes
+            // exactly at p = 1; feather width is ~1–2 letters (see R1).
             val edge = (w * feather).coerceAtLeast(1f)
             val head = p * (w * revealFraction.coerceIn(0f, 1f) + edge)
             val brush = if (rtl) {
@@ -265,7 +259,7 @@ fun Modifier.shapedWordBloom(
                     if (p >= 1f) return@forEach
                     val lineBounds = lineBoundsCache.boundsFor(textLayout, start, endExclusive)
                     val paperColors = stops.map { t ->
-                        val s = inkSmootherstep(t)
+                        val s = inkWashProfile(t)
                         val glyphAlpha = bloom.restingAlpha +
                             (1f - bloom.restingAlpha) * (if (rtl) s else 1f - s)
                         bloom.paper.copy(alpha = (1f - glyphAlpha).coerceIn(0f, 1f))
@@ -328,7 +322,7 @@ fun Modifier.shapedWordBloom(
                         bloom.glowRadius.dp.toPx() * 3f,
                     )
                     val washColors = stops.map { t ->
-                        val s = inkSmootherstep(t)
+                        val s = inkWashProfile(t)
                         val a = bloom.restingAlpha +
                             (1f - bloom.restingAlpha) * (if (rtl) s else 1f - s)
                         Color.White.copy(alpha = a)
@@ -561,14 +555,29 @@ internal fun linePaperCoverBounds(lineBounds: Rect, horizontalPad: Float): Rect 
 internal const val InkWashFeather = 0.5f
 
 /**
- * smootherstep (6t⁵−15t⁴+10t³): zero first *and* second derivative at both ends,
- * so ink blooms in with a soft toe and settles with a soft shoulder — no seam
- * where the wash meets the resting or the fully inked letters. The easing shape
- * behind the per-letter [letterFadeIn] gradient wash.
+ * smootherstep (6t⁵−15t⁴+10t³): zero first *and* second derivative at both ends.
+ * Kept for non-wash easing (glint, whole-word breath). The travelling wash edge
+ * uses [inkWashProfile] instead — a symmetric S-curve reads as a fade.
  */
 internal fun inkSmootherstep(t: Float): Float {
     val c = t.coerceIn(0f, 1f)
     return c * c * c * (c * (c * 6f - 15f) + 10f)
+}
+
+/**
+ * Ink wash edge profile (R2): steep toe, long shoulder.
+ *
+ * Real wash arrives as a dense front then soaks: density is near-full early
+ * across the feather, then settles slowly. Symmetric smootherstep put the
+ * midpoint at 50% and read as a crossfade; this front-loads density while
+ * keeping soft ends (zero slope at 0 and 1 via smootherstep on √t).
+ *
+ * 10–90% band stays ~½ the feather (~≥1 letter at letter-scaled feather).
+ */
+internal fun inkWashProfile(t: Float): Float {
+    val c = t.coerceIn(0f, 1f)
+    // √t pulls the domain forward before the Hermite ends — steep toe, long soak.
+    return inkSmootherstep(kotlin.math.sqrt(c))
 }
 
 private const val InkWashSpan = 1f + InkWashFeather
@@ -583,7 +592,7 @@ private const val InkWashSpan = 1f + InkWashFeather
  */
 fun inkWashAlpha(pos: Float, progress: Float, restingAlpha: Float): Float {
     val t = (InkWashSpan * progress - pos) / InkWashFeather
-    return restingAlpha + (1f - restingAlpha) * inkSmootherstep(t)
+    return restingAlpha + (1f - restingAlpha) * inkWashProfile(t)
 }
 
 /**

@@ -77,5 +77,7 @@ Horizontal-only gradients mean the dot of a bāʾ and the bowl of the same bāʾ
 
 ---
 
-## Next
-Set both feather knobs to 0.5 in the Ink Lab and watch one ayah. If the front is now visible but too mechanical, R2 and R3 are what's left — about half a day together, plus the test re-baselining.
+## Status
+- **R1 landed** — `InkWashFeather` / paced defaults at 0.5 / 0.45 (Android + web).
+- **R2 landed** — shared `inkWashProfile` = `smootherstep(√t)` on all wash stop builders + `inkWashAlpha` (Android + web). Symmetric `inkSmootherstep` kept for glint / whole-word breath only.
+- **Next:** R3 (seeded band irregularity) if the front still reads too machine-straight; then R4 dilute tint.

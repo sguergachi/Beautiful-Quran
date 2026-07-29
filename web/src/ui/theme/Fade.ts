@@ -1,14 +1,26 @@
 /**
- * Ink wash math — port of Android `ui/theme/Fade.kt` smootherstep helpers.
+ * Ink wash math — port of Android `ui/theme/Fade.kt` helpers.
  */
 
-/** smootherstep (6t⁵−15t⁴+10t³): zero first and second derivative at both ends. */
+/** Sample count for directional wash gradients (Android `InkProfileStops`). */
 export const INK_PROFILE_STOPS = 9
+/** Feather relative to word width (~1–2 letters; see INK_WASH_FEEL R1). */
 export const INK_WASH_FEATHER = 0.5
 
+/** smootherstep — non-wash easing (glint, whole-word breath). */
 export function inkSmootherstep(t: number): number {
   const c = t < 0 ? 0 : t > 1 ? 1 : t
   return c * c * c * (c * (c * 6 - 15) + 10)
+}
+
+/**
+ * Ink wash edge profile (R2): steep toe, long shoulder.
+ * Front-loads density via smootherstep(√t) so the edge reads as arrival + soak,
+ * not a symmetric fade. Soft ends (zero slope at 0 and 1).
+ */
+export function inkWashProfile(t: number): number {
+  const c = t < 0 ? 0 : t > 1 ? 1 : t
+  return inkSmootherstep(Math.sqrt(c))
 }
 
 /**
@@ -31,7 +43,7 @@ export function inkWashAlpha(
   const local = rtl ? (1 - pos) : pos
   // Distance behind the wash head, normalized by feather width.
   const behind = (head - local) / edge
-  const s = inkSmootherstep(behind)
+  const s = inkWashProfile(behind)
   return restingAlpha + (1 - restingAlpha) * s
 }
 
@@ -44,7 +56,7 @@ export function wholeWordInkAlpha(progress: number, restingAlpha: number): numbe
 /**
  * CSS mask-image for the directional ink wash.
  * Samples [inkWashAlpha] across the word (layout L→R) so the reveal matches
- * Android's smootherstep bloom instead of a blunt 3-stop wipe.
+ * Android's asymmetric wash bloom instead of a blunt 3-stop wipe.
  */
 export function washMaskImage(
   progress: number,
