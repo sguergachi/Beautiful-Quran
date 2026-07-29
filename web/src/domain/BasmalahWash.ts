@@ -54,6 +54,10 @@ export const MAX_FEATHER = 1 / WORD_END_PROGRESS[WORD_END_PROGRESS.length - 2] -
  * Wash progress 0..1 at [positionMs] of the lead-in clip, or null when
  * [segments] cannot time the four words (missing / repeated / non-monotone) and
  * the caller should fall back to the plain clip ramp.
+ *
+ * [clipDurationMs] is the measured media length; the closing word settles
+ * against it rather than its own mark, because late ink beats early ink — see
+ * [settleMs] / [onRowClock].
  */
 export function basmalahWashProgress(
   positionMs: number,
@@ -62,8 +66,8 @@ export function basmalahWashProgress(
 ): number | null {
   if (!segments || !timesTheWholeBasmalah(segments)) return null
   const rowMs = onRowClock(positionMs, segments, clipDurationMs)
-  const last = segments[segments.length - 1]
-  if (rowMs >= last.endMs) return 1
+  const settle = settleMs(segments, clipDurationMs)
+  if (rowMs >= settle) return 1
 
   let index = -1
   for (let i = 0; i < segments.length; i++) {
@@ -77,12 +81,29 @@ export function basmalahWashProgress(
   const bandStart = index === 0 ? 0 : WORD_END_PROGRESS[index - 1]
   const bandEnd = WORD_END_PROGRESS[index]
   // Karaoke hold: a word owns the gap until the next word starts, so the ink
-  // settles into its band rather than stalling short of it.
-  const holdEndMs = segments[index + 1]?.startMs ?? segment.endMs
+  // settles into its band rather than stalling short of it. The closing word
+  // owns the rest of the clip.
+  const holdEndMs = index === segments.length - 1 ? settle : segments[index + 1].startMs
   const holdMs = Math.max(0, holdEndMs - segment.startMs)
   const phase =
     holdMs <= 0 ? 1 : Math.min(1, Math.max(0, (rowMs - segment.startMs) / holdMs))
   return bandStart + (bandEnd - bandStart) * phase
+}
+
+/**
+ * When the wash must be fully settled: the end of the clip, not the row's own
+ * last mark — port of Android `BasmalahWash.settleMs`.
+ *
+ * Four of the seven shipped rows stop marking before the reciter stops
+ * (As-Sudais by 345 ms), which finished the calligraphy while "ar-raḥīīīm" was
+ * still going. Late beats early, so the closing word owns the rest of the clip,
+ * capped at its own marked length so a long tail of silence cannot make the ink
+ * crawl for seconds after the voice.
+ */
+function settleMs(segments: Segment[], clipDurationMs: number): number {
+  const closer = segments[segments.length - 1]
+  if (clipDurationMs <= closer.endMs) return closer.endMs
+  return Math.min(clipDurationMs, closer.endMs + (closer.endMs - closer.startMs))
 }
 
 /**

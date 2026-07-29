@@ -147,6 +147,51 @@ class BasmalahWashTest {
     }
 
     @Test
+    fun `the closing word settles with the clip, never before the voice`() {
+        // Every shipped clip, measured with ffprobe + an energy envelope: the
+        // rows stop marking before the reciter stops (As-Sudais by 345 ms), so
+        // settling on the row's own mark finished the ink mid-madd. The wash
+        // must not be complete before the voice is, and must be complete by the
+        // end of the clip.
+        data class Clip(val name: String, val segments: List<Segment>, val durationMs: Long, val voiceEndMs: Long)
+        val clips = listOf(
+            Clip("Alafasy", alafasy, 6031, 6020),
+            Clip("Husary", listOf(Segment(1, 50, 520), Segment(2, 520, 1330), Segment(3, 1330, 2336), Segment(4, 2336, 4790)), 5120, 4650),
+            Clip("AbdulBaset", listOf(Segment(1, 536, 970), Segment(2, 970, 1590), Segment(3, 1590, 2540), Segment(4, 2540, 4255)), 4336, 4320),
+            Clip("Minshawi", listOf(Segment(1, 544, 960), Segment(2, 960, 1620), Segment(3, 1620, 2740), Segment(4, 2740, 4075)), 4971, 4260),
+            Clip("As-Sudais", listOf(Segment(1, 0, 650), Segment(2, 650, 1130), Segment(3, 1130, 1860), Segment(4, 1860, 2725)), 3082, 3070),
+            Clip("Ash-Shuraym", listOf(Segment(1, 140, 650), Segment(2, 660, 1160), Segment(3, 1170, 2110), Segment(4, 2120, 2560)), 2722, 2710),
+            Clip("Hani", listOf(Segment(1, 945, 2285), Segment(2, 2285, 2865), Segment(3, 2865, 3685), Segment(4, 3685, 5417)), 4472, 4010),
+        )
+        for ((name, segments, durationMs, voiceEndMs) in clips) {
+            val settled = BasmalahWash.progress(voiceEndMs - 60, segments, durationMs)!!
+            assertTrue("$name settled before the voice stopped ($settled)", settled < 1f)
+            assertEquals(
+                "$name must be settled by the end of its clip",
+                1f,
+                BasmalahWash.progress(durationMs, segments, durationMs)!!,
+                1e-6f,
+            )
+            var previous = -1f
+            for (ms in 0L..durationMs step 8L) {
+                val progress = BasmalahWash.progress(ms, segments, durationMs)!!
+                assertTrue("$name regressed at $ms", progress >= previous - 1e-6f)
+                previous = progress
+            }
+        }
+    }
+
+    @Test
+    fun `an unusually long tail of silence cannot stretch the closer forever`() {
+        // Guard: the closer may at most double its own marked length, so a file
+        // that trails ten seconds of room tone does not make the ink crawl.
+        val hugeTail = 30_000L
+        val settlesAt = (2532L + (5870L - 2532L)) + (5870L - 2532L)
+        assertEquals(1f, BasmalahWash.progress(settlesAt, alafasy, hugeTail)!!, 1e-6f)
+        assertTrue(BasmalahWash.progress(settlesAt - 100, alafasy, hugeTail)!! < 1f)
+    }
+
+    @Test
     fun `the feather cap keeps the closing word untouched until its turn`() {
         // The wash gradient runs one feather ahead of the solid front, so the
         // faint edge first reaches the end of the artwork at 1 / (1 + feather).
@@ -173,6 +218,7 @@ class BasmalahWashTest {
         )
         val clipMs = 4472L
         assertTrue("unfitted, the clip ends mid-wash", at(clipMs, hani) < 0.95f)
+        // Fitted, it lands exactly as the clip ends.
         assertEquals(1f, BasmalahWash.progress(clipMs, hani, clipMs)!!, 1e-6f)
         // The measured onset is kept — no ink before the voice.
         assertEquals(0f, BasmalahWash.progress(944, hani, clipMs)!!, 1e-6f)
@@ -182,11 +228,11 @@ class BasmalahWashTest {
             assertTrue("regressed at $ms", progress >= previous - 1e-6f)
             previous = progress
         }
-        // Rows that fit their audio are untouched by the ceiling.
+        // A row whose last mark is the clip's end keeps its own clock exactly.
         for (ms in longArrayOf(0, 1000, 3000, 5000)) {
             assertEquals(
                 at(ms),
-                BasmalahWash.progress(ms, alafasy, 6087)!!,
+                BasmalahWash.progress(ms, alafasy, 5870)!!,
                 1e-6f,
             )
         }

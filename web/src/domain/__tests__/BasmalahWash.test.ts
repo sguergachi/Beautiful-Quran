@@ -20,6 +20,9 @@ const alafasy: Segment[] = [
   { position: 4, startMs: 2532, endMs: 5870 },
 ]
 
+const seg = (...pairs: [number, number][]): Segment[] =>
+  pairs.map(([startMs, endMs], i) => ({ position: i + 1, startMs, endMs }))
+
 const at = (positionMs: number, segments: Segment[] = alafasy): number => {
   const progress = basmalahWashProgress(positionMs, segments)
   expect(progress).not.toBeNull()
@@ -84,6 +87,36 @@ describe('BasmalahWash', () => {
     expect(settled).toBeLessThanOrEqual(WORD_END_PROGRESS[0])
   })
 
+  it('settles the closing word with the clip, never before the voice', () => {
+    // Measured with ffprobe + an energy envelope on every shipped 001001.mp3:
+    // [segments, clip duration, when the voice actually stops].
+    const clips: [string, Segment[], number, number][] = [
+      ['Alafasy', alafasy, 6031, 6020],
+      ['Husary', seg([50, 520], [520, 1330], [1330, 2336], [2336, 4790]), 5120, 4650],
+      ['AbdulBaset', seg([536, 970], [970, 1590], [1590, 2540], [2540, 4255]), 4336, 4320],
+      ['Minshawi', seg([544, 960], [960, 1620], [1620, 2740], [2740, 4075]), 4971, 4260],
+      ['As-Sudais', seg([0, 650], [650, 1130], [1130, 1860], [1860, 2725]), 3082, 3070],
+      ['Ash-Shuraym', seg([140, 650], [660, 1160], [1170, 2110], [2120, 2560]), 2722, 2710],
+      ['Hani', seg([945, 2285], [2285, 2865], [2865, 3685], [3685, 5417]), 4472, 4010],
+    ]
+    for (const [, segments, durationMs, voiceEndMs] of clips) {
+      expect(basmalahWashProgress(voiceEndMs - 60, segments, durationMs)).toBeLessThan(1)
+      expect(basmalahWashProgress(durationMs, segments, durationMs)).toBe(1)
+      let previous = -1
+      for (let ms = 0; ms <= durationMs; ms += 8) {
+        const progress = basmalahWashProgress(ms, segments, durationMs) as number
+        expect(progress).toBeGreaterThanOrEqual(previous - 1e-6)
+        previous = progress
+      }
+    }
+  })
+
+  it('will not stretch the closer through an unusually long tail', () => {
+    const closerMs = 5870 - 2532
+    expect(basmalahWashProgress(5870 + closerMs, alafasy, 30_000)).toBe(1)
+    expect(basmalahWashProgress(5870 + closerMs - 100, alafasy, 30_000)).toBeLessThan(1)
+  })
+
   it('caps the feather so the closing word is untouched until its turn', () => {
     // The gradient runs one feather ahead of the front, so the faint edge first
     // reaches the end of the artwork at 1 / (1 + feather).
@@ -111,8 +144,8 @@ describe('BasmalahWash', () => {
       expect(progress).toBeGreaterThanOrEqual(previous - 1e-6)
       previous = progress
     }
-    // Rows that fit their audio are untouched by the ceiling.
-    expect(basmalahWashProgress(3000, alafasy, 6087)).toBe(at(3000))
+    // A row whose last mark is the clip's end keeps its own clock exactly.
+    expect(basmalahWashProgress(3000, alafasy, 5870)).toBe(at(3000))
   })
 
   it('returns null for timings it cannot map', () => {
@@ -131,7 +164,9 @@ describe('BasmalahWash', () => {
   })
 
   it('is what the preface wash uses, with the clip ramp as fallback', () => {
-    expect(prefaceWashProgress(3000, 7000, alafasy)).toBe(at(3000))
+    expect(prefaceWashProgress(3000, 7000, alafasy)).toBe(
+      basmalahWashProgress(3000, alafasy, 7000),
+    )
     expect(prefaceWashProgress(3000, 7000, alafasy.slice(0, 3))).toBe(
       prefaceRampProgress(3000, 7000),
     )
