@@ -567,6 +567,16 @@ class InkEngineTest {
             (bigGap - 0.5f) > (smallGap - 0.5f),
         )
 
+        // Near-target: gap-scaled floor fades so we don't crawl robotically.
+        val near = InkEngine.acousticWashStep(
+            current = 0.90f,
+            target = 0.91f,
+            dtSec = 0.05f,
+            targetVelocity = 0f,
+        )
+        // Pure gap/τ step: 0.01/0.16 * 0.05 ≈ 0.0031
+        assertTrue("near-target step should be tiny (got ${near - 0.90f})", near - 0.90f < 0.02f)
+
         // dt=0 never snaps.
         assertEquals(
             0.2f,

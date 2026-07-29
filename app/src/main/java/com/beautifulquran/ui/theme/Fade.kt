@@ -533,13 +533,13 @@ private fun computeLineBounds(
 private const val InkProfileStops = 17
 
 /** Horizontal fibre bands that stagger the wash head (R3). */
-internal const val InkWashBandCount = 4
+internal const val InkWashBandCount = 5
 
 /**
- * Max head stagger as a fraction of feather width. ~0.15 keeps the front
- * irregular without looking torn (Claude: >0.25 letter is glitchy).
+ * Max head stagger as a fraction of feather width. Strong enough that the
+ * front reads as a liquid C-curve, not a wipe bar; below ~0.3 letter of tear.
  */
-internal const val InkWashBandJitter = 0.15f
+internal const val InkWashBandJitter = 0.28f
 
 /** Peak mix of [diluteInk] into the paper cover at mid-feather (R4). */
 internal const val InkDilutePeak = 0.4f
@@ -568,16 +568,22 @@ internal fun linePaperCoverBounds(lineBounds: Rect, horizontalPad: Float): Rect 
 internal const val InkWashFeather = 0.5f
 
 /**
- * Deterministic band stagger in [-1, 1]. Seed is per-word (character start);
- * band index varies the front even when seed is fixed. Never use frame time —
- * that would shimmer.
+ * Deterministic band stagger in [-1, 1]. Builds a **liquid C-curve** front
+ * (middle leads or trails by seed lean) plus a little fibre noise — not a
+ * random tear and not a straight bar. Seed is per-word; never frame time.
  */
 internal fun washBandOffsetFraction(seed: Int, band: Int): Float {
-    var h = seed * 374_761_393 + band * 668_265_263 + 1_013_904_223
+    val t = (band + 0.5f) / InkWashBandCount.toFloat()
+    // Lean flips per word so consecutive words don't share the same curve.
+    val lean = if ((seed * -0x61C88647) < 0) -1f else 1f
+    // sin(πt): 0 at top/bottom, peak mid → soft bulbous ink front.
+    val curve = kotlin.math.sin(t * Math.PI.toFloat())
+    // Mild diagonal so the front isn't always symmetric about mid-height.
+    val diag = (t - 0.5f) * 2f
+    var h = seed * 374_761_393 + band * 668_265_263
     h = h xor (h ushr 13)
-    h *= 127_412_617
-    h = h xor (h ushr 16)
-    return ((h and 0xFFFF) / 65_535f) * 2f - 1f
+    val noise = ((h and 0xFF) / 255f - 0.5f) * 0.4f
+    return ((curve * 0.55f + diag * 0.35f) * lean + noise).coerceIn(-1f, 1f)
 }
 
 /** Head delta in px for one fibre band. */

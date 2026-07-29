@@ -174,8 +174,10 @@ object TajweedPacing {
      * **letter-front position** (0..1 across the word) — the reciter truth.
      *
      * [softWash]: land on each spoken letter and park for its measured hold;
-     * peels use cosine ease. Display chase / feather live outside this curve
-     * so lag is measurable (see [InkEngine.acousticWashStep]).
+     * peels are **linear** in letter space (constant peel speed). Per-span
+     * cosine ease was removed: it zeroed velocity at every letter boundary and
+     * read as a robotic start/stop on each syllable. Continuous organic feel
+     * lives in [InkEngine.acousticWashStep] alone — one soft lag, not four.
      */
     class Curve internal constructor(
         private val times: FloatArray,
@@ -183,7 +185,7 @@ object TajweedPacing {
         /** Pronounced letters — drives the letter-scaled wash feather. */
         val letterCount: Int,
         /**
-         * True for measured acoustic curves: letter parks + eased peels.
+         * True for measured acoustic curves: letter parks + linear peels.
          */
         val softWash: Boolean = false,
     ) {
@@ -200,13 +202,13 @@ object TajweedPacing {
             // Flat = spoken-letter hold (truth). Chase step supplies continuous feel.
             if (p0 == p1) return p0
             val f = (c - times[i]) / span
-            val u = if (softWash) cosineEase(f) else f
-            return p0 + (p1 - p0) * u
+            // Honest linear peels for softWash and V1 — no per-letter ease pulse.
+            return p0 + (p1 - p0) * f
         }
 
         /**
          * Approximate d(position)/d(normalizedTime) at [t] for feed-forward chase.
-         * Zero on letter holds; positive on peels.
+         * Zero on letter holds; constant on linear peels.
          */
         fun velocityAt(t: Float): Float {
             if (t >= 1f) return 0f
@@ -218,14 +220,7 @@ object TajweedPacing {
             if (span <= 1e-6f) return 0f
             val rise = positions[i + 1] - positions[i]
             if (rise <= 0f) return 0f
-            // Cosine ease derivative peaks mid-span at π/2 * average slope.
-            return if (softWash) {
-                val f = ((c - times[i]) / span).coerceIn(0f, 1f)
-                val du = 0.5f * Math.PI.toFloat() * kotlin.math.sin(Math.PI.toFloat() * f)
-                (rise / span) * du
-            } else {
-                rise / span
-            }
+            return rise / span
         }
     }
 
@@ -233,8 +228,9 @@ object TajweedPacing {
      * Acoustic keyframes → **honest letter-timed** wash curve (reciter truth).
      *
      * CTC is arrive → hold → peel. Holds park on the spoken letter; peels
-     * ease between letters. Micro CTC freezes only are absorbed. Continuous
-     * chase feel is [InkEngine.acousticWashStep], not invented curve creep.
+     * advance linearly between letters. Micro CTC freezes only are absorbed.
+     * Continuous chase feel is [InkEngine.acousticWashStep], not invented
+     * curve creep or per-span cosine.
      */
     fun acousticCurve(
         keyframes: List<SubwordKeyframe>,
@@ -403,12 +399,6 @@ object TajweedPacing {
             val pp2 = p.coerceAtLeast(pp)
             if (tt != t || pp2 != p) points[k] = tt to pp2
         }
-    }
-
-    /** Cosine ease-in-out: accelerate mid-peel, decelerate into the next park. */
-    private fun cosineEase(t: Float): Float {
-        val c = t.coerceIn(0f, 1f)
-        return 0.5f - 0.5f * kotlin.math.cos(Math.PI.toFloat() * c)
     }
 
     /**

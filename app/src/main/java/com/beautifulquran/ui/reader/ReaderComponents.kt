@@ -941,18 +941,14 @@ private fun rememberLetterSweep(
                                 letterFront = letterFront,
                                 feather = feather,
                             ).coerceAtLeast(revealState.value.coerceIn(0f, 1f))
-                            // Feed-forward velocity from the letter curve (word/s).
-                            val targetVel = when {
-                                curve != null && dt > 1e-4f -> {
-                                    // d(letterFront)/dt, mapped roughly to mask space.
-                                    val vLetter = curve.velocityAt(phase) // per unit phase
-                                    // phase advances ~1 over word duration; use finite Δ.
-                                    ((target - lastTarget) / dt).coerceAtLeast(0f)
-                                        .coerceAtLeast(vLetter * 0.5f)
-                                }
-                                dt > 1e-4f ->
-                                    ((target - lastTarget) / dt).coerceAtLeast(0f)
-                                else -> 0f
+                            // Feed-forward: prefer the finite Δ of the *mask*
+                            // target (letter→feather mapped). Linear peels make
+                            // this smooth; cosine per letter used to inject a
+                            // start/stop pulse into the chase every syllable.
+                            val targetVel = if (dt > 1e-4f) {
+                                ((target - lastTarget) / dt).coerceAtLeast(0f)
+                            } else {
+                                0f
                             }
                             lastTarget = target
                             acousticDisplay.floatValue = InkEngine.acousticWashStep(

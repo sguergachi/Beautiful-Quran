@@ -83,4 +83,8 @@ Horizontal-only gradients mean the dot of a bāʾ and the bowl of the same bāʾ
 - **R3 landed** — 4 seeded horizontal fibre bands stagger the wash head (Android draw + web stacked `mask-image`; seed folded to 8 cache variants).
 - **R4 landed** — `QuranAccents.diluteInk` warms mid-feather paper cover (Android `paperWashColors`); CSS `--dilute-ink` token on web.
 - **R5 landed** — `InkProfileStops` / `INK_PROFILE_STOPS` 9 → 17.
-- **Next:** tune dilute chroma / band jitter by eye; wet-edge overshoot rim only if still flat.
+- **Organic motion (chase):** softWash peels are **linear** (no per-letter cosine
+  zero-velocity pulse); chase floor is gap-scaled; τ=0.16. Fibre front is a
+  liquid C-curve (5 bands, jitter 0.28), not random tear.
+- **Next:** if still robotic, check V1 wall-clock path (cubic whole-word) vs V2
+  toggle; wet-edge overshoot rim only after chase+front feel right.

@@ -529,6 +529,29 @@ class TajweedPacingTest {
     }
 
     @Test
+    fun `acoustic peels are linear — no cosine zero at peel ends`() {
+        // Two knots only: peel spans the whole word. Linear = constant velocity;
+        // cosine would be ~0 at both ends (the robotic syllable pulse).
+        val curve = requireNotNull(
+            TajweedPacing.acousticCurve(
+                keyframes = listOf(
+                    SubwordKeyframe(100, 0f),
+                    SubwordKeyframe(900, 1f),
+                ),
+                durationMs = 1_000,
+            ),
+        )
+        val vEarly = curve.velocityAt(0.15f)
+        val vMid = curve.velocityAt(0.5f)
+        val vLate = curve.velocityAt(0.85f)
+        assertTrue("early peel velocity should be >0 (got $vEarly)", vEarly > 0.5f)
+        assertTrue("late peel velocity should be >0 (got $vLate)", vLate > 0.5f)
+        // Constant slope: early ≈ mid ≈ late (within float noise).
+        assertEquals(vMid, vEarly, 0.05f)
+        assertEquals(vMid, vLate, 0.05f)
+    }
+
+    @Test
     fun `acoustic curve rejects an initial progress jump at time zero`() {
         assertNull(
             TajweedPacing.acousticCurve(

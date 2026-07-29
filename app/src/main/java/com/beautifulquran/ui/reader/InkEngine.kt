@@ -366,15 +366,19 @@ object InkEngine {
 
     /**
      * Chase time-constant (seconds): display speed ≈ v_target + gap/τ.
-     * ~0.12s keeps peels in the 50–150ms "in sync" window without buzz.
+     * Slightly softer than 0.12 so the edge *glides* rather than snapping
+     * onto each peel; still inside the 50–150ms "in sync" window.
      */
-    const val ACOUSTIC_CHASE_TAU_SEC = 0.12f
+    const val ACOUSTIC_CHASE_TAU_SEC = 0.16f
 
-    /** Floor chase speed (word-fraction / sec) while behind the target. */
-    const val ACOUSTIC_CHASE_FLOOR = 0.35f
+    /**
+     * Peak floor chase speed (word-fraction / sec) when far behind.
+     * Scaled by gap so micro-corrections don't crawl at a constant robotic rate.
+     */
+    const val ACOUSTIC_CHASE_FLOOR = 0.28f
 
     /** Cap chase speed so a large gap cannot snap a whole word in one frame. */
-    const val ACOUSTIC_CHASE_MAX = 2.5f
+    const val ACOUSTIC_CHASE_MAX = 2.2f
 
     /**
      * How long the active word's letter sweep should run: the time the
@@ -403,10 +407,10 @@ object InkEngine {
      * One frame of **feed-forward letter chase** (Claude chase law).
      *
      * [target] is the letter-timed mask progress (already feather-corrected).
-     * Speed = reciter velocity + gap/τ so peels keep up without a standing lag,
-     * with a floor while behind and a never-lead clamp at [target].
-     *
-     * Never rewinds. Never snaps on dt=0.
+     * Speed = reciter velocity + gap/τ so peels keep up without a standing lag.
+     * Floor is **gap-scaled** (zero when nearly on target) so parks are still
+     * and catch-up is a glide — not a constant-rate crawl. Never leads past
+     * [target]. Never rewinds. Never snaps on dt=0.
      */
     fun acousticWashStep(
         current: Float,
@@ -420,8 +424,11 @@ object InkEngine {
         if (dtSec <= 0f) return cur
         val gap = tgt - cur
         val vTarget = targetVelocity.coerceAtLeast(0f)
+        // Full floor only when ≥~0.15 word behind; near target the floor fades
+        // so the edge settles instead of humming forward at fixed speed.
+        val floor = ACOUSTIC_CHASE_FLOOR * (gap / 0.15f).coerceIn(0f, 1f)
         val speed = (vTarget + gap / ACOUSTIC_CHASE_TAU_SEC)
-            .coerceAtLeast(ACOUSTIC_CHASE_FLOOR)
+            .coerceAtLeast(floor)
             .coerceAtMost(ACOUSTIC_CHASE_MAX)
         return (cur + speed * dtSec).coerceAtMost(tgt)
     }

@@ -7,9 +7,9 @@ export const INK_PROFILE_STOPS = 17
 /** Feather relative to word width (~1–2 letters; see INK_WASH_FEEL R1). */
 export const INK_WASH_FEATHER = 0.5
 /** Horizontal fibre bands that stagger the wash head (R3). */
-export const INK_WASH_BAND_COUNT = 4
-/** Max head stagger as a fraction of feather width (R3). */
-export const INK_WASH_BAND_JITTER = 0.15
+export const INK_WASH_BAND_COUNT = 5
+/** Max head stagger as a fraction of feather width (R3 liquid C-curve). */
+export const INK_WASH_BAND_JITTER = 0.28
 
 /** smootherstep — non-wash easing (glint, whole-word breath). */
 export function inkSmootherstep(t: number): number {
@@ -28,15 +28,19 @@ export function inkWashProfile(t: number): number {
 }
 
 /**
- * Deterministic band stagger in [-1, 1]. Seed is per-word; band index varies
- * the front even when seed is fixed. Never use frame time.
+ * Deterministic band stagger in [-1, 1]. Liquid C-curve front (middle leads
+ * or trails by seed lean) plus light fibre noise — matches Android Fade.kt.
  */
 export function washBandOffsetFraction(seed: number, band: number): number {
-  let h = (Math.imul(seed | 0, 374761393) + Math.imul(band | 0, 668265263) + 1013904223) | 0
+  const t = (band + 0.5) / INK_WASH_BAND_COUNT
+  const lean = Math.imul(seed | 0, -0x61c88647) < 0 ? -1 : 1
+  const curve = Math.sin(t * Math.PI)
+  const diag = (t - 0.5) * 2
+  let h = (Math.imul(seed | 0, 374761393) + Math.imul(band | 0, 668265263)) | 0
   h = (h ^ (h >>> 13)) | 0
-  h = Math.imul(h, 127412617)
-  h = (h ^ (h >>> 16)) | 0
-  return ((h & 0xffff) / 65535) * 2 - 1
+  const noise = (((h & 0xff) / 255) - 0.5) * 0.4
+  const v = (curve * 0.55 + diag * 0.35) * lean + noise
+  return Math.min(1, Math.max(-1, v))
 }
 
 /**
