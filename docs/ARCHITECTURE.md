@@ -209,6 +209,10 @@ ReaderFocusController ── holds the LazyListState; the sole writer to it
   next verse across a mushaf page divider (often not yet laid out) glides
   instead of jumping. Concurrent `focus()` calls are serialized on a mutex
   so a sibling effect cannot cancel the slide mid-flight.
+- Opening a bookmark (or another explicit verse target) inside the same paused
+  playlist is a manual jump: the held verse yields focus, the playlist seeks
+  to the chosen verse without playing, and the transport can then resume from
+  that selection.
 - Display settings that reflow ayah heights (reading mode, word gloss,
   transliteration, translation, font scale) recover the pinned verse after the
   LazyColumn remasures, so the reading line stays on the ayah the reader was

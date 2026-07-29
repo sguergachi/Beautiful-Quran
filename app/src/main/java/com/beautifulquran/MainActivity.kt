@@ -230,6 +230,7 @@ private fun PaperStackApp(
 
     var selectedSurahId by rememberSaveable { mutableIntStateOf(0) }
     var selectedStartAyah by rememberSaveable { mutableIntStateOf(0) }
+    var selectedStartPlayback by rememberSaveable { mutableStateOf(false) }
     /** 1-based word position from a home word-search hit; 0 means no flash. */
     var selectedStartWord by rememberSaveable { mutableIntStateOf(0) }
     /**
@@ -385,6 +386,7 @@ private fun PaperStackApp(
         readerViewModel.load(surahId, startPlaybackAtAyah = startAyah.takeIf { play })
         selectedSurahId = surahId
         selectedStartAyah = startAyah
+        selectedStartPlayback = play
         selectedStartWord = 0
         jumpEpoch++
         readerSession++
@@ -491,6 +493,7 @@ private fun PaperStackApp(
         }
         selectedSurahId = surahId
         selectedStartAyah = ayah
+        selectedStartPlayback = false
         selectedStartWord = 0
         jumpEpoch++
         readerSession++
@@ -506,6 +509,7 @@ private fun PaperStackApp(
         }
         selectedSurahId = target.surahId
         selectedStartAyah = target.ayah
+        selectedStartPlayback = false
         selectedStartWord = 0
         jumpEpoch++
         readerSession++
@@ -616,6 +620,7 @@ private fun PaperStackApp(
                     if (surahId != selectedSurahId) readerViewModel.load(surahId)
                     selectedSurahId = surahId
                     selectedStartAyah = ayah
+                    selectedStartPlayback = false
                     selectedStartWord = 0
                     jumpEpoch++
                     readerSession++
@@ -656,6 +661,7 @@ private fun PaperStackApp(
                     ReaderScreen(
                         surahId = selectedSurahId,
                         startAyah = selectedStartAyah.takeIf { it > 0 },
+                        startPlaybackRequested = selectedStartPlayback,
                         startWordPosition = selectedStartWord.takeIf { it > 0 },
                         viewModel = readerViewModel,
                         onBack = { animateTo(COVER_LAYER) },
@@ -665,11 +671,13 @@ private fun PaperStackApp(
                             // continuous-scroll advance — only sync the sheet id.
                             selectedSurahId = nextId
                             selectedStartAyah = 0
+                            selectedStartPlayback = false
                             selectedStartWord = 0
                         },
                         onOpenPreviousChapter = { prevId ->
                             selectedSurahId = prevId
                             selectedStartAyah = 0
+                            selectedStartPlayback = false
                             selectedStartWord = 0
                         },
                         onAyahSelectorExpandedChange = { ayahSelectorExpanded = it },
@@ -759,6 +767,7 @@ private fun PaperStackApp(
                     readerViewModel.load(surahId)
                     selectedSurahId = surahId
                     selectedStartAyah = ayah ?: 0
+                    selectedStartPlayback = false
                     selectedStartWord = wordPosition ?: 0
                     readerSession++
                     animateTo(AYAH_LAYER)

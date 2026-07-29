@@ -49,6 +49,33 @@ class ReaderInteractionTest {
     }
 
     @Test
+    fun `opening different bookmark in paused playlist selects it without playing`() {
+        val selected = ReaderInteraction.initialState(
+            requestedAyah = 8,
+            isThisSurahPlaying = true,
+            isPlaying = false,
+            playbackAyah = 2,
+        )
+        assertEquals(8, selected.pendingJumpAyah)
+        assertFalse(selected.followEnabled)
+
+        val sameAyah = ReaderInteraction.initialState(2, true, false, 2)
+        assertEquals(idle, sameAyah)
+        assertEquals(idle, ReaderInteraction.initialState(8, true, true, 2))
+        assertEquals(idle, ReaderInteraction.initialState(8, false, false, 2))
+        assertEquals(
+            idle,
+            ReaderInteraction.initialState(
+                requestedAyah = 8,
+                isThisSurahPlaying = true,
+                isPlaying = false,
+                playbackAyah = 2,
+                playbackRequested = true,
+            ),
+        )
+    }
+
+    @Test
     fun `jump settled clears only matching pending`() {
         val mid = idle.copy(pendingJumpAyah = 7)
         val settled = ReaderInteraction.reduce(mid, ReaderInteractionEvent.JumpSettled(7))
