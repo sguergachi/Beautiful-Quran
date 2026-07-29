@@ -349,16 +349,18 @@ class ReaderViewModel(
     }
 
     /**
-     * Calligraphy wash 0..1 while the basmalah lead-in plays, paced by the
-     * clip's playback position so the SVG settles to full ink before audio
-     * ends (see [InkEngine.prefaceWashProgress]). Null when not on the lead-in.
+     * Calligraphy wash 0..1 while the basmalah lead-in plays: locked to the
+     * clip's own word timings and paced by tajweed inside each word's band of
+     * artwork, falling back to a plain clip ramp when those timings are missing
+     * (see [InkEngine.prefaceWashProgress] /
+     * [com.beautifulquran.domain.BasmalahWash]). Null when not on the lead-in.
      */
     val basmalahWashProgress: StateFlow<Float?> = pollingWhileLoaded(key = { it.ayah }) { ayah ->
         if (ayah != BASMALAH_PLAYLIST_AYAH) return@pollingWhileLoaded null
         val duration = player.durationMs
         val timed = timings[BASMALAH_PLAYLIST_AYAH]
-        // Prefer the real media duration once known; until then fall back to
-        // the timing span so the wash still advances on the first ticks.
+        // Fallback ramp only: prefer the real media duration once known, and
+        // until then the timing span so the wash still advances on first ticks.
         val endMs = when {
             duration > 0L -> duration
             timed != null -> timed.last().endMs
@@ -366,7 +368,7 @@ class ReaderViewModel(
         }
         // The pure ear clock: this consumer must not arm the ink clock's
         // "accept next sample" latch on the ink poll's behalf.
-        InkEngine.prefaceWashProgress(heardPositionMs(), endMs)
+        InkEngine.prefaceWashProgress(heardPositionMs(), endMs, timed)
     }
 
     /** Advances the lit ayah to the next one during the final

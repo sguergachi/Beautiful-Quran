@@ -1208,6 +1208,7 @@ export function ReaderScreen({ stackLayer }: { stackLayer: StackLayer }) {
                     data-state={preface}
                     active={state.activeBasmalah}
                     dimmed={false}
+                    segments={() => appStore.basmalahSegments()}
                     onClick={() => void appStore.playAyah(1)}
                   />
                 </div>

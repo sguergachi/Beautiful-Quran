@@ -462,9 +462,11 @@ image, so it is crisp at any density and nearly free to render.
   does for any verse while the lead-in plays. The VectorDrawable
   (`basmalah_naskh`) is adapted from Wikimedia Commons File:Basmala.svg
   (Baba66, CC BY-SA 3.0). It is an InkEngine **calligraphy render path**: an
-  RTL `letterFadeIn` wash advances across the SVG on the lead-in clip's
-  playback clock and settles to full ink before the audio ends; Upcoming while
-  another ayah is recited; Plain at rest. Starting playback from ayah 1 (or
+  RTL `letterFadeIn` wash advances across the SVG **on the clip's own word
+  timings** — each word owns the band of artwork its glyphs cover, paced inside
+  it by tajweed — so the ink reaches ٱللَّهِ as the reciter says "-llāhi" and
+  settles as the closing madd of ٱلرَّحِيمِ ends, not at a fixed fraction of the
+  file (`BasmalahWash`); Upcoming while another ayah is recited; Plain at rest. Starting playback from ayah 1 (or
   tapping the calligraphy) prepends Al-Fatihah 1:1 audio before the first ayah;
   word taps skip the lead-in.
 - **Restraint rule:** ornament appears in exactly three places on the open

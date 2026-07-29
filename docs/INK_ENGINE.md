@@ -397,10 +397,19 @@ InkEngine owns that too, as data rather than as animation code:
   [GLIMMER.md](GLIMMER.md) is the canonical cross-platform rendering,
   tuning, and visual-verification specification.
 - **Basmalah preface**: `prefaceState(isActive, dimmed)` /
-  `prefaceWashProgress(positionMs, durationMs)` for the surah-header basmalah
-  VectorDrawable (Active during the Al-Fatihah 1:1 lead-in clip, with an RTL
-  `letterFadeIn` wash paced by the clip clock and settled to full ink before
-  audio ends; Upcoming while recessed; Plain at rest).
+  `prefaceWashProgress(positionMs, durationMs, segments)` for the surah-header
+  basmalah VectorDrawable (Active during the Al-Fatihah 1:1 lead-in clip, with
+  an RTL `letterFadeIn` wash; Upcoming while recessed; Plain at rest). With the
+  clip's word `segments` the wash is locked to the voice by
+  [`BasmalahWash`](../app/src/main/java/com/beautifulquran/domain/BasmalahWash.kt):
+  each of the four words owns the **band of artwork its glyphs cover** (the
+  composition is not proportional to time — the elongated sīn gives بِسۡمِ over
+  half the width for a ~0.5 s syllable) and is paced inside that band by
+  tajweed, including the madd ʿāriḍ of the closing ٱلرَّحِيمِ, which is over
+  half the clip. `prefaceRampProgress` is the fallback when those timings are
+  missing or are not the plain four words: the old clip-clock ramp settling at
+  `PREFACE_WASH_SETTLE_FRACTION`. The web port has the bands but not yet the
+  letter pacing (no `TajweedPacing` on web).
 - **`InkEngine.Tuning`**: every feel knob in one data class — upcoming alpha,
   ink/mark fade durations, recess, sweep clamps, repeat sweep/fade-out and
   repeat ink strength, glint tint, glitter time, halo strength/blur, wash

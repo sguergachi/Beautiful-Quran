@@ -4,6 +4,8 @@ import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import com.beautifulquran.data.model.Segment
+import com.beautifulquran.domain.BasmalahWash
 import com.beautifulquran.domain.TajweedPacing
 
 /**
@@ -460,14 +462,54 @@ object InkEngine {
     /**
      * How far the calligraphy ink wash has traveled (0..1) across the SVG.
      *
-     * Driven by the lead-in clip's playback clock — not equal word slices —
-     * so the feathered [letterFadeIn] edge reaches full ink before the audio
-     * ends. [letterFadeIn] only clears the resting floor at progress ≥ 1, and
-     * the wide wash feather leaves the trailing edge faint until then; settling
-     * at [PREFACE_WASH_SETTLE_FRACTION] of the clip gives that edge time to
-     * finish while the basmalah is still playing.
+     * With the lead-in clip's word [segments] (Al-Fatihah 1:1, always the same
+     * file) the wash is locked to the voice: each word owns the band of artwork
+     * its glyphs cover and is paced inside it by tajweed — see [BasmalahWash].
+     * That is the shipped path; the ramp below is the fallback for timings that
+     * are missing, still loading, or not the plain four words.
+     *
+     * The fallback is driven by the clip's playback clock so the feathered
+     * [letterFadeIn] edge reaches full ink before the audio ends.
+     * [letterFadeIn] only clears the resting floor at progress ≥ 1, and the
+     * wide wash feather leaves the trailing edge faint until then; settling at
+     * [PREFACE_WASH_SETTLE_FRACTION] of the clip gives that edge time to finish
+     * while the basmalah is still playing.
      */
-    fun prefaceWashProgress(positionMs: Long, durationMs: Long): Float {
+    fun prefaceWashProgress(
+        positionMs: Long,
+        durationMs: Long,
+        segments: List<Segment>? = null,
+    ): Float {
+        segments
+            ?.let { BasmalahWash.progress(positionMs, it, prefaceHold()) }
+            ?.let { return it }
+        return prefaceRampProgress(positionMs, durationMs)
+    }
+
+    /**
+     * Tajweed pacing for the preface words, or null when Ink Lab has pacing
+     * off. The closer's dwell is over half the clip and lands on one glyph, so
+     * the preface parks it on the madd the stop lengthens
+     * ([TajweedPacing.Hold.maddAaridWaqf]) — the ي of "ar-raḥīīīm", not the م.
+     */
+    private fun prefaceHold(): TajweedPacing.Hold? {
+        val t = tuning
+        if (!t.tajweedPacing) return null
+        return TajweedPacing.Hold(
+            madd = t.holdMadd,
+            ghunnah = t.holdGhunnah,
+            waqf = t.holdWaqf,
+            connect = t.holdConnect,
+            cruiseCap = t.cruiseCap,
+            waqfShare = t.waqfShare,
+            waqfLengthScale = t.waqfLengthScale,
+            creep = t.holdCreep,
+            maddAaridWaqf = true,
+        )
+    }
+
+    /** Plain clip-clock ramp — the no-timings fallback of [prefaceWashProgress]. */
+    fun prefaceRampProgress(positionMs: Long, durationMs: Long): Float {
         if (durationMs <= 0L) return 0f
         if (positionMs <= 0L) return 0f
         val settleAt = (durationMs * PREFACE_WASH_SETTLE_FRACTION).toLong().coerceAtLeast(1L)

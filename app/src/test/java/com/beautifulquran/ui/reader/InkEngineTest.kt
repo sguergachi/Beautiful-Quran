@@ -1,5 +1,7 @@
 package com.beautifulquran.ui.reader
 
+import com.beautifulquran.data.model.Segment
+import com.beautifulquran.domain.BasmalahWash
 import com.beautifulquran.ui.reader.InkEngine.State
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -296,7 +298,48 @@ class InkEngineTest {
     }
 
     @Test
-    fun `calligraphy wash follows the lead-in playback clock`() {
+    fun `calligraphy wash prefers the lead-in word timings`() {
+        // Alafasy's 001001.mp3: nothing before the voice at 60 ms, settled as
+        // the closing madd ends at 5870 — not at a fraction of the file.
+        val segments = listOf(
+            Segment(1, 60, 610),
+            Segment(2, 610, 1439),
+            Segment(3, 1439, 2532),
+            Segment(4, 2532, 5870),
+        )
+        assertEquals(
+            0f,
+            InkEngine.prefaceWashProgress(positionMs = 40, durationMs = 7000, segments = segments),
+            1e-4f,
+        )
+        // Mid-closer: inside ٱلرَّحِيمِ's band of the artwork, not near the
+        // middle of the file (which the ramp would give at 3 s of 7 s).
+        val closer = InkEngine.prefaceWashProgress(
+            positionMs = 3000,
+            durationMs = 7000,
+            segments = segments,
+        )
+        assertTrue(closer >= BasmalahWash.WORD_END_PROGRESS[2])
+        assertTrue(closer < 1f)
+        assertEquals(
+            1f,
+            InkEngine.prefaceWashProgress(positionMs = 5870, durationMs = 7000, segments = segments),
+            1e-4f,
+        )
+        // Unmappable timings fall back to the clip ramp.
+        assertEquals(
+            InkEngine.prefaceRampProgress(positionMs = 3000, durationMs = 7000),
+            InkEngine.prefaceWashProgress(
+                positionMs = 3000,
+                durationMs = 7000,
+                segments = segments.dropLast(1),
+            ),
+            1e-4f,
+        )
+    }
+
+    @Test
+    fun `calligraphy wash falls back to the lead-in playback clock`() {
         assertEquals(0f, InkEngine.prefaceWashProgress(positionMs = 0, durationMs = 5000), 1e-4f)
         assertEquals(0f, InkEngine.prefaceWashProgress(positionMs = 100, durationMs = 0), 1e-4f)
         val settleAt = (5000 * InkEngine.PREFACE_WASH_SETTLE_FRACTION).toLong()

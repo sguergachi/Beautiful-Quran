@@ -151,6 +151,20 @@ object TajweedPacing {
         /** Fraction of its own slot the wash still crosses while holding, so
          *  the ink breathes instead of freezing dead. */
         val creep: Float = 0.08f,
+        /**
+         * Park the waqf hold on the **madd letter the stop lengthens** rather
+         * than on the closing consonant.
+         *
+         * A pausal stop silences the last letter, and what the reciter actually
+         * sustains is the madd before it (madd ʿāriḍ li-s-sukūn): ٱلرَّحِيمِ is
+         * held on the ي of "raḥīīīm", then the م closes it. Off by default: the
+         * two letters are adjacent, the wash feather blurs most of the
+         * difference, and flipping it moves the park on nearly every verse
+         * ending — a page-wide pacing change that wants its own review. The
+         * basmalah preface ([BasmalahWash]) opts in, where the closer's dwell
+         * is over half the clip and lands on a single glyph.
+         */
+        val maddAaridWaqf: Boolean = false,
     )
 
     /**
@@ -225,16 +239,21 @@ object TajweedPacing {
         }
 
         // A verse-closing word is sustained on its final letter (madd ʿāriḍ
-        // li-s-sukūn, 2/4/6 counts), whatever that letter's mid-flow value.
+        // li-s-sukūn, 2/4/6 counts), whatever that letter's mid-flow value —
+        // or, with [Hold.maddAaridWaqf], on the madd letter the stop lengthens.
         val isWaqf = hold.waqf && hold.isAyahFinal
-        if (isWaqf && lastPronounced >= 0) {
-            counts[lastPronounced] = maxOf(counts[lastPronounced], MADD_LAZIM)
+        val waqfIndex =
+            if (!isWaqf || lastPronounced < 0) -1
+            else if (hold.maddAaridWaqf) maddAaridIndex(events, counts, lastPronounced)
+            else lastPronounced
+        if (waqfIndex >= 0) {
+            counts[waqfIndex] = maxOf(counts[waqfIndex], MADD_LAZIM)
         }
 
         val held = BooleanArray(n) { i ->
             counts[i] > 0f && when {
                 waslEntry && i == 0 -> true
-                isWaqf && i == lastPronounced -> true
+                i == waqfIndex -> true
                 hold.madd && counts[i] >= MADD_MUTTASIL -> true
                 hold.ghunnah && counts[i] >= GHUNNAH && isGhunnah(events[i]) -> true
                 else -> false
@@ -330,6 +349,36 @@ object TajweedPacing {
         val t = ((letters - MIN_LETTERS + 1).toFloat() / span).coerceIn(0f, 1f)
         val factor = (1f - s) + s * t
         return (share * factor).coerceIn(0f, MAX_DWELL_SHARE)
+    }
+
+    /**
+     * Which letter a pausal stop actually lengthens (madd ʿāriḍ li-s-sukūn):
+     * the madd letter immediately before the closer — the ي of ٱلرَّحِيمِ, the
+     * و of يَعۡلَمُونَ's ـُونَ, the ا of ٱلۡمُتَّقِينَ-style opens — or the closer
+     * itself when it is a madd letter or nothing precedes it.
+     */
+    private fun maddAaridIndex(
+        events: List<Event>,
+        counts: FloatArray,
+        lastPronounced: Int,
+    ): Int {
+        if (isMaddLetter(events, lastPronounced)) return lastPronounced
+        var i = lastPronounced - 1
+        while (i >= 0 && counts[i] <= 0f) i--
+        return if (i >= 0 && isMaddLetter(events, i)) i else lastPronounced
+    }
+
+    /** Whether the event at [i] is a lengthened vowel (madd letter or maddah). */
+    private fun isMaddLetter(events: List<Event>, i: Int): Boolean {
+        val e = events.getOrNull(i) ?: return false
+        if (e.maddah || e.madd) return true
+        val prev = events.getOrNull(i - 1)
+        return when (e.base) {
+            ALEF, ALEF_MAKSURA -> prev?.fatha == true
+            WAW -> prev?.damma == true && !e.haraka
+            YEH -> prev?.kasra == true && !e.haraka
+            else -> false
+        }
     }
 
     /** Width slice of the pronounced event at [i]: its own slot plus any

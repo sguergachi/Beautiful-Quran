@@ -124,6 +124,37 @@ class TajweedPacingTest {
     }
 
     @Test
+    fun `madd aarid waqf parks on the vowel the stop lengthens`() {
+        // ٱلرَّحِيمِ stopped on: the reciter sustains the ي of "raḥīīīm" and
+        // then closes the م. Opt-in — the default still parks on the closer.
+        val rahim = BasmalahWash.WORDS.last()
+        val closer = curveOf(rahim, hold = Hold(isAyahFinal = true, waqfLengthScale = 0f))
+        val madd = curveOf(
+            rahim,
+            hold = Hold(isAyahFinal = true, waqfLengthScale = 0f, maddAaridWaqf = true),
+        )
+        // Both settle, but the madd variant parks earlier in the word — one
+        // glyph back — and still crosses the closing letter afterwards.
+        assertEquals(1f, closer.at(1f), 0f)
+        assertEquals(1f, madd.at(1f), 0f)
+        assertTrue(
+            "madd ʿāriḍ should park behind the closer (${madd.at(0.5f)} vs ${closer.at(0.5f)})",
+            madd.at(0.5f) < closer.at(0.5f),
+        )
+        val parked = madd.at(0.75f) - madd.at(0.35f)
+        assertTrue("the park must be a park, moved $parked", parked < 0.08f)
+        assertTrue("and the closer is still crossed", madd.at(1f) - madd.at(0.9f) > 0f)
+        // Nothing to move the hold onto: a word closing on its own madd letter
+        // paces identically either way.
+        val opensOnMadd = "ٱلۡهُدَىٰ"
+        assertEquals(
+            curveOf(opensOnMadd, hold = Hold(isAyahFinal = true)).at(0.5f),
+            curveOf(opensOnMadd, hold = Hold(isAyahFinal = true, maddAaridWaqf = true)).at(0.5f),
+            1e-6f,
+        )
+    }
+
+    @Test
     fun `the waqf share is what pays for the hold`() {
         // A bigger share buys a longer stillness — the run-up is quicker and
         // the wash then sits on the closing letter for more of the word.

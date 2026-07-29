@@ -2,7 +2,8 @@
  * Visual word-ink policy — port of Android `ui/reader/InkEngine.kt`.
  * Pure decision functions; no DOM.
  */
-import type { ActiveWord } from '../../data/models'
+import type { ActiveWord, Segment } from '../../data/models'
+import { basmalahWashProgress } from '../../domain/BasmalahWash'
 
 export enum InkState {
   Plain = 'Plain',
@@ -185,11 +186,27 @@ export function prefaceState(isActive: boolean, dimmed: boolean): InkState {
 
 /**
  * How far the basmalah calligraphy wash has traveled (0..1) across the SVG.
- * Driven by the lead-in clip's playback clock — settles at
- * [PREFACE_WASH_SETTLE_FRACTION] so the feathered edge finishes before audio ends.
+ *
+ * With the lead-in clip's word [segments] (Al-Fatihah 1:1, always the same
+ * file) the wash is locked to the voice: each word owns the band of artwork its
+ * glyphs cover — see `domain/BasmalahWash`. That is the shipped path; the ramp
+ * below is the fallback for timings that are missing, still loading, or not the
+ * plain four words. The fallback settles at [PREFACE_WASH_SETTLE_FRACTION] so
+ * the feathered edge finishes before audio ends.
  * Port of Android `InkEngine.prefaceWashProgress`.
  */
-export function prefaceWashProgress(positionMs: number, durationMs: number): number {
+export function prefaceWashProgress(
+  positionMs: number,
+  durationMs: number,
+  segments?: Segment[] | null,
+): number {
+  const paced = basmalahWashProgress(positionMs, segments)
+  if (paced != null) return paced
+  return prefaceRampProgress(positionMs, durationMs)
+}
+
+/** Plain clip-clock ramp — the no-timings fallback of [prefaceWashProgress]. */
+export function prefaceRampProgress(positionMs: number, durationMs: number): number {
   if (durationMs <= 0) return 0
   if (positionMs <= 0) return 0
   const settleAt = Math.max(1, Math.trunc(durationMs * PREFACE_WASH_SETTLE_FRACTION))
@@ -205,8 +222,9 @@ export function advancePrefaceWashProgress(
   previousProgress: number,
   positionMs: number,
   durationMs: number,
+  segments?: Segment[] | null,
 ): number {
-  return Math.max(previousProgress, prefaceWashProgress(positionMs, durationMs))
+  return Math.max(previousProgress, prefaceWashProgress(positionMs, durationMs, segments))
 }
 
 /** Fraction of the lead-in clip at which the SVG wash must be fully settled. */
@@ -229,6 +247,7 @@ export const InkEngine = {
   glinting,
   prefaceState,
   prefaceWashProgress,
+  prefaceRampProgress,
   advancePrefaceWashProgress,
   PREFACE_WASH_SETTLE_FRACTION,
   DEFAULT_HIGHLIGHT_LEAD_MS,
