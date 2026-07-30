@@ -42,6 +42,17 @@ language-model prior (Whisper and every Quran-fine-tuned model) normalises a
 re-recitation back to the canonical text — the lower-WER model is the wrong
 tool here precisely because it "corrects" the thing we need to observe.
 
+## Unsplit vs peer same-position re-says
+
+When CTC emits `unsplit`, `build_db.apply_timing_repairs` still **refuses** the
+edit if cleaned qdc already holds a *substantial* same-position pair (both
+halves fail the split-fragment gate used by `clean_qdc_artifacts`). CTC needs a
+≥300 ms pause to keep a repeat; many real single-word re-says are labeled flush
+(gap 0) with two full-length halves (Hani **4:4** فَكُلُوهُ = 1710 + 1120 ms).
+Those must stay as `12,12` for orange wash — see
+`tools/timing_patch_cases/unsplit-protect-hani-4-4.json`. True onset/body
+fragments still unsplit.
+
 ## The repeat-vs-split invariant
 
 Two consecutive CTC tokens on the same canonical word are either a genuine

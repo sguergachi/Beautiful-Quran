@@ -4,6 +4,7 @@ import com.beautifulquran.data.model.Segment
 import com.beautifulquran.domain.OutputLatency.OutputKind
 import com.beautifulquran.domain.OutputLatency.Route
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class OutputLatencyTest {
@@ -96,7 +97,65 @@ class OutputLatencyTest {
             leadMs = 114,
             leadNotBeforeMs = segments.first().startMs,
         )
+        // At the gate, ramped lead is still 0 — continuous with silence.
+        assertEquals(1_179L, voiceStart)
         assertEquals(1, HighlightEngine.activeWord(segments, voiceStart))
+    }
+
+    @Test
+    fun `word lead ramps in after the first word so handoff settle cannot skip it`() {
+        // Hard +lead at the gate (210 → 324) exceeds HighlightClock.MAX_SETTLE_STEP_MS
+        // (100) and freezes the post-ayah-handoff clock through a short word 1.
+        val gate = 210L
+        val lead = 114L
+        assertEquals(
+            210L,
+            OutputLatency.highlightMs(210, latencyMs = 0, leadMs = lead, leadNotBeforeMs = gate),
+        )
+        // Half-way through the ramp: applied lead == pastGate.
+        assertEquals(
+            310L, // 260 + min(114, 50)
+            OutputLatency.highlightMs(260, latencyMs = 0, leadMs = lead, leadNotBeforeMs = gate),
+        )
+        // Full lead once pastGate >= leadMs.
+        assertEquals(
+            438L, // 324 + 114
+            OutputLatency.highlightMs(324, latencyMs = 0, leadMs = lead, leadNotBeforeMs = gate),
+        )
+        // No gate: full lead from the first sample (unchanged).
+        assertEquals(
+            374L,
+            OutputLatency.highlightMs(260, latencyMs = 0, leadMs = lead, leadNotBeforeMs = 0),
+        )
+    }
+
+    @Test
+    fun `ramped lead plus settle lights word 1 after media-item handoff`() {
+        // Hani 3:7-shaped row: short word 1 inside the post-handoff settle window.
+        val segments = listOf(
+            Segment(position = 1, startMs = 210, endMs = 490),
+            Segment(position = 2, startMs = 490, endMs = 1_340),
+        )
+        val clock = HighlightClock()
+        val words = mutableListOf<Int?>()
+        for (tick in 0 until 25) {
+            val pos = tick * 33L
+            val raw = OutputLatency.highlightMs(
+                mediaPositionMs = pos,
+                latencyMs = 0,
+                leadMs = 114,
+                leadNotBeforeMs = segments.first().startMs,
+            )
+            val key = "ayah7"
+            val ms = clock.sample(key, raw)
+            words.add(HighlightEngine.activeWord(segments, ms))
+        }
+        assertTrue(
+            "word 1 must light before word 2 after handoff; saw $words",
+            words.any { it == 1 },
+        )
+        val firstLit = words.first { it != null }
+        assertEquals(1, firstLit)
     }
 
     @Test

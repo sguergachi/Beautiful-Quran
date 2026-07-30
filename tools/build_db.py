@@ -625,11 +625,53 @@ def multi_position_span_repeat(segs):
     return False
 
 
-def erases_span_repeat(pre_segs, repair_segs):
-    """True when a repair would delete a multi-position span-repeat present in pre."""
-    return multi_position_span_repeat(pre_segs) and not multi_position_span_repeat(
-        repair_segs
+def is_split_fragment(dur_a_ms, dur_b_ms):
+    """True when a same-position pair is an aligner mid-word split, not a re-say.
+
+    Same discriminator as [clean_qdc_artifacts]'s merge gate: a flat short floor,
+    or a medium fragment dwarfed by its neighbour. Peer utterances (both halves
+    substantial) are real single-word repeats and must survive.
+    """
+    shorter = min(dur_a_ms, dur_b_ms)
+    longer = max(dur_a_ms, dur_b_ms)
+    return shorter < QDC_SPLIT_FRAGMENT_MS or (
+        shorter < QDC_SPLIT_FRAGMENT_CEIL_MS
+        and shorter < QDC_SPLIT_FRAGMENT_RATIO * longer
     )
+
+
+def substantial_same_position_repeat(segs):
+    """True if any consecutive same-position pair is a peer re-say (not a split).
+
+    CTC `unsplit` repairs often collapse these because the generator requires a
+    ≥300 ms pause to keep a repeat, while qdc labels re-says flush (gap 0) with
+    two full-length halves — e.g. Hani 4:4 فَكُلُوهُ (1710 + 1120 ms).
+    """
+    for i in range(len(segs) - 1):
+        if segs[i][0] != segs[i + 1][0]:
+            continue
+        d1 = segs[i][2] - segs[i][1]
+        d2 = segs[i + 1][2] - segs[i + 1][1]
+        if not is_split_fragment(d1, d2):
+            return True
+    return False
+
+
+def erases_span_repeat(pre_segs, repair_segs):
+    """True when a repair would delete a real re-say present in pre.
+
+    Protects multi-position span-repeats and substantial single-word re-says
+    (same-position pairs that [clean_qdc_artifacts] also refuses to merge).
+    """
+    if multi_position_span_repeat(pre_segs) and not multi_position_span_repeat(
+        repair_segs
+    ):
+        return True
+    if substantial_same_position_repeat(pre_segs) and not substantial_same_position_repeat(
+        repair_segs
+    ):
+        return True
+    return False
 
 
 def collapse_false_phrase_loops(segs, words, stats):
@@ -677,16 +719,10 @@ def clean_qdc_artifacts(segs, stats, words=None):
         merged = [list(segs[0])]
         for pos, start, end in segs[1:]:
             last = merged[-1]
-            shorter = min(last[2] - last[1], end - start)
-            longer = max(last[2] - last[1], end - start)
-            fragment = shorter < QDC_SPLIT_FRAGMENT_MS or (
-                shorter < QDC_SPLIT_FRAGMENT_CEIL_MS
-                and shorter < QDC_SPLIT_FRAGMENT_RATIO * longer
-            )
             if (
                 pos == last[0]
                 and start - last[2] <= QDC_SPLIT_MERGE_GAP_MS
-                and fragment
+                and is_split_fragment(last[2] - last[1], end - start)
             ):
                 last[2] = max(last[2], end)
                 stats["merged_splits"] += 1
@@ -1168,7 +1204,8 @@ def apply_timing_repairs(timing_rows, word_counts, clock_offsets=None, durations
     on top of the current source rows. Structural differences and their
     immediate neighbours use the repair; matching segments retain current
     timing so stale full-row patches cannot overwrite unrelated improvements.
-    Repairs that erase an existing multi-position span-repeat are skipped."""
+    Repairs that erase an existing multi-position span-repeat or a substantial
+    same-position re-say (peer halves, not split fragments) are skipped."""
     clock_offsets = clock_offsets or {}
     durations = durations or {}
     slug_by_id = {r[0]: r[1] for r in RECITERS}
