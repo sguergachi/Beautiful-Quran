@@ -54,7 +54,7 @@ a case under this directory.
 |---|---|---|
 | `id` | yes | stable slug; should match the filename stem |
 | `label` | yes | one-line human name (shown on failure) |
-| `pipeline` | yes | `clean_qdc_artifacts`, `erases_span_repeat`, `rebase_timing_repair`, `clock_shifted_repair`, `qdc_clock_rebase`, `boundary_repair`, or `leading_silence_offset` |
+| `pipeline` | yes | `clean_qdc_artifacts`, `erases_span_repeat`, `rebase_timing_repair`, `clock_shifted_repair`, `qdc_clock_rebase`, `boundary_repair`, `leading_silence_offset`, `recover_negative_opening`, or `adjust_qdc_segments` |
 | `input_positions` | * | 1-based word indices in time order (synthetic equal durations) |
 | `expected_positions` | * | positions after the pipeline step |
 | `input_segments` | * | full `[[pos, start_ms, end_ms], …]` when times matter |

@@ -1,0 +1,45 @@
+{
+  "id": "unsplit-protect-hani-4-4",
+  "label": "Hani 4:4 فَكُلُوهُ substantial same-pos re-say must not unsplit",
+  "refs": [
+    "ear report",
+    "raw qdc 12,12 (1710+1120 ms)",
+    "timing_repairs Hani unsplit"
+  ],
+  "pipeline": "erases_span_repeat",
+  "notes": "CTC unsplit requires a ≥300 ms pause to keep a repeat; Hani re-says فَكُلُوهُ flush (gap 0) with two full-length halves. clean_qdc keeps them; apply_timing_repairs must refuse the unsplit that flattens to a single 2830 ms span.",
+  "input_segments": [
+    [1, 0, 910],
+    [2, 910, 3520],
+    [3, 3520, 5680],
+    [4, 5680, 6900],
+    [5, 6900, 7350],
+    [6, 7350, 8740],
+    [7, 8740, 9280],
+    [8, 9280, 10270],
+    [9, 10270, 10910],
+    [10, 10910, 12080],
+    [11, 12080, 13200],
+    [12, 13200, 14910],
+    [12, 14910, 16030],
+    [13, 16030, 17570],
+    [14, 17570, 20565]
+  ],
+  "repair_segments": [
+    [1, 0, 910],
+    [2, 910, 3520],
+    [3, 3520, 5680],
+    [4, 5680, 6900],
+    [5, 6900, 7350],
+    [6, 7350, 8740],
+    [7, 8740, 9280],
+    [8, 9280, 10270],
+    [9, 10270, 10910],
+    [10, 10910, 12080],
+    [11, 12080, 13200],
+    [12, 13200, 16030],
+    [13, 16030, 17570],
+    [14, 17570, 20565]
+  ],
+  "expected_erases": true
+}

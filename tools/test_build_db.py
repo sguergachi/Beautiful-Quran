@@ -23,6 +23,7 @@ ROOT = TOOLS.parent
 sys.path.insert(0, str(TOOLS))
 from build_db import (  # noqa: E402
     AUDIO_ONSETS_DIR,
+    adjust_qdc_segments,
     apply_audio_onsets,
     apply_boundary_repair,
     apply_clocked_timing_repair,
@@ -32,6 +33,7 @@ from build_db import (  # noqa: E402
     erases_span_repeat,
     load_audio_durations,
     offset_for_audio_onset,
+    recover_negative_opening,
     refit_displaced_rows,
     rebase_qdc_clock,
     rebase_timing_repair,
@@ -44,6 +46,7 @@ import detect_audio_onsets as onset_detector  # noqa: E402
 CASES_DIR = TOOLS / "timing_patch_cases"
 PIPELINES = frozenset(
     {
+        "adjust_qdc_segments",
         "boundary_repair",
         "clean_qdc_artifacts",
         "clock_shifted_repair",
@@ -51,6 +54,7 @@ PIPELINES = frozenset(
         "leading_silence_offset",
         "qdc_clock_rebase",
         "rebase_timing_repair",
+        "recover_negative_opening",
     }
 )
 
@@ -134,6 +138,24 @@ def run_pipeline(case, segs):
         }
         words = {int(pos): word for pos, word in case.get("words", {}).items()}
         return clean_qdc_artifacts(segs, stats, words)
+    if pipeline == "recover_negative_opening":
+        recovered, _ = recover_negative_opening(segs)
+        return recovered
+    if pipeline == "adjust_qdc_segments":
+        stats = {
+            "zero_len": 0,
+            "clamped": 0,
+            "repeats": 0,
+            "opening_shift": 0,
+            "merged_splits": 0,
+            "dropped_strays": 0,
+            "noncontiguous_orphans": 0,
+            "gap_phantoms": 0,
+            "false_phrase_loops": 0,
+        }
+        n_words = case.get("n_words") or max(p for p, _, _ in segs)
+        words = {int(pos): word for pos, word in case.get("words", {}).items()}
+        return adjust_qdc_segments(segs, n_words, stats, words or None)
     if pipeline == "boundary_repair":
         return apply_boundary_repair(segs, resolve_repair(case))
     if pipeline == "clock_shifted_repair":
