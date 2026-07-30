@@ -520,14 +520,11 @@ object InkEngine {
     }
 
     /**
-     * Cross-word nūn-rule prefix bloom into the **next word's opening letter**.
+     * Cross-word nūn-rule link (idghām / iqlāb / ikhfāʾ) for pacing math.
      *
-     * Eligibility and geometry are orthographic (idghām / iqlāb / ikhfāʾ) for
-     * both V1 and V2 — the reciter is already on that letter during the donor
-     * tail, so ink must start there before word handoff. V2 still prefers a
-     * measured [waslFromPrevMs] for the bloom **duration** when present; a
-     * missing tag must not kill the connection (that left full-QUA V2 with
-     * almost no wasl after mono CTC enrichment was replaced).
+     * The reader **does not** pre-bloom the next word while the donor is Active
+     * (sequential ink only — see ReaderComponents). Kept so Lab/tajweed can
+     * still reason about the connection and pure helpers stay testable.
      */
     fun connection(
         prevArabic: String,

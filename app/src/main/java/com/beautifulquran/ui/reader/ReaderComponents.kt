@@ -1157,69 +1157,6 @@ private data class WaslPrefix(
     fun displayProgress(): Float = waslWashProgress(windowProgress.value, endProgress)
 }
 
-private class ActiveWordEntry(
-    var index: Int,
-    var activation: Long,
-    var outgoingHandoff: Float = 0f,
-)
-
-private data class WaslProgress(
-    val value: State<Float>,
-    val atHandoff: Float,
-)
-
-/** Blooms the next opening letter over the connected tail of this word. */
-@Composable
-private fun rememberWaslProgress(
-    connection: TajweedPacing.Connection?,
-    sweepMs: Int?,
-    identity: Int?,
-    activation: Long,
-    /** V2 measured wasl budget (ms); 0 keeps the shipped V1 default ceiling. */
-    waslBudgetMs: Long = 0L,
-): WaslProgress {
-    val clock = remember(identity, activation) { Animatable(0f) }
-    val entryConnection = remember(identity, activation) { connection }
-    val entryMs = remember(identity, activation) { sweepMs }
-    // Capture at Active entry so a mid-word retune cannot jump the edge; the
-    // next wasl handoff picks up new lab values.
-    val waslPrefixMs = InkEngine.waslPrefixTargetMs(waslBudgetMs)
-    val waslHandoff = InkEngine.tuning.waslHandoff
-    val entryPrefixStart = remember(identity, activation, waslPrefixMs) {
-        entryMs?.let {
-            TajweedPacing.waslPrefixStart(it, waslPrefixMs.toFloat())
-        } ?: 1f
-    }
-    val entryCompletion = remember(identity, activation, waslPrefixMs, waslHandoff) {
-        entryMs?.let {
-            TajweedPacing.waslPrefixCompletion(
-                sweepMs = it,
-                minPrefixMs = waslPrefixMs.toFloat(),
-                maxCompletion = waslHandoff,
-            )
-        } ?: 0f
-    }
-    LaunchedEffect(identity, activation) {
-        if (entryConnection == null || entryMs == null) {
-            clock.snapTo(0f)
-        } else {
-            clock.snapTo(0f)
-            clock.animateTo(1f, tween(entryMs, easing = LinearEasing))
-        }
-    }
-    val progress = remember(identity, activation) {
-        derivedStateOf {
-            entryConnection?.at(clock.value, entryPrefixStart, entryCompletion) ?: 0f
-        }
-    }
-    return remember(identity, activation) {
-        WaslProgress(
-            value = progress,
-            atHandoff = entryConnection?.at(1f, entryPrefixStart, entryCompletion) ?: 0f,
-        )
-    }
-}
-
 /** Comfortable reading band the active word is kept inside while follow mode
  * scrolls the sheet (see [wordUnitBehavior] / [shapedActiveWordInView]).
  * Shared with [ReaderScreen] so the focus engine's bottom guard matches. */
@@ -2899,86 +2836,13 @@ fun AyahBlock(
         )
     }
     val activeIndex = inks.indexOfFirst { it.state == InkEngine.State.Active }
-    val scheme = activeWord?.timingScheme ?: TimingScheme.V1
-    val incomingConnection = if (activeIndex > 0) {
-        InkEngine.connection(
-            prevArabic = ayah.words[activeIndex - 1].arabic,
-            arabic = ayah.words[activeIndex].arabic,
-            timingScheme = scheme,
-            waslFromPrevMs = activeWord?.waslFromPrevMs ?: 0L,
-        )
-    } else {
-        null
-    }
-    val outgoingConnection = if (activeIndex in 0 until ayah.words.lastIndex) {
-        InkEngine.connection(
-            prevArabic = ayah.words[activeIndex].arabic,
-            arabic = ayah.words[activeIndex + 1].arabic,
-            timingScheme = scheme,
-            // V2: next occurrence's measured wasl budget (0 disables bloom).
-            waslFromPrevMs = activeWord?.nextWaslFromPrevMs ?: 0L,
-        )
-    } else {
-        null
-    }
-    val outgoingProgress = rememberWaslProgress(
-        connection = outgoingConnection,
-        sweepMs = sweepMs,
-        identity = activeWord?.wordPosition,
-        activation = activation,
-        waslBudgetMs = activeWord?.nextWaslFromPrevMs ?: 0L,
-    )
-    val previousActive = remember { ActiveWordEntry(activeIndex, activation) }
-    val carriedIncoming = remember(activeIndex, activation) {
-        previousActive.index == activeIndex - 1 &&
-            previousActive.activation == activation
-    }
-    val incomingHandoff = if (carriedIncoming) previousActive.outgoingHandoff else 0f
-    SideEffect {
-        previousActive.index = activeIndex
-        previousActive.activation = activation
-        previousActive.outgoingHandoff = outgoingProgress.atHandoff
-    }
-    val waslMainFeather = when {
-        pacing == null || pacing.softWash -> InkEngine.tuning.washFeather
-        else -> InkEngine.pacedFeather()
-    }
-    val activeRevealStart = if (carriedIncoming && incomingConnection != null) {
-        waslWashProgress(
-            windowProgress = incomingHandoff,
-            endProgress = waslContinuationStart(
-                prefixFraction = incomingConnection.prefixFraction,
-                mainFeather = waslMainFeather,
-            ),
-        )
-    } else {
-        0f
-    }
-    // A latched window (1) redraws exactly the partial edge carried across
-    // handoff while the active word's ordinary sweep continues from it.
-    val fullWaslWindow = remember { mutableStateOf(1f) }
-    val waslPrefixes = ayah.words.indices.map { index ->
-        when {
-            // Preserve the outgoing bloom's reached edge only across a natural
-            // adjacent handoff. A seek bumps activation and starts clean.
-            index == activeIndex && carriedIncoming && incomingConnection != null ->
-                WaslPrefix(
-                    windowProgress = fullWaslWindow,
-                    endProgress = activeRevealStart,
-                    feather = waslMainFeather,
-                )
-            index == activeIndex + 1 && outgoingConnection != null ->
-                WaslPrefix(
-                    windowProgress = outgoingProgress.value,
-                    endProgress = waslContinuationStart(
-                        prefixFraction = outgoingConnection.prefixFraction,
-                        mainFeather = waslMainFeather,
-                    ),
-                    feather = waslMainFeather,
-                )
-            else -> null
-        }
-    }
+    // Sequential ink only: one Active word at a time. Wasl used to pre-bloom
+    // the *next* word's opening letter while the current word was still lit,
+    // and to start the active word mid-wash from that carry — that reads as
+    // two words animating out of order. Never paint N+1 until it is Active,
+    // and always cold-start each word at progress 0.
+    val activeRevealStart = 0f
+    val waslPrefixes = List(ayah.words.size) { null as WaslPrefix? }
 
     // Shared across gloss, English, and Arabic-only: mark sits at upcoming
     // ink while recessed, then fades up to full when this verse is in focus.
