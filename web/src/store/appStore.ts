@@ -115,6 +115,8 @@ export interface AppState {
    * ([settings.lastSurah] / [settings.lastAyah]).
    */
   openAyah: number
+  /** Bumps for each explicit reader open, including a bookmark in the current surah. */
+  readerOpenRevision: number
   /**
    * Pending home word-search flash — set by [openSurah] with a word position,
    * consumed by the reader after focus settles.
@@ -197,6 +199,7 @@ class AppStore {
     rootViewerClosing: false,
     followEnabled: true,
     openAyah: 1,
+    readerOpenRevision: 0,
     pendingSearchFlash: null,
   }
 
@@ -425,6 +428,7 @@ class AppStore {
     // openAyah is session navigation only — Continue Listening stays put until
     // the user actually plays a verse (see [rememberListened]).
     const openAyah = Math.max(1, ayah)
+    const readerOpenRevision = this.state.readerOpenRevision + 1
     const flashWord =
       wordPosition != null && wordPosition > 0 ? wordPosition : null
     const flash =
@@ -443,6 +447,7 @@ class AppStore {
         stackLayer: READER_LAYER,
         sheet: 'reader',
         openAyah,
+        readerOpenRevision,
         followEnabled: true,
         rootViewer: this.state.rootViewer,
         rootViewerClosing,
@@ -471,6 +476,7 @@ class AppStore {
       sheet: 'reader',
       content,
       openAyah,
+      readerOpenRevision,
       hasTimings: false,
       activeWord: null,
       activeAyah: null,
