@@ -503,9 +503,10 @@ private fun DeveloperSection(
     )
     Caption(
         "Parallel DB fork: timings_v2 never overwrites V1. Toggle reloads the " +
-            "open chapter in place for live A/B. Alafasy V2 covers ~90% of ayahs " +
-            "(acoustic CTC + same-take repeats); missing ayahs keep pure V1. " +
-            "Lab edits apply only on V1.",
+            "open chapter in place for live A/B. Acoustic V2 rows ship for " +
+            "Alafasy only (~90% of his ayahs); other reciters stay pure V1 while " +
+            "the toggle is on (badge shows 0 acoustic). Missing Alafasy ayahs " +
+            "also keep V1. Lab edits apply only on V1.",
     )
 
     Spacer(Modifier.height(20.dp))

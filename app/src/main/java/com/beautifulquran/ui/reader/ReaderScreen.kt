@@ -1159,14 +1159,22 @@ fun ReaderScreen(
                 if (settings.developerModeEnabled) {
                     val lane = when (uiState.timingScheme) {
                         TimingScheme.V1 -> "Timing V1 (shipped)"
-                        TimingScheme.V2 ->
-                            "Timing V2 · ${uiState.v2AcousticAyahCount}/" +
-                                "${uiState.timedAyahCount} acoustic" +
-                                if (uiState.v2AcousticAyahCount < uiState.timedAyahCount) {
-                                    " · rest V1 fallback"
-                                } else {
-                                    ""
-                                }
+                        TimingScheme.V2 -> {
+                            val acoustic = uiState.v2AcousticAyahCount
+                            val total = uiState.timedAyahCount
+                            // V2 acoustic rows ship for Alafasy only. Other reciters
+                            // correctly report 0 and fall back to V1 per ayah — make
+                            // that legible so "0/N" is not read as a broken load.
+                            when {
+                                total == 0 -> "Timing V2 · no timings for this chapter"
+                                acoustic == 0 ->
+                                    "Timing V2 · 0/$total acoustic · " +
+                                        "this reciter has no V2 rows (Alafasy only)"
+                                acoustic < total ->
+                                    "Timing V2 · $acoustic/$total acoustic · rest V1 fallback"
+                                else -> "Timing V2 · $acoustic/$total acoustic"
+                            }
+                        }
                     }
                     Text(
                         text = lane,
