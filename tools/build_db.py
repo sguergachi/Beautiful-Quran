@@ -788,12 +788,39 @@ def clean_qdc_artifacts(segs, stats, words=None):
     return segs
 
 
+def recover_negative_opening(segs):
+    """Translate a row so words entirely before ayah t=0 are not erased.
+
+    Gapless qdc often places the first word(s) before ``timestamp_from``
+    (negative ayah-relative times). The old clamp-to-zero path then saw
+    ``end <= start`` and dropped them as zero-length — Alafasy 3:6 lost هُوَ
+    so its ink only appeared when word 2 lit. One constant shift keeps the
+    topology and lands the earliest start at 0 (everyayah still holds that
+    audio). Partial openers (start < 0 < end) are left for the clamp below.
+    """
+    if not segs:
+        return segs, False
+    if not any(end <= 0 for _, _, end in segs):
+        return segs, False
+    min_start = min(start for _, start, _ in segs)
+    if min_start >= 0:
+        return segs, False
+    shifted = [
+        [pos, start - min_start, end - min_start] for pos, start, end in segs
+    ]
+    return shifted, True
+
+
 def adjust_qdc_segments(segs, n_words, stats, words=None):
     """Clamp quran.com segments (already 1-based, ayah-relative) to our canonical
     word count while PRESERVING repeats; scrub aligner artifacts that would read
     as repeats that aren't in the audio; count the re-recited spans."""
     if not segs:
         return None
+    stats.setdefault("opening_shift", 0)
+    segs, shifted = recover_negative_opening(segs)
+    if shifted:
+        stats["opening_shift"] += 1
     adjusted = []
     for pos, start, end in sorted(segs, key=lambda s: s[1]):
         if start < 0:
@@ -1880,6 +1907,7 @@ def main():
                 data = load_qdc_timings(qdc_id)
                 stats = {
                     "zero_len": 0, "clamped": 0, "repeats": 0, "missing": 0,
+                    "opening_shift": 0,
                     "merged_splits": 0, "dropped_strays": 0,
                     "noncontiguous_orphans": 0, "gap_phantoms": 0,
                     "false_phrase_loops": 0, "clock_rebased": 0,
@@ -1929,6 +1957,7 @@ def main():
                     f"  {slug}: ayahs covered {covered}/6236, "
                     f"repeat spans {stats['repeats']}, clamped {stats['clamped']}, "
                     f"zero-len {stats['zero_len']}, missing {stats['missing']}, "
+                    f"opening-shift {stats.get('opening_shift', 0)}, "
                     f"split-words merged {stats['merged_splits']}, "
                     f"stray mislabels dropped {stats['dropped_strays']}, "
                     f"noncontiguous orphans {stats['noncontiguous_orphans']}, "

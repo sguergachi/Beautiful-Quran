@@ -1,0 +1,42 @@
+{
+  "id": "negative-opening-alafasy-3-6",
+  "label": "Alafasy 3:6 fully-negative هُوَ must survive as word 1",
+  "refs": [
+    "ear: Alafasy 3:6 هُوَ lights late",
+    "raw qdc word 1 at −545…−65 before timestamp_from"
+  ],
+  "pipeline": "adjust_qdc_segments",
+  "notes": "Gapless qdc places word 1 entirely before verse t=0. Clamping start to 0 then dropping end<=start erased هُوَ; recover_negative_opening shifts the row so position 1 stays.",
+  "n_words": 13,
+  "input_segments": [
+    [1, -545, -65],
+    [2, -65, 875],
+    [3, 875, 2345],
+    [4, 2345, 2605],
+    [5, 2605, 3895],
+    [6, 3895, 4565],
+    [7, 4565, 7825],
+    [8, 7825, 9665],
+    [9, 9665, 10505],
+    [10, 10505, 11345],
+    [11, 11345, 11775],
+    [12, 11775, 12835],
+    [13, 12835, 15910]
+  ],
+  "expected_positions": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13],
+  "expected_segments": [
+    [1, 0, 480],
+    [2, 480, 1420],
+    [3, 1420, 2890],
+    [4, 2890, 3150],
+    [5, 3150, 4440],
+    [6, 4440, 5110],
+    [7, 5110, 8370],
+    [8, 8370, 10210],
+    [9, 10210, 11050],
+    [10, 11050, 11890],
+    [11, 11890, 12320],
+    [12, 12320, 13380],
+    [13, 13380, 16455]
+  ]
+}
