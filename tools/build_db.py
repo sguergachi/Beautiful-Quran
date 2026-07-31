@@ -51,8 +51,8 @@ REPAIRS_DIR = Path(__file__).resolve().parent / "timing_repairs"
 # Unlike repairs, these name one operation and cannot replace an ayah row.
 CORRECTIONS_DIR = Path(__file__).resolve().parent / "timing_corrections"
 # Audio-grounded leading-silence measurements produced by
-# tools/detect_audio_onsets.py. Applied after structural repairs so the opening
-# wash uses final topology, and before Lab overrides (whose marks use file time).
+# tools/detect_audio_onsets.py. The finalizer applies them after every topology
+# source so the opening wash always uses the row that actually ships.
 AUDIO_ONSETS_DIR = Path(__file__).resolve().parent / "audio_onsets"
 MAX_AUDIO_ONSET_MS = 7_900
 # Matching quran-align boundaries are independent witnesses of one per-ayah
@@ -401,54 +401,11 @@ def load_qdc_timings(qdc_id: int):
     return out
 
 
-# The qdc aligner's output carries artifacts that read as false repeats once
-# HighlightEngine treats any non-forward word position as a backtrack:
-#   * split slivers — a word whose onset or tail the aligner emits as a tiny
-#     extra segment sharing that word's position; the sliver looks like an
-#     instant re-say. These are sub-word fragments (< QDC_SPLIT_FRAGMENT_MS),
-#     NOT two utterances — a real word is never that short;
-#   * mislabeled strays — a single segment carrying the wrong word index
-#     (often a sound-alike of an earlier word, e.g. 49:9 فَإِن tagged as وَإِن),
-#     an isolated backjump the recitation never follows up on;
-#   * non-contiguous span phantoms — the aligner stamps an early function word
-#     at the *onset* of a real re-say (Alafasy 5:54: long يُجَٰهِدُونَ labeled
-#     as word 4 مَن, so the chain reads [4, 21, 22, 23] after high-water 23).
-#     HighlightEngine then paints orange from 4 through 23. The real re-say is
-#     the contiguous component nearest the high water; the isolated earlier
-#     index is a mislabel and is relabeled onto that component's start;
-#   * gap phantoms — a backtrack run of early positions that does *not* re-cover
-#     the high-water tip, immediately followed by a first-pass resume that
-#     *skips* one or more words (Alafasy 5:59 after HW 11: [8, 9, 13…] with
-#     word 12 missing). The early labels sit on the skipped words' time and are
-#     not a re-say (a real re-say of the tip re-covers HW; a real earlier re-say
-#     resumes at HW+1). Relabel the run onto the gap (issue #570);
-#   * forward-gap duplicates — after a skipped word, the destination label is
-#     duplicated exactly enough times to cover the gap (`1,3,3,4` with word 2
-#     absent everywhere). Relabel onto `2,3`; abstain if word 2 occurs later;
-#   * forward spikes — the same mislabel in the other direction; the too-large
-#     index inflates the high-water mark so every following normal word until
-#     that index reads as a repeat.
-#
-# A genuine single-word repeat also appears as two same-position segments, but
-# BOTH are full utterances (each typically 0.5–2 s; the shorter half's median
-# is ~1.2 s across all six reciters). Keying the sliver merge on duration — not
-# on the gap, which is ~0 ms for a real immediate repeat too — is what separates
-# the two: only a fragment too short to be a spoken word is folded away; two
-# substantial utterances are preserved as a repeat. (An earlier version merged
-# on gap alone and silently ate real repeats such as Hani 4:163 word 20,
-# 1180 ms + 1510 ms — the bug the duration test fixes.)
-#
-# A flat 200 ms floor, though, is too low: the aligner also emits split slivers
-# in the 200–450 ms range (e.g. Hani 4:143 word 10 = a 210 ms onset + a 1290 ms
-# body — issue #123), which slip past the floor and bloom as false repeats. What
-# still separates these from a real repeat is the *ratio* to their neighbour: a
-# split is one tiny fragment against a full body (shorter/longer well under a
-# third — the same word split by the aligner, often at the same spot across
-# reciters, e.g. 27:20 and 15:7), whereas a real repeat is two comparable
-# utterances. So above the flat floor we fold a same-position span only when it
-# is BOTH under QDC_SPLIT_FRAGMENT_CEIL_MS and a small fraction of its
-# neighbour. Real repeats — whose shorter half is ≥ ~500 ms and comparable to
-# its partner — are untouched by construction.
+# TimingEngine V1.5 treats qdc as repeat topology, not truth by consensus.
+# Preserve every backtrack unless one local shape positively identifies aligner
+# noise: a dwarfed split, a jump that retreats, a disconnected label, or labels
+# that exactly occupy a missing first-pass gap. Detailed evidence and corpus
+# examples live in docs/REPEAT_HIGHLIGHTING.md; each rule has a patch case.
 QDC_SPLIT_MERGE_GAP_MS = 150  # a sliver sits flush against its word (0–50 ms)
 QDC_SPLIT_FRAGMENT_MS = 200  # shorter than this, a same-position span is always
 #                              a sub-word fragment, not a second utterance
@@ -461,6 +418,21 @@ QDC_SPIKE_JUMP = 3  # a forward jump this large that instantly retreats is noise
 # Positions in a backtrack run within this distance count as one contiguous
 # span-repeat (allows one dropped word inside a real re-say, e.g. 9,10,12,13).
 QDC_SPAN_CONNECT_GAP = 2
+
+
+def _repeat_signature(segs):
+    """Positions revisited after their row's high-water mark."""
+    repeats = []
+    high_water = 0
+    for pos, _, _ in segs:
+        if pos <= high_water:
+            repeats.append(pos)
+        high_water = max(high_water, pos)
+    return repeats
+
+
+def _covers_all_words(segs, n_words):
+    return bool(segs) and {seg[0] for seg in segs} == set(range(1, n_words + 1))
 
 
 def _position_components(positions, gap=QDC_SPAN_CONNECT_GAP):
@@ -516,13 +488,7 @@ def _dephantom_noncontiguous_run(run_segs, stats):
         # else drop (no kept peer — should not happen)
     if not out:
         return run_segs
-    merged = [out[0]]
-    for pos, start, end in out[1:]:
-        if pos == merged[-1][0] and start <= merged[-1][2] + QDC_SPLIT_MERGE_GAP_MS:
-            merged[-1][2] = max(merged[-1][2], end)
-        else:
-            merged.append([pos, start, end])
-    return merged
+    return _merge_adjacent_same_pos(out)
 
 
 def _map_run_onto_gap(run, gap):
@@ -598,7 +564,10 @@ def adjudicate_backtrack_runs(segs, stats):
                 and run_max < running_max
             ):
                 gap = list(range(running_max + 1, next_pos))
-                out.extend(_merge_adjacent_same_pos(_map_run_onto_gap(fixed, gap)))
+                mapped = _merge_adjacent_same_pos(_map_run_onto_gap(fixed, gap))
+                out.extend(mapped)
+                running_max = max(running_max, max(seg[0] for seg in mapped))
+                present.update(seg[0] for seg in mapped)
                 stats["gap_phantoms"] = stats.get("gap_phantoms", 0) + 1
                 changed = True
             else:
@@ -841,11 +810,7 @@ def adjust_qdc_segments(segs, n_words, stats):
     if not adjusted:
         return None
     adjusted = clean_qdc_artifacts(adjusted, stats)
-    running_max = -1
-    for pos, _, _ in adjusted:
-        if pos <= running_max:
-            stats["repeats"] += 1
-        running_max = max(running_max, pos)
+    stats["repeats"] += len(_repeat_signature(adjusted))
     return adjusted
 
 
@@ -866,21 +831,6 @@ def strictly_increasing(segs):
 def fits_audio(segs, duration_ms):
     """True when a row ends inside its recording, or nothing was measured."""
     return not duration_ms or not segs or segs[-1][2] <= duration_ms
-
-
-def describes_audio(segs, duration_ms):
-    """True unless the row is longer than the whole recording.
-
-    A row that spans more time than the file holds cannot be a description of
-    it at any offset: some of its words could never be reached, so the wash
-    would stall mid-ayah and the words before it would already be wrong.
-    """
-    return not duration_ms or not segs or segs[-1][2] - segs[0][1] <= duration_ms
-
-
-def every_word_is_reachable(segs, duration_ms):
-    """True when playback can reach the start of every word in the row."""
-    return not duration_ms or not segs or segs[-1][1] < duration_ms
 
 
 def trim_to_next_start(segs):
@@ -1249,18 +1199,6 @@ def apply_clocked_timing_repair(current, repaired, clock_offset):
     return sanitize_timing_row(merged) or current
 
 
-def rows_past_audio(timing_rows, durations):
-    """Every ayah whose last mark falls beyond the end of its recording."""
-    return [
-        (rid, sid, ay)
-        for rid, sid, ay, segs in timing_rows
-        if not fits_audio(
-            json.loads(segs) if isinstance(segs, str) else segs,
-            durations.get((rid, sid, ay)),
-        )
-    ]
-
-
 def refit_displaced_rows(timing_rows, durations, onsets, eligible_rows=None):
     """Re-anchor a row that overruns its recording because it starts too late.
 
@@ -1292,27 +1230,6 @@ def refit_displaced_rows(timing_rows, durations, onsets, eligible_rows=None):
         else:
             out.append((rid, sid, ay, segs))
     return out, refitted
-
-
-def drop_rows_longer_than_audio(timing_rows, durations):
-    """Withhold word marks that cannot all play inside their recording.
-
-    A handful of source rows describe a longer recitation than the file the app
-    streams — a different take, or an ayah the publisher split differently. The
-    reader falls back to lighting the whole ayah for these, which stays honest,
-    rather than washing words at times the audio never reaches. The same
-    fallback applies when the final word itself starts after playback ends.
-    """
-    kept = []
-    dropped = []
-    for rid, sid, ay, segs in timing_rows:
-        row = json.loads(segs) if isinstance(segs, str) else segs
-        duration = durations.get((rid, sid, ay))
-        if describes_audio(row, duration) and every_word_is_reachable(row, duration):
-            kept.append((rid, sid, ay, segs))
-        else:
-            dropped.append((rid, sid, ay))
-    return kept, dropped
 
 
 def apply_one_utterance(segs, positions):
@@ -1591,30 +1508,8 @@ def load_audio_onsets(evidence_dir=AUDIO_ONSETS_DIR):
     return onsets
 
 
-def apply_audio_onsets(timing_rows, evidence_dir=AUDIO_ONSETS_DIR):
-    """Clamp safe first washes; leave unsafe rows for the fallback stage."""
-    by_key = {(rid, sid, ay): segs for rid, sid, ay, segs in timing_rows}
-    onsets = load_audio_onsets(evidence_dir)
-    aligned = 0
-    refused = 0
-    for key, onset in onsets.items():
-        raw = by_key.get(key)
-        if raw is None:
-            continue
-        current = json.loads(raw) if isinstance(raw, str) else raw
-        corrected = offset_for_audio_onset(current, onset)
-        if corrected is None:
-            refused += 1
-        elif corrected != current:
-            aligned += 1
-            by_key[key] = json.dumps(corrected, separators=(",", ":"))
-    print(f"  audio onsets: {aligned} first wash(es) aligned, {refused} refused")
-    rows = [(rid, sid, ay, segs) for (rid, sid, ay), segs in sorted(by_key.items())]
-    return rows, onsets
-
-
 def _complete_from_reference(segs, reference, n_words, same_clock):
-    """Fill source holes from its file-clock witness, or use the witness whole."""
+    """Fill safe source holes from its file-clock witness, or use it whole."""
     if not segs:
         return reference
     present = {seg[0] for seg in segs}
@@ -1628,7 +1523,10 @@ def _complete_from_reference(segs, reference, n_words, same_clock):
     additions = [list(seg) for seg in reference if seg[0] in missing]
     if {seg[0] for seg in additions} != missing:
         return [list(seg) for seg in reference]
-    return sorted([list(seg) for seg in segs] + additions, key=lambda seg: seg[1])
+    completed = sorted([list(seg) for seg in segs] + additions, key=lambda seg: seg[1])
+    if _repeat_signature(completed) != _repeat_signature(segs):
+        return [list(seg) for seg in reference]
+    return completed
 
 
 def project_onto_reference(segs, reference):
@@ -1712,6 +1610,7 @@ def finalize_timing_rows(
             continue
         source = current.get(key)
         reference = references.get(key)
+        source_complete = _covers_all_words(source, n_words)
         projection = (
             project_onto_reference(source, reference)
             if source is not None and reference is not None
@@ -1726,7 +1625,7 @@ def finalize_timing_rows(
         if (
             source is not None
             and key not in file_clock_rows
-            and {seg[0] for seg in source} != set(range(1, n_words + 1))
+            and not source_complete
             and projection is not None
         ):
             candidate = _complete_from_reference(
@@ -1734,7 +1633,7 @@ def finalize_timing_rows(
             )
             projected += 1
         if candidate is not None and source is not None:
-            completed += {seg[0] for seg in source} != set(range(1, n_words + 1))
+            completed += not source_complete
         normalized = normalize_timing_row(
             candidate, onsets.get(key), durations.get(key)
         )
@@ -1746,9 +1645,7 @@ def finalize_timing_rows(
                 projected_candidate, onsets.get(key), durations.get(key)
             )
             projected += normalized is not None
-        if normalized is None or {seg[0] for seg in normalized} != set(
-            range(1, n_words + 1)
-        ):
+        if not _covers_all_words(normalized, n_words):
             normalized = normalize_timing_row(
                 reference,
                 onsets.get(key),
@@ -1756,9 +1653,7 @@ def finalize_timing_rows(
                 monotonic_fallback=True,
             )
             fallback += normalized is not None
-        if normalized is None or {seg[0] for seg in normalized} != set(
-            range(1, n_words + 1)
-        ):
+        if not _covers_all_words(normalized, n_words):
             withheld += 1
             continue
         out.append((rid, sid, ay, json.dumps(normalized, separators=(",", ":"))))
@@ -2211,7 +2106,7 @@ def main():
         print("[5/6] SKIPPING timings (--skip-timings)")
         reciter_rows = [(r[0], r[1], r[2], r[3], 0) for r in RECITERS]
     else:
-        print("[5/6] fetching + normalizing word timings (quran-align)")
+        print("[5/6] TimingEngine V1.5: building word timings")
         zp = fetch(ALIGN_ZIP, "quran-align-data.zip")
         verify_source(zp, ALIGN_ZIP_SHA256, "quran-align release")
         for rid, slug, name, style in RECITERS:
@@ -2311,36 +2206,36 @@ def main():
                 sys.exit(1)
             reciter_rows.append((rid, slug, name, style, 1))
 
-    print("[typed corrections] applying irreducible timing verdicts")
-    timing_rows = apply_timing_corrections(timing_rows)
+        print("[typed corrections] applying irreducible timing verdicts")
+        timing_rows = apply_timing_corrections(timing_rows)
 
-    print("[repairs] applying tools/timing_repairs/*.json")
-    timing_rows = apply_timing_repairs(
-        timing_rows, word_counts, timing_clock_offsets, audio_durations
-    )
-
-    print("[overrides] applying tools/timing_overrides/*.json")
-    timing_rows, reciter_rows = apply_timing_overrides(
-        timing_rows, reciter_rows, word_counts, word_text, alignment_references
-    )
-
-    if audio_durations:
-        timing_rows, refitted = refit_displaced_rows(
-            timing_rows, audio_durations, audio_onsets, file_clock_rows
+        print("[repairs] applying tools/timing_repairs/*.json")
+        timing_rows = apply_timing_repairs(
+            timing_rows, word_counts, timing_clock_offsets, audio_durations
         )
-        if refitted:
-            print(f"[audit] {len(refitted)} displaced row(s) re-anchored on the voice")
-            for rid, sid, ay in refitted:
-                print(f"    re-anchored: reciter {rid} {sid}:{ay}")
-    print("[timing finalizer] completing coverage and enforcing file physics")
-    timing_rows, audio_onsets = finalize_timing_rows(
-        timing_rows,
-        word_counts,
-        alignment_references,
-        audio_durations,
-        audio_onsets,
-        file_clock_rows,
-    )
+
+        print("[overrides] applying tools/timing_overrides/*.json")
+        timing_rows, reciter_rows = apply_timing_overrides(
+            timing_rows, reciter_rows, word_counts, word_text, alignment_references
+        )
+
+        if audio_durations:
+            timing_rows, refitted = refit_displaced_rows(
+                timing_rows, audio_durations, audio_onsets, file_clock_rows
+            )
+            if refitted:
+                print(f"[audit] {len(refitted)} displaced row(s) re-anchored on the voice")
+                for rid, sid, ay in refitted:
+                    print(f"    re-anchored: reciter {rid} {sid}:{ay}")
+        print("[timing finalizer] completing coverage and enforcing file physics")
+        timing_rows, audio_onsets = finalize_timing_rows(
+            timing_rows,
+            word_counts,
+            alignment_references,
+            audio_durations,
+            audio_onsets,
+            file_clock_rows,
+        )
 
     OUT.parent.mkdir(parents=True, exist_ok=True)
     if OUT.exists():

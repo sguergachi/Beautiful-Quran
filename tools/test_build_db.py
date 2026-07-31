@@ -24,24 +24,22 @@ sys.path.insert(0, str(TOOLS))
 from build_db import (  # noqa: E402
     AUDIO_ONSETS_DIR,
     adjust_qdc_segments,
-    apply_audio_onsets,
     apply_boundary_repair,
     apply_clocked_timing_repair,
     apply_one_utterance,
     boundary_conflicts,
     clean_qdc_artifacts,
     complete_monotonic_row,
-    drop_rows_longer_than_audio,
     erases_span_repeat,
     finalize_timing_rows,
     load_audio_durations,
+    load_audio_onsets,
     offset_for_audio_onset,
     preserve_peer_repeats,
     recover_negative_opening,
     refit_displaced_rows,
     rebase_qdc_clock,
     rebase_timing_repair,
-    rows_past_audio,
     suspicious_pacing,
     trim_to_next_start,
 )
@@ -146,7 +144,6 @@ def run_pipeline(case, segs):
             "dropped_strays": 0,
             "noncontiguous_orphans": 0,
             "gap_phantoms": 0,
-            "false_phrase_loops": 0,
         }
         return clean_qdc_artifacts(segs, stats)
     if pipeline == "recover_negative_opening":
@@ -162,7 +159,6 @@ def run_pipeline(case, segs):
             "dropped_strays": 0,
             "noncontiguous_orphans": 0,
             "gap_phantoms": 0,
-            "false_phrase_loops": 0,
         }
         n_words = case.get("n_words") or max(p for p, _, _ in segs)
         return adjust_qdc_segments(segs, n_words, stats)
@@ -293,7 +289,6 @@ def check_audio_onset_pipeline():
         onset_detector.RETRY_RANGE_BYTES,
     ]
 
-    segments = [[1, 500, 900], [2, 900, 1_200], [1, 1_200, 1_500]]
     with tempfile.TemporaryDirectory() as temp_dir:
         evidence = Path(temp_dir)
         (evidence / "test.json").write_text(json.dumps({
@@ -302,28 +297,12 @@ def check_audio_onset_pipeline():
             "offsets": {"2:253": 1_179},
             "durations": {"2:253": 53_820, "2:254": 2_000},
         }))
-        rows, onsets = apply_audio_onsets([(1, 2, 253, segments)], evidence)
+        onsets = load_audio_onsets(evidence)
         durations = load_audio_durations(evidence)
-    shifted = json.loads(rows[0][3]) if isinstance(rows[0][3], str) else rows[0][3]
-    integration = onsets == {(1, 2, 253): 1_179} and shifted == segments
-    ceilings = durations == {(1, 2, 253): 53_820, (1, 2, 254): 2_000} and rows_past_audio(
-        [(1, 2, 253, shifted), (1, 2, 254, [[1, 0, 2_400]])], durations
-    ) == [(1, 2, 254)]
-    # Running a little past the end still lights every word, so it is kept; a
-    # row longer than the whole file could never light its tail, so it is not.
-    late = [[1, 1_500, 2_100]]
-    unplayable = [[1, 0, 1_500], [2, 1_500, 3_000]]
-    unreachable_tail = [[1, 0, 1_500], [2, 2_100, 2_400]]
-    kept, dropped = drop_rows_longer_than_audio(
-        [
-            (1, 2, 253, late),
-            (1, 2, 254, unplayable),
-            (1, 2, 255, unreachable_tail),
-        ],
-        durations | {(1, 2, 255): 2_000},
+    evidence_ok = (
+        onsets == {(1, 2, 253): 1_179}
+        and durations == {(1, 2, 253): 53_820, (1, 2, 254): 2_000}
     )
-    ceilings &= dropped == [(1, 2, 254), (1, 2, 255)]
-    ceilings &= [row[2] for row in kept] == [253]
     # A row sitting seconds past the voice that overruns the file is displaced,
     # so it re-anchors; one already on its onset keeps its correct opening.
     displaced = [[1, 7_110, 9_000], [2, 9_000, 21_500]]
@@ -333,13 +312,13 @@ def check_audio_onset_pipeline():
         {(1, 2, 253): 21_290, (1, 2, 254): 2_400},
         {(1, 2, 253): 190, (1, 2, 254): 1_500},
     )
-    ceilings &= refitted == [(1, 2, 253)]
-    ceilings &= json.loads(rows[0][3]) == [[1, 190, 2_080], [2, 2_080, 14_580]]
-    ceilings &= rows[1][3] == anchored
-    ceilings &= trim_to_next_start(
+    physical = refitted == [(1, 2, 253)]
+    physical &= json.loads(rows[0][3]) == [[1, 190, 2_080], [2, 2_080, 14_580]]
+    physical &= rows[1][3] == anchored
+    physical &= trim_to_next_start(
         [[13, 11_950, 12_550], [15, 12_540, 15_040]]
     ) == [[13, 11_950, 12_540], [15, 12_540, 15_040]]
-    return parser and retry_ok and integration and ceilings
+    return parser and retry_ok and evidence_ok and physical
 
 
 def check_completion_pipeline():
@@ -353,22 +332,55 @@ def check_completion_pipeline():
         return False
 
     rows, onsets = finalize_timing_rows(
-        [(7, 1, 1, [[1, 0, 20], [2, 20, 100], [3, 100, 200]])],
-        {(1, 1): 3, (1, 2): 2},
+        [
+            (7, 1, 1, [[1, 0, 20], [2, 20, 100], [3, 100, 200]]),
+            (7, 1, 3, [[1, 0, 100], [2, 300, 400]]),
+            (
+                7,
+                1,
+                4,
+                [
+                    [1, 0, 100],
+                    [2, 100, 200],
+                    [1, 200, 300],
+                    [2, 300, 400],
+                    [4, 500, 600],
+                ],
+            ),
+        ],
+        {(1, 1): 3, (1, 2): 2, (1, 3): 3, (1, 4): 4},
         {
             (7, 1, 1): reference,
             (7, 1, 2): [[1, 0, 400], [2, 400, 900]],
+            (7, 1, 3): [[1, 0, 100], [2, 100, 200], [3, 200, 300]],
+            (7, 1, 4): [
+                [1, 0, 100],
+                [2, 100, 200],
+                [3, 400, 500],
+                [4, 500, 600],
+            ],
         },
-        {(7, 1, 1): 1_500, (7, 1, 2): 1_500},
+        {
+            (7, 1, 1): 1_500,
+            (7, 1, 2): 1_500,
+            (7, 1, 3): 1_000,
+            (7, 1, 4): 1_000,
+        },
         {(7, 1, 1): 250, (7, 1, 2): 500},
-        set(),
+        {(7, 1, 3), (7, 1, 4)},
     )
+    built = {
+        (rid, sid, ay): json.loads(raw) for rid, sid, ay, raw in rows
+    }
     return (
         onsets == {(7, 1, 1): 250, (7, 1, 2): 500}
-        and json.loads(rows[0][3])
+        and built[(7, 1, 1)]
         == [[1, 250, 450], [2, 450, 900], [3, 910, 1_500]]
-        and json.loads(rows[1][3])
+        and built[(7, 1, 2)]
         == [[1, 500, 900], [2, 900, 1_400]]
+        and built[(7, 1, 3)]
+        == [[1, 0, 100], [2, 100, 200], [3, 200, 300]]
+        and order(built[(7, 1, 4)]) == [1, 2, 1, 2, 3, 4]
     )
 
 
@@ -568,13 +580,13 @@ def main():
     completion_ok = check_completion_pipeline()
     database_ok = audit_bundled_db()
     print(f"  {'ok  ' if confidence_ok else 'FAIL'} weighted 2:214 confidence checks")
-    print(f"  {'ok  ' if audio_onset_ok else 'FAIL'} audio-onset detector and apply checks")
+    print(f"  {'ok  ' if audio_onset_ok else 'FAIL'} audio evidence and onset checks")
     print(f"  {'ok  ' if completion_ok else 'FAIL'} complete fallback and physics checks")
     print(f"  {'ok  ' if database_ok else 'FAIL'} bundled timing database invariants")
     if not confidence_ok:
         failures.append(("weighted confidence", "2:214 checks failed", None))
     if not audio_onset_ok:
-        failures.append(("audio onsets", "detector/apply checks failed", None))
+        failures.append(("audio onsets", "evidence/onset checks failed", None))
     if not completion_ok:
         failures.append(("timing finalizer", "completion/fallback checks failed", None))
     if not database_ok:

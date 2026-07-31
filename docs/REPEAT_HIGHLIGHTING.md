@@ -139,7 +139,20 @@ only when the recitation advances past `highWater` onto new, unread words. The
 chain start is found by walking back from the active segment over the contiguous
 run of backtracked segments and taking the minimum position (see `activeInfo`).
 
-## The build pipeline (`tools/build_db.py`)
+## TimingEngine V1.5 (`tools/build_db.py`)
+
+TimingEngine is deliberately not a source-voting system. Each input answers one
+question it is qualified to answer:
+
+- qdc supplies repeat topology;
+- quran-align supplies the streamed-file clock and monotonic fallback;
+- measured audio supplies the playable opening and ending;
+- CTC repairs and typed verdicts resolve only evidence-backed exceptions.
+
+The engine does three things in order: clean topology from local positive
+evidence, anchor it to the audio file, then enforce completion and physical
+safety. Uncertainty never grows another heuristic branch: it falls back to the
+monotonic reference, or withholds word timing when even that is unsafe.
 
 Repeat-aware reciters are listed in `QDC_REPEAT_RECITERS` (map: our `reciter_id`
 → quran.com recitation id). For those, the build fetches `qdc` segments instead
@@ -184,8 +197,10 @@ The finalizer then enforces four corpus laws:
 2. Starts are unique and increasing; spans are positive and non-overlapping.
 3. The row uses the exact everyayah file clock, starts on/after measured voice,
    and fits inside the MP3 duration.
-4. Failure falls back to a complete monotonic quran-align row; if that is also
-   unsafe, word timings are withheld and the reader highlights the whole ayah.
+4. A same-clock reference may fill missing words only when the splice preserves
+   the source's exact repeat signature. Any new backtrack falls back to the
+   complete monotonic quran-align row; if that is also unsafe, word timings are
+   withheld and the reader highlights the whole ayah.
 
 The 2026-07-30 audit checked all 6,236 ayahs for both Alafasy and Hani. Every
 shipped row is complete and physically valid; Hani ships all 6,236 rows.
@@ -208,7 +223,69 @@ one of these local shapes supplies positive evidence:
 A real re-say does **not** have to return to the previous high-water tip. If a
 skipped word appears later, the duplicate-gap rule abstains. Acoustics alone
 also cannot erase a qdc repeat: same-word split versus re-say is ambiguous
-without topology or an explicit ear-verified verdict.
+without topology or an explicit ear-verified verdict. Once a skipped gap is
+filled, its new positions advance the same high-water state as ordinary input,
+so a later heuristic cannot adjudicate that gap a second time.
+
+### Production boundary and Timing V2
+
+**TimingEngine V1.5 is the production engine.** [Timing V2 PR
+#617](https://github.com/sguergachi/Beautiful-Quran-/pull/617) explores the
+right longer-term model: occurrence structure is separate from the audio
+clock, and letter keyframes can drive a more faithful within-word wash. That
+model has a higher quality ceiling, but its current implementation is a
+developer research lane rather than a replacement for V1.5.
+
+The distinction is evidence, not ambition:
+
+- V1.5 has one small, auditable heuristic set, has been checked across the
+  complete Alafasy and Hani corpora, and fails closed when topology and the
+  exact everyayah MP3 clock cannot be reconciled.
+- V2's full QUA lane preserves valuable word and letter structure, but currently
+  makes QUA's surah-audio timestamps verse-relative and scales an overflowing
+  row to the everyayah duration. Duration fit is not clock alignment: without
+  same-take proof, waveform correlation, or fixed-sequence alignment against
+  the exact streamed file, precise-looking keyframes may follow a different
+  recording.
+- V2 still uses V1 repeat topology and runtime fallback where a lower lane
+  flattens a re-say. That is a sound safety net, but also means V2 does not yet
+  supersede V1.
+- Replaying Lab gold proves those rows were reproduced; it is not independent
+  validation. The frozen independent V2 evaluation set must be labeled before
+  it can support a production accuracy claim.
+
+V2 should therefore grow as a precision layer over V1.5's safety contract:
+
+```text
+independent occurrence topology (QUA / qdc)
+        ↓
+fixed-sequence alignment against the exact everyayah audio
+        ↓
+word and letter keyframes
+        ↓
+V1.5 completion and physical-safety finalizer
+        ↓
+V1.5 row whenever any evidence gate fails
+```
+
+V2 may become the production default only when all of these are true:
+
+1. Every accepted row is genuinely reclocked to the exact file the app streams;
+   scaling a foreign clock to fit its duration is not sufficient.
+2. A frozen, independently labeled structure-and-onset set meets its declared
+   thresholds. Inputs reused as output priorities are reported separately.
+3. V2 is compared with V1.5 on the same corpus and the same timing patch cases,
+   with accepted, rejected, and fallback rows counted separately.
+4. An Alafasy-only precision lane is described as per-reciter enhancement, not
+   as an engine replacement, until it matches the production coverage it
+   claims to replace.
+5. Timing-data correctness and subword rendering remain separable changes, so
+   neither needs the other to be reviewed or shipped safely.
+
+The intended destination is not a larger rule set. It is V2's richer structural
+model constrained by V1.5's smaller laws: use each source only for what it can
+prove, align against the audio that actually plays, and abstain rather than
+manufacture precision.
 
 ## False repeats: the qdc artifacts we scrub
 

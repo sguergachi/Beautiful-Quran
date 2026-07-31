@@ -1,4 +1,4 @@
-# Timing patch cases (unit tests)
+# TimingEngine V1.5 patch cases
 
 Regression fixtures for **systematic** timing fixes. Each `*.json` file is one
 defect (or a shape that must survive) derived from a Timings Lab report, ear
