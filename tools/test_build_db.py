@@ -27,12 +27,16 @@ from build_db import (  # noqa: E402
     apply_audio_onsets,
     apply_boundary_repair,
     apply_clocked_timing_repair,
+    apply_one_utterance,
     boundary_conflicts,
     clean_qdc_artifacts,
+    complete_monotonic_row,
     drop_rows_longer_than_audio,
     erases_span_repeat,
+    finalize_timing_rows,
     load_audio_durations,
     offset_for_audio_onset,
+    preserve_peer_repeats,
     recover_negative_opening,
     refit_displaced_rows,
     rebase_qdc_clock,
@@ -52,9 +56,11 @@ PIPELINES = frozenset(
         "clock_shifted_repair",
         "erases_span_repeat",
         "leading_silence_offset",
+        "preserve_peer_repeats",
         "qdc_clock_rebase",
         "rebase_timing_repair",
         "recover_negative_opening",
+        "timing_correction",
     }
 )
 
@@ -104,6 +110,12 @@ def resolve_repair(case):
 
 def check_expected(case, got_segs):
     """Return (ok, detail). Prefer full segments when expected_segments is set."""
+    if case.get("expected_invalid"):
+        return (
+            (True, None)
+            if got_segs is None
+            else (False, f"want invalid row, got segments {got_segs}")
+        )
     if case.get("expected_segments") is not None:
         want = [list(s) for s in case["expected_segments"]]
         got = [list(s) for s in got_segs]
@@ -136,8 +148,7 @@ def run_pipeline(case, segs):
             "gap_phantoms": 0,
             "false_phrase_loops": 0,
         }
-        words = {int(pos): word for pos, word in case.get("words", {}).items()}
-        return clean_qdc_artifacts(segs, stats, words)
+        return clean_qdc_artifacts(segs, stats)
     if pipeline == "recover_negative_opening":
         recovered, _ = recover_negative_opening(segs)
         return recovered
@@ -154,8 +165,7 @@ def run_pipeline(case, segs):
             "false_phrase_loops": 0,
         }
         n_words = case.get("n_words") or max(p for p, _, _ in segs)
-        words = {int(pos): word for pos, word in case.get("words", {}).items()}
-        return adjust_qdc_segments(segs, n_words, stats, words or None)
+        return adjust_qdc_segments(segs, n_words, stats)
     if pipeline == "boundary_repair":
         return apply_boundary_repair(segs, resolve_repair(case))
     if pipeline == "clock_shifted_repair":
@@ -178,9 +188,15 @@ def run_pipeline(case, segs):
         onset = case.get("audio_onset_ms")
         if onset is None:
             raise SystemExit(f"{case.get('_path')}: need audio_onset_ms")
-        return offset_for_audio_onset(
-            segs, onset, case.get("exact_file_clock", True)
-        )
+        return offset_for_audio_onset(segs, onset)
+    if pipeline == "timing_correction":
+        positions = case.get("correction_positions")
+        if positions is None:
+            raise SystemExit(f"{case.get('_path')}: need correction_positions")
+        return apply_one_utterance(segs, positions)
+    if pipeline == "preserve_peer_repeats":
+        repaired, _ = preserve_peer_repeats(segs, resolve_repair(case))
+        return repaired
     if pipeline == "qdc_clock_rebase":
         reference = case.get("reference_segments")
         if reference is None:
@@ -215,23 +231,20 @@ def check_confidence():
     onset &= offset_for_audio_onset([[1, 500, 900]], 850) == [[1, 850, 900]]
     onset &= offset_for_audio_onset([[1, 500, 900]], 1_000) == [[1, 1_000, 1_001]]
     onset &= offset_for_audio_onset(
-        [[1, 1_300, 2_000]], 850, exact_file_clock=False
-    ) == [[1, 1_300, 2_000]]
+        [[1, 1_300, 2_000]], 850
+    ) == [[1, 850, 2_000]]
     onset &= offset_for_audio_onset(
         [[1, 0, 4_690], [2, 4_690, 5_410], [3, 5_410, 6_290]],
         1_951,
-        exact_file_clock=False,
     ) == [[1, 1_951, 4_690], [2, 4_690, 5_410], [3, 5_410, 6_290]]
     onset &= offset_for_audio_onset(
         [[1, 0, 200], [2, 1_650, 2_370]],
         1_179,
-        exact_file_clock=True,
     ) == [[1, 1_179, 1_650], [2, 1_650, 2_370]]
     onset &= offset_for_audio_onset(
         [[1, 0, 20], [2, 20, 100], [3, 100, 200]],
         250,
-        exact_file_clock=False,
-    ) == [[1, 250, 270], [2, 270, 350], [3, 350, 450]]
+    ) is None
     repeats = [[1, 0, 500], [2, 500, 1000], [1, 1000, 1500]]
     return pacing and boundaries and onset and boundary_conflicts(
         repeats, {"quran-align": reference}
@@ -289,16 +302,10 @@ def check_audio_onset_pipeline():
             "offsets": {"2:253": 1_179},
             "durations": {"2:253": 53_820, "2:254": 2_000},
         }))
-        rows, onsets = apply_audio_onsets(
-            [(1, 2, 253, segments)], evidence, file_clock_rows=set()
-        )
+        rows, onsets = apply_audio_onsets([(1, 2, 253, segments)], evidence)
         durations = load_audio_durations(evidence)
-    shifted = json.loads(rows[0][3])
-    integration = onsets == {(1, 2, 253): 1_179} and shifted == [
-        [1, 1_179, 1_579],
-        [2, 1_579, 1_879],
-        [1, 1_879, 2_179],
-    ]
+    shifted = json.loads(rows[0][3]) if isinstance(rows[0][3], str) else rows[0][3]
+    integration = onsets == {(1, 2, 253): 1_179} and shifted == segments
     ceilings = durations == {(1, 2, 253): 53_820, (1, 2, 254): 2_000} and rows_past_audio(
         [(1, 2, 253, shifted), (1, 2, 254, [[1, 0, 2_400]])], durations
     ) == [(1, 2, 254)]
@@ -335,6 +342,36 @@ def check_audio_onset_pipeline():
     return parser and retry_ok and integration and ceilings
 
 
+def check_completion_pipeline():
+    words = {1: "مِن", 2: "سَمِّ", 3: "ٱلۡخِيَاطِ"}
+    reference = complete_monotonic_row(
+        [[1, 0, 900], [3, 910, 1_500]], 3, words
+    )
+    if reference != [
+        [1, 0, 450], [2, 450, 900], [3, 910, 1_500]
+    ]:
+        return False
+
+    rows, onsets = finalize_timing_rows(
+        [(7, 1, 1, [[1, 0, 20], [2, 20, 100], [3, 100, 200]])],
+        {(1, 1): 3, (1, 2): 2},
+        {
+            (7, 1, 1): reference,
+            (7, 1, 2): [[1, 0, 400], [2, 400, 900]],
+        },
+        {(7, 1, 1): 1_500, (7, 1, 2): 1_500},
+        {(7, 1, 1): 250, (7, 1, 2): 500},
+        set(),
+    )
+    return (
+        onsets == {(7, 1, 1): 250, (7, 1, 2): 500}
+        and json.loads(rows[0][3])
+        == [[1, 250, 450], [2, 450, 900], [3, 910, 1_500]]
+        and json.loads(rows[1][3])
+        == [[1, 500, 900], [2, 900, 1_400]]
+    )
+
+
 def audit_bundled_db():
     db = sqlite3.connect(ROOT / "data/quran.db")
     counts = {
@@ -350,10 +387,16 @@ def audit_bundled_db():
         segs = json.loads(raw)
         timings[(rid, s, a)] = segs
         starts = [x[1] for x in segs]
-        if not segs or starts != sorted(set(starts)) or any(
+        if (
+            not segs
+            or {x[0] for x in segs} != set(range(1, counts[(s, a)] + 1))
+            or starts != sorted(set(starts))
+            or any(segs[i][2] > segs[i + 1][1] for i in range(len(segs) - 1))
+            or any(
             len(x) != 3 or x[1] < 0
             or not 1 <= x[0] <= counts[(s, a)] or x[2] <= x[1]
             for x in segs
+            )
         ):
             bad.append((rid, s, a))
     row = db.execute(
@@ -417,6 +460,24 @@ def audit_bundled_db():
         (4, 4, 88): 5_968,
         (7, 5, 109): 6_636,
     }
+    exact &= {
+        (s, a) for rid, s, a in timings if rid == 7
+    } == set(counts)
+    exact &= set(counts) - {
+        (s, a) for rid, s, a in timings if rid == 1
+    } == {(37, 152)}
+    for key, subsequence in {
+        (7, 9, 33): [13, 9, 10, 14],
+        (7, 22, 55): [15, 7, 8, 16],
+        (7, 44, 22): [6, 1, 2, 3],
+        (7, 74, 52): [7, 4, 8],
+        (7, 4, 4): [12, 12],
+    }.items():
+        positions = order(timings[key])
+        exact &= any(
+            positions[i : i + len(subsequence)] == subsequence
+            for i in range(len(positions) - len(subsequence) + 1)
+        )
     for path in AUDIO_ONSETS_DIR.glob("*.json"):
         payload = json.loads(path.read_text(encoding="utf-8"))
         exact &= payload["detector"] == {
@@ -433,8 +494,10 @@ def audit_bundled_db():
         for verse, length in payload["durations"].items():
             s, a = map(int, verse.split(":"))
             row = timings.get((payload["reciterId"], s, a))
-            exact &= row is None or row[-1][2] - row[0][1] <= length
-            exact &= row is None or row[-1][1] < length
+            exact &= row is None or (
+                row[-1][2] <= length
+                and row[-1][2] - row[0][1] <= length
+            )
         rid = payload["reciterId"]
         for verse, onset in payload["offsets"].items():
             s, a = map(int, verse.split(":"))
@@ -474,7 +537,7 @@ def main():
             else:
                 got = run_pipeline(case, segs)
                 ok, detail = check_expected(case, got)
-                got_order = order(got)
+                got_order = order(got) if got is not None else None
         except SystemExit as e:
             failures.append((label, str(e), None))
             print(f"  FAIL {label}: {e}")
@@ -484,7 +547,12 @@ def main():
         print(f"  {'ok  ' if ok else 'FAIL'} {label}")
         if case.get("input_positions") is not None:
             print(f"        in={case['input_positions']}")
-        if pipeline in {"boundary_repair", "erases_span_repeat", "rebase_timing_repair"}:
+        if pipeline in {
+            "boundary_repair",
+            "erases_span_repeat",
+            "preserve_peer_repeats",
+            "rebase_timing_repair",
+        }:
             print(
                 f"        repair={case.get('repair_positions') or case.get('repair_segments')}"
             )
@@ -497,14 +565,18 @@ def main():
                 print(f"        {line}")
     confidence_ok = check_confidence()
     audio_onset_ok = check_audio_onset_pipeline()
+    completion_ok = check_completion_pipeline()
     database_ok = audit_bundled_db()
     print(f"  {'ok  ' if confidence_ok else 'FAIL'} weighted 2:214 confidence checks")
     print(f"  {'ok  ' if audio_onset_ok else 'FAIL'} audio-onset detector and apply checks")
+    print(f"  {'ok  ' if completion_ok else 'FAIL'} complete fallback and physics checks")
     print(f"  {'ok  ' if database_ok else 'FAIL'} bundled timing database invariants")
     if not confidence_ok:
         failures.append(("weighted confidence", "2:214 checks failed", None))
     if not audio_onset_ok:
         failures.append(("audio onsets", "detector/apply checks failed", None))
+    if not completion_ok:
+        failures.append(("timing finalizer", "completion/fallback checks failed", None))
     if not database_ok:
         failures.append(("bundled database", "timing audit failed", None))
     print()
@@ -516,7 +588,7 @@ def main():
                 for line in str(detail).splitlines():
                     print(f"    {line}")
         return 1
-    print(f"all {len(cases) + 3} cases pass ({CASES_DIR.relative_to(Path.cwd())})")
+    print(f"all {len(cases) + 4} cases pass ({CASES_DIR.relative_to(Path.cwd())})")
     return 0
 
 

@@ -11,15 +11,15 @@ data comes from, and the traps we hit making it ship.
 ## Current state
 
 Repeat-aware qdc timings are **shipped**. Measured against the committed
-`data/quran.db` (re-verified 2026-07-24):
+`data/quran.db` (re-verified 2026-07-30):
 
 | Fact | Value |
 |---|---|
-| Timing rows | 43,650 |
-| Genuine backtracks (`position < maxBefore`) | 8,805 |
-| Segments returning to the historical high-water (`position == maxBefore`) | 3,624 |
-| …of those, *consecutive* same-position pairs | 575 |
-| Consecutive pairs in rows with no backtrack at all | 415, across 392 rows |
+| Timing rows | 43,639 |
+| Genuine backtracks (`position < maxBefore`) | 9,129 |
+| Segments returning to the historical high-water (`position == maxBefore`) | 4,191 |
+| Consecutive same-position pairs | 1,074 |
+| Rows with a pair but no lower backtrack | 873 |
 
 **`HighlightEngine`'s repeat test is `position <= maxBefore`, and the `<=` is
 load-bearing. Do not "tighten" it to `<`.** Two things depend on it:
@@ -148,6 +148,8 @@ of quran-align:
 - `load_qdc_timings(qdc_id)` fetches all 114 surahs, **rebases** each verse's
   gapless-file offsets to ayah-relative ms (`start − timestamp_from`), preserves
   repeats, and caches the assembled result in `tools/.cache/qdc_<id>.json`.
+  The assembled qdc payloads and quran-align release are SHA-256 locked. A
+  source refresh therefore requires an explicit full-corpus audit.
 - `adjust_qdc_segments()` clamps word positions to our canonical word count,
   drops zero-length spans, keeps repeats, and counts the repeat spans.
 - `rebase_qdc_clock()` translates the complete repeat-aware row by the upper
@@ -170,10 +172,43 @@ of quran-align:
   go here — not into one-off overrides — and each is locked by a case under
   [`tools/timing_patch_cases/`](../tools/timing_patch_cases/README.md).
 
-After cleanup, Mishary yields **3,142 repeat spans** at full 6,236/6,236
-coverage; Hani yields **2,037 repeat spans** at 6,235/6,236 (one ayah has no
-quran.com segments and falls back to whole-ayah highlighting). Everyone not in
-`QDC_REPEAT_RECITERS` still uses quran-align exactly as before.
+After cleanup, generated CTC evidence is sequence-diffed onto only the changed
+structural spans. Substantial same-word re-says are restored per position, so
+an unrelated missing-word repair can still land; a repair cannot flatten a
+multi-word re-say. Shapes that topology and CTC cannot safely decide use narrow
+typed operations under `tools/timing_corrections/`.
+
+The finalizer then enforces four corpus laws:
+
+1. Every shipped row covers every canonical word; repeats may add occurrences.
+2. Starts are unique and increasing; spans are positive and non-overlapping.
+3. The row uses the exact everyayah file clock, starts on/after measured voice,
+   and fits inside the MP3 duration.
+4. Failure falls back to a complete monotonic quran-align row; if that is also
+   unsafe, word timings are withheld and the reader highlights the whole ayah.
+
+The 2026-07-30 audit checked all 6,236 ayahs for both Alafasy and Hani. Every
+shipped row is complete and physically valid; Hani ships all 6,236 rows.
+Alafasy 37:152 is deliberately withheld because neither source describes its
+audio safely.
+
+### The small heuristic set
+
+The cleaner defaults to **preserving a repeat**. It changes topology only when
+one of these local shapes supplies positive evidence:
+
+- a same-position half is a short/dwarfed split fragment;
+- a forward jump immediately retreats, making it a premature label;
+- disconnected positions inside one backtrack run are relabeled onto its
+  near-high-water component;
+- a backtrack run occupies a skipped forward gap;
+- a duplicated forward destination exactly accounts for words absent
+  everywhere else in the row.
+
+A real re-say does **not** have to return to the previous high-water tip. If a
+skipped word appears later, the duplicate-gap rule abstains. Acoustics alone
+also cannot erase a qdc repeat: same-word split versus re-say is ambiguous
+without topology or an explicit ear-verified verdict.
 
 ## False repeats: the qdc artifacts we scrub
 
@@ -220,6 +255,14 @@ are **not audible repeats**. Artifact classes scrubbed in `clean_qdc_artifacts`
    from 4 through 23. Fix: within each backtrack run, keep the position
    component nearest the high water and relabel orphan components onto it
    (`QDC_SPAN_CONNECT_GAP`). Locked by `tools/timing_patch_cases/noncontiguous-*.json`.
+5. **Backtrack-gap phantoms.** A backtrack run followed by a resume that skips
+   first-pass words occupies those missing words' time (`…11,8,9,13…`, word 12
+   absent). Relabel the run onto the gap. A real earlier re-say that resumes at
+   `highWater + 1` is untouched.
+6. **Forward-gap duplicates.** A duplicated destination exactly accounts for
+   an otherwise absent gap (`1,3,3,4` becomes `1,2,3,4`). If the skipped word
+   appears anywhere later, the rule abstains; Alafasy 16:106 locks that
+   counterexample.
 
 > **⚠️ A genuine single-word repeat looks exactly like a split sliver — same
 > position, ~0 ms gap — so the merge must key on *duration*, not the gap.**
@@ -236,18 +279,17 @@ are **not audible repeats**. Artifact classes scrubbed in `clean_qdc_artifacts`
 > The ratio clause keys on the split being *dwarfed* by its neighbour, so it can
 > never touch two peer utterances however the absolute floor is tuned.
 
-None of these rules can touch a genuine repeat: real multi-word chains re-walk
-forward after the backjump (so their members are never "isolated" strays or
-spikes), and single-word repeats are preserved by the duration floor. The
-ear-verified repeats (Mishary 2:14, Hani 2:38's `12,13,14 — 12,13,14`, Hani
-4:163's doubled word 20) survive cleanup. The cleanup runs to a fixpoint
-because dropping a spike can reunite a word with its stray sliver (9:51:
-`4, [7], 4` → `4, 4`, then merged only if one `4` is a sliver).
+Each rule has a paired survival fixture. Real repeats need not revisit the
+previous high-water tip, and substantial same-word peers survive even with a
+zero gap. The ear-verified repeats (Mishary 2:14, Hani 2:38's
+`12,13,14 — 12,13,14`, Hani 4:163's doubled word 20) survive cleanup. The
+cleanup runs to a fixpoint because dropping a spike can reunite a word with its
+stray sliver (9:51: `4, [7], 4` → `4, 4`, then merged only if one `4` is a
+sliver).
 
-**Bias any residual error toward *missed* orange, never *false* orange.** A
-repeat that fails to bloom goes unnoticed; a word blooming orange when the
-reciter never repeated it is the failure users report. When tuning these
-thresholds, err on the side of leaving a real repeat unmarked.
+When evidence remains ambiguous, preserve the source repeat and require a
+typed ear/acoustic verdict. A false orange bloom is visible, but silently
+deleting a genuine re-say is not an acceptable default either.
 
 When a real repeat is still missed or a false one slips through:
 
@@ -257,9 +299,10 @@ When a real repeat is still missed or a false one slips through:
    [`tools/timing_patch_cases/`](../tools/timing_patch_cases/README.md) whose
    expected output is the Timings Lab / ear-verified fix. Run
    `python3 tools/test_build_db.py`.
-2. **No one-off shipping.** A Timings Lab JSON may reproduce the issue locally,
-   but it must be deleted before commit. Permanent corrections change the
-   systematic repair/cleanup pipeline and run across the full corpus.
+2. **Narrow ambiguity only.** If topology cannot decide, add the smallest typed
+   operation under `tools/timing_corrections/` with evidence provenance.
+3. **No one-off shipping.** A Timings Lab override may reproduce the issue
+   locally, but it must be deleted before commit.
 
 ## The rendering path
 
@@ -348,8 +391,8 @@ read ink together while 12 fades in white as a new word.
   which is exactly why the orange first "didn't appear." Adding repeats required
   bumping `quran-v5.db` → `quran-v6.db`; the extractor's cleanup step deletes the
   old file. (That pair is the historical example — the asset has been rebumped
-  many times since. Read the live value from `QuranDatabase.DB_FILE_NAME`, which
-  is `quran-v32.db` as of 2026-07-30, rather than trusting any older number here.)
+  many times since. Always read the live value from
+  `QuranDatabase.DB_FILE_NAME` rather than trusting any number here.)
 - **quran.com timestamps are gapless-file offsets**, not per-ayah. Always
   subtract the verse's `timestamp_from`. (The build does this; noted here because
   it's the first thing that looks wrong if you inspect the raw API.)

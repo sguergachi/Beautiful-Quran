@@ -221,10 +221,13 @@ Free, no backend, no auth beyond the GitHub account:
 
    | Class | Where to fix | Unit test |
    |---|---|---|
-   | Structural qdc noise (forward spikes, strays, split slivers, non-contiguous / gap phantoms, recurring false phrase loops) | `clean_qdc_artifacts` in `tools/build_db.py` | Add `tools/timing_patch_cases/<id>.json` — broken `input_*` + expected `expected_*` from the patch; run `python3 tools/test_build_db.py` |
+   | Structural qdc noise (forward spikes, strays, split slivers, non-contiguous / gap phantoms) | `clean_qdc_artifacts` in `tools/build_db.py` | Add `tools/timing_patch_cases/<id>.json` — broken `input_*` + expected `expected_*` from the patch; run `python3 tools/test_build_db.py` |
+   | Topology cannot distinguish a false loop from a genuine repeat | narrow typed operation under `tools/timing_corrections/` | `pipeline: timing_correction` case |
    | Drop repair that flattens a real span-repeat | `apply_timing_repairs` span-protect (and regenerate repairs) | `pipeline: erases_span_repeat` case in `timing_patch_cases/` |
+   | Repair flattens a peer same-word re-say while fixing elsewhere | per-position `preserve_peer_repeats` | `pipeline: preserve_peer_repeats` case |
    | Repeat-vs-split / CTC | `tools/timing_repairs/` generator | `~/qasr` tests + rebuild repairs |
    | Boundary displacement without a topology change | weighted qdc / quran-align evidence, then a surgical `kind: "boundary"` repair | `pipeline: boundary_repair` focused case |
+   | Incomplete row or unsafe MP3 clock | source/class fix; finalizer completes, falls back, or withholds | completion/physics checks in `tools/test_build_db.py` |
 
    The patch case **is** the verification for systematic fixes: the Lab/GitHub
    payload supplies the expected shape; the cleaner must reproduce it. See
@@ -242,11 +245,13 @@ Free, no backend, no auth beyond the GitHub account:
    per-ayah median clock offset. Quran-align has weight 2 and the bundled row
    weight 1; ≤250 ms supports a boundary and >500 ms conflicts. Timestamps are
    never averaged, and one-pass evidence never judges repeat backtracks.
-4. Structural repairs are rebased onto the latest source row. Only changed
+4. Typed corrections run before generated structural evidence. Repairs are
+   rebased onto the latest source row. Only changed
    topology and its immediate neighbours use the repair clock; equal spans
-   retain current source timings. Existing span-repeat protection still rejects
-   repairs that would flatten a real re-recitation. Boundary repairs replace
-   only their listed, uniquely occurring positions.
+   retain current source timings. Span protection rejects repairs that flatten
+   a multi-word re-recitation; peer same-word re-says are restored per position
+   so unrelated repairs still apply. Boundary repairs replace only their listed,
+   uniquely occurring positions.
 5. Run `python3 tools/test_build_db.py`, rebuild `quran.db`, bump
    `DB_FILE_NAME`, and commit the systematic code, regression case, and DB.
    Delete any local override JSON first.

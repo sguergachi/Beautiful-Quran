@@ -16,17 +16,23 @@ Agents landing a GitHub `Timings patch` issue must follow the full checklist in
 (invariant #8). This directory is where that checklist's unit tests live.
 
 1. **Classify** the defect (forward spike, non-contiguous / gap phantom, false
-   split, repair that flattens a span, boundary misalign, …). Diff Lab expected
+   split, repair that flattens a span, boundary misalign, clock/coverage
+   failure, …). Diff Lab expected
    vs raw qdc vs post-clean vs post-repair — not only vs shipped DB.
 2. **Prefer a pipeline fix** that covers the *class*:
    - structural qdc noise → `clean_qdc_artifacts` in `tools/build_db.py`
    - drop repair erasing a multi-word re-say → `erases_span_repeat` / span-protect
+   - repair erasing a peer re-say while fixing elsewhere → per-position
+     `preserve_peer_repeats`
    - stale full-row repair timing → `rebase_timing_repair`
    - repair row on a translated source clock → `clock_shifted_repair`
    - qdc row on the wrong MP3 clock → `qdc_clock_rebase`
    - independently supported local boundary → `boundary_repair`
+   - irreducible verified topology → a typed operation in
+     `tools/timing_corrections/`
    - repeat-vs-split / CTC disagreement → `tools/timing_repairs/` generator
    - whole-ayah encoded lead-in → `tools/detect_audio_onsets.py`
+   - incomplete or physically impossible row → `finalize_timing_rows`
 3. **Add a case here** whose `input_*` is the broken shape and `expected_*` is
    the corrected shape (from the Lab patch, ASR/ear, or the intended clean
    positions). The case *is* the patch verification.
@@ -54,7 +60,7 @@ a case under this directory.
 |---|---|---|
 | `id` | yes | stable slug; should match the filename stem |
 | `label` | yes | one-line human name (shown on failure) |
-| `pipeline` | yes | `clean_qdc_artifacts`, `erases_span_repeat`, `rebase_timing_repair`, `clock_shifted_repair`, `qdc_clock_rebase`, `boundary_repair`, `leading_silence_offset`, `recover_negative_opening`, or `adjust_qdc_segments` |
+| `pipeline` | yes | `clean_qdc_artifacts`, `timing_correction`, `preserve_peer_repeats`, `erases_span_repeat`, `rebase_timing_repair`, `clock_shifted_repair`, `qdc_clock_rebase`, `boundary_repair`, `leading_silence_offset`, `recover_negative_opening`, or `adjust_qdc_segments` |
 | `input_positions` | * | 1-based word indices in time order (synthetic equal durations) |
 | `expected_positions` | * | positions after the pipeline step |
 | `input_segments` | * | full `[[pos, start_ms, end_ms], …]` when times matter |
@@ -62,6 +68,7 @@ a case under this directory.
 | `repair_positions` / `repair_segments` | for repair pipelines | candidate repair row |
 | `clock_offset_ms` | for `clock_shifted_repair` | source-to-MP3 translation applied before merge |
 | `expected_erases` | for `erases_span_repeat` | bool — must the guard refuse this repair? |
+| `correction_positions` | for `timing_correction` | positions named by the typed operation |
 | `audio_onset_ms` | for `leading_silence_offset` | measured first sustained voice onset |
 | `exact_file_clock` | no | false when word 2 proves the complete row predates voice |
 | `reference_segments` | for `qdc_clock_rebase` | quran-align boundaries on the everyayah MP3 clock |
