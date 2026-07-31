@@ -1,5 +1,6 @@
 package com.beautifulquran.ui.theme
 
+import android.graphics.Bitmap
 import android.graphics.BlurMaskFilter
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
@@ -8,9 +9,9 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Canvas
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Paint
-import androidx.compose.ui.graphics.asAndroidPath
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.drawscope.clipPath
@@ -20,6 +21,8 @@ import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import kotlin.math.ceil
+import kotlin.math.floor
 
 /**
  * Letter reveal for the word being recited: a soft ink wash sweeps across the
@@ -209,6 +212,7 @@ fun Modifier.shapedWordBloom(
 ): Modifier {
     val stops = FloatArray(InkProfileStops) { i -> i / (InkProfileStops - 1f) }
     val lineBoundsCache = LineBoundsCache()
+    val glyphHaloCache = GlyphHaloCache()
     return drawWithContent {
         drawContent()
         val textLayout = layout() ?: return@drawWithContent
@@ -343,15 +347,26 @@ fun Modifier.shapedWordBloom(
                     val glowAlpha = bloom.layerAlpha.coerceIn(0f, 1f) *
                         bloom.glowAlpha.coerceIn(0f, 1f) * inkSmootherstep(p)
                     if (glowAlpha > 0f) {
-                        val glowPaint = android.graphics.Paint().apply {
-                            color = bloom.color.copy(alpha = glowAlpha).toArgb()
-                            maskFilter = BlurMaskFilter(
-                                bloom.glowRadius.dp.toPx(),
-                                BlurMaskFilter.Blur.NORMAL,
-                            )
-                        }
-                        drawIntoCanvas { canvas ->
-                            canvas.nativeCanvas.drawPath(path.asAndroidPath(), glowPaint)
+                        val halo = glyphHaloCache.haloFor(
+                            textLayout = textLayout,
+                            start = start,
+                            endExclusive = endExclusive,
+                            radiusPx = bloom.glowRadius.dp.toPx(),
+                        )
+                        if (halo != null) {
+                            val glowPaint = android.graphics.Paint(
+                                android.graphics.Paint.ANTI_ALIAS_FLAG,
+                            ).apply {
+                                color = bloom.color.copy(alpha = glowAlpha).toArgb()
+                            }
+                            drawIntoCanvas { canvas ->
+                                canvas.nativeCanvas.drawBitmap(
+                                    halo.bitmap,
+                                    halo.left,
+                                    halo.top,
+                                    glowPaint,
+                                )
+                            }
                         }
                     }
                     clipPath(path) {
@@ -416,6 +431,77 @@ private class LineBoundsCache {
         val key = (start.toLong() shl 32) or endExclusive.toLong()
         byRange[key]?.let { return it }
         return computeLineBounds(textLayout, start, endExclusive).also { byRange[key] = it }
+    }
+}
+
+/**
+ * Small LRU of blurred alpha masks made from the laid-out glyphs themselves.
+ *
+ * [TextLayoutResult.getPathForRange] is a selection enclosure, not a glyph
+ * outline. Blurring it produces the rounded word-sized rectangle this halo is
+ * specifically meant to avoid. Render the selected glyphs into an alpha mask
+ * once per word/radius instead; every animation frame then draws one tiny
+ * cached bitmap with only its colour and lifecycle alpha changing.
+ */
+private class GlyphHaloCache {
+    private data class Key(
+        val start: Int,
+        val endExclusive: Int,
+        val radiusBits: Int,
+    )
+
+    data class Halo(
+        val bitmap: Bitmap,
+        val left: Float,
+        val top: Float,
+    )
+
+    private var layout: TextLayoutResult? = null
+    private val byRange = object : LinkedHashMap<Key, Halo>(8, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<Key, Halo>?): Boolean =
+            size > 8
+    }
+
+    fun haloFor(
+        textLayout: TextLayoutResult,
+        start: Int,
+        endExclusive: Int,
+        radiusPx: Float,
+    ): Halo? {
+        if (radiusPx <= 0f) return null
+        if (layout !== textLayout) {
+            layout = textLayout
+            byRange.clear()
+        }
+        val key = Key(start, endExclusive, radiusPx.toBits())
+        byRange[key]?.let { return it }
+
+        val path = textLayout.getPathForRange(start, endExclusive)
+        val bounds = path.getBounds()
+        if (bounds.isEmpty || bounds.width <= 0f || bounds.height <= 0f) return null
+        val left = floor(bounds.left).toInt()
+        val top = floor(bounds.top).toInt()
+        val width = (ceil(bounds.right).toInt() - left).coerceAtLeast(1)
+        val height = (ceil(bounds.bottom).toInt() - top).coerceAtLeast(1)
+        val glyphs = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        val glyphCanvas = Canvas(android.graphics.Canvas(glyphs))
+        glyphCanvas.translate(-left.toFloat(), -top.toFloat())
+        glyphCanvas.clipPath(path)
+        textLayout.multiParagraph.paint(glyphCanvas)
+
+        val offset = IntArray(2)
+        val blurred = glyphs.extractAlpha(
+            android.graphics.Paint().apply {
+                maskFilter = BlurMaskFilter(radiusPx, BlurMaskFilter.Blur.NORMAL)
+            },
+            offset,
+        )
+        glyphs.recycle()
+        return Halo(
+            bitmap = blurred,
+            left = (left + offset[0]).toFloat(),
+            top = (top + offset[1]).toFloat(),
+        ).also { byRange[key] = it }
     }
 }
 
