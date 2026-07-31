@@ -1,12 +1,25 @@
 # timing_repairs/
 
 Auto-generated structural repairs for reciter word timings. `build_db.py`
-applies every `*.json` here **before** `tools/timing_overrides/`, so a manual
-ear-verified patch always wins over an automatic repair.
+applies every `*.json` here before the local `tools/timing_overrides/` scratch
+layer. CI rejects shipping scratch overrides; permanent corrections belong in
+this systematic repair path.
 
 `*.flagged.json` files are **not** applied — they list the ayahs the generator
 refused to auto-repair (low CTC coverage or an implausible lead-in). They are
 the manual review queue.
+
+## Repairs are structural, not frozen ayah clocks
+
+Repair files contain whole rows for reproducibility, but `build_db.py` does not
+blindly replace the current source row. It sequence-diffs the word positions,
+uses repair timing only for changed structural spans plus one neighbour on each
+side, and keeps current qdc timing everywhere else. This is systematic across
+all repair files and prevents an old missing-word/repeat repair from
+reintroducing unrelated stale boundaries when qdc later improves them.
+
+Regression fixtures pin the stale-repair failures from Alafasy 2:214 and 5:52,
+alongside the existing cleaner and span-protection cases.
 
 ## How these are produced
 
@@ -28,6 +41,16 @@ CTC is used because it decodes acoustically. A seq2seq model with a Quran
 language-model prior (Whisper and every Quran-fine-tuned model) normalises a
 re-recitation back to the canonical text — the lower-WER model is the wrong
 tool here precisely because it "corrects" the thing we need to observe.
+
+## Unsplit vs peer same-position re-says
+
+When repair evidence presents a cleaned qdc *peer pair* only once,
+`build_db.apply_timing_repairs` restores the unmatched occurrence at that
+position instead of refusing the whole row. CTC needs a ≥300 ms pause to keep a
+repeat; many real single-word re-says are labeled flush (gap 0) with two
+full-length halves (Hani **4:4** فَكُلُوهُ = 1710 + 1120 ms). Those must stay as
+`12,12` for orange wash, while an unrelated missing-word repair in the same ayah
+must still land. True onset/body fragments remain eligible to unsplit.
 
 ## The repeat-vs-split invariant
 
@@ -74,6 +97,61 @@ The discriminator is span-vs-isolated, **not** word length: 2:33 أَلَمۡ أ
 لَّكُمۡ is a genuine re-recitation on 3-char words and survives because it is a
 span; Hani 4:157 وَمَا / مِنۡ are lone short-word re-covers and are dropped.
 
+## Non-contiguous span phantoms (Alafasy 5:54 class)
+
+A different phantom shape slips past both the isolated-stray rule and CTC span
+protection: qdc stamps an **early** function-word index at the *onset* of a real
+near-high-water re-say. Example (raw Alafasy 5:54 after high-water 23):
+
+```
+… 21, 22, 23,  4, 21, 22, 23, 24 …
+               ^ mislabel of the long يُجَٰهِدُونَ onset as مَن
+```
+
+The run is multi-position so CTC `dephantom` treats it as a trusted span-repeat;
+`HighlightEngine` paints orange from word 4 through 23 ("repeated more than it
+should"). This is fixed **in `tools/build_db.py` → `clean_qdc_artifacts`**, not
+in the CTC repair generator: within each backtrack run, position components
+separated by more than `QDC_SPAN_CONNECT_GAP` (2) are split, the component
+nearest the high water is kept, and orphan positions are relabeled onto that
+component's start (so the time stays on the word being said). Real contiguous
+spans, same-word re-says, and spans with a single internal drop survive.
+Regression cases live in `tools/test_build_db.py`.
+
+## Gap phantoms (Alafasy 5:59 class)
+
+A backtrack run that does **not** re-cover the high-water tip, immediately
+followed by a first-pass resume that **skips** words, is a mislabel of the
+skipped span — not a re-say. Example (raw Alafasy 5:59 after high-water 11):
+
+```
+… 10, 11,  8, 9,  13 …
+              ^   ^  word 12 missing; 8/9 sit on its time
+```
+
+`adjudicate_backtrack_runs` in `clean_qdc_artifacts` remaps the run onto
+`HW+1 … next−1` when `run_max < HW` and `next > HW+1`. A real re-say of the tip
+re-covers HW; a real earlier re-say resumes at HW+1 — both are untouched.
+Case: `tools/timing_patch_cases/gap-phantom-alafasy-5-59.json`.
+
+The same adjudicator covers the mirror shape `…1,3,3,4…`: two labels for word
+3 exactly account for absent word 2 plus word 3, so they become `2,3`. It
+abstains if word 2 occurs anywhere else in the row; Alafasy 16:106 proves that
+counterexample.
+
+## Irreducible إِلَّا أَن phrase loops (issues #594/#598)
+
+Qdc labels four Alafasy occurrences of stretched `إِلَّا أَن` as
+`A,B,A,B`. The two Lab reports, cached CTC, and the monotonic quran-align
+witness identify these specific middle labels as fragments, not a re-recited
+span. Topology alone cannot distinguish them from genuine alternating repeats,
+so they are explicit `one_utterance` operations under
+`tools/timing_corrections/`; there is no phrase/text heuristic in the cleaner.
+
+The Lab boundary clock is then applied surgically with `kind: "boundary"`
+repair entries. Such entries contain only the uniquely occurring positions
+they replace; `apply_boundary_repair` cannot alter the rest of the ayah.
+
 ## Trusting a qdc span-repeat CTC collapsed (issue #533)
 
 CTC confirms or restores a repeat, but it must never **erase** one. CTC
@@ -85,6 +163,32 @@ e.g. Hani 4:169 `[1,2,3,1,2,3,…]`) is kept even when CTC does not confirm it.
 A lone same-position qdc pair is still judged by CTC — merge it when CTC hears
 one utterance (the false-split class), keep it when CTC confirms (3:21). Without
 the span protection the generator deleted the correct Hani 4:169 re-recitation.
+
+### Apply-time guard (issue #570)
+
+Older committed repair files still contain `drop` rows that flattened real
+span-repeats (Alafasy 5:59 is the archetype: raw qdc had `[…7,8,9,7,8,9,…]`,
+the drop repair shipped a monotonic 20-word row). `build_db.apply_timing_repairs`
+skips any repair whose segments would erase the last multi-position span-repeat
+already present in the cleaned qdc row. Counts show as
+`span-protected N` in the build log. Prefer regenerating repairs with the
+generator invariant; the guard is the safety net for committed files.
+
+Same-word peer pairs are protected per position rather than by skipping the
+row; see `repair-preserve-peer-while-filling-word.json`.
+
+## Retirement policy
+
+These whole rows remain generated CTC evidence, not hand-maintained patches.
+Do not add an ambiguous one-ayah verdict here. Put a recurring structural class
+in the cleaner and an irreducible verified verdict in
+`tools/timing_corrections/`.
+
+A repair file can be retired only after its changed spans are reproduced by
+the cleaner or a narrow typed operation and the full-corpus topology/physics
+audit stays green. Deleting all repair evidence mechanically is unsafe: CTC is
+still the only source that restores some flattened re-recitations and missing
+words.
 
 ## Splits are judged PER POSITION (issues #551/#558/#559)
 

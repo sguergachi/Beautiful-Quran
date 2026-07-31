@@ -57,7 +57,8 @@ Sources (all fetched over HTTPS, cached in `tools/.cache/`):
 | `quran-json` (npm) | Uthmani Unicode text, Saheeh International translation, surah metadata | Tanzil-derived, verse-keyed, no auth |
 | `@kmaslesa/holy-quran-word-by-word-full-data` (npm) | Per-word English gloss + transliteration (Quran.com data) | Only per-word English dataset on an open registry |
 | `cpfair/quran-align` release zip | Word-level timestamps per reciter, CC-BY 4.0 | The canonical open word-alignment dataset, matched to everyayah.com audio |
-| quran.com `qdc` audio API | **Repeat-aware** word timestamps for reciters in `QDC_REPEAT_RECITERS` | quran-align is one-pass and cannot encode a repeated phrase; quran.com's segments backtrack when the reciter repeats. Same everyayah audio. See [REPEAT_HIGHLIGHTING.md](REPEAT_HIGHLIGHTING.md) |
+| quran.com `qdc` audio API | **Repeat-aware** word timestamps for reciters in `QDC_REPEAT_RECITERS` | quran-align is one-pass and cannot encode a repeated phrase; quran.com's segments backtrack when the reciter repeats. Accepted qdc payloads are SHA-256 locked so upstream drift cannot silently change the corpus. See [REPEAT_HIGHLIGHTING.md](REPEAT_HIGHLIGHTING.md) |
+| everyayah MP3 ranges | Leading-silence and duration measurements in `tools/audio_onsets/` | Some individual ayah files begin with silence. The offline scanner holds the first wash until sustained voice without moving valid later word boundaries, and records each file's length as the ceiling no timing row may cross. |
 | Quranic Arabic Corpus (QAC) v0.4 | Per-word root, lemma, POS, morphology; root concordance | Standard open Quranic morphology / root dictionary. Powers the [Root Word Viewer](ROOT_VIEWER.md) |
 
 The **canonical word segmentation** is the space-split of the Uthmani text.
@@ -69,14 +70,40 @@ The other two sources are mapped onto it by position:
   positions, drops segments that point at basmalah words prefixed to
   first-ayah audio (`adjust_segments`), clamps overshoot, and **fails the
   build** if a reciter's coverage drops below 6,000 ayahs.
-- A reciter whose timing file cannot be parsed at all (the Sudais file in the
-  upstream release zip is truncated) ships with `has_timings = 0` — the app
-  plays audio for that reciter without word highlighting.
-- Reciters in `QDC_REPEAT_RECITERS` take **repeat-aware** timings from quran.com
-  instead: same schema, but the word index backtracks where the reciter repeats
-  a phrase, driving the orange second fade. The segments are rebased from
-  gapless-file offsets to ayah-relative ms (`adjust_qdc_segments`). Full detail:
+- A reciter with no usable timing source ships with `has_timings = 0`. The
+  truncated Sudais quran-align file is harmless because his locked qdc source
+  supplies the row topology instead.
+- **TimingEngine V1.5** gives each timing source one job: qdc supplies repeat
+  topology, quran-align supplies the streamed-file clock and monotonic fallback,
+  and measured audio supplies physical limits. `rebase_qdc_clock` translates
+  repeat-aware rows using matching quran-align boundaries and abstains when
+  those witnesses scatter or cross the recording. Full detail:
   [REPEAT_HIGHLIGHTING.md](REPEAT_HIGHLIGHTING.md).
+- `clean_qdc_artifacts` produces one topology candidate from local structural
+  evidence. Generated CTC rows then change only differing spans; verified
+  same-word repeats are restored per position and multi-word re-says cannot be
+  flattened. Ambiguities that topology cannot decide live as small typed
+  operations in `tools/timing_corrections/`, never as replacement ayah rows.
+- `tools/detect_audio_onsets.py` scans up to the opening eight seconds of the
+  exact everyayah files the app streams. It retries a larger byte range when
+  the first range ends during silence, rather than treating ffmpeg's
+  end-of-input flush as voice. Silence must sustain for 80 ms to register;
+  voice onsets of at least 250 ms are committed as compact evidence under
+  `tools/audio_onsets/`; `build_db.py` clamps the first wash to that onset after
+  the complete row is on the MP3 clock, leaving words 2 onward unchanged. If
+  word 2 itself predates the voice, a repeat-aware row is projected into its
+  quran-align file-clock window; only a monotonic fallback may shift as a whole.
+  The onset is recorded separately as immutable MP3 metadata.
+  The repository reapplies that clock to on-device Timing Lab edits, so a saved zero-based
+  row cannot restart the wash during encoded silence. `ffmpeg` is needed only
+  to regenerate the evidence, never to build or run the app.
+- The finalizer ships a row only when it covers every canonical word, has
+  unique increasing starts and positive non-overlapping spans, begins on/after
+  measured voice, and fits inside its exact MP3. It fills holes from a
+  same-clock reference only when the splice preserves the source's exact repeat
+  signature; otherwise it uses the complete monotonic quran-align row. If
+  neither is physically valid, the row is withheld and the reader honestly
+  highlights the whole ayah.
 
 > **Changing the DB content requires a version bump.** `quran.db` is a committed
 > asset (regenerated by `build_db.py`), and at runtime it is extracted from assets
@@ -194,11 +221,18 @@ ReaderFocusController ── holds the LazyListState; the sole writer to it
   next verse across a mushaf page divider (often not yet laid out) glides
   instead of jumping. Concurrent `focus()` calls are serialized on a mutex
   so a sibling effect cannot cancel the slide mid-flight.
+- Opening a bookmark (or another explicit verse target) inside the same paused
+  playlist is a manual jump: the held verse yields focus, the playlist seeks
+  to the chosen verse without playing, and the transport can then resume from
+  that selection.
 - Display settings that reflow ayah heights (reading mode, word gloss,
-  transliteration, translation, font scale) trigger a gentle re-`focus` of
-  the pinned verse after the LazyColumn remasures, so the reading line
-  stays on the ayah the reader was looking at instead of drifting with the
-  resize.
+  transliteration, translation, font scale) recover the pinned verse after the
+  LazyColumn remasures, so the reading line stays on the ayah the reader was
+  looking at instead of drifting with the resize. A Play intent supersedes any
+  older manual-reading recovery. Playback-owned reflow pins the actual media
+  ayah rather than the fade-led visual target; when that ayah is now taller
+  than the viewport, recovery goes directly to its active word instead of first
+  pinning line one.
 - Word-level follow is the engine's *secondary* constraint: while follow is on,
   each active word reports its list-viewport bounds and
   `ReaderFocusController.keepWordInView` applies a **bottom-only** reading-band
@@ -209,6 +243,21 @@ ReaderFocusController ── holds the LazyListState; the sole writer to it
   that chrome. A repeat-aware timing backtrack to word one is a fresh verse
   focus event even though its media item and ayah key did not change, restoring
   the adaptive top anchor before the reciter walks the verse again.
+- Opening or foregrounding a held session runs one exact word-position restore,
+  even while paused. If the ayah is wholly offscreen the controller first
+  materializes it; if a tall ayah is already attached it skips the verse-top
+  anchor and moves directly to the held word. The request is consumed after a
+  real measurement, so normal paused state and end-of-playlist resets cannot
+  keep driving scroll. Display reflow issues the same restore directly for a
+  visible tall playback ayah, or after the verse-level pin when materialization
+  is still needed. The interaction arbiter still makes all of these yield to
+  hand scrolling, search, annotation, pending jumps, and the Ink Lab focus
+  freeze.
+- Re-enabling follow (Play or return-to-ayah), including during a display
+  reflow, while the actual playing ayah is tall and still has live geometry
+  skips the verse-top anchor entirely and restores the active word directly.
+  The verse-first path remains only for wholly offscreen targets that must be
+  materialized before their word can be measured.
 - Annotation editing uses the same secondary-focus path: the field reports live
   viewport bounds as it grows and as the IME rises,
   `keyboardOverlapPx` removes any bottom chrome already outside the list before
@@ -288,11 +337,13 @@ horizontal page turn — draggable, fling-able, with page-turn audio
   toggles, theme, attributions; developer mode unlocks the Timings Lab.
 
 Ink-bleed overlays soak **the sheet they belong to**, not a full-screen
-layer above the stack: the notification-permission prompt and the
+layer above the stack: the repeat question and the
 [Root Word Viewer](ROOT_VIEWER.md) (default word long-press) live on the
 reader sheet; the [Timings Lab](TIMINGS_LAB.md) (developer mode) stays
 stack-level because Settings can open it too. Shared primitive:
-`InkRevealOverlay`.
+`InkRevealOverlay`. Media-session notifications are platform-exempt from
+`POST_NOTIFICATIONS`, so playback never gates on a notification-permission
+prompt.
 
 On a cold start the whole stack sits behind the **entrance cover**
 (`entrance/EntranceCover` on Android; `web/src/ui/entrance/` on web) — the

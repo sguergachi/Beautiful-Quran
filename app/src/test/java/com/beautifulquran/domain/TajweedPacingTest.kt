@@ -44,8 +44,7 @@ class TajweedPacingTest {
         spoken: Float = 1f,
         hold: Hold = Hold(),
         prevArabic: String? = null,
-        nextArabic: String? = null,
-    ) = requireNotNull(TajweedPacing.curve(word, spoken, hold, prevArabic, nextArabic))
+    ) = requireNotNull(TajweedPacing.curve(word, spoken, hold, prevArabic))
 
     @Test
     fun `words with nothing dramatic take the plain sweep`() {
@@ -125,6 +124,37 @@ class TajweedPacingTest {
     }
 
     @Test
+    fun `madd aarid waqf parks on the vowel the stop lengthens`() {
+        // ٱلرَّحِيمِ stopped on: the reciter sustains the ي of "raḥīīīm" and
+        // then closes the م. Opt-in — the default still parks on the closer.
+        val rahim = BasmalahWash.WORDS.last()
+        val closer = curveOf(rahim, hold = Hold(isAyahFinal = true, waqfLengthScale = 0f))
+        val madd = curveOf(
+            rahim,
+            hold = Hold(isAyahFinal = true, waqfLengthScale = 0f, maddAaridWaqf = true),
+        )
+        // Both settle, but the madd variant parks earlier in the word — one
+        // glyph back — and still crosses the closing letter afterwards.
+        assertEquals(1f, closer.at(1f), 0f)
+        assertEquals(1f, madd.at(1f), 0f)
+        assertTrue(
+            "madd ʿāriḍ should park behind the closer (${madd.at(0.5f)} vs ${closer.at(0.5f)})",
+            madd.at(0.5f) < closer.at(0.5f),
+        )
+        val parked = madd.at(0.75f) - madd.at(0.35f)
+        assertTrue("the park must be a park, moved $parked", parked < 0.08f)
+        assertTrue("and the closer is still crossed", madd.at(1f) - madd.at(0.9f) > 0f)
+        // Nothing to move the hold onto: a word closing on its own madd letter
+        // paces identically either way.
+        val opensOnMadd = "ٱلۡهُدَىٰ"
+        assertEquals(
+            curveOf(opensOnMadd, hold = Hold(isAyahFinal = true)).at(0.5f),
+            curveOf(opensOnMadd, hold = Hold(isAyahFinal = true, maddAaridWaqf = true)).at(0.5f),
+            1e-6f,
+        )
+    }
+
+    @Test
     fun `the waqf share is what pays for the hold`() {
         // A bigger share buys a longer stillness — the run-up is quicker and
         // the wash then sits on the closing letter for more of the word.
@@ -186,6 +216,7 @@ class TajweedPacingTest {
         val connection = requireNotNull(
             TajweedPacing.connection("نُوحٖ", "وَٱلنَّبِيِّـۧنَ"),
         )
+        // Default (long-word) junction: rise over the last 18%, smoothstepped.
         assertEquals(0f, connection.at(0.82f), 0f)
         assertTrue(connection.at(0.91f) in 0.49f..0.51f)
         assertEquals(1f, connection.at(1f), 0f)
@@ -202,6 +233,99 @@ class TajweedPacingTest {
         assertTrue(connection.at(0.91f) in 0.49f..0.51f)
         assertEquals(1f, connection.at(1f), 0f)
         assertEquals(1f / 6f, connection.prefixFraction, 0f)
+    }
+
+    @Test
+    fun `short wasl donor starts the next-letter bloom earlier`() {
+        // مِن/مَن-scale (~500 ms): claim 75% of the donor so the next opening
+        // gets ~375 ms of soft carry-in (speed ceiling), not a half-word pop.
+        val start = TajweedPacing.waslPrefixStart(500)
+        assertEquals(0.25f, start, 1e-3f)
+        assertTrue(
+            "short donor bloom window should be at least ~350 ms",
+            (1f - start) * 500f >= 350f,
+        )
+        val connection = requireNotNull(
+            TajweedPacing.connection("مِن", "رَّبِّكُم"),
+        )
+        assertEquals(0f, connection.at(start, start), 0f)
+        // smoothstep(0.5) = 0.5 at the window midpoint.
+        val mid = start + 0.5f * (1f - start)
+        assertEquals(0.5f, connection.at(mid, start), 1e-3f)
+        assertEquals(1f, connection.at(1f, start), 0f)
+        // Soft onset: a little past the start is still well below linear.
+        val early = start + 0.2f * (1f - start)
+        assertTrue(
+            "smoothstep should lag a linear ramp at the toe",
+            connection.at(early, start) < 0.2f * 0.85f,
+        )
+    }
+
+    @Test
+    fun `wasl prefix speed ceiling targets about 480ms when the donor allows`() {
+        // 800 ms donor: 480/800 = 0.60 window → start 0.40.
+        val start = TajweedPacing.waslPrefixStart(800)
+        assertEquals(0.40f, start, 1e-3f)
+        assertEquals(
+            TajweedPacing.DEFAULT_WASL_PREFIX_MS,
+            (1f - start) * 800f,
+            1f,
+        )
+        assertEquals(
+            TajweedPacing.DEFAULT_WASL_HANDOFF,
+            TajweedPacing.waslPrefixCompletion(800),
+            0f,
+        )
+    }
+
+    @Test
+    fun `very short wasl donor hands off an unfinished slower bloom`() {
+        // Alafasy 2:207 مَن is 220 ms; the wash floor makes it 254 ms.
+        // Its capped 75% tail cannot honestly fit a 480 ms fade, so preserve
+        // the initial quarter-word pause and carry partial progress forward.
+        val sweepMs = 254
+        val start = TajweedPacing.waslPrefixStart(sweepMs)
+        val completion = TajweedPacing.waslPrefixCompletion(sweepMs)
+        val connection = requireNotNull(
+            TajweedPacing.connection("مَن", "يَشۡرِي"),
+        )
+
+        assertEquals(0.25f, start, 1e-3f)
+        assertEquals(0.75f * sweepMs / TajweedPacing.DEFAULT_WASL_PREFIX_MS, completion, 1e-3f)
+        assertEquals(0f, connection.at(start, start, completion), 0f)
+        assertTrue("handoff must remain a partial fade", connection.at(1f, start, completion) < 0.5f)
+    }
+
+    @Test
+    fun `long wasl donor still leaves visible fade after handoff`() {
+        // Alafasy 2:231 بِمَعۡرُوفٖۚ → وَلَا: the 2.22 s donor has ample
+        // room for 480 ms, but pre-forming the whole wāw snaps across a line.
+        val sweepMs = 2_220
+        val start = TajweedPacing.waslPrefixStart(sweepMs)
+        val completion = TajweedPacing.waslPrefixCompletion(sweepMs)
+        val connection = requireNotNull(
+            TajweedPacing.connection("بِمَعۡرُوفٖۚ", "وَلَا"),
+        )
+
+        assertEquals(1f - 480f / sweepMs, start, 1e-3f)
+        assertEquals(TajweedPacing.DEFAULT_WASL_HANDOFF, completion, 0f)
+        assertTrue(connection.at(1f, start, completion) < 0.5f)
+    }
+
+    @Test
+    fun `wasl prefix start respects a lab minPrefixMs override`() {
+        // Ink Lab "Wasl prefix ms" = 600 on an 800 ms donor → 0.75 window.
+        assertEquals(0.25f, TajweedPacing.waslPrefixStart(800, minPrefixMs = 600f), 1e-3f)
+        // Very high ceiling still clamped by MAX_WASL_PREFIX_WINDOW (0.75).
+        assertEquals(0.25f, TajweedPacing.waslPrefixStart(500, minPrefixMs = 900f), 1e-3f)
+    }
+
+    @Test
+    fun `long wasl donor keeps a late junction`() {
+        // 5 s: 480/5000 < min window 0.18 → still 82% junction.
+        assertEquals(0.82f, TajweedPacing.waslPrefixStart(5000), 1e-3f)
+        // 2 s: 480/2000 = 0.24 → slightly earlier than the bare 18% tail.
+        assertEquals(0.76f, TajweedPacing.waslPrefixStart(2000), 1e-3f)
     }
 
     @Test
@@ -234,35 +358,15 @@ class TajweedPacingTest {
     }
 
     @Test
-    fun `wasl exit finishes the previous word early`() {
-        // Word ends in tanwīn feeding و… — ink reaches full before the handoff.
+    fun `wasl connection leaves the donor on its ordinary sweep`() {
         val thulumat = "ظُلُمَٰتٞ"
-        val curve = curveOf(
-            thulumat,
-            hold = Hold(madd = false),
-            nextArabic = "وَرَعۡدٞ",
-        )
-        assertEquals(1f, curve.at(0.82f), 1e-4f)
-        assertEquals(1f, curve.at(0.95f), 0f)
-        // Without a next-word absorb, nothing dramatic → plain sweep (null).
+        assertNotNull(TajweedPacing.connection(thulumat, "وَرَعۡدٞ"))
         assertNull(TajweedPacing.curve(thulumat, 1f, Hold(madd = false)))
 
         // 4:165 writes fatḥatan on lām before a silent carrier alif.
         val rusulan = "رُّسُلٗا"
-        val carrierCurve = curveOf(
-            rusulan,
-            hold = Hold(madd = false),
-            nextArabic = "مُّبَشِّرِينَ",
-        )
-        assertEquals(1f, carrierCurve.at(0.82f), 1e-4f)
-        assertNull(
-            TajweedPacing.curve(
-                rusulan,
-                1f,
-                Hold(madd = false),
-                nextArabic = "عَلِيمٌ",
-            ),
-        )
+        assertNotNull(TajweedPacing.connection(rusulan, "مُّبَشِّرِينَ"))
+        assertNull(TajweedPacing.curve(rusulan, 1f, Hold(madd = false)))
     }
 
     @Test

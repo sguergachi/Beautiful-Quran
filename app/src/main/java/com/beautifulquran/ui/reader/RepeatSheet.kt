@@ -1,18 +1,19 @@
 package com.beautifulquran.ui.reader
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -24,13 +25,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.media3.common.Player
 import com.beautifulquran.ui.home.SearchDialWheel
 import com.beautifulquran.ui.theme.InkCircledChoiceColumn
-import com.beautifulquran.ui.theme.LocalQuranAccents
 import com.beautifulquran.ui.theme.UnselectedChoiceInk
 import com.beautifulquran.ui.theme.quietClickable
 
@@ -82,8 +83,13 @@ internal fun repeatChoice(
  * inline choices. No radio buttons, no card, no Material buttons.
  *
  * Picking "a range of ayahs" reveals two vertical wheels to bound the loop;
- * picking "from this ayah" reveals a single wheel counting forward from the
- * current ayah. Everything applies on Done; the quiet margins dismiss.
+ * picking "from this ayah" reveals a wheel of *distances* beside a label of the
+ * range it lands on — the reader knows how far on they want to go, not which
+ * ayahs those are. Neither is captioned: both write themselves out on the
+ * reading line. Everything applies on Done, the sheet's one action; the quiet
+ * margins are the only way out. A second "Not now" line used to sit 4 dp under
+ * Done — same type vocabulary as the choices, so the sheet read as one long
+ * list, and discarding the pick was a thumb-width from committing it.
  *
  * This replaced a stock Material `Dialog` that had been violating AGENTS.md
  * invariant 4 (recorded, and now resolved, in docs/DESIGN.md).
@@ -116,6 +122,9 @@ fun RepeatSheet(
     var to by remember {
         mutableIntStateOf((repeatRange?.last ?: safeAyahCount).coerceIn(1, safeAyahCount))
     }
+    // "From this ayah" is held as a *count* of ayahs, because that is what the
+    // reader knows from where they are sitting — the ayah it lands on is the
+    // dial's answer, not its input.
     val maxNextNCount = (safeAyahCount - safeCurrentAyah + 1).coerceAtLeast(1)
     var nextNCount by remember {
         val opening = if (isNextNRange) repeatRange.count() else 2
@@ -130,7 +139,7 @@ fun RepeatSheet(
             RepeatChoice.AYAH_RANGE -> onRepeatRange(from, to)
             RepeatChoice.NEXT_N_AYAHS -> onRepeatRange(
                 safeCurrentAyah,
-                safeCurrentAyah + nextNCount - 1,
+                (safeCurrentAyah + nextNCount - 1).coerceAtMost(safeAyahCount),
             )
         }
         // Remember the *choice*, not just the resulting range: "a range of
@@ -166,75 +175,138 @@ fun RepeatSheet(
             Spacer(Modifier.height(24.dp))
 
             // The shared ink-brush circle loops the chosen line — the same mark
-            // the Settings sheet paints around its inline choices.
+            // the Settings sheet paints around its inline choices. A choice that
+            // needs numbers unfolds them directly under itself, so the wheels
+            // belong to the line that asked for them rather than trailing the
+            // whole list.
             InkCircledChoiceColumn(
                 entries = RepeatChoice.entries,
                 selected = choice,
                 label = { it.label },
                 onSelect = { choice = it },
-            )
+            ) { entry ->
+                // Neither dial is captioned: each spells its own range out with
+                // the "to" standing between the two figures.
+                when (entry) {
+                    RepeatChoice.AYAH_RANGE -> RepeatWheelBlock {
+                        RepeatRangeDials(
+                            ayahCount = safeAyahCount,
+                            from = from,
+                            to = to,
+                            onFromChange = {
+                                from = it
+                                if (to < it) to = it
+                            },
+                            onToChange = {
+                                to = it
+                                if (from > it) from = it
+                            },
+                        )
+                    }
 
-            if (choice == RepeatChoice.AYAH_RANGE) {
-                Spacer(Modifier.height(20.dp))
-                RepeatWheelCaption("Ayah $from to $to")
-                Spacer(Modifier.height(10.dp))
-                RepeatRangeDials(
-                    ayahCount = safeAyahCount,
-                    from = from,
-                    to = to,
-                    onFromChange = {
-                        from = it
-                        if (to < it) to = it
-                    },
-                    onToChange = {
-                        to = it
-                        if (from > it) from = it
-                    },
-                )
-            } else if (choice == RepeatChoice.NEXT_N_AYAHS) {
-                Spacer(Modifier.height(20.dp))
-                RepeatWheelCaption(
-                    "Repeat $nextNCount ayah${if (nextNCount == 1) "" else "s"} " +
-                        "from ayah $safeCurrentAyah",
-                )
-                Spacer(Modifier.height(10.dp))
-                RepeatCountDial(
-                    count = nextNCount,
-                    maxCount = maxNextNCount,
-                    onCountChange = { nextNCount = it },
-                )
+                    RepeatChoice.NEXT_N_AYAHS -> RepeatWheelBlock {
+                        RepeatFromHereDial(
+                            startAyah = safeCurrentAyah,
+                            ayahCount = safeAyahCount,
+                            count = nextNCount,
+                            onCountChange = { nextNCount = it },
+                        )
+                    }
+
+                    else -> Unit
+                }
             }
 
-            Spacer(Modifier.height(32.dp))
+            // Done sits well clear of the last choice — a 20 dp gap would read
+            // as one more line in the list — and carries the sheet's strongest
+            // ink, so the action is never quieter than the options above it.
+            Spacer(Modifier.height(48.dp))
             Text(
                 text = "Done",
-                style = MaterialTheme.typography.titleMedium,
+                style = MaterialTheme.typography.titleLarge,
                 color = MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier
                     .quietClickable(onClick = ::commit)
                     .padding(horizontal = 16.dp, vertical = 10.dp),
             )
-            Spacer(Modifier.height(4.dp))
-            Text(
-                text = "Not now",
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
-                modifier = Modifier
-                    .quietClickable(onClick = onDismiss)
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-            )
         }
     }
 }
 
+/** One item's height on every wheel this sheet shows. */
+private val WheelItemHeight = 42.dp
+
+/**
+ * How much of the surrounding ayahs the wheel keeps in view — four rows.
+ *
+ * Taller than this and a dial parked at either end of a surah (ayah 1, or the
+ * last ayah) is mostly empty paper, which read as an unfinished layout rather
+ * than a wheel that has run out of numbers.
+ */
+private val WheelHeight = 168.dp
+
+/**
+ * A single dial's measure. The wheels are a compact block in the middle of the
+ * sheet, not two columns pushed to opposite margins: a range is one phrase —
+ * "1 to 75" — and the two figures have to sit close enough to read as a pair.
+ */
+private val WheelColumnWidth = 110.dp
+
+/**
+ * The paper between the two range wheels — wide enough to hold the word "to" on
+ * the reading line, since that word *is* the range's caption.
+ */
+private val WheelGutter = 34.dp
+
+/** Both dials plus the gutter, so the pair can be centred as one block. */
+private val WheelPairWidth = WheelColumnWidth * 2 + WheelGutter
+
+/** The word that joins the two figures of a written range. */
+private const val RangeJoinWord = " to "
+
+/** Paper between the range it lands on and the dial that sets the distance. */
+private val FromHereGutterWidth = 12.dp
+
+/**
+ * The distance dial runs narrower than a range wheel: it holds a count, not an
+ * ayah number, and every dp of column width is another dp of daylight between
+ * the figure and the range it produces.
+ */
+private val FromHereWheelWidth = 68.dp
+
+/**
+ * A choice's numbers, unfolding under the line that asked for them.
+ *
+ * No captions anywhere: both dials are written as *two figures with "to"
+ * between them*, which is the sentence a caption would have spelled out. What
+ * separates them is which figures move — the range offers two wheels, "from
+ * this ayah" pins the left figure to where the reader already is.
+ *
+ * Nothing is drawn under the wheel — **no band, no plate, not even a wash.**
+ * The reading line is the row the numbers fade *towards*: rows dissolve into the
+ * sheet as they leave the centre (`SearchDialWheel`'s own edge fade), and the
+ * centred figure holds full ink in the accent while its neighbours sit faint.
+ * Ink strength and the fade are the whole affordance, which is what keeps this
+ * one sheet of paper rather than a control resting on it.
+ */
 @Composable
-private fun RepeatWheelCaption(text: String) {
+private fun RepeatWheelBlock(dial: @Composable () -> Unit) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Spacer(Modifier.height(18.dp))
+        dial()
+        Spacer(Modifier.height(18.dp))
+    }
+}
+
+/** The word standing between the two figures of a range, on the reading line. */
+@Composable
+private fun BoxScope.RangeJoint() {
     Text(
-        text = text,
-        style = MaterialTheme.typography.labelLarge,
-        textAlign = TextAlign.Center,
-        color = MaterialTheme.colorScheme.primary,
-        modifier = Modifier.fillMaxWidth(),
+        text = "to",
+        style = MaterialTheme.typography.bodyMedium,
+        // Quiet ink — it is the joint between the figures, not a third figure.
+        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f),
+        modifier = Modifier.align(Alignment.Center),
     )
 }
 
@@ -246,119 +318,166 @@ private fun RepeatRangeDials(
     onFromChange: (Int) -> Unit,
     onToChange: (Int) -> Unit,
 ) {
-    val accents = LocalQuranAccents.current
-    val itemHeight = 42.dp
+    // The wheels dissolve into the ink-bleed paper this sheet is painted on,
+    // not into `surface` — see SearchDialWheel's `fadeColor`.
+    val paper = MaterialTheme.colorScheme.background
 
-    Column(
-        modifier = Modifier.fillMaxWidth(),
+    BoxWithConstraints(
+        modifier = Modifier
+            .width(WheelPairWidth)
+            .height(WheelHeight),
     ) {
+        val wheelEdgePadding = ((maxHeight - WheelItemHeight) / 2).coerceAtLeast(0.dp)
         Row(
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(WheelGutter),
             modifier = Modifier.fillMaxWidth(),
         ) {
-            RepeatWheelLabel("Start", Modifier.weight(1f))
-            RepeatWheelLabel("End", Modifier.weight(1f))
-        }
-        Spacer(Modifier.height(4.dp))
-        BoxWithConstraints(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(208.dp),
-        ) {
-            val wheelEdgePadding = ((maxHeight - itemHeight) / 2).coerceAtLeast(0.dp)
-            // A soft gilt band marks the reading line of the wheel — an ink
-            // wash on the page, not a selected-item container.
-            Box(
-                modifier = Modifier
-                    .align(Alignment.Center)
-                    .fillMaxWidth()
-                    .height(itemHeight)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(accents.gold.copy(alpha = 0.12f)),
-            )
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                SearchDialWheel(
-                    itemCount = ayahCount,
-                    selectedIndex = (from - 1).coerceIn(0, ayahCount - 1),
-                    itemHeight = itemHeight,
-                    edgePadding = wheelEdgePadding,
-                    onSelectedIndexChange = { onFromChange(it + 1) },
-                    modifier = Modifier.weight(1f),
-                ) { index, selected ->
-                    RepeatNumberItem(index + 1, selected)
-                }
-                SearchDialWheel(
-                    itemCount = ayahCount,
-                    selectedIndex = (to - 1).coerceIn(0, ayahCount - 1),
-                    itemHeight = itemHeight,
-                    edgePadding = wheelEdgePadding,
-                    onSelectedIndexChange = { onToChange(it + 1) },
-                    modifier = Modifier.weight(1f),
-                ) { index, selected ->
-                    RepeatNumberItem(index + 1, selected)
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun RepeatCountDial(
-    count: Int,
-    maxCount: Int,
-    onCountChange: (Int) -> Unit,
-) {
-    val accents = LocalQuranAccents.current
-    val itemHeight = 42.dp
-    val safeMaxCount = maxCount.coerceAtLeast(1)
-
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        RepeatWheelLabel("Count", Modifier.fillMaxWidth())
-        Spacer(Modifier.height(4.dp))
-        BoxWithConstraints(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(208.dp),
-        ) {
-            val wheelEdgePadding = ((maxHeight - itemHeight) / 2).coerceAtLeast(0.dp)
-            Box(
-                modifier = Modifier
-                    .align(Alignment.Center)
-                    .fillMaxWidth(0.5f)
-                    .height(itemHeight)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(accents.gold.copy(alpha = 0.12f)),
-            )
             SearchDialWheel(
-                itemCount = safeMaxCount,
-                selectedIndex = (count - 1).coerceIn(0, safeMaxCount - 1),
-                itemHeight = itemHeight,
+                itemCount = ayahCount,
+                selectedIndex = (from - 1).coerceIn(0, ayahCount - 1),
+                itemHeight = WheelItemHeight,
                 edgePadding = wheelEdgePadding,
-                onSelectedIndexChange = { onCountChange(it + 1) },
-                modifier = Modifier.fillMaxWidth(),
+                onSelectedIndexChange = { onFromChange(it + 1) },
+                modifier = Modifier.weight(1f),
+                fadeColor = paper,
+            ) { index, selected ->
+                RepeatNumberItem(index + 1, selected)
+            }
+            SearchDialWheel(
+                itemCount = ayahCount,
+                selectedIndex = (to - 1).coerceIn(0, ayahCount - 1),
+                itemHeight = WheelItemHeight,
+                edgePadding = wheelEdgePadding,
+                onSelectedIndexChange = { onToChange(it + 1) },
+                modifier = Modifier.weight(1f),
+                fadeColor = paper,
             ) { index, selected ->
                 RepeatNumberItem(index + 1, selected)
             }
         }
+        RangeJoint()
     }
 }
 
+/**
+ * "From this ayah": the reader turns a **distance**, the sheet writes the
+ * **range** it lands on.
+ *
+ * This is the one dial whose two sides are not the same kind of thing. What the
+ * reader has is "about four ayahs on" — the number they can feel from where they
+ * are sitting; what the player needs is a pair of ayah numbers they do not know.
+ * So the dial on the right takes the distance, and the label on the left is
+ * *derived*: the whole range, written out in the same "67 to 120" grammar the
+ * range dial above it uses, moving as the wheel turns.
+ *
+ * The label leads because it is the answer being checked; the wheel follows
+ * because it is the question being asked. Turning the wheel through ayah
+ * numbers instead reads more tidily, but asks the reader for the one number
+ * they came here without.
+ */
 @Composable
-private fun RepeatWheelLabel(text: String, modifier: Modifier = Modifier) {
-    Box(
-        contentAlignment = Alignment.Center,
-        modifier = modifier,
-    ) {
+private fun RepeatFromHereDial(
+    startAyah: Int,
+    ayahCount: Int,
+    count: Int,
+    onCountChange: (Int) -> Unit,
+) {
+    val paper = MaterialTheme.colorScheme.background
+    val first = startAyah.coerceIn(1, ayahCount)
+    // The loop cannot run past the end of the surah, so neither can the count.
+    val maxCount = (ayahCount - first + 1).coerceAtLeast(1)
+    val safeCount = count.coerceIn(1, maxCount)
+
+    // Hold exactly the widest range *this surah* can spell out: fixed, so the
+    // dial never shifts as the figures gain a digit under the reader's thumb,
+    // but no wider, so a fifteen-ayah surah does not reserve room for "286 to
+    // 286" and push the whole block off centre.
+    val measurer = rememberTextMeasurer()
+    val density = LocalDensity.current
+    val numberStyle = MaterialTheme.typography.titleMedium
+    val joinStyle = MaterialTheme.typography.bodyMedium
+    val labelWidth = remember(ayahCount, numberStyle, joinStyle, measurer, density) {
+        val widestFigure = measurer.measure(ayahCount.toString(), numberStyle).size.width
+        val join = measurer.measure(RangeJoinWord, joinStyle).size.width
+        with(density) { (widestFigure * 2 + join).toDp() } + 2.dp
+    }
+    val blockWidth = labelWidth + FromHereGutterWidth + FromHereWheelWidth
+
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        // Names the dial without crowding the reading line: the two figures
+        // there are the sentence, this only says what the turning one counts.
+        Row(modifier = Modifier.width(blockWidth)) {
+            Spacer(Modifier.width(labelWidth + FromHereGutterWidth))
+            Box(
+                modifier = Modifier.width(FromHereWheelWidth),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = "ayahs",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f),
+                )
+            }
+        }
+        Spacer(Modifier.height(6.dp))
+        BoxWithConstraints(
+            modifier = Modifier
+                .width(blockWidth)
+                .height(WheelHeight),
+        ) {
+            val wheelEdgePadding = ((maxHeight - WheelItemHeight) / 2).coerceAtLeast(0.dp)
+            Row(modifier = Modifier.fillMaxWidth()) {
+                Box(
+                    modifier = Modifier
+                        .width(labelWidth)
+                        .fillMaxHeight(),
+                    // Flush right, so the range closes on the dial that sets it.
+                    contentAlignment = Alignment.CenterEnd,
+                ) {
+                    RepeatRangeLabel(from = first, to = first + safeCount - 1)
+                }
+                Spacer(Modifier.width(FromHereGutterWidth))
+                SearchDialWheel(
+                    itemCount = maxCount,
+                    selectedIndex = safeCount - 1,
+                    itemHeight = WheelItemHeight,
+                    edgePadding = wheelEdgePadding,
+                    onSelectedIndexChange = { onCountChange(it + 1) },
+                    modifier = Modifier.width(FromHereWheelWidth),
+                    fadeColor = paper,
+                ) { index, selected ->
+                    RepeatNumberItem(index + 1, selected)
+                }
+            }
+        }
+    }
+}
+
+/**
+ * The range a distance lands on, written the way the range dial reads: figures
+ * in the accent, the joining word quiet. One ayah is written as one figure —
+ * "16", not "16 to 16".
+ */
+@Composable
+private fun RepeatRangeLabel(from: Int, to: Int) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
         Text(
-            text = text,
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+            text = from.toString(),
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.primary,
         )
+        if (to != from) {
+            Text(
+                text = RangeJoinWord,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f),
+            )
+            Text(
+                text = to.toString(),
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.primary,
+            )
+        }
     }
 }
 

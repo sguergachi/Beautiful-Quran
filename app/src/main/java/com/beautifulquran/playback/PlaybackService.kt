@@ -1,7 +1,9 @@
 package com.beautifulquran.playback
 
+import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.media.AudioManager
 import android.net.ConnectivityManager
 import androidx.core.content.getSystemService
 import androidx.media3.common.AudioAttributes
@@ -23,6 +25,7 @@ import androidx.media3.session.MediaLibraryService
 import androidx.media3.session.MediaLibraryService.LibraryParams
 import androidx.media3.session.MediaLibraryService.MediaLibrarySession
 import androidx.media3.session.MediaSession
+import com.beautifulquran.MainActivity
 import com.beautifulquran.QuranApp
 import com.beautifulquran.assistant.AssistantAction
 import com.beautifulquran.assistant.AssistantIntents
@@ -43,6 +46,7 @@ class PlaybackService : MediaLibraryService() {
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var mediaSession: MediaLibrarySession? = null
     private var prefetcher: AudioPrefetcher? = null
+    private var assistantAudioResume: AssistantAudioResume? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -86,8 +90,22 @@ class PlaybackService : MediaLibraryService() {
 
         player.addListener(PrefetchListener(player, prefetcher))
         player.addListener(BasmalahSkipListener(player))
+        assistantAudioResume = AssistantAudioResume(
+            player,
+            getSystemService(AudioManager::class.java),
+        )
 
-        mediaSession = MediaLibrarySession.Builder(this, player, LibraryCallback()).build()
+        // Notification / lock-screen content tap opens the app. Without this,
+        // Media3 still shows transport controls but the body tap is a no-op.
+        val sessionActivity = PendingIntent.getActivity(
+            this,
+            /* requestCode = */ 0,
+            Intent(this, MainActivity::class.java),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+        )
+        mediaSession = MediaLibrarySession.Builder(this, player, LibraryCallback())
+            .setSessionActivity(sessionActivity)
+            .build()
     }
 
     /**
@@ -338,6 +356,8 @@ class PlaybackService : MediaLibraryService() {
         serviceScope.cancel()
         prefetcher?.release()
         prefetcher = null
+        assistantAudioResume?.release()
+        assistantAudioResume = null
         mediaSession?.run {
             player.release()
             release()

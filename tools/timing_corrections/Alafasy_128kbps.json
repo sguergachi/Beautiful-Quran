@@ -1,0 +1,42 @@
+{
+  "schema": 1,
+  "reciter": "Alafasy_128kbps",
+  "edits": [
+    {
+      "reciterId": 1,
+      "surahId": 2,
+      "ayah": 229,
+      "op": "one_utterance",
+      "positions": [16, 17],
+      "evidence": ["ear", "CTC", "quran-align"],
+      "refs": ["GitHub issue #594"]
+    },
+    {
+      "reciterId": 1,
+      "surahId": 2,
+      "ayah": 235,
+      "op": "one_utterance",
+      "positions": [22, 23],
+      "evidence": ["ear", "CTC", "quran-align"],
+      "refs": ["GitHub issue #598"]
+    },
+    {
+      "reciterId": 1,
+      "surahId": 4,
+      "ayah": 19,
+      "op": "one_utterance",
+      "positions": [17, 18],
+      "evidence": ["CTC", "quran-align"],
+      "refs": ["full-corpus acoustic audit"]
+    },
+    {
+      "reciterId": 1,
+      "surahId": 6,
+      "ayah": 145,
+      "op": "one_utterance",
+      "positions": [12, 13],
+      "evidence": ["CTC", "quran-align"],
+      "refs": ["full-corpus acoustic audit"]
+    }
+  ]
+}

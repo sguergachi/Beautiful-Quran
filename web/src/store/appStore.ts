@@ -21,8 +21,17 @@ import {
   type Settings,
 } from '../data/settings'
 import { HighlightEngine, PreparedTimings } from '../domain/HighlightEngine'
-import { BASMALAH_PLAYLIST_AYAH } from '../domain/Basmalah'
+import {
+  BASMALAH_PLAYLIST_AYAH,
+  SURAH_FATIHA,
+  surahOpensWithBasmalahPreface,
+} from '../domain/Basmalah'
 import { HighlightClock } from '../domain/HighlightClock'
+import {
+  fastForwardAction,
+  midpointMs,
+  nextConsumedAyah,
+} from '../domain/FastForwardPolicy'
 import { player, type PlayerState } from '../playback/player'
 import {
   readerHighlightKey,
@@ -71,8 +80,6 @@ export interface RootViewerState {
   isPlayingWord: boolean
 }
 
-const LONG_AYAH_MIN_WORDS = 20
-const MIDPOINT_SEEK_GRACE_MS = 1_000
 const START_SEEK_GRACE_MS = 1_500
 const WORD_CLIP_POLL_MS = 16
 const WORD_CLIP_READY_TIMEOUT_MS = 4_000
@@ -108,6 +115,8 @@ export interface AppState {
    * ([settings.lastSurah] / [settings.lastAyah]).
    */
   openAyah: number
+  /** Bumps for each explicit reader open, including a bookmark in the current surah. */
+  readerOpenRevision: number
   /**
    * Pending home word-search flash — set by [openSurah] with a word position,
    * consumed by the reader after focus settles.
@@ -119,6 +128,23 @@ type Listener = () => void
 
 function deriveSheet(stackLayer: StackLayer, hasReader: boolean): Sheet {
   return sheetAtLayer(stackLayer, hasReader)
+}
+
+/**
+ * Surah timings plus, for preface surahs, Al-Fatihah 1:1 segments under
+ * [BASMALAH_PLAYLIST_AYAH] so the lead-in clip and the calligraphy wash share
+ * the same word clock. Android `ReaderViewModel.timingsWithBasmalahLeadIn`.
+ */
+function withBasmalahLeadIn(
+  map: Map<number, Segment[]>,
+  reciterId: number,
+  surahId: number,
+): Map<number, Segment[]> {
+  if (!surahOpensWithBasmalahPreface(surahId)) return map
+  const basmalah = QuranRepository.timings(reciterId, SURAH_FATIHA).get(1)
+  if (!basmalah) return map
+  // The repository caches its maps, so copy before adding the sentinel.
+  return new Map(map).set(BASMALAH_PLAYLIST_AYAH, basmalah)
 }
 
 class AppStore {
@@ -145,6 +171,12 @@ class AppStore {
   /** Cancels an in-flight word-clip poll / ready wait. */
   private wordClipToken = 0
   private wordClipTimer: ReturnType<typeof setTimeout> | null = null
+  /**
+   * Long-ayah midpoint skip already issued for this ayah (0 = none).
+   * Decided by intent, not positionMs, because seeks are async — a second FF
+   * before position catches up must not re-seek midpoint (#560).
+   */
+  private longAyahMidpointConsumed = 0
 
   state: AppState = {
     ready: false,
@@ -167,6 +199,7 @@ class AppStore {
     rootViewerClosing: false,
     followEnabled: true,
     openAyah: 1,
+    readerOpenRevision: 0,
     pendingSearchFlash: null,
   }
 
@@ -349,7 +382,12 @@ class AppStore {
 
   private reloadTimingsAndReciter(reciter: Reciter) {
     if (!this.state.content) return
-    const map = QuranRepository.timings(reciter.id, this.state.content.surah.id)
+    const surahId = this.state.content.surah.id
+    const map = withBasmalahLeadIn(
+      QuranRepository.timings(reciter.id, surahId),
+      reciter.id,
+      surahId,
+    )
     this.timingSegments = map
     this.prepared = new Map()
     const ayah = this.state.player.nowPlaying?.ayah ?? this.state.settings.lastAyah
@@ -390,6 +428,7 @@ class AppStore {
     // openAyah is session navigation only — Continue Listening stays put until
     // the user actually plays a verse (see [rememberListened]).
     const openAyah = Math.max(1, ayah)
+    const readerOpenRevision = this.state.readerOpenRevision + 1
     const flashWord =
       wordPosition != null && wordPosition > 0 ? wordPosition : null
     const flash =
@@ -408,6 +447,7 @@ class AppStore {
         stackLayer: READER_LAYER,
         sheet: 'reader',
         openAyah,
+        readerOpenRevision,
         followEnabled: true,
         rootViewer: this.state.rootViewer,
         rootViewerClosing,
@@ -428,6 +468,7 @@ class AppStore {
     // sheet while audio metadata hydrates independently.
     this.timingSegments = new Map()
     this.prepared = new Map()
+    this.longAyahMidpointConsumed = 0
 
     // One state commit: the first reader frame already contains Quran text.
     this.set({
@@ -435,6 +476,7 @@ class AppStore {
       sheet: 'reader',
       content,
       openAyah,
+      readerOpenRevision,
       hasTimings: false,
       activeWord: null,
       activeAyah: null,
@@ -458,7 +500,11 @@ class AppStore {
       // idle task and refresh the current highlight if Play was tapped first.
       const loadTimings = () => {
         if (token !== this.openToken) return
-        const map = QuranRepository.timings(reciter.id, surahId)
+        const map = withBasmalahLeadIn(
+          QuranRepository.timings(reciter.id, surahId),
+          reciter.id,
+          surahId,
+        )
         if (token !== this.openToken) return
         this.timingSegments = map
         this.ensurePrepared(ayah)
@@ -598,6 +644,15 @@ class AppStore {
     this.set({ followEnabled: true })
   }
 
+  /**
+   * Word timings of the basmalah lead-in clip (Al-Fatihah 1:1) for the open
+   * chapter's reciter, so the calligraphy wash can ride the same word clock the
+   * clip does — Android `ReaderViewModel.timingsWithBasmalahLeadIn` parity.
+   */
+  basmalahSegments(): Segment[] | null {
+    return this.timingSegments.get(BASMALAH_PLAYLIST_AYAH) ?? null
+  }
+
   /** First timing segment start for [ayah]/[wordPosition], if timings are loaded. */
   segmentStartMs(ayah: number, wordPosition: number): number | null {
     const prepared = this.ensurePrepared(ayah)
@@ -621,21 +676,23 @@ class AppStore {
     if (!np || np.surahId !== content.surah.id) return
 
     if (np.ayah === BASMALAH_PLAYLIST_AYAH) {
+      this.longAyahMidpointConsumed = 0
       await player.seekToAyah(1)
       return
     }
 
-    const midpointMs = this.midpointForLongAyah(np.ayah)
-    if (
-      midpointMs != null &&
-      this.state.player.positionMs < midpointMs - MIDPOINT_SEEK_GRACE_MS
-    ) {
-      await player.seekToWord(np.ayah, midpointMs)
-      return
-    }
-
-    if (np.ayah < content.surah.ayahCount) {
-      await player.seekToAyah(np.ayah + 1)
+    const action = fastForwardAction({
+      ayah: np.ayah,
+      positionMs: this.state.player.positionMs,
+      ayahCount: content.surah.ayahCount,
+      midpointMs: this.midpointForLongAyah(np.ayah),
+      midpointConsumedForAyah: this.longAyahMidpointConsumed,
+    })
+    this.longAyahMidpointConsumed = nextConsumedAyah(action)
+    if (action.kind === 'midpoint') {
+      await player.seekToWord(action.ayah, action.positionMs)
+    } else if (action.kind === 'ayah') {
+      await player.seekToAyah(action.ayah)
     }
   }
 
@@ -665,9 +722,7 @@ class AppStore {
 
   private midpointForLongAyah(ayah: number): number | null {
     const prepared = this.ensurePrepared(ayah)
-    const segments = prepared?.segments
-    if (!segments || segments.length < LONG_AYAH_MIN_WORDS) return null
-    return segments[Math.floor(segments.length / 2)]!.startMs
+    return prepared ? midpointMs(prepared.segments) : null
   }
 
   /** Dismiss the cover float and end the playback session. */

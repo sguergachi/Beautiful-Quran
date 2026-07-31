@@ -4,6 +4,8 @@ import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import com.beautifulquran.data.model.Segment
+import com.beautifulquran.domain.BasmalahWash
 import com.beautifulquran.domain.TajweedPacing
 
 /**
@@ -71,7 +73,7 @@ object InkEngine {
      */
     data class Tuning(
         /** Resting ink of an upcoming / recessed word. */
-        val upcomingAlpha: Float = 0.22f,
+        val upcomingAlpha: Float = 0.2661f,
         /** State tween between resting inks (Active snaps — see
          *  ReaderComponents.animatedInkAlpha for why). */
         val inkFadeMs: Int = 400,
@@ -83,7 +85,7 @@ object InkEngine {
         /** Letter-sweep duration clamps around the reciter's actual dwell. */
         val minSweepMs: Int = 140,
         val maxSweepMs: Int = 8_000,
-        /** Repeat wash sweep when the active word carries no timing. */
+        /** Minimum repeat sweep (and fallback when no active timing exists). */
         val repeatSweepMs: Int = 450,
         /** Dissolve of the orange wash once the repeat chain releases. */
         val repeatFadeOutMs: Int = 900,
@@ -109,34 +111,46 @@ object InkEngine {
         val sweepEaseY2: Float = 0.78f,
         /** Letter-level tajweed pacing of the active word's sweep — the ink
          *  dwells on held letters (madd, ghunnah) instead of sweeping at a
-         *  constant rate. Off by default; auditioned via the Ink Lab.
+         *  constant rate. On by default; still auditionable via the Ink Lab.
          *  See docs/TAJWEED_PACING.md. */
-        val tajweedPacing: Boolean = false,
-        /** Feather of a paced word. Defaults to [washFeather]'s whole-word
-         *  breath: the hold now reads through the wash *stopping*, so the
-         *  edge no longer has to be sharpened (which is what cost the reveal
-         *  its softness the first time round). */
-        val pacedFeather: Float = 1.6f,
+        val tajweedPacing: Boolean = true,
+        /** Feather of a paced word. Slightly sharper than [washFeather] so
+         *  holds read clearly while the edge stays soft (see
+         *  docs/TAJWEED_PACING.md). */
+        val pacedFeather: Float = 1.1857f,
         /** Which moments earn a hold — see [TajweedPacing.Hold]. */
         val holdMadd: Boolean = true,
-        val holdGhunnah: Boolean = false,
+        val holdGhunnah: Boolean = true,
         val holdWaqf: Boolean = true,
         /** Cross-word idghām (nūn/tanwīn + يرملون): hold the next word's
          *  opening letter. See [TajweedPacing.Hold.connect]. */
         val holdConnect: Boolean = true,
+        /**
+         * Wasl next-letter bloom speed ceiling (ms). Short donors (مَن، مِن)
+         * stretch their carry-in window toward this wall-clock so the next
+         * opening fades instead of racing; if the donor is still too short,
+         * the unfinished edge continues after handoff. See
+         * [docs/TAJWEED_PACING.md] Short wasl donors.
+         */
+        val waslPrefixMs: Int = 480,
+        /**
+         * Maximum wasl bloom clock laid down before the connected word becomes
+         * active. Lower leaves more of its opening wash visible after handoff.
+         */
+        val waslHandoff: Float = TajweedPacing.DEFAULT_WASL_HANDOFF,
         /** Ceiling on ordinary-letter speed while a hold is bought, as a
          *  multiple of the plain sweep rate. Word timings are contiguous, so
          *  hold length and this cap are the same dial; 1 means ordinary
          *  letters are never hurried and only [holdWaqf] can hold. */
-        val cruiseCap: Float = 1.25f,
+        val cruiseCap: Float = 2f,
         /** Share of a verse-closing word spent sustaining its final letter
          *  when the word is long enough (see [waqfLengthScale]). */
-        val waqfShare: Float = 0.55f,
+        val waqfShare: Float = 0.5932f,
         /** How strongly shorter closers reduce effective [waqfShare] — see
          *  [TajweedPacing.Hold.waqfLengthScale]. */
-        val waqfLengthScale: Float = 0.7f,
+        val waqfLengthScale: Float = 1f,
         /** How far the wash still creeps while holding, so it breathes. */
-        val holdCreep: Float = 0.08f,
+        val holdCreep: Float = 0.1076f,
     )
 
     /**
@@ -171,7 +185,8 @@ object InkEngine {
     /**
      * How early word ink runs ahead of [com.beautifulquran.domain.HighlightEngine]
      * segment times (ms). Added to the playhead before the engine query so
-     * the next word's wash can start before the timed startMs. Default 0.
+     * the next word's wash can start before the timed startMs.
+     * Default [DEFAULT_HIGHLIGHT_LEAD_MS].
      */
     private var highlightLeadState by mutableStateOf(DEFAULT_HIGHLIGHT_LEAD_MS)
     var highlightLeadMs: Int
@@ -218,7 +233,7 @@ object InkEngine {
         }
 
     /** Shipped defaults for highlight sync (lab knobs start here). */
-    const val DEFAULT_HIGHLIGHT_LEAD_MS = 0
+    const val DEFAULT_HIGHLIGHT_LEAD_MS = 114
     const val DEFAULT_FADE_LEAD_MS = 500
 
     /**
@@ -333,9 +348,19 @@ object InkEngine {
         )
 
     /**
+     * Effective min letter-sweep duration. Short holds (and wasl tails that
+     * inherit this word's sweep) scale up to this so the wash still breathes.
+     * [highlightLeadMs] already starts word ink early; that lead is spent on
+     * a longer soft reveal rather than idle full-ink before the voice arrives.
+     */
+    fun minSweepFloorMs(): Int =
+        (tuning.minSweepMs + highlightLeadMs.coerceAtLeast(0))
+            .coerceIn(1, tuning.maxSweepMs)
+
+    /**
      * How long the active word's letter sweep should run: the time the
      * word stays lit (karaoke hold until the next word), corrected for
-     * playback speed, floored at [Tuning.minSweepMs] so short holds (and
+     * playback speed, floored at [minSweepFloorMs] so short holds (and
      * first-word timing quirks with near-zero remaining Active time) still
      * get a visible wash. The renderers finish an incomplete wash after
      * handoff rather than snapping to full ink — so scaling past the lit
@@ -345,8 +370,9 @@ object InkEngine {
     fun sweepMs(activeWord: ActiveWord?, playbackSpeed: Float): Int? {
         val word = activeWord ?: return null
         val raw = (word.durationMs / playbackSpeed).toInt().coerceAtLeast(0)
-        if (raw <= 0) return tuning.minSweepMs
-        return raw.coerceIn(tuning.minSweepMs, tuning.maxSweepMs)
+        val floor = minSweepFloorMs()
+        if (raw <= 0) return floor
+        return raw.coerceIn(floor, tuning.maxSweepMs)
     }
 
     /**
@@ -357,9 +383,8 @@ object InkEngine {
      *
      * [arabic] is the active word's Hafs Uthmani text and [isAyahFinal] marks
      * the verse-closing word, whose waqf carries the only slack that is not
-     * borrowed from its neighbours. [prevArabic] / [nextArabic] are same-ayah
-     * neighbours for wasl nūn rules (entry hold on this opening letter; early
-     * exit when this trailing nūn is absorbed next). The voiced share comes
+     * borrowed from its neighbours. [prevArabic] is the same-ayah predecessor
+     * for a wasl entry hold on this opening letter. The voiced share comes
      * from [ActiveWord.spokenMs] vs the karaoke hold, so the ink settles
      * rather than smearing across a breath gap.
      */
@@ -368,7 +393,6 @@ object InkEngine {
         activeWord: ActiveWord,
         isAyahFinal: Boolean,
         prevArabic: String? = null,
-        nextArabic: String? = null,
     ): TajweedPacing.Curve? {
         val t = tuning
         if (!t.tajweedPacing) return null
@@ -390,7 +414,6 @@ object InkEngine {
                 creep = t.holdCreep,
             ),
             prevArabic = prevArabic,
-            nextArabic = nextArabic,
         )
     }
 
@@ -439,14 +462,62 @@ object InkEngine {
     /**
      * How far the calligraphy ink wash has traveled (0..1) across the SVG.
      *
-     * Driven by the lead-in clip's playback clock — not equal word slices —
-     * so the feathered [letterFadeIn] edge reaches full ink before the audio
-     * ends. [letterFadeIn] only clears the resting floor at progress ≥ 1, and
-     * the wide wash feather leaves the trailing edge faint until then; settling
-     * at [PREFACE_WASH_SETTLE_FRACTION] of the clip gives that edge time to
-     * finish while the basmalah is still playing.
+     * With the lead-in clip's word [segments] (Al-Fatihah 1:1, always the same
+     * file) the wash is locked to the voice: each word owns the band of artwork
+     * its glyphs cover and is paced inside it by tajweed — see [BasmalahWash].
+     * That is the shipped path; the ramp below is the fallback for timings that
+     * are missing, still loading, or not the plain four words.
+     *
+     * The fallback is driven by the clip's playback clock so the feathered
+     * [letterFadeIn] edge reaches full ink before the audio ends.
+     * [letterFadeIn] only clears the resting floor at progress ≥ 1, and the
+     * wide wash feather leaves the trailing edge faint until then; settling at
+     * [PREFACE_WASH_SETTLE_FRACTION] of the clip gives that edge time to finish
+     * while the basmalah is still playing.
      */
-    fun prefaceWashProgress(positionMs: Long, durationMs: Long): Float {
+    fun prefaceWashProgress(
+        positionMs: Long,
+        durationMs: Long,
+        segments: List<Segment>? = null,
+    ): Float {
+        segments
+            ?.let { BasmalahWash.progress(positionMs, it, durationMs, prefaceHold()) }
+            ?.let { return it }
+        return prefaceRampProgress(positionMs, durationMs)
+    }
+
+    /**
+     * Feather of the calligraphy wash — the Ink Lab's [Tuning.washFeather],
+     * capped by what this four-word-wide artwork can carry without inking the
+     * closing word before the reciter reaches it ([BasmalahWash.MAX_FEATHER]).
+     * A verse word is one word wide, so it takes the uncapped value.
+     */
+    fun prefaceFeather(): Float = minOf(tuning.washFeather, BasmalahWash.MAX_FEATHER)
+
+    /**
+     * Tajweed pacing for the preface words, or null when Ink Lab has pacing
+     * off. The closer's dwell is over half the clip and lands on one glyph, so
+     * the preface parks it on the madd the stop lengthens
+     * ([TajweedPacing.Hold.maddAaridWaqf]) — the ي of "ar-raḥīīīm", not the م.
+     */
+    private fun prefaceHold(): TajweedPacing.Hold? {
+        val t = tuning
+        if (!t.tajweedPacing) return null
+        return TajweedPacing.Hold(
+            madd = t.holdMadd,
+            ghunnah = t.holdGhunnah,
+            waqf = t.holdWaqf,
+            connect = t.holdConnect,
+            cruiseCap = t.cruiseCap,
+            waqfShare = t.waqfShare,
+            waqfLengthScale = t.waqfLengthScale,
+            creep = t.holdCreep,
+            maddAaridWaqf = true,
+        )
+    }
+
+    /** Plain clip-clock ramp — the no-timings fallback of [prefaceWashProgress]. */
+    fun prefaceRampProgress(positionMs: Long, durationMs: Long): Float {
         if (durationMs <= 0L) return 0f
         if (positionMs <= 0L) return 0f
         val settleAt = (durationMs * PREFACE_WASH_SETTLE_FRACTION).toLong().coerceAtLeast(1L)

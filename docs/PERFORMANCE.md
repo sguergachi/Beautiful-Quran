@@ -5,9 +5,6 @@ display's native refresh rate (90/120 Hz where available) with nothing on the
 UI thread that doesn't belong there. This file documents every technique in
 use and the reasoning, so future changes don't regress them.
 
-The latest whole-pipeline review and its profiling constraints are recorded in
-[Android rendering performance audit — 2026-07-12](PERFORMANCE_AUDIT_2026-07-12.md).
-
 Web-specific GPU / paint findings (2026-07-16) live in
 [§ Web rendering and GPU](#web-rendering-and-gpu) below.
 
@@ -70,6 +67,11 @@ paints with:
   run. Deriving that path for every bloom (which an earlier version did,
   unconditionally, then discarded for two of the three kinds) cost ~2 selection
   paths per word per frame for nothing.
+- A glimmer cannot blur that selection path because it is rectangular.
+  `GlyphHaloCache` renders the selected laid-out glyphs into a tiny alpha mask
+  once per word and blur radius, then each animation frame only recolours that
+  cached mask. The cache is layout-local and retains the eight most recent
+  words, covering overlapping dry-downs without growing across a long ayah.
 
 Settled inactive ayahs do **not** redraw continuously: their draw-scope state
 reads are static once the 400 ms recess/focus tween finishes.
@@ -103,9 +105,11 @@ applies `distinctUntilChanged` on the **derived word position**, so
 downstream state changes ~2–3×/second during recitation, not 30×. The loop
 runs only while the surah is loaded (`flatMapLatest` + `WhileSubscribed`),
 drops to a gentle 250 ms poll while paused, and stops entirely when the
-reader leaves the screen. Repeat / high-water tables are built once when
-timings load (`HighlightEngine.PreparedTimings`); the lookup itself is a
-binary search + O(1) table read that allocates nothing.
+reader leaves the screen. Play/pause is part of the `flatMapLatest` identity,
+so resuming cancels any paused sleep and samples immediately; a word tap cannot
+start audio up to 250 ms before its ink restart. Repeat / high-water tables are
+built once when timings load (`HighlightEngine.PreparedTimings`); the lookup
+itself is a binary search + O(1) table read that allocates nothing.
 
 The *poll* is not allocation-free, though: every tick builds an
 `ActiveInfo` and an `ActiveWord`, and `distinctUntilChanged` discards them
@@ -216,6 +220,20 @@ user journeys on stable hardware. See [Profiling](PROFILING.md).
 
 ## Future headroom (not yet done)
 
+Investigate in measured order. Each trades memory, shaping correctness, or
+animation appearance for speed, so none should change without a representative
+device trace and a pixel/motion comparison.
+
+- Cold-start main-thread disk I/O: `SettingsRepository` and `BookmarkRepository`
+  are constructed in `QuranApp.onCreate()`, and their initial `read()` does
+  synchronous `SharedPreferences` reads. Trace it before changing anything —
+  the whole prefs file is parsed once and then served from memory, so this may
+  well be noise. If a trace shows a real stall, move the *first read* off the
+  main thread; do not migrate to DataStore (see `COMPLEXITY.md`).
+- Allocation inside per-frame custom draw lambdas — especially temporary bloom
+  lists and gradient construction.
+- The number and retained memory of per-word graphics layers in gloss mode.
+- Long-ayah text shaping / prefetch on first exposure.
 - Replace the conservative seed Baseline/Startup rules with output captured on
   a stable physical Android 17 device, then retain them only if Macrobenchmark
   confirms an improvement.

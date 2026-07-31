@@ -1,0 +1,29 @@
+{
+  "id": "repair-preserve-peer-while-filling-word",
+  "label": "a missing-word repair must preserve an unrelated peer re-say",
+  "refs": [
+    "Alafasy 60:12",
+    "two-reciter full-corpus before/after audit"
+  ],
+  "pipeline": "preserve_peer_repeats",
+  "notes": "The source has a substantial repeat of word 1 but lacks word 4. Whole-row repair evidence supplies word 4 while flattening word 1. Apply the repair and restore only the unmatched peer occurrence.",
+  "input_segments": [
+    [1, 0, 800],
+    [1, 800, 1600],
+    [2, 1600, 2400],
+    [3, 2400, 3200]
+  ],
+  "repair_segments": [
+    [1, 0, 1600],
+    [2, 1600, 2400],
+    [3, 2400, 3200],
+    [4, 3200, 4000]
+  ],
+  "expected_segments": [
+    [1, 0, 800],
+    [1, 800, 1600],
+    [2, 1600, 2400],
+    [3, 2400, 3200],
+    [4, 3200, 4000]
+  ]
+}

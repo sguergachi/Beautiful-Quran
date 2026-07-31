@@ -54,7 +54,7 @@ data class QuranAccents(
      * third hue, distinct from [gold] (selection/ornament) and [repeatInk]
      * (recitation), so "my marks" never reads as navigation or playback. */
     val bookmarkRibbon: Color,
-    /** Pale red used for the reader's annotation prose. */
+    /** Dark maroon inky red for the reader's annotation prose. */
     val annotationInk: Color,
     /** Freshly laid ink's white-gold sheen — the first-gloss glint a newly
      * read word wears for a breath before drying to plain recited ink
@@ -72,7 +72,7 @@ val LocalQuranAccents = staticCompositionLocalOf {
         embossLight = Color(0x59FFFFFF),
         repeatInk = Color(0xFFC2622A),
         bookmarkRibbon = Color(0xFFB3122F),
-        annotationInk = Color(0xFFD47D8C),
+        annotationInk = Color(0xFF6B2838),
     )
 }
 
@@ -202,7 +202,8 @@ private val LightAccents = QuranAccents(
     repeatInk = Color(0xFFB4551E),
     // Deep ruby: saturated enough to sit as ink on warm paper without glowing.
     bookmarkRibbon = Color(0xFFB3122F),
-    annotationInk = Color(0xFFD47D8C),
+    // Dark maroon inky red — dried red ink on warm paper, not pale rose.
+    annotationInk = Color(0xFF6B2838),
 )
 
 private val DarkAccents = QuranAccents(
@@ -241,10 +242,10 @@ fun themePreviewColors(themeMode: ThemeMode): List<Color> {
     }
 }
 
-/** The contrasting "overlay" palette shared by the Timings Lab and the
- * notification prompt, so the two look the same: always Royal Green so it reads
- * as a distinct surface over the reader — except under the Royal Green theme
- * itself, where Nightfall provides the contrast instead. */
+/** Contrasting overlay palette for ink-bleed surfaces (repeat, lab, root viewer
+ * overlays on the reader): always Royal Green so they read as a distinct
+ * surface — except under the Royal Green theme itself, where Nightfall
+ * provides the contrast instead. */
 fun contrastingOverlayColorScheme(themeMode: ThemeMode): ColorScheme = when (themeMode) {
     ThemeMode.ROYAL_GREEN -> DarkColors
     else -> RoyalGreenColors

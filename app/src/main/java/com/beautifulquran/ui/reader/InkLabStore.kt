@@ -3,6 +3,7 @@ package com.beautifulquran.ui.reader
 import android.content.Context
 import android.content.SharedPreferences
 import androidx.core.content.edit
+import com.beautifulquran.domain.TajweedPacing
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
@@ -48,7 +49,7 @@ class InkLabStore(context: Context) {
 @Serializable
 data class InkLabSnapshot(
     val schema: Int = SCHEMA,
-    val upcomingAlpha: Float = 0.22f,
+    val upcomingAlpha: Float = 0.2661f,
     val inkFadeMs: Int = 400,
     val ayahMarkFadeMs: Int = 400,
     val recessMs: Int = 400,
@@ -66,16 +67,18 @@ data class InkLabSnapshot(
     val sweepEaseY1: Float = 0.24f,
     val sweepEaseX2: Float = 0.7f,
     val sweepEaseY2: Float = 0.78f,
-    val tajweedPacing: Boolean = false,
-    val pacedFeather: Float = 1.6f,
+    val tajweedPacing: Boolean = true,
+    val pacedFeather: Float = 1.1857f,
     val holdMadd: Boolean = true,
-    val holdGhunnah: Boolean = false,
+    val holdGhunnah: Boolean = true,
     val holdWaqf: Boolean = true,
     val holdConnect: Boolean = true,
-    val cruiseCap: Float = 1.25f,
-    val waqfShare: Float = 0.55f,
-    val waqfLengthScale: Float = 0.7f,
-    val holdCreep: Float = 0.08f,
+    val waslPrefixMs: Int = 480,
+    val waslHandoff: Float = TajweedPacing.DEFAULT_WASL_HANDOFF,
+    val cruiseCap: Float = 2f,
+    val waqfShare: Float = 0.5932f,
+    val waqfLengthScale: Float = 1f,
+    val holdCreep: Float = 0.1076f,
     val highlightLeadMs: Int = InkEngine.DEFAULT_HIGHLIGHT_LEAD_MS,
     val fadeLeadMs: Int = InkEngine.DEFAULT_FADE_LEAD_MS,
     /** Null means auto route preset; omitted on old saves → null. */
@@ -106,6 +109,8 @@ data class InkLabSnapshot(
         holdGhunnah = holdGhunnah,
         holdWaqf = holdWaqf,
         holdConnect = holdConnect,
+        waslPrefixMs = waslPrefixMs,
+        waslHandoff = waslHandoff,
         cruiseCap = cruiseCap,
         waqfShare = waqfShare,
         waqfLengthScale = waqfLengthScale,
@@ -150,6 +155,8 @@ data class InkLabSnapshot(
             holdGhunnah = tuning.holdGhunnah,
             holdWaqf = tuning.holdWaqf,
             holdConnect = tuning.holdConnect,
+            waslPrefixMs = tuning.waslPrefixMs,
+            waslHandoff = tuning.waslHandoff,
             cruiseCap = tuning.cruiseCap,
             waqfShare = tuning.waqfShare,
             waqfLengthScale = tuning.waqfLengthScale,

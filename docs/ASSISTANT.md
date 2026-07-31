@@ -42,13 +42,22 @@ allowed to call it.
 is a Media3 `MediaLibraryService` and advertises both the Media3 and platform
 `MediaBrowserService` actions. It exposes all 114 surahs as browsable and
 searchable media, expands a match into a full ayah queue, and uses the selected
-reciter. `MainActivity` also accepts the legacy
-`android.media.action.MEDIA_PLAY_FROM_SEARCH` action.
+reciter. The media session sets a `sessionActivity` `PendingIntent` so tapping
+the notification or lock-screen player opens `MainActivity`. `MainActivity`
+also accepts the legacy `android.media.action.MEDIA_PLAY_FROM_SEARCH` action.
 
 This is the correct Android route for playback and transport commands. It does
 not implement non-media requests such as “open without playing” or “bookmark
 this.” Named cold-start requests can still go to YouTube Music when Assistant
 does not identify Beautiful Quran as the intended media provider.
+
+Media3 owns normal audio-focus behavior: spoken-content recitation pauses on a
+transient Assistant interruption and resumes when focus returns. If an Assistant
+build instead labels its brief speech as a permanent focus loss, Android sends
+no later gain callback. `AssistantAudioResume` handles that narrow case by
+matching the focus-loss pause to an active platform audio player with
+`USAGE_ASSISTANT`, then resuming after that player goes quiet. User and remote
+pauses remain paused.
 
 ### Classic Google Assistant App Actions
 

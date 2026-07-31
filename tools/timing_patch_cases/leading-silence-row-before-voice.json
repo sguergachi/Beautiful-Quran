@@ -1,0 +1,13 @@
+{
+  "id": "leading-silence-row-before-voice",
+  "label": "onset refuses to translate a row whose second word predates voice",
+  "pipeline": "leading_silence_offset",
+  "audio_onset_ms": 250,
+  "input_segments": [
+    [1, 0, 20],
+    [2, 20, 100],
+    [3, 100, 200]
+  ],
+  "expected_invalid": true,
+  "notes": "Onset may reject this clock but must never assert a whole-row translation. The finalizer chooses quran-align or whole-ayah fallback."
+}

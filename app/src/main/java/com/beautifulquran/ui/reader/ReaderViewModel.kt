@@ -102,6 +102,21 @@ data class ReaderPlaybackSnapshot(
     val speed: Float,
 )
 
+internal data class PollingIdentity<K : Any>(
+    val sampleKey: K,
+    /** Cancels a sleeping paused poll so resume samples immediately. */
+    val isPlaying: Boolean,
+)
+
+internal fun <K : Any> pollingIdentity(
+    state: PlayerUiState,
+    loadedSurahId: Int,
+    key: (NowPlaying) -> K?,
+): PollingIdentity<K>? = state.nowPlaying
+    ?.takeIf { it.surahId == loadedSurahId }
+    ?.let(key)
+    ?.let { PollingIdentity(it, state.isPlaying) }
+
 class ReaderViewModel(
     private val repository: QuranRepository,
     val settings: SettingsRepository,
@@ -186,12 +201,13 @@ class ReaderViewModel(
         key: (NowPlaying) -> K?,
         sample: (K) -> T?,
     ): StateFlow<T?> = player.state
-        .map { s -> s.nowPlaying?.takeIf { it.surahId == surahId }?.let(key) }
+        .map { pollingIdentity(it, surahId, key) }
         .distinctUntilChanged()
-        .flatMapLatest { k ->
-            if (k == null) {
+        .flatMapLatest { identity ->
+            if (identity == null) {
                 flowOf<T?>(null)
             } else {
+                val k = identity.sampleKey
                 flow<T?> {
                     while (true) {
                         // At an ayah handoff the controller's item (and its
@@ -242,14 +258,15 @@ class ReaderViewModel(
         OutputLatency.heardMs(player.positionMs, outputLatencyMs())
 
     /**
-     * The heard position plus the word-only Ink Lab lead. A route or lab change
-     * steps query time, so arm [HighlightClock] to take it rather than hold it
-     * as jitter.
+     * The heard position plus the word-only Ink Lab lead. [firstWordStartMs]
+     * keeps that lead from crossing encoded opening silence. A route or lab
+     * change steps query time, so arm [HighlightClock] to take it rather than
+     * hold it as jitter.
      *
      * Forced word seeks stay on the media timeline so a tap lights the word
      * that was just sought.
      */
-    private fun highlightPositionMs(forcedMediaMs: Long?): Long {
+    private fun highlightPositionMs(forcedMediaMs: Long?, firstWordStartMs: Long): Long {
         val latencyMs = outputLatencyMs()
         val leadMs = InkEngine.highlightLeadMs.toLong().coerceAtLeast(0L)
         if (latencyMs != lastOutputLatencyMs || leadMs != lastHighlightLeadMs) {
@@ -258,7 +275,12 @@ class ReaderViewModel(
             highlightClock.acceptNextSample()
         }
         if (forcedMediaMs != null) return forcedMediaMs
-        return OutputLatency.highlightMs(player.positionMs, latencyMs, leadMs)
+        return OutputLatency.highlightMs(
+            mediaPositionMs = player.positionMs,
+            latencyMs = latencyMs,
+            leadMs = leadMs,
+            leadNotBeforeMs = firstWordStartMs,
+        )
     }
 
     /** Emits the active word ~30x/sec while this surah is playing, but only
@@ -273,7 +295,12 @@ class ReaderViewModel(
         } else {
             null
         }
-        val rawMs = highlightPositionMs(forcedMs)
+        val firstWordStartMs = preparedTimings[np.ayah]
+            ?.segments
+            ?.firstOrNull()
+            ?.startMs
+            ?: 0L
+        val rawMs = highlightPositionMs(forcedMs, firstWordStartMs)
         val clockMs = highlightClock.sample(np, rawMs)
         if (lastInkSampleKey != np) {
             lastInkSampleKey = np
@@ -322,16 +349,20 @@ class ReaderViewModel(
     }
 
     /**
-     * Calligraphy wash 0..1 while the basmalah lead-in plays, paced by the
-     * clip's playback position so the SVG settles to full ink before audio
-     * ends (see [InkEngine.prefaceWashProgress]). Null when not on the lead-in.
+     * Calligraphy wash 0..1 while the basmalah lead-in plays: locked to the
+     * clip's own word timings and paced by tajweed inside each word's band of
+     * artwork, falling back to a plain clip ramp when those timings are missing
+     * (see [InkEngine.prefaceWashProgress] /
+     * [com.beautifulquran.domain.BasmalahWash]). Null when not on the lead-in.
      */
     val basmalahWashProgress: StateFlow<Float?> = pollingWhileLoaded(key = { it.ayah }) { ayah ->
         if (ayah != BASMALAH_PLAYLIST_AYAH) return@pollingWhileLoaded null
-        val duration = player.durationMs
         val timed = timings[BASMALAH_PLAYLIST_AYAH]
-        // Prefer the real media duration once known; until then fall back to
-        // the timing span so the wash still advances on the first ticks.
+        // The real media duration once known: it is both the fallback ramp's
+        // span and the ceiling the paced wash is fitted inside (a source row
+        // that overruns its own MP3 must still finish). Until then the timing
+        // span, so the wash still advances on the first ticks.
+        val duration = player.durationMs
         val endMs = when {
             duration > 0L -> duration
             timed != null -> timed.last().endMs
@@ -339,7 +370,7 @@ class ReaderViewModel(
         }
         // The pure ear clock: this consumer must not arm the ink clock's
         // "accept next sample" latch on the ink poll's behalf.
-        InkEngine.prefaceWashProgress(heardPositionMs(), endMs)
+        InkEngine.prefaceWashProgress(heardPositionMs(), endMs, timed)
     }
 
     /** Advances the lit ayah to the next one during the final
@@ -612,11 +643,8 @@ class ReaderViewModel(
         }
     }
 
-    private fun midpointForLongAyah(ayah: Int): Long? {
-        val segments = timings[ayah].orEmpty()
-        if (segments.size < FastForwardPolicy.LONG_AYAH_MIN_WORDS) return null
-        return segments[segments.size / 2].startMs
-    }
+    private fun midpointForLongAyah(ayah: Int): Long? =
+        FastForwardPolicy.midpointMs(timings[ayah].orEmpty())
 
     /** Loads this surah as the playlist from [startAyah]; no-op until content
      * and reciter are ready. Returns false when not started.

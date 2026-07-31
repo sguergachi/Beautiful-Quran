@@ -44,9 +44,41 @@ Hard rules:
 > `ui/reader/RepeatSheet.kt`, hosted by `ReaderScreen` inside the shared
 > `InkRevealOverlay`: ink bleeds from the player bar's repeat control and the
 > reader sheet becomes the question. Selection is the ink-brush circle plus ink
-> strength, Done/Not now are quiet text lines, and the margins dismiss. The ayah
-> wheels are the same `SearchDialWheel` the cover sheet's search uses, under a
-> soft gilt reading band.
+> strength, Done is one quiet text line, and the margins dismiss. The ayah
+> wheels are the same `SearchDialWheel` the cover sheet's search uses — a
+> compact centred block, so a range reads as one phrase — and they unfold
+> **directly under the choice that asked for them**, pushing the rest of the
+> list down, so the numbers belong to that line rather than trailing the sheet.
+> Neither dial carries a caption: each writes itself out **on the reading line**,
+> so it reads straight across — "67 to 120", and "5 to 9" beside the distance
+> that produced it.
+>
+> Those two dials are not the same instrument, because the reader does not
+> arrive with the same knowledge. For a range they have both ayah numbers, so
+> both figures are wheels. For "from this ayah" they have *a distance* — "about
+> four ayahs on" — and specifically **not** the ayah numbers, so the sides
+> swap roles: the **dial on the right takes the distance**, and the **label on
+> the left is derived** — the whole range it lands on, "5 to 9", written in the
+> same grammar the range dial above it uses and moving as the wheel turns. The
+> label leads because it is the answer being checked; the wheel follows because
+> it is the question being asked. Asking for what the reader can know and
+> writing out what they cannot is the whole design of that line. One word,
+> **"ayahs"**, sits over the dial to name what it counts — the only column
+> heading left on the sheet, and it earns its place because that wheel is the
+> one figure the reading line does not explain. The label's column is measured
+> from the widest range *that surah* can spell out, so the dial never shifts as
+> the figures gain a digit, and a fifteen-ayah surah never reserves room for
+> "286 to 286".
+>
+> Nothing is drawn under the wheel: no band, no plate, no wash. The reading line
+> is the row the numbers fade *towards* — rows dissolve into the sheet as they
+> leave the centre, and the centred figure holds full ink in the accent while
+> its neighbours sit faint. That is the same "hierarchy from ink and spacing
+> only" rule the rest of the page obeys, and it is what keeps the dial part of
+> the paper instead of a control resting on it. For that dissolve to work,
+> `SearchDialWheel` takes the paper it is standing on as `fadeColor`: this sheet
+> is painted in `background`, and fading to `surface` here turned the wheel's
+> own dissolve into a visible plate over its top and bottom rows.
 
 ### The selection marks (`ui/theme/BrushMarks.kt`)
 
@@ -89,7 +121,15 @@ JVM-testable at all: `androidx.compose.ui.graphics.Path` wraps
 `android.graphics.Path`, which is stubbed in unit tests.
 
 Because the mark is derived from each child's own measured bounds rather than the
-container's, the same code loops a word in a `Row` and a full line in a `Column`.
+container's, the same code loops a word in a `Row` and a stacked choice in a
+`Column`. That is also why neither container stretches its children to the full
+sheet width: `InkCircledChoiceColumn` sets every line to the measured width of
+its longest label, so each mark in the stack shares one width and keeps a
+hand-drawn ~4:1 loop. Stretched to the sheet, the same stroke came out 10:1 — two
+parallel rules with caps, a lozenge rather than a loop. The width is *measured*
+from the label text rather than taken from the column's intrinsics so that
+`expanded` — the slot each choice can unfold beneath itself, and which is free to
+be wider than the labels — can never change the size of the circle.
 
 ### Turning the sheet
 
@@ -138,30 +178,21 @@ While an ink bleed is entering, open, or receding, paper-stack swipes are
 disabled. The gesture gate follows the overlay's rendered lifetime rather than
 only its requested visibility, so a page cannot turn underneath a closing wash.
 
-The shared composable is `InkRevealOverlay` (`ui/theme/InkReveal.kt`). Three
-surfaces use it today / by design:
+The shared composable is `InkRevealOverlay` (`ui/theme/InkReveal.kt`). Surfaces
+that use it today / by design:
 
 | Surface | Origin | What settles after the bloom |
 |---|---|---|
-| Notification permission | Play control | The allow / not-now question (word-by-word lyric fade) |
+| Repeat range | Player-bar repeat control | The repeat-mode / range question |
 | [Root Word Viewer](ROOT_VIEWER.md) | Long-pressed word | Root, form, and concordance for that word |
 | [Timings Lab](TIMINGS_LAB.md) | Long-pressed word (developer mode only) | The timing workbench |
 | Ornaments Lab | Settings → Developer (developer mode only) | The procedural ornament generator workbench — explore/design/save seeds |
 | [Share Send page](SHARE.md) | Share host / gather mode (not on player bar) | Ordered selection + text/image share (video later) |
 
-For the notification prompt specifically:
-
-- **Top** — a large display-face title (Cormorant Garamond), the way a
-  chapter opens.
-- **Middle** — the body, written in word by word with the Apple-Music lyric
-  fade, so the ink literally *arrives* on the page.
-- **Bottom** — the two answers, *Not now* (quiet, ink-only) and *Allow*
-  (the single green accent), which fade up only after the words have landed,
-  so the reader reads before deciding.
-
-This is the *only* place the app borrows Material's ink-spread gesture, and
-it is justified because here the spreading ink *is* the paper metaphor, not
-a tap ripple (taps still never ripple — see Motion).
+The spreading ink *is* the paper metaphor here, not a tap ripple (taps still
+never ripple — see Motion). Media-session playback controls do **not** need
+`POST_NOTIFICATIONS` (Android exempts media sessions), so play never raises a
+permission bleed.
 
 ## Ink
 
@@ -265,11 +296,10 @@ not the app's.
   0.78 em. Web uses a calibrated paint lift for its browser font metrics;
   Compose shares the English prose baseline because Android reports different
   metrics for the same Hafs ornament.
-- **English gloss punctuation**: display-only periods close each ayah and
-  precede genuine capitalized sentence starts. Proper and reverential capitals
-  (Allah, His, Lord, etc.), speech cues, and known source-capitalization
-  artifacts such as mid-phrase “Guidance” are excluded. This policy never
-  mutates the database text or the timing/search identity of a word.
+- **English gloss punctuation**: a display-only period closes each ayah.
+  Existing source punctuation is preserved, but capitalization never creates
+  an inferred sentence boundary. This policy never mutates the database text
+  or the timing/search identity of a word.
 - **Translations**: EB Garamond, 17 sp, 26 sp leading, at 66 % ink.
 - **UI text**: the same serif at small sizes with letterspacing and reduced
   alpha; labels never compete with scripture. Nothing in the app is sans.
@@ -405,9 +435,11 @@ image, so it is crisp at any density and nearly free to render.
   tooling rather than illumination. The **surah header's rosette and field
   are likewise static** — fixed page typography, not a ceremony. One
   absolute rule, enforced everywhere this generator draws: no composition
-  may read as a hexagram — star indices that decompose into triangles
-  ({12/4}), 6-fold seals, and 6-fold field tilings are all excluded by
-  construction and guarded by tests on both platforms.
+  may read as an occult compound — star indices that decompose into
+  triangles ({12/4} → hexagram) or into interlaced pentagrams
+  ({10/4} → two {5/2} pentacles stacked), 6-fold seals, and 6-fold field
+  tilings are all excluded by construction and guarded by tests on both
+  platforms.
 - **Gilding.** Gold is never a flat color. Gilded elements (the surah
   rosette, ayah number marks, the home mark) carry a three-stop leaf
   gradient (deep bronze → bright gilt → deep bronze). On the reader, the
@@ -430,9 +462,11 @@ image, so it is crisp at any density and nearly free to render.
   does for any verse while the lead-in plays. The VectorDrawable
   (`basmalah_naskh`) is adapted from Wikimedia Commons File:Basmala.svg
   (Baba66, CC BY-SA 3.0). It is an InkEngine **calligraphy render path**: an
-  RTL `letterFadeIn` wash advances across the SVG on the lead-in clip's
-  playback clock and settles to full ink before the audio ends; Upcoming while
-  another ayah is recited; Plain at rest. Starting playback from ayah 1 (or
+  RTL `letterFadeIn` wash advances across the SVG **on the clip's own word
+  timings** — each word owns the band of artwork its glyphs cover, paced inside
+  it by tajweed — so the ink reaches ٱللَّهِ as the reciter says "-llāhi" and
+  settles as the closing madd of ٱلرَّحِيمِ ends, not at a fixed fraction of the
+  file (`BasmalahWash`); Upcoming while another ayah is recited; Plain at rest. Starting playback from ayah 1 (or
   tapping the calligraphy) prepends Al-Fatihah 1:1 audio before the first ayah;
   word taps skip the lead-in.
 - **Restraint rule:** ornament appears in exactly three places on the open
@@ -561,7 +595,8 @@ vanish entirely while reciting.
   verse's tip so consecutive ribbons never touch.
 - **Marking is where you tap.** A tap on the verse's ribbon margin marks (or
   unmarks) *that* verse — the tip on the verse you are reading burns a little
-  brighter so the affordance finds your eye.
+  brighter so the affordance finds your eye. On an exposed saved ribbon,
+  press and hold opens that verse's note; unsaved tips do not offer notes.
 - **The unfurl.** On mark, the tip *spills down the block* with a gravity drop
   (slow peel, then accelerates), a traveling cloth wave, a soft overshoot past
   the block bottom, then a spring settle and a single underdamped flutter.

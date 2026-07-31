@@ -8,10 +8,10 @@ one-tap jumps into those ayahs.
 
 It is **not** a floating popup, dialog, or sheet in the Material sense. It
 is an **ink bleed on the reader sheet** — the same surface primitive as the
-notification-permission prompt. The wash soaks *that* paper only (hosted
-inside the reader `PaperPage` / web `.sheet`), never a full-screen layer
-above the stack. See [DESIGN.md](DESIGN.md) ("The ink bleed") and the shared
-composable `InkRevealOverlay` in `ui/theme/InkReveal.kt`.
+repeat question. The wash soaks *that* paper only (hosted inside the reader
+`PaperPage` / web `.sheet`), never a full-screen layer above the stack. See
+[DESIGN.md](DESIGN.md) ("The ink bleed") and the shared composable
+`InkRevealOverlay` in `ui/theme/InkReveal.kt`.
 
 ## Why it exists
 
@@ -90,9 +90,7 @@ On the pressed word at `(surahId, ayah, wordPosition)`:
    want to continue beyond the bundled data:
    - QAC's segment-by-segment grammar page for the exact `(surah:ayah:word)`.
    - QAC's Quran dictionary for the exact root (using QAC's Buckwalter query).
-   - Lane's classical Arabic–English lexicon entry for the root, with a reminder
-     that historical dictionary entries are broad and context still determines
-     the intended sense.
+   - Lane's classical Arabic–English lexicon entry for the root.
    - The full ayah on Quran.com for translations, recitation, and tafsir.
 
 The viewer does not fetch these pages or depend on them to open. Links are

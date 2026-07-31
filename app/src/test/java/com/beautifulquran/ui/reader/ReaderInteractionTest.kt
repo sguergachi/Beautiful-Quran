@@ -13,6 +13,14 @@ class ReaderInteractionTest {
 
     private val idle = ReaderInteractionState()
 
+    private data class ReflowCase(
+        val changed: Boolean,
+        val ownsPlayback: Boolean,
+        val playingAyah: Int?,
+        val playingTall: Boolean,
+        val expected: LayoutReflowRecovery?,
+    )
+
     @Test
     fun `hand scroll disables follow`() {
         val next = ReaderInteraction.reduce(idle, ReaderInteractionEvent.UserMovedPage)
@@ -38,6 +46,33 @@ class ReaderInteractionTest {
         )
         assertEquals(3, next.pendingJumpAyah)
         assertFalse(next.followEnabled)
+    }
+
+    @Test
+    fun `opening different bookmark in paused playlist selects it without playing`() {
+        val selected = ReaderInteraction.initialState(
+            requestedAyah = 8,
+            isThisSurahPlaying = true,
+            isPlaying = false,
+            playbackAyah = 2,
+        )
+        assertEquals(8, selected.pendingJumpAyah)
+        assertFalse(selected.followEnabled)
+
+        val sameAyah = ReaderInteraction.initialState(2, true, false, 2)
+        assertEquals(idle, sameAyah)
+        assertEquals(idle, ReaderInteraction.initialState(8, true, true, 2))
+        assertEquals(idle, ReaderInteraction.initialState(8, false, false, 2))
+        assertEquals(
+            idle,
+            ReaderInteraction.initialState(
+                requestedAyah = 8,
+                isThisSurahPlaying = true,
+                isPlaying = false,
+                playbackAyah = 2,
+                playbackRequested = true,
+            ),
+        )
     }
 
     @Test
@@ -234,6 +269,59 @@ class ReaderInteractionTest {
     }
 
     @Test
+    fun `playback recovery restores word directly when playing ayah is visibly tall`() {
+        assertTrue(
+            ReaderInteraction.shouldRestoreWordBeforeVerseHome(
+                verseHomeRequested = true,
+                playingAyahHasLiveTallGeometry = true,
+            ),
+        )
+        assertFalse(
+            ReaderInteraction.shouldRestoreWordBeforeVerseHome(
+                verseHomeRequested = false,
+                playingAyahHasLiveTallGeometry = true,
+            ),
+        )
+        // Wholly offscreen and normal-height playing ayahs still need verse focus.
+        assertFalse(
+            ReaderInteraction.shouldRestoreWordBeforeVerseHome(
+                verseHomeRequested = true,
+                playingAyahHasLiveTallGeometry = false,
+            ),
+        )
+    }
+
+    @Test
+    fun `display reflow recovery follows the latest focus owner`() {
+        listOf(
+            ReflowCase(false, true, 12, true, null),
+            ReflowCase(true, false, 12, true, LayoutReflowRecovery(4, false)),
+            ReflowCase(true, true, null, true, LayoutReflowRecovery(4, false)),
+            ReflowCase(true, true, 12, false, LayoutReflowRecovery(12, false)),
+            ReflowCase(true, true, 12, true, LayoutReflowRecovery(12, true)),
+            ReflowCase(true, true, 0, false, LayoutReflowRecovery(0, false)),
+        ).forEach { case ->
+            assertEquals(
+                case.expected,
+                ReaderInteraction.layoutReflowRecovery(
+                    layoutChanged = case.changed,
+                    playbackOwnsFocus = case.ownsPlayback,
+                    playingAyah = case.playingAyah,
+                    stickyAyah = 4,
+                    playingAyahHasLiveTallGeometry = case.playingTall,
+                ),
+            )
+        }
+    }
+
+    @Test
+    fun `layout sticky ayah ignores other surah playback and basmalah`() {
+        assertEquals(12, ReaderInteraction.layoutStickyAyah(true, 12, 4))
+        assertEquals(4, ReaderInteraction.layoutStickyAyah(false, 12, 4))
+        assertEquals(4, ReaderInteraction.layoutStickyAyah(true, 0, 4))
+    }
+
+    @Test
     fun `word-play seed skips verse home so tall-ayah bottom taps stay put`() {
         // Screen sets lastHomed = tapped ayah and followWasEnabled = true before
         // EnableFollow so justEnabled is false and the same target does not re-home.
@@ -244,7 +332,7 @@ class ReaderInteractionTest {
                 lastHomedTarget = 141,
             ),
         )
-        // Return-to-verse still homes when follow was off (justEnabled).
+        // Normal/offscreen return still homes once visible-tall restore does not apply.
         assertTrue(
             ReaderInteraction.shouldHomeOntoPlaybackTarget(
                 target = 141,
@@ -255,33 +343,46 @@ class ReaderInteractionTest {
     }
 
     @Test
-    fun `shouldKeepWordInView requires actual play not debounced chrome`() {
+    fun `word follow requires actual play but resume may restore held word once`() {
         // End of last ayah: isPlaying false while chrome may still be recessed.
         assertFalse(
             ReaderInteraction.shouldKeepWordInView(
-                followEnabled = true,
-                labFocusEnabled = true,
+                followPlayback = true,
                 isPlaying = false,
-                annotating = false,
                 hasActiveWord = true,
             ),
         )
         assertTrue(
             ReaderInteraction.shouldKeepWordInView(
-                followEnabled = true,
-                labFocusEnabled = true,
+                followPlayback = true,
                 isPlaying = true,
-                annotating = false,
                 hasActiveWord = true,
+            ),
+        )
+        assertTrue(
+            ReaderInteraction.shouldKeepWordInView(
+                followPlayback = true,
+                isPlaying = false,
+                hasActiveWord = true,
+                restoreRequested = true,
+            ),
+        )
+        // A pending jump, note, hand scroll, or Ink Lab freeze makes the
+        // arbiter's followPlayback false; resume restoration must still yield.
+        assertFalse(
+            ReaderInteraction.shouldKeepWordInView(
+                followPlayback = false,
+                isPlaying = true,
+                hasActiveWord = true,
+                restoreRequested = true,
             ),
         )
         assertFalse(
             ReaderInteraction.shouldKeepWordInView(
-                followEnabled = true,
-                labFocusEnabled = true,
+                followPlayback = true,
                 isPlaying = true,
-                annotating = false,
                 hasActiveWord = false,
+                restoreRequested = true,
             ),
         )
     }

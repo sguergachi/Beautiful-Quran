@@ -1,0 +1,22 @@
+{
+  "id": "boundary-alafasy-2-235",
+  "label": "Alafasy 2:235 Lab boundaries after phrase-loop cleanup",
+  "refs": ["GitHub issue #598"],
+  "pipeline": "boundary_repair",
+  "input_segments": [
+    [21, 22385, 23195],
+    [22, 23195, 23875],
+    [23, 26165, 26975],
+    [24, 26975, 27905]
+  ],
+  "repair_segments": [
+    [22, 23195, 23966],
+    [23, 26200, 26975]
+  ],
+  "expected_segments": [
+    [21, 22385, 23195],
+    [22, 23195, 23966],
+    [23, 26200, 26975],
+    [24, 26975, 27905]
+  ]
+}

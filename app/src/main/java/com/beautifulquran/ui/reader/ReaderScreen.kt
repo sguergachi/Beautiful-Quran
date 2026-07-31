@@ -27,6 +27,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.ime
@@ -37,6 +39,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.statusBarsIgnoringVisibility
@@ -106,6 +110,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -122,8 +129,25 @@ import com.beautifulquran.ui.theme.absorbPointerEvents
 import com.beautifulquran.ui.theme.contrastingOverlayColorScheme
 import com.beautifulquran.ui.theme.verticalFadingEdges
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlin.math.abs
+
+/** Paused highlight polling is 250 ms; leave one scheduling beat for a fresh sample. */
+private const val HELD_WORD_REFRESH_MS = 300L
+
+/** One-shot request to reveal a held word after opening or foreground resume. */
+private data class WordFocusRequest(
+    val generation: Int,
+    val ayah: Int,
+    val wordPosition: Int,
+    val activation: Long,
+) {
+    fun matches(word: ActiveWord?): Boolean =
+        word?.ayah == ayah &&
+            word.wordPosition == wordPosition &&
+            word.activation == activation
+}
 
 /** Flying next-chapter opening while it slides from footer → header slot. */
 private data class FlyingChapterHeader(
@@ -164,6 +188,8 @@ private sealed interface LazyItem {
 fun ReaderScreen(
     surahId: Int,
     startAyah: Int?,
+    /** True when [startAyah] came from an autoplay intent, not a bare focus selection. */
+    startPlaybackRequested: Boolean = false,
     /** 1-based word from a home word-search hit — triggers the orange flash. */
     startWordPosition: Int? = null,
     viewModel: ReaderViewModel,
@@ -282,7 +308,18 @@ fun ReaderScreen(
     }
     val sheen = remember { derivedStateOf { sheenAnim.value } }
     // Follow / jump / annotation precedence — pure rules in ReaderInteraction.
-    var interaction by remember { mutableStateOf(ReaderInteractionState()) }
+    var didInitialScroll by rememberSaveable { mutableStateOf(false) }
+    var interaction by remember {
+        mutableStateOf(
+            ReaderInteraction.initialState(
+                requestedAyah = startAyah.takeUnless { didInitialScroll },
+                isThisSurahPlaying = playerState.nowPlaying?.surahId == surahId,
+                isPlaying = playerState.isPlaying,
+                playbackAyah = playerState.nowPlaying?.ayah,
+                playbackRequested = startPlaybackRequested,
+            ),
+        )
+    }
     fun dispatch(event: ReaderInteractionEvent) {
         interaction = ReaderInteraction.reduce(interaction, event)
     }
@@ -489,21 +526,42 @@ fun ReaderScreen(
         lastAyahNumber = lastAyahNumber,
         bottomGuardPx = wordBandBottomGuardPx,
     )
+    var initialFocusSettled by remember { mutableStateOf(false) }
+    var restoreFocusGeneration by remember { mutableIntStateOf(1) }
+    var wordFocusRequest by remember { mutableStateOf<WordFocusRequest?>(null) }
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        // Composition can attach before Activity.onResume (cold open) or while
+        // already resumed (opening the reader from another sheet). Generation 1
+        // owns that initial restore; only later foreground resumes need a new one.
+        var currentResumeSeen =
+            lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                if (currentResumeSeen) restoreFocusGeneration++ else currentResumeSeen = true
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
     var listCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
     val scope = rememberCoroutineScope()
     val onKeepWordInView: (() -> Pair<Float, Float>?) -> Unit = remember(
         focusController,
         wordBandBottomMarginPx,
+        wordFocusRequest,
     ) {
+        val request = wordFocusRequest
         { measure ->
             scope.launch {
-                focusController.keepWordInView(
+                val measured = focusController.keepWordInView(
                     // Bottom-only: lift words clear of the play-bar fold; do not
                     // pull short verses down from their reading-line anchor.
                     bandTopMarginPx = 0f,
                     bandBottomMarginPx = wordBandBottomMarginPx,
                     measureInViewport = measure,
                 )
+                if (measured && wordFocusRequest == request) wordFocusRequest = null
             }
         }
     }
@@ -545,15 +603,12 @@ fun ReaderScreen(
         label = "topBarAlpha",
     )
 
-    val notifPermission = rememberPlaybackPermissionState()
     val onInkOverlayVisibilityChangeLatest = rememberUpdatedState(onInkOverlayVisibilityChange)
     // Union of reader-owned ink surfaces. Report open *and* still-rendered so
     // MainActivity keeps stackGesturesBlocked through the close wash (same
     // pattern as ShareHost + shareSendRendered).
-    LaunchedEffect(notifPermission.sheetVisible, showRepeatDialog, repeatRendered) {
-        onInkOverlayVisibilityChangeLatest.value(
-            notifPermission.sheetVisible || showRepeatDialog || repeatRendered,
-        )
+    LaunchedEffect(showRepeatDialog, repeatRendered) {
+        onInkOverlayVisibilityChangeLatest.value(showRepeatDialog || repeatRendered)
     }
     DisposableEffect(Unit) {
         onDispose { onInkOverlayVisibilityChangeLatest.value(false) }
@@ -561,11 +616,6 @@ fun ReaderScreen(
     // System Back must dismiss the bleed, not pop the paper stack beneath it
     // (MainActivity's stack BackHandlers fire otherwise — see overlay backs there).
     BackHandler(enabled = showRepeatDialog) { showRepeatDialog = false }
-
-    // The permission prompt is not a dialog — it is an ink bleed that turns
-    // this very sheet into the question. See PlaybackNotificationSheet and the
-    // "ink bleed" section of docs/DESIGN.md. Rendered as a full-screen overlay
-    // over the Scaffold below.
 
     // Reading by hand pauses the follow mode via pointerInput.
 
@@ -594,10 +644,10 @@ fun ReaderScreen(
 
     LaunchedEffect(requestedJumpAyah) {
         val content = uiState.content ?: return@LaunchedEffect
-        val target = requestedJumpAyah
+        val request = requestedJumpAyah
             .takeIf { it > 0 }
-            ?.coerceIn(1, content.surah.ayahCount)
             ?: return@LaunchedEffect
+        val target = request.coerceIn(1, content.surah.ayahCount)
         // Do NOT clear pendingJump before focus() finishes: this effect is
         // keyed on it, so settling early cancels the coroutine mid-slide and the
         // jump reads as a pop. Clear in finally once the approach has landed (or
@@ -609,7 +659,7 @@ fun ReaderScreen(
         try {
             focusController.focus(target, animate = true, preRoll = true)
         } finally {
-            dispatch(ReaderInteractionEvent.JumpSettled(target))
+            dispatch(ReaderInteractionEvent.JumpSettled(request))
         }
     }
 
@@ -676,6 +726,18 @@ fun ReaderScreen(
         val target = playbackFocusTarget ?: return@LaunchedEffect
         val justEnabled = !followWasEnabled
         followWasEnabled = true
+        if (ReaderInteraction.shouldRestoreWordBeforeVerseHome(
+                verseHomeRequested = justEnabled,
+                playingAyahHasLiveTallGeometry =
+                    listeningAyah?.let(focusController::exceedsViewport) == true,
+            )
+        ) {
+            // Play / return-follow inside a long ayah: the active word is the
+            // destination. Never glide backward to line one before going there.
+            lastFollowFocusTarget = target
+            restoreFocusGeneration++
+            return@LaunchedEffect
+        }
         // Same verse still following: word-band keep-in-view owns the camera.
         // Re-homing here fights mid-verse position after pause/play/FF/back.
         if (!ReaderInteraction.shouldHomeOntoPlaybackTarget(
@@ -715,15 +777,67 @@ fun ReaderScreen(
     }
 
     // Opening from "Continue listening": settle on the saved ayah once.
-    var didInitialScroll by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(uiState.content) {
-        val content = uiState.content ?: return@LaunchedEffect
-        if (!didInitialScroll) {
-            didInitialScroll = true
-            if (startAyah != null && startAyah in 1..content.ayahs.size) {
-                focusController.focus(startAyah, animate = false)
+        initialFocusSettled = false
+        val content = uiState.content
+        if (content != null) {
+            if (!didInitialScroll) {
+                didInitialScroll = true
+                // A different verse in this paused playlist was seeded into
+                // pendingJump above; that path both focuses it and moves the
+                // held media item without starting playback.
+                if (requestedJumpAyah == 0 &&
+                    startAyah != null && startAyah in 1..content.ayahs.size
+                ) {
+                    focusController.focus(startAyah, animate = false)
+                }
             }
+            initialFocusSettled = true
         }
+    }
+
+    // Verse focus alone is not enough for a paused long ayah: its adaptive
+    // anchor deliberately shows line one, while the held word may be many
+    // screens lower. On initial open, foreground resume, and display reflow,
+    // restore the exact active word once. Continuous tracking remains play-only
+    // so an ended playlist cannot snap from the final word back to word one.
+    LaunchedEffect(
+        restoreFocusGeneration,
+        initialFocusSettled,
+        uiState.content?.surah?.id,
+        isThisSurahPlaying,
+        followPlayback,
+    ) {
+        val content = uiState.content
+        if (!initialFocusSettled || content == null || !isThisSurahPlaying || !followPlayback) {
+            return@LaunchedEffect
+        }
+        val playlistAyah = playerState.nowPlaying?.ayah?.takeIf { it >= 1 }
+            ?: return@LaunchedEffect
+        // An explicit word-search open owns its requested orange hit on the
+        // first pass; a later app resume may restore playback normally.
+        if (restoreFocusGeneration == 1 && startWordPosition != null) return@LaunchedEffect
+        // The highlight StateFlow retains its last value while the lifecycle is
+        // stopped. If playback was paused from outside the app, wait through one
+        // 250 ms paused poll so a same-ayah stale word cannot win this restore.
+        if (!playerState.isPlaying) delay(HELD_WORD_REFRESH_MS)
+        val word = snapshotFlow { activeWordState.value }
+            .first { it?.ayah == playlistAyah }
+            ?: return@LaunchedEffect
+        if (word.ayah !in 1..content.surah.ayahCount) return@LaunchedEffect
+        // If the ayah is wholly offscreen, materialize it first. When a tall
+        // ayah is already attached, skip the top-anchor pass to avoid the old
+        // up/down stutter and let the word correction move directly.
+        if (!focusController.isLaidOut(word.ayah)) {
+            focusController.focus(word.ayah, animate = false)
+            withFrameNanos { }
+        }
+        wordFocusRequest = WordFocusRequest(
+            generation = restoreFocusGeneration,
+            ayah = word.ayah,
+            wordPosition = word.wordPosition,
+            activation = word.activation,
+        )
     }
 
     // Home word-search hit: orange repeat wash (wash in → dissolve × 2) on the
@@ -767,35 +881,48 @@ fun ReaderScreen(
     var lastLayoutSignature by remember { mutableStateOf(layoutSignature) }
     var stickyAyah by remember { mutableIntStateOf(1) }
     var layoutFocusSeeded by remember { mutableStateOf(false) }
+    val playbackOwnsReflow = followPlayback && isThisSurahPlaying
+    val latestListeningAyah = rememberUpdatedState(listeningAyah)
     SideEffect {
         if (layoutSignature == lastLayoutSignature) {
-            stickyAyah = when {
-                followPlayback &&
-                    playbackFocusTarget != null &&
-                    !FocusEngine.isChapterTopFocusTarget(playbackFocusTarget) -> playbackFocusTarget
-                else -> scrolledAyah.value
-            }.coerceIn(1, lastAyahNumber)
+            stickyAyah = ReaderInteraction.layoutStickyAyah(
+                playbackOwnsFocus = playbackOwnsReflow,
+                playingAyah = listeningAyah,
+                scrolledAyah = scrolledAyah.value,
+            ).coerceIn(1, lastAyahNumber)
         }
     }
-    LaunchedEffect(layoutSignature) {
+    LaunchedEffect(layoutSignature, playbackOwnsReflow) {
         if (!layoutFocusSeeded) {
             // First composition matches the initial settle above; don't fight it.
             layoutFocusSeeded = true
             lastLayoutSignature = layoutSignature
             return@LaunchedEffect
         }
-        val pin = when {
-            followPlayback &&
-                playbackFocusTarget != null -> playbackFocusTarget
-            else -> stickyAyah.coerceIn(1, lastAyahNumber)
-        }
+        // A playback-ownership change restarts an in-flight reflow recovery so
+        // its older manual-reading target cannot scroll after Play. If no
+        // layout change is pending, playback follow already owns the move.
         // Two frames + a short beat so sibling ayahs finish remasuring before
         // we glide against the final geometry (otherwise the home lands on a
         // height that is still shifting).
         withFrameNanos { }
         withFrameNanos { }
         delay(48)
-        focusController.focus(pin, animate = true, preRoll = false)
+        val playingAyah = latestListeningAyah.value
+        val recovery = ReaderInteraction.layoutReflowRecovery(
+            layoutChanged = layoutSignature != lastLayoutSignature,
+            playbackOwnsFocus = playbackOwnsReflow,
+            playingAyah = playingAyah,
+            stickyAyah = stickyAyah.coerceIn(1, lastAyahNumber),
+            playingAyahHasLiveTallGeometry =
+                playingAyah?.let(focusController::exceedsViewport) == true,
+        ) ?: return@LaunchedEffect
+        if (!recovery.restoreWordDirectly) {
+            focusController.focus(recovery.focusAyah, animate = true, preRoll = false)
+        }
+        // Tall playback ayahs go straight to their current word; other reflows
+        // restore it after the verse-level anchor settles.
+        restoreFocusGeneration++
         lastLayoutSignature = layoutSignature
     }
 
@@ -911,19 +1038,25 @@ fun ReaderScreen(
                     }
                 },
                 navigationIcon = {
-                    IconButton(
-                        onClick = { if (search.active) search.close() else onBack() },
-                        enabled = search.active || !recitingActive,
-                    ) {
-                        Icon(
-                            imageVector = if (search.active) {
-                                Icons.Rounded.Close
-                            } else {
-                                Icons.AutoMirrored.Rounded.ArrowBack
-                            },
-                            contentDescription = if (search.active) "Close search" else "Back",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
-                        )
+                    Row {
+                        IconButton(
+                            onClick = { if (search.active) search.close() else onBack() },
+                            enabled = search.active || !recitingActive,
+                        ) {
+                            Icon(
+                                imageVector = if (search.active) {
+                                    Icons.Rounded.Close
+                                } else {
+                                    Icons.AutoMirrored.Rounded.ArrowBack
+                                },
+                                contentDescription = if (search.active) "Close search" else "Back",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                    .copy(alpha = 0.55f),
+                            )
+                        }
+                        // Match the two trailing buttons so Material's title
+                        // slot stays on the physical centre line at narrow widths.
+                        if (!search.active) Spacer(Modifier.width(48.dp))
                     }
                 },
                 actions = {
@@ -977,6 +1110,9 @@ fun ReaderScreen(
                                 Icons.Rounded.Search,
                                 contentDescription = "Search in surah",
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
+                                modifier = Modifier
+                                    .offset(x = 4.dp)
+                                    .size(26.dp),
                             )
                         }
                         IconButton(
@@ -987,6 +1123,9 @@ fun ReaderScreen(
                                 Icons.Rounded.Tune,
                                 contentDescription = "Settings",
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
+                                modifier = Modifier
+                                    .offset(x = (-4).dp)
+                                    .size(26.dp),
                             )
                         }
                     }
@@ -1025,21 +1164,17 @@ fun ReaderScreen(
                             if (playerState.isPlaying) {
                                 viewModel.player.togglePlayPause()
                             } else {
-                                notifPermission.request {
-                                    dispatch(ReaderInteractionEvent.EnableFollow)
-                                    if (requestedJumpAyah > 0) {
-                                        val selectedAyah = selectedPlaybackAyah()
-                                        viewModel.playLoadedFromAyah(selectedAyah)
-                                    } else {
-                                        viewModel.player.togglePlayPause()
-                                    }
+                                dispatch(ReaderInteractionEvent.EnableFollow)
+                                if (requestedJumpAyah > 0) {
+                                    val selectedAyah = selectedPlaybackAyah()
+                                    viewModel.playLoadedFromAyah(selectedAyah)
+                                } else {
+                                    viewModel.player.togglePlayPause()
                                 }
                             }
                         } else {
-                            notifPermission.request {
-                                dispatch(ReaderInteractionEvent.EnableFollow)
-                                viewModel.playFromAyah(selectedPlaybackAyah())
-                            }
+                            dispatch(ReaderInteractionEvent.EnableFollow)
+                            viewModel.playFromAyah(selectedPlaybackAyah())
                         }
                     },
                     onFastBackward = viewModel::fastBackward,
@@ -1807,10 +1942,8 @@ fun ReaderScreen(
                                     dimmed = recitingActive && activeBasmalah != true,
                                     washProgress = viewModel.basmalahWashProgress,
                                     onClick = {
-                                        notifPermission.request {
-                                            dispatch(ReaderInteractionEvent.EnableFollow)
-                                            viewModel.playFromAyah(1)
-                                        }
+                                        dispatch(ReaderInteractionEvent.EnableFollow)
+                                        viewModel.playFromAyah(1)
                                     },
                                 )
                             }
@@ -1842,6 +1975,7 @@ fun ReaderScreen(
                             val bookmarkFocused by remember(ayah.number) {
                                 derivedStateOf { scrolledAyah.value == ayah.number }
                             }
+                            val bookmarked = ayah.number in bookmarkedAyahs
                             Box(
                                 Modifier.graphicsLayer {
                                     translationY = verseRevealY
@@ -1875,17 +2009,17 @@ fun ReaderScreen(
                                 // toward the item start while chrome is still
                                 // recessed — word-follow would scroll back up.
                                 keepActiveWordInView = ReaderInteraction.shouldKeepWordInView(
-                                    followEnabled = followEnabled,
-                                    labFocusEnabled = labFocusEnabled,
+                                    followPlayback = followPlayback,
                                     isPlaying = playingNow,
-                                    annotating = editingAnnotationAyah != 0,
                                     hasActiveWord = activeWord != null,
+                                    restoreRequested =
+                                        wordFocusRequest?.matches(activeWord) == true,
                                 ),
                                 listCoordinates = { listCoordinates },
                                 onKeepWordInView = onKeepWordInView,
                                 onKeepAnnotationInView = onKeepAnnotationInView,
                                 bookmarkSide = bookmarkSide,
-                                bookmarked = ayah.number in bookmarkedAyahs,
+                                bookmarked = bookmarked,
                                 bookmarkFocused = bookmarkFocused,
                                 bookmarkChromeAlpha = bookmarkChromeAlpha,
                                 // Gather mode and open note editors both own taps /
@@ -1912,20 +2046,18 @@ fun ReaderScreen(
                                         if (editingAnnotationAyah != 0) return@wordClick
                                         val segment = viewModel.segmentsFor(ayah.number)
                                             ?.firstOrNull { it.position == word.position }
-                                        notifPermission.request {
-                                            // Mid-verse word play must not verse-home: for tall
-                                            // ayahs that pins the top, un-lays-out the bottom
-                                            // line the reader tapped, and word-band follow cannot
-                                            // measure it — so the page jumps up. Seed follow as
-                                            // already on this ayah so shouldHomeOnto skips.
-                                            lastFollowFocusTarget = ayah.number
-                                            followWasEnabled = true
-                                            dispatch(ReaderInteractionEvent.EnableFollow)
-                                            if (segment != null) {
-                                                viewModel.playFromWord(ayah.number, segment.startMs)
-                                            } else {
-                                                viewModel.playFromAyah(ayah.number)
-                                            }
+                                        // Mid-verse word play must not verse-home: for tall
+                                        // ayahs that pins the top, un-lays-out the bottom
+                                        // line the reader tapped, and word-band follow cannot
+                                        // measure it — so the page jumps up. Seed follow as
+                                        // already on this ayah so shouldHomeOnto skips.
+                                        lastFollowFocusTarget = ayah.number
+                                        followWasEnabled = true
+                                        dispatch(ReaderInteractionEvent.EnableFollow)
+                                        if (segment != null) {
+                                            viewModel.playFromWord(ayah.number, segment.startMs)
+                                        } else {
+                                            viewModel.playFromAyah(ayah.number)
                                         }
                                     }
                                 },
@@ -1934,10 +2066,8 @@ fun ReaderScreen(
                                 } else {
                                     ayahClick@{
                                         if (editingAnnotationAyah != 0) return@ayahClick
-                                        notifPermission.request {
-                                            dispatch(ReaderInteractionEvent.EnableFollow)
-                                            viewModel.playFromAyah(ayah.number)
-                                        }
+                                        dispatch(ReaderInteractionEvent.EnableFollow)
+                                        viewModel.playFromAyah(ayah.number)
                                     }
                                 },
                                 onWordLongClick = if (gathering) {
@@ -1953,15 +2083,17 @@ fun ReaderScreen(
                                     }
                                 },
                                 // Switched off, annotations are simply not part
-                                // of the page: nothing renders and the ayah mark
-                                // goes back to being only a mark. Stored writing
-                                // is untouched and returns when it is switched on.
+                                // of the page. Notes are currently also bound to
+                                // saved ribbons, so unmarking hides (but does not
+                                // delete) the stored writing.
                                 annotationText = when {
-                                    gathering || !settings.annotationsEnabled -> null
+                                    gathering || !bookmarked ||
+                                        !settings.annotationsEnabled -> null
                                     editingAnnotationAyah == ayah.number -> editingAnnotationText
                                     else -> annotationsForSurah.value[ayah.number]
                                 },
                                 isEditingAnnotation = !gathering &&
+                                    bookmarked &&
                                     settings.annotationsEnabled &&
                                     editingAnnotationAyah == ayah.number,
                                 onAnnotationChange = { editingAnnotationText = it },
@@ -1972,7 +2104,9 @@ fun ReaderScreen(
                                 onAnnotationEditDone = {
                                     if (editingAnnotationAyah == ayah.number) commitOpenAnnotation()
                                 },
-                                onAyahMarkLongClick = if (gathering || !settings.annotationsEnabled) {
+                                onEditAnnotation = if (
+                                    gathering || !bookmarked || !settings.annotationsEnabled
+                                ) {
                                     null
                                 } else {
                                     {
@@ -2183,25 +2317,10 @@ fun ReaderScreen(
             )
         }
 
-        // The notification-permission prompt: ink bleeds across this sheet and
-        // it becomes the question. Answering runs the bleed in reverse, back
-        // into the pressed button (the sheet owns that exit), then hands off —
-        // so the callbacks fire only once the paper has receded.
-        if (notifPermission.sheetVisible) {
-            PlaybackNotificationSheet(
-                colors = contrastingOverlayColorScheme(settings.themeMode),
-                modifier = Modifier.zIndex(2f),
-                onDismiss = notifPermission::dismiss,
-                onAllow = notifPermission::allow,
-            )
-        }
-
         // The repeat question is an ink bleed on this sheet, not a dialog: the
         // shared InkRevealOverlay soaks the reader paper from the player bar's
         // repeat control, exactly as the Root Word Viewer opens. It must live
-        // inside this Box so the bleed has the sheet to spread across, and below
-        // the notification prompt's zIndex — choosing a range can raise that
-        // prompt next.
+        // inside this Box so the bleed has the sheet to spread across.
         val repeatContent = uiState.content
         val repeatOverlayColors = contrastingOverlayColorScheme(settings.themeMode)
         val repeatStartAyah = repeatContent?.let {
@@ -2238,10 +2357,8 @@ fun ReaderScreen(
                             onDismiss = { showRepeatDialog = false },
                             onRepeatMode = viewModel::setRepeatMode,
                             onRepeatRange = { from, to ->
-                                notifPermission.request {
-                                    dispatch(ReaderInteractionEvent.EnableFollow)
-                                    viewModel.setRepeatRange(from, to)
-                                }
+                                dispatch(ReaderInteractionEvent.EnableFollow)
+                                viewModel.setRepeatRange(from, to)
                             },
                             onChoiceApplied = { retainedRepeatChoice = it },
                         )

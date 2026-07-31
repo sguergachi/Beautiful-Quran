@@ -1,5 +1,7 @@
 package com.beautifulquran.ui.reader
 
+import com.beautifulquran.data.model.Segment
+import com.beautifulquran.domain.BasmalahWash
 import com.beautifulquran.ui.reader.InkEngine.State
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -89,17 +91,150 @@ class InkEngineTest {
 
     @Test
     fun `pending sweep entry masks the completed animatable before reset`() {
+        // Arm always masks — including re-Arm with the same activation keys.
+        assertEquals(
+            0f,
+            displayedSweepProgress(
+                entryAction = SweepEntryAction.Arm,
+                applied = true,
+                progress = 1f,
+            ),
+            0f,
+        )
+        // Keep before the reset effect applied still masks the idle 1f.
+        assertEquals(
+            0f,
+            displayedSweepProgress(
+                entryAction = SweepEntryAction.Keep,
+                applied = false,
+                progress = 1f,
+            ),
+            0f,
+        )
+        // Live wash after apply.
+        assertEquals(
+            0.4f,
+            displayedSweepProgress(
+                entryAction = SweepEntryAction.Keep,
+                applied = true,
+                progress = 0.4f,
+            ),
+            0f,
+        )
+        // Recited residual / clear never mask.
+        assertEquals(
+            1f,
+            displayedSweepProgress(
+                entryAction = SweepEntryAction.Clear,
+                applied = true,
+                progress = 1f,
+            ),
+            0f,
+        )
+        // Legacy bool overload.
         assertEquals(0f, displayedSweepProgress(entryPending = true, progress = 1f), 0f)
         assertEquals(0.4f, displayedSweepProgress(entryPending = false, progress = 0.4f), 0f)
     }
 
     @Test
-    fun `wasl handoff continues from the completed prefix edge`() {
-        val prefix = 1f / 7f
-        val feather = 1.6f
-        val start = waslContinuationStart(prefix, feather)
+    fun `re-arm after recited with same activation still masks full ink`() {
+        // Same (active=true, activation=N) keys as the first pass — the old
+        // remember() MutableState stayed false and flashed full → unread.
+        val reentry = sweepEntryAction(
+            wasActive = false,
+            previousActivation = 1L,
+            active = true,
+            activation = 1L,
+            hasSweep = true,
+        )
+        assertEquals(SweepEntryAction.Arm, reentry)
+        assertEquals(
+            0f,
+            displayedSweepProgress(reentry, applied = true, progress = 1f),
+            0f,
+        )
+    }
 
-        assertEquals(2f * prefix / (1f + feather), start, 1e-4f)
+    @Test
+    fun `residual only rewinds an idle full-ink animatable not a mid-wash`() {
+        // Unapplied arm still sitting at the idle ceiling → start residual at 0.
+        assertEquals(0f, residualSweepAnchor(applied = false, currentProgress = 1f), 0f)
+        // Wash already advanced: never snap back to unread (prior-word flash).
+        assertEquals(0.35f, residualSweepAnchor(applied = false, currentProgress = 0.35f), 0f)
+        assertEquals(0.9f, residualSweepAnchor(applied = false, currentProgress = 0.9f), 0f)
+        // Applied residual always continues from the live value.
+        assertEquals(1f, residualSweepAnchor(applied = true, currentProgress = 1f), 0f)
+        assertEquals(0.5f, residualSweepAnchor(applied = true, currentProgress = 0.5f), 0f)
+    }
+
+    @Test
+    fun `reveal start stays latched through Active to Recited residual`() {
+        val waslEdge = 0.22f
+        assertEquals(
+            waslEdge,
+            effectiveRevealStart(
+                active = true,
+                finishResidual = false,
+                revealStart = waslEdge,
+                latchedRevealStart = 0f,
+            ),
+            0f,
+        )
+        // Handoff: caller passes 0 for non-active words; residual keeps the edge.
+        assertEquals(
+            waslEdge,
+            effectiveRevealStart(
+                active = false,
+                finishResidual = true,
+                revealStart = 0f,
+                latchedRevealStart = waslEdge,
+            ),
+            0f,
+        )
+        // Seek / recess clears the edge.
+        assertEquals(
+            0f,
+            effectiveRevealStart(
+                active = false,
+                finishResidual = false,
+                revealStart = 0f,
+                latchedRevealStart = waslEdge,
+            ),
+            0f,
+        )
+    }
+
+    @Test
+    fun `latched reveal start prevents wasl prefix unread flash on residual`() {
+        val start = 0.2f
+        // Mid residual raw progress after handoff — without the latch this
+        // would display as 0.1 (rewound); with it the edge holds continuity.
+        assertEquals(
+            continuedSweepProgress(progress = 0.1f, start = start),
+            continuedSweepProgress(
+                progress = 0.1f,
+                start = effectiveRevealStart(
+                    active = false,
+                    finishResidual = true,
+                    revealStart = 0f,
+                    latchedRevealStart = start,
+                ),
+            ),
+            0f,
+        )
+        assertTrue(
+            continuedSweepProgress(progress = 0.1f, start = start) >
+                continuedSweepProgress(progress = 0.1f, start = 0f),
+        )
+    }
+
+    @Test
+    fun `wasl handoff continues from a supplied prefix edge`() {
+        val prefix = 1f / 7f
+        val mainFeather = 1.6f
+        val start = waslContinuationStart(prefix, mainFeather)
+
+        assertEquals(waslHeadTravel(prefix) / (1f + mainFeather), start, 1e-4f)
         assertEquals(start, continuedSweepProgress(progress = 0f, start = start), 0f)
         assertEquals(
             start + 0.5f * (1f - start),
@@ -107,6 +242,32 @@ class InkEngineTest {
             0f,
         )
         assertEquals(1f, continuedSweepProgress(progress = 1f, start = start), 0f)
+    }
+
+    @Test
+    fun `wasl wash maps the freed tail onto a short main-wash segment`() {
+        val prefix = 1f / 7f
+        val mainFeather = 1.6f
+        val end = waslContinuationStart(prefix, mainFeather)
+        // Window 0→1 only advances the main wash to the handoff edge — not a
+        // full 0→1 wipe — so the soft edge has time to breathe.
+        assertTrue(end < 0.35f)
+        assertEquals(0f, waslWashProgress(windowProgress = 0f, endProgress = end), 0f)
+        assertEquals(end * 0.5f, waslWashProgress(windowProgress = 0.5f, endProgress = end), 1e-4f)
+        assertEquals(end, waslWashProgress(windowProgress = 1f, endProgress = end), 0f)
+        // Head travel is one glyph plus a soft lead under main geometry.
+        assertTrue(waslHeadTravel(prefix) > prefix)
+        assertEquals(0.5f + 0.55f, waslHeadTravel(0.5f), 0f)
+    }
+
+    @Test
+    fun `unfinished wasl bloom keeps the same edge across handoff`() {
+        val fullEnd = waslContinuationStart(prefixFraction = 0.25f, mainFeather = 1.6f)
+        val partialWindow = 0.35f
+        val carried = waslWashProgress(partialWindow, fullEnd)
+
+        assertTrue(carried in 0f..fullEnd)
+        assertEquals(carried, continuedSweepProgress(progress = 0f, start = carried), 0f)
     }
 
     @Test
@@ -137,7 +298,53 @@ class InkEngineTest {
     }
 
     @Test
-    fun `calligraphy wash follows the lead-in playback clock`() {
+    fun `calligraphy wash prefers the lead-in word timings`() {
+        // Alafasy's 001001.mp3: nothing before the voice at 60 ms, settled as
+        // the closing madd ends at 5870 — not at a fraction of the file.
+        val segments = listOf(
+            Segment(1, 60, 610),
+            Segment(2, 610, 1439),
+            Segment(3, 1439, 2532),
+            Segment(4, 2532, 5870),
+        )
+        assertEquals(
+            0f,
+            InkEngine.prefaceWashProgress(positionMs = 40, durationMs = 7000, segments = segments),
+            1e-4f,
+        )
+        // Mid-closer: inside ٱلرَّحِيمِ's band of the artwork, not near the
+        // middle of the file (which the ramp would give at 3 s of 7 s).
+        val closer = InkEngine.prefaceWashProgress(
+            positionMs = 3000,
+            durationMs = 7000,
+            segments = segments,
+        )
+        assertTrue(closer >= BasmalahWash.WORD_END_PROGRESS[2])
+        assertTrue(closer < 1f)
+        // The closing word settles with the clip, not with its own mark: late
+        // ink is better than ink that finishes mid-madd.
+        assertTrue(
+            InkEngine.prefaceWashProgress(positionMs = 5870, durationMs = 6031, segments = segments) < 1f,
+        )
+        assertEquals(
+            1f,
+            InkEngine.prefaceWashProgress(positionMs = 6031, durationMs = 6031, segments = segments),
+            1e-4f,
+        )
+        // Unmappable timings fall back to the clip ramp.
+        assertEquals(
+            InkEngine.prefaceRampProgress(positionMs = 3000, durationMs = 7000),
+            InkEngine.prefaceWashProgress(
+                positionMs = 3000,
+                durationMs = 7000,
+                segments = segments.dropLast(1),
+            ),
+            1e-4f,
+        )
+    }
+
+    @Test
+    fun `calligraphy wash falls back to the lead-in playback clock`() {
         assertEquals(0f, InkEngine.prefaceWashProgress(positionMs = 0, durationMs = 5000), 1e-4f)
         assertEquals(0f, InkEngine.prefaceWashProgress(positionMs = 100, durationMs = 0), 1e-4f)
         val settleAt = (5000 * InkEngine.PREFACE_WASH_SETTLE_FRACTION).toLong()
@@ -252,11 +459,11 @@ class InkEngineTest {
 
     @Test
     fun `sweep clamps to the tuned floor and ceiling`() {
-        val tuning = InkEngine.tuning
+        val floor = InkEngine.minSweepFloorMs()
         assertEquals(
-            tuning.minSweepMs,
+            floor,
             InkEngine.sweepMs(
-                active(1, durationMs = tuning.minSweepMs.toLong()),
+                active(1, durationMs = floor.toLong()),
                 playbackSpeed = 1f,
             ),
         )
@@ -265,7 +472,7 @@ class InkEngineTest {
             InkEngine.sweepMs(active(1, durationMs = 500), playbackSpeed = 1f),
         )
         assertEquals(
-            tuning.maxSweepMs,
+            InkEngine.tuning.maxSweepMs,
             InkEngine.sweepMs(active(1, durationMs = 60_000), playbackSpeed = 1f),
         )
     }
@@ -274,12 +481,36 @@ class InkEngineTest {
     fun `short hold is scaled up to the min sweep floor`() {
         // Short holds (and first-word timing with almost no remaining Active
         // time) still get a visible wash. Renderers finish residual progress
-        // after handoff instead of snapping to full ink.
-        val floor = InkEngine.tuning.minSweepMs
+        // after handoff instead of snapping to full ink. Floor includes the
+        // highlight lead so early-started short words breathe longer.
+        val floor = InkEngine.minSweepFloorMs()
         assertEquals(floor, InkEngine.sweepMs(active(1, durationMs = 80), playbackSpeed = 1f))
         assertEquals(floor, InkEngine.sweepMs(active(1, durationMs = 80), playbackSpeed = 2f))
         assertEquals(floor, InkEngine.sweepMs(active(1, durationMs = 10), playbackSpeed = 1f))
         assertEquals(floor, InkEngine.sweepMs(active(1, durationMs = 0), playbackSpeed = 1f))
+    }
+
+    @Test
+    fun `highlight lead raises the short-hold sweep floor`() {
+        val savedLead = InkEngine.highlightLeadMs
+        try {
+            InkEngine.highlightLeadMs = 0
+            assertEquals(
+                InkEngine.tuning.minSweepMs,
+                InkEngine.minSweepFloorMs(),
+            )
+            InkEngine.highlightLeadMs = 114
+            assertEquals(
+                InkEngine.tuning.minSweepMs + 114,
+                InkEngine.minSweepFloorMs(),
+            )
+            assertEquals(
+                InkEngine.minSweepFloorMs(),
+                InkEngine.sweepMs(active(1, durationMs = 80), playbackSpeed = 1f),
+            )
+        } finally {
+            InkEngine.highlightLeadMs = savedLead
+        }
     }
 
     @Test
@@ -303,7 +534,7 @@ class InkEngineTest {
     }
 
     @Test
-    fun `same-word repeat reveals with an unchanged activation generation`() {
+    fun `same-word repeat masks retained clock until reveal begins`() {
         val action = repeatWashAction(
             wasRepeat = false,
             previousActivation = 4L,
@@ -323,6 +554,8 @@ class InkEngineTest {
 
     @Test
     fun `repeat wash holds on chain advance and restarts on seek`() {
+        // Active handoff drops activation to 0 — must be Hold so the residual
+        // 0→1 wash is not cancelled/restarted (sequential finish law).
         assertEquals(
             RepeatWashAction.Hold,
             repeatWashAction(
@@ -341,6 +574,26 @@ class InkEngineTest {
                 activation = 5L,
             ),
         )
+    }
+
+    @Test
+    fun `leaving the chain releases after a completed hold`() {
+        assertEquals(
+            RepeatWashAction.Release,
+            repeatWashAction(
+                wasRepeat = true,
+                previousActivation = 0L,
+                repeat = false,
+                activation = 0L,
+            ),
+        )
+    }
+
+    @Test
+    fun `repeat wash follows long dwell but keeps a soft minimum`() {
+        assertEquals(450, repeatWashDurationMs(activeSweepMs = null, minimumMs = 450))
+        assertEquals(450, repeatWashDurationMs(activeSweepMs = 140, minimumMs = 450))
+        assertEquals(1_800, repeatWashDurationMs(activeSweepMs = 1_800, minimumMs = 450))
     }
 
     @Test

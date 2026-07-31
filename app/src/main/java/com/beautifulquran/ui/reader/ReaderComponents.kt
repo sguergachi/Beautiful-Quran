@@ -16,6 +16,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -48,10 +49,14 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.staticCompositionLocalOf
+
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
@@ -234,7 +239,14 @@ private const val AYAH_MARK_SIZE_RATIO = 20f / 30f
 private data class RepeatWash(
     val progress: State<Float>,
     val alpha: State<Float>,
+    val feather: State<Float?>,
 )
+
+/**
+ * Per-ayah gate so orange chain washes run **one word at a time**, in
+ * **word-position order**. Plain FIFO mutexes can invert on same-frame entry.
+ */
+internal val LocalRepeatWashGate = staticCompositionLocalOf<OrderedWashGate?> { null }
 
 internal enum class RepeatWashAction { Hold, Reveal, Release }
 
@@ -255,61 +267,155 @@ private class RepeatWashLifecycle(
     var activation: Long = 0L,
 )
 
+internal fun repeatWashDurationMs(activeSweepMs: Int?, minimumMs: Int): Int =
+    maxOf(activeSweepMs ?: 0, minimumMs)
+
+/**
+ * Orange wash for one word in a repeat chain.
+ *
+ * **Sequential residual finish (law):**
+ * - [InkEngine.Tuning.repeatSweepMs] is the minimum duration, so short words
+ *   still get a full soft edge while longer words follow the reciter's dwell.
+ * - Tajweed-paced entries map that clock through the same captured curve and
+ *   feather as first-pass ink.
+ * - A shared per-ayah [OrderedWashGate] runs members **one after another by
+ *   word position**; N+1 cannot start until N's 0→1 completes.
+ * - [snapshotFlow] + collect (not `LaunchedEffect(activation)`) so Active
+ *   advancing (activation → 0) **does not cancel** an in-flight wash. The
+ *   feather always runs out; Hold is a no-op after completion.
+ * - Never snap incomplete → full. Release finishes any residual progress by
+ *   animating the remainder, then dissolves alpha.
+ */
 @Composable
 private fun rememberRepeatWash(
     repeat: Boolean,
-    sweepMs: Int?,
+    /** 1-based word position — orders the per-ayah gate. */
+    position: Int,
+    /** Active word dwell; null for queued members revealed by a seek. */
+    activeSweepMs: Int? = null,
+    /** Tajweed curve for the active repeated word. */
+    pacing: TajweedPacing.Curve? = null,
     /** Bumps on seek for the active word so replaying it re-runs orange too. */
     activation: Long = 0L,
 ): RepeatWash {
-    val progress = remember { Animatable(if (repeat) 0f else 1f) }
+    val clock = remember { Animatable(if (repeat) 0f else 1f) }
     val alpha = remember { Animatable(if (repeat) 1f else 0f) }
+    val lockedPacing = remember { mutableStateOf<TajweedPacing.Curve?>(null) }
+    val lockedFeather = remember { mutableStateOf<Float?>(null) }
+    val lockedDurationMs = remember { mutableIntStateOf(InkEngine.tuning.repeatSweepMs) }
     val lifecycle = remember { RepeatWashLifecycle() }
-    val action = repeatWashAction(
-        wasRepeat = lifecycle.repeat,
-        previousActivation = lifecycle.activation,
+    val displayLifecycle = remember { RepeatWashLifecycle() }
+    val entryAction = repeatWashAction(
+        wasRepeat = displayLifecycle.repeat,
+        previousActivation = displayLifecycle.activation,
         repeat = repeat,
         activation = activation,
     )
-    // A completed repeat clock survives between entries. Pin its displayed
-    // value to zero now, before the reveal coroutine can expose one full frame.
-    val entryPending = remember(repeat, activation) {
-        mutableStateOf(action == RepeatWashAction.Reveal)
-    }
+    val entryPending = remember { mutableStateOf(false) }
     SideEffect {
-        lifecycle.repeat = repeat
-        lifecycle.activation = activation
-    }
-    LaunchedEffect(repeat, activation) {
-        when (action) {
-            RepeatWashAction.Reveal -> {
-                // Chain entry always reveals, including a same-word repeat
-                // whose already-non-zero activation generation is unchanged.
-                // A new non-zero generation also replays an active repeat.
-                progress.snapTo(0f)
-                alpha.snapTo(1f)
-                entryPending.value = false
-                progress.animateTo(
-                    1f,
-                    tween(sweepMs ?: InkEngine.tuning.repeatSweepMs, easing = InkEngine.sweepEasing),
-                )
-            }
-            RepeatWashAction.Release -> {
-                progress.snapTo(1f)
-                alpha.animateTo(
-                    0f,
-                    tween(InkEngine.tuning.repeatFadeOutMs, easing = InkEngine.sweepEasing),
-                )
-            }
-            // Active moving to the next word drops this word's activation to
-            // zero; hold its completed orange instead of restarting the wash.
+        when (entryAction) {
+            RepeatWashAction.Reveal -> entryPending.value = true
+            RepeatWashAction.Release -> entryPending.value = false
             RepeatWashAction.Hold -> Unit
         }
+        displayLifecycle.repeat = repeat
+        displayLifecycle.activation = activation
     }
-    val displayedProgress = remember(entryPending) {
-        derivedStateOf { displayedSweepProgress(entryPending.value, progress.value) }
+    val sharedGate = LocalRepeatWashGate.current
+    val localGate = remember { OrderedWashGate() }
+    val gate = sharedGate ?: localGate
+    // Local gate needs a pump when no ayah-level provider is present.
+    if (sharedGate == null) {
+        LaunchedEffect(localGate) { localGate.pump() }
     }
-    return RepeatWash(progress = displayedProgress, alpha = alpha.asState())
+    val repeatState = rememberUpdatedState(repeat)
+    val activationState = rememberUpdatedState(activation)
+    val activeSweepState = rememberUpdatedState(activeSweepMs)
+    val pacingState = rememberUpdatedState(pacing)
+    LaunchedEffect(Unit) {
+        snapshotFlow { repeatState.value to activationState.value }.collect { (rep, act) ->
+            val action = repeatWashAction(
+                wasRepeat = lifecycle.repeat,
+                previousActivation = lifecycle.activation,
+                repeat = rep,
+                activation = act,
+            )
+            lifecycle.repeat = rep
+            lifecycle.activation = act
+            when (action) {
+                RepeatWashAction.Reveal -> {
+                    // Capture at chain entry: this word can stop being Active
+                    // while it waits behind an earlier member in the gate.
+                    val entryPacing = pacingState.value
+                    val sweepMs = repeatWashDurationMs(
+                        activeSweepMs = activeSweepState.value,
+                        minimumMs = InkEngine.tuning.repeatSweepMs,
+                    )
+                    val easing =
+                        if (entryPacing != null) LinearEasing else InkEngine.sweepEasing
+                    gate.run(position) {
+                        // Dropped from the chain while queued — skip start.
+                        if (!repeatState.value) return@run
+                        lockedDurationMs.intValue = sweepMs
+                        lockedPacing.value = entryPacing
+                        lockedFeather.value =
+                            if (entryPacing != null) InkEngine.pacedFeather() else null
+                        clock.snapTo(0f)
+                        entryPending.value = false
+                        alpha.snapTo(1f)
+                        clock.animateTo(1f, tween(sweepMs, easing = easing))
+                    }
+                }
+                RepeatWashAction.Release -> {
+                    // Residual under the gate (no overlap with next reveal);
+                    // alpha dissolve is outside so chain clear doesn't serialize
+                    // N× fadeMs on the ordered queue.
+                    if (clock.value < 1f && alpha.value > 0f) {
+                        gate.run(position) {
+                            if (clock.value < 1f) {
+                                val remain =
+                                    ((1f - clock.value) * lockedDurationMs.intValue)
+                                        .toInt()
+                                        .coerceAtLeast(1)
+                                val easing = if (lockedPacing.value != null) {
+                                    LinearEasing
+                                } else {
+                                    InkEngine.sweepEasing
+                                }
+                                clock.animateTo(1f, tween(remain, easing = easing))
+                            }
+                        }
+                    }
+                    if (alpha.value > 0f) {
+                        alpha.animateTo(
+                            0f,
+                            tween(
+                                InkEngine.tuning.repeatFadeOutMs,
+                                easing = InkEngine.sweepEasing,
+                            ),
+                        )
+                    }
+                    lockedPacing.value = null
+                    lockedFeather.value = null
+                }
+                RepeatWashAction.Hold -> Unit
+            }
+        }
+    }
+    val progress = remember {
+        derivedStateOf {
+            val mapped = lockedPacing.value?.at(clock.value) ?: clock.value
+            displayedSweepProgress(
+                entryPending = repeatState.value && entryPending.value,
+                progress = mapped,
+            )
+        }
+    }
+    return RepeatWash(
+        progress = progress,
+        alpha = alpha.asState(),
+        feather = lockedFeather,
+    )
 }
 
 /**
@@ -322,6 +428,7 @@ private fun rememberRepeatWash(
 private fun rememberSearchHitWash(active: Boolean): RepeatWash {
     val progress = remember { Animatable(1f) }
     val alpha = remember { Animatable(0f) }
+    val feather = remember { mutableStateOf<Float?>(null) }
     LaunchedEffect(active) {
         if (!active) {
             progress.snapTo(1f)
@@ -337,7 +444,11 @@ private fun rememberSearchHitWash(active: Boolean): RepeatWash {
             alpha.animateTo(0f, tween(fadeMs, easing = InkEngine.sweepEasing))
         }
     }
-    return RepeatWash(progress = progress.asState(), alpha = alpha.asState())
+    return RepeatWash(
+        progress = progress.asState(),
+        alpha = alpha.asState(),
+        feather = feather,
+    )
 }
 
 /**
@@ -401,7 +512,7 @@ private fun Modifier.repeatInkLayer(
             progress = { wash.progress.value },
             rtl = rtl,
             restingAlpha = 0f,
-            feather = InkEngine.tuning.washFeather,
+            feather = wash.feather.value ?: InkEngine.tuning.washFeather,
         )
 
 /**
@@ -428,6 +539,32 @@ internal fun sweepEntryAction(
     else -> SweepEntryAction.Keep
 }
 
+/**
+ * Policy for the entry mask (tests / docs). Runtime uses MutableState
+ * `applied`: SideEffect sets false on every [SweepEntryAction.Arm]; 
+ * LaunchedEffect sets true after `snapTo(0)` so the draw-phase wash runs
+ * without a parent recompose (`activeWord` only publishes once per word).
+ *
+ * A composition-only Boolean captured in `derivedStateOf` stayed true for the
+ * whole Active span and killed every word after the first. A
+ * `remember(active, activation)` flag that only initialized once stayed false
+ * on re-Arm and flashed full ink.
+ *
+ * - [SweepEntryAction.Arm]: always mask to 0 this frame
+ * - [SweepEntryAction.Keep] while not yet [applied]: effect has not reset yet
+ * - otherwise: live progress
+ */
+internal fun displayedSweepProgress(
+    entryAction: SweepEntryAction,
+    applied: Boolean,
+    progress: Float,
+): Float = when {
+    entryAction == SweepEntryAction.Arm -> 0f
+    entryAction == SweepEntryAction.Keep && !applied -> 0f
+    else -> progress
+}
+
+/** @deprecated Use the entryAction overload — kept for intermediate call sites. */
 internal fun displayedSweepProgress(entryPending: Boolean, progress: Float): Float =
     if (entryPending) 0f else progress
 
@@ -437,11 +574,56 @@ internal fun continuedSweepProgress(progress: Float, start: Float): Float {
 }
 
 /**
- * Matches the completed prefix wash's leading-edge position in the main wash.
- * The prefix travels one [prefixFraction] with an equally wide feather.
+ * Where a residual wash should resume when Active ends before its entry
+ * effect applied.
+ *
+ * The idle [Animatable] sits at 1f. An unapplied arm that never ran would
+ * otherwise expose that full-ink stale value — so we only rewind to 0 when
+ * progress is still at that idle ceiling. A wash that already advanced must
+ * never snap back to unread: that is the prior-word ink flash on handoff.
+ */
+internal fun residualSweepAnchor(applied: Boolean, currentProgress: Float): Float {
+    if (applied) return currentProgress
+    return if (currentProgress >= 1f - 1e-4f) 0f else currentProgress
+}
+
+/**
+ * Reveal start to feed [continuedSweepProgress] for one word this frame.
+ * While Active the caller's wasl handoff edge wins; on Recited residual the
+ * latched edge is kept so handoff cannot drop the prefix back to unread.
+ */
+internal fun effectiveRevealStart(
+    active: Boolean,
+    finishResidual: Boolean,
+    revealStart: Float,
+    latchedRevealStart: Float,
+): Float = when {
+    active -> revealStart.coerceIn(0f, 1f)
+    finishResidual -> latchedRevealStart.coerceIn(0f, 1f)
+    else -> 0f
+}
+
+/**
+ * Soft head travel (word-widths) for a completed wasl bloom: one opening
+ * glyph plus a modest lead so the letter is clearly entering ink. Used only
+ * to place the main-wash progress handoff — the drawn edge is the main
+ * feather, not this lead.
+ */
+internal fun waslHeadTravel(prefixFraction: Float): Float =
+    prefixFraction + (prefixFraction + 0.25f).coerceAtMost(0.55f)
+
+/**
+ * Main-wash progress already laid down during the prior word's wasl tail.
+ * Wasl is the first segment of the ordinary ink wash (same feather, full-word
+ * geometry): window time 0→1 maps onto progress 0→this value, so the soft
+ * edge breathes at the main wash rate instead of racing a one-glyph wipe.
  */
 internal fun waslContinuationStart(prefixFraction: Float, mainFeather: Float): Float =
-    (2f * prefixFraction / (1f + mainFeather)).coerceIn(0f, 1f)
+    (waslHeadTravel(prefixFraction) / (1f + mainFeather)).coerceIn(0f, 1f)
+
+/** Window progress (0→1 over the freed tail) → main-wash progress. */
+internal fun waslWashProgress(windowProgress: Float, endProgress: Float): Float =
+    windowProgress.coerceIn(0f, 1f) * endProgress.coerceIn(0f, 1f)
 
 private class SweepEntryLifecycle(
     var active: Boolean = false,
@@ -450,12 +632,14 @@ private class SweepEntryLifecycle(
     var durationMs: Int = 1,
     var pacing: TajweedPacing.Curve? = null,
     var feather: Float? = null,
+    /** Wasl handoff edge latched at Active entry for residual after handoff. */
+    var revealStart: Float = 0f,
 )
 
 /**
  * Drives the letter-fade sweep for the active word: restarts at 0 each time
  * the word lights up and runs for [sweepMs] — usually the karaoke hold, but
- * floored at [InkEngine.Tuning.minSweepMs] so short words still breathe.
+ * floored at [InkEngine.minSweepFloorMs] so short words still breathe.
  *
  * [activation] bumps on a genuine seek so replaying the *same* Active word
  * (tap it again) restarts the wash; mid-word retunes of [sweepMs] alone must
@@ -465,7 +649,9 @@ private class SweepEntryLifecycle(
  * first-word timing with almost no remaining Active time, or a min-sweep floor
  * past handoff), the residual wash **completes** instead of snapping to full
  * ink. Renderers keep the letter mask on while progress < 1 so short words
- * still show the soft directional edge.
+ * still show the soft directional edge. The wasl [revealStart] is latched for
+ * that residual so handoff cannot drop the already-bloomed prefix back to
+ * unread for a frame.
  *
  * Leaving Active for **Upcoming/Plain** (seek, recess) abandons the residual
  * immediately — finishing toward full ink then dimming back would flash.
@@ -488,6 +674,8 @@ private fun rememberLetterSweep(
     sweepMs: Int?,
     pacing: TajweedPacing.Curve? = null,
     activation: Long = 0L,
+    /** Main-wash progress already laid by a wasl prefix on this word. */
+    revealStart: Float = 0f,
 ): LetterSweep {
     // Survives Active → Recited so a short hold can finish its wash after
     // handoff instead of recreating at progress 1 (the old hard snap).
@@ -510,18 +698,36 @@ private fun rememberLetterSweep(
     // coming to clear it. So compute now, commit in the SideEffect below.
     val armDurationMs = sweepMs ?: 1
     val armFeather = if (pacing != null) InkEngine.pacedFeather() else null
-    // The display mask, by contrast, *must* be resolved during composition —
-    // that is the whole point: the draw phase reads it before any effect runs.
-    // A `remember` calculation is the sanctioned place to do that.
-    val entryPending = remember(active, activation) {
-        mutableStateOf(entryAction == SweepEntryAction.Arm)
-    }
+    val armRevealStart = revealStart.coerceIn(0f, 1f)
+    // Composition-time edge so draw sees wasl continuity before SideEffect.
+    // Residual reads the latched value from the last Active frame.
+    val displayRevealStart = effectiveRevealStart(
+        active = active,
+        finishResidual = finishResidual,
+        revealStart = armRevealStart,
+        latchedRevealStart = lifecycle.revealStart,
+    )
+    // Snapshot mask: activeWord only recomposes once per word, so the wash
+    // must unmask via MutableState (draw-phase) — never a composition Boolean
+    // captured in derivedStateOf (that stayed true for the whole Active span
+    // and killed every word after the first, which often got an extra
+    // recompose from player/ayah startup). SideEffect remasks on Arm;
+    // LaunchedEffect unmasks after snapTo(0).
+    val applied = remember { mutableStateOf(true) }
+    val revealStartState = rememberUpdatedState(displayRevealStart)
     SideEffect {
         if (entryAction == SweepEntryAction.Arm) {
+            applied.value = false
             lifecycle.applied = false
             lifecycle.durationMs = armDurationMs
             lifecycle.pacing = pacing
             lifecycle.feather = armFeather
+            lifecycle.revealStart = armRevealStart
+        } else if (active) {
+            // Keep path: track live wasl edge without re-arming the wash.
+            lifecycle.revealStart = armRevealStart
+        } else if (!finishResidual) {
+            lifecycle.revealStart = 0f
         }
         // Last, so the Arm test above still sees the previous entry.
         lifecycle.active = active
@@ -541,21 +747,28 @@ private fun rememberLetterSweep(
             lockedFeather.value = armFeather
             sweep.snapTo(0f)
             lifecycle.applied = true
-            entryPending.value = false
+            // Unmask after idle full-ink is gone — invalidates draw without
+            // waiting for the next word's parent recompose.
+            applied.value = true
             val easing = if (pacing != null) LinearEasing else InkEngine.sweepEasing
             sweep.animateTo(1f, tween(sweepMs, easing = easing))
         } else if (finishResidual) {
             // A residual belongs to an *earlier* frame's entry, so here the
             // tracker is the only source — see the SideEffect above.
-            // If Active ended before its reset coroutine ran, begin the
-            // residual at zero instead of exposing the stale completed value.
+            // If Active ended before its reset coroutine ran, only rewind from
+            // the idle full-ink ceiling — never from a mid-wash progress.
             if (!lifecycle.applied) {
                 lockedMs.value = lifecycle.durationMs
                 lockedPacing.value = lifecycle.pacing
                 lockedFeather.value = lifecycle.feather
-                sweep.snapTo(0f)
+                val anchor = residualSweepAnchor(
+                    applied = false,
+                    currentProgress = sweep.value,
+                )
+                if (anchor != sweep.value) sweep.snapTo(anchor)
                 lifecycle.applied = true
             }
+            applied.value = true
             val total = lockedMs.value.coerceAtLeast(1)
             if (sweep.value < 1f) {
                 val remain = ((1f - sweep.value) * total).toInt().coerceAtLeast(1)
@@ -575,31 +788,45 @@ private fun rememberLetterSweep(
             // Upcoming / Plain / idle: abandon residual so dim ink applies now.
             if (sweep.value < 1f) sweep.snapTo(1f)
             lifecycle.applied = true
+            lifecycle.revealStart = 0f
+            applied.value = true
             lockedPacing.value = null
             lockedFeather.value = null
         }
     }
-    val progress = remember(entryPending) {
+    val progress = remember {
         derivedStateOf {
             val mapped = lockedPacing.value?.at(sweep.value) ?: sweep.value
-            displayedSweepProgress(entryPending.value, mapped)
+            val raw = if (!applied.value) 0f else mapped
+            continuedSweepProgress(raw, revealStartState.value)
         }
     }
     return remember(progress) { LetterSweep(progress = progress, feather = lockedFeather) }
 }
 
 /**
- * A one-glyph continuation wash. [fraction] deliberately bounds both its
- * travel and feather so the following letter stays at upcoming ink.
+ * Wasl bloom on the next word during this word's connected tail.
+ * [windowProgress] is 0→1 over the freed tail; [endProgress] is the
+ * main-wash progress that maps onto (see [waslWashProgress]). [feather] is
+ * the ordinary ink edge so the handoff is a faded continuation, not a wipe.
  */
 private data class WaslPrefix(
-    val fraction: Float,
-    val progress: State<Float>,
-)
+    val windowProgress: State<Float>,
+    val endProgress: Float,
+    val feather: Float,
+) {
+    fun displayProgress(): Float = waslWashProgress(windowProgress.value, endProgress)
+}
 
 private class ActiveWordEntry(
     var index: Int,
     var activation: Long,
+    var outgoingHandoff: Float = 0f,
+)
+
+private data class WaslProgress(
+    val value: State<Float>,
+    val atHandoff: Float,
 )
 
 /** Blooms the next opening letter over the connected tail of this word. */
@@ -609,10 +836,28 @@ private fun rememberWaslProgress(
     sweepMs: Int?,
     identity: Int?,
     activation: Long,
-): State<Float> {
+): WaslProgress {
     val clock = remember(identity, activation) { Animatable(0f) }
     val entryConnection = remember(identity, activation) { connection }
     val entryMs = remember(identity, activation) { sweepMs }
+    // Capture at Active entry so a mid-word retune cannot jump the edge; the
+    // next wasl handoff picks up new lab values.
+    val waslPrefixMs = InkEngine.tuning.waslPrefixMs
+    val waslHandoff = InkEngine.tuning.waslHandoff
+    val entryPrefixStart = remember(identity, activation, waslPrefixMs) {
+        entryMs?.let {
+            TajweedPacing.waslPrefixStart(it, waslPrefixMs.toFloat())
+        } ?: 1f
+    }
+    val entryCompletion = remember(identity, activation, waslPrefixMs, waslHandoff) {
+        entryMs?.let {
+            TajweedPacing.waslPrefixCompletion(
+                sweepMs = it,
+                minPrefixMs = waslPrefixMs.toFloat(),
+                maxCompletion = waslHandoff,
+            )
+        } ?: 0f
+    }
     LaunchedEffect(identity, activation) {
         if (entryConnection == null || entryMs == null) {
             clock.snapTo(0f)
@@ -621,8 +866,16 @@ private fun rememberWaslProgress(
             clock.animateTo(1f, tween(entryMs, easing = LinearEasing))
         }
     }
+    val progress = remember(identity, activation) {
+        derivedStateOf {
+            entryConnection?.at(clock.value, entryPrefixStart, entryCompletion) ?: 0f
+        }
+    }
     return remember(identity, activation) {
-        derivedStateOf { entryConnection?.at(clock.value) ?: 0f }
+        WaslProgress(
+            value = progress,
+            atHandoff = entryConnection?.at(1f, entryPrefixStart, entryCompletion) ?: 0f,
+        )
     }
 }
 
@@ -663,7 +916,14 @@ private fun Modifier.shapedActiveWordInView(
     onKeepWordInView: OnKeepWordInView?,
 ): Modifier {
     var textCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
-    LaunchedEffect(keepInView, activeIndex, layoutResult, wordRanges, textCoordinates) {
+    LaunchedEffect(
+        keepInView,
+        activeIndex,
+        layoutResult,
+        wordRanges,
+        textCoordinates,
+        onKeepWordInView,
+    ) {
         if (!keepInView || activeIndex < 0 || onKeepWordInView == null) return@LaunchedEffect
         // Snapshot the index/layout the effect was launched for; measure is
         // re-invoked inside the focus lock after any competing scroll settles.
@@ -698,15 +958,13 @@ private class WordHighlight(
     private val repeat: Boolean,
     private val lyricInk: State<Float>,
     private val sweep: LetterSweep,
-    private val revealStart: Float,
     val repeatWash: RepeatWash,
     private val glintAlpha: State<Float>,
     val glintIsRepeat: Boolean,
     private val glintReplacedByRepeat: Boolean,
 ) {
+    /** Already continued through wasl revealStart inside [rememberLetterSweep]. */
     private val sweepProgress: Float get() = sweep.progress.value
-    private val continuedProgress: Float
-        get() = continuedSweepProgress(sweepProgress, revealStart)
     private val washFeather: Float
         get() = sweep.feather.value ?: InkEngine.tuning.washFeather
 
@@ -724,7 +982,7 @@ private class WordHighlight(
                 if (isActive || sweepProgress < 1f) 1f else lyricInk.value
             }
             .letterFadeIn(
-                progress = { continuedProgress },
+                progress = { sweepProgress },
                 rtl = rtl,
                 restingAlpha = InkEngine.State.Upcoming.inkAlpha(),
                 feather = washFeather,
@@ -759,7 +1017,7 @@ private class WordHighlight(
             }
             .letterFadeIn(
                 progress = {
-                    if (glintIsRepeat) repeatWash.progress.value else continuedProgress
+                    if (glintIsRepeat) repeatWash.progress.value else sweepProgress
                 },
                 rtl = rtl,
                 restingAlpha = 0f,
@@ -769,7 +1027,7 @@ private class WordHighlight(
     /** Tight glyph halo: forms with the word and recedes with [glintAlpha]. */
     fun glintHaloLayer(): Modifier = Modifier.drawWithContent {
         val progress =
-            if (glintIsRepeat) repeatWash.progress.value else continuedProgress
+            if (glintIsRepeat) repeatWash.progress.value else sweepProgress
         val alpha = glintAlpha.value * inkSmootherstep(progress) *
             glintCarryAlpha(glintReplacedByRepeat, repeatWash.progress.value)
         if (alpha <= 0f) return@drawWithContent
@@ -797,6 +1055,8 @@ private class WordHighlight(
 @Composable
 private fun rememberWordHighlight(
     ink: InkEngine.Word,
+    /** 1-based word position for ordered orange chain washes. */
+    position: Int,
     sweepMs: Int?,
     pacing: TajweedPacing.Curve? = null,
     revealStart: Float = 0f,
@@ -819,11 +1079,15 @@ private fun rememberWordHighlight(
             sweepMs = sweepMs,
             pacing = entryPacing,
             activation = activation,
+            revealStart = revealStart,
         ),
-        revealStart = revealStart,
         repeatWash = rememberRepeatWash(
             repeat = ink.repeat,
-            sweepMs = sweepMs.takeIf { isActive },
+            position = position,
+            activeSweepMs = sweepMs.takeIf { isActive },
+            pacing = entryPacing,
+            // Only the active word carries a non-zero seek generation so a
+            // mid-chain handoff (activation → 0) is Hold, not a re-Reveal.
             activation = if (isActive) activation else 0L,
         ),
         glintAlpha = rememberGlintAlpha(glinting),
@@ -848,7 +1112,7 @@ private fun Modifier.wordUnitBehavior(
     onLongClick: (() -> Unit)? = null,
 ): Modifier {
     var wordCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
-    LaunchedEffect(active, keepInView, wordCoordinates) {
+    LaunchedEffect(active, keepInView, wordCoordinates, onKeepWordInView) {
         if (!active || !keepInView || onKeepWordInView == null) return@LaunchedEffect
         onKeepWordInView {
             val wordCoords = wordCoordinates?.takeIf { it.isAttached } ?: return@onKeepWordInView null
@@ -953,11 +1217,10 @@ private fun HighlightLayeredText(
                 style = style,
                 color = color,
                 modifier = Modifier.letterFadeIn(
-                    progress = { waslPrefix.progress.value },
+                    progress = { waslPrefix.displayProgress() },
                     rtl = rtl,
                     restingAlpha = 0f,
-                    feather = waslPrefix.fraction,
-                    revealFraction = waslPrefix.fraction,
+                    feather = waslPrefix.feather,
                 ),
             )
         }
@@ -1012,6 +1275,7 @@ private fun WordUnit(
 ) {
     val highlight = rememberWordHighlight(
         ink = ink,
+        position = word.position,
         sweepMs = sweepMs,
         pacing = pacing,
         revealStart = revealStart,
@@ -1104,7 +1368,12 @@ fun ConnectedArabicWordUnit(
     onLongClick: (() -> Unit)? = null,
     activation: Long = 0L,
 ) {
-    val highlight = rememberWordHighlight(ink, sweepMs, activation = activation)
+    val highlight = rememberWordHighlight(
+        ink = ink,
+        position = word.position,
+        sweepMs = sweepMs,
+        activation = activation,
+    )
     HighlightLayeredText(
         text = word.arabic,
         highlight = highlight,
@@ -1152,13 +1421,15 @@ private fun rememberWordInkPalette(): WordInkPalette {
 
 /** One letter sweep per word, running for Active and finishing residual on
  * Recited. Progress/feather must be read in the draw phase only — never while
- * building the annotated string — so the sweep does not reshape every frame. */
+ * building the annotated string — so the sweep does not reshape every frame.
+ * [activeRevealStart] is the wasl handoff edge for the active word only. */
 @Composable
 private fun rememberLetterSweeps(
     inks: List<InkEngine.Word>,
     activeSweepMs: Int?,
     pacing: TajweedPacing.Curve? = null,
     activation: Long = 0L,
+    activeRevealStart: Float = 0f,
 ): List<LetterSweep> = inks.map { ink ->
     val active = ink.state == InkEngine.State.Active
     rememberLetterSweep(
@@ -1167,22 +1438,37 @@ private fun rememberLetterSweeps(
         sweepMs = activeSweepMs.takeIf { active },
         pacing = if (active) pacing else null,
         activation = if (active) activation else 0L,
+        // Only the lit word receives the wasl edge; residual keeps it latched.
+        revealStart = if (active) activeRevealStart else 0f,
     )
 }
 
-/** Orange wash per word in the repeat chain — same timing as gloss mode. */
+/**
+ * Orange washes for a shaped/English line — **same** [rememberRepeatWash] +
+ * [LocalRepeatWashGate] path as gloss [WordUnit]. One law, one implementation
+ * (no second hand-rolled sequencer that serialized N× fadeMs on release).
+ */
 @Composable
 private fun rememberRepeatWashes(
     inks: List<InkEngine.Word>,
-    activeSweepMs: Int?,
+    positions: List<Int>,
+    activeSweepMs: Int? = null,
+    pacing: TajweedPacing.Curve? = null,
     activation: Long = 0L,
-): List<RepeatWash> = inks.map { ink ->
-    val active = ink.state == InkEngine.State.Active
-    rememberRepeatWash(
-        repeat = ink.repeat,
-        sweepMs = activeSweepMs.takeIf { active },
-        activation = if (active) activation else 0L,
-    )
+): List<RepeatWash> {
+    require(inks.size == positions.size) {
+        "inks (${inks.size}) and positions (${positions.size}) must align"
+    }
+    return inks.mapIndexed { index, ink ->
+        val active = ink.state == InkEngine.State.Active
+        rememberRepeatWash(
+            repeat = ink.repeat,
+            position = positions[index],
+            activeSweepMs = activeSweepMs.takeIf { active },
+            pacing = pacing.takeIf { active },
+            activation = if (active) activation else 0L,
+        )
+    }
 }
 
 private data class Glint(
@@ -1228,14 +1514,18 @@ private fun ResponsiveEnglishAyah(
     onAyahClick: () -> Unit,
     onWordClick: ((Word) -> Unit)?,
     onWordLongClick: ((Word) -> Unit)?,
-    /** Hold the trailing ﴿N﴾ mark to write this verse's note. */
-    onMarkLongClick: (() -> Unit)? = null,
 ) {
     val palette = rememberWordInkPalette()
     val gold = LocalQuranAccents.current.gold
     val glintInk = LocalQuranAccents.current.glintInk
     val sweeps = rememberLetterSweeps(inks, activeSweepMs, activation = activation)
-    val repeatWashes = rememberRepeatWashes(inks, activeSweepMs, activation)
+    val wordPositions = remember(ayah) { ayah.words.map { it.position } }
+    val repeatWashes = rememberRepeatWashes(
+        inks = inks,
+        positions = wordPositions,
+        activeSweepMs = activeSweepMs,
+        activation = activation,
+    )
     val glints = rememberGlints(inks)
     val searchHitWash = rememberSearchHitWash(flashWordPosition != null)
     val activeIndex = inks.indexOfFirst { it.state == InkEngine.State.Active }
@@ -1353,6 +1643,7 @@ private fun ResponsiveEnglishAyah(
                             color = palette.repeatInkColor,
                             restingAlpha = 0f,
                             layerAlpha = wash.alpha.value,
+                            feather = wash.feather.value,
                             colorAlpha = InkEngine.tuning.repeatInkAlpha,
                         )
                     }
@@ -1382,7 +1673,11 @@ private fun ResponsiveEnglishAyah(
                                 } else InkEngine.tuning.glintTintAlpha,
                                 glowAlpha = InkEngine.tuning.glintGlowAlpha,
                                 glowRadius = InkEngine.tuning.glintGlowRadius,
-                                feather = if (glint.repeat) null else sweeps[index].feather.value,
+                                feather = if (glint.repeat) {
+                                    repeatWashes[index].feather.value
+                                } else {
+                                    sweeps[index].feather.value
+                                },
                             )
                         }
                     }
@@ -1415,8 +1710,7 @@ private fun ResponsiveEnglishAyah(
                         onWordClick = onWordClick,
                         onWordLongClick = onWordLongClick,
                         onMiss = onAyahClick,
-                        markRange = rendered.markRange,
-                        onMarkLongClick = onMarkLongClick,
+                        inertLongPressRange = rendered.markRange,
                     )
                 },
             ),
@@ -1427,11 +1721,8 @@ private fun ResponsiveEnglishAyah(
 /**
  * Resolves taps on an annotated ayah line to the word whose glyph bounds
  * (inflated by [hitSlopPx]) contain the tap; taps that miss every word go to
- * [onMiss] (null = ignored).
- *
- * A long-press is checked against the trailing ﴿N﴾ [markRange] *first*: the mark
- * is the verse's own identity on the page, so holding it opens the verse note
- * rather than a word's lexicon (docs/NOTES.md).
+ * [onMiss] (null = ignored). [inertLongPressRange] prevents the trailing ayah
+ * mark from borrowing the nearby final word's hold action.
  */
 private fun Modifier.wordTapTarget(
     words: List<Word>,
@@ -1441,23 +1732,18 @@ private fun Modifier.wordTapTarget(
     onWordClick: (Word) -> Unit,
     onWordLongClick: ((Word) -> Unit)? = null,
     onMiss: (() -> Unit)? = null,
-    markRange: IntRange = IntRange.EMPTY,
-    onMarkLongClick: (() -> Unit)? = null,
-): Modifier = pointerInput(ranges, words, layoutResult, onWordLongClick, onMarkLongClick) {
+    inertLongPressRange: IntRange = IntRange.EMPTY,
+): Modifier = pointerInput(ranges, words, layoutResult, onWordLongClick, inertLongPressRange) {
     detectTapGestures(
         onTap = { tap ->
             val wordIndex = layoutResult?.wordIndexAt(tap, ranges, hitSlopPx) ?: -1
             if (wordIndex >= 0) onWordClick(words[wordIndex]) else onMiss?.invoke()
         },
-        onLongPress = if (onWordLongClick == null && onMarkLongClick == null) {
+        onLongPress = if (onWordLongClick == null) {
             null
         } else {
             { pos ->
-                val onMark = onMarkLongClick != null &&
-                    layoutResult?.rangeContains(pos, markRange, hitSlopPx) == true
-                if (onMark) {
-                    onMarkLongClick!!()
-                } else if (onWordLongClick != null) {
+                if (layoutResult?.rangeContains(pos, inertLongPressRange, hitSlopPx) != true) {
                     val wordIndex = layoutResult?.wordIndexAt(pos, ranges, hitSlopPx) ?: -1
                     if (wordIndex >= 0) onWordLongClick(words[wordIndex])
                 }
@@ -1492,8 +1778,6 @@ private fun ResponsiveHafsAyah(
     onAyahClick: () -> Unit,
     onWordClick: ((Word) -> Unit)?,
     onWordLongClick: ((Word) -> Unit)? = null,
-    /** Hold the trailing ﴿N﴾ mark to write this verse's note. */
-    onMarkLongClick: (() -> Unit)? = null,
 ) {
     val palette = rememberWordInkPalette()
     val ayahMarkInk = LocalQuranAccents.current.gold
@@ -1501,8 +1785,21 @@ private fun ResponsiveHafsAyah(
     // Lock tajweed for this activation (Hafs path shares one curve for the
     // active word) so an Ink Lab toggle mid-word cannot remount the wash.
     val entryPacing = remember(activation, activeSweepMs) { pacing }
-    val sweeps = rememberLetterSweeps(inks, activeSweepMs, entryPacing, activation)
-    val repeatWashes = rememberRepeatWashes(inks, activeSweepMs, activation)
+    val sweeps = rememberLetterSweeps(
+        inks = inks,
+        activeSweepMs = activeSweepMs,
+        pacing = entryPacing,
+        activation = activation,
+        activeRevealStart = activeRevealStart,
+    )
+    val wordPositions = remember(ayah) { ayah.words.map { it.position } }
+    val repeatWashes = rememberRepeatWashes(
+        inks = inks,
+        positions = wordPositions,
+        activeSweepMs = activeSweepMs,
+        pacing = entryPacing,
+        activation = activation,
+    )
     val glints = rememberGlints(inks)
     val searchHitWash = rememberSearchHitWash(flashWordPosition != null)
     val activeIndex = inks.indexOfFirst { it.state == InkEngine.State.Active }
@@ -1619,10 +1916,8 @@ private fun ResponsiveHafsAyah(
                     // word hands off without a flash.
                     sweeps.forEachIndexed { index, sweepState ->
                         if (inks[index].repeat) return@forEachIndexed
-                        val p = continuedSweepProgress(
-                            progress = sweepState.progress.value,
-                            start = activeRevealStart.takeIf { index == activeIndex } ?: 0f,
-                        )
+                        // Progress already includes latched wasl revealStart.
+                        val p = sweepState.progress.value
                         if (p >= 1f) return@forEachIndexed
                         val range = rendered.wordRanges.getOrNull(index)
                             ?: return@forEachIndexed
@@ -1637,17 +1932,17 @@ private fun ResponsiveHafsAyah(
                         )
                     }
                     waslPrefixes.forEachIndexed { index, prefix ->
-                        if (prefix == null || prefix.progress.value <= 0f) {
+                        val wash = prefix?.displayProgress() ?: 0f
+                        if (prefix == null || wash <= 0f) {
                             return@forEachIndexed
                         }
                         val range = rendered.wordRanges.getOrNull(index)
                             ?: return@forEachIndexed
                         blooms += ShapedWordBloom.ColorReveal(
                             range = range,
-                            progress = prefix.progress.value,
+                            progress = wash,
                             color = palette.fullInkColor,
-                            feather = prefix.fraction,
-                            revealFraction = prefix.fraction,
+                            feather = prefix.feather,
                         )
                     }
                     // Orange directional bloom: SrcIn-tint the shaped glyphs,
@@ -1663,6 +1958,7 @@ private fun ResponsiveHafsAyah(
                             color = palette.repeatInkColor,
                             restingAlpha = 0f,
                             layerAlpha = wash.alpha.value,
+                            feather = wash.feather.value,
                             colorAlpha = InkEngine.tuning.repeatInkAlpha,
                         )
                     }
@@ -1682,12 +1978,7 @@ private fun ResponsiveHafsAyah(
                                 progress = if (glint.repeat) {
                                     repeatWashes[index].progress.value
                                 } else {
-                                    continuedSweepProgress(
-                                        progress = sweeps[index].progress.value,
-                                        start = activeRevealStart.takeIf {
-                                            index == activeIndex
-                                        } ?: 0f,
-                                    )
+                                    sweeps[index].progress.value
                                 },
                                 color = if (glint.repeat) {
                                     palette.repeatInkColor
@@ -1700,7 +1991,7 @@ private fun ResponsiveHafsAyah(
                                 glowAlpha = InkEngine.tuning.glintGlowAlpha,
                                 glowRadius = InkEngine.tuning.glintGlowRadius,
                                 feather = if (glint.repeat) {
-                                    null
+                                    repeatWashes[index].feather.value
                                 } else {
                                     sweeps[index].feather.value
                                 },
@@ -1742,8 +2033,7 @@ private fun ResponsiveHafsAyah(
                         onWordClick = onWordClick,
                         onWordLongClick = onWordLongClick,
                         onMiss = onAyahClick,
-                        markRange = rendered.markRange,
-                        onMarkLongClick = onMarkLongClick,
+                        inertLongPressRange = rendered.markRange,
                     )
                 },
             ),
@@ -1790,7 +2080,6 @@ fun AyahNumberMark(
 private fun ArabicAyahNumberUnit(
     number: Int,
     fontScale: Float,
-    onLongClick: (() -> Unit)? = null,
 ) {
     val density = LocalDensity.current
     val arabicLineHeight = with(density) {
@@ -1799,14 +2088,7 @@ private fun ArabicAyahNumberUnit(
     Box(
         modifier = Modifier
             .padding(horizontal = 6.dp)
-            .requiredHeight(arabicLineHeight)
-            .then(
-                if (onLongClick != null) {
-                    Modifier.pointerInput(onLongClick) {
-                        detectTapGestures(onLongPress = { onLongClick() })
-                    }
-                } else Modifier,
-            ),
+            .requiredHeight(arabicLineHeight),
         contentAlignment = Alignment.Center,
     ) {
         AyahNumberMark(number, fontScale)
@@ -2138,9 +2420,8 @@ fun AyahBlock(
     onAnnotationChange: ((String) -> Unit)? = null,
     /** Called when the editor loses focus — caller should commit and clear edit state. */
     onAnnotationEditDone: (() -> Unit)? = null,
-    /** Opens the editor: long-press on the gold ayah mark, or a tap on a
-     * settled note to revise it. */
-    onAyahMarkLongClick: (() -> Unit)? = null,
+    /** Opens the editor from a saved ribbon hold or a settled note tap. */
+    onEditAnnotation: (() -> Unit)? = null,
     /** True while recitation is running: annotations leave the page entirely, the
      * same rule the ribbon and rail marks follow. */
     annotationsHidden: Boolean = false,
@@ -2193,7 +2474,6 @@ fun AyahBlock(
                     activeWord = aw,
                     isAyahFinal = word.position == ayah.words.lastOrNull()?.position,
                     prevArabic = ayah.words.getOrNull(idx - 1)?.arabic,
-                    nextArabic = ayah.words.getOrNull(idx + 1)?.arabic,
                 )
             }
         }
@@ -2237,31 +2517,50 @@ fun AyahBlock(
         previousActive.index == activeIndex - 1 &&
             previousActive.activation == activation
     }
+    val incomingHandoff = if (carriedIncoming) previousActive.outgoingHandoff else 0f
     SideEffect {
         previousActive.index = activeIndex
         previousActive.activation = activation
+        previousActive.outgoingHandoff = outgoingProgress.atHandoff
+    }
+    val waslMainFeather = if (pacing != null) {
+        InkEngine.pacedFeather()
+    } else {
+        InkEngine.tuning.washFeather
     }
     val activeRevealStart = if (carriedIncoming && incomingConnection != null) {
-        waslContinuationStart(
-            prefixFraction = incomingConnection.prefixFraction,
-            mainFeather = if (pacing != null) {
-                InkEngine.pacedFeather()
-            } else {
-                InkEngine.tuning.washFeather
-            },
+        waslWashProgress(
+            windowProgress = incomingHandoff,
+            endProgress = waslContinuationStart(
+                prefixFraction = incomingConnection.prefixFraction,
+                mainFeather = waslMainFeather,
+            ),
         )
     } else {
         0f
     }
-    val fullWaslProgress = remember { mutableStateOf(1f) }
+    // A latched window (1) redraws exactly the partial edge carried across
+    // handoff while the active word's ordinary sweep continues from it.
+    val fullWaslWindow = remember { mutableStateOf(1f) }
     val waslPrefixes = ayah.words.indices.map { index ->
         when {
-            // Preserve a completed outgoing bloom only across the natural
+            // Preserve the outgoing bloom's reached edge only across a natural
             // adjacent handoff. A seek bumps activation and starts clean.
             index == activeIndex && carriedIncoming && incomingConnection != null ->
-                WaslPrefix(incomingConnection.prefixFraction, fullWaslProgress)
+                WaslPrefix(
+                    windowProgress = fullWaslWindow,
+                    endProgress = activeRevealStart,
+                    feather = waslMainFeather,
+                )
             index == activeIndex + 1 && outgoingConnection != null ->
-                WaslPrefix(outgoingConnection.prefixFraction, outgoingProgress)
+                WaslPrefix(
+                    windowProgress = outgoingProgress.value,
+                    endProgress = waslContinuationStart(
+                        prefixFraction = outgoingConnection.prefixFraction,
+                        mainFeather = waslMainFeather,
+                    ),
+                    feather = waslMainFeather,
+                )
             else -> null
         }
     }
@@ -2277,10 +2576,17 @@ fun AyahBlock(
         label = "translationRecess",
     )
 
+    // Position-ordered gate so orange chain washes run one word at a time
+    // (word N finishes before N+1 starts), even when every member enters on
+    // the same frame (seek into an open chain).
+    val repeatWashGate = remember { OrderedWashGate() }
+    LaunchedEffect(repeatWashGate) { repeatWashGate.pump() }
+
     // The ribbon is part of the verse block itself — same Box, same height —
     // so it never "follows" from a floating overlay. Text keeps the existing
     // horizontal inset; the ribbon sits in the outer margin opposite the
     // ayah selector.
+    CompositionLocalProvider(LocalRepeatWashGate provides repeatWashGate) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -2314,7 +2620,6 @@ fun AyahBlock(
                     onAyahClick = onAyahClick,
                     onWordClick = onWordClick,
                     onWordLongClick = onWordLongClick,
-                    onMarkLongClick = onAyahMarkLongClick,
                 )
             } else if (showGloss) {
                 CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
@@ -2352,7 +2657,7 @@ fun AyahBlock(
                         Box(
                             modifier = Modifier.graphicsLayer { alpha = ayahMarkAlpha.value },
                         ) {
-                            ArabicAyahNumberUnit(ayah.number, fontScale, onLongClick = onAyahMarkLongClick)
+                            ArabicAyahNumberUnit(ayah.number, fontScale)
                         }
                     }
                 }
@@ -2378,7 +2683,6 @@ fun AyahBlock(
                         onAyahClick = onAyahClick,
                         onWordClick = onWordClick?.let { handler -> { word -> handler(word) } },
                         onWordLongClick = onWordLongClick?.let { handler -> { word -> handler(word) } },
-                        onMarkLongClick = onAyahMarkLongClick,
                     )
                 }
             }
@@ -2409,7 +2713,8 @@ fun AyahBlock(
             // Editing always wins — writing in progress never vanishes because
             // playback happened to start.
             AnimatedVisibility(
-                visible = (isEditingAnnotation || annotationText != null) &&
+                visible = bookmarked &&
+                    (isEditingAnnotation || annotationText != null) &&
                     (isEditingAnnotation || !annotationsHidden),
                 enter = fadeIn(tween(ANNOTATION_FADE_MS)) +
                     expandVertically(tween(ANNOTATION_FADE_MS)),
@@ -2427,7 +2732,7 @@ fun AyahBlock(
                         translationRecess = { translationRecess.value },
                         onAnnotationChange = onAnnotationChange,
                         onEditDone = { onAnnotationEditDone?.invoke() },
-                        onStartEdit = onAyahMarkLongClick,
+                        onStartEdit = onEditAnnotation,
                         onDelete = onAnnotationDelete,
                         listCoordinates = listCoordinates,
                         onKeepInView = onKeepAnnotationInView,
@@ -2468,6 +2773,7 @@ fun AyahBlock(
                     chromeAlpha = bookmarkChromeAlpha,
                     interactive = bookmarkInteractive,
                     onToggle = onToggleBookmark,
+                    onLongClick = if (bookmarked) onEditAnnotation else null,
                     modifier = Modifier
                         .align(
                             if (bookmarkSide == AyahSelectorSide.RIGHT) {
@@ -2481,6 +2787,7 @@ fun AyahBlock(
             }
         }
     }
+    } // LocalRepeatWashGate
 }
 
 /**
@@ -2697,48 +3004,73 @@ fun OrnateSurahTitle(
     sheen: State<Float>,
 ) {
     val accents = LocalQuranAccents.current
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.Center,
-    ) {
-        GildedFlourish(
-            width = 36.dp,
-            height = 13.dp,
-            brightGold = accents.goldBright,
-            deepGold = accents.goldDeep,
-            embossDark = accents.embossDark,
-            embossLight = accents.embossLight,
-            sheen = sheen,
-        )
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.padding(horizontal = 12.dp),
-        ) {
-            Text(
-                text = "سُورَةُ $nameArabic",
-                style = ArabicTitleStyle,
-                fontSize = 19.sp,
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 1,
-            )
-            Text(
-                text = "$chapterNumber · ${nameTransliteration.uppercase()}",
-                style = MaterialTheme.typography.labelSmall.copy(letterSpacing = 2.sp),
-                fontSize = 9.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                maxLines = 1,
-            )
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        val showFlourishes = maxWidth >= 200.dp
+        val titlePadding = if (showFlourishes) 12.dp else 2.dp
+        val arabicFontSize = if (maxWidth < 150.dp) 17.sp else 19.sp
+        val transliterationSpacing = when {
+            maxWidth >= 200.dp -> 2.sp
+            maxWidth >= 150.dp -> 1.2.sp
+            else -> 0.8.sp
         }
-        GildedFlourish(
-            width = 36.dp,
-            height = 13.dp,
-            brightGold = accents.goldBright,
-            deepGold = accents.goldDeep,
-            embossDark = accents.embossDark,
-            embossLight = accents.embossLight,
-            sheen = sheen,
-            mirrored = true,
-        )
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            if (showFlourishes) {
+                GildedFlourish(
+                    width = 36.dp,
+                    height = 13.dp,
+                    brightGold = accents.goldBright,
+                    deepGold = accents.goldDeep,
+                    embossDark = accents.embossDark,
+                    embossLight = accents.embossLight,
+                    sheen = sheen,
+                )
+            }
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(horizontal = titlePadding),
+            ) {
+                Text(
+                    text = "سُورَةُ $nameArabic",
+                    style = ArabicTitleStyle,
+                    fontSize = arabicFontSize,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    textAlign = TextAlign.Center,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Text(
+                    text = "$chapterNumber · ${nameTransliteration.uppercase()}",
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        letterSpacing = transliterationSpacing,
+                    ),
+                    fontSize = 9.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                    textAlign = TextAlign.Center,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+            if (showFlourishes) {
+                GildedFlourish(
+                    width = 36.dp,
+                    height = 13.dp,
+                    brightGold = accents.goldBright,
+                    deepGold = accents.goldDeep,
+                    embossDark = accents.embossDark,
+                    embossLight = accents.embossLight,
+                    sheen = sheen,
+                    mirrored = true,
+                )
+            }
+        }
     }
 }
 

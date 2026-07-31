@@ -112,9 +112,8 @@ If host Vulkan is broken on your machine, you can still fall back with
 
 ## Documentation
 
-- [PLAN.md](PLAN.md) — the original product/engineering plan and research
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — how the app is put together: pipeline, sync engine, modules, conventions
-- [docs/COMPLEXITY.md](docs/COMPLEXITY.md) — subsystem-by-subsystem complexity map and safe simplification roadmap
+- [docs/COMPLEXITY.md](docs/COMPLEXITY.md) — complexity rules, current hotspots, and the invariants a refactor must preserve
 - [docs/DESIGN.md](docs/DESIGN.md) — the design language: the sheet, ink, color, type, motion
 - [docs/PERFORMANCE.md](docs/PERFORMANCE.md) — every smoothness technique in use and why
 - [docs/REPEAT_HIGHLIGHTING.md](docs/REPEAT_HIGHLIGHTING.md) — the orange second fade for words a reciter repeats, and where the repeat-aware timing data comes from

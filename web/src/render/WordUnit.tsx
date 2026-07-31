@@ -22,12 +22,17 @@ import {
   runGlintWashIn,
   runLetterWash,
   runPaperCoverWash,
-  runRepeatFadeOut,
-  runRepeatWashIn,
+  hasRepeatWashProgress,
+  runRepeatFadeOutAsync,
+  runRepeatResidualAsync,
+  runRepeatWashInAsync,
   runSearchHitDoubleWash,
+  type CancellablePromise,
 } from './inkWash'
 import { SearchHitFlash } from '../ui/reader/SearchHitFlash'
 import { useWordInteraction } from './useWordInteraction'
+import { useRepeatWashGate } from './RepeatWashContext'
+import { isRepeatSeekReactivation } from './repeatWashGate'
 
 interface Props {
   word: Word
@@ -403,10 +408,22 @@ export function WordUnit({
     )
   }, [ink.state, ink.repeat, showGloss, showTransliteration, word.translation, word.transliteration, englishMode])
 
-  // Orange repeat overlay: wash in on chain entry, dissolve on release.
-  // Advancing the active word inside a chain must not cancel a mid-wash on
-  // earlier members (activation is 0 for non-active words). Seek-reactivation
-  // of the active word restarts its orange wash.
+  const repeatGate = useRepeatWashGate()
+  const repeatLive = useRef(ink.repeat)
+  repeatLive.current = ink.repeat
+  /** In-flight leave fade — must cancel on re-entry or opacity races to 0. */
+  const fadeCancelRef = useRef<(() => void) | null>(null)
+  const cancelLeaveFade = () => {
+    fadeCancelRef.current?.()
+    fadeCancelRef.current = null
+  }
+  // Orange repeat overlay — sequential residual finish (Android law):
+  // • Duration is always repeatSweepMs (never the audio sliver).
+  // • Per-ayah gate: word N finishes its feather before N+1 starts.
+  // • Active handoff does not cancel an in-flight wash (deps omit activation).
+  // • Never snap incomplete → full; release finishes residual then dissolves.
+  // • Never-started members no-op on residual (no post-chain orange bloom).
+  // • Re-entry cancels a stale leave fade so opacity is not raced to 0.
   useLayoutEffect(() => {
     if (!repeatMounted) {
       prevRepeat.current = ink.repeat
@@ -417,31 +434,86 @@ export function WordUnit({
     const was = prevRepeat.current
     const enteredRepeat = ink.repeat && !was
     const leftRepeat = !ink.repeat && was
-    prevRepeat.current = ink.repeat
     const rtl = !englishMode
+    const duration = getTuning().repeatSweepMs
 
+    const pos = word.position
     if (enteredRepeat) {
-      const duration = activeSweepMs ?? getTuning().repeatSweepMs
-      return runRepeatWashIn(overlay, rtl, duration)
-    }
-    if (ink.repeat && was && ink.state === InkState.Active) {
-      const duration = activeSweepMs ?? getTuning().repeatSweepMs
-      return runRepeatWashIn(overlay, rtl, duration)
+      prevRepeat.current = true
+      cancelLeaveFade()
+      // Only abandons *queued* work still waiting on the gate — once the
+      // wash body starts it always runs to progress 1.
+      let stillQueued = true
+      void repeatGate.run(pos, async () => {
+        if (!stillQueued || !overlayRef.current) return
+        if (!repeatLive.current) return
+        stillQueued = false
+        await runRepeatWashInAsync(overlayRef.current, rtl, duration)
+      })
+      return () => {
+        // Drop only if we never left the queue. In-flight wash keeps going.
+        if (stillQueued) {
+          stillQueued = false
+          if (repeatLive.current) prevRepeat.current = false
+        }
+      }
     }
     if (leftRepeat) {
-      return runRepeatFadeOut(overlay, () => setRepeatMounted(false))
+      prevRepeat.current = false
+      // Residual under the gate; fade outside so N-word clear isn't serial.
+      void (async () => {
+        await repeatGate.run(pos, async () => {
+          const el = overlayRef.current
+          if (!el) return
+          await runRepeatResidualAsync(el, rtl)
+        })
+        if (repeatLive.current) return
+        const el = overlayRef.current
+        if (!el) {
+          setRepeatMounted(false)
+          return
+        }
+        // Never washed → nothing to dissolve.
+        if (!hasRepeatWashProgress(el)) {
+          setRepeatMounted(false)
+          return
+        }
+        const fade: CancellablePromise = runRepeatFadeOutAsync(el)
+        fadeCancelRef.current = () => fade.cancel()
+        await fade
+        fadeCancelRef.current = null
+        if (!repeatLive.current) setRepeatMounted(false)
+      })()
+      return
     }
-    if (ink.repeat) {
-      // Still in chain from a prior entry — hold full orange, do not restart.
-      overlay.style.opacity = '1'
-      applyMask(overlay, 'none')
-    } else {
-      overlay.style.opacity = '0'
-      applyMask(overlay, 'none')
-      setRepeatMounted(false)
-    }
+    // Still in chain — hold settled orange; do not snap.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ink.repeat, englishMode, repeatMounted, activation, ink.state])
+  }, [ink.repeat, englishMode, repeatMounted])
+
+  // Seek-reactivation of the *active* word: queue another full orange wash.
+  const prevSeekActive = useRef(false)
+  const prevSeekActivation = useRef(activation)
+  useLayoutEffect(() => {
+    const active = ink.repeat && ink.state === InkState.Active
+    const reactivated = isRepeatSeekReactivation(
+      prevSeekActive.current,
+      prevSeekActivation.current,
+      active,
+      activation,
+    )
+    prevSeekActive.current = active
+    prevSeekActivation.current = activation
+    if (!reactivated) return
+    cancelLeaveFade()
+    if (!overlayRef.current || !repeatMounted) return
+    const rtl = !englishMode
+    const duration = getTuning().repeatSweepMs
+    void repeatGate.run(word.position, async () => {
+      if (!overlayRef.current || !repeatLive.current) return
+      await runRepeatWashInAsync(overlayRef.current, rtl, duration)
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activation, ink.repeat, ink.state, repeatMounted, englishMode])
 
   // Search-hit pulse: mount the twin overlay only while flashing.
   useLayoutEffect(() => {

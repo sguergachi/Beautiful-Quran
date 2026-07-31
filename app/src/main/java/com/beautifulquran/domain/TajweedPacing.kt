@@ -31,8 +31,9 @@ package com.beautifulquran.domain
  * - **Wasl connect** — when the previous word ends in nūn sākinah or tanwīn
  *   and this word starts with an idghām / iqlāb / ikhfāʾ letter, the nūn is
  *   absorbed and the reciter sustains the **opening letter of this word**.
- *   Pass the previous word as [prevArabic]. The previous word can pass
- *   [nextArabic] so its trailing nūn exits early (absorbed, not settled).
+ *   Pass the previous word as [prevArabic]. The donor keeps its ordinary
+ *   sweep; the separate cross-word bloom represents the connected handoff
+ *   without accelerating the word that feeds it.
  * - **Waqf length scale** — [Hold.waqfLengthScale] ramps how much of
  *   [Hold.waqfShare] a closer may spend by letter count, so a high hold
  *   slider does not sprint the run-up on short/medium finals (e.g. عَظِيمًا)
@@ -50,12 +51,68 @@ object TajweedPacing {
      * before the timing handoff reaches the next word.
      *
      * [prefixFraction] is the opening letter's approximate share of the
-     * shaped word. [at] blooms that prefix over the absorbed nūn's tail.
+     * shaped word. [at] blooms that prefix over the absorbed nūn's tail,
+     * smoothstepped so the letter eases across the junction instead of
+     * popping on the last frames of a short donor (مِن، مَن).
      */
     data class Connection(val prefixFraction: Float) {
-        /** Opening-glyph bloom progress at normalized prior-word time [t]. */
-        fun at(t: Float): Float =
-            ((t - WASL_EXIT_FRACTION) / (1f - WASL_EXIT_FRACTION)).coerceIn(0f, 1f)
+        /**
+         * Opening-glyph bloom progress at normalized prior-word time [t].
+         *
+         * [prefixStart] is where the rise begins (see [waslPrefixStart]).
+         * [completion] is how much of the target bloom clock fits before
+         * handoff; values below one leave a soft edge for the next word.
+         * Default matches a long-word late junction ([WASL_EXIT_FRACTION]).
+         */
+        fun at(
+            t: Float,
+            prefixStart: Float = WASL_EXIT_FRACTION,
+            completion: Float = 1f,
+        ): Float {
+            val span = (1f - prefixStart).coerceAtLeast(1e-4f)
+            val u = (((t - prefixStart) / span) * completion).coerceIn(0f, 1f)
+            // smoothstep: zero slope at both ends — soft carry-in, soft settle.
+            return u * u * (3f - 2f * u)
+        }
+    }
+
+    /**
+     * Normalized prior-word time when the next opening letter begins to bloom.
+     *
+     * Enforces a **speed ceiling** on the wasl carry-in: the bloom window aims
+     * for at least [minPrefixMs] of wall-clock (and may claim up to
+     * [MAX_WASL_PREFIX_WINDOW] of a short donor) so pairs like مَن يَشْرِى do
+     * not race the first glyph. Longer words stay near the absorbed-nūn tail
+     * ([WASL_EXIT_FRACTION]). [minPrefixMs] is lab-tunable
+     * (`InkEngine.Tuning.waslPrefixMs`); default matches [DEFAULT_WASL_PREFIX_MS].
+     */
+    fun waslPrefixStart(
+        sweepMs: Int,
+        minPrefixMs: Float = DEFAULT_WASL_PREFIX_MS,
+    ): Float {
+        val window = (minPrefixMs.coerceAtLeast(1f) / sweepMs.coerceAtLeast(1).toFloat())
+            .coerceIn(MIN_WASL_PREFIX_WINDOW, MAX_WASL_PREFIX_WINDOW)
+        return 1f - window
+    }
+
+    /**
+     * Share of the target wasl bloom clock available before word handoff.
+     *
+     * Very short donors keep the initial pause imposed by
+     * [MAX_WASL_PREFIX_WINDOW], then hand off an incomplete bloom rather than
+     * compressing the whole fade into that tail. The incoming word continues
+     * from the same edge. [maxCompletion] also keeps long donors from
+     * pre-forming the whole opening before activation.
+     */
+    fun waslPrefixCompletion(
+        sweepMs: Int,
+        minPrefixMs: Float = DEFAULT_WASL_PREFIX_MS,
+        maxCompletion: Float = DEFAULT_WASL_HANDOFF,
+    ): Float {
+        val start = waslPrefixStart(sweepMs, minPrefixMs)
+        val availableMs = (1f - start) * sweepMs.coerceAtLeast(1)
+        return (availableMs / minPrefixMs.coerceAtLeast(1f))
+            .coerceIn(0f, maxCompletion.coerceIn(0f, 1f))
     }
 
     /**
@@ -74,8 +131,7 @@ object TajweedPacing {
         /** An ayah's closing word parks the wash on its final letter. */
         val waqf: Boolean = true,
         /** Cross-word nūn rules (idghām / iqlāb / ikhfāʾ): hold this word's
-         *  opening letter when [prevArabic] feeds the rule; exit early when
-         *  [nextArabic] absorbs this word's trailing nūn. */
+         *  opening letter when [prevArabic] feeds the rule. */
         val connect: Boolean = true,
         /** Whether this word closes its verse (drives [waqf]). */
         val isAyahFinal: Boolean = false,
@@ -95,6 +151,20 @@ object TajweedPacing {
         /** Fraction of its own slot the wash still crosses while holding, so
          *  the ink breathes instead of freezing dead. */
         val creep: Float = 0.08f,
+        /**
+         * Park the waqf hold on the **madd letter the stop lengthens** rather
+         * than on the closing consonant.
+         *
+         * A pausal stop silences the last letter, and what the reciter actually
+         * sustains is the madd before it (madd ʿāriḍ li-s-sukūn): ٱلرَّحِيمِ is
+         * held on the ي of "raḥīīīm", then the م closes it. Off by default: the
+         * two letters are adjacent, the wash feather blurs most of the
+         * difference, and flipping it moves the park on nearly every verse
+         * ending — a page-wide pacing change that wants its own review. The
+         * basmalah preface ([BasmalahWash]) opts in, where the closer's dwell
+         * is over half the clip and lands on a single glyph.
+         */
+        val maddAaridWaqf: Boolean = false,
     )
 
     /**
@@ -141,16 +211,14 @@ object TajweedPacing {
      * (`cruiseCap` of 1 on a non-final word), when the word is too short to
      * pace, or when nothing tokenizes.
      *
-     * [prevArabic] / [nextArabic] are same-ayah neighbours (Hafs Uthmani) for
-     * wasl nūn rules. Null means no neighbour on that side — never looks
-     * across an ayah boundary.
+     * [prevArabic] is the same-ayah predecessor (Hafs Uthmani) for wasl nūn
+     * entry. Null means no predecessor — never looks across an ayah boundary.
      */
     fun curve(
         arabic: String,
         spokenFraction: Float = 1f,
         hold: Hold = Hold(),
         prevArabic: String? = null,
-        nextArabic: String? = null,
     ): Curve? {
         val events = tokenize(arabic)
         if (events.isEmpty()) return null
@@ -170,52 +238,29 @@ object TajweedPacing {
             counts[0] = maxOf(counts[0], GHUNNAH)
         }
 
-        // Wasl exit: this word's trailing nūn is absorbed into the next word —
-        // soft weight and early layout so the wash does not settle on it.
-        val waslExit = hold.connect &&
-            !nextArabic.isNullOrEmpty() &&
-            endsWithNoonSakinOrTanween(arabic) &&
-            startsWithWaslNoonTarget(nextArabic)
-        if (waslExit && lastPronounced >= 0) {
-            counts[lastPronounced] = minOf(counts[lastPronounced], ABSORBED_NOON)
-            if (counts[lastPronounced] <= 0f) {
-                lastPronounced = counts.indexOfLast { it > 0f }
-                letters = counts.count { it > 0f }
-                if (letters < MIN_LETTERS && !waslEntry) return null
-            }
-        }
-
         // A verse-closing word is sustained on its final letter (madd ʿāriḍ
-        // li-s-sukūn, 2/4/6 counts), whatever that letter's mid-flow value.
+        // li-s-sukūn, 2/4/6 counts), whatever that letter's mid-flow value —
+        // or, with [Hold.maddAaridWaqf], on the madd letter the stop lengthens.
         val isWaqf = hold.waqf && hold.isAyahFinal
-        if (isWaqf && lastPronounced >= 0) {
-            counts[lastPronounced] = maxOf(counts[lastPronounced], MADD_LAZIM)
+        val waqfIndex =
+            if (!isWaqf || lastPronounced < 0) -1
+            else if (hold.maddAaridWaqf) maddAaridIndex(events, counts, lastPronounced)
+            else lastPronounced
+        if (waqfIndex >= 0) {
+            counts[waqfIndex] = maxOf(counts[waqfIndex], MADD_LAZIM)
         }
 
         val held = BooleanArray(n) { i ->
             counts[i] > 0f && when {
                 waslEntry && i == 0 -> true
-                // Absorbed trailing nūn is never held — the next word owns it.
-                waslExit && i == lastPronounced -> false
-                isWaqf && i == lastPronounced -> true
+                i == waqfIndex -> true
                 hold.madd && counts[i] >= MADD_MUTTASIL -> true
                 hold.ghunnah && counts[i] >= GHUNNAH && isGhunnah(events[i]) -> true
                 else -> false
             }
         }
         val spoken = spokenFraction.coerceIn(MIN_SPOKEN_FRACTION, 1f)
-        // Letters finish early when the trailing nūn is absorbed next door.
-        val layoutSpoken = if (waslExit) {
-            (spoken * WASL_EXIT_FRACTION).coerceIn(MIN_SPOKEN_FRACTION, spoken)
-        } else {
-            spoken
-        }
-
-        // The gate: nothing dramatic — unless wasl exit alone needs an early finish.
-        if (held.none { it }) {
-            if (!waslExit) return null
-            return earlyExitCurve(layoutSpoken, spoken, letters)
-        }
+        if (held.none { it }) return null
 
         val dwellShare = (
             if (isWaqf) effectiveWaqfShare(hold.waqfShare, letters, hold.waqfLengthScale)
@@ -246,7 +291,7 @@ object TajweedPacing {
         fun glideTo(target: Float) {
             t += (target - x) / cruiseRate
             x = target
-            times += t * layoutSpoken
+            times += t * spoken
             positions += x
         }
         for (i in 0 until n) {
@@ -262,18 +307,14 @@ object TajweedPacing {
             glideTo(slotStart + HOLD_ANCHOR * (slotEnd - slotStart))
             t += dwellShare * excess[i] / excessTotal
             x += creep * (slotEnd - slotStart)
-            times += t * layoutSpoken
+            times += t * spoken
             positions += x
         }
         // A held final letter still has the tail of its own slot to cross.
         if (x < 1f) glideTo(1f)
-        // Letters done at layoutSpoken; rest full until spoken, then handoff.
-        times[times.lastIndex] = layoutSpoken
+        // Letters done at the voiced boundary; rest full until handoff.
+        times[times.lastIndex] = spoken
         positions[positions.lastIndex] = 1f
-        if (layoutSpoken < spoken) {
-            times += spoken
-            positions += 1f
-        }
         times += 1f
         positions += 1f
         return Curve(times.toFloatArray(), positions.toFloatArray(), letters)
@@ -288,23 +329,6 @@ object TajweedPacing {
         val events = tokenize(arabic)
         if (events.isEmpty() || !isWaslNoonTarget(events.first().base)) return null
         return Connection(prefixFraction = 1f / events.size)
-    }
-
-    /** Plain early finish when the only wasl signal is an absorbed trailing nūn. */
-    private fun earlyExitCurve(layoutSpoken: Float, spoken: Float, letterCount: Int): Curve {
-        val times = ArrayList<Float>(4)
-        val positions = ArrayList<Float>(4)
-        times += 0f
-        positions += 0f
-        times += layoutSpoken
-        positions += 1f
-        if (layoutSpoken < spoken) {
-            times += spoken
-            positions += 1f
-        }
-        times += 1f
-        positions += 1f
-        return Curve(times.toFloatArray(), positions.toFloatArray(), letterCount)
     }
 
     /**
@@ -325,6 +349,36 @@ object TajweedPacing {
         val t = ((letters - MIN_LETTERS + 1).toFloat() / span).coerceIn(0f, 1f)
         val factor = (1f - s) + s * t
         return (share * factor).coerceIn(0f, MAX_DWELL_SHARE)
+    }
+
+    /**
+     * Which letter a pausal stop actually lengthens (madd ʿāriḍ li-s-sukūn):
+     * the madd letter immediately before the closer — the ي of ٱلرَّحِيمِ, the
+     * و of يَعۡلَمُونَ's ـُونَ, the ا of ٱلۡمُتَّقِينَ-style opens — or the closer
+     * itself when it is a madd letter or nothing precedes it.
+     */
+    private fun maddAaridIndex(
+        events: List<Event>,
+        counts: FloatArray,
+        lastPronounced: Int,
+    ): Int {
+        if (isMaddLetter(events, lastPronounced)) return lastPronounced
+        var i = lastPronounced - 1
+        while (i >= 0 && counts[i] <= 0f) i--
+        return if (i >= 0 && isMaddLetter(events, i)) i else lastPronounced
+    }
+
+    /** Whether the event at [i] is a lengthened vowel (madd letter or maddah). */
+    private fun isMaddLetter(events: List<Event>, i: Int): Boolean {
+        val e = events.getOrNull(i) ?: return false
+        if (e.maddah || e.madd) return true
+        val prev = events.getOrNull(i - 1)
+        return when (e.base) {
+            ALEF, ALEF_MAKSURA -> prev?.fatha == true
+            WAW -> prev?.damma == true && !e.haraka
+            YEH -> prev?.kasra == true && !e.haraka
+            else -> false
+        }
     }
 
     /** Width slice of the pronounced event at [i]: its own slot plus any
@@ -355,12 +409,6 @@ object TajweedPacing {
         // unvoiced carrier alif after it: رُّسُلٗا → مُّبَشِّرِينَ.
         if (last.base == ALEF && events.getOrNull(lastIndex - 1)?.tanween == true) return true
         return last.base == NOON && !last.haraka
-    }
-
-    /** First base letter is an idghām / iqlāb / ikhfāʾ target (not iẓhār, not wasla). */
-    private fun startsWithWaslNoonTarget(arabic: String): Boolean {
-        val first = tokenize(arabic).firstOrNull() ?: return false
-        return isWaslNoonTarget(first.base)
     }
 
     private fun isWaslNoonTarget(base: Char): Boolean =
@@ -483,10 +531,27 @@ object TajweedPacing {
     /** Where inside its own slot the wash parks: half-way, so the held letter
      * is caught mid-bloom rather than sustained before or after itself. */
     private const val HOLD_ANCHOR = 0.5f
-    /** Trailing nūn absorbed into the next word — almost no solo duration. */
-    private const val ABSORBED_NOON = 0.25f
-    /** Fraction of the spoken span used to finish letters when wasl-exiting. */
+    /** Default junction for long donors; short donors may begin earlier. */
     private const val WASL_EXIT_FRACTION = 0.82f
+    /** Floor on the wasl prefix bloom window (matches 1 − [WASL_EXIT_FRACTION]). */
+    private const val MIN_WASL_PREFIX_WINDOW = 1f - WASL_EXIT_FRACTION
+    /**
+     * Max share of a short donor spent on the next-letter bloom. Must be high
+     * enough that [DEFAULT_WASL_PREFIX_MS] is reachable on مَن/مِن-scale holds
+     * (~500 ms); at 0.50 the ceiling never applied (only ~250 ms of fade).
+     */
+    private const val MAX_WASL_PREFIX_WINDOW = 0.75f
+    /**
+     * Shipped speed ceiling (ms) for the next-letter wasl bloom — also the
+     * default for [InkEngine.Tuning.waslPrefixMs] / Ink Lab.
+     */
+    const val DEFAULT_WASL_PREFIX_MS = 480f
+    /**
+     * Max share of the wasl bloom clock laid down before the next word becomes
+     * active. Smoothstep maps 0.45 clock progress to ~0.43 visible progress,
+     * leaving most of the incoming word's wash observable after handoff.
+     */
+    const val DEFAULT_WASL_HANDOFF = 0.45f
 
     private const val ALEF_WASLA = 'ٱ'
     private const val ALEF = 'ا'

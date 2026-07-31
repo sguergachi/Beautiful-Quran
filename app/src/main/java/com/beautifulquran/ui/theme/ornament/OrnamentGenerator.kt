@@ -159,15 +159,25 @@ const val SEAL_RING_RADIUS = 0.46
 private fun gcd(a: Int, b: Int): Int = if (b == 0) a else gcd(b, a % b)
 
 /**
- * Star indices whose {n/k} never decomposes into triangles. A triangle
- * decomposition (n / gcd(n, k) == 3, e.g. {12/4}) reads as overlapped
- * triangles — the hexagram — which this app must never draw. The seal
- * fold mapping below avoids 6-fold stars for the same reason.
+ * Star indices whose {n/k} never yields occult compounds.
+ *
+ * A triangle decomposition (n / gcd(n, k) == 3, e.g. {12/4}) is
+ * overlapped triangles — the hexagram. A pentagram decomposition
+ * (component {5/2} or {5/3}, e.g. {10/4} → two interlaced pentagrams)
+ * is the classic pentacle compound. Both are excluded. The seal fold
+ * mapping below also avoids 6-fold stars for the hexagram reason.
  */
 private fun allowedStarKs(n: Int): List<Int> {
     val ks = ArrayList<Int>()
     for (k in 2..n / 2 - 1) {
-        if (n / gcd(n, k) != 3) ks.add(k)
+        val g = gcd(n, k)
+        val m = n / g
+        val s = k / g
+        // {3/*} components → hexagram when interlaced.
+        if (m == 3) continue
+        // {5/2} and {5/3} are the same pentagram; two of them stacked is occult.
+        if (m == 5 && (s == 2 || s == 3)) continue
+        ks.add(k)
     }
     return ks
 }

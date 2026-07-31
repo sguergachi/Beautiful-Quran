@@ -165,7 +165,9 @@ Key points, detailed in [PERFORMANCE.md](PERFORMANCE.md) and
 [ARCHITECTURE.md](ARCHITECTURE.md#the-sync-engine):
 
 - The 33 ms poll runs only while this surah is audible and drops to a gentle
-  250 ms while paused; the flow publishes only *word boundaries*
+  250 ms while paused. A play/pause transition restarts that poll immediately,
+  so a paused word tap publishes its forced ink restart on the resume callback
+  instead of waiting up to 250 ms; the flow publishes only *word boundaries*
   (`distinctUntilChanged`), so downstream recomposition happens ~2–3×/sec, not
   30×.
 - Source-data word accuracy is ±73 ms on average — inside the ~150 ms window
@@ -175,8 +177,9 @@ Key points, detailed in [PERFORMANCE.md](PERFORMANCE.md) and
   A2DP (and similar) deliver sound after the media playhead; Android has no
   reliable ear-delay API, so the reader subtracts a coarse route preset
   (`OutputLatency` / `AudioOutputLatency`) before `HighlightClock`. See
-  [OUTPUT_LATENCY.md](OUTPUT_LATENCY.md). Do not bake device lag into segments
-  or into `HighlightEngine`.
+  [OUTPUT_LATENCY.md](OUTPUT_LATENCY.md). The optional visual lead is gated
+  until the first segment starts, so it cannot cross encoded opening silence.
+  Do not bake device lag into segments or into `HighlightEngine`.
 - The lit word's `startMs`/`endMs` drive the letter-by-letter fade in the UI,
   which interpolates at the display's full refresh rate independently of the
   poll.

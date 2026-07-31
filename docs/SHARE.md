@@ -47,9 +47,8 @@ its layout; it grows ordinals in the margin.
   `onGatherControlClick()` when the list is non-empty (opens Send).
 
 While gathering, word taps do not seek, word long-press does not open the
-Root Viewer, ayah-mark long-press does not open annotations, and the bookmark
-ribbon is inactive. The mode owns the tap — interactions are *replaced*, not
-stacked.
+Root Viewer, and the bookmark ribbon (including its note hold) is inactive.
+The mode owns the tap — interactions are *replaced*, not stacked.
 
 **Mode chrome (visual QA):** margin ordinals use `headlineSmall` full gold.
 Selection wash and gather-bar takeover are planned — see

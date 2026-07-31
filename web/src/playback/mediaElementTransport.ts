@@ -35,6 +35,20 @@ function applyPreservesPitch(audio: HTMLAudioElement): void {
   el.webkitPreservesPitch = true
 }
 
+/**
+ * Apply rate for both the live clock and the post-src default.
+ *
+ * Browsers re-seed [HTMLMediaElement.playbackRate] from
+ * [HTMLMediaElement.defaultPlaybackRate] when the resource changes (src/load).
+ * Setting only playbackRate is wiped on the next ayah load — which is why a
+ * saved 0.75 felt like 1× until the user cycled speed while media was already
+ * loaded. Set both so quiet open + first play honor the preference.
+ */
+function applyPlaybackRate(audio: HTMLAudioElement, speed: number): void {
+  audio.defaultPlaybackRate = speed
+  audio.playbackRate = speed
+}
+
 function createBrowserAudio(): HTMLAudioElement {
   const audio = new Audio()
   audio.preload = 'auto'
@@ -89,10 +103,13 @@ export class MediaElementTransport {
     this.activeElement.pause()
     this.activeElement.loop = source.loop
     this.activeElement.src = source.src
-    this.activeElement.playbackRate = source.playbackRate
+    applyPlaybackRate(this.activeElement, source.playbackRate)
     applyPreservesPitch(this.activeElement)
     this.activeElement.volume = source.volume
     this.activeElement.load()
+    // Re-assert after load(): some engines re-seed from defaultPlaybackRate
+    // during the resource algorithm; keep both in lockstep.
+    applyPlaybackRate(this.activeElement, source.playbackRate)
   }
 
   prepareStandby(index: number, src: string, playbackRate: number): void {
@@ -100,15 +117,20 @@ export class MediaElementTransport {
     if (!standby) return
     const current = standby.currentSrc || standby.src
     const sameSource = current === src || current.endsWith(src) || src.endsWith(current)
-    if (this.standbyIndex === index && sameSource) return
+    if (this.standbyIndex === index && sameSource) {
+      // Same clip may have been prepared under a different speed preference.
+      applyPlaybackRate(standby, playbackRate)
+      return
+    }
 
     standby.pause()
     standby.volume = 1
     standby.loop = false
     standby.src = src
-    standby.playbackRate = playbackRate
+    applyPlaybackRate(standby, playbackRate)
     applyPreservesPitch(standby)
     standby.load()
+    applyPlaybackRate(standby, playbackRate)
     this.standbyIndex = index
   }
 
@@ -129,10 +151,10 @@ export class MediaElementTransport {
   }
 
   setSpeed(speed: number): void {
-    this.activeElement.playbackRate = speed
+    applyPlaybackRate(this.activeElement, speed)
     applyPreservesPitch(this.activeElement)
     if (this.standbyElement) {
-      this.standbyElement.playbackRate = speed
+      applyPlaybackRate(this.standbyElement, speed)
       applyPreservesPitch(this.standbyElement)
     }
   }

@@ -47,7 +47,7 @@ the other consumers must not:
 
 | Consumer | Clock |
 |---|---|
-| Word ink (`activeWord`) | Heard position + `highlightLeadMs` |
+| Word ink (`activeWord`) | Heard position; + `highlightLeadMs` after word 1 starts |
 | Ayah fade lead (`ayahWithFadeLead`) | Heard position + its own `fadeLeadMs` |
 | Basmalah calligraphy wash | Heard position |
 
@@ -60,11 +60,18 @@ ink poll's behalf.
 item*, because the fade-led ayah names the next verse before a note of it is
 heard — persisting that recorded verses the listener never reached.
 
-**Highlight lead** (Ink Lab → Highlight, default 0; persists with other lab numbers) advances the
+**Highlight lead** (Ink Lab → Highlight, default 114; persists with other lab numbers) advances the
 query time so each word’s wash can start *before* its segment `startMs`. It is
 the opposite direction of output lag: lag delays ink to match late audio; lead
-runs ink ahead of the timing table. It does not move the ayah handoff or basmalah
-wash. Neither lag nor lead is baked into `HighlightEngine`.
+runs ink ahead of the timing table. That early budget also raises the short-hold
+sweep floor (`minSweepMs + highlightLeadMs`) so small words and wasl tails can
+breathe longer instead of racing. It does not move the ayah handoff or basmalah
+wash. During encoded silence before word 1, the lead is gated off completely;
+after the first segment starts it **ramps** from 0 to full lead over the first
+`leadMs` of voiced audio so engagement stays continuous with silence. A hard
+`+lead` cliff at the gate was larger than `HighlightClock`'s post-handoff settle
+step and froze the clock through short word 1 (both words lit when settle ended
+on word 2). Neither lag nor lead is baked into `HighlightEngine`.
 
 ## Presets
 

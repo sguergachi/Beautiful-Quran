@@ -17,6 +17,12 @@ data class ReaderInteractionState(
     val annotating: Boolean = false,
 )
 
+/** Pure recovery chosen after a display reflow has finished measuring. */
+internal data class LayoutReflowRecovery(
+    val focusAyah: Int,
+    val restoreWordDirectly: Boolean,
+)
+
 sealed class ReaderInteractionEvent {
     /** Vertical hand drag on the page — reader is navigating by eye. */
     data object UserMovedPage : ReaderInteractionEvent()
@@ -47,6 +53,30 @@ sealed class ReaderInteractionEvent {
 }
 
 object ReaderInteraction {
+
+    /**
+     * Initial focus ownership for a freshly opened reader. An explicit verse
+     * in the same paused playlist is a manual selection: when it differs from
+     * the held media item, park it as a jump so playback cannot reclaim focus
+     * before the playlist seeks there. An autoplay request already owns focus
+     * through playback and must not be mistaken for a paused selection.
+     */
+    fun initialState(
+        requestedAyah: Int?,
+        isThisSurahPlaying: Boolean,
+        isPlaying: Boolean,
+        playbackAyah: Int?,
+        playbackRequested: Boolean = false,
+    ): ReaderInteractionState {
+        val target = requestedAyah?.takeIf {
+            it > 0 && isThisSurahPlaying && !isPlaying &&
+                !playbackRequested && it != playbackAyah
+        } ?: return ReaderInteractionState()
+        return reduce(
+            ReaderInteractionState(),
+            ReaderInteractionEvent.JumpRequested(target, resumeFollowIfPlaying = false),
+        )
+    }
 
     fun reduce(
         state: ReaderInteractionState,
@@ -96,10 +126,10 @@ object ReaderInteraction {
 
     /**
      * Whether lyric-follow should call [ReaderFocusController.focus] for
-     * [target]. When follow just re-enabled, always home (return-to-verse).
-     * While follow stays on, only home when the playback target **changes** —
-     * re-homing the same tall verse on pause/play/seek fights word-band follow
-     * and stutters the page up then down.
+     * [target], after the direct visible-tall-word policy below has been ruled
+     * out. A normal return-to-verse homes when follow just re-enabled. While
+     * follow stays on, only target changes home; re-homing the same tall verse
+     * on pause/play/seek fights word-band follow and stutters up then down.
      */
     fun shouldHomeOntoPlaybackTarget(
         target: Int,
@@ -108,19 +138,58 @@ object ReaderInteraction {
     ): Boolean = justEnabledFollow || target != lastHomedTarget
 
     /**
-     * Word-band keep-in-view must track **actual** play, not the debounced
-     * "reciting chrome" flag. After the last ayah ends, Media3 can snap
-     * position toward the item start while chrome is still recessed for a few
-     * hundred ms — if word-follow stays armed, it scrolls back up to word 1.
+     * A playback-owned recovery inside the visible, tall **playing** ayah
+     * should restore its active word directly. Homing the fade-led verse target
+     * first can move in the opposite direction, pin line one, and queue the
+     * real word correction behind that glide.
+     */
+    fun shouldRestoreWordBeforeVerseHome(
+        verseHomeRequested: Boolean,
+        playingAyahHasLiveTallGeometry: Boolean,
+    ): Boolean = verseHomeRequested && playingAyahHasLiveTallGeometry
+
+    /** Keep the media ayah sticky only while playback owns this reader. */
+    internal fun layoutStickyAyah(
+        playbackOwnsFocus: Boolean,
+        playingAyah: Int?,
+        scrolledAyah: Int,
+    ): Int = playingAyah?.takeIf { playbackOwnsFocus && it > 0 } ?: scrolledAyah
+
+    /**
+     * Resolve display-reflow recovery without leaking Compose timing into the
+     * policy. Playback pins the actual media ayah, never the fade-led visual
+     * target; a live tall ayah restores its current word without homing first.
+     */
+    internal fun layoutReflowRecovery(
+        layoutChanged: Boolean,
+        playbackOwnsFocus: Boolean,
+        playingAyah: Int?,
+        stickyAyah: Int,
+        playingAyahHasLiveTallGeometry: Boolean,
+    ): LayoutReflowRecovery? {
+        if (!layoutChanged) return null
+        val playbackAyah = playingAyah?.takeIf { playbackOwnsFocus }
+        return LayoutReflowRecovery(
+            focusAyah = playbackAyah ?: stickyAyah,
+            restoreWordDirectly =
+                playbackAyah != null && playingAyahHasLiveTallGeometry,
+        )
+    }
+
+    /**
+     * Word-band keep-in-view continuously tracks **actual** play, not the
+     * debounced "reciting chrome" flag. [restoreRequested] is the narrow
+     * exception: opening / foreground resume may reveal the held word once
+     * while paused. Keeping that request one-shot prevents Media3's end-state
+     * position reset from pulling the final ayah back to word one.
      */
     fun shouldKeepWordInView(
-        followEnabled: Boolean,
-        labFocusEnabled: Boolean,
+        followPlayback: Boolean,
         isPlaying: Boolean,
-        annotating: Boolean,
         hasActiveWord: Boolean,
+        restoreRequested: Boolean = false,
     ): Boolean =
-        followEnabled && labFocusEnabled && isPlaying && !annotating && hasActiveWord
+        followPlayback && hasActiveWord && (isPlaying || restoreRequested)
 
     /**
      * Which ayah the transport "play from here" control should use: a pending

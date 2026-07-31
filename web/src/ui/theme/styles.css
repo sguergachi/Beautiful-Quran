@@ -3854,20 +3854,11 @@ select {
   line-height: 1.4;
 }
 
-.root-reference-description,
-.root-reference-caution {
+.root-reference-description {
+  margin-top: 0.125rem;
   color: color-mix(in srgb, var(--ink) 68%, transparent);
   font-size: 0.875rem;
   line-height: 1.5;
-}
-
-.root-reference-description {
-  margin-top: 0.125rem;
-}
-
-.root-reference-caution {
-  margin-top: var(--root-space-2) !important;
-  color: color-mix(in srgb, var(--ink) 62%, transparent);
 }
 
 .ink-bleed-attribution {

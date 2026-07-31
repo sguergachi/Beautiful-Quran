@@ -174,7 +174,7 @@ Port exactly:
   has been deleted from Android's `InkEngine` (its gate collapsed to
   `glinting(state) = state == Active`). The web copy is harmless dead weight —
   fold it away next time `WordUnit.tsx` is touched. Behaviour is identical.
-- `Tuning` defaults (upcoming alpha 0.22, ink/mark/recess fade 400 ms, sweep clamps, feather 1.6, easing CPs)
+- `Tuning` defaults (upcoming alpha 0.2661, ink/mark/recess fade 400 ms, sweep clamps, feather 1.6, easing CPs)
 
 Acceptance: `InkEngineTest` parity. Optional Ink Lab later (session-only
 tuning, same as Android).
@@ -492,7 +492,6 @@ sans.
 **Explicitly out of v1 web (unless pulled in later):**
 - Timings Lab / timing patch export
 - QCF V2 mushaf fonts
-- Notification-permission ink bleed (no Android notification prompt)
 - Exact Media3 preload configuration
 - Sharing / accounts / analytics (never)
 

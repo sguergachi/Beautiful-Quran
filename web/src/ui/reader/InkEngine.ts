@@ -2,7 +2,8 @@
  * Visual word-ink policy — port of Android `ui/reader/InkEngine.kt`.
  * Pure decision functions; no DOM.
  */
-import type { ActiveWord } from '../../data/models'
+import type { ActiveWord, Segment } from '../../data/models'
+import { MAX_FEATHER, basmalahWashProgress } from '../../domain/BasmalahWash'
 
 export enum InkState {
   Plain = 'Plain',
@@ -36,7 +37,7 @@ export interface InkTuning {
 }
 
 export const DEFAULT_TUNING: InkTuning = {
-  upcomingAlpha: 0.22,
+  upcomingAlpha: 0.2661,
   inkFadeMs: 400,
   ayahMarkFadeMs: 400,
   recessMs: 400,
@@ -64,6 +65,7 @@ export function setTuning(next: Partial<InkTuning> | InkTuning): void {
 
 export function resetTuning(): void {
   tuning = { ...DEFAULT_TUNING }
+  highlightLeadMs = DEFAULT_HIGHLIGHT_LEAD_MS
 }
 
 export function inkAlpha(state: InkState): number {
@@ -106,6 +108,32 @@ export function word(
   }
 }
 
+/** Port of Android `InkEngine.DEFAULT_HIGHLIGHT_LEAD_MS`. */
+export const DEFAULT_HIGHLIGHT_LEAD_MS = 114
+
+/** Word-ink lead (ms). Live-tunable on Android; web keeps the shipped default. */
+let highlightLeadMs = DEFAULT_HIGHLIGHT_LEAD_MS
+
+export function getHighlightLeadMs(): number {
+  return highlightLeadMs
+}
+
+export function setHighlightLeadMs(ms: number): void {
+  highlightLeadMs = Math.max(0, Math.trunc(ms))
+}
+
+/**
+ * Effective min letter-sweep duration. Short holds scale up to this so the
+ * wash still breathes; highlight lead already starts word ink early, so that
+ * lead is spent on a longer soft reveal. Port of Android `minSweepFloorMs`.
+ */
+export function minSweepFloorMs(): number {
+  return Math.min(
+    tuning.maxSweepMs,
+    Math.max(1, tuning.minSweepMs + Math.max(0, highlightLeadMs)),
+  )
+}
+
 export function sweepMs(
   activeWord: ActiveWord | null | undefined,
   playbackSpeed: number,
@@ -113,10 +141,11 @@ export function sweepMs(
   if (!activeWord) return null
   // Kotlin `toInt()` truncates; use the same boundary semantics on web.
   const raw = Math.max(0, Math.trunc(activeWord.durationMs / playbackSpeed))
-  // Floor at minSweepMs so short holds still get a visible wash. Incomplete
+  // Floor at minSweep + lead so short holds / wasl still breathe. Incomplete
   // washes finish after handoff (WordUnit / HafsWord) rather than snapping.
-  if (raw <= 0) return tuning.minSweepMs
-  return Math.min(tuning.maxSweepMs, Math.max(tuning.minSweepMs, raw))
+  const floor = minSweepFloorMs()
+  if (raw <= 0) return floor
+  return Math.min(tuning.maxSweepMs, Math.max(floor, raw))
 }
 
 /**
@@ -157,11 +186,36 @@ export function prefaceState(isActive: boolean, dimmed: boolean): InkState {
 
 /**
  * How far the basmalah calligraphy wash has traveled (0..1) across the SVG.
- * Driven by the lead-in clip's playback clock — settles at
- * [PREFACE_WASH_SETTLE_FRACTION] so the feathered edge finishes before audio ends.
+ *
+ * With the lead-in clip's word [segments] (Al-Fatihah 1:1, always the same
+ * file) the wash is locked to the voice: each word owns the band of artwork its
+ * glyphs cover — see `domain/BasmalahWash`. That is the shipped path; the ramp
+ * below is the fallback for timings that are missing, still loading, or not the
+ * plain four words. The fallback settles at [PREFACE_WASH_SETTLE_FRACTION] so
+ * the feathered edge finishes before audio ends.
  * Port of Android `InkEngine.prefaceWashProgress`.
  */
-export function prefaceWashProgress(positionMs: number, durationMs: number): number {
+export function prefaceWashProgress(
+  positionMs: number,
+  durationMs: number,
+  segments?: Segment[] | null,
+): number {
+  const paced = basmalahWashProgress(positionMs, segments, durationMs)
+  if (paced != null) return paced
+  return prefaceRampProgress(positionMs, durationMs)
+}
+
+/**
+ * Feather of the calligraphy wash: the tuned `washFeather`, capped by what this
+ * four-word-wide artwork can carry without inking the closing word before the
+ * reciter reaches it. Port of Android `InkEngine.prefaceFeather`.
+ */
+export function prefaceFeather(): number {
+  return Math.min(tuning.washFeather, MAX_FEATHER)
+}
+
+/** Plain clip-clock ramp — the no-timings fallback of [prefaceWashProgress]. */
+export function prefaceRampProgress(positionMs: number, durationMs: number): number {
   if (durationMs <= 0) return 0
   if (positionMs <= 0) return 0
   const settleAt = Math.max(1, Math.trunc(durationMs * PREFACE_WASH_SETTLE_FRACTION))
@@ -177,8 +231,9 @@ export function advancePrefaceWashProgress(
   previousProgress: number,
   positionMs: number,
   durationMs: number,
+  segments?: Segment[] | null,
 ): number {
-  return Math.max(previousProgress, prefaceWashProgress(positionMs, durationMs))
+  return Math.max(previousProgress, prefaceWashProgress(positionMs, durationMs, segments))
 }
 
 /** Fraction of the lead-in clip at which the SVG wash must be fully settled. */
@@ -195,13 +250,19 @@ export const InkEngine = {
   wordState,
   inRepeatChain,
   word,
+  minSweepFloorMs,
   sweepMs,
   startRevealed,
   glinting,
   prefaceState,
   prefaceWashProgress,
+  prefaceRampProgress,
+  prefaceFeather,
   advancePrefaceWashProgress,
   PREFACE_WASH_SETTLE_FRACTION,
+  DEFAULT_HIGHLIGHT_LEAD_MS,
+  getHighlightLeadMs,
+  setHighlightLeadMs,
   inkAlpha,
   resetTuning,
   setTuning,

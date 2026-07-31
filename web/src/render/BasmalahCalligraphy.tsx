@@ -4,9 +4,11 @@ import {
   type CSSProperties,
   type MouseEventHandler,
 } from 'react'
+import type { Segment } from '../data/models'
 import {
   advancePrefaceWashProgress,
   getTuning,
+  prefaceFeather,
   prefaceState,
   prefaceWashProgress,
   InkState,
@@ -31,6 +33,7 @@ export function BasmalahCalligraphy({
   onClick,
   active = false,
   dimmed = false,
+  segments,
   'data-state': dataState,
 }: {
   className?: string
@@ -40,6 +43,11 @@ export function BasmalahCalligraphy({
   active?: boolean
   /** Recessed while another ayah is recited. */
   dimmed?: boolean
+  /**
+   * Word timings of the lead-in clip, read per frame — they load in an idle
+   * task, so the wash may start on the ramp and pick them up mid-clip.
+   */
+  segments?: () => Segment[] | null
   'data-state'?: string
 }) {
   const btnRef = useRef<HTMLButtonElement>(null)
@@ -80,7 +88,7 @@ export function BasmalahCalligraphy({
     let raf = 0
     let cancelled = false
     const ps = player.getState()
-    let progress = prefaceWashProgress(ps.positionMs, ps.durationMs)
+    let progress = prefaceWashProgress(ps.positionMs, ps.durationMs, segments?.())
 
     const paint = (p: number) => {
       if (p >= 1) {
@@ -90,7 +98,7 @@ export function BasmalahCalligraphy({
       cover.style.opacity = '1'
       applyMask(
         cover,
-        cachedPaperCoverMask(p, resting, true, t.washFeather),
+        cachedPaperCoverMask(p, resting, true, prefaceFeather()),
       )
     }
 
@@ -101,6 +109,7 @@ export function BasmalahCalligraphy({
         progress,
         current.positionMs,
         current.durationMs,
+        segments?.(),
       )
       paint(progress)
       if (progress < 1) raf = requestAnimationFrame(tick)

@@ -1,13 +1,19 @@
 package com.beautifulquran.ui.reader
 
+import com.beautifulquran.data.model.Segment
+
 /**
  * Pure transport skip rules for the reader fast-forward control.
  *
- * Long ayahs (≥ [longAyahMinWords] segments) offer a one-shot midpoint skip.
- * The midpoint is consumed by **intent** (we already issued that seek), not by
- * waiting for [positionMs] to catch up — Media3 seeks are async, so a second
- * tap while position is still pre-midpoint must advance to the next ayah
- * rather than re-seeking the same midpoint forever.
+ * Long ayahs (≥ [LONG_AYAH_MIN_WORDS] segments) offer a one-shot midpoint skip
+ * to the first word at/after half the timed span. The midpoint is consumed by
+ * **intent** (we already issued that seek), not by waiting for [positionMs] to
+ * catch up — Media3 seeks are async, so a second tap while position is still
+ * pre-midpoint must advance to the next ayah rather than re-seeking the same
+ * midpoint forever.
+ *
+ * "Past halfway" uses the same time-based midpoint so natural play past half
+ * the ayah advances to the next verse on the first FF (#560).
  */
 internal object FastForwardPolicy {
 
@@ -27,11 +33,12 @@ internal object FastForwardPolicy {
         graceMs: Long = MIDPOINT_SEEK_GRACE_MS,
     ): Action {
         if (ayah < 1) return Action.None
-        val canMidSkip = midpointMs != null &&
+        if (
+            midpointMs != null &&
             midpointConsumedForAyah != ayah &&
             positionMs < midpointMs - graceMs
-        if (canMidSkip) {
-            return Action.SeekToMidpoint(ayah, midpointMs!!)
+        ) {
+            return Action.SeekToMidpoint(ayah, midpointMs)
         }
         if (ayah < ayahCount) return Action.SeekToAyah(ayah + 1)
         return Action.None
@@ -41,6 +48,19 @@ internal object FastForwardPolicy {
     fun nextConsumedAyah(action: Action): Int = when (action) {
         is Action.SeekToMidpoint -> action.ayah
         is Action.SeekToAyah, Action.None -> 0
+    }
+
+    /**
+     * Start of the first segment at or after half the ayah's timed span, or
+     * null when the ayah is too short for a mid-skip.
+     */
+    fun midpointMs(segments: List<Segment>): Long? {
+        if (segments.size < LONG_AYAH_MIN_WORDS) return null
+        val end = segments.maxOf { it.endMs }
+        if (end <= 0L) return segments[segments.size / 2].startMs
+        val half = end / 2L
+        return segments.firstOrNull { it.startMs >= half }?.startMs
+            ?: segments.last().startMs
     }
 
     const val LONG_AYAH_MIN_WORDS = 20

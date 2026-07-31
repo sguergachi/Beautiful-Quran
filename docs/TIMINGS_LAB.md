@@ -10,6 +10,21 @@ notice a mistimed word while reading → open the Lab (developer mode) →
 fix it in seconds → the reader is corrected immediately → submit the
 correction upstream when convenient.
 
+Whole-ayah drift caused by silence encoded at the beginning of an everyayah
+MP3 is handled systematically outside the Lab. `tools/detect_audio_onsets.py`
+measures the first sustained voice sample. Repeat-aware qdc rows are translated
+as a whole onto the exact MP3 clock by the median matching quran-align
+boundary; only the first wash is then clamped to the voice onset, leaving every
+later valid boundary and repeat unchanged. A row whose second word also
+predates voice is instead shifted uniformly. The onset is also stored
+separately as immutable MP3 metadata. The repository median-rebases older Lab edits against
+the current bundled row, so every word keeps its correction rather than fixing
+only the opening wash. Override schema 2 records a clock version per row:
+unversioned schema-1 rows migrate once at read time and are written straight
+back, so the reader, the Lab and an exported patch all describe the same marks.
+Every newly saved Lab row keeps its intentional word boundaries and receives
+only the opening voice floor.
+
 > **Entry is developer-only.** Default readers long-press a word to open the
 > [Root Word Viewer](ROOT_VIEWER.md), not the Lab. See *Where it lives*
 > below.
@@ -143,9 +158,9 @@ timings leave the DB; overrides are fused there, so the reader and the Lab
 read the same corrected numbers with no extra wiring:
 
 ```
-db timings row            ─┐
+db timings + audio onset  ─┐
 TimingOverrides[key]      ─┴─►  Map<ayah, List<Segment>>  ─►  HighlightEngine
-                                (override wins when present)
+                                (edit wins; whole row rebased to MP3 clock)
 ```
 
 The Lab's live preview additionally runs `HighlightEngine` directly over its
@@ -194,17 +209,52 @@ Free, no backend, no auth beyond the GitHub account:
    fenced ```json``` block. **Copy this ayah patch** / **Copy all patch JSON**
    are the clipboard fallbacks (and cover very large patches that exceed
    URL limits). Prefer one-ayah submits when iterating verse-by-verse.
-2. Maintainer saves the JSON block to `tools/timing_overrides/<anything>.json`
-   in the repo and runs `python3 tools/build_db.py`.
-3. `build_db.py` fetches/normalizes the open-dataset timings as usual, then
-   **applies every file in `tools/timing_overrides/` on top**, replacing (or
-   adding) the matching `(reciter, surah, ayah)` rows — with position-range
-   validation — before writing `quran.db`. Committed override files are
-   therefore permanent: every future DB rebuild reapplies them.
-4. Ship: bump `DB_FILE_NAME` (`quran-vN.db`) in `QuranDatabase.kt`, commit
-   the regenerated DB + the override file. Once the fixed DB is bundled, the
-   on-device override for that ayah can be cleared (or simply left — it now
-   matches the DB).
+2. **Maintainer / agent: fix systematically first, verify with a unit test.**
+   Do **not** paste every Lab issue straight into `tools/timing_overrides/`.
+   Agent checklist (mandatory): [AGENTS.md — Landing Timings Lab / GitHub
+   timing patches](../AGENTS.md#landing-timings-lab--github-timing-patches).
+
+   Before classifying, **diff the Lab positions against raw qdc**
+   (`tools/.cache/qdc_<id>.json`) and against the row **after**
+   `clean_qdc_artifacts` and **after** `timing_repairs` — the shipped DB may
+   already be wrong because a `drop` repair flattened a real re-say (#570).
+
+   | Class | Where to fix | Unit test |
+   |---|---|---|
+   | Structural qdc noise (forward spikes, strays, split slivers, non-contiguous / gap phantoms) | `clean_qdc_artifacts` in `tools/build_db.py` | Add `tools/timing_patch_cases/<id>.json` — broken `input_*` + expected `expected_*` from the patch; run `python3 tools/test_build_db.py` |
+   | Topology cannot distinguish a false loop from a genuine repeat | narrow typed operation under `tools/timing_corrections/` | `pipeline: timing_correction` case |
+   | Drop repair that flattens a real span-repeat | `apply_timing_repairs` span-protect (and regenerate repairs) | `pipeline: erases_span_repeat` case in `timing_patch_cases/` |
+   | Repair flattens a peer same-word re-say while fixing elsewhere | per-position `preserve_peer_repeats` | `pipeline: preserve_peer_repeats` case |
+   | Repeat-vs-split / CTC | `tools/timing_repairs/` generator | `~/qasr` tests + rebuild repairs |
+   | Boundary displacement without a topology change | weighted qdc / quran-align evidence, then a surgical `kind: "boundary"` repair | `pipeline: boundary_repair` focused case |
+   | Incomplete row or unsafe MP3 clock | source/class fix; finalizer completes, falls back, or withholds | completion/physics checks in `tools/test_build_db.py` |
+
+   The patch case **is** the verification for systematic fixes: the Lab/GitHub
+   payload supplies the expected shape; the cleaner must reproduce it. See
+   [tools/timing_patch_cases/README.md](../tools/timing_patch_cases/README.md)
+   and [tools/timing_overrides/README.md](../tools/timing_overrides/README.md).
+
+   **Anti-pattern:** saving the issue fenced JSON under `timing_overrides/`
+   without classifying. That was the first #570 attempt; #571 fixed the class
+   (gap phantoms + span-protect) and deleted the override.
+3. A JSON may be placed in `tools/timing_overrides/` temporarily to reproduce
+   the report, but CI rejects committed one-off overrides. Pacing validation
+   uses the actual karaoke window (`start_ms` to the next `start_ms`) and
+   compares normalized word length. Candidate boundaries are checked against
+   the bundled/CTC row and independent quran-align timing after removing the
+   per-ayah median clock offset. Quran-align has weight 2 and the bundled row
+   weight 1; ≤250 ms supports a boundary and >500 ms conflicts. Timestamps are
+   never averaged, and one-pass evidence never judges repeat backtracks.
+4. Typed corrections run before generated structural evidence. Repairs are
+   rebased onto the latest source row. Only changed
+   topology and its immediate neighbours use the repair clock; equal spans
+   retain current source timings. Span protection rejects repairs that flatten
+   a multi-word re-recitation; peer same-word re-says are restored per position
+   so unrelated repairs still apply. Boundary repairs replace only their listed,
+   uniquely occurring positions.
+5. Run `python3 tools/test_build_db.py`, rebuild `quran.db`, bump
+   `DB_FILE_NAME`, and commit the systematic code, regression case, and DB.
+   Delete any local override JSON first.
 
 The patch JSON shape (also the shape `tools/timing_overrides/*.json` accepts):
 
@@ -237,8 +287,10 @@ timingslab/
     TimingsPatch.kt         overrides → GitHub issue deep-link / clipboard
 data/QuranRepository.kt     timings() fuses overrides over the DB
 ui/reader/ReaderComponents  AyahBlock — reused as-is for the live preview
-tools/build_db.py           applies tools/timing_overrides/*.json at build time
-tools/timing_overrides/     committed, reviewed correction patches
+tools/build_db.py           cleaner + span-protect + repair rebase + validation
+tools/timing_patch_cases/   unit-test fixtures: Lab/GitHub patches → pipeline expectations
+tools/test_build_db.py      runs every timing_patch_cases/*.json (no network)
+tools/timing_overrides/     local reproduction scratch; empty in commits
 ```
 
 ## Conventions kept

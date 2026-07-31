@@ -1,6 +1,6 @@
 # Tajweed-paced ink
 
-**Status: implemented on Android, off by default behind the Ink Lab's
+**Status: implemented on Android, on by default and tunable behind the Ink Lab's
 "Tajweed pacing" toggle (Settings → Developer → Ink Lab overlay → Tajweed
 tab). The web port and measured letter widths are not yet built — the design
 for those lives below.**
@@ -98,10 +98,12 @@ letter + its combining marks), then weight each event in harakah counts:
 
 Normalize to cumulative time fractions `t₀=0 … tₙ=1`. Zero-weight letters
 merge into their neighbour's glide (see the curve section). Cross-word **nūn
-rules** (idghām / iqlāb / ikhfāʾ) use same-ayah `prevArabic` / `nextArabic`:
-hold on the next word's first letter; early exit on the previous word's
-trailing nūn. Iẓhār (ءهعحغخ) and cross-ayah wasl are not connected. Madd
-ʿāriḍ letter choice at waqf remains a force-weight on the final letter.
+rules** (idghām / iqlāb / ikhfāʾ) use same-ayah `prevArabic` to hold on the
+next word's first letter. The donor keeps its ordinary sweep while the
+separate prefix bloom carries ink across the junction; Wasl never accelerates
+the donor. Iẓhār (ءهعحغخ) and cross-ayah wasl are not connected. Madd ʿāriḍ
+letter choice at waqf force-weights the final letter, unless the caller asks
+for `Hold.maddAaridWaqf` (see Waqf below).
 Counts live as named constants in `TajweedPacing`.
 
 **The counts pick the moment, not the tempo.** An earlier revision spread
@@ -186,29 +188,107 @@ The model is therefore a **gated hint**, built from four parts:
   actually sustaining. This is the one case that deliberately cruises past
   `cruiseCap` (up to ~2.2× the word's own uniform rate, still slower in
   absolute terms than an ordinary word because the word is so much longer).
+  `Hold.maddAaridWaqf` moves that park onto the **madd letter the stop
+  lengthens** — the ي of "ar-raḥīīīm", with the closing م crossed after the
+  park — which is what madd ʿāriḍ actually is. Off by default: the two letters
+  are adjacent and the wash feather blurs most of the difference, so flipping it
+  page-wide is a pacing change that wants its own review. The basmalah preface
+  (`BasmalahWash`) opts in, where that one park is over half the clip.
 - **Wasl connect (nūn rules).** When the **previous** word ends in nūn sākinah
   or tanwīn and **this** word starts with idghām (`يرملون`), iqlāb (`ب`), or
   ikhfāʾ (the fifteen letters), the nūn is absorbed under wasl and the
   reciter sustains **this word's opening letter** (e.g. `مَن يَقُولُ`,
   `مِن قَبۡلُ`, `نُوحٖ وَٱلنَّبِيِّـۧنَ`,
-  `رُّسُلٗا مُّبَشِّرِينَ`). `prevArabic` arms that entry hold;
-  `nextArabic` softens the previous word's exit (letters finish by ~82 % of
-  the spoken span so the trailing nūn is not settled at handoff). During the
-  freed tail, a narrow soft wash blooms only the next word's opening glyph;
-  it remains inked across the word-timing boundary while the ordinary
-  whole-word wash continues from the same spatial leading edge. The prefix
-  uses its one-letter fraction for both travel and feather, retaining the
-  smootherstep edge without brightening the following glyph. Its completed
-  edge becomes the active sweep's starting point, so the opening letter is
-  not replayed and the wash immediately advances through the remaining word.
-  That continuation is armed only on a natural adjacent-word handoff, never
-  a seek. Same-ayah neighbours only (`Hold.connect`, default on).
-  Iẓhār and cross-ayah wasl are left alone.
+  `رُّسُلٗا مُّبَشِّرِينَ`). `prevArabic` arms that entry hold. The donor's
+  main wash keeps its normal timing and may overlap the connected carry-in;
+  it is never compressed to make room for Wasl. During the donor tail, the
+  next word's ordinary ink wash begins early: window time
+  over the tail maps onto a short main-wash segment (`waslWashProgress` →
+  `waslContinuationStart`) with the same feather as the active word, not a
+  one-glyph wipe. The soft edge therefore breathes at the main wash rate and
+  hands off on the same spatial leading edge when the timing boundary
+  arrives. Window progress is **smoothstepped**, and a **speed ceiling**
+  stretches short wasl donors (see [Short wasl donors](#short-wasl-donors--speed-ceiling)
+  below). When the donor is too short to fit that ceiling, its first 25 %
+  remains untouched and only the progress honestly reached is handed to the
+  active sweep; the incoming word finishes the same fade instead of snapping
+  its opening letter on. That continuation is armed only on a natural adjacent-word
+  handoff, never a seek. Same-ayah neighbours only (`Hold.connect`, default
+  on). Iẓhār and cross-ayah wasl are left alone.
 - **Waqf length scale.** `Hold.waqfLengthScale` (Ink Lab: **Waqf length
-  scale**, default 0.7) multiplies `waqfShare` by a letter-count ramp: 0 =
+  scale**, shipped default 1) multiplies `waqfShare` by a letter-count ramp: 0 =
   full share on every closer; 1 = linear from ~0 at 3 letters to full share
   at 8+ pronounced letters. Medium closers like `عَظِيمًا` keep a readable
   run-up when the hold slider is high; long closers still park hard.
+
+### Short wasl donors — speed ceiling
+
+**Product case.** Short nūn donors (`مَن`, `مِن`, and similar ~400–600 ms
+holds) feed idghām / ikhfāʾ / iqlāb into the next word. The reciter is already
+on the **next** opening letter during the donor's tail, so ink must start
+blooming that opening **before** the word-timing handoff. Concrete audition
+pairs:
+
+| Pair | Where | Rule |
+|------|--------|------|
+| `مَن يَشْرِى` | 2:207 | idghām (ن + ي) |
+| `مِن رَّبِّكُم` | 5:68 | idghām (ن + ر) |
+| `مِن قَبۡلُ` | e.g. 2:26 | ikhfāʾ (ن + ق) |
+
+**What went wrong without a ceiling.** The carry-in is a main-wash segment
+over the donor's freed tail (`waslWashProgress` → `waslContinuationStart`),
+not a full-word sweep. Mapping that segment only onto the last ~18 % of a
+~500 ms donor left ~90–250 ms of motion — the next opening **popped** while
+wasl **off** still looked soft (whole-word min-sweep). Users correctly
+reported: wasl-aware mode looked *worse* than plain wash on these pairs.
+
+**Speed ceiling (shipped).** `TajweedPacing.waslPrefixStart(sweepMs)` chooses
+when the next-letter bloom begins:
+
+| Constant / knob | Role | Shipped |
+|-----------------|------|---------|
+| `DEFAULT_WASL_PREFIX_MS` / `Tuning.waslPrefixMs` | Target wall-clock for the bloom | **480 ms** |
+| `MAX_WASL_PREFIX_WINDOW` | Max fraction of a short donor spent on the bloom | **0.75** |
+| `MIN_WASL_PREFIX_WINDOW` | Floor (= final 18% junction) for long donors | **0.18** |
+| `DEFAULT_WASL_HANDOFF` / `Tuning.waslHandoff` | Max bloom clock laid before activation | **0.45** |
+
+Ink Lab → **Tajweed** → **Wasl prefix ms** (120–900) live-tunes
+`waslPrefixMs`; **Wasl pre-ink** (0–1) controls how much may arrive before
+activation. Both persist with the other lab numbers and **Copy values**
+includes them.
+
+So a ~500 ms `مَن` claims ~75 % of its span (~375 ms) for a smoothstepped
+fade into `يَشْرِى` / `رَّبِّكُم` and carries its unfinished edge
+forward; an 800 ms donor hits the full ~480 ms target; multi-second donors
+stay near the late junction (~18–24 % window).
+No connection completes its prefix before activation: the shipped 0.45 clock
+cap becomes roughly 0.43 after smoothstep, leaving most of the word's ordinary
+wash visible. This matters for wrapped connections such as Alafasy 2:231
+`بِمَعۡرُوفٖۚ → وَلَا`: its 2.22 s donor easily fits the old 480 ms bloom and
+used to present the opening of `وَلَا` fully formed across the line break.
+
+The default Alafasy timing at 2:207 is shorter still: `مَن` has a 220 ms
+segment (254 ms after the sweep floor), leaving only ~190 ms after the initial
+quarter-word pause. That tail now reaches roughly 35 % of the eased bloom and
+the active `يَشۡرِي` sweep continues from exactly that edge. It is never
+normalized to 100 % merely because the timing boundary arrived.
+An earlier 50 % cap made the old 320 ms floor **unreachable** on short holds
+(only ~250 ms actual) — do not reintroduce that without re-checking 2:207.
+
+**Handoff.** When the next word becomes Active on a natural adjacent pass,
+the main sweep starts at the prefix edge actually reached. Donors with at
+least the target window reach `waslContinuationStart`; shorter donors carry a
+partial `waslWashProgress` and finish softly inside the incoming sweep. The
+opening letter is neither replayed nor forced complete. Seek / activation bump
+does not arm continuation.
+
+**Regression checks.** With Tajweed + Connect on: play 2:207 through
+`مَن يَشْرِى` and 5:68 through `مِن رَّبِّكُم` — the next opening must
+*ease* in during the donor's end, not snap; the rest of the second word then
+continues the same soft edge. With Connect off, behavior matches a plain
+word wash (no early prefix). JVM: `TajweedPacingTest` short/long
+`waslPrefixStart` cases and connection bloom tests.
+
 
 Breakpoints `(tᵢ, xᵢ)` — time fraction → width fraction, two per hold and one
 per plain letter — are evaluated as a **monotone piecewise-linear** map (a
@@ -234,8 +314,8 @@ Two refinements built into the curve, not the callers:
 ## Integration — what changed where (Android, implemented)
 
 - **`InkEngine`** — `sweepMs` unchanged.
-  `InkEngine.pacing(arabic, activeWord, isAyahFinal, prevArabic, nextArabic)`
-  returns the nullable curve (gated on `Tuning.tajweedPacing`, default off)
+  `InkEngine.pacing(arabic, activeWord, isAyahFinal, prevArabic)`
+  returns the nullable curve (gated on `Tuning.tajweedPacing`, default on)
   and assembles a `TajweedPacing.Hold` from the tuning;
   `InkEngine.pacedFeather()` supplies the paced edge. Knobs on the Ink Lab's
   **Tajweed** tab: the `tajweedPacing` master toggle, `holdMadd` /
@@ -254,11 +334,13 @@ Two refinements built into the curve, not the callers:
   the curve itself is tracked live (`rememberUpdatedState`), so every Ink Lab
   knob reshapes the word already on screen instead of waiting for the next
   activation. `AyahBlock` also passes `isAyahFinal` (the active word's position
-  vs `ayah.words.last()`), which arms the waqf hold, and the previous/next
-  words' `arabic` for wasl nūn entry and exit. A detected connection also
-  drives a prefix-only overlay on the next shaped word over the prior word's
-  final 18%; on handoff that prefix stays full and the main wash resumes from
-  its completed edge, so the wāw/other target never dims or restarts.
+  vs `ayah.words.last()`), which arms the waqf hold, and the previous word's
+  `arabic` for wasl nūn entry. A detected connection separately
+  drives a main-feather wash overlay on the next shaped word over the prior
+  word's wasl window (default final 18%; short donors stretch earlier via
+  `waslPrefixStart`), advancing only to `waslContinuationStart` (not a full
+  wipe); on handoff that edge holds and the main wash resumes from the same
+  progress, so the wāw/other target never dims or restarts.
 - **Feather** — the make-or-break visual change, and the one the first
   revision got wrong. `letterFadeIn`'s wide edge is *what makes the reveal
   ethereal*: at 1.6× the word width the wash reads "closer to a whole-word
@@ -266,15 +348,19 @@ Two refinements built into the curve, not the callers:
   pacing was too subtle to see at that width, so it narrowed the edge to
   0.3–0.8 — up to 3× sharper — and the softness went with it. A hold does not
   need a sharp edge: the bloom visibly *stopping* is legible at any feather.
-  So `pacedFeather` now defaults to 1.6, identical to `washFeather`, and stays
-  a slider for auditioning. `ShapedWordBloom.InkReveal` keeps its optional
-  per-bloom `feather` override for that path.
+  So `pacedFeather` ships slightly sharper than `washFeather` (1.1857 vs 1.6)
+  so holds stay legible without a hard edge, and remains a slider for
+  auditioning. `ShapedWordBloom.InkReveal` keeps its optional per-bloom
+  `feather` override for that path.
 - **Web renderer (pending)** — `runWash` accepts a `(t: number) => number`
   easing in place of the bezier tuple (Motion supports custom easing
   functions); the active-word wash passes the curve, everything else keeps
   the bezier. The 48-step mask quantization is applied *after* the curve, so
   plateaus render as repeated identical masks — free.
-- **Unchanged** — repeat wash (decorative, stays constant-rate bezier),
+- **Repeat wash** — a repeated active word captures the same curve and paced
+  feather as first-pass ink. Its clock follows the measured word sweep with
+  `repeatSweepMs` as a minimum, preserving the sequential residual finish for
+  short segments while long madd/waqf repeats visibly sustain.
   `secondaryAlpha` gloss/translit tracking (it reads the paced sweep value,
   so the gloss breath follows the dwell), all `HighlightEngine` semantics,
   the 33 ms poll.
@@ -300,7 +386,8 @@ Known approximations, accepted for v1:
 - Widths are uniform per letter event (see the width-fractions section).
 - Cross-word nūn rules (idghām / iqlāb / ikhfāʾ) are implemented same-ayah;
   cross-ayah wasl and iẓhār are not. Madd ʿāriḍ at waqf still force-weights
-  the final letter rather than detecting the madd letter. Hamzat wasl is
+  the final letter by default; `Hold.maddAaridWaqf` detects the madd letter and
+  is on only for the basmalah preface. Hamzat wasl is
   always treated as elided (true mid-flow, slightly early at an utterance
   start).
 - Word-level `startMs`/`endMs` are themselves ±73 ms — letter pacing inherits
@@ -336,11 +423,12 @@ the curve, not the weights, is the module boundary.
   `waqfShare` buys a longer stillness and `waqfLengthScale` protects short /
   medium closers' run-up;
   wasl entry (`مَن`→`يَقُولُ`, ikhfāʾ, iqlāb) parks on the next opening letter
-  and wasl exit finishes the previous word early; the exact 4:163
-  `نُوحٖ`→`وَٱلنَّبِيِّـۧنَ` pair blooms its wāw from 82–100% of the prior
-  word; no segment anywhere outruns the cruise cap; and every knob combination
-  stays monotone and bounded with exact endpoints. **The golden literals must
-  stay byte-identical to the DB** — an
+  without changing the donor's own pacing; the exact 4:163
+  `نُوحٖ`→`وَٱلنَّبِيِّـۧنَ` pair blooms its wāw over the prior-word tail
+  (smoothstepped; ~480 ms speed ceiling / up to 75 % of short donors via
+  `waslPrefixStart`); no segment anywhere outruns the cruise cap; and every
+  knob combination stays monotone and bounded with exact endpoints. **The
+  golden literals must stay byte-identical to the DB** — an
   editor or tool that NFC-normalizes the file fuses `ا + ٓ` into precomposed
   `آ` (U+0622) and silently changes the weights (the parser now unfuses U+0622
   defensively, but the DB itself is always decomposed).

@@ -1,0 +1,23 @@
+{
+  "id": "unsplit-allow-fragment-merge",
+  "label": "unsplit of a true split fragment is not blocked",
+  "refs": [
+    "clean_qdc_artifacts split-fragment gate"
+  ],
+  "pipeline": "preserve_peer_repeats",
+  "notes": "A short onset sliver + full body is a mid-word split (fragment), not a peer re-say. Per-position repeat protection must leave the repaired single span alone.",
+  "input_segments": [
+    [1, 0, 800],
+    [2, 800, 1600],
+    [3, 1600, 1810],
+    [3, 1810, 3100],
+    [4, 3100, 4000]
+  ],
+  "repair_segments": [
+    [1, 0, 800],
+    [2, 800, 1600],
+    [3, 1600, 3100],
+    [4, 3100, 4000]
+  ],
+  "expected_positions": [1, 2, 3, 4]
+}

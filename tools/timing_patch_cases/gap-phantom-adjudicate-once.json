@@ -1,0 +1,11 @@
+{
+  "id": "gap-phantom-adjudicate-once",
+  "label": "one skipped first-pass gap is adjudicated only once",
+  "refs": [
+    "combined backtrack-run and forward-duplicate edge case"
+  ],
+  "pipeline": "clean_qdc_artifacts",
+  "notes": "The backtrack run fills words 4 and 5. The following repeated word 6 is then a real same-word re-say, not a second witness for the already-filled gap.",
+  "input_positions": [1, 2, 3, 1, 2, 6, 6, 6, 7],
+  "expected_positions": [1, 2, 3, 4, 5, 6, 6, 6, 7]
+}
