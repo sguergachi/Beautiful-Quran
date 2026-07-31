@@ -93,8 +93,10 @@ Then, in place:
 
 1. A caret appears on the note line beneath the verse, at exactly the
    position the finished note will occupy, and the keyboard rises. The focus
-   engine parks the field 16 dp above the IME, as low as safely possible so the
-   page shows the largest available portion of the verse above it.
+   engine reads the keyboard's completed inset before moving, then parks the
+   field 16 dp above the IME in one slow, direction-locked glide. The landing is
+   as low as safely possible so the page shows the largest available portion of
+   the verse above it.
 2. The reader writes. The line grows downward; the verse above never moves.
    Playback, if running, is **not** interrupted, but scripture taps cannot
    start or seek playback and bookmark ribbons cannot toggle while the field
