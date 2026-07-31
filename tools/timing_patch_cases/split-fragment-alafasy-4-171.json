@@ -1,0 +1,25 @@
+{
+  "id": "split-fragment-alafasy-4-171",
+  "label": "Alafasy 4:171 dwarfed إِلَىٰ tail is a split, not a peer re-say",
+  "refs": [
+    "issue #634",
+    "Timings Lab Google/Pixel 10 v0.5",
+    "CTC unsplit Alafasy 4:171"
+  ],
+  "pipeline": "clean_qdc_artifacts",
+  "notes": "qdc emits word 22 as 1600 ms + 600 ms flush halves (ratio 0.375). The 600 ms piece is a trailing split before word 23, not a second utterance — Lab removes the false orange bloom. The prior CEIL of 500 ms left 600 ms tails classified as peers, so preserve_peer_repeats also blocked the CTC unsplit.",
+  "input_segments": [
+    [21, 18840, 19740],
+    [22, 19740, 21340],
+    [22, 21340, 21940],
+    [23, 21940, 22720],
+    [24, 22720, 23590]
+  ],
+  "expected_positions": [21, 22, 23, 24],
+  "expected_segments": [
+    [21, 18840, 19740],
+    [22, 19740, 21940],
+    [23, 21940, 22720],
+    [24, 22720, 23590]
+  ]
+}
