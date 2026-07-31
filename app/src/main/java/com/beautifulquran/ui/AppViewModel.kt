@@ -38,7 +38,7 @@ object AppViewModelFactory : ViewModelProvider.Factory {
             modelClass.isAssignableFrom(TimingsLabViewModel::class.java) ->
                 TimingsLabViewModel(app.repository, app.settings, app.player, app.timingOverrides) as T
             modelClass.isAssignableFrom(RootViewerViewModel::class.java) ->
-                RootViewerViewModel(app.repository, app.settings, app.player) as T
+                RootViewerViewModel(app.repository, app.lexicon, app.settings, app.player) as T
             modelClass.isAssignableFrom(ShareViewModel::class.java) ->
                 ShareViewModel(app.repository, app.player) as T
             modelClass.isAssignableFrom(OrnamentsLabViewModel::class.java) ->

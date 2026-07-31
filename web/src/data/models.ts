@@ -93,6 +93,8 @@ export interface RootLemmaSummary {
   lemma: string
   pos: string
   occurrenceCount: number
+  /** Most common word-by-word English rendering of this form; may be ''. */
+  gloss: string
 }
 
 /** The word currently being recited — mirrors Android `ActiveWord`. */

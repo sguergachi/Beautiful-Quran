@@ -3680,9 +3680,34 @@ select {
 
 .root-occurrences,
 .root-related,
+.root-lexicon,
 .root-references {
   max-width: 34rem;
   margin-inline: auto;
+}
+
+/* Lane's article: English prose with Arabic set inline, his own divisions
+   kept as line breaks. */
+.root-lexicon-entry {
+  margin: var(--root-space-5) 0 0;
+  color: var(--ink);
+  font-size: 1rem;
+  line-height: 1.75;
+  white-space: pre-line;
+}
+
+.root-lexicon-arabic {
+  font-family: var(--font-arabic);
+  font-size: 1.15em;
+  line-height: 1.6;
+  unicode-bidi: isolate;
+}
+
+.root-lexicon-credit {
+  margin: var(--root-space-4) 0 0;
+  color: var(--ink-muted);
+  font-size: 0.8125rem;
+  line-height: 1.5;
 }
 
 .root-chapter-heading {
@@ -3805,10 +3830,20 @@ select {
 .root-related-row {
   display: flex;
   min-height: 48px;
+  flex-wrap: wrap;
   align-items: baseline;
   justify-content: space-between;
-  gap: var(--root-space-4);
+  gap: var(--root-space-1) var(--root-space-4);
   padding: var(--root-space-3) 0;
+}
+
+/* The English gloss takes its own line beneath the form and its count. */
+.root-related-gloss {
+  flex-basis: 100%;
+  margin: 0;
+  color: var(--ink-muted);
+  font-size: 1rem;
+  line-height: 1.5;
 }
 
 .root-related-form {
