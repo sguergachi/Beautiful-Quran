@@ -21,6 +21,11 @@ Quick essentials (details and rationale in AGENTS.md):
   / repairs, lock with `tools/timing_patch_cases/` + `python3 tools/test_build_db.py`.
   Overrides are last resort for true one-off boundaries only. Full checklist:
   AGENTS.md invariant #8 and "Landing Timings Lab / GitHub timing patches".
+- **Chesterton's fence.** Guards, gates and "too broad" assertions here are
+  load-bearing and their reason is rarely written next to them. Before
+  weakening or deleting one, run `git log -S "<the line>"` and read the commit
+  that added it. If you cannot say what breaks without it, don't touch it.
+  Full rule: AGENTS.md invariant #9. Worked examples: `docs/CHESTERTON.md`.
 
 ## PR Workflow
 

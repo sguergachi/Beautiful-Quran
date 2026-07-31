@@ -92,16 +92,25 @@ Requires **JDK 21**. No Android device/emulator is needed for tests.
 ./gradlew testDebugUnitTest     # unit tests — run these before committing
 ./gradlew assembleDebug         # debug APK
 ./gradlew assembleRelease       # what CI ships (R8-minified; falls back to debug keystore)
+python3 tools/test_build_db.py  # timing pipeline regressions (~1s, no Gradle)
 ```
 
-- `data/lexicon.db` is committed too, and is rebuilt only to deliberately
-  change the lexicon: `python3 tools/build_lexicon_db.py` (downloads the pinned
-  Perseus TEI XML into `tools/.cache/`, ~32 MB). It needs `quran.db` to exist,
-  since it keys entries by the roots that database already carries.
+- **Toolchain, if Gradle can't find it.** A non-login shell inherits neither,
+  so export both: `JAVA_HOME` (`/usr/lib/jvm/java-21-openjdk` on Arch/CachyOS,
+  `/usr/lib/jvm/java-21-openjdk-amd64` on Debian/Ubuntu images) and
+  `ANDROID_HOME=$HOME/Android/Sdk`. `local.properties` is gitignored, so a
+  fresh clone or worktree has no `sdk.dir` and relies on `ANDROID_HOME`.
+- **`./gradlew lintDebug` fails on purpose.** ~37 pre-existing Media3
+  `@UnstableApi` opt-in errors. The real gate is `lintVitalRelease` inside
+  `assembleRelease` (`checkReleaseBuilds = false`). Not a regression.
 - `data/quran.db` is **committed**, so a fresh clone builds
   offline with no extra steps. Only run `python3 tools/build_db.py` if you are
   deliberately changing the data (it downloads sources over HTTPS into
   `tools/.cache/` and regenerates the asset).
+- `data/lexicon.db` is committed too, and is rebuilt only to deliberately
+  change the lexicon: `python3 tools/build_lexicon_db.py` (downloads the pinned
+  Perseus TEI XML into `tools/.cache/`, ~32 MB). It needs `quran.db` to exist,
+  since it keys entries by the roots that database already carries.
 - `docs/ornaments.css` and `docs/ornaments/*.svg` are **committed** too: the
   Pages workflow copies `docs/` verbatim, so the product page can't run the
   TypeScript ornament generator itself. `npm run build:ornaments` (from `web/`)
@@ -121,6 +130,10 @@ Requires **JDK 21**. No Android device/emulator is needed for tests.
    assets to internal storage keyed on `QuranDatabase.DB_FILE_NAME`
    (`quran-vN.db`). If you change the database content in any way, bump that
    suffix or existing installs silently keep the stale cached copy.
+   `DatabaseFingerprintTest` enforces this for both: `data/<asset>.sha256` pins
+   each digest to the version it was bumped for, so regenerating a database
+   means updating **both** lines in that file and its `DB_FILE_NAME` to match.
+   A red fingerprint test is the bump you forgot, not a flake.
 2. **The data pipeline is a build step, not app code.** All data messiness
    (source mismatches, basmalah offsets, truncated upstream files) is resolved
    in `tools/build_db.py` with validation. The app assumes a clean, consistent,
@@ -161,6 +174,15 @@ Requires **JDK 21**. No Android device/emulator is needed for tests.
    Canonical anti-pattern: the first #570 attempt (one-off override); the
    correct fix is #571 (gap phantoms + span-protect).
 
+9. **Chesterton's fence: find out why before you take it down.** Guards, gates
+   and "obviously too broad" assertions here are usually load-bearing, and the
+   reason is rarely written next to them. Before weakening, narrowing or
+   deleting one, run `git log -S "<the line>"` and read the commit that added
+   it. If you cannot say what breaks without it, you may not change it.
+   Reporting "this looks too aggressive, here is what it turned out to be for"
+   is a good outcome; quietly relaxing it is not. Worked example — a check that
+   looks wrong and isn't: [docs/CHESTERTON.md](docs/CHESTERTON.md).
+
 ## Landing Timings Lab / GitHub timing patches
 
 When the user asks to "fix the timing issue", "apply the timings patch", or
@@ -194,6 +216,30 @@ Full write-ups: [docs/TIMINGS_LAB.md](docs/TIMINGS_LAB.md),
 [tools/timing_overrides/README.md](tools/timing_overrides/README.md),
 [tools/timing_repairs/README.md](tools/timing_repairs/README.md).
 
+## Reading this codebase without burning context
+
+Four files are large enough that opening one whole costs more than the rest of
+this document combined: `ReaderComponents.kt` (~36k tokens),
+`ReaderScreen.kt` (~31k), `build_db.py` (~23k), `SettingsScreen.kt` (~14k).
+
+- **Grep for the symbol, then read a window around the hit.** `grep -n` for the
+  function or property, then read with an offset and a limit. Do not open these
+  files whole "to get oriented" — you will spend a third of your context before
+  the first edit.
+- **Prefer the extracted policy file over the composable.** Most reader
+  decisions already live in small pure files next to their tests —
+  `InkEngine.kt`, `OrderedWashGate.kt`, `FastForwardPolicy.kt`,
+  `ReaderSessionGate.kt`, `SearchHitFlash.kt`, `RootReturnTarget.kt`. If a
+  behavior has a name, it usually has its own file; find that first.
+- **`docs/DESIGN.md` is ~12k tokens across 11 sections.** Read the section for
+  the surface you are touching, not the whole file. The hard rules are
+  invariant #4 above.
+- **New logic goes in a pure function, not in the composable.** Every ink bug
+  fixed in the last 120 commits (#485, #573, #575, #580, #587) was fixed by
+  extracting the decision out of Compose and testing it. `InkEngine.kt` changed
+  20 times in that window and never regressed; the untested composables around
+  it account for most of the `Fix …` commits.
+
 ## Code conventions
 
 - Kotlin official style; Compose function-per-component; one file per screen
@@ -218,6 +264,9 @@ Full write-ups: [docs/TIMINGS_LAB.md](docs/TIMINGS_LAB.md),
 | `docs/quality-reviews/` | Multi-agent Android quality audits (summary + Grok/Codex; Claude when available) |
 | `docs/quality-reviews/AGENT_REVIEWS.md` | **How to run real Codex (`gpt-5.6-sol`) and Claude Opus reviews** — CLI flags, gotchas; do not fake them with Grok |
 | `docs/HIGHLIGHT_ENGINE.md` | The pure word-sync engine — karaoke model, binary search, repeat/high-water logic |
+| `docs/INK_ENGINE.md` | **The wash itself** — `InkEngine.kt`, the most-changed subsystem in the repo |
+| `docs/TAJWEED_PACING.md` | Letter-level ink pacing, wasl handoff, QPC orthography pitfalls |
+| `docs/CHESTERTON.md` | Worked examples for invariant #9 — guards that look wrong and aren't |
 | `docs/OUTPUT_LATENCY.md` | Route-based Bluetooth/output lag presets applied before the highlight clock |
 | `docs/DESIGN.md` | Any UI/visual change — the paper metaphor and its hard rules |
 | `docs/PERFORMANCE.md` | Anything touching the reader, scrolling, or the highlight loop |
@@ -230,15 +279,11 @@ Full write-ups: [docs/TIMINGS_LAB.md](docs/TIMINGS_LAB.md),
 | `docs/TIMINGS_LAB.md` | In-app timing editor + maintainer apply path (systematic first) |
 | `tools/timing_patch_cases/README.md` | **Required** unit tests when landing a Lab/GitHub timing patch systematically |
 | `tools/timing_overrides/README.md` | Local patch reproduction; committed JSON is rejected |
-| This file § Landing Timings Lab… | Agent checklist when asked to fix/close a timings issue |
 | `docs/WEB.md` | Web port plan — Focus / Highlight / Ink engines + paper reader in the browser |
 
 ## Working style
 
 - Branch off `master`; keep commits focused with clear, descriptive messages.
-- Run `./gradlew testDebugUnitTest` before pushing — CI blocks on it.
-- If a change alters what `tools/build_db.py` produces, regenerate `quran.db`,
-  commit the new asset, and bump the DB version (invariant #1).
 - Update the relevant doc in `docs/` when you change behavior it describes —
   the docs are load-bearing and kept accurate.
 
@@ -265,25 +310,14 @@ build-tools 36.0.0 for `compileSdk`). `JAVA_HOME`/`ANDROID_HOME`/`PATH` are
 exported from `~/.bashrc`, so **login shells are already set up** — standard
 build/test commands from the "Build, test, run" section above work as-is.
 
-- **Build with JDK 21.** Prefer Temurin/OpenJDK 21 for the Gradle daemon and
-  `jvmTarget`. If you invoke Gradle from a non-login shell that didn't source
-  `~/.bashrc`, set `JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64` first.
-- **`local.properties` is gitignored** and points Gradle at the SDK
-  (`sdk.dir=$HOME/Android/Sdk`). The startup update script re-creates it, so a
-  fresh checkout still builds. Install `platforms;android-37.0` and
-  `build-tools;36.0.0` if they are missing (`compileSdk` uses API 37.0).
-- **Emulator / GUI run works here.** Use the repo scripts (KVM is available):
-  `scripts/setup_android_emulator.sh` once if needed, then
-  `scripts/run_android_app.sh` (windowed by default; host GPU + X11). Still
-  verify with `./gradlew testDebugUnitTest` and APK builds
-  (`assembleDebug` / `assembleRelease`) before committing. The signature
-  word-sync feature lives in the pure-JVM `HighlightEngine` and is fully
-  unit-testable without a device. You can also inspect real bundled data with
-  `sqlite3 data/quran.db`.
-- **`./gradlew lintDebug` fails on purpose here.** It reports ~37 pre-existing
-  Media3 `@UnstableApi` opt-in errors. The real lint gate is `lintVitalRelease`,
-  which runs inside `assembleRelease` with `checkReleaseBuilds = false` (see
-  `app/build.gradle.kts`). Don't treat a `lintDebug` failure as a regression.
+- The startup update script re-creates `local.properties`, so a fresh checkout
+  builds. Install `platforms;android-37.0` and `build-tools;36.0.0` if missing
+  (`compileSdk` uses API 37.0).
+- **Emulator / GUI run works here** (KVM available): `scripts/run_android_app.sh`
+  after a one-time `scripts/setup_android_emulator.sh`. Still verify with
+  `./gradlew testDebugUnitTest` before committing — the signature word-sync
+  feature is pure-JVM `HighlightEngine` and needs no device. Inspect bundled
+  data with `sqlite3 data/quran.db`.
 
 # GPT/Codex specific instructions
 
