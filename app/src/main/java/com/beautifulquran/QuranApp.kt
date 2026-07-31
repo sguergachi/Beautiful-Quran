@@ -5,6 +5,8 @@ import com.beautifulquran.assistant.AssistantAction
 import com.beautifulquran.assistant.VoiceShortcuts
 import com.beautifulquran.data.BookmarkRepository
 import com.beautifulquran.data.AnnotationRepository
+import com.beautifulquran.data.LexiconDatabase
+import com.beautifulquran.data.LexiconRepository
 import com.beautifulquran.data.QuranDatabase
 import com.beautifulquran.data.QuranRepository
 import com.beautifulquran.data.SettingsRepository
@@ -22,6 +24,9 @@ class QuranApp : Application() {
     val assistantActions = MutableSharedFlow<AssistantAction>(extraBufferCapacity = 1)
 
     lateinit var repository: QuranRepository
+        private set
+    /** Lane's Lexicon — opened lazily, on the first root the reader unfolds. */
+    lateinit var lexicon: LexiconRepository
         private set
     lateinit var settings: SettingsRepository
         private set
@@ -47,6 +52,7 @@ class QuranApp : Application() {
         DevProfiling.install(this)
         val overrides = TimingOverrides(this)
         repository = QuranRepository(QuranDatabase(this), overrides)
+        lexicon = LexiconRepository(LexiconDatabase(this))
         settings = SettingsRepository(this)
         bookmarks = BookmarkRepository(this)
         annotations = AnnotationRepository(this)

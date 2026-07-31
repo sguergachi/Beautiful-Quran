@@ -65,7 +65,11 @@ app/                    The entire Android app (single Gradle module)
     timingslab/         In-app editor for word-timing corrections
   src/test/             JVM unit tests (JUnit 4)
 data/quran.db           Canonical committed SQLite database consumed by both apps
+data/lexicon.db         Lane's Lexicon, keyed by QAC root — the Root Viewer's
+                        classical entry. Committed, loaded lazily, separate from
+                        quran.db so timing rebuilds don't rewrite 20 MB of it
 tools/build_db.py       Data pipeline that generates quran.db (build-time, not app code)
+tools/build_lexicon_db.py  Renders Perseus' TEI edition of Lane into lexicon.db
 tools/timing_overrides/ Local timing-report scratch; CI rejects committed JSON
 tools/timing_patch_cases/ Unit tests for systematic cleaner / span-protect fixes
 tools/timing_repairs/   CTC auto-repairs rebased onto current source timing
@@ -90,6 +94,10 @@ Requires **JDK 21**. No Android device/emulator is needed for tests.
 ./gradlew assembleRelease       # what CI ships (R8-minified; falls back to debug keystore)
 ```
 
+- `data/lexicon.db` is committed too, and is rebuilt only to deliberately
+  change the lexicon: `python3 tools/build_lexicon_db.py` (downloads the pinned
+  Perseus TEI XML into `tools/.cache/`, ~32 MB). It needs `quran.db` to exist,
+  since it keys entries by the roots that database already carries.
 - `data/quran.db` is **committed**, so a fresh clone builds
   offline with no extra steps. Only run `python3 tools/build_db.py` if you are
   deliberately changing the data (it downloads sources over HTTPS into
@@ -107,7 +115,9 @@ Requires **JDK 21**. No Android device/emulator is needed for tests.
 
 ## Invariants — do not break these
 
-1. **DB content changes require a version bump.** `quran.db` is extracted from
+1. **DB content changes require a version bump.** This holds for both assets:
+   `LexiconDatabase.DB_FILE_NAME` tracks `lexicon.db` exactly as
+   `QuranDatabase.DB_FILE_NAME` tracks `quran.db`. `quran.db` is extracted from
    assets to internal storage keyed on `QuranDatabase.DB_FILE_NAME`
    (`quran-vN.db`). If you change the database content in any way, bump that
    suffix or existing installs silently keep the stale cached copy.

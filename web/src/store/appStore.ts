@@ -9,6 +9,7 @@
  */
 import { useCallback, useRef, useSyncExternalStore } from 'react'
 import type { ActiveWord, Reciter, Surah, SurahContent, Segment, Word } from '../data/models'
+import { lexiconEntry, type LexiconEntry } from '../data/lexicon'
 import { QuranRepository } from '../data/repository'
 import {
   loadBookmarks,
@@ -67,6 +68,7 @@ export interface RootViewerState {
     lemma: string
     pos: string
     occurrenceCount: number
+    gloss: string
   }[]
   occurrences: {
     surahId: number
@@ -76,6 +78,8 @@ export interface RootViewerState {
     translation: string
     surahNameTransliteration: string
   }[]
+  /** Lane's article for this root; null while loading or when he has none. */
+  lexicon: LexiconEntry | null
   /** True while the header speaker is auditioning this word. */
   isPlayingWord: boolean
 }
@@ -831,6 +835,7 @@ class AppStore {
           occurrenceCount: 0,
           lemmas: [],
           occurrences: [],
+          lexicon: null,
           isPlayingWord: false,
         },
       })
@@ -853,8 +858,17 @@ class AppStore {
         occurrenceCount: summary?.occurrenceCount ?? 0,
         lemmas: summary?.lemmas ?? [],
         occurrences: summary?.occurrences ?? [],
+        lexicon: null,
         isPlayingWord: false,
       },
+    })
+    // Lane lives in its own ~20 MB asset, fetched on the first root a reader
+    // opens. The analysis above must never wait on it, and a reader who has
+    // moved on by the time it lands must not have the screen change under them.
+    void lexiconEntry(morph.root).then((entry) => {
+      if (entry && this.state.rootViewer?.root === entry.root) {
+        this.set({ rootViewer: { ...this.state.rootViewer, lexicon: entry } })
+      }
     })
   }
 

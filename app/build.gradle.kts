@@ -112,7 +112,12 @@ kotlin {
 
 val syncQuranDbAsset by tasks.registering(Sync::class) {
     val dbAsset = rootProject.layout.projectDirectory.file("data/quran.db")
+    val lexiconAsset = rootProject.layout.projectDirectory.file("data/lexicon.db")
     from(dbAsset)
+    // Lane's Lexicon ships as .sqlite, not .db, so it falls outside
+    // `noCompress` above and travels deflated (~7 MB rather than 20 MB).
+    // LexiconDatabase copies it out of assets, where AssetManager inflates it.
+    from(lexiconAsset) { rename { "lexicon.sqlite" } }
     into(layout.buildDirectory.dir("generated/quranAssets"))
 
     doLast {
@@ -120,6 +125,12 @@ val syncQuranDbAsset by tasks.registering(Sync::class) {
             throw GradleException(
                 "Missing canonical Quran database: ${dbAsset.asFile}. " +
                     "Run `python3 tools/build_db.py` from the repo root before building locally.",
+            )
+        }
+        if (!lexiconAsset.asFile.isFile) {
+            throw GradleException(
+                "Missing canonical lexicon database: ${lexiconAsset.asFile}. " +
+                    "Run `python3 tools/build_lexicon_db.py` from the repo root before building locally.",
             )
         }
     }

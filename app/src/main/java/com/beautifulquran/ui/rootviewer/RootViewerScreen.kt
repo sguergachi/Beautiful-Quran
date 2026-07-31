@@ -58,6 +58,10 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
 import com.beautifulquran.data.model.RootLemmaSummary
 import com.beautifulquran.data.model.RootOccurrence
 import com.beautifulquran.data.model.Word
@@ -79,8 +83,13 @@ private const val GRAMMAR_HELP =
     "How this word functions here: its part of speech and features such as verb form, person, number, gender, case, voice, or mood."
 private const val OCCURRENCES_HELP =
     "Every Quran word annotated with this root. Shared roots suggest a family resemblance, but context decides the meaning."
+private const val LEXICON_HELP =
+    "Edward Lane's Arabic-English Lexicon (1863–93), the deepest classical dictionary in English. " +
+        "It describes the root across all of Arabic, not only the Quran, and cites the mediaeval " +
+        "lexicographers it draws on in parentheses."
 private const val RELATED_FORMS_HELP =
-    "Other dictionary headwords built from the same root. Their meanings may be related, but are not necessarily identical."
+    "Other dictionary headwords built from the same root. Their meanings may be related, but are not necessarily identical. " +
+        "Each English line is the rendering used most often for that form, not a dictionary definition."
 
 internal data class RootOccurrenceSection(
     val surahId: Int,
@@ -141,6 +150,7 @@ fun RootViewerScreen(
     var showAllOccurrences by remember(morph?.root) { mutableStateOf(false) }
     var showAllChapters by remember(morph?.root) { mutableStateOf(false) }
     var showAllForms by remember(morph?.root) { mutableStateOf(false) }
+    var lexiconExpanded by remember(morph?.root) { mutableStateOf(false) }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -319,6 +329,22 @@ fun RootViewerScreen(
                                     },
                                 ) { showAllForms = !showAllForms }
                             }
+                        }
+                    }
+
+                    ui.lexicon?.let { entry ->
+                        item(key = "lexicon-heading") {
+                            Column(Modifier.padding(top = 40.dp)) {
+                                RootSectionTitle("Classical lexicon", LEXICON_HELP)
+                                Spacer(Modifier.height(16.dp))
+                            }
+                        }
+                        item(key = "lexicon-entry") {
+                            LexiconArticle(
+                                entry = entry,
+                                expanded = lexiconExpanded,
+                                onToggle = { lexiconExpanded = !lexiconExpanded },
+                            )
                         }
                     }
 
@@ -681,39 +707,103 @@ private fun OccurrenceRow(occurrence: RootOccurrence, isCurrent: Boolean, onClic
 
 @Composable
 private fun RelatedFormRow(form: RootLemmaSummary) {
-    Row(
+    Column(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 12.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
     ) {
         Row(
-            modifier = Modifier.weight(1f),
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            Row(
+                modifier = Modifier.weight(1f),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = form.lemma,
+                    fontFamily = HafsFontFamily,
+                    fontSize = 24.sp,
+                    lineHeight = 36.sp,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    text = MorphologyLabels.posLabel(form.pos),
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.68f),
+                )
+            }
             Text(
-                text = form.lemma,
-                fontFamily = HafsFontFamily,
-                fontSize = 24.sp,
-                lineHeight = 36.sp,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
-            Spacer(Modifier.width(8.dp))
-            Text(
-                text = MorphologyLabels.posLabel(form.pos),
-                style = MaterialTheme.typography.bodyLarge,
+                text = if (form.occurrenceCount == 1) "once" else "${form.occurrenceCount}×",
+                style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.68f),
+                modifier = Modifier.padding(start = 16.dp),
             )
         }
+        if (form.gloss.isNotBlank()) {
+            Text(
+                text = form.gloss,
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.68f),
+                modifier = Modifier.padding(top = 2.dp),
+            )
+        }
+    }
+}
+
+/**
+ * Lane's article for the open root. Collapsed to its opening senses — the
+ * longest run to some 99,000 characters — with the whole article a tap away.
+ */
+@Composable
+private fun LexiconArticle(
+    entry: com.beautifulquran.data.model.LexiconEntry,
+    expanded: Boolean,
+    onToggle: () -> Unit,
+) {
+    val text = remember(entry.text, expanded) {
+        if (expanded) entry.text else lexiconPreview(entry.text)
+    }
+    val annotated = remember(text) { lexiconAnnotated(text) }
+
+    Column(Modifier.fillMaxWidth()) {
         Text(
-            text = if (form.occurrenceCount == 1) "once" else "${form.occurrenceCount}×",
+            text = annotated,
+            style = MaterialTheme.typography.bodyLarge,
+            lineHeight = 30.sp,
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.86f),
+        )
+        if (entry.text.length > text.length || expanded) {
+            TextAction(
+                text = if (expanded) "Show less of the entry" else "Read the whole entry",
+                onClick = onToggle,
+            )
+        }
+        val page = entry.page.takeIf { it > 0 }?.let { ", p. $it" }.orEmpty()
+        Text(
+            text = "Edward William Lane, An Arabic-English Lexicon$page. ${entry.credit}",
             style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.68f),
-            modifier = Modifier.padding(start = 16.dp),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 12.dp),
         )
     }
 }
+
+/** Arabic runs in the mushaf face, at the size the surrounding prose reads at. */
+private fun lexiconAnnotated(text: String): AnnotatedString =
+    buildAnnotatedString {
+        for (run in lexiconRuns(text)) {
+            if (run.isArabic) {
+                withStyle(SpanStyle(fontFamily = HafsFontFamily, fontSize = 19.sp)) {
+                    append(run.text)
+                }
+            } else {
+                append(run.text)
+            }
+        }
+    }
 
 @Composable
 private fun TextAction(text: String, startPadding: Dp = 0.dp, onClick: () -> Unit) {

@@ -49,9 +49,9 @@ describe('initialRootSections', () => {
 describe('relatedRootForms', () => {
   it('excludes only the exact current lemma and POS', () => {
     const forms = [
-      { lemma: 'كتب', pos: 'N', occurrenceCount: 10 },
-      { lemma: 'كتب', pos: 'V', occurrenceCount: 6 },
-      { lemma: 'كاتب', pos: 'N', occurrenceCount: 3 },
+      { lemma: 'كتب', pos: 'N', occurrenceCount: 10, gloss: 'Book' },
+      { lemma: 'كتب', pos: 'V', occurrenceCount: 6, gloss: 'prescribed' },
+      { lemma: 'كاتب', pos: 'N', occurrenceCount: 3, gloss: 'scribe' },
     ]
 
     expect(relatedRootForms(forms, 'كتب', 'N')).toEqual(forms.slice(1))

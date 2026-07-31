@@ -2,8 +2,10 @@ package com.beautifulquran.ui.rootviewer
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.beautifulquran.data.LexiconRepository
 import com.beautifulquran.data.QuranRepository
 import com.beautifulquran.data.SettingsRepository
+import com.beautifulquran.data.model.LexiconEntry
 import com.beautifulquran.data.model.Reciter
 import com.beautifulquran.data.model.RootOccurrence
 import com.beautifulquran.data.model.RootLemmaSummary
@@ -30,6 +32,8 @@ data class RootViewerUiState(
     val occurrences: List<RootOccurrence> = emptyList(),
     /** Exact QAC lemma/POS analyses grouped beneath this root. */
     val lemmas: List<RootLemmaSummary> = emptyList(),
+    /** Lane's article for this root; null while loading or when he has none. */
+    val lexicon: LexiconEntry? = null,
     val error: String? = null,
     /** True while the header speaker is auditioning this word. */
     val isPlayingWord: Boolean = false,
@@ -61,6 +65,7 @@ internal fun wordClipBounds(segments: List<Segment>, position: Int): Pair<Long, 
  */
 class RootViewerViewModel(
     private val repository: QuranRepository,
+    private val lexicon: LexiconRepository,
     private val settings: SettingsRepository,
     private val player: PlayerController,
 ) : ViewModel() {
@@ -95,6 +100,15 @@ class RootViewerViewModel(
                     else -> null
                 },
             )
+            // Extracting and opening the lexicon can take a beat on first use;
+            // the analysis above must never wait on it.
+            val root = morph?.root.orEmpty()
+            if (root.isNotBlank()) {
+                val entry = lexicon.entryFor(root)
+                if (entry != null && _ui.value.morphology?.root == root) {
+                    _ui.value = _ui.value.copy(lexicon = entry)
+                }
+            }
         }
     }
 
