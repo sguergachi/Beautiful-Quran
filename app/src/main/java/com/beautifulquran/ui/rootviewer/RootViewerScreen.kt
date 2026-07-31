@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
@@ -17,6 +18,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
@@ -32,27 +34,39 @@ import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalMinimumInteractiveComponentSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.text.PlatformTextStyle
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.LineHeightStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -79,9 +93,9 @@ internal const val ROOT_RELATED_FORM_PREVIEW_LIMIT = 5
 private const val ROOT_HELP =
     "Usually three consonants shared by a family of related words. A root points to a meaning family, not one fixed translation."
 private const val LEMMA_HELP =
-    "The form you'd look up in a dictionary for this word. Other endings of the same word share this lemma; the root is the wider family."
-private const val GRAMMAR_HELP =
-    "How this word functions here: its part of speech and features such as verb form, person, number, gender, case, voice, or mood."
+    "The dictionary headword for this form. Other endings of the same word share this lemma; the root is the wider family."
+/** Minimal Wiktionary credit when senses are shown under Lemma. */
+private const val DICTIONARY_HELP = "English senses from Wiktionary (CC BY-SA)."
 private const val OCCURRENCES_HELP =
     "Every Quran word annotated with this root. Shared roots suggest a family resemblance, but context decides the meaning."
 private const val RELATED_FORMS_HELP =
@@ -147,6 +161,7 @@ fun RootViewerScreen(
     val ui by viewModel.ui.collectAsStateWithLifecycle()
     val uriHandler = LocalUriHandler.current
     val listState = rememberLazyListState()
+    val scope = rememberCoroutineScope()
     val showTopTitle by remember { derivedStateOf { listState.firstVisibleItemIndex > 0 } }
     val morph = ui.morphology
     val sections = remember(ui.occurrences) { rootOccurrenceSections(ui.occurrences) }
@@ -158,6 +173,7 @@ fun RootViewerScreen(
     var showAllChapters by remember(morph?.root) { mutableStateOf(false) }
     var showAllForms by remember(morph?.root) { mutableStateOf(false) }
     var lexiconExpanded by remember(morph?.root) { mutableStateOf(false) }
+    var dictionaryExpanded by remember(morph?.lemma) { mutableStateOf(false) }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -226,7 +242,18 @@ fun RootViewerScreen(
                     if (morph != null) {
                         item(key = "analysis") {
                             ProseMeasure(Modifier.padding(top = 32.dp)) {
-                                WordAnalysis(morph, ui.lemmas)
+                                WordAnalysis(
+                                    morph = morph,
+                                    lemmas = ui.lemmas,
+                                    lexiconText = ui.lexicon?.text,
+                                    dictionary = ui.dictionary,
+                                    dictionaryExpanded = dictionaryExpanded,
+                                    onToggleDictionary = { dictionaryExpanded = !dictionaryExpanded },
+                                    onSeeLexiconDetail = {
+                                        scope.launch { listState.animateScrollToKey("lexicon-heading") }
+                                    },
+                                    onOpenWiktionary = uriHandler::openUri,
+                                )
                             }
                         }
                     }
@@ -417,69 +444,225 @@ private fun RootMessage(text: String, padding: PaddingValues) {
     }
 }
 
+/** Space between Root / Lemma (DESIGN.md proximity scale). */
+private val AnalysisGroupGap = 28.dp
+
+/**
+ * Label → first value under Root / Lemma. Kept as a [Spacer] (not Text
+ * padding) so large Hafs glyphs cannot paint up into the gap.
+ */
+private val AnalysisLabelToValue = 12.dp
+
+/** Quiet ink for the lemma↔dictionary column rule. */
+private val LemmaConnectorAlpha = 0.22f
+
+/** Shared face size for Root radicals and Lemma Arabic. */
+private val AnalysisArabicSize = 32.sp
+private val AnalysisArabicLineHeight = 40.sp
+private val AnalysisArabicBearingCrop = 16.dp
+
+/**
+ * Gutter between lemma and glosses: long horizontal stub on the shared
+ * baseline, then a vertical column rule down the sense stack.
+ */
+private val LemmaGutterWidth = 52.dp
+private val LemmaGutterPaddingStart = 16.dp
+private val LemmaGutterPaddingEnd = 18.dp
+private val LemmaGlossGap = 10.dp
+private val LemmaMetaGap = 2.dp
+
+/** Shared face for Root Form‑1 lead and Lemma dictionary glosses. */
+private val AnalysisGlossAlpha = 0.9f
+
+@Composable
+private fun analysisGlossStyle(): TextStyle = MaterialTheme.typography.bodyLarge.copy(
+    fontSize = 18.sp,
+    lineHeight = 22.sp,
+    fontWeight = FontWeight.Medium,
+    platformStyle = PlatformTextStyle(includeFontPadding = false),
+    lineHeightStyle = LineHeightStyle(
+        alignment = LineHeightStyle.Alignment.Top,
+        trim = LineHeightStyle.Trim.Both,
+    ),
+)
+
+/**
+ * First value under an analysis label. Top-aligned with ascent kept in-box
+ * (no Trim.Both — that let Hafs paint up through the spacer).
+ */
+private fun analysisValueStyle(
+    fontSize: androidx.compose.ui.unit.TextUnit,
+    lineHeight: androidx.compose.ui.unit.TextUnit,
+    fontFamily: androidx.compose.ui.text.font.FontFamily? = null,
+): TextStyle = TextStyle(
+    fontFamily = fontFamily,
+    fontSize = fontSize,
+    lineHeight = lineHeight,
+    platformStyle = PlatformTextStyle(includeFontPadding = false),
+    lineHeightStyle = LineHeightStyle(
+        alignment = LineHeightStyle.Alignment.Top,
+        trim = LineHeightStyle.Trim.None,
+    ),
+)
+
+/**
+ * Hafs ships a large empty top bearing; without this, ROOT's 32sp radicals sit
+ * visibly farther under the label than GRAMMAR's Latin line after the same
+ * [AnalysisLabelToValue] spacer. Pulls ink up and shortens layout by [crop].
+ */
+private fun Modifier.tightenHafsTopBearing(crop: Dp): Modifier {
+    if (crop <= 0.dp) return this
+    return layout { measurable, constraints ->
+        val placeable = measurable.measure(constraints)
+        val cut = crop.roundToPx().coerceIn(0, placeable.height / 2)
+        layout(placeable.width, placeable.height - cut) {
+            placeable.placeRelative(0, -cut)
+        }
+    }
+}
+
+/**
+ * Word analysis rhythm (DESIGN.md proximity scale):
+ * [AnalysisLabelToValue] label→value, 10–12dp within one fact,
+ * [AnalysisGroupGap] between groups.
+ */
 @Composable
 private fun WordAnalysis(
     morph: com.beautifulquran.data.model.WordMorphology,
     lemmas: List<RootLemmaSummary>,
+    lexiconText: String? = null,
+    dictionary: com.beautifulquran.data.model.DictionaryEntry? = null,
+    dictionaryExpanded: Boolean = false,
+    onToggleDictionary: () -> Unit = {},
+    onSeeLexiconDetail: (() -> Unit)? = null,
+    onOpenWiktionary: (String) -> Unit = {},
 ) {
-    if (morph.root.isNotBlank()) {
-        RootLabel("Root", ROOT_HELP)
-        Text(
-            text = MorphologyLabels.spacedRoot(morph.root),
-            fontFamily = HafsFontFamily,
-            fontSize = 32.sp,
-            lineHeight = 46.sp,
-            color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.padding(top = 8.dp),
-        )
+    val rootSense = remember(lexiconText) { lexiconText?.let { lexiconRootSense(it) } }
+    val multiForm = remember(lexiconText) {
+        lexiconText != null && lexiconFormCount(lexiconText) > 1
     }
-    if (morph.lemma.isNotBlank() || morph.pos.isNotBlank()) {
-        Column(Modifier.padding(top = if (morph.root.isBlank()) 0.dp else 24.dp)) {
-            if (morph.lemma.isNotBlank()) {
-                RootLabel("Lemma", LEMMA_HELP)
+    val grammar = listOf(
+        MorphologyLabels.posLabel(morph.pos).takeIf { morph.pos.isNotBlank() },
+        MorphologyLabels.featureSummary(morph.features).takeIf { it.isNotBlank() },
+    ).filterNotNull().joinToString(" · ")
+    val lemmaCount = lemmas.filter { it.lemma == morph.lemma }.sumOf { it.occurrenceCount }
+    val hasRoot = morph.root.isNotBlank()
+    val hasLemma = morph.lemma.isNotBlank()
+
+    // spacedBy — not per-group top padding — so Root→Lemma share one gap.
+    Column(verticalArrangement = Arrangement.spacedBy(AnalysisGroupGap)) {
+        Column {
+            RootLabel("Root", ROOT_HELP)
+            Spacer(Modifier.height(AnalysisLabelToValue))
+            if (hasRoot) {
                 Text(
-                    text = morph.lemma,
-                    fontFamily = HafsFontFamily,
-                    fontSize = 24.sp,
-                    lineHeight = 36.sp,
+                    text = MorphologyLabels.spacedRoot(morph.root),
                     color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.padding(top = 8.dp),
+                    style = analysisValueStyle(
+                        AnalysisArabicSize,
+                        AnalysisArabicLineHeight,
+                        HafsFontFamily,
+                    ),
+                    modifier = Modifier.tightenHafsTopBearing(AnalysisArabicBearingCrop),
                 )
-            }
-            val grammar = listOf(
-                MorphologyLabels.posLabel(morph.pos).takeIf { morph.pos.isNotBlank() },
-                MorphologyLabels.featureSummary(morph.features).takeIf { it.isNotBlank() },
-            ).filterNotNull().joinToString(" · ")
-            if (grammar.isNotBlank()) {
-                RootLabel(
-                    text = "Grammar",
-                    explanation = GRAMMAR_HELP,
-                    modifier = Modifier.padding(top = 16.dp),
-                )
+                if (rootSense != null) {
+                    val bodyColor = MaterialTheme.colorScheme.onSurface.copy(alpha = AnalysisGlossAlpha)
+                    val citationColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                    val annotated = remember(rootSense, bodyColor, citationColor) {
+                        lexiconAnnotated(rootSense, bodyColor, citationColor)
+                    }
+                    Text(
+                        text = annotated,
+                        style = analysisGlossStyle(),
+                        color = bodyColor,
+                        modifier = Modifier.padding(top = 12.dp),
+                    )
+                }
+                if (multiForm && onSeeLexiconDetail != null) {
+                    AnalysisActionLink(
+                        text = "See more detail",
+                        onClick = onSeeLexiconDetail,
+                        modifier = Modifier.padding(
+                            top = if (rootSense != null) 10.dp else 12.dp,
+                        ),
+                    )
+                }
+            } else {
                 Text(
-                    text = grammar,
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.82f),
-                    modifier = Modifier.padding(top = 8.dp),
-                )
-            }
-            val lemmaCount = lemmas.filter { it.lemma == morph.lemma }.sumOf { it.occurrenceCount }
-            if (lemmaCount > 0) {
-                Text(
-                    text = "This lemma occurs ${times(lemmaCount)}.",
-                    style = MaterialTheme.typography.bodyLarge,
+                    text = "No lexical root is annotated for this word.",
+                    style = MaterialTheme.typography.bodyLarge.copy(
+                        platformStyle = PlatformTextStyle(includeFontPadding = false),
+                        lineHeightStyle = LineHeightStyle(
+                            alignment = LineHeightStyle.Alignment.Center,
+                            trim = LineHeightStyle.Trim.None,
+                        ),
+                    ),
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.74f),
-                    modifier = Modifier.padding(top = 4.dp),
                 )
             }
         }
+        if (hasLemma) {
+            Column {
+                val lemmaHelp = if (dictionary != null) {
+                    "$LEMMA_HELP $DICTIONARY_HELP"
+                } else {
+                    LEMMA_HELP
+                }
+                RootLabel("Lemma", lemmaHelp)
+                Spacer(Modifier.height(AnalysisLabelToValue))
+                if (dictionary != null) {
+                    LemmaWithDictionary(
+                        lemma = morph.lemma,
+                        entry = dictionary,
+                        qacPos = morph.pos,
+                        grammar = grammar,
+                        lemmaCount = lemmaCount,
+                        expanded = dictionaryExpanded,
+                        onToggle = onToggleDictionary,
+                        onOpenOnline = onOpenWiktionary,
+                    )
+                } else {
+                    Text(
+                        text = morph.lemma,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        style = analysisValueStyle(
+                            AnalysisArabicSize,
+                            AnalysisArabicLineHeight,
+                            HafsFontFamily,
+                        ),
+                        modifier = Modifier.tightenHafsTopBearing(AnalysisArabicBearingCrop),
+                    )
+                    LemmaMeta(
+                        grammar = grammar,
+                        lemmaCount = lemmaCount,
+                        modifier = Modifier.padding(top = 12.dp),
+                    )
+                }
+            }
+        }
     }
-    if (morph.root.isBlank()) {
+}
+
+/**
+ * Quiet text action under Root / Lemma. Same line box for every trailing
+ * link so Material's 48dp min-touch enlargement cannot pull Root→Lemma and
+ * lemma dictionary links apart when one label has descenders / an arrow.
+ */
+@Composable
+private fun AnalysisActionLink(
+    text: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides Dp.Unspecified) {
         Text(
-            text = "No lexical root is annotated for this word.",
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.74f),
-            modifier = Modifier.padding(top = 16.dp),
+            text = text,
+            style = MaterialTheme.typography.bodyLarge.copy(lineHeight = 24.sp),
+            color = MaterialTheme.colorScheme.primary,
+            maxLines = 1,
+            modifier = modifier
+                .quietClickable(role = Role.Button, onClick = onClick)
+                .padding(vertical = 2.dp),
         )
     }
 }
@@ -547,21 +730,45 @@ private fun ExplainedHeading(
         Row(verticalAlignment = Alignment.CenterVertically) {
             textContent(text)
             if (explanation != null) {
+                // Layout height matches the label line (16.dp); the 40.dp hit
+                // target overflows so it stays centered on the glyphs without
+                // lifting the ⓘ above ROOT / LEMMA / GRAMMAR.
                 Box(
-                    modifier = Modifier
-                        .size(40.dp)
-                        .quietClickable(role = Role.Button) { expanded = !expanded }
-                        .semantics {
-                            contentDescription = "Explain ${text.lowercase()}"
-                            stateDescription = if (expanded) "Expanded" else "Collapsed"
-                        },
                     contentAlignment = Alignment.Center,
+                    modifier = Modifier
+                        .padding(start = 8.dp)
+                        .size(16.dp),
                 ) {
-                    Text(
-                        text = "ⓘ",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
-                    )
+                    CompositionLocalProvider(
+                        LocalMinimumInteractiveComponentSize provides Dp.Unspecified,
+                    ) {
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier
+                                .requiredSize(40.dp)
+                                .quietClickable(role = Role.Button) { expanded = !expanded }
+                                .semantics {
+                                    contentDescription = "Explain ${text.lowercase()}"
+                                    stateDescription =
+                                        if (expanded) "Expanded" else "Collapsed"
+                                },
+                        ) {
+                            Text(
+                                text = "ⓘ",
+                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
+                                style = TextStyle(
+                                    fontSize = 14.sp,
+                                    lineHeight = 14.sp,
+                                    platformStyle = PlatformTextStyle(includeFontPadding = false),
+                                    lineHeightStyle = LineHeightStyle(
+                                        alignment = LineHeightStyle.Alignment.Center,
+                                        trim = LineHeightStyle.Trim.Both,
+                                    ),
+                                ),
+                                textAlign = TextAlign.Center,
+                            )
+                        }
+                    }
                 }
             }
             afterTitle()
@@ -762,6 +969,172 @@ private fun RelatedFormRow(form: RootLemmaSummary) {
 }
 
 /**
+ * Arabic lemma left, Wiktionary senses right — one shared baseline, long
+ * gutter stub, vertical column rule down the gloss stack. Grammar / frequency
+ * sit under the senses; action links under that.
+ */
+@Composable
+private fun LemmaWithDictionary(
+    lemma: String,
+    entry: com.beautifulquran.data.model.DictionaryEntry,
+    qacPos: String,
+    grammar: String,
+    lemmaCount: Int,
+    expanded: Boolean,
+    onToggle: () -> Unit,
+    onOpenOnline: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val glosses = remember(entry, qacPos) { dictionaryGlosses(entry, qacPos) }
+    val visible = if (expanded) glosses else glosses.take(DICTIONARY_PREVIEW_SENSES)
+    val glossColor = MaterialTheme.colorScheme.onSurface.copy(alpha = AnalysisGlossAlpha)
+    val showPosLabels = glosses.count { it.first != null } > 1
+    val lineColor = MaterialTheme.colorScheme.onSurface.copy(alpha = LemmaConnectorAlpha)
+    val glossStyle = analysisGlossStyle()
+
+    val spineWidthPx = with(LocalDensity.current) { 1.dp.toPx() }
+
+    Column(modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(IntrinsicSize.Min),
+        ) {
+            Text(
+                text = lemma,
+                color = MaterialTheme.colorScheme.onSurface,
+                style = analysisValueStyle(
+                    AnalysisArabicSize,
+                    AnalysisArabicLineHeight,
+                    HafsFontFamily,
+                ),
+                modifier = Modifier
+                    .alignByBaseline()
+                    .tightenHafsTopBearing(AnalysisArabicBearingCrop),
+            )
+            // 1dp stub whose bottom sits on the shared baseline.
+            Box(
+                modifier = Modifier
+                    .padding(start = LemmaGutterPaddingStart)
+                    .width(LemmaGutterWidth)
+                    .height(1.dp)
+                    .alignBy { it.measuredHeight }
+                    .background(lineColor),
+            )
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .alignByBaseline()
+                    .drawBehind {
+                        // Column rule on the leading edge — full sense-stack height.
+                        drawLine(
+                            color = lineColor,
+                            start = Offset(0f, 0f),
+                            end = Offset(0f, size.height),
+                            strokeWidth = spineWidthPx,
+                        )
+                    }
+                    .padding(start = LemmaGutterPaddingEnd),
+                verticalArrangement = Arrangement.spacedBy(LemmaGlossGap),
+            ) {
+                visible.forEachIndexed { index, row ->
+                    val posLabel = row.first
+                    val gloss = row.second
+                    // One child per sense so spacedBy is even; first sense is a
+                    // single Text so the column's FirstBaseline locks to lemma.
+                    if (index == 0) {
+                        Text(
+                            text = if (showPosLabels && posLabel != null) {
+                                "$posLabel · $gloss"
+                            } else {
+                                gloss
+                            },
+                            style = glossStyle,
+                            color = glossColor,
+                        )
+                    } else {
+                        Column {
+                            if (showPosLabels && posLabel != null) {
+                                Text(
+                                    text = posLabel,
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f),
+                                    modifier = Modifier.padding(bottom = 4.dp),
+                                )
+                            }
+                            Text(
+                                text = gloss,
+                                style = glossStyle,
+                                color = glossColor,
+                            )
+                        }
+                    }
+                }
+            }
+        }
+        LemmaMeta(
+            grammar = grammar,
+            lemmaCount = lemmaCount,
+            modifier = Modifier.padding(top = 12.dp),
+        )
+        if (dictionaryNeedsExpand(glosses.size)) {
+            AnalysisActionLink(
+                text = if (expanded) "Show fewer senses" else "Read more senses",
+                onClick = onToggle,
+                modifier = Modifier.padding(top = 12.dp),
+            )
+        }
+        AnalysisActionLink(
+            text = "Open on Wiktionary  ↗",
+            onClick = { onOpenOnline(wiktionaryArabicUrl(entry.word)) },
+            modifier = Modifier.padding(
+                top = if (dictionaryNeedsExpand(glosses.size)) 8.dp else 12.dp,
+            ),
+        )
+    }
+}
+
+/** Quiet grammar / frequency between lemma senses and the action links. */
+@Composable
+private fun LemmaMeta(
+    grammar: String,
+    lemmaCount: Int,
+    modifier: Modifier = Modifier,
+) {
+    if (grammar.isBlank() && lemmaCount <= 0) return
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(LemmaMetaGap),
+    ) {
+        if (grammar.isNotBlank()) {
+            Text(
+                text = grammar,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.52f),
+                style = lemmaMetaStyle(),
+            )
+        }
+        if (lemmaCount > 0) {
+            Text(
+                text = "This lemma occurs ${times(lemmaCount)}.",
+                style = lemmaMetaStyle(),
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.48f),
+            )
+        }
+    }
+}
+
+@Composable
+private fun lemmaMetaStyle(): TextStyle = MaterialTheme.typography.bodyMedium.copy(
+    fontSize = 14.sp,
+    lineHeight = 18.sp,
+    platformStyle = PlatformTextStyle(includeFontPadding = false),
+    lineHeightStyle = LineHeightStyle(
+        alignment = LineHeightStyle.Alignment.Top,
+        trim = LineHeightStyle.Trim.Both,
+    ),
+)
+
+/**
  * Lane's article for the open root. Collapsed to its opening senses — the
  * longest run to some 99,000 characters — with the whole article a tap away.
  *
@@ -830,6 +1203,7 @@ private fun LexiconBlockView(
     citationColor: Color,
     modifier: Modifier = Modifier,
 ) {
+    val gold = LocalQuranAccents.current.gold
     Column(modifier.fillMaxWidth()) {
         block.form?.let { form ->
             Text(
@@ -838,7 +1212,7 @@ private fun LexiconBlockView(
                 fontWeight = FontWeight.Medium,
                 fontSize = 18.sp,
                 lineHeight = 22.sp,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.78f),
+                color = gold,
                 modifier = Modifier.padding(bottom = 8.dp),
             )
         }
@@ -863,7 +1237,8 @@ private fun lexiconAnnotated(
     citationColor: Color,
 ): AnnotatedString =
     buildAnnotatedString {
-        for (run in lexiconRuns(text)) {
+        val runs = lexiconRuns(text)
+        runs.forEachIndexed { index, run ->
             when {
                 run.isArabic -> withStyle(
                     SpanStyle(fontFamily = HafsFontFamily, fontSize = 19.sp, color = bodyColor),
@@ -873,8 +1248,33 @@ private fun lexiconAnnotated(
                 }
                 else -> append(run.text)
             }
+            // Keep "see" glued to its Arabic target across the style boundary.
+            val next = runs.getOrNull(index + 1)
+            if (run.isCitation && next?.isArabic == true) append("\u2060")
         }
     }
+
+/**
+ * Scrolls a LazyColumn to the item with [key], probing near the end when the
+ * target is not yet laid out (Classical lexicon sits below long concordance).
+ */
+private suspend fun LazyListState.animateScrollToKey(key: Any) {
+    layoutInfo.visibleItemsInfo.firstOrNull { it.key == key }?.let {
+        animateScrollToItem(it.index)
+        return
+    }
+    val last = layoutInfo.totalItemsCount - 1
+    if (last < 0) return
+    var guess = last
+    while (guess >= 0) {
+        scrollToItem(guess)
+        layoutInfo.visibleItemsInfo.firstOrNull { it.key == key }?.let {
+            animateScrollToItem(it.index)
+            return
+        }
+        guess -= layoutInfo.visibleItemsInfo.size.coerceAtLeast(3)
+    }
+}
 
 @Composable
 private fun TextAction(text: String, startPadding: Dp = 0.dp, onClick: () -> Unit) {

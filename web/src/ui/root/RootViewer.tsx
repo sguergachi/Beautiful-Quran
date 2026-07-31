@@ -2,7 +2,20 @@ import { useEffect, useId, useMemo, useState } from 'react'
 import { appStore, useAppSelector, type RootViewerState } from '../../store/appStore'
 import { IconClose, IconVolumeUp } from '../icons/PlaybackIcons'
 import { featureSummary, posLabel, spacedRoot } from './morphologyLabels'
-import { LEXICON_PREVIEW_CHARS, lexiconArticleText, lexiconBlocks, lexiconRuns } from './lexiconText'
+import {
+  DICTIONARY_PREVIEW_SENSES,
+  dictionaryGlosses,
+  dictionaryNeedsExpand,
+  wiktionaryArabicUrl,
+} from './dictionaryText'
+import {
+  LEXICON_PREVIEW_CHARS,
+  lexiconArticleText,
+  lexiconBlocks,
+  lexiconFormCount,
+  lexiconRootSense,
+  lexiconRuns,
+} from './lexiconText'
 import { laneLexiconUrl, rootViewerReferences } from './rootViewerReferences'
 import {
   initialRootSections,
@@ -15,13 +28,42 @@ import {
 
 /** Exit hole duration — keep in sync with `.ink-bleed[data-closing]`. */
 const BLEED_OUT_MS = 420
+
+/** Lane prose: Arabic mushaf face, quiet citations; glue "see" to its target. */
+function LexiconProse({ text }: { text: string }) {
+  const runs = lexiconRuns(text)
+  return (
+    <>
+      {runs.map((run, index) =>
+        run.isArabic ? (
+          <span key={index} lang="ar" className="root-lexicon-arabic">
+            {run.text}
+          </span>
+        ) : run.isCitation ? (
+          <span key={index} className="root-lexicon-citation">
+            {run.text}
+            {runs[index + 1]?.isArabic ? '\u2060' : null}
+          </span>
+        ) : (
+          <span key={index}>{run.text}</span>
+        ),
+      )}
+    </>
+  )
+}
 const HELP = {
   root: 'Usually three consonants shared by a family of related words. A root points to a meaning family, not one fixed translation.',
-  lemma: "The form you'd look up in a dictionary for this word. Other endings of the same word share this lemma; the root is the wider family.",
-  grammar: 'How this word functions here: its part of speech and features such as verb form, person, number, gender, case, voice, or mood.',
+  lemma:
+    'The dictionary headword for this form. Other endings of the same word share this lemma; the root is the wider family.',
+  dictionary: 'English senses from Wiktionary (CC BY-SA).',
   occurrences: 'Every Quran word annotated with this root. Shared roots suggest a family resemblance, but context decides the meaning.',
   related: 'Other dictionary headwords built from the same root. Their meanings may be related, but are not necessarily identical. Each English line is the rendering used most often for that form, not a dictionary definition.',
 } as const
+
+/** Lemma ⓘ — definition, plus a one-line Wiktionary credit when senses are shown. */
+function lemmaHelp(hasDictionary: boolean): string {
+  return hasDictionary ? `${HELP.lemma} ${HELP.dictionary}` : HELP.lemma
+}
 
 /** Lane intro plus the Perseus credit — shown in the section ⓘ, not under every entry. */
 function lexiconHelp(page: number, credit: string): string {
@@ -102,6 +144,7 @@ function RootViewerBleed({ closing, rv }: { closing: boolean; rv: RootViewerStat
   const [showAllChapters, setShowAllChapters] = useState(false)
   const [showAllForms, setShowAllForms] = useState(false)
   const [showWholeEntry, setShowWholeEntry] = useState(false)
+  const [showAllDictionarySenses, setShowAllDictionarySenses] = useState(false)
 
   useEffect(() => {
     setOpenSurahId(rv.surahId)
@@ -109,7 +152,8 @@ function RootViewerBleed({ closing, rv }: { closing: boolean; rv: RootViewerStat
     setShowAllChapters(false)
     setShowAllForms(false)
     setShowWholeEntry(false)
-  }, [rv.root, rv.surahId])
+    setShowAllDictionarySenses(false)
+  }, [rv.root, rv.surahId, rv.lemma])
 
   const visibleSections = showAllChapters
     ? sections
@@ -129,6 +173,21 @@ function RootViewerBleed({ closing, rv }: { closing: boolean; rv: RootViewerStat
     () => (lexiconText ? lexiconBlocks(lexiconText) : []),
     [lexiconText],
   )
+  const rootSense = useMemo(
+    () => (rv.lexicon ? lexiconRootSense(rv.lexicon.text) : null),
+    [rv.lexicon],
+  )
+  const lexiconHasMultipleForms = useMemo(
+    () => (rv.lexicon ? lexiconFormCount(rv.lexicon.text) > 1 : false),
+    [rv.lexicon],
+  )
+  const dictionaryRows = useMemo(
+    () => (rv.dictionary ? dictionaryGlosses(rv.dictionary, rv.pos) : []),
+    [rv.dictionary, rv.pos],
+  )
+  const visibleDictionaryRows = showAllDictionarySenses
+    ? dictionaryRows
+    : dictionaryRows.slice(0, DICTIONARY_PREVIEW_SENSES)
 
   return (
     <div
@@ -168,32 +227,115 @@ function RootViewerBleed({ closing, rv }: { closing: boolean; rv: RootViewerStat
         <main>
           {(rv.root || rv.lemma || rv.pos) ? (
             <section className="root-analysis root-prose-measure" aria-label="Word analysis">
-              {rv.root ? (
-                <div className="root-analysis-group">
-                  <ExplainedHeading label="Root" explanation={HELP.root} />
-                  <p className="root-radicals" lang="ar" dir="rtl">{spacedRoot(rv.root)}</p>
-                </div>
-              ) : null}
-              {(rv.lemma || rv.pos) ? (
-                <div className="root-analysis-group root-form">
-                  {rv.lemma ? (
-                    <>
-                      <ExplainedHeading label="Lemma" explanation={HELP.lemma} />
-                      <p className="root-form-lemma" lang="ar" dir="rtl">{rv.lemma}</p>
-                    </>
-                  ) : null}
-                  {(rv.pos || featureSummary(rv.features)) ? (
-                    <div className="root-grammar">
-                      <ExplainedHeading label="Grammar" explanation={HELP.grammar} />
-                      <p className="root-form-grammar">
-                        {[rv.pos ? posLabel(rv.pos) : '', featureSummary(rv.features)].filter(Boolean).join(' · ')}
+              <div className="root-analysis-group">
+                <ExplainedHeading label="Root" explanation={HELP.root} />
+                {rv.root ? (
+                  <>
+                    <p className="root-radicals" lang="ar" dir="rtl">{spacedRoot(rv.root)}</p>
+                    {rootSense ? (
+                      <p className="root-sense">
+                        <LexiconProse text={rootSense} />
                       </p>
+                    ) : null}
+                    {lexiconHasMultipleForms ? (
+                      <button
+                        type="button"
+                        className="root-text-action root-sense-more"
+                        onClick={() => {
+                          document
+                            .getElementById('root-lexicon')
+                            ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                        }}
+                      >
+                        See more detail
+                      </button>
+                    ) : null}
+                  </>
+                ) : (
+                  <p className="root-no-root">No lexical root is annotated for this word.</p>
+                )}
+              </div>
+              {rv.lemma ? (
+                <div className="root-analysis-group">
+                  <ExplainedHeading
+                    label="Lemma"
+                    explanation={lemmaHelp(!!rv.dictionary)}
+                  />
+                  {rv.dictionary && dictionaryRows.length > 0 ? (
+                    <div className="root-lemma-dict-block">
+                      <div className="root-lemma-pair">
+                        <p className="root-form-lemma" lang="ar" dir="rtl">{rv.lemma}</p>
+                        <div className="root-lemma-connector" aria-hidden="true" />
+                        <div className="root-lemma-dictionary">
+                          {visibleDictionaryRows.map((row, index) => {
+                            const multiPos =
+                              dictionaryRows.filter((r) => r.pos).length > 1 && !!row.pos
+                            // First gloss owns the column baseline (locks to lemma);
+                            // opening POS rides inline so nothing sits above it.
+                            const gloss =
+                              index === 0 && multiPos
+                                ? `${row.pos} · ${row.gloss}`
+                                : row.gloss
+                            return (
+                              <div key={index} className="root-lemma-sense">
+                                {multiPos && index > 0 ? (
+                                  <p className="root-lemma-pos">{row.pos}</p>
+                                ) : null}
+                                <p className="root-sense">{gloss}</p>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
+                      {(rv.pos || featureSummary(rv.features)) ? (
+                        <p className="root-form-grammar root-lemma-meta">
+                          {[rv.pos ? posLabel(rv.pos) : '', featureSummary(rv.features)]
+                            .filter(Boolean)
+                            .join(' · ')}
+                        </p>
+                      ) : null}
+                      {lemmaCount > 0 ? (
+                        <p className="root-form-frequency root-lemma-meta">
+                          This lemma occurs {times(lemmaCount)}.
+                        </p>
+                      ) : null}
+                      {dictionaryNeedsExpand(dictionaryRows.length) ? (
+                        <button
+                          type="button"
+                          className="root-text-action root-sense-more root-lemma-dict-action"
+                          onClick={() => setShowAllDictionarySenses((value) => !value)}
+                        >
+                          {showAllDictionarySenses ? 'Show fewer senses' : 'Read more senses'}
+                        </button>
+                      ) : null}
+                      <a
+                        className="root-text-action root-sense-more root-lemma-dict-action"
+                        href={wiktionaryArabicUrl(rv.dictionary.word)}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        Open on Wiktionary <span aria-hidden="true">↗</span>
+                      </a>
                     </div>
-                  ) : null}
-                  {lemmaCount > 0 ? <p className="root-form-frequency">This lemma occurs {times(lemmaCount)}.</p> : null}
+                  ) : (
+                    <>
+                      <p className="root-form-lemma" lang="ar" dir="rtl">{rv.lemma}</p>
+                      {(rv.pos || featureSummary(rv.features)) ? (
+                        <p className="root-form-grammar root-lemma-meta">
+                          {[rv.pos ? posLabel(rv.pos) : '', featureSummary(rv.features)]
+                            .filter(Boolean)
+                            .join(' · ')}
+                        </p>
+                      ) : null}
+                      {lemmaCount > 0 ? (
+                        <p className="root-form-frequency root-lemma-meta">
+                          This lemma occurs {times(lemmaCount)}.
+                        </p>
+                      ) : null}
+                    </>
+                  )}
                 </div>
               ) : null}
-              {!rv.root ? <p className="root-no-root">No lexical root is annotated for this word.</p> : null}
             </section>
           ) : null}
 
@@ -311,7 +453,11 @@ function RootViewerBleed({ closing, rv }: { closing: boolean; rv: RootViewerStat
           ) : null}
 
           {rv.lexicon ? (
-            <section className="root-section root-lexicon" aria-labelledby="root-lexicon-title">
+            <section
+              id="root-lexicon"
+              className="root-section root-lexicon"
+              aria-labelledby="root-lexicon-title"
+            >
               <ExplainedHeading
                 id="root-lexicon-title"
                 kind="section"
@@ -331,19 +477,7 @@ function RootViewerBleed({ closing, rv }: { closing: boolean; rv: RootViewerStat
                     {block.form ? <h3 className="root-lexicon-form">{block.form}</h3> : null}
                     {block.text ? (
                       <p>
-                        {lexiconRuns(block.text).map((run, index) =>
-                          run.isArabic ? (
-                            <span key={index} lang="ar" className="root-lexicon-arabic">
-                              {run.text}
-                            </span>
-                          ) : run.isCitation ? (
-                            <span key={index} className="root-lexicon-citation">
-                              {run.text}
-                            </span>
-                          ) : (
-                            <span key={index}>{run.text}</span>
-                          ),
-                        )}
+                        <LexiconProse text={block.text} />
                       </p>
                     ) : null}
                   </div>

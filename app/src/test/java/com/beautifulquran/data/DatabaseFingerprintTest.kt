@@ -25,6 +25,7 @@ class DatabaseFingerprintTest {
         listOf(
             Asset("quran.db", QuranDatabase.DB_FILE_NAME),
             Asset("lexicon.db", LexiconDatabase.DB_FILE_NAME),
+            Asset("dictionary.db", DictionaryDatabase.DB_FILE_NAME),
         ).forEach(::assertFingerprintMatches)
     }
 

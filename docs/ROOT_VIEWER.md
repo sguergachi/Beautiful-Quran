@@ -51,19 +51,21 @@ On the pressed word at `(surahId, ayah, wordPosition)`:
    currently selected reciter: it seeks to the word's timing mark and
    pauses at the word's end. Without a usable timing segment the speaker
    does nothing (it never starts the rest of the ayah).
-2. **Root** — the radical letters (e.g. ك ت ب), shown large. QAC supplies
-   morphology, not licensed prose dictionary definitions, so the viewer does
-   not invent a root sense from the word glosses.
-3. **Lemma and grammar** — part of speech and a plain-English morphology line
-   drawn from the annotation (noun / verb, person, gender, number, case,
-   verb form and mood where present), plus the exact QAC lemma and its
-   occurrence count beneath this root. Grammar tags stay secondary to readable
-   English; the point is understanding, not a tag dump. Root, lemma, grammar,
-   occurrences, and related forms each have a quiet info mark that unfolds a
-   short definition inline. These notes are part of the paper flow, not floating
-   tooltips or dialogs. In particular, they explain that a **lemma** is the
-   dictionary form of this word (other endings still share it), while a root
-   is the broader family.
+2. **Root** — the radical letters (e.g. ك ت ب), shown large. When a bundled
+   Lane entry exists, a short Form‑1 English lead from that entry sits quietly
+   under the radicals (not invented from Quran word glosses). If Lane marks
+   more than one form, a quiet "See more detail" line scrolls to Classical
+   lexicon below.
+3. **Lemma** — the exact QAC lemma on the left at the same Arabic size as the
+   root radicals, with (when bundled) English Wiktionary senses on the right
+   from `dictionary.db` (kaikki / wiktextract; prefers the open word's QAC
+   part of speech; preview unfolds; a one-line Wiktionary / CC BY-SA credit
+   lives in the Lemma ⓘ; soft-hides when there is no match; quiet exit to
+   Wiktionary). Lemma and first gloss share one baseline; a long horizontal
+   stub on that line meets a quiet column rule down the sense stack. Grammar
+   and lemma frequency sit under the senses (above the Wiktionary link).
+   Root, lemma, occurrences, and related forms each have a quiet info mark
+   that unfolds a short definition inline.
 4. **Occurrences** — how often this root appears in the Quran, and where.
    This is a first-class part of the surface, not a footnote:
    - A clear **count** ("appears *N* times in the Quran").
@@ -164,11 +166,14 @@ maintained in association with the quran.com team.
 | Redistribution | May be used in an application if the source is clearly indicated and a link to `http://corpus.quran.com` is provided; include the copyright notice with substantial portions |
 | Offline fit | Ships inside `quran.db` via `tools/build_db.py` — no network at read time |
 
-Classical lexica (Lane, Lisān al-ʿArab, etc.) are richer as prose dictionaries
-but are not a practical redistributable pipeline for this app. QAC is the
-morphology + concordance layer; our existing WBW glosses remain the
-token-level English. Deeper dictionary prose can be considered later only
-with an explicit redistributable license.
+**English Wiktionary Arabic** (via kaikki.org / wiktextract) supplies modern
+lemma-keyed English senses in a separate `dictionary.db` (~1 MB, QAC-lemma
+subset only). License is CC-BY-SA / GFDL — credit lives in the Lemma
+section ⓘ. Soft-miss when a lemma has no Wiktionary entry.
+
+**Lane's Arabic-English Lexicon** (Perseus TEI → `lexicon.db`) is the classical
+root article shown lower on the page. QAC remains the morphology + concordance
+layer; WBW glosses remain the token-level English.
 
 Terms reminder (paraphrased from the QAC download notice): use in an app
 is allowed with clear attribution and a link back to the project; the
@@ -204,6 +209,17 @@ root_occurrences (
   ayah_number INTEGER NOT NULL,
   position INTEGER NOT NULL,
   PRIMARY KEY (root, surah_id, ayah_number, position)
+)
+```
+
+Dictionary senses ship separately (`tools/build_dictionary_db.py` →
+`dictionary.db`):
+
+```sql
+lemma_entries (
+  lemma TEXT PRIMARY KEY,   -- QAC spelling
+  word TEXT NOT NULL,      -- Wiktionary headword matched
+  payload TEXT NOT NULL     -- JSON: [{pos, glosses: string[]}, ...]
 )
 ```
 

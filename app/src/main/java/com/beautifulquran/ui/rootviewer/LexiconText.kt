@@ -30,15 +30,26 @@ internal const val LEXICON_PREVIEW_CHARS = 1_400
  */
 private val GLOSS_OPEN = Regex(
     """(?<=[;:.,)\]]|[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]) """ +
-        """(?=(?:He|It|She|They|A|An|To|The|One)\b)""",
+        """(?=\[?(?:He|It|I|She|They|A|An|To|The|One)\b)""",
 )
+
+/** Lane often sets the primary English sense in square brackets after the morph. */
+private val BRACKET_GLOSS = Regex("""\[([^\[\]]{12,500})\]""")
 
 private val FORM_HEAD = Regex("""^Form (\d+)\.\s*""")
 private val FORM_SPLIT = Regex("""(?=Form \d+\.)""")
 private val BLOCK_SPLIT = Regex("""\n\n+|\n(?=•)""")
 private val PAREN = Regex("""\([^()\n]*\)""")
-/** Bare "see …" cross-refs — not the ones already inside `(see …)`. */
-private val SEE_REF = Regex("""(?<!\()\b[Ss]ee\b[^.!\n]*(?:[.!])?""")
+/**
+ * Bare Latin "see …" cross-refs — not the ones already inside `(see …)`.
+ *
+ * Stops before Arabic so the target keeps the mushaf face; swallowing the
+ * Arabic into a Latin citation span lets bidi wrap `see` / `ظَلَعَ.` apart.
+ */
+private val SEE_REF = Regex(
+    """(?<!\()\b[Ss]ee\b(?:(?![\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF])[^.!\n])*""" +
+        """(?:[.!])?""",
+)
 private val LATIN_WORD = Regex("""[A-Za-z]+""")
 
 /**
@@ -85,6 +96,162 @@ internal fun lexiconReflow(text: String): String {
 internal fun lexiconArticleText(text: String, expanded: Boolean): String {
     val reflowed = lexiconReflow(text)
     return if (expanded) reflowed else lexiconPreview(reflowed)
+}
+
+/** How many `Form N.` measures Lane marks in the article. */
+internal fun lexiconFormCount(text: String): Int =
+    Regex("""Form \d+\.""").findAll(text).count()
+
+/**
+ * A short English sense for the Root section, taken from Lane's Form 1
+ * (or the Form his opening "see N" / "see the latter" points at).
+ *
+ * Uses only the opening sense (before later `•` senses), prefers his
+ * bracketed primary gloss, then the first English lead after the morphology.
+ * Returns null when the article has no readable English lead.
+ */
+internal fun lexiconRootSense(text: String, maxChars: Int = 180): String? {
+    if (text.isBlank()) return null
+    val section = resolveSenseSection(lexiconReflow(text)) ?: return null
+    return senseLeadFromSection(section, maxChars)
+}
+
+/**
+ * Follow Lane's Form-1 cross-refs (`see 4`, `see the latter`) so roots like
+ * نور — where Form 1 only redirects to أَنَارَ — still yield a Root gloss.
+ */
+private fun resolveSenseSection(reflowed: String): String? {
+    if (!Regex("""(?:^|\n)Form \d+\.""").containsMatchIn(reflowed)) {
+        return reflowed.takeIf {
+            looksLikeEnglishSense(it) || BRACKET_GLOSS.containsMatchIn(it)
+        }
+    }
+    var n = 1
+    val visited = mutableSetOf<Int>()
+    while (n !in visited && visited.size < 6) {
+        visited += n
+        val section = formSection(reflowed, n) ?: break
+        when (val redirect = openingFormRedirect(section)) {
+            null -> return section
+            0 -> n += 1
+            else -> n = redirect
+        }
+    }
+    return formSection(reflowed, 1)
+}
+
+/** Form N body including its label. */
+private fun formSection(reflowed: String, n: Int): String? {
+    val head = Regex("""(?:^|\n)(Form $n\.)""").find(reflowed) ?: return null
+    val start = head.groups[1]!!.range.first
+    val rest = reflowed.substring(start)
+    val end = Regex("""\nForm \d+\.""")
+        .find(rest, startIndex = "Form $n.".length)
+        ?.range?.first
+        ?: rest.length
+    return rest.take(end)
+}
+
+/**
+ * When Form N opens as a bare cross-ref, the Form number to follow.
+ * `0` means "see the latter" (try the next Form). Null = real opening sense.
+ */
+private fun openingFormRedirect(formSection: String): Int? {
+    val open = formSection
+        .replace(Regex("""^Form \d+\.\s*"""), "")
+        .substringBefore("\n•")
+        .substringBefore("\n\n")
+        .trim()
+    if (open.isEmpty() || hasSenseLead(open)) return null
+    Regex("""\bsee (\d+)\b""", RegexOption.IGNORE_CASE)
+        .find(open)
+        ?.groupValues?.get(1)?.toIntOrNull()
+        ?.takeIf { it in 1..15 }
+        ?.let { return it }
+    if (Regex("""\bsee the latter\b""", RegexOption.IGNORE_CASE).containsMatchIn(open)) {
+        return 0
+    }
+    return null
+}
+
+private fun hasSenseLead(text: String): Boolean {
+    BRACKET_GLOSS.find(text)?.groupValues?.get(1)?.trim()
+        ?.takeIf { looksLikePrimaryBracketGloss(it) }
+        ?.let { return true }
+    return englishSenseLead(text) != null
+}
+
+private fun senseLeadFromSection(section: String, maxChars: Int): String? {
+    val lead = section.substringBefore("\n•")
+
+    BRACKET_GLOSS.find(lead)?.groupValues?.get(1)?.trim()
+        ?.takeIf { looksLikePrimaryBracketGloss(it) }
+        ?.let { return shortenSense(it, maxChars) }
+
+    for (block in lexiconBlocks(lead)) {
+        englishSenseLead(block.text)?.let { return shortenSense(it, maxChars) }
+    }
+    return null
+}
+
+private fun englishSenseLead(text: String): String? {
+    val trimmed = text.trim()
+    if (trimmed.isEmpty()) return null
+    // Prefer an already-English paragraph (after reflow). Mid-string GLOSS_OPEN
+    // would otherwise steal `, A,` inside Lane citations like `(S, A, Msb)`.
+    val gloss = GLOSS_OPEN.find(trimmed)
+    val body = when {
+        trimmed.first().let { it == '[' || (!it.isArabicScript() && it.isUpperCase()) } ->
+            trimmed
+        gloss != null && gloss.range.first < 500 ->
+            trimmed.substring(gloss.range.last + 1).trim()
+        else -> return null
+    }.removePrefix("[").trimStart { it == ' ' || it == ']' }
+    return body.takeIf { looksLikeEnglishSense(it) || it.firstOrNull()?.isUpperCase() == true }
+}
+
+private fun looksLikeEnglishSense(text: String): Boolean {
+    var latin = 0
+    var arabic = 0
+    for (char in text) {
+        when {
+            char in 'A'..'Z' || char in 'a'..'z' -> latin++
+            char.isArabicScript() -> arabic++
+        }
+    }
+    return latin >= 12 && latin > arabic
+}
+
+/** Lane's Form-1 primary gloss, not later editorial asides in brackets. */
+private fun looksLikePrimaryBracketGloss(inner: String): Boolean {
+    if (!looksLikeEnglishSense(inner)) return false
+    val lead = inner.trimStart()
+    if (lead.startsWith("This is what", ignoreCase = true)) return false
+    if (lead.startsWith("i. e.", ignoreCase = true) || lead.startsWith("i.e.", ignoreCase = true)) {
+        return false
+    }
+    return Regex("""^(?:He|It|I|She|They|A|An|To|The|One)\b""").containsMatchIn(lead)
+}
+
+private fun shortenSense(text: String, maxChars: Int): String {
+    var sense = text.trim().trimStart('[').trimEnd(']', ' ')
+    // `: (` / `; (` are Lane citations after a gloss; `; syn.` / `; or` and
+    // sentence ends need a longer lead so we don't chop ordinary English.
+    val earlyStop = listOf(
+        Regex(""":\s*\(""").find(sense)?.range?.first?.takeIf { it >= 8 },
+        Regex(""";\s*\(""").find(sense)?.range?.first?.takeIf { it >= 16 },
+        Regex(""";\s*(?:syn\.|or\b|and ↓|see\b)""", RegexOption.IGNORE_CASE)
+            .find(sense)?.range?.first?.takeIf { it >= 16 },
+        Regex("""[.!?](?:\s|$)""").find(sense)?.range?.first?.takeIf { it >= 24 },
+    ).filterNotNull().minOrNull()
+    if (earlyStop != null) {
+        sense = sense.take(earlyStop + if (sense.getOrNull(earlyStop) in setOf('.', '!', '?')) 1 else 0)
+    }
+    sense = sense.replace(Regex("""\s*\([^()]*\)\s*$"""), "").trimEnd(' ', ':', ';', ',')
+    if (sense.length <= maxChars) return sense
+    val window = sense.take(maxChars)
+    val cut = window.lastIndexOf(' ').takeIf { it > maxChars / 2 } ?: maxChars
+    return window.take(cut).trimEnd(' ', ',', ';', ':') + "…"
 }
 
 /**

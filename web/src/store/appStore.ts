@@ -9,6 +9,7 @@
  */
 import { useCallback, useRef, useSyncExternalStore } from 'react'
 import type { ActiveWord, Reciter, Surah, SurahContent, Segment, Word } from '../data/models'
+import { dictionaryEntry, type DictionaryEntry } from '../data/dictionary'
 import { lexiconEntry, type LexiconEntry } from '../data/lexicon'
 import { QuranRepository } from '../data/repository'
 import {
@@ -82,6 +83,8 @@ export interface RootViewerState {
   }[]
   /** Lane's article for this root; null while loading or when he has none. */
   lexicon: LexiconEntry | null
+  /** English Wiktionary senses for this lemma; null while loading or on miss. */
+  dictionary: DictionaryEntry | null
   /** True while the header speaker is auditioning this word. */
   isPlayingWord: boolean
 }
@@ -836,7 +839,7 @@ class AppStore {
     }
 
     const morph = QuranRepository.wordMorphology(surahId, ayah, word.position)
-    if (!morph || !morph.root) {
+    if (!morph) {
       this.set({
         rootViewerClosing: false,
         rootViewer: {
@@ -847,19 +850,20 @@ class AppStore {
           translation: word.translation,
           transliteration: word.transliteration,
           root: '',
-          lemma: morph?.lemma ?? '',
-          pos: morph?.pos ?? '',
-          features: morph?.features ?? '',
+          lemma: '',
+          pos: '',
+          features: '',
           occurrenceCount: 0,
           lemmas: [],
           occurrences: [],
           lexicon: null,
+          dictionary: null,
           isPlayingWord: false,
         },
       })
       return
     }
-    const summary = QuranRepository.rootSummary(morph.root)
+    const summary = morph.root ? QuranRepository.rootSummary(morph.root) : null
     this.set({
       rootViewerClosing: false,
       rootViewer: {
@@ -877,17 +881,28 @@ class AppStore {
         lemmas: summary?.lemmas ?? [],
         occurrences: summary?.occurrences ?? [],
         lexicon: null,
+        dictionary: null,
         isPlayingWord: false,
       },
     })
     // Lane lives in its own ~20 MB asset, fetched on the first root a reader
     // opens. The analysis above must never wait on it, and a reader who has
     // moved on by the time it lands must not have the screen change under them.
-    void lexiconEntry(morph.root).then((entry) => {
-      if (entry && this.state.rootViewer?.root === entry.root) {
-        this.set({ rootViewer: { ...this.state.rootViewer, lexicon: entry } })
-      }
-    })
+    if (morph.root) {
+      void lexiconEntry(morph.root).then((entry) => {
+        if (entry && this.state.rootViewer?.root === entry.root) {
+          this.set({ rootViewer: { ...this.state.rootViewer, lexicon: entry } })
+        }
+      })
+    }
+    // Wiktionary is lemma-keyed — load even when QAC has no root.
+    if (morph.lemma) {
+      void dictionaryEntry(morph.lemma).then((entry) => {
+        if (entry && this.state.rootViewer?.lemma === entry.lemma) {
+          this.set({ rootViewer: { ...this.state.rootViewer, dictionary: entry } })
+        }
+      })
+    }
   }
 
   /**
