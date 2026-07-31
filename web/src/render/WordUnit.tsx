@@ -10,7 +10,7 @@ import type { Word } from '../data/models'
 import {
   InkState,
   getTuning,
-  startRevealed,
+  glinting as inkGlinting,
   type InkWord,
 } from '../ui/reader/InkEngine'
 import { secondaryAlpha, TRANSLITERATION_COLOR_ALPHA } from '../ui/reader/WordHighlight'
@@ -131,8 +131,6 @@ export function WordUnit({
   // still runs its first-pass wash (same idea as prevRepeat starting false).
   const prevState = useRef<InkState | null>(null)
   const prevActivation = useRef(activation)
-  /** Captured at Active entry — stable for the whole time the word is lit. */
-  const revealedOnEntry = useRef(false)
   // false so a word that mounts already in the chain still washes orange in
   // (Android Animatable starts at progress 0 when repeat is true on first compose).
   const prevRepeat = useRef(false)
@@ -188,12 +186,6 @@ export function WordUnit({
       ink.state === InkState.Active &&
       prev === InkState.Active &&
       activation !== prevActivation.current
-    if (enteredActive || reactivated) {
-      // Always re-run the wash on Active entry / seek-reactivation.
-      revealedOnEntry.current = startRevealed(prev ?? InkState.Plain, ink.state)
-    } else if (ink.state !== InkState.Active) {
-      revealedOnEntry.current = false
-    }
     prevState.current = ink.state
     prevActivation.current = activation
 
@@ -233,13 +225,6 @@ export function WordUnit({
           clearPaperCover(cover)
           paintSecondary(glossRef.current, translitRef.current, ink, null, false)
         }
-        return
-      }
-
-      if (revealedOnEntry.current) {
-        stopWash()
-        clearPaperCover(cover)
-        paintSecondary(glossRef.current, translitRef.current, ink, 1, false)
         return
       }
 
@@ -289,14 +274,6 @@ export function WordUnit({
         el.style.removeProperty('opacity')
         paintSecondary(glossRef.current, translitRef.current, ink, null, true)
       }
-      return
-    }
-
-    if (revealedOnEntry.current) {
-      stopWash()
-      applyMask(el, 'none')
-      el.style.opacity = '1'
-      paintSecondary(glossRef.current, translitRef.current, ink, 1, true)
       return
     }
 
@@ -353,8 +330,7 @@ export function WordUnit({
     const overlay = englishMode ? glintRef.current : null
     const halo = glintHaloRef.current
     if (!halo || (englishMode && !overlay)) return
-    const glinting =
-      ink.state === InkState.Active && (ink.repeat || !revealedOnEntry.current)
+    const glinting = inkGlinting(ink.state)
     const was = prevGlint.current
     const wasRepeat = prevGlintRepeat.current
     prevGlint.current = glinting
@@ -395,7 +371,7 @@ export function WordUnit({
   // Keep secondary alpha in sync when gloss/translit mount or ink leaves Active
   // without a wash restart (e.g. settings toggle mid-verse).
   useLayoutEffect(() => {
-    if (ink.state === InkState.Active && !ink.repeat && !revealedOnEntry.current) {
+    if (ink.state === InkState.Active && !ink.repeat) {
       // Wash rAF owns secondary while sweeping; only seed resting/full here.
       return
     }

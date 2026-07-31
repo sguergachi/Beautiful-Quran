@@ -28,11 +28,13 @@ import {
   surahOpensWithBasmalahPreface,
 } from '../domain/Basmalah'
 import { HighlightClock } from '../domain/HighlightClock'
+import { OutputLatency } from '../domain/OutputLatency'
 import {
   fastForwardAction,
   midpointMs,
   nextConsumedAyah,
 } from '../domain/FastForwardPolicy'
+import { getHighlightLeadMs } from '../ui/reader/InkEngine'
 import { player, type PlayerState } from '../playback/player'
 import {
   readerHighlightKey,
@@ -163,6 +165,14 @@ class AppStore {
   private inkActivation = 0
   private lastInkMediaKey = ''
   private lastInkClockMs = -1
+  /** Last applied word-ink lead so a lab change can reset the clock. */
+  private lastHighlightLeadMs = -1
+  /**
+   * User seek target (ayah → ms) applied on the next poll once that ayah is
+   * the media item — so ink jumps to the tapped word without waiting for the
+   * media position estimate to catch up (Android [forcedHighlight] parity).
+   */
+  private forcedHighlight: { ayah: number; seekMs: number } | null = null
   /** Bumps when a newer openSurah supersedes an in-flight peel→load. */
   private openToken = 0
   /**
@@ -608,6 +618,7 @@ class AppStore {
       // Paused but loaded: a pending rail jump must start there — not resume
       // the chapter-opening clip parked by loadSurah.
       if (opts?.pendingJump) {
+        this.noteInkRestart(selected, 0)
         await player.playLoadedFromAyah(selected)
         this.rememberListened(content.surah.id, selected)
         return
@@ -621,10 +632,12 @@ class AppStore {
 
   /** Seek within the loaded playlist without forcing play (rail jump while loaded). */
   async seekToAyah(ayah: number) {
+    this.noteInkRestart(ayah, 0)
     await player.seekToAyah(ayah)
   }
 
   async playAyah(ayah: number, includeBasmalah = ayah === 1) {
+    this.noteInkRestart(ayah, 0)
     await player.playFrom(ayah, includeBasmalah && ayah === 1)
     const surahId = this.state.content?.surah.id
     if (surahId != null) this.rememberListened(surahId, ayah)
@@ -639,8 +652,10 @@ class AppStore {
   async playFromWord(ayah: number, wordPosition: number) {
     const startMs = this.segmentStartMs(ayah, wordPosition)
     if (startMs != null) {
+      this.noteInkRestart(ayah, startMs)
       await player.seekToWordAndPlay(ayah, startMs)
     } else {
+      this.noteInkRestart(ayah, 0)
       await player.playFrom(ayah, false)
     }
     const surahId = this.state.content?.surah.id
@@ -681,7 +696,7 @@ class AppStore {
 
     if (np.ayah === BASMALAH_PLAYLIST_AYAH) {
       this.longAyahMidpointConsumed = 0
-      await player.seekToAyah(1)
+      await this.seekToAyah(1)
       return
     }
 
@@ -694,9 +709,10 @@ class AppStore {
     })
     this.longAyahMidpointConsumed = nextConsumedAyah(action)
     if (action.kind === 'midpoint') {
+      this.noteInkRestart(action.ayah, action.positionMs)
       await player.seekToWord(action.ayah, action.positionMs)
     } else if (action.kind === 'ayah') {
-      await player.seekToAyah(action.ayah)
+      await this.seekToAyah(action.ayah)
     }
   }
 
@@ -708,18 +724,20 @@ class AppStore {
     if (!np || np.surahId !== content.surah.id) return
 
     if (np.ayah === BASMALAH_PLAYLIST_AYAH) {
+      this.noteInkRestart(BASMALAH_PLAYLIST_AYAH, 0)
       player.seekToBasmalah()
       return
     }
 
     if (this.state.player.positionMs > START_SEEK_GRACE_MS) {
-      await player.seekToAyah(np.ayah)
+      await this.seekToAyah(np.ayah)
       return
     }
 
     if (np.ayah > 1) {
-      await player.seekToAyah(np.ayah - 1)
+      await this.seekToAyah(np.ayah - 1)
     } else if (np.ayah === 1) {
+      this.noteInkRestart(1, 0)
       await player.playLoadedFromAyah(1)
     }
   }
@@ -961,6 +979,42 @@ class AppStore {
     }
   }
 
+  /**
+   * User-initiated play/seek: bump ink activation, accept the next clock
+   * sample, and pin highlight to [seekMs] on [ayah] so the wash restarts on
+   * the word being played (Android [noteInkRestart] parity).
+   */
+  private noteInkRestart(ayah: number, seekMs: number) {
+    this.inkActivation++
+    this.highlightClock.acceptNextSample()
+    this.forcedHighlight = { ayah, seekMs }
+  }
+
+  /**
+   * Karaoke query time: heard playhead + word-ink lead (ramped after the first
+   * segment). Forced word seeks stay on the media timeline. Web uses LOCAL
+   * output lag (0); route presets live in OutputLatency for a future monitor.
+   */
+  private highlightPositionMs(
+    mediaPositionMs: number,
+    forcedMediaMs: number | null,
+    firstWordStartMs: number,
+  ): number {
+    const latencyMs = OutputLatency.LOCAL_MS
+    const leadMs = getHighlightLeadMs()
+    if (leadMs !== this.lastHighlightLeadMs) {
+      this.lastHighlightLeadMs = leadMs
+      this.highlightClock.acceptNextSample()
+    }
+    if (forcedMediaMs != null) return forcedMediaMs
+    return OutputLatency.highlightMs(
+      mediaPositionMs,
+      latencyMs,
+      leadMs,
+      firstWordStartMs,
+    )
+  }
+
   private recomputeActive(ps: PlayerState) {
     const np = ps.nowPlaying
     if (!np || np.surahId !== this.state.content?.surah.id) {
@@ -976,29 +1030,40 @@ class AppStore {
       return
     }
 
+    const forced = this.forcedHighlight
+    let forcedMs: number | null = null
+    if (forced != null && forced.ayah === np.ayah) {
+      forcedMs = forced.seekMs
+      this.forcedHighlight = null
+    }
+    const prepared = this.ensurePrepared(np.ayah)
+    const firstWordStartMs = prepared?.segments[0]?.startMs ?? 0
+    const heardMs = OutputLatency.heardMs(ps.positionMs, OutputLatency.LOCAL_MS)
+    const rawMs = this.highlightPositionMs(ps.positionMs, forcedMs, firstWordStartMs)
     const mediaKey = `${np.surahId}:${np.ayah}:${np.reciterId}`
-    const positionMs = this.highlightClock.sample(mediaKey, ps.positionMs)
+    const highlightPositionMs = this.highlightClock.sample(mediaKey, rawMs)
     if (mediaKey !== this.lastInkMediaKey) {
       this.lastInkMediaKey = mediaKey
     } else if (
       this.lastInkClockMs >= 0 &&
-      positionMs + HighlightClock.SEEK_THRESHOLD_MS < this.lastInkClockMs
+      highlightPositionMs + HighlightClock.SEEK_THRESHOLD_MS < this.lastInkClockMs
     ) {
       // Large backward jump within the same media item: word tap / scrub.
       this.inkActivation++
     }
-    this.lastInkClockMs = positionMs
+    this.lastInkClockMs = highlightPositionMs
     const next = readerHighlightState(
       {
         ayah: np.ayah,
-        positionMs,
+        positionMs: heardMs,
+        highlightPositionMs,
         durationMs: ps.durationMs,
         isPlaying: ps.isPlaying,
         ayahCount: this.state.content?.surah.ayahCount ?? 0,
         repeatRange: ps.repeatRange,
         activation: this.inkActivation,
       },
-      this.ensurePrepared(np.ayah) ?? undefined,
+      prepared ?? undefined,
     )
     const key = readerHighlightKey(next)
     if (key === this.lastActiveKey) return

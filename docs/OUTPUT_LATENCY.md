@@ -1,9 +1,11 @@
 # Output latency (Bluetooth karaoke sync)
 
-**Status: implemented on Android.** The reader subtracts a small,
-route-based delay from the media playhead before the highlight clock and
-`HighlightEngine` see it. Web does not apply this yet (browser output
-latency is harder to classify).
+**Status: implemented on Android; web applies word-ink lead with LOCAL lag.**
+The reader subtracts a small, route-based delay from the media playhead
+before the highlight clock and `HighlightEngine` see it. Web ports the pure
+`OutputLatency` helpers and feeds `highlightMs(..., leadMs)` into
+`HighlightClock` (default lead 114). Browser output-route classification is
+still hard, so web lag stays at LOCAL (0 ms) until a monitor exists.
 
 ## Why
 
@@ -140,6 +142,8 @@ compensation is separate — see [TIMINGS_LAB.md](TIMINGS_LAB.md)).
 | `domain/OutputLatencyTest.kt` | Spec for classify + heard clamp |
 | `playback/AudioOutputLatency.kt` | Android device watch → `StateFlow` latency |
 | `ui/reader/ReaderViewModel.kt` | Applies heard clock on the poll path |
+| `web/src/domain/OutputLatency.ts` | Same pure presets + `highlightMs` (Vitest twin) |
+| `web/src/store/appStore.ts` | Applies lead (+ LOCAL lag) on the poll path |
 
 ## Tuning
 

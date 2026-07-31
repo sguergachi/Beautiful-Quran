@@ -170,10 +170,8 @@ Port exactly:
 
 - `State` { Plain, Upcoming, Active, Recited }
 - `word` / `wordState` / `inRepeatChain` / `sweepMs` / `prefaceState`
-- `startRevealed` is **web-only now**: it was a constant `false` on both sides and
-  has been deleted from Android's `InkEngine` (its gate collapsed to
-  `glinting(state) = state == Active`). The web copy is harmless dead weight —
-  fold it away next time `WordUnit.tsx` is touched. Behaviour is identical.
+- `glinting(state) = state == Active` (Android parity). The old constant-false
+  `startRevealed` gate is gone on both sides.
 - `Tuning` defaults (upcoming alpha 0.2661, ink/mark/recess fade 400 ms, sweep clamps, feather 1.6, easing CPs)
 
 Acceptance: `InkEngineTest` parity. Optional Ink Lab later (session-only

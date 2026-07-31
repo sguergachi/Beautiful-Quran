@@ -35,8 +35,8 @@ There is no seek/replay suppression: tapping a word must restart the directional
 ink animation, so being Active *is* the whole word-side gate. (Android once had a
 `startRevealed(previous, current)` predicate for this; it had degenerated to a
 constant `false` — sampling jitter is filtered upstream by `HighlightClock` — and
-was removed along with its Compose wrapper. The web port still carries the
-constant-false version; see docs/WEB.md.)
+was removed along with its Compose wrapper. Web matches that collapse:
+`glinting(state) = state == Active`.)
 
 ## Motion and layer order
 
