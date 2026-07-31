@@ -74,27 +74,27 @@ export function BookmarksScreen({ stackLayer }: { stackLayer: StackLayer }) {
         </header>
 
         <div className="bookmarks-search">
-          <span className="bookmarks-search-lane" aria-hidden="true">
+          <div className="home-search">
             <SearchGlyph />
-          </span>
-          <PaperInput
-            type="search"
-            name="bookmark-search"
-            placeholder="Search bookmarks, text, or 2:255"
-            value={query}
-            onValueChange={changeQuery}
-            aria-label="Search bookmarked verses"
-          />
-          {query ? (
-            <button
-              type="button"
-              className="bookmarks-search-clear"
-              aria-label="Clear bookmark search"
-              onClick={() => changeQuery('')}
-            >
-              ×
-            </button>
-          ) : null}
+            <PaperInput
+              type="search"
+              name="bookmark-search"
+              placeholder="Search bookmarks, text, or 2:255"
+              value={query}
+              onValueChange={changeQuery}
+              aria-label="Search bookmarked verses"
+            />
+            {query ? (
+              <button
+                type="button"
+                className="home-search-clear"
+                aria-label="Clear bookmark search"
+                onClick={() => changeQuery('')}
+              >
+                <ClearGlyph />
+              </button>
+            ) : null}
+          </div>
         </div>
 
         <div className="edge-fade bookmarks-edge-fade">
@@ -294,15 +294,17 @@ function BookmarkEmptyState({ query }: { query: string }) {
 
 function SearchGlyph() {
   return (
-    <svg
-      className="bookmarks-search-icon"
-      viewBox="0 0 24 24"
-      width="22"
-      height="22"
-      aria-hidden="true"
-    >
+    <svg className="home-search-icon" viewBox="0 0 24 24" aria-hidden="true">
       <circle cx="10.5" cy="10.5" r="6.5" />
-      <path d="m15.5 15.5 5 5" />
+      <path d="m15.4 15.4 4.2 4.2" />
+    </svg>
+  )
+}
+
+function ClearGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="m7 7 10 10M17 7 7 17" />
     </svg>
   )
 }

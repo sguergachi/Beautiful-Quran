@@ -2318,59 +2318,7 @@ select {
 }
 
 .bookmarks-search {
-  display: flex;
-  align-items: center;
-  min-height: 52px;
   margin: 1.5rem var(--bookmark-pad) 0;
-  color: color-mix(in srgb, var(--ink-muted) 84%, transparent);
-}
-
-.bookmarks-search .paper-input {
-  min-width: 0;
-  width: 100%;
-  height: 52px;
-  padding: 0;
-  color: var(--ink);
-  border: none;
-  font: 400 1.0625rem/1.5625rem var(--font-body);
-}
-
-.bookmarks-search .paper-input::placeholder {
-  color: color-mix(in srgb, var(--ink-muted) 82%, transparent);
-  opacity: 1;
-}
-
-.bookmarks-search:focus-within {
-  color: var(--accent);
-}
-
-.bookmarks-search-lane {
-  display: flex;
-  flex: 0 0 var(--bookmark-spine);
-  align-items: center;
-  box-sizing: border-box;
-  padding-left: 0;
-  justify-content: flex-start;
-}
-
-.bookmarks-search-icon {
-  display: block;
-  fill: none;
-  stroke: currentColor;
-  stroke-linecap: round;
-  stroke-width: 1.8;
-}
-
-.bookmarks-search-clear {
-  flex: 0 0 44px;
-  width: 44px;
-  height: 44px;
-  padding: 0;
-  color: color-mix(in srgb, var(--ink-muted) 82%, transparent);
-  background: transparent;
-  border: 0;
-  font: 400 1.5rem/1 var(--font-body);
-  cursor: pointer;
 }
 
 .bookmarks-scroll {
@@ -3343,7 +3291,8 @@ select {
   color: color-mix(in srgb, var(--ink-muted) 70%, transparent);
 }
 
-.search-row .home-search .paper-input {
+.search-row .home-search .paper-input,
+.bookmarks-search .home-search .paper-input {
   flex: 1;
   min-width: 0;
   width: auto;
@@ -3353,7 +3302,8 @@ select {
   border: 0;
 }
 
-.search-row .home-search .paper-input::placeholder {
+.search-row .home-search .paper-input::placeholder,
+.bookmarks-search .home-search .paper-input::placeholder {
   color: color-mix(in srgb, var(--ink-muted) 50%, transparent);
 }
 
