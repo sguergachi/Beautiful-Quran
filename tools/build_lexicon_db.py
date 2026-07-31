@@ -241,7 +241,27 @@ def _collapse(body: str, paragraph: str, line: str) -> str:
     body = re.sub(r"\n{3,}", "\n\n", body)
     # A break that landed before punctuation belonged mid-sentence.
     body = re.sub(r"\n+(?=[,.;:)\]])", " ", body)
-    return re.sub(r" {2,}", " ", body).strip()
+    return re.sub(r" {2,}", " ", _tighten(body)).strip()
+
+
+def _tighten(body: str) -> str:
+    """Close the gaps the inline-Arabic padding opens around punctuation.
+
+    `render_entry` sets every Arabic word off with a space on both sides so it
+    never fuses to the English around it, which leaves Lane's own punctuation
+    floating away from the word it belongs to — "كَتَبَهُ , (S,)" instead of
+    "كَتَبَهُ, (S,)", "( إِسْتَمْلَاهُ )" instead of "(إِسْتَمْلَاهُ)". The
+    padding is a rendering artefact, not Lane; close it here, at build time,
+    so the apps read a clean entry (architecture invariant #2).
+
+    Only the space is removed. Which side of the Arabic the comma displays on
+    is decided by bidi over the whole paragraph, not by this whitespace.
+    """
+    import re
+
+    body = re.sub(r" +([,;:.!?)\]])", r"\1", body)
+    body = re.sub(r"([(\[]) +", r"\1", body)
+    return re.sub(r"“ +", "“", re.sub(r" +”", "”", body))
 
 
 def load_lane_entries(tgz: Path) -> dict[str, tuple[str, int]]:

@@ -113,11 +113,13 @@ kotlin {
 val syncQuranDbAsset by tasks.registering(Sync::class) {
     val dbAsset = rootProject.layout.projectDirectory.file("data/quran.db")
     val lexiconAsset = rootProject.layout.projectDirectory.file("data/lexicon.db")
+    val dictionaryAsset = rootProject.layout.projectDirectory.file("data/dictionary.db")
     from(dbAsset)
-    // Lane's Lexicon ships as .sqlite, not .db, so it falls outside
-    // `noCompress` above and travels deflated (~7 MB rather than 20 MB).
-    // LexiconDatabase copies it out of assets, where AssetManager inflates it.
+    // Lane / Wiktionary ship as .sqlite, not .db, so they fall outside
+    // `noCompress` above and travel deflated. The *Database classes copy them
+    // out of assets, where AssetManager inflates them.
     from(lexiconAsset) { rename { "lexicon.sqlite" } }
+    from(dictionaryAsset) { rename { "dictionary.sqlite" } }
     into(layout.buildDirectory.dir("generated/quranAssets"))
 
     doLast {
@@ -133,6 +135,12 @@ val syncQuranDbAsset by tasks.registering(Sync::class) {
                     "Run `python3 tools/build_lexicon_db.py` from the repo root before building locally.",
             )
         }
+        if (!dictionaryAsset.asFile.isFile) {
+            throw GradleException(
+                "Missing canonical dictionary database: ${dictionaryAsset.asFile}. " +
+                    "Run `python3 tools/build_dictionary_db.py` from the repo root before building locally.",
+            )
+        }
     }
 }
 
@@ -145,7 +153,11 @@ tasks.named("preBuild") {
 // a database leaves the task UP-TO-DATE and the guard never runs — which is
 // precisely the case it exists to catch.
 tasks.withType<Test>().configureEach {
-    listOf("quran.db", "quran.db.sha256", "lexicon.db", "lexicon.db.sha256")
+    listOf(
+        "quran.db", "quran.db.sha256",
+        "lexicon.db", "lexicon.db.sha256",
+        "dictionary.db", "dictionary.db.sha256",
+    )
         .forEach { asset ->
             inputs.file(rootProject.layout.projectDirectory.file("data/$asset"))
                 .withPropertyName("dbFingerprint-$asset")

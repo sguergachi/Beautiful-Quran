@@ -51,19 +51,21 @@ On the pressed word at `(surahId, ayah, wordPosition)`:
    currently selected reciter: it seeks to the word's timing mark and
    pauses at the word's end. Without a usable timing segment the speaker
    does nothing (it never starts the rest of the ayah).
-2. **Root** — the radical letters (e.g. ك ت ب), shown large. QAC supplies
-   morphology, not licensed prose dictionary definitions, so the viewer does
-   not invent a root sense from the word glosses.
-3. **Lemma and grammar** — part of speech and a plain-English morphology line
-   drawn from the annotation (noun / verb, person, gender, number, case,
-   verb form and mood where present), plus the exact QAC lemma and its
-   occurrence count beneath this root. Grammar tags stay secondary to readable
-   English; the point is understanding, not a tag dump. Root, lemma, grammar,
-   occurrences, and related forms each have a quiet info mark that unfolds a
-   short definition inline. These notes are part of the paper flow, not floating
-   tooltips or dialogs. In particular, they explain that a **lemma** is the
-   dictionary headword for inflected versions of one word, while a root is the
-   broader consonantal family.
+2. **Root** — the radical letters (e.g. ك ت ب), shown large. When a bundled
+   Lane entry exists, a short Form‑1 English lead from that entry sits quietly
+   under the radicals (not invented from Quran word glosses). If Lane marks
+   more than one form, a quiet "See more detail" line scrolls to Classical
+   lexicon below.
+3. **Lemma** — the exact QAC lemma on the left at the same Arabic size as the
+   root radicals, with (when bundled) English Wiktionary senses on the right
+   from `dictionary.db` (kaikki / wiktextract; prefers the open word's QAC
+   part of speech; preview unfolds; a one-line Wiktionary / CC BY-SA credit
+   lives in the Lemma ⓘ; soft-hides when there is no match; quiet exit to
+   Wiktionary). Lemma and first gloss share one baseline; a long horizontal
+   stub on that line meets a quiet column rule down the sense stack. Grammar
+   and lemma frequency sit under the senses (above the Wiktionary link).
+   Root, lemma, occurrences, and related forms each have a quiet info mark
+   that unfolds a short definition inline.
 4. **Occurrences** — how often this root appears in the Quran, and where.
    This is a first-class part of the surface, not a footnote:
    - A clear **count** ("appears *N* times in the Quran").
@@ -84,14 +86,19 @@ On the pressed word at `(surahId, ayah, wordPosition)`:
 5. **Related forms** — the other frequency-ordered lemma / POS analyses under
    this root, excluding the form already explained above. Five appear before
    a quiet show-more line; the section disappears when there are no others.
-6. **Attribution** — a quiet line naming the Quranic Arabic Corpus and
-   linking to `http://corpus.quran.com` (required by the data terms).
+6. **Classical lexicon (Lane)** — when a bundled entry exists for the root:
+   Form labels, spaced senses, and quieter source citations, with a preview
+   that unfolds to the whole article. Lane's bibliographic line and the
+   required Perseus credit live in the section ⓘ, not under the entry. The
+   section ends with a quiet browser exit to the full Lane page
+   (`arabiclexicon.hawramani.com`).
 7. **Learn more online** — location-aware browser shortcuts for readers who
    want to continue beyond the bundled data:
    - QAC's segment-by-segment grammar page for the exact `(surah:ayah:word)`.
    - QAC's Quran dictionary for the exact root (using QAC's Buckwalter query).
-   - Lane's classical Arabic–English lexicon entry for the root.
    - The full ayah on Quran.com for translations, recitation, and tafsir.
+8. **Attribution** — a quiet line naming the Quranic Arabic Corpus and
+   linking to `http://corpus.quran.com` (required by the data terms).
 
 The viewer does not fetch these pages or depend on them to open. Links are
 optional exits to the browser; all bundled morphology and concordance remain
@@ -159,11 +166,14 @@ maintained in association with the quran.com team.
 | Redistribution | May be used in an application if the source is clearly indicated and a link to `http://corpus.quran.com` is provided; include the copyright notice with substantial portions |
 | Offline fit | Ships inside `quran.db` via `tools/build_db.py` — no network at read time |
 
-Classical lexica (Lane, Lisān al-ʿArab, etc.) are richer as prose dictionaries
-but are not a practical redistributable pipeline for this app. QAC is the
-morphology + concordance layer; our existing WBW glosses remain the
-token-level English. Deeper dictionary prose can be considered later only
-with an explicit redistributable license.
+**English Wiktionary Arabic** (via kaikki.org / wiktextract) supplies modern
+lemma-keyed English senses in a separate `dictionary.db` (~1 MB, QAC-lemma
+subset only). License is CC-BY-SA / GFDL — credit lives in the Lemma
+section ⓘ. Soft-miss when a lemma has no Wiktionary entry.
+
+**Lane's Arabic-English Lexicon** (Perseus TEI → `lexicon.db`) is the classical
+root article shown lower on the page. QAC remains the morphology + concordance
+layer; WBW glosses remain the token-level English.
 
 Terms reminder (paraphrased from the QAC download notice): use in an app
 is allowed with clear attribution and a link back to the project; the
@@ -199,6 +209,17 @@ root_occurrences (
   ayah_number INTEGER NOT NULL,
   position INTEGER NOT NULL,
   PRIMARY KEY (root, surah_id, ayah_number, position)
+)
+```
+
+Dictionary senses ship separately (`tools/build_dictionary_db.py` →
+`dictionary.db`):
+
+```sql
+lemma_entries (
+  lemma TEXT PRIMARY KEY,   -- QAC spelling
+  word TEXT NOT NULL,      -- Wiktionary headword matched
+  payload TEXT NOT NULL     -- JSON: [{pos, glosses: string[]}, ...]
 )
 ```
 

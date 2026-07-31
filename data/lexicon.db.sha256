@@ -7,5 +7,5 @@
 # Rebuilt the lexicon? Change BOTH lines below:
 #   1. bump `version` and LexiconDatabase.DB_FILE_NAME together (lexicon-vN -> vN+1)
 #   2. record the new digest: sha256sum data/lexicon.db
-version=lexicon-v1.db
-sha256=988044121552e498b317ad08a764f94c16143cef0e50941ba50f1c159db8e575
+version=lexicon-v2.db
+sha256=aa2eeaa0940bc2ee4e248801afa82b9634a02722489d9c3dba31fae48d6d11ae

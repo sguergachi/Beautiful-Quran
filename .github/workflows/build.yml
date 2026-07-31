@@ -20,7 +20,7 @@ jobs:
           java-version: "21"
 
       - name: Verify bundled Quran database asset
-        run: test -s data/quran.db && test -s data/lexicon.db
+        run: test -s data/quran.db && test -s data/lexicon.db && test -s data/dictionary.db
 
       - name: Timing pipeline regressions
         run: python3 tools/test_build_db.py

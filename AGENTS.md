@@ -68,8 +68,11 @@ data/quran.db           Canonical committed SQLite database consumed by both app
 data/lexicon.db         Lane's Lexicon, keyed by QAC root — the Root Viewer's
                         classical entry. Committed, loaded lazily, separate from
                         quran.db so timing rebuilds don't rewrite 20 MB of it
+data/dictionary.db      English Wiktionary Arabic (kaikki extract), keyed by QAC
+                        lemma — Root Viewer Dictionary section. Lazy, ~1 MB
 tools/build_db.py       Data pipeline that generates quran.db (build-time, not app code)
 tools/build_lexicon_db.py  Renders Perseus' TEI edition of Lane into lexicon.db
+tools/build_dictionary_db.py  Filters kaikki Arabic JSONL onto QAC lemmas → dictionary.db
 tools/timing_overrides/ Local timing-report scratch; CI rejects committed JSON
 tools/timing_patch_cases/ Unit tests for systematic cleaner / span-protect fixes
 tools/timing_repairs/   CTC auto-repairs rebased onto current source timing
@@ -111,6 +114,10 @@ python3 tools/test_build_db.py  # timing pipeline regressions (~1s, no Gradle)
   change the lexicon: `python3 tools/build_lexicon_db.py` (downloads the pinned
   Perseus TEI XML into `tools/.cache/`, ~32 MB). It needs `quran.db` to exist,
   since it keys entries by the roots that database already carries.
+- `data/dictionary.db` is committed the same way: rebuild with
+  `python3 tools/build_dictionary_db.py` (caches ~485 MB kaikki Arabic JSONL
+  under `tools/.cache/`, emits a ~1 MB QAC-lemma subset). Bump
+  `DictionaryDatabase.DB_FILE_NAME` when its content changes.
 - `docs/ornaments.css` and `docs/ornaments/*.svg` are **committed** too: the
   Pages workflow copies `docs/` verbatim, so the product page can't run the
   TypeScript ornament generator itself. `npm run build:ornaments` (from `web/`)
@@ -124,16 +131,17 @@ python3 tools/test_build_db.py  # timing pipeline regressions (~1s, no Gradle)
 
 ## Invariants — do not break these
 
-1. **DB content changes require a version bump.** This holds for both assets:
-   `LexiconDatabase.DB_FILE_NAME` tracks `lexicon.db` exactly as
-   `QuranDatabase.DB_FILE_NAME` tracks `quran.db`. `quran.db` is extracted from
-   assets to internal storage keyed on `QuranDatabase.DB_FILE_NAME`
-   (`quran-vN.db`). If you change the database content in any way, bump that
-   suffix or existing installs silently keep the stale cached copy.
-   `DatabaseFingerprintTest` enforces this for both: `data/<asset>.sha256` pins
-   each digest to the version it was bumped for, so regenerating a database
-   means updating **both** lines in that file and its `DB_FILE_NAME` to match.
-   A red fingerprint test is the bump you forgot, not a flake.
+1. **DB content changes require a version bump.** This holds for every packaged
+   asset: `QuranDatabase.DB_FILE_NAME` ↔ `quran.db`,
+   `LexiconDatabase.DB_FILE_NAME` ↔ `lexicon.db`,
+   `DictionaryDatabase.DB_FILE_NAME` ↔ `dictionary.db`. Each is extracted from
+   assets to internal storage keyed on that version name. If you change the
+   database content in any way, bump that suffix or existing installs silently
+   keep the stale cached copy. `DatabaseFingerprintTest` enforces this:
+   `data/<asset>.sha256` pins each digest to the version it was bumped for, so
+   regenerating a database means updating **both** lines in that file and its
+   `DB_FILE_NAME` to match. A red fingerprint test is the bump you forgot, not
+   a flake.
 2. **The data pipeline is a build step, not app code.** All data messiness
    (source mismatches, basmalah offsets, truncated upstream files) is resolved
    in `tools/build_db.py` with validation. The app assumes a clean, consistent,

@@ -16,17 +16,21 @@ class RootViewerReferencesTest {
     fun `references target the exact word root and verse`() {
         val links = rootViewerReferences(2, 282, 10, "كتب")
 
-        assertEquals(4, links.size)
+        assertEquals(3, links.size)
         assertEquals(
             "https://corpus.quran.com/wordmorphology.jsp?location=%282%3A282%3A10%29",
             links[0].url,
         )
         assertEquals("https://corpus.quran.com/qurandictionary.jsp?q=ktb", links[1].url)
+        assertEquals("https://quran.com/2/282", links.last().url)
+    }
+
+    @Test
+    fun `Lane web entry lives under the classical lexicon section`() {
         assertEquals(
             "https://arabiclexicon.hawramani.com/search/%D9%83%D8%AA%D8%A8?cat=50",
-            links[2].url,
+            laneLexiconUrl("كتب"),
         )
-        assertEquals("https://quran.com/2/282", links.last().url)
     }
 
     @Test
