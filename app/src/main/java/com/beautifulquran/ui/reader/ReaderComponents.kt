@@ -2280,12 +2280,12 @@ internal fun VerseAnnotationField(
                         cap = StrokeCap.Round,
                     )
                 }
-                // The delete mark: a drawn ruby cross on the first line, never
-                // an icon in a container.
+                // The delete mark follows the last writing line, whose bottom
+                // the focus engine keeps parked just above the keyboard.
                 if (editing > 0.01f) {
                     val arm = 5.dp.toPx()
                     val cx = size.width / 2f
-                    val cy = noteStyle.lineHeight.toPx() / 2f
+                    val cy = size.height - noteStyle.lineHeight.toPx() / 2f
                     val stroke = 1.8.dp.toPx()
                     val color = markInk.copy(alpha = editing * ANNOTATION_MARK_ALPHA)
                     drawLine(
