@@ -91,8 +91,9 @@ Android has two text paths, and both preserve their existing shaping strategy.
 
 `HighlightLayeredText` renders a duplicate `Text` behind the ink with a
 glyph-derived `Shadow`, nearly transparent fill, and the configured halo color,
-strength, and blur. `WordHighlight.glintHaloLayer` applies the glimmer lifecycle
-alpha at draw time. A second duplicate above the normal/repeat ink carries the
+strength, and blur. The shared per-word `InkMotion` owns glimmer formation and
+dry-down; `layeredGlintHalo` applies its alpha at draw time. A second duplicate
+above the normal/repeat ink carries the
 directionally masked white-gold tint.
 
 Each duplicate keeps its natural text measurement inside a match-parent wrapper.
@@ -111,7 +112,9 @@ bounds, and restricting the layer to those bounds creates a visible box edge.
 ### Shaped Arabic and English lines
 
 `ShapedWordBloom.ColorReveal` keeps the paragraph's existing shaping and line
-breaks. Compose's range path encloses a selection; it is not the outline of
+breaks. `addShapedInkMotionBlooms` maps the same `InkMotion` used by layered
+words onto the English/Hafs ranges; it owns no clocks or release logic.
+Compose's range path encloses a selection; it is not the outline of
 the glyphs and must never be painted as the halo. The renderer clips the
 already-laid-out paragraph to that range, extracts its glyph alpha into a
 small cached mask, and blurs that mask. The crisp tint still uses the existing

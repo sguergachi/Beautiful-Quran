@@ -418,14 +418,16 @@ HighlightEngine.PreparedTimings.activeInfo(positionMs)
   the orange arrives as its **own directional wash on top** — it does not re-run
   the base layer's dim→ink sweep, and it is not a colour tween either. Both
   renderers use the same soft feathered edge as first-pass ink:
-  - Per-word units (gloss / English): `Modifier.repeatInkLayer` =
+  - Layered Arabic + gloss word units: `Modifier.repeatInkLayer` =
     `glyphLayerAlpha { wash.alpha }` over `letterFadeIn(progress = wash.progress,
     restingAlpha = 0f, feather = Tuning.washFeather)`.
-  - Arabic-only Hafs: `ShapedWordBloom.ColorReveal` — re-draw the shaped run,
+  - Continuous English and Arabic-only Hafs:
+    `ShapedWordBloom.ColorReveal` — re-draw the shaped run,
     `BlendMode.SrcIn`-tint it, then `DstIn`-wash it.
 
-  Timing lives in `rememberRepeatWash` (gloss, Hafs, and English — one path)
-  and web `WordUnit` / `HafsWord`. On Android, chain entry captures the active
+  Android timing lives once in the ayah's per-word `InkMotion`
+  (`rememberRepeatWash` is its internal repeat clock), shared by gloss, Hafs,
+  and English; web uses `WordUnit` / `HafsWord`. On Android, chain entry captures the active
   word's sweep duration, tajweed curve, and paced feather; the duration is
   `max(sweepMs, Tuning.repeatSweepMs)` (450 ms by default). The capture happens
   before the word waits in the position-ordered gate, so an Active handoff

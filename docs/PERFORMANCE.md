@@ -48,11 +48,17 @@ the whole ayah. It keeps the shaped ayah as static full-ink spans and applies
 `shapedWordBloom` in the draw phase: upcoming words get a full-strength paper
 cover from the first Upcoming frame — and the same cover is used while the ayah
 is recessed (`dimmed`), so landing on the next verse does not change unread ink.
-Block alpha stays at 1 during recitation in every mode (word-level Upcoming ink
-for gloss/English; paper cover for Arabic-only). First-pass pulls the cover back
-on the ink-wash curve; repeat SrcIn-tints the same shaped glyphs orange then
-DstIn-washes. Progress is read only at draw time, so the sweep never reshapes
-the ayah or paints onto neighbouring words.
+Block alpha stays at 1 during recitation in every mode (word-layer alpha for
+gloss; paper covers over opaque glyphs for shaped English/Hafs). First-pass
+pulls the cover back on the ink-wash curve; repeat SrcIn-tints the same shaped
+glyphs orange then DstIn-washes. Progress is read only at draw time, so the
+sweep never reshapes the ayah or paints onto neighbouring words.
+
+`AyahBlock` creates one `InkMotion` per word before selecting a renderer.
+Layered gloss text and both shaped modes therefore share the same sweep,
+entry-mask, repeat gate/release, feather, and glint clocks. The renderers only
+adapt those deferred values to `letterFadeIn` layers or `ShapedWordBloom`;
+switching paint strategy does not create a second animation lifecycle.
 
 Because the active word's sweep is read inside that draw scope, the **whole
 bloom list is rebuilt every frame** — one `UpcomingDim` per unread word, up to
