@@ -140,6 +140,19 @@ tasks.named("preBuild") {
     dependsOn(syncQuranDbAsset)
 }
 
+// DatabaseFingerprintTest reads these straight off disk, outside anything
+// Gradle already tracks for the unit-test task. Without them declared, editing
+// a database leaves the task UP-TO-DATE and the guard never runs — which is
+// precisely the case it exists to catch.
+tasks.withType<Test>().configureEach {
+    listOf("quran.db", "quran.db.sha256", "lexicon.db", "lexicon.db.sha256")
+        .forEach { asset ->
+            inputs.file(rootProject.layout.projectDirectory.file("data/$asset"))
+                .withPropertyName("dbFingerprint-$asset")
+                .withPathSensitivity(PathSensitivity.NONE)
+        }
+}
+
 dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.splashscreen)

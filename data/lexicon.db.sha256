@@ -1,0 +1,11 @@
+# Fingerprint of data/lexicon.db, enforced by DatabaseFingerprintTest.
+#
+# Installs cache the extracted lexicon under LexiconDatabase.DB_FILE_NAME, so a
+# lexicon whose content changed without a version bump is silently ignored by
+# everyone who already has the app.
+#
+# Rebuilt the lexicon? Change BOTH lines below:
+#   1. bump `version` and LexiconDatabase.DB_FILE_NAME together (lexicon-vN -> vN+1)
+#   2. record the new digest: sha256sum data/lexicon.db
+version=lexicon-v1.db
+sha256=988044121552e498b317ad08a764f94c16143cef0e50941ba50f1c159db8e575
