@@ -360,8 +360,8 @@ If the answer to any of these is no, reduce the scope.
 to the proposed shape: the review found that the four-state derivation is the
 easy part — the highlight's *feel* lives in the motion policy (400 ms
 tween-vs-snap rules, sweep entry and residual rules, repeat wash timing, the
-1.6× feather), which was still scattered across five `remember*` helpers. So
-InkEngine owns that too, as data rather than as animation code:
+1.6× feather). `InkEngine` owns that policy as data, while one per-word
+`InkMotion` owns its Compose runtime:
 
 - **Pure word policy** (JVM-tested in `InkEngineTest`):
   `wordState(position, activeWord, isActiveAyah, dimmed)` (including the
@@ -444,14 +444,21 @@ InkEngine owns that too, as data rather than as animation code:
   before the first word — see
   [OUTPUT_LATENCY.md](OUTPUT_LATENCY.md). `focusEngineEnabled` is a session-only
   lab freeze and is never persisted.
-- **Renderers consume `InkEngine.Word`.** `AyahBlock` derives each ayah's ink
-  list once (the single `InkEngine.word(...)` call site) and passes it into all
-  three branches (`WordUnit`, `ResponsiveEnglishAyah`, `ResponsiveHafsAyah`);
-  none of them re-derive highlight semantics. The Compose animation helpers
-  stayed in ReaderComponents.kt but read every **highlight** duration, alpha and
-  easing from `InkEngine.tuning` — no literal ink-tuning values remain. Literals
-  for motion that is *not* the highlight still live locally (e.g. the block fade
-  when the ayah-selector rail obscures the page); those are not `Tuning`'s job.
+- **One motion lifecycle, two paint adapters.** `AyahBlock` derives the ayah's
+  `InkEngine.Word` list once (the single `InkEngine.word(...)` call site), then
+  builds one aligned `InkMotion` per word. `InkMotion` exclusively owns base
+  sweep entry/residual, wasl handoff, repeat sweep + ordered release, captured
+  feather/pacing, lyric alpha, and glint dry-down. The render branches receive
+  those motions as paint-only inputs: `HighlightLayeredText` adapts them to the
+  Arabic + gloss word layers, while `addShapedInkMotionBlooms` adapts the same
+  motion to the continuous English paragraph and shaped Hafs ayah. No renderer
+  creates an `Animatable`, `SideEffect`, ordered gate, or word-motion lifecycle.
+  The two shaped modes still keep independent text construction because their
+  typography differs; only their motion-to-bloom adapter is shared.
+- Every **highlight** duration, alpha and easing still comes from
+  `InkEngine.tuning` — no literal ink-tuning values remain. Motion outside the
+  word highlight stays local (for example the block fade while the ayah-selector
+  rail obscures the page); those values are not `Tuning`'s job.
 - **Draw primitives stayed in `ui/theme/Fade.kt`** per Step 3; the feather and
   the reveal fraction became parameters (`letterFadeIn` / `shapedWordBloom` take
   `feather`; `letterFadeIn` and `ShapedWordBloom.ColorReveal` take
@@ -465,8 +472,9 @@ InkEngine owns that too, as data rather than as animation code:
 
 The letter sweep is the one piece of motion whose *lifecycle* is subtle enough to
 be worth stating, because three separate requirements pull against each other.
-It lives in `rememberLetterSweep` (ReaderComponents.kt) with its decisions in
-pure, `InkEngineTest`-covered helpers.
+It is owned by each `InkMotion` through `rememberInkMotions` /
+`rememberLetterSweep` (ReaderComponents.kt), with its decisions in pure,
+`InkEngineTest`-covered helpers.
 
 1. **The `Animatable` outlives `Active`.** `sweepMs` can floor a short hold up to
    `minSweepFloorMs()` (`minSweepMs + highlightLeadMs`), so the wash may still
