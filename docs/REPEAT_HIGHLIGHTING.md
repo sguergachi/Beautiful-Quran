@@ -207,7 +207,12 @@ are **not audible repeats**. Artifact classes scrubbed in `clean_qdc_artifacts`
    3, 4, 5 …`). Worse than it looks: the spike inflates `highWater`, so every
    normal word after it (3–7 here) satisfied the backtrack test and a long
    false orange chain appeared. Fix: drop a segment that jumps ≥
-   `QDC_SPIKE_JUMP` past the high-water mark and immediately retreats.
+   `QDC_SPIKE_JUMP` past the high-water mark and immediately retreats. A +2
+   jump is also a spike when the retreat immediately walks forward through
+   that same position: Alafasy 16:106 emitted
+   `…12, 7…11, [14,14], 12,13,14…`; dropping the premature 14s preserves the
+   real 7…11 re-say and prevents the normal 12…14 continuation from appearing
+   as a second repeat.
 4. **Non-contiguous span phantoms.** The aligner stamps an early function-word
    index at the *onset* of a real near-high-water re-say (Alafasy 5:54:
    `… 21, 22, 23, [4], 21, 22, 23, 24 …` — long يُجَٰهِدُونَ labeled as مَن).
@@ -274,7 +279,9 @@ HighlightEngine.PreparedTimings.activeInfo(positionMs)
   chain releases together, so a repeated *section* stays highlighted as one unit.
   When Active advances to the next member, the previous member only dries its
   glimmer; its completed orange sweep is held and must not restart. Only chain
-  entry or a genuine non-zero seek activation can begin that sweep.
+  entry or a genuine non-zero seek activation while that same word remains
+  Active can begin that sweep. A session's older seek generation must not
+  queue a second wash as each later chain member becomes Active.
 - **Sequential residual wash (law).** Members wash **one after another** in
   **word-position order** via a per-ayah gate (`OrderedWashGate` /
   web `createRepeatWashGate` — sorted by position, not mere enqueue FIFO).
@@ -342,7 +349,7 @@ read ink together while 12 fades in white as a new word.
   bumping `quran-v5.db` → `quran-v6.db`; the extractor's cleanup step deletes the
   old file. (That pair is the historical example — the asset has been rebumped
   many times since. Read the live value from `QuranDatabase.DB_FILE_NAME`, which
-  is `quran-v22.db` as of 2026-07-25, rather than trusting any number here.)
+  is `quran-v31.db` as of 2026-07-30, rather than trusting any older number here.)
 - **quran.com timestamps are gapless-file offsets**, not per-ayah. Always
   subtract the verse's `timestamp_from`. (The build does this; noted here because
   it's the first thing that looks wrong if you inspect the raw API.)
