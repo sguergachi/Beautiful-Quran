@@ -108,13 +108,19 @@ The halo is drawn inside an offscreen layer expanded by 14 dp on every side.
 That bleed is intentional: the shadow may paint outside the word's measured
 bounds, and restricting the layer to those bounds creates a visible box edge.
 
-### Shaped Arabic lines
+### Shaped Arabic and English lines
 
-`ShapedWordBloom.ColorReveal` redraws the exact shaped glyph `Path` with an
-Android `BlurMaskFilter`, then draws the crisp tint through the existing
-directional color-reveal mask. The offscreen layer expands by at least three
-times the configured blur radius, so even the Ink Lab's maximum blur does not
-clip into a rectangle.
+`ShapedWordBloom.ColorReveal` keeps the paragraph's existing shaping and line
+breaks. Compose's range path encloses a selection; it is not the outline of
+the glyphs and must never be painted as the halo. The renderer clips the
+already-laid-out paragraph to that range, extracts its glyph alpha into a
+small cached mask, and blurs that mask. The crisp tint still uses the existing
+directional color-reveal mask.
+
+The cache is local to the laid-out line and keeps only the most recent masks,
+so a draw frame only recolours one small bitmap while the glimmer animates.
+The extracted mask includes the blur's own expansion, preventing the halo from
+clipping into a rectangle even at the Ink Lab's maximum radius.
 
 Never replace the shaped path with a word-sized radial field or alpha-dim the
 Hafs glyphs. Arabic glyphs stay opaque; the established paper-cover wash remains

@@ -67,6 +67,11 @@ paints with:
   run. Deriving that path for every bloom (which an earlier version did,
   unconditionally, then discarded for two of the three kinds) cost ~2 selection
   paths per word per frame for nothing.
+- A glimmer cannot blur that selection path because it is rectangular.
+  `GlyphHaloCache` renders the selected laid-out glyphs into a tiny alpha mask
+  once per word and blur radius, then each animation frame only recolours that
+  cached mask. The cache is layout-local and retains the eight most recent
+  words, covering overlapping dry-downs without growing across a long ayah.
 
 Settled inactive ayahs do **not** redraw continuously: their draw-scope state
 reads are static once the 400 ms recess/focus tween finishes.
