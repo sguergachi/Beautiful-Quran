@@ -208,11 +208,11 @@ are **not audible repeats**. Artifact classes scrubbed in `clean_qdc_artifacts`
    normal word after it (3–7 here) satisfied the backtrack test and a long
    false orange chain appeared. Fix: drop a segment that jumps ≥
    `QDC_SPIKE_JUMP` past the high-water mark and immediately retreats. A +2
-   jump is also a spike when the retreat immediately walks forward through
-   that same position: Alafasy 16:106 emitted
-   `…12, 7…11, [14,14], 12,13,14…`; dropping the premature 14s preserves the
-   real 7…11 re-say and prevents the normal 12…14 continuation from appearing
-   as a second repeat.
+   jump is also a spike only when the aligner duplicates that premature
+   position and the retreat immediately walks forward through it: Alafasy
+   16:106 emitted `…12, 7…11, [14,14], 12,13,14…`; dropping the premature 14s
+   preserves the real 7…11 re-say and prevents the normal 12…14 continuation
+   from appearing as a second repeat.
 4. **Non-contiguous span phantoms.** The aligner stamps an early function-word
    index at the *onset* of a real near-high-water re-say (Alafasy 5:54:
    `… 21, 22, 23, [4], 21, 22, 23, 24 …` — long يُجَٰهِدُونَ labeled as مَن).

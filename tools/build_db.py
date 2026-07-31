@@ -744,8 +744,9 @@ def clean_qdc_artifacts(segs, stats, words=None):
             # [17,18] before word 11; 28:32 emits [16,17,18] before word 8). A
             # real dropped word makes a forward jump too, but it keeps going
             # forward — only a jump that RETREATS is spurious. A smaller +2
-            # jump is removed only when the retreat then walks canonically
-            # back to the same position (16:106: 12,[14,14],12,13,14).
+            # jump is removed only when the aligner duplicates that premature
+            # position and the retreat then walks canonically back through it
+            # (16:106: 12,[14,14],12,13,14).
             if prev is not None and pos >= running_max + 2:
                 j = i
                 while (
@@ -763,6 +764,8 @@ def clean_qdc_artifacts(segs, stats, words=None):
                 confirmed_near_spike = (
                     after is not None
                     and pos == running_max + 2
+                    and j > i
+                    and all(merged[k][0] == pos for k in range(i, j + 1))
                     and replay == list(range(after, pos + 1))
                 )
                 if (
