@@ -1,0 +1,24 @@
+{
+  "id": "leading-silence-hani-4-148",
+  "label": "Hani 4:148 onset clamps word 1 without delaying later words",
+  "refs": [
+    "everyayah Hani_Rifai_192kbps/004148.mp3",
+    "reader ear report"
+  ],
+  "pipeline": "leading_silence_offset",
+  "audio_onset_ms": 1951,
+  "exact_file_clock": false,
+  "input_segments": [
+    [1, 0, 4690],
+    [2, 4690, 5410],
+    [3, 5410, 6290],
+    [4, 6290, 7220]
+  ],
+  "expected_segments": [
+    [1, 1951, 4690],
+    [2, 4690, 5410],
+    [3, 5410, 6290],
+    [4, 6290, 7220]
+  ],
+  "notes": "The onset lies inside word 1 while word 2 is already after the voice. It is not evidence for translating the complete row."
+}

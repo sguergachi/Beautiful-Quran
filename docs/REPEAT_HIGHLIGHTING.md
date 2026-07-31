@@ -349,7 +349,7 @@ read ink together while 12 fades in white as a new word.
   bumping `quran-v5.db` → `quran-v6.db`; the extractor's cleanup step deletes the
   old file. (That pair is the historical example — the asset has been rebumped
   many times since. Read the live value from `QuranDatabase.DB_FILE_NAME`, which
-  is `quran-v31.db` as of 2026-07-30, rather than trusting any older number here.)
+  is `quran-v32.db` as of 2026-07-30, rather than trusting any older number here.)
 - **quran.com timestamps are gapless-file offsets**, not per-ayah. Always
   subtract the verse's `timestamp_from`. (The build does this; noted here because
   it's the first thing that looks wrong if you inspect the raw API.)

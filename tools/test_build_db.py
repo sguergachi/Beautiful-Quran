@@ -218,6 +218,11 @@ def check_confidence():
         [[1, 1_300, 2_000]], 850, exact_file_clock=False
     ) == [[1, 1_300, 2_000]]
     onset &= offset_for_audio_onset(
+        [[1, 0, 4_690], [2, 4_690, 5_410], [3, 5_410, 6_290]],
+        1_951,
+        exact_file_clock=False,
+    ) == [[1, 1_951, 4_690], [2, 4_690, 5_410], [3, 5_410, 6_290]]
+    onset &= offset_for_audio_onset(
         [[1, 0, 200], [2, 1_650, 2_370]],
         1_179,
         exact_file_clock=True,
@@ -301,10 +306,17 @@ def check_audio_onset_pipeline():
     # row longer than the whole file could never light its tail, so it is not.
     late = [[1, 1_500, 2_100]]
     unplayable = [[1, 0, 1_500], [2, 1_500, 3_000]]
+    unreachable_tail = [[1, 0, 1_500], [2, 2_100, 2_400]]
     kept, dropped = drop_rows_longer_than_audio(
-        [(1, 2, 253, late), (1, 2, 254, unplayable)], durations
+        [
+            (1, 2, 253, late),
+            (1, 2, 254, unplayable),
+            (1, 2, 255, unreachable_tail),
+        ],
+        durations | {(1, 2, 255): 2_000},
     )
-    ceilings &= dropped == [(1, 2, 254)] and [row[2] for row in kept] == [253]
+    ceilings &= dropped == [(1, 2, 254), (1, 2, 255)]
+    ceilings &= [row[2] for row in kept] == [253]
     # A row sitting seconds past the voice that overruns the file is displaced,
     # so it re-anchors; one already on its onset keeps its correct opening.
     displaced = [[1, 7_110, 9_000], [2, 9_000, 21_500]]
@@ -392,6 +404,11 @@ def audit_bundled_db():
         [7, 5_970, 6_710],
         [8, 6_710, 7_540],
     ]
+    exact &= timings[(7, 4, 148)][:3] == [
+        [1, 1_951, 4_690],
+        [2, 4_690, 5_410],
+        [3, 5_410, 6_290],
+    ]
     exact &= {
         key: timings[key][0][1]
         for key in ((4, 3, 113), (4, 4, 88), (7, 5, 109))
@@ -417,10 +434,14 @@ def audit_bundled_db():
             s, a = map(int, verse.split(":"))
             row = timings.get((payload["reciterId"], s, a))
             exact &= row is None or row[-1][2] - row[0][1] <= length
+            exact &= row is None or row[-1][1] < length
         rid = payload["reciterId"]
         for verse, onset in payload["offsets"].items():
             s, a = map(int, verse.split(":"))
-            exact &= timings[(rid, s, a)][0][1] >= onset
+            row = timings.get((rid, s, a))
+            if row is None:
+                continue
+            exact &= row[0][1] >= onset
             exact &= db.execute(
                 "SELECT audio_onset_ms FROM timings "
                 "WHERE reciter_id=? AND surah_id=? AND ayah_number=?",
