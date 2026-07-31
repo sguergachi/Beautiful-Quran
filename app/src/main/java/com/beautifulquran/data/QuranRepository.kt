@@ -8,6 +8,7 @@ import com.beautifulquran.data.model.RootOccurrence
 import com.beautifulquran.data.model.RootLemmaSummary
 import com.beautifulquran.data.model.RootSummary
 import com.beautifulquran.data.model.Segment
+import com.beautifulquran.data.model.SubwordKeyframe
 import com.beautifulquran.data.model.Surah
 import com.beautifulquran.data.model.SurahContent
 import com.beautifulquran.data.model.Word
@@ -25,6 +26,7 @@ import com.beautifulquran.timingslab.TimingOverrides
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlin.math.abs
 
@@ -92,6 +94,22 @@ internal fun alignToAudioClock(
         if (migrateWholeRow) shiftToBundledClock(segments, bundled) else segments
     return holdOpeningBehind(shifted, maxOf(onsetMs, bundled.first().startMs))
 }
+
+@Serializable
+private data class TimingV2Segment(
+    val position: Int,
+    val startMs: Long,
+    val endMs: Long,
+    val keyframes: List<TimingV2Keyframe>,
+    /** Optional; absent in older V2 artifacts means no acoustic wasl. */
+    val waslFromPrevMs: Long = 0L,
+)
+
+@Serializable
+private data class TimingV2Keyframe(
+    val offsetMs: Long,
+    val progress: Float,
+)
 
 class QuranRepository(
     private val database: QuranDatabase,
@@ -420,6 +438,41 @@ class QuranRepository(
             bundledTimingRows(reciterId, surahId).segments
         }
 
+    /**
+     * Parallel timing fork: pure V1 rows from [timings], overlaid with
+     * machine-generated rows from [timings_v2] where present. The V1 table is
+     * never written by the V2 pipeline — both lanes ship in one DB so the app
+     * can A/B live via [TimingScheme]. Missing V2 ayahs keep bundled V1.
+     * Timing Lab patches never enter this path.
+     */
+    private suspend fun bundledV2Timings(
+        reciterId: Int,
+        surahId: Int,
+    ): Map<Int, List<Segment>> = withContext(Dispatchers.IO) {
+        val fallback = bundledTimings(reciterId, surahId)
+        val acoustic = database.db.rawQuery(
+            """
+            SELECT t.ayah_number, t.segments, COUNT(w.position)
+            FROM timings_v2 t
+            JOIN words w
+              ON w.surah_id = t.surah_id
+             AND w.ayah_number = t.ayah_number
+            WHERE t.reciter_id = ? AND t.surah_id = ?
+            GROUP BY t.ayah_number, t.segments
+            """.trimIndent(),
+            arrayOf(reciterId.toString(), surahId.toString()),
+        ).use { c ->
+            buildMap {
+                while (c.moveToNext()) {
+                    parseV2Segments(c.getString(1), expectedWordCount = c.getInt(2))
+                        .takeIf { it.isNotEmpty() }
+                        ?.let { put(c.getInt(0), it) }
+                }
+            }
+        }
+        fallback + acoustic
+    }
+
     /** ayah number -> word segments, for one reciter and surah. Any
      * hand-corrected override from the Timings Lab takes precedence over the
      * bundled DB row, so the reader immediately reflects edits. The MP3 voice
@@ -427,8 +480,15 @@ class QuranRepository(
      * a whole, while current Lab boundaries remain exact. A rebased row is
      * written back once, so the Lab, the reader and an exported patch all
      * describe the same marks. */
-    suspend fun timings(reciterId: Int, surahId: Int): Map<Int, List<Segment>> =
+    suspend fun timings(
+        reciterId: Int,
+        surahId: Int,
+        scheme: TimingScheme = TimingScheme.V1,
+    ): Map<Int, List<Segment>> =
         withContext(Dispatchers.IO) {
+            if (scheme == TimingScheme.V2) {
+                return@withContext bundledV2Timings(reciterId, surahId)
+            }
             val bundled = bundledTimingRows(reciterId, surahId)
             if (timingOverrides == null) return@withContext bundled.segments
             val overrides = timingOverrides.overrides.value
@@ -467,6 +527,55 @@ class QuranRepository(
                     .filter { it.size >= 3 }
                     .map { Segment(it[0].toInt(), it[1], it[2]) }
                     .sortedBy { it.startMs }
+            }.getOrDefault(emptyList())
+
+        /**
+         * Parses confidence-gated V2 rows. Invalid topology rejects the row;
+         * the repository then uses its bundled V1 fallback for that ayah.
+         */
+        fun parseV2Segments(
+            raw: String,
+            expectedWordCount: Int? = null,
+        ): List<Segment> =
+            runCatching {
+                val parsed = json.decodeFromString<List<TimingV2Segment>>(raw)
+                    .map { segment ->
+                        require(segment.startMs < segment.endMs)
+                        var lastOffset = 0L
+                        var lastProgress = 0f
+                        val keyframes = segment.keyframes.map { keyframe ->
+                            require(keyframe.offsetMs in 1..(segment.endMs - segment.startMs))
+                            require(keyframe.offsetMs > lastOffset)
+                            require(keyframe.progress >= lastProgress && keyframe.progress <= 1f)
+                            lastOffset = keyframe.offsetMs
+                            lastProgress = keyframe.progress
+                            SubwordKeyframe(keyframe.offsetMs, keyframe.progress)
+                        }
+                        require(keyframes.isNotEmpty() && keyframes.last().progress == 1f)
+                        require(segment.waslFromPrevMs >= 0L)
+                        Segment(
+                            position = segment.position,
+                            startMs = segment.startMs,
+                            endMs = segment.endMs,
+                            subwordKeyframes = keyframes,
+                            waslFromPrevMs = segment.waslFromPrevMs,
+                        )
+                    }
+                require(parsed.zipWithNext().all { (left, right) ->
+                    left.startMs < right.startMs
+                })
+                if (expectedWordCount != null) {
+                    var expected = 1
+                    val seen = HashSet<Int>(expectedWordCount)
+                    for (segment in parsed) {
+                        require(segment.position in 1..expectedWordCount)
+                        if (seen.add(segment.position)) {
+                            require(segment.position == expected++)
+                        }
+                    }
+                    require(expected == expectedWordCount + 1)
+                }
+                parsed
             }.getOrDefault(emptyList())
     }
 }

@@ -1,5 +1,7 @@
 package com.beautifulquran.domain
 
+import com.beautifulquran.data.model.SubwordKeyframe
+
 /**
  * Letter-level pacing of the active word's ink sweep, derived from tajweed
  * rules (docs/TAJWEED_PACING.md).
@@ -168,31 +170,251 @@ object TajweedPacing {
     )
 
     /**
-     * Monotone piecewise-linear map from normalized sweep time (0..1 of the
-     * karaoke hold) to wash position (0..1 across the word). Silent letters
-     * contribute width but no time of their own — their slice is folded into
-     * the neighbouring pronounced letter's glide so the edge crosses them in
-     * motion rather than teleporting; the plateau after the spoken span keeps
-     * the ink settled while the reciter breathes before the next word.
+     * Monotone map from normalized sweep time (0..1 of the karaoke hold) to
+     * **letter-front position** (0..1 across the word) — the reciter truth.
+     *
+     * [softWash]: land on each spoken letter and park for its measured hold;
+     * peels are **linear** in letter space (constant peel speed). Per-span
+     * cosine ease was removed: it zeroed velocity at every letter boundary and
+     * read as a robotic start/stop on each syllable. Continuous organic feel
+     * lives in [InkEngine.acousticWashStep] alone — one soft lag, not four.
      */
     class Curve internal constructor(
         private val times: FloatArray,
         private val positions: FloatArray,
-        /** Pronounced letters — drives the paced feather width. */
+        /** Pronounced letters — drives the letter-scaled wash feather. */
         val letterCount: Int,
+        /**
+         * True for measured acoustic curves: letter parks + linear peels.
+         */
+        val softWash: Boolean = false,
     ) {
         fun at(t: Float): Float {
             if (t >= 1f) return 1f
             val c = t.coerceAtLeast(0f)
-            // Last breakpoint at or before c (a duplicate time collapses to
-            // the furthest position — the settle point when spoken == 1).
             var i = times.size - 1
             while (i > 0 && times[i] > c) i--
             if (i >= times.size - 1) return 1f
             val span = times[i + 1] - times[i]
             if (span <= 0f) return positions[i + 1]
+            val p0 = positions[i]
+            val p1 = positions[i + 1]
+            // Flat = spoken-letter hold (truth). Chase step supplies continuous feel.
+            if (p0 == p1) return p0
             val f = (c - times[i]) / span
-            return positions[i] + (positions[i + 1] - positions[i]) * f
+            // Honest linear peels for softWash and V1 — no per-letter ease pulse.
+            return p0 + (p1 - p0) * f
+        }
+
+        /**
+         * Approximate d(position)/d(normalizedTime) at [t] for feed-forward chase.
+         * Zero on letter holds; constant on linear peels.
+         */
+        fun velocityAt(t: Float): Float {
+            if (t >= 1f) return 0f
+            val c = t.coerceIn(0f, 1f)
+            var i = times.size - 1
+            while (i > 0 && times[i] > c) i--
+            if (i >= times.size - 1) return 0f
+            val span = times[i + 1] - times[i]
+            if (span <= 1e-6f) return 0f
+            val rise = positions[i + 1] - positions[i]
+            if (rise <= 0f) return 0f
+            return rise / span
+        }
+
+        /**
+         * Next letter-front position the ink may finish into (Claude ceiling).
+         *
+         * Truth [at] parks on the spoken letter; the display may drift from that
+         * park toward this ceiling so a madd *completes* instead of freezing the
+         * edge mid-word. Never past an unspoken letter onset.
+         */
+        fun ceilingAt(t: Float): Float {
+            val q = at(t)
+            if (q >= 1f - 1e-4f) return 1f
+            var best = 1f
+            for (p in positions) {
+                if (p > q + 1e-4f && p < best) best = p
+            }
+            return best.coerceIn(q, 1f)
+        }
+    }
+
+    /**
+     * Acoustic keyframes → **honest letter-timed** wash curve (reciter truth).
+     *
+     * CTC is arrive → hold → peel. Holds park on the spoken letter; peels
+     * advance linearly between letters. Micro CTC freezes only are absorbed.
+     * Continuous chase feel is [InkEngine.acousticWashStep], not invented
+     * curve creep or per-span cosine.
+     */
+    fun acousticCurve(
+        keyframes: List<SubwordKeyframe>,
+        durationMs: Long,
+    ): Curve? {
+        if (keyframes.isEmpty() || durationMs <= 0L) return null
+        if (keyframes.first().offsetMs <= 0L && keyframes.first().progress > 0f) {
+            return null
+        }
+
+        val raw = ArrayList<Pair<Long, Float>>(keyframes.size + 2)
+        raw.add(0L to 0f)
+        var lastProgress = 0f
+        for (kf in keyframes) {
+            val t = kf.offsetMs.coerceIn(0L, durationMs)
+            val p = kf.progress.coerceIn(0f, 1f)
+            if (p < lastProgress) continue
+            if (p == 0f && lastProgress == 0f) continue
+            val prevT = raw.last().first
+            if (t < prevT) continue
+            if (t == prevT) {
+                raw[raw.lastIndex] = t to p
+            } else {
+                raw.add(t to p)
+            }
+            lastProgress = p
+        }
+        when {
+            raw.last().first == durationMs -> raw[raw.lastIndex] = durationMs to 1f
+            else -> raw.add(durationMs to 1f)
+        }
+
+        val flow = holdParkFlow(raw, durationMs)
+        expandMicroAdvances(flow, durationMs)
+        absorbMicroHolds(flow)
+
+        val times = FloatArray(flow.size)
+        val positions = FloatArray(flow.size)
+        val inv = 1f / durationMs.toFloat()
+        for (i in flow.indices) {
+            times[i] = (flow[i].first * inv).coerceIn(0f, 1f)
+            positions[i] = flow[i].second.coerceIn(0f, 1f)
+        }
+        times[0] = 0f
+        positions[0] = 0f
+        times[times.lastIndex] = 1f
+        positions[positions.lastIndex] = 1f
+
+        val letterCount = keyframes.count { it.progress > 0f }.coerceAtLeast(1)
+        return Curve(times, positions, letterCount = letterCount, softWash = true)
+    }
+
+    /**
+     * Keep measured holds as flat parks; only rising edges are letter peels.
+     */
+    private fun holdParkFlow(
+        raw: ArrayList<Pair<Long, Float>>,
+        durationMs: Long,
+    ): ArrayList<Pair<Long, Float>> {
+        val flow = ArrayList<Pair<Long, Float>>(raw.size + 2)
+        flow.add(0L to 0f)
+        var i = 0
+        while (i < raw.size) {
+            val p = raw[i].second
+            var j = i
+            while (j + 1 < raw.size && raw[j + 1].second == p) j++
+            val arriveT = raw[i].first
+            val holdEndT = raw[j].first
+            // Land on the letter.
+            if (p > flow.last().second) {
+                appendFlow(flow, arriveT, p)
+            }
+            // Park for the full hold (waqf / madd / CTC freeze).
+            if (holdEndT > arriveT && p < 1f) {
+                appendFlow(flow, holdEndT, p)
+            }
+            i = j + 1
+        }
+        appendFlow(flow, durationMs, 1f)
+        return flow
+    }
+
+    /**
+     * Widen ~20ms CTC peels so cosine ease has room to accelerate/decelerate,
+     * stealing at most [MAX_PEEL_STEAL_MS] from neighbouring parks.
+     */
+    private fun expandMicroAdvances(
+        points: ArrayList<Pair<Long, Float>>,
+        durationMs: Long,
+    ) {
+        val minSpan = 72L
+        var i = 0
+        while (i < points.size - 1) {
+            val (t0, p0) = points[i]
+            val (t1, p1) = points[i + 1]
+            val span = t1 - t0
+            if (p1 > p0 && span in 1 until minSpan) {
+                var need = minSpan - span
+                if (need > 0L && i + 2 < points.size) {
+                    val (t2, p2) = points[i + 2]
+                    if (p2 == p1 && t2 > t1) {
+                        val steal = minOf(need, (t2 - t1) / 4, MAX_PEEL_STEAL_MS)
+                        if (steal > 0L) {
+                            points[i + 1] = (t1 + steal) to p1
+                            need -= steal
+                        }
+                    }
+                }
+                if (need > 0L && i > 0) {
+                    val (tPrev, pPrev) = points[i - 1]
+                    if (pPrev == p0 && t0 > tPrev) {
+                        val steal = minOf(need, (t0 - tPrev) / 4, MAX_PEEL_STEAL_MS)
+                        if (steal > 0L) {
+                            points[i] = (t0 - steal) to p0
+                        }
+                    }
+                }
+            }
+            i++
+        }
+    }
+
+    private fun appendFlow(
+        flow: ArrayList<Pair<Long, Float>>,
+        t: Long,
+        p: Float,
+    ) {
+        val prevT = flow.last().first
+        val prevP = flow.last().second
+        val tt = t.coerceAtLeast(prevT)
+        val pp = p.coerceAtLeast(prevP)
+        if (tt == prevT && pp == prevP) return
+        if (tt == prevT) {
+            flow[flow.lastIndex] = tt to pp
+        } else {
+            flow.add(tt to pp)
+        }
+    }
+
+    private const val MAX_PEEL_STEAL_MS = 40L
+
+    /** Sub-perceptual CTC freezes only — not real spoken letter holds. */
+    const val MICRO_HOLD_MS = 80L
+
+    /**
+     * Drop flat freezes shorter than [MICRO_HOLD_MS]. Real letter holds stay
+     * parked so the chase target remains the spoken letter.
+     */
+    private fun absorbMicroHolds(points: ArrayList<Pair<Long, Float>>) {
+        if (points.size < 3) return
+        var i = 0
+        while (i < points.size - 1) {
+            val (t0, p0) = points[i]
+            val (t1, p1) = points[i + 1]
+            val span = t1 - t0
+            if (p0 == p1 && p0 < 1f - 1e-4f && span in 1L until MICRO_HOLD_MS) {
+                points.removeAt(i + 1)
+                continue
+            }
+            i++
+        }
+        for (k in 1 until points.size) {
+            val (t, p) = points[k]
+            val (pt, pp) = points[k - 1]
+            val tt = t.coerceAtLeast(pt)
+            val pp2 = p.coerceAtLeast(pp)
+            if (tt != t || pp2 != p) points[k] = tt to pp2
         }
     }
 

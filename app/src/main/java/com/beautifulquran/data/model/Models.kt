@@ -51,11 +51,30 @@ data class Reciter(
     fun basmalahAudioUrl(): String = audioUrl(surah = 1, ayah = 1)
 }
 
+/**
+ * An acoustic point inside a V2 word span.
+ *
+ * [offsetMs] is relative to the word's [Segment.startMs]; [progress] is the
+ * monotone 0..1 reveal position across the shaped word.
+ */
+data class SubwordKeyframe(
+    val offsetMs: Long,
+    val progress: Float,
+)
+
 /** One highlighted span: word [position] is active from [startMs] until [endMs]. */
 data class Segment(
     val position: Int,
     val startMs: Long,
     val endMs: Long,
+    /** Empty for V1; machine-generated acoustic keyframes for Timing V2. */
+    val subwordKeyframes: List<SubwordKeyframe> = emptyList(),
+    /**
+     * Measured wasl bloom budget (ms) donated by the previous word when audio
+     * shows a continuous nūn-rule connection into this occurrence. 0 = none.
+     * V1 ignores this field (text-rule wasl only).
+     */
+    val waslFromPrevMs: Long = 0L,
 )
 
 data class SurahContent(

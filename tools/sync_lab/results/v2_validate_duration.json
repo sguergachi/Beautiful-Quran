@@ -1,0 +1,23 @@
+{
+  "acceptedRows": 2700,
+  "coveragePctOfAlafasy": 43.3,
+  "repeatRows": 321,
+  "audioDurationChecked": 2700,
+  "missingAudio": 0,
+  "flaggedRows": 0,
+  "flaggedPctOfAccepted": 0.0,
+  "flagCounts": {},
+  "historicalOverlap": {
+    "overlapRows": 142,
+    "structureExact": 50,
+    "structureExactPct": 35.21,
+    "onsets": {
+      "count": 950,
+      "medianMs": 57.0,
+      "p90Ms": 639,
+      "within100Pct": 72.3157894736842
+    },
+    "note": "historical patches are regression evidence, not independent gold"
+  },
+  "note": "duration-only full pass; silence/pause/repeat self-xcorr need waveform sample"
+}

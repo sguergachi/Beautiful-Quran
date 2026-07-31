@@ -5,7 +5,7 @@ A beautiful, simple Quran reader for Android and the web. Its signature feature 
 illuminates in time with the audio, with its English meaning beneath it.
 
 - 📖 Full Quran, Uthmani script, in the KFGQPC Hafs typeface
-- ✨ Word-by-word highlighting synced to reciters with bundled timing data
+- ✨ Word-by-word highlighting synced to reciters with bundled timing data — **sync fidelity is the product core** ([docs/SYNC_FIDELITY.md](docs/SYNC_FIDELITY.md))
 - 🎙️ 7 reciters, with ayah audio streamed and cached
 - 🈯 Word-by-word English gloss + Saheeh International translation
 - 🔁 Repeat one ayah, the whole surah, or any ayah range you choose
@@ -112,6 +112,7 @@ If host Vulkan is broken on your machine, you can still fall back with
 
 ## Documentation
 
+- [docs/SYNC_FIDELITY.md](docs/SYNC_FIDELITY.md) — **product core:** word↔recitation sync fidelity and high-precision timing roadmap
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — how the app is put together: pipeline, sync engine, modules, conventions
 - [docs/COMPLEXITY.md](docs/COMPLEXITY.md) — complexity rules, current hotspots, and the invariants a refactor must preserve
 - [docs/DESIGN.md](docs/DESIGN.md) — the design language: the sheet, ink, color, type, motion

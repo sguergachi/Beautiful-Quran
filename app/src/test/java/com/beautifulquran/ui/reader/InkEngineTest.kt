@@ -2,9 +2,12 @@ package com.beautifulquran.ui.reader
 
 import com.beautifulquran.data.model.Segment
 import com.beautifulquran.domain.BasmalahWash
+import com.beautifulquran.data.TimingScheme
+import com.beautifulquran.data.model.SubwordKeyframe
 import com.beautifulquran.ui.reader.InkEngine.State
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -17,10 +20,14 @@ class InkEngineTest {
         isRepeat: Boolean = false,
         highWater: Int = wordPosition,
         repeatStart: Int = wordPosition,
+        timingScheme: TimingScheme = TimingScheme.V1,
+        keyframes: List<SubwordKeyframe> = emptyList(),
     ) = ActiveWord(
         ayah = 1,
         wordPosition = wordPosition,
         durationMs = durationMs,
+        timingScheme = timingScheme,
+        subwordKeyframes = keyframes,
         isRepeat = isRepeat,
         highWater = highWater,
         repeatStart = repeatStart,
@@ -518,6 +525,171 @@ class InkEngineTest {
         assertNull(InkEngine.sweepMs(activeWord = null, playbackSpeed = 1f))
     }
 
+    @Test
+    fun `V2 wash feed-forward chases without leading past the letter`() {
+        // At ceiling: no motion.
+        assertEquals(
+            0.5f,
+            InkEngine.acousticWashStep(
+                current = 0.5f,
+                target = 0.5f,
+                dtSec = 0.05f,
+                targetVelocity = 0f,
+                ceiling = 0.5f,
+            ),
+            1e-3f,
+        )
+
+        // Large gap + reciter peel velocity: keep-up (feed-forward), not crawl.
+        val after = InkEngine.acousticWashStep(
+            current = 0.2f,
+            target = 0.8f,
+            dtSec = 0.05f,
+            targetVelocity = 1.2f,
+            ceiling = 0.8f,
+        )
+        assertTrue("should keep up on peel (got $after)", after > 0.2f + 0.08f)
+        assertTrue("must not lead past ceiling (got $after)", after <= 0.8f + 1e-4f)
+
+        // Bigger gap → faster catch-up than small gap (same v_target).
+        val smallGap = InkEngine.acousticWashStep(
+            current = 0.5f,
+            target = 0.55f,
+            dtSec = 0.05f,
+            targetVelocity = 0.5f,
+            ceiling = 0.55f,
+        )
+        val bigGap = InkEngine.acousticWashStep(
+            current = 0.5f,
+            target = 0.75f,
+            dtSec = 0.05f,
+            targetVelocity = 0.5f,
+            ceiling = 0.75f,
+        )
+        assertTrue(
+            "gap term should speed catch-up (${smallGap - 0.5f} vs ${bigGap - 0.5f})",
+            (bigGap - 0.5f) > (smallGap - 0.5f),
+        )
+
+        // Hold: target parked, ceiling ahead → soft drift (no mid-word freeze).
+        val held = InkEngine.acousticWashStep(
+            current = 0.40f,
+            target = 0.40f,
+            dtSec = 0.05f,
+            targetVelocity = 0f,
+            ceiling = 0.55f,
+        )
+        assertTrue("hold should drift toward ceiling (got $held)", held > 0.40f)
+        assertTrue("hold must not pass ceiling (got $held)", held <= 0.55f + 1e-4f)
+        val expectedDrift = 0.40f + InkEngine.ACOUSTIC_HOLD_DRIFT * 0.05f
+        assertEquals(expectedDrift.coerceAtMost(0.55f), held, 1e-4f)
+
+        // dt=0 never snaps.
+        assertEquals(
+            0.2f,
+            InkEngine.acousticWashStep(
+                current = 0.2f,
+                target = 0.9f,
+                dtSec = 0f,
+                targetVelocity = 2f,
+                ceiling = 0.9f,
+            ),
+            1e-4f,
+        )
+
+        // Never rewinds when target drops behind current.
+        assertEquals(
+            0.7f,
+            InkEngine.acousticWashStep(
+                current = 0.7f,
+                target = 0.4f,
+                dtSec = 0.05f,
+                targetVelocity = 0f,
+                ceiling = 0.4f,
+            ),
+            1e-4f,
+        )
+    }
+
+    @Test
+    fun `letter feather scales with letter count for visible chase`() {
+        assertTrue(InkEngine.letterFeather(2) in 0.35f..0.9f)
+        assertTrue(InkEngine.letterFeather(5) < InkEngine.letterFeather(3))
+        assertEquals(0.35f, InkEngine.letterFeather(20), 1e-3f) // floor
+        // Front on letter mid-word maps inside mask progress.
+        val f = InkEngine.letterFeather(5)
+        val p = InkEngine.maskProgressForLetterFront(0.5f, f)
+        assertTrue("mask p in (0,1) got $p", p in 0.2f..0.8f)
+    }
+
+    @Test
+    fun `V2 acoustic pacing does not depend on the V1 Tajweed toggle`() {
+        val saved = InkEngine.tuning
+        try {
+            InkEngine.tuning = saved.copy(tajweedPacing = false)
+            val curve = InkEngine.pacing(
+                arabic = "ٱلضَّآلِّينَ",
+                activeWord = active(
+                    1,
+                    durationMs = 1_000,
+                    timingScheme = TimingScheme.V2,
+                    keyframes = listOf(
+                        SubwordKeyframe(200, 0.4f),
+                        SubwordKeyframe(600, 1f),
+                    ),
+                ),
+                isAyahFinal = true,
+            )
+            assertNotNull(curve)
+            assertEquals(0.4f, curve!!.at(0.2f), 1e-4f)
+        } finally {
+            InkEngine.tuning = saved
+        }
+    }
+
+    @Test
+    fun `V2 never borrows inferred Tajweed pacing when keyframes are absent`() {
+        val saved = InkEngine.tuning
+        try {
+            InkEngine.tuning = saved.copy(tajweedPacing = true)
+            val v1 = active(1, durationMs = 1_000, timingScheme = TimingScheme.V1)
+            val v2 = active(1, durationMs = 1_000, timingScheme = TimingScheme.V2)
+
+            assertNotNull(InkEngine.pacing("ٱلضَّآلِّينَ", v1, isAyahFinal = true))
+            assertNull(InkEngine.pacing("ٱلضَّآلِّينَ", v2, isAyahFinal = true))
+        } finally {
+            InkEngine.tuning = saved
+        }
+    }
+
+    @Test
+    fun `V2 wasl blooms the next opening letter like V1 geometry`() {
+        val saved = InkEngine.tuning
+        try {
+            InkEngine.tuning = saved.copy(tajweedPacing = true, holdConnect = true)
+            assertNotNull(
+                InkEngine.connection("مِن", "رَّبِّكُم", TimingScheme.V1),
+            )
+            // Missing measured budget must not kill wasl — ink still starts on
+            // the next word's opening letter during the donor tail.
+            assertNotNull(
+                InkEngine.connection("مِن", "رَّبِّكُم", TimingScheme.V2, waslFromPrevMs = 0L),
+            )
+            assertNotNull(
+                InkEngine.connection("مِن", "رَّبِّكُم", TimingScheme.V2, waslFromPrevMs = 200L),
+            )
+            // Measured budget only refines duration.
+            assertEquals(200, InkEngine.waslPrefixTargetMs(200L))
+            assertEquals(InkEngine.tuning.waslPrefixMs, InkEngine.waslPrefixTargetMs(0L))
+            InkEngine.tuning = saved.copy(holdConnect = false)
+            assertNull(
+                InkEngine.connection("مِن", "رَّبِّكُم", TimingScheme.V2, waslFromPrevMs = 200L),
+            )
+        } finally {
+            InkEngine.tuning = saved
+        }
+    }
+
     // --- glinting ---
 
     @Test
@@ -539,33 +711,137 @@ class InkEngineTest {
             RepeatWashAction.Reveal,
             repeatWashAction(
                 wasRepeat = false,
+                wasActive = false,
                 previousActivation = 4L,
                 repeat = true,
+                active = true,
                 activation = 4L,
             ),
         )
     }
 
     @Test
-    fun `repeat wash holds on chain advance and restarts on seek`() {
-        // Active handoff drops activation to 0 — must be Hold so the residual
-        // 0→1 wash is not cancelled/restarted (sequential finish law).
+    fun `repeat wash holds on chain handoff and reveals multi-loop re-say`() {
+        // Active ends while still in chain — Hold so residual is not cancelled.
         assertEquals(
             RepeatWashAction.Hold,
             repeatWashAction(
                 wasRepeat = true,
+                wasActive = true,
                 previousActivation = 4L,
                 repeat = true,
-                activation = 0L,
+                active = false,
+                activation = 4L,
             ),
         )
+        // Multi-loop re-say: still in open chain, becomes Active again → Reveal.
         assertEquals(
             RepeatWashAction.Reveal,
             repeatWashAction(
                 wasRepeat = true,
+                wasActive = false,
                 previousActivation = 4L,
                 repeat = true,
+                active = true,
+                activation = 4L,
+            ),
+        )
+        // Seek / generation bump while in chain → Reveal.
+        assertEquals(
+            RepeatWashAction.Reveal,
+            repeatWashAction(
+                wasRepeat = true,
+                wasActive = true,
+                previousActivation = 4L,
+                repeat = true,
+                active = true,
                 activation = 5L,
+            ),
+        )
+        // Activation unchanged and still Active → Hold (no re-snap every frame).
+        assertEquals(
+            RepeatWashAction.Hold,
+            repeatWashAction(
+                wasRepeat = true,
+                wasActive = true,
+                previousActivation = 4L,
+                repeat = true,
+                active = true,
+                activation = 4L,
+            ),
+        )
+    }
+
+    @Test
+    fun `wash may hard-restart only when the overlay is invisible`() {
+        // Product law: never rewind progress while still painted.
+        assertFalse(washMayHardRestart(visibleAlpha = 1f))
+        assertFalse(washMayHardRestart(visibleAlpha = 0.4f))
+        assertFalse(washMayHardRestart(visibleAlpha = WASH_INVISIBLE_ALPHA))
+        assertTrue(washMayHardRestart(visibleAlpha = 0f))
+        assertTrue(washMayHardRestart(visibleAlpha = WASH_INVISIBLE_ALPHA - 0.001f))
+    }
+
+    @Test
+    fun `drawn wash progress never rewinds while the overlay is visible`() {
+        // Visible: peak holds even if raw clock snaps backward (flash source).
+        val (mid, peakMid) = monotonicWashProgress(raw = 0.4f, visibleAlpha = 1f, peak = 0f)
+        assertEquals(0.4f, mid, 1e-5f)
+        val (held, peakHeld) = monotonicWashProgress(raw = 0f, visibleAlpha = 1f, peak = peakMid)
+        assertEquals(0.4f, held, 1e-5f)
+        assertEquals(0.4f, peakHeld, 1e-5f)
+        val (advanced, peakAdv) = monotonicWashProgress(raw = 0.7f, visibleAlpha = 1f, peak = peakHeld)
+        assertEquals(0.7f, advanced, 1e-5f)
+        // Invisible: may return to 0 for a true cold start.
+        val (cold, peakCold) = monotonicWashProgress(raw = 0f, visibleAlpha = 0f, peak = peakAdv)
+        assertEquals(0f, cold, 1e-5f)
+        assertEquals(0f, peakCold, 1e-5f)
+    }
+
+    @Test
+    fun `repeat wash never hard-restarts a visible overlay — even on seek`() {
+        // Mid-wash re-fire must not snap the edge back to 0.
+        assertFalse(
+            repeatWashShouldRestart(
+                previousActivation = 0L,
+                activation = 4L,
+                clockProgress = 0.4f,
+                alpha = 1f,
+            ),
+        )
+        // Already-settled full orange must not restart (that flashed full→0).
+        assertFalse(
+            repeatWashShouldRestart(
+                previousActivation = 0L,
+                activation = 4L,
+                clockProgress = 1f,
+                alpha = 1f,
+            ),
+        )
+        // Seek while still painted also cannot hard-restart; dissolve first.
+        assertFalse(
+            repeatWashShouldRestart(
+                previousActivation = 4L,
+                activation = 5L,
+                clockProgress = 0.4f,
+                alpha = 1f,
+            ),
+        )
+        // Cold entry (overlay invisible) — only then may progress return to 0.
+        assertTrue(
+            repeatWashShouldRestart(
+                previousActivation = 0L,
+                activation = 4L,
+                clockProgress = 1f,
+                alpha = 0f,
+            ),
+        )
+        assertTrue(
+            repeatWashShouldRestart(
+                previousActivation = 4L,
+                activation = 5L,
+                clockProgress = 0.4f,
+                alpha = 0f,
             ),
         )
     }
@@ -576,15 +852,18 @@ class InkEngineTest {
             RepeatWashAction.Release,
             repeatWashAction(
                 wasRepeat = true,
+                wasActive = false,
                 previousActivation = 0L,
                 repeat = false,
+                active = false,
                 activation = 0L,
             ),
         )
     }
 
     @Test
-    fun `repeat wash follows long dwell but keeps a soft minimum`() {
+    fun `repeat wash duration helper floors short dwells`() {
+        // Duration follows reciter dwell with repeatSweepMs as the soft floor.
         assertEquals(450, repeatWashDurationMs(activeSweepMs = null, minimumMs = 450))
         assertEquals(450, repeatWashDurationMs(activeSweepMs = 140, minimumMs = 450))
         assertEquals(1_800, repeatWashDurationMs(activeSweepMs = 1_800, minimumMs = 450))

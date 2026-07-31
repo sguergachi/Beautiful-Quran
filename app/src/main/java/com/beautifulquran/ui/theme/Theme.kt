@@ -61,6 +61,12 @@ data class QuranAccents(
      * (InkEngine.glinting). Null on themes without the effect; Nightfall and
      * Royal Green share the accent. */
     val glintInk: Color? = null,
+    /**
+     * Warm dilute pigment for the ink-wash transition zone (R4). Mid-feather
+     * paper cover lerps toward this so the wet edge reads as thin ink, not
+     * grey 50% paper over black. Keep chroma low — high chroma becomes haze.
+     */
+    val diluteInk: Color = Color(0xFF4A3728),
 )
 
 val LocalQuranAccents = staticCompositionLocalOf {
@@ -73,6 +79,7 @@ val LocalQuranAccents = staticCompositionLocalOf {
         repeatInk = Color(0xFFC2622A),
         bookmarkRibbon = Color(0xFFB3122F),
         annotationInk = Color(0xFF6B2838),
+        diluteInk = Color(0xFF4A3728),
     )
 }
 
@@ -204,6 +211,8 @@ private val LightAccents = QuranAccents(
     bookmarkRibbon = Color(0xFFB3122F),
     // Dark maroon inky red — dried red ink on warm paper, not pale rose.
     annotationInk = Color(0xFF6B2838),
+    // Warm umber dilute — thin pigment on cream paper (wash mid-feather).
+    diluteInk = Color(0xFF4A3728),
 )
 
 private val DarkAccents = QuranAccents(
@@ -222,6 +231,8 @@ private val DarkAccents = QuranAccents(
     // White gold: a breath brighter and warmer than Parchment, so fresh ink
     // glints on the night page without shouting.
     glintInk = Color(0xFFF8E9BE),
+    // Warm parchment dilute on charcoal — low chroma so it never hazes the page.
+    diluteInk = Color(0xFF9A8B72),
 )
 
 /** Royal Green shares Nightfall's accent inks, including the fresh-ink glint. */

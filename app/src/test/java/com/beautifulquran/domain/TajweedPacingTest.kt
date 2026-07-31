@@ -1,5 +1,6 @@
 package com.beautifulquran.domain
 
+import com.beautifulquran.data.model.SubwordKeyframe
 import com.beautifulquran.domain.TajweedPacing.Hold
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -481,5 +482,132 @@ class TajweedPacingTest {
                 }
             }
         }
+    }
+
+    @Test
+    fun `acoustic curve lands on letter arrivals and finishes full ink`() {
+        val curve = requireNotNull(
+            TajweedPacing.acousticCurve(
+                keyframes = listOf(
+                    SubwordKeyframe(200, 0.4f),
+                    SubwordKeyframe(600, 1f),
+                ),
+                durationMs = 1_000,
+            ),
+        )
+
+        assertTrue(curve.softWash)
+        assertEquals(0f, curve.at(0f), 0f)
+        assertEquals(0.4f, curve.at(0.2f), 1e-3f)
+        assertEquals(1f, curve.at(0.6f), 1e-3f)
+        assertEquals(1f, curve.at(1f), 0f)
+    }
+
+    @Test
+    fun `acoustic curve parks on the spoken letter for a long hold then peels`() {
+        // Honest letter truth: park on madd for its measured dwell.
+        val curve = requireNotNull(
+            TajweedPacing.acousticCurve(
+                keyframes = listOf(
+                    SubwordKeyframe(20, 0.166667f),
+                    SubwordKeyframe(201, 0.166667f),
+                    SubwordKeyframe(221, 0.333333f),
+                    SubwordKeyframe(742, 0.833333f),
+                    SubwordKeyframe(3727, 0.833333f),
+                    SubwordKeyframe(3747, 1f),
+                ),
+                durationMs = 3_747,
+            ),
+        )
+
+        assertEquals(0.833333f, curve.at(742f / 3747f), 1e-3f)
+        assertEquals(0.833333f, curve.at(2000f / 3747f), 1e-3f)
+        assertEquals(0.833333f, curve.at(3600f / 3747f), 1e-3f)
+        assertEquals(0f, curve.velocityAt(2000f / 3747f), 1e-3f)
+        assertTrue(curve.velocityAt(0.5f) >= 0f)
+        assertEquals(1f, curve.at(1f), 0f)
+    }
+
+    @Test
+    fun `ceiling is the next letter onset past the parked front`() {
+        val curve = requireNotNull(
+            TajweedPacing.acousticCurve(
+                keyframes = listOf(
+                    SubwordKeyframe(50, 0.25f),
+                    SubwordKeyframe(400, 0.25f), // hold
+                    SubwordKeyframe(450, 0.5f),
+                    SubwordKeyframe(800, 0.5f),
+                    SubwordKeyframe(850, 1f),
+                ),
+                durationMs = 1_000,
+            ),
+        )
+        // Mid-hold on first letter: front parked at 0.25, ceiling is next onset 0.5.
+        assertEquals(0.25f, curve.at(0.2f), 1e-3f)
+        assertEquals(0.5f, curve.ceilingAt(0.2f), 1e-3f)
+        assertTrue(curve.ceilingAt(0.2f) > curve.at(0.2f))
+        assertEquals(1f, curve.ceilingAt(0.99f), 1e-3f)
+    }
+
+    @Test
+    fun `acoustic peels are linear — no cosine zero at peel ends`() {
+        // Two knots only: peel spans the whole word. Linear = constant velocity;
+        // cosine would be ~0 at both ends (the robotic syllable pulse).
+        val curve = requireNotNull(
+            TajweedPacing.acousticCurve(
+                keyframes = listOf(
+                    SubwordKeyframe(100, 0f),
+                    SubwordKeyframe(900, 1f),
+                ),
+                durationMs = 1_000,
+            ),
+        )
+        val vEarly = curve.velocityAt(0.15f)
+        val vMid = curve.velocityAt(0.5f)
+        val vLate = curve.velocityAt(0.85f)
+        assertTrue("early peel velocity should be >0 (got $vEarly)", vEarly > 0.5f)
+        assertTrue("late peel velocity should be >0 (got $vLate)", vLate > 0.5f)
+        // Constant slope: early ≈ mid ≈ late (within float noise).
+        assertEquals(vMid, vEarly, 0.05f)
+        assertEquals(vMid, vLate, 0.05f)
+    }
+
+    @Test
+    fun `acoustic curve rejects an initial progress jump at time zero`() {
+        assertNull(
+            TajweedPacing.acousticCurve(
+                keyframes = listOf(
+                    SubwordKeyframe(0, 0.25f),
+                    SubwordKeyframe(400, 1f),
+                ),
+                durationMs = 500,
+            ),
+        )
+    }
+
+    @Test
+    fun `acoustic curve stays on the spoken letter during a real hold`() {
+        val curve = requireNotNull(
+            TajweedPacing.acousticCurve(
+                keyframes = listOf(
+                    SubwordKeyframe(75, 0f),
+                    SubwordKeyframe(95, 0.333f),
+                    SubwordKeyframe(296, 0.333f),
+                    SubwordKeyframe(316, 0.666f),
+                    SubwordKeyframe(416, 0.666f),
+                    SubwordKeyframe(436, 1f),
+                ),
+                durationMs = 536,
+            ),
+        )
+        assertEquals(0.333f, curve.at(200f / 536f), 1e-3f)
+        assertTrue(curve.at(250f / 536f) <= 0.34f)
+        var prev = curve.at(0f)
+        for (i in 1..64) {
+            val p = curve.at(i.toFloat() / 64f)
+            assertTrue(p + 1e-5f >= prev)
+            prev = p
+        }
+        assertEquals(1f, prev, 1e-4f)
     }
 }

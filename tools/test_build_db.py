@@ -24,6 +24,7 @@ sys.path.insert(0, str(TOOLS))
 from build_db import (  # noqa: E402
     AUDIO_ONSETS_DIR,
     adjust_qdc_segments,
+    _is_complete_timing_sequence,
     apply_audio_onsets,
     apply_boundary_repair,
     apply_clocked_timing_repair,
@@ -32,6 +33,7 @@ from build_db import (  # noqa: E402
     drop_rows_longer_than_audio,
     erases_span_repeat,
     load_audio_durations,
+    load_timing_v2,
     offset_for_audio_onset,
     recover_negative_opening,
     refit_displaced_rows,
@@ -67,6 +69,177 @@ def segs_from_positions(positions, dur=800):
 
 def order(segs_):
     return [p for p, _, _ in segs_]
+
+
+def check_v2_lab_gold_gate():
+    """V2 must match Timings Lab ground truth at ≥99% (structure + onsets)."""
+    sys.path.insert(0, str(TOOLS / "sync_lab"))
+    from eval_v2_vs_lab_gold import evaluate, load_lab_gold, load_v2  # noqa: PLC0415
+
+    db = ROOT / "data" / "quran.db"
+    hist = TOOLS / "sync_lab" / "historical_manual_patches.json"
+    if not db.exists() or not hist.exists():
+        return False, "missing db or historical_manual_patches.json"
+    report = evaluate(load_lab_gold(hist, db), load_v2(db))
+    if report.get("pass"):
+        return True, report.get("claim", "ok")
+    return False, report.get("claim") or json.dumps(report, indent=2)
+
+
+# Hard golden structures — wrong topology is a product failure (docs/V2_STRUCTURE.md).
+# 5:54 locks QUA/V2 multi-loop (differs slightly from V1 on the 21–24 span).
+V2_STRUCTURE_CASES = {
+    (1, 1): [1, 2, 3, 4],
+    (1, 2): [1, 2, 3, 4],
+    (1, 3): [1, 2],
+    (1, 4): [1, 2, 3],
+    (1, 5): [1, 2, 3, 4],
+    (1, 6): [1, 2, 3],
+    (1, 7): [1, 2, 3, 4, 5, 6, 7, 8, 9],
+    (5, 54): [
+        1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 9, 10, 11, 12, 13, 14, 15, 16, 17,
+        15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 21, 22, 23, 24, 25, 26, 27, 28,
+        29, 30, 31, 32, 33, 34, 35, 36, 37,
+    ],
+    (6, 10): [1, 2, 3, 4, 5, 6, 7, 8, 6, 7, 8, 9, 10, 11, 12, 13],
+}
+
+
+def check_v2_structure_gate():
+    """Shipped V2 must not flatten known re-says or invent Fatiha backtracks."""
+    db = ROOT / "data" / "quran.db"
+    if not db.exists():
+        return False, "missing data/quran.db"
+    failures = []
+    with sqlite3.connect(db) as conn:
+        for (surah, ayah), want in V2_STRUCTURE_CASES.items():
+            row = conn.execute(
+                "SELECT segments FROM timings_v2 "
+                "WHERE reciter_id=1 AND surah_id=? AND ayah_number=?",
+                (surah, ayah),
+            ).fetchone()
+            if row is None:
+                failures.append(f"{surah}:{ayah} missing from timings_v2")
+                continue
+            got = [int(s["position"]) for s in json.loads(row[0])]
+            if got != want:
+                failures.append(f"{surah}:{ayah} got={got} want={want}")
+    if failures:
+        return False, "; ".join(failures)
+    return True, f"{len(V2_STRUCTURE_CASES)} structure cases exact"
+
+
+def check_v2_backtrack_metrics():
+    """No-regression floors on V2 vs V1 backtrack recall (Dir1 metrics)."""
+    sys.path.insert(0, str(TOOLS / "sync_lab"))
+    from eval_v2_structure_metrics import evaluate  # noqa: PLC0415
+
+    db = ROOT / "data" / "quran.db"
+    if not db.exists():
+        return False, "missing data/quran.db"
+    report = evaluate(db)
+    if report.get("pass"):
+        return True, report.get("claim", "ok")
+    return False, report.get("claim") or json.dumps(report, indent=2)
+
+
+def check_timing_v2_loader():
+    """The committed V2 source gate must reject non-acoustic curve shapes."""
+    if not _is_complete_timing_sequence([1, 2, 1, 2], 2):
+        return False
+    if _is_complete_timing_sequence([1, 3, 2, 3], 3):
+        return False
+    payload = {
+        "schema": 2,
+        "generator": "sync_lab/generate_timing_v2.py@3",
+        "source": "jonatasgrosman/wav2vec2-large-xlsr-53-arabic",
+        "sourceRevision": "af46c2d8531b8dcbb5e23b952f739b372c2e5d2d",
+        "reciterId": 1,
+        "minimumGateScore": -1.0,
+        "rows": [{
+            "surah": 1,
+            "ayah": 1,
+            "gateScore": 0.0,
+            "audioSha256": "b" * 64,
+            "segments": [{
+                "position": 1,
+                "startMs": 100,
+                "endMs": 500,
+                "keyframes": [{"offsetMs": 100, "progress": 1.0}],
+            }],
+        }],
+    }
+
+    with tempfile.TemporaryDirectory() as raw_dir:
+        source_dir = Path(raw_dir)
+        path = source_dir / "case.json"
+
+        def loads(candidate):
+            path.write_text(json.dumps(candidate), encoding="utf-8")
+            return load_timing_v2({(1, 1): 1}, source_dir)
+
+        if len(loads(payload)) != 1:
+            return False
+        for mutate in (
+            lambda p: p["rows"][0].update(gateScore=-2.0),
+            lambda p: p["rows"][0]["segments"][0]["keyframes"][0].update(offsetMs=0),
+            lambda p: p["rows"][0]["segments"][0]["keyframes"][0].update(progress=0.5),
+            lambda p: p["rows"][0].update(audioSha256="z" * 64),
+            lambda p: p["rows"][0]["segments"][0]["keyframes"][0].update(
+                progress=float("nan")
+            ),
+        ):
+            candidate = json.loads(json.dumps(payload))
+            mutate(candidate)
+            try:
+                loads(candidate)
+                return False
+            except ValueError:
+                pass
+
+        qua = json.loads(json.dumps(payload))
+        qua.update({
+            "generator": "sync_lab/generate_qua_timing_v2.py@1",
+            "source": "Wider-Community/quranic-universal-audio@v2.3.0",
+            "sourceRevision": "9b83ea5824d1f4de3921562f9d7282e279f05860",
+            "sourceAssetSha256":
+                "8a05209a022ad4410ce39f74f374ec09fb5bae6a019b1e2b054fda8342bf0df7",
+            "minimumGateScore": 0.7,
+            "minimumPeakMargin": 0.25,
+        })
+        qua["rows"][0].update({
+            "gateScore": 0.8,
+            "clockCorrelation": 0.8,
+            "clockPeakMargin": 0.5,
+            "sourceZeroMs": 120.0,
+            "sourceAudioSha256": "c" * 64,
+        })
+        if len(loads(qua)) != 1:
+            return False
+        qua["rows"][0]["clockPeakMargin"] = 0.24
+        try:
+            loads(qua)
+            return False
+        except ValueError:
+            pass
+
+        fallback = json.loads(json.dumps(payload))
+        fallback.update({
+            "generator": "sync_lab/merge_v2_priority.py@1",
+            "source": "quran-v1 repeat topology",
+            "sourceRevision": "a" * 64,
+            "minimumGateScore": 1.0,
+        })
+        fallback["rows"][0]["gateScore"] = 1.0
+        if len(loads(fallback)) != 1:
+            return False
+        fallback["sourceRevision"] = "not-a-sha"
+        try:
+            loads(fallback)
+            return False
+        except ValueError:
+            pass
+    return True
 
 
 def load_cases():
@@ -356,6 +529,23 @@ def audit_bundled_db():
             for x in segs
         ):
             bad.append((rid, s, a))
+    v2_rows = list(db.execute(
+        "SELECT reciter_id,surah_id,ayah_number,segments FROM timings_v2"
+    ))
+    expected_v2 = {
+        (rid, surah, ayah)
+        for rid, surah, ayah, _ in load_timing_v2(counts)
+    }
+    exact = {(rid, s, a) for rid, s, a, _ in v2_rows} == expected_v2
+    for rid, s, a, raw in v2_rows:
+        segments = json.loads(raw)
+        exact &= rid == 1 and bool(segments)
+        for segment in segments:
+            points = segment["keyframes"]
+            exact &= bool(points) and points[-1]["progress"] == 1.0
+            exact &= [p["offsetMs"] for p in points] == sorted(
+                p["offsetMs"] for p in points
+            )
     row = db.execute(
         "SELECT segments FROM timings WHERE reciter_id=1 "
         "AND surah_id=2 AND ayah_number=214"
@@ -497,16 +687,32 @@ def main():
                 print(f"        {line}")
     confidence_ok = check_confidence()
     audio_onset_ok = check_audio_onset_pipeline()
+    timing_v2_ok = check_timing_v2_loader()
     database_ok = audit_bundled_db()
+    lab_gold_ok, lab_gold_detail = check_v2_lab_gold_gate()
+    structure_ok, structure_detail = check_v2_structure_gate()
+    backtrack_ok, backtrack_detail = check_v2_backtrack_metrics()
     print(f"  {'ok  ' if confidence_ok else 'FAIL'} weighted 2:214 confidence checks")
     print(f"  {'ok  ' if audio_onset_ok else 'FAIL'} audio-onset detector and apply checks")
+    print(f"  {'ok  ' if timing_v2_ok else 'FAIL'} Timing V2 source validation")
     print(f"  {'ok  ' if database_ok else 'FAIL'} bundled timing database invariants")
+    print(f"  {'ok  ' if lab_gold_ok else 'FAIL'} V2 vs Timings Lab gold (≥99%)")
+    print(f"  {'ok  ' if structure_ok else 'FAIL'} V2 structure gate (Fatiha + 5:54 + 6:10)")
+    print(f"  {'ok  ' if backtrack_ok else 'FAIL'} V2 backtrack recall floors")
     if not confidence_ok:
         failures.append(("weighted confidence", "2:214 checks failed", None))
     if not audio_onset_ok:
         failures.append(("audio onsets", "detector/apply checks failed", None))
+    if not timing_v2_ok:
+        failures.append(("Timing V2 loader", "source validation checks failed", None))
     if not database_ok:
         failures.append(("bundled database", "timing audit failed", None))
+    if not lab_gold_ok:
+        failures.append(("V2 Lab gold gate", lab_gold_detail, None))
+    if not structure_ok:
+        failures.append(("V2 structure gate", structure_detail, None))
+    if not backtrack_ok:
+        failures.append(("V2 backtrack metrics", backtrack_detail, None))
     print()
     if failures:
         print(f"{len(failures)} FAILURE(S):")
@@ -516,7 +722,7 @@ def main():
                 for line in str(detail).splitlines():
                     print(f"    {line}")
         return 1
-    print(f"all {len(cases) + 3} cases pass ({CASES_DIR.relative_to(Path.cwd())})")
+    print(f"all {len(cases) + 7} cases pass ({CASES_DIR.relative_to(Path.cwd())})")
     return 0
 
 

@@ -8,6 +8,10 @@ question, purely and cheaply:
 > word should be lit right now**, and what does the reader need to know to
 > draw it (including repeats)?
 
+That lock between voice and word **is the product core** — see
+[SYNC_FIDELITY.md](SYNC_FIDELITY.md). This engine is the pure runtime half;
+timing *data* quality is the other half.
+
 It is a single Kotlin `object` with no Android, Compose, or coroutine
 dependencies — a pure function over immutable data. That purity is an
 [invariant](../AGENTS.md#invariants--do-not-break-these): sync correctness

@@ -1,0 +1,21 @@
+{
+  "keptRows": 10,
+  "keptWordOccurrences": 66,
+  "coveragePctOfAlafasy": 0.16,
+  "dropped": {
+    "energy_snap_failed": 0,
+    "dead_zone_or_invalid": 13,
+    "ctc_disagree": 65,
+    "ctc_unavailable": 4,
+    "repeat_skipped": 28
+  },
+  "note": "Accuracy and coverage are separate. Dual-witness agreement is not ear gold; freeze independent_labels before claiming 99%.",
+  "dualWitnessOnsets": {
+    "count": 66,
+    "medianMs": 11.5,
+    "p90Ms": 44,
+    "within100Pct": 100.0,
+    "within60Pct": 100.0,
+    "signedMedianMs": 0.0
+  }
+}

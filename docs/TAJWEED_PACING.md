@@ -1,9 +1,10 @@
 # Tajweed-paced ink
 
-**Status: implemented on Android, on by default and tunable behind the Ink Lab's
-"Tajweed pacing" toggle (Settings → Developer → Ink Lab overlay → Tajweed
-tab). The web port and measured letter widths are not yet built — the design
-for those lives below.**
+**Status: V1-only on Android, on by default and tunable behind the Ink Lab's
+"V1 Tajweed pacing" toggle (Settings → Developer → Ink Lab overlay → Tajweed
+tab). Timing V2 uses measured acoustic sub-word keyframes as its sole pacing
+authority and never runs this inference model. The web port and measured
+letter widths are not yet built — the design for those lives below.**
 
 The shipped model is the **gate / cruise / hold** design in §3. The first
 revision spread every letter by its raw tajweed counts; because word timings
@@ -341,6 +342,12 @@ Two refinements built into the curve, not the callers:
   `waslPrefixStart`), advancing only to `waslContinuationStart` (not a full
   wipe); on handoff that edge holds and the main wash resumes from the same
   progress, so the wāw/other target never dims or restarts.
+  Timing V2 does not use that wall-clock `Animatable`: the reader publishes a
+  listener-corrected media anchor and the renderer extrapolates it on each
+  draw frame. Its acoustic curve includes equal-progress plateau pairs for
+  CTC blanks, so elongation holds the revealed glyph until the next measured
+  unit begins. The 33 ms poll still resolves word membership; it no longer
+  quantizes motion inside the word.
 - **Feather** — the make-or-break visual change, and the one the first
   revision got wrong. `letterFadeIn`'s wide edge is *what makes the reveal
   ethereal*: at 1.6× the word width the wash reads "closer to a whole-word

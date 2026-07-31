@@ -1,0 +1,15 @@
+{
+  "rowsScanned": 500,
+  "rowsWithMatches": 177,
+  "goldOnsetsFound": 281,
+  "matchedOnsets": 238,
+  "onsets": {
+    "count": 238,
+    "medianMs": 21.0,
+    "p90Ms": 53,
+    "within100Pct": 97.89915966386555
+  },
+  "signedMedianMs": -20.5,
+  "pauseMs": 250.0,
+  "note": "Easy-subset objective gold after long silence. Not full-product 99%. Use to CI-gate regressions and calibrate early bias."
+}

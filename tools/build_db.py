@@ -27,6 +27,7 @@ import argparse
 from difflib import SequenceMatcher
 import io
 import json
+import math
 import re
 import sqlite3
 import sys
@@ -50,6 +51,9 @@ REPAIRS_DIR = Path(__file__).resolve().parent / "timing_repairs"
 # tools/detect_audio_onsets.py. Applied after structural repairs so the opening
 # wash uses final topology, and before Lab overrides (whose marks use file time).
 AUDIO_ONSETS_DIR = Path(__file__).resolve().parent / "audio_onsets"
+# Confidence-gated, machine-generated acoustic keyframes. These are source
+# artifacts, never hand-edited per-ayah corrections.
+TIMING_V2_DIR = Path(__file__).resolve().parent / "timing_v2"
 MAX_AUDIO_ONSET_MS = 7_900
 # Matching quran-align boundaries are independent witnesses of one per-ayah
 # clock translation, so they cluster tightly when the witness is sound. Past a
@@ -1491,6 +1495,142 @@ def apply_audio_onsets(
     return rows, onsets
 
 
+def _is_complete_timing_sequence(positions, word_count):
+    """First occurrences cover 1..N; extras only re-emit a seen word."""
+    expected = 1
+    seen = set()
+    for position in positions:
+        if position < 1 or position > word_count:
+            return False
+        if position not in seen:
+            if position != expected:
+                return False
+            seen.add(position)
+            expected += 1
+    return expected == word_count + 1
+
+
+def load_timing_v2(word_counts, source_dir=TIMING_V2_DIR):
+    """Load generated acoustic keyframes, rejecting any malformed source row."""
+    generators = {
+        "sync_lab/generate_timing_v2.py@3": (
+            "jonatasgrosman/wav2vec2-large-xlsr-53-arabic",
+            "af46c2d8531b8dcbb5e23b952f739b372c2e5d2d",
+        ),
+        "sync_lab/generate_qua_timing_v2.py@1": (
+            "Wider-Community/quranic-universal-audio@v2.3.0",
+            "9b83ea5824d1f4de3921562f9d7282e279f05860",
+        ),
+        # Full QUA Alafasy: structure + letters, verse-relative EveryAyah reclock.
+        # Structure lane (phrase re-says); not gated on same-take xcorr.
+        "sync_lab/generate_qua_full_v2.py@1": (
+            "Wider-Community/quranic-universal-audio@v2.3.0",
+            "9b83ea5824d1f4de3921562f9d7282e279f05860",
+        ),
+        # Timings Lab historical patches (grammar-valid Alafasy) as V2 ground truth.
+        "sync_lab/generate_lab_gold_v2.py@1": (
+            "timing_lab/historical_manual_patches",
+            None,  # revision checked as 64-hex below
+        ),
+        "sync_lab/merge_v2_priority.py@1": (
+            "quran-v1 repeat topology",
+            None,  # revision checked as 64-hex below
+        ),
+    }
+    rows = []
+    seen = set()
+    for path in sorted(source_dir.glob("*.json")):
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        if payload.get("schema") != 2:
+            raise ValueError(f"{path.name}: unsupported Timing V2 schema")
+        generator = payload.get("generator")
+        if generator not in generators:
+            raise ValueError(f"{path.name}: unknown Timing V2 generator")
+        expected_source, expected_revision = generators[generator]
+        if payload.get("source") != expected_source:
+            raise ValueError(f"{path.name}: unpinned Timing V2 source")
+        if expected_revision is not None and payload.get("sourceRevision") != expected_revision:
+            raise ValueError(f"{path.name}: unpinned Timing V2 source revision")
+        if generator.endswith(("generate_lab_gold_v2.py@1", "merge_v2_priority.py@1")):
+            rev = payload.get("sourceRevision", "")
+            if not re.fullmatch(r"[0-9a-f]{64}", rev):
+                raise ValueError(f"{path.name}: derived V2 lane needs sha256 sourceRevision")
+        reciter_id = int(payload["reciterId"])
+        minimum = float(payload["minimumGateScore"])
+        if not math.isfinite(minimum):
+            raise ValueError(f"{path.name}: invalid Timing V2 threshold")
+        minimum_margin = float(payload.get("minimumPeakMargin", 0))
+        if generator.endswith("generate_qua_timing_v2.py@1") and (
+            minimum_margin < 0.25
+            or payload.get("sourceAssetSha256")
+            != "8a05209a022ad4410ce39f74f374ec09fb5bae6a019b1e2b054fda8342bf0df7"
+        ):
+            raise ValueError(f"{path.name}: invalid QUA identity gate")
+        if generator.endswith("generate_qua_full_v2.py@1") and payload.get(
+            "sourceAssetSha256"
+        ) != "8a05209a022ad4410ce39f74f374ec09fb5bae6a019b1e2b054fda8342bf0df7":
+            raise ValueError(f"{path.name}: invalid QUA full-lane asset pin")
+        for row in payload.get("rows", []):
+            surah, ayah = int(row["surah"]), int(row["ayah"])
+            key = reciter_id, surah, ayah
+            if key in seen:
+                raise ValueError(f"{path.name}: duplicate Timing V2 row {key}")
+            gate_score = float(row["gateScore"])
+            if not math.isfinite(gate_score) or gate_score < minimum:
+                raise ValueError(f"{path.name}: below-gate Timing V2 row {key}")
+            if generator.endswith("generate_qua_timing_v2.py@1"):
+                correlation = float(row.get("clockCorrelation", float("-inf")))
+                source_zero = float(row.get("sourceZeroMs", float("nan")))
+                if (
+                    correlation != gate_score
+                    or not math.isfinite(source_zero)
+                    or float(row.get("clockPeakMargin", float("-inf")))
+                    < minimum_margin
+                    or not re.fullmatch(
+                        r"[0-9a-f]{64}",
+                        row.get("sourceAudioSha256", ""),
+                    )
+                ):
+                    raise ValueError(f"{path.name}: ambiguous Timing V2 audio clock {key}")
+            if not re.fullmatch(r"[0-9a-f]{64}", row.get("audioSha256", "")):
+                raise ValueError(f"{path.name}: missing audio hash for {key}")
+            segments = row["segments"]
+            positions = [int(segment["position"]) for segment in segments]
+            if not _is_complete_timing_sequence(
+                positions,
+                word_counts[(surah, ayah)],
+            ):
+                raise ValueError(f"{path.name}: incomplete Timing V2 row {key}")
+            last_start = -1
+            for segment in segments:
+                start, end = int(segment["startMs"]), int(segment["endMs"])
+                if start <= last_start or end <= start:
+                    raise ValueError(f"{path.name}: invalid V2 span in {key}")
+                last_start = start
+                last_offset, last_progress = 0, 0.0
+                for point in segment["keyframes"]:
+                    offset, progress = int(point["offsetMs"]), float(point["progress"])
+                    if (
+                        not math.isfinite(progress)
+                        or offset <= last_offset
+                        or offset > end - start
+                        or progress < last_progress
+                        or progress > 1.0
+                    ):
+                        raise ValueError(f"{path.name}: invalid V2 keyframe in {key}")
+                    last_offset, last_progress = offset, progress
+                if last_progress != 1.0:
+                    raise ValueError(f"{path.name}: incomplete V2 keyframes in {key}")
+            seen.add(key)
+            rows.append((
+                reciter_id,
+                surah,
+                ayah,
+                json.dumps(segments, ensure_ascii=False, separators=(",", ":")),
+            ))
+    return rows
+
+
 def apply_timing_overrides(
     timing_rows, reciter_rows, word_counts, word_text, alignment_references=None
 ):
@@ -1671,6 +1811,13 @@ CREATE TABLE timings (
   ayah_number INTEGER NOT NULL,
   segments TEXT NOT NULL,
   audio_onset_ms INTEGER NOT NULL,
+  PRIMARY KEY (reciter_id, surah_id, ayah_number)
+);
+CREATE TABLE timings_v2 (
+  reciter_id INTEGER NOT NULL,
+  surah_id INTEGER NOT NULL,
+  ayah_number INTEGER NOT NULL,
+  segments TEXT NOT NULL,
   PRIMARY KEY (reciter_id, surah_id, ayah_number)
 );
 CREATE TABLE word_morphology (
@@ -2069,6 +2216,9 @@ def main():
             key: onset for key, onset in audio_onsets.items() if key not in set(dropped)
         }
 
+    timing_v2_rows = load_timing_v2(word_counts)
+    print(f"[timing v2] {len(timing_v2_rows)} confidence-gated acoustic row(s)")
+
     OUT.parent.mkdir(parents=True, exist_ok=True)
     if OUT.exists():
         OUT.unlink()
@@ -2088,14 +2238,19 @@ def main():
             for rid, sid, ay, segments in timing_rows
         ],
     )
+    db.executemany("INSERT INTO timings_v2 VALUES (?,?,?,?)", timing_v2_rows)
     write_morphology(db, morph_rows, roots_rows, occ_rows)
     db.execute("CREATE INDEX idx_words_ayah ON words(surah_id, ayah_number)")
     db.execute("CREATE INDEX idx_timings ON timings(reciter_id, surah_id)")
+    db.execute("CREATE INDEX idx_timings_v2 ON timings_v2(reciter_id, surah_id)")
     db.commit()
     db.execute("VACUUM")
     db.close()
     size_mb = OUT.stat().st_size / 1e6
-    print(f"OK -> {OUT} ({size_mb:.1f} MB, {len(timing_rows)} timing rows, {len(morph_rows)} morph rows)")
+    print(
+        f"OK -> {OUT} ({size_mb:.1f} MB, {len(timing_rows)} V1 + "
+        f"{len(timing_v2_rows)} V2 timing rows, {len(morph_rows)} morph rows)"
+    )
 
 
 if __name__ == "__main__":

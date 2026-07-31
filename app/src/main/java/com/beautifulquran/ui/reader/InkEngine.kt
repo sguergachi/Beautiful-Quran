@@ -6,6 +6,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.beautifulquran.data.model.Segment
 import com.beautifulquran.domain.BasmalahWash
+import com.beautifulquran.data.TimingScheme
 import com.beautifulquran.domain.TajweedPacing
 
 /**
@@ -100,9 +101,10 @@ object InkEngine {
         val glintTintAlpha: Float = 0.62f,
         val glintGlowAlpha: Float = 0.49f,
         val glintGlowRadius: Float = 10f,
-        /** Width of the ink feather relative to the word (see
-         *  ui/theme/Fade.kt: the wash reads as a whole-word breath). */
-        val washFeather: Float = 1.6f,
+        /** Width of the ink feather relative to the word — ~1–2 letters so
+         *  the front is a travelling wash edge, not a whole-word crossfade
+         *  (see docs/quality-reviews/INK_WASH_FEEL_CLAUDE.md R1). */
+        val washFeather: Float = 0.5f,
         /** Control points of the sweep easing: a steady glide, softened only
          *  at the very ends so it never snaps into or out of motion. */
         val sweepEaseX1: Float = 0.3f,
@@ -117,7 +119,7 @@ object InkEngine {
         /** Feather of a paced word. Slightly sharper than [washFeather] so
          *  holds read clearly while the edge stays soft (see
          *  docs/TAJWEED_PACING.md). */
-        val pacedFeather: Float = 1.1857f,
+        val pacedFeather: Float = 0.45f,
         /** Which moments earn a hold — see [TajweedPacing.Hold]. */
         val holdMadd: Boolean = true,
         val holdGhunnah: Boolean = true,
@@ -358,6 +360,34 @@ object InkEngine {
             .coerceIn(1, tuning.maxSweepMs)
 
     /**
+     * Soft residual floor when a V2 word hands off before the edge is done.
+     */
+    const val MIN_ACOUSTIC_WASH_MS = 1_000
+
+    /**
+     * Chase time-constant (seconds): display speed ≈ v_target + gap/τ.
+     * Slightly softer than 0.12 so the edge *glides* rather than snapping
+     * onto each peel; still inside the 50–150ms "in sync" window.
+     */
+    const val ACOUSTIC_CHASE_TAU_SEC = 0.16f
+
+    /**
+     * Peak floor chase speed (word-fraction / sec) when far behind.
+     * Scaled by gap so micro-corrections don't crawl at a constant robotic rate.
+     */
+    const val ACOUSTIC_CHASE_FLOOR = 0.28f
+
+    /** Cap chase speed so a large gap cannot snap a whole word in one frame. */
+    const val ACOUSTIC_CHASE_MAX = 2.2f
+
+    /**
+     * Hold drift (word-fraction / sec): while the voice parks on a letter, the
+     * ink slowly finishes that letter toward the next onset (ceiling). Never
+     * zero mid-word — kills the metronomic freeze without inventing peels.
+     */
+    const val ACOUSTIC_HOLD_DRIFT = 0.07f
+
+    /**
      * How long the active word's letter sweep should run: the time the
      * word stays lit (karaoke hold until the next word), corrected for
      * playback speed, floored at [minSweepFloorMs] so short holds (and
@@ -370,16 +400,82 @@ object InkEngine {
     fun sweepMs(activeWord: ActiveWord?, playbackSpeed: Float): Int? {
         val word = activeWord ?: return null
         val raw = (word.durationMs / playbackSpeed).toInt().coerceAtLeast(0)
+        if (word.timingScheme == TimingScheme.V2) {
+            // V2 wash follows letter timing; residual uses duration as budget.
+            if (raw <= 0) return MIN_ACOUSTIC_WASH_MS
+            return raw.coerceIn(1, tuning.maxSweepMs)
+        }
         val floor = minSweepFloorMs()
         if (raw <= 0) return floor
         return raw.coerceIn(floor, tuning.maxSweepMs)
     }
 
     /**
-     * The active word's tajweed pacing curve — how the sweep's linear clock
-     * maps to wash position so the ink sustains the letter the reciter is
-     * sustaining — or null for the plain sweep (toggle off, no dramatic
-     * letter in the word, no dwell affordable, or nothing recognisable).
+     * One frame of **ceiling-aware letter chase** (Claude chase law).
+     *
+     * [target] is the spoken letter front (may park on a hold).
+     * [ceiling] is the next letter onset — ink may finish the current letter
+     * into that ceiling during a hold (soft drift), but never past it.
+     *
+     * Behind target: feed-forward v + gap/τ (peels keep up).
+     * At/past target, below ceiling: [ACOUSTIC_HOLD_DRIFT] (no mid-word freeze).
+     * Never rewinds. Never snaps on dt=0.
+     */
+    fun acousticWashStep(
+        current: Float,
+        target: Float,
+        dtSec: Float,
+        targetVelocity: Float = 0f,
+        ceiling: Float = target,
+    ): Float {
+        val cur = current.coerceIn(0f, 1f)
+        val tgt = target.coerceIn(0f, 1f)
+        val ceil = ceiling.coerceIn(0f, 1f).coerceAtLeast(tgt)
+        // Never rewind (seek/reorder can drop target below current).
+        if (cur >= ceil) return cur
+        if (dtSec <= 0f) return cur
+        if (cur < tgt) {
+            val gap = tgt - cur
+            val vTarget = targetVelocity.coerceAtLeast(0f)
+            val floor = ACOUSTIC_CHASE_FLOOR * (gap / 0.15f).coerceIn(0f, 1f)
+            val speed = (vTarget + gap / ACOUSTIC_CHASE_TAU_SEC)
+                .coerceAtLeast(floor)
+                .coerceAtMost(ACOUSTIC_CHASE_MAX)
+            return (cur + speed * dtSec).coerceAtMost(ceil)
+        }
+        // Hold: spoken front is parked; finish the letter toward next onset.
+        return (cur + ACOUSTIC_HOLD_DRIFT * dtSec).coerceAtMost(ceil)
+    }
+
+    /**
+     * Letter-scaled soft feather for V2/softWash: ~one letter wide so the
+     * chase can be *seen*. Floor keeps the paper-soft edge; ceiling avoids
+     * whole-word breath that erases letter timing.
+     */
+    fun letterFeather(letterCount: Int): Float {
+        val n = letterCount.coerceAtLeast(1)
+        return (2f / n.toFloat()).coerceIn(0.35f, 0.9f)
+    }
+
+    /**
+     * Map letter-front position [q] (0..1 word) to [letterFadeIn] progress
+     * so the **faded front** sits on the spoken letter for feather [f].
+     *
+     * letterFadeIn: head = p·(w+edge), front ≈ head − edge/2
+     * → q = p(1+f) − f/2  ⇒  p = (q + f/2) / (1+f)
+     *
+     * At q=1 the map is still <1; residual chase finishes p→1 (shoulder settle).
+     */
+    fun maskProgressForLetterFront(letterFront: Float, feather: Float): Float {
+        val q = letterFront.coerceIn(0f, 1f)
+        val f = feather.coerceAtLeast(0.01f)
+        return ((q + f * 0.5f) / (1f + f)).coerceIn(0f, 1f)
+    }
+
+    /**
+     * The active word's sole within-word pacing curve. V2 consumes only its
+     * measured acoustic keyframes; missing keyframes return null rather than
+     * borrowing V1's inferred Tajwīd. V1 may use the Tajwīd heuristic.
      *
      * [arabic] is the active word's Hafs Uthmani text and [isAyahFinal] marks
      * the verse-closing word, whose waqf carries the only slack that is not
@@ -394,6 +490,12 @@ object InkEngine {
         isAyahFinal: Boolean,
         prevArabic: String? = null,
     ): TajweedPacing.Curve? {
+        if (activeWord.timingScheme == TimingScheme.V2) {
+            return TajweedPacing.acousticCurve(
+                keyframes = activeWord.subwordKeyframes,
+                durationMs = activeWord.durationMs,
+            )
+        }
         val t = tuning
         if (!t.tajweedPacing) return null
         val spokenFraction =
@@ -417,12 +519,39 @@ object InkEngine {
         )
     }
 
-    /** Cross-word prefix bloom for a nūn/tanwīn connection, when enabled. */
-    fun connection(prevArabic: String, arabic: String): TajweedPacing.Connection? {
+    /**
+     * Cross-word nūn-rule link (idghām / iqlāb / ikhfāʾ) for pacing math.
+     *
+     * The reader **does not** pre-bloom the next word while the donor is Active
+     * (sequential ink only — see ReaderComponents). Kept so Lab/tajweed can
+     * still reason about the connection and pure helpers stay testable.
+     */
+    fun connection(
+        prevArabic: String,
+        arabic: String,
+        timingScheme: TimingScheme = TimingScheme.V1,
+        @Suppress("UNUSED_PARAMETER") waslFromPrevMs: Long = 0L,
+    ): TajweedPacing.Connection? {
         val t = tuning
+        if (timingScheme == TimingScheme.V2) {
+            // V2: holdConnect alone — not tajweedPacing (that toggle is V1-only).
+            if (!t.holdConnect) return null
+            return TajweedPacing.connection(prevArabic, arabic)
+        }
         if (!t.tajweedPacing || !t.holdConnect) return null
         return TajweedPacing.connection(prevArabic, arabic)
     }
+
+    /**
+     * Speed-ceiling target for wasl bloom. Measured acoustic budget when the
+     * pipeline tagged the link; otherwise the shipped/lab [Tuning.waslPrefixMs].
+     */
+    fun waslPrefixTargetMs(waslFromPrevMs: Long = 0L): Int =
+        if (waslFromPrevMs > 0L) {
+            waslFromPrevMs.toInt().coerceIn(40, 800)
+        } else {
+            tuning.waslPrefixMs
+        }
 
     /**
      * Feather width for a tajweed-paced wash. Paced words keep the whole-word

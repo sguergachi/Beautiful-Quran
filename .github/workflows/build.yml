@@ -22,8 +22,13 @@ jobs:
       - name: Verify bundled Quran database asset
         run: test -s data/quran.db
 
+      - name: Install Timing V2 test dependencies
+        run: python3 -m pip install --disable-pip-version-check numpy scipy
+
       - name: Timing pipeline regressions
-        run: python3 tools/test_build_db.py
+        run: |
+          python3 tools/test_build_db.py
+          python3 tools/sync_lab/test_timing_v2.py
 
       - name: Accept Android SDK licenses
         run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true

@@ -1,0 +1,83 @@
+{
+  "date": "2026-07-27",
+  "lane": "QUA same-take Alafasy V2",
+  "coverage": {
+    "acceptedRows": 2700,
+    "alafasyUniverse": 6236,
+    "coveragePct": 43.3,
+    "wordOccurrences": 34421,
+    "keyframes": 137155,
+    "repeatRows": 321
+  },
+  "hardStructuralFlagsFullCorpus": {
+    "audioDurationChecked": 2700,
+    "flaggedRows": 0,
+    "flagCounts": {}
+  },
+  "waveformSampleFlags": {
+    "audioRowsChecked": 300,
+    "flaggedRows": 48,
+    "flaggedPctOfAcceptedSample": 1.78,
+    "flagCounts": {
+      "onset_in_silence": 44,
+      "span_crosses_pause": 8
+    },
+    "note": "dead-zone onset / long interior pause diagnostics; not applied as drop gate"
+  },
+  "multiWindowSourceZeroMs": {
+    "sampleRows": 40,
+    "spreadMedianMs": 0.0,
+    "spreadP90Ms": 0.25,
+    "rowsAbove80Ms": 0,
+    "note": "head/mid/tail xcorr vs chapter clock; scalar sourceZeroMs holds"
+  },
+  "independentCtcWitnessMono": {
+    "sampleSize": 60,
+    "compared": 56,
+    "monoOnly": true,
+    "onsets": {
+      "count": 616,
+      "medianMs": 36.5,
+      "p90Ms": 91,
+      "within100Pct": 93.34415584415585
+    },
+    "clockConventionDiagnostics": {
+      "signedMedianMs": -28.0,
+      "perRowSignedMedianMs": -27.0,
+      "rowCentered": {
+        "count": 616,
+        "medianMs": 21.0,
+        "p90Ms": 88.5,
+        "within100Pct": 91.72077922077922
+      },
+      "rowCenteredInterior": {
+        "count": 506,
+        "medianMs": 23.0,
+        "p90Ms": 95,
+        "within100Pct": 90.51383399209486
+      }
+    },
+    "note": "CTC is an independent acoustic witness on EveryAyah audio, not ear gold. Report accuracy and coverage separately from QUA acceptance."
+  },
+  "historicalOverlapEvidence": {
+    "overlapRows": 142,
+    "structureExact": 50,
+    "structureExactPct": 35.21,
+    "onsets": {
+      "count": 950,
+      "medianMs": 57.0,
+      "p90Ms": 639,
+      "within100Pct": 72.3157894736842
+    },
+    "note": "historical patches are regression evidence, not independent gold"
+  },
+  "gates": {
+    "notClaiming99Pct": true,
+    "accuracyAndCoverageSeparate": true,
+    "nextFor99": [
+      "frozen independent ear onset+structure labels",
+      "time-localized structure for different-take 57%",
+      "calibrated abstention on ear validation"
+    ]
+  }
+}

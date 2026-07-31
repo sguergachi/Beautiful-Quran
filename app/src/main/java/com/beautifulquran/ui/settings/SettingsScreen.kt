@@ -77,6 +77,7 @@ import com.beautifulquran.data.BrushCircleStyle
 import com.beautifulquran.data.HomeBookmarkStyle
 import com.beautifulquran.data.ReadingMode
 import com.beautifulquran.data.Settings
+import com.beautifulquran.data.TimingScheme
 import com.beautifulquran.data.ThemeMode
 import com.beautifulquran.ui.PageTurnSounds
 import com.beautifulquran.ui.theme.BrushCheckParams
@@ -487,6 +488,26 @@ private fun DeveloperSection(
         color = MaterialTheme.colorScheme.primary,
     )
     Caption("Edit word-level timing marks; also opens from a word long-press.")
+
+    Spacer(Modifier.height(18.dp))
+    ToggleRow(
+        label = "Timing engine V2",
+        checked = settings.timingScheme == TimingScheme.V2,
+        onChange = { enabled ->
+            viewModel.settings.update {
+                it.copy(timingScheme = if (enabled) TimingScheme.V2 else TimingScheme.V1)
+            }
+        },
+        checkParams = checkParams,
+        checkPaintToken = checkPaintToken,
+    )
+    Caption(
+        "Parallel DB fork: timings_v2 never overwrites V1. Toggle reloads the " +
+            "open chapter in place for live A/B. Acoustic V2 rows ship for " +
+            "Alafasy only (~90% of his ayahs); other reciters stay pure V1 while " +
+            "the toggle is on (badge shows 0 acoustic). Missing Alafasy ayahs " +
+            "also keep V1. Lab edits apply only on V1.",
+    )
 
     Spacer(Modifier.height(20.dp))
     Text(

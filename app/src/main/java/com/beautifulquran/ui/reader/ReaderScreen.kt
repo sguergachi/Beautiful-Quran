@@ -118,6 +118,7 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import com.beautifulquran.data.AyahSelectorSide
 import com.beautifulquran.data.ReadingMode
+import com.beautifulquran.data.TimingScheme
 import com.beautifulquran.data.model.Surah
 import com.beautifulquran.domain.BASMALAH_PLAYLIST_AYAH
 import com.beautifulquran.ui.reader.focus.FocusEngine
@@ -1154,6 +1155,37 @@ fun ReaderScreen(
                             .padding(vertical = 6.dp),
                     )
                 }
+                // Live V1/V2 A/B: show which fork is driving ink for this chapter.
+                if (settings.developerModeEnabled) {
+                    val lane = when (uiState.timingScheme) {
+                        TimingScheme.V1 -> "Timing V1 (shipped)"
+                        TimingScheme.V2 -> {
+                            val acoustic = uiState.v2AcousticAyahCount
+                            val total = uiState.timedAyahCount
+                            // V2 acoustic rows ship for Alafasy only. Other reciters
+                            // correctly report 0 and fall back to V1 per ayah — make
+                            // that legible so "0/N" is not read as a broken load.
+                            when {
+                                total == 0 -> "Timing V2 · no timings for this chapter"
+                                acoustic == 0 ->
+                                    "Timing V2 · 0/$total acoustic · " +
+                                        "this reciter has no V2 rows (Alafasy only)"
+                                acoustic < total ->
+                                    "Timing V2 · $acoustic/$total acoustic · rest V1 fallback"
+                                else -> "Timing V2 · $acoustic/$total acoustic"
+                            }
+                        }
+                    }
+                    Text(
+                        text = lane,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 4.dp),
+                    )
+                }
                 PlayerBar(
                     state = playerState,
                     isThisSurahLoaded = isThisSurahPlaying,
@@ -1986,6 +2018,9 @@ fun ReaderScreen(
                                 ayah = ayah,
                                 readingMode = settings.readingMode,
                                 activeWord = activeWord,
+                                acousticWordClock = viewModel.acousticWordClock.takeIf {
+                                    activeWord?.timingScheme == TimingScheme.V2
+                                },
                                 playbackSpeed = playerState.speed,
                                 isActiveAyah = policyActive,
                                 dimmed = recitingActive && !policyActive,

@@ -141,7 +141,15 @@ Requires **JDK 21**. No Android device/emulator is needed for tests.
    one active word, recess via ayah veil) but do not degrade the wash itself.
    Arabic glyphs stay full opaque ink under a paper cover; never dim Hafs via
    glyph alpha. Web and Android must feel like the same product.
-8. **Timing Lab / GitHub timing patches are fixed systematically.** Never
+8. **No mid-animation reset — ever.** While a wash (first-pass ink, orange
+   repeat, glint, wasl) is still **visible**, its progress is **monotonic**:
+   only finish or hold — never `snapTo(0)`, never flash full→empty→fill.
+   Hard-restart is allowed only when the overlay is invisible (`alpha` below
+   the invisible threshold). Intentional seek/replay dissolves first, then
+   cold-starts. Chain handoff is Hold, not re-Reveal. Unit-tested via
+   `washMayHardRestart` / `repeatWashShouldRestart`. Breaking this is a
+   product failure, not a polish bug.
+9. **Timing Lab / GitHub timing patches are fixed systematically.** Never
    default to dropping the issue JSON into `tools/timing_overrides/`. Classify
    first (raw qdc vs cleaned vs repairs vs Lab expected), fix the **class** in
    `clean_qdc_artifacts` or the repairs span-protect / generator, and lock it
@@ -179,6 +187,10 @@ Full write-ups: [docs/TIMINGS_LAB.md](docs/TIMINGS_LAB.md),
 [tools/timing_patch_cases/README.md](tools/timing_patch_cases/README.md),
 [tools/timing_overrides/README.md](tools/timing_overrides/README.md),
 [tools/timing_repairs/README.md](tools/timing_repairs/README.md).
+9. **Word↔recitation sync is the product core.** The app exists so written
+   words and the reciter's voice feel like one act — millisecond-accurate,
+   word-by-word timing in total sync. Timing data quality and felt sync beat
+   every secondary feature. See [docs/SYNC_FIDELITY.md](docs/SYNC_FIDELITY.md).
 
 ## Code conventions
 
@@ -203,6 +215,9 @@ Full write-ups: [docs/TIMINGS_LAB.md](docs/TIMINGS_LAB.md),
 | `docs/COMPLEXITY.md` | Before any refactor — complexity rules, current hotspots, open decompositions, and the invariants a refactor must preserve |
 | `docs/quality-reviews/` | Multi-agent Android quality audits (summary + Grok/Codex; Claude when available) |
 | `docs/quality-reviews/AGENT_REVIEWS.md` | **How to run real Codex (`gpt-5.6-sol`) and Claude Opus reviews** — CLI flags, gotchas; do not fake them with Grok |
+| `docs/SYNC_FIDELITY.md` | **Product core** — word↔recitation sync is the app; ms/sub-word timing roadmap |
+| `docs/TIMING_FIRST_PRINCIPLES.md` | **Handoff** — first-principles timing plan, lab results, 409-patch gate, roadmap |
+| `tools/sync_lab/RESULTS.md` | Automated aligner bake-off (scale+quality) and winner pipeline |
 | `docs/HIGHLIGHT_ENGINE.md` | The pure word-sync engine — karaoke model, binary search, repeat/high-water logic |
 | `docs/OUTPUT_LATENCY.md` | Route-based Bluetooth/output lag presets applied before the highlight clock |
 | `docs/DESIGN.md` | Any UI/visual change — the paper metaphor and its hard rules |

@@ -1,3 +1,4 @@
+
 .gradle/
 build/
 local.properties
@@ -16,6 +17,9 @@ _site/
 # Source data cache for tools/build_db.py. The built database is committed
 # as app/src/main/assets/quran.db so normal app builds are offline.
 tools/.cache/
+tools/sync_lab/audio/
+tools/sync_lab/cache/
+tools/sync_lab/results/lab_*.json
 __pycache__/
 release.keystore
 images/

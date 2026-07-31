@@ -1,14 +1,46 @@
 /**
- * Ink wash math — port of Android `ui/theme/Fade.kt` smootherstep helpers.
+ * Ink wash math — port of Android `ui/theme/Fade.kt` helpers.
  */
 
-/** smootherstep (6t⁵−15t⁴+10t³): zero first and second derivative at both ends. */
-export const INK_PROFILE_STOPS = 9
-export const INK_WASH_FEATHER = 1.6
+/** Gradient samples across the feather (Android `InkProfileStops`, R5). */
+export const INK_PROFILE_STOPS = 17
+/** Feather relative to word width (~1–2 letters; see INK_WASH_FEEL R1). */
+export const INK_WASH_FEATHER = 0.5
+/** Horizontal fibre bands that stagger the wash head (R3). */
+export const INK_WASH_BAND_COUNT = 5
+/** Max head stagger as a fraction of feather width (R3 liquid C-curve). */
+export const INK_WASH_BAND_JITTER = 0.28
 
+/** smootherstep — non-wash easing (glint, whole-word breath). */
 export function inkSmootherstep(t: number): number {
   const c = t < 0 ? 0 : t > 1 ? 1 : t
   return c * c * c * (c * (c * 6 - 15) + 10)
+}
+
+/**
+ * Ink wash edge profile (R2): steep toe, long shoulder.
+ * Front-loads density via smootherstep(√t) so the edge reads as arrival + soak,
+ * not a symmetric fade. Soft ends (zero slope at 0 and 1).
+ */
+export function inkWashProfile(t: number): number {
+  const c = t < 0 ? 0 : t > 1 ? 1 : t
+  return inkSmootherstep(Math.sqrt(c))
+}
+
+/**
+ * Deterministic band stagger in [-1, 1]. Liquid C-curve front (middle leads
+ * or trails by seed lean) plus light fibre noise — matches Android Fade.kt.
+ */
+export function washBandOffsetFraction(seed: number, band: number): number {
+  const t = (band + 0.5) / INK_WASH_BAND_COUNT
+  const lean = Math.imul(seed | 0, -0x61c88647) < 0 ? -1 : 1
+  const curve = Math.sin(t * Math.PI)
+  const diag = (t - 0.5) * 2
+  let h = (Math.imul(seed | 0, 374761393) + Math.imul(band | 0, 668265263)) | 0
+  h = (h ^ (h >>> 13)) | 0
+  const noise = (((h & 0xff) / 255) - 0.5) * 0.4
+  const v = (curve * 0.55 + diag * 0.35) * lean + noise
+  return Math.min(1, Math.max(-1, v))
 }
 
 /**
@@ -28,10 +60,10 @@ export function inkWashAlpha(
   // Head travels one edge past the end so the final letter finishes at p=1.
   const travel = 1 + edge
   const head = p * travel
-  const local = rtl ? (1 - pos) : pos
+  const local = rtl ? 1 - pos : pos
   // Distance behind the wash head, normalized by feather width.
   const behind = (head - local) / edge
-  const s = inkSmootherstep(behind)
+  const s = inkWashProfile(behind)
   return restingAlpha + (1 - restingAlpha) * s
 }
 
@@ -42,16 +74,22 @@ export function wholeWordInkAlpha(progress: number, restingAlpha: number): numbe
 }
 
 /**
- * CSS mask-image for the directional ink wash.
- * Samples [inkWashAlpha] across the word (layout L→R) so the reveal matches
- * Android's smootherstep bloom instead of a blunt 3-stop wipe.
+ * Mild diagonal so iso-alpha isn't a perfect vertical bar.
+ * Always ~left→right (80–100°) so stop order matches L→R pos sampling —
+ * reversing the angle was making RTL look like a reverse wipe.
  */
-export function washMaskImage(
+function washAngleDeg(lean: number): number {
+  return 90 + lean * 10
+}
+
+function singleWashGradient(
   progress: number,
   restingAlpha: number,
   rtl: boolean,
-  feather = INK_WASH_FEATHER,
-  stopCount = INK_PROFILE_STOPS,
+  feather: number,
+  stopCount: number,
+  paperCover: boolean,
+  lean = 0,
 ): string {
   const p = Math.min(1, Math.max(0, progress))
   if (p >= 1) return 'none'
@@ -59,10 +97,89 @@ export function washMaskImage(
   const stops: string[] = []
   for (let i = 0; i < n; i++) {
     const pos = i / (n - 1)
-    const a = inkWashAlpha(pos, p, restingAlpha, rtl, feather)
+    const glyphA = inkWashAlpha(pos, p, restingAlpha, rtl, feather)
+    const a = paperCover
+      ? Math.min(1, Math.max(0, 1 - glyphA))
+      : glyphA
     stops.push(`rgba(0,0,0,${a.toFixed(4)}) ${(pos * 100).toFixed(2)}%`)
   }
-  return `linear-gradient(to right, ${stops.join(', ')})`
+  const angle = washAngleDeg(lean)
+  return `linear-gradient(${angle.toFixed(1)}deg, ${stops.join(', ')})`
+}
+
+/**
+ * Banded CSS mask: stacked horizontal strips with seeded head offsets (R3).
+ * Returns a multi-layer mask-image string plus size/position for applyMask.
+ */
+export type BandedMask = {
+  image: string
+  size: string
+  position: string
+}
+
+function bandedMask(
+  progress: number,
+  restingAlpha: number,
+  rtl: boolean,
+  feather: number,
+  seed: number,
+  paperCover: boolean,
+  stopCount = INK_PROFILE_STOPS,
+): BandedMask | 'none' {
+  const p = Math.min(1, Math.max(0, progress))
+  if (p >= 1) return 'none'
+  const travel = 1 + feather
+  const layers: string[] = []
+  const positions: string[] = []
+  const bandPct = 100 / INK_WASH_BAND_COUNT
+  const wordLean = washBandOffsetFraction(seed, 0)
+  for (let b = 0; b < INK_WASH_BAND_COUNT; b++) {
+    const offset = washBandOffsetFraction(seed, b) * INK_WASH_BAND_JITTER
+    // head' = head + offset*feather → progress' = head' / travel
+    const bp = Math.min(1, Math.max(0, p + (offset * feather) / travel))
+    // Keep lean small so angle stays near 90° (never reverse).
+    const lean = (wordLean * 0.6 + washBandOffsetFraction(seed, b + 17) * 0.4) * 0.5
+    const g = singleWashGradient(
+      bp,
+      restingAlpha,
+      rtl,
+      feather,
+      stopCount,
+      paperCover,
+      lean,
+    )
+    if (g === 'none') {
+      // Fully revealed band: opaque (glyph) or transparent (paper cover).
+      layers.push(
+        paperCover
+          ? 'linear-gradient(to right, rgba(0,0,0,0), rgba(0,0,0,0))'
+          : 'linear-gradient(to right, rgba(0,0,0,1), rgba(0,0,0,1))',
+      )
+    } else {
+      layers.push(g)
+    }
+    positions.push(`0% ${(b * bandPct).toFixed(4)}%`)
+  }
+  return {
+    image: layers.join(', '),
+    size: `100% ${bandPct.toFixed(4)}%`,
+    position: positions.join(', '),
+  }
+}
+
+/**
+ * CSS mask-image for the directional ink wash (glyph DstIn path).
+ * Banded fibre front (R3) + inkWashProfile (R2).
+ */
+export function washMaskImage(
+  progress: number,
+  restingAlpha: number,
+  rtl: boolean,
+  feather = INK_WASH_FEATHER,
+  stopCount = INK_PROFILE_STOPS,
+  seed = 0,
+): BandedMask | 'none' {
+  return bandedMask(progress, restingAlpha, rtl, feather, seed, false, stopCount)
 }
 
 /**
@@ -76,18 +193,20 @@ export function paperCoverMaskImage(
   rtl: boolean,
   feather = INK_WASH_FEATHER,
   stopCount = INK_PROFILE_STOPS,
+  seed = 0,
+): BandedMask | 'none' {
+  return bandedMask(progress, restingAlpha, rtl, feather, seed, true, stopCount)
+}
+
+/** @deprecated single-layer form for tests that only care about alpha math. */
+export function washMaskImageFlat(
+  progress: number,
+  restingAlpha: number,
+  rtl: boolean,
+  feather = INK_WASH_FEATHER,
+  stopCount = INK_PROFILE_STOPS,
 ): string {
-  const p = Math.min(1, Math.max(0, progress))
-  if (p >= 1) return 'none'
-  const n = Math.max(2, stopCount)
-  const stops: string[] = []
-  for (let i = 0; i < n; i++) {
-    const pos = i / (n - 1)
-    const glyphA = inkWashAlpha(pos, p, restingAlpha, rtl, feather)
-    const paperA = Math.min(1, Math.max(0, 1 - glyphA))
-    stops.push(`rgba(0,0,0,${paperA.toFixed(4)}) ${(pos * 100).toFixed(2)}%`)
-  }
-  return `linear-gradient(to right, ${stops.join(', ')})`
+  return singleWashGradient(progress, restingAlpha, rtl, feather, stopCount, false)
 }
 
 /** Cubic-bezier sample for sweep easing (matches InkEngine tuning defaults). */

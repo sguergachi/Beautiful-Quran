@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.beautifulquran.data.QuranRepository
 import com.beautifulquran.data.SettingsRepository
+import com.beautifulquran.data.effectiveTimingScheme
 import com.beautifulquran.data.model.Reciter
 import com.beautifulquran.data.model.RootOccurrence
 import com.beautifulquran.data.model.RootLemmaSummary
@@ -112,7 +113,11 @@ class RootViewerViewModel(
             if (reciters.isEmpty()) return@launch
             val reciterId = settings.settings.value.reciterId
             val reciter = reciters.firstOrNull { it.id == reciterId } ?: reciters.first()
-            val segments = repository.timings(reciter.id, st.surahId)[st.ayah].orEmpty()
+            val segments = repository.timings(
+                reciter.id,
+                st.surahId,
+                settings.settings.value.effectiveTimingScheme,
+            )[st.ayah].orEmpty()
             val clip = wordClipBounds(segments, word.position) ?: return@launch
             startWordAudition(
                 surahId = st.surahId,
