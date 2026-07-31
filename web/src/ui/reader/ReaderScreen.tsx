@@ -555,8 +555,9 @@ export function ReaderScreen({ stackLayer }: { stackLayer: StackLayer }) {
     focus.bind(el, count, 0)
   }, [content?.surah.id, content?.surah.ayahCount, isTop])
 
-  // Initial settle when a surah's content arrives — one frame after mount so
-  // the peel keeps its first paint. Same-surah reopen (isTop only) keeps scroll.
+  // Settle every explicit reader open — one frame after mount so the peel
+  // keeps its first paint. The revision distinguishes bookmark/search opens
+  // from playback and rail updates to openAyah.
   // Continuous next-chapter advance owns scroll/transform — only pin focus.
   useEffect(() => {
     if (!content || !isTop) return
@@ -578,9 +579,9 @@ export function ReaderScreen({ stackLayer }: { stackLayer: StackLayer }) {
       cancelled = true
       cancelAnimationFrame(raf)
     }
-    // Only when content identity changes — not every peel of the same surah.
+    // Explicit opens only — not playback updates to the session anchor.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [content?.surah.id])
+  }, [content?.surah.id, state.readerOpenRevision])
 
   // Progressive mount expands — refresh focus geometry without re-homing.
   useEffect(() => {
