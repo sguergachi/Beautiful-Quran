@@ -304,14 +304,20 @@ class InkEngineTest {
 
     @Test
     fun `same-word repeat reveals with an unchanged activation generation`() {
+        val action = repeatWashAction(
+            wasRepeat = false,
+            previousActivation = 4L,
+            repeat = true,
+            activation = 4L,
+        )
+        assertEquals(RepeatWashAction.Reveal, action)
         assertEquals(
-            RepeatWashAction.Reveal,
-            repeatWashAction(
-                wasRepeat = false,
-                previousActivation = 4L,
-                repeat = true,
-                activation = 4L,
+            0f,
+            displayedSweepProgress(
+                entryPending = action == RepeatWashAction.Reveal,
+                progress = 1f,
             ),
+            0f,
         )
     }
 

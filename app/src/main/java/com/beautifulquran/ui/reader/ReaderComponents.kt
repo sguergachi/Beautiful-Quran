@@ -265,22 +265,30 @@ private fun rememberRepeatWash(
     val progress = remember { Animatable(if (repeat) 0f else 1f) }
     val alpha = remember { Animatable(if (repeat) 1f else 0f) }
     val lifecycle = remember { RepeatWashLifecycle() }
-    LaunchedEffect(repeat, activation) {
-        val action = repeatWashAction(
-            wasRepeat = lifecycle.repeat,
-            previousActivation = lifecycle.activation,
-            repeat = repeat,
-            activation = activation,
-        )
+    val action = repeatWashAction(
+        wasRepeat = lifecycle.repeat,
+        previousActivation = lifecycle.activation,
+        repeat = repeat,
+        activation = activation,
+    )
+    // A completed repeat clock survives between entries. Pin its displayed
+    // value to zero now, before the reveal coroutine can expose one full frame.
+    val entryPending = remember(repeat, activation) {
+        mutableStateOf(action == RepeatWashAction.Reveal)
+    }
+    SideEffect {
         lifecycle.repeat = repeat
         lifecycle.activation = activation
+    }
+    LaunchedEffect(repeat, activation) {
         when (action) {
             RepeatWashAction.Reveal -> {
                 // Chain entry always reveals, including a same-word repeat
                 // whose already-non-zero activation generation is unchanged.
                 // A new non-zero generation also replays an active repeat.
-                alpha.snapTo(1f)
                 progress.snapTo(0f)
+                alpha.snapTo(1f)
+                entryPending.value = false
                 progress.animateTo(
                     1f,
                     tween(sweepMs ?: InkEngine.tuning.repeatSweepMs, easing = InkEngine.sweepEasing),
@@ -298,7 +306,10 @@ private fun rememberRepeatWash(
             RepeatWashAction.Hold -> Unit
         }
     }
-    return RepeatWash(progress = progress.asState(), alpha = alpha.asState())
+    val displayedProgress = remember(entryPending) {
+        derivedStateOf { displayedSweepProgress(entryPending.value, progress.value) }
+    }
+    return RepeatWash(progress = displayedProgress, alpha = alpha.asState())
 }
 
 /**

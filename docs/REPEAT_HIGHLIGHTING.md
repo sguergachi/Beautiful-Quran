@@ -253,6 +253,9 @@ HighlightEngine.PreparedTimings.activeInfo(positionMs)
   `Tuning.repeatSweepMs` (450 ms) for a chain member that is not the active
   word; on release, progress pins at 1 and alpha dissolves over
   `Tuning.repeatFadeOutMs` (900 ms). Both are Ink Lab sliders.
+  A chain member's displayed progress is pinned at 0 from its entry composition
+  until the reveal coroutine has reset the retained animation clock, preventing
+  a one-frame full-orange/glimmer flash before the directional edge begins.
   On Nightfall, each newly active repeat word also
   replays the white-gold glimmer over that orange bloom: the repeat is a new
   event even though the word's base ink was already revealed. This includes
