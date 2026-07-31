@@ -143,9 +143,10 @@ Requires **JDK 21**. No Android device/emulator is needed for tests.
    glyph alpha. Web and Android must feel like the same product.
 8. **Timing Lab / GitHub timing patches are fixed systematically.** Never
    default to dropping the issue JSON into `tools/timing_overrides/`. Classify
-   first (raw qdc vs cleaned vs repairs vs Lab expected), fix the **class** in
-   `clean_qdc_artifacts` or the repairs span-protect / generator, and lock it
-   with `tools/timing_patch_cases/*.json` + `python3 tools/test_build_db.py`.
+   first (raw qdc vs cleaned vs corrections vs repairs vs Lab expected), fix
+   the **class** in `clean_qdc_artifacts`, use a narrow typed operation only
+   when topology is irreducibly ambiguous, and lock it with
+   `tools/timing_patch_cases/*.json` + `python3 tools/test_build_db.py`.
    Override JSON is local reproduction scratch only and must not be committed.
    Canonical anti-pattern: the first #570 attempt (one-off override); the
    correct fix is #571 (gap phantoms + span-protect).
@@ -163,11 +164,14 @@ close a `Timings patch — …` GitHub issue, **do this checklist in order**:
 3. **Classify** the topology difference:
    | Symptom | Fix where | Test |
    |---|---|---|
-| Forward spike, stray, split sliver, non-contiguous / **gap phantom** (`…11,8,9,13…` missing 12), recurring false phrase loop | `clean_qdc_artifacts` in `tools/build_db.py` | `tools/timing_patch_cases/<id>.json` + `python3 tools/test_build_db.py` |
+| Forward spike, stray, split sliver, non-contiguous / **gap phantom** (`…11,8,9,13…` missing 12 or `…1,3,3…` missing 2) | `clean_qdc_artifacts` in `tools/build_db.py` | `tools/timing_patch_cases/<id>.json` + `python3 tools/test_build_db.py` |
+| Topology cannot distinguish a false loop from a real repeat | narrow typed operation in `tools/timing_corrections/` | `pipeline: "timing_correction"` case |
    | Repair flattens a multi-word re-say that cleaned qdc still has | `apply_timing_repairs` span-protect (`erases_span_repeat`) | `pipeline: "erases_span_repeat"` case |
+| Repair erases a peer same-word re-say while fixing elsewhere | per-position `preserve_peer_repeats` | `pipeline: "preserve_peer_repeats"` case |
 | CTC repeat-vs-split / restore / drop quality | regenerate `tools/timing_repairs/` (`~/qasr`) | generator tests + rebuild |
 | Single boundary steal, no structural signal | weighted source-conflict validation + surgical `kind: "boundary"` repair | `pipeline: "boundary_repair"` case |
 | Whole ayah starts early because its MP3 has encoded silence | regenerate the reciter with `tools/detect_audio_onsets.py` | `pipeline: "leading_silence_offset"` case |
+| Missing positions, unsafe clock, or marks outside the MP3 | fix the source/class; `finalize_timing_rows` completes, falls back, or withholds | completion/physics checks in `tools/test_build_db.py` |
 4. **Implement the class fix** + add the patch case (input = broken shape,
    expected = Lab/ear topology). Run `python3 tools/test_build_db.py`.
 5. **Rebuild**: `python3 tools/build_db.py`, bump `DB_FILE_NAME`, commit DB +

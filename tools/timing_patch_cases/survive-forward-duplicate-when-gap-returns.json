@@ -1,0 +1,11 @@
+{
+  "id": "survive-forward-duplicate-when-gap-returns",
+  "label": "a duplicated destination survives when the skipped word returns",
+  "refs": [
+    "Alafasy 16:106"
+  ],
+  "pipeline": "clean_qdc_artifacts",
+  "notes": "The apparent forward gap is not absent from the row: word 3 arrives in the following re-say. The forward-duplicate gap heuristic must abstain.",
+  "input_positions": [1, 2, 4, 4, 3, 4, 5],
+  "expected_positions": [1, 2, 4, 4, 3, 4, 5]
+}

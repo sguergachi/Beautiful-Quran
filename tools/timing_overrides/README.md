@@ -29,10 +29,13 @@ bug until proven otherwise — not an override.
 | Defect class | Fix where | Verify with |
 |---|---|---|
 | Forward spikes, isolated strays, split slivers, **non-contiguous / gap phantoms** | `clean_qdc_artifacts` in `tools/build_db.py` | `tools/timing_patch_cases/*.json` + `python3 tools/test_build_db.py` |
+| Irreducible verified topology ambiguity | narrow operation in `tools/timing_corrections/` | `pipeline: timing_correction` case |
 | Drop repair flattening a real multi-word re-say | `apply_timing_repairs` span-protect | `pipeline: erases_span_repeat` case |
+| Repair flattening a peer re-say while fixing elsewhere | per-position `preserve_peer_repeats` | `pipeline: preserve_peer_repeats` case |
 | Repeat-vs-split / CTC disagreement | `tools/timing_repairs/` generator | case in `~/qasr` + rebuild repairs |
 | Boundary nudge without a topology change | weighted source evidence + repair generator | focused regression case |
 | Whole ayah starts early because its MP3 has encoded silence | regenerate the reciter with `tools/detect_audio_onsets.py` | detector/apply tests + `pipeline: leading_silence_offset` case |
+| Missing positions or impossible file clock | source/class fix; finalizer completes, falls back, or withholds | completion/physics checks |
 
 When a Lab patch reveals a **class** of bugs (same wrong topology on many
 ayahs), implement the rule in the pipeline and add a

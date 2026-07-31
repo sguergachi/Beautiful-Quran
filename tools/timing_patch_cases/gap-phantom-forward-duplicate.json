@@ -1,0 +1,13 @@
+{
+  "id": "gap-phantom-forward-duplicate",
+  "label": "a duplicated destination fills an otherwise absent forward gap",
+  "refs": [
+    "Alafasy 6:111, 26:63, 33:31, 33:67, 65:11",
+    "Hani 5:2, 17:63",
+    "two-reciter full-corpus topology audit"
+  ],
+  "pipeline": "clean_qdc_artifacts",
+  "notes": "After word 1, two labels for word 3 exactly account for absent word 2 plus word 3. Relabel them 2,3. The rule abstains when the skipped word occurs anywhere else, preserving cases such as Alafasy 16:106.",
+  "input_positions": [1, 3, 3, 4, 5],
+  "expected_positions": [1, 2, 3, 4, 5]
+}

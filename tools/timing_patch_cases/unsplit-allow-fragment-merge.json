@@ -4,8 +4,8 @@
   "refs": [
     "clean_qdc_artifacts split-fragment gate"
   ],
-  "pipeline": "erases_span_repeat",
-  "notes": "A short onset sliver + full body is a mid-word split (fragment), not a peer re-say. erases_span_repeat must stay false so CTC unsplit / cleaner can still merge it.",
+  "pipeline": "preserve_peer_repeats",
+  "notes": "A short onset sliver + full body is a mid-word split (fragment), not a peer re-say. Per-position repeat protection must leave the repaired single span alone.",
   "input_segments": [
     [1, 0, 800],
     [2, 800, 1600],
@@ -19,5 +19,5 @@
     [3, 1600, 3100],
     [4, 3100, 4000]
   ],
-  "expected_erases": false
+  "expected_positions": [1, 2, 3, 4]
 }
