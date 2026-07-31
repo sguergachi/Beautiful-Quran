@@ -34,6 +34,7 @@ from build_db import (  # noqa: E402
     finalize_timing_rows,
     load_audio_durations,
     load_audio_onsets,
+    normalize_text,
     offset_for_audio_onset,
     preserve_peer_repeats,
     recover_negative_opening,
@@ -522,10 +523,33 @@ def audit_bundled_db():
                 "WHERE reciter_id=? AND surah_id=? AND ayah_number=?",
                 (rid, s, a),
             ).fetchone() == (onset,)
+    # Upstream WBW glosses sometimes ship a trailing space ("those "); English
+    # only joins words with a space, so untrimmed glosses read as a double gap.
+    untrimmed = db.execute(
+        "SELECT COUNT(*) FROM words "
+        "WHERE translation_en != trim(translation_en) "
+        "OR transliteration != trim(transliteration)"
+    ).fetchone()[0]
+    exact &= untrimmed == 0
+    # 4:152 — the reported English-only double space between أولئك and سوف.
+    exact &= db.execute(
+        "SELECT translation_en FROM words "
+        "WHERE surah_id=4 AND ayah_number=152 AND position=10"
+    ).fetchone() == ("those",)
     overrides = list((TOOLS / "timing_overrides").glob("*.json"))
     return not bad and exact and not overrides and db.execute(
         "PRAGMA integrity_check"
     ).fetchone()[0] == "ok"
+
+
+def check_gloss_normalize():
+    """load_wbw runs glosses through normalize_text — lock the 4:152 shape."""
+    return (
+        normalize_text("those ") == "those"
+        and normalize_text(" those") == "those"
+        and normalize_text("those\u00a0") == "those"
+        and normalize_text("soon") == "soon"
+    )
 
 
 def main():
@@ -578,10 +602,12 @@ def main():
     confidence_ok = check_confidence()
     audio_onset_ok = check_audio_onset_pipeline()
     completion_ok = check_completion_pipeline()
+    gloss_ok = check_gloss_normalize()
     database_ok = audit_bundled_db()
     print(f"  {'ok  ' if confidence_ok else 'FAIL'} weighted 2:214 confidence checks")
     print(f"  {'ok  ' if audio_onset_ok else 'FAIL'} audio evidence and onset checks")
     print(f"  {'ok  ' if completion_ok else 'FAIL'} complete fallback and physics checks")
+    print(f"  {'ok  ' if gloss_ok else 'FAIL'} WBW gloss whitespace normalize")
     print(f"  {'ok  ' if database_ok else 'FAIL'} bundled timing database invariants")
     if not confidence_ok:
         failures.append(("weighted confidence", "2:214 checks failed", None))
@@ -589,6 +615,8 @@ def main():
         failures.append(("audio onsets", "evidence/onset checks failed", None))
     if not completion_ok:
         failures.append(("timing finalizer", "completion/fallback checks failed", None))
+    if not gloss_ok:
+        failures.append(("gloss normalize", "trailing-space strip failed", None))
     if not database_ok:
         failures.append(("bundled database", "timing audit failed", None))
     print()
@@ -600,7 +628,7 @@ def main():
                 for line in str(detail).splitlines():
                     print(f"    {line}")
         return 1
-    print(f"all {len(cases) + 4} cases pass ({CASES_DIR.relative_to(Path.cwd())})")
+    print(f"all {len(cases) + 5} cases pass ({CASES_DIR.relative_to(Path.cwd())})")
     return 0
 
 
