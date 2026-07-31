@@ -432,6 +432,9 @@ HighlightEngine.PreparedTimings.activeInfo(positionMs)
   cannot erase its pacing. On release, residual progress finishes under the
   gate, then alpha dissolves over `Tuning.repeatFadeOutMs` (900 ms). Web keeps
   the constant 450 ms clock until tajweed pacing is ported.
+  A chain member's displayed progress is pinned at 0 from its entry composition
+  until the ordered gate resets the retained animation clock, preventing a
+  one-frame full-orange/glimmer flash before the directional edge begins.
   On Nightfall, each newly active repeat word also
   replays the white-gold glimmer over that orange bloom: the repeat is a new
   event even though the word's base ink was already revealed. This includes

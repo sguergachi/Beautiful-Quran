@@ -304,6 +304,23 @@ private fun rememberRepeatWash(
     val lockedFeather = remember { mutableStateOf<Float?>(null) }
     val lockedDurationMs = remember { mutableIntStateOf(InkEngine.tuning.repeatSweepMs) }
     val lifecycle = remember { RepeatWashLifecycle() }
+    val displayLifecycle = remember { RepeatWashLifecycle() }
+    val entryAction = repeatWashAction(
+        wasRepeat = displayLifecycle.repeat,
+        previousActivation = displayLifecycle.activation,
+        repeat = repeat,
+        activation = activation,
+    )
+    val entryPending = remember { mutableStateOf(false) }
+    SideEffect {
+        when (entryAction) {
+            RepeatWashAction.Reveal -> entryPending.value = true
+            RepeatWashAction.Release -> entryPending.value = false
+            RepeatWashAction.Hold -> Unit
+        }
+        displayLifecycle.repeat = repeat
+        displayLifecycle.activation = activation
+    }
     val sharedGate = LocalRepeatWashGate.current
     val localGate = remember { OrderedWashGate() }
     val gate = sharedGate ?: localGate
@@ -343,8 +360,9 @@ private fun rememberRepeatWash(
                         lockedPacing.value = entryPacing
                         lockedFeather.value =
                             if (entryPacing != null) InkEngine.pacedFeather() else null
-                        alpha.snapTo(1f)
                         clock.snapTo(0f)
+                        entryPending.value = false
+                        alpha.snapTo(1f)
                         clock.animateTo(1f, tween(sweepMs, easing = easing))
                     }
                 }
@@ -385,7 +403,13 @@ private fun rememberRepeatWash(
         }
     }
     val progress = remember {
-        derivedStateOf { lockedPacing.value?.at(clock.value) ?: clock.value }
+        derivedStateOf {
+            val mapped = lockedPacing.value?.at(clock.value) ?: clock.value
+            displayedSweepProgress(
+                entryPending = repeatState.value && entryPending.value,
+                progress = mapped,
+            )
+        }
     }
     return RepeatWash(
         progress = progress,
