@@ -10,7 +10,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.waitForUpOrCancellation
-import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -30,11 +29,6 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Close
-import androidx.compose.material.icons.rounded.Search
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -51,10 +45,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.boundsInRoot
@@ -90,6 +82,7 @@ import com.beautifulquran.ui.reader.VerseBookmarkRibbon
 import com.beautifulquran.ui.theme.ArabicTitleStyle
 import com.beautifulquran.ui.theme.GildedRosette
 import com.beautifulquran.ui.theme.LocalQuranAccents
+import com.beautifulquran.ui.theme.PaperSearchField
 import com.beautifulquran.ui.theme.quietClickable
 import com.beautifulquran.ui.theme.verticalFadingEdges
 
@@ -284,9 +277,10 @@ fun HomeScreen(
                         if (searchFocused) {
                             Spacer(Modifier.height(8.dp))
                         }
-                        HomeSearchField(
+                        PaperSearchField(
                             value = uiState.query,
                             onValueChange = viewModel::onQueryChange,
+                            placeholder = "Search surah, word, or 2:255",
                             onFocusChanged = { searchFocused = it },
                             modifier = Modifier
                                 .padding(start = HomeStartInset, end = HomeEndInset)
@@ -588,78 +582,6 @@ private fun SavedPassagesRow(
             )
         }
     }
-}
-
-@Composable
-private fun HomeSearchField(
-    value: String,
-    onValueChange: (String) -> Unit,
-    onFocusChanged: (Boolean) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    var focused by remember { mutableStateOf(false) }
-    val ink = MaterialTheme.colorScheme.onBackground
-    val mutedInk = MaterialTheme.colorScheme.onSurfaceVariant
-    BasicTextField(
-        value = value,
-        onValueChange = onValueChange,
-        singleLine = true,
-        textStyle = MaterialTheme.typography.bodyLarge.copy(color = ink),
-        cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-        modifier = modifier
-            .height(56.dp)
-            .onFocusChanged {
-                focused = it.isFocused
-                onFocusChanged(it.isFocused)
-            }
-            .clip(RoundedCornerShape(20.dp))
-            .background(
-                MaterialTheme.colorScheme.surfaceVariant.copy(
-                    alpha = if (focused) 0.45f else 0.35f,
-                ),
-            ),
-        decorationBox = { field ->
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 16.dp),
-            ) {
-                Icon(
-                    Icons.Rounded.Search,
-                    contentDescription = null,
-                    tint = mutedInk.copy(alpha = 0.5f),
-                    modifier = Modifier.size(22.dp),
-                )
-                Spacer(Modifier.width(12.dp))
-                Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
-                    if (value.isEmpty()) {
-                        Text(
-                            "Search surah, word, or 2:255",
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = mutedInk.copy(alpha = 0.5f),
-                        )
-                    }
-                    field()
-                }
-                if (value.isNotEmpty()) {
-                    Box(
-                        contentAlignment = Alignment.Center,
-                        modifier = Modifier
-                            .size(44.dp)
-                            .quietClickable(role = Role.Button) { onValueChange("") }
-                            .semantics { contentDescription = "Clear search" },
-                    ) {
-                        Icon(
-                            Icons.Rounded.Close,
-                            contentDescription = null,
-                            tint = mutedInk.copy(alpha = 0.6f),
-                        )
-                    }
-                }
-            }
-        },
-    )
 }
 
 @Composable

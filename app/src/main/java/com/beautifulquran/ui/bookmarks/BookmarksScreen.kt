@@ -21,13 +21,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowForward
-import androidx.compose.material.icons.rounded.Close
-import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -42,8 +38,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
@@ -65,6 +59,7 @@ import com.beautifulquran.ui.reader.VerseBookmarkRibbon
 import com.beautifulquran.ui.reader.VERSE_ANNOTATION_INK_ALPHA
 import com.beautifulquran.ui.reader.verseAnnotationStyle
 import com.beautifulquran.ui.theme.ArabicTitleStyle
+import com.beautifulquran.ui.theme.PaperSearchField
 import com.beautifulquran.ui.theme.DisclosureChevron
 import com.beautifulquran.ui.theme.LocalQuranAccents
 import com.beautifulquran.ui.theme.quietClickable
@@ -105,7 +100,16 @@ fun BookmarksScreen(
                     BookmarksHeader(onClose)
                 }
                 item(key = "search") {
-                    BookmarkSearchField(uiState.query, viewModel::onQueryChange)
+                    PaperSearchField(
+                        value = uiState.query,
+                        onValueChange = viewModel::onQueryChange,
+                        placeholder = "Search bookmarks, text, or 2:255",
+                        contentDescription = "Search bookmarked verses",
+                        clearContentDescription = "Clear bookmark search",
+                        modifier = Modifier
+                            .padding(start = 24.dp, top = 24.dp, end = 24.dp)
+                            .fillMaxWidth(),
+                    )
                 }
 
                 if (!uiState.loading && uiState.sections.isEmpty()) {
@@ -222,57 +226,6 @@ private fun BookmarksHeader(onClose: () -> Unit) {
             )
         }
     }
-}
-
-@Composable
-private fun BookmarkSearchField(value: String, onValueChange: (String) -> Unit) {
-    var focused by remember { mutableStateOf(false) }
-    val ink = MaterialTheme.colorScheme.onBackground
-    val accent = MaterialTheme.colorScheme.primary
-    BasicTextField(
-        value = value,
-        onValueChange = onValueChange,
-        singleLine = true,
-        textStyle = MaterialTheme.typography.bodyLarge.copy(
-            color = ink,
-            fontSize = 17.sp,
-            lineHeight = 25.sp,
-        ),
-        cursorBrush = SolidColor(accent),
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(start = 24.dp, top = 24.dp, end = 24.dp)
-            .height(52.dp)
-            .onFocusChanged { focused = it.isFocused }
-            .semantics { contentDescription = "Search bookmarked verses" },
-        decorationBox = { field ->
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.width(40.dp), contentAlignment = Alignment.CenterStart) {
-                    Icon(
-                        Icons.Rounded.Search,
-                        contentDescription = null,
-                        tint = if (focused) accent else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f),
-                        modifier = Modifier.size(22.dp),
-                    )
-                }
-                Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
-                    if (value.isEmpty()) {
-                        Text(
-                            "Search bookmarks, text, or 2:255",
-                            style = MaterialTheme.typography.bodyLarge.copy(fontSize = 17.sp, lineHeight = 25.sp),
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.68f),
-                        )
-                    }
-                    field()
-                }
-                if (value.isNotEmpty()) {
-                    IconButton(onClick = { onValueChange("") }) {
-                        Icon(Icons.Rounded.Close, contentDescription = "Clear bookmark search")
-                    }
-                }
-            }
-        },
-    )
 }
 
 @Composable
