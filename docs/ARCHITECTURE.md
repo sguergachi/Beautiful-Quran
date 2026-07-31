@@ -259,12 +259,14 @@ ReaderFocusController ── holds the LazyListState; the sole writer to it
   The verse-first path remains only for wholly offscreen targets that must be
   materialized before their word can be measured.
 - Annotation editing uses the same secondary-focus path: the field reports live
-  viewport bounds as it grows and as the IME rises,
+  viewport bounds as it grows; `imeAnimationTarget` supplies the keyboard's
+  completed geometry before the first focus movement,
   `keyboardOverlapPx` removes any bottom chrome already outside the list before
   `annotationFieldDeltaPx` anchors its bottom on the keyboard-safe line, and
-  `ReaderFocusController.keepAnnotationInView` serializes that glide with every
-  other reader scroll. Playback continues while writing, but lyric auto-follow
-  yields until the editor closes so it cannot pull the field back under the IME.
+  `ReaderFocusController.keepAnnotationInView` continuously remeasures through
+  one slow, direction-locked glide serialized with every other reader scroll.
+  Playback continues while writing, but lyric auto-follow yields until the
+  editor closes so it cannot pull the field back under the IME.
 
 ## Playback
 

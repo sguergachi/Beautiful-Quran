@@ -25,7 +25,7 @@ import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.imeAnimationTarget
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -1934,6 +1934,7 @@ private val ANNOTATION_KEYBOARD_CLEARANCE = 16.dp
  * the reader writes in place; otherwise the settled note is shown and tapping
  * it reopens the editor. Blank text on commit deletes the note.
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun VerseAnnotationField(
     text: String,
@@ -1969,15 +1970,20 @@ internal fun VerseAnnotationField(
         if (isEditing) focusRequester.requestFocus()
     }
 
-    // Re-measure as the field grows or the IME animates, then let the focus
-    // engine calculate and serialize the keyboard-safe scroll.
+    // Aim at the IME's completed geometry from the first animation frame.
+    // Following the current inset started a glide at zero height, then reversed
+    // it as the keyboard rose; the target gives the focus engine one landing.
     var fieldCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
     var fieldSize by remember { mutableStateOf(IntSize.Zero) }
     val density = LocalDensity.current
     val view = LocalView.current
-    val imeBottom = WindowInsets.ime.getBottom(density)
-    LaunchedEffect(isEditing, imeBottom, fieldSize, fieldCoordinates, onKeepInView) {
-        if (!isEditing || fieldSize.height == 0 || onKeepInView == null) return@LaunchedEffect
+    val imeTargetBottom = WindowInsets.imeAnimationTarget.getBottom(density)
+    LaunchedEffect(isEditing, imeTargetBottom, fieldSize, fieldCoordinates, onKeepInView) {
+        if (!isEditing || imeTargetBottom <= 0 || fieldSize.height == 0 ||
+            onKeepInView == null
+        ) {
+            return@LaunchedEffect
+        }
         val clearance = with(density) { ANNOTATION_KEYBOARD_CLEARANCE.toPx() }
         val list = listCoordinates()?.takeIf { it.isAttached } ?: return@LaunchedEffect
         val listTop = list.localToWindow(Offset.Zero).y
@@ -1985,7 +1991,7 @@ internal fun VerseAnnotationField(
         val keyboardOverlap = FocusEngine.keyboardOverlapPx(
             listBottomInWindowPx = listBottom,
             windowHeightPx = view.height.toFloat(),
-            keyboardInsetPx = imeBottom.toFloat(),
+            keyboardInsetPx = imeTargetBottom.toFloat(),
         )
         onKeepInView(keyboardOverlap, clearance) {
             val field = fieldCoordinates?.takeIf { it.isAttached } ?: return@onKeepInView null
@@ -2049,12 +2055,12 @@ internal fun VerseAnnotationField(
                         cap = StrokeCap.Round,
                     )
                 }
-                // The delete mark: a drawn ruby cross on the first line, never
-                // an icon in a container.
+                // The delete mark follows the last writing line, whose bottom
+                // the focus engine keeps parked just above the keyboard.
                 if (editing > 0.01f) {
                     val arm = 5.dp.toPx()
                     val cx = size.width / 2f
-                    val cy = noteStyle.lineHeight.toPx() / 2f
+                    val cy = size.height - noteStyle.lineHeight.toPx() / 2f
                     val stroke = 1.8.dp.toPx()
                     val color = markInk.copy(alpha = editing * ANNOTATION_MARK_ALPHA)
                     drawLine(

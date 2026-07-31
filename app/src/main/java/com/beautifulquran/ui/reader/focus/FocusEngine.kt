@@ -207,6 +207,24 @@ object FocusEngine {
     }
 
     /**
+     * A live-remeasured home step that may travel only in [direction].
+     * Annotation focus uses this while the IME and field finish laying out:
+     * geometry may settle past the requested landing, but that must stop the
+     * glide rather than turn it into a visible correction in reverse.
+     */
+    fun oneDirectionHomeScrollStep(
+        remainingPx: Float,
+        progress: Float,
+        lastProgress: Float,
+        direction: Float,
+    ): Float =
+        if (remainingPx * direction <= 0f) {
+            0f
+        } else {
+            homeScrollStep(remainingPx, progress, lastProgress)
+        }
+
+    /**
      * Whether [target] is far enough from the current window that a smooth glide
      * would stutter estimating unmeasured verse heights along the way, so the
      * controller should teleport to a doorstep first and glide the last stretch.
