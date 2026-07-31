@@ -11,6 +11,7 @@ captures/
 web/node_modules/
 web/dist/
 web/public/quran.db
+web/public/lexicon.db
 _site/
 
 # Source data cache for tools/build_db.py. The built database is committed
@@ -23,3 +24,6 @@ images/
 # Release bundles written to the repo root by scripts/build_release_bundle.sh.
 # Ship them via GitHub releases / Play, never as committed blobs.
 *.aab
+
+# OptMem runtime lock — recreated on every memo command.
+.optmem/memory/.lock

@@ -2,7 +2,7 @@
 
 Your memory is OptMem:
 - The tool is `~/.optmem/memo`
-- Your memories are in `~/.optmem/memory`
+- Your memories are in `~/Dev/Beautiful-Quran/.optmem/memory`
 
 OptMem outlives every session, compaction, model and vendor change.
 Without it you do not know who you are, or what was decided and tried.
@@ -23,7 +23,7 @@ Do not register redundant memories.
 
 If `~/.optmem/memo note` asks a compression: do it before your next action.
 
-Never edit or delete anything under `~/.optmem/memory`: the tool manages it.
+Never edit or delete anything under `~/Dev/Beautiful-Quran/.optmem/memory`: the tool manages it.
 
 ### When you need an old memory: search, or navigate
 
