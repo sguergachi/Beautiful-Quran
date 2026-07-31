@@ -178,6 +178,8 @@ def acoustic_keyframes(
 
     intervals = []
     for token_index, (_, _, start, end) in enumerate(letters):
+        if int(end) <= word_start_ms or int(start) >= word_end_ms:
+            continue
         lo = max(word_start_ms, int(start))
         hi = min(word_end_ms, int(end))
         if hi < lo:
@@ -187,6 +189,9 @@ def acoustic_keyframes(
             intervals[-1][2] = item[2]
         else:
             intervals.append(item)
+
+    if not intervals:
+        return []
 
     points: list[list[float]] = []
 
