@@ -4,8 +4,9 @@
 (see `docs/V2_STRUCTURE.md`):
 
 1. **`alafasy_lab_gold.json`** — Timings Lab ground truth (grammar-valid historical patches)
-2. **`alafasy_qua_full.json`** — full QUA Alafasy structure + letters (phrase re-says preserved)
-3. **`alafasy_ctc_auto.json`** — mono CTC **gap-fill only** (never invents structure over QUA)
+2. **`alafasy_v1_replay_fallback.json`** — complete V1 re-says when a lower-priority acoustic lane is mono
+3. **`alafasy_qua_full.json`** — full QUA Alafasy structure + letters (phrase re-says preserved)
+4. **`alafasy_ctc_auto.json`** — mono CTC **gap-fill only** (never invents structure over QUA)
 
 Regenerate QUA full + re-merge:
 
@@ -16,6 +17,7 @@ python3 tools/sync_lab/merge_v2_priority.py \
   --lab-gold tools/timing_v2/alafasy_lab_gold.json \
   --ctc tools/timing_v2/alafasy_ctc_auto.json \
   --qua tools/timing_v2/alafasy_qua_full_raw.json \
+  --v1-db data/quran.db \
   --out-dir tools/timing_v2
 # then rebuild DB + bump QuranDatabase.DB_FILE_NAME
 ```

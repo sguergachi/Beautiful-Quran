@@ -1532,6 +1532,10 @@ def load_timing_v2(word_counts, source_dir=TIMING_V2_DIR):
             "timing_lab/historical_manual_patches",
             None,  # revision checked as 64-hex below
         ),
+        "sync_lab/merge_v2_priority.py@1": (
+            "quran-v1 repeat topology",
+            None,  # revision checked as 64-hex below
+        ),
     }
     rows = []
     seen = set()
@@ -1547,10 +1551,10 @@ def load_timing_v2(word_counts, source_dir=TIMING_V2_DIR):
             raise ValueError(f"{path.name}: unpinned Timing V2 source")
         if expected_revision is not None and payload.get("sourceRevision") != expected_revision:
             raise ValueError(f"{path.name}: unpinned Timing V2 source revision")
-        if generator.endswith("generate_lab_gold_v2.py@1"):
+        if generator.endswith(("generate_lab_gold_v2.py@1", "merge_v2_priority.py@1")):
             rev = payload.get("sourceRevision", "")
             if not re.fullmatch(r"[0-9a-f]{64}", rev):
-                raise ValueError(f"{path.name}: Lab gold needs sha256 sourceRevision")
+                raise ValueError(f"{path.name}: derived V2 lane needs sha256 sourceRevision")
         reciter_id = int(payload["reciterId"])
         minimum = float(payload["minimumGateScore"])
         if not math.isfinite(minimum):

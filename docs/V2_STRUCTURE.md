@@ -41,7 +41,7 @@ Lab-gold “100%” only scored **307** patched rows. It did **not** measure the
 
 **Required metrics:**
 
-1. **Backtrack recall** vs V1∪QUA structure gold (target ≥ 99% of gold backtrack *ayahs*, not tokens).  
+1. **Backtrack recall** vs V1∪QUA structure gold (target ≥ 99% of gold backtrack *ayahs*, not tokens). A Lab-gold mono row is excluded from the V1 compatibility denominator: Lab remains the higher-priority correction.
 2. **Structure exact** on golden set (100% of cases in `tools/timing_patch_cases/` / new `structure_cases/`).  
 3. **Onset quality** on accepted V2 rows (p90 ≤ 100ms or stated bar).  
 4. **Coverage** = accepted / mushaf (report separately from accuracy).
@@ -172,8 +172,8 @@ Proceed with **Dir 1 first** (full QUA Alafasy structure+letter import + reclock
 | Piece | Location |
 |-------|----------|
 | Full QUA importer | `tools/sync_lab/generate_qua_full_v2.py@1` |
-| Merge Lab > full QUA > CTC gap | `tools/sync_lab/merge_v2_priority.py` |
-| Committed V2 sources | `tools/timing_v2/alafasy_{lab_gold,qua_full,ctc_auto}.json` |
+| Merge Lab > V1 replay fallback > full QUA > CTC gap | `tools/sync_lab/merge_v2_priority.py` |
+| Committed V2 sources | `tools/timing_v2/alafasy_{lab_gold,v1_replay_fallback,qua_full,ctc_auto}.json` |
 | Loader pin | `load_timing_v2` accepts `generate_qua_full_v2.py@1` |
 | Structure gate | `tools/test_build_db.py` → Fatiha mono + 5:54 multi-loop + 6:10 exact |
 | Backtrack metrics | `tools/sync_lab/eval_v2_structure_metrics.py` (no-regression floors) |
@@ -182,5 +182,5 @@ Proceed with **Dir 1 first** (full QUA Alafasy structure+letter import + reclock
 
 **6:10:** V2 positions = V1 = `1…8,6,7,8,9…13`.  
 **5:54:** V2 multi-loop locked (QUA topology; slight V1 delta on 21–24).  
-**Scale:** ~6229 QUA accepted / 7 fail; merged Lab 307 + QUA full ~5925 + CTC gap few = 6236 V2 rows.  
-**Backtrack recall vs V1 (measured):** ~77% of V1-backtrack ayahs still have a backtrack in V2 (~624/808); exact topology match ~62% among V1-bt. Floors: recall ≥75%, V2 bt ayahs ≥600, Fatiha mono.
+**Scale:** merged Lab 307 + QUA full 5,891 + V1 replay fallback 35 + CTC gap 3 = 6,236 V2 rows.
+**Backtrack recall vs V1 (measured):** 96.5% of compatible V1-backtrack ayahs retain a V2 backtrack (662/686); 263 Lab-gold mono corrections are intentionally excluded. Floors: recall ≥75%, V2 bt ayahs ≥600, Fatiha mono.

@@ -49,6 +49,17 @@ def has_backtrack(pos: list[int]) -> bool:
     return False
 
 
+def lab_mono_keys() -> set[tuple[int, int]]:
+    """Lab gold is higher-priority truth than V1's historical topology."""
+    path = ROOT / "tools" / "timing_v2" / "alafasy_lab_gold.json"
+    rows = json.loads(path.read_text(encoding="utf-8"))["rows"]
+    return {
+        (int(row["surah"]), int(row["ayah"]))
+        for row in rows
+        if not has_backtrack([int(segment["position"]) for segment in row["segments"]])
+    }
+
+
 def load_tables(db: Path) -> tuple[dict[tuple[int, int], list[int]], dict[tuple[int, int], list[int]]]:
     v1: dict[tuple[int, int], list[int]] = {}
     v2: dict[tuple[int, int], list[int]] = {}
@@ -68,7 +79,11 @@ def evaluate(db: Path) -> dict:
     v1, v2 = load_tables(db)
     keys = sorted(set(v1) | set(v2))
 
-    v1_bt = {k for k in keys if has_backtrack(v1.get(k, []))}
+    raw_v1_bt = {k for k in keys if has_backtrack(v1.get(k, []))}
+    # A Lab mono row intentionally wins over the V1 repeat it corrects. It is
+    # not a V2 regression, so exclude it from the V1 compatibility baseline.
+    protected = raw_v1_bt & lab_mono_keys()
+    v1_bt = raw_v1_bt - protected
     v2_bt = {k for k in keys if has_backtrack(v2.get(k, []))}
     both = v1_bt & v2_bt
     exact = {
@@ -87,6 +102,8 @@ def evaluate(db: Path) -> dict:
 
     report = {
         "v1BacktrackAyahs": len(v1_bt),
+        "rawV1BacktrackAyahs": len(raw_v1_bt),
+        "labGoldMonoExemptions": len(protected),
         "v2BacktrackAyahs": len(v2_bt),
         "bothBacktrackAyahs": len(both),
         "v1OnlyBacktrackAyahs": len(v1_bt - v2_bt),
@@ -111,6 +128,7 @@ def evaluate(db: Path) -> dict:
         f"({len(both)}/{len(v1_bt)} V1-bt ayahs); "
         f"exact {exact_rate:.1%} among V1-bt; "
         f"V2 bt ayahs={len(v2_bt)}; "
+        f"Lab mono exemptions={len(protected)}; "
         f"Fatiha false-bt={len(fatiha_false)}"
     )
     return report

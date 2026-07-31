@@ -222,6 +222,23 @@ def check_timing_v2_loader():
             return False
         except ValueError:
             pass
+
+        fallback = json.loads(json.dumps(payload))
+        fallback.update({
+            "generator": "sync_lab/merge_v2_priority.py@1",
+            "source": "quran-v1 repeat topology",
+            "sourceRevision": "a" * 64,
+            "minimumGateScore": 1.0,
+        })
+        fallback["rows"][0]["gateScore"] = 1.0
+        if len(loads(fallback)) != 1:
+            return False
+        fallback["sourceRevision"] = "not-a-sha"
+        try:
+            loads(fallback)
+            return False
+        except ValueError:
+            pass
     return True
 
 
