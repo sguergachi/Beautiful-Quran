@@ -2,8 +2,8 @@ import { useEffect, useId, useMemo, useState } from 'react'
 import { appStore, useAppSelector, type RootViewerState } from '../../store/appStore'
 import { IconClose, IconVolumeUp } from '../icons/PlaybackIcons'
 import { featureSummary, posLabel, spacedRoot } from './morphologyLabels'
-import { LEXICON_PREVIEW_CHARS, lexiconPreview, lexiconRuns } from './lexiconText'
-import { rootViewerReferences } from './rootViewerReferences'
+import { LEXICON_PREVIEW_CHARS, lexiconArticleText, lexiconBlocks, lexiconRuns } from './lexiconText'
+import { laneLexiconUrl, rootViewerReferences } from './rootViewerReferences'
 import {
   initialRootSections,
   relatedRootForms,
@@ -17,12 +17,22 @@ import {
 const BLEED_OUT_MS = 420
 const HELP = {
   root: 'Usually three consonants shared by a family of related words. A root points to a meaning family, not one fixed translation.',
-  lemma: 'The dictionary headword that groups inflected versions of the same word. It is more specific than a root.',
+  lemma: "The form you'd look up in a dictionary for this word. Other endings of the same word share this lemma; the root is the wider family.",
   grammar: 'How this word functions here: its part of speech and features such as verb form, person, number, gender, case, voice, or mood.',
   occurrences: 'Every Quran word annotated with this root. Shared roots suggest a family resemblance, but context decides the meaning.',
-  lexicon: "Edward Lane's Arabic-English Lexicon (1863–93), the deepest classical dictionary in English. It describes the root across all of Arabic, not only the Quran, and cites the mediaeval lexicographers it draws on in parentheses.",
   related: 'Other dictionary headwords built from the same root. Their meanings may be related, but are not necessarily identical. Each English line is the rendering used most often for that form, not a dictionary definition.',
 } as const
+
+/** Lane intro plus the Perseus credit — shown in the section ⓘ, not under every entry. */
+function lexiconHelp(page: number, credit: string): string {
+  const pageMark = page > 0 ? `, p. ${page}` : ''
+  return (
+    "Edward Lane's Arabic-English Lexicon (1863–93), the deepest classical dictionary in English. " +
+    'It describes the root across all of Arabic, not only the Quran, and cites the mediaeval ' +
+    `lexicographers it draws on in parentheses. Edward William Lane, An Arabic-English Lexicon${pageMark}. ${credit}`
+  )
+}
+
 function times(count: number) {
   return count === 1 ? 'once' : `${count} times`
 }
@@ -110,6 +120,14 @@ function RootViewerBleed({ closing, rv }: { closing: boolean; rv: RootViewerStat
   const references = useMemo(
     () => rootViewerReferences(rv.surahId, rv.ayah, rv.position, rv.root),
     [rv.ayah, rv.position, rv.root, rv.surahId],
+  )
+  const lexiconText = useMemo(
+    () => (rv.lexicon ? lexiconArticleText(rv.lexicon.text, showWholeEntry) : ''),
+    [rv.lexicon, showWholeEntry],
+  )
+  const lexiconEntryBlocks = useMemo(
+    () => (lexiconText ? lexiconBlocks(lexiconText) : []),
+    [lexiconText],
   )
 
   return (
@@ -298,18 +316,39 @@ function RootViewerBleed({ closing, rv }: { closing: boolean; rv: RootViewerStat
                 id="root-lexicon-title"
                 kind="section"
                 label="Classical lexicon"
-                explanation={HELP.lexicon}
+                explanation={lexiconHelp(rv.lexicon.page, rv.lexicon.credit)}
               />
-              <p className="root-lexicon-entry">
-                {lexiconRuns(showWholeEntry ? rv.lexicon.text : lexiconPreview(rv.lexicon.text)).map(
-                  (run, index) =>
-                    run.isArabic ? (
-                      <span key={index} lang="ar" className="root-lexicon-arabic">{run.text}</span>
-                    ) : (
-                      <span key={index}>{run.text}</span>
-                    ),
-                )}
-              </p>
+              <div className="root-lexicon-entry">
+                {lexiconEntryBlocks.map((block, blockIndex) => (
+                  <div
+                    key={blockIndex}
+                    className={
+                      block.form
+                        ? 'root-lexicon-block root-lexicon-block--form'
+                        : 'root-lexicon-block'
+                    }
+                  >
+                    {block.form ? <h3 className="root-lexicon-form">{block.form}</h3> : null}
+                    {block.text ? (
+                      <p>
+                        {lexiconRuns(block.text).map((run, index) =>
+                          run.isArabic ? (
+                            <span key={index} lang="ar" className="root-lexicon-arabic">
+                              {run.text}
+                            </span>
+                          ) : run.isCitation ? (
+                            <span key={index} className="root-lexicon-citation">
+                              {run.text}
+                            </span>
+                          ) : (
+                            <span key={index}>{run.text}</span>
+                          ),
+                        )}
+                      </p>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
               {rv.lexicon.text.length > LEXICON_PREVIEW_CHARS ? (
                 <button
                   type="button"
@@ -319,10 +358,19 @@ function RootViewerBleed({ closing, rv }: { closing: boolean; rv: RootViewerStat
                   {showWholeEntry ? 'Show less of the entry' : 'Read the whole entry'}
                 </button>
               ) : null}
-              <p className="root-lexicon-credit">
-                Edward William Lane, An Arabic-English Lexicon
-                {rv.lexicon.page > 0 ? `, p. ${rv.lexicon.page}` : ''}. {rv.lexicon.credit}
-              </p>
+              <a
+                className="root-lexicon-online"
+                href={laneLexiconUrl(rv.root)}
+                target="_blank"
+                rel="noreferrer"
+              >
+                <span className="root-lexicon-online-title">
+                  Open the full entry online <span aria-hidden="true">↗</span>
+                </span>
+                <span className="root-lexicon-online-description">
+                  Lane on arabiclexicon.hawramani.com — the complete article for this root.
+                </span>
+              </a>
             </section>
           ) : null}
 

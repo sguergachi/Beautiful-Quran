@@ -32,13 +32,6 @@ internal fun rootViewerReferences(
                 "https://corpus.quran.com/qurandictionary.jsp?q=${encode(arabicToBuckwalter(root))}",
             ),
         )
-        add(
-            RootViewerReference(
-                "Lane's classical lexicon",
-                "A deep Arabic–English dictionary entry for this root.",
-                "https://arabiclexicon.hawramani.com/search/${encode(root)}?cat=50",
-            ),
-        )
     }
     add(
         RootViewerReference(
@@ -48,6 +41,10 @@ internal fun rootViewerReferences(
         ),
     )
 }
+
+/** Hawramani's Lane entry for [root] — shown under the Classical lexicon section. */
+internal fun laneLexiconUrl(root: String): String =
+    "https://arabiclexicon.hawramani.com/search/${encode(root)}?cat=50"
 
 private fun encode(value: String): String =
     URLEncoder.encode(value, StandardCharsets.UTF_8).replace("+", "%20")

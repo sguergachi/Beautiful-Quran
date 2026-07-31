@@ -44,6 +44,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -78,18 +79,24 @@ internal const val ROOT_RELATED_FORM_PREVIEW_LIMIT = 5
 private const val ROOT_HELP =
     "Usually three consonants shared by a family of related words. A root points to a meaning family, not one fixed translation."
 private const val LEMMA_HELP =
-    "The dictionary headword that groups inflected versions of the same word. It is more specific than a root."
+    "The form you'd look up in a dictionary for this word. Other endings of the same word share this lemma; the root is the wider family."
 private const val GRAMMAR_HELP =
     "How this word functions here: its part of speech and features such as verb form, person, number, gender, case, voice, or mood."
 private const val OCCURRENCES_HELP =
     "Every Quran word annotated with this root. Shared roots suggest a family resemblance, but context decides the meaning."
-private const val LEXICON_HELP =
-    "Edward Lane's Arabic-English Lexicon (1863–93), the deepest classical dictionary in English. " +
-        "It describes the root across all of Arabic, not only the Quran, and cites the mediaeval " +
-        "lexicographers it draws on in parentheses."
 private const val RELATED_FORMS_HELP =
     "Other dictionary headwords built from the same root. Their meanings may be related, but are not necessarily identical. " +
         "Each English line is the rendering used most often for that form, not a dictionary definition."
+
+/** Lane intro plus the Perseus credit — shown in the section ⓘ, not under every entry. */
+private fun lexiconHelp(entry: com.beautifulquran.data.model.LexiconEntry): String {
+    val page = entry.page.takeIf { it > 0 }?.let { ", p. $it" }.orEmpty()
+    return "Edward Lane's Arabic-English Lexicon (1863–93), the deepest classical dictionary " +
+        "in English. It describes the root across all of Arabic, not only the Quran, and cites " +
+        "the mediaeval lexicographers it draws on in parentheses. Edward William Lane, " +
+        "An Arabic-English Lexicon$page. ${entry.credit}"
+}
+
 
 internal data class RootOccurrenceSection(
     val surahId: Int,
@@ -335,7 +342,7 @@ fun RootViewerScreen(
                     ui.lexicon?.let { entry ->
                         item(key = "lexicon-heading") {
                             Column(Modifier.padding(top = 40.dp)) {
-                                RootSectionTitle("Classical lexicon", LEXICON_HELP)
+                                RootSectionTitle("Classical lexicon", lexiconHelp(entry))
                                 Spacer(Modifier.height(16.dp))
                             }
                         }
@@ -344,6 +351,7 @@ fun RootViewerScreen(
                                 entry = entry,
                                 expanded = lexiconExpanded,
                                 onToggle = { lexiconExpanded = !lexiconExpanded },
+                                onOpenOnline = uriHandler::openUri,
                             )
                         }
                     }
@@ -756,51 +764,114 @@ private fun RelatedFormRow(form: RootLemmaSummary) {
 /**
  * Lane's article for the open root. Collapsed to its opening senses — the
  * longest run to some 99,000 characters — with the whole article a tap away.
+ *
+ * Form labels, sense breaks, and the morphology→gloss pivot become spaced
+ * blocks; his parenthetical source marks recede so the English can be read.
  */
 @Composable
 private fun LexiconArticle(
     entry: com.beautifulquran.data.model.LexiconEntry,
     expanded: Boolean,
     onToggle: () -> Unit,
+    onOpenOnline: (String) -> Unit,
 ) {
-    val text = remember(entry.text, expanded) {
-        if (expanded) entry.text else lexiconPreview(entry.text)
-    }
-    val annotated = remember(text) { lexiconAnnotated(text) }
+    val text = remember(entry.text, expanded) { lexiconArticleText(entry.text, expanded) }
+    val blocks = remember(text) { lexiconBlocks(text) }
+    val bodyColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.86f)
+    val citationColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+    val onlineUrl = remember(entry.root) { laneLexiconUrl(entry.root) }
 
-    Column(Modifier.fillMaxWidth()) {
-        Text(
-            text = annotated,
-            style = MaterialTheme.typography.bodyLarge,
-            lineHeight = 30.sp,
-            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.86f),
-        )
-        if (entry.text.length > text.length || expanded) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        blocks.forEachIndexed { index, block ->
+            val top = when {
+                index == 0 -> 0.dp
+                block.form != null -> 28.dp // new Form section
+                else -> 12.dp // sense within the same Form
+            }
+            LexiconBlockView(
+                block = block,
+                bodyColor = bodyColor,
+                citationColor = citationColor,
+                modifier = Modifier.padding(top = top),
+            )
+        }
+        if (entry.text.length > LEXICON_PREVIEW_CHARS || expanded) {
             TextAction(
                 text = if (expanded) "Show less of the entry" else "Read the whole entry",
                 onClick = onToggle,
             )
         }
-        val page = entry.page.takeIf { it > 0 }?.let { ", p. $it" }.orEmpty()
-        Text(
-            text = "Edward William Lane, An Arabic-English Lexicon$page. ${entry.credit}",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(top = 12.dp),
-        )
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 16.dp)
+                .quietClickable(role = Role.Button) { onOpenOnline(onlineUrl) }
+                .padding(vertical = 4.dp),
+        ) {
+            Text(
+                text = "Open the full entry online  ↗",
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.primary,
+            )
+            Text(
+                text = "Lane on arabiclexicon.hawramani.com — the complete article for this root.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.68f),
+                modifier = Modifier.padding(top = 2.dp),
+            )
+        }
     }
 }
 
-/** Arabic runs in the mushaf face, at the size the surrounding prose reads at. */
-private fun lexiconAnnotated(text: String): AnnotatedString =
+@Composable
+private fun LexiconBlockView(
+    block: LexiconBlock,
+    bodyColor: Color,
+    citationColor: Color,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier.fillMaxWidth()) {
+        block.form?.let { form ->
+            Text(
+                text = form,
+                fontFamily = DisplayFontFamily,
+                fontWeight = FontWeight.Medium,
+                fontSize = 18.sp,
+                lineHeight = 22.sp,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.78f),
+                modifier = Modifier.padding(bottom = 8.dp),
+            )
+        }
+        if (block.text.isNotEmpty()) {
+            val annotated = remember(block.text, bodyColor, citationColor) {
+                lexiconAnnotated(block.text, bodyColor, citationColor)
+            }
+            Text(
+                text = annotated,
+                style = MaterialTheme.typography.bodyLarge,
+                lineHeight = 32.sp,
+                color = bodyColor,
+            )
+        }
+    }
+}
+
+/** Arabic in the mushaf face; Lane's source marks at quieter ink. */
+private fun lexiconAnnotated(
+    text: String,
+    bodyColor: Color,
+    citationColor: Color,
+): AnnotatedString =
     buildAnnotatedString {
         for (run in lexiconRuns(text)) {
-            if (run.isArabic) {
-                withStyle(SpanStyle(fontFamily = HafsFontFamily, fontSize = 19.sp)) {
+            when {
+                run.isArabic -> withStyle(
+                    SpanStyle(fontFamily = HafsFontFamily, fontSize = 19.sp, color = bodyColor),
+                ) { append(run.text) }
+                run.isCitation -> withStyle(SpanStyle(color = citationColor, fontSize = 15.sp)) {
                     append(run.text)
                 }
-            } else {
-                append(run.text)
+                else -> append(run.text)
             }
         }
     }

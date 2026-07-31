@@ -62,8 +62,8 @@ On the pressed word at `(surahId, ayah, wordPosition)`:
    occurrences, and related forms each have a quiet info mark that unfolds a
    short definition inline. These notes are part of the paper flow, not floating
    tooltips or dialogs. In particular, they explain that a **lemma** is the
-   dictionary headword for inflected versions of one word, while a root is the
-   broader consonantal family.
+   dictionary form of this word (other endings still share it), while a root
+   is the broader family.
 4. **Occurrences** — how often this root appears in the Quran, and where.
    This is a first-class part of the surface, not a footnote:
    - A clear **count** ("appears *N* times in the Quran").
@@ -84,14 +84,19 @@ On the pressed word at `(surahId, ayah, wordPosition)`:
 5. **Related forms** — the other frequency-ordered lemma / POS analyses under
    this root, excluding the form already explained above. Five appear before
    a quiet show-more line; the section disappears when there are no others.
-6. **Attribution** — a quiet line naming the Quranic Arabic Corpus and
-   linking to `http://corpus.quran.com` (required by the data terms).
+6. **Classical lexicon (Lane)** — when a bundled entry exists for the root:
+   Form labels, spaced senses, and quieter source citations, with a preview
+   that unfolds to the whole article. Lane's bibliographic line and the
+   required Perseus credit live in the section ⓘ, not under the entry. The
+   section ends with a quiet browser exit to the full Lane page
+   (`arabiclexicon.hawramani.com`).
 7. **Learn more online** — location-aware browser shortcuts for readers who
    want to continue beyond the bundled data:
    - QAC's segment-by-segment grammar page for the exact `(surah:ayah:word)`.
    - QAC's Quran dictionary for the exact root (using QAC's Buckwalter query).
-   - Lane's classical Arabic–English lexicon entry for the root.
    - The full ayah on Quran.com for translations, recitation, and tafsir.
+8. **Attribution** — a quiet line naming the Quranic Arabic Corpus and
+   linking to `http://corpus.quran.com` (required by the data terms).
 
 The viewer does not fetch these pages or depend on them to open. Links are
 optional exits to the browser; all bundled morphology and concordance remain

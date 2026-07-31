@@ -17,18 +17,11 @@ export function rootViewerReferences(
     url: `https://corpus.quran.com/wordmorphology.jsp?location=${encodeURIComponent(`(${surahId}:${ayah}:${position})`)}`,
   }]
   if (root) {
-    links.push(
-      {
-        title: 'Quran root dictionary',
-        description: 'Quran-wide senses and derived forms grouped under this root.',
-        url: `https://corpus.quran.com/qurandictionary.jsp?q=${encodeURIComponent(arabicToBuckwalter(root))}`,
-      },
-      {
-        title: "Lane's classical lexicon",
-        description: 'A deep Arabic–English dictionary entry for this root.',
-        url: `https://arabiclexicon.hawramani.com/search/${encodeURIComponent(root)}?cat=50`,
-      },
-    )
+    links.push({
+      title: 'Quran root dictionary',
+      description: 'Quran-wide senses and derived forms grouped under this root.',
+      url: `https://corpus.quran.com/qurandictionary.jsp?q=${encodeURIComponent(arabicToBuckwalter(root))}`,
+    })
   }
   links.push({
     title: 'Read the full ayah',
@@ -36,6 +29,11 @@ export function rootViewerReferences(
     url: `https://quran.com/${surahId}/${ayah}`,
   })
   return links
+}
+
+/** Hawramani's Lane entry for `root` — shown under the Classical lexicon section. */
+export function laneLexiconUrl(root: string): string {
+  return `https://arabiclexicon.hawramani.com/search/${encodeURIComponent(root)}?cat=50`
 }
 
 const ARABIC_TO_BUCKWALTER: Record<string, string> = {
