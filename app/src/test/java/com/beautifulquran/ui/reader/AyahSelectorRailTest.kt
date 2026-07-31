@@ -1,5 +1,6 @@
 package com.beautifulquran.ui.reader
 
+import com.beautifulquran.data.model.Ayah
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -33,4 +34,33 @@ class AyahSelectorRailTest {
         assertTrue(collapsedRailHitHeightDp(286) < 200f)
         assertTrue(collapsedRailHitHeightDp(286) > collapsedRailHitHeightDp(1))
     }
+
+    @Test
+    fun pageStartByAyah_marksFirstAyahOfEachPage() {
+        val ayahs = listOf(
+            ayah(1, page = 2), ayah(2, page = 2), ayah(3, page = 2),
+            ayah(4, page = 3), ayah(5, page = 3),
+            ayah(6, page = 4),
+        )
+        assertEquals(mapOf(1 to 2, 4 to 3, 6 to 4), pageStartByAyah(ayahs))
+    }
+
+    @Test
+    fun pageStartByAyah_skipsMissingPagesWithoutBreakingTheChain() {
+        val ayahs = listOf(
+            ayah(1, page = 0),
+            ayah(2, page = 5), ayah(3, page = 0), ayah(4, page = 5),
+            ayah(5, page = 6),
+        )
+        assertEquals(mapOf(2 to 5, 5 to 6), pageStartByAyah(ayahs))
+    }
+
+    private fun ayah(number: Int, page: Int) = Ayah(
+        surahId = 1,
+        number = number,
+        text = "",
+        translation = "",
+        page = page,
+        words = emptyList(),
+    )
 }
