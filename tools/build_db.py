@@ -894,6 +894,11 @@ def describes_audio(segs, duration_ms):
     return not duration_ms or not segs or segs[-1][2] - segs[0][1] <= duration_ms
 
 
+def every_word_is_reachable(segs, duration_ms):
+    """True when playback can reach the start of every word in the row."""
+    return not duration_ms or not segs or segs[-1][1] < duration_ms
+
+
 def trim_to_next_start(segs):
     """Clip each end at the following start so neighbouring spans never overlap."""
     out = [list(seg) for seg in segs]
@@ -1230,18 +1235,20 @@ def refit_displaced_rows(timing_rows, durations, onsets):
 
 
 def drop_rows_longer_than_audio(timing_rows, durations):
-    """Withhold word marks that no offset could fit inside their recording.
+    """Withhold word marks that cannot all play inside their recording.
 
     A handful of source rows describe a longer recitation than the file the app
     streams — a different take, or an ayah the publisher split differently. The
     reader falls back to lighting the whole ayah for these, which stays honest,
-    rather than washing words at times the audio never reaches.
+    rather than washing words at times the audio never reaches. The same
+    fallback applies when the final word itself starts after playback ends.
     """
     kept = []
     dropped = []
     for rid, sid, ay, segs in timing_rows:
         row = json.loads(segs) if isinstance(segs, str) else segs
-        if describes_audio(row, durations.get((rid, sid, ay))):
+        duration = durations.get((rid, sid, ay))
+        if describes_audio(row, duration) and every_word_is_reachable(row, duration):
             kept.append((rid, sid, ay, segs))
         else:
             dropped.append((rid, sid, ay))
@@ -1355,13 +1362,21 @@ def offset_for_audio_onset(segs, onset_ms, exact_file_clock=True):
     """Hold the first wash until the first voiced sample of its everyayah file.
 
     The row has already been rebased to the file clock, so an opening boundary
-    that spans the onset is clamped without moving any later word. Fall back to
-    translating the row only when its whole first segment predates the voice.
+    that spans the onset is clamped without moving any later word. A row is
+    translated only when word 2 also predates the voice, which proves the
+    complete row — not merely its opening boundary — is on the wrong clock.
     """
     if not segs:
         return segs
     onset_ms = int(onset_ms)
-    if exact_file_clock:
+    shift_row = (
+        not exact_file_clock
+        and len(segs) > 1
+        and int(segs[1][1]) <= onset_ms
+    )
+    if not exact_file_clock and not shift_row and onset_ms <= int(segs[0][1]):
+        return segs
+    if not shift_row:
         out = [list(seg) for seg in segs]
         out[0][1] = onset_ms
         if out[0][2] <= onset_ms:
@@ -2045,7 +2060,7 @@ def main():
         timing_rows, dropped = drop_rows_longer_than_audio(timing_rows, audio_durations)
         past_audio = rows_past_audio(timing_rows, audio_durations)
         print(
-            f"[audit] {len(dropped)} row(s) longer than their recording withheld, "
+            f"[audit] {len(dropped)} unreachable timing row(s) withheld, "
             f"{len(past_audio)} still end past it, of {len(audio_durations)} measured"
         )
         for rid, sid, ay in dropped:
