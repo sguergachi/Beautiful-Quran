@@ -743,8 +743,11 @@ def clean_qdc_artifacts(segs, stats, words=None):
             # original spike; a multi-word run needs the lookahead (16:61 emits
             # [17,18] before word 11; 28:32 emits [16,17,18] before word 8). A
             # real dropped word makes a forward jump too, but it keeps going
-            # forward — only a jump that RETREATS is spurious.
-            if prev is not None and pos >= running_max + QDC_SPIKE_JUMP:
+            # forward — only a jump that RETREATS is spurious. A smaller +2
+            # jump is removed only when the aligner duplicates that premature
+            # position and the retreat then walks canonically back through it
+            # (16:106: 12,[14,14],12,13,14).
+            if prev is not None and pos >= running_max + 2:
                 j = i
                 while (
                     j + 1 < len(merged)
@@ -753,7 +756,26 @@ def clean_qdc_artifacts(segs, stats, words=None):
                 ):
                     j += 1
                 after = merged[j + 1][0] if j + 1 < len(merged) else None
-                if after is not None and after < pos:
+                replay = (
+                    [s[0] for s in merged[j + 1 : j + pos - after + 2]]
+                    if after is not None
+                    else []
+                )
+                confirmed_near_spike = (
+                    after is not None
+                    and pos == running_max + 2
+                    and j > i
+                    and all(merged[k][0] == pos for k in range(i, j + 1))
+                    and replay == list(range(after, pos + 1))
+                )
+                if (
+                    after is not None
+                    and after < pos
+                    and (
+                        pos >= running_max + QDC_SPIKE_JUMP
+                        or confirmed_near_spike
+                    )
+                ):
                     for k in range(i, j + 1):
                         prev[2] = max(prev[2], merged[k][2])
                         stats["dropped_strays"] += 1

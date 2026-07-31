@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { createRepeatWashGate } from '../repeatWashGate'
+import { createRepeatWashGate, isRepeatSeekReactivation } from '../repeatWashGate'
 
 describe('createRepeatWashGate', () => {
+  it('restarts only when the same repeated word stayed active across a seek', () => {
+    expect(isRepeatSeekReactivation(false, 0, true, 1)).toBe(false)
+    expect(isRepeatSeekReactivation(true, 1, true, 1)).toBe(false)
+    expect(isRepeatSeekReactivation(true, 1, true, 2)).toBe(true)
+  })
+
   it('runs jobs strictly one after another', async () => {
     const gate = createRepeatWashGate()
     const order: number[] = []

@@ -7,6 +7,16 @@ export type RepeatWashGate = {
   run: <T>(position: number, fn: () => Promise<T>) => Promise<T>
 }
 
+/** A seek generation restarts orange only when this same word stayed Active. */
+export function isRepeatSeekReactivation(
+  wasActive: boolean,
+  previousActivation: number,
+  active: boolean,
+  activation: number,
+): boolean {
+  return active && wasActive && activation !== 0 && activation !== previousActivation
+}
+
 type Job = {
   position: number
   run: () => Promise<void>

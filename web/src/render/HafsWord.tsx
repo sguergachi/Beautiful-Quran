@@ -30,6 +30,7 @@ import {
 import { SearchHitFlash } from '../ui/reader/SearchHitFlash'
 import { useWordInteraction } from './useWordInteraction'
 import { useRepeatWashGate } from './RepeatWashContext'
+import { isRepeatSeekReactivation } from './repeatWashGate'
 
 interface Props {
   word: Word
@@ -297,17 +298,19 @@ export function HafsWord({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ink.repeat, repeatMounted])
 
+  const prevSeekActive = useRef(false)
   const prevSeekActivation = useRef(activation)
   useLayoutEffect(() => {
-    if (!ink.repeat || ink.state !== InkState.Active) {
-      prevSeekActivation.current = activation
-      return
-    }
-    if (activation === 0 || activation === prevSeekActivation.current) {
-      prevSeekActivation.current = activation
-      return
-    }
+    const active = ink.repeat && ink.state === InkState.Active
+    const reactivated = isRepeatSeekReactivation(
+      prevSeekActive.current,
+      prevSeekActivation.current,
+      active,
+      activation,
+    )
+    prevSeekActive.current = active
     prevSeekActivation.current = activation
+    if (!reactivated) return
     cancelLeaveFade()
     if (!overlayRef.current || !repeatMounted) return
     const duration = getTuning().repeatSweepMs
