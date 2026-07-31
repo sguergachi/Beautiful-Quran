@@ -217,10 +217,13 @@ def load_wbw(tgz: Path):
                     continue
                 sk, ak = w["parentAyahVerseKey"].split(":")
                 key = (int(sk), int(ak))
+                # Upstream glosses sometimes carry a trailing space (e.g. 4:152
+                # "those "), which becomes a visible double gap when English-only
+                # joins words with a space. Normalize like Arabic text.
                 out.setdefault(key, []).append(
                     (
-                        w.get("translation", {}).get("text") or "",
-                        w.get("transliteration", {}).get("text") or "",
+                        normalize_text(w.get("translation", {}).get("text") or ""),
+                        normalize_text(w.get("transliteration", {}).get("text") or ""),
                     )
                 )
                 if key not in page_of:
