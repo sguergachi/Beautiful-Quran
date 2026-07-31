@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
@@ -83,6 +84,7 @@ import com.beautifulquran.data.model.Word
 import com.beautifulquran.ui.theme.DisplayFontFamily
 import com.beautifulquran.ui.theme.HafsFontFamily
 import com.beautifulquran.ui.theme.LocalQuranAccents
+import com.beautifulquran.ui.theme.SerifFontFamily
 import com.beautifulquran.ui.theme.quietClickable
 import com.beautifulquran.ui.theme.verticalFadingEdges
 
@@ -186,7 +188,14 @@ fun RootViewerScreen(
                         exit = fadeOut(tween(350)),
                     ) {
                         ui.word?.let {
-                            CollapsedWordTitle(it, ui.isPlayingWord, viewModel::playCurrentWord)
+                            CollapsedWordTitle(
+                                word = it,
+                                isPlaying = ui.isPlayingWord,
+                                onPlay = viewModel::playCurrentWord,
+                                onScrollToTop = {
+                                    scope.launch { listState.animateScrollToItem(0) }
+                                },
+                            )
                         }
                     }
                 },
@@ -452,6 +461,8 @@ private val AnalysisGroupGap = 28.dp
  * padding) so large Hafs glyphs cannot paint up into the gap.
  */
 private val AnalysisLabelToValue = 12.dp
+/** Lemma title → Arabic/senses — a hair more air than Root. */
+private val LemmaLabelToValue = 20.dp
 
 /** Quiet ink for the lemma↔dictionary column rule. */
 private val LemmaConnectorAlpha = 0.22f
@@ -470,6 +481,8 @@ private val LemmaGutterPaddingStart = 16.dp
 private val LemmaGutterPaddingEnd = 18.dp
 private val LemmaGlossGap = 10.dp
 private val LemmaMetaGap = 2.dp
+/** Air between the sense stack (or bare lemma) and grammar / frequency. */
+private val LemmaToMetaGap = 20.dp
 
 /** Shared face for Root Form‑1 lead and Lemma dictionary glosses. */
 private val AnalysisGlossAlpha = 0.9f
@@ -552,7 +565,7 @@ private fun WordAnalysis(
     // spacedBy — not per-group top padding — so Root→Lemma share one gap.
     Column(verticalArrangement = Arrangement.spacedBy(AnalysisGroupGap)) {
         Column {
-            RootLabel("Root", ROOT_HELP)
+            RootLabel("Root", ROOT_HELP, iconNudgePx = 2)
             Spacer(Modifier.height(AnalysisLabelToValue))
             if (hasRoot) {
                 Text(
@@ -608,8 +621,8 @@ private fun WordAnalysis(
                 } else {
                     LEMMA_HELP
                 }
-                RootLabel("Lemma", lemmaHelp)
-                Spacer(Modifier.height(AnalysisLabelToValue))
+                RootLabel("Lemma", lemmaHelp, iconNudgePx = 1)
+                Spacer(Modifier.height(LemmaLabelToValue))
                 if (dictionary != null) {
                     LemmaWithDictionary(
                         lemma = morph.lemma,
@@ -635,7 +648,7 @@ private fun WordAnalysis(
                     LemmaMeta(
                         grammar = grammar,
                         lemmaCount = lemmaCount,
-                        modifier = Modifier.padding(top = 12.dp),
+                        modifier = Modifier.padding(top = LemmaToMetaGap),
                     )
                 }
             }
@@ -672,19 +685,33 @@ private fun RootLabel(
     text: String,
     explanation: String? = null,
     modifier: Modifier = Modifier,
+    iconNudgePx: Int = 1,
 ) {
     ExplainedHeading(
         text = text.uppercase(),
         explanation = explanation,
         modifier = modifier,
+        titleRowHeight = 16.dp,
+        iconNudgePx = iconNudgePx,
         textContent = {
             Text(
                 text = it,
-                fontSize = 12.sp,
-                lineHeight = 16.sp,
-                fontWeight = FontWeight.SemiBold,
-                letterSpacing = 1.56.sp,
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.72f),
+                // Keep EB Garamond (a bare TextStyle drops LocalTextStyle's
+                // serif and falls back to system sans). Trim matches the ⓘ
+                // so CenterVertically stays even between ROOT and LEMMA.
+                style = TextStyle(
+                    fontFamily = SerifFontFamily,
+                    fontSize = 12.sp,
+                    lineHeight = 16.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    letterSpacing = 1.56.sp,
+                    platformStyle = PlatformTextStyle(includeFontPadding = false),
+                    lineHeightStyle = LineHeightStyle(
+                        alignment = LineHeightStyle.Alignment.Center,
+                        trim = LineHeightStyle.Trim.Both,
+                    ),
+                ),
             )
         },
     )
@@ -722,12 +749,20 @@ private fun ExplainedHeading(
     text: String,
     explanation: String?,
     modifier: Modifier = Modifier,
+    /** When set (analysis labels), locks ROOT/LEMMA ⓘ to one vertical center. */
+    titleRowHeight: Dp? = null,
+    /** Optical lift for the ⓘ, in px (ROOT needs a hair more than LEMMA). */
+    iconNudgePx: Int = 0,
     textContent: @Composable (String) -> Unit,
     afterTitle: @Composable RowScope.() -> Unit = {},
 ) {
     var expanded by remember(text) { mutableStateOf(false) }
+    val iconNudge = with(LocalDensity.current) { (-iconNudgePx).toDp() }
     Column(modifier) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        Row(
+            modifier = titleRowHeight?.let { Modifier.height(it) } ?: Modifier,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
             textContent(text)
             if (explanation != null) {
                 // Layout height matches the label line (16.dp); the 40.dp hit
@@ -737,6 +772,9 @@ private fun ExplainedHeading(
                     contentAlignment = Alignment.Center,
                     modifier = Modifier
                         .padding(start = 8.dp)
+                        .then(
+                            if (iconNudgePx != 0) Modifier.offset(y = iconNudge) else Modifier,
+                        )
                         .size(16.dp),
                 ) {
                     CompositionLocalProvider(
@@ -1021,12 +1059,12 @@ private fun LemmaWithDictionary(
                     .alignBy { it.measuredHeight }
                     .background(lineColor),
             )
+            // Right column: senses + Show more/less, all under the spine.
             Column(
                 modifier = Modifier
                     .weight(1f)
                     .alignByBaseline()
                     .drawBehind {
-                        // Column rule on the leading edge — full sense-stack height.
                         drawLine(
                             color = lineColor,
                             start = Offset(0f, 0f),
@@ -1035,61 +1073,62 @@ private fun LemmaWithDictionary(
                         )
                     }
                     .padding(start = LemmaGutterPaddingEnd),
-                verticalArrangement = Arrangement.spacedBy(LemmaGlossGap),
             ) {
-                visible.forEachIndexed { index, row ->
-                    val posLabel = row.first
-                    val gloss = row.second
-                    // One child per sense so spacedBy is even; first sense is a
-                    // single Text so the column's FirstBaseline locks to lemma.
-                    if (index == 0) {
-                        Text(
-                            text = if (showPosLabels && posLabel != null) {
-                                "$posLabel · $gloss"
-                            } else {
-                                gloss
-                            },
-                            style = glossStyle,
-                            color = glossColor,
-                        )
-                    } else {
-                        Column {
-                            if (showPosLabels && posLabel != null) {
-                                Text(
-                                    text = posLabel,
-                                    style = MaterialTheme.typography.labelLarge,
-                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f),
-                                    modifier = Modifier.padding(bottom = 4.dp),
-                                )
-                            }
+                Column(verticalArrangement = Arrangement.spacedBy(LemmaGlossGap)) {
+                    visible.forEachIndexed { index, row ->
+                        val posLabel = row.first
+                        val gloss = row.second
+                        // One child per sense so spacedBy is even; first sense
+                        // is a single Text so FirstBaseline locks to lemma.
+                        if (index == 0) {
                             Text(
-                                text = gloss,
+                                text = if (showPosLabels && posLabel != null) {
+                                    "$posLabel · $gloss"
+                                } else {
+                                    gloss
+                                },
                                 style = glossStyle,
                                 color = glossColor,
                             )
+                        } else {
+                            Column {
+                                if (showPosLabels && posLabel != null) {
+                                    Text(
+                                        text = posLabel,
+                                        style = MaterialTheme.typography.labelLarge,
+                                        color = MaterialTheme.colorScheme.onSurface.copy(
+                                            alpha = 0.55f,
+                                        ),
+                                        modifier = Modifier.padding(bottom = 4.dp),
+                                    )
+                                }
+                                Text(
+                                    text = gloss,
+                                    style = glossStyle,
+                                    color = glossColor,
+                                )
+                            }
                         }
                     }
+                }
+                if (dictionaryNeedsExpand(glosses.size)) {
+                    AnalysisActionLink(
+                        text = if (expanded) "Show less" else "Show more",
+                        onClick = onToggle,
+                        modifier = Modifier.padding(top = 8.dp),
+                    )
                 }
             }
         }
         LemmaMeta(
             grammar = grammar,
             lemmaCount = lemmaCount,
-            modifier = Modifier.padding(top = 12.dp),
+            modifier = Modifier.padding(top = LemmaToMetaGap),
         )
-        if (dictionaryNeedsExpand(glosses.size)) {
-            AnalysisActionLink(
-                text = if (expanded) "Show fewer senses" else "Read more senses",
-                onClick = onToggle,
-                modifier = Modifier.padding(top = 12.dp),
-            )
-        }
         AnalysisActionLink(
             text = "Open on Wiktionary  ↗",
             onClick = { onOpenOnline(wiktionaryArabicUrl(entry.word)) },
-            modifier = Modifier.padding(
-                top = if (dictionaryNeedsExpand(glosses.size)) 8.dp else 12.dp,
-            ),
+            modifier = Modifier.padding(top = 12.dp),
         )
     }
 }
@@ -1340,7 +1379,15 @@ private fun WordHeader(word: Word, isPlaying: Boolean, onPlay: () -> Unit) {
 }
 
 @Composable
-private fun CollapsedWordTitle(word: Word, isPlaying: Boolean, onPlay: () -> Unit) {
+private fun CollapsedWordTitle(
+    word: Word,
+    isPlaying: Boolean,
+    onPlay: () -> Unit,
+    onScrollToTop: () -> Unit,
+) {
+    fun Modifier.scrollToTop(): Modifier =
+        quietClickable(role = Role.Button, onClick = onScrollToTop)
+            .semantics { contentDescription = "Scroll to top" }
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Spacer(Modifier.width(26.dp))
@@ -1351,6 +1398,7 @@ private fun CollapsedWordTitle(word: Word, isPlaying: Boolean, onPlay: () -> Uni
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.scrollToTop(),
             )
             Spacer(Modifier.width(8.dp))
             WordSpeakerButton(isPlaying, onPlay, 18.dp)
@@ -1362,6 +1410,7 @@ private fun CollapsedWordTitle(word: Word, isPlaying: Boolean, onPlay: () -> Uni
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.scrollToTop(),
             )
         }
     }

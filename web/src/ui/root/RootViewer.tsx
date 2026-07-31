@@ -88,11 +88,14 @@ function ExplainedHeading({
   explanation,
   kind = 'label',
   id,
+  iconNudgePx = 0,
 }: {
   label: string
   explanation: string
   kind?: 'label' | 'section'
   id?: string
+  /** Optical lift for the ⓘ, in px (ROOT needs a hair more than LEMMA). */
+  iconNudgePx?: number
 }) {
   const [open, setOpen] = useState(false)
   const helpId = useId()
@@ -103,6 +106,7 @@ function ExplainedHeading({
         <button
           type="button"
           className="root-info-button"
+          style={iconNudgePx ? { top: `${-iconNudgePx}px` } : undefined}
           aria-label={`Explain ${label.toLowerCase()}`}
           aria-expanded={open}
           aria-controls={helpId}
@@ -228,7 +232,7 @@ function RootViewerBleed({ closing, rv }: { closing: boolean; rv: RootViewerStat
           {(rv.root || rv.lemma || rv.pos) ? (
             <section className="root-analysis root-prose-measure" aria-label="Word analysis">
               <div className="root-analysis-group">
-                <ExplainedHeading label="Root" explanation={HELP.root} />
+                <ExplainedHeading label="Root" explanation={HELP.root} iconNudgePx={2} />
                 {rv.root ? (
                   <>
                     <p className="root-radicals" lang="ar" dir="rtl">{spacedRoot(rv.root)}</p>
@@ -260,6 +264,7 @@ function RootViewerBleed({ closing, rv }: { closing: boolean; rv: RootViewerStat
                   <ExplainedHeading
                     label="Lemma"
                     explanation={lemmaHelp(!!rv.dictionary)}
+                    iconNudgePx={1}
                   />
                   {rv.dictionary && dictionaryRows.length > 0 ? (
                     <div className="root-lemma-dict-block">
@@ -285,6 +290,15 @@ function RootViewerBleed({ closing, rv }: { closing: boolean; rv: RootViewerStat
                               </div>
                             )
                           })}
+                          {dictionaryNeedsExpand(dictionaryRows.length) ? (
+                            <button
+                              type="button"
+                              className="root-text-action root-sense-more root-lemma-sense-more"
+                              onClick={() => setShowAllDictionarySenses((value) => !value)}
+                            >
+                              {showAllDictionarySenses ? 'Show less' : 'Show more'}
+                            </button>
+                          ) : null}
                         </div>
                       </div>
                       {(rv.pos || featureSummary(rv.features)) ? (
@@ -298,15 +312,6 @@ function RootViewerBleed({ closing, rv }: { closing: boolean; rv: RootViewerStat
                         <p className="root-form-frequency root-lemma-meta">
                           This lemma occurs {times(lemmaCount)}.
                         </p>
-                      ) : null}
-                      {dictionaryNeedsExpand(dictionaryRows.length) ? (
-                        <button
-                          type="button"
-                          className="root-text-action root-sense-more root-lemma-dict-action"
-                          onClick={() => setShowAllDictionarySenses((value) => !value)}
-                        >
-                          {showAllDictionarySenses ? 'Show fewer senses' : 'Read more senses'}
-                        </button>
                       ) : null}
                       <a
                         className="root-text-action root-sense-more root-lemma-dict-action"

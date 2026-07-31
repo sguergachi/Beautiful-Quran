@@ -3582,6 +3582,7 @@ select {
 }
 
 .root-info-button {
+  position: relative;
   display: inline-flex;
   flex: 0 0 auto;
   align-items: center;
@@ -3643,7 +3644,7 @@ select {
 
 .root-form-lemma {
   width: fit-content;
-  margin-top: 0.75rem !important; /* label → value when alone */
+  margin-top: 1.25rem !important; /* Lemma title → value (more than Root) */
   color: var(--ink);
   font-family: var(--font-arabic);
   font-size: 2rem; /* match root radicals */
@@ -3665,7 +3666,7 @@ select {
 }
 
 .root-lemma-meta {
-  margin-top: 0.75rem !important;
+  margin-top: 1.25rem !important; /* air after senses / bare lemma */
 }
 
 .root-lemma-meta + .root-lemma-meta {
@@ -3752,7 +3753,7 @@ select {
 }
 
 .root-lemma-dict-block {
-  margin-top: 0.85rem;
+  margin-top: 1.25rem; /* match bare-lemma title → value */
 }
 
 .root-lemma-dict-block .root-lemma-pair {
@@ -3789,13 +3790,14 @@ select {
   margin-top: 0 !important;
 }
 
-/* Exit / expand sit below the elbow, not inside the spine. */
-.root-lemma-dict-action {
-  margin-top: 0.75rem !important;
+/* Expand sits under the English senses (inside the dict column). */
+.root-lemma-sense-more {
+  margin-top: 0.5rem !important;
 }
 
-.root-lemma-dict-action + .root-lemma-dict-action {
-  margin-top: 0.5rem !important;
+/* Wiktionary exit stays below grammar / frequency. */
+.root-lemma-dict-action {
+  margin-top: 0.75rem !important;
 }
 
 /* Lane's article: Form sections get more air; senses stay closer; citations
