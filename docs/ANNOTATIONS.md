@@ -93,9 +93,13 @@ Then, in place:
 
 1. A caret appears on the note line beneath the verse, at exactly the
    position the finished note will occupy, and the keyboard rises. The focus
-   engine parks the field 16 dp above the IME, as low as safely possible so the
-   page shows the largest available portion of the verse above it.
+   engine reads the keyboard's completed inset before moving, then parks the
+   field 16 dp above the IME in one slow, direction-locked glide. The landing is
+   as low as safely possible so the page shows the largest available portion of
+   the verse above it.
 2. The reader writes. The line grows downward; the verse above never moves.
+   The ruby delete cross follows the last writing line, staying beside the
+   keyboard even when the beginning of a long note has scrolled away.
    Playback, if running, is **not** interrupted, but scripture taps cannot
    start or seek playback and bookmark ribbons cannot toggle while the field
    owns focus.
@@ -116,9 +120,8 @@ rail and top app bar withdraw. The visible system status-bar inset remains, but
 the active verse gains the rest of that vertical space and stays together with
 its note as the only thought on the page.
 
-Deleting an existing note is therefore just: open it, clear it, tap away.
-There is no separate destructive control and no confirmation — the reader
-watched their own text leave the page.
+The ruby cross in the note's margin deletes it without confirmation. Clearing
+the text and tapping away does the same thing.
 
 **Hard rules.** No dialog, no bottom sheet, no ink bleed, no ripple. The
 cursor is a caret in the paper, not a text field: no box, no underline, no

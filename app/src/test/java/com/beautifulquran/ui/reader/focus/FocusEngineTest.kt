@@ -176,6 +176,28 @@ class FocusEngineTest {
     }
 
     @Test
+    fun `annotation home step never reverses after layout crosses its landing`() {
+        assertEquals(
+            25f,
+            FocusEngine.oneDirectionHomeScrollStep(
+                remainingPx = 100f,
+                progress = 0.25f,
+                lastProgress = 0f,
+                direction = 1f,
+            ),
+        )
+        assertEquals(
+            0f,
+            FocusEngine.oneDirectionHomeScrollStep(
+                remainingPx = -4f,
+                progress = 0.5f,
+                lastProgress = 0.25f,
+                direction = 1f,
+            ),
+        )
+    }
+
+    @Test
     fun `basmalah list item uses the same adaptive anchor as a short verse`() {
         // The basmalah is its own short LazyColumn item — not the tall header —
         // so it rests on the verse-style reading line (fitsFullyVisible path).
