@@ -31,9 +31,10 @@
   --home-number-column: 26px;
   --home-column-gap: 4px;
   --ease-sheet: cubic-bezier(0.22, 0.61, 0.36, 1);
-  --upcoming-alpha: 0.22;
+  /* Match InkEngine DEFAULT_TUNING.upcomingAlpha (0.2661). */
+  --upcoming-alpha: 0.2661;
   /* Paper-cover strength for recessed (Upcoming) Arabic — 1 − upcoming-alpha. */
-  --upcoming-cover: 0.78;
+  --upcoming-cover: 0.7339;
   --translit-alpha: 0.55;
   /* Play-start recess — even ease-in-out, matched to Android. */
   --chrome-recede-ms: 520ms;
@@ -1442,7 +1443,7 @@ select {
 }
 
 .basmalah-calligraphy[data-state='Upcoming'] .ink-paper-cover {
-  opacity: var(--upcoming-cover, 0.78);
+  opacity: var(--upcoming-cover, 0.7339);
   transition: opacity var(--recess-ms) var(--recede-ease);
 }
 
@@ -1461,7 +1462,7 @@ select {
 }
 
 .basmalah-calligraphy[data-state='Upcoming']:hover .basmalah-paper-cover {
-  opacity: calc(var(--upcoming-cover, 0.78) + 0.08);
+  opacity: calc(var(--upcoming-cover, 0.7339) + 0.08);
 }
 
 .ayah-block {
@@ -1713,7 +1714,7 @@ select {
 }
 
 .word-ink[data-state='Upcoming'] {
-  opacity: var(--upcoming-alpha, 0.22);
+  opacity: var(--upcoming-alpha, 0.2661);
 }
 
 .word-ink[data-state='Plain'],
@@ -1927,7 +1928,7 @@ select {
 
 .hafs-word[data-state='Upcoming'] .ink-paper-cover,
 .word-arabic-ink[data-state='Upcoming'] .ink-paper-cover {
-  opacity: var(--upcoming-cover, 0.78);
+  opacity: var(--upcoming-cover, 0.7339);
   transition: opacity var(--recess-ms) var(--recede-ease);
 }
 
@@ -1963,7 +1964,7 @@ select {
 }
 
 .ayah-block[data-dimmed='true'] .ayah-translation {
-  opacity: var(--upcoming-alpha, 0.22);
+  opacity: var(--upcoming-alpha, 0.2661);
 }
 
 /*
@@ -1997,7 +1998,7 @@ select {
 
 .scroll[data-reciting='true'] .ayah-block:not([data-ayah-active='true']) .ayah-recess-veil,
 .scroll[data-reciting='true'] .basmalah-block:not([data-ayah-active='true'])::after {
-  opacity: var(--upcoming-cover, 0.78);
+  opacity: var(--upcoming-cover, 0.7339);
 }
 
 /* Bookmark ribbons recede with chrome — CSS only, no per-ayah React update. */
@@ -3680,9 +3681,34 @@ select {
 
 .root-occurrences,
 .root-related,
+.root-lexicon,
 .root-references {
   max-width: 34rem;
   margin-inline: auto;
+}
+
+/* Lane's article: English prose with Arabic set inline, his own divisions
+   kept as line breaks. */
+.root-lexicon-entry {
+  margin: var(--root-space-5) 0 0;
+  color: var(--ink);
+  font-size: 1rem;
+  line-height: 1.75;
+  white-space: pre-line;
+}
+
+.root-lexicon-arabic {
+  font-family: var(--font-arabic);
+  font-size: 1.15em;
+  line-height: 1.6;
+  unicode-bidi: isolate;
+}
+
+.root-lexicon-credit {
+  margin: var(--root-space-4) 0 0;
+  color: var(--ink-muted);
+  font-size: 0.8125rem;
+  line-height: 1.5;
 }
 
 .root-chapter-heading {
@@ -3805,10 +3831,20 @@ select {
 .root-related-row {
   display: flex;
   min-height: 48px;
+  flex-wrap: wrap;
   align-items: baseline;
   justify-content: space-between;
-  gap: var(--root-space-4);
+  gap: var(--root-space-1) var(--root-space-4);
   padding: var(--root-space-3) 0;
+}
+
+/* The English gloss takes its own line beneath the form and its count. */
+.root-related-gloss {
+  flex-basis: 100%;
+  margin: 0;
+  color: var(--ink-muted);
+  font-size: 1rem;
+  line-height: 1.5;
 }
 
 .root-related-form {

@@ -301,12 +301,15 @@ are **not audible repeats**. Artifact classes scrubbed in `clean_qdc_artifacts`
    "repeat." Fix: merge a same-position, time-contiguous neighbour when it is a
    fragment rather than a full utterance. A span is a fragment when it is either
    **shorter than `QDC_SPLIT_FRAGMENT_MS` (200 ms)** — too short to be any spoken
-   word — **or shorter than `QDC_SPLIT_FRAGMENT_CEIL_MS` (500 ms) *and* under
-   `QDC_SPLIT_FRAGMENT_RATIO` (0.35) of its neighbour's length** — dwarfed by the
+   word — **or shorter than `QDC_SPLIT_FRAGMENT_CEIL_MS` (700 ms) *and* under
+   `QDC_SPLIT_FRAGMENT_RATIO` (0.40) of its neighbour's length** — dwarfed by the
    word it split off from. The flat floor alone missed slivers in the 200–450 ms
    band (Hani 4:143 word 10 = a 210 ms onset + 1290 ms body, issue #123, which
    bloomed as a false repeat); the ratio clause catches those while the warning
-   below keeps the rule from eating real single-word repeats.
+   below keeps the rule from eating real single-word repeats. A prior CEIL of
+   500 ms left dwarfed 500–700 ms tails classified as peers (Alafasy 4:171
+   إِلَىٰ = 1600+600 ms, issue #634), so `preserve_peer_repeats` also blocked
+   the matching CTC unsplit — the CEIL/ratio pair now covers that band.
 2. **Mislabeled strays.** A single segment carrying a wrong, *earlier* word
    index — often a sound-alike (49:9 goes `… 7, [1], 9 …`: word 8 فَإِن was
    tagged as word 1 وَإِن) — then the recitation continues forward past the
@@ -346,15 +349,17 @@ are **not audible repeats**. Artifact classes scrubbed in `clean_qdc_artifacts`
 > When a reciter says a word and immediately says it again, qdc emits two
 > same-position segments with no gap between them, identical in shape to a
 > split. The only reliable difference is that a real repeat's two halves are
-> both *full utterances* (across all six reciters the shorter half's median is
-> ~1.2 s and is ≥ ~500 ms), whereas a split's extra piece is a sub-word sliver
-> (a fragment: < 200 ms, or < 500 ms but a fraction of the word it split from).
-> An earlier version of this cleanup merged on the gap alone and silently ate
-> real repeats — e.g. Hani **4:163 word 20** (1180 ms + 1510 ms, ear-confirmed
-> via a Timings Lab correction). The duration/ratio fragment test is what fixes
-> that: only slivers fold; two substantial, comparable utterances stay a repeat.
-> The ratio clause keys on the split being *dwarfed* by its neighbour, so it can
-> never touch two peer utterances however the absolute floor is tuned.
+> both *full, comparable utterances* (across all six reciters the shorter half's
+> median is ≥ ~1.2 s; ear-confirmed peers like Hani 4:4 = 1710+1120 ms sit well
+> above the dwarfing gate), whereas a split's extra piece is a sub-word sliver
+> or dwarfed tail (a fragment: < 200 ms, or < 700 ms and under 0.40 of the word
+> it split from). An earlier version of this cleanup merged on the gap alone and
+> silently ate real repeats — e.g. Hani **4:163 word 20** (1180 ms + 1510 ms,
+> ear-confirmed via a Timings Lab correction). The duration/ratio fragment test
+> is what fixes that: only slivers and dwarfed tails fold; two substantial,
+> comparable utterances stay a repeat. The ratio clause keys on the split being
+> *dwarfed* by its neighbour, so it can never touch two peer utterances however
+> the absolute floor is tuned.
 
 Each rule has a paired survival fixture. Real repeats need not revisit the
 previous high-water tip, and substantial same-word peers survive even with a
@@ -418,14 +423,16 @@ HighlightEngine.PreparedTimings.activeInfo(positionMs)
   the orange arrives as its **own directional wash on top** — it does not re-run
   the base layer's dim→ink sweep, and it is not a colour tween either. Both
   renderers use the same soft feathered edge as first-pass ink:
-  - Per-word units (gloss / English): `Modifier.repeatInkLayer` =
+  - Layered Arabic + gloss word units: `Modifier.repeatInkLayer` =
     `glyphLayerAlpha { wash.alpha }` over `letterFadeIn(progress = wash.progress,
     restingAlpha = 0f, feather = Tuning.washFeather)`.
-  - Arabic-only Hafs: `ShapedWordBloom.ColorReveal` — re-draw the shaped run,
+  - Continuous English and Arabic-only Hafs:
+    `ShapedWordBloom.ColorReveal` — re-draw the shaped run,
     `BlendMode.SrcIn`-tint it, then `DstIn`-wash it.
 
-  Timing lives in `rememberRepeatWash` (gloss, Hafs, and English — one path)
-  and web `WordUnit` / `HafsWord`. On Android, chain entry captures the active
+  Android timing lives once in the ayah's per-word `InkMotion`
+  (`rememberRepeatWash` is its internal repeat clock), shared by gloss, Hafs,
+  and English; web uses `WordUnit` / `HafsWord`. On Android, chain entry captures the active
   word's sweep duration, tajweed curve, and paced feather; the duration is
   `max(sweepMs, Tuning.repeatSweepMs)` (450 ms by default). The capture happens
   before the word waits in the position-ordered gate, so an Active handoff

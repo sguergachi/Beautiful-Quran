@@ -10,7 +10,6 @@ import {
   setHighlightLeadMs,
   DEFAULT_HIGHLIGHT_LEAD_MS,
   sweepMs,
-  startRevealed,
   glinting,
   prefaceState,
   prefaceWashProgress,
@@ -151,26 +150,11 @@ describe('InkEngine', () => {
     expect(sweepMs(null, 1)).toBeNull()
   })
 
-  it('only a recited word lighting up again starts revealed', () => {
-    // Every Active entry re-runs the wash — including Recited → Active replay.
-    expect(startRevealed(InkState.Recited, InkState.Active)).toBe(false)
-    expect(startRevealed(InkState.Plain, InkState.Active)).toBe(false)
-    expect(startRevealed(InkState.Upcoming, InkState.Active)).toBe(false)
-    expect(startRevealed(InkState.Recited, InkState.Recited)).toBe(false)
-    expect(startRevealed(InkState.Active, InkState.Recited)).toBe(false)
-  })
-
-  it('new and repeated active words wear the fresh-ink glint', () => {
-    expect(glinting(InkState.Active, false, false)).toBe(true)
-    // Repeats carry the glint over their orange wash, including re-entry.
-    expect(glinting(InkState.Active, true, false)).toBe(true)
-    expect(glinting(InkState.Active, true, true)).toBe(true)
-    // Re-lit already revealed (seek / repeat re-entry): old ink, not fresh.
-    expect(glinting(InkState.Active, false, true)).toBe(false)
-    // Resting states never glint.
-    expect(glinting(InkState.Plain, false, false)).toBe(false)
-    expect(glinting(InkState.Upcoming, false, false)).toBe(false)
-    expect(glinting(InkState.Recited, false, false)).toBe(false)
+  it('active words wear the fresh-ink glint', () => {
+    expect(glinting(InkState.Active)).toBe(true)
+    expect(glinting(InkState.Plain)).toBe(false)
+    expect(glinting(InkState.Upcoming)).toBe(false)
+    expect(glinting(InkState.Recited)).toBe(false)
   })
 
   it('only upcoming ink is faint', () => {

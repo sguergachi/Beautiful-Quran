@@ -6,7 +6,16 @@ export const FADE_LEAD_MS = 500
 
 export interface ReaderHighlightInput {
   ayah: number
+  /**
+   * Heard media position (latency-corrected, no word lead). Drives ayah fade
+   * lead so verse handoff stays with the voice.
+   */
   positionMs: number
+  /**
+   * Karaoke query time (heard + ramped highlight lead). Drives active word.
+   * Defaults to [positionMs] when omitted (tests / idle paths).
+   */
+  highlightPositionMs?: number
   durationMs: number
   isPlaying: boolean
   ayahCount: number
@@ -76,7 +85,8 @@ export function readerHighlightState(
 
   let activeWord: ActiveWord | null = null
   if (!activeBasmalah && input.ayah > 0) {
-    const info = prepared?.activeInfo(input.positionMs)
+    const queryMs = input.highlightPositionMs ?? input.positionMs
+    const info = prepared?.activeInfo(queryMs)
     if (info) {
       activeWord = {
         ayah: input.ayah,

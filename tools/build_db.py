@@ -217,10 +217,13 @@ def load_wbw(tgz: Path):
                     continue
                 sk, ak = w["parentAyahVerseKey"].split(":")
                 key = (int(sk), int(ak))
+                # Upstream glosses sometimes carry a trailing space (e.g. 4:152
+                # "those "), which becomes a visible double gap when English-only
+                # joins words with a space. Normalize like Arabic text.
                 out.setdefault(key, []).append(
                     (
-                        w.get("translation", {}).get("text") or "",
-                        w.get("transliteration", {}).get("text") or "",
+                        normalize_text(w.get("translation", {}).get("text") or ""),
+                        normalize_text(w.get("transliteration", {}).get("text") or ""),
                     )
                 )
                 if key not in page_of:
@@ -409,11 +412,15 @@ def load_qdc_timings(qdc_id: int):
 QDC_SPLIT_MERGE_GAP_MS = 150  # a sliver sits flush against its word (0–50 ms)
 QDC_SPLIT_FRAGMENT_MS = 200  # shorter than this, a same-position span is always
 #                              a sub-word fragment, not a second utterance
-QDC_SPLIT_FRAGMENT_CEIL_MS = 500  # in [FRAGMENT_MS, CEIL) it is a fragment only
-#                                   when dwarfed by its neighbour (see ratio);
-#                                   a real repeat's shorter half is ≥ ~500 ms
-QDC_SPLIT_FRAGMENT_RATIO = 0.35  # shorter/longer below this = a split fragment,
+QDC_SPLIT_FRAGMENT_CEIL_MS = 700  # in [FRAGMENT_MS, CEIL) it is a fragment only
+#                                   when dwarfed by its neighbour (see ratio).
+#                                   Real peers are comparable (Hani 4:4 =
+#                                   1710+1120); a 500–700 ms tail dwarfed by a
+#                                   long body is still a split (Alafasy 4:171
+#                                   إِلَىٰ = 1600+600), not a second utterance.
+QDC_SPLIT_FRAGMENT_RATIO = 0.40  # shorter/longer below this = a split fragment,
 #                                  not a peer utterance
+
 QDC_SPIKE_JUMP = 3  # a forward jump this large that instantly retreats is noise
 # Positions in a backtrack run within this distance count as one contiguous
 # span-repeat (allows one dropped word inside a real re-say, e.g. 9,10,12,13).

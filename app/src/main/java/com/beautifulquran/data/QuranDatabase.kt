@@ -45,6 +45,8 @@ class QuranDatabase(private val context: Context) {
     companion object {
         // Bump the suffix whenever the packaged database changes shape
         // (or content — e.g. a new reciter), so updated installs re-extract.
-        private const val DB_FILE_NAME = "quran-v33.db"
+        // `data/quran.db.sha256` pins this to the asset it was bumped for;
+        // DatabaseFingerprintTest fails if the two drift apart.
+        internal const val DB_FILE_NAME = "quran-v35.db"
     }
 }

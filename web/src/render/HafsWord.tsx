@@ -13,7 +13,7 @@ import {
   type MutableRefObject,
 } from 'react'
 import type { Word } from '../data/models'
-import { InkState, getTuning, startRevealed, type InkWord } from '../ui/reader/InkEngine'
+import { InkState, getTuning, glinting as inkGlinting, type InkWord } from '../ui/reader/InkEngine'
 import {
   clearPaperCover,
   glintEnabled,
@@ -65,7 +65,6 @@ export function HafsWord({
   // null until first layout effect so mount-as-Active still runs the wash.
   const prevState = useRef<InkState | null>(null)
   const prevActivation = useRef(activation)
-  const revealedOnEntry = useRef(false)
   const prevRepeat = useRef(false)
   const prevGlint = useRef(false)
   const prevGlintRepeat = useRef(ink.repeat)
@@ -110,12 +109,6 @@ export function HafsWord({
       ink.state === InkState.Active &&
       prev === InkState.Active &&
       activation !== prevActivation.current
-    if (enteredActive || reactivated) {
-      // Always re-run the wash on Active entry / seek-reactivation.
-      revealedOnEntry.current = startRevealed(prev ?? InkState.Plain, ink.state)
-    } else if (ink.state !== InkState.Active) {
-      revealedOnEntry.current = false
-    }
     prevState.current = ink.state
     prevActivation.current = activation
 
@@ -145,12 +138,6 @@ export function HafsWord({
     if (ink.state !== InkState.Active) {
       // Recited / Plain: let residual short-hold wash finish; idle only clear.
       if (!washingRef.current) clearPaperCover(cover)
-      return
-    }
-
-    if (revealedOnEntry.current) {
-      stopWash()
-      clearPaperCover(cover)
       return
     }
 
@@ -192,8 +179,7 @@ export function HafsWord({
     }
     const halo = glintHaloRef.current
     if (!halo) return
-    const glinting =
-      ink.state === InkState.Active && (ink.repeat || !revealedOnEntry.current)
+    const glinting = inkGlinting(ink.state)
     const was = prevGlint.current
     const wasRepeat = prevGlintRepeat.current
     prevGlint.current = glinting

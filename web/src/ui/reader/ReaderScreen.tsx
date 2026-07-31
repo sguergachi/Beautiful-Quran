@@ -1177,6 +1177,7 @@ export function ReaderScreen({ stackLayer }: { stackLayer: StackLayer }) {
               data-chapter-advancing={chapterAdvancing || undefined}
               style={{
                 ['--upcoming-alpha' as string]: String(inkTuning.upcomingAlpha),
+                ['--upcoming-cover' as string]: String(1 - inkTuning.upcomingAlpha),
                 ['--ink-fade-ms' as string]: `${inkTuning.inkFadeMs}ms`,
                 ['--ayah-mark-fade-ms' as string]: `${inkTuning.ayahMarkFadeMs}ms`,
                 ['--recess-ms' as string]: `${inkTuning.recessMs}ms`,

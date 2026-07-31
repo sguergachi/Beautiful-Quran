@@ -367,22 +367,42 @@ class QuranRepository(
                 surahNameTransliteration = c.getString(5),
             )
         }
-        val lemmas = queryList(
+        // Every rendering of every form under this root: the counts add up to
+        // the form's frequency, and they elect its English gloss.
+        val renderings = queryList(
             """
-            SELECT lemma, pos, COUNT(*)
-            FROM word_morphology
-            WHERE root = ? AND lemma <> ''
-            GROUP BY lemma, pos
-            ORDER BY COUNT(*) DESC, lemma, pos
+            SELECT m.lemma, m.pos, w.translation_en, COUNT(*)
+            FROM word_morphology m
+            JOIN words w
+              ON w.surah_id = m.surah_id
+             AND w.ayah_number = m.ayah_number
+             AND w.position = m.position
+            WHERE m.root = ? AND m.lemma <> ''
+            GROUP BY m.lemma, m.pos, w.translation_en
             """.trimIndent(),
             arrayOf(root),
         ) { c ->
-            RootLemmaSummary(
+            LemmaRendering(
                 lemma = c.getString(0),
                 pos = c.getString(1),
-                occurrenceCount = c.getInt(2),
+                vote = GlossVote(translation = c.getString(2), count = c.getInt(3)),
             )
         }
+        val lemmas = renderings
+            .groupBy { it.lemma to it.pos }
+            .map { (form, rows) ->
+                RootLemmaSummary(
+                    lemma = form.first,
+                    pos = form.second,
+                    occurrenceCount = rows.sumOf { it.vote.count },
+                    gloss = LemmaGloss.pick(rows.map { it.vote }),
+                )
+            }
+            .sortedWith(
+                compareByDescending<RootLemmaSummary> { it.occurrenceCount }
+                    .thenBy { it.lemma }
+                    .thenBy { it.pos },
+            )
         RootSummary(
             root = root,
             occurrenceCount = count,
@@ -470,3 +490,6 @@ class QuranRepository(
             }.getOrDefault(emptyList())
     }
 }
+
+/** One (form, English rendering) tally row backing a root's lemma list. */
+private data class LemmaRendering(val lemma: String, val pos: String, val vote: GlossVote)

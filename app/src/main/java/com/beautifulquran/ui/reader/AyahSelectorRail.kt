@@ -38,6 +38,7 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
@@ -48,6 +49,7 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.beautifulquran.data.AyahSelectorSide
+import com.beautifulquran.data.model.Ayah
 import com.beautifulquran.ui.theme.LocalQuranAccents
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -96,6 +98,21 @@ internal fun collapsedRailHitHeightDp(ayahCount: Int, padDp: Float = 24f): Float
     return max(48f, collapsedStackSpanDp(ayahCount) + padDp)
 }
 
+/**
+ * Ayah number → mushaf page number for ayahs that open a new page: the first
+ * ayah whose page differs from the previous ayah's. The expanded wheel marks
+ * these with a faded diamond and page number. Ayahs with no page data (0) are
+ * skipped without breaking the boundary chain.
+ */
+internal fun pageStartByAyah(ayahs: List<Ayah>): Map<Int, Int> = buildMap {
+    var previousPage = 0
+    for (ayah in ayahs) {
+        if (ayah.page <= 0) continue
+        if (ayah.page != previousPage) put(ayah.number, ayah.page)
+        previousPage = ayah.page
+    }
+}
+
 private suspend fun settleDialWheel(
     start: Float,
     velocity: Float,
@@ -142,6 +159,9 @@ internal fun AyahSelectorRail(
     currentPosition: State<Float>,
     /** Ayah numbers bookmarked in this surah — ruby ticks on the collapsed stack. */
     bookmarkedAyahs: Set<Int> = emptySet(),
+    /** Ayah number → mushaf page where a new page opens — a faded diamond and
+     *  page number trailing the tick's label on the expanded wheel. */
+    pageStarts: Map<Int, Int> = emptyMap(),
     chromeAlpha: () -> Float,
     /** Plain boolean for the touch-target gate, so composition never reads the
      * animated [chromeAlpha] (which would recompose the rail on every fade
@@ -293,6 +313,11 @@ internal fun AyahSelectorRail(
                 textAlign = if (mirrored) Paint.Align.RIGHT else Paint.Align.LEFT
                 textSize = 9.sp.toPx()
                 typeface = Typeface.create(Typeface.SERIF, Typeface.BOLD)
+            }
+            val pagePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                textAlign = if (mirrored) Paint.Align.RIGHT else Paint.Align.LEFT
+                textSize = 7.5.sp.toPx()
+                typeface = Typeface.create(Typeface.SERIF, Typeface.NORMAL)
             }
 
             // Collapsed-stack metrics live outside the pass because the
@@ -479,6 +504,39 @@ internal fun AyahSelectorRail(
                             y + numberPaint.textSize * 0.34f,
                             numberPaint,
                         )
+                    }
+                    // Mushaf page boundary: a tiny diamond and the page number
+                    // trail the ayah number in the faintest ink — optional
+                    // wayfinding metadata, quiet beside the tick's own label.
+                    // Distances stay in from-edge units so mirroring just works.
+                    val pageStart = pageStarts[ayah]
+                    if (pageStart != null) {
+                        val pageInk = onSurface.copy(
+                            alpha = (0.14f + 0.2f * focus) * arrival * edgeFade,
+                        )
+                        val numberWidth = numberPaint.measureText(ayah.toString())
+                        val markHalf = 2.dp.toPx()
+                        val markCenter = wheelX + length + 6.dp.toPx() +
+                            numberWidth + 6.dp.toPx() + markHalf
+                        withTransform({
+                            rotate(45f, Offset(textAnchor(markCenter), y))
+                        }) {
+                            drawRoundRect(
+                                color = pageInk,
+                                topLeft = Offset(textAnchor(markCenter) - markHalf, y - markHalf),
+                                size = Size(markHalf * 2f, markHalf * 2f),
+                                cornerRadius = CornerRadius(markHalf / 2f),
+                            )
+                        }
+                        pagePaint.color = pageInk.toArgb()
+                        drawIntoCanvas { canvas ->
+                            canvas.nativeCanvas.drawText(
+                                pageStart.toString(),
+                                textAnchor(markCenter + markHalf + 3.dp.toPx()),
+                                y + numberPaint.textSize * 0.34f,
+                                pagePaint,
+                            )
+                        }
                     }
                 }
             }

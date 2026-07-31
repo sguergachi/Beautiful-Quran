@@ -174,13 +174,42 @@ class ReaderFocusController internal constructor(
         keyboardPaddingPx: Float,
         measureInViewport: () -> Pair<Float, Float>?,
     ) {
-        keepBoundsInView(measureInViewport) { bounds, viewportHeight ->
-            FocusEngine.annotationFieldDeltaPx(
-                fieldBottomPx = bounds.second,
-                viewportHeightPx = viewportHeight.toFloat(),
-                keyboardOverlapPx = keyboardOverlapPx,
-                keyboardPaddingPx = keyboardPaddingPx,
-            )
+        focusMutex.withLock {
+            val viewportHeight = listState.layoutInfo.viewportSize.height
+            if (viewportHeight <= 0) return
+            fun remainingPx(): Float {
+                val bounds = measureInViewport() ?: return 0f
+                return FocusEngine.annotationFieldDeltaPx(
+                    fieldBottomPx = bounds.second,
+                    viewportHeightPx = viewportHeight.toFloat(),
+                    keyboardOverlapPx = keyboardOverlapPx,
+                    keyboardPaddingPx = keyboardPaddingPx,
+                )
+            }
+
+            val initial = remainingPx()
+            if (abs(initial) < 0.5f) return
+            val direction = if (initial > 0f) 1f else -1f
+            listState.scroll {
+                var lastProgress = 0f
+                animate(
+                    initialValue = 0f,
+                    targetValue = 1f,
+                    animationSpec = tween(
+                        durationMillis = ANNOTATION_GLIDE_MS,
+                        easing = FastOutSlowInEasing,
+                    ),
+                ) { progress, _ ->
+                    val step = FocusEngine.oneDirectionHomeScrollStep(
+                        remainingPx = remainingPx(),
+                        progress = progress,
+                        lastProgress = lastProgress,
+                        direction = direction,
+                    )
+                    lastProgress = progress
+                    if (abs(step) >= 0.5f) scrollBy(step)
+                }
+            }
         }
     }
 
@@ -445,6 +474,10 @@ class ReaderFocusController internal constructor(
         /** Detail-follow duration — short so line changes feel instant but
          *  still ease (matches the web port's word glide). */
         const val DETAIL_GLIDE_MS: Int = 300
+
+        /** Note focus waits for the IME's final geometry, then follows it with
+         *  one deliberately slower, continuously remeasured glide. */
+        const val ANNOTATION_GLIDE_MS: Int = 500
     }
 }
 

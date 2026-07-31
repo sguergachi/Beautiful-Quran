@@ -106,4 +106,17 @@ data class RootLemmaSummary(
     val lemma: String,
     val pos: String,
     val occurrenceCount: Int,
+    /** Most common word-by-word English rendering of this form; may be blank. */
+    val gloss: String = "",
+)
+
+/** Lane's lexicon article for one root, as shipped in lexicon.db. */
+data class LexiconEntry(
+    val root: String,
+    /** Display text: English prose with Arabic inline, Lane's own divisions. */
+    val text: String,
+    /** First printed page of the article, or 0 when the source records none. */
+    val page: Int,
+    /** Perseus' required credit line, carried with their text. */
+    val credit: String,
 )

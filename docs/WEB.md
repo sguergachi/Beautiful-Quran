@@ -170,10 +170,8 @@ Port exactly:
 
 - `State` { Plain, Upcoming, Active, Recited }
 - `word` / `wordState` / `inRepeatChain` / `sweepMs` / `prefaceState`
-- `startRevealed` is **web-only now**: it was a constant `false` on both sides and
-  has been deleted from Android's `InkEngine` (its gate collapsed to
-  `glinting(state) = state == Active`). The web copy is harmless dead weight —
-  fold it away next time `WordUnit.tsx` is touched. Behaviour is identical.
+- `glinting(state) = state == Active` (Android parity). The old constant-false
+  `startRevealed` gate is gone on both sides.
 - `Tuning` defaults (upcoming alpha 0.2661, ink/mark/recess fade 400 ms, sweep clamps, feather 1.6, easing CPs)
 
 Acceptance: `InkEngineTest` parity. Optional Ink Lab later (session-only
@@ -321,7 +319,7 @@ technique.
 |---|---|---|
 | Arabic + gloss | Per-word spans; Arabic glyphs stay full opaque ink with paper-cover bloom (`WordUnit` / `ink-paper-cover`); gloss/translit use `secondaryAlpha` | Timed word-by-word ink; **never** CSS opacity / glyph alpha on Arabic (overlapping marks look dirty) |
 | English lyric | Directional `letterFadeIn` via `runLetterWash` + Upcoming floor | Same timings as Arabic; soft faded edge required; masked layers retain inline bleed for serif overhangs |
-| Gloss / translit under Arabic | Whole-word opacity via `secondaryAlpha` (tracks sweep; never letter-reveal) | Same as Android `WordHighlight.secondaryAlpha` |
+| Gloss / translit under Arabic | Whole-word opacity via `secondaryAlpha` (tracks sweep; never letter-reveal) | Same as Android `InkMotion.secondaryAlpha` |
 | Arabic-only (Hafs) | Per-word full-ink glyphs + paper-cover bloom (`HafsWord`) | No per-glyph style runs that break joining; no neighbour bleed; upcoming = opaque paper cover, not alpha |
 
 Product rule from `DESIGN.md` / `CONNECTED_ARABIC_RENDERING.md`: a renderer

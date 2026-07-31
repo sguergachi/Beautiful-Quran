@@ -31,7 +31,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
-import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.imeAnimationTarget
 import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -1710,7 +1710,8 @@ fun ReaderScreen(
             // with the IME right under the caret. While a note is open, clear
             // the keyboard's own height plus a hand's-width of paper so the
             // line being written sits well above it.
-            val imeBottom = WindowInsets.ime.asPaddingValues().calculateBottomPadding()
+            val imeBottom =
+                WindowInsets.imeAnimationTarget.asPaddingValues().calculateBottomPadding()
             val listBottomPad = if (editingAnnotationAyah != 0) {
                 132.dp + imeBottom + 96.dp
             } else {
@@ -2232,6 +2233,8 @@ fun ReaderScreen(
                         .coerceIn(1f, content.surah.ayahCount.toFloat())
                 }
             }
+            // Page-boundary marks for the expanded selector wheel.
+            val railPageStarts = remember(content.surah.id) { pageStartByAyah(content.ayahs) }
             if (editingAnnotationAyah == 0) {
                 AyahSelectorRail(
                     ayahCount = content.surah.ayahCount,
@@ -2239,6 +2242,7 @@ fun ReaderScreen(
                     currentAyah = railCurrentAyah,
                     currentPosition = railCurrentPosition,
                     bookmarkedAyahs = bookmarkedAyahs,
+                    pageStarts = railPageStarts,
                     chromeAlpha = { topBarAlpha.value },
                     interactive = !recitingActive,
                     onJumpToAyah = { ayah ->

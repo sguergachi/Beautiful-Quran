@@ -44,6 +44,28 @@ describe('ReaderHighlightState', () => {
     expect(readerInkAyah(state.activeWord, 1)).toBe(1)
   })
 
+  it('uses highlightPositionMs for word ink while fade lead stays on heard position', () => {
+    const timings = prepared([
+      { position: 1, startMs: 0, endMs: 200 },
+      { position: 2, startMs: 200, endMs: 1_000 },
+    ])
+    // Heard still on word 1; lead-advanced query already on word 2.
+    const state = readerHighlightState(
+      {
+        ayah: 1,
+        positionMs: 100,
+        highlightPositionMs: 250,
+        durationMs: 1_000,
+        isPlaying: true,
+        ayahCount: 7,
+        repeatRange: null,
+      },
+      timings,
+    )
+    expect(state.activeAyah).toBe(1)
+    expect(state.activeWord?.wordPosition).toBe(2)
+  })
+
   it('keeps ink on the media verse when no word owns the trailing silence', () => {
     expect(readerInkAyah(null, 4)).toBe(4)
     expect(readerInkAyah(null, null)).toBeNull()

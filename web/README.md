@@ -53,10 +53,12 @@ Engines are DOM-free and unit-tested against the Android JVM suites. See
   48-unit grid on the live board size (`coverLayout`). Tap or Escape skips
   once ready.
 - First load downloads `quran.db`; a service worker caches the DB, fonts, and
-  hashed assets (cache-first) **only after a successful boot**. Navigations /
-  `index.html` are **network-only** (never written to the Cache API) so a
-  deploy cannot leave phones on a stale shell that points at deleted JS.
-  Bump `CACHE` in `public/sw.js` when changing that contract.
+  hashed assets (cache-first) **only after a successful boot**, then warms the
+  DB/wasm into the Cache API. Navigations are **network-first**: a successful
+  fetch stashes HTML in a side cache used only when offline, so a deploy cannot
+  leave phones on a stale shell while online. Bump `CACHE` /
+  `OFFLINE_SHELL` in `public/sw.js` when changing that contract. Recitation
+  audio stays in the separate AudioPrefetch Cache API (cross-origin).
 - `sql.js`’s browser build requests `sql-wasm-browser.wasm` (copied into
   `public/` on `npm install`). Shipping only `sql-wasm.wasm` 404s on Pages.
 - Audio streams from everyayah.com; upcoming ayahs are prefetched in parallel

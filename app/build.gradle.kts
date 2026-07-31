@@ -112,7 +112,12 @@ kotlin {
 
 val syncQuranDbAsset by tasks.registering(Sync::class) {
     val dbAsset = rootProject.layout.projectDirectory.file("data/quran.db")
+    val lexiconAsset = rootProject.layout.projectDirectory.file("data/lexicon.db")
     from(dbAsset)
+    // Lane's Lexicon ships as .sqlite, not .db, so it falls outside
+    // `noCompress` above and travels deflated (~7 MB rather than 20 MB).
+    // LexiconDatabase copies it out of assets, where AssetManager inflates it.
+    from(lexiconAsset) { rename { "lexicon.sqlite" } }
     into(layout.buildDirectory.dir("generated/quranAssets"))
 
     doLast {
@@ -122,11 +127,30 @@ val syncQuranDbAsset by tasks.registering(Sync::class) {
                     "Run `python3 tools/build_db.py` from the repo root before building locally.",
             )
         }
+        if (!lexiconAsset.asFile.isFile) {
+            throw GradleException(
+                "Missing canonical lexicon database: ${lexiconAsset.asFile}. " +
+                    "Run `python3 tools/build_lexicon_db.py` from the repo root before building locally.",
+            )
+        }
     }
 }
 
 tasks.named("preBuild") {
     dependsOn(syncQuranDbAsset)
+}
+
+// DatabaseFingerprintTest reads these straight off disk, outside anything
+// Gradle already tracks for the unit-test task. Without them declared, editing
+// a database leaves the task UP-TO-DATE and the guard never runs — which is
+// precisely the case it exists to catch.
+tasks.withType<Test>().configureEach {
+    listOf("quran.db", "quran.db.sha256", "lexicon.db", "lexicon.db.sha256")
+        .forEach { asset ->
+            inputs.file(rootProject.layout.projectDirectory.file("data/$asset"))
+                .withPropertyName("dbFingerprint-$asset")
+                .withPathSensitivity(PathSensitivity.NONE)
+        }
 }
 
 dependencies {

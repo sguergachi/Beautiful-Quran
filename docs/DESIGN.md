@@ -581,6 +581,10 @@ the ayah selector (the selector side is a setting), and both ribbon and rail
 marks obey the same chrome rules: they fade with the rest of the chrome and
 vanish entirely while reciting.
 
+The wheel also carries mushaf wayfinding in the faintest ink: where a new page
+opens, a tiny diamond and the page number trail the tick's ayah number, fading
+with focus and edge distance like every other mark on the rail.
+
 - **Unified with the verse.** The ribbon is composed inside `AyahBlock`, so its
   height *is* the block's height (Arabic, gloss, and translation together). It
   cannot drift, lag, or sit mid-block — the tip begins 24 dp below the block

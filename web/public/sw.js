@@ -2,18 +2,20 @@
  * Offline shell for the GitHub Pages reader.
  *
  * Strategy:
- *   - Navigations / HTML → network-only (never Cache API)
+ *   - Navigations / HTML → network-first; on success stash a copy for offline
+ *     reload only. HTML is never served from cache while online (avoids a
+ *     poisoned shell pointing at deleted hashed assets after a Pages deploy).
  *   - Hashed JS/CSS, wasm, fonts, quran.db → cache-first
+ *   - After boot, the client may postMessage WARM_ASSETS so the DB/wasm land
+ *     in the Cache API even though the first fetch happened before register
  *   - sw.js itself is never cached through this worker
  *
- * Caching index.html is what blanked phones after each Pages deploy: a
- * cache-first (or stale network-first fallback) shell pointed at deleted
- * hashed assets. HTML must not enter the Cache API.
- *
- * Bump CACHE whenever this contract changes. Activate deletes every other
- * cache name and reloads open clients so a poisoned shell cannot stick.
+ * Bump CACHE (and OFFLINE_SHELL) whenever this contract changes. Activate
+ * deletes every other cache name and reloads open clients so a poisoned
+ * shell cannot stick.
  */
-const CACHE = 'beautiful-quran-web-v10'
+const CACHE = 'beautiful-quran-web-v11'
+const OFFLINE_SHELL = 'beautiful-quran-offline-shell-v11'
 const BASE = self.registration.scope
 
 function isNavigationRequest(req, url) {
@@ -48,13 +50,14 @@ function shouldCacheAsset(url) {
     url.pathname.endsWith('.woff2') ||
     url.pathname.endsWith('.wasm') ||
     url.pathname.endsWith('.svg') ||
-    url.pathname.endsWith('.webmanifest')
+    url.pathname.endsWith('.webmanifest') ||
+    url.pathname.endsWith('.png')
   )
 }
 
 self.addEventListener('install', () => {
-  // Do not precache HTML or the 27 MB DB — HTML must stay network-only, and
-  // addAll(quran.db) blows mobile cache quotas and can stall install.
+  // Do not precache HTML or the 27 MB DB during install — HTML must stay
+  // network-first, and addAll(quran.db) blows mobile cache quotas.
   self.skipWaiting()
 })
 
@@ -62,15 +65,16 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(
     (async () => {
       const keys = await caches.keys()
-      const hadStale = keys.some((k) => k !== CACHE)
+      const keep = new Set([CACHE, OFFLINE_SHELL])
+      const hadStale = keys.some((k) => !keep.has(k))
       const deletes = []
       for (const k of keys) {
-        if (k !== CACHE) deletes.push(caches.delete(k))
+        if (!keep.has(k)) deletes.push(caches.delete(k))
       }
       await Promise.all(deletes)
 
-      // Older workers may have stored index.html under this or prior names.
-      // Strip any HTML out of the current cache so it can never be replayed.
+      // Older workers may have stored index.html under the asset cache.
+      // Strip any HTML out of CACHE so it can never be replayed as an asset.
       let purgedHtml = false
       try {
         const cache = await caches.open(CACHE)
@@ -104,6 +108,12 @@ self.addEventListener('activate', (event) => {
   )
 })
 
+self.addEventListener('message', (event) => {
+  const data = event.data
+  if (!data || data.type !== 'WARM_ASSETS' || !Array.isArray(data.urls)) return
+  event.waitUntil(warmAssets(data.urls))
+})
+
 self.addEventListener('fetch', (event) => {
   const req = event.request
   if (req.method !== 'GET') return
@@ -118,17 +128,26 @@ self.addEventListener('fetch', (event) => {
   }
 
   if (isNavigationRequest(req, url)) {
-    event.respondWith(networkOnlyNavigation(req))
+    event.respondWith(networkFirstNavigation(req))
     return
   }
 
   event.respondWith(cacheFirstAsset(req, url))
 })
 
-async function networkOnlyNavigation(req) {
+async function networkFirstNavigation(req) {
   try {
-    return await fetch(req)
+    const res = await fetch(req)
+    if (res.ok) {
+      const copy = res.clone()
+      void caches.open(OFFLINE_SHELL).then((c) => c.put(req, copy))
+    }
+    return res
   } catch {
+    const cached =
+      (await caches.match(req, { cacheName: OFFLINE_SHELL })) ||
+      (await caches.match(req.url, { cacheName: OFFLINE_SHELL }))
+    if (cached) return cached
     return new Response(
       `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><title>Beautiful Quran</title></head><body style="margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:#FAF3E8;color:#1C1B18;font-family:Georgia,serif;text-align:center;padding:2rem"><div><h1 style="font-weight:500;letter-spacing:.02em">Beautiful Quran</h1><p style="opacity:.7">You appear to be offline. Reconnect and reload.</p></div></body></html>`,
       {
@@ -137,6 +156,23 @@ async function networkOnlyNavigation(req) {
       },
     )
   }
+}
+
+async function warmAssets(urls) {
+  const cache = await caches.open(CACHE)
+  await Promise.all(
+    urls.map(async (href) => {
+      try {
+        const url = new URL(href, self.location.href)
+        if (!shouldCacheAsset(url)) return
+        if (await cache.match(href)) return
+        const res = await fetch(href, { credentials: 'same-origin' })
+        if (res.ok) await cache.put(href, res)
+      } catch {
+        /* optional warm */
+      }
+    }),
+  )
 }
 
 async function cacheFirstAsset(req, url) {

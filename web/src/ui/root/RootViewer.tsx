@@ -2,6 +2,7 @@ import { useEffect, useId, useMemo, useState } from 'react'
 import { appStore, useAppSelector, type RootViewerState } from '../../store/appStore'
 import { IconClose, IconVolumeUp } from '../icons/PlaybackIcons'
 import { featureSummary, posLabel, spacedRoot } from './morphologyLabels'
+import { LEXICON_PREVIEW_CHARS, lexiconPreview, lexiconRuns } from './lexiconText'
 import { rootViewerReferences } from './rootViewerReferences'
 import {
   initialRootSections,
@@ -19,7 +20,8 @@ const HELP = {
   lemma: 'The dictionary headword that groups inflected versions of the same word. It is more specific than a root.',
   grammar: 'How this word functions here: its part of speech and features such as verb form, person, number, gender, case, voice, or mood.',
   occurrences: 'Every Quran word annotated with this root. Shared roots suggest a family resemblance, but context decides the meaning.',
-  related: 'Other dictionary headwords built from the same root. Their meanings may be related, but are not necessarily identical.',
+  lexicon: "Edward Lane's Arabic-English Lexicon (1863–93), the deepest classical dictionary in English. It describes the root across all of Arabic, not only the Quran, and cites the mediaeval lexicographers it draws on in parentheses.",
+  related: 'Other dictionary headwords built from the same root. Their meanings may be related, but are not necessarily identical. Each English line is the rendering used most often for that form, not a dictionary definition.',
 } as const
 function times(count: number) {
   return count === 1 ? 'once' : `${count} times`
@@ -89,12 +91,14 @@ function RootViewerBleed({ closing, rv }: { closing: boolean; rv: RootViewerStat
   const [showAllOccurrences, setShowAllOccurrences] = useState(false)
   const [showAllChapters, setShowAllChapters] = useState(false)
   const [showAllForms, setShowAllForms] = useState(false)
+  const [showWholeEntry, setShowWholeEntry] = useState(false)
 
   useEffect(() => {
     setOpenSurahId(rv.surahId)
     setShowAllOccurrences(false)
     setShowAllChapters(false)
     setShowAllForms(false)
+    setShowWholeEntry(false)
   }, [rv.root, rv.surahId])
 
   const visibleSections = showAllChapters
@@ -276,6 +280,7 @@ function RootViewerBleed({ closing, rv }: { closing: boolean; rv: RootViewerStat
                       <span>{posLabel(entry.pos)}</span>
                     </span>
                     <span className="root-related-count">{entry.occurrenceCount === 1 ? 'once' : `${entry.occurrenceCount}×`}</span>
+                    {entry.gloss ? <p className="root-related-gloss">{entry.gloss}</p> : null}
                   </div>
                 ))}
               </div>
@@ -284,6 +289,40 @@ function RootViewerBleed({ closing, rv }: { closing: boolean; rv: RootViewerStat
                   {showAllForms ? 'Show fewer forms' : `Show ${relatedForms.length - visibleForms.length} more forms`}
                 </button>
               ) : null}
+            </section>
+          ) : null}
+
+          {rv.lexicon ? (
+            <section className="root-section root-lexicon" aria-labelledby="root-lexicon-title">
+              <ExplainedHeading
+                id="root-lexicon-title"
+                kind="section"
+                label="Classical lexicon"
+                explanation={HELP.lexicon}
+              />
+              <p className="root-lexicon-entry">
+                {lexiconRuns(showWholeEntry ? rv.lexicon.text : lexiconPreview(rv.lexicon.text)).map(
+                  (run, index) =>
+                    run.isArabic ? (
+                      <span key={index} lang="ar" className="root-lexicon-arabic">{run.text}</span>
+                    ) : (
+                      <span key={index}>{run.text}</span>
+                    ),
+                )}
+              </p>
+              {rv.lexicon.text.length > LEXICON_PREVIEW_CHARS ? (
+                <button
+                  type="button"
+                  className="root-text-action"
+                  onClick={() => setShowWholeEntry((value) => !value)}
+                >
+                  {showWholeEntry ? 'Show less of the entry' : 'Read the whole entry'}
+                </button>
+              ) : null}
+              <p className="root-lexicon-credit">
+                Edward William Lane, An Arabic-English Lexicon
+                {rv.lexicon.page > 0 ? `, p. ${rv.lexicon.page}` : ''}. {rv.lexicon.credit}
+              </p>
             </section>
           ) : null}
 
