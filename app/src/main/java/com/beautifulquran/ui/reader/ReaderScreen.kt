@@ -246,6 +246,9 @@ fun ReaderScreen(
     var editingAnnotationSurah by rememberSaveable { mutableStateOf(0) }
     var editingAnnotationAyah by rememberSaveable { mutableStateOf(0) }
     var editingAnnotationText by rememberSaveable { mutableStateOf("") }
+    var bookmarkNoteTipSurah by rememberSaveable { mutableIntStateOf(0) }
+    var bookmarkNoteTipAyah by rememberSaveable { mutableIntStateOf(0) }
+    var bookmarkNoteTipOpen by rememberSaveable { mutableStateOf(false) }
     /**
      * Commits the open draft and closes the editor. Called when the field loses
      * focus, *before* opening another verse's note (so a draft is never carried
@@ -329,6 +332,8 @@ fun ReaderScreen(
     /** True while the repeat bleed is still on screen (including close wash). */
     var repeatRendered by remember { mutableStateOf(false) }
     var retainedRepeatChoice by rememberSaveable { mutableStateOf<RepeatChoice?>(null) }
+    val bookmarkNoteTipVisible = bookmarkNoteTipOpen &&
+        bookmarkNoteTipSurah != 0 && bookmarkNoteTipAyah != 0
     val haptics = LocalHapticFeedback.current
     val onRootReturnUserMovedLatest = rememberUpdatedState(onRootReturnUserMoved)
     // Continuous next-chapter advance: fly the opening from footer → header.
@@ -616,6 +621,10 @@ fun ReaderScreen(
     // System Back must dismiss the bleed, not pop the paper stack beneath it
     // (MainActivity's stack BackHandlers fire otherwise — see overlay backs there).
     BackHandler(enabled = showRepeatDialog) { showRepeatDialog = false }
+    BackHandler(enabled = bookmarkNoteTipVisible) {
+        viewModel.dismissBookmarkNoteTip()
+        bookmarkNoteTipOpen = false
+    }
 
     // Reading by hand pauses the follow mode via pointerInput.
 
@@ -2027,13 +2036,43 @@ fun ReaderScreen(
                                 // the margin; disable the ribbon while either is live.
                                 bookmarkInteractive = !recitingActive &&
                                     !gathering &&
-                                    editingAnnotationAyah == 0,
+                                    editingAnnotationAyah == 0 &&
+                                    !(bookmarkNoteTipSurah == ayah.surahId &&
+                                        bookmarkNoteTipAyah == ayah.number),
                                 // Gather mode owns the outer margin (ordinals)
                                 // and verse taps; hide the ribbon while gathering.
                                 onToggleBookmark = if (gathering) {
                                     null
                                 } else {
-                                    { viewModel.toggleBookmark(ayah.number) }
+                                    {
+                                        val result = viewModel.toggleBookmark(ayah.number)
+                                        if (result.showNoteTip) {
+                                            bookmarkNoteTipSurah = ayah.surahId
+                                            bookmarkNoteTipAyah = ayah.number
+                                            bookmarkNoteTipOpen = true
+                                        }
+                                        result.bookmarked
+                                    }
+                                },
+                                showBookmarkNoteTip = bookmarkNoteTipOpen &&
+                                    bookmarkNoteTipSurah == ayah.surahId &&
+                                    bookmarkNoteTipAyah == ayah.number,
+                                onDismissBookmarkNoteTip = if (
+                                    bookmarkNoteTipSurah == ayah.surahId &&
+                                    bookmarkNoteTipAyah == ayah.number
+                                ) {
+                                    {
+                                        viewModel.dismissBookmarkNoteTip()
+                                        bookmarkNoteTipOpen = false
+                                    }
+                                } else {
+                                    null
+                                },
+                                onBookmarkNoteTipRenderedChange = { rendered ->
+                                    if (!rendered && !bookmarkNoteTipOpen) {
+                                        bookmarkNoteTipSurah = 0
+                                        bookmarkNoteTipAyah = 0
+                                    }
                                 },
                                 gatherOrdinal = if (gathering) {
                                     gatherOrdinal(ayah.surahId, ayah.number)
