@@ -4,6 +4,11 @@ set -euo pipefail
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd -- "$SCRIPT_DIR/.." && pwd)"
 GRADLE_BUNDLE="$REPO_ROOT/app/build/outputs/bundle/release/app-release.aab"
+GIT_COMMON_DIR="$(
+  git -C "$REPO_ROOT" rev-parse --path-format=absolute --git-common-dir 2>/dev/null || true
+)"
+PRIMARY_ROOT="$(cd -- "$(dirname "$GIT_COMMON_DIR")" && pwd)"
+RELEASE_DIR="$PRIMARY_ROOT/release"
 VERSION_NAME="$(
   sed -nE 's/^[[:space:]]*versionName[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' \
     "$REPO_ROOT/app/build.gradle.kts"
@@ -12,17 +17,14 @@ if [[ -z "$VERSION_NAME" || "$VERSION_NAME" == *$'\n'* ]]; then
   printf 'error: expected one versionName in app/build.gradle.kts\n' >&2
   exit 1
 fi
-BUNDLE="$REPO_ROOT/BeautifulQuran-$VERSION_NAME.aab"
+BUNDLE="$RELEASE_DIR/BeautifulQuran-$VERSION_NAME.aab"
 EXPECTED_SHA1="48:36:68:57:5C:44:6A:BC:D2:AF:E3:3A:63:78:D6:CC:7B:DF:64:18"
 KEYSTORE="${RELEASE_KEYSTORE_FILE:-$REPO_ROOT/release.keystore}"
 
 # Linked worktrees do not inherit ignored files such as signing keys.
 if [[ -z "${RELEASE_KEYSTORE_FILE:-}" && ! -f "$KEYSTORE" ]]; then
-  git_common_dir="$(
-    git -C "$REPO_ROOT" rev-parse --path-format=absolute --git-common-dir 2>/dev/null || true
-  )"
-  primary_keystore="$(dirname "$git_common_dir")/release.keystore"
-  if [[ -n "$git_common_dir" && -f "$primary_keystore" ]]; then
+  primary_keystore="$PRIMARY_ROOT/release.keystore"
+  if [[ -n "$GIT_COMMON_DIR" && -f "$primary_keystore" ]]; then
     KEYSTORE="$primary_keystore"
   fi
 fi
@@ -63,6 +65,7 @@ if [[ "$actual_sha1" != "$EXPECTED_SHA1" ]]; then
   exit 1
 fi
 
+mkdir -p "$RELEASE_DIR"
 cp "$GRADLE_BUNDLE" "$BUNDLE"
 
 printf 'Release bundle: %s\n' "$BUNDLE"
