@@ -67,6 +67,9 @@ import com.beautifulquran.ornamentslab.OrnamentsLabViewModel
 import com.beautifulquran.ui.bookmarks.BookmarksScreen
 import com.beautifulquran.ui.bookmarks.BookmarksViewModel
 import com.beautifulquran.ui.entrance.EntranceCover
+import com.beautifulquran.ui.entrance.readCoverWindowChrome
+import com.beautifulquran.ui.theme.ornament.generateCoverOrnament
+import kotlin.random.Random
 import com.beautifulquran.ui.home.FloatingPlaybackCoverVisibleMaxPage
 import com.beautifulquran.ui.home.FloatingPlaybackListClearance
 import com.beautifulquran.ui.home.HomeScreen
@@ -127,9 +130,19 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        installSplashScreen()
+        // Hold the leather splash until the first Compose frame paints — either
+        // the closed mushaf (cold start) or the sheets (deep-link skip).
+        var splashPending = true
+        installSplashScreen().setKeepOnScreenCondition { splashPending }
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        // Pre-read safe insets + corner radii, and grow this launch's ornament,
+        // before Compose so the first cover frame is only layout + paint.
+        val coverChrome = DevProfiling.trace("coverChrome") { readCoverWindowChrome() }
+        val coverOrnament = DevProfiling.trace("coverOrnament") {
+            generateCoverOrnament(Random.nextInt())
+        }
+        DevProfiling.mark("preComposeReady")
         pendingAssistantAction.value = AssistantIntents.parse(intent)
 
         val app = application as QuranApp
@@ -152,6 +165,10 @@ class MainActivity : ComponentActivity() {
             LaunchedEffect(assistantAction) {
                 if (assistantAction != null) entranceDone = true
             }
+            // Deep links skip the cover: dismiss splash as soon as sheets draw.
+            if (entranceDone) {
+                SideEffect { splashPending = false }
+            }
 
             SideEffect {
                 val statusBarStyle = when {
@@ -163,25 +180,60 @@ class MainActivity : ComponentActivity() {
             }
 
             BeautifulQuranTheme(themeMode = settings.themeMode) {
-                // The status bar stays visible during playback: hiding it used
-                // to collapse the top inset (pulling the verse up under the
-                // notch) and flashed back on every loop restart. The reader
-                // instead paints its own opaque bar over that strip.
-                PaperStackApp(
-                    themeMode = settings.themeMode,
-                    developerModeEnabled = settings.developerModeEnabled,
-                    homeBookmarkStyle = settings.homeBookmarkStyle,
-                    entranceVisible = !entranceDone,
-                    pendingAssistantAction = assistantAction,
-                    onAssistantActionConsumed = { pendingAssistantAction.value = null },
-                    onRecordSystemTrace = {
-                        DevProfiling.recordSystemTrace(this@MainActivity)
-                    },
-                    onEntranceFinished = {
-                        entranceDone = true
-                        DevProfiling.reportFullyDrawn(this@MainActivity)
-                    },
-                )
+                // Cold start paints the closed mushaf first; the paper stack
+                // mounts under it after the title settles (onWarmStack), not
+                // at splash handoff — so ViewModel init cannot jank first paint.
+                var stackMounted by remember { mutableStateOf(entranceDone) }
+                var coverSounds by remember { mutableStateOf<PageTurnSounds?>(null) }
+                DisposableEffect(Unit) {
+                    onDispose { coverSounds?.release() }
+                }
+                Box(Modifier.fillMaxSize()) {
+                    if (stackMounted) {
+                        PaperStackApp(
+                            themeMode = settings.themeMode,
+                            developerModeEnabled = settings.developerModeEnabled,
+                            homeBookmarkStyle = settings.homeBookmarkStyle,
+                            entranceVisible = !entranceDone,
+                            pendingAssistantAction = assistantAction,
+                            onAssistantActionConsumed = {
+                                pendingAssistantAction.value = null
+                            },
+                            onRecordSystemTrace = {
+                                DevProfiling.recordSystemTrace(this@MainActivity)
+                            },
+                        )
+                    }
+                    if (!entranceDone) {
+                        EntranceCover(
+                            chrome = coverChrome,
+                            ornament = coverOrnament,
+                            onOpenBegan = {
+                                val sounds = coverSounds
+                                    ?: PageTurnSounds(this@MainActivity).also { coverSounds = it }
+                                sounds.playCoverOpen()
+                            },
+                            onReady = {
+                                splashPending = false
+                                DevProfiling.mark("coverReady")
+                            },
+                            onWarmStack = {
+                                DevProfiling.mark("warmStack")
+                                stackMounted = true
+                                if (coverSounds == null) {
+                                    coverSounds = DevProfiling.trace("coverSounds") {
+                                        PageTurnSounds(this@MainActivity)
+                                    }
+                                }
+                            },
+                            onFinished = {
+                                entranceDone = true
+                                DevProfiling.reportFullyDrawn(this@MainActivity)
+                            },
+                            modifier = Modifier.zIndex(1f),
+                        )
+                    }
+                }
             }
         }
     }
@@ -213,7 +265,6 @@ private fun PaperStackApp(
     pendingAssistantAction: AssistantAction? = null,
     onAssistantActionConsumed: () -> Unit = {},
     onRecordSystemTrace: () -> Unit,
-    onEntranceFinished: () -> Unit,
 ) {
     val app = LocalContext.current.applicationContext as QuranApp
     val homeViewModel: HomeViewModel = viewModel(factory = AppViewModelFactory)
@@ -861,16 +912,6 @@ private fun PaperStackApp(
             }
         }
 
-        // The entrance ceremony — the closed mushaf over everything. It is
-        // not a sheet in the stack: it is the board the stack lives behind,
-        // and it leaves composition for good once it has swung open.
-        if (entranceVisible) {
-            EntranceCover(
-                onOpenBegan = { pageTurnSounds.playCoverOpen() },
-                onFinished = onEntranceFinished,
-                modifier = Modifier.zIndex(6f),
-            )
-        }
     }
 }
 

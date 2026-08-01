@@ -462,7 +462,7 @@ private fun DeveloperSection(
     Spacer(Modifier.height(2.dp))
     Caption("Tools for testing work in progress.")
 
-    if (BuildConfig.DEBUG && Build.VERSION.SDK_INT >= 37) {
+    if (BuildConfig.DEBUG && Build.VERSION.SDK_INT >= 35) {
         Spacer(Modifier.height(20.dp))
         Text(
             text = "Record 10-second system trace",
@@ -473,7 +473,13 @@ private fun DeveloperSection(
                 .padding(vertical = 6.dp),
             color = MaterialTheme.colorScheme.primary,
         )
-        Caption("Android 17 ProfilingManager writes a Perfetto trace locally; the path is logged under BeautifulQuranProfile.")
+        Caption(
+            if (Build.VERSION.SDK_INT >= 37) {
+                "ProfilingManager SystemTraceRequestBuilder + cold-start triggers; path logged under BeautifulQuranProfile."
+            } else {
+                "ProfilingManager SystemTraceRequestBuilder (API 35+); path logged under BeautifulQuranProfile. Cold-start triggers need API 37."
+            },
+        )
     }
 
     Spacer(Modifier.height(20.dp))

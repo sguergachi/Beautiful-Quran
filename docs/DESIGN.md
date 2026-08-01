@@ -485,21 +485,31 @@ The paper metaphor begins before the first sheet: a cold start opens on the
 selection is what the reader finds when its cover turns. The ceremony has
 three moments:
 
-1. **Arrival.** The board fades in from the system splash: deep-green
-   leather (fixed across themes — a bound book keeps its own boards, colors
-   in `Theme.kt`'s `Cover*` values), framed in a doubled gilt rule
-   (`MushafCoverFrame`) with the generated border frieze running between
-   the rules — each side is a railed channel fitting a whole number of
-   pattern periods, and its mouth tapers onto the corner seal's petal tip
-   (each seal wears a four-petal ogee bezel whose tips aim down the band
-   axes), so border and corner ornaments are one continuous piece of
-   geometry. The frame, border, and seals are the binding's tooling and
-   render complete on the very first frame — no wash, no fade. Tooled
-   *inside* that frame, this launch's generated Hankin field (whisper ink)
-   and the generated medallion (`GeneratedMedallion`) with the title
-   **القرآن الكريم** beneath it in the Hafs hand, leafed in gold, ink
-   themselves onto the leather in real time as the ceremony arrives —
-   the illumination, drawn before the reader's eyes.
+1. **Arrival.** The system splash *is* the board: the same deep-green
+   leather (`CoverLeatherCenter` / `@color/cover_leather`) with no app
+   icon, held on screen until Compose lays out the closed mushaf, then
+   handed off with no second fade.    Cold start composes the cover first; chrome and this launch's ornament
+   are pre-built in `onCreate`, and the paper stack mounts under the board
+   only after two cover frames (not at splash handoff) so ViewModel init
+   cannot jank first paint. Safe-area insets (system bars ignoring
+   visibility ∪ cutout) and screen-corner radii come from
+   `WindowManager.currentWindowMetrics`, so the gilt frame is correct on
+   the first Compose frame and splash hands off without waiting for
+   Compose's inset mirror. Fixed across themes — a bound book
+   keeps its own boards (`Theme.kt`'s `Cover*` values) — framed in a
+   doubled gilt rule (`MushafCoverFrame`) with the generated border
+   frieze running between the rules — each side is a railed channel
+   fitting a whole number of pattern periods, and its mouth tapers onto
+   the corner seal's petal tip (each seal wears a four-petal ogee bezel
+   whose tips aim down the band axes), so border and corner ornaments
+   are one continuous piece of geometry. The frame, border, and seals
+   are the binding's tooling and render complete on the very first
+   frame — no wash, no fade. Tooled *inside* that frame, this launch's
+   generated Hankin field (whisper ink) and the generated medallion
+   (`GeneratedMedallion`) with the title **القرآن الكريم** beneath it
+   in the Hafs hand, leafed in gold, ink themselves onto the leather in
+   real time as the ceremony arrives — the illumination, drawn before
+   the reader's eyes.
    The frame's inset and corner radii are derived from the display's
    rounded corners (`WindowInsets.getRoundedCorner`, via
    `coverFrameGeometry`) so the gilt rule is concentric with the phone's

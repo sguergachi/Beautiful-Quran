@@ -104,18 +104,26 @@ regression, and a fabricated before/after must not enter the performance record.
 
 `DevProfiling` has source-set-specific implementations:
 
-- `src/debug` registers Android 17 triggers and can request a manual system
-  trace;
+- `src/debug` uses Jetpack `SystemTraceRequestBuilder` +
+  `androidx.core.os.requestProfiling` (API 35+) for manual traces, and
+  registers Android 17 cold-start / fully-drawn triggers (API 37+);
 - `src/release` is a no-op, so release builds register nothing and collect
   nothing.
 
-On Android 17 debug builds, cold start, fully drawn, ANR, OOM, and excessive-CPU
-kill triggers are registered with a one-hour per-trigger limit. Trigger capture
-depends on the system background trace being active and is not guaranteed.
+On Android 17 debug builds, `TRIGGER_TYPE_COLD_START` starts a system trace as
+early as the process allows and keeps it until `Activity.reportFullyDrawn()`
+(the entrance ceremony calls this when the cover finishes opening) or a
+5-second default timeout. `TRIGGER_TYPE_APP_FULLY_DRAWN` captures the moment
+fully-drawn is reported. Trigger capture depends on the system background
+trace being active — enable the testing helpers below for local work.
+
+Ceremony milestones also emit `BeautifulQuranProfile` log lines and atrace
+sections (`coverChrome`, `coverOrnament`, `coverReady`, `warmStack`, …) so a
+Perfetto UI search finds the handoff points quickly.
 
 For an explicit local trace request:
 
-1. Install and run the debug APK on Android 17.
+1. Install and run the debug APK on API 35+ (API 37 for cold-start triggers).
 2. Open Settings and tap the app mark three times to enable developer mode.
 3. In Developer, tap **Record 10-second system trace**.
 4. Exercise the interaction of interest during those ten seconds.
@@ -126,17 +134,23 @@ adb logcat -s BeautifulQuranProfile
 ```
 
 Pull the returned `resultFilePath` with `adb pull` and open it in
-[Perfetto](https://ui.perfetto.dev/). For repeated local requests, Android's
-profiling rate limiter can be disabled temporarily:
+[Perfetto](https://ui.perfetto.dev/). For repeated local requests, disable
+rate limiting and keep temporary results:
 
 ```bash
 adb shell device_config put profiling_testing rate_limiter.disabled true
+adb shell device_config put profiling_testing delete_temporary_results.disabled true
+# API 37 cold-start triggers also need a running background trace:
+adb shell device_config put profiling_testing \
+  system_triggered_profiling.testing_package_name com.beautifulquran
 ```
 
-Restore it after the session:
+Restore after the session:
 
 ```bash
 adb shell device_config delete profiling_testing rate_limiter.disabled
+adb shell device_config delete profiling_testing delete_temporary_results.disabled
+adb shell device_config delete profiling_testing system_triggered_profiling.testing_package_name
 ```
 
 Profiles remain on the test device until removed. They must never be committed

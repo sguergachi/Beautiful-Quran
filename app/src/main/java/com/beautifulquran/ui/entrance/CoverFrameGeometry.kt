@@ -20,6 +20,55 @@ data class ScreenCornerRadiiPx(
 }
 
 /**
+ * Safe-area insets for the entrance cover frame, in pixels. Union of system
+ * bars (ignoring visibility) and display cutout — the ceremony hides the
+ * status bar but still reserves that band so the gilt rule never jumps.
+ */
+data class CoverSafeInsetsPx(
+    val left: Int,
+    val top: Int,
+    val right: Int,
+    val bottom: Int,
+) {
+    companion object {
+        val Zero = CoverSafeInsetsPx(0, 0, 0, 0)
+    }
+}
+
+/**
+ * Horizontal and vertical frame margins in dp for the cover's gilt rule.
+ *
+ * Book proportions: generous head/foot, tighter fore-edges. Each side is
+ * floored to clear [safe]; the fore-edge only widens (never past the base
+ * margin) as far as it must to seat the isti'adha inside the inner rule.
+ */
+fun coverFrameMarginsDp(
+    density: Float,
+    safe: CoverSafeInsetsPx,
+    screenWidthPx: Float,
+    duaWidthPx: Float,
+    innerInsetPx: Float,
+): Pair<Float, Float> {
+    val breathing = 8f * density
+    val baseH = 16f * density
+    val baseV = 44f * density
+    val floorH = maxOf(
+        10f * density,
+        safe.left + breathing,
+        safe.right + breathing,
+    )
+    val duaGap = 14f * density
+    val allowH = screenWidthPx / 2f - duaWidthPx / 2f - duaGap - innerInsetPx
+    val hPx = allowH.coerceAtMost(baseH).coerceAtLeast(floorH)
+    val vPx = maxOf(
+        baseV,
+        safe.top + breathing,
+        safe.bottom + breathing,
+    )
+    return (hPx / density) to (vPx / density)
+}
+
+/**
  * Concentric gilt-frame insets, corner radii, and corner-ornament size for
  * the entrance cover.
  *

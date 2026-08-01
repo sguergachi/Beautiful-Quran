@@ -6,9 +6,13 @@
         <item name="android:windowLightStatusBar">true</item>
     </style>
 
+    <!-- Cold start: solid leather until Compose paints the closed mushaf.
+         Icon + icon-background match the board so Android 12's mandatory
+         circle never flashes a separate mark over the ceremony. -->
     <style name="Theme.BeautifulQuran.Splash" parent="Theme.SplashScreen">
-        <item name="windowSplashScreenBackground">#0E5C4A</item>
+        <item name="windowSplashScreenBackground">@color/cover_leather</item>
         <item name="windowSplashScreenAnimatedIcon">@drawable/ic_splash</item>
+        <item name="windowSplashScreenIconBackgroundColor">@color/cover_leather</item>
         <item name="postSplashScreenTheme">@style/Theme.BeautifulQuran</item>
     </style>
 </resources>

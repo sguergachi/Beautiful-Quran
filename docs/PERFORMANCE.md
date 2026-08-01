@@ -236,6 +236,10 @@ device trace and a pixel/motion comparison.
   the whole prefs file is parsed once and then served from memory, so this may
   well be noise. If a trace shows a real stall, move the *first read* off the
   main thread; do not migrate to DataStore (see `COMPLEXITY.md`).
+- Entrance ceremony: cover chrome + ornament are built in `Activity.onCreate`
+  before `setContent`; the paper stack / ViewModels mount only after two
+  cover frames (`onWarmStack`). Cover-open `PageTurnSounds` is created lazily
+  at warm/open, not on first paint. Leather fill uses `drawWithCache`.
 - Allocation inside per-frame custom draw lambdas — especially temporary bloom
   lists and gradient construction.
 - The number and retained memory of per-word graphics layers in gloss mode.
