@@ -474,7 +474,9 @@ private val AnalysisArabicBearingCrop = 16.dp
 
 /**
  * Gutter between lemma and glosses: long horizontal stub on the shared
- * baseline, then a vertical column rule down the sense stack.
+ * baseline, then a vertical column rule down the sense stack. Single-sense
+ * rows split the gutter evenly so the elbow sits midway (see
+ * [LemmaSingleSenseRow]).
  */
 private val LemmaGutterWidth = 52.dp
 private val LemmaGutterPaddingStart = 16.dp
@@ -486,11 +488,13 @@ private val LemmaToMetaGap = 20.dp
 
 /** Shared face for Root Form‑1 lead and Lemma dictionary glosses. */
 private val AnalysisGlossAlpha = 0.9f
+private val AnalysisGlossSize = 18.sp
+private val AnalysisGlossLineHeight = 22.sp
 
 @Composable
 private fun analysisGlossStyle(): TextStyle = MaterialTheme.typography.bodyLarge.copy(
-    fontSize = 18.sp,
-    lineHeight = 22.sp,
+    fontSize = AnalysisGlossSize,
+    lineHeight = AnalysisGlossLineHeight,
     fontWeight = FontWeight.Medium,
     platformStyle = PlatformTextStyle(includeFontPadding = false),
     lineHeightStyle = LineHeightStyle(
@@ -1008,8 +1012,9 @@ private fun RelatedFormRow(form: RootLemmaSummary) {
 
 /**
  * Arabic lemma left, Wiktionary senses right — one shared baseline, long
- * gutter stub, vertical column rule down the gloss stack. Grammar / frequency
- * sit under the senses; action links under that.
+ * gutter stub, vertical column rule down the sense stack. A single sense
+ * centers the elbow in that gutter. Grammar / frequency sit under the
+ * senses; action links under that.
  */
 @Composable
 private fun LemmaWithDictionary(
@@ -1030,95 +1035,29 @@ private fun LemmaWithDictionary(
     val lineColor = MaterialTheme.colorScheme.onSurface.copy(alpha = LemmaConnectorAlpha)
     val glossStyle = analysisGlossStyle()
 
-    val spineWidthPx = with(LocalDensity.current) { 1.dp.toPx() }
-
     Column(modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(IntrinsicSize.Min),
-        ) {
-            Text(
-                text = lemma,
-                color = MaterialTheme.colorScheme.onSurface,
-                style = analysisValueStyle(
-                    AnalysisArabicSize,
-                    AnalysisArabicLineHeight,
-                    HafsFontFamily,
-                ),
-                modifier = Modifier
-                    .alignByBaseline()
-                    .tightenHafsTopBearing(AnalysisArabicBearingCrop),
+        if (visible.size == 1) {
+            LemmaSingleSenseRow(
+                lemma = lemma,
+                gloss = visible[0].let { (posLabel, gloss) ->
+                    if (showPosLabels && posLabel != null) "$posLabel · $gloss" else gloss
+                },
+                lineColor = lineColor,
+                glossStyle = glossStyle,
+                glossColor = glossColor,
             )
-            // 1dp stub whose bottom sits on the shared baseline.
-            Box(
-                modifier = Modifier
-                    .padding(start = LemmaGutterPaddingStart)
-                    .width(LemmaGutterWidth)
-                    .height(1.dp)
-                    .alignBy { it.measuredHeight }
-                    .background(lineColor),
+        } else {
+            LemmaSenseStackRow(
+                lemma = lemma,
+                visible = visible,
+                showPosLabels = showPosLabels,
+                lineColor = lineColor,
+                glossStyle = glossStyle,
+                glossColor = glossColor,
+                expanded = expanded,
+                canExpand = dictionaryNeedsExpand(glosses.size),
+                onToggle = onToggle,
             )
-            // Right column: senses + Show more/less, all under the spine.
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .alignByBaseline()
-                    .drawBehind {
-                        drawLine(
-                            color = lineColor,
-                            start = Offset(0f, 0f),
-                            end = Offset(0f, size.height),
-                            strokeWidth = spineWidthPx,
-                        )
-                    }
-                    .padding(start = LemmaGutterPaddingEnd),
-            ) {
-                Column(verticalArrangement = Arrangement.spacedBy(LemmaGlossGap)) {
-                    visible.forEachIndexed { index, row ->
-                        val posLabel = row.first
-                        val gloss = row.second
-                        // One child per sense so spacedBy is even; first sense
-                        // is a single Text so FirstBaseline locks to lemma.
-                        if (index == 0) {
-                            Text(
-                                text = if (showPosLabels && posLabel != null) {
-                                    "$posLabel · $gloss"
-                                } else {
-                                    gloss
-                                },
-                                style = glossStyle,
-                                color = glossColor,
-                            )
-                        } else {
-                            Column {
-                                if (showPosLabels && posLabel != null) {
-                                    Text(
-                                        text = posLabel,
-                                        style = MaterialTheme.typography.labelLarge,
-                                        color = MaterialTheme.colorScheme.onSurface.copy(
-                                            alpha = 0.55f,
-                                        ),
-                                        modifier = Modifier.padding(bottom = 4.dp),
-                                    )
-                                }
-                                Text(
-                                    text = gloss,
-                                    style = glossStyle,
-                                    color = glossColor,
-                                )
-                            }
-                        }
-                    }
-                }
-                if (dictionaryNeedsExpand(glosses.size)) {
-                    AnalysisActionLink(
-                        text = if (expanded) "Show less" else "Show more",
-                        onClick = onToggle,
-                        modifier = Modifier.padding(top = 8.dp),
-                    )
-                }
-            }
         }
         LemmaMeta(
             grammar = grammar,
@@ -1130,6 +1069,173 @@ private fun LemmaWithDictionary(
             onClick = { onOpenOnline(wiktionaryArabicUrl(entry.word)) },
             modifier = Modifier.padding(top = 12.dp),
         )
+    }
+}
+
+/**
+ * One gloss: fixed gutter with equal arms so the vertical elbow sits
+ * midway in the gap — short English stays beside the lemma, not hugged
+ * by a left-edge spine.
+ */
+@Composable
+private fun LemmaSingleSenseRow(
+    lemma: String,
+    gloss: String,
+    lineColor: Color,
+    glossStyle: TextStyle,
+    glossColor: Color,
+) {
+    val spineHeight = with(LocalDensity.current) { AnalysisGlossLineHeight.toDp() }
+    val spineWidthPx = with(LocalDensity.current) { 1.dp.toPx() }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(IntrinsicSize.Min),
+    ) {
+        Text(
+            text = lemma,
+            color = MaterialTheme.colorScheme.onSurface,
+            style = analysisValueStyle(
+                AnalysisArabicSize,
+                AnalysisArabicLineHeight,
+                HafsFontFamily,
+            ),
+            modifier = Modifier
+                .alignByBaseline()
+                .tightenHafsTopBearing(AnalysisArabicBearingCrop),
+        )
+        Box(
+            modifier = Modifier
+                .padding(horizontal = LemmaGutterPaddingStart)
+                .width(LemmaGutterWidth)
+                .height(spineHeight)
+                .alignBy { it.measuredHeight }
+                .drawBehind {
+                    val y = size.height - spineWidthPx / 2f
+                    val midX = size.width / 2f
+                    drawLine(
+                        color = lineColor,
+                        start = Offset(0f, y),
+                        end = Offset(size.width, y),
+                        strokeWidth = spineWidthPx,
+                    )
+                    drawLine(
+                        color = lineColor,
+                        start = Offset(midX, 0f),
+                        end = Offset(midX, size.height),
+                        strokeWidth = spineWidthPx,
+                    )
+                },
+        )
+        Text(
+            text = gloss,
+            style = glossStyle,
+            color = glossColor,
+            modifier = Modifier
+                .weight(1f)
+                .alignByBaseline(),
+        )
+    }
+}
+
+/** Multi-sense stack: fixed stub, column rule down the English side. */
+@Composable
+private fun LemmaSenseStackRow(
+    lemma: String,
+    visible: List<Pair<String?, String>>,
+    showPosLabels: Boolean,
+    lineColor: Color,
+    glossStyle: TextStyle,
+    glossColor: Color,
+    expanded: Boolean,
+    canExpand: Boolean,
+    onToggle: () -> Unit,
+) {
+    val spineWidthPx = with(LocalDensity.current) { 1.dp.toPx() }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(IntrinsicSize.Min),
+    ) {
+        Text(
+            text = lemma,
+            color = MaterialTheme.colorScheme.onSurface,
+            style = analysisValueStyle(
+                AnalysisArabicSize,
+                AnalysisArabicLineHeight,
+                HafsFontFamily,
+            ),
+            modifier = Modifier
+                .alignByBaseline()
+                .tightenHafsTopBearing(AnalysisArabicBearingCrop),
+        )
+        Box(
+            modifier = Modifier
+                .padding(start = LemmaGutterPaddingStart)
+                .width(LemmaGutterWidth)
+                .height(1.dp)
+                .alignBy { it.measuredHeight }
+                .background(lineColor),
+        )
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .alignByBaseline()
+                .drawBehind {
+                    drawLine(
+                        color = lineColor,
+                        start = Offset(0f, 0f),
+                        end = Offset(0f, size.height),
+                        strokeWidth = spineWidthPx,
+                    )
+                }
+                .padding(start = LemmaGutterPaddingEnd),
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(LemmaGlossGap)) {
+                visible.forEachIndexed { index, row ->
+                    val posLabel = row.first
+                    val gloss = row.second
+                    // One child per sense so spacedBy is even; first sense
+                    // is a single Text so FirstBaseline locks to lemma.
+                    if (index == 0) {
+                        Text(
+                            text = if (showPosLabels && posLabel != null) {
+                                "$posLabel · $gloss"
+                            } else {
+                                gloss
+                            },
+                            style = glossStyle,
+                            color = glossColor,
+                        )
+                    } else {
+                        Column {
+                            if (showPosLabels && posLabel != null) {
+                                Text(
+                                    text = posLabel,
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = MaterialTheme.colorScheme.onSurface.copy(
+                                        alpha = 0.55f,
+                                    ),
+                                    modifier = Modifier.padding(bottom = 4.dp),
+                                )
+                            }
+                            Text(
+                                text = gloss,
+                                style = glossStyle,
+                                color = glossColor,
+                            )
+                        }
+                    }
+                }
+            }
+            if (canExpand) {
+                AnalysisActionLink(
+                    text = if (expanded) "Show less" else "Show more",
+                    onClick = onToggle,
+                    modifier = Modifier.padding(top = 8.dp),
+                )
+            }
+        }
     }
 }
 
