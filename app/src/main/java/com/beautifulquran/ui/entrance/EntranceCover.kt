@@ -3,8 +3,6 @@ package com.beautifulquran.ui.entrance
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
-import android.os.Build
-import android.view.RoundedCorner
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.CubicBezierEasing
@@ -18,14 +16,10 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.systemBars
-import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.shape.AbsoluteRoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -38,17 +32,18 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -75,9 +70,8 @@ import com.beautifulquran.ui.theme.MushafCoverFrame
 import com.beautifulquran.ui.theme.generatedFieldWeave
 import com.beautifulquran.ui.theme.gilded
 import com.beautifulquran.ui.theme.letterFadeIn
-import com.beautifulquran.ui.theme.ornament.generateCoverOrnament
+import com.beautifulquran.ui.theme.ornament.CoverOrnament
 import com.beautifulquran.ui.theme.quietClickable
-import kotlin.random.Random
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -92,9 +86,6 @@ private const val ISTIADHA_ENGLISH = "I seek refuge in Allah from Shaytan, the a
 /** Isti'adha type size — shared by the rendered line and the width measure
  *  that sizes the cover's fore-edge margin so the du'a stays inside the frame. */
 private const val DUA_ARABIC_SP = 24f
-
-/** The sheet breathing in from the system splash. */
-private const val SHEET_FADE_MS = 550
 
 /** The title's ink wash across the calligraphy. */
 private const val TITLE_WASH_MS = 1_500
@@ -149,25 +140,34 @@ private const val COVER_FRAME_SCALE = 1.10f
  * it at once.
  *
  * Sits over the whole paper stack and leaves composition via [onFinished].
- * The status bar is hidden for the ceremony so the leather board reads as a
- * full-bleed cover; it is restored when this composable leaves.
+ * The system splash is the same leather; [chrome] is pre-read from the
+ * window in `onCreate` so the gilt frame is inset-correct on the first
+ * Compose frame, and [onReady] dismisses splash as soon as this board has
+ * laid out. [onWarmStack] fires once the arrival title has settled (or on
+ * skip) so the paper stack can mount under the cover without stealing the
+ * first frames. The status bar is hidden for the ceremony so the leather
+ * board reads as a full-bleed cover; it is restored when this composable
+ * leaves.
  */
 @Composable
 fun EntranceCover(
+    chrome: CoverWindowChrome,
+    ornament: CoverOrnament,
     onOpenBegan: () -> Unit,
     onFinished: () -> Unit,
+    onReady: () -> Unit = {},
+    onWarmStack: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val view = LocalView.current
     val localDensity = LocalDensity.current
 
     var phase by remember { mutableStateOf(EntrancePhase.Arriving) }
-    val sheetAlpha = remember { Animatable(0f) }
+    // Opaque from the first frame: the splash already showed this leather.
+    val sheetAlpha = remember { Animatable(1f) }
     val titleWash = remember { Animatable(0f) }
     val duaWash = remember { Animatable(0f) }
     val turn = remember { Animatable(0f) }
-    // A fresh ornament every launch — the generating machine's whole point.
-    val ornament = remember { generateCoverOrnament(Random.nextInt()) }
     val build = remember { Animatable(0f) }
     // Skip requests cancel the in-flight moment without re-running arrival —
     // re-keying a phase effect used to replay the title wash.
@@ -175,8 +175,19 @@ fun EntranceCover(
     // Caption fades up once the du'a moment begins — driven by phase so
     // composition does not poll the wash Animatable every frame.
     var captionVisible by remember { mutableStateOf(false) }
+    val splashHandedOff = remember { booleanArrayOf(false) }
+    val stackWarmed = remember { booleanArrayOf(false) }
+    fun warmStackOnce() {
+        if (!stackWarmed[0]) {
+            stackWarmed[0] = true
+            onWarmStack()
+        }
+    }
 
-    val screenRadii = rememberScreenCornerRadii()
+    // Chrome is fixed for the ceremony: Activity pre-read system bars
+    // (ignoring visibility) ∪ cutout and screen corners so the frame never
+    // waits on Compose's inset mirror or jumps when the status bar hides.
+    val screenRadii = chrome.radii
     val frameGeometry = remember(screenRadii, localDensity.density) {
         coverFrameGeometry(screenRadii, localDensity.density)
     }
@@ -206,39 +217,21 @@ fun EntranceCover(
             style = TextStyle(fontFamily = HafsFontFamily, fontSize = DUA_ARABIC_SP.sp),
         ).size.width.toFloat()
     }
-
-    // The leather board bleeds to the physical edge, but its gilt frame and
-    // ornaments must clear the camera cutout and the system-bar zones — a
-    // tooled cover never runs its rule under the lens. Pull the frame in with
-    // a book's proportions: generous head and foot margins, tighter
-    // fore-edges. Each side is floored to clear its safe inset; the fore-edge
-    // then only widens (never past the base margin) as far as it must to seat
-    // the du'a inside the inner rule.
-    val layoutDirection = LocalLayoutDirection.current
-    val safeInsets = WindowInsets.displayCutout.union(WindowInsets.systemBars)
-    val (frameMarginH, frameMarginV) = with(localDensity) {
-        val breathing = 8.dp.toPx()
-        val baseH = 16.dp.toPx()
-        val baseV = 44.dp.toPx()
-        val floorH = maxOf(
-            10.dp.toPx(),
-            safeInsets.getLeft(this, layoutDirection) + breathing,
-            safeInsets.getRight(this, layoutDirection) + breathing,
+    val (frameMarginH, frameMarginV) = remember(
+        chrome.safeInsets,
+        localDensity.density,
+        configuration.screenWidthDp,
+        duaWidthPx,
+        frameGeometry.innerInsetPx,
+    ) {
+        val (hDp, vDp) = coverFrameMarginsDp(
+            density = localDensity.density,
+            safe = chrome.safeInsets,
+            screenWidthPx = configuration.screenWidthDp * localDensity.density,
+            duaWidthPx = duaWidthPx,
+            innerInsetPx = frameGeometry.innerInsetPx,
         )
-        // Largest fore-edge margin at which the inner rule still clears the
-        // du'a: screenHalf − duaHalf − gap − (inner rule's inset in the box).
-        val duaGap = 14.dp.toPx()
-        val allowH = configuration.screenWidthDp.dp.toPx() / 2f -
-            duaWidthPx / 2f - duaGap - frameGeometry.innerInsetPx
-        // Never past the base margin, never under the safe-inset floor — the
-        // floor wins if a side cutout ever demands more than the base.
-        val h = allowH.coerceAtMost(baseH).coerceAtLeast(floorH).toDp()
-        val v = maxOf(
-            baseV,
-            safeInsets.getTop(this) + breathing,
-            safeInsets.getBottom(this) + breathing,
-        ).toDp()
-        h to v
+        hDp.dp to vDp.dp
     }
 
     // Full-bleed leather: hide the status bar for the ceremony, restore after.
@@ -268,13 +261,20 @@ fun EntranceCover(
     // in-flight moment without re-keying this effect — re-keying on phase
     // used to replay the title wash.
     LaunchedEffect(Unit) {
-        // The ornament inks in alongside the ceremony, not gated by it.
+        // Ornament was pre-grown in onCreate; ink wash runs beside the ceremony.
         launch { build.animateTo(1f, tween(ORNAMENT_BUILD_MS, easing = LinearEasing)) }
+        // Two exclusive cover frames, then mount the stack under the board so
+        // a fast skip-to-open still has time to warm ViewModels.
+        launch {
+            withFrameNanos { }
+            withFrameNanos { }
+            warmStackOnce()
+        }
         val moment = launch {
-            sheetAlpha.animateTo(1f, tween(SHEET_FADE_MS, easing = LinearEasing))
             titleWash.animateTo(1f, tween(TITLE_WASH_MS, easing = LinearEasing))
             delay(ARRIVAL_HOLD_MS)
 
+            warmStackOnce()
             phase = EntrancePhase.Dua
             captionVisible = true
             duaWash.animateTo(1f, tween(DUA_WASH_MS, easing = LinearEasing))
@@ -293,6 +293,7 @@ fun EntranceCover(
         duaWash.snapTo(1f)
         build.snapTo(1f)
         captionVisible = true
+        warmStackOnce()
         phase = EntrancePhase.Opening
         onOpenBegan()
         turn.animateTo(1f, tween(OPEN_MS, easing = CoverOpenEasing))
@@ -314,7 +315,16 @@ fun EntranceCover(
         label = "duaCaption",
     )
 
-    Box(modifier.fillMaxSize()) {
+    Box(
+        modifier
+            .fillMaxSize()
+            .onGloballyPositioned {
+                if (!splashHandedOff[0]) {
+                    splashHandedOff[0] = true
+                    onReady()
+                }
+            },
+    ) {
         Box(
             Modifier
                 .fillMaxSize()
@@ -335,15 +345,14 @@ fun EntranceCover(
                     alpha = sheetAlpha.value * (1f - openFade(t))
                 }
                 .clip(coverShape)
-                .drawBehind {
-                    drawRect(
-                        Brush.radialGradient(
-                            0f to CoverLeatherCenter,
-                            1f to CoverLeatherEdge,
-                            center = Offset(size.width / 2f, size.height * 0.42f),
-                            radius = size.height * 0.75f,
-                        ),
+                .drawWithCache {
+                    val leather = Brush.radialGradient(
+                        0f to CoverLeatherCenter,
+                        1f to CoverLeatherEdge,
+                        center = Offset(size.width / 2f, size.height * 0.42f),
+                        radius = size.height * 0.75f,
                     )
+                    onDrawBehind { drawRect(leather) }
                 }
                 .generatedFieldWeave(
                     field = ornament.field,
@@ -486,40 +495,6 @@ fun EntranceCover(
             }
         }
     }
-}
-
-/**
- * Reads the display's rounded-corner radii from the root window insets
- * (API 31+). Re-reads after layout so the first frame (often before insets
- * land) does not lock in zeros.
- */
-@Composable
-private fun rememberScreenCornerRadii(): ScreenCornerRadiiPx {
-    val view = LocalView.current
-    var radii by remember { mutableStateOf(readScreenCornerRadii(view)) }
-    DisposableEffect(view) {
-        val listener = android.view.View.OnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
-            val next = readScreenCornerRadii(view)
-            if (next != radii) radii = next
-        }
-        view.addOnLayoutChangeListener(listener)
-        radii = readScreenCornerRadii(view)
-        onDispose { view.removeOnLayoutChangeListener(listener) }
-    }
-    return radii
-}
-
-private fun readScreenCornerRadii(view: android.view.View): ScreenCornerRadiiPx {
-    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return ScreenCornerRadiiPx.Zero
-    val insets = view.rootWindowInsets ?: return ScreenCornerRadiiPx.Zero
-    fun r(position: Int): Float =
-        insets.getRoundedCorner(position)?.radius?.toFloat() ?: 0f
-    return ScreenCornerRadiiPx(
-        topLeft = r(RoundedCorner.POSITION_TOP_LEFT),
-        topRight = r(RoundedCorner.POSITION_TOP_RIGHT),
-        bottomRight = r(RoundedCorner.POSITION_BOTTOM_RIGHT),
-        bottomLeft = r(RoundedCorner.POSITION_BOTTOM_LEFT),
-    )
 }
 
 /** 0 until the swing passes ~55% (web keyframe), then eases to 1 edge-on. */

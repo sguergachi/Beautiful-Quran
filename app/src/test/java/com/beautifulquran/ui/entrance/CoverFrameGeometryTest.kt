@@ -64,4 +64,35 @@ class CoverFrameGeometryTest {
         // Star stays smaller than the outer margin it lives in.
         assertTrue(g.starRadiusPx < g.outerInsetPx * 1.05f)
     }
+
+    @Test
+    fun `frame margins reserve ignoring-visibility status bar from the first frame`() {
+        val g = coverFrameGeometry(ScreenCornerRadiiPx.Zero, density)
+        val statusTop = (48f * density).toInt()
+        val (hDp, vDp) = coverFrameMarginsDp(
+            density = density,
+            safe = CoverSafeInsetsPx(0, statusTop, 0, 0),
+            screenWidthPx = 360f * density,
+            duaWidthPx = 120f * density,
+            innerInsetPx = g.innerInsetPx,
+        )
+        // Vertical: status + 8 dp breathing beats the 44 dp base.
+        assertEquals(48f + 8f, vDp, 0.01f)
+        // Horizontal stays at the book base when cutouts are absent.
+        assertEquals(16f, hDp, 0.01f)
+    }
+
+    @Test
+    fun `frame margins without safe insets keep the book base`() {
+        val g = coverFrameGeometry(ScreenCornerRadiiPx.Zero, density)
+        val (hDp, vDp) = coverFrameMarginsDp(
+            density = density,
+            safe = CoverSafeInsetsPx.Zero,
+            screenWidthPx = 360f * density,
+            duaWidthPx = 200f * density,
+            innerInsetPx = g.innerInsetPx,
+        )
+        assertEquals(16f, hDp, 0.01f)
+        assertEquals(44f, vDp, 0.01f)
+    }
 }

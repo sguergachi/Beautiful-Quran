@@ -1,19 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Transparent: the splash is leather only; the entrance cover is the icon. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
     <path
-        android:fillColor="#C9A227"
-        android:pathData="M36,36 L72,36 L72,72 L36,72 Z" />
-    <path
-        android:fillColor="#C9A227"
-        android:pathData="M54,28.5 L79.5,54 L54,79.5 L28.5,54 Z" />
-    <path
-        android:fillColor="#0E5C4A"
-        android:pathData="M54,41 A13,13 0 1,1 53.99,41 Z" />
-    <path
-        android:fillColor="#FAF6EF"
-        android:pathData="M54,46 A8,8 0 1,1 53.99,46 Z" />
+        android:fillColor="@android:color/transparent"
+        android:pathData="M0,0h108v108h-108z" />
 </vector>

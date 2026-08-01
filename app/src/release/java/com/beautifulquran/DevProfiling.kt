@@ -9,4 +9,6 @@ object DevProfiling {
     fun install(application: Application) = Unit
     fun reportFullyDrawn(activity: Activity) = Unit
     fun recordSystemTrace(context: Context) = Unit
+    fun mark(label: String) = Unit
+    inline fun <T> trace(label: String, block: () -> T): T = block()
 }
