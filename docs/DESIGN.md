@@ -38,6 +38,25 @@ Hard rules:
 - **Taps have no ripple.** Touch feedback is the content's own motion
   (a word lighting, a page turning), never Material ink splash.
 
+### Contextual teaching
+
+Feature education stays with the feature it explains. It never takes the full
+screen, floats in a card, or dims the whole sheet. The feature's own mark stays
+visible; only the ink inside its local bounds fades back into the unchanged
+paper colour. This is an **inverse paper spotlight**: opaque paper covers the
+area being defocused while a soft clear window remains around the live feature;
+it is never a dark scrim, blur, or whole-screen opacity change. A short lesson
+takes the quiet reading space beside that window. One simple geometric leader
+connects lesson to mark, typography does the rest, and one quiet text action
+dismisses it. `ContextualFeatureTip` is the shared primitive.
+
+The first use is the bookmark-note gesture. After the first ribbon unfurls,
+**royal green blooms out from that ribbon** across the ayah while a soft clear
+window preserves the ruby cloth and its immediate paper context. Parchment type
+and two hold rings settle into the green: “Add a note — Press and hold this
+ribbon.” Dismissal contracts the bloom and returns the ayah in place; no other
+verse or chrome leaves the reader.
+
 > **Fixed 2026-07-24: the repeat picker.** It used to be the one live violation
 > of the two rules above — a stock `androidx.compose.ui.window.Dialog` with a
 > `Surface`, `RadioButton`s and `TextButton`s. It is now

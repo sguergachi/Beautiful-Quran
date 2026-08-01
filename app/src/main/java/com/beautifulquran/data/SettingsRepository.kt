@@ -17,6 +17,11 @@ enum class AyahSelectorSide { LEFT, RIGHT }
 /** Developer-selectable bookmark treatment on the Chapters sheet. */
 enum class HomeBookmarkStyle { TOP_BOUND, SAVED_PASSAGES }
 
+/** One-shot, dismissible lessons that teach a gesture in its own UI context. */
+enum class EducationMoment(val preferenceKey: String) {
+    BOOKMARK_NOTE("educationBookmarkNoteV1"),
+}
+
 /**
  * Ink-brush circle variants for settings selectors. [BASELINE] is the shipped
  * mark; the rest are developer-only A/B options (see Settings → Developer).
@@ -126,6 +131,15 @@ class SettingsRepository(context: Context) {
             putInt("lastSurah", surah)
             putInt("lastAyah", ayah)
         }
+    }
+
+    /** Whether the reader has explicitly put this contextual lesson away. */
+    fun isEducationDismissed(moment: EducationMoment): Boolean =
+        prefs.getBoolean(moment.preferenceKey, false)
+
+    /** Persists dismissal without rewriting the user-facing settings state. */
+    fun dismissEducation(moment: EducationMoment) {
+        prefs.edit { putBoolean(moment.preferenceKey, true) }
     }
 
     fun update(transform: (Settings) -> Settings) {
