@@ -3651,27 +3651,31 @@ select {
 }
 
 /*
- * Single sense: same stub width as the multi-sense connector, but equal arms
- * so the vertical elbow sits midway (short glosses were hugged by a left-edge spine).
+ * Single sense: horizontal stub from the Arabic to the English edge, sitting
+ * on the shared baseline, with a vertical rule at that edge half above /
+ * half below the stub.
  */
 .root-lemma-elbow {
   flex: 0 0 3.25rem;
-  align-self: stretch;
-  display: flex;
-  align-items: flex-end;
+  align-self: baseline;
+  display: inline-flex;
+  align-items: center;
+  height: 1.55em;
   margin-inline: 1rem;
 }
 
 .root-lemma-elbow-arm {
   flex: 1 1 auto;
   height: 1px;
+  transform: translateY(-4px);
   background: color-mix(in srgb, var(--ink) 22%, transparent);
 }
 
 .root-lemma-elbow-spine {
   flex: 0 0 1px;
-  align-self: stretch;
   width: 1px;
+  height: 1.55em;
+  transform: translateY(-4px);
   background: color-mix(in srgb, var(--ink) 22%, transparent);
 }
 

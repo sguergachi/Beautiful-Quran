@@ -280,30 +280,16 @@ function RootViewerBleed({ closing, rv }: { closing: boolean; rv: RootViewerStat
                           <div className="root-lemma-elbow" aria-hidden="true">
                             <span className="root-lemma-elbow-arm" />
                             <span className="root-lemma-elbow-spine" />
-                            <span className="root-lemma-elbow-arm" />
                           </div>
                         ) : (
                           <div className="root-lemma-connector" aria-hidden="true" />
                         )}
                         <div className="root-lemma-dictionary">
-                          {visibleDictionaryRows.map((row, index) => {
-                            const multiPos =
-                              dictionaryRows.filter((r) => r.pos).length > 1 && !!row.pos
-                            // First gloss owns the column baseline (locks to lemma);
-                            // opening POS rides inline so nothing sits above it.
-                            const gloss =
-                              index === 0 && multiPos
-                                ? `${row.pos} · ${row.gloss}`
-                                : row.gloss
-                            return (
-                              <div key={index} className="root-lemma-sense">
-                                {multiPos && index > 0 ? (
-                                  <p className="root-lemma-pos">{row.pos}</p>
-                                ) : null}
-                                <p className="root-sense">{gloss}</p>
-                              </div>
-                            )
-                          })}
+                          {visibleDictionaryRows.map((row, index) => (
+                            <div key={index} className="root-lemma-sense">
+                              <p className="root-sense">{row.gloss}</p>
+                            </div>
+                          ))}
                           {dictionaryNeedsExpand(dictionaryRows.length) ? (
                             <button
                               type="button"

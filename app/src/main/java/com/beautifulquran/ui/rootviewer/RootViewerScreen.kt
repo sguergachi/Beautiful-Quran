@@ -1031,7 +1031,8 @@ private fun LemmaWithDictionary(
     val glosses = remember(entry, qacPos) { dictionaryGlosses(entry, qacPos) }
     val visible = if (expanded) glosses else glosses.take(DICTIONARY_PREVIEW_SENSES)
     val glossColor = MaterialTheme.colorScheme.onSurface.copy(alpha = AnalysisGlossAlpha)
-    val showPosLabels = glosses.count { it.first != null } > 1
+    // No POS labels in the Lemma section; keep it to plain glosses.
+    val showPosLabels = false
     val lineColor = MaterialTheme.colorScheme.onSurface.copy(alpha = LemmaConnectorAlpha)
     val glossStyle = analysisGlossStyle()
 
@@ -1073,9 +1074,9 @@ private fun LemmaWithDictionary(
 }
 
 /**
- * One gloss: fixed gutter with equal arms so the vertical elbow sits
- * midway in the gap — short English stays beside the lemma, not hugged
- * by a left-edge spine.
+ * One gloss: horizontal stub from the Arabic to the English edge, sitting on
+ * the shared baseline, with a vertical rule at that edge half above / half
+ * below the stub.
  */
 @Composable
 private fun LemmaSingleSenseRow(
@@ -1087,6 +1088,7 @@ private fun LemmaSingleSenseRow(
 ) {
     val spineHeight = with(LocalDensity.current) { AnalysisGlossLineHeight.toDp() }
     val spineWidthPx = with(LocalDensity.current) { 1.dp.toPx() }
+    val stubOffsetPx = with(LocalDensity.current) { 4.dp.toPx() }
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -1109,20 +1111,22 @@ private fun LemmaSingleSenseRow(
                 .padding(horizontal = LemmaGutterPaddingStart)
                 .width(LemmaGutterWidth)
                 .height(spineHeight)
-                .alignBy { it.measuredHeight }
+                // Centre the gutter on the shared baseline so the stub sits on
+                // the baseline and the vertical rule is half above / half below.
+                .alignBy { it.measuredHeight / 2 }
                 .drawBehind {
-                    val y = size.height - spineWidthPx / 2f
-                    val midX = size.width / 2f
+                    val y = size.height / 2f - stubOffsetPx
+                    val rightX = size.width - spineWidthPx / 2f
                     drawLine(
                         color = lineColor,
                         start = Offset(0f, y),
-                        end = Offset(size.width, y),
+                        end = Offset(rightX, y),
                         strokeWidth = spineWidthPx,
                     )
                     drawLine(
                         color = lineColor,
-                        start = Offset(midX, 0f),
-                        end = Offset(midX, size.height),
+                        start = Offset(rightX, -stubOffsetPx),
+                        end = Offset(rightX, size.height - stubOffsetPx),
                         strokeWidth = spineWidthPx,
                     )
                 },
