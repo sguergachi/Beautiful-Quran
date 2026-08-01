@@ -122,6 +122,7 @@ import com.beautifulquran.data.ReadingMode
 import com.beautifulquran.data.model.Ayah
 import com.beautifulquran.data.model.Word
 import com.beautifulquran.domain.EnglishTypography
+import com.beautifulquran.domain.hideParentheticalText
 import com.beautifulquran.domain.TajweedPacing
 import com.beautifulquran.ui.reader.focus.FocusEngine
 import com.beautifulquran.ui.theme.ArabicTitleStyle
@@ -1527,6 +1528,7 @@ private fun ResponsiveEnglishAyah(
     markAlpha: () -> Float,
     fontScale: Float,
     searchQuery: String?,
+    hideParentheticals: Boolean,
     flashWordPosition: Int?,
     searchHitWash: RepeatWash,
     keepActiveWordInView: Boolean,
@@ -1550,33 +1552,48 @@ private fun ResponsiveEnglishAyah(
     )
     var layoutResult by remember { mutableStateOf<TextLayoutResult?>(null) }
     val hitSlopPx = with(LocalDensity.current) { 8.dp.toPx() }
-    val punctuatedGlosses = remember(ayah) {
-        EnglishTypography.punctuate(ayah.words.map { it.translation })
+    val punctuatedGlosses = remember(ayah, hideParentheticals) {
+        ayah.words.map { it.translation }
+            .let { if (hideParentheticals) hideParentheticalText(it) else it }
+            .let(EnglishTypography::punctuate)
     }
 
-    val rendered = remember(ayah, palette.fullInkColor, gold, searchQuery, fontScale) {
+    val rendered = remember(
+        ayah,
+        palette.fullInkColor,
+        gold,
+        searchQuery,
+        fontScale,
+        punctuatedGlosses,
+    ) {
         val ranges = ArrayList<IntRange>(ayah.words.size)
         var markRange = 0..-1
         val text = buildAnnotatedString {
+            var hasVisibleGloss = false
             ayah.words.forEachIndexed { index, word ->
+                val gloss = punctuatedGlosses[index]
+                if (hasVisibleGloss && gloss.isNotBlank()) append(" ")
                 val start = length
-                withStyle(
-                    SpanStyle(
-                        color = if (
-                            searchQuery != null &&
-                            word.translation.contains(searchQuery, ignoreCase = true)
-                        ) {
-                            gold
-                        } else {
-                            palette.fullInkColor
-                        },
-                    ),
-                ) {
-                    append(punctuatedGlosses[index])
+                if (gloss.isNotBlank()) {
+                    withStyle(
+                        SpanStyle(
+                            color = if (
+                                searchQuery != null &&
+                                word.translation.contains(searchQuery, ignoreCase = true)
+                            ) {
+                                gold
+                            } else {
+                                palette.fullInkColor
+                            },
+                        ),
+                    ) {
+                        append(gloss)
+                    }
+                    hasVisibleGloss = true
                 }
                 ranges += start until length
-                append(" ")
             }
+            if (hasVisibleGloss) append(" ")
             val markStart = length
             withStyle(
                 SpanStyle(
@@ -2166,6 +2183,7 @@ fun AyahBlock(
     showGloss: Boolean,
     showTransliteration: Boolean,
     showTranslation: Boolean,
+    hideEnglishParentheticals: Boolean = false,
     searchQuery: String? = null,
     /** 1-based word to orange-flash (home search hit); null = no flash. */
     flashWordPosition: Int? = null,
@@ -2432,6 +2450,7 @@ fun AyahBlock(
                     markAlpha = { ayahMarkAlpha.value },
                     fontScale = fontScale,
                     searchQuery = searchQuery,
+                    hideParentheticals = hideEnglishParentheticals,
                     flashWordPosition = flashWordPosition,
                     searchHitWash = searchHitWash,
                     keepActiveWordInView = keepActiveWordInView,

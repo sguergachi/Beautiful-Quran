@@ -5,14 +5,17 @@ object EnglishTypography {
     private val terminalPunctuation = Regex("[.!?…][\\\"'’”)]*$")
 
     /** Closes the ayah without guessing sentence boundaries from capitalization. */
-    fun punctuate(glosses: List<String>): List<String> = glosses.mapIndexed { index, gloss ->
-        if (
-            index == glosses.lastIndex &&
-            !terminalPunctuation.containsMatchIn(gloss)
-        ) {
-            "$gloss."
-        } else {
-            gloss
+    fun punctuate(glosses: List<String>): List<String> {
+        val lastVisible = glosses.indexOfLast { it.isNotBlank() }
+        return glosses.mapIndexed { index, gloss ->
+            if (
+                index == lastVisible &&
+                !terminalPunctuation.containsMatchIn(gloss)
+            ) {
+                "$gloss."
+            } else {
+                gloss
+            }
         }
     }
 }

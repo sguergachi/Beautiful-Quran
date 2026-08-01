@@ -885,6 +885,7 @@ fun ReaderScreen(
         settings.showWordGloss,
         settings.showTransliteration,
         settings.showTranslation,
+        settings.hideEnglishParentheticals,
         settings.fontScale,
     )
     var lastLayoutSignature by remember { mutableStateOf(layoutSignature) }
@@ -2008,6 +2009,7 @@ fun ReaderScreen(
                                 showGloss = settings.showWordGloss,
                                 showTransliteration = settings.showTransliteration,
                                 showTranslation = settings.showTranslation,
+                                hideEnglishParentheticals = settings.hideEnglishParentheticals,
                                 searchQuery = activeQuery,
                                 flashWordPosition = searchFlashWord
                                     ?.takeIf { searchFlashAyah == ayah.number },

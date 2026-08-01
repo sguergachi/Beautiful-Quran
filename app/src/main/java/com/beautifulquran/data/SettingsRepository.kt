@@ -70,6 +70,8 @@ data class Settings(
     val homeBookmarkStyle: HomeBookmarkStyle = HomeBookmarkStyle.TOP_BOUND,
     /** Developer-only: which ink-brush circle to paint around selected enums. */
     val brushCircleStyle: BrushCircleStyle = BrushCircleStyle.BASELINE,
+    /** Developer-only: removes parenthetical asides from the English-only reader. */
+    val hideEnglishParentheticals: Boolean = false,
 )
 
 /** Maps a persisted ordinal back to an enum entry, falling back to [default]
@@ -115,6 +117,7 @@ class SettingsRepository(context: Context) {
         inkLabEnabled = prefs.getBoolean("inkLabEnabled", false),
         homeBookmarkStyle = prefs.homeBookmarkStyle(),
         brushCircleStyle = prefs.enum("brushCircleStyle", BrushCircleStyle.BASELINE),
+        hideEnglishParentheticals = prefs.getBoolean("hideEnglishParentheticals", false),
     )
 
     /**
@@ -168,6 +171,7 @@ class SettingsRepository(context: Context) {
             putString("homeBookmarkStyleV2", next.homeBookmarkStyle.name)
             remove("homeBookmarkStyle")
             putInt("brushCircleStyle", next.brushCircleStyle.ordinal)
+            putBoolean("hideEnglishParentheticals", next.hideEnglishParentheticals)
         }
     }
 }
