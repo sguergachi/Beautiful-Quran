@@ -1,15 +1,26 @@
 package com.beautifulquran.domain
 
-/** Removes parenthetical asides while preserving one entry for every source word. */
+/** Removes parenthetical and square-bracketed asides while preserving source-word entries. */
 fun hideParentheticalText(parts: List<String>): List<String> {
-    var depth = 0
+    var parenthesisDepth = 0
+    var squareBracketDepth = 0
     return parts.map { part ->
         buildString {
             part.forEach { character ->
                 when (character) {
-                    '(' -> depth++
-                    ')' -> if (depth > 0) depth-- else append(character)
-                    else -> if (depth == 0) append(character)
+                    '(' -> parenthesisDepth++
+                    ')' -> if (parenthesisDepth > 0) {
+                        parenthesisDepth--
+                    } else if (squareBracketDepth == 0) {
+                        append(character)
+                    }
+                    '[' -> squareBracketDepth++
+                    ']' -> if (squareBracketDepth > 0) {
+                        squareBracketDepth--
+                    } else if (parenthesisDepth == 0) {
+                        append(character)
+                    }
+                    else -> if (parenthesisDepth == 0 && squareBracketDepth == 0) append(character)
                 }
             }
         }.trim()

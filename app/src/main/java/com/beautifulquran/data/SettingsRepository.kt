@@ -70,7 +70,7 @@ data class Settings(
     val homeBookmarkStyle: HomeBookmarkStyle = HomeBookmarkStyle.TOP_BOUND,
     /** Developer-only: which ink-brush circle to paint around selected enums. */
     val brushCircleStyle: BrushCircleStyle = BrushCircleStyle.BASELINE,
-    /** Developer-only: removes parenthetical asides from the English-only reader. */
+    /** Developer-only: removes parenthetical and bracketed asides from English-only reading. */
     val hideEnglishParentheticals: Boolean = false,
 )
 

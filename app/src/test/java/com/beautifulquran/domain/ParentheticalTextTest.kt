@@ -22,8 +22,21 @@ class ParentheticalTextTest {
     }
 
     @Test
+    fun `hides square-bracketed English across word glosses`() {
+        assertEquals(
+            listOf("He", "", "knows"),
+            hideParentheticalText(listOf("He", "[alone]", "knows")),
+        )
+        assertEquals(
+            listOf("He", "", "", "knows"),
+            hideParentheticalText(listOf("He", "[alone", "the (unseen)]", "knows")),
+        )
+    }
+
+    @Test
     fun `keeps an unmatched closing parenthesis as text`() {
         assertEquals(listOf("word)"), hideParentheticalText(listOf("word)")))
+        assertEquals(listOf("word]"), hideParentheticalText(listOf("word]")))
     }
 
     @Test

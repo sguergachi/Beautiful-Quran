@@ -534,13 +534,13 @@ private fun DeveloperSection(
 
     Spacer(Modifier.height(20.dp))
     ToggleRow(
-        label = "Hide parenthetical English",
+        label = "Hide bracketed English",
         checked = settings.hideEnglishParentheticals,
         onChange = { on -> viewModel.settings.update { it.copy(hideEnglishParentheticals = on) } },
         checkParams = checkParams,
         checkPaintToken = checkPaintToken,
     )
-    Caption("English-only reading hides text in parentheses, including the parentheses.")
+    Caption("English-only reading hides text in parentheses or square brackets, including the brackets.")
 
     Spacer(Modifier.height(20.dp))
     Text(
