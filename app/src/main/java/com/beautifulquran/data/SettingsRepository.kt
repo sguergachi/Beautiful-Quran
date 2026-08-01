@@ -142,6 +142,11 @@ class SettingsRepository(context: Context) {
         prefs.edit { putBoolean(moment.preferenceKey, true) }
     }
 
+    /** Developer tool: lets every contextual lesson run on its next eligible gesture. */
+    fun rearmEducation() {
+        prefs.edit { EducationMoment.entries.forEach { remove(it.preferenceKey) } }
+    }
+
     fun update(transform: (Settings) -> Settings) {
         val next = transform(_settings.value)
         if (next == _settings.value) return

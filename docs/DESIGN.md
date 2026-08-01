@@ -55,7 +55,9 @@ The first use is the bookmark-note gesture. After the first ribbon unfurls,
 window preserves the ruby cloth and its immediate paper context. Parchment type
 and two hold rings settle into the green: “Add a note — Press and hold this
 ribbon.” Dismissal contracts the bloom and returns the ayah in place; no other
-verse or chrome leaves the reader.
+verse or chrome leaves the reader. Settings → Developer → **Replay feature
+guides** rearms every lesson for its next eligible gesture without touching
+bookmarks or notes.
 
 > **Fixed 2026-07-24: the repeat picker.** It used to be the one live violation
 > of the two rules above — a stock `androidx.compose.ui.window.Dialog` with a
