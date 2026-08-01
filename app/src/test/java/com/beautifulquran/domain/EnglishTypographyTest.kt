@@ -33,4 +33,30 @@ class EnglishTypographyTest {
             ),
         )
     }
+
+    @Test
+    fun `coalesces a shared phrase spanning different Arabic words`() {
+        assertEquals(
+            listOf("guide", "the wrongdoing people.", ""),
+            EnglishTypography.lyricize(
+                glosses = listOf("guide", "the wrongdoing people", "the wrongdoing people"),
+                arabicWords = listOf(
+                    "يَهۡدِي",
+                    "ٱلۡقَوۡمَ",
+                    "ٱلظَّـٰلِمِينَ",
+                ),
+            ),
+        )
+    }
+
+    @Test
+    fun `keeps a genuine repeated Arabic word`() {
+        assertEquals(
+            listOf("a saying", "Peace", "Peace."),
+            EnglishTypography.lyricize(
+                glosses = listOf("a saying", "Peace", "Peace"),
+                arabicWords = listOf("قِيلٰا", "سَلَـٰمٰا", "سَلَـٰمٰا"),
+            ),
+        )
+    }
 }
