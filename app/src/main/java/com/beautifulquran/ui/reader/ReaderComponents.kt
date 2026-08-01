@@ -1531,6 +1531,7 @@ private fun ResponsiveEnglishAyah(
     markAlpha: () -> Float,
     fontScale: Float,
     searchQuery: String?,
+    hideParentheticals: Boolean,
     flashWordPosition: Int?,
     searchHitWash: RepeatWash,
     keepActiveWordInView: Boolean,
@@ -1554,14 +1555,22 @@ private fun ResponsiveEnglishAyah(
     )
     var layoutResult by remember { mutableStateOf<TextLayoutResult?>(null) }
     val hitSlopPx = with(LocalDensity.current) { 8.dp.toPx() }
-    val lyricGlosses = remember(ayah) {
+    val lyricGlosses = remember(ayah, hideParentheticals) {
         EnglishTypography.lyricize(
             glosses = ayah.words.map { it.translation },
             arabicWords = ayah.words.map { it.arabic },
+            hideParentheticals = hideParentheticals,
         )
     }
 
-    val rendered = remember(ayah, palette.fullInkColor, gold, searchQuery, fontScale) {
+    val rendered = remember(
+        ayah,
+        palette.fullInkColor,
+        gold,
+        searchQuery,
+        fontScale,
+        lyricGlosses,
+    ) {
         val ranges = ArrayList<IntRange>(ayah.words.size)
         var markRange = 0..-1
         val text = buildAnnotatedString {
@@ -2175,6 +2184,7 @@ fun AyahBlock(
     showGloss: Boolean,
     showTransliteration: Boolean,
     showTranslation: Boolean,
+    hideEnglishParentheticals: Boolean = false,
     searchQuery: String? = null,
     /** 1-based word to orange-flash (home search hit); null = no flash. */
     flashWordPosition: Int? = null,
@@ -2441,6 +2451,7 @@ fun AyahBlock(
                     markAlpha = { ayahMarkAlpha.value },
                     fontScale = fontScale,
                     searchQuery = searchQuery,
+                    hideParentheticals = hideEnglishParentheticals,
                     flashWordPosition = flashWordPosition,
                     searchHitWash = searchHitWash,
                     keepActiveWordInView = keepActiveWordInView,

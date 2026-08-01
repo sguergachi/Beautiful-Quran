@@ -6,9 +6,12 @@ object EnglishTypography {
 
     /** Closes the ayah without guessing sentence boundaries from capitalization. */
     fun punctuate(glosses: List<String>): List<String> {
-        val lastGloss = glosses.indexOfLast(String::isNotEmpty)
+        val lastVisible = glosses.indexOfLast { it.isNotBlank() }
         return glosses.mapIndexed { index, gloss ->
-            if (index == lastGloss && !terminalPunctuation.containsMatchIn(gloss)) {
+            if (
+                index == lastVisible &&
+                !terminalPunctuation.containsMatchIn(gloss)
+            ) {
                 "$gloss."
             } else {
                 gloss
@@ -21,7 +24,11 @@ object EnglishTypography {
      * repeats one shared phrase on each Arabic word it spans; keep that phrase
      * once, while preserving genuine repetitions of the same Arabic word.
      */
-    fun lyricize(glosses: List<String>, arabicWords: List<String>): List<String> {
+    fun lyricize(
+        glosses: List<String>,
+        arabicWords: List<String>,
+        hideParentheticals: Boolean = false,
+    ): List<String> {
         require(glosses.size == arabicWords.size) { "glosses and Arabic words must align" }
         val prose = glosses.mapIndexed { index, gloss ->
             if (
@@ -35,6 +42,6 @@ object EnglishTypography {
                 gloss
             }
         }
-        return punctuate(prose)
+        return punctuate(if (hideParentheticals) hideParentheticalText(prose) else prose)
     }
 }

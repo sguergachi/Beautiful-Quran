@@ -187,6 +187,7 @@ fun TimingsLabScreen(
                         showGloss = settings.showWordGloss,
                         showTransliteration = settings.showTransliteration,
                         showTranslation = settings.showTranslation,
+                        hideEnglishParentheticals = settings.hideEnglishParentheticals,
                         keepActiveWordInView = ui.isPlaying,
                         onWordClick = { word ->
                             if (ui.mode == LabMode.RECORD) {
