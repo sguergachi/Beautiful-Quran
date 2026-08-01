@@ -396,6 +396,13 @@ content measure. It is part of the heading lockup, not a border or row
 divider: it never reaches the sheet edge, never appears between rows, and
 never uses gold.
 
+Classical lexicon (Lane) is still one reading spine, never a card grid: Form
+labels sit as quiet Cormorant lines with ~28 dp before each new Form and
+~12 dp between senses inside one Form — no bullet marks. Parenthetical source
+marks (`(S, K)`, `(Msb,)`), editorial tags (`(tropical:)`), and bare
+`see …` cross-refs drop to ~38% ink so the English gloss can be scanned. Do
+not invent sense boundaries the source never marked.
+
 ## Ornament
 
 Traditional, geometric, and nearly invisible — ornament whispers, never

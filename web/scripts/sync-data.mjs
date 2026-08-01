@@ -4,12 +4,13 @@ import { fileURLToPath } from 'node:url'
 
 const webRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 
-// quran.db is required. lexicon.db is fetched only when a reader opens a root,
-// so a missing one degrades to a Root Viewer without Lane rather than a broken
-// build — run `python3 tools/build_lexicon_db.py` to produce it.
+// quran.db is required. lexicon.db / dictionary.db are fetched only when a
+// reader opens a root, so a missing one degrades the Root Viewer rather than
+// breaking the build.
 const assets = [
   { name: 'quran.db', label: 'Quran database', required: true },
   { name: 'lexicon.db', label: "Lane's lexicon database", required: false },
+  { name: 'dictionary.db', label: 'Wiktionary dictionary database', required: false },
 ]
 
 for (const asset of assets) {

@@ -5,6 +5,8 @@ import com.beautifulquran.assistant.AssistantAction
 import com.beautifulquran.assistant.VoiceShortcuts
 import com.beautifulquran.data.BookmarkRepository
 import com.beautifulquran.data.AnnotationRepository
+import com.beautifulquran.data.DictionaryDatabase
+import com.beautifulquran.data.DictionaryRepository
 import com.beautifulquran.data.LexiconDatabase
 import com.beautifulquran.data.LexiconRepository
 import com.beautifulquran.data.QuranDatabase
@@ -27,6 +29,9 @@ class QuranApp : Application() {
         private set
     /** Lane's Lexicon — opened lazily, on the first root the reader unfolds. */
     lateinit var lexicon: LexiconRepository
+        private set
+    /** English Wiktionary Arabic — lazy, keyed by the open word's QAC lemma. */
+    lateinit var dictionary: DictionaryRepository
         private set
     lateinit var settings: SettingsRepository
         private set
@@ -53,6 +58,7 @@ class QuranApp : Application() {
         val overrides = TimingOverrides(this)
         repository = QuranRepository(QuranDatabase(this), overrides)
         lexicon = LexiconRepository(LexiconDatabase(this))
+        dictionary = DictionaryRepository(DictionaryDatabase(this))
         settings = SettingsRepository(this)
         bookmarks = BookmarkRepository(this)
         annotations = AnnotationRepository(this)

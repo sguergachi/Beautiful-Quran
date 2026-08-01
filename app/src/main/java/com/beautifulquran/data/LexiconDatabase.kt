@@ -57,6 +57,6 @@ class LexiconDatabase(private val context: Context) {
         // re-extract instead of keeping the stale cached copy.
         // `data/lexicon.db.sha256` pins this to the asset it was bumped for;
         // DatabaseFingerprintTest fails if the two drift apart.
-        internal const val DB_FILE_NAME = "lexicon-v1.db"
+        internal const val DB_FILE_NAME = "lexicon-v2.db"
     }
 }

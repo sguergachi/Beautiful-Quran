@@ -120,3 +120,19 @@ data class LexiconEntry(
     /** Perseus' required credit line, carried with their text. */
     val credit: String,
 )
+
+/** One Wiktionary POS block for a QAC lemma. */
+data class DictionarySenseGroup(
+    val pos: String,
+    val glosses: List<String>,
+)
+
+/** English Wiktionary Arabic entry for one QAC lemma (`dictionary.db`). */
+data class DictionaryEntry(
+    val lemma: String,
+    /** Wiktionary headword that matched this lemma. */
+    val word: String,
+    val groups: List<DictionarySenseGroup>,
+    /** CC-BY-SA credit line carried with the extract. */
+    val credit: String,
+)

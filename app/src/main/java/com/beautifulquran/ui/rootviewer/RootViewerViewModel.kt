@@ -2,9 +2,11 @@ package com.beautifulquran.ui.rootviewer
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.beautifulquran.data.DictionaryRepository
 import com.beautifulquran.data.LexiconRepository
 import com.beautifulquran.data.QuranRepository
 import com.beautifulquran.data.SettingsRepository
+import com.beautifulquran.data.model.DictionaryEntry
 import com.beautifulquran.data.model.LexiconEntry
 import com.beautifulquran.data.model.Reciter
 import com.beautifulquran.data.model.RootOccurrence
@@ -34,6 +36,8 @@ data class RootViewerUiState(
     val lemmas: List<RootLemmaSummary> = emptyList(),
     /** Lane's article for this root; null while loading or when he has none. */
     val lexicon: LexiconEntry? = null,
+    /** English Wiktionary senses for this lemma; null while loading or on miss. */
+    val dictionary: DictionaryEntry? = null,
     val error: String? = null,
     /** True while the header speaker is auditioning this word. */
     val isPlayingWord: Boolean = false,
@@ -66,6 +70,7 @@ internal fun wordClipBounds(segments: List<Segment>, position: Int): Pair<Long, 
 class RootViewerViewModel(
     private val repository: QuranRepository,
     private val lexicon: LexiconRepository,
+    private val dictionary: DictionaryRepository,
     private val settings: SettingsRepository,
     private val player: PlayerController,
 ) : ViewModel() {
@@ -100,13 +105,20 @@ class RootViewerViewModel(
                     else -> null
                 },
             )
-            // Extracting and opening the lexicon can take a beat on first use;
-            // the analysis above must never wait on it.
+            // Extracting Lane / Wiktionary can take a beat on first use;
+            // the analysis above must never wait on either asset.
             val root = morph?.root.orEmpty()
             if (root.isNotBlank()) {
                 val entry = lexicon.entryFor(root)
                 if (entry != null && _ui.value.morphology?.root == root) {
                     _ui.value = _ui.value.copy(lexicon = entry)
+                }
+            }
+            val lemma = morph?.lemma.orEmpty()
+            if (lemma.isNotBlank()) {
+                val entry = dictionary.entryFor(lemma)
+                if (entry != null && _ui.value.morphology?.lemma == lemma) {
+                    _ui.value = _ui.value.copy(dictionary = entry)
                 }
             }
         }

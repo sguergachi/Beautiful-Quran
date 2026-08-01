@@ -3512,14 +3512,15 @@ select {
   margin-top: var(--root-space-6);
 }
 
+/* Related subgroups (Root / Lemma / Grammar): ~28px — DESIGN proximity scale. */
 .root-analysis-group + .root-analysis-group {
-  margin-top: var(--root-space-5);
+  margin-top: 1.75rem;
 }
 
 .root-label {
   display: flex;
   align-items: center;
-  gap: 0.25rem;
+  gap: 0.5rem;
   margin: 0;
   color: color-mix(in srgb, var(--ink) 72%, transparent);
   font-family: var(--font-body);
@@ -3531,6 +3532,7 @@ select {
 }
 
 .root-info-button {
+  position: relative;
   display: inline-flex;
   flex: 0 0 auto;
   align-items: center;
@@ -3559,46 +3561,109 @@ select {
 
 .root-radicals {
   width: fit-content;
-  margin-top: var(--root-space-2) !important;
+  margin-top: 0.75rem !important; /* label → value — same as lemma/grammar */
   color: var(--ink);
   font-family: var(--font-arabic);
   font-size: 2rem;
-  line-height: 1.45;
+  line-height: 1.1;
   unicode-bidi: isolate;
+}
+
+/* Root Form-1 lead and lemma dictionary glosses — same analysis sense face. */
+.root-sense {
+  margin: 0.75rem 0 0 !important; /* within one fact */
+  color: color-mix(in srgb, var(--ink) 90%, transparent);
+  font-size: 1.125rem;
+  font-weight: 500;
+  line-height: 1.25;
+}
+
+.root-sense-more {
+  margin-top: 0.625rem !important;
+  /* Beat .root-text-action's 44px min-height so Root→Lemma and Lemma→Grammar
+     share the same ink gap (descenders / ↗ must not eat the group spacing). */
+  min-height: 0 !important;
+  padding: 0.125rem 0;
+  font-size: 1rem;
+  line-height: 1.5;
+}
+
+.root-lexicon {
+  scroll-margin-top: 4rem;
 }
 
 .root-form-lemma {
   width: fit-content;
-  margin-top: var(--root-space-2) !important;
+  margin-top: 1.25rem !important; /* Lemma title → value (more than Root) */
   color: var(--ink);
   font-family: var(--font-arabic);
-  font-size: 1.5rem;
-  line-height: 1.5;
+  font-size: 2rem; /* match root radicals */
+  line-height: 1.1;
   unicode-bidi: isolate;
 }
 
+/* Grammar / frequency: under senses (or bare lemma), above action links. */
 .root-form-grammar {
-  margin-top: var(--root-space-2) !important;
-  color: color-mix(in srgb, var(--ink) 82%, transparent);
-  font-size: 1.0625rem;
-  line-height: 1.47;
+  color: color-mix(in srgb, var(--ink) 52%, transparent);
+  font-size: 0.875rem;
+  line-height: 1.25;
 }
 
-.root-grammar {
-  margin-top: var(--root-space-4);
+.root-analysis-group .root-form-frequency {
+  color: color-mix(in srgb, var(--ink) 48%, transparent);
+  font-size: 0.875rem;
+  line-height: 1.25;
+}
+
+.root-lemma-meta {
+  margin-top: 1.25rem !important; /* air after senses / bare lemma */
+}
+
+.root-lemma-meta + .root-lemma-meta {
+  margin-top: 0.125rem !important;
+}
+
+/*
+ * Arabic lemma | gutter stub | English senses.
+ * Shared baseline; stub sits on that line; column rule is the dict border.
+ */
+.root-lemma-pair {
+  display: flex;
+  align-items: baseline;
+  gap: 0;
+  margin-top: 0.85rem;
+}
+
+.root-lemma-pair .root-form-lemma {
+  flex: 0 0 auto;
+  align-self: baseline;
+  margin-top: 0 !important;
+}
+
+/* Horizontal stub only — height 1px on the shared baseline; meets the dict rule. */
+.root-lemma-connector {
+  flex: 0 0 3.25rem;
+  align-self: baseline;
+  height: 1px;
+  margin-inline-start: 1rem;
+  margin-inline-end: -1px;
+  background: color-mix(in srgb, var(--ink) 22%, transparent);
 }
 
 .root-form-frequency,
-.root-no-root,
 .root-section-summary {
-  margin-top: var(--root-space-1) !important;
+  margin-top: 0.5rem !important; /* same fact cluster */
   color: color-mix(in srgb, var(--ink) 74%, transparent);
   font-size: 1rem;
   line-height: 1.55;
 }
 
+/* Empty Root placeholder — same quiet ink as frequency facts, label→value gap. */
 .root-no-root {
-  margin-top: var(--root-space-4) !important;
+  margin-top: 0.75rem !important;
+  color: color-mix(in srgb, var(--ink) 74%, transparent);
+  font-size: 1rem;
+  line-height: 1.55;
 }
 
 .root-section {
@@ -3637,14 +3702,95 @@ select {
   margin-inline: auto;
 }
 
-/* Lane's article: English prose with Arabic set inline, his own divisions
-   kept as line breaks. */
+.root-lemma-dict-block {
+  margin-top: 1.25rem; /* match bare-lemma title → value */
+}
+
+.root-lemma-dict-block .root-lemma-pair {
+  margin-top: 0;
+}
+
+/* Wiktionary senses — column rule on the leading edge; flush left stack. */
+.root-lemma-dictionary {
+  flex: 1 1 auto;
+  align-self: baseline;
+  min-width: 0;
+  margin-top: 0;
+  margin-inline-start: 0;
+  padding-inline-start: 0.9rem;
+  border-inline-start: 1px solid color-mix(in srgb, var(--ink) 22%, transparent);
+}
+
+.root-lemma-sense + .root-lemma-sense {
+  margin-top: 0.55rem;
+}
+
+.root-lemma-pos {
+  margin: 0 0 0.25rem !important;
+  color: color-mix(in srgb, var(--ink) 55%, transparent);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  line-height: 1.3;
+  text-transform: uppercase;
+}
+
+/* Lemma column: same .root-sense face, no extra top margin in the stack. */
+.root-lemma-dictionary .root-sense {
+  margin-top: 0 !important;
+}
+
+/* Expand sits under the English senses (inside the dict column). */
+.root-lemma-sense-more {
+  margin-top: 0.5rem !important;
+}
+
+/* Wiktionary exit stays below grammar / frequency. */
+.root-lemma-dict-action {
+  margin-top: 0.75rem !important;
+}
+
+/* Lane's article: Form sections get more air; senses stay closer; citations
+   and "see …" cross-refs recede so the gloss can be scanned. */
 .root-lexicon-entry {
   margin: var(--root-space-5) 0 0;
   color: var(--ink);
   font-size: 1rem;
-  line-height: 1.75;
+  line-height: 1.85;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.root-lexicon-block {
+  margin-top: var(--root-space-3);
+}
+
+.root-lexicon-block:first-child {
+  margin-top: 0;
+}
+
+.root-lexicon-block--form {
+  margin-top: var(--root-space-6);
+}
+
+.root-lexicon-block--form:first-child {
+  margin-top: 0;
+}
+
+.root-lexicon-block p {
+  margin: 0;
   white-space: pre-line;
+}
+
+.root-lexicon-form {
+  margin: 0 0 var(--root-space-2);
+  color: var(--gold); /* same gilt as surah numbers / ayah refs */
+  font-family: var(--font-display);
+  font-size: 1.125rem;
+  font-weight: 500;
+  line-height: 1.3;
+  letter-spacing: 0.01em;
 }
 
 .root-lexicon-arabic {
@@ -3654,11 +3800,29 @@ select {
   unicode-bidi: isolate;
 }
 
-.root-lexicon-credit {
+.root-lexicon-citation {
+  color: color-mix(in srgb, var(--ink) 38%, transparent);
+  font-size: 0.9em;
+}
+
+.root-lexicon-online {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
   margin: var(--root-space-4) 0 0;
-  color: var(--ink-muted);
-  font-size: 0.8125rem;
-  line-height: 1.5;
+  text-decoration: none;
+}
+
+.root-lexicon-online-title {
+  color: var(--accent);
+  font-size: 1rem;
+  line-height: 1.4;
+}
+
+.root-lexicon-online-description {
+  color: color-mix(in srgb, var(--ink) 68%, transparent);
+  font-size: 0.875rem;
+  line-height: 1.45;
 }
 
 .root-chapter-heading {
