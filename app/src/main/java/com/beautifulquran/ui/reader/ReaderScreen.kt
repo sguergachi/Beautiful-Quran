@@ -2049,7 +2049,10 @@ fun ReaderScreen(
                                         if (result.showNoteTip) {
                                             bookmarkNoteTipSurah = ayah.surahId
                                             bookmarkNoteTipAyah = ayah.number
-                                            bookmarkNoteTipOpen = true
+                                            scope.launch {
+                                                focusController.focus(ayah.number, animate = true)
+                                                bookmarkNoteTipOpen = true
+                                            }
                                         }
                                         result.bookmarked
                                     }

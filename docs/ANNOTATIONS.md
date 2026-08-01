@@ -76,12 +76,13 @@ an exposed saved ribbon opens the verse's note. The same 44 dp target serves
 both gestures without adding a second margin glyph; a retracted unsaved tip
 does not accept note entry.
 
-On a reader's first bookmark, that ayah briefly becomes its own contextual
-lesson: royal green blooms across its scripture while the new ruby ribbon stays
-exposed inside a soft clear spotlight. A parchment geometric hold mark names
-the gesture, and a quiet “Got it” contracts the bloom and returns the verse.
-The rest of the reader remains in place; this is neither an overlay sheet nor a
-floating callout. See `ContextualFeatureTip`.
+On a reader's first bookmark, the ayah glides onto the reading line and briefly
+becomes its own contextual lesson. Royal green blossoms from the new ruby ribbon
+into a shallow, feathered field behind the guide while the ribbon stays exposed
+inside a soft clear spotlight; scripture below remains on paper. A parchment
+geometric hold mark names the gesture, and a quiet “Got it” contracts the bloom
+and returns the verse. The rest of the reader remains in place; this is neither
+an overlay sheet nor a floating callout. See `ContextualFeatureTip`.
 
 **Arrival** *(not yet built)*. A note that has just been written should fade in
 word by word with the lyric fade — the ink literally arriving on the page. A

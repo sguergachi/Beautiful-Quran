@@ -9,8 +9,10 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
@@ -29,6 +31,7 @@ import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.Dp
@@ -36,8 +39,7 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlin.math.hypot
-import kotlin.math.max
+import kotlin.math.min
 
 /** Which edge of a contextual lesson owns the feature being explained. */
 enum class ContextualTipAnchor { START, END }
@@ -47,10 +49,10 @@ enum class ContextualTipAnchor { START, END }
  *
  * The parent keeps the real feature above this composable as the visual anchor.
  * An inverse spotlight blooms the current background out from the anchored
- * feature over everything else in the local bounds, with a soft clear window
+ * feature into a shallow, feathered lesson field, with a soft clear window
  * left around the feature itself. [mark], [title], and [body] then ink into
- * that quiet field. There is no card, edge, shadow, dimming scrim, or blur;
- * the surrounding sheet remains present.
+ * that quiet field. The bloom deliberately stops inside the local surface;
+ * there is no card, hard edge, shadow, dimming scrim, or blur.
  */
 @Composable
 fun ContextualFeatureTip(
@@ -64,9 +66,10 @@ fun ContextualFeatureTip(
     contentPadding: PaddingValues = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
     dismissLabel: String = "Got it",
     onRenderedChange: (Boolean) -> Unit = {},
+    guideHeight: Dp = 156.dp,
     spotlightInset: Dp = 14.dp,
-    spotlightRadius: Dp = 22.dp,
-    spotlightFeather: Dp = 20.dp,
+    spotlightRadius: Dp = 18.dp,
+    spotlightFeather: Dp = 10.dp,
 ) {
     var rendered by remember { mutableStateOf(visible) }
     val paper = remember { Animatable(0f) }
@@ -110,6 +113,7 @@ fun ContextualFeatureTip(
                 .fillMaxSize()
                 .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen },
         ) {
+            val bandHeight = min(size.height, guideHeight.toPx())
             val clearRadius = spotlightRadius.toPx()
             val outerRadius = (clearRadius + spotlightFeather.toPx()).coerceAtLeast(0.5f)
             val center = Offset(
@@ -118,29 +122,29 @@ fun ContextualFeatureTip(
                 } else {
                     size.width - spotlightInset.toPx()
                 }.coerceIn(0f, size.width),
-                y = size.height / 2f,
+                y = bandHeight / 2f,
             )
-            val farthestRadius = hypot(
-                max(center.x, size.width - center.x),
-                max(center.y, size.height - center.y),
-            )
-            val bloomFeather = 18.dp.toPx()
-            val bloomRadius = (farthestRadius + bloomFeather) * paper.value
+            // Wide enough to leave solid green under the lesson at the far
+            // edge, but shallow enough that scripture below remains on paper.
+            val settledRadius = size.width * 1.32f
+            val bloomRadius = settledRadius * paper.value
             if (bloomRadius > 0.5f) {
-                val solidStop = ((bloomRadius - bloomFeather) / bloomRadius).coerceIn(0f, 1f)
-                drawCircle(
-                    brush = Brush.radialGradient(
-                        colorStops = arrayOf(
-                            0f to paperColor,
-                            solidStop to paperColor,
-                            1f to paperColor.copy(alpha = 0f),
+                val verticalScale = (bandHeight * 0.48f / settledRadius).coerceIn(0.08f, 1f)
+                scale(scaleX = 1f, scaleY = verticalScale, pivot = center) {
+                    drawCircle(
+                        brush = Brush.radialGradient(
+                            colorStops = arrayOf(
+                                0f to paperColor,
+                                0.76f to paperColor,
+                                1f to paperColor.copy(alpha = 0f),
+                            ),
+                            center = center,
+                            radius = bloomRadius,
                         ),
-                        center = center,
                         radius = bloomRadius,
-                    ),
-                    radius = bloomRadius,
-                    center = center,
-                )
+                        center = center,
+                    )
+                }
             }
             drawCircle(
                 brush = Brush.radialGradient(
@@ -161,7 +165,9 @@ fun ContextualFeatureTip(
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
-                .fillMaxSize()
+                .fillMaxWidth()
+                .heightIn(max = guideHeight)
+                .fillMaxHeight()
                 .padding(contentPadding)
                 .graphicsLayer { alpha = ink.value },
         ) {
