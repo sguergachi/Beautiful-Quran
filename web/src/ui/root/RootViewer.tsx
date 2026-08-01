@@ -268,9 +268,23 @@ function RootViewerBleed({ closing, rv }: { closing: boolean; rv: RootViewerStat
                   />
                   {rv.dictionary && dictionaryRows.length > 0 ? (
                     <div className="root-lemma-dict-block">
-                      <div className="root-lemma-pair">
+                      <div
+                        className={
+                          visibleDictionaryRows.length === 1
+                            ? 'root-lemma-pair root-lemma-pair--single'
+                            : 'root-lemma-pair'
+                        }
+                      >
                         <p className="root-form-lemma" lang="ar" dir="rtl">{rv.lemma}</p>
-                        <div className="root-lemma-connector" aria-hidden="true" />
+                        {visibleDictionaryRows.length === 1 ? (
+                          <div className="root-lemma-elbow" aria-hidden="true">
+                            <span className="root-lemma-elbow-arm" />
+                            <span className="root-lemma-elbow-spine" />
+                            <span className="root-lemma-elbow-arm" />
+                          </div>
+                        ) : (
+                          <div className="root-lemma-connector" aria-hidden="true" />
+                        )}
                         <div className="root-lemma-dictionary">
                           {visibleDictionaryRows.map((row, index) => {
                             const multiPos =

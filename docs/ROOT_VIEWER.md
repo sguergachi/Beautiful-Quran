@@ -61,9 +61,11 @@ On the pressed word at `(surahId, ayah, wordPosition)`:
    from `dictionary.db` (kaikki / wiktextract; prefers the open word's QAC
    part of speech; preview unfolds; a one-line Wiktionary / CC BY-SA credit
    lives in the Lemma ⓘ; soft-hides when there is no match; quiet exit to
-   Wiktionary). Lemma and first gloss share one baseline; a long horizontal
-   stub on that line meets a quiet column rule down the sense stack. Grammar
-   and lemma frequency sit under the senses (above the Wiktionary link).
+   Wiktionary).    Lemma and first gloss share one baseline; a long horizontal
+   stub on that line meets a quiet column rule down the sense stack. A single
+   sense keeps the same gutter width but centers the elbow in that gap so
+   short glosses are not hugged by the vertical. Grammar and lemma frequency
+   sit under the senses (above the Wiktionary link).
    Root, lemma, occurrences, and related forms each have a quiet info mark
    that unfolds a short definition inline.
 4. **Occurrences** — how often this root appears in the Quran, and where.
