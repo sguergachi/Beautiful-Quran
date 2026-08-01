@@ -8,9 +8,11 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -19,8 +21,14 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.isImeVisible
+import androidx.compose.foundation.interaction.collectIsDraggedAsState
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowForward
 import androidx.compose.material3.Icon
@@ -28,16 +36,22 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
@@ -46,7 +60,11 @@ import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -64,12 +82,15 @@ import com.beautifulquran.ui.theme.DisclosureChevron
 import com.beautifulquran.ui.theme.LocalQuranAccents
 import com.beautifulquran.ui.theme.quietClickable
 import com.beautifulquran.ui.theme.verticalFadingEdges
+import kotlinx.coroutines.flow.first
 
 private data class BookmarkKey(val surahId: Int, val ayahNumber: Int)
 
 @Composable
+@OptIn(ExperimentalLayoutApi::class)
 fun BookmarksScreen(
     viewModel: BookmarksViewModel,
+    sheetVisible: () -> Boolean,
     onClose: () -> Unit,
     onOpenAyah: (surahId: Int, ayah: Int) -> Unit,
 ) {
@@ -77,13 +98,56 @@ fun BookmarksScreen(
     var pendingRemoval by remember { mutableStateOf<BookmarkKey?>(null) }
     var expandedSurahs by remember { mutableStateOf<Set<Int>>(emptySet()) }
     var collapsedSurahs by remember { mutableStateOf<Set<Int>>(emptySet()) }
+    var editingSurah by rememberSaveable { mutableStateOf(0) }
+    var editingAyah by rememberSaveable { mutableStateOf(0) }
+    var annotationDraft by rememberSaveable { mutableStateOf("") }
     val searching = uiState.query.isNotBlank()
+    val focusManager = LocalFocusManager.current
+    val listState = rememberLazyListState()
+
+    fun commitAnnotation() {
+        if (editingAyah == 0) return
+        viewModel.writeAnnotation(editingSurah, editingAyah, annotationDraft)
+        editingSurah = 0
+        editingAyah = 0
+        annotationDraft = ""
+    }
+
+    fun editAnnotation(key: BookmarkKey, text: String?) {
+        commitAnnotation()
+        pendingRemoval = null
+        annotationDraft = text.orEmpty()
+        editingSurah = key.surahId
+        editingAyah = key.ayahNumber
+    }
+
+    val openAnnotation by rememberUpdatedState(Triple(editingSurah, editingAyah, annotationDraft))
+    DisposableEffect(Unit) {
+        onDispose {
+            val (surah, ayah, text) = openAnnotation
+            if (ayah != 0) viewModel.writeAnnotation(surah, ayah, text)
+        }
+    }
 
     LaunchedEffect(uiState.query) { pendingRemoval = null }
+    val imeVisible = WindowInsets.isImeVisible
+    LaunchedEffect(imeVisible, editingAyah) {
+        if (!imeVisible && editingAyah != 0) focusManager.clearFocus()
+    }
+    val listDragged by listState.interactionSource.collectIsDraggedAsState()
+    LaunchedEffect(listDragged, editingAyah) {
+        if (listDragged && editingAyah != 0) focusManager.clearFocus()
+    }
+    LaunchedEffect(editingAyah) {
+        if (editingAyah == 0) return@LaunchedEffect
+        snapshotFlow(sheetVisible).first { !it }
+        commitAnnotation()
+    }
 
     Scaffold(containerColor = MaterialTheme.colorScheme.background) { padding ->
         Box(Modifier.padding(padding).fillMaxSize()) {
             LazyColumn(
+                state = listState,
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .fillMaxHeight()
@@ -97,7 +161,10 @@ fun BookmarksScreen(
                 contentPadding = PaddingValues(top = 24.dp, bottom = 48.dp),
             ) {
                 item(key = "title") {
-                    BookmarksHeader(onClose)
+                    BookmarksHeader {
+                        commitAnnotation()
+                        onClose()
+                    }
                 }
                 item(key = "search") {
                     PaperSearchField(
@@ -131,6 +198,7 @@ fun BookmarksScreen(
                             expanded = !collapsed,
                             collapsible = !searching,
                             onToggle = {
+                                commitAnnotation()
                                 collapsedSurahs = if (collapsed) {
                                     collapsedSurahs - section.surah.id
                                 } else {
@@ -152,10 +220,37 @@ fun BookmarksScreen(
                         val key = BookmarkKey(bookmark.surah.id, bookmark.ayahNumber)
                         BookmarkAyahRow(
                             bookmark = bookmark,
-                            annotationText = uiState.annotations["${bookmark.surah.id}:${bookmark.ayahNumber}"],
+                            annotationText = if (editingSurah == key.surahId &&
+                                editingAyah == key.ayahNumber
+                            ) {
+                                annotationDraft
+                            } else {
+                                uiState.annotations["${bookmark.surah.id}:${bookmark.ayahNumber}"]
+                            },
+                            editingAnnotation = editingSurah == key.surahId &&
+                                editingAyah == key.ayahNumber,
+                            annotationsEnabled = uiState.annotationsEnabled,
                             confirming = pendingRemoval == key,
-                            onOpen = { onOpenAyah(bookmark.surah.id, bookmark.ayahNumber) },
-                            onRequestRemove = { pendingRemoval = key },
+                            onOpen = {
+                                commitAnnotation()
+                                onOpenAyah(bookmark.surah.id, bookmark.ayahNumber)
+                            },
+                            onEditAnnotation = {
+                                editAnnotation(
+                                    key,
+                                    uiState.annotations["${bookmark.surah.id}:${bookmark.ayahNumber}"],
+                                )
+                            },
+                            onAnnotationChange = { annotationDraft = it },
+                            onAnnotationEditDone = {
+                                if (editingSurah == key.surahId && editingAyah == key.ayahNumber) {
+                                    commitAnnotation()
+                                }
+                            },
+                            onRequestRemove = {
+                                commitAnnotation()
+                                pendingRemoval = key
+                            },
                             onConfirmRemove = {
                                 viewModel.removeBookmark(bookmark.surah.id, bookmark.ayahNumber)
                                 pendingRemoval = null
@@ -171,6 +266,7 @@ fun BookmarksScreen(
                                 hiddenCount = hiddenBookmarkCount(section.ayahs, expanded, searching),
                                 expanded = expanded,
                                 onClick = {
+                                    commitAnnotation()
                                     expandedSurahs = if (expanded) {
                                         expandedSurahs - section.surah.id
                                     } else {
@@ -296,8 +392,13 @@ private fun BookmarkSectionHeader(
 private fun BookmarkAyahRow(
     bookmark: BookmarkedAyah,
     annotationText: String?,
+    editingAnnotation: Boolean,
+    annotationsEnabled: Boolean,
     confirming: Boolean,
     onOpen: () -> Unit,
+    onEditAnnotation: () -> Unit,
+    onAnnotationChange: (String) -> Unit,
+    onAnnotationEditDone: () -> Unit,
     onRequestRemove: () -> Unit,
     onConfirmRemove: () -> Unit,
     onKeep: () -> Unit,
@@ -314,7 +415,7 @@ private fun BookmarkAyahRow(
                 // Balance the ribbon spine so the verse copy stays centered
                 // between equal reading gutters.
                 .padding(horizontal = 40.dp)
-                .quietClickable(onClick = onOpen),
+                .then(if (editingAnnotation) Modifier else Modifier.quietClickable(onClick = onOpen)),
         ) {
             Text(
                 text = bookmark.text,
@@ -333,19 +434,22 @@ private fun BookmarkAyahRow(
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
-            if (annotationText != null) {
+            if (annotationText != null || editingAnnotation) {
                 Spacer(Modifier.height(6.dp))
-                Text(
+                BookmarkAnnotationField(
                     text = annotationText,
-                    style = verseAnnotationStyle(fontSize = 15.sp, lineHeight = 21.sp),
-                    color = LocalQuranAccents.current.annotationInk.copy(alpha = VERSE_ANNOTATION_INK_ALPHA),
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
+                    editing = editingAnnotation,
+                    onStartEdit = onEditAnnotation,
+                    onTextChange = onAnnotationChange,
+                    onEditDone = onAnnotationEditDone,
                 )
             }
             BookmarkReferenceOrConfirmation(
                 bookmark = bookmark,
                 confirming = confirming,
+                hasAnnotation = annotationText != null || editingAnnotation,
+                canAddAnnotation = annotationsEnabled,
+                onEditAnnotation = onEditAnnotation,
                 onKeep = onKeep,
                 onRemove = onConfirmRemove,
             )
@@ -356,11 +460,12 @@ private fun BookmarkAyahRow(
                 focused = true,
                 side = AyahSelectorSide.LEFT,
                 chromeAlpha = { 1f },
-                interactive = true,
+                interactive = !editingAnnotation,
                 onToggle = {
                     onRequestRemove()
                     true
                 },
+                onLongClick = if (annotationsEnabled) onEditAnnotation else null,
                 animateOnTap = false,
                 edgeInset = 2.dp,
                 topInset = 0.dp,
@@ -378,9 +483,79 @@ private fun BookmarkAyahRow(
 }
 
 @Composable
+private fun BookmarkAnnotationField(
+    text: String?,
+    editing: Boolean,
+    onStartEdit: () -> Unit,
+    onTextChange: (String) -> Unit,
+    onEditDone: () -> Unit,
+) {
+    val style = verseAnnotationStyle(fontSize = 15.sp, lineHeight = 21.sp)
+    val color = LocalQuranAccents.current.annotationInk.copy(alpha = VERSE_ANNOTATION_INK_ALPHA)
+    if (!editing) {
+        Text(
+            text = text.orEmpty(),
+            style = style,
+            color = color,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier
+                .fillMaxWidth()
+                .quietClickable(role = Role.Button, onClick = onStartEdit)
+                .semantics { contentDescription = "Edit note" },
+        )
+        return
+    }
+
+    val focusRequester = remember { FocusRequester() }
+    val focusManager = LocalFocusManager.current
+    var fieldValue by remember {
+        val initial = text.orEmpty()
+        mutableStateOf(TextFieldValue(initial, selection = TextRange(initial.length)))
+    }
+    var everFocused by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { focusRequester.requestFocus() }
+    BasicTextField(
+        value = fieldValue,
+        onValueChange = {
+            fieldValue = it
+            onTextChange(it.text)
+        },
+        textStyle = style.copy(color = color),
+        cursorBrush = SolidColor(LocalQuranAccents.current.bookmarkRibbon),
+        keyboardOptions = KeyboardOptions(
+            capitalization = KeyboardCapitalization.Sentences,
+            imeAction = ImeAction.Done,
+        ),
+        keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
+        modifier = Modifier
+            .fillMaxWidth()
+            .focusRequester(focusRequester)
+            .onFocusChanged { state ->
+                if (state.isFocused) {
+                    everFocused = true
+                } else if (everFocused) {
+                    onEditDone()
+                }
+            },
+        decorationBox = { field ->
+            Box {
+                if (fieldValue.text.isEmpty()) {
+                    Text("Write a note…", style = style, color = color.copy(alpha = 0.5f))
+                }
+                field()
+            }
+        },
+    )
+}
+
+@Composable
 private fun BookmarkReferenceOrConfirmation(
     bookmark: BookmarkedAyah,
     confirming: Boolean,
+    hasAnnotation: Boolean,
+    canAddAnnotation: Boolean,
+    onEditAnnotation: () -> Unit,
     onKeep: () -> Unit,
     onRemove: () -> Unit,
 ) {
@@ -438,6 +613,17 @@ private fun BookmarkReferenceOrConfirmation(
                         style = bookmarkMetadataStyle(FontWeight.Medium, numeric = true),
                         color = LocalQuranAccents.current.gold,
                     )
+                    if (!hasAnnotation && canAddAnnotation) {
+                        Spacer(Modifier.weight(1f))
+                        Text(
+                            text = "Add note",
+                            style = bookmarkMetadataStyle(FontWeight.Medium),
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier
+                                .quietClickable(role = Role.Button, onClick = onEditAnnotation)
+                                .padding(vertical = 12.dp),
+                        )
+                    }
                 }
             }
         }

@@ -779,8 +779,10 @@ shows only its ayah number. The small ruby strip beside a result opens an
 inline Keep / Remove confirmation in that ayah line's fixed-height space before
 changing the mark, so the page does not jump. Keep is green, Remove is quiet
 ink, ayah numbers are gold, and ruby remains exclusive to the physical ribbon.
-Tapping the verse returns to it in the reader. The long Chapters ribbon is
-navigation only and never retracts when tapped.
+An empty ayah line offers a quiet green *Add note* action; existing italic note
+text edits in place when tapped, and holding the exposed ribbon opens the same
+chromeless editor. Tapping the verse copy returns to it in the reader. The long
+Chapters ribbon is navigation only and never retracts when tapped.
 
 ## Reading modes
 

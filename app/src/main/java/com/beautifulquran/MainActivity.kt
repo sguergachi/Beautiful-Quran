@@ -672,6 +672,7 @@ private fun PaperStackApp(
         ) {
             BookmarksScreen(
                 viewModel = bookmarksViewModel,
+                sheetVisible = { stackPosition.value <= BOOKMARKS_LAYER + 0.02f },
                 onClose = { animateTo(COVER_LAYER) },
                 onOpenAyah = { surahId, ayah ->
                     if (surahId != selectedSurahId) readerViewModel.load(surahId)
