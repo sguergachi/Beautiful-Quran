@@ -10,3 +10,9 @@ export function toArabicIndic(n: number): string {
 export function formatReaderDigits(n: number, useArabicIndicDigits: boolean): string {
   return useArabicIndicDigits ? toArabicIndic(n) : String(n)
 }
+
+/** Ornate ayah brackets follow the surrounding line's writing direction. */
+export function formatAyahNumberMark(n: number, useArabicIndicDigits: boolean): string {
+  const digits = formatReaderDigits(n, useArabicIndicDigits)
+  return useArabicIndicDigits ? `﴿${digits}﴾` : `﴾${digits}﴿`
+}

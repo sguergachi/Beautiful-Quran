@@ -33,4 +33,16 @@ class ParentheticalTextTest {
             EnglishTypography.punctuate(hideParentheticalText(listOf("It", "(is)"))),
         )
     }
+
+    @Test
+    fun `lyric prose coalesces before it hides parenthetical English`() {
+        assertEquals(
+            listOf("Say", "", "", "it."),
+            EnglishTypography.lyricize(
+                glosses = listOf("Say", "(O Messenger)", "(O Messenger)", "it"),
+                arabicWords = listOf("قُلْ", "يَا", "أَيُّهَا", "لَهُ"),
+                hideParentheticals = true,
+            ),
+        )
+    }
 }

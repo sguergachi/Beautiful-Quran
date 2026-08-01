@@ -18,4 +18,30 @@ object EnglishTypography {
             }
         }
     }
+
+    /**
+     * Turns word-card glosses into continuous English prose. Quran.com's data
+     * repeats one shared phrase on each Arabic word it spans; keep that phrase
+     * once, while preserving genuine repetitions of the same Arabic word.
+     */
+    fun lyricize(
+        glosses: List<String>,
+        arabicWords: List<String>,
+        hideParentheticals: Boolean = false,
+    ): List<String> {
+        require(glosses.size == arabicWords.size) { "glosses and Arabic words must align" }
+        val prose = glosses.mapIndexed { index, gloss ->
+            if (
+                index > 0 &&
+                gloss == glosses[index - 1] &&
+                normalizeArabicForSearch(arabicWords[index]) !=
+                normalizeArabicForSearch(arabicWords[index - 1])
+            ) {
+                ""
+            } else {
+                gloss
+            }
+        }
+        return punctuate(if (hideParentheticals) hideParentheticalText(prose) else prose)
+    }
 }

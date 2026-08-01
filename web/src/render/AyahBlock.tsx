@@ -1,10 +1,10 @@
 import { memo, useEffect, useMemo, useRef, useState } from 'react'
 import type { ActiveWord, Ayah, Word } from '../data/models'
 import type { ReadingMode } from '../data/settings'
-import { punctuateEnglishGlosses } from '../domain/EnglishTypography'
+import { lyricizeEnglishGlosses } from '../domain/EnglishTypography'
 import { InkEngine, InkState } from '../ui/reader/InkEngine'
 import { ayahTranslationAlpha } from '../ui/reader/WordHighlight'
-import { formatReaderDigits } from '../util/digits'
+import { formatAyahNumberMark } from '../util/digits'
 import { WordUnit } from './WordUnit'
 import { HafsWord } from './HafsWord'
 import { VerseBookmarkRibbon } from './VerseBookmarkRibbon'
@@ -66,12 +66,15 @@ function AyahBlockInner({
   const englishOnly = readingMode === 'english_only'
   const arabicOnly = readingMode === 'arabic_only'
   // English-only: Western digits (Android AyahNumberMark useArabicIndicDigits=false).
-  const ayahMark = `﴿${formatReaderDigits(ayah.number, !englishOnly)}﴾`
+  const ayahMark = formatAyahNumberMark(ayah.number, !englishOnly)
   // Inactive-ayah recess is one `.ayah-recess-veil` (paint-phase) — no per-word
   // inline dim so play/pause does not thrash every verse.
   const words = useMemo(() => ayah.words, [ayah.words])
   const englishWords = useMemo(
-    () => punctuateEnglishGlosses(words.map((word) => word.translation)),
+    () => lyricizeEnglishGlosses(
+      words.map((word) => word.translation),
+      words.map((word) => word.arabic),
+    ),
     [words],
   )
   // Derive ink policy once for the ayah, matching Android AyahBlock. The
@@ -151,6 +154,7 @@ function AyahBlockInner({
           {words.map((w, index) => {
             const ink = inks[index]!
             const isActive = ink.state === InkState.Active
+            if (englishOnly && !englishWords[index]) return null
             return (
               <span key={w.position} className={englishOnly ? 'english-word-run' : 'word-unit-run'}>
                 <WordUnit

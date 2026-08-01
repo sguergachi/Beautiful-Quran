@@ -122,7 +122,6 @@ import com.beautifulquran.data.ReadingMode
 import com.beautifulquran.data.model.Ayah
 import com.beautifulquran.data.model.Word
 import com.beautifulquran.domain.EnglishTypography
-import com.beautifulquran.domain.hideParentheticalText
 import com.beautifulquran.domain.TajweedPacing
 import com.beautifulquran.ui.reader.focus.FocusEngine
 import com.beautifulquran.ui.theme.ArabicTitleStyle
@@ -149,6 +148,10 @@ import kotlinx.coroutines.flow.StateFlow
 
 private fun Int.toArabicIndic(): String =
     toString().map { '٠' + (it - '0') }.joinToString("")
+
+/** Ornate ayah brackets follow the surrounding line's writing direction. */
+internal fun formatAyahNumberMark(number: Int, useArabicIndicDigits: Boolean): String =
+    if (useArabicIndicDigits) "﴿${number.toArabicIndic()}﴾" else "﴾$number﴿"
 
 private fun wordFadeAlpha(progress: Float): Float {
     val resting = InkEngine.State.Upcoming.inkAlpha()
@@ -1552,10 +1555,12 @@ private fun ResponsiveEnglishAyah(
     )
     var layoutResult by remember { mutableStateOf<TextLayoutResult?>(null) }
     val hitSlopPx = with(LocalDensity.current) { 8.dp.toPx() }
-    val punctuatedGlosses = remember(ayah, hideParentheticals) {
-        ayah.words.map { it.translation }
-            .let { if (hideParentheticals) hideParentheticalText(it) else it }
-            .let(EnglishTypography::punctuate)
+    val lyricGlosses = remember(ayah, hideParentheticals) {
+        EnglishTypography.lyricize(
+            glosses = ayah.words.map { it.translation },
+            arabicWords = ayah.words.map { it.arabic },
+            hideParentheticals = hideParentheticals,
+        )
     }
 
     val rendered = remember(
@@ -1564,36 +1569,36 @@ private fun ResponsiveEnglishAyah(
         gold,
         searchQuery,
         fontScale,
-        punctuatedGlosses,
+        lyricGlosses,
     ) {
         val ranges = ArrayList<IntRange>(ayah.words.size)
         var markRange = 0..-1
         val text = buildAnnotatedString {
-            var hasVisibleGloss = false
             ayah.words.forEachIndexed { index, word ->
-                val gloss = punctuatedGlosses[index]
-                if (hasVisibleGloss && gloss.isNotBlank()) append(" ")
+                val gloss = lyricGlosses[index]
+                if (gloss.isEmpty()) {
+                    ranges += IntRange.EMPTY
+                    return@forEachIndexed
+                }
+                if (length > 0) append(" ")
                 val start = length
-                if (gloss.isNotBlank()) {
-                    withStyle(
-                        SpanStyle(
-                            color = if (
-                                searchQuery != null &&
-                                word.translation.contains(searchQuery, ignoreCase = true)
-                            ) {
-                                gold
-                            } else {
-                                palette.fullInkColor
-                            },
-                        ),
-                    ) {
-                        append(gloss)
-                    }
-                    hasVisibleGloss = true
+                withStyle(
+                    SpanStyle(
+                        color = if (
+                            searchQuery != null &&
+                            word.translation.contains(searchQuery, ignoreCase = true)
+                        ) {
+                            gold
+                        } else {
+                            palette.fullInkColor
+                        },
+                    ),
+                ) {
+                    append(gloss)
                 }
                 ranges += start until length
             }
-            if (hasVisibleGloss) append(" ")
+            if (length > 0) append(" ")
             val markStart = length
             withStyle(
                 SpanStyle(
@@ -1604,9 +1609,7 @@ private fun ResponsiveEnglishAyah(
                     fontSize = 17.sp * fontScale,
                 ),
             ) {
-                append("﴿")
-                append(ayah.number.toString())
-                append("﴾")
+                append(formatAyahNumberMark(ayah.number, useArabicIndicDigits = false))
             }
             markRange = markStart until length
         }
@@ -1780,9 +1783,7 @@ private fun ResponsiveHafsAyah(
                     fontSize = fontSize * AYAH_MARK_SIZE_RATIO,
                 ),
             ) {
-                append("﴿")
-                append(ayah.number.toArabicIndic())
-                append("﴾")
+                append(formatAyahNumberMark(ayah.number, useArabicIndicDigits = true))
             }
             markRange = markStart until length
         }
@@ -1856,7 +1857,7 @@ fun AyahNumberMark(
 ) {
     val accents = LocalQuranAccents.current
     Text(
-        text = "﴿${if (useArabicIndicDigits) number.toArabicIndic() else number.toString()}﴾",
+        text = formatAyahNumberMark(number, useArabicIndicDigits),
         fontFamily = HafsFontFamily,
         fontSize = 20.sp * fontScale,
         color = accents.gold,
