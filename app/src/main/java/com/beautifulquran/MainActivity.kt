@@ -1,11 +1,9 @@
 package com.beautifulquran
 
 import android.content.Intent
-import android.graphics.Color
 import android.os.Bundle
 import androidx.activity.compose.BackHandler
 import androidx.activity.ComponentActivity
-import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.core.Animatable
@@ -50,8 +48,10 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
+import androidx.core.view.WindowCompat
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -134,8 +134,14 @@ class MainActivity : ComponentActivity() {
         // the closed mushaf (cold start) or the sheets (deep-link skip).
         var splashPending = true
         installSplashScreen().setKeepOnScreenCondition { splashPending }
-        super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        super.onCreate(savedInstanceState)
+        // The entrance cover is always dark. The sheet theme sets its own icon
+        // appearance once Compose has its persisted settings.
+        WindowCompat.getInsetsController(window, window.decorView).apply {
+            isAppearanceLightStatusBars = false
+            isAppearanceLightNavigationBars = false
+        }
         // Pre-read safe insets + corner radii, and grow this launch's ornament,
         // before Compose so the first cover frame is only layout + paint.
         val coverChrome = DevProfiling.trace("coverChrome") { readCoverWindowChrome() }
@@ -156,6 +162,8 @@ class MainActivity : ComponentActivity() {
             val systemDark = isSystemInDarkTheme()
             val usesNightfall = settings.themeMode == ThemeMode.DARK ||
                 (settings.themeMode == ThemeMode.SYSTEM && systemDark)
+            val lightSystemBarIcons = !(usesNightfall || settings.themeMode == ThemeMode.ROYAL_GREEN)
+            val view = LocalView.current
             // The entrance ceremony plays once per cold start; saveable so a
             // rotation or process-restore never replays it mid-session. Deep
             // links / Routines skip it so the user lands on the target.
@@ -171,12 +179,10 @@ class MainActivity : ComponentActivity() {
             }
 
             SideEffect {
-                val statusBarStyle = when {
-                    usesNightfall || settings.themeMode == ThemeMode.ROYAL_GREEN ->
-                        SystemBarStyle.dark(Color.TRANSPARENT)
-                    else -> SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT)
+                WindowCompat.getInsetsController(window, view).apply {
+                    isAppearanceLightStatusBars = lightSystemBarIcons
+                    isAppearanceLightNavigationBars = lightSystemBarIcons
                 }
-                enableEdgeToEdge(statusBarStyle = statusBarStyle)
             }
 
             BeautifulQuranTheme(themeMode = settings.themeMode) {
