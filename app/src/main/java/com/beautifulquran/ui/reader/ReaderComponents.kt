@@ -1550,8 +1550,11 @@ private fun ResponsiveEnglishAyah(
     )
     var layoutResult by remember { mutableStateOf<TextLayoutResult?>(null) }
     val hitSlopPx = with(LocalDensity.current) { 8.dp.toPx() }
-    val punctuatedGlosses = remember(ayah) {
-        EnglishTypography.punctuate(ayah.words.map { it.translation })
+    val lyricGlosses = remember(ayah) {
+        EnglishTypography.lyricize(
+            glosses = ayah.words.map { it.translation },
+            arabicWords = ayah.words.map { it.arabic },
+        )
     }
 
     val rendered = remember(ayah, palette.fullInkColor, gold, searchQuery, fontScale) {
@@ -1559,6 +1562,12 @@ private fun ResponsiveEnglishAyah(
         var markRange = 0..-1
         val text = buildAnnotatedString {
             ayah.words.forEachIndexed { index, word ->
+                val gloss = lyricGlosses[index]
+                if (gloss.isEmpty()) {
+                    ranges += IntRange.EMPTY
+                    return@forEachIndexed
+                }
+                if (length > 0) append(" ")
                 val start = length
                 withStyle(
                     SpanStyle(
@@ -1572,11 +1581,11 @@ private fun ResponsiveEnglishAyah(
                         },
                     ),
                 ) {
-                    append(punctuatedGlosses[index])
+                    append(gloss)
                 }
                 ranges += start until length
-                append(" ")
             }
+            if (length > 0) append(" ")
             val markStart = length
             withStyle(
                 SpanStyle(

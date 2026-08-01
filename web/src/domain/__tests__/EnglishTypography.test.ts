@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { punctuateEnglishGlosses } from '../EnglishTypography'
+import { lyricizeEnglishGlosses, punctuateEnglishGlosses } from '../EnglishTypography'
 
 describe('punctuateEnglishGlosses', () => {
   it('adds a stop only at the ayah end', () => {
@@ -15,5 +15,19 @@ describe('punctuateEnglishGlosses', () => {
   it('preserves existing punctuation', () => {
     expect(punctuateEnglishGlosses(['Why?', 'Then', 'listen!']))
       .toEqual(['Why?', 'Then', 'listen!'])
+  })
+
+  it('coalesces a shared phrase spanning different Arabic words', () => {
+    expect(lyricizeEnglishGlosses(
+      ['guide', 'the wrongdoing people', 'the wrongdoing people'],
+      ['يَهۡدِي', 'ٱلۡقَوۡمَ', 'ٱلظَّـٰلِمِينَ'],
+    )).toEqual(['guide', 'the wrongdoing people.', ''])
+  })
+
+  it('keeps a genuine repeated Arabic word', () => {
+    expect(lyricizeEnglishGlosses(
+      ['a saying', 'Peace', 'Peace'],
+      ['قِيلٰا', 'سَلَـٰمٰا', 'سَلَـٰمٰا'],
+    )).toEqual(['a saying', 'Peace', 'Peace.'])
   })
 })
