@@ -151,7 +151,12 @@ already the app's answer to "what did I mark".
 - A bookmarked verse that also carries a note shows the note as one italic
   line beneath its translation, truncated to two lines, on the index's inner
   40 dp/px spine.
-- Tapping the entry returns to the verse in the reader, as it does today.
+- Tapping the note edits it in place. A bookmark without writing carries a
+  quiet *Add note* action in its ayah line; holding its exposed ribbon opens
+  the same editor. The field is the same chromeless caret-on-paper interaction
+  as the reader and commits on focus loss, Done, or leaving the sheet. Blank
+  text removes the note without removing the bookmark.
+- Tapping the verse copy still returns to the verse in the reader.
 
 *Not yet built:* Index search does not match note text (only reference,
 chapter name, and verse text).
