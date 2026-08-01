@@ -149,6 +149,10 @@ import kotlinx.coroutines.flow.StateFlow
 private fun Int.toArabicIndic(): String =
     toString().map { '٠' + (it - '0') }.joinToString("")
 
+/** Ornate ayah brackets follow the surrounding line's writing direction. */
+internal fun formatAyahNumberMark(number: Int, useArabicIndicDigits: Boolean): String =
+    if (useArabicIndicDigits) "﴿${number.toArabicIndic()}﴾" else "﴾$number﴿"
+
 private fun wordFadeAlpha(progress: Float): Float {
     val resting = InkEngine.State.Upcoming.inkAlpha()
     return resting + (InkEngine.State.Active.inkAlpha() - resting) * progress.coerceIn(0f, 1f)
@@ -1587,9 +1591,7 @@ private fun ResponsiveEnglishAyah(
                     fontSize = 17.sp * fontScale,
                 ),
             ) {
-                append("﴿")
-                append(ayah.number.toString())
-                append("﴾")
+                append(formatAyahNumberMark(ayah.number, useArabicIndicDigits = false))
             }
             markRange = markStart until length
         }
@@ -1763,9 +1765,7 @@ private fun ResponsiveHafsAyah(
                     fontSize = fontSize * AYAH_MARK_SIZE_RATIO,
                 ),
             ) {
-                append("﴿")
-                append(ayah.number.toArabicIndic())
-                append("﴾")
+                append(formatAyahNumberMark(ayah.number, useArabicIndicDigits = true))
             }
             markRange = markStart until length
         }
@@ -1839,7 +1839,7 @@ fun AyahNumberMark(
 ) {
     val accents = LocalQuranAccents.current
     Text(
-        text = "﴿${if (useArabicIndicDigits) number.toArabicIndic() else number.toString()}﴾",
+        text = formatAyahNumberMark(number, useArabicIndicDigits),
         fontFamily = HafsFontFamily,
         fontSize = 20.sp * fontScale,
         color = accents.gold,
