@@ -454,6 +454,7 @@ private fun DeveloperSection(
     var sounds by remember { mutableStateOf<PageTurnSounds?>(null) }
     var presetsOpen by remember { mutableStateOf(false) }
     var pasteText by remember { mutableStateOf("") }
+    var educationRearmed by remember { mutableStateOf(false) }
     DisposableEffect(Unit) {
         onDispose { sounds?.release() }
     }
@@ -461,6 +462,21 @@ private fun DeveloperSection(
     SectionLabel("Developer")
     Spacer(Modifier.height(2.dp))
     Caption("Tools for testing work in progress.")
+
+    Spacer(Modifier.height(20.dp))
+    Text(
+        text = if (educationRearmed) "Feature guides ready" else "Replay feature guides",
+        style = MaterialTheme.typography.bodyLarge,
+        modifier = Modifier
+            .fillMaxWidth()
+            .quietClickable {
+                viewModel.settings.rearmEducation()
+                educationRearmed = true
+            }
+            .padding(vertical = 6.dp),
+        color = MaterialTheme.colorScheme.primary,
+    )
+    Caption("Shows each contextual lesson again on its next eligible gesture.")
 
     if (BuildConfig.DEBUG && Build.VERSION.SDK_INT >= 35) {
         Spacer(Modifier.height(20.dp))

@@ -571,15 +571,13 @@ class ReaderViewModel(
 
     fun segmentsFor(ayah: Int): List<Segment>? = timings[ayah]
 
-    /** Marks or unmarks [ayah], and identifies the first mark that should teach notes. */
+    /** Marks or unmarks [ayah], and identifies a mark that should teach notes. */
     fun toggleBookmark(ayah: Int): BookmarkToggleResult {
         val surah = surahId.takeIf { it != 0 } ?: return BookmarkToggleResult(false)
-        val firstBookmark = bookmarks.bookmarks.value.isEmpty()
         val nowBookmarked = bookmarks.toggle(surah, ayah)
         return BookmarkToggleResult(
             bookmarked = nowBookmarked,
             showNoteTip = nowBookmarked &&
-                firstBookmark &&
                 settings.settings.value.annotationsEnabled &&
                 !settings.isEducationDismissed(EducationMoment.BOOKMARK_NOTE),
         )
