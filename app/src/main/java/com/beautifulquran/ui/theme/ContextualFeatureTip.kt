@@ -3,8 +3,9 @@ package com.beautifulquran.ui.theme
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -12,9 +13,12 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -26,20 +30,16 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.BlendMode
-import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.CompositingStrategy
-import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlin.math.min
 
 /** Which edge of a contextual lesson owns the feature being explained. */
 enum class ContextualTipAnchor { START, END }
@@ -48,11 +48,12 @@ enum class ContextualTipAnchor { START, END }
  * A short lesson written into the feature's existing place on the paper.
  *
  * The parent keeps the real feature above this composable as the visual anchor.
- * An inverse spotlight blooms the current background out from the anchored
- * feature into a shallow, feathered lesson field, with a soft clear window
- * left around the feature itself. [mark], [title], and [body] then ink into
- * that quiet field. The bloom deliberately stops inside the local surface;
- * there is no card, hard edge, shadow, dimming scrim, or blur.
+ * The feature remains untouched on its edge while a directional ink field
+ * enters from the opposite paper edge, holds across half the screen surface,
+ * and feathers away before reaching the feature. [mark], [title], and [body]
+ * then ink into that quiet field. There is no floating layer, shadow, or
+ * generic scrim; the GPU-softened vellum keeps the sampled page below this
+ * sharp teaching content visibly present through its feather.
  */
 @Composable
 fun ContextualFeatureTip(
@@ -65,11 +66,11 @@ fun ContextualFeatureTip(
     anchor: ContextualTipAnchor = ContextualTipAnchor.START,
     contentPadding: PaddingValues = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
     dismissLabel: String = "Got it",
+    dismissPaperColor: Color? = null,
+    dismissInkColor: Color? = null,
     onRenderedChange: (Boolean) -> Unit = {},
-    guideHeight: Dp = 156.dp,
-    spotlightInset: Dp = 14.dp,
-    spotlightRadius: Dp = 18.dp,
-    spotlightFeather: Dp = 10.dp,
+    guideHeight: Dp = 188.dp,
+    targetCenterY: Dp? = null,
 ) {
     var rendered by remember { mutableStateOf(visible) }
     val paper = remember { Animatable(0f) }
@@ -92,13 +93,13 @@ fun ContextualFeatureTip(
                 }
                 launch {
                     delay(110)
-                    ink.animateTo(1f, tween(270, easing = FastOutSlowInEasing))
+                    ink.animateTo(1f, tween(240, easing = FastOutSlowInEasing))
                 }
             }
         } else if (rendered) {
             coroutineScope {
                 launch { ink.animateTo(0f, tween(160)) }
-                launch { paper.animateTo(0f, tween(280, easing = FastOutSlowInEasing)) }
+                launch { paper.animateTo(0f, tween(320, easing = FastOutSlowInEasing)) }
             }
             rendered = false
         }
@@ -107,104 +108,118 @@ fun ContextualFeatureTip(
     if (!rendered) return
 
     val paperColor = MaterialTheme.colorScheme.background
-    Box(modifier.fillMaxSize()) {
-        Canvas(
+    val buttonPaper = dismissPaperColor ?: MaterialTheme.colorScheme.onSurface
+    val buttonInk = dismissInkColor ?: paperColor
+    BoxWithConstraints(modifier.fillMaxSize()) {
+        val laneHeight = minOf(guideHeight, maxHeight)
+        val targetY = (targetCenterY ?: maxHeight / 2).coerceIn(0.dp, maxHeight)
+        val laneTop = (targetY - laneHeight / 2)
+            .coerceIn(0.dp, (maxHeight - laneHeight).coerceAtLeast(0.dp))
+        val markTop = (targetY - 14.dp)
+            .coerceIn(0.dp, (maxHeight - 28.dp).coerceAtLeast(0.dp))
+        InkSpillField(
+            progress = { paper.value },
+            targetCenterY = targetY,
+            lessonOnLeft = anchor == ContextualTipAnchor.END,
+            color = paperColor,
+            modifier = Modifier.fillMaxSize(),
+        )
+        // The teaching half owns taps; the untouched half stays attached to
+        // the LazyColumn so a vertical drag there can dismiss and keep moving.
+        Box(
             Modifier
-                .fillMaxSize()
-                .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen },
-        ) {
-            val bandHeight = min(size.height, guideHeight.toPx())
-            val clearRadius = spotlightRadius.toPx()
-            val outerRadius = (clearRadius + spotlightFeather.toPx()).coerceAtLeast(0.5f)
-            val center = Offset(
-                x = if (anchor == ContextualTipAnchor.START) {
-                    spotlightInset.toPx()
-                } else {
-                    size.width - spotlightInset.toPx()
-                }.coerceIn(0f, size.width),
-                y = bandHeight / 2f,
-            )
-            // Wide enough to leave solid green under the lesson at the far
-            // edge, but shallow enough that scripture below remains on paper.
-            val settledRadius = size.width * 1.32f
-            val bloomRadius = settledRadius * paper.value
-            if (bloomRadius > 0.5f) {
-                val verticalScale = (bandHeight * 0.48f / settledRadius).coerceIn(0.08f, 1f)
-                scale(scaleX = 1f, scaleY = verticalScale, pivot = center) {
-                    drawCircle(
-                        brush = Brush.radialGradient(
-                            colorStops = arrayOf(
-                                0f to paperColor,
-                                0.76f to paperColor,
-                                1f to paperColor.copy(alpha = 0f),
-                            ),
-                            center = center,
-                            radius = bloomRadius,
-                        ),
-                        radius = bloomRadius,
-                        center = center,
-                    )
-                }
-            }
-            drawCircle(
-                brush = Brush.radialGradient(
-                    colorStops = arrayOf(
-                        0f to Color.Black,
-                        (clearRadius / outerRadius).coerceIn(0f, 1f) to Color.Black,
-                        1f to Color.Transparent,
-                    ),
-                    center = center,
-                    radius = outerRadius,
-                ),
-                radius = outerRadius,
-                center = center,
-                blendMode = BlendMode.DstOut,
-            )
-        }
-        Box(Modifier.fillMaxSize().absorbPointerEvents())
+                .align(
+                    if (anchor == ContextualTipAnchor.END) {
+                        Alignment.TopStart
+                    } else {
+                        Alignment.TopEnd
+                    },
+                )
+                .fillMaxWidth(0.7f)
+                .fillMaxHeight()
+                .absorbPointerEvents(),
+        )
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(max = guideHeight)
-                .fillMaxHeight()
+                .align(
+                    if (anchor == ContextualTipAnchor.END) {
+                        Alignment.TopStart
+                    } else {
+                        Alignment.TopEnd
+                    },
+                )
+                .fillMaxWidth(0.72f)
+                .height(laneHeight)
+                .offset(y = laneTop)
                 .padding(contentPadding)
                 .graphicsLayer { alpha = ink.value },
         ) {
-            if (anchor == ContextualTipAnchor.START) {
-                mark()
-                Spacer(Modifier.width(10.dp))
-            }
             Column(Modifier.weight(1f)) {
                 Text(
                     text = title,
-                    style = MaterialTheme.typography.titleMedium,
+                    style = MaterialTheme.typography.titleLarge.copy(
+                        fontSize = 28.sp,
+                        lineHeight = 32.sp,
+                    ),
                     color = MaterialTheme.colorScheme.onSurface,
                 )
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text(
-                        text = body,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.62f),
-                        modifier = Modifier.weight(1f),
-                    )
-                    Text(
-                        text = dismissLabel,
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.88f),
-                        modifier = Modifier
-                            .quietClickable(role = Role.Button) { dismissLatest.value() }
-                            .padding(horizontal = 10.dp, vertical = 10.dp),
-                    )
-                }
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    text = body,
+                    style = MaterialTheme.typography.bodyLarge.copy(
+                        fontSize = 19.sp,
+                        lineHeight = 24.sp,
+                    ),
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.76f),
+                )
             }
-            if (anchor == ContextualTipAnchor.END) {
-                Spacer(Modifier.width(10.dp))
-                mark()
+        }
+        Box(
+            modifier = Modifier
+                .align(
+                    if (anchor == ContextualTipAnchor.END) {
+                        Alignment.BottomStart
+                    } else {
+                        Alignment.BottomEnd
+                    },
+                )
+                .fillMaxWidth(0.5f)
+                .navigationBarsPadding()
+                .padding(horizontal = 32.dp, vertical = 28.dp)
+                .graphicsLayer { alpha = ink.value },
+        ) {
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(50))
+                    .background(buttonPaper)
+                    .quietClickable(role = Role.Button) { dismissLatest.value() }
+                    .padding(horizontal = 22.dp, vertical = 10.dp),
+            ) {
+                Text(
+                    text = dismissLabel,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = buttonInk,
+                )
             }
+        }
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .align(
+                    if (anchor == ContextualTipAnchor.END) {
+                        Alignment.TopEnd
+                    } else {
+                        Alignment.TopStart
+                    },
+                )
+                .width(28.dp)
+                .height(28.dp)
+                .offset(y = markTop)
+                .graphicsLayer { alpha = ink.value },
+        ) {
+            mark()
         }
     }
 }

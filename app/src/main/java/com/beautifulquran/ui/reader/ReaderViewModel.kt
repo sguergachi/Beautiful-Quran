@@ -575,10 +575,13 @@ class ReaderViewModel(
     fun toggleBookmark(ayah: Int): BookmarkToggleResult {
         val surah = surahId.takeIf { it != 0 } ?: return BookmarkToggleResult(false)
         val nowBookmarked = bookmarks.toggle(surah, ayah)
+        val currentSettings = settings.settings.value
         return BookmarkToggleResult(
             bookmarked = nowBookmarked,
             showNoteTip = nowBookmarked &&
-                settings.settings.value.annotationsEnabled &&
+                currentSettings.developerModeEnabled &&
+                currentSettings.educationGuidesEnabled &&
+                currentSettings.annotationsEnabled &&
                 !settings.isEducationDismissed(EducationMoment.BOOKMARK_NOTE),
         )
     }

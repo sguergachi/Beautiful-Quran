@@ -95,7 +95,6 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
@@ -2205,10 +2204,8 @@ fun AyahBlock(
     bookmarkChromeAlpha: () -> Float = { 1f },
     bookmarkInteractive: Boolean = true,
     onToggleBookmark: (() -> Boolean)? = null,
-    /** Contextual first-use lesson written into this ayah behind its live ribbon. */
-    showBookmarkNoteTip: Boolean = false,
-    onDismissBookmarkNoteTip: (() -> Unit)? = null,
-    onBookmarkNoteTipRenderedChange: (Boolean) -> Unit = {},
+    /** Reports the live ribbon's screen position to a contextual reader overlay. */
+    onBookmarkRibbonPositioned: ((LayoutCoordinates) -> Unit)? = null,
     /**
      * 1-based gather ordinal drawn in the outer margin (gold Arabic-Indic).
      * Non-null only while gather mode has this verse selected.
@@ -2435,13 +2432,6 @@ fun AyahBlock(
                     end = if (bookmarkSide == AyahSelectorSide.RIGHT) 38.dp else 28.dp,
                     top = 14.dp,
                     bottom = 14.dp,
-                )
-                .then(
-                    if (onDismissBookmarkNoteTip != null) {
-                        Modifier.clearAndSetSemantics { }
-                    } else {
-                        Modifier
-                    },
                 ),
         ) {
             if (readingMode == ReadingMode.ENGLISH_ONLY) {
@@ -2572,16 +2562,6 @@ fun AyahBlock(
             Spacer(Modifier.height(if (readingMode == ReadingMode.ENGLISH_ONLY) 18.dp else 26.dp))
         }
 
-        if (bookmarkSide != null && onDismissBookmarkNoteTip != null) {
-            BookmarkNoteTip(
-                visible = showBookmarkNoteTip,
-                ribbonSide = bookmarkSide,
-                onDismiss = onDismissBookmarkNoteTip,
-                onRenderedChange = onBookmarkNoteTipRenderedChange,
-                modifier = Modifier.matchParentSize(),
-            )
-        }
-
         if (gatherOrdinal != null && bookmarkSide != null) {
             Box(Modifier.matchParentSize()) {
                 GatherOrdinalMark(
@@ -2621,7 +2601,14 @@ fun AyahBlock(
                                 AbsoluteAlignment.TopLeft
                             },
                         )
-                        .fillMaxHeight(),
+                        .fillMaxHeight()
+                        .then(
+                            if (onBookmarkRibbonPositioned != null) {
+                                Modifier.onGloballyPositioned(onBookmarkRibbonPositioned)
+                            } else {
+                                Modifier
+                            },
+                        ),
                 )
             }
         }

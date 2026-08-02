@@ -77,12 +77,20 @@ both gestures without adding a second margin glyph; a retracted unsaved tip
 does not accept note entry.
 
 On a reader's first bookmark, the ayah glides onto the reading line and briefly
-becomes its own contextual lesson. Royal green blossoms from the new ruby ribbon
-into a shallow, feathered field behind the guide while the ribbon stays exposed
-inside a soft clear spotlight; scripture below remains on paper. A parchment
-geometric hold mark names the gesture, and a quiet “Got it” contracts the bloom
-and returns the verse. The rest of the reader remains in place; this is neither
-an overlay sheet nor a floating callout. See `ContextualFeatureTip`.
+becomes its own contextual lesson. Royal green enters from the paper edge
+opposite the new ruby ribbon, owns that entire half of the physical screen from
+top to bottom, then tapers toward the ribbon through one continuous per-pixel
+wash: dark wet shoulder, long translucent tail, and restrained paper
+absorption. A parchment geometric hold mark pulses on the live ribbon, and
+a compact theme-paper “Got it” clearing at the thumb-reachable bottom
+withdraws the bleed and returns the verse. A vertical drag on the untouched
+ribbon half dismisses the lesson and scrolls normally. The reader remains in
+place beneath this single paper surface; this is neither an overlay sheet nor a
+floating callout. See `ContextualFeatureTip`.
+
+This lesson is currently developer-gated and off by default. Settings →
+Developer → **Contextual feature guides** enables it for testing;
+**Replay bookmark guide** explicitly rearms it for the next bookmark added.
 
 **Arrival** *(not yet built)*. A note that has just been written should fade in
 word by word with the lyric fade — the ink literally arriving on the page. A

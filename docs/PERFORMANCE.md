@@ -140,7 +140,16 @@ an alpha mask with `BlendMode.DstIn` — requires
 offscreen buffer **every frame while scrolling**. The overlay is visually
 identical on a solid background and costs almost nothing.
 
-### 4b. Layout reads confined to derived state and coroutines
+### 4b. Transient progressive vellum
+
+The contextual guide's progressive vellum is developer-gated and transient.
+On Android 13+ one AGSL brush draws the full-height pigment field and samples
+its analytic alpha mask five times only inside the feather. The verse viewport
+keeps its normal render path: no offscreen page capture, and the real scripture
+and ribbon remain live below the translucent veil. Android 11–12 uses a smooth
+gradient fallback. Idle reading has no guide draw or render-node cost.
+
+### 4c. Layout reads confined to derived state and coroutines
 
 `LazyListState.layoutInfo` changes on every scroll frame, so reading it in
 plain composition would recompose the whole reader while scrolling. The focus

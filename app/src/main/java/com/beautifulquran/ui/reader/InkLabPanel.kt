@@ -32,6 +32,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import com.beautifulquran.ui.theme.ContextualGuideTuning
 import com.beautifulquran.ui.theme.DisclosureChevron
 import com.beautifulquran.ui.theme.quietClickable
 import java.util.Locale
@@ -66,14 +67,20 @@ private enum class InkLabTab(val label: String) {
     Sweep("Sweep"),
     Repeat("Repeat"),
     Tajweed("Tajweed"),
+    Guide("Guide"),
     /** Karaoke clock: word lead + output lag + ayah fade-lead — not wash feel. */
-    Highlight("Highlight"),
+    Highlight("Sync"),
 }
 
 @Composable
-fun InkLabPanel(modifier: Modifier = Modifier) {
+fun InkLabPanel(
+    modifier: Modifier = Modifier,
+    guideActive: Boolean = false,
+) {
     var expanded by remember { mutableStateOf(false) }
-    var tab by remember { mutableStateOf(InkLabTab.Ink) }
+    var tab by remember(guideActive) {
+        mutableStateOf(if (guideActive) InkLabTab.Guide else InkLabTab.Ink)
+    }
     var copyNote by remember { mutableStateOf<String?>(null) }
     val context = LocalContext.current
     Column(
@@ -114,6 +121,7 @@ fun InkLabPanel(modifier: Modifier = Modifier) {
                     .verticalScroll(rememberScrollState(), reverseScrolling = false),
             ) {
                 val t = InkEngine.tuning
+                val guide = InkEngine.contextualGuideTuning
                 when (tab) {
                     InkLabTab.Ink -> {
                         TuningSlider("Upcoming ink", t.upcomingAlpha, 0.05f..0.6f) {
@@ -225,6 +233,30 @@ fun InkLabPanel(modifier: Modifier = Modifier) {
                         }
                     }
 
+                    InkLabTab.Guide -> {
+                        TuningSlider("Body edge", guide.bodyEdge, 0.28f..0.55f) {
+                            InkEngine.contextualGuideTuning = guide.copy(bodyEdge = it)
+                        }
+                        TuningSlider("Feather width", guide.featherWidth, 0.12f..0.5f) {
+                            InkEngine.contextualGuideTuning = guide.copy(featherWidth = it)
+                        }
+                        TuningSlider("Fade softness", guide.fadeSoftness, 0.4f..1.8f) {
+                            InkEngine.contextualGuideTuning = guide.copy(fadeSoftness = it)
+                        }
+                        TuningSlider("Blur radius dp", guide.blurRadiusDp, 0f..24f) {
+                            InkEngine.contextualGuideTuning = guide.copy(blurRadiusDp = it)
+                        }
+                        TuningSlider("Blur strength", guide.blurStrength, 0f..1f) {
+                            InkEngine.contextualGuideTuning = guide.copy(blurStrength = it)
+                        }
+                        TuningSlider("Vellum grain", guide.vellumGrain, 0f..0.08f) {
+                            InkEngine.contextualGuideTuning = guide.copy(vellumGrain = it)
+                        }
+                        TuningSlider("Vertical taper", guide.verticalTaper, 0f..0.08f) {
+                            InkEngine.contextualGuideTuning = guide.copy(verticalTaper = it)
+                        }
+                    }
+
                     // Karaoke clock — word lead, BT lag, ayah prepare
                     // (docs/OUTPUT_LATENCY.md).
                     InkLabTab.Highlight -> {
@@ -306,6 +338,8 @@ fun InkLabPanel(modifier: Modifier = Modifier) {
                     modifier = Modifier
                         .quietClickable {
                             val text = formatTuningCopy(InkEngine.tuning) +
+                                "\n" +
+                                formatContextualGuideCopy(InkEngine.contextualGuideTuning) +
                                 "\n" + formatHighlightCopy()
                             val cm = context.getSystemService(Context.CLIPBOARD_SERVICE)
                                 as? ClipboardManager
@@ -329,6 +363,26 @@ fun InkLabPanel(modifier: Modifier = Modifier) {
                 )
             }
         }
+    }
+}
+
+/** Paste-ready defaults for the progressive-vellum guide shader. */
+internal fun formatContextualGuideCopy(t: ContextualGuideTuning): String {
+    fun f(v: Float): String {
+        val s = "%.4f".format(Locale.US, v).trimEnd('0').trimEnd('.')
+        return "${s}f"
+    }
+    return buildString {
+        appendLine("// Contextual guide — 02 progressive vellum")
+        appendLine("ContextualGuideTuning(")
+        appendLine("    bodyEdge = ${f(t.bodyEdge)},")
+        appendLine("    featherWidth = ${f(t.featherWidth)},")
+        appendLine("    fadeSoftness = ${f(t.fadeSoftness)},")
+        appendLine("    blurRadiusDp = ${f(t.blurRadiusDp)},")
+        appendLine("    blurStrength = ${f(t.blurStrength)},")
+        appendLine("    vellumGrain = ${f(t.vellumGrain)},")
+        appendLine("    verticalTaper = ${f(t.verticalTaper)},")
+        append(")")
     }
 }
 

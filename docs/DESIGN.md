@@ -42,24 +42,42 @@ Hard rules:
 
 Feature education stays with the feature it explains. It never takes the full
 screen, floats in a card, or dims the whole sheet. The feature's own mark stays
-visible; only the ink inside its local bounds fades back into the unchanged
-paper colour. This is an **inverse paper spotlight**: opaque paper covers the
-area being defocused while a soft clear window remains around the live feature;
-it is never a dark scrim, blur, or whole-screen opacity change. A short lesson
+visible; the opposite half of the current reader sheet becomes a clean royal-green
+vellum field. This is an **inverse paper spotlight**: pigment covers the area
+being defocused while a soft clear window remains around the live feature;
+it is never a dark scrim or whole-screen opacity change. A short lesson
 takes the quiet reading space beside that window. One simple geometric leader
 connects lesson to mark, typography does the rest, and one quiet text action
 dismisses it. `ContextualFeatureTip` is the shared primitive.
 
 The first use is the bookmark-note gesture. After the first ribbon unfurls,
 the reader first glides that ayah onto its reading line. **Royal green then
-blossoms out from the ribbon** into a shallow, feathered field behind the
-lesson—not a rectangular fill across the verse—while a soft clear window
-preserves the ruby cloth and its immediate paper context. Scripture below the
-lesson stays on paper. Parchment type and two hold rings settle into the green:
-“Add a note — Press and hold this ribbon.” Dismissal contracts the blossom and
-returns the ayah in place; no other verse or chrome leaves the reader. Settings
-→ Developer → **Replay feature guides** rearms every lesson for its next
-eligible gesture without touching bookmarks or notes.
+bleeds in from the paper edge opposite the ribbon**, holds solid across half
+the physical screen from top to bottom, then tapers toward the ruby cloth as a
+continuous progressive wash. The selected **02 progressive vellum** study is
+the target: a stable pigment body runs into a broad nonlinear alpha veil while
+the live scripture remains readable through that transition. Android 13+
+softens the continuous vellum mask in one runtime-shader pass; Android 11–12
+keeps a smooth gradient fallback. The shader never owns or replaces the reader
+render node, so the real verse and ruby ribbon remain beneath the translucent
+veil. Low-amplitude vellum grain exists only inside the transition,
+with no visible slices, bands, scallops, or drawn contour. The ribbon remains
+fully exposed on its own side. Parchment type settles partly into that feather: “Add a note —
+Press and hold this ribbon,” while a compact area preserved from the spill
+uses the reader theme's own paper color as its dismissal button at the
+thumb-reachable bottom of the teaching side. Dismissal withdraws the
+bleed and returns the ayah in place; no other verse or chrome leaves the reader.
+The hold target pulses on the live ribbon itself, never at the bleed's feather.
+The teaching half absorbs gestures; a vertical drag on the untouched ribbon
+half dismisses the lesson and continues scrolling the paper.
+The guide system remains disabled by default while this language is being
+refined. Settings → Developer → **Contextual feature guides** enables and
+rearms every lesson for its next eligible gesture. **Replay bookmark guide**
+provides an explicit reset while also enabling the gate; the lesson appears
+when a new bookmark is added. Neither control touches bookmarks or notes, and
+leaving developer mode disables guide presentation again.
+The ten visual studies and selected 02 target live in
+`docs/design-studies/contextual-guide/`.
 
 > **Fixed 2026-07-24: the repeat picker.** It used to be the one live violation
 > of the two rules above — a stock `androidx.compose.ui.window.Dialog` with a
