@@ -12,30 +12,48 @@ const DISMISS_KEYS: Record<EducationMoment, string> = {
   ayah_rail: 'beautiful-quran-education-ayah-rail-v1',
 }
 
-export function isEducationDismissed(moment: EducationMoment): boolean {
-  try {
-    return localStorage.getItem(DISMISS_KEYS[moment]) === '1'
-  } catch {
-    return false
-  }
-}
+/** Fallback when localStorage is missing (Vitest node) or blocked. */
+const memory = new Map<string, string>()
 
-export function dismissEducation(moment: EducationMoment): void {
+function storageGet(key: string): string | null {
   try {
-    localStorage.setItem(DISMISS_KEYS[moment], '1')
+    if (typeof localStorage !== 'undefined') return localStorage.getItem(key)
   } catch {
     /* private mode */
   }
+  return memory.get(key) ?? null
+}
+
+function storageSet(key: string, value: string): void {
+  memory.set(key, value)
+  try {
+    if (typeof localStorage !== 'undefined') localStorage.setItem(key, value)
+  } catch {
+    /* private mode */
+  }
+}
+
+function storageRemove(key: string): void {
+  memory.delete(key)
+  try {
+    if (typeof localStorage !== 'undefined') localStorage.removeItem(key)
+  } catch {
+    /* private mode */
+  }
+}
+
+export function isEducationDismissed(moment: EducationMoment): boolean {
+  return storageGet(DISMISS_KEYS[moment]) === '1'
+}
+
+export function dismissEducation(moment: EducationMoment): void {
+  storageSet(DISMISS_KEYS[moment], '1')
 }
 
 /** Clears every dismiss flag so lessons can fire on their next eligible moment. */
 export function rearmEducation(): void {
-  try {
-    for (const key of Object.values(DISMISS_KEYS)) {
-      localStorage.removeItem(key)
-    }
-  } catch {
-    /* private mode */
+  for (const key of Object.values(DISMISS_KEYS)) {
+    storageRemove(key)
   }
 }
 
