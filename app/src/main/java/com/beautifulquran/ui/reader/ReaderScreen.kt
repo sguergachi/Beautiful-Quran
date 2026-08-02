@@ -2021,7 +2021,11 @@ fun ReaderScreen(
                                     visible = bookmarkNoteTipVisible && bookmarkTipHasTarget,
                                     rendered = (bookmarkNoteTipVisible ||
                                         bookmarkNoteTipRendered) && bookmarkTipHasTarget,
-                                    lessonOnLeft = bookmarkTipSide == AyahSelectorSide.RIGHT,
+                                    flow = if (bookmarkTipSide == AyahSelectorSide.LEFT) {
+                                        Offset(-1f, 0f)
+                                    } else {
+                                        Offset(1f, 0f)
+                                    },
                                 ) {
                                     translationY = verseRevealY
                                     alpha = verseFadeAlpha

@@ -16,7 +16,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -28,8 +27,10 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.layer.drawLayer
 import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
+import kotlin.math.abs
+import kotlin.math.hypot
 
 /**
  * Optically scatters the live reader only where the vellum is translucent.
@@ -41,7 +42,7 @@ internal fun Modifier.contextualGuideProgressiveBlur(
     enabled: Boolean,
     visible: Boolean,
     rendered: Boolean,
-    lessonOnLeft: Boolean,
+    flow: Offset,
     layerBlock: GraphicsLayerScope.() -> Unit = {},
 ): Modifier {
     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU || !enabled) {
@@ -63,6 +64,7 @@ internal fun Modifier.contextualGuideProgressiveBlur(
     }
     val sourceLayer = rememberGraphicsLayer()
     val softenedLayer = rememberGraphicsLayer()
+    val direction = flow.normalized()
     val progress = remember { Animatable(0f) }
     LaunchedEffect(visible) {
         progress.animateTo(
@@ -89,24 +91,20 @@ internal fun Modifier.contextualGuideProgressiveBlur(
         val threeQuarter = (tuning.bodyEdge + tuning.featherWidth * 0.67f)
             .coerceIn(center, 1f)
         val outer = (tuning.bodyEdge + tuning.featherWidth).coerceIn(threeQuarter, 1f)
-        val maskStops = if (lessonOnLeft) {
-            arrayOf(
-                inner to Color.Transparent,
-                quarter to Color.White.copy(alpha = 0.24f * amount),
-                center to Color.White.copy(alpha = 0.72f * amount),
-                threeQuarter to Color.White.copy(alpha = 0.38f * amount),
-                outer to Color.Transparent,
-            )
-        } else {
-            arrayOf(
-                (1f - outer) to Color.Transparent,
-                (1f - threeQuarter) to Color.White.copy(alpha = 0.38f * amount),
-                (1f - center) to Color.White.copy(alpha = 0.72f * amount),
-                (1f - quarter) to Color.White.copy(alpha = 0.24f * amount),
-                (1f - inner) to Color.Transparent,
-            )
-        }
-        val mask = Brush.horizontalGradient(*maskStops)
+        val maskStops = arrayOf(
+            inner to Color.Transparent,
+            quarter to Color.White.copy(alpha = 0.24f * amount),
+            center to Color.White.copy(alpha = 0.72f * amount),
+            threeQuarter to Color.White.copy(alpha = 0.38f * amount),
+            outer to Color.Transparent,
+        )
+        val span = abs(direction.x) * size.width + abs(direction.y) * size.height
+        val fieldCenter = Offset(size.width / 2f, size.height / 2f)
+        val mask = Brush.linearGradient(
+            *maskStops,
+            start = fieldCenter - direction * (span / 2f),
+            end = fieldCenter + direction * (span / 2f),
+        )
         val bounds = Rect(Offset.Zero, size)
         drawContext.canvas.saveLayer(bounds, Paint())
         drawLayer(sourceLayer)
@@ -126,15 +124,23 @@ internal fun Modifier.contextualGuideProgressiveBlur(
 @Composable
 internal fun InkSpillField(
     progress: () -> Float,
-    targetCenterY: Dp,
-    lessonOnLeft: Boolean,
+    spotlightCenter: DpOffset,
+    bodyCenter: DpOffset,
+    actionCenter: DpOffset,
     color: Color,
     modifier: Modifier = Modifier,
 ) {
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-        ShaderInkSpillField(progress, targetCenterY, lessonOnLeft, color, modifier)
+        ShaderInkSpillField(
+            progress,
+            spotlightCenter,
+            bodyCenter,
+            actionCenter,
+            color,
+            modifier,
+        )
     } else {
-        GradientInkSpillField(progress, lessonOnLeft, color, modifier)
+        GradientInkSpillField(progress, spotlightCenter, bodyCenter, color, modifier)
     }
 }
 
@@ -142,8 +148,9 @@ internal fun InkSpillField(
 @Composable
 private fun ShaderInkSpillField(
     progress: () -> Float,
-    targetCenterY: Dp,
-    lessonOnLeft: Boolean,
+    spotlightCenter: DpOffset,
+    bodyCenter: DpOffset,
+    actionCenter: DpOffset,
     color: Color,
     modifier: Modifier,
 ) {
@@ -151,10 +158,16 @@ private fun ShaderInkSpillField(
     val brush = remember(shader) { ShaderBrush(shader) }
     Canvas(modifier) {
         val tuning = ContextualGuideStyle.tuning
+        val spotlight = Offset(spotlightCenter.x.toPx(), spotlightCenter.y.toPx())
+        val body = Offset(bodyCenter.x.toPx(), bodyCenter.y.toPx())
+        val action = Offset(actionCenter.x.toPx(), actionCenter.y.toPx())
+        val flow = (spotlight - body).normalized()
         shader.setFloatUniform("resolution", size.width, size.height)
-        shader.setFloatUniform("targetY", targetCenterY.toPx() / size.height)
+        shader.setFloatUniform("spotlight", spotlight.x, spotlight.y)
+        shader.setFloatUniform("bodyCenter", body.x, body.y)
+        shader.setFloatUniform("actionCenter", action.x, action.y)
         shader.setFloatUniform("progress", progress())
-        shader.setFloatUniform("direction", if (lessonOnLeft) 1f else -1f)
+        shader.setFloatUniform("flow", flow.x, flow.y)
         shader.setFloatUniform("bodyEdge", tuning.bodyEdge)
         shader.setFloatUniform("featherWidth", tuning.featherWidth)
         shader.setFloatUniform("fadeSoftness", tuning.fadeSoftness)
@@ -174,7 +187,8 @@ private fun ShaderInkSpillField(
 @Composable
 private fun GradientInkSpillField(
     progress: () -> Float,
-    lessonOnLeft: Boolean,
+    spotlightCenter: DpOffset,
+    bodyCenter: DpOffset,
     color: Color,
     modifier: Modifier,
 ) {
@@ -182,8 +196,12 @@ private fun GradientInkSpillField(
         val amount = progress()
         if (amount <= 0.001f) return@Canvas
         val tuning = ContextualGuideStyle.tuning
+        val spotlight = Offset(spotlightCenter.x.toPx(), spotlightCenter.y.toPx())
+        val body = Offset(bodyCenter.x.toPx(), bodyCenter.y.toPx())
+        val direction = (spotlight - body).normalized()
         val reachFraction = tuning.bodyEdge + tuning.featherWidth
-        val reach = size.width * reachFraction * amount
+        val span = abs(direction.x) * size.width + abs(direction.y) * size.height
+        val reach = span * reachFraction * amount
         val bodyStop = (tuning.bodyEdge / reachFraction).coerceIn(0f, 1f)
         val stops = arrayOf(
             0f to color.copy(alpha = amount),
@@ -192,20 +210,14 @@ private fun GradientInkSpillField(
             bodyStop + (1f - bodyStop) * 0.76f to color.copy(alpha = 0.28f * amount),
             1f to Color.Transparent,
         )
-        val colorStops = if (lessonOnLeft) {
-            stops
-        } else {
-            stops.map { (at, ink) -> (1f - at) to ink }.reversed().toTypedArray()
-        }
-        val left = if (lessonOnLeft) 0f else size.width - reach
+        val fieldCenter = Offset(size.width / 2f, size.height / 2f)
+        val start = fieldCenter - direction * (span / 2f)
         drawRect(
-            brush = Brush.horizontalGradient(
-                *colorStops,
-                startX = left,
-                endX = left + reach,
+            brush = Brush.linearGradient(
+                *stops,
+                start = start,
+                end = start + direction * reach,
             ),
-            topLeft = Offset(left, 0f),
-            size = Size(reach, size.height),
         )
     }
 }
@@ -213,6 +225,31 @@ private fun GradientInkSpillField(
 private const val VellumFieldFunctions = """
     float smoother(float value) {
         return value * value * value * (value * (value * 6.0 - 15.0) + 10.0);
+    }
+
+    float2 orientedCoordinates(float2 point) {
+        float2 crossAxis = float2(-flow.y, flow.x);
+        if (abs(crossAxis.y) > 0.0001) {
+            if (crossAxis.y < 0.0) crossAxis = -crossAxis;
+        } else if (crossAxis.x < 0.0) {
+            crossAxis = -crossAxis;
+        }
+        float alongMin = min(0.0, flow.x * resolution.x)
+            + min(0.0, flow.y * resolution.y);
+        float crossMin = min(0.0, crossAxis.x * resolution.x)
+            + min(0.0, crossAxis.y * resolution.y);
+        float alongSpan = max(
+            abs(flow.x) * resolution.x + abs(flow.y) * resolution.y,
+            1.0
+        );
+        float crossSpan = max(
+            abs(crossAxis.x) * resolution.x + abs(crossAxis.y) * resolution.y,
+            1.0
+        );
+        return float2(
+            (dot(point, flow) - alongMin) / alongSpan,
+            (dot(point, crossAxis) - crossMin) / crossSpan
+        );
     }
 
     float hash(float2 point) {
@@ -248,20 +285,29 @@ private const val VellumFieldFunctions = """
     }
 
     float vellumDensity(float2 fragCoord) {
-        float2 uv = fragCoord / resolution;
-        float fromEdge = direction > 0.0 ? uv.x : 1.0 - uv.x;
-        float riseEnd = clamp(targetY + 0.05, 0.30, 0.42);
-        float rise = smoother(clamp((uv.y + 0.02) / riseEnd, 0.0, 1.0));
-        float tail = 1.0 - 0.68 * smoother(clamp((uv.y - 0.72) / 0.28, 0.0, 1.0));
+        float2 oriented = orientedCoordinates(fragCoord);
+        float2 target = orientedCoordinates(spotlight);
+        float2 body = orientedCoordinates(bodyCenter);
+        float fromEdge = oriented.x;
+        float cross = oriented.y;
+        float targetCross = target.y;
+        float riseEnd = clamp(targetCross + 0.05, 0.30, 0.42);
+        float rise = smoother(clamp((cross + 0.02) / riseEnd, 0.0, 1.0));
+        float tail = 1.0 - 0.68 * smoother(clamp((cross - 0.72) / 0.28, 0.0, 1.0));
         float silhouette = rise * tail;
         float taper = verticalTaper * (1.0 - silhouette);
-        float lessonDistance = (uv.y - targetY) / 0.17;
+        float lessonDistance = (cross - targetCross) / 0.17;
         float lessonReservoir = verticalTaper * 0.85
             * exp(-lessonDistance * lessonDistance);
         // A single diffusion profile has no solid/feather junction to expose.
         // Its midpoint follows only the lesson; the button contour is separate.
-        float midpoint = (bodyEdge + featherWidth * 0.32 - taper
-            + lessonReservoir) * progress;
+        float bodyFloor = body.x + featherWidth * 0.08;
+        float spotlightCeiling = target.x - featherWidth * 0.12;
+        float midpoint = clamp(
+            bodyEdge + featherWidth * 0.32 - taper + lessonReservoir,
+            min(bodyFloor, spotlightCeiling),
+            max(bodyFloor, spotlightCeiling)
+        ) * progress;
         float diffusion = max(featherWidth * 0.28, 0.025);
         float clouds = noise(fragCoord * float2(0.006, 0.008)) * 0.65
             + noise(fragCoord * float2(0.017, 0.021)) * 0.35;
@@ -272,9 +318,14 @@ private const val VellumFieldFunctions = """
 
         // A second, localized diffusion contour gives the untouched-paper
         // action breathing room without changing the lesson silhouette.
-        float buttonDistance = (uv.y - 0.91) / 0.11;
+        float actionCross = orientedCoordinates(actionCenter).y;
+        float buttonDistance = (cross - actionCross) / 0.11;
         float buttonEnvelope = exp(-buttonDistance * buttonDistance);
-        float buttonMidpoint = (bodyEdge + featherWidth * 0.18) * progress;
+        float buttonMidpoint = clamp(
+            bodyEdge + featherWidth * 0.18,
+            min(bodyFloor, spotlightCeiling),
+            max(bodyFloor, spotlightCeiling)
+        ) * progress;
         float buttonDiffusion = max(featherWidth * 0.22, 0.02);
         float buttonAbsorbed = buttonMidpoint - fromEdge
             + texture * vellumGrain * 0.12;
@@ -293,9 +344,11 @@ private const val VellumFieldFunctions = """
 
 private const val VellumFieldShader = """
     uniform float2 resolution;
-    uniform float targetY;
+    uniform float2 spotlight;
+    uniform float2 bodyCenter;
+    uniform float2 actionCenter;
     uniform float progress;
-    uniform float direction;
+    uniform float2 flow;
     uniform float bodyEdge;
     uniform float featherWidth;
     uniform float fadeSoftness;
@@ -310,12 +363,12 @@ private const val VellumFieldShader = """
         float coverage = vellumCoverage(density);
         float edge = 4.0 * density * (1.0 - density);
         float radius = blurRadius * (0.35 + 0.65 * edge);
-        float axis = direction * radius;
+        float2 axis = flow * radius;
         float softened = coverage * 0.36;
-        softened += vellumCoverage(vellumDensity(fragCoord + float2(axis, 0.0))) * 0.24;
-        softened += vellumCoverage(vellumDensity(fragCoord - float2(axis, 0.0))) * 0.24;
-        softened += vellumCoverage(vellumDensity(fragCoord + float2(axis * 2.0, 0.0))) * 0.08;
-        softened += vellumCoverage(vellumDensity(fragCoord - float2(axis * 2.0, 0.0))) * 0.08;
+        softened += vellumCoverage(vellumDensity(fragCoord + axis)) * 0.24;
+        softened += vellumCoverage(vellumDensity(fragCoord - axis)) * 0.24;
+        softened += vellumCoverage(vellumDensity(fragCoord + axis * 2.0)) * 0.08;
+        softened += vellumCoverage(vellumDensity(fragCoord - axis * 2.0)) * 0.08;
         coverage = mix(coverage, softened, blurStrength * edge);
         // Paper tooth varies pigment load, rather than displacing a contour.
         // Pixel-scale dither keeps the long translucent ramp quantization-free.
@@ -326,11 +379,15 @@ private const val VellumFieldShader = """
             0.0,
             1.0
         );
-        float2 uv = fragCoord / resolution;
-        float fromSource = direction > 0.0 ? uv.x : 1.0 - uv.x;
+        float fromSource = orientedCoordinates(fragCoord).x;
         float sourcePool = smoother(clamp((0.5 - fromSource) / 0.5, 0.0, 1.0));
         coverage = 1.0 - pow(1.0 - coverage, 1.0 + 0.75 * sourcePool);
         half alpha = inkColor.a * half(coverage * progress);
         return half4(inkColor.rgb * alpha, alpha);
     }
 """
+
+private fun Offset.normalized(): Offset {
+    val length = hypot(x, y)
+    return if (length > 1e-4f) this / length else Offset(1f, 0f)
+}

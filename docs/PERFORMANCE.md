@@ -143,8 +143,8 @@ identical on a solid background and costs almost nothing.
 ### 4b. Transient progressive vellum
 
 The contextual guide's progressive vellum is developer-gated and transient.
-On Android 13+ one AGSL brush draws the full-height tapered pigment field and
-samples its analytic alpha mask five times only inside the feather. A second
+On Android 13+ one AGSL brush draws the arbitrarily angled tapered pigment
+field and samples its analytic alpha mask five times only inside the feather. A second
 pass records each visible ayah—not the virtualized `LazyColumn`, whose child
 display lists cannot be sampled reliably—into a small graphics layer. A native
 GPU blur replaces the sharp ayah progressively through paired `DstOut`/`DstIn`

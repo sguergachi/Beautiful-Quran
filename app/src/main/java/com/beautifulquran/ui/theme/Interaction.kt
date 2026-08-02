@@ -6,6 +6,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.semantics.Role
 
@@ -62,3 +63,18 @@ fun Modifier.absorbPointerEvents(onFirstDown: (() -> Unit)? = null): Modifier =
             } while (event.changes.any { it.pressed })
         }
     }
+
+/** Consumes a gesture only when its first contact satisfies [shouldAbsorb]. */
+fun Modifier.absorbPointerEventsWhere(
+    shouldAbsorb: (Offset) -> Boolean,
+): Modifier = pointerInput(shouldAbsorb) {
+    awaitEachGesture {
+        val down = awaitFirstDown(requireUnconsumed = false)
+        val absorb = shouldAbsorb(down.position)
+        if (absorb) down.consume()
+        do {
+            val event = awaitPointerEvent()
+            if (absorb) event.changes.forEach { it.consume() }
+        } while (event.changes.any { it.pressed })
+    }
+}

@@ -539,9 +539,10 @@ and the experimental tajweed hold (see
 panel is split into **Ink / Sweep / Repeat / Tajweed / Guide / Sync** tabs —
 quiet ink names with a hairline under the live one, no tab-bar chrome. Guide
 exposes the contextual lesson's body edge, feather width, fade softness,
-progressive-blur radius/strength, vellum grain, and vertical taper. The GPU
-field keeps the target-relative lesson contour independent from a localized
-lower contour behind the untouched-paper action. The bottom action row
+progressive-blur radius/strength, vellum grain, and vertical taper. Each guide
+supplies a spotlight plus a body angle/distance; the GPU field keeps that
+lesson contour independent from a localized contour behind the untouched-paper
+action. The bottom action row
 holds **Reset**, **Copy values**, and a session-only **Focus** freeze
 (`InkEngine.focusEngineEnabled`) that parks playback auto-home and word-band
 follow so the page can be panned while auditioning ink; it is not part of
