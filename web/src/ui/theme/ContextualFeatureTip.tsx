@@ -52,9 +52,9 @@ export function ContextualFeatureTip({
   dismissPaperColor = 'var(--reader-paper, #faf3e8)',
   dismissInkColor = 'var(--reader-ink, #1c1b18)',
   onRenderedChange,
-  guideWidthFraction = 0.42,
+  guideWidthFraction = 0.36,
   guideHeightPx = 188,
-  contentPadding = { start: 18, end: 32 },
+  contentPadding = { start: 12, end: 20 },
 }: Props) {
   const rootRef = useRef<HTMLDivElement>(null)
   const [size, setSize] = useState({ width: 0, height: 0 })
@@ -140,18 +140,20 @@ export function ContextualFeatureTip({
       : tipActionCenter(placement, spotlight, surface)
   const laneWidth = Math.min(
     surface.width * Math.min(1, Math.max(0.25, guideWidthFraction)),
-    22 * 16,
+    18 * 16,
   )
   const laneHeight = Math.min(guideHeightPx, surface.height || guideHeightPx)
   const spotlightOnLeft = spotlightSide === 'left'
   // Pin copy to the far paper edge (opposite the live feature), not the
   // mid-feather bodyCenter — wide desktop sheets otherwise read mid-panel.
-  const edgeInset = 20
+  const edgeInset = 12
   const laneLeft = spotlightOnLeft
     ? Math.max(0, surface.width - laneWidth - edgeInset)
     : edgeInset
+  // Sit a touch above vertical center so type reads in the pigment body,
+  // not down in the tapered wash.
   const laneTop = Math.min(
-    Math.max(0, bodyCenter.y - laneHeight / 2),
+    Math.max(0, bodyCenter.y - laneHeight * 0.62),
     Math.max(0, surface.height - laneHeight),
   )
   const actionX = Math.min(

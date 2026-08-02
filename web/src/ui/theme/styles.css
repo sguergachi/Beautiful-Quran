@@ -5232,8 +5232,17 @@ html[data-entrance='true'] body {
   display: flex;
   flex-direction: column;
   justify-content: center;
+  align-items: stretch;
   pointer-events: none;
   box-sizing: border-box;
+}
+
+.contextual-feature-tip[data-spotlight='left'] .contextual-tip-lesson {
+  align-items: flex-end;
+}
+
+.contextual-feature-tip[data-spotlight='right'] .contextual-tip-lesson {
+  align-items: flex-start;
 }
 
 .contextual-tip-title {
