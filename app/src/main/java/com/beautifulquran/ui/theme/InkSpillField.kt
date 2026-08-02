@@ -258,10 +258,13 @@ private const val VellumFieldFunctions = """
         float lessonDistance = (uv.y - targetY) / 0.17;
         float lessonReservoir = verticalTaper * 0.85
             * exp(-lessonDistance * lessonDistance);
+        float buttonDistance = (uv.y - 0.9) / 0.15;
+        float buttonReservoir = verticalTaper * 0.22
+            * exp(-buttonDistance * buttonDistance);
         // A single diffusion profile has no solid/feather junction to expose.
-        // Its midpoint follows the tapered silhouette and opens at the lesson.
+        // Its midpoint opens at the lesson and breathes around the paper button.
         float midpoint = (bodyEdge + featherWidth * 0.32 - taper
-            + lessonReservoir) * progress;
+            + lessonReservoir + buttonReservoir) * progress;
         float diffusion = max(featherWidth * 0.28, 0.025);
         float clouds = noise(fragCoord * float2(0.006, 0.008)) * 0.65
             + noise(fragCoord * float2(0.017, 0.021)) * 0.35;

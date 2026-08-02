@@ -72,7 +72,9 @@ with no visible slices, bands, scallops, or drawn contour. The ribbon remains
 fully exposed on its own side. Parchment type settles partly into that feather: “Add a note —
 Press and hold this ribbon,” while a compact area preserved from the spill
 uses the reader theme's own paper color as its dismissal button at the
-thumb-reachable bottom of the teaching side. Dismissal withdraws the
+thumb-reachable bottom of the teaching side. A restrained lower pigment
+reservoir gives that paper cutout breathing room without drawing a ring or
+separate container around it. Dismissal withdraws the
 bleed and returns the ayah in place; no other verse or chrome leaves the reader.
 Low-contrast rings breathe around the live ribbon itself—no target dot,
 pointer glyph, or competing accent—and never sits at the bleed's feather.

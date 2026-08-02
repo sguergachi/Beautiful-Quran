@@ -8,13 +8,13 @@ import androidx.compose.runtime.setValue
 /** Live GPU parameters for the contextual guide's progressive vellum field. */
 @Immutable
 data class ContextualGuideTuning(
-    val bodyEdge: Float = 0.4202f,
-    val featherWidth: Float = 0.4603f,
-    val fadeSoftness: Float = 1.4711f,
+    val bodyEdge: Float = 0.5f,
+    val featherWidth: Float = 0.2819f,
+    val fadeSoftness: Float = 1.3329f,
     val blurRadiusDp: Float = 24f,
     val blurStrength: Float = 1f,
-    val vellumGrain: Float = 0.0488f,
-    val verticalTaper: Float = 0.1724f,
+    val vellumGrain: Float = 0.0297f,
+    val verticalTaper: Float = 0.24f,
 )
 
 /** Snapshot-backed bridge between the renderer and developer Ink Lab. */

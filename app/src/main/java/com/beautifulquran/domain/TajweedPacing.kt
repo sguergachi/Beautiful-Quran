@@ -83,8 +83,9 @@ object TajweedPacing {
      * for at least [minPrefixMs] of wall-clock (and may claim up to
      * [MAX_WASL_PREFIX_WINDOW] of a short donor) so pairs like مَن يَشْرِى do
      * not race the first glyph. Longer words stay near the absorbed-nūn tail
-     * ([WASL_EXIT_FRACTION]). [minPrefixMs] is lab-tunable
-     * (`InkEngine.Tuning.waslPrefixMs`); default matches [DEFAULT_WASL_PREFIX_MS].
+     * ([WASL_EXIT_FRACTION]). The reader explicitly supplies its lab-tunable
+     * `InkEngine.Tuning.waslPrefixMs`; omitted calls use the conservative
+     * [DEFAULT_WASL_PREFIX_MS] reference used by the pure helper tests.
      */
     fun waslPrefixStart(
         sweepMs: Int,
@@ -542,8 +543,8 @@ object TajweedPacing {
      */
     private const val MAX_WASL_PREFIX_WINDOW = 0.75f
     /**
-     * Shipped speed ceiling (ms) for the next-letter wasl bloom — also the
-     * default for [InkEngine.Tuning.waslPrefixMs] / Ink Lab.
+     * Conservative reference speed ceiling (ms) for standalone helper calls.
+     * The reader explicitly supplies its live `InkEngine.Tuning.waslPrefixMs`.
      */
     const val DEFAULT_WASL_PREFIX_MS = 480f
     /**
