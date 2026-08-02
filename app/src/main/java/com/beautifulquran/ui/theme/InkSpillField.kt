@@ -258,20 +258,29 @@ private const val VellumFieldFunctions = """
         float lessonDistance = (uv.y - targetY) / 0.17;
         float lessonReservoir = verticalTaper * 0.85
             * exp(-lessonDistance * lessonDistance);
-        float buttonDistance = (uv.y - 0.9) / 0.15;
-        float buttonReservoir = verticalTaper * 0.22
-            * exp(-buttonDistance * buttonDistance);
         // A single diffusion profile has no solid/feather junction to expose.
-        // Its midpoint opens at the lesson and breathes around the paper button.
+        // Its midpoint follows only the lesson; the button contour is separate.
         float midpoint = (bodyEdge + featherWidth * 0.32 - taper
-            + lessonReservoir + buttonReservoir) * progress;
+            + lessonReservoir) * progress;
         float diffusion = max(featherWidth * 0.28, 0.025);
         float clouds = noise(fragCoord * float2(0.006, 0.008)) * 0.65
             + noise(fragCoord * float2(0.017, 0.021)) * 0.35;
         float fibres = noise(fragCoord * float2(0.055, 0.071));
         float texture = (clouds - 0.5) + (fibres - 0.5) * 0.18;
         float absorbed = midpoint - fromEdge + texture * vellumGrain * 0.18;
-        return 1.0 / (1.0 + exp(-absorbed / diffusion));
+        float lessonDensity = 1.0 / (1.0 + exp(-absorbed / diffusion));
+
+        // A second, localized diffusion contour gives the untouched-paper
+        // action breathing room without changing the lesson silhouette.
+        float buttonDistance = (uv.y - 0.91) / 0.11;
+        float buttonEnvelope = exp(-buttonDistance * buttonDistance);
+        float buttonMidpoint = (bodyEdge + featherWidth * 0.18) * progress;
+        float buttonDiffusion = max(featherWidth * 0.22, 0.02);
+        float buttonAbsorbed = buttonMidpoint - fromEdge
+            + texture * vellumGrain * 0.12;
+        float buttonDensity = buttonEnvelope
+            / (1.0 + exp(-buttonAbsorbed / buttonDiffusion));
+        return 1.0 - (1.0 - lessonDensity) * (1.0 - buttonDensity);
     }
 
     float vellumCoverage(float density) {
