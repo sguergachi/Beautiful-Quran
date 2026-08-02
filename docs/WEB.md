@@ -414,11 +414,11 @@ until the hole finishes.
 **Contextual feature guides** (Android `ContextualFeatureTip`) are also
 hosted on the reader sheet: an inverse royal-green progressive vellum
 spotlight around the live bookmark ribbon or collapsed ayah rail, with
-lesson copy pinned toward the far paper edge and a theme-paper **Got it**
-cutout. Off by default; Settings → Developer → **Contextual feature
-guides** / **Replay feature guides** gates them. Web draws the same
-progressive-vellum field as Android’s AGSL shader via WebGL (canvas
-gradient fallback only when WebGL is unavailable).
+lesson copy seated on the wash’s leading feather (toward the mark) and a
+theme-paper **Got it** cutout. Off by default; Settings → Developer →
+**Contextual feature guides** / **Replay feature guides** gates them. Web
+draws the same progressive-vellum field as Android’s AGSL shader via WebGL
+(canvas gradient fallback only when WebGL is unavailable).
 
 Ink wash uses the smootherstep mask from `fade.washMaskImage` (not a blunt
 3-stop wipe). Repeat orange is a second overlay that washes in and dissolves

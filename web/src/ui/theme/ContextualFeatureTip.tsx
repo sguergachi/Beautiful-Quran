@@ -4,6 +4,10 @@
  * Inverse paper spotlight: royal-green vellum covers unused paper while the
  * feature stays clear. Body-side half-plane absorbs gestures; spotlight-side
  * stays interactive. Not a dialog, card, scrim, or sheet push.
+ *
+ * Lesson copy sits on the wash's leading feather (Android lane + CenterStart),
+ * not against the solid far paper edge — parchment type settles into that
+ * progressive veil toward the live mark.
  */
 import { animate, type AnimationPlaybackControls } from 'motion'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
@@ -52,9 +56,9 @@ export function ContextualFeatureTip({
   dismissPaperColor = 'var(--reader-paper, #faf3e8)',
   dismissInkColor = 'var(--reader-ink, #1c1b18)',
   onRenderedChange,
-  guideWidthFraction = 0.36,
+  guideWidthFraction = 0.72,
   guideHeightPx = 188,
-  contentPadding = { start: 12, end: 20 },
+  contentPadding = { start: 18, end: 32 },
 }: Props) {
   const rootRef = useRef<HTMLDivElement>(null)
   const [size, setSize] = useState({ width: 0, height: 0 })
@@ -131,23 +135,40 @@ export function ContextualFeatureTip({
 
   const surface = size
   const spotlight = coercePoint(spotlightCenter, surface)
-  // Shader reservoir stays on the Android ray fraction; lesson copy pins to
-  // the far paper edge so wide desktop sheets do not park type mid-feather.
   const bodyCenter = tipBodyCenter(placement, spotlight, surface)
   const action =
     actionCenter != null
       ? coercePoint(actionCenter, surface)
       : tipActionCenter(placement, spotlight, surface)
+  // Leading-edge anchor: between the solid body reservoir and the spotlight,
+  // where the progressive veil feathers — DESIGN.md "type settles into that feather".
+  const leadingEdge = tipBodyCenter(
+    {
+      ...placement,
+      bodyDistanceFraction: 0.52,
+    },
+    spotlight,
+    surface,
+  )
   const laneWidth = Math.min(
     surface.width * Math.min(1, Math.max(0.25, guideWidthFraction)),
-    16 * 16,
+    22 * 16,
   )
   const laneHeight = Math.min(guideHeightPx, surface.height || guideHeightPx)
+  // Park the lesson box on the leading edge; keep type on the spotlight-facing
+  // side of the lane (Android CenterStart for left spotlight; mirror for right).
   const spotlightOnLeft = spotlightSide === 'left'
-  // Sit a touch above vertical center so type reads in the pigment body,
-  // not down in the tapered wash.
+  const laneLeft = spotlightOnLeft
+    ? Math.min(
+        Math.max(0, leadingEdge.x - contentPadding.start),
+        Math.max(0, surface.width - laneWidth),
+      )
+    : Math.min(
+        Math.max(0, leadingEdge.x - laneWidth + contentPadding.end),
+        Math.max(0, surface.width - laneWidth),
+      )
   const laneTop = Math.min(
-    Math.max(0, bodyCenter.y - laneHeight * 0.62),
+    Math.max(0, bodyCenter.y - laneHeight / 2),
     Math.max(0, surface.height - laneHeight),
   )
   const actionX = Math.min(
@@ -192,16 +213,14 @@ export function ContextualFeatureTip({
       <div
         className="contextual-tip-lesson"
         style={{
+          left: laneLeft,
           top: laneTop,
+          width: laneWidth,
           height: laneHeight,
-          maxWidth: laneWidth,
           paddingLeft: contentPadding.start,
           paddingRight: contentPadding.end,
           opacity: ink,
-          // Anchor to the far paper edge opposite the spotlight.
-          ...(spotlightOnLeft
-            ? { right: 10, left: 'auto', textAlign: 'end' as const }
-            : { left: 10, right: 'auto', textAlign: 'start' as const }),
+          textAlign: spotlightOnLeft ? 'start' : 'end',
         }}
       >
         <h2 className="contextual-tip-title">{title}</h2>

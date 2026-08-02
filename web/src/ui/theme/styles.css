@@ -5232,17 +5232,17 @@ html[data-entrance='true'] body {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  width: max-content;
   pointer-events: none;
   box-sizing: border-box;
 }
 
+/* Type faces the wash's leading edge (toward the spotlight). */
 .contextual-feature-tip[data-spotlight='left'] .contextual-tip-lesson {
-  align-items: flex-end;
+  align-items: flex-start;
 }
 
 .contextual-feature-tip[data-spotlight='right'] .contextual-tip-lesson {
-  align-items: flex-start;
+  align-items: flex-end;
 }
 
 .contextual-tip-title {
