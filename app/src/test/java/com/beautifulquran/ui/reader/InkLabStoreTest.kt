@@ -15,6 +15,30 @@ import org.junit.Test
 class InkLabStoreTest {
 
     @Test
+    fun shippedDefaults_matchSelectedInkAndVellumProfile() {
+        val ink = InkEngine.Tuning()
+        assertEquals(1.1092f, ink.pacedFeather, 0.0001f)
+        assertEquals(120, ink.waslPrefixMs)
+        assertEquals(1.4185f, ink.cruiseCap, 0.0001f)
+        assertEquals(0.3f, ink.holdCreep, 0.0001f)
+
+        val guide = ContextualGuideTuning()
+        assertEquals(0.5f, guide.bodyEdge, 0.0001f)
+        assertEquals(0.2819f, guide.featherWidth, 0.0001f)
+        assertEquals(1.3329f, guide.fadeSoftness, 0.0001f)
+        assertEquals(24f, guide.blurRadiusDp, 0.0001f)
+        assertEquals(1f, guide.blurStrength, 0.0001f)
+        assertEquals(0.0297f, guide.vellumGrain, 0.0001f)
+        assertEquals(0.24f, guide.verticalTaper, 0.0001f)
+
+        assertEquals(ink, InkLabSnapshot().toTuning())
+        assertEquals(guide, InkLabSnapshot().toContextualGuideTuning())
+        assertEquals(114, InkEngine.DEFAULT_HIGHLIGHT_LEAD_MS)
+        assertEquals(500, InkEngine.DEFAULT_FADE_LEAD_MS)
+        assertNull(InkLabSnapshot().outputLatencyOverrideMs)
+    }
+
+    @Test
     fun encodeThenDecode_roundTripsAllFields() {
         val original = InkLabSnapshot(
             upcomingAlpha = 0.31f,

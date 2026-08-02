@@ -242,12 +242,15 @@ not a full-word sweep. Mapping that segment only onto the last ~18 % of a
 wasl **off** still looked soft (whole-word min-sweep). Users correctly
 reported: wasl-aware mode looked *worse* than plain wash on these pairs.
 
-**Speed ceiling (shipped).** `TajweedPacing.waslPrefixStart(sweepMs)` chooses
-when the next-letter bloom begins:
+**Speed ceiling.** `TajweedPacing.waslPrefixStart(sweepMs, minPrefixMs)` chooses
+when the next-letter bloom begins. The reader passes its shipped tuning
+explicitly; the no-argument helper default remains the conservative reference
+used by the pure pacing tests:
 
-| Constant / knob | Role | Shipped |
-|-----------------|------|---------|
-| `DEFAULT_WASL_PREFIX_MS` / `Tuning.waslPrefixMs` | Target wall-clock for the bloom | **480 ms** |
+| Constant / knob | Role | Value |
+|-----------------|------|-------|
+| `DEFAULT_WASL_PREFIX_MS` | Standalone helper / test reference | **480 ms** |
+| `Tuning.waslPrefixMs` | Reader target wall-clock for the bloom | **120 ms** |
 | `MAX_WASL_PREFIX_WINDOW` | Max fraction of a short donor spent on the bloom | **0.75** |
 | `MIN_WASL_PREFIX_WINDOW` | Floor (= final 18% junction) for long donors | **0.18** |
 | `DEFAULT_WASL_HANDOFF` / `Tuning.waslHandoff` | Max bloom clock laid before activation | **0.45** |
@@ -257,10 +260,9 @@ Ink Lab → **Tajweed** → **Wasl prefix ms** (120–900) live-tunes
 activation. Both persist with the other lab numbers and **Copy values**
 includes them.
 
-So a ~500 ms `مَن` claims ~75 % of its span (~375 ms) for a smoothstepped
-fade into `يَشْرِى` / `رَّبِّكُم` and carries its unfinished edge
-forward; an 800 ms donor hits the full ~480 ms target; multi-second donors
-stay near the late junction (~18–24 % window).
+With the selected reader tuning, a ~500 ms `مَن` claims its final 120 ms for a
+smoothstepped fade into `يَشْرِى` / `رَّبِّكُم`; an 800 ms donor uses its final
+18 % (~144 ms), and longer donors stay at that late junction.
 No connection completes its prefix before activation: the shipped 0.45 clock
 cap becomes roughly 0.43 after smoothstep, leaving most of the word's ordinary
 wash visible. This matters for wrapped connections such as Alafasy 2:231
@@ -268,10 +270,10 @@ wash visible. This matters for wrapped connections such as Alafasy 2:231
 used to present the opening of `وَلَا` fully formed across the line break.
 
 The default Alafasy timing at 2:207 is shorter still: `مَن` has a 220 ms
-segment (254 ms after the sweep floor), leaving only ~190 ms after the initial
-quarter-word pause. That tail now reaches roughly 35 % of the eased bloom and
-the active `يَشۡرِي` sweep continues from exactly that edge. It is never
-normalized to 100 % merely because the timing boundary arrived.
+segment (254 ms after the sweep floor). Its final 120 ms reaches the shipped
+0.45 clock cap (roughly 0.43 after smoothstep), and the active `يَشۡرِي` sweep
+continues from exactly that edge. It is never normalized to 100 % merely
+because the timing boundary arrived.
 An earlier 50 % cap made the old 320 ms floor **unreachable** on short holds
 (only ~250 ms actual) — do not reintroduce that without re-checking 2:207.
 
@@ -348,7 +350,7 @@ Two refinements built into the curve, not the callers:
   pacing was too subtle to see at that width, so it narrowed the edge to
   0.3–0.8 — up to 3× sharper — and the softness went with it. A hold does not
   need a sharp edge: the bloom visibly *stopping* is legible at any feather.
-  So `pacedFeather` ships slightly sharper than `washFeather` (1.1857 vs 1.6)
+  So `pacedFeather` ships slightly sharper than `washFeather` (1.1092 vs 1.6)
   so holds stay legible without a hard edge, and remains a slider for
   auditioning. `ShapedWordBloom.InkReveal` keeps its optional per-bloom
   `feather` override for that path.
@@ -425,8 +427,9 @@ the curve, not the weights, is the module boundary.
   wasl entry (`مَن`→`يَقُولُ`, ikhfāʾ, iqlāb) parks on the next opening letter
   without changing the donor's own pacing; the exact 4:163
   `نُوحٖ`→`وَٱلنَّبِيِّـۧنَ` pair blooms its wāw over the prior-word tail
-  (smoothstepped; ~480 ms speed ceiling / up to 75 % of short donors via
-  `waslPrefixStart`); no segment anywhere outruns the cruise cap; and every
+  (smoothstepped; reader-tuned to 120 ms while the standalone helper keeps its
+  conservative 480 ms reference); no segment anywhere outruns the cruise cap;
+  and every
   knob combination stays monotone and bounded with exact endpoints. **The
   golden literals must stay byte-identical to the DB** — an
   editor or tool that NFC-normalizes the file fuses `ا + ٓ` into precomposed

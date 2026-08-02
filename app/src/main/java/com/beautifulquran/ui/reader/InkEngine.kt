@@ -119,7 +119,7 @@ object InkEngine {
         /** Feather of a paced word. Slightly sharper than [washFeather] so
          *  holds read clearly while the edge stays soft (see
          *  docs/TAJWEED_PACING.md). */
-        val pacedFeather: Float = 1.1857f,
+        val pacedFeather: Float = 1.1092f,
         /** Which moments earn a hold — see [TajweedPacing.Hold]. */
         val holdMadd: Boolean = true,
         val holdGhunnah: Boolean = true,
@@ -134,7 +134,7 @@ object InkEngine {
          * the unfinished edge continues after handoff. See
          * [docs/TAJWEED_PACING.md] Short wasl donors.
          */
-        val waslPrefixMs: Int = 480,
+        val waslPrefixMs: Int = 120,
         /**
          * Maximum wasl bloom clock laid down before the connected word becomes
          * active. Lower leaves more of its opening wash visible after handoff.
@@ -144,7 +144,7 @@ object InkEngine {
          *  multiple of the plain sweep rate. Word timings are contiguous, so
          *  hold length and this cap are the same dial; 1 means ordinary
          *  letters are never hurried and only [holdWaqf] can hold. */
-        val cruiseCap: Float = 2f,
+        val cruiseCap: Float = 1.4185f,
         /** Share of a verse-closing word spent sustaining its final letter
          *  when the word is long enough (see [waqfLengthScale]). */
         val waqfShare: Float = 0.5932f,
@@ -152,7 +152,7 @@ object InkEngine {
          *  [TajweedPacing.Hold.waqfLengthScale]. */
         val waqfLengthScale: Float = 1f,
         /** How far the wash still creeps while holding, so it breathes. */
-        val holdCreep: Float = 0.1076f,
+        val holdCreep: Float = 0.3f,
     )
 
     /**
