@@ -44,6 +44,15 @@ class DeveloperModeSettingsTest {
     }
 
     @Test
+    fun `contextual lessons keep independent persisted moments`() {
+        assertEquals(2, EducationMoment.entries.size)
+        assertEquals(
+            EducationMoment.entries.size,
+            EducationMoment.entries.map { it.preferenceKey }.distinct().size,
+        )
+    }
+
+    @Test
     fun `English parentheticals stay visible unless the developer setting enables hiding`() {
         assertFalse(Settings().hideEnglishParentheticals)
         assertTrue(Settings().copy(hideEnglishParentheticals = true).hideEnglishParentheticals)

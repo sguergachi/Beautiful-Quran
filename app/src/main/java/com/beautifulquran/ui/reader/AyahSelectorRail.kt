@@ -45,6 +45,8 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.input.pointer.util.VelocityTracker
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -169,6 +171,8 @@ internal fun AyahSelectorRail(
     interactive: Boolean,
     onJumpToAyah: (Int) -> Unit,
     onExpandedChange: (Boolean) -> Unit,
+    /** Root-space center of the collapsed stack for contextual education. */
+    onCollapsedCenterY: (Float) -> Unit = {},
     dismissRequests: Int,
     modifier: Modifier = Modifier,
 ) {
@@ -194,6 +198,7 @@ internal fun AyahSelectorRail(
     val view = LocalView.current
     val latestOnJumpToAyah by rememberUpdatedState(onJumpToAyah)
     val latestOnExpandedChange by rememberUpdatedState(onExpandedChange)
+    val latestOnCollapsedCenterY by rememberUpdatedState(onCollapsedCenterY)
 
     LaunchedEffect(expanded) {
         latestOnExpandedChange(expanded)
@@ -293,7 +298,15 @@ internal fun AyahSelectorRail(
             .width(92.dp)
             .graphicsLayer { alpha = chromeAlpha() },
     ) {
-        Canvas(Modifier.fillMaxSize()) {
+        Canvas(
+            Modifier
+                .fillMaxSize()
+                .onGloballyPositioned { coordinates ->
+                    latestOnCollapsedCenterY(
+                        coordinates.positionInRoot().y + coordinates.size.height / 2f,
+                    )
+                },
+        ) {
             val expand = expansion.value
             // The right-side rail is the left layout mirrored across the rail's
             // own width: bar rects flip so their hidden cap lands under the far

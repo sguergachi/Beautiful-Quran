@@ -20,6 +20,7 @@ enum class HomeBookmarkStyle { TOP_BOUND, SAVED_PASSAGES }
 /** One-shot, dismissible lessons that teach a gesture in its own UI context. */
 enum class EducationMoment(val preferenceKey: String) {
     BOOKMARK_NOTE("educationBookmarkNoteV1"),
+    AYAH_RAIL("educationAyahRailV1"),
 }
 
 /**

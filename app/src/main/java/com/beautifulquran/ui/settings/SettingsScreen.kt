@@ -483,7 +483,7 @@ private fun DeveloperSection(
 
     Spacer(Modifier.height(12.dp))
     Text(
-        text = "Replay bookmark guide",
+        text = "Replay feature guides",
         style = MaterialTheme.typography.bodyLarge,
         modifier = Modifier
             .fillMaxWidth()
@@ -497,9 +497,9 @@ private fun DeveloperSection(
     )
     Caption(
         if (educationRearmed) {
-            "Ready — add a new bookmark in the reader."
+            "Ready — open a chapter or add a new bookmark."
         } else {
-            "Rearms the lesson for the next bookmark you add."
+            "Rearms each lesson for its next matching moment."
         },
     )
 

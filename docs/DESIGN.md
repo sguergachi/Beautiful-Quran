@@ -87,12 +87,22 @@ pointer glyph, or competing accent—and never sits at the bleed's feather.
 The body-side half-plane absorbs gestures; the spotlight-side half-plane stays
 attached to the feature below. For the bookmark lesson, a vertical drag there
 dismisses the lesson and continues scrolling the paper.
+
+The ayah rail is the second use. On the first settled chapter opening, its live
+collapsed stack stays clear at the selected edge while the same vellum occupies
+the unused opposite paper. “Find any ayah — Press and drag this rail” sits
+across from the spotlight. Dragging the real rail both dismisses the
+lesson and blooms the existing scrub wheel; an ordinary page drag, Back, or
+**Got it** also puts the lesson away. It never opens over active recitation,
+chapter-flight motion, or before the initial reading position has settled.
+
 The guide system remains disabled by default while this language is being
 refined. Settings → Developer → **Contextual feature guides** enables and
-rearms every lesson for its next eligible gesture. **Replay bookmark guide**
-provides an explicit reset while also enabling the gate; the lesson appears
-when a new bookmark is added. Neither control touches bookmarks or notes, and
-leaving developer mode disables guide presentation again.
+rearms every lesson for its next eligible moment. **Replay feature guides**
+provides an explicit reset while also enabling the gate; lessons then appear
+on the next chapter opening or newly added bookmark. Neither control touches
+bookmarks or notes, and leaving developer mode disables guide presentation
+again.
 The ten visual studies and selected 02 target live in
 `docs/design-studies/contextual-guide/`.
 

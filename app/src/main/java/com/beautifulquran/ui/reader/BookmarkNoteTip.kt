@@ -24,6 +24,7 @@ import com.beautifulquran.data.AyahSelectorSide
 import com.beautifulquran.ui.theme.ContextualFeatureTip
 import com.beautifulquran.ui.theme.ContextualTipPlacement
 import com.beautifulquran.ui.theme.royalGreenOverlayColorScheme
+import com.beautifulquran.ui.theme.sharePointerInputWithSiblings
 
 /** First-bookmark lesson, composed across the reader sheet around the live ribbon. */
 @Composable
@@ -42,7 +43,7 @@ internal fun BookmarkNoteTip(
         colorScheme = royalGreenOverlayColorScheme(),
         typography = typography,
     ) {
-        BoxWithConstraints(modifier) {
+        BoxWithConstraints(modifier.sharePointerInputWithSiblings()) {
             val ribbonOnLeft = ribbonSide == AyahSelectorSide.LEFT
             ContextualFeatureTip(
                 visible = visible,
@@ -69,25 +70,25 @@ internal fun BookmarkNoteTip(
                     top = 0.dp,
                     bottom = 0.dp,
                 ),
-                mark = { HoldGestureMark() },
+                mark = { ContextualPulseMark() },
                 modifier = Modifier.fillMaxSize(),
             )
         }
     }
 }
 
-/** One quiet, ink-only breath around the live ribbon's cloth tip. */
+/** One quiet, ink-only breath around a contextual guide's live target. */
 @Composable
-private fun HoldGestureMark() {
+internal fun ContextualPulseMark() {
     val ink = MaterialTheme.colorScheme.background
-    val pulse by rememberInfiniteTransition(label = "bookmarkHoldPulse").animateFloat(
+    val pulse by rememberInfiniteTransition(label = "contextualTargetPulse").animateFloat(
         initialValue = 0f,
         targetValue = 1f,
         animationSpec = infiniteRepeatable(
             animation = tween(1_350, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Restart,
         ),
-        label = "bookmarkHoldPulseRadius",
+        label = "contextualTargetPulseRadius",
     )
     Canvas(Modifier.size(28.dp)) {
         val center = Offset(size.width / 2f, size.height / 2f)

@@ -252,6 +252,9 @@ fun ReaderScreen(
     var bookmarkNoteTipOpen by rememberSaveable { mutableStateOf(false) }
     var bookmarkNoteTipRendered by remember { mutableStateOf(false) }
     var bookmarkNoteTipRibbonCenterY by remember { mutableFloatStateOf(Float.NaN) }
+    var ayahRailTipOpen by rememberSaveable { mutableStateOf(false) }
+    var ayahRailTipRendered by remember { mutableStateOf(false) }
+    var ayahRailTipCenterY by remember { mutableFloatStateOf(Float.NaN) }
     /**
      * Commits the open draft and closes the editor. Called when the field loses
      * focus, *before* opening another verse's note (so a draft is never carried
@@ -288,11 +291,20 @@ fun ReaderScreen(
         if (!imeVisible && editingAnnotationAyah != 0) focusManager.clearFocus()
     }
     val listDragged by listState.interactionSource.collectIsDraggedAsState()
-    LaunchedEffect(listDragged, editingAnnotationAyah, bookmarkNoteTipOpen) {
+    LaunchedEffect(
+        listDragged,
+        editingAnnotationAyah,
+        bookmarkNoteTipOpen,
+        ayahRailTipOpen,
+    ) {
         if (listDragged && editingAnnotationAyah != 0) focusManager.clearFocus()
         if (listDragged && bookmarkNoteTipOpen) {
             viewModel.dismissBookmarkNoteTip()
             bookmarkNoteTipOpen = false
+        }
+        if (listDragged && ayahRailTipOpen) {
+            viewModel.dismissAyahRailTip()
+            ayahRailTipOpen = false
         }
     }
     // Gilding sheen: light catches the header rosette as the page moves.
@@ -341,9 +353,11 @@ fun ReaderScreen(
     var retainedRepeatChoice by rememberSaveable { mutableStateOf<RepeatChoice?>(null) }
     val bookmarkNoteTipVisible = bookmarkNoteTipOpen &&
         bookmarkNoteTipSurah != 0 && bookmarkNoteTipAyah != 0
+    val ayahRailTipVisible = ayahRailTipOpen && ayahRailTipCenterY.isFinite()
     LaunchedEffect(settings.developerModeEnabled, settings.educationGuidesEnabled) {
         if (!settings.developerModeEnabled || !settings.educationGuidesEnabled) {
             bookmarkNoteTipOpen = false
+            ayahRailTipOpen = false
         }
     }
     val haptics = LocalHapticFeedback.current
@@ -629,10 +643,13 @@ fun ReaderScreen(
         repeatRendered,
         bookmarkNoteTipVisible,
         bookmarkNoteTipRendered,
+        ayahRailTipVisible,
+        ayahRailTipRendered,
     ) {
         onInkOverlayVisibilityChangeLatest.value(
             showRepeatDialog || repeatRendered ||
-                bookmarkNoteTipVisible || bookmarkNoteTipRendered,
+                bookmarkNoteTipVisible || bookmarkNoteTipRendered ||
+                ayahRailTipVisible || ayahRailTipRendered,
         )
     }
     DisposableEffect(Unit) {
@@ -644,6 +661,10 @@ fun ReaderScreen(
     BackHandler(enabled = bookmarkNoteTipVisible) {
         viewModel.dismissBookmarkNoteTip()
         bookmarkNoteTipOpen = false
+    }
+    BackHandler(enabled = ayahRailTipVisible) {
+        viewModel.dismissAyahRailTip()
+        ayahRailTipOpen = false
     }
 
     // Reading by hand pauses the follow mode via pointerInput.
@@ -825,6 +846,26 @@ fun ReaderScreen(
         }
     }
 
+    // Offer the rail lesson only as a chapter settles. Enabling the developer
+    // gate over an already-open reader waits for the next chapter opening.
+    LaunchedEffect(
+        uiState.content?.surah?.id,
+        initialFocusSettled,
+        ayahRailTipCenterY,
+        chapterAdvancing,
+        verseRevealForSurah,
+    ) {
+        if (!initialFocusSettled || !ayahRailTipCenterY.isFinite() ||
+            chapterAdvancing || verseRevealForSurah != 0 || recitingActive
+        ) {
+            return@LaunchedEffect
+        }
+        delay(320)
+        if (viewModel.shouldShowAyahRailTip() && !bookmarkNoteTipOpen) {
+            ayahRailTipOpen = true
+        }
+    }
+
     // Verse focus alone is not enough for a paused long ayah: its adaptive
     // anchor deliberately shows line one, while the held word may be many
     // screens lower. On initial open, foreground resume, and display reflow,
@@ -975,6 +1016,18 @@ fun ReaderScreen(
         AyahSelectorSide.RIGHT
     }
     val bookmarkTipHasTarget = bookmarkNoteTipRibbonCenterY.isFinite()
+    val bookmarkGuidePresent = (bookmarkNoteTipVisible || bookmarkNoteTipRendered) &&
+        bookmarkTipHasTarget
+    val railGuidePresent = (ayahRailTipVisible || ayahRailTipRendered) &&
+        ayahRailTipCenterY.isFinite()
+    val contextualGuideVisible =
+        (bookmarkNoteTipVisible && bookmarkTipHasTarget) || ayahRailTipVisible
+    val contextualGuideRendered = bookmarkGuidePresent || railGuidePresent
+    val contextualGuideTargetSide = if (bookmarkGuidePresent) {
+        bookmarkTipSide
+    } else {
+        settings.ayahSelectorSide
+    }
     Box(Modifier.fillMaxSize()) {
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -2017,11 +2070,12 @@ fun ReaderScreen(
                                 Modifier.contextualGuideProgressiveBlur(
                                     enabled = settings.developerModeEnabled &&
                                         settings.educationGuidesEnabled &&
-                                        (bookmarkNoteTipVisible || bookmarkNoteTipRendered),
-                                    visible = bookmarkNoteTipVisible && bookmarkTipHasTarget,
-                                    rendered = (bookmarkNoteTipVisible ||
-                                        bookmarkNoteTipRendered) && bookmarkTipHasTarget,
-                                    flow = if (bookmarkTipSide == AyahSelectorSide.LEFT) {
+                                        contextualGuideRendered,
+                                    visible = contextualGuideVisible,
+                                    rendered = contextualGuideRendered,
+                                    flow = if (
+                                        contextualGuideTargetSide == AyahSelectorSide.LEFT
+                                    ) {
                                         Offset(-1f, 0f)
                                     } else {
                                         Offset(1f, 0f)
@@ -2092,6 +2146,10 @@ fun ReaderScreen(
                                     {
                                         val result = viewModel.toggleBookmark(ayah.number)
                                         if (result.showNoteTip) {
+                                            if (ayahRailTipOpen) {
+                                                viewModel.dismissAyahRailTip()
+                                                ayahRailTipOpen = false
+                                            }
                                             bookmarkNoteTipRibbonCenterY = Float.NaN
                                             bookmarkNoteTipSurah = ayah.surahId
                                             bookmarkNoteTipAyah = ayah.number
@@ -2333,7 +2391,14 @@ fun ReaderScreen(
                             ),
                         )
                     },
-                    onExpandedChange = { ayahSelectorExpanded = it },
+                    onExpandedChange = { expanded ->
+                        ayahSelectorExpanded = expanded
+                        if (expanded && ayahRailTipOpen) {
+                            viewModel.dismissAyahRailTip()
+                            ayahRailTipOpen = false
+                        }
+                    },
+                    onCollapsedCenterY = { centerY -> ayahRailTipCenterY = centerY },
                     dismissRequests = ayahSelectorDismissRequests,
                     modifier = Modifier
                         .align(
@@ -2390,6 +2455,20 @@ fun ReaderScreen(
             )
         }
 
+        AyahRailTip(
+            visible = ayahRailTipVisible,
+            railSide = settings.ayahSelectorSide,
+            targetCenterY = with(density) { ayahRailTipCenterY.toDp() },
+            onDismiss = {
+                viewModel.dismissAyahRailTip()
+                ayahRailTipOpen = false
+            },
+            onRenderedChange = { ayahRailTipRendered = it },
+            modifier = Modifier
+                .fillMaxSize()
+                .zIndex(1.7f),
+        )
+
         BookmarkNoteTip(
             visible = bookmarkNoteTipVisible && bookmarkNoteTipRibbonCenterY.isFinite(),
             ribbonSide = bookmarkTipSide,
@@ -2415,7 +2494,7 @@ fun ReaderScreen(
         // in place; full reader ink overlays still cover the lab at z=1.8.
         if (settings.developerModeEnabled && settings.inkLabEnabled) {
             InkLabPanel(
-                guideActive = bookmarkNoteTipVisible,
+                guideActive = bookmarkNoteTipVisible || ayahRailTipVisible,
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
                     .padding(end = 10.dp, bottom = 10.dp)
