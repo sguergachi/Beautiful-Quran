@@ -588,6 +588,16 @@ class ReaderViewModel(
 
     fun dismissBookmarkNoteTip() = settings.dismissEducation(EducationMoment.BOOKMARK_NOTE)
 
+    /** Whether a settled chapter opening should teach its live ayah rail. */
+    fun shouldShowAyahRailTip(): Boolean {
+        val current = settings.settings.value
+        return current.developerModeEnabled &&
+            current.educationGuidesEnabled &&
+            !settings.isEducationDismissed(EducationMoment.AYAH_RAIL)
+    }
+
+    fun dismissAyahRailTip() = settings.dismissEducation(EducationMoment.AYAH_RAIL)
+
     /** Writes (or, on blank [text], clears) the reader's note on a verse. The
      * surah is passed in rather than read from the loaded chapter so a draft
      * committed during a chapter advance still lands on the verse it was
