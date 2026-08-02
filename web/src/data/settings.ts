@@ -34,6 +34,11 @@ export interface Settings {
   /** Reveals developer tools (e.g. the Ornaments Lab). Off by default. */
   developerMode: boolean
   /**
+   * Developer-only gate for contextual feature lessons. Off until their
+   * visual language is approved for readers. Enabling rearms every lesson.
+   */
+  educationGuidesEnabled: boolean
+  /**
    * Use Gapless-5 (HTML5 + Web Audio) for verse joins. On by default; the
    * developer toggle can fall back to dual-`<audio>` handoff for A/B.
    */
@@ -57,6 +62,7 @@ const DEFAULTS: Settings = {
   lastAyah: 1,
   playbackSpeed: 1,
   developerMode: false,
+  educationGuidesEnabled: false,
   gapless5Playback: true,
   homeBookmarkStyle: 'top_bound',
   brushCircleStyle: 'baseline',
@@ -82,6 +88,9 @@ export function normalizeSettings(partial: Partial<Settings> = {}): Settings {
     ...partial,
     fontScale: clampFontScale(partial.fontScale ?? DEFAULTS.fontScale),
     developerMode: Boolean(partial.developerMode ?? DEFAULTS.developerMode),
+    educationGuidesEnabled: Boolean(
+      partial.educationGuidesEnabled ?? DEFAULTS.educationGuidesEnabled,
+    ),
     gapless5Playback: Boolean(
       partial.gapless5Playback ?? DEFAULTS.gapless5Playback,
     ),

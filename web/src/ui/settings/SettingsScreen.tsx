@@ -38,6 +38,7 @@ import { PaperChoiceList } from '../kit/PaperChoiceList'
 import { PaperSegmented } from '../kit/PaperSegmented'
 import { PaperSlider } from '../kit/PaperSlider'
 import { PaperSwitch } from '../kit/PaperSwitch'
+import { rearmEducation } from '../../data/education'
 import { ThemeSwatches } from './themeSwatches'
 
 const ATTRIBUTIONS = `Quran text (Uthmani script) and Saheeh International translation via the quran-json project, from Tanzil and Al Quran Cloud.
@@ -118,6 +119,7 @@ export function SettingsScreen({
   const [pasteText, setPasteText] = useState('')
   const [checkPasteText, setCheckPasteText] = useState('')
   const [developerTapCount, setDeveloperTapCount] = useState(0)
+  const [educationRearmed, setEducationRearmed] = useState(false)
   const pasteRef = useRef<HTMLTextAreaElement>(null)
   const checkPasteRef = useRef<HTMLTextAreaElement>(null)
   const lastStyleRef = useRef(s.brushCircleStyle)
@@ -457,6 +459,47 @@ export function SettingsScreen({
           <section className="settings-section settings-section-developer">
             <h2>Developer</h2>
             <p className="settings-caption">Tools for testing work in progress.</p>
+
+            <div className="settings-dev-block">
+              <PaperSwitch
+                id="setting-education-guides"
+                label="Contextual feature guides"
+                checked={s.educationGuidesEnabled}
+                checkParams={checkParams}
+                paintToken={checkPaintToken}
+                onChange={(enabled) => {
+                  if (enabled) {
+                    rearmEducation()
+                    setEducationRearmed(true)
+                  } else {
+                    setEducationRearmed(false)
+                  }
+                  appStore.updateSettings({ educationGuidesEnabled: enabled })
+                }}
+              />
+              <p className="settings-caption">
+                Off by default. Guides appear only after their matching gesture.
+              </p>
+            </div>
+
+            <div className="settings-dev-block">
+              <button
+                type="button"
+                className="settings-dev-link settings-dev-primary"
+                onClick={() => {
+                  rearmEducation()
+                  appStore.updateSettings({ educationGuidesEnabled: true })
+                  setEducationRearmed(true)
+                }}
+              >
+                Replay feature guides
+              </button>
+              <p className="settings-caption">
+                {educationRearmed
+                  ? 'Ready — open a chapter or add a new bookmark.'
+                  : 'Rearms each lesson for its next matching moment.'}
+              </p>
+            </div>
 
             <button
               type="button"

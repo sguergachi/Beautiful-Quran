@@ -411,6 +411,15 @@ blooms with an expanding circle clip; exit punches a hole open from the same
 origin (Android `InkRevealOverlay` punchHole), keeping the overlay mounted
 until the hole finishes.
 
+**Contextual feature guides** (Android `ContextualFeatureTip`) are also
+hosted on the reader sheet: an inverse royal-green progressive vellum
+spotlight around the live bookmark ribbon or collapsed ayah rail, with
+lesson copy seated on the wash’s leading feather (toward the mark) and a
+theme-paper **Got it** cutout. Off by default; Settings → Developer →
+**Contextual feature guides** / **Replay feature guides** gates them. Web
+draws the same progressive-vellum field as Android’s AGSL shader via WebGL
+(canvas gradient fallback only when WebGL is unavailable).
+
 Ink wash uses the smootherstep mask from `fade.washMaskImage` (not a blunt
 3-stop wipe). Repeat orange is a second overlay that washes in and dissolves
 over `repeatFadeOutMs`.
@@ -484,6 +493,8 @@ sans.
   transliteration, flanked by gilded flourishes).
 - ✅ Mushaf page breaks (Android `PageBreak` — gold hairline + Western /
   Arabic-Indic page numbers from `ayahs.page`).
+- ✅ Contextual feature guides (ayah-rail + bookmark-note lessons; developer
+  gated, inverse progressive vellum — see `DESIGN.md` § Contextual teaching).
 - Visual QA against Android screenshots (`docs/ss*.png`).
 - CI: Vitest on every PR; optional Playwright on `master`.
 
@@ -491,6 +502,7 @@ sans.
 - Timings Lab / timing patch export
 - QCF V2 mushaf fonts
 - Exact Media3 preload configuration
+- Verse annotations / ḥawāshī (bookmark-note guide ships; note editor pending)
 - Sharing / accounts / analytics (never)
 
 ## 11. Repo layout
