@@ -92,8 +92,6 @@ fun InkLabPanel(
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
-                .clip(RoundedCornerShape(14.dp))
-                .background(MaterialTheme.colorScheme.background.copy(alpha = 0.92f))
                 .quietClickable { expanded = !expanded }
                 .padding(horizontal = 12.dp, vertical = 6.dp),
         ) {
@@ -237,7 +235,7 @@ fun InkLabPanel(
                         TuningSlider("Body edge", guide.bodyEdge, 0.2f..0.5f) {
                             InkEngine.contextualGuideTuning = guide.copy(bodyEdge = it)
                         }
-                        TuningSlider("Feather width", guide.featherWidth, 0.12f..0.5f) {
+                        TuningSlider("Feather width", guide.featherWidth, 0.12f..0.65f) {
                             InkEngine.contextualGuideTuning = guide.copy(featherWidth = it)
                         }
                         TuningSlider("Fade softness", guide.fadeSoftness, 0.4f..1.8f) {

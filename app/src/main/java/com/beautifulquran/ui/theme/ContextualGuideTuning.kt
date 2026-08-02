@@ -9,11 +9,11 @@ import androidx.compose.runtime.setValue
 @Immutable
 data class ContextualGuideTuning(
     val bodyEdge: Float = 0.4f,
-    val featherWidth: Float = 0.38f,
+    val featherWidth: Float = 0.4f,
     val fadeSoftness: Float = 1.4f,
-    val blurRadiusDp: Float = 10f,
+    val blurRadiusDp: Float = 14f,
     val blurStrength: Float = 0.9f,
-    val vellumGrain: Float = 0.085f,
+    val vellumGrain: Float = 0.1f,
     val verticalTaper: Float = 0.14f,
 )
 

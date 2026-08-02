@@ -147,9 +147,10 @@ On Android 13+ one AGSL brush draws the full-height tapered pigment field and
 samples its analytic alpha mask five times only inside the feather. A second
 pass records each visible ayah—not the virtualized `LazyColumn`, whose child
 display lists cannot be sampled reliably—into a small graphics layer. A native
-GPU blur is composited back through one `DstIn` feather mask, preserving the
-real scripture and ribbon below it. Android 11–12 uses a smooth gradient
-fallback. Idle reading creates neither guide shader layers nor draw cost.
+GPU blur replaces the sharp ayah progressively through paired `DstOut`/`DstIn`
+feather masks, preserving the real scripture and ribbon outside it. Android
+11–12 uses a smooth gradient fallback. Idle reading creates neither guide
+shader layers nor draw cost.
 
 ### 4c. Layout reads confined to derived state and coroutines
 

@@ -56,13 +56,18 @@ bleeds in from the paper edge opposite the ribbon**, holds solid across half
 the physical screen from top to bottom, then tapers toward the ruby cloth as a
 continuous progressive wash. The selected **02 progressive vellum** study is
 the target: a stable pigment body runs into a broad nonlinear alpha veil while
-the live scripture remains readable through that transition. Android 13+
+the live scripture remains readable through that transition. One unbounded
+diffusion profile replaces separate body and feather boundaries, so there is
+no iso-opacity ridge to read as an edge. Paper fibres vary pigment absorption,
+and a restrained reservoir gathers behind the lesson copy. Android 13+
 draws the independently tapered pigment contours in one runtime-shader pass,
-then records each visible ayah into its own GPU layer and adds a softly blurred
-ghost only through the feather; Android 11–12 keeps a smooth gradient fallback.
+then records each visible ayah into its own GPU layer and crossfades it into a
+softly blurred version only through the feather; Android 11–12 keeps a smooth
+gradient fallback.
 The effect never captures the virtualized list as one layer, so the real verse
 and ruby ribbon remain present beneath the translucent veil. Low-amplitude,
-multi-scale vellum grain exists only inside the transition,
+domain-warped pigment pooling, fibre absorption, and paper tooth continue from
+the body through the transition, becoming most legible in the translucent wash,
 with no visible slices, bands, scallops, or drawn contour. The ribbon remains
 fully exposed on its own side. Parchment type settles partly into that feather: “Add a note —
 Press and hold this ribbon,” while a compact area preserved from the spill

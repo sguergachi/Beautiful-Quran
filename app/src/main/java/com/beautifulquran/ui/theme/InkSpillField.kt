@@ -75,33 +75,47 @@ internal fun Modifier.contextualGuideProgressiveBlur(
     }
     return graphicsLayer(layerBlock).drawWithContent {
         sourceLayer.record { this@drawWithContent.drawContent() }
-        drawLayer(sourceLayer)
         val amount = progress.value * tuning.blurStrength
-        if (!rendered || amount <= 0.001f || blurEffect == null) return@drawWithContent
+        if (!rendered || amount <= 0.001f || blurEffect == null) {
+            drawLayer(sourceLayer)
+            return@drawWithContent
+        }
 
         softenedLayer.renderEffect = blurEffect
         softenedLayer.record { drawLayer(sourceLayer) }
-        drawContext.canvas.saveLayer(Rect(Offset.Zero, size), Paint())
-        drawLayer(softenedLayer)
-        val solid = (tuning.bodyEdge - tuning.verticalTaper * 0.15f).coerceIn(0f, 1f)
-        val outer = (tuning.bodyEdge + tuning.featherWidth -
-            tuning.verticalTaper * 0.05f).coerceIn(solid, 1f)
-        val center = (solid + outer) / 2f
+        val inner = (tuning.bodyEdge - tuning.featherWidth * 0.25f).coerceIn(0f, 1f)
+        val quarter = (tuning.bodyEdge + tuning.featherWidth * 0.1f).coerceIn(inner, 1f)
+        val center = (tuning.bodyEdge + tuning.featherWidth * 0.38f).coerceIn(quarter, 1f)
+        val threeQuarter = (tuning.bodyEdge + tuning.featherWidth * 0.67f)
+            .coerceIn(center, 1f)
+        val outer = (tuning.bodyEdge + tuning.featherWidth).coerceIn(threeQuarter, 1f)
         val maskStops = if (lessonOnLeft) {
             arrayOf(
-                solid to Color.Transparent,
-                center to Color.White.copy(alpha = 0.42f * amount),
+                inner to Color.Transparent,
+                quarter to Color.White.copy(alpha = 0.24f * amount),
+                center to Color.White.copy(alpha = 0.72f * amount),
+                threeQuarter to Color.White.copy(alpha = 0.38f * amount),
                 outer to Color.Transparent,
             )
         } else {
             arrayOf(
                 (1f - outer) to Color.Transparent,
-                (1f - center) to Color.White.copy(alpha = 0.42f * amount),
-                (1f - solid) to Color.Transparent,
+                (1f - threeQuarter) to Color.White.copy(alpha = 0.38f * amount),
+                (1f - center) to Color.White.copy(alpha = 0.72f * amount),
+                (1f - quarter) to Color.White.copy(alpha = 0.24f * amount),
+                (1f - inner) to Color.Transparent,
             )
         }
+        val mask = Brush.horizontalGradient(*maskStops)
+        val bounds = Rect(Offset.Zero, size)
+        drawContext.canvas.saveLayer(bounds, Paint())
+        drawLayer(sourceLayer)
+        drawRect(brush = mask, blendMode = BlendMode.DstOut)
+        drawContext.canvas.restore()
+        drawContext.canvas.saveLayer(bounds, Paint())
+        drawLayer(softenedLayer)
         drawRect(
-            brush = Brush.horizontalGradient(*maskStops),
+            brush = mask,
             blendMode = BlendMode.DstIn,
         )
         drawContext.canvas.restore()
@@ -230,7 +244,7 @@ private const val VellumFieldFunctions = """
             point.y * 0.006
         ));
         float tooth = noise((point + float2(61.0, 157.0)) * 0.057);
-        return pooling * 0.68 + fibres * 0.2 + tooth * 0.12;
+        return pooling * 0.42 + fibres * 0.3 + tooth * 0.28;
     }
 
     float vellumDensity(float2 fragCoord) {
@@ -238,25 +252,27 @@ private const val VellumFieldFunctions = """
         float fromEdge = direction > 0.0 ? uv.x : 1.0 - uv.x;
         float riseEnd = clamp(targetY + 0.05, 0.30, 0.42);
         float rise = smoother(clamp((uv.y + 0.02) / riseEnd, 0.0, 1.0));
-        float tail = 1.0 - 0.45 * smoother(clamp((uv.y - 0.72) / 0.28, 0.0, 1.0));
+        float tail = 1.0 - 0.68 * smoother(clamp((uv.y - 0.72) / 0.28, 0.0, 1.0));
         float silhouette = rise * tail;
         float taper = verticalTaper * (1.0 - silhouette);
-        float solid = (bodyEdge - taper) * progress;
-        // Both contours travel together, preserving one long vellum feather
-        // while the whole wash opens toward the contextual teaching band.
-        float outer = (bodyEdge + featherWidth - taper) * progress;
-        float density = clamp((outer - fromEdge) / max(outer - solid, 0.001), 0.0, 1.0);
-        float transition = 4.0 * density * (1.0 - density);
+        float lessonDistance = (uv.y - targetY) / 0.17;
+        float lessonReservoir = verticalTaper * 0.85
+            * exp(-lessonDistance * lessonDistance);
+        // A single diffusion profile has no solid/feather junction to expose.
+        // Its midpoint follows the tapered silhouette and opens at the lesson.
+        float midpoint = (bodyEdge + featherWidth * 0.32 - taper
+            + lessonReservoir) * progress;
+        float diffusion = max(featherWidth * 0.28, 0.025);
         float clouds = noise(fragCoord * float2(0.006, 0.008)) * 0.65
             + noise(fragCoord * float2(0.017, 0.021)) * 0.35;
         float fibres = noise(fragCoord * float2(0.055, 0.071));
         float texture = (clouds - 0.5) + (fibres - 0.5) * 0.18;
-        density = clamp(density + texture * vellumGrain * transition, 0.0, 1.0);
-        return density;
+        float absorbed = midpoint - fromEdge + texture * vellumGrain * 0.18;
+        return 1.0 / (1.0 + exp(-absorbed / diffusion));
     }
 
     float vellumCoverage(float density) {
-        return mix(pow(density, fadeSoftness), smoother(density), 0.4);
+        return pow(density, max(0.7, fadeSoftness * 0.58));
     }
 """
 
@@ -286,11 +302,12 @@ private const val VellumFieldShader = """
         softened += vellumCoverage(vellumDensity(fragCoord + float2(axis * 2.0, 0.0))) * 0.08;
         softened += vellumCoverage(vellumDensity(fragCoord - float2(axis * 2.0, 0.0))) * 0.08;
         coverage = mix(coverage, softened, blurStrength * edge);
-        // Lay pigment variation back over the softened contour. Keeping this
-        // after the mask blur preserves fibre tooth without producing bands.
+        // Paper tooth varies pigment load, rather than displacing a contour.
+        // Pixel-scale dither keeps the long translucent ramp quantization-free.
         float brush = brushedPigment(fragCoord) - 0.5;
         coverage = clamp(
-            coverage + brush * vellumGrain * (0.5 + 2.0 * edge),
+            coverage * (1.0 + brush * vellumGrain * (1.4 + 2.0 * edge))
+                + (hash(floor(fragCoord)) - 0.5) * edge / 255.0,
             0.0,
             1.0
         );
