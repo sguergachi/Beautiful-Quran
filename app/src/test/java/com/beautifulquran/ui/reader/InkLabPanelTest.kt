@@ -1,5 +1,6 @@
 package com.beautifulquran.ui.reader
 
+import com.beautifulquran.ui.theme.ContextualGuideTuning
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -32,6 +33,18 @@ class InkLabPanelTest {
         // Fields without lab sliders still snapshot so nothing is lost on apply.
         assertTrue(text.contains("sweepEaseX1 ="))
         assertTrue(text.contains("sweepEaseY2 ="))
+    }
+
+    @Test
+    fun formatContextualGuideCopy_includesProgressiveVellumKnobs() {
+        val text = formatContextualGuideCopy(
+            ContextualGuideTuning(featherWidth = 0.42f, blurRadiusDp = 12f),
+        )
+        assertTrue(text.contains("02 progressive vellum"))
+        assertTrue(text.contains("featherWidth = 0.42f"))
+        assertTrue(text.contains("blurRadiusDp = 12f"))
+        assertTrue(text.contains("blurStrength ="))
+        assertTrue(text.contains("vellumGrain ="))
     }
 
     @Test

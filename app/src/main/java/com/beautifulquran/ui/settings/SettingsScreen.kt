@@ -464,19 +464,44 @@ private fun DeveloperSection(
     Caption("Tools for testing work in progress.")
 
     Spacer(Modifier.height(20.dp))
+    ToggleRow(
+        label = "Contextual feature guides",
+        checked = settings.educationGuidesEnabled,
+        onChange = { enabled ->
+            if (enabled) {
+                viewModel.settings.rearmEducation()
+                educationRearmed = true
+            } else {
+                educationRearmed = false
+            }
+            viewModel.settings.update { it.copy(educationGuidesEnabled = enabled) }
+        },
+        checkParams = checkParams,
+        checkPaintToken = checkPaintToken,
+    )
+    Caption("Off by default. Guides appear only after their matching gesture.")
+
+    Spacer(Modifier.height(12.dp))
     Text(
-        text = if (educationRearmed) "Feature guides ready" else "Replay feature guides",
+        text = "Replay bookmark guide",
         style = MaterialTheme.typography.bodyLarge,
         modifier = Modifier
             .fillMaxWidth()
             .quietClickable {
                 viewModel.settings.rearmEducation()
+                viewModel.settings.update { it.copy(educationGuidesEnabled = true) }
                 educationRearmed = true
             }
             .padding(vertical = 6.dp),
         color = MaterialTheme.colorScheme.primary,
     )
-    Caption("Shows each contextual lesson again on its next eligible gesture.")
+    Caption(
+        if (educationRearmed) {
+            "Ready — add a new bookmark in the reader."
+        } else {
+            "Rearms the lesson for the next bookmark you add."
+        },
+    )
 
     if (BuildConfig.DEBUG && Build.VERSION.SDK_INT >= 35) {
         Spacer(Modifier.height(20.dp))

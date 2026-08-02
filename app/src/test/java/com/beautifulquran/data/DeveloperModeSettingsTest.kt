@@ -15,6 +15,7 @@ class DeveloperModeSettingsTest {
     @Test
     fun `developer mode defaults off`() {
         assertFalse(Settings().developerModeEnabled)
+        assertFalse(Settings().educationGuidesEnabled)
     }
 
     @Test
@@ -29,6 +30,17 @@ class DeveloperModeSettingsTest {
         val on = Settings().copy(developerModeEnabled = true)
         assertTrue(on.developerModeEnabled)
         assertFalse(on.copy(developerModeEnabled = false).developerModeEnabled)
+    }
+
+    @Test
+    fun `contextual guides are an independent developer toggle`() {
+        val enabled = Settings().copy(
+            developerModeEnabled = true,
+            educationGuidesEnabled = true,
+        )
+
+        assertTrue(enabled.educationGuidesEnabled)
+        assertFalse(enabled.copy(educationGuidesEnabled = false).educationGuidesEnabled)
     }
 
     @Test

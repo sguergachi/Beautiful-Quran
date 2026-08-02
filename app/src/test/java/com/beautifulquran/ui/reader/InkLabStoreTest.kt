@@ -1,5 +1,6 @@
 package com.beautifulquran.ui.reader
 
+import com.beautifulquran.ui.theme.ContextualGuideTuning
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
@@ -54,6 +55,7 @@ class InkLabStoreTest {
         assertEquals(defaults.washFeather, snap.washFeather, 0.0001f)
         assertEquals(defaults.tajweedPacing, snap.tajweedPacing)
         assertEquals(defaults.waslHandoff, snap.waslHandoff, 0.0001f)
+        assertEquals(ContextualGuideTuning(), snap.toContextualGuideTuning())
     }
 
     @Test
@@ -63,6 +65,8 @@ class InkLabStoreTest {
             val snap = InkLabSnapshot(
                 upcomingAlpha = 0.44f,
                 inkFadeMs = 640,
+                guideBlurRadiusDp = 14f,
+                guideFeatherWidth = 0.41f,
                 highlightLeadMs = 1_100,
                 fadeLeadMs = 250,
                 outputLatencyOverrideMs = 90,
@@ -70,6 +74,8 @@ class InkLabStoreTest {
             InkEngine.applyLabSnapshot(snap, persist = false)
             assertEquals(0.44f, InkEngine.tuning.upcomingAlpha, 0.0001f)
             assertEquals(640, InkEngine.tuning.inkFadeMs)
+            assertEquals(14f, InkEngine.contextualGuideTuning.blurRadiusDp, 0.0001f)
+            assertEquals(0.41f, InkEngine.contextualGuideTuning.featherWidth, 0.0001f)
             assertEquals(1_100, InkEngine.highlightLeadMs)
             assertEquals(250, InkEngine.fadeLeadMs)
             assertEquals(90, InkEngine.outputLatencyOverrideMs)
@@ -83,11 +89,13 @@ class InkLabStoreTest {
         val prev = InkEngine.captureLabSnapshot()
         try {
             InkEngine.tuning = InkEngine.Tuning(upcomingAlpha = 0.5f)
+            InkEngine.contextualGuideTuning = ContextualGuideTuning(blurStrength = 0.2f)
             InkEngine.highlightLeadMs = 800
             InkEngine.fadeLeadMs = 100
             InkEngine.outputLatencyOverrideMs = 50
             InkEngine.resetLabToShippedDefaults()
             assertEquals(InkEngine.Tuning(), InkEngine.tuning)
+            assertEquals(ContextualGuideTuning(), InkEngine.contextualGuideTuning)
             assertEquals(InkEngine.DEFAULT_HIGHLIGHT_LEAD_MS, InkEngine.highlightLeadMs)
             assertEquals(InkEngine.DEFAULT_FADE_LEAD_MS, InkEngine.fadeLeadMs)
             assertNull(InkEngine.outputLatencyOverrideMs)
@@ -101,11 +109,13 @@ class InkLabStoreTest {
         val prev = InkEngine.captureLabSnapshot()
         try {
             InkEngine.tuning = InkEngine.Tuning(glintTintAlpha = 0.77f, holdWaqf = false)
+            InkEngine.contextualGuideTuning = ContextualGuideTuning(verticalTaper = 0.06f)
             InkEngine.highlightLeadMs = 42
             InkEngine.outputLatencyOverrideMs = null
             val cap = InkEngine.captureLabSnapshot()
             assertEquals(0.77f, cap.glintTintAlpha, 0.0001f)
             assertEquals(false, cap.holdWaqf)
+            assertEquals(0.06f, cap.guideVerticalTaper, 0.0001f)
             assertEquals(42, cap.highlightLeadMs)
             assertNull(cap.outputLatencyOverrideMs)
             assertTrue(cap.schema == InkLabSnapshot.SCHEMA)

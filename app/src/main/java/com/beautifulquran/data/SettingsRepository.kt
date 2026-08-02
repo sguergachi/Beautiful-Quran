@@ -61,6 +61,9 @@ data class Settings(
      *  repeatedly tapping the Settings logo; persisted so the reader can
      *  honour it. See docs/ROOT_VIEWER.md and docs/TIMINGS_LAB.md. */
     val developerModeEnabled: Boolean = false,
+    /** Developer-only gate for contextual feature lessons. Off until their
+     * visual language is approved for readers. Enabling rearms every lesson. */
+    val educationGuidesEnabled: Boolean = false,
     /** Shows the Ink Lab overlay on the reader — live sliders over the
      *  highlight tuning (see docs/INK_ENGINE.md). Only honoured while
      *  [developerModeEnabled] is on. Lab numbers persist via
@@ -114,6 +117,7 @@ class SettingsRepository(context: Context) {
         lastSurah = prefs.getInt("lastSurah", 0),
         lastAyah = prefs.getInt("lastAyah", 1),
         developerModeEnabled = prefs.getBoolean("developerModeEnabled", false),
+        educationGuidesEnabled = prefs.getBoolean("educationGuidesEnabled", false),
         inkLabEnabled = prefs.getBoolean("inkLabEnabled", false),
         homeBookmarkStyle = prefs.homeBookmarkStyle(),
         brushCircleStyle = prefs.enum("brushCircleStyle", BrushCircleStyle.BASELINE),
@@ -122,7 +126,7 @@ class SettingsRepository(context: Context) {
 
     /**
      * Continue Listening only — the one setting written during playback, on
-     * every ayah advance. [update] queues all fifteen keys per call, which is
+     * every ayah advance. [update] queues all sixteen keys per call, which is
      * needless write amplification for two integers that change every few
      * seconds. No-ops when the position is unchanged.
      */
@@ -167,6 +171,7 @@ class SettingsRepository(context: Context) {
             putInt("lastSurah", next.lastSurah)
             putInt("lastAyah", next.lastAyah)
             putBoolean("developerModeEnabled", next.developerModeEnabled)
+            putBoolean("educationGuidesEnabled", next.educationGuidesEnabled)
             putBoolean("inkLabEnabled", next.inkLabEnabled)
             putString("homeBookmarkStyleV2", next.homeBookmarkStyle.name)
             remove("homeBookmarkStyle")

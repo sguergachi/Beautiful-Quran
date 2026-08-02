@@ -7,6 +7,8 @@ import androidx.compose.runtime.setValue
 import com.beautifulquran.data.model.Segment
 import com.beautifulquran.domain.BasmalahWash
 import com.beautifulquran.domain.TajweedPacing
+import com.beautifulquran.ui.theme.ContextualGuideStyle
+import com.beautifulquran.ui.theme.ContextualGuideTuning
 
 /**
  * The reader's single source of truth for *how a word's ink should behave*.
@@ -176,6 +178,14 @@ object InkEngine {
             persistLab()
         }
 
+    /** Progressive-vellum guide parameters, persisted by the same Ink Lab snapshot. */
+    var contextualGuideTuning: ContextualGuideTuning
+        get() = ContextualGuideStyle.tuning
+        set(value) {
+            ContextualGuideStyle.tuning = value
+            persistLab()
+        }
+
     /**
      * Highlight-tab *sync* knobs — not ink feel. Kept outside [Tuning] so
      * visual paste/copy stays about the wash, while these adjust when the
@@ -257,6 +267,7 @@ object InkEngine {
         suppressLabPersist = true
         try {
             tuningState = snapshot.toTuning()
+            ContextualGuideStyle.tuning = snapshot.toContextualGuideTuning()
             highlightLeadState = snapshot.highlightLeadMs
             fadeLeadState = snapshot.fadeLeadMs
             outputLatencyOverrideState = snapshot.outputLatencyOverrideMs
@@ -276,6 +287,7 @@ object InkEngine {
         suppressLabPersist = true
         try {
             tuningState = Tuning()
+            ContextualGuideStyle.tuning = ContextualGuideTuning()
             highlightLeadState = DEFAULT_HIGHLIGHT_LEAD_MS
             fadeLeadState = DEFAULT_FADE_LEAD_MS
             outputLatencyOverrideState = null
