@@ -79,6 +79,13 @@ type Props = {
    * should drive a FocusEngine jump onto the chosen ayah.
    */
   onJump: (ayah: number) => void
+  /** Fires when the magnification wheel opens or collapses. */
+  onExpandedChange?: (expanded: boolean) => void
+  /**
+   * Sheet-relative vertical center of the collapsed dash stack — used by
+   * contextual education to aim the ayah-rail spotlight.
+   */
+  onCollapsedCenterY?: (centerYInSheet: number) => void
 }
 
 function readCssColor(el: HTMLElement, name: string, fallback: string): string {
@@ -144,10 +151,16 @@ export const AyahSelectorRail = forwardRef<AyahSelectorRailHandle, Props>(
       side,
       receded,
       onJump,
+      onExpandedChange,
+      onCollapsedCenterY,
     }: Props,
     ref,
   ) {
     const rootRef = useRef<HTMLDivElement>(null)
+    const onExpandedChangeRef = useRef(onExpandedChange)
+    onExpandedChangeRef.current = onExpandedChange
+    const onCollapsedCenterYRef = useRef(onCollapsedCenterY)
+    onCollapsedCenterYRef.current = onCollapsedCenterY
     const canvasRef = useRef<HTMLCanvasElement>(null)
     const dialRef = useRef(currentPositionRef?.current ?? currentAyah)
     const expandRef = useRef(0)
@@ -369,14 +382,40 @@ export const AyahSelectorRail = forwardRef<AyahSelectorRailHandle, Props>(
     }
   }, [schedulePaint])
 
+  const reportCollapsedCenter = useCallback(() => {
+    const root = rootRef.current
+    const report = onCollapsedCenterYRef.current
+    if (!root || !report) return
+    const sheet = root.closest('.sheet')
+    if (!(sheet instanceof HTMLElement)) return
+    const sheetRect = sheet.getBoundingClientRect()
+    const rootRect = root.getBoundingClientRect()
+    report(rootRect.top + rootRect.height / 2 - sheetRect.top)
+  }, [])
+
+  useEffect(() => {
+    reportCollapsedCenter()
+    const root = rootRef.current
+    if (!root) return
+    const ro = new ResizeObserver(() => reportCollapsedCenter())
+    ro.observe(root)
+    window.addEventListener('resize', reportCollapsedCenter)
+    return () => {
+      ro.disconnect()
+      window.removeEventListener('resize', reportCollapsedCenter)
+    }
+  }, [reportCollapsedCenter, ayahCount, side])
+
   const setExpanded = (open: boolean) => {
     const target = open ? 1 : 0
+    const wasOpen = expandTargetRef.current >= 0.5
     expandTargetRef.current = target
     expandControlsRef.current?.stop()
     expandControlsRef.current = null
     // Grow the hit zone immediately on open so drag can continue; shrink only
     // after collapse finishes so the wheel does not lose the pointer mid-fade.
     if (open) setHitExpanded(true)
+    if (open !== wasOpen) onExpandedChangeRef.current?.(open)
 
     const reducedMotion =
       typeof window !== 'undefined' &&

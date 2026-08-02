@@ -5186,3 +5186,132 @@ html[data-entrance='true'] body {
   outline: 1px solid var(--accent);
   outline-offset: 3px;
 }
+
+/* ── Contextual feature guides (Android ContextualFeatureTip) ─────────
+ * Inverse paper spotlight: royal-green vellum over unused paper, clear
+ * window on the live feature. Not a dialog, card, or dark scrim. */
+.contextual-feature-tip {
+  position: absolute;
+  inset: 0;
+  z-index: 18;
+  pointer-events: none;
+  /* Fixed royal-green teaching surface — Android royalGreenOverlayColorScheme. */
+  --tip-ink: #e8e2d5;
+  --tip-ink-muted: rgba(232, 226, 213, 0.76);
+  color: var(--tip-ink);
+}
+
+.contextual-tip-vellum {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+/* Body half absorbs gestures; spotlight half stays open to the feature. */
+.contextual-tip-absorb {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 50%;
+  pointer-events: auto;
+  touch-action: none;
+}
+
+.contextual-feature-tip[data-spotlight='left'] .contextual-tip-absorb {
+  right: 0;
+}
+
+.contextual-feature-tip[data-spotlight='right'] .contextual-tip-absorb {
+  left: 0;
+}
+
+.contextual-tip-lesson {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  pointer-events: none;
+  box-sizing: border-box;
+}
+
+.contextual-tip-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: 1.75rem;
+  line-height: 2rem;
+  color: var(--tip-ink);
+}
+
+.contextual-tip-body {
+  margin: 0.125rem 0 0;
+  font-family: var(--font-body);
+  font-size: 1.1875rem;
+  line-height: 1.5rem;
+  color: var(--tip-ink-muted);
+}
+
+.contextual-tip-dismiss {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  margin: 0;
+  border: 0;
+  border-radius: 999px;
+  padding: 0.625rem 1.375rem;
+  font-family: var(--font-body);
+  font-size: 1rem;
+  line-height: 1.25;
+  pointer-events: auto;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.contextual-tip-dismiss:focus-visible {
+  outline: 1px solid var(--tip-ink);
+  outline-offset: 3px;
+}
+
+.contextual-tip-mark {
+  position: absolute;
+  width: 1.75rem;
+  height: 1.75rem;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.contextual-pulse-mark,
+.contextual-pulse-mark::after {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 0.875rem;
+  height: 0.875rem;
+  border-radius: 50%;
+  border: 0.9px solid rgba(250, 243, 232, 0.34);
+  pointer-events: none;
+}
+
+.contextual-pulse-mark::after {
+  content: '';
+  border-color: rgba(250, 243, 232, 0.2);
+  animation: contextual-pulse 1.35s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+@keyframes contextual-pulse {
+  0% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1.85);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .contextual-pulse-mark {
+    animation: none;
+  }
+}

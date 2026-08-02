@@ -34,6 +34,13 @@ import {
   IconTune,
 } from '../icons/PlaybackIcons'
 import { AyahSelectorRail, type AyahSelectorRailHandle } from './AyahSelectorRail'
+import { AyahRailTip } from './AyahRailTip'
+import { BookmarkNoteTip } from './BookmarkNoteTip'
+import {
+  dismissEducation,
+  shouldShowAyahRailTip,
+  shouldShowBookmarkNoteTip,
+} from '../../data/education'
 import { OrnateSurahTitle } from './OrnateSurahTitle'
 import { NextChapterFooter } from './NextChapterFooter'
 import { PageBreak } from './PageBreak'
@@ -221,7 +228,55 @@ export function ReaderScreen({ stackLayer }: { stackLayer: StackLayer }) {
   const onPlayWord = useCallback((ayah: number, pos: number) => {
     void appStore.playFromWord(ayah, pos)
   }, [])
-  const onToggleBookmark = useCallback((n: number) => appStore.toggleBookmark(n), [])
+  const sheetRef = useRef<HTMLDivElement>(null)
+  const [sheetSize, setSheetSize] = useState({ width: 0, height: 0 })
+  const [initialFocusSettled, setInitialFocusSettled] = useState(false)
+  const [ayahRailTipOpen, setAyahRailTipOpen] = useState(false)
+  const [ayahRailTipCenterY, setAyahRailTipCenterY] = useState(Number.NaN)
+  const [bookmarkNoteTipOpen, setBookmarkNoteTipOpen] = useState(false)
+  const [bookmarkNoteTipRendered, setBookmarkNoteTipRendered] = useState(false)
+  const [bookmarkNoteTipAyah, setBookmarkNoteTipAyah] = useState(0)
+  const [bookmarkNoteTipCenterY, setBookmarkNoteTipCenterY] = useState(Number.NaN)
+  const [ayahRailTipRendered, setAyahRailTipRendered] = useState(false)
+  const bookmarkNoteTipOpenRef = useRef(false)
+  bookmarkNoteTipOpenRef.current = bookmarkNoteTipOpen
+  const ayahRailTipOpenRef = useRef(false)
+  ayahRailTipOpenRef.current = ayahRailTipOpen
+
+  const dismissBookmarkNoteTip = useCallback(() => {
+    dismissEducation('bookmark_note')
+    setBookmarkNoteTipOpen(false)
+  }, [])
+  const dismissAyahRailTip = useCallback(() => {
+    dismissEducation('ayah_rail')
+    setAyahRailTipOpen(false)
+  }, [])
+
+  const onToggleBookmark = useCallback(
+    (n: number) => {
+      const nowBookmarked = appStore.toggleBookmark(n)
+      const settings = appStore.getSnapshot().settings
+      if (
+        shouldShowBookmarkNoteTip({
+          developerMode: settings.developerMode,
+          educationGuidesEnabled: settings.educationGuidesEnabled,
+          nowBookmarked,
+        })
+      ) {
+        if (ayahRailTipOpenRef.current) {
+          dismissEducation('ayah_rail')
+          setAyahRailTipOpen(false)
+        }
+        setBookmarkNoteTipCenterY(Number.NaN)
+        setBookmarkNoteTipAyah(n)
+        void focusAyah(n, { animate: true, preRoll: true }).finally(() => {
+          setBookmarkNoteTipOpen(true)
+        })
+      }
+      return nowBookmarked
+    },
+    [focusAyah],
+  )
   const surahIdRef = useRef(content?.surah.id ?? 0)
   surahIdRef.current = content?.surah.id ?? 0
   const onHoldWord = useCallback(
@@ -561,6 +616,7 @@ export function ReaderScreen({ stackLayer }: { stackLayer: StackLayer }) {
   // Continuous next-chapter advance owns scroll/transform — only pin focus.
   useEffect(() => {
     if (!content || !isTop) return
+    setInitialFocusSettled(false)
     if (chapterAdvancingRef.current) {
       setFocusedAyah(Math.max(1, state.openAyah || 1))
       setShowTopTitle(false)
@@ -573,6 +629,7 @@ export function ReaderScreen({ stackLayer }: { stackLayer: StackLayer }) {
       void focusAyah(ayah, { animate: false, preRoll: false }).then(() => {
         if (cancelled) return
         setFocusedAyah(focus.focusedAyah())
+        setInitialFocusSettled(true)
       })
     })
     return () => {
@@ -582,6 +639,127 @@ export function ReaderScreen({ stackLayer }: { stackLayer: StackLayer }) {
     // Explicit opens only — not playback updates to the session anchor.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [content?.surah.id, state.readerOpenRevision])
+
+  // Measure the reader sheet for tip placement.
+  useEffect(() => {
+    const el = sheetRef.current
+    if (!el) return
+    const measure = () => {
+      const rect = el.getBoundingClientRect()
+      setSheetSize({ width: rect.width, height: rect.height })
+    }
+    measure()
+    const ro = new ResizeObserver(measure)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [content?.surah.id])
+
+  // Force-close guides when the developer gate turns off.
+  useEffect(() => {
+    if (
+      !state.settings.developerMode ||
+      !state.settings.educationGuidesEnabled
+    ) {
+      setBookmarkNoteTipOpen(false)
+      setAyahRailTipOpen(false)
+    }
+  }, [state.settings.developerMode, state.settings.educationGuidesEnabled])
+
+  // Offer the rail lesson only as a chapter settles. Enabling the developer
+  // gate over an already-open reader waits for the next chapter opening —
+  // do not key this effect on the guides toggle itself.
+  useEffect(() => {
+    if (
+      !initialFocusSettled ||
+      !Number.isFinite(ayahRailTipCenterY) ||
+      chapterAdvancing ||
+      verseReveal < 1 ||
+      recitingActive
+    ) {
+      return
+    }
+    const timer = window.setTimeout(() => {
+      const settings = appStore.getSnapshot().settings
+      if (
+        shouldShowAyahRailTip({
+          developerMode: settings.developerMode,
+          educationGuidesEnabled: settings.educationGuidesEnabled,
+        }) &&
+        !bookmarkNoteTipOpenRef.current
+      ) {
+        setAyahRailTipOpen(true)
+      }
+    }, 320)
+    return () => window.clearTimeout(timer)
+  }, [
+    content?.surah.id,
+    initialFocusSettled,
+    ayahRailTipCenterY,
+    chapterAdvancing,
+    verseReveal,
+    recitingActive,
+  ])
+
+  // Measure the live ribbon while the bookmark lesson is open.
+  useEffect(() => {
+    if (!bookmarkNoteTipOpen || bookmarkNoteTipAyah <= 0) return
+    const sheet = sheetRef.current
+    if (!sheet) return
+    const measure = () => {
+      const ribbon = sheet.querySelector(
+        `#ayah-${bookmarkNoteTipAyah} .verse-ribbon`,
+      )
+      if (!(ribbon instanceof HTMLElement)) return
+      const sheetRect = sheet.getBoundingClientRect()
+      const ribbonRect = ribbon.getBoundingClientRect()
+      setBookmarkNoteTipCenterY(
+        ribbonRect.top + ribbonRect.height / 2 - sheetRect.top,
+      )
+    }
+    measure()
+    const raf = requestAnimationFrame(measure)
+    return () => cancelAnimationFrame(raf)
+  }, [bookmarkNoteTipOpen, bookmarkNoteTipAyah, focusedAyah])
+
+  // Page drag dismisses open lessons (Android listDragged parity).
+  useEffect(() => {
+    const el = scrollRef.current
+    if (!el || (!bookmarkNoteTipOpen && !ayahRailTipOpen)) return
+    let lastTop = el.scrollTop
+    const onScroll = () => {
+      if (Math.abs(el.scrollTop - lastTop) < 2) return
+      lastTop = el.scrollTop
+      if (bookmarkNoteTipOpenRef.current) dismissBookmarkNoteTip()
+      if (ayahRailTipOpenRef.current) dismissAyahRailTip()
+    }
+    el.addEventListener('scroll', onScroll, { passive: true })
+    return () => el.removeEventListener('scroll', onScroll)
+  }, [
+    bookmarkNoteTipOpen,
+    ayahRailTipOpen,
+    dismissBookmarkNoteTip,
+    dismissAyahRailTip,
+  ])
+
+  // Escape dismisses an open guide before other reader shortcuts.
+  useEffect(() => {
+    if (!isTop || (!bookmarkNoteTipOpen && !ayahRailTipOpen)) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return
+      e.preventDefault()
+      e.stopPropagation()
+      if (bookmarkNoteTipOpenRef.current) dismissBookmarkNoteTip()
+      else if (ayahRailTipOpenRef.current) dismissAyahRailTip()
+    }
+    window.addEventListener('keydown', onKey, true)
+    return () => window.removeEventListener('keydown', onKey, true)
+  }, [
+    isTop,
+    bookmarkNoteTipOpen,
+    ayahRailTipOpen,
+    dismissBookmarkNoteTip,
+    dismissAyahRailTip,
+  ])
 
   // Progressive mount expands — refresh focus geometry without re-homing.
   useEffect(() => {
@@ -933,12 +1111,19 @@ export function ReaderScreen({ stackLayer }: { stackLayer: StackLayer }) {
         togglePlayback()
       }
       else if (action.type === 'search') setSearchActive(true)
-      else appStore.toggleBookmark(focusedAyah)
+      else onToggleBookmark(focusedAyah)
     }
     // Capture before React's word-level key handler can audition the word.
     window.addEventListener('keydown', onKeyDown, true)
     return () => window.removeEventListener('keydown', onKeyDown, true)
-  }, [content, focusedAyah, isTop, state.rootViewer, togglePlayback])
+  }, [
+    content,
+    focusedAyah,
+    isTop,
+    state.rootViewer,
+    togglePlayback,
+    onToggleBookmark,
+  ])
 
   const closeSearch = () => {
     setSearchActive(false)
@@ -1019,8 +1204,20 @@ export function ReaderScreen({ stackLayer }: { stackLayer: StackLayer }) {
       side={side}
       receded={receded}
       onJump={jumpToAyah}
+      onExpandedChange={(expanded) => {
+        if (expanded && ayahRailTipOpenRef.current) dismissAyahRailTip()
+      }}
+      onCollapsedCenterY={setAyahRailTipCenterY}
     />
   ) : null
+
+  const bookmarkTipSide = side === 'left' ? 'right' : 'left'
+  const ayahRailTipVisible =
+    ayahRailTipOpen && Number.isFinite(ayahRailTipCenterY)
+  const bookmarkNoteTipVisible =
+    bookmarkNoteTipOpen &&
+    bookmarkNoteTipAyah > 0 &&
+    Number.isFinite(bookmarkNoteTipCenterY)
 
   const repeatMode = state.player.repeatMode
   const keepWordInView =
@@ -1044,11 +1241,18 @@ export function ReaderScreen({ stackLayer }: { stackLayer: StackLayer }) {
 
   return (
     <div
+      ref={sheetRef}
       className="sheet"
       data-name="reader"
       data-layer={READER_LAYER}
       data-depth={depth}
       data-active={active}
+      style={
+        {
+          ['--reader-paper' as string]: 'var(--paper)',
+          ['--reader-ink' as string]: 'var(--ink)',
+        } as import('react').CSSProperties
+      }
     >
       {peeking ? (
         <button
@@ -1271,10 +1475,15 @@ export function ReaderScreen({ stackLayer }: { stackLayer: StackLayer }) {
                       showWordGloss={state.settings.showWordGloss}
                       showTransliteration={state.settings.showTransliteration}
                       showTranslation={state.settings.showTranslation}
-                      bookmarked={bookmarkedAyahs.has(ayah.number)}
-                      bookmarkSide={side === 'left' ? 'right' : 'left'}
+                      bookmarked={
+                        bookmarkedAyahs.has(ayah.number) ||
+                        bookmarkNoteTipAyah === ayah.number
+                      }
+                      bookmarkSide={bookmarkTipSide}
                       bookmarkChromeAlpha={1}
-                      bookmarkInteractive={true}
+                      bookmarkInteractive={
+                        !recitingActive && bookmarkNoteTipAyah !== ayah.number
+                      }
                       speed={state.settings.playbackSpeed}
                       fontScale={state.settings.fontScale}
                       onPlayWord={onPlayWord}
@@ -1412,6 +1621,44 @@ export function ReaderScreen({ stackLayer }: { stackLayer: StackLayer }) {
       </div>
 
       {state.player.error ? <p className="muted-error">{state.player.error}</p> : null}
+
+      {ayahRailTipVisible || ayahRailTipRendered ? (
+        <AyahRailTip
+          visible={ayahRailTipVisible}
+          railSide={side}
+          targetCenterY={
+            Number.isFinite(ayahRailTipCenterY)
+              ? ayahRailTipCenterY
+              : sheetSize.height / 2
+          }
+          surfaceWidth={sheetSize.width}
+          surfaceHeight={sheetSize.height}
+          onDismiss={dismissAyahRailTip}
+          onRenderedChange={setAyahRailTipRendered}
+        />
+      ) : null}
+
+      {bookmarkNoteTipVisible || bookmarkNoteTipRendered ? (
+        <BookmarkNoteTip
+          visible={bookmarkNoteTipVisible}
+          ribbonSide={bookmarkTipSide}
+          targetCenterY={
+            Number.isFinite(bookmarkNoteTipCenterY)
+              ? bookmarkNoteTipCenterY
+              : sheetSize.height / 2
+          }
+          surfaceWidth={sheetSize.width}
+          surfaceHeight={sheetSize.height}
+          onDismiss={dismissBookmarkNoteTip}
+          onRenderedChange={(rendered) => {
+            setBookmarkNoteTipRendered(rendered)
+            if (!rendered && !bookmarkNoteTipOpen) {
+              setBookmarkNoteTipAyah(0)
+              setBookmarkNoteTipCenterY(Number.NaN)
+            }
+          }}
+        />
+      ) : null}
 
       {/* Ink bleed lives on this sheet — not a full-viewport layer over the deck. */}
       <RootViewer />

@@ -20,6 +20,16 @@ export const RETRACT = [0.55, 0.05, 0.35, 1] as const
 /** Ink sweep defaults from `InkEngine.Tuning` (overridable per wash). */
 export const INK_SWEEP_DEFAULT = [0.3, 0.24, 0.7, 0.78] as const
 
+/**
+ * Android `InkExpandEasing` — exponential ease-out used by ink bloom and the
+ * contextual-guide vellum enter. `1 - 2^(-9t)`.
+ */
+export function inkExpandProgress(t: number): number {
+  if (t >= 1) return 1
+  if (t <= 0) return 0
+  return 1 - 2 ** (-9 * t)
+}
+
 export type CubicBezierEase = readonly [number, number, number, number]
 
 export function cubicBezierTuple(
