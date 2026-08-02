@@ -127,6 +127,7 @@ import com.beautifulquran.ui.theme.IslamicReturnToAyahButton
 import com.beautifulquran.ui.theme.InkRevealOverlay
 import com.beautifulquran.ui.theme.absorbPointerEvents
 import com.beautifulquran.ui.theme.contrastingOverlayColorScheme
+import com.beautifulquran.ui.theme.contextualGuideProgressiveBlur
 import com.beautifulquran.ui.theme.verticalFadingEdges
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
@@ -2013,7 +2014,15 @@ fun ReaderScreen(
                             }
                             val bookmarked = ayah.number in bookmarkedAyahs
                             Box(
-                                Modifier.graphicsLayer {
+                                Modifier.contextualGuideProgressiveBlur(
+                                    enabled = settings.developerModeEnabled &&
+                                        settings.educationGuidesEnabled &&
+                                        (bookmarkNoteTipVisible || bookmarkNoteTipRendered),
+                                    visible = bookmarkNoteTipVisible && bookmarkTipHasTarget,
+                                    rendered = (bookmarkNoteTipVisible ||
+                                        bookmarkNoteTipRendered) && bookmarkTipHasTarget,
+                                    lessonOnLeft = bookmarkTipSide == AyahSelectorSide.RIGHT,
+                                ) {
                                     translationY = verseRevealY
                                     alpha = verseFadeAlpha
                                 },

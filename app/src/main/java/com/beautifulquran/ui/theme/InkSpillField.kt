@@ -1,19 +1,112 @@
 package com.beautifulquran.ui.theme
 
+import android.graphics.RenderEffect
 import android.graphics.RuntimeShader
+import android.graphics.Shader
 import android.os.Build
 import androidx.annotation.RequiresApi
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.GraphicsLayerScope
+import androidx.compose.ui.graphics.Paint
 import androidx.compose.ui.graphics.ShaderBrush
+import androidx.compose.ui.graphics.asComposeRenderEffect
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.layer.drawLayer
+import androidx.compose.ui.graphics.rememberGraphicsLayer
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+
+/**
+ * Optically scatters the live reader only where the vellum is translucent.
+ * This belongs directly on each visible ayah render node: sampling the parent
+ * LazyColumn loses Android's virtualized child display lists on some devices.
+ */
+@Composable
+internal fun Modifier.contextualGuideProgressiveBlur(
+    enabled: Boolean,
+    visible: Boolean,
+    rendered: Boolean,
+    lessonOnLeft: Boolean,
+    layerBlock: GraphicsLayerScope.() -> Unit = {},
+): Modifier {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU || !enabled) {
+        return graphicsLayer(layerBlock)
+    }
+    val pixelDensity = LocalDensity.current.density
+    val tuning = ContextualGuideStyle.tuning
+    val blurRadiusPx = tuning.blurRadiusDp * pixelDensity
+    val blurEffect = remember(blurRadiusPx) {
+        if (blurRadiusPx > 0.01f) {
+            RenderEffect.createBlurEffect(
+                blurRadiusPx,
+                blurRadiusPx,
+                Shader.TileMode.DECAL,
+            ).asComposeRenderEffect()
+        } else {
+            null
+        }
+    }
+    val sourceLayer = rememberGraphicsLayer()
+    val softenedLayer = rememberGraphicsLayer()
+    val progress = remember { Animatable(0f) }
+    LaunchedEffect(visible) {
+        progress.animateTo(
+            if (visible) 1f else 0f,
+            tween(
+                durationMillis = if (visible) 380 else 320,
+                easing = if (visible) InkExpandEasing else FastOutSlowInEasing,
+            ),
+        )
+    }
+    return graphicsLayer(layerBlock).drawWithContent {
+        sourceLayer.record { this@drawWithContent.drawContent() }
+        drawLayer(sourceLayer)
+        val amount = progress.value * tuning.blurStrength
+        if (!rendered || amount <= 0.001f || blurEffect == null) return@drawWithContent
+
+        softenedLayer.renderEffect = blurEffect
+        softenedLayer.record { drawLayer(sourceLayer) }
+        drawContext.canvas.saveLayer(Rect(Offset.Zero, size), Paint())
+        drawLayer(softenedLayer)
+        val solid = (tuning.bodyEdge - tuning.verticalTaper * 0.15f).coerceIn(0f, 1f)
+        val outer = (tuning.bodyEdge + tuning.featherWidth -
+            tuning.verticalTaper * 0.05f).coerceIn(solid, 1f)
+        val center = (solid + outer) / 2f
+        val maskStops = if (lessonOnLeft) {
+            arrayOf(
+                solid to Color.Transparent,
+                center to Color.White.copy(alpha = 0.42f * amount),
+                outer to Color.Transparent,
+            )
+        } else {
+            arrayOf(
+                (1f - outer) to Color.Transparent,
+                (1f - center) to Color.White.copy(alpha = 0.42f * amount),
+                (1f - solid) to Color.Transparent,
+            )
+        }
+        drawRect(
+            brush = Brush.horizontalGradient(*maskStops),
+            blendMode = BlendMode.DstIn,
+        )
+        drawContext.canvas.restore()
+    }
+}
 
 /** A continuous GPU-rendered vellum field that leaves the live page visible. */
 @Composable
@@ -123,24 +216,47 @@ private const val VellumFieldFunctions = """
         );
     }
 
+    float brushedPigment(float2 fragCoord) {
+        float2 warp = float2(
+            noise(fragCoord * 0.0027),
+            noise((fragCoord + float2(173.0, 91.0)) * 0.0031)
+        ) - 0.5;
+        float2 point = fragCoord + warp * 30.0;
+        float pooling = noise(point * 0.0045) * 0.55
+            + noise((point + float2(47.0, 113.0)) * 0.011) * 0.3
+            + noise((point + float2(211.0, 29.0)) * 0.026) * 0.15;
+        float fibres = noise(float2(
+            point.x * 0.021 + noise(point * 0.004) * 1.7,
+            point.y * 0.006
+        ));
+        float tooth = noise((point + float2(61.0, 157.0)) * 0.057);
+        return pooling * 0.68 + fibres * 0.2 + tooth * 0.12;
+    }
+
     float vellumDensity(float2 fragCoord) {
         float2 uv = fragCoord / resolution;
         float fromEdge = direction > 0.0 ? uv.x : 1.0 - uv.x;
-        float down = uv.y - targetY;
-        float focusTaper = exp(-(down * down) / 0.18);
-        float taper = verticalTaper * (0.3 + 0.7 * focusTaper);
-        float solid = (bodyEdge + taper) * progress;
-        float outer = (bodyEdge + featherWidth + taper) * progress;
+        float riseEnd = clamp(targetY + 0.05, 0.30, 0.42);
+        float rise = smoother(clamp((uv.y + 0.02) / riseEnd, 0.0, 1.0));
+        float tail = 1.0 - 0.45 * smoother(clamp((uv.y - 0.72) / 0.28, 0.0, 1.0));
+        float silhouette = rise * tail;
+        float taper = verticalTaper * (1.0 - silhouette);
+        float solid = (bodyEdge - taper) * progress;
+        // Both contours travel together, preserving one long vellum feather
+        // while the whole wash opens toward the contextual teaching band.
+        float outer = (bodyEdge + featherWidth - taper) * progress;
         float density = clamp((outer - fromEdge) / max(outer - solid, 0.001), 0.0, 1.0);
         float transition = 4.0 * density * (1.0 - density);
         float clouds = noise(fragCoord * float2(0.006, 0.008)) * 0.65
             + noise(fragCoord * float2(0.017, 0.021)) * 0.35;
-        density = clamp(density + (clouds - 0.5) * vellumGrain * transition, 0.0, 1.0);
+        float fibres = noise(fragCoord * float2(0.055, 0.071));
+        float texture = (clouds - 0.5) + (fibres - 0.5) * 0.18;
+        density = clamp(density + texture * vellumGrain * transition, 0.0, 1.0);
         return density;
     }
 
     float vellumCoverage(float density) {
-        return mix(pow(density, fadeSoftness), smoother(density), 0.22);
+        return mix(pow(density, fadeSoftness), smoother(density), 0.4);
     }
 """
 
@@ -170,6 +286,14 @@ private const val VellumFieldShader = """
         softened += vellumCoverage(vellumDensity(fragCoord + float2(axis * 2.0, 0.0))) * 0.08;
         softened += vellumCoverage(vellumDensity(fragCoord - float2(axis * 2.0, 0.0))) * 0.08;
         coverage = mix(coverage, softened, blurStrength * edge);
+        // Lay pigment variation back over the softened contour. Keeping this
+        // after the mask blur preserves fibre tooth without producing bands.
+        float brush = brushedPigment(fragCoord) - 0.5;
+        coverage = clamp(
+            coverage + brush * vellumGrain * (0.5 + 2.0 * edge),
+            0.0,
+            1.0
+        );
         half alpha = inkColor.a * half(coverage * progress);
         return half4(inkColor.rgb * alpha, alpha);
     }

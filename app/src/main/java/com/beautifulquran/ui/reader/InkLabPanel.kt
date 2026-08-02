@@ -234,7 +234,7 @@ fun InkLabPanel(
                     }
 
                     InkLabTab.Guide -> {
-                        TuningSlider("Body edge", guide.bodyEdge, 0.28f..0.55f) {
+                        TuningSlider("Body edge", guide.bodyEdge, 0.2f..0.5f) {
                             InkEngine.contextualGuideTuning = guide.copy(bodyEdge = it)
                         }
                         TuningSlider("Feather width", guide.featherWidth, 0.12f..0.5f) {
@@ -249,10 +249,10 @@ fun InkLabPanel(
                         TuningSlider("Blur strength", guide.blurStrength, 0f..1f) {
                             InkEngine.contextualGuideTuning = guide.copy(blurStrength = it)
                         }
-                        TuningSlider("Vellum grain", guide.vellumGrain, 0f..0.08f) {
+                        TuningSlider("Vellum grain", guide.vellumGrain, 0f..0.16f) {
                             InkEngine.contextualGuideTuning = guide.copy(vellumGrain = it)
                         }
-                        TuningSlider("Vertical taper", guide.verticalTaper, 0f..0.08f) {
+                        TuningSlider("Contour taper", guide.verticalTaper, 0f..0.24f) {
                             InkEngine.contextualGuideTuning = guide.copy(verticalTaper = it)
                         }
                     }

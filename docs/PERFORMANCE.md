@@ -143,11 +143,13 @@ identical on a solid background and costs almost nothing.
 ### 4b. Transient progressive vellum
 
 The contextual guide's progressive vellum is developer-gated and transient.
-On Android 13+ one AGSL brush draws the full-height pigment field and samples
-its analytic alpha mask five times only inside the feather. The verse viewport
-keeps its normal render path: no offscreen page capture, and the real scripture
-and ribbon remain live below the translucent veil. Android 11–12 uses a smooth
-gradient fallback. Idle reading has no guide draw or render-node cost.
+On Android 13+ one AGSL brush draws the full-height tapered pigment field and
+samples its analytic alpha mask five times only inside the feather. A second
+pass records each visible ayah—not the virtualized `LazyColumn`, whose child
+display lists cannot be sampled reliably—into a small graphics layer. A native
+GPU blur is composited back through one `DstIn` feather mask, preserving the
+real scripture and ribbon below it. Android 11–12 uses a smooth gradient
+fallback. Idle reading creates neither guide shader layers nor draw cost.
 
 ### 4c. Layout reads confined to derived state and coroutines
 
