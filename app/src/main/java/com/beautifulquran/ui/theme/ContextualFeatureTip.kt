@@ -6,6 +6,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.BoxWithConstraintsScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
@@ -45,11 +46,14 @@ import kotlin.math.hypot
 /**
  * A short lesson written into unused paper around a live feature spotlight.
  *
- * [spotlightCenter] is the feature's position in this composable. [placement]
- * casts a ray from it at any angle and places the teaching body along that ray;
- * the GPU vellum enters from behind the body and feathers toward the spotlight.
- * The spotlight half remains interactive. There is no floating layer, shadow,
- * generic scrim, or direction-specific rendering path.
+ * [spotlightCenter] resolves the feature's position against this composable's
+ * full bounds. [placement] casts a ray from it at any angle and places the
+ * teaching body along that ray; the GPU vellum enters from behind the body and
+ * feathers toward the spotlight. This must be the guide wrapper's outer emitted
+ * layout so its sibling input sharing reaches the real feature beneath it.
+ * Callers must keep that target enabled and dismiss the lesson only after its
+ * taught action succeeds. There is no floating layer, shadow, generic scrim, or
+ * direction-specific rendering path.
  */
 @Composable
 fun ContextualFeatureTip(
@@ -58,10 +62,10 @@ fun ContextualFeatureTip(
     body: String,
     onDismiss: () -> Unit,
     mark: @Composable () -> Unit,
-    spotlightCenter: DpOffset,
+    spotlightCenter: BoxWithConstraintsScope.() -> DpOffset,
     placement: ContextualTipPlacement,
     modifier: Modifier = Modifier,
-    actionCenter: DpOffset? = null,
+    actionCenter: (BoxWithConstraintsScope.() -> DpOffset)? = null,
     contentPadding: PaddingValues = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
     dismissLabel: String = "Got it",
     dismissPaperColor: Color? = null,
@@ -106,14 +110,16 @@ fun ContextualFeatureTip(
     val buttonPaper = dismissPaperColor ?: MaterialTheme.colorScheme.onSurface
     val buttonInk = dismissInkColor ?: paperColor
     val density = LocalDensity.current
-    BoxWithConstraints(modifier.fillMaxSize()) {
+    BoxWithConstraints(modifier.fillMaxSize().sharePointerInputWithSiblings()) {
+        val requestedSpotlight = spotlightCenter()
+        val requestedAction = actionCenter?.invoke(this)
         val surface = with(density) { Size(maxWidth.toPx(), maxHeight.toPx()) }
         val spotlight = with(density) {
-            Offset(spotlightCenter.x.toPx(), spotlightCenter.y.toPx())
+            Offset(requestedSpotlight.x.toPx(), requestedSpotlight.y.toPx())
         }.coerceTo(surface)
         val bodyCenter = placement.bodyCenter(spotlight, surface)
         val defaultAction = placement.actionCenter(spotlight, surface)
-        val action = actionCenter?.let {
+        val action = requestedAction?.let {
             with(density) { Offset(it.x.toPx(), it.y.toPx()) }
         }?.coerceTo(surface) ?: defaultAction
         val flow = (spotlight - bodyCenter).normalized()

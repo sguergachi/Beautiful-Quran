@@ -107,6 +107,8 @@ bookmarks or notes, and leaving developer mode disables guide presentation
 again.
 The ten visual studies and selected 02 target live in
 `docs/design-studies/contextual-guide/`.
+Implementation rules and the required live-target verification checklist live
+in [CONTEXTUAL_GUIDES.md](CONTEXTUAL_GUIDES.md).
 
 > **Fixed 2026-07-24: the repeat picker.** It used to be the one live violation
 > of the two rules above — a stock `androidx.compose.ui.window.Dialog` with a
