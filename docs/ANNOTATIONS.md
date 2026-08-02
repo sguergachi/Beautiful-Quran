@@ -84,9 +84,11 @@ wash: dark wet shoulder, long translucent tail, and restrained paper
 absorption. A parchment geometric hold mark pulses on the live ribbon, and
 a compact theme-paper “Got it” clearing at the thumb-reachable bottom
 withdraws the bleed and returns the verse. A vertical drag on the untouched
-ribbon half dismisses the lesson and scrolls normally. The reader remains in
-place beneath this single paper surface; this is neither an overlay sheet nor a
-floating callout. See `ContextualFeatureTip`.
+ribbon half dismisses the lesson and scrolls normally. Holding the spotlighted
+ribbon opens the note editor and dismisses the lesson, while a short tap cannot
+unmark it mid-instruction. The reader remains in place beneath this single paper
+surface; this is neither an overlay sheet nor a floating callout. See
+`ContextualFeatureTip`.
 
 This lesson is currently developer-gated and off by default. Settings →
 Developer → **Contextual feature guides** enables it for testing;

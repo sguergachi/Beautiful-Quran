@@ -2066,6 +2066,10 @@ fun ReaderScreen(
                                 derivedStateOf { scrolledAyah.value == ayah.number }
                             }
                             val bookmarked = ayah.number in bookmarkedAyahs
+                            val bookmarkLessonTarget = bookmarkNoteTipOpen &&
+                                bookmarkNoteTipSurah == ayah.surahId &&
+                                bookmarkNoteTipAyah == ayah.number
+                            val ribbonBookmarked = bookmarked || bookmarkLessonTarget
                             Box(
                                 Modifier.contextualGuideProgressiveBlur(
                                     enabled = settings.developerModeEnabled &&
@@ -2126,24 +2130,21 @@ fun ReaderScreen(
                                 // The repository update is synchronous, but the
                                 // collected projection can arrive one frame after
                                 // the lesson. Keep its live anchor ruby meanwhile.
-                                bookmarked = bookmarked ||
-                                    (bookmarkNoteTipSurah == ayah.surahId &&
-                                        bookmarkNoteTipAyah == ayah.number),
+                                bookmarked = ribbonBookmarked,
                                 bookmarkFocused = bookmarkFocused,
                                 bookmarkChromeAlpha = bookmarkChromeAlpha,
-                                // Gather mode and open note editors both own taps /
-                                // the margin; disable the ribbon while either is live.
+                                // Keep the lesson target live so its taught hold
+                                // can be completed without leaving the paper.
                                 bookmarkInteractive = !recitingActive &&
                                     !gathering &&
-                                    editingAnnotationAyah == 0 &&
-                                    !(bookmarkNoteTipSurah == ayah.surahId &&
-                                        bookmarkNoteTipAyah == ayah.number),
+                                    editingAnnotationAyah == 0,
                                 // Gather mode owns the outer margin (ordinals)
                                 // and verse taps; hide the ribbon while gathering.
                                 onToggleBookmark = if (gathering) {
                                     null
                                 } else {
-                                    {
+                                    bookmarkToggle@{
+                                        if (bookmarkLessonTarget) return@bookmarkToggle true
                                         val result = viewModel.toggleBookmark(ayah.number)
                                         if (result.showNoteTip) {
                                             if (ayahRailTipOpen) {
@@ -2244,12 +2245,16 @@ fun ReaderScreen(
                                     if (editingAnnotationAyah == ayah.number) commitOpenAnnotation()
                                 },
                                 onEditAnnotation = if (
-                                    gathering || !bookmarked || !settings.annotationsEnabled
+                                    gathering || !ribbonBookmarked || !settings.annotationsEnabled
                                 ) {
                                     null
                                 } else {
                                     {
                                         haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                        if (bookmarkLessonTarget) {
+                                            viewModel.dismissBookmarkNoteTip()
+                                            bookmarkNoteTipOpen = false
+                                        }
                                         commitOpenAnnotation()
                                         editingAnnotationText =
                                             annotationsForSurah.value[ayah.number] ?: ""
