@@ -44,8 +44,8 @@ export function AyahRailTip({
         y: Math.max(52, surfaceHeight - 72),
       }}
       contentPadding={{
-        start: railOnLeft ? 18 : 32,
-        end: railOnLeft ? 32 : 18,
+        start: railOnLeft ? 12 : 28,
+        end: railOnLeft ? 28 : 12,
       }}
     />
   )

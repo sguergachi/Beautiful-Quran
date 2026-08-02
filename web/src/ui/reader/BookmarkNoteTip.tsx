@@ -46,8 +46,8 @@ export function BookmarkNoteTip({
         y: Math.max(52, surfaceHeight - 72),
       }}
       contentPadding={{
-        start: ribbonOnLeft ? 18 : 32,
-        end: ribbonOnLeft ? 32 : 18,
+        start: ribbonOnLeft ? 12 : 28,
+        end: ribbonOnLeft ? 28 : 12,
       }}
     />
   )

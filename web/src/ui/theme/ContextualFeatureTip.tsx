@@ -52,7 +52,7 @@ export function ContextualFeatureTip({
   dismissPaperColor = 'var(--reader-paper, #faf3e8)',
   dismissInkColor = 'var(--reader-ink, #1c1b18)',
   onRenderedChange,
-  guideWidthFraction = 0.72,
+  guideWidthFraction = 0.42,
   guideHeightPx = 188,
   contentPadding = { start: 18, end: 32 },
 }: Props) {
@@ -131,17 +131,25 @@ export function ContextualFeatureTip({
 
   const surface = size
   const spotlight = coercePoint(spotlightCenter, surface)
+  // Shader reservoir stays on the Android ray fraction; lesson copy pins to
+  // the far paper edge so wide desktop sheets do not park type mid-feather.
   const bodyCenter = tipBodyCenter(placement, spotlight, surface)
   const action =
     actionCenter != null
       ? coercePoint(actionCenter, surface)
       : tipActionCenter(placement, spotlight, surface)
-  const laneWidth = surface.width * Math.min(1, Math.max(0.25, guideWidthFraction))
-  const laneHeight = Math.min(guideHeightPx, surface.height || guideHeightPx)
-  const laneLeft = Math.min(
-    Math.max(0, bodyCenter.x - laneWidth / 2),
-    Math.max(0, surface.width - laneWidth),
+  const laneWidth = Math.min(
+    surface.width * Math.min(1, Math.max(0.25, guideWidthFraction)),
+    22 * 16,
   )
+  const laneHeight = Math.min(guideHeightPx, surface.height || guideHeightPx)
+  const spotlightOnLeft = spotlightSide === 'left'
+  // Pin copy to the far paper edge (opposite the live feature), not the
+  // mid-feather bodyCenter — wide desktop sheets otherwise read mid-panel.
+  const edgeInset = 20
+  const laneLeft = spotlightOnLeft
+    ? Math.max(0, surface.width - laneWidth - edgeInset)
+    : edgeInset
   const laneTop = Math.min(
     Math.max(0, bodyCenter.y - laneHeight / 2),
     Math.max(0, surface.height - laneHeight),
@@ -177,6 +185,7 @@ export function ContextualFeatureTip({
         progress={paper}
         spotlight={spotlight}
         body={bodyCenter}
+        action={action}
         color={ROYAL_GREEN_PAPER}
         width={surface.width}
         height={surface.height}
@@ -194,6 +203,7 @@ export function ContextualFeatureTip({
           paddingLeft: contentPadding.start,
           paddingRight: contentPadding.end,
           opacity: ink,
+          textAlign: spotlightOnLeft ? 'end' : 'start',
         }}
       >
         <h2 className="contextual-tip-title">{title}</h2>
