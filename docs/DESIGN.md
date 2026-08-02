@@ -86,7 +86,9 @@ Low-contrast rings breathe around the live ribbon itself—no target dot,
 pointer glyph, or competing accent—and never sits at the bleed's feather.
 The body-side half-plane absorbs gestures; the spotlight-side half-plane stays
 attached to the feature below. For the bookmark lesson, a vertical drag there
-dismisses the lesson and continues scrolling the paper.
+dismisses the lesson and continues scrolling the paper. Holding the live ribbon
+opens its note editor and completes the lesson; a short tap cannot accidentally
+remove the bookmark while the lesson is teaching that hold.
 
 The ayah rail is the second use. On the first settled chapter opening, its live
 collapsed stack stays clear at the selected edge while the same vellum occupies
@@ -105,6 +107,8 @@ bookmarks or notes, and leaving developer mode disables guide presentation
 again.
 The ten visual studies and selected 02 target live in
 `docs/design-studies/contextual-guide/`.
+Implementation rules and the required live-target verification checklist live
+in [CONTEXTUAL_GUIDES.md](CONTEXTUAL_GUIDES.md).
 
 > **Fixed 2026-07-24: the repeat picker.** It used to be the one live violation
 > of the two rules above — a stock `androidx.compose.ui.window.Dialog` with a
