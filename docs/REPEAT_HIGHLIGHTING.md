@@ -337,8 +337,10 @@ are **not audible repeats**. Artifact classes scrubbed in `clean_qdc_artifacts`
    (`QDC_SPAN_CONNECT_GAP`). Locked by `tools/timing_patch_cases/noncontiguous-*.json`.
 5. **Backtrack-gap phantoms.** A backtrack run followed by a resume that skips
    first-pass words occupies those missing words' time (`…11,8,9,13…`, word 12
-   absent). Relabel the run onto the gap. A real earlier re-say that resumes at
-   `highWater + 1` is untouched.
+   absent). A one-segment backtrack (`…2,1,4…`) is retried as a coverage-only
+   recovery only when no reference or CTC repair completes the row; it then
+   relabels onto word 3 rather than losing the sole coverage witness as a
+   stray. A real earlier re-say that resumes at `highWater + 1` is untouched.
 6. **Forward-gap duplicates.** A duplicated destination exactly accounts for
    an otherwise absent gap (`1,3,3,4` becomes `1,2,3,4`). If the skipped word
    appears anywhere later, the rule abstains; Alafasy 16:106 locks that

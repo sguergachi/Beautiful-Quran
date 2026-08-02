@@ -670,11 +670,12 @@ def preserve_peer_repeats(current, repaired):
     return trim_to_next_start(out), len(extras)
 
 
-def clean_qdc_artifacts(segs, stats):
+def clean_qdc_artifacts(segs, stats, recover_singleton_gap=False):
     """Remove aligner artifacts (see above) from one ayah's time-sorted
     segments. Dropped spans are folded into the neighbouring segment so the
     karaoke sweep has no holes. Runs to a fixpoint because a dropped spike can
-    reunite a word with its stray sliver."""
+    reunite a word with its stray sliver. ``recover_singleton_gap`` is reserved
+    for a last-resort coverage candidate with no independent witness."""
     stats.setdefault("noncontiguous_orphans", 0)
     stats.setdefault("gap_phantoms", 0)
     if not segs:
@@ -696,6 +697,7 @@ def clean_qdc_artifacts(segs, stats):
             else:
                 merged.append([pos, start, end])
         kept = []
+        present_positions = {seg[0] for seg in merged}
         running_max = -1
         i = 0
         while i < len(merged):
@@ -754,6 +756,16 @@ def clean_qdc_artifacts(segs, stats):
                 prev is not None
                 and pos < prev[0]
                 and (next_pos is None or next_pos > running_max)
+                and not (recover_singleton_gap and (
+                    # A lone earlier label just before a forward gap owns that
+                    # missing word's time. Preserve it for the gap adjudicator;
+                    # dropping it here would erase the only coverage witness.
+                    next_pos is not None
+                    and next_pos > running_max + 1
+                    and not present_positions.intersection(
+                        range(running_max + 1, next_pos)
+                    )
+                ))
             )
             if stray:
                 prev[2] = max(prev[2], end)
@@ -793,7 +805,7 @@ def recover_negative_opening(segs):
     return shifted, True
 
 
-def adjust_qdc_segments(segs, n_words, stats):
+def adjust_qdc_segments(segs, n_words, stats, recover_singleton_gap=False):
     """Clamp quran.com segments (already 1-based, ayah-relative) to our canonical
     word count while PRESERVING repeats; scrub aligner artifacts that would read
     as repeats that aren't in the audio; count the re-recited spans."""
@@ -816,7 +828,7 @@ def adjust_qdc_segments(segs, n_words, stats):
         adjusted.append([pos, start, end])
     if not adjusted:
         return None
-    adjusted = clean_qdc_artifacts(adjusted, stats)
+    adjusted = clean_qdc_artifacts(adjusted, stats, recover_singleton_gap)
     stats["repeats"] += len(_repeat_signature(adjusted))
     return adjusted
 
@@ -1165,17 +1177,28 @@ def rebase_timing_repair(current, repaired):
     return merged
 
 
-def apply_boundary_repair(current, repaired):
-    """Replace only the explicitly supplied segments in a timing row."""
+def apply_boundary_repair(current, repaired, occurrence=None):
+    """Replace named segments, or one explicitly numbered repeated occurrence."""
     if not repaired:
         raise ValueError("boundary repair must name at least one position")
-    replacement = {seg[0]: list(seg) for seg in repaired}
-    if len(replacement) != len(repaired):
-        raise ValueError("boundary repair positions must be unique")
-    current_positions = [seg[0] for seg in current]
-    if any(current_positions.count(pos) != 1 for pos in replacement):
-        raise ValueError("boundary repair positions must occur once in the source row")
-    out = [replacement.get(seg[0], list(seg)) for seg in current]
+    if occurrence is not None:
+        if len(repaired) != 1:
+            raise ValueError("occurrence boundary repair names exactly one segment")
+        if occurrence < 1 or occurrence > len(current):
+            raise ValueError("boundary repair occurrence is outside the source row")
+        index = occurrence - 1
+        if current[index][0] != repaired[0][0]:
+            raise ValueError("boundary repair occurrence does not match its position")
+        out = [list(seg) for seg in current]
+        out[index] = list(repaired[0])
+    else:
+        replacement = {seg[0]: list(seg) for seg in repaired}
+        if len(replacement) != len(repaired):
+            raise ValueError("boundary repair positions must be unique")
+        current_positions = [seg[0] for seg in current]
+        if any(current_positions.count(pos) != 1 for pos in replacement):
+            raise ValueError("boundary repair positions must occur once in the source row")
+        out = [replacement.get(seg[0], list(seg)) for seg in current]
     starts = [seg[1] for seg in out]
     if starts != sorted(set(starts)):
         raise ValueError("boundary repair must preserve unique start order")
@@ -1262,6 +1285,21 @@ def apply_one_utterance(segs, positions):
     ]
 
 
+def merge_same_position_pair(segs, position):
+    """Collapse one verified adjacent same-word split into one utterance."""
+    matches = [
+        i for i in range(len(segs) - 1)
+        if segs[i][0] == position == segs[i + 1][0]
+    ]
+    if len(matches) != 1 or sum(seg[0] == position for seg in segs) != 2:
+        raise ValueError(
+            f"merge_same_position_pair expected one adjacent pair at {position}"
+        )
+    i = matches[0]
+    merged = [position, segs[i][1], segs[i + 1][2]]
+    return [*[list(seg) for seg in segs[:i]], merged, *[list(seg) for seg in segs[i + 2 :]]]
+
+
 def apply_timing_corrections(timing_rows, corrections_dir=CORRECTIONS_DIR):
     """Apply narrow typed verdicts that cannot be inferred from row topology."""
     by_key = {
@@ -1294,6 +1332,10 @@ def apply_timing_corrections(timing_rows, corrections_dir=CORRECTIONS_DIR):
                 if op == "one_utterance":
                     by_key[key] = apply_one_utterance(
                         by_key[key], [int(p) for p in edit.get("positions") or []]
+                    )
+                elif op == "merge_same_position_pair":
+                    by_key[key] = merge_same_position_pair(
+                        by_key[key], int(edit["position"])
                     )
                 else:
                     raise ValueError(f"unknown op {op!r}")
@@ -1371,7 +1413,11 @@ def apply_timing_repairs(timing_rows, word_counts, clock_offsets=None, durations
                 current = json.loads(pre_raw) if isinstance(pre_raw, str) else pre_raw
                 try:
                     merged = sanitize_timing_row(
-                        apply_boundary_repair(current, translate_segments(segs, offset))
+                        apply_boundary_repair(
+                            current,
+                            translate_segments(segs, offset),
+                            edit.get("occurrence"),
+                        )
                     )
                     if merged is None:
                         raise ValueError("clock translation collapses segment starts")
@@ -1584,6 +1630,23 @@ def normalize_timing_row(
     if any(seg[1] < 0 or seg[2] <= seg[1] for seg in row):
         return None
     return row
+
+
+def preserve_complete_repeat_topology(segs, n_words, onset_ms, duration_ms):
+    """Keep a complete source re-say when only its final tail exceeds the MP3.
+
+    Quran-align has one monotonic occurrence per word, so falling back to it
+    would erase an audible multi-word re-say. A source row that already names
+    every canonical word can stay on its own clock: normalization clips only
+    its final fade to the measured recording. Incomplete sources stay on the
+    reference path, because inserting missing words can change topology.
+    """
+    if not (
+        _covers_all_words(segs, n_words)
+        and multi_position_span_repeat(segs)
+    ):
+        return None
+    return normalize_timing_row(segs, onset_ms, duration_ms)
 
 
 def finalize_timing_rows(
@@ -2107,6 +2170,7 @@ def main():
     alignment_references = {}
     timing_clock_offsets = {}
     file_clock_rows = set()
+    singleton_gap_candidates = {}
     audio_durations = load_audio_durations()
     audio_onsets = load_audio_onsets()
     if args.skip_timings:
@@ -2133,6 +2197,7 @@ def main():
                     "noncontiguous_orphans": 0, "gap_phantoms": 0,
                     "clock_rebased": 0,
                     "clock_abstained": 0, "quran_align_fallback": 0,
+                    "repeat_tail_clamped": 0,
                 }
 
                 def adjust_qdc(key, n):
@@ -2144,6 +2209,14 @@ def main():
                     row_key = (rid, key[0], key[1])
                     reference = reciter_alignment.get(row_key)
                     duration = audio_durations.get(row_key)
+                    if reference is None and not _covers_all_words(cleaned, n):
+                        rescue_stats = {name: 0 for name in stats}
+                        rescued = adjust_qdc_segments(
+                            data.get(key), n, rescue_stats,
+                            recover_singleton_gap=True,
+                        )
+                        if _covers_all_words(rescued, n) and fits_audio(rescued, duration):
+                            singleton_gap_candidates[row_key] = rescued
                     rebased, offset = rebase_qdc_clock(cleaned, reference, duration)
                     if offset is not None:
                         file_clock_rows.add(row_key)
@@ -2153,6 +2226,21 @@ def main():
                         return rebased
                     if cleaned and reference:
                         stats["clock_abstained"] += 1
+                    if reference and not fits_audio(cleaned, duration):
+                        preserved_repeat = preserve_complete_repeat_topology(
+                            cleaned,
+                            n,
+                            audio_onsets.get(row_key),
+                            duration,
+                        )
+                        if preserved_repeat:
+                            # The source contains the complete repeated phrase;
+                            # only its final fade ran past the file. Retain the
+                            # real topology instead of replacing the ayah with
+                            # monotonic timings.
+                            stats["repeat_tail_clamped"] += 1
+                            file_clock_rows.add(row_key)
+                            return preserved_repeat
                     if (
                         reference
                         and not fits_audio(cleaned, duration)
@@ -2184,7 +2272,8 @@ def main():
                     f"gap phantoms {stats.get('gap_phantoms', 0)}, "
                     f"clock-rebased {stats['clock_rebased']}, "
                     f"clock-abstained {stats['clock_abstained']}, "
-                    f"quran-align fallback {stats['quran_align_fallback']}"
+                    f"quran-align fallback {stats['quran_align_fallback']}, "
+                    f"repeat tails clamped {stats['repeat_tail_clamped']}"
                 )
             else:
                 if not reciter_alignment:
@@ -2225,6 +2314,23 @@ def main():
         timing_rows, reciter_rows = apply_timing_overrides(
             timing_rows, reciter_rows, word_counts, word_text, alignment_references
         )
+
+        # A qdc singleton-gap rescue is a last resort: use it only when no
+        # independently aligned or CTC-repaired row completed this ayah.
+        rescued = 0
+        if singleton_gap_candidates:
+            recovered_rows = []
+            for rid, sid, ay, segs in timing_rows:
+                key = (rid, sid, ay)
+                current = json.loads(segs) if isinstance(segs, str) else segs
+                candidate = singleton_gap_candidates.get(key)
+                if candidate and not _covers_all_words(current, word_counts[(sid, ay)]):
+                    segs = json.dumps(candidate, separators=(",", ":"))
+                    rescued += 1
+                recovered_rows.append((rid, sid, ay, segs))
+            timing_rows = recovered_rows
+        if rescued:
+            print(f"[coverage] recovered {rescued} singleton-gap qdc row(s)")
 
         if audio_durations:
             timing_rows, refitted = refit_displaced_rows(

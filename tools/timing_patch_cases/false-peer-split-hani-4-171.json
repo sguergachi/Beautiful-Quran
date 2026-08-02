@@ -1,0 +1,9 @@
+{
+  "id": "false-peer-split-hani-4-171",
+  "label": "Hani 4:171 word 39 ear-verified false peer split",
+  "refs": ["CTC repair unsplit", "ear review"],
+  "pipeline": "timing_correction",
+  "correction_position": 39,
+  "input_segments": [[38, 36840, 38190], [39, 38190, 40290], [39, 40290, 41890], [40, 41890, 42580]],
+  "expected_segments": [[38, 36840, 38190], [39, 38190, 41890], [40, 41890, 42580]]
+}

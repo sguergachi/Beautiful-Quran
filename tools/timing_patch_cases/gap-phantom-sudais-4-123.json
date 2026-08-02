@@ -1,0 +1,16 @@
+{
+  "id": "gap-phantom-sudais-4-123",
+  "label": "Sudais 4:123 singleton backtrack owns skipped word 9",
+  "refs": ["everyayah audio ear/ASR check"],
+  "pipeline": "clean_qdc_artifacts",
+  "recover_singleton_gap": true,
+  "notes": "qdc labels the interval after word 8 as word 5, then resumes at word 10. The exact streamed MP3 is a one-pass recitation, so the singleton is the missing word 9, not a repeat of word 5.",
+  "input_positions": [
+    1, 2, 3, 4, 5, 6, 7, 8, 5, 10, 11, 10, 11,
+    12, 13, 14, 15, 16, 17, 18, 19, 20
+  ],
+  "expected_positions": [
+    1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 10, 11,
+    12, 13, 14, 15, 16, 17, 18, 19, 20
+  ]
+}

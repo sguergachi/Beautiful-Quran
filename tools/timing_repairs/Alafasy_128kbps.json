@@ -40888,6 +40888,25 @@
      15865
     ]
    ]
+  },
+  {
+   "reciterId": 1,
+   "reciterSlug": "Alafasy_128kbps",
+   "surahId": 6,
+   "ayah": 61,
+   "kind": "boundary",
+   "occurrence": 15,
+   "refs": [
+    "independent MMS phoneme witness",
+    "quran-align fixed-sequence witness"
+   ],
+   "segments": [
+    [
+     8,
+     18220,
+     20415
+    ]
+   ]
   }
  ]
 }

@@ -150,7 +150,8 @@ so they are explicit `one_utterance` operations under
 
 The Lab boundary clock is then applied surgically with `kind: "boundary"`
 repair entries. Such entries contain only the uniquely occurring positions
-they replace; `apply_boundary_repair` cannot alter the rest of the ayah.
+they replace; a repeated position additionally names its 1-based `occurrence`.
+`apply_boundary_repair` cannot alter the rest of the ayah.
 
 ## Trusting a qdc span-repeat CTC collapsed (issue #533)
 

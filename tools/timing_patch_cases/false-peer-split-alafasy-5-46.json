@@ -1,0 +1,9 @@
+{
+  "id": "false-peer-split-alafasy-5-46",
+  "label": "Alafasy 5:46 word 17 ear-verified false peer split",
+  "refs": ["CTC repair unsplit", "ear review"],
+  "pipeline": "timing_correction",
+  "correction_position": 17,
+  "input_segments": [[16, 17975, 18350], [17, 18350, 19350], [17, 19350, 20780], [18, 20780, 22765]],
+  "expected_segments": [[16, 17975, 18350], [17, 18350, 20780], [18, 20780, 22765]]
+}

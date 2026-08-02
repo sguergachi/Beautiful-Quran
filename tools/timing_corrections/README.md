@@ -12,6 +12,9 @@ Supported operations:
 
 - `one_utterance`: collapse one verified `A,B,A,B` aligner loop to a single
   utterance while preserving the first `A` and final `B` boundaries.
+- `merge_same_position_pair`: collapse one verified adjacent `A,A` false split
+  while preserving its first onset and final end. This is only for a verdict
+  that distinguishes a split from a genuine same-word re-say.
 
 Every entry carries evidence provenance. The build fails if its expected source
 shape no longer exists, so a pinned-source refresh cannot silently retain a

@@ -34,8 +34,10 @@ from build_db import (  # noqa: E402
     finalize_timing_rows,
     load_audio_durations,
     load_audio_onsets,
+    merge_same_position_pair,
     normalize_text,
     offset_for_audio_onset,
+    preserve_complete_repeat_topology,
     preserve_peer_repeats,
     recover_negative_opening,
     refit_displaced_rows,
@@ -53,6 +55,7 @@ PIPELINES = frozenset(
         "boundary_repair",
         "clean_qdc_artifacts",
         "clock_shifted_repair",
+        "complete_repeat_topology",
         "erases_span_repeat",
         "leading_silence_offset",
         "preserve_peer_repeats",
@@ -146,7 +149,9 @@ def run_pipeline(case, segs):
             "noncontiguous_orphans": 0,
             "gap_phantoms": 0,
         }
-        return clean_qdc_artifacts(segs, stats)
+        return clean_qdc_artifacts(
+            segs, stats, case.get("recover_singleton_gap", False)
+        )
     if pipeline == "recover_negative_opening":
         recovered, _ = recover_negative_opening(segs)
         return recovered
@@ -164,12 +169,20 @@ def run_pipeline(case, segs):
         n_words = case.get("n_words") or max(p for p, _, _ in segs)
         return adjust_qdc_segments(segs, n_words, stats)
     if pipeline == "boundary_repair":
-        return apply_boundary_repair(segs, resolve_repair(case))
+        return apply_boundary_repair(segs, resolve_repair(case), case.get("occurrence"))
     if pipeline == "clock_shifted_repair":
         offset = case.get("clock_offset_ms")
         if offset is None:
             raise SystemExit(f"{case.get('_path')}: need clock_offset_ms")
         return apply_clocked_timing_repair(segs, resolve_repair(case), offset)
+    if pipeline == "complete_repeat_topology":
+        n_words = case.get("n_words")
+        duration = case.get("audio_duration_ms")
+        if n_words is None or duration is None:
+            raise SystemExit(f"{case.get('_path')}: need n_words and audio_duration_ms")
+        return preserve_complete_repeat_topology(
+            segs, n_words, case.get("audio_onset_ms"), duration
+        )
     if pipeline == "erases_span_repeat":
         repair = resolve_repair(case)
         got = erases_span_repeat(segs, repair)
@@ -187,6 +200,9 @@ def run_pipeline(case, segs):
             raise SystemExit(f"{case.get('_path')}: need audio_onset_ms")
         return offset_for_audio_onset(segs, onset)
     if pipeline == "timing_correction":
+        position = case.get("correction_position")
+        if position is not None:
+            return merge_same_position_pair(segs, position)
         positions = case.get("correction_positions")
         if positions is None:
             raise SystemExit(f"{case.get('_path')}: need correction_positions")
@@ -260,15 +276,25 @@ def check_audio_onset_pipeline():
         pass
 
     # An MPEG1 Layer III 128 kbps 44.1 kHz stereo frame carrying a Xing count.
+    # A valid header must be followed by its next frame: ID3/payload bytes can
+    # otherwise happen to look like an MPEG header and invent a huge duration.
+    def frame(payload=b""):
+        result = bytearray(417)  # floor(144 * 128000 / 44100)
+        result[:4] = b"\xff\xfb\x90\x00"
+        result[4:4 + len(payload)] = payload
+        return bytes(result)
+
     xing = (
         b"ID3\x04\x00\x00\x00\x00\x00\x0a" + b"\x00" * 10
-        + b"\xff\xfb\x90\x00" + b"\x00" * 32
-        + b"Xing" + (1).to_bytes(4, "big") + (100).to_bytes(4, "big")
+        + frame(b"\x00" * 32 + b"Xing" + (1).to_bytes(4, "big") + (100).to_bytes(4, "big"))
+        + frame()
     )
     # 100 frames x 1152 samples at 44.1 kHz, not the 128 kbps the name implies.
     parser &= onset_detector.duration_ms(xing, 999_999) == 2_612
-    cbr = b"\xff\xfb\x90\x00" + b"\x00" * 64
+    cbr = frame() + frame()
     parser &= onset_detector.duration_ms(cbr, 160_000) == 10_000
+    fake_header = b"\xff\xfb\x90\x00" + b"\x00" * 496 + cbr
+    parser &= onset_detector.duration_ms(fake_header, 160_500) == 10_000
 
     with (
         patch.object(
@@ -292,6 +318,10 @@ def check_audio_onset_pipeline():
 
     with tempfile.TemporaryDirectory() as temp_dir:
         evidence = Path(temp_dir)
+        (evidence / "Hani_Rifai_192kbps_005109.mp3").write_bytes(cbr)
+        parser &= onset_detector.measure_local_duration(
+            evidence, "Hani_Rifai_192kbps", (5, 109)
+        ) == onset_detector.duration_ms(cbr, len(cbr))
         (evidence / "test.json").write_text(json.dumps({
             "reciterId": 1,
             "reciterSlug": "Alafasy_128kbps",
@@ -473,18 +503,44 @@ def audit_bundled_db():
         (4, 4, 88): 5_968,
         (7, 5, 109): 6_636,
     }
-    exact &= {
-        (s, a) for rid, s, a in timings if rid == 7
-    } == set(counts)
-    exact &= set(counts) - {
-        (s, a) for rid, s, a in timings if rid == 1
-    } == {(37, 152)}
+    # A withheld row is an intentional whole-ayah fallback only when neither
+    # source can describe the streamed recording safely. Pin every reciter's
+    # known exceptions so an accidental coverage loss cannot hide in the
+    # broad per-reciter coverage threshold.
+    expected_withheld = {
+        1: {(37, 152)},
+        2: set(),
+        3: set(),
+        4: set(),
+        5: {
+            (2, 25), (2, 198), (2, 223), (7, 5),
+            (13, 37), (73, 4),
+        },
+        6: {(12, 50), (12, 75), (12, 76), (91, 15)},
+        7: set(),
+    }
+    exact &= all(
+        set(counts) - {(s, a) for rid_, s, a in timings if rid_ == rid}
+        == withheld
+        for rid, withheld in expected_withheld.items()
+    )
     for key, subsequence in {
         (7, 9, 33): [13, 9, 10, 14],
         (7, 22, 55): [15, 7, 8, 16],
         (7, 44, 22): [6, 1, 2, 3],
         (7, 74, 52): [7, 4, 8],
         (7, 4, 4): [12, 12],
+        # Complete QDC rows retain an audible phrase re-say even when only
+        # their final source fade needed clipping to the exact MP3 duration.
+        (4, 18, 16): [
+            *range(1, 15), *range(7, 15), *range(15, 20),
+        ],
+        (1, 6, 61): [
+            *range(1, 15), *range(8, 15), *range(15, 18),
+        ],
+        # This incomplete QDC row omits canonical word 23. Interpolating it
+        # would alter the repeat order, so the monotonic witness must remain.
+        (3, 7, 155): list(range(1, 42)),
     }.items():
         positions = order(timings[key])
         exact &= any(

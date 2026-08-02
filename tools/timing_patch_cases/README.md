@@ -32,6 +32,8 @@ Agents landing a GitHub `Timings patch` issue must follow the full checklist in
      `tools/timing_corrections/`
    - repeat-vs-split / CTC disagreement → `tools/timing_repairs/` generator
    - whole-ayah encoded lead-in → `tools/detect_audio_onsets.py`
+   - complete phrase re-say whose last fade alone overruns the file →
+     `complete_repeat_topology`
    - incomplete or physically impossible row → `finalize_timing_rows`
 3. **Add a case here** whose `input_*` is the broken shape and `expected_*` is
    the corrected shape (from the Lab patch, ASR/ear, or the intended clean
@@ -60,16 +62,19 @@ a case under this directory.
 |---|---|---|
 | `id` | yes | stable slug; should match the filename stem |
 | `label` | yes | one-line human name (shown on failure) |
-| `pipeline` | yes | `clean_qdc_artifacts`, `timing_correction`, `preserve_peer_repeats`, `erases_span_repeat`, `rebase_timing_repair`, `clock_shifted_repair`, `qdc_clock_rebase`, `boundary_repair`, `leading_silence_offset`, `recover_negative_opening`, or `adjust_qdc_segments` |
+| `pipeline` | yes | `clean_qdc_artifacts`, `timing_correction`, `preserve_peer_repeats`, `erases_span_repeat`, `rebase_timing_repair`, `clock_shifted_repair`, `complete_repeat_topology`, `qdc_clock_rebase`, `boundary_repair`, `leading_silence_offset`, `recover_negative_opening`, or `adjust_qdc_segments` |
 | `input_positions` | * | 1-based word indices in time order (synthetic equal durations) |
 | `expected_positions` | * | positions after the pipeline step |
 | `input_segments` | * | full `[[pos, start_ms, end_ms], …]` when times matter |
 | `expected_segments` | * | full segments after the step (compared when present) |
+| `recover_singleton_gap` | for `clean_qdc_artifacts` | opt into the last-resort singleton-gap coverage candidate |
 | `repair_positions` / `repair_segments` | for repair pipelines | candidate repair row |
+| `occurrence` | for `boundary_repair` | 1-based repeated occurrence to replace without changing its peer |
 | `clock_offset_ms` | for `clock_shifted_repair` | source-to-MP3 translation applied before merge |
 | `expected_erases` | for `erases_span_repeat` | bool — must the guard refuse this repair? |
 | `correction_positions` | for `timing_correction` | positions named by the typed operation |
 | `audio_onset_ms` | for `leading_silence_offset` | measured first sustained voice onset |
+| `n_words` | for `complete_repeat_topology` | canonical word count; source must cover it completely |
 | `exact_file_clock` | no | false when word 2 proves the complete row predates voice |
 | `reference_segments` | for `qdc_clock_rebase` | quran-align boundaries on the everyayah MP3 clock |
 | `audio_duration_ms` | no | measured recording length; a translation past it is refused |

@@ -1,0 +1,15 @@
+{
+  "schema": 1,
+  "reciter": "Hani_Rifai_192kbps",
+  "edits": [
+    {
+      "reciterId": 7,
+      "surahId": 4,
+      "ayah": 171,
+      "op": "merge_same_position_pair",
+      "position": 39,
+      "evidence": ["ear", "CTC"],
+      "refs": ["CTC repair unsplit", "tools/timing_patch_cases/false-peer-split-hani-4-171.json"]
+    }
+  ]
+}
