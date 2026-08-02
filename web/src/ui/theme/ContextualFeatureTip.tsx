@@ -56,7 +56,7 @@ export function ContextualFeatureTip({
   dismissPaperColor = 'var(--reader-paper, #faf3e8)',
   dismissInkColor = 'var(--reader-ink, #1c1b18)',
   onRenderedChange,
-  guideWidthFraction = 0.72,
+  guideWidthFraction = 0.42,
   guideHeightPx = 188,
   contentPadding = { start: 18, end: 32 },
 }: Props) {
@@ -140,32 +140,35 @@ export function ContextualFeatureTip({
     actionCenter != null
       ? coercePoint(actionCenter, surface)
       : tipActionCenter(placement, spotlight, surface)
-  // Leading-edge anchor: between the solid body reservoir and the spotlight,
-  // where the progressive veil feathers — DESIGN.md "type settles into that feather".
+  // Leading-edge anchor on the progressive feather (toward the spotlight) —
+  // DESIGN.md: parchment type settles partly into that veil. Keep the shader
+  // reservoir at the default bodyDistanceFraction (0.78).
   const leadingEdge = tipBodyCenter(
     {
       ...placement,
-      bodyDistanceFraction: 0.52,
+      bodyDistanceFraction: 0.4,
     },
     spotlight,
     surface,
   )
   const laneWidth = Math.min(
     surface.width * Math.min(1, Math.max(0.25, guideWidthFraction)),
-    22 * 16,
+    18 * 16,
   )
   const laneHeight = Math.min(guideHeightPx, surface.height || guideHeightPx)
-  // Park the lesson box on the leading edge; keep type on the spotlight-facing
-  // side of the lane (Android CenterStart for left spotlight; mirror for right).
+  // Seat the lesson at the leading edge; type faces the spotlight.
   const spotlightOnLeft = spotlightSide === 'left'
   const laneLeft = spotlightOnLeft
     ? Math.min(
         Math.max(0, leadingEdge.x - contentPadding.start),
         Math.max(0, surface.width - laneWidth),
       )
-    : Math.min(
-        Math.max(0, leadingEdge.x - laneWidth + contentPadding.end),
-        Math.max(0, surface.width - laneWidth),
+    : Math.max(
+        0,
+        Math.min(
+          leadingEdge.x - laneWidth + contentPadding.end,
+          surface.width - laneWidth,
+        ),
       )
   const laneTop = Math.min(
     Math.max(0, bodyCenter.y - laneHeight / 2),
@@ -215,7 +218,7 @@ export function ContextualFeatureTip({
         style={{
           left: laneLeft,
           top: laneTop,
-          width: laneWidth,
+          maxWidth: laneWidth,
           height: laneHeight,
           paddingLeft: contentPadding.start,
           paddingRight: contentPadding.end,
