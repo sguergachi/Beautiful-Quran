@@ -21,4 +21,11 @@ describe('vellumShader', () => {
     expect(VELLUM_FRAG).toContain('u_actionCenter')
     expect(VELLUM_FRAG).toContain('gl_FragColor')
   })
+
+  it('uses a precision-safe hash and multi-octave grain, not sin-lattice noise', () => {
+    expect(VELLUM_FRAG).toContain('fbm')
+    expect(VELLUM_FRAG).toContain('0.1031')
+    expect(VELLUM_FRAG).not.toContain('43758.5453')
+    expect(VELLUM_FRAG).toContain('highp')
+  })
 })

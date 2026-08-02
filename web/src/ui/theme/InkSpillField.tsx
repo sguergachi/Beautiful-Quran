@@ -97,6 +97,7 @@ function createProgram(canvas: HTMLCanvasElement): GlProgram | null {
   gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA)
   const names = [
     'u_resolution',
+    'u_dpr',
     'u_spotlight',
     'u_bodyCenter',
     'u_actionCenter',
@@ -225,17 +226,18 @@ export function InkSpillField({
       y: spotlight.y - body.y,
     })
     const rgb = parseRgb(color)
-    // Uniforms are in CSS pixels; fragCoord is scaled via resolution.
-    gl.uniform2f(locs.u_resolution!, pw, ph)
-    gl.uniform2f(locs.u_spotlight!, spotlight.x * dpr, spotlight.y * dpr)
-    gl.uniform2f(locs.u_bodyCenter!, body.x * dpr, body.y * dpr)
-    gl.uniform2f(locs.u_actionCenter!, action.x * dpr, action.y * dpr)
+    // Geometry + noise in CSS pixels; dpr only for framebuffer sampling.
+    gl.uniform2f(locs.u_resolution!, width, height)
+    gl.uniform1f(locs.u_dpr!, dpr)
+    gl.uniform2f(locs.u_spotlight!, spotlight.x, spotlight.y)
+    gl.uniform2f(locs.u_bodyCenter!, body.x, body.y)
+    gl.uniform2f(locs.u_actionCenter!, action.x, action.y)
     gl.uniform1f(locs.u_progress!, progress)
     gl.uniform2f(locs.u_flow!, flow.x, flow.y)
     gl.uniform1f(locs.u_bodyEdge!, VELLUM_TUNING.bodyEdge)
     gl.uniform1f(locs.u_featherWidth!, VELLUM_TUNING.featherWidth)
     gl.uniform1f(locs.u_fadeSoftness!, VELLUM_TUNING.fadeSoftness)
-    gl.uniform1f(locs.u_blurRadius!, VELLUM_TUNING.blurRadiusPx * dpr)
+    gl.uniform1f(locs.u_blurRadius!, VELLUM_TUNING.blurRadiusPx)
     gl.uniform1f(locs.u_blurStrength!, VELLUM_TUNING.blurStrength)
     gl.uniform1f(locs.u_vellumGrain!, VELLUM_TUNING.vellumGrain)
     gl.uniform1f(locs.u_verticalTaper!, VELLUM_TUNING.verticalTaper)
