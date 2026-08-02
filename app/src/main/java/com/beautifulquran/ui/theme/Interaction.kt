@@ -14,6 +14,9 @@ import androidx.compose.ui.node.ModifierNodeElement
 import androidx.compose.ui.node.PointerInputModifierNode
 import androidx.compose.ui.platform.InspectorInfo
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.IntSize
 
 /**
@@ -84,6 +87,42 @@ fun Modifier.absorbPointerEventsWhere(
         } while (event.changes.any { it.pressed })
     }
 }
+
+/**
+ * A quiet action that owns its touch before shared siblings can consume it.
+ * Contextual surfaces use this for controls drawn over otherwise live paper.
+ */
+fun Modifier.ownedQuietClickable(
+    role: Role? = null,
+    onClick: () -> Unit,
+): Modifier =
+    semantics {
+        role?.let { this.role = it }
+        onClick {
+            onClick()
+            true
+        }
+    }.pointerInput(onClick) {
+        awaitEachGesture {
+            val down = awaitFirstDown(
+                requireUnconsumed = false,
+                pass = PointerEventPass.Initial,
+            )
+            down.consume()
+            var inside = true
+            var released = false
+            do {
+                val event = awaitPointerEvent(PointerEventPass.Initial)
+                val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                inside = inside &&
+                    change.position.x in 0f..size.width.toFloat() &&
+                    change.position.y in 0f..size.height.toFloat()
+                change.consume()
+                released = !change.pressed
+            } while (change.pressed)
+            if (released && inside) onClick()
+        }
+    }
 
 /** Keeps lower paper siblings on the hit path beneath a contextual surface. */
 fun Modifier.sharePointerInputWithSiblings(): Modifier = this then SharedPointerElement

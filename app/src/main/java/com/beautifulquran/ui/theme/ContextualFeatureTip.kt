@@ -178,7 +178,7 @@ fun ContextualFeatureTip(
                 }
                 .clip(RoundedCornerShape(50))
                 .background(buttonPaper)
-                .quietClickable(role = Role.Button) { dismissLatest.value() }
+                .ownedQuietClickable(role = Role.Button) { dismissLatest.value() }
                 .padding(horizontal = 22.dp, vertical = 10.dp),
         ) {
             Text(
