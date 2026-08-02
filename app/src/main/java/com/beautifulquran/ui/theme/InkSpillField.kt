@@ -272,7 +272,10 @@ private const val VellumFieldFunctions = """
     }
 
     float vellumCoverage(float density) {
-        return pow(density, max(0.7, fadeSoftness * 0.58));
+        float wash = pow(density, max(0.7, fadeSoftness * 0.58));
+        // A second translucent glaze adds pigment depth without moving the
+        // diffusion contour or hardening its paper-side tail.
+        return 1.0 - pow(1.0 - wash, 1.18);
     }
 """
 
@@ -311,6 +314,10 @@ private const val VellumFieldShader = """
             0.0,
             1.0
         );
+        float2 uv = fragCoord / resolution;
+        float fromSource = direction > 0.0 ? uv.x : 1.0 - uv.x;
+        float sourcePool = smoother(clamp((0.5 - fromSource) / 0.5, 0.0, 1.0));
+        coverage = 1.0 - pow(1.0 - coverage, 1.0 + 0.75 * sourcePool);
         half alpha = inkColor.a * half(coverage * progress);
         return half4(inkColor.rgb * alpha, alpha);
     }
