@@ -45,6 +45,7 @@ import com.beautifulquran.playback.PlayerUiState
 fun PlayerBar(
     state: PlayerUiState,
     isThisSurahLoaded: Boolean,
+    enabled: Boolean,
     chromeAlpha: () -> Float,
     reciterName: String,
     onPlayPause: () -> Unit,
@@ -64,6 +65,7 @@ fun PlayerBar(
         ) {
             TextButton(
                 onClick = onReciterClick,
+                enabled = enabled,
                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 2.dp),
                 modifier = Modifier.graphicsLayer { alpha = chromeAlpha() },
             ) {
@@ -94,6 +96,7 @@ fun PlayerBar(
                 val singleAyahRange = state.repeatRange?.let { it.first == it.last } == true
                 IconButton(
                     onClick = onRepeatClick,
+                    enabled = enabled,
                     modifier = Modifier
                         .size(48.dp)
                         .graphicsLayer { alpha = chromeAlpha() },
@@ -114,7 +117,7 @@ fun PlayerBar(
                 }
                 IconButton(
                     onClick = onFastBackward,
-                    enabled = isThisSurahLoaded,
+                    enabled = enabled && isThisSurahLoaded,
                     modifier = Modifier.size(48.dp),
                 ) {
                     Icon(
@@ -123,7 +126,11 @@ fun PlayerBar(
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                IconButton(onClick = onPlayPause, modifier = Modifier.size(56.dp)) {
+                IconButton(
+                    onClick = onPlayPause,
+                    enabled = enabled,
+                    modifier = Modifier.size(56.dp),
+                ) {
                     if (state.isBuffering && isThisSurahLoaded) {
                         CircularProgressIndicator(
                             modifier = Modifier.size(24.dp),
@@ -145,7 +152,7 @@ fun PlayerBar(
                 }
                 IconButton(
                     onClick = onFastForward,
-                    enabled = isThisSurahLoaded,
+                    enabled = enabled && isThisSurahLoaded,
                     modifier = Modifier.size(48.dp),
                 ) {
                     Icon(
@@ -156,6 +163,7 @@ fun PlayerBar(
                 }
                 TextButton(
                     onClick = onSpeed,
+                    enabled = enabled,
                     contentPadding = PaddingValues(0.dp),
                     modifier = Modifier
                         .size(48.dp)
