@@ -148,6 +148,10 @@ import kotlinx.coroutines.flow.StateFlow
 private fun Int.toArabicIndic(): String =
     toString().map { '٠' + (it - '0') }.joinToString("")
 
+/** Ornate ayah brackets follow the surrounding line's writing direction. */
+internal fun formatAyahNumberMark(number: Int, useArabicIndicDigits: Boolean): String =
+    if (useArabicIndicDigits) "﴿${number.toArabicIndic()}﴾" else "﴾$number﴿"
+
 private fun wordFadeAlpha(progress: Float): Float {
     val resting = InkEngine.State.Upcoming.inkAlpha()
     return resting + (InkEngine.State.Active.inkAlpha() - resting) * progress.coerceIn(0f, 1f)
@@ -1526,6 +1530,7 @@ private fun ResponsiveEnglishAyah(
     markAlpha: () -> Float,
     fontScale: Float,
     searchQuery: String?,
+    hideParentheticals: Boolean,
     flashWordPosition: Int?,
     searchHitWash: RepeatWash,
     keepActiveWordInView: Boolean,
@@ -1549,15 +1554,32 @@ private fun ResponsiveEnglishAyah(
     )
     var layoutResult by remember { mutableStateOf<TextLayoutResult?>(null) }
     val hitSlopPx = with(LocalDensity.current) { 8.dp.toPx() }
-    val punctuatedGlosses = remember(ayah) {
-        EnglishTypography.punctuate(ayah.words.map { it.translation })
+    val lyricGlosses = remember(ayah, hideParentheticals) {
+        EnglishTypography.lyricize(
+            glosses = ayah.words.map { it.translation },
+            arabicWords = ayah.words.map { it.arabic },
+            hideParentheticals = hideParentheticals,
+        )
     }
 
-    val rendered = remember(ayah, palette.fullInkColor, gold, searchQuery, fontScale) {
+    val rendered = remember(
+        ayah,
+        palette.fullInkColor,
+        gold,
+        searchQuery,
+        fontScale,
+        lyricGlosses,
+    ) {
         val ranges = ArrayList<IntRange>(ayah.words.size)
         var markRange = 0..-1
         val text = buildAnnotatedString {
             ayah.words.forEachIndexed { index, word ->
+                val gloss = lyricGlosses[index]
+                if (gloss.isEmpty()) {
+                    ranges += IntRange.EMPTY
+                    return@forEachIndexed
+                }
+                if (length > 0) append(" ")
                 val start = length
                 withStyle(
                     SpanStyle(
@@ -1571,11 +1593,11 @@ private fun ResponsiveEnglishAyah(
                         },
                     ),
                 ) {
-                    append(punctuatedGlosses[index])
+                    append(gloss)
                 }
                 ranges += start until length
-                append(" ")
             }
+            if (length > 0) append(" ")
             val markStart = length
             withStyle(
                 SpanStyle(
@@ -1586,9 +1608,7 @@ private fun ResponsiveEnglishAyah(
                     fontSize = 17.sp * fontScale,
                 ),
             ) {
-                append("﴿")
-                append(ayah.number.toString())
-                append("﴾")
+                append(formatAyahNumberMark(ayah.number, useArabicIndicDigits = false))
             }
             markRange = markStart until length
         }
@@ -1762,9 +1782,7 @@ private fun ResponsiveHafsAyah(
                     fontSize = fontSize * AYAH_MARK_SIZE_RATIO,
                 ),
             ) {
-                append("﴿")
-                append(ayah.number.toArabicIndic())
-                append("﴾")
+                append(formatAyahNumberMark(ayah.number, useArabicIndicDigits = true))
             }
             markRange = markStart until length
         }
@@ -1838,7 +1856,7 @@ fun AyahNumberMark(
 ) {
     val accents = LocalQuranAccents.current
     Text(
-        text = "﴿${if (useArabicIndicDigits) number.toArabicIndic() else number.toString()}﴾",
+        text = formatAyahNumberMark(number, useArabicIndicDigits),
         fontFamily = HafsFontFamily,
         fontSize = 20.sp * fontScale,
         color = accents.gold,
@@ -2165,6 +2183,7 @@ fun AyahBlock(
     showGloss: Boolean,
     showTransliteration: Boolean,
     showTranslation: Boolean,
+    hideEnglishParentheticals: Boolean = false,
     searchQuery: String? = null,
     /** 1-based word to orange-flash (home search hit); null = no flash. */
     flashWordPosition: Int? = null,
@@ -2185,6 +2204,8 @@ fun AyahBlock(
     bookmarkChromeAlpha: () -> Float = { 1f },
     bookmarkInteractive: Boolean = true,
     onToggleBookmark: (() -> Boolean)? = null,
+    /** Reports the live ribbon's screen position to a contextual reader overlay. */
+    onBookmarkRibbonPositioned: ((LayoutCoordinates) -> Unit)? = null,
     /**
      * 1-based gather ordinal drawn in the outer margin (gold Arabic-Indic).
      * Non-null only while gather mode has this verse selected.
@@ -2420,6 +2441,7 @@ fun AyahBlock(
                     markAlpha = { ayahMarkAlpha.value },
                     fontScale = fontScale,
                     searchQuery = searchQuery,
+                    hideParentheticals = hideEnglishParentheticals,
                     flashWordPosition = flashWordPosition,
                     searchHitWash = searchHitWash,
                     keepActiveWordInView = keepActiveWordInView,
@@ -2579,7 +2601,14 @@ fun AyahBlock(
                                 AbsoluteAlignment.TopLeft
                             },
                         )
-                        .fillMaxHeight(),
+                        .fillMaxHeight()
+                        .then(
+                            if (onBookmarkRibbonPositioned != null) {
+                                Modifier.onGloballyPositioned(onBookmarkRibbonPositioned)
+                            } else {
+                                Modifier
+                            },
+                        ),
                 )
             }
         }

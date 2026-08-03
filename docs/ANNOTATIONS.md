@@ -76,6 +76,24 @@ an exposed saved ribbon opens the verse's note. The same 44 dp target serves
 both gestures without adding a second margin glyph; a retracted unsaved tip
 does not accept note entry.
 
+On a reader's first bookmark, the ayah glides onto the reading line and briefly
+becomes its own contextual lesson. Royal green enters from the paper edge
+opposite the new ruby ribbon, owns that entire half of the physical screen from
+top to bottom, then tapers toward the ribbon through one continuous per-pixel
+wash: dark wet shoulder, long translucent tail, and restrained paper
+absorption. A parchment geometric hold mark pulses on the live ribbon, and
+a compact theme-paper “Got it” clearing at the thumb-reachable bottom
+withdraws the bleed and returns the verse. A vertical drag on the untouched
+ribbon half dismisses the lesson and scrolls normally. Holding the spotlighted
+ribbon opens the note editor and dismisses the lesson, while a short tap cannot
+unmark it mid-instruction. The reader remains in place beneath this single paper
+surface; this is neither an overlay sheet nor a floating callout. See
+`ContextualFeatureTip`.
+
+This lesson is currently developer-gated and off by default. Settings →
+Developer → **Contextual feature guides** enables it for testing;
+**Replay bookmark guide** explicitly rearms it for the next bookmark added.
+
 **Arrival** *(not yet built)*. A note that has just been written should fade in
 word by word with the lyric fade — the ink literally arriving on the page. A
 note already on the page when the verse scrolls into view is simply there; the
@@ -151,7 +169,12 @@ already the app's answer to "what did I mark".
 - A bookmarked verse that also carries a note shows the note as one italic
   line beneath its translation, truncated to two lines, on the index's inner
   40 dp/px spine.
-- Tapping the entry returns to the verse in the reader, as it does today.
+- Tapping the note edits it in place. A bookmark without writing carries a
+  quiet *Add note* action in its ayah line; holding its exposed ribbon opens
+  the same editor. The field is the same chromeless caret-on-paper interaction
+  as the reader and commits on focus loss, Done, or leaving the sheet. Blank
+  text removes the note without removing the bookmark.
+- Tapping the verse copy still returns to the verse in the reader.
 
 *Not yet built:* Index search does not match note text (only reference,
 chapter name, and verse text).

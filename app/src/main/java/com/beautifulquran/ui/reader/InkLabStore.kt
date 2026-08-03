@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.SharedPreferences
 import androidx.core.content.edit
 import com.beautifulquran.domain.TajweedPacing
+import com.beautifulquran.ui.theme.ContextualGuideTuning
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
@@ -68,17 +69,24 @@ data class InkLabSnapshot(
     val sweepEaseX2: Float = 0.7f,
     val sweepEaseY2: Float = 0.78f,
     val tajweedPacing: Boolean = true,
-    val pacedFeather: Float = 1.1857f,
+    val pacedFeather: Float = 1.1092f,
     val holdMadd: Boolean = true,
     val holdGhunnah: Boolean = true,
     val holdWaqf: Boolean = true,
     val holdConnect: Boolean = true,
-    val waslPrefixMs: Int = 480,
+    val waslPrefixMs: Int = 120,
     val waslHandoff: Float = TajweedPacing.DEFAULT_WASL_HANDOFF,
-    val cruiseCap: Float = 2f,
+    val cruiseCap: Float = 1.4185f,
     val waqfShare: Float = 0.5932f,
     val waqfLengthScale: Float = 1f,
-    val holdCreep: Float = 0.1076f,
+    val holdCreep: Float = 0.3f,
+    val guideBodyEdge: Float = 0.5f,
+    val guideFeatherWidth: Float = 0.2819f,
+    val guideFadeSoftness: Float = 1.3329f,
+    val guideBlurRadiusDp: Float = 24f,
+    val guideBlurStrength: Float = 1f,
+    val guideVellumGrain: Float = 0.0297f,
+    val guideVerticalTaper: Float = 0.24f,
     val highlightLeadMs: Int = InkEngine.DEFAULT_HIGHLIGHT_LEAD_MS,
     val fadeLeadMs: Int = InkEngine.DEFAULT_FADE_LEAD_MS,
     /** Null means auto route preset; omitted on old saves → null. */
@@ -117,6 +125,16 @@ data class InkLabSnapshot(
         holdCreep = holdCreep,
     )
 
+    fun toContextualGuideTuning(): ContextualGuideTuning = ContextualGuideTuning(
+        bodyEdge = guideBodyEdge,
+        featherWidth = guideFeatherWidth,
+        fadeSoftness = guideFadeSoftness,
+        blurRadiusDp = guideBlurRadiusDp,
+        blurStrength = guideBlurStrength,
+        vellumGrain = guideVellumGrain,
+        verticalTaper = guideVerticalTaper,
+    )
+
     companion object {
         const val SCHEMA = 1
 
@@ -127,6 +145,7 @@ data class InkLabSnapshot(
 
         fun capture(
             tuning: InkEngine.Tuning = InkEngine.tuning,
+            guide: ContextualGuideTuning = InkEngine.contextualGuideTuning,
             highlightLeadMs: Int = InkEngine.highlightLeadMs,
             fadeLeadMs: Int = InkEngine.fadeLeadMs,
             outputLatencyOverrideMs: Int? = InkEngine.outputLatencyOverrideMs,
@@ -161,6 +180,13 @@ data class InkLabSnapshot(
             waqfShare = tuning.waqfShare,
             waqfLengthScale = tuning.waqfLengthScale,
             holdCreep = tuning.holdCreep,
+            guideBodyEdge = guide.bodyEdge,
+            guideFeatherWidth = guide.featherWidth,
+            guideFadeSoftness = guide.fadeSoftness,
+            guideBlurRadiusDp = guide.blurRadiusDp,
+            guideBlurStrength = guide.blurStrength,
+            guideVellumGrain = guide.vellumGrain,
+            guideVerticalTaper = guide.verticalTaper,
             highlightLeadMs = highlightLeadMs,
             fadeLeadMs = fadeLeadMs,
             outputLatencyOverrideMs = outputLatencyOverrideMs,

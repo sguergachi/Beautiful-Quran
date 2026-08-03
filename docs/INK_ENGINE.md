@@ -536,8 +536,13 @@ repeat timings, **Repeat ink** strength, the fresh-ink **Glitter time**,
 **Glint tint**, **Halo strength**, and **Halo blur** controls, wash feather,
 and the experimental tajweed hold (see
 [TAJWEED_PACING.md](TAJWEED_PACING.md)). There are enough knobs now that the
-panel is split into **Ink / Sweep / Repeat / Tajweed** tabs — quiet ink names
-with a hairline under the live one, no tab-bar chrome. The bottom action row
+panel is split into **Ink / Sweep / Repeat / Tajweed / Guide / Sync** tabs —
+quiet ink names with a hairline under the live one, no tab-bar chrome. Guide
+exposes the contextual lesson's body edge, feather width, fade softness,
+progressive-blur radius/strength, vellum grain, and vertical taper. Each guide
+supplies a spotlight plus a body angle/distance; the GPU field keeps that
+lesson contour independent from a localized contour behind the untouched-paper
+action. The bottom action row
 holds **Reset**, **Copy values**, and a session-only **Focus** freeze
 (`InkEngine.focusEngineEnabled`) that parks playback auto-home and word-band
 follow so the page can be panned while auditioning ink; it is not part of
@@ -546,8 +551,9 @@ persist on device via `InkLabStore` across process restarts so multi-session
 auditioning keeps the last dial positions; **Reset** clears the store and
 restores shipped defaults (so future default changes apply cleanly). Focus
 is never persisted. **Copy values** still puts a paste-ready
-`InkEngine.Tuning(…)` constructor on the clipboard (and Logcat tag `InkLab`)
-so a tuned feel can be transcribed into the defaults in InkEngine.kt. Every
+`InkEngine.Tuning(…)` constructor plus the contextual guide profile on the
+clipboard (and Logcat tag `InkLab`) so tuned values can be promoted into their
+shipped defaults. Every
 slider uses a **log track** (equal thumb travel ≈ equal ratios when the range
 starts above zero; more precision near the floor when it includes zero) so
 small values stay fine-grained while large ends stay reachable. Slider

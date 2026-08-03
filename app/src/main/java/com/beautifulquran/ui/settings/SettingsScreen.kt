@@ -454,6 +454,7 @@ private fun DeveloperSection(
     var sounds by remember { mutableStateOf<PageTurnSounds?>(null) }
     var presetsOpen by remember { mutableStateOf(false) }
     var pasteText by remember { mutableStateOf("") }
+    var educationRearmed by remember { mutableStateOf(false) }
     DisposableEffect(Unit) {
         onDispose { sounds?.release() }
     }
@@ -461,6 +462,46 @@ private fun DeveloperSection(
     SectionLabel("Developer")
     Spacer(Modifier.height(2.dp))
     Caption("Tools for testing work in progress.")
+
+    Spacer(Modifier.height(20.dp))
+    ToggleRow(
+        label = "Contextual feature guides",
+        checked = settings.educationGuidesEnabled,
+        onChange = { enabled ->
+            if (enabled) {
+                viewModel.settings.rearmEducation()
+                educationRearmed = true
+            } else {
+                educationRearmed = false
+            }
+            viewModel.settings.update { it.copy(educationGuidesEnabled = enabled) }
+        },
+        checkParams = checkParams,
+        checkPaintToken = checkPaintToken,
+    )
+    Caption("Off by default. Guides appear only after their matching gesture.")
+
+    Spacer(Modifier.height(12.dp))
+    Text(
+        text = "Replay feature guides",
+        style = MaterialTheme.typography.bodyLarge,
+        modifier = Modifier
+            .fillMaxWidth()
+            .quietClickable {
+                viewModel.settings.rearmEducation()
+                viewModel.settings.update { it.copy(educationGuidesEnabled = true) }
+                educationRearmed = true
+            }
+            .padding(vertical = 6.dp),
+        color = MaterialTheme.colorScheme.primary,
+    )
+    Caption(
+        if (educationRearmed) {
+            "Ready — open a chapter or add a new bookmark."
+        } else {
+            "Rearms each lesson for its next matching moment."
+        },
+    )
 
     if (BuildConfig.DEBUG && Build.VERSION.SDK_INT >= 35) {
         Spacer(Modifier.height(20.dp))
@@ -515,6 +556,16 @@ private fun DeveloperSection(
         checkPaintToken = checkPaintToken,
     )
     Caption("Live sliders over the reader's highlight tuning. Numbers persist until Reset.")
+
+    Spacer(Modifier.height(20.dp))
+    ToggleRow(
+        label = "Hide bracketed English",
+        checked = settings.hideEnglishParentheticals,
+        onChange = { on -> viewModel.settings.update { it.copy(hideEnglishParentheticals = on) } },
+        checkParams = checkParams,
+        checkPaintToken = checkPaintToken,
+    )
+    Caption("English-only reading hides text in parentheses or square brackets, including the brackets.")
 
     Spacer(Modifier.height(20.dp))
     Text(

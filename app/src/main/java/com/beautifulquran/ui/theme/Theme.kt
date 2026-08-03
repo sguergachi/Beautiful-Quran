@@ -251,6 +251,9 @@ fun contrastingOverlayColorScheme(themeMode: ThemeMode): ColorScheme = when (the
     else -> RoyalGreenColors
 }
 
+/** Fixed royal-green ink surface for contextual teaching blooms. */
+fun royalGreenOverlayColorScheme(): ColorScheme = RoyalGreenColors
+
 /** These contrasting overlays are always a dark surface, so their gold/orange
  * accents use the dark set regardless of the user's theme — the reader's own
  * accents are tuned for a light page and wash out on this green/night surface. */

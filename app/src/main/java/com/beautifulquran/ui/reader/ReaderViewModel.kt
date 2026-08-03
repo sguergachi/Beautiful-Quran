@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.media3.common.Player
 import com.beautifulquran.data.BookmarkRepository
 import com.beautifulquran.data.AnnotationRepository
+import com.beautifulquran.data.EducationMoment
 import com.beautifulquran.data.QuranRepository
 import com.beautifulquran.data.SettingsRepository
 import com.beautifulquran.data.model.Reciter
@@ -106,6 +107,12 @@ internal data class PollingIdentity<K : Any>(
     val sampleKey: K,
     /** Cancels a sleeping paused poll so resume samples immediately. */
     val isPlaying: Boolean,
+)
+
+/** Result of a ribbon tap; animation and contextual education have separate owners. */
+data class BookmarkToggleResult(
+    val bookmarked: Boolean,
+    val showNoteTip: Boolean = false,
 )
 
 internal fun <K : Any> pollingIdentity(
@@ -564,13 +571,32 @@ class ReaderViewModel(
 
     fun segmentsFor(ayah: Int): List<Segment>? = timings[ayah]
 
-    /** Marks or unmarks [ayah] in the loaded surah. Returns `true` when the
-     * verse is now bookmarked, so the ribbon runs the unfurl animation only on
-     * an add (never on a remove). */
-    fun toggleBookmark(ayah: Int): Boolean {
-        val surah = surahId.takeIf { it != 0 } ?: return false
-        return bookmarks.toggle(surah, ayah)
+    /** Marks or unmarks [ayah], and identifies a mark that should teach notes. */
+    fun toggleBookmark(ayah: Int): BookmarkToggleResult {
+        val surah = surahId.takeIf { it != 0 } ?: return BookmarkToggleResult(false)
+        val nowBookmarked = bookmarks.toggle(surah, ayah)
+        val currentSettings = settings.settings.value
+        return BookmarkToggleResult(
+            bookmarked = nowBookmarked,
+            showNoteTip = nowBookmarked &&
+                currentSettings.developerModeEnabled &&
+                currentSettings.educationGuidesEnabled &&
+                currentSettings.annotationsEnabled &&
+                !settings.isEducationDismissed(EducationMoment.BOOKMARK_NOTE),
+        )
     }
+
+    fun dismissBookmarkNoteTip() = settings.dismissEducation(EducationMoment.BOOKMARK_NOTE)
+
+    /** Whether a settled chapter opening should teach its live ayah rail. */
+    fun shouldShowAyahRailTip(): Boolean {
+        val current = settings.settings.value
+        return current.developerModeEnabled &&
+            current.educationGuidesEnabled &&
+            !settings.isEducationDismissed(EducationMoment.AYAH_RAIL)
+    }
+
+    fun dismissAyahRailTip() = settings.dismissEducation(EducationMoment.AYAH_RAIL)
 
     /** Writes (or, on blank [text], clears) the reader's note on a verse. The
      * surah is passed in rather than read from the loaded chapter so a draft

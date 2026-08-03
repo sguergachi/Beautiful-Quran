@@ -30,3 +30,16 @@ describe('gapless5Playback setting', () => {
     ).toBe(true)
   })
 })
+
+describe('educationGuidesEnabled setting', () => {
+  it('defaults off and coerces to boolean', () => {
+    expect(normalizeSettings().educationGuidesEnabled).toBe(false)
+    expect(
+      normalizeSettings({ educationGuidesEnabled: true }).educationGuidesEnabled,
+    ).toBe(true)
+    expect(
+      normalizeSettings({ educationGuidesEnabled: 1 as unknown as boolean })
+        .educationGuidesEnabled,
+    ).toBe(true)
+  })
+})

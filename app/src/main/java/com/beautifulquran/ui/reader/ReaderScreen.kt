@@ -127,6 +127,7 @@ import com.beautifulquran.ui.theme.IslamicReturnToAyahButton
 import com.beautifulquran.ui.theme.InkRevealOverlay
 import com.beautifulquran.ui.theme.absorbPointerEvents
 import com.beautifulquran.ui.theme.contrastingOverlayColorScheme
+import com.beautifulquran.ui.theme.contextualGuideProgressiveBlur
 import com.beautifulquran.ui.theme.verticalFadingEdges
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
@@ -246,6 +247,14 @@ fun ReaderScreen(
     var editingAnnotationSurah by rememberSaveable { mutableStateOf(0) }
     var editingAnnotationAyah by rememberSaveable { mutableStateOf(0) }
     var editingAnnotationText by rememberSaveable { mutableStateOf("") }
+    var bookmarkNoteTipSurah by rememberSaveable { mutableIntStateOf(0) }
+    var bookmarkNoteTipAyah by rememberSaveable { mutableIntStateOf(0) }
+    var bookmarkNoteTipOpen by rememberSaveable { mutableStateOf(false) }
+    var bookmarkNoteTipRendered by remember { mutableStateOf(false) }
+    var bookmarkNoteTipRibbonCenterY by remember { mutableFloatStateOf(Float.NaN) }
+    var ayahRailTipOpen by rememberSaveable { mutableStateOf(false) }
+    var ayahRailTipRendered by remember { mutableStateOf(false) }
+    var ayahRailTipCenterY by remember { mutableFloatStateOf(Float.NaN) }
     /**
      * Commits the open draft and closes the editor. Called when the field loses
      * focus, *before* opening another verse's note (so a draft is never carried
@@ -282,8 +291,21 @@ fun ReaderScreen(
         if (!imeVisible && editingAnnotationAyah != 0) focusManager.clearFocus()
     }
     val listDragged by listState.interactionSource.collectIsDraggedAsState()
-    LaunchedEffect(listDragged, editingAnnotationAyah) {
+    LaunchedEffect(
+        listDragged,
+        editingAnnotationAyah,
+        bookmarkNoteTipOpen,
+        ayahRailTipOpen,
+    ) {
         if (listDragged && editingAnnotationAyah != 0) focusManager.clearFocus()
+        if (listDragged && bookmarkNoteTipOpen) {
+            viewModel.dismissBookmarkNoteTip()
+            bookmarkNoteTipOpen = false
+        }
+        if (listDragged && ayahRailTipOpen) {
+            viewModel.dismissAyahRailTip()
+            ayahRailTipOpen = false
+        }
     }
     // Gilding sheen: light catches the header rosette as the page moves.
     // At chapter end (scrolled) sheen is bright (~0.85); cold open at the top
@@ -329,6 +351,15 @@ fun ReaderScreen(
     /** True while the repeat bleed is still on screen (including close wash). */
     var repeatRendered by remember { mutableStateOf(false) }
     var retainedRepeatChoice by rememberSaveable { mutableStateOf<RepeatChoice?>(null) }
+    val bookmarkNoteTipVisible = bookmarkNoteTipOpen &&
+        bookmarkNoteTipSurah != 0 && bookmarkNoteTipAyah != 0
+    val ayahRailTipVisible = ayahRailTipOpen && ayahRailTipCenterY.isFinite()
+    LaunchedEffect(settings.developerModeEnabled, settings.educationGuidesEnabled) {
+        if (!settings.developerModeEnabled || !settings.educationGuidesEnabled) {
+            bookmarkNoteTipOpen = false
+            ayahRailTipOpen = false
+        }
+    }
     val haptics = LocalHapticFeedback.current
     val onRootReturnUserMovedLatest = rememberUpdatedState(onRootReturnUserMoved)
     // Continuous next-chapter advance: fly the opening from footer → header.
@@ -607,8 +638,19 @@ fun ReaderScreen(
     // Union of reader-owned ink surfaces. Report open *and* still-rendered so
     // MainActivity keeps stackGesturesBlocked through the close wash (same
     // pattern as ShareHost + shareSendRendered).
-    LaunchedEffect(showRepeatDialog, repeatRendered) {
-        onInkOverlayVisibilityChangeLatest.value(showRepeatDialog || repeatRendered)
+    LaunchedEffect(
+        showRepeatDialog,
+        repeatRendered,
+        bookmarkNoteTipVisible,
+        bookmarkNoteTipRendered,
+        ayahRailTipVisible,
+        ayahRailTipRendered,
+    ) {
+        onInkOverlayVisibilityChangeLatest.value(
+            showRepeatDialog || repeatRendered ||
+                bookmarkNoteTipVisible || bookmarkNoteTipRendered ||
+                ayahRailTipVisible || ayahRailTipRendered,
+        )
     }
     DisposableEffect(Unit) {
         onDispose { onInkOverlayVisibilityChangeLatest.value(false) }
@@ -616,6 +658,14 @@ fun ReaderScreen(
     // System Back must dismiss the bleed, not pop the paper stack beneath it
     // (MainActivity's stack BackHandlers fire otherwise — see overlay backs there).
     BackHandler(enabled = showRepeatDialog) { showRepeatDialog = false }
+    BackHandler(enabled = bookmarkNoteTipVisible) {
+        viewModel.dismissBookmarkNoteTip()
+        bookmarkNoteTipOpen = false
+    }
+    BackHandler(enabled = ayahRailTipVisible) {
+        viewModel.dismissAyahRailTip()
+        ayahRailTipOpen = false
+    }
 
     // Reading by hand pauses the follow mode via pointerInput.
 
@@ -796,6 +846,26 @@ fun ReaderScreen(
         }
     }
 
+    // Offer the rail lesson only as a chapter settles. Enabling the developer
+    // gate over an already-open reader waits for the next chapter opening.
+    LaunchedEffect(
+        uiState.content?.surah?.id,
+        initialFocusSettled,
+        ayahRailTipCenterY,
+        chapterAdvancing,
+        verseRevealForSurah,
+    ) {
+        if (!initialFocusSettled || !ayahRailTipCenterY.isFinite() ||
+            chapterAdvancing || verseRevealForSurah != 0 || recitingActive
+        ) {
+            return@LaunchedEffect
+        }
+        delay(320)
+        if (viewModel.shouldShowAyahRailTip() && !bookmarkNoteTipOpen) {
+            ayahRailTipOpen = true
+        }
+    }
+
     // Verse focus alone is not enough for a paused long ayah: its adaptive
     // anchor deliberately shows line one, while the held word may be many
     // screens lower. On initial open, foreground resume, and display reflow,
@@ -876,6 +946,7 @@ fun ReaderScreen(
         settings.showWordGloss,
         settings.showTransliteration,
         settings.showTranslation,
+        settings.hideEnglishParentheticals,
         settings.fontScale,
     )
     var lastLayoutSignature by remember { mutableStateOf(layoutSignature) }
@@ -938,6 +1009,24 @@ fun ReaderScreen(
     val searchFocus = remember { FocusRequester() }
     LaunchedEffect(search.active) {
         if (search.active) searchFocus.requestFocus() else keyboard?.hide()
+    }
+    val bookmarkTipSide = if (settings.ayahSelectorSide == AyahSelectorSide.RIGHT) {
+        AyahSelectorSide.LEFT
+    } else {
+        AyahSelectorSide.RIGHT
+    }
+    val bookmarkTipHasTarget = bookmarkNoteTipRibbonCenterY.isFinite()
+    val bookmarkGuidePresent = (bookmarkNoteTipVisible || bookmarkNoteTipRendered) &&
+        bookmarkTipHasTarget
+    val railGuidePresent = (ayahRailTipVisible || ayahRailTipRendered) &&
+        ayahRailTipCenterY.isFinite()
+    val contextualGuideVisible =
+        (bookmarkNoteTipVisible && bookmarkTipHasTarget) || ayahRailTipVisible
+    val contextualGuideRendered = bookmarkGuidePresent || railGuidePresent
+    val contextualGuideTargetSide = if (bookmarkGuidePresent) {
+        bookmarkTipSide
+    } else {
+        settings.ayahSelectorSide
     }
     Box(Modifier.fillMaxSize()) {
     Scaffold(
@@ -1977,8 +2066,25 @@ fun ReaderScreen(
                                 derivedStateOf { scrolledAyah.value == ayah.number }
                             }
                             val bookmarked = ayah.number in bookmarkedAyahs
+                            val bookmarkLessonTarget = bookmarkNoteTipOpen &&
+                                bookmarkNoteTipSurah == ayah.surahId &&
+                                bookmarkNoteTipAyah == ayah.number
+                            val ribbonBookmarked = bookmarked || bookmarkLessonTarget
                             Box(
-                                Modifier.graphicsLayer {
+                                Modifier.contextualGuideProgressiveBlur(
+                                    enabled = settings.developerModeEnabled &&
+                                        settings.educationGuidesEnabled &&
+                                        contextualGuideRendered,
+                                    visible = contextualGuideVisible,
+                                    rendered = contextualGuideRendered,
+                                    flow = if (
+                                        contextualGuideTargetSide == AyahSelectorSide.LEFT
+                                    ) {
+                                        Offset(-1f, 0f)
+                                    } else {
+                                        Offset(1f, 0f)
+                                    },
+                                ) {
                                     translationY = verseRevealY
                                     alpha = verseFadeAlpha
                                 },
@@ -1999,6 +2105,7 @@ fun ReaderScreen(
                                 showGloss = settings.showWordGloss,
                                 showTransliteration = settings.showTransliteration,
                                 showTranslation = settings.showTranslation,
+                                hideEnglishParentheticals = settings.hideEnglishParentheticals,
                                 searchQuery = activeQuery,
                                 flashWordPosition = searchFlashWord
                                     ?.takeIf { searchFlashAyah == ayah.number },
@@ -2020,11 +2127,14 @@ fun ReaderScreen(
                                 onKeepWordInView = onKeepWordInView,
                                 onKeepAnnotationInView = onKeepAnnotationInView,
                                 bookmarkSide = bookmarkSide,
-                                bookmarked = bookmarked,
+                                // The repository update is synchronous, but the
+                                // collected projection can arrive one frame after
+                                // the lesson. Keep its live anchor ruby meanwhile.
+                                bookmarked = ribbonBookmarked,
                                 bookmarkFocused = bookmarkFocused,
                                 bookmarkChromeAlpha = bookmarkChromeAlpha,
-                                // Gather mode and open note editors both own taps /
-                                // the margin; disable the ribbon while either is live.
+                                // Keep the lesson target live so its taught hold
+                                // can be completed without leaving the paper.
                                 bookmarkInteractive = !recitingActive &&
                                     !gathering &&
                                     editingAnnotationAyah == 0,
@@ -2033,7 +2143,36 @@ fun ReaderScreen(
                                 onToggleBookmark = if (gathering) {
                                     null
                                 } else {
-                                    { viewModel.toggleBookmark(ayah.number) }
+                                    bookmarkToggle@{
+                                        if (bookmarkLessonTarget) return@bookmarkToggle true
+                                        val result = viewModel.toggleBookmark(ayah.number)
+                                        if (result.showNoteTip) {
+                                            if (ayahRailTipOpen) {
+                                                viewModel.dismissAyahRailTip()
+                                                ayahRailTipOpen = false
+                                            }
+                                            bookmarkNoteTipRibbonCenterY = Float.NaN
+                                            bookmarkNoteTipSurah = ayah.surahId
+                                            bookmarkNoteTipAyah = ayah.number
+                                            scope.launch {
+                                                focusController.focus(ayah.number, animate = true)
+                                                bookmarkNoteTipOpen = true
+                                            }
+                                        }
+                                        result.bookmarked
+                                    }
+                                },
+                                onBookmarkRibbonPositioned = if (
+                                    bookmarkNoteTipSurah == ayah.surahId &&
+                                    bookmarkNoteTipAyah == ayah.number
+                                ) {
+                                    { coordinates ->
+                                        bookmarkNoteTipRibbonCenterY =
+                                            coordinates.positionInRoot().y +
+                                            coordinates.size.height / 2f
+                                    }
+                                } else {
+                                    null
                                 },
                                 gatherOrdinal = if (gathering) {
                                     gatherOrdinal(ayah.surahId, ayah.number)
@@ -2106,12 +2245,16 @@ fun ReaderScreen(
                                     if (editingAnnotationAyah == ayah.number) commitOpenAnnotation()
                                 },
                                 onEditAnnotation = if (
-                                    gathering || !bookmarked || !settings.annotationsEnabled
+                                    gathering || !ribbonBookmarked || !settings.annotationsEnabled
                                 ) {
                                     null
                                 } else {
                                     {
                                         haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                        if (bookmarkLessonTarget) {
+                                            viewModel.dismissBookmarkNoteTip()
+                                            bookmarkNoteTipOpen = false
+                                        }
                                         commitOpenAnnotation()
                                         editingAnnotationText =
                                             annotationsForSurah.value[ayah.number] ?: ""
@@ -2253,7 +2396,14 @@ fun ReaderScreen(
                             ),
                         )
                     },
-                    onExpandedChange = { ayahSelectorExpanded = it },
+                    onExpandedChange = { expanded ->
+                        ayahSelectorExpanded = expanded
+                        if (expanded && ayahRailTipOpen) {
+                            viewModel.dismissAyahRailTip()
+                            ayahRailTipOpen = false
+                        }
+                    },
+                    onCollapsedCenterY = { centerY -> ayahRailTipCenterY = centerY },
                     dismissRequests = ayahSelectorDismissRequests,
                     modifier = Modifier
                         .align(
@@ -2294,17 +2444,6 @@ fun ReaderScreen(
                 }
             }
 
-            // Developer-mode Ink Lab: live sliders bound to InkEngine.tuning,
-            // floated over the page so the highlight feel can be tuned while
-            // a recitation plays behind it. See docs/INK_ENGINE.md.
-            if (settings.developerModeEnabled && settings.inkLabEnabled) {
-                InkLabPanel(
-                    modifier = Modifier
-                        .align(Alignment.BottomEnd)
-                        .padding(end = 10.dp, bottom = 10.dp)
-                        .zIndex(1.4f),
-                )
-            }
         }
     }
 
@@ -2318,6 +2457,53 @@ fun ReaderScreen(
                     .height(statusBarTop)
                     .background(MaterialTheme.colorScheme.background)
                     .zIndex(1.5f),
+            )
+        }
+
+        AyahRailTip(
+            visible = ayahRailTipVisible,
+            railSide = settings.ayahSelectorSide,
+            targetCenterY = with(density) { ayahRailTipCenterY.toDp() },
+            onDismiss = {
+                viewModel.dismissAyahRailTip()
+                ayahRailTipOpen = false
+            },
+            onRenderedChange = { ayahRailTipRendered = it },
+            modifier = Modifier
+                .fillMaxSize()
+                .zIndex(1.7f),
+        )
+
+        BookmarkNoteTip(
+            visible = bookmarkNoteTipVisible && bookmarkNoteTipRibbonCenterY.isFinite(),
+            ribbonSide = bookmarkTipSide,
+            targetCenterY = with(density) { bookmarkNoteTipRibbonCenterY.toDp() },
+            onDismiss = {
+                viewModel.dismissBookmarkNoteTip()
+                bookmarkNoteTipOpen = false
+            },
+            onRenderedChange = { rendered ->
+                bookmarkNoteTipRendered = rendered
+                if (!rendered && !bookmarkNoteTipOpen) {
+                    bookmarkNoteTipSurah = 0
+                    bookmarkNoteTipAyah = 0
+                    bookmarkNoteTipRibbonCenterY = Float.NaN
+                }
+            },
+            modifier = Modifier
+                .fillMaxSize()
+                .zIndex(1.7f),
+        )
+
+        // Keep developer controls above the guide so its shader can be tuned
+        // in place; full reader ink overlays still cover the lab at z=1.8.
+        if (settings.developerModeEnabled && settings.inkLabEnabled) {
+            InkLabPanel(
+                guideActive = bookmarkNoteTipVisible || ayahRailTipVisible,
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(end = 10.dp, bottom = 10.dp)
+                    .zIndex(1.75f),
             )
         }
 

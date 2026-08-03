@@ -38,6 +38,78 @@ Hard rules:
 - **Taps have no ripple.** Touch feedback is the content's own motion
   (a word lighting, a page turning), never Material ink splash.
 
+### Contextual teaching
+
+Feature education stays with the feature it explains. It never takes the full
+screen, floats in a card, or dims the whole sheet. The feature's own mark stays
+visible; unused paper away from it becomes a clean royal-green vellum field.
+This is an **inverse paper spotlight**: pigment covers the area
+being defocused while a soft clear window remains around the live feature;
+it is never a dark scrim or whole-screen opacity change. A short lesson
+takes the quiet reading space beside that window. One simple geometric leader
+connects lesson to mark, typography does the rest, and one quiet text action
+dismisses it. `ContextualFeatureTip` is the shared primitive. Its placement is
+not limited to four screen edges: the caller supplies the spotlight point plus
+an angle and a fractional distance along the ray to the first paper edge.
+That ray locates the lesson body in unused space and becomes the shader, blur,
+and interaction axis. Cardinal directions are ordinary parameter values;
+diagonal compositions use the same rendering path.
+
+The first use is the bookmark-note gesture. After the first ribbon unfurls,
+the reader first glides that ayah onto its reading line. **Royal green then
+bleeds in from the paper edge opposite the ribbon**, holds solid across half
+the physical screen from top to bottom, then tapers toward the ruby cloth as a
+continuous progressive wash. The selected **02 progressive vellum** study is
+the target: a stable pigment body runs into a broad nonlinear alpha veil while
+the live scripture remains readable through that transition. One unbounded
+diffusion profile replaces separate body and feather boundaries, so there is
+no iso-opacity ridge to read as an edge. Paper fibres vary pigment absorption,
+and a restrained reservoir gathers behind the lesson copy. Android 13+
+draws the independently tapered pigment contours in one runtime-shader pass,
+then records each visible ayah into its own GPU layer and crossfades it into a
+softly blurred version only through the feather; Android 11–12 keeps a smooth
+gradient fallback.
+The effect never captures the virtualized list as one layer, so the real verse
+and ruby ribbon remain present beneath the translucent veil. Low-amplitude,
+domain-warped pigment pooling, fibre absorption, and paper tooth continue from
+the body through the transition, becoming most legible in the translucent wash,
+with no visible slices, bands, scallops, or drawn contour. The ribbon remains
+fully exposed on its own side. Parchment type settles partly into that feather: “Add a note —
+Press and hold this ribbon,” while a compact area preserved from the spill
+uses the reader theme's own paper color as its dismissal button at the
+thumb-reachable bottom of the teaching side. An independent soft pigment
+contour sits behind that paper cutout without changing the lesson reservoir or
+moving its target-relative typography. It never draws a ring or separate
+container around the action. Dismissal withdraws the
+bleed and returns the ayah in place; no other verse or chrome leaves the reader.
+Low-contrast rings breathe around the live ribbon itself—no target dot,
+pointer glyph, or competing accent—and never sits at the bleed's feather.
+The body-side half-plane absorbs gestures; the spotlight-side half-plane stays
+attached to the feature below. For the bookmark lesson, a vertical drag there
+dismisses the lesson and continues scrolling the paper. Holding the live ribbon
+opens its note editor and completes the lesson; a short tap cannot accidentally
+remove the bookmark while the lesson is teaching that hold.
+
+The ayah rail is the second use. On the first settled chapter opening, its live
+collapsed stack stays clear at the selected edge while the same vellum occupies
+the unused opposite paper. “Find any ayah — Press and drag this rail” sits
+across from the spotlight. Dragging the real rail both dismisses the
+lesson and blooms the existing scrub wheel; an ordinary page drag, Back, or
+**Got it** also puts the lesson away. It never opens over active recitation,
+chapter-flight motion, or before the initial reading position has settled.
+
+The guide system remains disabled by default while this language is being
+refined. Settings → Developer → **Contextual feature guides** enables and
+rearms every lesson for its next eligible moment. **Replay feature guides**
+provides an explicit reset while also enabling the gate; lessons then appear
+on the next chapter opening or newly added bookmark. Neither control touches
+bookmarks or notes, and leaving developer mode disables guide presentation
+again.
+The ten visual studies and selected 02 target live in
+`docs/design-studies/contextual-guide/`.
+Implementation rules and the required live-target verification checklist live
+in [CONTEXTUAL_GUIDES.md](CONTEXTUAL_GUIDES.md).
+
 > **Fixed 2026-07-24: the repeat picker.** It used to be the one live violation
 > of the two rules above — a stock `androidx.compose.ui.window.Dialog` with a
 > `Surface`, `RadioButton`s and `TextButton`s. It is now
@@ -779,8 +851,10 @@ shows only its ayah number. The small ruby strip beside a result opens an
 inline Keep / Remove confirmation in that ayah line's fixed-height space before
 changing the mark, so the page does not jump. Keep is green, Remove is quiet
 ink, ayah numbers are gold, and ruby remains exclusive to the physical ribbon.
-Tapping the verse returns to it in the reader. The long Chapters ribbon is
-navigation only and never retracts when tapped.
+An empty ayah line offers a quiet green *Add note* action; existing italic note
+text edits in place when tapped, and holding the exposed ribbon opens the same
+chromeless editor. Tapping the verse copy returns to it in the reader. The long
+Chapters ribbon is navigation only and never retracts when tapped.
 
 ## Reading modes
 

@@ -1,7 +1,7 @@
 {
   "name": "beautiful-quran-web",
   "private": true,
-  "version": "0.6.0",
+  "version": "0.7.0",
   "type": "module",
   "scripts": {
     "postinstall": "cp node_modules/sql.js/dist/sql-wasm.wasm public/sql-wasm.wasm && cp node_modules/sql.js/dist/sql-wasm-browser.wasm public/sql-wasm-browser.wasm",

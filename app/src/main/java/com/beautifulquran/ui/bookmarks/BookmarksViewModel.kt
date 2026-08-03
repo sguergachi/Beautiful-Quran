@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.beautifulquran.data.BookmarkRepository
 import com.beautifulquran.data.AnnotationRepository
 import com.beautifulquran.data.QuranRepository
+import com.beautifulquran.data.SettingsRepository
 import com.beautifulquran.data.model.BookmarkedAyah
 import com.beautifulquran.data.model.Surah
 import com.beautifulquran.domain.normalizeArabicForSearch
@@ -28,6 +29,7 @@ data class BookmarksUiState(
     val sections: List<BookmarkSection> = emptyList(),
     /** Annotation text keyed by "surahId:ayah" for quick lookup in the index. */
     val annotations: Map<String, String> = emptyMap(),
+    val annotationsEnabled: Boolean = true,
     val loading: Boolean = true,
 )
 
@@ -89,6 +91,7 @@ class BookmarksViewModel(
     private val repository: QuranRepository,
     private val bookmarks: BookmarkRepository,
     private val annotations: AnnotationRepository,
+    private val settings: SettingsRepository,
 ) : ViewModel() {
 
     private val query = MutableStateFlow("")
@@ -105,12 +108,22 @@ class BookmarksViewModel(
             bookmarks.bookmarks.value.size,
         )
 
-    val uiState = combine(query, resolved, annotations.annotations) { search, (saved, ayahs), written ->
+    val uiState = combine(
+        query,
+        resolved,
+        annotations.annotations,
+        settings.settings,
+    ) { search, (saved, ayahs), written, preferences ->
         BookmarksUiState(
             query = search,
             totalCount = saved.size,
             sections = bookmarkSections(ayahs, search),
-            annotations = written.associate { "${it.surahId}:${it.ayah}" to it.text },
+            annotations = if (preferences.annotationsEnabled) {
+                written.associate { "${it.surahId}:${it.ayah}" to it.text }
+            } else {
+                emptyMap()
+            },
+            annotationsEnabled = preferences.annotationsEnabled,
             loading = false,
         )
     }.stateIn(
@@ -125,5 +138,9 @@ class BookmarksViewModel(
 
     fun removeBookmark(surahId: Int, ayah: Int) {
         if (bookmarks.isBookmarked(surahId, ayah)) bookmarks.toggle(surahId, ayah)
+    }
+
+    fun writeAnnotation(surahId: Int, ayah: Int, text: String) {
+        if (settings.settings.value.annotationsEnabled) annotations.write(surahId, ayah, text)
     }
 }
