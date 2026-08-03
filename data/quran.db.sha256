@@ -7,5 +7,5 @@
 # Regenerated the database? Change BOTH lines below:
 #   1. bump `version` and QuranDatabase.DB_FILE_NAME together (quran-vN -> vN+1)
 #   2. record the new digest: sha256sum data/quran.db
-version=quran-v41.db
-sha256=f0719591106f4b804f2e294515fae4c64cbcfa01fe63e6da164e3ef836643d17
+version=quran-v42.db
+sha256=861f75f7f3131b66eb9dc01c2a371a30f4a2b378642e707c4be00097ba995fc8

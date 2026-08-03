@@ -1248,10 +1248,9 @@ def refit_displaced_rows(timing_rows, durations, onsets, eligible_rows=None):
 
     A row whose marks run off the end may simply sit at the wrong offset —
     quran-align occasionally places an ayah seconds into a file that opens on
-    the voice. Pulling it back to the measured onset (or to the start, which
-    the absent onset evidence puts within `MIN_OFFSET_MS`) makes every word
-    reachable again. Rows already sitting on their onset do not move, so a row
-    that merely trails a little past the end keeps its correct opening.
+    the voice. Pulling it back to a *measured* onset makes every word reachable
+    again. Rows without onset evidence are deliberately left alone: absence is
+    unknown, not evidence that their audio begins at zero.
     """
     out = []
     refitted = []
@@ -1259,7 +1258,8 @@ def refit_displaced_rows(timing_rows, durations, onsets, eligible_rows=None):
         key = (rid, sid, ay)
         row = json.loads(segs) if isinstance(segs, str) else segs
         duration = durations.get(key)
-        shift = onsets.get(key, 0) - row[0][1] if row else 0
+        onset = onsets.get(key)
+        shift = onset - row[0][1] if row and onset is not None else 0
         if (
             (eligible_rows is not None and key not in eligible_rows)
             or fits_audio(row, duration)
@@ -1299,6 +1299,32 @@ def apply_one_utterance(segs, positions):
     ]
 
 
+def merge_same_position_pair(segs, position, requires_audio_verdict=False):
+    """Merge one acoustically-vetted adjacent duplicate occurrence.
+
+    Equal positions can be a real re-say, so source topology alone is never
+    enough. The correction file must explicitly declare its audio verdict.
+    """
+    matches = [
+        i
+        for i in range(len(segs) - 1)
+        if segs[i][0] == position == segs[i + 1][0]
+    ]
+    if len(matches) != 1:
+        raise ValueError(
+            f"merge_same_position_pair expected one duplicate {position}, "
+            f"found {len(matches)}"
+        )
+    if not requires_audio_verdict:
+        raise ValueError("merge_same_position_pair requires an audio verdict")
+    i = matches[0]
+    return [
+        *[list(seg) for seg in segs[:i]],
+        [position, segs[i][1], segs[i + 1][2]],
+        *[list(seg) for seg in segs[i + 2 :]],
+    ]
+
+
 def apply_timing_corrections(timing_rows, corrections_dir=CORRECTIONS_DIR):
     """Apply narrow typed verdicts that cannot be inferred from row topology."""
     by_key = {
@@ -1331,6 +1357,12 @@ def apply_timing_corrections(timing_rows, corrections_dir=CORRECTIONS_DIR):
                 if op == "one_utterance":
                     by_key[key] = apply_one_utterance(
                         by_key[key], [int(p) for p in edit.get("positions") or []]
+                    )
+                elif op == "merge_same_position_pair":
+                    by_key[key] = merge_same_position_pair(
+                        by_key[key],
+                        int(edit["position"]),
+                        bool(edit.get("requiresAudioVerdict")),
                     )
                 else:
                     raise ValueError(f"unknown op {op!r}")

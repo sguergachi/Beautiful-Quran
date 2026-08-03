@@ -35,6 +35,7 @@ from build_db import (  # noqa: E402
     finalize_timing_rows,
     load_audio_durations,
     load_audio_onsets,
+    merge_same_position_pair,
     normalize_text,
     offset_for_audio_onset,
     preserve_complete_repeat_topology,
@@ -208,6 +209,11 @@ def run_pipeline(case, segs):
             raise SystemExit(f"{case.get('_path')}: need audio_onset_ms")
         return offset_for_audio_onset(segs, onset)
     if pipeline == "timing_correction":
+        position = case.get("correction_position")
+        if position is not None:
+            return merge_same_position_pair(
+                segs, position, bool(case.get("requires_audio_verdict"))
+            )
         positions = case.get("correction_positions")
         if positions is None:
             raise SystemExit(f"{case.get('_path')}: need correction_positions")
@@ -351,6 +357,11 @@ def check_audio_onset_pipeline():
     physical = refitted == [(1, 2, 253)]
     physical &= json.loads(rows[0][3]) == [[1, 190, 2_080], [2, 2_080, 14_580]]
     physical &= rows[1][3] == anchored
+    unknown = [[1, 260, 1_030], [2, 1_030, 2_320], [3, 2_320, 3_555]]
+    rows, refitted = refit_displaced_rows(
+        [(1, 88, 25, unknown)], {(1, 88, 25): 3_532}, {}
+    )
+    physical &= refitted == [] and rows[0][3] == unknown
     physical &= trim_to_next_start(
         [[13, 11_950, 12_550], [15, 12_540, 15_040]]
     ) == [[13, 11_950, 12_540], [15, 12_540, 15_040]]
@@ -518,7 +529,7 @@ def audit_bundled_db():
         3: set(),
         4: set(),
         5: {
-            (2, 25), (2, 198), (2, 223), (4, 123), (6, 104), (7, 5),
+            (2, 25), (2, 198), (2, 223), (7, 5),
             (13, 37), (73, 4),
         },
         6: {(12, 50), (12, 75), (12, 76), (91, 15)},

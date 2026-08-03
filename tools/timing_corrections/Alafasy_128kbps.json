@@ -37,6 +37,36 @@
       "positions": [12, 13],
       "evidence": ["CTC", "quran-align"],
       "refs": ["full-corpus acoustic audit"]
+    },
+    {
+      "reciterId": 1,
+      "surahId": 5,
+      "ayah": 44,
+      "op": "merge_same_position_pair",
+      "position": 6,
+      "requiresAudioVerdict": true,
+      "evidence": ["dual CTC", "waveform"],
+      "refs": ["tools/timing_verdicts/v35-topology-restorations.json"]
+    },
+    {
+      "reciterId": 1,
+      "surahId": 5,
+      "ayah": 46,
+      "op": "merge_same_position_pair",
+      "position": 17,
+      "requiresAudioVerdict": true,
+      "evidence": ["dual CTC", "waveform"],
+      "refs": ["tools/timing_verdicts/v35-topology-restorations.json"]
+    },
+    {
+      "reciterId": 1,
+      "surahId": 67,
+      "ayah": 22,
+      "op": "merge_same_position_pair",
+      "position": 8,
+      "requiresAudioVerdict": true,
+      "evidence": ["dual CTC", "waveform"],
+      "refs": ["tools/timing_verdicts/v35-topology-restorations.json"]
     }
   ]
 }
