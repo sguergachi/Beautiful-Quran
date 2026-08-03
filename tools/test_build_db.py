@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+import subprocess
 import sys
 import tempfile
 from pathlib import Path
@@ -34,7 +35,6 @@ from build_db import (  # noqa: E402
     finalize_timing_rows,
     load_audio_durations,
     load_audio_onsets,
-    merge_same_position_pair,
     normalize_text,
     offset_for_audio_onset,
     preserve_complete_repeat_topology,
@@ -47,8 +47,16 @@ from build_db import (  # noqa: E402
     trim_to_next_start,
 )
 import detect_audio_onsets as onset_detector  # noqa: E402
+from timing_delta import (  # noqa: E402
+    build_delta,
+    load_verdict_ledger,
+    read_git_timing_rows,
+    read_timing_rows,
+    rejected_changes,
+)
 
 CASES_DIR = TOOLS / "timing_patch_cases"
+VERDICTS_DIR = TOOLS / "timing_verdicts"
 PIPELINES = frozenset(
     {
         "adjust_qdc_segments",
@@ -200,9 +208,6 @@ def run_pipeline(case, segs):
             raise SystemExit(f"{case.get('_path')}: need audio_onset_ms")
         return offset_for_audio_onset(segs, onset)
     if pipeline == "timing_correction":
-        position = case.get("correction_position")
-        if position is not None:
-            return merge_same_position_pair(segs, position)
         positions = case.get("correction_positions")
         if positions is None:
             raise SystemExit(f"{case.get('_path')}: need correction_positions")
@@ -513,7 +518,7 @@ def audit_bundled_db():
         3: set(),
         4: set(),
         5: {
-            (2, 25), (2, 198), (2, 223), (7, 5),
+            (2, 25), (2, 198), (2, 223), (4, 123), (6, 104), (7, 5),
             (13, 37), (73, 4),
         },
         6: {(12, 50), (12, 75), (12, 76), (91, 15)},
@@ -530,14 +535,6 @@ def audit_bundled_db():
         (7, 44, 22): [6, 1, 2, 3],
         (7, 74, 52): [7, 4, 8],
         (7, 4, 4): [12, 12],
-        # Complete QDC rows retain an audible phrase re-say even when only
-        # their final source fade needed clipping to the exact MP3 duration.
-        (4, 18, 16): [
-            *range(1, 15), *range(7, 15), *range(15, 20),
-        ],
-        (1, 6, 61): [
-            *range(1, 15), *range(8, 15), *range(15, 18),
-        ],
         # This incomplete QDC row omits canonical word 23. Interpolating it
         # would alter the repeat order, so the monotonic witness must remain.
         (3, 7, 155): list(range(1, 42)),
@@ -608,6 +605,34 @@ def check_gloss_normalize():
     )
 
 
+def check_timing_delta():
+    """Fail closed unless every shipped timing delta has current evidence."""
+    try:
+        base = subprocess.run(
+            ["git", "merge-base", "HEAD", "origin/master"],
+            cwd=ROOT,
+            text=True,
+            capture_output=True,
+            check=True,
+        ).stdout.strip()
+        ledger = {}
+        for path in sorted(VERDICTS_DIR.glob("*.json")):
+            entries = load_verdict_ledger(path)
+            duplicate = set(ledger) & set(entries)
+            if duplicate:
+                raise ValueError(f"duplicate timing verdict(s): {sorted(duplicate)}")
+            ledger.update(entries)
+        report = build_delta(
+            read_git_timing_rows(base), read_timing_rows(ROOT / "data" / "quran.db"), ledger
+        )
+        rejected = rejected_changes(report["changes"])
+    except (OSError, subprocess.CalledProcessError, ValueError, sqlite3.Error) as exc:
+        return False, str(exc)
+    if rejected:
+        return False, "; ".join(f"{change['key']}: {reason}" for change, reason in rejected)
+    return True, f"{report['summary']['changedRows']} accepted timing DB delta(s)"
+
+
 def main():
     cases = load_cases()
     failures = []
@@ -660,11 +685,13 @@ def main():
     completion_ok = check_completion_pipeline()
     gloss_ok = check_gloss_normalize()
     database_ok = audit_bundled_db()
+    timing_delta_ok, timing_delta_detail = check_timing_delta()
     print(f"  {'ok  ' if confidence_ok else 'FAIL'} weighted 2:214 confidence checks")
     print(f"  {'ok  ' if audio_onset_ok else 'FAIL'} audio evidence and onset checks")
     print(f"  {'ok  ' if completion_ok else 'FAIL'} complete fallback and physics checks")
     print(f"  {'ok  ' if gloss_ok else 'FAIL'} WBW gloss whitespace normalize")
     print(f"  {'ok  ' if database_ok else 'FAIL'} bundled timing database invariants")
+    print(f"  {'ok  ' if timing_delta_ok else 'FAIL'} fail-closed timing DB delta gate")
     if not confidence_ok:
         failures.append(("weighted confidence", "2:214 checks failed", None))
     if not audio_onset_ok:
@@ -675,6 +702,8 @@ def main():
         failures.append(("gloss normalize", "trailing-space strip failed", None))
     if not database_ok:
         failures.append(("bundled database", "timing audit failed", None))
+    if not timing_delta_ok:
+        failures.append(("timing DB delta gate", timing_delta_detail, None))
     print()
     if failures:
         print(f"{len(failures)} FAILURE(S):")
@@ -684,7 +713,7 @@ def main():
                 for line in str(detail).splitlines():
                     print(f"    {line}")
         return 1
-    print(f"all {len(cases) + 5} cases pass ({CASES_DIR.relative_to(Path.cwd())})")
+    print(f"all {len(cases) + 6} cases pass ({CASES_DIR.relative_to(Path.cwd())})")
     return 0
 
 

@@ -1,9 +1,0 @@
-{
-  "id": "false-peer-split-alafasy-67-22",
-  "label": "Alafasy 67:22 word 8 ear-verified false peer split",
-  "refs": ["CTC repair unsplit", "ear review"],
-  "pipeline": "timing_correction",
-  "correction_position": 8,
-  "input_segments": [[7, 8825, 10070], [8, 10070, 10840], [8, 10840, 11540], [9, 11540, 12525]],
-  "expected_segments": [[7, 8825, 10070], [8, 10070, 11540], [9, 11540, 12525]]
-}

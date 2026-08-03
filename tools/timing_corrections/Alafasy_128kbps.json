@@ -37,33 +37,6 @@
       "positions": [12, 13],
       "evidence": ["CTC", "quran-align"],
       "refs": ["full-corpus acoustic audit"]
-    },
-    {
-      "reciterId": 1,
-      "surahId": 5,
-      "ayah": 44,
-      "op": "merge_same_position_pair",
-      "position": 6,
-      "evidence": ["ear", "CTC"],
-      "refs": ["CTC repair unsplit", "tools/timing_patch_cases/false-peer-split-alafasy-5-44.json"]
-    },
-    {
-      "reciterId": 1,
-      "surahId": 5,
-      "ayah": 46,
-      "op": "merge_same_position_pair",
-      "position": 17,
-      "evidence": ["ear", "CTC"],
-      "refs": ["CTC repair unsplit", "tools/timing_patch_cases/false-peer-split-alafasy-5-46.json"]
-    },
-    {
-      "reciterId": 1,
-      "surahId": 67,
-      "ayah": 22,
-      "op": "merge_same_position_pair",
-      "position": 8,
-      "evidence": ["ear", "CTC"],
-      "refs": ["CTC repair unsplit", "tools/timing_patch_cases/false-peer-split-alafasy-67-22.json"]
     }
   ]
 }

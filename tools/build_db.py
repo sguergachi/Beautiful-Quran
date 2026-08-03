@@ -60,6 +60,11 @@ MAX_AUDIO_ONSET_MS = 7_900
 # quarter second of median disagreement the reference row is broken and no
 # translation is trustworthy (the 99th percentile of real rows is 240 ms).
 MAX_CLOCK_DISAGREEMENT_MS = 250
+# MPEG headers describe the playable frame envelope, while a source word mark
+# can include a final fade a few milliseconds beyond decoded PCM. Keep a valid
+# clock translation in that narrow case, but never let a duration refresh move
+# an ayah wholesale merely because of its final tail.
+MAX_REBASE_TAIL_CLIP_MS = 50
 
 QURAN_JSON_TGZ = "https://registry.npmjs.org/quran-json/-/quran-json-3.1.2.tgz"
 WBW_TGZ = (
@@ -899,8 +904,11 @@ def rebase_qdc_clock(segs, reference, duration_ms=None):
     Quran-align cannot preserve repeats, but its monotonic boundaries use the
     exact files streamed by the app. The median first-pass boundary difference
     gives one robust per-ayah translation without altering qdc topology. A
-    translation that would push the row past the end of the recording, or
-    collapse its starts, is dropped in favour of the untranslated source row.
+    material translation past the recording, or one that collapses its starts,
+    is dropped in favour of the untranslated source row. A final source fade
+    within ``MAX_REBASE_TAIL_CLIP_MS`` is instead clipped: a better duration
+    measurement may shorten only the unreachable tail, never select a worse
+    clock for every word in the ayah.
 
     Returns the row and the translation it carries, or None when the row is
     left on its source clock.
@@ -917,7 +925,13 @@ def rebase_qdc_clock(segs, reference, duration_ms=None):
         # qdc sometimes clamps a negative first-word start to zero. Restore
         # only that opening boundary; every later boundary keeps one offset.
         rebased[0][1] = first_reference[0]
-    if not strictly_increasing(rebased) or not fits_audio(rebased, duration_ms):
+    if not strictly_increasing(rebased):
+        return segs, None
+    if duration_ms and rebased[-1][2] > duration_ms:
+        if rebased[-1][2] - duration_ms > MAX_REBASE_TAIL_CLIP_MS:
+            return segs, None
+        rebased[-1][2] = duration_ms
+    if not fits_audio(rebased, duration_ms):
         return segs, None
     return rebased, offset
 
@@ -1285,21 +1299,6 @@ def apply_one_utterance(segs, positions):
     ]
 
 
-def merge_same_position_pair(segs, position):
-    """Collapse one verified adjacent same-word split into one utterance."""
-    matches = [
-        i for i in range(len(segs) - 1)
-        if segs[i][0] == position == segs[i + 1][0]
-    ]
-    if len(matches) != 1 or sum(seg[0] == position for seg in segs) != 2:
-        raise ValueError(
-            f"merge_same_position_pair expected one adjacent pair at {position}"
-        )
-    i = matches[0]
-    merged = [position, segs[i][1], segs[i + 1][2]]
-    return [*[list(seg) for seg in segs[:i]], merged, *[list(seg) for seg in segs[i + 2 :]]]
-
-
 def apply_timing_corrections(timing_rows, corrections_dir=CORRECTIONS_DIR):
     """Apply narrow typed verdicts that cannot be inferred from row topology."""
     by_key = {
@@ -1332,10 +1331,6 @@ def apply_timing_corrections(timing_rows, corrections_dir=CORRECTIONS_DIR):
                 if op == "one_utterance":
                     by_key[key] = apply_one_utterance(
                         by_key[key], [int(p) for p in edit.get("positions") or []]
-                    )
-                elif op == "merge_same_position_pair":
-                    by_key[key] = merge_same_position_pair(
-                        by_key[key], int(edit["position"])
                     )
                 else:
                     raise ValueError(f"unknown op {op!r}")

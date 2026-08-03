@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "baseline": {
+    "commit": "bb8856bc9f41912a6bef72d453045054cf62072b",
+    "databaseSha256": "a2b1eb2e103e20b4a9fdbe8580c66cc39f54e4db6e3128960926cd16bc19b8f4"
+  },
+  "verdicts": {
+    "Abdul_Basit_Murattal_64kbps:27:77": {
+      "verdict": "accept",
+      "kinds": ["timestamp"],
+      "baselinePayloadHash": "b48772062968a86ba9af9cd4eca2f4aa94be183fe5e62a730c2ebcdc18615db7",
+      "candidatePayloadHash": "cc4556a3c2423e0f19326bce149281656e9377afb84a10108054161e661294bf",
+      "evidence": {
+        "kind": "duration_tail_clip",
+        "summary": "The MPEG-frame duration is 8,391 ms; the baseline starts and all internal boundaries are retained and only its 6 ms unreachable tail is clipped.",
+        "artifact": "tools/timing_verdicts/v35-tail-clips.json",
+        "audioSha256": "2b599e80604222abc954396c9e6b1521c6c94cf736043f35b6ba326025fd8201",
+        "measuredDurationMs": 8391
+      }
+    },
+    "Hani_Rifai_192kbps:88:25": {
+      "verdict": "accept",
+      "kinds": ["timestamp"],
+      "baselinePayloadHash": "4b9d99bbfcd074bd27d737911a83f4fa2912b2d3c3327eb9afa0205c1cd8a144",
+      "candidatePayloadHash": "4def96479dee2b189eddd7075d8ae121d702432db445af780586481bc2fdb6be",
+      "evidence": {
+        "kind": "duration_tail_clip",
+        "summary": "The MPEG-frame duration is 3,532 ms; the baseline starts and all internal boundaries are retained and only its 23 ms unreachable tail is clipped.",
+        "artifact": "tools/timing_verdicts/v35-tail-clips.json",
+        "audioSha256": "39c34956fe624fa8cdf47c88f2e0b700180a7f3828496958eae12e26066ecada",
+        "measuredDurationMs": 3532
+      }
+    }
+  }
+}
