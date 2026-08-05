@@ -1550,6 +1550,8 @@ select {
   margin-inline-start: 0.15rem;
   transition: opacity var(--ayah-mark-fade-ms) var(--recede-ease);
   line-height: 1;
+  /* Keep ﴾N﴿ as one unit — never wrap between ornament and digits. */
+  white-space: nowrap;
 }
 
 /*
