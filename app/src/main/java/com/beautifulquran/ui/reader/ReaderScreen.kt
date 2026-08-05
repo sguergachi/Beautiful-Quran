@@ -354,6 +354,9 @@ fun ReaderScreen(
     val bookmarkNoteTipVisible = bookmarkNoteTipOpen &&
         bookmarkNoteTipSurah != 0 && bookmarkNoteTipAyah != 0
     val ayahRailTipVisible = ayahRailTipOpen && ayahRailTipCenterY.isFinite()
+    // Guide **Got it** rests near the playback fold; mute transport while open
+    // so an overlapping thumb cannot fire Repeat / Play instead of dismiss.
+    val contextualGuideOpen = bookmarkNoteTipOpen || ayahRailTipOpen
     LaunchedEffect(settings.developerModeEnabled, settings.educationGuidesEnabled) {
         if (!settings.developerModeEnabled || !settings.educationGuidesEnabled) {
             bookmarkNoteTipOpen = false
@@ -1246,6 +1249,7 @@ fun ReaderScreen(
                 PlayerBar(
                     state = playerState,
                     isThisSurahLoaded = isThisSurahPlaying,
+                    enabled = !contextualGuideOpen,
                     chromeAlpha = { chromeAlpha.value },
                     reciterName = uiState.currentReciter?.name.orEmpty(),
                     onPlayPause = {

@@ -45,9 +45,13 @@ spotlight. The same vector drives typography, pigment, taper, blur, and the
 interactive half-plane, so left, right, top, bottom, and diagonal placements use
 one rendering path.
 
-The guide action uses `ownedQuietClickable`. It claims only its own gesture at
-the initial pointer pass so a control underneath cannot steal **Got it**. The
-rest of the spotlight side continues to the feature below.
+The guide action uses `ownedQuietClickable` on a large hit zone (~72 dp radius
+around the paper **Got it** pill), not only the pill's ink bounds. It claims
+that gesture at the initial pointer pass so a control underneath cannot steal
+dismissal. While any guide is open, the reader also disables playback-bar
+actions (repeat / seek / play / speed / reciter) so an overlapping thumb cannot
+fire transport instead. The spotlight side remains live paper for the taught
+feature.
 
 ## Adding a guide
 
@@ -150,8 +154,9 @@ For the existing lessons, the acceptance actions are:
 - **The guide disappears but the feature does nothing.** The page received the
   drag instead of the target. Verify the live target's real state while the
   pointer is still down; dismissal alone is not evidence.
-- **Got it does nothing over another control.** Use `ownedQuietClickable`; do
-  not use an ordinary shared-path click detector for guide actions.
+- **Got it does nothing over another control.** Use `ownedQuietClickable` on a
+  large hit zone around the pill (not the ink bounds alone), and disable
+  competing playback chrome while the guide is open.
 - **The target works only after dismissal.** The overlay is consuming the
   spotlight half or another higher-z input layer excludes the target from hit
   testing.
