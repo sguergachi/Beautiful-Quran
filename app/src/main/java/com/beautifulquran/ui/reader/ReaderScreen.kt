@@ -354,8 +354,8 @@ fun ReaderScreen(
     val bookmarkNoteTipVisible = bookmarkNoteTipOpen &&
         bookmarkNoteTipSurah != 0 && bookmarkNoteTipAyah != 0
     val ayahRailTipVisible = ayahRailTipOpen && ayahRailTipCenterY.isFinite()
-    // The guide's quiet action intentionally rests near the playback fold.
-    // While it is up, the underlying transport must not compete for the same tap.
+    // Guide **Got it** rests near the playback fold; mute transport while open
+    // so an overlapping thumb cannot fire Repeat / Play instead of dismiss.
     val contextualGuideOpen = bookmarkNoteTipOpen || ayahRailTipOpen
     LaunchedEffect(settings.developerModeEnabled, settings.educationGuidesEnabled) {
         if (!settings.developerModeEnabled || !settings.educationGuidesEnabled) {

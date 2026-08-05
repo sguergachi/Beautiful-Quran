@@ -45,7 +45,11 @@ import com.beautifulquran.playback.PlayerUiState
 fun PlayerBar(
     state: PlayerUiState,
     isThisSurahLoaded: Boolean,
-    enabled: Boolean,
+    /**
+     * When false, transport stays visible but does not compete with a
+     * contextual guide's **Got it** action drawn over the same corner.
+     */
+    enabled: Boolean = true,
     chromeAlpha: () -> Float,
     reciterName: String,
     onPlayPause: () -> Unit,
