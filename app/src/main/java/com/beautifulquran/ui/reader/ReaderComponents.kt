@@ -148,9 +148,20 @@ import kotlinx.coroutines.flow.StateFlow
 private fun Int.toArabicIndic(): String =
     toString().map { '٠' + (it - '0') }.joinToString("")
 
-/** Ornate ayah brackets follow the surrounding line's writing direction. */
-internal fun formatAyahNumberMark(number: Int, useArabicIndicDigits: Boolean): String =
-    if (useArabicIndicDigits) "﴿${number.toArabicIndic()}﴾" else "﴾$number﴿"
+/**
+ * Ornate ayah brackets follow the surrounding line's writing direction.
+ *
+ * Characters are glued with WORD JOINER (U+2060) so Compose never line-breaks
+ * mid-mark (e.g. `﴾` on one line and `3﴿` on the next in English prose).
+ */
+internal fun formatAyahNumberMark(number: Int, useArabicIndicDigits: Boolean): String {
+    val raw = if (useArabicIndicDigits) {
+        "﴿${number.toArabicIndic()}﴾"
+    } else {
+        "﴾$number﴿"
+    }
+    return raw.toCharArray().joinToString("\u2060")
+}
 
 private fun wordFadeAlpha(progress: Float): Float {
     val resting = InkEngine.State.Upcoming.inkAlpha()
