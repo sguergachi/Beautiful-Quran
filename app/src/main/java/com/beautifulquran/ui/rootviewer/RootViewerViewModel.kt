@@ -26,6 +26,8 @@ data class RootViewerUiState(
     val isLoading: Boolean = true,
     val surahId: Int = 0,
     val ayah: Int = 0,
+    /** Full chapter length — word audition must load this many items, not [ayah]. */
+    val ayahCount: Int = 0,
     /** Transliterated chapter name for the word's surah (concordance return pill). */
     val surahNameTransliteration: String = "",
     val word: Word? = null,
@@ -42,6 +44,15 @@ data class RootViewerUiState(
     /** True while the header speaker is auditioning this word. */
     val isPlayingWord: Boolean = false,
 )
+
+/**
+ * Playlist length for root-viewer word audition. Always the full chapter so
+ * exit → Play still advances past this ayah. The clip poll hard-stops at the
+ * word end; truncating to [wordAyah] leaves a dead-end queue that stops at
+ * the end of the verse.
+ */
+internal fun wordAuditionPlaylistAyahCount(surahAyahCount: Int, wordAyah: Int): Int =
+    surahAyahCount.coerceAtLeast(wordAyah.coerceAtLeast(1))
 
 /**
  * Start/end ms for a single word clip. Prefer the segment's own end; if
@@ -78,15 +89,17 @@ class RootViewerViewModel(
     private val _ui = MutableStateFlow(RootViewerUiState())
     val ui: StateFlow<RootViewerUiState> = _ui.asStateFlow()
 
+    /** Outer [playCurrentWord] load; cancelled with [wordClipJob] on clear. */
+    private var wordPlayJob: Job? = null
     private var wordClipJob: Job? = null
 
     fun open(surahId: Int, ayah: Int, wordPosition: Int) {
         stopWordAudition(pauseIfPlaying = true)
         _ui.value = RootViewerUiState(isLoading = true, surahId = surahId, ayah = ayah)
         viewModelScope.launch {
-            val surahName = repository.surahs().firstOrNull { it.id == surahId }
-                ?.nameTransliteration
-                .orEmpty()
+            val surah = repository.surahs().firstOrNull { it.id == surahId }
+            val surahName = surah?.nameTransliteration.orEmpty()
+            val ayahCount = surah?.ayahCount ?: ayah
             val word = repository.wordAt(surahId, ayah, wordPosition)
             val morph = repository.wordMorphology(surahId, ayah, wordPosition)
             val summary = morph?.root?.takeIf { it.isNotBlank() }?.let { repository.rootSummary(it) }
@@ -94,6 +107,7 @@ class RootViewerViewModel(
                 isLoading = false,
                 surahId = surahId,
                 ayah = ayah,
+                ayahCount = ayahCount,
                 surahNameTransliteration = surahName,
                 word = word,
                 morphology = morph,
@@ -133,7 +147,10 @@ class RootViewerViewModel(
         val st = _ui.value
         val word = st.word ?: return
         if (st.isLoading) return
-        viewModelScope.launch {
+        // Cancel any in-flight load/clip so a late completion cannot clobber
+        // the chapter queue after [clear] / resume has already restored it.
+        stopWordAudition(pauseIfPlaying = true)
+        wordPlayJob = viewModelScope.launch {
             val reciters = repository.reciters()
             if (reciters.isEmpty()) return@launch
             val reciterId = settings.settings.value.reciterId
@@ -143,6 +160,7 @@ class RootViewerViewModel(
             startWordAudition(
                 surahId = st.surahId,
                 ayah = st.ayah,
+                ayahCount = st.ayahCount,
                 surahName = st.surahNameTransliteration,
                 reciter = reciter,
                 startMs = clip.first,
@@ -154,17 +172,18 @@ class RootViewerViewModel(
     private fun startWordAudition(
         surahId: Int,
         ayah: Int,
+        ayahCount: Int,
         surahName: String,
         reciter: Reciter,
         startMs: Long,
         endMs: Long,
     ) {
-        stopWordAudition(pauseIfPlaying = true)
+        // Do not cancel [wordPlayJob] — we are running inside it.
+        stopWordAudition(pauseIfPlaying = true, cancelPlayJob = false)
         player.clearRepeatRange()
-        // Always load a one-ayah playlist so a late pause cannot spill into
-        // the next ayah, and seek lands on this verse even if the reader had
-        // a different surah loaded.
-        loadAyahAndPlay(surahId, ayah, surahName, reciter, startMs)
+        // Full chapter queue + hard-stop at the word end. Never truncate to
+        // [ayah]: that left Play after exit stuck ending on this verse.
+        loadAyahAndPlay(surahId, ayah, ayahCount, surahName, reciter, startMs)
         _ui.value = _ui.value.copy(isPlayingWord = true)
         wordClipJob = viewModelScope.launch {
             if (!awaitPlaybackIntoWord(surahId, ayah, startMs)) {
@@ -222,17 +241,18 @@ class RootViewerViewModel(
         return false
     }
 
-    /** One-ayah playlist for this word — same shape as Timings Lab. */
+    /** Chapter playlist starting at this word — hard-stopped by the clip poll. */
     private fun loadAyahAndPlay(
         surahId: Int,
         ayah: Int,
+        ayahCount: Int,
         surahName: String,
         reciter: Reciter,
         startMs: Long,
     ) {
         player.playSurah(
             surahId = surahId,
-            ayahCount = ayah,
+            ayahCount = wordAuditionPlaylistAyahCount(ayahCount, ayah),
             startAyah = ayah,
             reciter = reciter,
             surahName = surahName.ifBlank { surahId.toString() },
@@ -248,8 +268,15 @@ class RootViewerViewModel(
         _ui.value = RootViewerUiState()
     }
 
-    private fun stopWordAudition(pauseIfPlaying: Boolean) {
+    private fun stopWordAudition(
+        pauseIfPlaying: Boolean,
+        cancelPlayJob: Boolean = true,
+    ) {
         val wasAuditioning = _ui.value.isPlayingWord
+        if (cancelPlayJob) {
+            wordPlayJob?.cancel()
+            wordPlayJob = null
+        }
         wordClipJob?.cancel()
         wordClipJob = null
         if (pauseIfPlaying && wasAuditioning) player.pause()
