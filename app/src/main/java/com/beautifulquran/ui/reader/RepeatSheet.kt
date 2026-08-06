@@ -68,6 +68,70 @@ internal fun repeatChoice(
 }
 
 /**
+ * Draft bounds for the two range instruments on the repeat sheet.
+ *
+ * "A range of ayahs" holds [from]..[to]; "from this ayah" holds a distance
+ * [nextNCount] from the reader's current ayah. Both describe the same loop.
+ */
+internal data class RangeDraft(
+    val from: Int,
+    val to: Int,
+    val nextNCount: Int,
+)
+
+/**
+ * When the reader flips between "from this ayah" and "a range of ayahs", carry
+ * the span they already chose into the other instrument.
+ *
+ * Distance → bounds: start at the current ayah, end at
+ * `current + count − 1` (the inverse of how "from this" labels the range).
+ * Bounds → distance: the count is how many ayahs from the current position
+ * land on the end they picked.
+ */
+internal fun carryRangeDraft(
+    fromChoice: RepeatChoice,
+    toChoice: RepeatChoice,
+    currentAyah: Int,
+    ayahCount: Int,
+    from: Int,
+    to: Int,
+    nextNCount: Int,
+): RangeDraft {
+    val safeCount = ayahCount.coerceAtLeast(1)
+    val safeCurrent = currentAyah.coerceIn(1, safeCount)
+    val maxNextN = (safeCount - safeCurrent + 1).coerceAtLeast(1)
+    val clampedFrom = from.coerceIn(1, safeCount)
+    val clampedTo = to.coerceIn(1, safeCount)
+    val clampedNextN = nextNCount.coerceIn(1, maxNextN)
+
+    return when {
+        fromChoice == RepeatChoice.NEXT_N_AYAHS &&
+            toChoice == RepeatChoice.AYAH_RANGE -> {
+            val end = (safeCurrent + clampedNextN - 1).coerceAtMost(safeCount)
+            RangeDraft(
+                from = safeCurrent,
+                to = end.coerceAtLeast(safeCurrent),
+                nextNCount = clampedNextN,
+            )
+        }
+        fromChoice == RepeatChoice.AYAH_RANGE &&
+            toChoice == RepeatChoice.NEXT_N_AYAHS -> {
+            val end = clampedTo.coerceIn(safeCurrent, safeCount)
+            RangeDraft(
+                from = clampedFrom,
+                to = clampedTo,
+                nextNCount = (end - safeCurrent + 1).coerceIn(1, maxNextN),
+            )
+        }
+        else -> RangeDraft(
+            from = clampedFrom,
+            to = clampedTo,
+            nextNCount = clampedNextN,
+        )
+    }
+}
+
+/**
  * Choosing how the recitation repeats — **not a dialog**.
  *
  * The reader sheet itself becomes the question: `ReaderScreen` hosts this inside
@@ -183,7 +247,23 @@ fun RepeatSheet(
                 entries = RepeatChoice.entries,
                 selected = choice,
                 label = { it.label },
-                onSelect = { choice = it },
+                onSelect = { next ->
+                    // Keep the span when flipping between the two range dials:
+                    // distance ↔ end verse are inverses of each other.
+                    val carried = carryRangeDraft(
+                        fromChoice = choice,
+                        toChoice = next,
+                        currentAyah = safeCurrentAyah,
+                        ayahCount = safeAyahCount,
+                        from = from,
+                        to = to,
+                        nextNCount = nextNCount,
+                    )
+                    from = carried.from
+                    to = carried.to
+                    nextNCount = carried.nextNCount
+                    choice = next
+                },
             ) { entry ->
                 // Neither dial is captioned: each spells its own range out with
                 // the "to" standing between the two figures.
