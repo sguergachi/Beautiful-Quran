@@ -66,6 +66,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -119,6 +120,19 @@ This app is free, ad-free, and collects no data.
 private const val FONT_SCALE_MIN = 0.8f
 private const val FONT_SCALE_MAX = 1.6f
 private const val FONT_SCALE_STOPS = 8 // intervals; nine tappable stops
+private val FONT_SCALE_STEP = (FONT_SCALE_MAX - FONT_SCALE_MIN) / FONT_SCALE_STOPS
+
+/**
+ * Snap [scale] to the nearest stop, then move [deltaStops] (±1 for the A glyphs).
+ * Clamped to [FONT_SCALE_MIN]…[FONT_SCALE_MAX].
+ */
+internal fun nudgeFontScale(scale: Float, deltaStops: Int): Float {
+    val current = ((scale - FONT_SCALE_MIN) / FONT_SCALE_STEP)
+        .roundToInt()
+        .coerceIn(0, FONT_SCALE_STOPS)
+    val next = (current + deltaStops).coerceIn(0, FONT_SCALE_STOPS)
+    return FONT_SCALE_MIN + next * FONT_SCALE_STEP
+}
 
 /** Settings as its own sheet of paper — a full page, nothing floating, no
  * cards, no dividers. Hierarchy is spacing, size, and ink alone (docs/DESIGN.md). */
@@ -1351,8 +1365,9 @@ private fun parseBrushParamsFromText(text: String, base: BrushCircleParams): Bru
 
 
 /** Text size as ink, not a Material slider: an "A" at each size flanks a thin
- * paper track with a green dot; tap or drag the track to choose. The letters
- * show the effect the setting has. */
+ * paper track with a green dot; tap or drag the track to choose, or tap the
+ * small/large "A" to nudge one stop. The letters show the effect the setting
+ * has. */
 @Composable
 private fun TextSizeControl(scale: Float, onScale: (Float) -> Unit) {
     var widthPx by remember { mutableStateOf(1) }
@@ -1360,6 +1375,7 @@ private fun TextSizeControl(scale: Float, onScale: (Float) -> Unit) {
     val animFraction by animateFloatAsState(fraction, label = "sizeDot")
     val trackInk = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.28f)
     val accent = MaterialTheme.colorScheme.primary
+    val glyphInk = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
 
     fun setFromX(x: Float) {
         val f = (x / widthPx.coerceAtLeast(1)).coerceIn(0f, 1f)
@@ -1372,13 +1388,16 @@ private fun TextSizeControl(scale: Float, onScale: (Float) -> Unit) {
             text = "A",
             fontSize = 15.sp,
             fontFamily = MaterialTheme.typography.bodyLarge.fontFamily,
-            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+            color = glyphInk,
+            modifier = Modifier
+                .quietClickable(role = Role.Button) { onScale(nudgeFontScale(scale, -1)) }
+                .padding(horizontal = 6.dp, vertical = 10.dp),
         )
         Box(
             modifier = Modifier
                 .weight(1f)
                 .height(44.dp)
-                .padding(horizontal = 14.dp)
+                .padding(horizontal = 8.dp)
                 .onSizeChanged { widthPx = it.width }
                 .pointerInput(Unit) { detectTapGestures { setFromX(it.x) } }
                 .pointerInput(Unit) {
@@ -1404,7 +1423,10 @@ private fun TextSizeControl(scale: Float, onScale: (Float) -> Unit) {
             text = "A",
             fontSize = 26.sp,
             fontFamily = MaterialTheme.typography.bodyLarge.fontFamily,
-            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+            color = glyphInk,
+            modifier = Modifier
+                .quietClickable(role = Role.Button) { onScale(nudgeFontScale(scale, +1)) }
+                .padding(horizontal = 6.dp, vertical = 10.dp),
         )
     }
 }

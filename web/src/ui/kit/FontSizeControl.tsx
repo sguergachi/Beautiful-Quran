@@ -3,6 +3,7 @@ import {
   FONT_SCALE_MAX,
   FONT_SCALE_MIN,
   FONT_SCALE_STEPS,
+  nudgeFontScale,
 } from '../../data/settings'
 
 type Props = {
@@ -12,8 +13,8 @@ type Props = {
 
 /**
  * Text size as ink, not a Material slider — an "A" at each size flanks a thin
- * paper track with a green dot; tap or drag the track to choose (Android
- * `FontSizeControl` parity).
+ * paper track with a green dot; tap or drag the track, or tap the small/large
+ * "A" to nudge one stop (Android `TextSizeControl` parity).
  */
 export function FontSizeControl({ scale, onChange }: Props) {
   const trackRef = useRef<HTMLDivElement>(null)
@@ -39,36 +40,42 @@ export function FontSizeControl({ scale, onChange }: Props) {
   return (
     <div
       className="font-size-control"
-      role="slider"
+      role="group"
       aria-label="Text size"
-      aria-valuemin={FONT_SCALE_MIN}
-      aria-valuemax={FONT_SCALE_MAX}
-      aria-valuenow={scale}
-      aria-valuetext={`${Math.round(scale * 100)}%`}
-      tabIndex={0}
-      onKeyDown={(e) => {
-        const step = (FONT_SCALE_MAX - FONT_SCALE_MIN) / FONT_SCALE_STEPS
-        if (e.key === 'ArrowRight' || e.key === 'ArrowUp') {
-          e.preventDefault()
-          onChange(Math.min(FONT_SCALE_MAX, scale + step))
-        } else if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') {
-          e.preventDefault()
-          onChange(Math.max(FONT_SCALE_MIN, scale - step))
-        } else if (e.key === 'Home') {
-          e.preventDefault()
-          onChange(FONT_SCALE_MIN)
-        } else if (e.key === 'End') {
-          e.preventDefault()
-          onChange(FONT_SCALE_MAX)
-        }
-      }}
     >
-      <span className="font-size-glyph font-size-glyph-sm" aria-hidden="true">
+      <button
+        type="button"
+        className="font-size-glyph font-size-glyph-sm"
+        aria-label="Decrease text size"
+        onClick={() => onChange(nudgeFontScale(scale, -1))}
+      >
         A
-      </span>
+      </button>
       <div
         ref={trackRef}
         className="font-size-track"
+        role="slider"
+        aria-label="Text size"
+        aria-valuemin={FONT_SCALE_MIN}
+        aria-valuemax={FONT_SCALE_MAX}
+        aria-valuenow={scale}
+        aria-valuetext={`${Math.round(scale * 100)}%`}
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.key === 'ArrowRight' || e.key === 'ArrowUp') {
+            e.preventDefault()
+            onChange(nudgeFontScale(scale, +1))
+          } else if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') {
+            e.preventDefault()
+            onChange(nudgeFontScale(scale, -1))
+          } else if (e.key === 'Home') {
+            e.preventDefault()
+            onChange(FONT_SCALE_MIN)
+          } else if (e.key === 'End') {
+            e.preventDefault()
+            onChange(FONT_SCALE_MAX)
+          }
+        }}
         onPointerDown={(e) => {
           dragging.current = true
           e.currentTarget.setPointerCapture(e.pointerId)
@@ -97,9 +104,14 @@ export function FontSizeControl({ scale, onChange }: Props) {
           style={{ left: `${fraction * 100}%` }}
         />
       </div>
-      <span className="font-size-glyph font-size-glyph-lg" aria-hidden="true">
+      <button
+        type="button"
+        className="font-size-glyph font-size-glyph-lg"
+        aria-label="Increase text size"
+        onClick={() => onChange(nudgeFontScale(scale, +1))}
+      >
         A
-      </span>
+      </button>
     </div>
   )
 }
