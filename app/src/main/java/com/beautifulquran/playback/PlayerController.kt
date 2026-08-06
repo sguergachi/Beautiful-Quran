@@ -257,6 +257,7 @@ class PlayerController(private val context: Context) {
         preserveRepeatRange: Boolean = true,
         includeBasmalahLeadIn: Boolean = true,
         startWithBasmalah: Boolean = false,
+        autoplay: Boolean = true,
     ) {
         val boundedRange = repeatRange
             ?.takeIf { preserveRepeatRange }
@@ -286,7 +287,7 @@ class PlayerController(private val context: Context) {
             else startPositionMs
             c.setMediaItems(queue.items, queue.startIndex, startPos)
             c.prepare()
-            c.play()
+            if (autoplay) c.play()
             if (boundedRange != null) startRepeatBoundaryMonitor()
         }
     }

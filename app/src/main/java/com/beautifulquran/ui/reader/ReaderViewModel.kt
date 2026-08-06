@@ -101,6 +101,8 @@ data class ReaderPlaybackSnapshot(
     val repeatMode: Int,
     val repeatRange: IntRange?,
     val speed: Float,
+    /** When false, restore the chapter queue without autoplay (paused open). */
+    val wasPlaying: Boolean = true,
 )
 
 internal data class PollingIdentity<K : Any>(
@@ -681,6 +683,7 @@ class ReaderViewModel(
         startPositionMs: Long = 0L,
         preserveRepeatRange: Boolean = true,
         startWithBasmalah: Boolean = false,
+        autoplay: Boolean = true,
     ): Boolean {
         val content = _uiState.value.content ?: return false
         val reciter = _uiState.value.currentReciter ?: return false
@@ -693,6 +696,7 @@ class ReaderViewModel(
             startPositionMs = startPositionMs,
             preserveRepeatRange = preserveRepeatRange,
             startWithBasmalah = startWithBasmalah,
+            autoplay = autoplay,
         )
         return true
     }
@@ -778,10 +782,13 @@ class ReaderViewModel(
         return surah to focusedAyah.coerceAtLeast(1)
     }
 
-    /** Pauses a live reading session and returns enough state to restore it. */
+    /**
+     * Captures this chapter's playhead (playing or paused) so the root viewer
+     * can restore a full surah queue after word audition. Pauses only when
+     * audio is live. Null when the player is not on this chapter.
+     */
     fun pauseForRootViewer(): ReaderPlaybackSnapshot? {
         val state = playerState.value
-        if (!state.isPlaying) return null
         val nowPlaying = player.liveNowPlaying ?: state.nowPlaying ?: return null
         if (nowPlaying.surahId != surahId) return null
         val snapshot = ReaderPlaybackSnapshot(
@@ -790,12 +797,16 @@ class ReaderViewModel(
             repeatMode = state.repeatMode,
             repeatRange = state.repeatRange,
             speed = state.speed,
+            wasPlaying = state.isPlaying,
         )
-        player.pause()
+        if (state.isPlaying) player.pause()
         return snapshot
     }
 
-    /** Restores the chapter playlist displaced by the root viewer's audition. */
+    /**
+     * Restores the full chapter playlist displaced by the root viewer's
+     * audition. Auto-plays only when [ReaderPlaybackSnapshot.wasPlaying].
+     */
     fun resumeAfterRootViewer(snapshot: ReaderPlaybackSnapshot) {
         val playlistAyah = snapshot.ayah.coerceAtLeast(1)
         if (!startSurah(
@@ -803,6 +814,7 @@ class ReaderViewModel(
                 startPositionMs = snapshot.positionMs,
                 preserveRepeatRange = false,
                 startWithBasmalah = snapshot.ayah == BASMALAH_PLAYLIST_AYAH,
+                autoplay = snapshot.wasPlaying,
             )
         ) return
         player.setSpeed(snapshot.speed)

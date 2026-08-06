@@ -179,12 +179,17 @@ class AppStore {
   /** Bumps when a newer openSurah supersedes an in-flight peel→load. */
   private openToken = 0
   /**
-   * Reading session paused when the root viewer opened. Normal close restores
-   * and resumes; concordance jumps and other navigations discard it. The
-   * isolated word speaker may move the playhead — this snapshot is the source
-   * of truth for restore (Android [ReaderPlaybackSnapshot] parity).
+   * Reading session captured when the root viewer opened. Normal close restores
+   * the chapter queue; autoplay only when [wasPlaying]. Concordance jumps
+   * discard it. The isolated word speaker may move the playhead — this
+   * snapshot is the source of truth for restore (Android
+   * [ReaderPlaybackSnapshot] parity).
    */
-  private rootViewerSnapshot: { ayah: number; positionMs: number } | null = null
+  private rootViewerSnapshot: {
+    ayah: number
+    positionMs: number
+    wasPlaying: boolean
+  } | null = null
   /** Cancels an in-flight word-clip poll / ready wait. */
   private wordClipToken = 0
   private wordClipTimer: ReturnType<typeof setTimeout> | null = null
@@ -819,21 +824,18 @@ class AppStore {
 
   openRootViewer(surahId: number, ayah: number, word: Word) {
     this.stopWordAudition(true)
-    // Android pauseForRootViewer: only pause/resume a live reading of this chapter.
+    // Android pauseForRootViewer: capture when this chapter is on the player
+    // (playing or paused) so exit can restore a full queue after word audition.
     const ps = this.state.player
     const np = ps.nowPlaying
     const readerSurahId = this.state.content?.surah.id
-    if (
-      ps.isPlaying &&
-      np != null &&
-      readerSurahId != null &&
-      np.surahId === readerSurahId
-    ) {
+    if (np != null && readerSurahId != null && np.surahId === readerSurahId) {
       this.rootViewerSnapshot = {
         ayah: np.ayah,
         positionMs: player.positionMs,
+        wasPlaying: ps.isPlaying,
       }
-      player.pause()
+      if (ps.isPlaying) player.pause()
     } else {
       this.rootViewerSnapshot = null
     }
@@ -966,8 +968,16 @@ class AppStore {
   }
 
   /** Restore the chapter playhead displaced by the root viewer's word clip. */
-  private async resumeAfterRootViewer(snapshot: { ayah: number; positionMs: number }) {
-    await player.seekToWordAndPlay(snapshot.ayah, snapshot.positionMs)
+  private async resumeAfterRootViewer(snapshot: {
+    ayah: number
+    positionMs: number
+    wasPlaying: boolean
+  }) {
+    if (snapshot.wasPlaying) {
+      await player.seekToWordAndPlay(snapshot.ayah, snapshot.positionMs)
+    } else {
+      await player.seekToWord(snapshot.ayah, snapshot.positionMs)
+    }
   }
 
   private stopWordAudition(pauseIfPlaying: boolean) {
