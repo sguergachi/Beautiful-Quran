@@ -189,9 +189,14 @@ object TajweedPacing {
          * the fresh-ink glint's soft resonance shimmer.
          */
         private val waqfHoldSpans: FloatArray = FloatArray(0),
+        /** At least one hold park on this word's *own* letters — a long madd,
+         * a ghunnah, or the waqf. A wasl-entry hold alone does not count: it
+         * sustains the *previous* word's nūn, so the listener hears no hold
+         * on this word. Gates the tarjīʿ shimmer's eligibility. */
+        val hasStrongHold: Boolean = false,
     ) {
         /** True when this word closes its verse with a long waqf hold — the
-         * only words whose glint may resonate with the reciter's tarjīʿ. */
+         * only words that earn the steady-hold free-running floor. */
         val hasWaqfHold: Boolean get() = waqfHoldSpans.isNotEmpty()
 
         fun at(t: Float): Float {
@@ -375,6 +380,7 @@ object TajweedPacing {
             positions = positions.toFloatArray(),
             letterCount = letters,
             waqfHoldSpans = waqfHoldSpans.toFloatArray(),
+            hasStrongHold = (0 until n).any { held[it] && !(waslEntry && it == 0) },
         )
     }
 

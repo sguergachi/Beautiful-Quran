@@ -42,6 +42,12 @@ class Tarji {
     var holdMs = 0f
         private set
 
+    /** Debug/diagnostics: last pitch estimate (Hz) and its clarity 0..1. */
+    var lastPitchHz = 0f
+        private set
+    var lastClarity = 0f
+        private set
+
     /** True while a voiced single note is being held (with or without
      * reverberation) — gates the steady-hold sine floor. */
     val holdingNote: Boolean get() = holdMs >= HOLD_NOTE_MIN_MS
@@ -130,14 +136,20 @@ class Tarji {
         envCount++
 
         val (pitchHz, clarity) = pitch()
+        lastPitchHz = pitchHz
+        lastClarity = clarity
         val voiced = clarity >= MIN_CLARITY && rms >= floor
 
         if (voiced) {
-            val sameNote =
-                holdPitchHz > 0f && abs(pitchHz - holdPitchHz) / holdPitchHz <= MAX_PITCH_DRIFT
+            val sameNote = holdPitchHz > 0f && samePitch(pitchHz, holdPitchHz)
             if (holdMs > 0f && sameNote) {
                 holdMs += HOP_MS
-                holdPitchHz += PITCH_EMA * (pitchHz - holdPitchHz)
+                // Track in the anchor's own octave — single-hop octave flips
+                // (lag L vs 2L scoring within noise) must not drag it.
+                var p = pitchHz
+                while (p > holdPitchHz * 1.4142f) p /= 2f
+                while (p < holdPitchHz / 1.4142f) p *= 2f
+                holdPitchHz += PITCH_EMA * (p - holdPitchHz)
             } else {
                 // New note (or first voiced frame): the hold restarts here.
                 holdMs = HOP_MS.toFloat()
@@ -188,21 +200,31 @@ class Tarji {
         val amp = sqrt(2f * sumSq / n) // sine-amplitude estimate
         val depth = amp / mean
 
-        // Oscillation rate from hysteresis crossings of the demeaned envelope.
-        val h = 0.3f * sqrt(sumSq / n)
-        var crossings = 0
-        var sign = 0
-        for (j in 0 until n) {
-            val d = env[(start + j) % ENV_HOPS] - mean
-            if (sign <= 0 && d > h) {
-                if (sign < 0) crossings++
-                sign = 1
-            } else if (sign >= 0 && d < -h) {
-                if (sign > 0) crossings++
-                sign = -1
+        // Periodicity of the demeaned envelope: autocorrelation over the
+        // tarjīʿ band (1.5–10 Hz). Robust where crossings fail — reciters
+        // pulse anywhere from slow ~2 Hz swells (Hani) to ~6–8 Hz vibrato.
+        var bestC = 0f
+        var bestLag = 0
+        for (lag in MIN_ENV_LAG..MAX_ENV_LAG) {
+            if (n - lag < MIN_ENV_HOPS / 2) break
+            var corr = 0f
+            var e0 = 0f
+            var eL = 0f
+            for (j in 0 until n - lag) {
+                val a = env[(start + j) % ENV_HOPS] - mean
+                val b = env[(start + j + lag) % ENV_HOPS] - mean
+                corr += a * b
+                e0 += a * a
+                eL += b * b
+            }
+            val norm = corr / (sqrt(e0 * eL) + 1e-9f)
+            if (norm > bestC) {
+                bestC = norm
+                bestLag = lag
             }
         }
-        val hz = crossings / (2f * n * HOP_MS / 1000f)
+        val rateHz =
+            if (bestLag > 0) 1000f / (bestLag * HOP_MS.toFloat()) else 0f
 
         // Keep the signal smoothing even while gated off, so a lock-on starts
         // from the live envelope rather than a stale frozen value.
@@ -213,19 +235,21 @@ class Tarji {
         // Hysteresis: stricter to switch on than to stay on — no flapping
         // when the reverberation breathes near the gate.
         val longEnough = holdMs >= HOLD_MIN_MS
+        val periodic = bestC >= MIN_PERIODICITY &&
+            rateHz in MIN_TREMOLO_HZ..MAX_TREMOLO_HZ
+        val stillPeriodic = bestC >= MIN_PERIODICITY * 0.7f &&
+            rateHz in (MIN_TREMOLO_HZ - 0.5f)..(MAX_TREMOLO_HZ + 1f)
         reverberating = if (reverberating) {
-            longEnough && depth >= MIN_TREMOLO_DEPTH * DEPTH_OFF_RATIO &&
-                hz in (MIN_TREMOLO_HZ - 1f)..(MAX_TREMOLO_HZ + 1f)
+            longEnough && depth >= MIN_TREMOLO_DEPTH * DEPTH_OFF_RATIO && stillPeriodic
         } else {
-            longEnough && depth >= MIN_TREMOLO_DEPTH &&
-                hz in MIN_TREMOLO_HZ..MAX_TREMOLO_HZ
+            longEnough && depth >= MIN_TREMOLO_DEPTH && periodic
         }
 
         // Lead the measured oscillation by the analysis+smoothing lag, so the
         // shimmer swells *with* the voice rather than trailing it: for a
         // near-sinusoid at the measured rate, s(t+τ) ≈ s·cos ωτ + ṡ·sin ωτ / ω.
         tremolo = if (reverberating) {
-            val omega = 2f * Math.PI.toFloat() * hz
+            val omega = 2f * Math.PI.toFloat() * rateHz
             val dS = (tremoloSmoothed - prev) * (1000f / HOP_MS)
             val wt = (omega * LAG_SEC).coerceAtMost(1.2f)
             (
@@ -235,6 +259,16 @@ class Tarji {
         } else {
             tremoloSmoothed
         }
+    }
+
+    /** Octave-folded pitch match: autocorrelation flips freely between a
+     * period and its double on real voice, and those are the same note. */
+    private fun samePitch(a: Float, b: Float): Boolean {
+        if (a <= 0f || b <= 0f) return false
+        var r = a / b
+        while (r > 1.4142f) r /= 2f
+        while (r < 0.7071f) r *= 2f
+        return abs(r - 1f) <= MAX_PITCH_DRIFT
     }
 
     /** Normalized-autocorrelation pitch over the reciter's vocal range. */
@@ -265,8 +299,8 @@ class Tarji {
         const val HOP_MS = 20
         const val HOP_SAMPLES = SAMPLE_RATE * HOP_MS / 1000 // 160
         const val FRAME_SAMPLES = HOP_SAMPLES * 4 // 80 ms
-        private const val ENV_HOPS = 48
-        private const val MIN_ENV_HOPS = 20
+        private const val ENV_HOPS = 64
+        private const val MIN_ENV_HOPS = 30
 
         /** Hold must survive this long before reverberation is considered. */
         const val HOLD_MIN_MS = 400
@@ -280,23 +314,31 @@ class Tarji {
         private const val MIN_CLARITY = 0.5f
         private const val MAX_PITCH_DRIFT = 0.08f
         private const val PITCH_EMA = 0.1f
-        private const val MAX_MISSES = 2
+        private const val MAX_MISSES = 4
 
         private const val MIN_FLOOR = 0.006f
         private const val FLOOR_OF_PEAK = 0.15f
         private const val PEAK_DECAY = 0.997f
 
-        /** Tarjīʿ lives around 3–9.5 Hz of envelope oscillation. */
-        private const val MIN_TREMOLO_HZ = 3f
-        private const val MAX_TREMOLO_HZ = 9.5f
+        /** Tarjīʿ lives around 1.5–10 Hz of envelope oscillation: slow ~2 Hz
+         * swells (Hani) to ~6–8 Hz vibrato (Alafasy), at any hop rate. */
+        private const val MIN_TREMOLO_HZ = 1.5f
+        private const val MAX_TREMOLO_HZ = 10f
         private const val MIN_TREMOLO_DEPTH = 0.035f
         /** Off-gate depth as a fraction of [MIN_TREMOLO_DEPTH] (hysteresis). */
         private const val DEPTH_OFF_RATIO = 0.7f
+        /** Envelope-autocorrelation periodicity needed to call it a pulse. */
+        private const val MIN_PERIODICITY = 0.4f
+        // Band as envelope-hop lags (20 ms hops): 10 Hz → 5, 1.5 Hz → 33.
+        private const val MIN_ENV_LAG = 5
+        private const val MAX_ENV_LAG = 33
         private const val TREMOLO_EMA = 0.35f
         /** Analysis + smoothing lag the phase lead compensates (~45 ms). */
         private const val LAG_SEC = 0.045f
         private const val ATTACK_MS = 250f
-        private const val RELEASE_MS = 450f
+        /** Slow release: sub-second lulls in a long hold's pulsing (the
+         * reciter breathing *within* the tarjīʿ) must not drop the shimmer. */
+        private const val RELEASE_MS = 800f
         /** Read-out history for the output-latency delay (~1.3 s). */
         private const val HIST_HOPS = 64
     }
