@@ -168,6 +168,7 @@ class PlayerController(private val context: Context) {
             // Playing again means we recovered; retire any stale error line.
             error = if (player.isPlaying) null else _state.value.error,
         )
+        voiceEnergy.playbackSpeed = player.playbackParameters.speed
         // The PCM tap needs no lifecycle here — [VoiceEnergy.isLive] goes
         // quiet on its own within ~350 ms of the audio stopping.
     }
