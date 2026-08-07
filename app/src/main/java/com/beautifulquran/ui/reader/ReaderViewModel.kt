@@ -277,6 +277,9 @@ class ReaderViewModel(
      */
     private fun highlightPositionMs(forcedMediaMs: Long?, firstWordStartMs: Long): Long {
         val latencyMs = outputLatencyMs()
+        // The tarjīʿ shimmer delays the tapped voice signal by the same
+        // latency so it lands on what the listener hears now.
+        com.beautifulquran.playback.VoiceEnergy.active?.outputLatencyMs = latencyMs
         val leadMs = InkEngine.highlightLeadMs.toLong().coerceAtLeast(0L)
         if (latencyMs != lastOutputLatencyMs || leadMs != lastHighlightLeadMs) {
             lastOutputLatencyMs = latencyMs

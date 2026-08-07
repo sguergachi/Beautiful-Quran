@@ -81,10 +81,12 @@ unit-tested DSP core — tracks a **single held note** (voiced, pitch-stable
 ≥ ~0.4 s) and scans its amplitude envelope for an oscillation in the tarjīʿ
 band (~3–9.5 Hz). The moment the reverberation is detected, the shimmer
 starts — on any held note, mid-word or verse-closing — and rides the
-*measured* oscillation itself, phase-lead-compensated, so the gold swells
-and rests exactly with the reciter's voice (`InkEngine.GLINT_RESONANCE_DEPTH`
-~42 %). Detection ramps in and out under an attack/release envelope, so no
-edge ever pops.
+*measured* oscillation itself, so the gold swells and rests exactly with the
+reciter's voice (`InkEngine.GLINT_RESONANCE_DEPTH` ~42 %). Two clock
+corrections keep it in step: a phase lead covers the analysis lag, and the
+whole signal is delayed by the same output-route latency the highlight clock
+subtracts (the PCM tap hears the voice *before* the listener does). Detection
+ramps in and out under an attack/release envelope, so no edge ever pops.
 
 A free-running carrier at ~5.5 Hz (`GLINT_RESONANCE_SINE` ~22 %) remains as
 a gentle floor for **steady** holds inside the waqf window

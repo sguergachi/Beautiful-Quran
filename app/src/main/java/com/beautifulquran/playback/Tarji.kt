@@ -42,10 +42,35 @@ class Tarji {
     var holdMs = 0f
         private set
 
+    /**
+     * Read-out delay in content hops, set from the output route latency
+     * (× playback speed) by [VoiceEnergy]: the PCM tap hears the voice
+     * *before* the listener does, so the reported signal is delayed to match
+     * what is actually reaching the ear right now.
+     */
+    var delayHops = 0
+
+    // Reported (delayed) views — what renderers should consume.
+    private val histTremolo = FloatArray(HIST_HOPS)
+    private val histGain = FloatArray(HIST_HOPS)
+    private val histRev = FloatArray(HIST_HOPS)
+    private var histCount = 0
+
+    /** Tarjīʿ state as it reaches the ear now (delayed by [delayHops]). */
+    val syncReverberating: Boolean get() = histRev[histIndex()] != 0f
+    val syncTremolo: Float get() = histTremolo[histIndex()]
+    val syncTremoloGain: Float get() = histGain[histIndex()]
+
+    private fun histIndex(): Int {
+        val oldest = maxOf(0, histCount - HIST_HOPS)
+        return (maxOf(oldest, histCount - 1 - delayHops)) % HIST_HOPS
+    }
+
     // Rolling 80 ms analysis frame at 8 kHz, plus a reuse buffer for the
     // linearised copy (the audio thread must not allocate per hop).
     private val frame = FloatArray(FRAME_SAMPLES)
     private val work = FloatArray(FRAME_SAMPLES)
+    private val corrs = FloatArray(MAX_LAG + 1)
     private var frameFill = 0
 
     // Per-hop envelope RMS series (48 hops ≈ 1 s).
@@ -53,6 +78,7 @@ class Tarji {
     private var envCount = 0
 
     private var holdPitchHz = 0f
+    private var holdStartEnvCount = 0
     private var misses = 0
     private var peak = 0f
     private var tremoloSmoothed = 0f
@@ -77,6 +103,8 @@ class Tarji {
         tremoloSmoothed = 0f
         frameFill = 0
         envCount = 0
+        histCount = 0
+        holdStartEnvCount = 0
     }
 
     private fun onHop() {
@@ -106,6 +134,7 @@ class Tarji {
                 // New note (or first voiced frame): the hold restarts here.
                 holdMs = HOP_MS.toFloat()
                 holdPitchHz = pitchHz
+                holdStartEnvCount = envCount
             }
             misses = 0
         } else if (++misses > MAX_MISSES) {
@@ -118,12 +147,19 @@ class Tarji {
         val target = if (reverberating) 1f else 0f
         val tau = if (reverberating) ATTACK_MS else RELEASE_MS
         tremoloGain += (HOP_MS / tau) * (target - tremoloGain)
+
+        histTremolo[histCount % HIST_HOPS] = tremolo
+        histGain[histCount % HIST_HOPS] = tremoloGain
+        histRev[histCount % HIST_HOPS] = if (reverberating) 1f else 0f
+        histCount++
     }
 
-    /** Envelope oscillation scan over the recent window. */
+    /** Envelope oscillation scan over the held note's own envelope. */
     private fun updateTremolo(latestRms: Float) {
-        val n = minOf(envCount, ENV_HOPS)
-        if (holdMs < HOLD_MIN_MS || n < MIN_ENV_HOPS) {
+        // Only envelope samples from within the hold: the syllable attack
+        // ramp would otherwise poison the depth estimate for ~1 s.
+        val n = minOf(envCount - holdStartEnvCount, ENV_HOPS)
+        if (n < MIN_ENV_HOPS) {
             reverberating = false
             return
         }
@@ -159,10 +195,23 @@ class Tarji {
         }
         val hz = crossings / (2f * n * HOP_MS / 1000f)
 
-        reverberating = depth >= MIN_TREMOLO_DEPTH && hz in MIN_TREMOLO_HZ..MAX_TREMOLO_HZ
+        // Keep the signal smoothing even while gated off, so a lock-on starts
+        // from the live envelope rather than a stale frozen value.
         val raw = ((latestRms - mean) / amp).coerceIn(-1.5f, 1.5f)
         val prev = tremoloSmoothed
         tremoloSmoothed += TREMOLO_EMA * (raw - tremoloSmoothed)
+
+        // Hysteresis: stricter to switch on than to stay on — no flapping
+        // when the reverberation breathes near the gate.
+        val longEnough = holdMs >= HOLD_MIN_MS
+        reverberating = if (reverberating) {
+            longEnough && depth >= MIN_TREMOLO_DEPTH * DEPTH_OFF_RATIO &&
+                hz in (MIN_TREMOLO_HZ - 1f)..(MAX_TREMOLO_HZ + 1f)
+        } else {
+            longEnough && depth >= MIN_TREMOLO_DEPTH &&
+                hz in MIN_TREMOLO_HZ..MAX_TREMOLO_HZ
+        }
+
         // Lead the measured oscillation by the analysis+smoothing lag, so the
         // shimmer swells *with* the voice rather than trailing it: for a
         // near-sinusoid at the measured rate, s(t+τ) ≈ s·cos ωτ + ṡ·sin ωτ / ω.
@@ -184,18 +233,22 @@ class Tarji {
         var energy = 0f
         for (j in 0 until FRAME_SAMPLES - MAX_LAG) energy += work[j] * work[j]
         if (energy <= 1e-8f) return 0f to 0f
-        var bestLag = 0
         var best = 0f
         for (lag in MIN_LAG..MAX_LAG) {
             var corr = 0f
             for (j in 0 until FRAME_SAMPLES - MAX_LAG) corr += work[j] * work[j + lag]
-            if (corr > best) {
-                best = corr
-                bestLag = lag
-            }
+            corrs[lag] = corr
+            if (corr > best) best = corr
         }
-        if (bestLag == 0) return 0f to 0f
-        return (SAMPLE_RATE / bestLag.toFloat()) to (best / energy)
+        if (best <= 0f) return 0f to 0f
+        // Octave-stabilize: harmonics make lag multiples score near-identically,
+        // and picking the plain max flips the estimate between L and 2L hop to
+        // hop (which kept resetting the hold on real recitation). Take the
+        // shortest period within 5% of the best instead.
+        var lag = MIN_LAG
+        while (lag <= MAX_LAG && corrs[lag] < 0.95f * best) lag++
+        if (lag > MAX_LAG) return 0f to 0f
+        return (SAMPLE_RATE / lag.toFloat()) to (best / energy)
     }
 
     companion object {
@@ -225,10 +278,14 @@ class Tarji {
         private const val MIN_TREMOLO_HZ = 3f
         private const val MAX_TREMOLO_HZ = 9.5f
         private const val MIN_TREMOLO_DEPTH = 0.035f
+        /** Off-gate depth as a fraction of [MIN_TREMOLO_DEPTH] (hysteresis). */
+        private const val DEPTH_OFF_RATIO = 0.7f
         private const val TREMOLO_EMA = 0.35f
         /** Analysis + smoothing lag the phase lead compensates (~45 ms). */
         private const val LAG_SEC = 0.045f
         private const val ATTACK_MS = 250f
         private const val RELEASE_MS = 450f
+        /** Read-out history for the output-latency delay (~1.3 s). */
+        private const val HIST_HOPS = 64
     }
 }

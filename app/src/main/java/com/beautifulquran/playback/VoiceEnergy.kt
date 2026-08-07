@@ -39,6 +39,20 @@ class VoiceEnergy {
     @Volatile
     private var lastFeedMs = 0L
 
+    /**
+     * Output route latency (sink buffer + Bluetooth etc.), pushed by the
+     * reader — the same estimate the highlight clock subtracts. The tap hears
+     * the voice before the listener does, so the reported signal is delayed
+     * by exactly this to land on what reaches the ear now.
+     */
+    @Volatile
+    var outputLatencyMs = 0L
+
+    /** Current playback speed, pushed by [PlayerController] — the delay is in
+     * wall time, the history in content hops, so the speed scales it. */
+    @Volatile
+    var playbackSpeed = 1f
+
     // Decimation state (44.1/48 kHz stereo PCM → 8 kHz mono).
     private var decimSum = 0f
     private var decimCount = 0
@@ -70,11 +84,13 @@ class VoiceEnergy {
 
     private fun flushChunk() {
         if (chunkFill == 0) return
+        tarji.delayHops =
+            (outputLatencyMs * playbackSpeed / Tarji.HOP_MS).toInt().coerceIn(0, 63)
         tarji.onSamples8k(chunk, chunkFill)
         chunkFill = 0
-        reverberating = tarji.reverberating
-        tremolo = tarji.tremolo
-        tremoloGain = tarji.tremoloGain
+        reverberating = tarji.syncReverberating
+        tremolo = tarji.syncTremolo
+        tremoloGain = tarji.syncTremoloGain
         lastFeedMs = SystemClock.elapsedRealtime()
     }
 
