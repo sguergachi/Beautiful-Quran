@@ -229,7 +229,7 @@ fun InkLabPanel(
                         TuningSlider("Paced feather", t.pacedFeather, 0.3f..3f) {
                             InkEngine.tuning = t.copy(pacedFeather = it)
                         }
-                        TuningToggle("Voice glint shimmer", t.glintResonance) {
+                        TuningToggle("Tarjīʿ", t.glintResonance) {
                             InkEngine.tuning = t.copy(glintResonance = it)
                         }
                         LabCaption(
