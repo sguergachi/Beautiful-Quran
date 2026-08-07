@@ -36,6 +36,12 @@ class VoiceEnergy {
     var tremoloGain = 0f
         private set
 
+    /** True while a voiced single note is being held (with or without
+     * reverberation) — the still-gold sine floor only breathes then. */
+    @Volatile
+    var holdingNote = false
+        private set
+
     @Volatile
     private var lastFeedMs = 0L
 
@@ -68,7 +74,9 @@ class VoiceEnergy {
     fun onPcm16(buffer: ByteBuffer, channels: Int, sampleRate: Int) {
         if (channels <= 0 || sampleRate <= 0) return
         decimStep = maxOf(1, sampleRate / Tarji.SAMPLE_RATE)
-        val buf = buffer.asReadOnlyBuffer()
+        // PCM16 is little-endian regardless of the buffer's own order flag —
+        // byte-swapped reads keep their energy but lose all periodicity.
+        val buf = buffer.asReadOnlyBuffer().order(java.nio.ByteOrder.LITTLE_ENDIAN)
         while (buf.remaining() >= 2 * channels) {
             // Envelope + pitch need one channel only; skip the rest.
             decimSum += buf.short / 32768f
@@ -91,6 +99,7 @@ class VoiceEnergy {
         reverberating = tarji.syncReverberating
         tremolo = tarji.syncTremolo
         tremoloGain = tarji.syncTremoloGain
+        holdingNote = tarji.syncHoldingNote
         lastFeedMs = SystemClock.elapsedRealtime()
     }
 
@@ -107,6 +116,7 @@ class VoiceEnergy {
         reverberating = false
         tremolo = 0f
         tremoloGain = 0f
+        holdingNote = false
         lastFeedMs = 0L
         decimSum = 0f
         decimCount = 0

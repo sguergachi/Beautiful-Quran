@@ -1001,9 +1001,40 @@ private class InkMotion(
     val repeatAlpha: Float get() = repeatWash.alpha.value
     val repeatFeather: Float? get() = repeatWash.feather.value
     val glintProgress: Float
-        get() = if (glintIsRepeat) repeatProgress else sweepProgress
+        get() {
+            if (glintIsRepeat) return repeatProgress
+            // The gold's leading edge ripples with the detected tarjīʿ — the
+            // feather is where the shimmer reads on a formed word, so the
+            // voice drives it directly (the ink wash itself is untouched).
+            val g = resonanceGain()
+            if (g <= 0.01f) return sweepProgress
+            val voice = com.beautifulquran.playback.VoiceEnergy.active
+            val ripple = (voice?.tremolo ?: 0f) * g *
+                InkEngine.tuning.glintResonanceDepth * InkEngine.GLINT_EDGE_RIPPLE
+            return (sweepProgress + ripple).coerceIn(0f, 1f)
+        }
     val glintFeather: Float?
         get() = if (glintIsRepeat) repeatFeather else sweepFeather
+
+    /** Attack/release envelope of a detected tarjīʿ, 0 when none. */
+    private fun resonanceGain(): Float =
+        com.beautifulquran.playback.VoiceEnergy.active?.shimmerGain ?: 0f
+
+    /**
+     * True while the glint may resonate: a tarjīʿ hold detected on the voice
+     * (any held note), or — inside the pacing curve's waqf span — a voiced
+     * note is being held steady, earning the gentle free-running floor. When
+     * the voice decays (verse end) or playback pauses, both are false: still
+     * gold.
+     */
+    private val resonanceHolding: Boolean
+        get() {
+            if (resonanceGain() > 0.01f) return true
+            val voice = com.beautifulquran.playback.VoiceEnergy.active ?: return false
+            if (!voice.isLive || !voice.holdingNote) return false
+            return sweep.pacing.value?.inWaqfHold(sweep.linearClock.value) == true
+        }
+
     val glintLayerAlpha: Float
         get() {
             val base = glintAlpha.value * glintCarryAlpha(
@@ -1014,37 +1045,26 @@ private class InkMotion(
             // — the hold ends with the voice, so the dry-down after handoff
             // stays still; repeat terracotta sheen is never modulated.
             if (glintIsRepeat || base <= 0f || !isActive) return base
+            if (!resonanceHolding || !InkEngine.tuning.glintResonance) return base
             val t = sweep.linearClock.value
             val voice = com.beautifulquran.playback.VoiceEnergy.active
-            val g = voice?.shimmerGain ?: 0f
-            // The window opens the moment tarjīʿ is detected on the voice
-            // (any held note); the pacing curve's waqf span stays as the
-            // gentle sine floor when the hold is steady.
-            val holding = g > 0.01f ||
-                (sweep.pacing.value?.inWaqfHold(t) == true)
-            if (!holding || !InkEngine.tuning.glintResonance) return base
             val phaseSec = t * (sweep.durationMs.value.coerceAtLeast(1) / 1000f)
             return base * InkEngine.glintResonance(
                 holding = true,
                 phaseSec = phaseSec,
                 tremolo = voice?.tremolo ?: 0f,
-                tremoloGain = g,
+                tremoloGain = resonanceGain(),
             )
         }
 
-    /** True while the recited word is inside the waqf resonance window. */
+    /** True while the glint is resonating (halo stays bright for the shimmer). */
     val glintResonating: Boolean
-        get() {
-            if (glintIsRepeat || !isActive || glintAlpha.value <= 0f) return false
-            if (!InkEngine.tuning.glintResonance ||
-                InkEngine.tuning.glintResonanceDepth <= 0f
-            ) {
-                return false
-            }
-            val voice = com.beautifulquran.playback.VoiceEnergy.active
-            if ((voice?.shimmerGain ?: 0f) > 0.01f) return true
-            return sweep.pacing.value?.inWaqfHold(sweep.linearClock.value) == true
-        }
+        get() = !glintIsRepeat &&
+            isActive &&
+            glintAlpha.value > 0f &&
+            InkEngine.tuning.glintResonance &&
+            InkEngine.tuning.glintResonanceDepth > 0f &&
+            resonanceHolding
 
     /** Whether the orange repeat overlay still has any ink to show. */
     val showRepeatLayer: Boolean get() = repeatAlpha > 0f

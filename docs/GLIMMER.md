@@ -88,13 +88,26 @@ whole signal is delayed by the same output-route latency the highlight clock
 subtracts (the PCM tap hears the voice *before* the listener does). Detection
 ramps in and out under an attack/release envelope, so no edge ever pops.
 
+How the shimmer **reads** on a formed, parked word (gold tint over formed
+ink is low-contrast, so plain layer-alpha modulation barely shows there):
+
+- The glint's **leading edge ripples** with the tremolo
+  (`GLINT_EDGE_RIPPLE` ~4 % of the word width at full depth) — the feather
+  is where the eye reads the shimmer, so the voice drives it directly. The
+  ink wash itself is untouched.
+- The alpha multiplier is **re-centred below 1** while resonance runs
+  (`HEADROOM` 60 % of the swing): layer alpha clips at full opacity, so a
+  multiplier centred on 1 shows only the dimming half. Sinking the resting
+  point lets the gold brighten *and* dim with the voice.
+
 A free-running carrier at ~5.5 Hz (`GLINT_RESONANCE_SINE` ~22 %) remains as
 a gentle floor for **steady** holds inside the waqf window
 (`TajweedPacing.Curve.inWaqfHold(t)`, from the closing word's first long
-hold park through the end of the sweep), cross-fading out as the voice
-signal locks on. The gate hard-closes at handoff: the dry-down dissolve
-after the voice moves on is never modulated, and repeat terracotta glint is
-never modulated either.
+hold park through the end of the sweep) — but only while a voiced note is
+actually being held (`Tarji.holdingNote`), so it goes still at verse decay
+and on pause, and cross-fades out as the voice signal locks on. The gate
+hard-closes at handoff: the dry-down dissolve after the voice moves on is
+never modulated, and repeat terracotta glint is never modulated either.
 
 ## Visual target
 
