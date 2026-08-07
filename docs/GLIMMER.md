@@ -216,6 +216,8 @@ and inspect ink; the toggle is session-only and not part of `Tuning`.
 | Glint tint | `glintTintAlpha` | 0.62 | 0–1 | Peak strength of the crisp white-gold ink tint. |
 | Halo strength | `glintGlowAlpha` | 0.49 | 0–1 | Peak opacity of the blurred outline. |
 | Halo blur | `glintGlowRadius` | 10 | 0–10 | Renderer blur radius around the glyph outline; it is not a word-relative radial size. |
+| Waqf glint shimmer (Tajweed tab) | `glintResonance` | on | toggle | Soft white-gold breath on long verse-closing parks (voice energy + free carrier). |
+| Resonance strength (Tajweed tab) | `glintResonanceDepth` | 0.42 | 0–1 | How hard the gold swings with the held note; scales the free-running floor with it. |
 
 The scalar maps to Compose `Shadow.blurRadius` for per-word text and to dp for
 the shaped-path `BlurMaskFilter`; use the visual result, not physical units, as

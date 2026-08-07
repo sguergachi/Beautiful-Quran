@@ -80,6 +80,8 @@ data class InkLabSnapshot(
     val waqfShare: Float = 0.5932f,
     val waqfLengthScale: Float = 1f,
     val holdCreep: Float = 0.3f,
+    val glintResonance: Boolean = true,
+    val glintResonanceDepth: Float = InkEngine.GLINT_RESONANCE_DEPTH,
     val guideBodyEdge: Float = 0.5f,
     val guideFeatherWidth: Float = 0.2819f,
     val guideFadeSoftness: Float = 1.3329f,
@@ -123,6 +125,8 @@ data class InkLabSnapshot(
         waqfShare = waqfShare,
         waqfLengthScale = waqfLengthScale,
         holdCreep = holdCreep,
+        glintResonance = glintResonance,
+        glintResonanceDepth = glintResonanceDepth,
     )
 
     fun toContextualGuideTuning(): ContextualGuideTuning = ContextualGuideTuning(
@@ -180,6 +184,8 @@ data class InkLabSnapshot(
             waqfShare = tuning.waqfShare,
             waqfLengthScale = tuning.waqfLengthScale,
             holdCreep = tuning.holdCreep,
+            glintResonance = tuning.glintResonance,
+            glintResonanceDepth = tuning.glintResonanceDepth,
             guideBodyEdge = guide.bodyEdge,
             guideFeatherWidth = guide.featherWidth,
             guideFadeSoftness = guide.fadeSoftness,

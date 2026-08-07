@@ -1015,7 +1015,7 @@ private class InkMotion(
             if (glintIsRepeat || base <= 0f) return base
             val t = sweep.linearClock.value
             val holding = sweep.pacing.value?.inWaqfHold(t) == true
-            if (!holding) return base
+            if (!holding || !InkEngine.tuning.glintResonance) return base
             val phaseSec = t * (sweep.durationMs.value.coerceAtLeast(1) / 1000f)
             val energy = com.beautifulquran.playback.VoiceEnergy.active
             return base * InkEngine.glintResonance(
@@ -1030,6 +1030,8 @@ private class InkMotion(
     val glintResonating: Boolean
         get() = !glintIsRepeat &&
             glintAlpha.value > 0f &&
+            InkEngine.tuning.glintResonance &&
+            InkEngine.tuning.glintResonanceDepth > 0f &&
             (sweep.pacing.value?.inWaqfHold(sweep.linearClock.value) == true)
 
     /** Whether the orange repeat overlay still has any ink to show. */
