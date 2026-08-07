@@ -70,12 +70,16 @@ karaoke wash or turn the word into a whole-opacity pop.
 ### Long waqf resonance
 
 While the wash parks on a **long verse-closing waqf** (the reciter sustaining
-the final letter — median closer ~3 s), the formed glint breathes with a soft
-sine shimmer at a stylistic vocal-resonance rate (`InkEngine.GLINT_RESONANCE_HZ`,
-~5.5 Hz, amplitude `GLINT_RESONANCE_AMP` ~8 %). This is **not** real-time pitch
-tracking of the audio: it expresses the *hold* of the voice with a living wet
-ink, gated by `TajweedPacing.Curve.inWaqfHold(t)` so mid-ayah madds and short
-closers stay still. Repeat terracotta glint is never modulated.
+the final letter — median closer ~3 s), the formed white-gold glint **tracks
+the live voice**. Android attaches a `Visualizer` to the player's audio session
+(`playback/VoiceEnergy`): waveform RMS is compared to a slow resting EMA so
+vibrato and breath on the held note move the gold (`InkEngine.GLINT_RESONANCE_DEPTH`
+~42 %). A free-running carrier at ~5.5 Hz (`GLINT_RESONANCE_SINE` ~22 %) sits
+underneath so the sheen still breathes when Visualizer is silent (some devices
+/ Bluetooth routes). Gated by `TajweedPacing.Curve.inWaqfHold(t)` — mid-ayah
+madds and short closers stay still. During the park the halo stays near full
+formation so the shimmer reads on bright metal. Repeat terracotta glint is
+never modulated.
 
 ## Visual target
 

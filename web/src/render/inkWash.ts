@@ -468,9 +468,9 @@ export function runGlintWashIn(
 ): () => void {
   halo.style.opacity = '0'
   const cancelInk = ink ? runRepeatWashIn(ink, rtl, durationMs) : null
-  // Web has no full TajweedPacing curve yet: approximate long-waqf resonance
-  // as a soft shimmer over the middle of long Active sweeps (verse closers
-  // are multi-second). Android gates on Curve.inWaqfHold exactly.
+  // Web has no full TajweedPacing / Visualizer yet: approximate long-waqf
+  // resonance as a stronger free-running shimmer over the middle of long
+  // Active sweeps (verse closers). Android gates on Curve.inWaqfHold + voice.
   const longHold = durationMs >= 1_800
   const cancelHalo = runWash(
     durationMs,
@@ -479,7 +479,8 @@ export function runGlintWashIn(
     (p, eased) => {
       const holding = longHold && p >= 0.4 && p <= 0.95
       const phaseSec = (p * durationMs) / 1000
-      const r = glintResonance(holding, phaseSec)
+      // No AnalyserNode wire yet — sine floor only (depth 0 keeps identity).
+      const r = glintResonance(holding, phaseSec, 0, 0, 0)
       halo.style.opacity = String(Math.min(1, Math.max(0, eased * r)))
     },
     () => { halo.style.opacity = '1' },
