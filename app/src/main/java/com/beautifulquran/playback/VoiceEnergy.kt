@@ -1,93 +1,104 @@
 package com.beautifulquran.playback
 
-import android.media.audiofx.Visualizer
-import kotlin.math.sqrt
+import android.os.SystemClock
+import java.nio.ByteBuffer
 
 /**
- * Live voice level of the reciter for the glint resonance shimmer.
+ * Live voice analysis of the reciter, feeding the glint's tarjīʿ shimmer.
  *
- * Attaches an [Visualizer] to the player's audio session and exposes a
- * thread-safe [level] (0..1 RMS of the waveform) plus a slow [resting]
- * EMA so the gold can track vibrato and breath as deviation from the
- * sustained note — not absolute loudness.
+ * PCM is tapped inside the app's own audio pipeline ([VoiceTapAudioProcessor]
+ * on the player's audio sink) — no `RECORD_AUDIO` permission, no Visualizer
+ * (which would also be dead on emulators and several Bluetooth routes), and
+ * the envelope arrives in wall-clock order at whatever speed is playing, so
+ * the detected reverberation is the very one the listener hears.
  *
- * Pure RMS helpers stay unit-testable without Android.
+ * Buffers arrive on ExoPlayer's audio thread; the glint draw path reads only
+ * the volatile mirrors — no locks, no composition.
  */
 class VoiceEnergy {
 
+    private val tarji = Tarji()
+
+    /** True while a held note carries a detected reverberation (tarjīʿ). */
     @Volatile
-    var level: Float = 0f
+    var reverberating = false
         private set
 
-    /** Slow center of the sustained note; updated on each capture. */
+    /** The reverberation oscillation, zero-centred ~−1..1, in phase with the
+     * voice. Ride this for the synced shimmer. */
     @Volatile
-    var resting: Float = 0f
+    var tremolo = 0f
         private set
 
-    private var visualizer: Visualizer? = null
-    private var attachedSession: Int = Visualizer.ERROR
+    /** Attack/release envelope of the detection (0..1) — ramp the effect by
+     * this so the shimmer never pops at detection edges. */
+    @Volatile
+    var tremoloGain = 0f
+        private set
 
-    fun attach(audioSessionId: Int) {
-        if (audioSessionId == 0 || audioSessionId == Visualizer.ERROR) {
-            release()
-            return
-        }
-        if (attachedSession == audioSessionId && visualizer != null) return
-        release()
-        try {
-            val v = Visualizer(audioSessionId)
-            v.enabled = false
-            v.captureSize = Visualizer.getCaptureSizeRange()[1]
-            val rate = (Visualizer.getMaxCaptureRate() / 2).coerceAtLeast(8_000)
-            v.setDataCaptureListener(
-                object : Visualizer.OnDataCaptureListener {
-                    override fun onWaveFormDataCapture(
-                        visualizer: Visualizer?,
-                        waveform: ByteArray?,
-                        samplingRate: Int,
-                    ) {
-                        if (waveform == null || waveform.isEmpty()) return
-                        val rms = rms(waveform)
-                        level = rms
-                        // Slow EMA so vibrato/breath read as deviation, not
-                        // absolute volume of the reciter or device gain.
-                        resting = resting * RESTING_EMA + rms * (1f - RESTING_EMA)
-                    }
+    @Volatile
+    private var lastFeedMs = 0L
 
-                    override fun onFftDataCapture(
-                        visualizer: Visualizer?,
-                        fft: ByteArray?,
-                        samplingRate: Int,
-                    ) = Unit
-                },
-                rate,
-                true,
-                false,
-            )
-            v.enabled = true
-            visualizer = v
-            attachedSession = audioSessionId
-        } catch (_: RuntimeException) {
-            // Some devices / output routes refuse Visualizer; glint falls back
-            // to the free-running shimmer in [InkEngine.glintResonance].
-            release()
+    // Decimation state (44.1/48 kHz stereo PCM → 8 kHz mono).
+    private var decimSum = 0f
+    private var decimCount = 0
+    private var decimStep = 6
+    private val chunk = FloatArray(2048)
+    private var chunkFill = 0
+
+    /**
+     * Feed 16-bit PCM straight from the audio sink. Only reads [buffer]'s
+     * content (position untouched); the tap passes it through afterwards.
+     * Called on the audio thread.
+     */
+    fun onPcm16(buffer: ByteBuffer, channels: Int, sampleRate: Int) {
+        if (channels <= 0 || sampleRate <= 0) return
+        decimStep = maxOf(1, sampleRate / Tarji.SAMPLE_RATE)
+        val buf = buffer.asReadOnlyBuffer()
+        while (buf.remaining() >= 2 * channels) {
+            // Envelope + pitch need one channel only; skip the rest.
+            decimSum += buf.short / 32768f
+            buf.position(buf.position() + 2 * (channels - 1))
+            if (++decimCount >= decimStep) {
+                chunk[chunkFill++] = decimSum / decimStep
+                decimSum = 0f
+                decimCount = 0
+                if (chunkFill >= chunk.size) flushChunk()
+            }
         }
     }
 
+    private fun flushChunk() {
+        if (chunkFill == 0) return
+        tarji.onSamples8k(chunk, chunkFill)
+        chunkFill = 0
+        reverberating = tarji.reverberating
+        tremolo = tarji.tremolo
+        tremoloGain = tarji.tremoloGain
+        lastFeedMs = SystemClock.elapsedRealtime()
+    }
+
+    /** Detection goes silent when the PCM stops (pause, track change). */
+    val isLive: Boolean
+        get() = SystemClock.elapsedRealtime() - lastFeedMs < LIVE_WINDOW_MS
+
+    /** The gain a renderer should apply: collapses promptly when audio stops. */
+    val shimmerGain: Float
+        get() = if (isLive) tremoloGain else 0f
+
     fun release() {
-        try {
-            visualizer?.enabled = false
-            visualizer?.release()
-        } catch (_: RuntimeException) {
-            // already gone
-        }
-        visualizer = null
-        attachedSession = Visualizer.ERROR
-        level = 0f
+        tarji.reset()
+        reverberating = false
+        tremolo = 0f
+        tremoloGain = 0f
+        lastFeedMs = 0L
+        decimSum = 0f
+        decimCount = 0
+        chunkFill = 0
     }
 
     companion object {
-        private const val RESTING_EMA = 0.92f
+        private const val LIVE_WINDOW_MS = 350L
 
         /**
          * The live probe owned by [PlayerController]. Draw-phase glint reads
@@ -95,19 +106,5 @@ class VoiceEnergy {
          */
         @Volatile
         var active: VoiceEnergy? = null
-
-        /**
-         * RMS of an 8-bit unsigned PCM waveform (Visualizer format: 128 =
-         * silence). Returns 0..1.
-         */
-        fun rms(waveform: ByteArray): Float {
-            if (waveform.isEmpty()) return 0f
-            var sum = 0.0
-            for (b in waveform) {
-                val v = (b.toInt() and 0xFF) - 128
-                sum += v * v
-            }
-            return (sqrt(sum / waveform.size) / 128.0).toFloat().coerceIn(0f, 1f)
-        }
     }
 }

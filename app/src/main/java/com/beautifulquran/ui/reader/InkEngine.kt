@@ -472,24 +472,29 @@ object InkEngine {
     fun glinting(state: State): Boolean = state == State.Active
 
     /**
-     * Multiplier for wet-ink glint alpha while a long waqf is sustained.
+     * Multiplier for wet-ink glint alpha while a hold is sustained.
      *
-     * Primary signal is the reciter's live voice energy ([voiceLevel] vs a
-     * slow [resting] center from [com.beautifulquran.playback.VoiceEnergy]):
-     * vibrato and breath on the held note move the gold. A free-running sine
-     * at [hz] is mixed underneath so the sheen still breathes when the
-     * Visualizer is silent (some devices / BT routes). Pure and unit-tested.
+     * The primary signal is the reciter's live tarjīʿ (ترجيع) — the repeated
+     * reverberation of the voice on a held note — detected on the tapped PCM
+     * by [com.beautifulquran.playback.VoiceEnergy]: [tremolo] is that very
+     * oscillation (zero-centred, phase-locked to the voice) and [tremoloGain]
+     * its attack/release envelope, so the gold breathes exactly with the
+     * reciter and never pops at detection edges. A free-running sine at [hz]
+     * sits underneath as a gentle floor for steady holds (no tarjīʿ) inside
+     * the waqf window, cross-fading out as the voice signal arrives. Pure and
+     * unit-tested.
      *
-     * @param holding true only inside a long waqf park ([TajweedPacing.Curve.inWaqfHold])
+     * @param holding true inside the resonance window (waqf hold span, or a
+     * detected reverberant hold — see the glint layer in ReaderComponents)
      * @param phaseSec sweep seconds for the free-running carrier
-     * @param voiceLevel instantaneous waveform RMS 0..1
-     * @param resting slow EMA of that RMS on the sustained note
+     * @param tremolo synced tarjīʿ band signal −1..1 (0 = nothing detected)
+     * @param tremoloGain 0..1 attack/release ramp of the detected signal
      */
     fun glintResonance(
         holding: Boolean,
         phaseSec: Float,
-        voiceLevel: Float = 0f,
-        resting: Float = 0f,
+        tremolo: Float = 0f,
+        tremoloGain: Float = 0f,
         depth: Float = tuning.glintResonanceDepth,
         sineAmp: Float = glintResonanceSineFor(depth),
         hz: Float = GLINT_RESONANCE_HZ,
@@ -497,23 +502,18 @@ object InkEngine {
     ): Float {
         if (!holding || !enabled) return 1f
         if (depth <= 0f && sineAmp <= 0f) return 1f
+        val g = tremoloGain.coerceIn(0f, 1f)
         val sine =
             if (sineAmp > 0f && hz > 0f) {
                 kotlin.math.sin(2f * Math.PI.toFloat() * hz * phaseSec)
             } else {
                 0f
             }
-        // Only trust the Visualizer once it has real energy — silence must not
-        // pull the gold down (some devices report zeros for the session).
-        val voiceDelta =
-            if (voiceLevel < 0.02f && resting < 0.02f) {
-                0f
-            } else {
-                val center = resting.coerceAtLeast(0.04f)
-                ((voiceLevel - resting) / center).coerceIn(-1f, 1f)
-            }
-        // Voice carries the true vibration; sine keeps a minimum visible shimmer.
-        return (1f + depth * voiceDelta + sineAmp * sine).coerceIn(0.35f, 1.65f)
+        // Voice carries the true reverberation; the sine floor cross-fades
+        // out as the voice signal arrives.
+        val voice = depth * g * tremolo.coerceIn(-1.5f, 1.5f)
+        val floor = sineAmp * (1f - g) * sine
+        return (1f + voice + floor).coerceIn(0.35f, 1.65f)
     }
 
     /**
@@ -534,7 +534,7 @@ object InkEngine {
 
     /**
      * Free-running carrier under the voice signal so the gold still breathes
-     * when Visualizer is unavailable (0.08 shipped invisible; this is intentional).
+     * on steady holds without tarjīʿ (and before detection locks on).
      */
     const val GLINT_RESONANCE_SINE = 0.22f
 

@@ -67,23 +67,32 @@ The result should read as light forming with the word, peaking when the word is
 complete, then drying away. It must never replace the soft leading edge of the
 karaoke wash or turn the word into a whole-opacity pop.
 
-### Long waqf resonance
+### Tarjīʿ resonance
 
-While the wash parks on a **long verse-closing waqf** (the reciter sustaining
-the final letter — median closer ~3 s), the formed white-gold glint **tracks
-the live voice**. Android attaches a `Visualizer` to the player's audio session
-(`playback/VoiceEnergy`): waveform RMS is compared to a slow resting EMA so
-vibrato and breath on the held note move the gold (`InkEngine.GLINT_RESONANCE_DEPTH`
-~42 %). A free-running carrier at ~5.5 Hz (`GLINT_RESONANCE_SINE` ~22 %) sits
-underneath so the sheen still breathes when Visualizer is silent (some devices
-/ Bluetooth routes). Gated by `TajweedPacing.Curve.inWaqfHold(t)`, whose window
-runs from the closing word's **first long hold park through the end of the
-sweep** — the whole sustained close, not only the final letter's park (that
-sliver sits at the end of the sweep, long after the voice began holding).
-Mid-ayah madds and short closers stay still, and the gate hard-closes at
-handoff: the dry-down dissolve after the voice moves on is never modulated.
-During the park the halo stays near full formation so the shimmer reads on
-bright metal. Repeat terracotta glint is never modulated.
+**Tarjīʿ (ترجيع)** is the repeated reverberation of the voice on a single
+held note — the pulsing a reciter carries into a long madd or waqf sustain.
+The ḥadīth of Ibn Mughaffal (Bukhārī 5048) describes the Prophet's ﷺ
+recitation with exactly this word: يُرَجِّعُ — "his voice reverberated".
+
+The glint **listens for it directly**. `VoiceTapAudioProcessor` mirrors the
+player's own PCM (no mic permission, no Visualizer — which also means it
+works on every output route and emulator), and `playback/Tarji` — a pure,
+unit-tested DSP core — tracks a **single held note** (voiced, pitch-stable
+≥ ~0.4 s) and scans its amplitude envelope for an oscillation in the tarjīʿ
+band (~3–9.5 Hz). The moment the reverberation is detected, the shimmer
+starts — on any held note, mid-word or verse-closing — and rides the
+*measured* oscillation itself, phase-lead-compensated, so the gold swells
+and rests exactly with the reciter's voice (`InkEngine.GLINT_RESONANCE_DEPTH`
+~42 %). Detection ramps in and out under an attack/release envelope, so no
+edge ever pops.
+
+A free-running carrier at ~5.5 Hz (`GLINT_RESONANCE_SINE` ~22 %) remains as
+a gentle floor for **steady** holds inside the waqf window
+(`TajweedPacing.Curve.inWaqfHold(t)`, from the closing word's first long
+hold park through the end of the sweep), cross-fading out as the voice
+signal locks on. The gate hard-closes at handoff: the dry-down dissolve
+after the voice moves on is never modulated, and repeat terracotta glint is
+never modulated either.
 
 ## Visual target
 

@@ -229,13 +229,15 @@ fun InkLabPanel(
                         TuningSlider("Paced feather", t.pacedFeather, 0.3f..3f) {
                             InkEngine.tuning = t.copy(pacedFeather = it)
                         }
-                        TuningToggle("Waqf glint shimmer", t.glintResonance) {
+                        TuningToggle("Tarjīʿ", t.glintResonance) {
                             InkEngine.tuning = t.copy(glintResonance = it)
                         }
                         LabCaption(
-                            "White-gold breath on long verse-closing parks — " +
-                                "tracks the reciter's voice energy (plus a " +
-                                "soft free-running floor). Off keeps still gold.",
+                            "White-gold breath that rides the reciter's " +
+                                "tarjīʿ — the reverberation of the voice on a " +
+                                "held note — detected live on the tapped PCM. " +
+                                "Steady waqf holds keep a soft free-running " +
+                                "floor. Off keeps still gold.",
                         )
                         TuningSlider(
                             "Resonance strength",
