@@ -153,6 +153,17 @@ object InkEngine {
         val waqfLengthScale: Float = 1f,
         /** How far the wash still creeps while holding, so it breathes. */
         val holdCreep: Float = 0.3f,
+        /**
+         * Soft white-gold shimmer while a long verse-closing waqf is sustained.
+         * Off: still gold, no voice-driven flicker. See [glintResonance].
+         */
+        val glintResonance: Boolean = true,
+        /**
+         * How hard voice energy (and the free-running carrier) swing glint
+         * alpha during a long waqf park. 0 = no shimmer; shipped
+         * [GLINT_RESONANCE_DEPTH]. Auditionable in the Tajweed Ink Lab tab.
+         */
+        val glintResonanceDepth: Float = GLINT_RESONANCE_DEPTH,
     )
 
     /**
@@ -479,11 +490,13 @@ object InkEngine {
         phaseSec: Float,
         voiceLevel: Float = 0f,
         resting: Float = 0f,
-        depth: Float = GLINT_RESONANCE_DEPTH,
-        sineAmp: Float = GLINT_RESONANCE_SINE,
+        depth: Float = tuning.glintResonanceDepth,
+        sineAmp: Float = glintResonanceSineFor(depth),
         hz: Float = GLINT_RESONANCE_HZ,
+        enabled: Boolean = tuning.glintResonance,
     ): Float {
-        if (!holding) return 1f
+        if (!holding || !enabled) return 1f
+        if (depth <= 0f && sineAmp <= 0f) return 1f
         val sine =
             if (sineAmp > 0f && hz > 0f) {
                 kotlin.math.sin(2f * Math.PI.toFloat() * hz * phaseSec)
@@ -501,6 +514,16 @@ object InkEngine {
             }
         // Voice carries the true vibration; sine keeps a minimum visible shimmer.
         return (1f + depth * voiceDelta + sineAmp * sine).coerceIn(0.35f, 1.65f)
+    }
+
+    /**
+     * Free-running carrier amplitude scaled with [depth] so one Ink Lab
+     * slider moves voice depth and the sine floor together.
+     */
+    fun glintResonanceSineFor(depth: Float): Float {
+        if (depth <= 0f || GLINT_RESONANCE_DEPTH <= 0f) return 0f
+        return GLINT_RESONANCE_SINE *
+            (depth / GLINT_RESONANCE_DEPTH).coerceIn(0f, 2.5f)
     }
 
     /**

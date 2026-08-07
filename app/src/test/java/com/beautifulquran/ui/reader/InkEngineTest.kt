@@ -534,8 +534,29 @@ class InkEngineTest {
     }
 
     @Test
-    fun `glint resonance is identity when not holding`() {
+    fun `glint resonance is identity when not holding or disabled`() {
         assertEquals(1f, InkEngine.glintResonance(holding = false, phaseSec = 0.5f), 0f)
+        assertEquals(
+            1f,
+            InkEngine.glintResonance(
+                holding = true,
+                phaseSec = 0.5f,
+                depth = 0.4f,
+                sineAmp = 0.2f,
+                enabled = false,
+            ),
+            0f,
+        )
+        assertEquals(
+            1f,
+            InkEngine.glintResonance(
+                holding = true,
+                phaseSec = 0.5f,
+                depth = 0f,
+                sineAmp = 0f,
+            ),
+            0f,
+        )
     }
 
     @Test

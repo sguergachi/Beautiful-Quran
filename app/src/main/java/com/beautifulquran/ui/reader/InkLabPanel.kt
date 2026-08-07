@@ -229,6 +229,25 @@ fun InkLabPanel(
                         TuningSlider("Paced feather", t.pacedFeather, 0.3f..3f) {
                             InkEngine.tuning = t.copy(pacedFeather = it)
                         }
+                        TuningToggle("Waqf glint shimmer", t.glintResonance) {
+                            InkEngine.tuning = t.copy(glintResonance = it)
+                        }
+                        LabCaption(
+                            "White-gold breath on long verse-closing parks — " +
+                                "tracks the reciter's voice energy (plus a " +
+                                "soft free-running floor). Off keeps still gold.",
+                        )
+                        TuningSlider(
+                            "Resonance strength",
+                            t.glintResonanceDepth,
+                            0f..1f,
+                        ) {
+                            InkEngine.tuning = t.copy(glintResonanceDepth = it)
+                        }
+                        LabCaption(
+                            "How hard the gold swings with the held note. " +
+                                "0 = no shimmer; shipped ~${"%.2f".format(InkEngine.GLINT_RESONANCE_DEPTH)}.",
+                        )
                     }
 
                     InkLabTab.Guide -> {
@@ -428,6 +447,8 @@ internal fun formatTuningCopy(t: InkEngine.Tuning): String {
         appendLine("    waqfShare = ${f(t.waqfShare)},")
         appendLine("    waqfLengthScale = ${f(t.waqfLengthScale)},")
         appendLine("    holdCreep = ${f(t.holdCreep)},")
+        appendLine("    glintResonance = ${t.glintResonance},")
+        appendLine("    glintResonanceDepth = ${f(t.glintResonanceDepth)},")
         append(")")
     }
 }
