@@ -1010,9 +1010,10 @@ private class InkMotion(
                 replacedByRepeat = glintReplacedByRepeat,
                 repeatProgress = repeatProgress,
             )
-            // Resonance only on first-pass glint during a long waqf park;
-            // repeat terracotta sheen stays steady.
-            if (glintIsRepeat || base <= 0f) return base
+            // Resonance only while the first-pass word is still being recited
+            // — the hold ends with the voice, so the dry-down after handoff
+            // stays still; repeat terracotta sheen is never modulated.
+            if (glintIsRepeat || base <= 0f || !isActive) return base
             val t = sweep.linearClock.value
             val holding = sweep.pacing.value?.inWaqfHold(t) == true
             if (!holding || !InkEngine.tuning.glintResonance) return base
@@ -1026,9 +1027,10 @@ private class InkMotion(
             )
         }
 
-    /** True while the linear sweep is in a long waqf park (glint may shimmer). */
+    /** True while the recited word is inside the waqf resonance window. */
     val glintResonating: Boolean
         get() = !glintIsRepeat &&
+            isActive &&
             glintAlpha.value > 0f &&
             InkEngine.tuning.glintResonance &&
             InkEngine.tuning.glintResonanceDepth > 0f &&

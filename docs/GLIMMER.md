@@ -76,10 +76,14 @@ the live voice**. Android attaches a `Visualizer` to the player's audio session
 vibrato and breath on the held note move the gold (`InkEngine.GLINT_RESONANCE_DEPTH`
 ~42 %). A free-running carrier at ~5.5 Hz (`GLINT_RESONANCE_SINE` ~22 %) sits
 underneath so the sheen still breathes when Visualizer is silent (some devices
-/ Bluetooth routes). Gated by `TajweedPacing.Curve.inWaqfHold(t)` — mid-ayah
-madds and short closers stay still. During the park the halo stays near full
-formation so the shimmer reads on bright metal. Repeat terracotta glint is
-never modulated.
+/ Bluetooth routes). Gated by `TajweedPacing.Curve.inWaqfHold(t)`, whose window
+runs from the closing word's **first long hold park through the end of the
+sweep** — the whole sustained close, not only the final letter's park (that
+sliver sits at the end of the sweep, long after the voice began holding).
+Mid-ayah madds and short closers stay still, and the gate hard-closes at
+handoff: the dry-down dissolve after the voice moves on is never modulated.
+During the park the halo stays near full formation so the shimmer reads on
+bright metal. Repeat terracotta glint is never modulated.
 
 ## Visual target
 

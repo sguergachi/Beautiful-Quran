@@ -15,6 +15,8 @@ BOOT_TIMEOUT_SECONDS="${BOOT_TIMEOUT_SECONDS:-180}"
 # Windowed is the default. Only set ANDROID_EMULATOR_HEADLESS=1 for CI/SSH.
 ANDROID_EMULATOR_HEADLESS="${ANDROID_EMULATOR_HEADLESS:-0}"
 EMULATOR_LOG="$REPO_ROOT/.android-emulator.log"
+# Set to 0 by configure_host_vulkan when the host Vulkan driver is broken.
+HOST_VULKAN_USABLE=1
 
 log() {
   printf '\n==> %s\n' "$*" >&2
@@ -65,6 +67,21 @@ restore_local_display() {
   fail "no graphical display found (DISPLAY unset, no /tmp/.X11-unix/X*). Set DISPLAY, or use ANDROID_EMULATOR_HEADLESS=1"
 }
 
+# Cheap probe: is the selected host Vulkan driver actually alive? A stale
+# kernel module (NVIDIA updated without a reboot) leaves the ICD in place but
+# the driver unable to enumerate any device — gfxstream then dies with
+# "FATAL: No physical devices available".
+host_vulkan_usable() {
+  case "${VK_ICD_FILENAMES:-}" in
+    *nvidia*)
+      # nvidia-smi -L lists GPUs only when kernel module and user-space
+      # driver versions match.
+      ! command -v nvidia-smi >/dev/null 2>&1 || nvidia-smi -L >/dev/null 2>&1
+      ;;
+    *) return 0 ;;
+  esac
+}
+
 # Prefer the host GPU's Vulkan ICD over the emulator's bundled Lavapipe.
 # Without this, guest HWUI Vulkan (skiavk) can land in libvulkan_lvp.so and
 # SIGSEGV RenderThread under load. Safe no-op when no host ICD is present.
@@ -92,6 +109,13 @@ configure_host_vulkan() {
         break
       fi
     done
+  fi
+
+  if [[ -n "${VK_ICD_FILENAMES:-}" ]] && ! host_vulkan_usable; then
+    log "Host Vulkan driver unusable ($VK_ICD_FILENAMES) — kernel module mismatch? Reboot restores the host GPU; falling back to software rendering"
+    unset VK_ICD_FILENAMES ANDROID_EMU_VK_LOADER_PATH
+    HOST_VULKAN_USABLE=0
+    return 0
   fi
 
   # Re-enable host Vulkan if a previous workaround left it off.
@@ -166,9 +190,17 @@ start_emulator_if_needed() {
   fi
 
   log "Starting emulator: $ANDROID_AVD_NAME"
-  # Host GPU + KVM by default (software GL is unusably laggy for Compose).
-  # Override with ANDROID_EMULATOR_GPU=swiftshader_indirect if host GL fails.
-  local gpu_mode="${ANDROID_EMULATOR_GPU:-host}"
+  # Host GPU + KVM by default (software GL is unusably laggy for Compose),
+  # but auto-fallback to SwiftShader when the host Vulkan driver is broken.
+  # Override explicitly with ANDROID_EMULATOR_GPU=<mode> if needed.
+  local gpu_mode="${ANDROID_EMULATOR_GPU:-}"
+  if [[ -z "$gpu_mode" ]]; then
+    if [[ "$HOST_VULKAN_USABLE" == "1" ]]; then
+      gpu_mode=host
+    else
+      gpu_mode=swiftshader_indirect
+    fi
+  fi
   local emulator_args=(
     -avd "$ANDROID_AVD_NAME"
     -netdelay none
