@@ -510,23 +510,21 @@ object InkEngine {
                 0f
             }
         // Voice carries the true reverberation; the sine floor cross-fades
-        // out as the voice signal arrives.
+        // out as the voice signal arrives. The swing stays gentle: deep dips
+        // read as the word resetting, and the tint clamps at full opacity
+        // anyway — so centre slightly below 1 and bound both ends.
         val voice = depth * g * tremolo.coerceIn(-1.5f, 1.5f)
         val floor = sineAmp * (1f - g) * sine
-        // Re-center below 1 while the effect is engaged: layer alpha clips at
-        // full opacity, so a multiplier centred on 1 shows only the dips —
-        // which is exactly why the shimmer used to read only at the feather.
-        // Sinking the resting point lets the gold brighten *and* dim with the
-        // voice across its whole swing.
-        val swing = depth * g + sineAmp * (1 - g)
-        val center = 1f - HEADROOM * swing
-        return (center + voice + floor).coerceIn(MIN_RESONANCE_MULT, MAX_RESONANCE_MULT)
+        return (RESONANCE_CENTER + 0.5f * (voice + floor))
+            .coerceIn(MIN_RESONANCE_MULT, MAX_RESONANCE_MULT)
     }
 
-    /** Fraction of the swing the resting point sinks while resonance runs. */
-    private const val HEADROOM = 0.6f
-    private const val MIN_RESONANCE_MULT = 0.15f
-    private const val MAX_RESONANCE_MULT = 1.3f
+    /** Resting point of the resonance multiplier: just below full, so the
+     * gold can both brighten and dim with the voice. */
+    private const val RESONANCE_CENTER = 0.9f
+    /** Never dim formed ink past a breath — deeper dips read as a reset. */
+    private const val MIN_RESONANCE_MULT = 0.55f
+    private const val MAX_RESONANCE_MULT = 1.25f
 
     /**
      * Free-running carrier amplitude scaled with [depth] so one Ink Lab
@@ -552,11 +550,6 @@ object InkEngine {
 
     /** Free-running carrier rate (Hz) — mid vocal-vibrato range. */
     const val GLINT_RESONANCE_HZ = 5.5f
-
-    /** How far the glint's leading edge ripples with the detected tarjīʿ, as
-     * a fraction of the word width at full depth — the feather is where the
-     * shimmer reads on a formed word. */
-    const val GLINT_EDGE_RIPPLE = 0.04f
 
     /** @deprecated Use [GLINT_RESONANCE_DEPTH] / [GLINT_RESONANCE_SINE]. */
     const val GLINT_RESONANCE_AMP = GLINT_RESONANCE_SINE

@@ -561,8 +561,8 @@ class InkEngineTest {
 
     @Test
     fun `glint resonance rides the detected tarji signal`() {
-        // Re-centred below 1 (HEADROOM) so brightening reads too, not only
-        // dips: layer alpha clips at full opacity.
+        // Centred at 0.9 and bounded: brightening and dimming both read on a
+        // formed word, but a dip can never look like the ink resetting.
         val up = InkEngine.glintResonance(
             holding = true,
             phaseSec = 0f,
@@ -579,9 +579,8 @@ class InkEngineTest {
             depth = 0.4f,
             sineAmp = 0f,
         )
-        // swing = 0.4 → center = 1 − 0.6·0.4 = 0.76.
-        assertEquals(1.16f, up, 1e-4f)
-        assertEquals(0.36f, down, 1e-4f)
+        assertEquals(1.1f, up, 1e-4f)
+        assertEquals(0.7f, down, 1e-4f)
         // Half-ramped detection halves the swing (no pops at the edges).
         val ramping = InkEngine.glintResonance(
             holding = true,
@@ -591,13 +590,23 @@ class InkEngineTest {
             depth = 0.4f,
             sineAmp = 0f,
         )
-        assertEquals(1.08f, ramping, 1e-4f)
+        assertEquals(1.0f, ramping, 1e-4f)
+        // Even at max depth and a hard tremolo trough, the gold only breathes.
+        val maxDip = InkEngine.glintResonance(
+            holding = true,
+            phaseSec = 0f,
+            tremolo = -1.5f,
+            tremoloGain = 1f,
+            depth = 1f,
+            sineAmp = 0f,
+        )
+        assertEquals(0.55f, maxDip, 1e-4f)
     }
 
     @Test
     fun `glint resonance sine floor yields to the voice as it locks on`() {
         val hz = 5.5f
-        // No detection yet: free-running floor around its own sunk centre.
+        // No detection yet: free-running floor around the centre.
         val floorOnly = InkEngine.glintResonance(
             holding = true,
             phaseSec = 0.25f / hz,
@@ -607,7 +616,7 @@ class InkEngineTest {
             sineAmp = 0.22f,
             hz = hz,
         )
-        assertEquals(1f - 0.6f * 0.22f + 0.22f, floorOnly, 1e-4f)
+        assertEquals(0.9f + 0.5f * 0.22f, floorOnly, 1e-4f)
         // Detection locked at a tremolo peak: voice term wins, floor gone.
         val locked = InkEngine.glintResonance(
             holding = true,
@@ -618,7 +627,7 @@ class InkEngineTest {
             sineAmp = 0.22f,
             hz = hz,
         )
-        assertEquals(1.16f, locked, 1e-4f)
+        assertEquals(1.1f, locked, 1e-4f)
     }
 
     @Test
