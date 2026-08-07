@@ -126,18 +126,39 @@ class TajweedPacingTest {
 
     @Test
     fun `long waqf parks mark a glint resonance window`() {
-        // Long closer with a real park: mid-hold is in the resonance window,
-        // cruise start and final settle are not.
+        // Long closer with a real park: the window runs from the waqf park
+        // through the end of the sweep — the voice sustains until the word is
+        // done, and the glint layer's Active gate closes it at handoff.
         val long = curveOf(
             dallin,
             hold = Hold(madd = false, isAyahFinal = true, waqfLengthScale = 0f),
         )
-        assertFalse("early cruise is not a waqf park", long.inWaqfHold(0.05f))
-        assertTrue("mid park is a waqf hold", long.inWaqfHold(0.55f))
-        assertFalse("settled end is past the park", long.inWaqfHold(0.99f))
+        assertFalse("early cruise is before the close", long.inWaqfHold(0.05f))
+        assertTrue("mid park is inside the window", long.inWaqfHold(0.55f))
+        assertTrue("window runs through the end of the verse", long.inWaqfHold(0.99f))
         // Mid-ayah madd holds must not arm resonance — only verse-closing waqf.
         val mid = curveOf(dallin, hold = Hold(isAyahFinal = false))
         assertFalse(mid.inWaqfHold(0.5f))
+    }
+
+    @Test
+    fun `resonance window opens at the first long hold of the closing word`() {
+        // ٱلضَّآلِّينَ carries a mid-word madd lazim long before its waqf
+        // close: with madds enabled the window opens at that earlier park, so
+        // the shimmer covers the whole sustained close — not only the final
+        // letter's park sliver at the end of the sweep.
+        fun windowStart(hold: Hold): Float {
+            val curve = curveOf(dallin, hold = hold)
+            var t = 0f
+            while (t <= 1f && !curve.inWaqfHold(t)) t += 0.01f
+            return t
+        }
+        val maddOff = windowStart(Hold(madd = false, isAyahFinal = true, waqfLengthScale = 0f))
+        val maddOn = windowStart(Hold(madd = true, isAyahFinal = true, waqfLengthScale = 0f))
+        assertTrue(
+            "madd park should open the window earlier: on=$maddOn off=$maddOff",
+            maddOn < maddOff,
+        )
     }
 
     @Test
