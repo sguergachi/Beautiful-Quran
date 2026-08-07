@@ -60,8 +60,8 @@ class PlayerController(private val context: Context) {
     val state: StateFlow<PlayerUiState> = _state
 
     /**
-     * Live waveform energy of the reciter (Visualizer on the audio session).
-     * Read from the glint draw path during long waqf parks — no composition.
+     * Live voice analysis of the reciter (PCM tapped in the player's audio
+     * sink). Read from the glint draw path during holds — no composition.
      */
     val voiceEnergy = VoiceEnergy().also { VoiceEnergy.active = it }
 
@@ -168,13 +168,8 @@ class PlayerController(private val context: Context) {
             // Playing again means we recovered; retire any stale error line.
             error = if (player.isPlaying) null else _state.value.error,
         )
-        // Glint resonance rides the voice: attach while audio is live, drop
-        // when idle so the Visualizer does not outlive the session.
-        if (playing || player.playbackState == Player.STATE_BUFFERING) {
-            voiceEnergy.attach(player.audioSessionId)
-        } else {
-            voiceEnergy.release()
-        }
+        // The PCM tap needs no lifecycle here — [VoiceEnergy.isLive] goes
+        // quiet on its own within ~350 ms of the audio stopping.
     }
 
     fun clearError() {

@@ -1015,26 +1015,36 @@ private class InkMotion(
             // stays still; repeat terracotta sheen is never modulated.
             if (glintIsRepeat || base <= 0f || !isActive) return base
             val t = sweep.linearClock.value
-            val holding = sweep.pacing.value?.inWaqfHold(t) == true
+            val voice = com.beautifulquran.playback.VoiceEnergy.active
+            val g = voice?.shimmerGain ?: 0f
+            // The window opens the moment tarjīʿ is detected on the voice
+            // (any held note); the pacing curve's waqf span stays as the
+            // gentle sine floor when the hold is steady.
+            val holding = g > 0.01f ||
+                (sweep.pacing.value?.inWaqfHold(t) == true)
             if (!holding || !InkEngine.tuning.glintResonance) return base
             val phaseSec = t * (sweep.durationMs.value.coerceAtLeast(1) / 1000f)
-            val energy = com.beautifulquran.playback.VoiceEnergy.active
             return base * InkEngine.glintResonance(
                 holding = true,
                 phaseSec = phaseSec,
-                voiceLevel = energy?.level ?: 0f,
-                resting = energy?.resting ?: 0f,
+                tremolo = voice?.tremolo ?: 0f,
+                tremoloGain = g,
             )
         }
 
     /** True while the recited word is inside the waqf resonance window. */
     val glintResonating: Boolean
-        get() = !glintIsRepeat &&
-            isActive &&
-            glintAlpha.value > 0f &&
-            InkEngine.tuning.glintResonance &&
-            InkEngine.tuning.glintResonanceDepth > 0f &&
-            (sweep.pacing.value?.inWaqfHold(sweep.linearClock.value) == true)
+        get() {
+            if (glintIsRepeat || !isActive || glintAlpha.value <= 0f) return false
+            if (!InkEngine.tuning.glintResonance ||
+                InkEngine.tuning.glintResonanceDepth <= 0f
+            ) {
+                return false
+            }
+            val voice = com.beautifulquran.playback.VoiceEnergy.active
+            if ((voice?.shimmerGain ?: 0f) > 0.01f) return true
+            return sweep.pacing.value?.inWaqfHold(sweep.linearClock.value) == true
+        }
 
     /** Whether the orange repeat overlay still has any ink to show. */
     val showRepeatLayer: Boolean get() = repeatAlpha > 0f
