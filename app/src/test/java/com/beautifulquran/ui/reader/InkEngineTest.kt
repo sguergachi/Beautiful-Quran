@@ -534,6 +534,33 @@ class InkEngineTest {
     }
 
     @Test
+    fun `glint resonance is identity when not holding`() {
+        assertEquals(1f, InkEngine.glintResonance(holding = false, phaseSec = 0.5f), 0f)
+        assertEquals(1f, InkEngine.glintResonance(holding = true, phaseSec = 0f, amplitude = 0f), 0f)
+    }
+
+    @Test
+    fun `glint resonance oscillates around one while holding`() {
+        val amp = 0.08f
+        val hz = 5.5f
+        // Peak of the sine at quarter period.
+        val peak = InkEngine.glintResonance(
+            holding = true,
+            phaseSec = 0.25f / hz,
+            amplitude = amp,
+            hz = hz,
+        )
+        val trough = InkEngine.glintResonance(
+            holding = true,
+            phaseSec = 0.75f / hz,
+            amplitude = amp,
+            hz = hz,
+        )
+        assertEquals(1f + amp, peak, 1e-4f)
+        assertEquals(1f - amp, trough, 1e-4f)
+    }
+
+    @Test
     fun `same-word repeat masks retained clock until reveal begins`() {
         val action = repeatWashAction(
             wasRepeat = false,

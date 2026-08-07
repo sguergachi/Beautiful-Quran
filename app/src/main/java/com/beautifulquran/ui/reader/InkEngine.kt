@@ -461,6 +461,36 @@ object InkEngine {
     fun glinting(state: State): Boolean = state == State.Active
 
     /**
+     * Soft shimmer of the wet-ink glint while a long waqf is sustained.
+     *
+     * Multiplies glint layer alpha. Returns 1 when not holding. [hz] is a
+     * stylistic vocal-resonance rate (~typical reciter vibrato), not a
+     * measured fundamental frequency from the audio — the product expresses
+     * the *hold*, not pitch-tracks the voice. Pure and unit-tested.
+     *
+     * @param holding true only inside a long waqf park ([TajweedPacing.Curve.inWaqfHold])
+     * @param phaseSec wall/sweep seconds used as the sine phase
+     */
+    fun glintResonance(
+        holding: Boolean,
+        phaseSec: Float,
+        amplitude: Float = GLINT_RESONANCE_AMP,
+        hz: Float = GLINT_RESONANCE_HZ,
+    ): Float {
+        if (!holding || amplitude <= 0f || hz <= 0f) return 1f
+        return 1f + amplitude * kotlin.math.sin(2f * Math.PI.toFloat() * hz * phaseSec)
+    }
+
+    /** Peak-to-peak half-amplitude of [glintResonance] (fraction of glint alpha). */
+    const val GLINT_RESONANCE_AMP = 0.08f
+
+    /**
+     * Soft resonance rate in Hz — mid vocal-vibrato range so a multi-second
+     * waqf park reads as a living hold rather than a static spotlight.
+     */
+    const val GLINT_RESONANCE_HZ = 5.5f
+
+    /**
      * Ink for the surah-header basmalah calligraphy (a VectorDrawable, not
      * shaped text): Active while the lead-in clip plays, Upcoming while
      * another ayah is recited (same recess as verse words), Plain at rest.

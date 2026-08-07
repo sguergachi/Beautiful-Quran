@@ -67,6 +67,16 @@ The result should read as light forming with the word, peaking when the word is
 complete, then drying away. It must never replace the soft leading edge of the
 karaoke wash or turn the word into a whole-opacity pop.
 
+### Long waqf resonance
+
+While the wash parks on a **long verse-closing waqf** (the reciter sustaining
+the final letter — median closer ~3 s), the formed glint breathes with a soft
+sine shimmer at a stylistic vocal-resonance rate (`InkEngine.GLINT_RESONANCE_HZ`,
+~5.5 Hz, amplitude `GLINT_RESONANCE_AMP` ~8 %). This is **not** real-time pitch
+tracking of the audio: it expresses the *hold* of the voice with a living wet
+ink, gated by `TajweedPacing.Curve.inWaqfHold(t)` so mid-ayah madds and short
+closers stay still. Repeat terracotta glint is never modulated.
+
 ## Visual target
 
 The halo is a slight, realistically blurred extension of the glyph silhouette:

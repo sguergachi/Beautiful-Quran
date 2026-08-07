@@ -13,7 +13,7 @@
  */
 import { animate, type AnimationPlaybackControls } from 'motion'
 import { cubicBezierEase, paperCoverMaskImage, washMaskImage } from '../ui/theme/Fade'
-import { getTuning } from '../ui/reader/InkEngine'
+import { getTuning, glintResonance } from '../ui/reader/InkEngine'
 import { cubicBezierTuple, type CubicBezierEase } from '../ui/motion/easing'
 
 /** Quantize wash progress to ~48 steps — visually identical, far fewer strings. */
@@ -468,11 +468,20 @@ export function runGlintWashIn(
 ): () => void {
   halo.style.opacity = '0'
   const cancelInk = ink ? runRepeatWashIn(ink, rtl, durationMs) : null
+  // Web has no full TajweedPacing curve yet: approximate long-waqf resonance
+  // as a soft shimmer over the middle of long Active sweeps (verse closers
+  // are multi-second). Android gates on Curve.inWaqfHold exactly.
+  const longHold = durationMs >= 1_800
   const cancelHalo = runWash(
     durationMs,
     sweepEase(),
     cubicBezierEase,
-    (_p, eased) => { halo.style.opacity = String(eased) },
+    (p, eased) => {
+      const holding = longHold && p >= 0.4 && p <= 0.95
+      const phaseSec = (p * durationMs) / 1000
+      const r = glintResonance(holding, phaseSec)
+      halo.style.opacity = String(Math.min(1, Math.max(0, eased * r)))
+    },
     () => { halo.style.opacity = '1' },
   )
   return () => { cancelInk?.(); cancelHalo() }

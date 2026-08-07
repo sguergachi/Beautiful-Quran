@@ -181,6 +181,13 @@ object TajweedPacing {
         private val positions: FloatArray,
         /** Pronounced letters — drives the paced feather width. */
         val letterCount: Int,
+        /**
+         * Normalized-time pairs `[start0, end0, start1, end1, …]` for the
+         * verse-closing waqf park. Empty when this curve has no long waqf
+         * hold (mid-ayah madds, short closers below [MIN_WAQF_RESONANCE_SPAN]).
+         * Used by the fresh-ink glint's soft resonance shimmer.
+         */
+        private val waqfHoldSpans: FloatArray = FloatArray(0),
     ) {
         fun at(t: Float): Float {
             if (t >= 1f) return 1f
@@ -194,6 +201,22 @@ object TajweedPacing {
             if (span <= 0f) return positions[i + 1]
             val f = (c - times[i]) / span
             return positions[i] + (positions[i + 1] - positions[i]) * f
+        }
+
+        /**
+         * True while the linear sweep clock [t] is inside a long waqf park —
+         * the reciter is sustaining the closing letter, so the glint may
+         * breathe with a soft resonance shimmer.
+         */
+        fun inWaqfHold(t: Float): Boolean {
+            if (waqfHoldSpans.isEmpty()) return false
+            val c = t.coerceIn(0f, 1f)
+            var i = 0
+            while (i + 1 < waqfHoldSpans.size) {
+                if (c >= waqfHoldSpans[i] && c <= waqfHoldSpans[i + 1]) return true
+                i += 2
+            }
+            return false
         }
     }
 
@@ -285,6 +308,8 @@ object TajweedPacing {
         // get none of their own: their width is crossed on a neighbour's glide.
         val times = ArrayList<Float>(letters + held.size + 4)
         val positions = ArrayList<Float>(letters + held.size + 4)
+        // Long waqf parks only — mid-word madds keep a still glint.
+        val waqfHoldSpans = ArrayList<Float>(2)
         times += 0f
         positions += 0f
         var t = 0f
@@ -306,10 +331,20 @@ object TajweedPacing {
             // sustained, rather than held before or after itself.
             val slotStart = slotEnd - slotWidth(i, n, counts, lastPronounced)
             glideTo(slotStart + HOLD_ANCHOR * (slotEnd - slotStart))
+            val holdStart = times.last()
             t += dwellShare * excess[i] / excessTotal
             x += creep * (slotEnd - slotStart)
             times += t * spoken
             positions += x
+            if (i == waqfIndex) {
+                val holdEnd = times.last()
+                // Short closers still park, but the span is too brief for a
+                // shimmer to read as resonance rather than noise.
+                if (holdEnd - holdStart >= MIN_WAQF_RESONANCE_SPAN) {
+                    waqfHoldSpans += holdStart
+                    waqfHoldSpans += holdEnd
+                }
+            }
         }
         // A held final letter still has the tail of its own slot to cross.
         if (x < 1f) glideTo(1f)
@@ -318,7 +353,12 @@ object TajweedPacing {
         positions[positions.lastIndex] = 1f
         times += 1f
         positions += 1f
-        return Curve(times.toFloatArray(), positions.toFloatArray(), letters)
+        return Curve(
+            times = times.toFloatArray(),
+            positions = positions.toFloatArray(),
+            letterCount = letters,
+            waqfHoldSpans = waqfHoldSpans.toFloatArray(),
+        )
     }
 
     /**
@@ -529,6 +569,11 @@ object TajweedPacing {
      * sprint, which is the very problem the gate exists to avoid. */
     private const val MAX_DWELL_SHARE = 0.85f
     private const val MAX_CREEP = 0.5f
+    /**
+     * Minimum normalized-time length of a waqf park before the glint may
+     * shimmer. Below this the hold is a blink, not a sustained resonance.
+     */
+    private const val MIN_WAQF_RESONANCE_SPAN = 0.12f
     /** Where inside its own slot the wash parks: half-way, so the held letter
      * is caught mid-bloom rather than sustained before or after itself. */
     private const val HOLD_ANCHOR = 0.5f
