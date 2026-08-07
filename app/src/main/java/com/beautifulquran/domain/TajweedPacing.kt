@@ -190,6 +190,10 @@ object TajweedPacing {
          */
         private val waqfHoldSpans: FloatArray = FloatArray(0),
     ) {
+        /** True when this word closes its verse with a long waqf hold — the
+         * only words whose glint may resonate with the reciter's tarjīʿ. */
+        val hasWaqfHold: Boolean get() = waqfHoldSpans.isNotEmpty()
+
         fun at(t: Float): Float {
             if (t >= 1f) return 1f
             val c = t.coerceAtLeast(0f)

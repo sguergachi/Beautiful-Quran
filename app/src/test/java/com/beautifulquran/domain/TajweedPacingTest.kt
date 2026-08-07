@@ -136,9 +136,11 @@ class TajweedPacingTest {
         assertFalse("early cruise is before the close", long.inWaqfHold(0.05f))
         assertTrue("mid park is inside the window", long.inWaqfHold(0.55f))
         assertTrue("window runs through the end of the verse", long.inWaqfHold(0.99f))
+        assertTrue(long.hasWaqfHold)
         // Mid-ayah madd holds must not arm resonance — only verse-closing waqf.
         val mid = curveOf(dallin, hold = Hold(isAyahFinal = false))
         assertFalse(mid.inWaqfHold(0.5f))
+        assertFalse(mid.hasWaqfHold)
     }
 
     @Test
