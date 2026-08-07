@@ -1006,10 +1006,10 @@ private class InkMotion(
             // The gold's leading edge ripples with the detected tarjīʿ — the
             // feather is where the shimmer reads on a formed word, so the
             // voice drives it directly (the ink wash itself is untouched).
-            // Waqf-closing words only.
+            // Only words the wash parks on (a tajweed hold).
             val g = resonanceGain()
             if (g <= 0.01f) return sweepProgress
-            if (sweep.pacing.value?.hasWaqfHold != true) return sweepProgress
+            if (sweep.pacing.value == null) return sweepProgress
             val voice = com.beautifulquran.playback.VoiceEnergy.active
             val ripple = (voice?.tremolo ?: 0f) * g *
                 InkEngine.tuning.glintResonanceDepth * InkEngine.GLINT_EDGE_RIPPLE
@@ -1023,17 +1023,17 @@ private class InkMotion(
         com.beautifulquran.playback.VoiceEnergy.active?.shimmerGain ?: 0f
 
     /**
-     * True while the glint may resonate — only on words that close their
-     * verse with a long waqf hold ([TajweedPacing.Curve.hasWaqfHold]).
-     * Then: a tarjīʿ detected on the voice opens the shimmer the moment the
-     * reverberation starts; a voiced note held steady inside the waqf span
-     * earns the gentle free-running floor. When the voice decays (verse end)
-     * or playback pauses, both are false: still gold.
+     * True while the glint may resonate. Eligible words are those the wash
+     * parks on — a **strong tajweed hold**: long madd, ghunnah (e.g. the
+     * shadda nūn of ٱلنَّارِ), or the verse-closing waqf — i.e. the pacing
+     * curve exists. Then: a tarjīʿ detected on the voice opens the shimmer
+     * the moment the reverberation starts. Steady holds earn the gentle
+     * free-running floor only inside the waqf span. When the voice decays or
+     * playback pauses: still gold.
      */
     private val resonanceHolding: Boolean
         get() {
             val pacing = sweep.pacing.value ?: return false
-            if (!pacing.hasWaqfHold) return false
             if (resonanceGain() > 0.01f) return true
             val voice = com.beautifulquran.playback.VoiceEnergy.active ?: return false
             if (!voice.isLive || !voice.holdingNote) return false
