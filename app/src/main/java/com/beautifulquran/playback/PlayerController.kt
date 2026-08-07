@@ -59,6 +59,12 @@ class PlayerController(private val context: Context) {
     private val _state = MutableStateFlow(PlayerUiState())
     val state: StateFlow<PlayerUiState> = _state
 
+    /**
+     * Live waveform energy of the reciter (Visualizer on the audio session).
+     * Read from the glint draw path during long waqf parks — no composition.
+     */
+    val voiceEnergy = VoiceEnergy().also { VoiceEnergy.active = it }
+
     /** Set synchronously (not in the launch bodies) so callers can sequence
      * playSurah + setRepeatRange without the coroutines racing the field. */
     private var repeatRange: IntRange? = null
@@ -102,6 +108,7 @@ class PlayerController(private val context: Context) {
                     // Drop the stale handle so the next command reconnects.
                     this@PlayerController.controller = null
                     basmalahLeadIn = false
+                    voiceEnergy.release()
                     _state.value = PlayerUiState()
                 }
             })
@@ -146,8 +153,9 @@ class PlayerController(private val context: Context) {
         basmalahLeadIn = player.mediaItemCount > 0 &&
             parseMediaId(player.getMediaItemAt(0).mediaId)?.ayah == 0
         val ended = player.playbackState == Player.STATE_ENDED
+        val playing = player.isPlaying || forcePlaying
         _state.value = _state.value.copy(
-            isPlaying = player.isPlaying || forcePlaying,
+            isPlaying = playing,
             isBuffering = player.playbackState == Player.STATE_BUFFERING,
             nowPlaying = if (ended && !forcePlaying) {
                 null
@@ -160,6 +168,13 @@ class PlayerController(private val context: Context) {
             // Playing again means we recovered; retire any stale error line.
             error = if (player.isPlaying) null else _state.value.error,
         )
+        // Glint resonance rides the voice: attach while audio is live, drop
+        // when idle so the Visualizer does not outlive the session.
+        if (playing || player.playbackState == Player.STATE_BUFFERING) {
+            voiceEnergy.attach(player.audioSessionId)
+        } else {
+            voiceEnergy.release()
+        }
     }
 
     fun clearError() {
@@ -375,6 +390,7 @@ class PlayerController(private val context: Context) {
     fun stop() {
         resetRepeatState()
         basmalahLeadIn = false
+        voiceEnergy.release()
         val epoch = commands.invalidate()
         scope.launch {
             commands.runIfCurrent(epoch) {
