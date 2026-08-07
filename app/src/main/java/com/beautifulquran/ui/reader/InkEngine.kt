@@ -153,6 +153,17 @@ object InkEngine {
         val waqfLengthScale: Float = 1f,
         /** How far the wash still creeps while holding, so it breathes. */
         val holdCreep: Float = 0.3f,
+        /**
+         * Soft white-gold shimmer while a long verse-closing waqf is sustained.
+         * Off: still gold, no voice-driven flicker. See [glintResonance].
+         */
+        val glintResonance: Boolean = true,
+        /**
+         * How hard voice energy (and the free-running carrier) swing glint
+         * alpha during a long waqf park. 0 = no shimmer; shipped
+         * [GLINT_RESONANCE_DEPTH]. Auditionable in the Tajweed Ink Lab tab.
+         */
+        val glintResonanceDepth: Float = GLINT_RESONANCE_DEPTH,
     )
 
     /**
@@ -461,34 +472,77 @@ object InkEngine {
     fun glinting(state: State): Boolean = state == State.Active
 
     /**
-     * Soft shimmer of the wet-ink glint while a long waqf is sustained.
+     * Multiplier for wet-ink glint alpha while a long waqf is sustained.
      *
-     * Multiplies glint layer alpha. Returns 1 when not holding. [hz] is a
-     * stylistic vocal-resonance rate (~typical reciter vibrato), not a
-     * measured fundamental frequency from the audio — the product expresses
-     * the *hold*, not pitch-tracks the voice. Pure and unit-tested.
+     * Primary signal is the reciter's live voice energy ([voiceLevel] vs a
+     * slow [resting] center from [com.beautifulquran.playback.VoiceEnergy]):
+     * vibrato and breath on the held note move the gold. A free-running sine
+     * at [hz] is mixed underneath so the sheen still breathes when the
+     * Visualizer is silent (some devices / BT routes). Pure and unit-tested.
      *
      * @param holding true only inside a long waqf park ([TajweedPacing.Curve.inWaqfHold])
-     * @param phaseSec wall/sweep seconds used as the sine phase
+     * @param phaseSec sweep seconds for the free-running carrier
+     * @param voiceLevel instantaneous waveform RMS 0..1
+     * @param resting slow EMA of that RMS on the sustained note
      */
     fun glintResonance(
         holding: Boolean,
         phaseSec: Float,
-        amplitude: Float = GLINT_RESONANCE_AMP,
+        voiceLevel: Float = 0f,
+        resting: Float = 0f,
+        depth: Float = tuning.glintResonanceDepth,
+        sineAmp: Float = glintResonanceSineFor(depth),
         hz: Float = GLINT_RESONANCE_HZ,
+        enabled: Boolean = tuning.glintResonance,
     ): Float {
-        if (!holding || amplitude <= 0f || hz <= 0f) return 1f
-        return 1f + amplitude * kotlin.math.sin(2f * Math.PI.toFloat() * hz * phaseSec)
+        if (!holding || !enabled) return 1f
+        if (depth <= 0f && sineAmp <= 0f) return 1f
+        val sine =
+            if (sineAmp > 0f && hz > 0f) {
+                kotlin.math.sin(2f * Math.PI.toFloat() * hz * phaseSec)
+            } else {
+                0f
+            }
+        // Only trust the Visualizer once it has real energy — silence must not
+        // pull the gold down (some devices report zeros for the session).
+        val voiceDelta =
+            if (voiceLevel < 0.02f && resting < 0.02f) {
+                0f
+            } else {
+                val center = resting.coerceAtLeast(0.04f)
+                ((voiceLevel - resting) / center).coerceIn(-1f, 1f)
+            }
+        // Voice carries the true vibration; sine keeps a minimum visible shimmer.
+        return (1f + depth * voiceDelta + sineAmp * sine).coerceIn(0.35f, 1.65f)
     }
 
-    /** Peak-to-peak half-amplitude of [glintResonance] (fraction of glint alpha). */
-    const val GLINT_RESONANCE_AMP = 0.08f
+    /**
+     * Free-running carrier amplitude scaled with [depth] so one Ink Lab
+     * slider moves voice depth and the sine floor together.
+     */
+    fun glintResonanceSineFor(depth: Float): Float {
+        if (depth <= 0f || GLINT_RESONANCE_DEPTH <= 0f) return 0f
+        return GLINT_RESONANCE_SINE *
+            (depth / GLINT_RESONANCE_DEPTH).coerceIn(0f, 2.5f)
+    }
 
     /**
-     * Soft resonance rate in Hz — mid vocal-vibrato range so a multi-second
-     * waqf park reads as a living hold rather than a static spotlight.
+     * How hard live voice energy can swing the glint (± fraction of base alpha).
+     * Large enough to read on Nightfall's soft white-gold, not a disco strobe.
      */
+    const val GLINT_RESONANCE_DEPTH = 0.42f
+
+    /**
+     * Free-running carrier under the voice signal so the gold still breathes
+     * when Visualizer is unavailable (0.08 shipped invisible; this is intentional).
+     */
+    const val GLINT_RESONANCE_SINE = 0.22f
+
+    /** Free-running carrier rate (Hz) — mid vocal-vibrato range. */
     const val GLINT_RESONANCE_HZ = 5.5f
+
+    /** @deprecated Use [GLINT_RESONANCE_DEPTH] / [GLINT_RESONANCE_SINE]. */
+    const val GLINT_RESONANCE_AMP = GLINT_RESONANCE_SINE
 
     /**
      * Ink for the surah-header basmalah calligraphy (a VectorDrawable, not

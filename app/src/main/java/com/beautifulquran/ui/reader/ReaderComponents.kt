@@ -1010,14 +1010,29 @@ private class InkMotion(
                 replacedByRepeat = glintReplacedByRepeat,
                 repeatProgress = repeatProgress,
             )
-            // Soft resonance only on first-pass glint during a long waqf park;
+            // Resonance only on first-pass glint during a long waqf park;
             // repeat terracotta sheen stays steady.
             if (glintIsRepeat || base <= 0f) return base
             val t = sweep.linearClock.value
             val holding = sweep.pacing.value?.inWaqfHold(t) == true
+            if (!holding || !InkEngine.tuning.glintResonance) return base
             val phaseSec = t * (sweep.durationMs.value.coerceAtLeast(1) / 1000f)
-            return base * InkEngine.glintResonance(holding, phaseSec)
+            val energy = com.beautifulquran.playback.VoiceEnergy.active
+            return base * InkEngine.glintResonance(
+                holding = true,
+                phaseSec = phaseSec,
+                voiceLevel = energy?.level ?: 0f,
+                resting = energy?.resting ?: 0f,
+            )
         }
+
+    /** True while the linear sweep is in a long waqf park (glint may shimmer). */
+    val glintResonating: Boolean
+        get() = !glintIsRepeat &&
+            glintAlpha.value > 0f &&
+            InkEngine.tuning.glintResonance &&
+            InkEngine.tuning.glintResonanceDepth > 0f &&
+            (sweep.pacing.value?.inWaqfHold(sweep.linearClock.value) == true)
 
     /** Whether the orange repeat overlay still has any ink to show. */
     val showRepeatLayer: Boolean get() = repeatAlpha > 0f
@@ -1077,7 +1092,17 @@ private fun Modifier.layeredGlintInk(motion: InkMotion, rtl: Boolean): Modifier 
 
 /** Layered-word adapter for the tight glyph halo. */
 private fun Modifier.layeredGlintHalo(motion: InkMotion): Modifier =
-    bleedAlphaLayer { motion.glintLayerAlpha * inkSmootherstep(motion.glintProgress) }
+    bleedAlphaLayer {
+        // During a long waqf park the gold is the sustained letter — keep the
+        // halo fully lit so the voice-driven shimmer reads on bright metal,
+        // not on a half-formed edge.
+        val form = if (motion.glintResonating) {
+            maxOf(inkSmootherstep(motion.glintProgress), 0.88f)
+        } else {
+            inkSmootherstep(motion.glintProgress)
+        }
+        motion.glintLayerAlpha * form
+    }
 
 @Composable
 private fun rememberInkMotions(

@@ -534,30 +534,76 @@ class InkEngineTest {
     }
 
     @Test
-    fun `glint resonance is identity when not holding`() {
+    fun `glint resonance is identity when not holding or disabled`() {
         assertEquals(1f, InkEngine.glintResonance(holding = false, phaseSec = 0.5f), 0f)
-        assertEquals(1f, InkEngine.glintResonance(holding = true, phaseSec = 0f, amplitude = 0f), 0f)
+        assertEquals(
+            1f,
+            InkEngine.glintResonance(
+                holding = true,
+                phaseSec = 0.5f,
+                depth = 0.4f,
+                sineAmp = 0.2f,
+                enabled = false,
+            ),
+            0f,
+        )
+        assertEquals(
+            1f,
+            InkEngine.glintResonance(
+                holding = true,
+                phaseSec = 0.5f,
+                depth = 0f,
+                sineAmp = 0f,
+            ),
+            0f,
+        )
     }
 
     @Test
-    fun `glint resonance oscillates around one while holding`() {
-        val amp = 0.08f
+    fun `glint resonance tracks voice energy above resting`() {
+        val hot = InkEngine.glintResonance(
+            holding = true,
+            phaseSec = 0f,
+            voiceLevel = 0.6f,
+            resting = 0.3f,
+            depth = 0.4f,
+            sineAmp = 0f,
+        )
+        val cold = InkEngine.glintResonance(
+            holding = true,
+            phaseSec = 0f,
+            voiceLevel = 0.15f,
+            resting = 0.3f,
+            depth = 0.4f,
+            sineAmp = 0f,
+        )
+        assertTrue(hot > 1f)
+        assertTrue(cold < 1f)
+    }
+
+    @Test
+    fun `glint resonance free sine still breathes without voice`() {
         val hz = 5.5f
-        // Peak of the sine at quarter period.
         val peak = InkEngine.glintResonance(
             holding = true,
             phaseSec = 0.25f / hz,
-            amplitude = amp,
+            voiceLevel = 0f,
+            resting = 0f,
+            depth = 0f,
+            sineAmp = 0.22f,
             hz = hz,
         )
         val trough = InkEngine.glintResonance(
             holding = true,
             phaseSec = 0.75f / hz,
-            amplitude = amp,
+            voiceLevel = 0f,
+            resting = 0f,
+            depth = 0f,
+            sineAmp = 0.22f,
             hz = hz,
         )
-        assertEquals(1f + amp, peak, 1e-4f)
-        assertEquals(1f - amp, trough, 1e-4f)
+        assertEquals(1f + 0.22f, peak, 1e-4f)
+        assertEquals(1f - 0.22f, trough, 1e-4f)
     }
 
     @Test

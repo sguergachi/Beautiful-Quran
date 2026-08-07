@@ -30,6 +30,8 @@ class InkLabPanelTest {
         assertTrue(text.contains("waslHandoff ="))
         assertTrue(text.contains("waqfShare ="))
         assertTrue(text.contains("waqfLengthScale ="))
+        assertTrue(text.contains("glintResonance ="))
+        assertTrue(text.contains("glintResonanceDepth ="))
         // Fields without lab sliders still snapshot so nothing is lost on apply.
         assertTrue(text.contains("sweepEaseX1 ="))
         assertTrue(text.contains("sweepEaseY2 ="))
