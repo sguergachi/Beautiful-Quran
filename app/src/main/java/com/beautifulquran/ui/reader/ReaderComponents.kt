@@ -1001,20 +1001,7 @@ private class InkMotion(
     val repeatAlpha: Float get() = repeatWash.alpha.value
     val repeatFeather: Float? get() = repeatWash.feather.value
     val glintProgress: Float
-        get() {
-            if (glintIsRepeat) return repeatProgress
-            // The gold's leading edge ripples with the detected tarjīʿ — the
-            // feather is where the shimmer reads on a formed word, so the
-            // voice drives it directly (the ink wash itself is untouched).
-            // Only words with a strong hold of their own.
-            val g = resonanceGain()
-            if (g <= 0.01f) return sweepProgress
-            if (sweep.pacing.value?.hasStrongHold != true) return sweepProgress
-            val voice = com.beautifulquran.playback.VoiceEnergy.active
-            val ripple = (voice?.tremolo ?: 0f) * g *
-                InkEngine.tuning.glintResonanceDepth * InkEngine.GLINT_EDGE_RIPPLE
-            return (sweepProgress + ripple).coerceIn(0f, 1f)
-        }
+        get() = if (glintIsRepeat) repeatProgress else sweepProgress
     val glintFeather: Float?
         get() = if (glintIsRepeat) repeatFeather else sweepFeather
 

@@ -91,16 +91,12 @@ subtracts (the PCM tap hears the voice *before* the listener does). Detection
 ramps in and out under an attack/release envelope, so no edge ever pops.
 
 How the shimmer **reads** on a formed, parked word (gold tint over formed
-ink is low-contrast, so plain layer-alpha modulation barely shows there):
-
-- The glint's **leading edge ripples** with the tremolo
-  (`GLINT_EDGE_RIPPLE` ~4 % of the word width at full depth) — the feather
-  is where the eye reads the shimmer, so the voice drives it directly. The
-  ink wash itself is untouched.
-- The alpha multiplier is **re-centred below 1** while resonance runs
-  (`HEADROOM` 60 % of the swing): layer alpha clips at full opacity, so a
-  multiplier centred on 1 shows only the dimming half. Sinking the resting
-  point lets the gold brighten *and* dim with the voice.
+ink is low-contrast, so a multiplier centred on 1 shows only the dimming
+half — every brightening peak clips at full opacity): the multiplier rests
+at 0.9 and is bounded to [0.55, 1.25], so the gold both brightens and dims
+with the voice, while a dip can never run deep enough to read as the ink
+resetting. The modulation is **pure alpha** — the reveal edge never moves
+mid-animation, so the bloom can never appear to restart.
 
 A free-running carrier at ~5.5 Hz (`GLINT_RESONANCE_SINE` ~22 %) remains as
 a gentle floor for **steady** holds inside the waqf window
