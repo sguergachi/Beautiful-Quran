@@ -42,6 +42,10 @@ class Tarji {
     var holdMs = 0f
         private set
 
+    /** True while a voiced single note is being held (with or without
+     * reverberation) — gates the steady-hold sine floor. */
+    val holdingNote: Boolean get() = holdMs >= HOLD_NOTE_MIN_MS
+
     /**
      * Read-out delay in content hops, set from the output route latency
      * (× playback speed) by [VoiceEnergy]: the PCM tap hears the voice
@@ -54,12 +58,16 @@ class Tarji {
     private val histTremolo = FloatArray(HIST_HOPS)
     private val histGain = FloatArray(HIST_HOPS)
     private val histRev = FloatArray(HIST_HOPS)
+    private val histHold = FloatArray(HIST_HOPS)
     private var histCount = 0
 
     /** Tarjīʿ state as it reaches the ear now (delayed by [delayHops]). */
     val syncReverberating: Boolean get() = histRev[histIndex()] != 0f
     val syncTremolo: Float get() = histTremolo[histIndex()]
     val syncTremoloGain: Float get() = histGain[histIndex()]
+
+    /** A voiced hold as it reaches the ear now (delayed by [delayHops]). */
+    val syncHoldingNote: Boolean get() = histHold[histIndex()] != 0f
 
     private fun histIndex(): Int {
         val oldest = maxOf(0, histCount - HIST_HOPS)
@@ -151,6 +159,7 @@ class Tarji {
         histTremolo[histCount % HIST_HOPS] = tremolo
         histGain[histCount % HIST_HOPS] = tremoloGain
         histRev[histCount % HIST_HOPS] = if (reverberating) 1f else 0f
+        histHold[histCount % HIST_HOPS] = if (holdingNote) 1f else 0f
         histCount++
     }
 
@@ -261,6 +270,9 @@ class Tarji {
 
         /** Hold must survive this long before reverberation is considered. */
         const val HOLD_MIN_MS = 400
+
+        /** A voiced note this long counts as a hold for the still-floor gate. */
+        private const val HOLD_NOTE_MIN_MS = 150f
 
         // Reciter vocal range ~70–350 Hz (covers playback-speed shifts).
         private const val MIN_LAG = SAMPLE_RATE / 350 // 22
