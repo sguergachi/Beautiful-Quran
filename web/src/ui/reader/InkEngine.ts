@@ -159,6 +159,31 @@ export function glinting(state: InkState): boolean {
   return state === InkState.Active
 }
 
+/** Peak-to-peak half-amplitude of [glintResonance] (fraction of glint alpha). */
+export const GLINT_RESONANCE_AMP = 0.08
+
+/**
+ * Soft resonance rate in Hz — mid vocal-vibrato range so a multi-second
+ * waqf park reads as a living hold rather than a static spotlight.
+ * Port of Android `InkEngine.GLINT_RESONANCE_HZ`.
+ */
+export const GLINT_RESONANCE_HZ = 5.5
+
+/**
+ * Soft shimmer of the wet-ink glint while a long hold is sustained.
+ * Multiplies glint opacity; returns 1 when not holding. Stylistic rate, not
+ * measured pitch. Port of Android `InkEngine.glintResonance`.
+ */
+export function glintResonance(
+  holding: boolean,
+  phaseSec: number,
+  amplitude = GLINT_RESONANCE_AMP,
+  hz = GLINT_RESONANCE_HZ,
+): number {
+  if (!holding || amplitude <= 0 || hz <= 0) return 1
+  return 1 + amplitude * Math.sin(2 * Math.PI * hz * phaseSec)
+}
+
 export function prefaceState(isActive: boolean, dimmed: boolean): InkState {
   if (isActive) return InkState.Active
   if (dimmed) return InkState.Upcoming

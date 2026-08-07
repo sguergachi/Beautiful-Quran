@@ -2,6 +2,7 @@ package com.beautifulquran.domain
 
 import com.beautifulquran.domain.TajweedPacing.Hold
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -121,6 +122,22 @@ class TajweedPacingTest {
         )
         val late = long.at(0.9f) - long.at(0.5f)
         assertTrue("long waqf should park the wash, moved $late", late < 0.08f)
+    }
+
+    @Test
+    fun `long waqf parks mark a glint resonance window`() {
+        // Long closer with a real park: mid-hold is in the resonance window,
+        // cruise start and final settle are not.
+        val long = curveOf(
+            dallin,
+            hold = Hold(madd = false, isAyahFinal = true, waqfLengthScale = 0f),
+        )
+        assertFalse("early cruise is not a waqf park", long.inWaqfHold(0.05f))
+        assertTrue("mid park is a waqf hold", long.inWaqfHold(0.55f))
+        assertFalse("settled end is past the park", long.inWaqfHold(0.99f))
+        // Mid-ayah madd holds must not arm resonance — only verse-closing waqf.
+        val mid = curveOf(dallin, hold = Hold(isAyahFinal = false))
+        assertFalse(mid.inWaqfHold(0.5f))
     }
 
     @Test

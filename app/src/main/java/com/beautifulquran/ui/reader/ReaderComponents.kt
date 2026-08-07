@@ -523,10 +523,17 @@ private fun Modifier.repeatInkLayer(
  * Progress + optional feather locked for one word's letter sweep. [feather]
  * is non-null only while a tajweed-paced activation (or its residual) is
  * running, so handoff does not widen/narrow the edge mid-wash.
+ *
+ * [linearClock] is the pre-curve 0→1 Animatable (identity when unpaced).
+ * [pacing] and [durationMs] let the glint layer know when a long waqf park
+ * is being sustained so it can apply [InkEngine.glintResonance].
  */
 private class LetterSweep(
     val progress: State<Float>,
     val feather: State<Float?>,
+    val linearClock: State<Float>,
+    val pacing: State<TajweedPacing.Curve?>,
+    val durationMs: State<Int>,
 )
 
 internal enum class SweepEntryAction { Arm, Keep, Clear }
@@ -805,7 +812,18 @@ private fun rememberLetterSweep(
             continuedSweepProgress(raw, revealStartState.value)
         }
     }
-    return remember(progress) { LetterSweep(progress = progress, feather = lockedFeather) }
+    val linearClock = remember {
+        derivedStateOf { if (!applied.value) 0f else sweep.value }
+    }
+    return remember(progress) {
+        LetterSweep(
+            progress = progress,
+            feather = lockedFeather,
+            linearClock = linearClock,
+            pacing = lockedPacing,
+            durationMs = lockedMs,
+        )
+    }
 }
 
 /**
@@ -987,10 +1005,19 @@ private class InkMotion(
     val glintFeather: Float?
         get() = if (glintIsRepeat) repeatFeather else sweepFeather
     val glintLayerAlpha: Float
-        get() = glintAlpha.value * glintCarryAlpha(
-            replacedByRepeat = glintReplacedByRepeat,
-            repeatProgress = repeatProgress,
-        )
+        get() {
+            val base = glintAlpha.value * glintCarryAlpha(
+                replacedByRepeat = glintReplacedByRepeat,
+                repeatProgress = repeatProgress,
+            )
+            // Soft resonance only on first-pass glint during a long waqf park;
+            // repeat terracotta sheen stays steady.
+            if (glintIsRepeat || base <= 0f) return base
+            val t = sweep.linearClock.value
+            val holding = sweep.pacing.value?.inWaqfHold(t) == true
+            val phaseSec = t * (sweep.durationMs.value.coerceAtLeast(1) / 1000f)
+            return base * InkEngine.glintResonance(holding, phaseSec)
+        }
 
     /** Whether the orange repeat overlay still has any ink to show. */
     val showRepeatLayer: Boolean get() = repeatAlpha > 0f

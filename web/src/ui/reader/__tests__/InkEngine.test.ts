@@ -11,6 +11,7 @@ import {
   DEFAULT_HIGHLIGHT_LEAD_MS,
   sweepMs,
   glinting,
+  glintResonance,
   prefaceState,
   prefaceWashProgress,
   advancePrefaceWashProgress,
@@ -155,6 +156,18 @@ describe('InkEngine', () => {
     expect(glinting(InkState.Plain)).toBe(false)
     expect(glinting(InkState.Upcoming)).toBe(false)
     expect(glinting(InkState.Recited)).toBe(false)
+  })
+
+  it('glint resonance is identity when not holding', () => {
+    expect(glintResonance(false, 0.5)).toBe(1)
+    expect(glintResonance(true, 0, 0)).toBe(1)
+  })
+
+  it('glint resonance oscillates around one while holding', () => {
+    const amp = 0.08
+    const hz = 5.5
+    expect(glintResonance(true, 0.25 / hz, amp, hz)).toBeCloseTo(1 + amp, 4)
+    expect(glintResonance(true, 0.75 / hz, amp, hz)).toBeCloseTo(1 - amp, 4)
   })
 
   it('only upcoming ink is faint', () => {
