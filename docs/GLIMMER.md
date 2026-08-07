@@ -79,10 +79,12 @@ player's own PCM (no mic permission, no Visualizer — which also means it
 works on every output route and emulator), and `playback/Tarji` — a pure,
 unit-tested DSP core — tracks a **single held note** (voiced, pitch-stable
 ≥ ~0.4 s) and scans its amplitude envelope for an oscillation in the tarjīʿ
-band (~3–9.5 Hz). The moment the reverberation is detected, the shimmer
-starts — on any held note, mid-word or verse-closing — and rides the
-*measured* oscillation itself, so the gold swells and rests exactly with the
-reciter's voice (`InkEngine.GLINT_RESONANCE_DEPTH` ~42 %). Two clock
+band (~3–9.5 Hz). The shimmer only answers on words carrying a **strong
+tajweed hold** — a long madd, a ghunnah (the shadda نّ of ٱلنَّارِ), or the
+verse-closing waqf; i.e. words the wash actually parks on — and starts the
+moment the reverberation is detected there, riding the *measured*
+oscillation itself, so the gold swells and rests exactly with the reciter's
+voice (`InkEngine.GLINT_RESONANCE_DEPTH` ~42 %). Two clock
 corrections keep it in step: a phase lead covers the analysis lag, and the
 whole signal is delayed by the same output-route latency the highlight clock
 subtracts (the PCM tap hears the voice *before* the listener does). Detection

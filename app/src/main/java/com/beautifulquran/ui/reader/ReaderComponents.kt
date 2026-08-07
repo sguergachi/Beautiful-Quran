@@ -1006,8 +1006,10 @@ private class InkMotion(
             // The gold's leading edge ripples with the detected tarjīʿ — the
             // feather is where the shimmer reads on a formed word, so the
             // voice drives it directly (the ink wash itself is untouched).
+            // Only words with a strong hold of their own.
             val g = resonanceGain()
             if (g <= 0.01f) return sweepProgress
+            if (sweep.pacing.value?.hasStrongHold != true) return sweepProgress
             val voice = com.beautifulquran.playback.VoiceEnergy.active
             val ripple = (voice?.tremolo ?: 0f) * g *
                 InkEngine.tuning.glintResonanceDepth * InkEngine.GLINT_EDGE_RIPPLE
@@ -1021,18 +1023,23 @@ private class InkMotion(
         com.beautifulquran.playback.VoiceEnergy.active?.shimmerGain ?: 0f
 
     /**
-     * True while the glint may resonate: a tarjīʿ hold detected on the voice
-     * (any held note), or — inside the pacing curve's waqf span — a voiced
-     * note is being held steady, earning the gentle free-running floor. When
-     * the voice decays (verse end) or playback pauses, both are false: still
-     * gold.
+     * True while the glint may resonate. Eligible words carry a **strong hold
+     * on their own letters** — a long madd, a ghunnah (e.g. the shadda nūn of
+     * ٱلنَّارِ), or the verse-closing waqf
+     * ([TajweedPacing.Curve.hasStrongHold]); a wasl entry alone sustains the
+     * previous word's nūn, so those words never resonate. Then: a tarjīʿ
+     * detected on the voice opens the shimmer the moment the reverberation
+     * starts. Steady holds earn the gentle free-running floor only inside the
+     * waqf span. When the voice decays or playback pauses: still gold.
      */
     private val resonanceHolding: Boolean
         get() {
+            val pacing = sweep.pacing.value ?: return false
+            if (!pacing.hasStrongHold) return false
             if (resonanceGain() > 0.01f) return true
             val voice = com.beautifulquran.playback.VoiceEnergy.active ?: return false
             if (!voice.isLive || !voice.holdingNote) return false
-            return sweep.pacing.value?.inWaqfHold(sweep.linearClock.value) == true
+            return pacing.inWaqfHold(sweep.linearClock.value)
         }
 
     val glintLayerAlpha: Float

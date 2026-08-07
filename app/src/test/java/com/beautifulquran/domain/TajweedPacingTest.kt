@@ -136,9 +136,21 @@ class TajweedPacingTest {
         assertFalse("early cruise is before the close", long.inWaqfHold(0.05f))
         assertTrue("mid park is inside the window", long.inWaqfHold(0.55f))
         assertTrue("window runs through the end of the verse", long.inWaqfHold(0.99f))
+        assertTrue(long.hasWaqfHold)
         // Mid-ayah madd holds must not arm resonance — only verse-closing waqf.
         val mid = curveOf(dallin, hold = Hold(isAyahFinal = false))
         assertFalse(mid.inWaqfHold(0.5f))
+        assertFalse(mid.hasWaqfHold)
+    }
+
+    @Test
+    fun `a mid-ayah ghunnah hold makes the word a resonance candidate`() {
+        // 4:145 ٱلنَّارِ — the shadda nūn's ghunnah (idghām of the article's
+        // lām into the nūn) is a strong mid-ayah hold: the word carries a
+        // pacing curve (requireNotNull in curveOf), so voice-detected tarjīʿ
+        // may shimmer on it even though it is not a verse close.
+        val curve = curveOf("ٱلنَّارِ", hold = Hold(ghunnah = true))
+        assertFalse("not a waqf close — no still-floor window", curve.hasWaqfHold)
     }
 
     @Test
