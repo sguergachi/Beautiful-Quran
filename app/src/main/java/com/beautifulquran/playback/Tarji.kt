@@ -48,10 +48,6 @@ class Tarji {
     var lastClarity = 0f
         private set
 
-    /** True while a voiced single note is being held (with or without
-     * reverberation) — gates the steady-hold sine floor. */
-    val holdingNote: Boolean get() = holdMs >= HOLD_NOTE_MIN_MS
-
     /**
      * Read-out delay in content hops, set from the output route latency
      * (× playback speed) by [VoiceEnergy]: the PCM tap hears the voice
@@ -60,20 +56,23 @@ class Tarji {
      */
     var delayHops = 0
 
+    /**
+     * Fastest envelope oscillation that still counts as tarjīʿ (Hz) — the
+     * Ink Lab's rate ceiling. Only pulses at or below this rate open the
+     * shimmer.
+     */
+    var maxTremoloHz = MAX_TREMOLO_HZ
+
     // Reported (delayed) views — what renderers should consume.
     private val histTremolo = FloatArray(HIST_HOPS)
     private val histGain = FloatArray(HIST_HOPS)
     private val histRev = FloatArray(HIST_HOPS)
-    private val histHold = FloatArray(HIST_HOPS)
     private var histCount = 0
 
     /** Tarjīʿ state as it reaches the ear now (delayed by [delayHops]). */
     val syncReverberating: Boolean get() = histRev[histIndex()] != 0f
     val syncTremolo: Float get() = histTremolo[histIndex()]
     val syncTremoloGain: Float get() = histGain[histIndex()]
-
-    /** A voiced hold as it reaches the ear now (delayed by [delayHops]). */
-    val syncHoldingNote: Boolean get() = histHold[histIndex()] != 0f
 
     private fun histIndex(): Int {
         val oldest = maxOf(0, histCount - HIST_HOPS)
@@ -89,6 +88,7 @@ class Tarji {
 
     // Per-hop envelope RMS series (48 hops ≈ 1 s).
     private val env = FloatArray(ENV_HOPS)
+    private val envCorr = FloatArray(MAX_ENV_LAG + 1)
     private var envCount = 0
 
     private var holdPitchHz = 0f
@@ -171,7 +171,6 @@ class Tarji {
         histTremolo[histCount % HIST_HOPS] = tremolo
         histGain[histCount % HIST_HOPS] = tremoloGain
         histRev[histCount % HIST_HOPS] = if (reverberating) 1f else 0f
-        histHold[histCount % HIST_HOPS] = if (holdingNote) 1f else 0f
         histCount++
     }
 
@@ -201,11 +200,14 @@ class Tarji {
         val depth = amp / mean
 
         // Periodicity of the demeaned envelope: autocorrelation over the
-        // tarjīʿ band (1.5–10 Hz). Robust where crossings fail — reciters
-        // pulse anywhere from slow ~2 Hz swells (Hani) to ~6–8 Hz vibrato.
+        // tarjīʿ band (1.5 Hz … maxTremoloHz). Robust where crossings fail —
+        // reciters pulse anywhere from slow ~2 Hz swells (Hani) to ~6–8 Hz
+        // vibrato (Alafasy).
+        val minLag = (1000f / (maxTremoloHz * HOP_MS)).toInt()
+            .coerceIn(2, MAX_ENV_LAG - 4)
         var bestC = 0f
         var bestLag = 0
-        for (lag in MIN_ENV_LAG..MAX_ENV_LAG) {
+        for (lag in 2..MAX_ENV_LAG) {
             if (n - lag < MIN_ENV_HOPS / 2) break
             var corr = 0f
             var e0 = 0f
@@ -218,13 +220,19 @@ class Tarji {
                 eL += b * b
             }
             val norm = corr / (sqrt(e0 * eL) + 1e-9f)
-            if (norm > bestC) {
+            envCorr[lag] = norm
+            if (lag >= minLag && norm > bestC) {
                 bestC = norm
                 bestLag = lag
             }
         }
         val rateHz =
             if (bestLag > 0) 1000f / (bestLag * HOP_MS.toFloat()) else 0f
+        // A pulse whose true period sits *below* the scan floor still
+        // correlates at double that lag — without this check a 5.5 Hz vibrato
+        // reads as 2.8 Hz and slips under a low rate ceiling.
+        val harmonicLeak = bestLag > 0 && bestLag / 2 >= 2 &&
+            envCorr[bestLag / 2] >= 0.7f * bestC
 
         // Keep the signal smoothing even while gated off, so a lock-on starts
         // from the live envelope rather than a stale frozen value.
@@ -235,10 +243,10 @@ class Tarji {
         // Hysteresis: stricter to switch on than to stay on — no flapping
         // when the reverberation breathes near the gate.
         val longEnough = holdMs >= HOLD_MIN_MS
-        val periodic = bestC >= MIN_PERIODICITY &&
-            rateHz in MIN_TREMOLO_HZ..MAX_TREMOLO_HZ
-        val stillPeriodic = bestC >= MIN_PERIODICITY * 0.7f &&
-            rateHz in (MIN_TREMOLO_HZ - 0.5f)..(MAX_TREMOLO_HZ + 1f)
+        val periodic = bestC >= MIN_PERIODICITY && !harmonicLeak &&
+            rateHz in MIN_TREMOLO_HZ..maxTremoloHz
+        val stillPeriodic = bestC >= MIN_PERIODICITY * 0.7f && !harmonicLeak &&
+            rateHz in (MIN_TREMOLO_HZ - 0.5f)..(maxTremoloHz + 1f)
         reverberating = if (reverberating) {
             longEnough && depth >= MIN_TREMOLO_DEPTH * DEPTH_OFF_RATIO && stillPeriodic
         } else {
@@ -305,9 +313,6 @@ class Tarji {
         /** Hold must survive this long before reverberation is considered. */
         const val HOLD_MIN_MS = 400
 
-        /** A voiced note this long counts as a hold for the still-floor gate. */
-        private const val HOLD_NOTE_MIN_MS = 150f
-
         // Reciter vocal range ~70–350 Hz (covers playback-speed shifts).
         private const val MIN_LAG = SAMPLE_RATE / 350 // 22
         private const val MAX_LAG = SAMPLE_RATE / 70 // 114
@@ -321,16 +326,16 @@ class Tarji {
         private const val PEAK_DECAY = 0.997f
 
         /** Tarjīʿ lives around 1.5–10 Hz of envelope oscillation: slow ~2 Hz
-         * swells (Hani) to ~6–8 Hz vibrato (Alafasy), at any hop rate. */
+         * swells (Hani) to ~6–8 Hz vibrato (Alafasy), at any hop rate. The
+         * ceiling is Ink-Lab-tunable via [maxTremoloHz]. */
         private const val MIN_TREMOLO_HZ = 1.5f
-        private const val MAX_TREMOLO_HZ = 10f
+        const val MAX_TREMOLO_HZ = 10f
         private const val MIN_TREMOLO_DEPTH = 0.035f
         /** Off-gate depth as a fraction of [MIN_TREMOLO_DEPTH] (hysteresis). */
         private const val DEPTH_OFF_RATIO = 0.7f
         /** Envelope-autocorrelation periodicity needed to call it a pulse. */
         private const val MIN_PERIODICITY = 0.4f
-        // Band as envelope-hop lags (20 ms hops): 10 Hz → 5, 1.5 Hz → 33.
-        private const val MIN_ENV_LAG = 5
+        // Band floor as an envelope-hop lag (20 ms hops): 1.5 Hz → 33.
         private const val MAX_ENV_LAG = 33
         private const val TREMOLO_EMA = 0.35f
         /** Analysis + smoothing lag the phase lead compensates (~45 ms). */

@@ -236,8 +236,8 @@ fun InkLabPanel(
                             "White-gold breath that rides the reciter's " +
                                 "tarjīʿ — the reverberation of the voice on a " +
                                 "held note — detected live on the tapped PCM. " +
-                                "Steady waqf holds keep a soft free-running " +
-                                "floor. Off keeps still gold.",
+                                "No reverberation, no shimmer: steady holds " +
+                                "keep still gold. Off keeps still gold.",
                         )
                         TuningSlider(
                             "Resonance strength",
@@ -249,6 +249,18 @@ fun InkLabPanel(
                         LabCaption(
                             "How hard the gold swings with the held note. " +
                                 "0 = no shimmer; shipped ~${"%.2f".format(InkEngine.GLINT_RESONANCE_DEPTH)}.",
+                        )
+                        TuningSlider(
+                            "Tarjīʿ max rate",
+                            t.glintResonanceMaxHz,
+                            2f..10f,
+                        ) {
+                            InkEngine.tuning = t.copy(glintResonanceMaxHz = it)
+                        }
+                        LabCaption(
+                            "Fastest voice pulse that still counts as tarjīʿ, " +
+                                "in Hz. Lower it and only slow, deep swells " +
+                                "move the gold; shipped ~${"%.0f".format(InkEngine.GLINT_RESONANCE_MAX_HZ)}.",
                         )
                     }
 
@@ -451,6 +463,7 @@ internal fun formatTuningCopy(t: InkEngine.Tuning): String {
         appendLine("    holdCreep = ${f(t.holdCreep)},")
         appendLine("    glintResonance = ${t.glintResonance},")
         appendLine("    glintResonanceDepth = ${f(t.glintResonanceDepth)},")
+        appendLine("    glintResonanceMaxHz = ${f(t.glintResonanceMaxHz)},")
         append(")")
     }
 }

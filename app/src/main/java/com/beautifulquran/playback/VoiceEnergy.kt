@@ -36,12 +36,6 @@ class VoiceEnergy {
     var tremoloGain = 0f
         private set
 
-    /** True while a voiced single note is being held (with or without
-     * reverberation) — the still-gold sine floor only breathes then. */
-    @Volatile
-    var holdingNote = false
-        private set
-
     @Volatile
     private var lastFeedMs = 0L
 
@@ -94,12 +88,12 @@ class VoiceEnergy {
         if (chunkFill == 0) return
         tarji.delayHops =
             (outputLatencyMs * playbackSpeed / Tarji.HOP_MS).toInt().coerceIn(0, 63)
+        tarji.maxTremoloHz = maxTremoloHz
         tarji.onSamples8k(chunk, chunkFill)
         chunkFill = 0
         reverberating = tarji.syncReverberating
         tremolo = tarji.syncTremolo
         tremoloGain = tarji.syncTremoloGain
-        holdingNote = tarji.syncHoldingNote
         lastFeedMs = SystemClock.elapsedRealtime()
     }
 
@@ -116,7 +110,6 @@ class VoiceEnergy {
         reverberating = false
         tremolo = 0f
         tremoloGain = 0f
-        holdingNote = false
         lastFeedMs = 0L
         decimSum = 0f
         decimCount = 0
@@ -132,5 +125,10 @@ class VoiceEnergy {
          */
         @Volatile
         var active: VoiceEnergy? = null
+
+        /** Fastest voice oscillation that still counts as tarjīʿ (Hz) —
+         * pushed from `InkEngine.tuning` (the Ink Lab rate slider). */
+        @Volatile
+        var maxTremoloHz: Float = Tarji.MAX_TREMOLO_HZ
     }
 }

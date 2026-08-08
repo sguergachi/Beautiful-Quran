@@ -522,18 +522,13 @@ private fun Modifier.repeatInkLayer(
 /**
  * Progress + optional feather locked for one word's letter sweep. [feather]
  * is non-null only while a tajweed-paced activation (or its residual) is
- * running, so handoff does not widen/narrow the edge mid-wash.
- *
- * [linearClock] is the pre-curve 0→1 Animatable (identity when unpaced).
- * [pacing] and [durationMs] let the glint layer know when a long waqf park
- * is being sustained so it can apply [InkEngine.glintResonance].
+ * running, so handoff does not widen/narrow the edge mid-wash. [pacing] lets
+ * the glint layer know this word carries a hold worth resonating with.
  */
 private class LetterSweep(
     val progress: State<Float>,
     val feather: State<Float?>,
-    val linearClock: State<Float>,
     val pacing: State<TajweedPacing.Curve?>,
-    val durationMs: State<Int>,
 )
 
 internal enum class SweepEntryAction { Arm, Keep, Clear }
@@ -812,16 +807,11 @@ private fun rememberLetterSweep(
             continuedSweepProgress(raw, revealStartState.value)
         }
     }
-    val linearClock = remember {
-        derivedStateOf { if (!applied.value) 0f else sweep.value }
-    }
     return remember(progress) {
         LetterSweep(
             progress = progress,
             feather = lockedFeather,
-            linearClock = linearClock,
             pacing = lockedPacing,
-            durationMs = lockedMs,
         )
     }
 }
@@ -1009,26 +999,6 @@ private class InkMotion(
     private fun resonanceGain(): Float =
         com.beautifulquran.playback.VoiceEnergy.active?.shimmerGain ?: 0f
 
-    /**
-     * True while the glint may resonate. Eligible words carry a **strong hold
-     * on their own letters** — a long madd, a ghunnah (e.g. the shadda nūn of
-     * ٱلنَّارِ), or the verse-closing waqf
-     * ([TajweedPacing.Curve.hasStrongHold]); a wasl entry alone sustains the
-     * previous word's nūn, so those words never resonate. Then: a tarjīʿ
-     * detected on the voice opens the shimmer the moment the reverberation
-     * starts. Steady holds earn the gentle free-running floor only inside the
-     * waqf span. When the voice decays or playback pauses: still gold.
-     */
-    private val resonanceHolding: Boolean
-        get() {
-            val pacing = sweep.pacing.value ?: return false
-            if (!pacing.hasStrongHold) return false
-            if (resonanceGain() > 0.01f) return true
-            val voice = com.beautifulquran.playback.VoiceEnergy.active ?: return false
-            if (!voice.isLive || !voice.holdingNote) return false
-            return pacing.inWaqfHold(sweep.linearClock.value)
-        }
-
     val glintLayerAlpha: Float
         get() {
             val base = glintAlpha.value * glintCarryAlpha(
@@ -1039,26 +1009,32 @@ private class InkMotion(
             // — the hold ends with the voice, so the dry-down after handoff
             // stays still; repeat terracotta sheen is never modulated.
             if (glintIsRepeat || base <= 0f || !isActive) return base
-            if (!resonanceHolding || !InkEngine.tuning.glintResonance) return base
-            val t = sweep.linearClock.value
+            if (!glintResonating) return base
             val voice = com.beautifulquran.playback.VoiceEnergy.active
-            val phaseSec = t * (sweep.durationMs.value.coerceAtLeast(1) / 1000f)
             return base * InkEngine.glintResonance(
                 holding = true,
-                phaseSec = phaseSec,
                 tremolo = voice?.tremolo ?: 0f,
                 tremoloGain = resonanceGain(),
             )
         }
 
+    /** How engaged the tarjīʿ resonance is on this word, 0..1 — 0 means the
+     * word shows no sign of the effect at all (no halo floor, no swing). */
+    val resonanceEngaged: Float
+        get() {
+            if (glintIsRepeat || !isActive || glintAlpha.value <= 0f) return 0f
+            if (!InkEngine.tuning.glintResonance ||
+                InkEngine.tuning.glintResonanceDepth <= 0f
+            ) {
+                return 0f
+            }
+            if (sweep.pacing.value?.hasStrongHold != true) return 0f
+            return resonanceGain()
+        }
+
     /** True while the glint is resonating (halo stays bright for the shimmer). */
     val glintResonating: Boolean
-        get() = !glintIsRepeat &&
-            isActive &&
-            glintAlpha.value > 0f &&
-            InkEngine.tuning.glintResonance &&
-            InkEngine.tuning.glintResonanceDepth > 0f &&
-            resonanceHolding
+        get() = resonanceEngaged > 0.01f
 
     /** Whether the orange repeat overlay still has any ink to show. */
     val showRepeatLayer: Boolean get() = repeatAlpha > 0f
@@ -1119,14 +1095,13 @@ private fun Modifier.layeredGlintInk(motion: InkMotion, rtl: Boolean): Modifier 
 /** Layered-word adapter for the tight glyph halo. */
 private fun Modifier.layeredGlintHalo(motion: InkMotion): Modifier =
     bleedAlphaLayer {
-        // During a long waqf park the gold is the sustained letter — keep the
-        // halo fully lit so the voice-driven shimmer reads on bright metal,
-        // not on a half-formed edge.
-        val form = if (motion.glintResonating) {
-            maxOf(inkSmootherstep(motion.glintProgress), 0.88f)
-        } else {
-            inkSmootherstep(motion.glintProgress)
-        }
+        // The halo's formation floor rises with the detection gain: an
+        // un-reverberating word keeps its ordinary formed halo, so nothing
+        // about it telegraphs the shimmer before the voice actually pulses.
+        val form = maxOf(
+            inkSmootherstep(motion.glintProgress),
+            0.88f * motion.resonanceEngaged,
+        )
         motion.glintLayerAlpha * form
     }
 

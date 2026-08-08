@@ -41,7 +41,7 @@ class HighlightClockTest {
 
     @Test
     fun `a genuine backward seek passes through outside settle`() {
-        val clock = HighlightClock(settleSamples = 0)
+        val clock = HighlightClock(minSettlePolls = 0, stablePollsNeeded = 0)
         clock.sample("a", 5000)
         // Word tap / loop restart: jump well past the jitter threshold.
         assertEquals(1000L, clock.sample("a", 1000))
@@ -58,14 +58,14 @@ class HighlightClockTest {
 
     @Test
     fun `regression exactly at the threshold is a seek outside settle`() {
-        val clock = HighlightClock(seekThresholdMs = 250, settleSamples = 0)
+        val clock = HighlightClock(seekThresholdMs = 250, minSettlePolls = 0, stablePollsNeeded = 0)
         clock.sample("a", 1000)
         assertEquals(750L, clock.sample("a", 750))
     }
 
     @Test
     fun `regression just under the threshold is jitter`() {
-        val clock = HighlightClock(seekThresholdMs = 250, settleSamples = 0)
+        val clock = HighlightClock(seekThresholdMs = 250, minSettlePolls = 0, stablePollsNeeded = 0)
         clock.sample("a", 1000)
         assertEquals(1000L, clock.sample("a", 751))
     }
@@ -112,7 +112,7 @@ class HighlightClockTest {
 
     @Test
     fun `after settle expires a large regression is accepted as a seek`() {
-        val clock = HighlightClock(settleSamples = 2, maxSettleStepMs = 10_000)
+        val clock = HighlightClock(minSettlePolls = 2, stablePollsNeeded = 0, maxSettleStepMs = 10_000)
         clock.sample("a", 5000)
         clock.sample("a", 5033) // settleLeft 1 → 0
         clock.sample("a", 5066) // settle exhausted
@@ -136,11 +136,24 @@ class HighlightClockTest {
     }
 
     @Test
-    fun `after the longer settle a snap-back is a genuine seek again`() {
+    fun `a big regression passes once the clock has converged`() {
+        val clock = HighlightClock()
+        var clockMs = clock.sample("a", 0L)
+        // Believable playback: converges, minimum window passes.
+        for (i in 1..60) clockMs = clock.sample("a", i * 33L)
+        assertEquals(1980L, clockMs)
+        assertEquals(300L, clock.sample("a", 300L))
+    }
+
+    @Test
+    fun `settle ends early once the estimate tracks realtime`() {
+        // Normal playback right after a handoff: ~33 ms steps are believable,
+        // so the minimum window applies and the guard lifts at poll 12 — a
+        // genuine seek after that must pass immediately.
         val clock = HighlightClock()
         var clockMs = clock.sample("ayah 7", 0L)
-        for (i in 1..40) clockMs = clock.sample("ayah 7", i * 90L)
-        assertEquals(3600L, clockMs)
-        assertEquals(300L, clock.sample("ayah 7", 300L))
+        for (i in 1..12) clockMs = clock.sample("ayah 7", i * 33L)
+        assertEquals(396L, clockMs)
+        assertEquals(100L, clock.sample("ayah 7", 100L))
     }
 }

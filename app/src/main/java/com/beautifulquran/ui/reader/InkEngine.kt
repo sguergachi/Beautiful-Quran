@@ -164,6 +164,13 @@ object InkEngine {
          * [GLINT_RESONANCE_DEPTH]. Auditionable in the Tajweed Ink Lab tab.
          */
         val glintResonanceDepth: Float = GLINT_RESONANCE_DEPTH,
+        /**
+         * Fastest voice oscillation that still counts as tarjīʿ (Hz). Only
+         * pulses at or below this rate open the shimmer — lower it to answer
+         * just the slow, deep swells. Shipped [GLINT_RESONANCE_MAX_HZ].
+         * Auditionable in the Tajweed Ink Lab tab.
+         */
+        val glintResonanceMaxHz: Float = GLINT_RESONANCE_MAX_HZ,
     )
 
     /**
@@ -186,6 +193,9 @@ object InkEngine {
         get() = tuningState
         set(value) {
             tuningState = value
+            // The detector lives in the playback layer; push the rate gate.
+            com.beautifulquran.playback.VoiceEnergy.maxTremoloHz =
+                value.glintResonanceMaxHz
             persistLab()
         }
 
@@ -472,50 +482,37 @@ object InkEngine {
     fun glinting(state: State): Boolean = state == State.Active
 
     /**
-     * Multiplier for wet-ink glint alpha while a hold is sustained.
+     * Multiplier for wet-ink glint alpha while the reciter's tarjīʿ (ترجيع) —
+     * the repeated reverberation of the voice on a held note — is detected on
+     * the tapped PCM by [com.beautifulquran.playback.VoiceEnergy]. [tremolo]
+     * is that very oscillation (zero-centred, phase-locked to the voice) and
+     * [tremoloGain] its attack/release envelope, so the gold breathes exactly
+     * with the reciter and never pops at detection edges. **No detection, no
+     * shimmer**: a steady hold without audible reverberation keeps still
+     * gold. Pure and unit-tested.
      *
-     * The primary signal is the reciter's live tarjīʿ (ترجيع) — the repeated
-     * reverberation of the voice on a held note — detected on the tapped PCM
-     * by [com.beautifulquran.playback.VoiceEnergy]: [tremolo] is that very
-     * oscillation (zero-centred, phase-locked to the voice) and [tremoloGain]
-     * its attack/release envelope, so the gold breathes exactly with the
-     * reciter and never pops at detection edges. A free-running sine at [hz]
-     * sits underneath as a gentle floor for steady holds (no tarjīʿ) inside
-     * the waqf window, cross-fading out as the voice signal arrives. Pure and
-     * unit-tested.
-     *
-     * @param holding true inside the resonance window (waqf hold span, or a
-     * detected reverberant hold — see the glint layer in ReaderComponents)
-     * @param phaseSec sweep seconds for the free-running carrier
+     * @param holding true while a reverberant hold is detected on an eligible
+     * word (see the glint layer in ReaderComponents)
      * @param tremolo synced tarjīʿ band signal −1..1 (0 = nothing detected)
      * @param tremoloGain 0..1 attack/release ramp of the detected signal
      */
     fun glintResonance(
         holding: Boolean,
-        phaseSec: Float,
         tremolo: Float = 0f,
         tremoloGain: Float = 0f,
         depth: Float = tuning.glintResonanceDepth,
-        sineAmp: Float = glintResonanceSineFor(depth),
-        hz: Float = GLINT_RESONANCE_HZ,
         enabled: Boolean = tuning.glintResonance,
     ): Float {
-        if (!holding || !enabled) return 1f
-        if (depth <= 0f && sineAmp <= 0f) return 1f
+        if (!holding || !enabled || depth <= 0f) return 1f
         val g = tremoloGain.coerceIn(0f, 1f)
-        val sine =
-            if (sineAmp > 0f && hz > 0f) {
-                kotlin.math.sin(2f * Math.PI.toFloat() * hz * phaseSec)
-            } else {
-                0f
-            }
-        // Voice carries the true reverberation; the sine floor cross-fades
-        // out as the voice signal arrives. The swing stays gentle: deep dips
-        // read as the word resetting, and the tint clamps at full opacity
-        // anyway — so centre slightly below 1 and bound both ends.
+        // The swing stays gentle: deep dips read as the word resetting, and
+        // the tint clamps at full opacity anyway — so centre slightly below
+        // 1 and bound both ends. The centre itself eases in with the gain:
+        // at g = 0 the multiplier is exactly 1, so a word whose voice has
+        // not started reverberating shows no tell of the coming shimmer.
         val voice = depth * g * tremolo.coerceIn(-1.5f, 1.5f)
-        val floor = sineAmp * (1f - g) * sine
-        return (RESONANCE_CENTER + 0.5f * (voice + floor))
+        val center = 1f + (RESONANCE_CENTER - 1f) * g
+        return (center + 0.5f * voice)
             .coerceIn(MIN_RESONANCE_MULT, MAX_RESONANCE_MULT)
     }
 
@@ -527,32 +524,13 @@ object InkEngine {
     private const val MAX_RESONANCE_MULT = 1.25f
 
     /**
-     * Free-running carrier amplitude scaled with [depth] so one Ink Lab
-     * slider moves voice depth and the sine floor together.
-     */
-    fun glintResonanceSineFor(depth: Float): Float {
-        if (depth <= 0f || GLINT_RESONANCE_DEPTH <= 0f) return 0f
-        return GLINT_RESONANCE_SINE *
-            (depth / GLINT_RESONANCE_DEPTH).coerceIn(0f, 2.5f)
-    }
-
-    /**
      * How hard live voice energy can swing the glint (± fraction of base alpha).
      * Large enough to read on Nightfall's soft white-gold, not a disco strobe.
      */
     const val GLINT_RESONANCE_DEPTH = 0.42f
 
-    /**
-     * Free-running carrier under the voice signal so the gold still breathes
-     * on steady holds without tarjīʿ (and before detection locks on).
-     */
-    const val GLINT_RESONANCE_SINE = 0.22f
-
-    /** Free-running carrier rate (Hz) — mid vocal-vibrato range. */
-    const val GLINT_RESONANCE_HZ = 5.5f
-
-    /** @deprecated Use [GLINT_RESONANCE_DEPTH] / [GLINT_RESONANCE_SINE]. */
-    const val GLINT_RESONANCE_AMP = GLINT_RESONANCE_SINE
+    /** Shipped tarjīʿ rate ceiling (Hz) — see [Tuning.glintResonanceMaxHz]. */
+    const val GLINT_RESONANCE_MAX_HZ = 10f
 
     /**
      * Ink for the surah-header basmalah calligraphy (a VectorDrawable, not
