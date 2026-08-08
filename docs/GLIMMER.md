@@ -90,17 +90,18 @@ a wasl entry alone sustains the previous word's nūn and never qualifies) —
 and starts the moment the reverberation is detected there.
 
 **Tarjīʿ is the turning on and off of the glimmer itself**, not a soft breath
-around permanent gold. Only the **positive half** of the measured oscillation
-flashes the wet-ink sheen on (squared for a snappy peak); troughs and the
-negative half leave it off (`InkEngine.GLINT_RESONANCE_DEPTH` = 1 by default;
-Ink Lab **Pulse depth** softens that). First-pass white-gold and **repeat
-terracotta** glimmers both take the same gate. A per-frame sampler on the
-Active strong-hold word keeps the pulse painting after the wash park freezes
-its Animatable — without that, long closers (1:7) looked still. Two clock
-corrections keep it in step: a phase lead covers the analysis lag, and the
-whole signal is delayed by the same output-route latency the highlight clock
-subtracts (the PCM tap hears the voice *before* the listener does). Detection
-ramps in and out under an attack/release envelope, so no edge ever pops.
+around permanent gold. Full-wave `|tremolo|` intensity: both crests of the
+measured oscillation light the sheen; zero-crossings extinguish it
+(`InkEngine.GLINT_RESONANCE_DEPTH` = 1 by default; Ink Lab **Pulse depth**
+softens that). Peaks also **boost** tint/halo colour
+(`GLINT_RESONANCE_PEAK_BOOST`) so they outshine idle gold-on-parchment — a
+layer-alpha pulse alone is nearly invisible there. First-pass white-gold and
+**repeat terracotta** glimmers both take the same gate. A per-frame sampler on
+the Active strong-hold word keeps the pulse painting after the wash park
+freezes its Animatable. Two clock corrections keep it in step: a phase lead
+covers the analysis lag, and the whole signal is delayed by the same
+output-route latency the highlight clock subtracts. Detection ramps in and out
+under an attack/release envelope, so no edge ever pops.
 
 **No reverberation, no pulse**: a steady hold without an audible pulse —
 even a long verse-closing waqf — keeps still gold. The gate also hard-closes

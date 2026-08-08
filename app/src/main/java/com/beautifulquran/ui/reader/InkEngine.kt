@@ -513,18 +513,31 @@ object InkEngine {
     fun glinting(state: State): Boolean = state == State.Active
 
     /**
-     * Multiplier that **turns the wet-ink glimmer on and off** with the
+     * Draw values that **turn the wet-ink glimmer on and off** with the
      * reciter's tarjīʿ (ترجيع) — the repeated reverberation of the voice on a
      * held note — detected on the tapped PCM by
-     * [com.beautifulquran.playback.VoiceEnergy]. [tremolo] is that oscillation
-     * (zero-centred, phase-locked to the voice) and [tremoloGain] its
-     * attack/release envelope.
+     * [com.beautifulquran.playback.VoiceEnergy].
      *
-     * This is not a soft breath around a permanent sheen. Peaks of the
-     * measured pulse leave the glimmer fully on; troughs extinguish it
-     * (by [depth]). At [tremoloGain] = 0 the multiplier is exactly 1 — no
-     * tell before the voice actually reverberates. Steady holds without an
-     * audible pulse keep still gold. Pure and unit-tested.
+     * @param layerMult multiplies glint layer alpha (1 = identity / idle full
+     * sheen; 0 = extinguished). Idle / no detection is always 1 — no tell.
+     * @param peak 0..1 how hard the pulse is cresting right now; boosts tint
+     * and halo colour so peaks read brighter than the idle sheen (gold-on-
+     * parchment is low contrast without it).
+     */
+    data class GlintResonance(
+        val layerMult: Float,
+        val peak: Float,
+    ) {
+        companion object {
+            val Idle = GlintResonance(layerMult = 1f, peak = 0f)
+        }
+    }
+
+    /**
+     * Maps the detected tarjīʿ signal into [GlintResonance] for the glint
+     * paint path. Full-wave intensity: both peaks of the zero-centred
+     * [tremolo] light the sheen; zero-crossings extinguish it. Pure and
+     * unit-tested.
      *
      * @param holding true while a reverberant hold is detected on an eligible
      * word (see the glint layer in ReaderComponents)
@@ -537,19 +550,19 @@ object InkEngine {
         tremoloGain: Float = 0f,
         depth: Float = tuning.glintResonanceDepth,
         enabled: Boolean = tuning.glintResonance,
-    ): Float {
-        if (!holding || !enabled || depth <= 0f) return 1f
+    ): GlintResonance {
+        if (!holding || !enabled || depth <= 0f) return GlintResonance.Idle
         val g = tremoloGain.coerceIn(0f, 1f)
-        if (g <= 0f) return 1f
-        // Positive half of the oscillation only: swells flash the glimmer ON,
-        // troughs leave it OFF. Squared for a snappier, more legible pulse
-        // than a linear map (gold-on-gold is low contrast).
-        val rise = (tremolo.coerceIn(-1.5f, 1.5f) / 1.5f).coerceIn(0f, 1f)
-        val on = rise * rise
+        if (g <= 0f) return GlintResonance.Idle
+        // Full-wave 0..1: |tremolo| at 1 → full on. Do NOT divide by 1.5 then
+        // square — that capped real peaks (~1.0) at ~0.44 and made the
+        // "shimmer" dimmer than the idle sheen (invisible on parchment).
+        val on = kotlin.math.abs(tremolo).coerceIn(0f, 1f)
         // depth=1 fully extinguishes at trough; lower leaves residual sheen.
         val gated = 1f - depth.coerceIn(0f, 1f) * (1f - on)
         // Attack/release blend from identity so detection edges never pop.
-        return 1f + g * (gated - 1f)
+        val mult = 1f + g * (gated - 1f)
+        return GlintResonance(layerMult = mult, peak = g * on)
     }
 
     /**
@@ -558,6 +571,13 @@ object InkEngine {
      * turning on and off, not a mild breath of permanent gold.
      */
     const val GLINT_RESONANCE_DEPTH = 1f
+
+    /**
+     * Extra tint/halo strength at a full tarjīʿ peak, as a fraction of the
+     * shipped glint alphas. Peaks must outshine idle gold-on-parchment or the
+     * pulse is invisible.
+     */
+    const val GLINT_RESONANCE_PEAK_BOOST = 0.85f
 
     /** Shipped tarjīʿ rate ceiling (Hz) — see [Tuning.glintResonanceMaxHz]. */
     const val GLINT_RESONANCE_MAX_HZ = 10f

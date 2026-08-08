@@ -535,9 +535,9 @@ class InkEngineTest {
 
     @Test
     fun `glint resonance is identity when not holding or disabled`() {
-        assertEquals(1f, InkEngine.glintResonance(holding = false), 0f)
+        assertEquals(InkEngine.GlintResonance.Idle, InkEngine.glintResonance(holding = false))
         assertEquals(
-            1f,
+            InkEngine.GlintResonance.Idle,
             InkEngine.glintResonance(
                 holding = true,
                 tremolo = 1f,
@@ -545,28 +545,26 @@ class InkEngineTest {
                 depth = 0.4f,
                 enabled = false,
             ),
-            0f,
         )
         assertEquals(
-            1f,
+            InkEngine.GlintResonance.Idle,
             InkEngine.glintResonance(
                 holding = true,
                 tremolo = 1f,
                 tremoloGain = 1f,
                 depth = 0f,
             ),
-            0f,
         )
     }
 
     @Test
     fun `glint resonance turns the glimmer on and off with the tarji pulse`() {
-        // Half-wave + square: only positive swells light the sheen; troughs off.
-        // tremolo +1.5 → full on; 0 and below → off. Gold-on-gold needs that
-        // contrast or the pulse is invisible on a parked 1:7 closer.
+        // Full-wave |tremolo|: both crests light the sheen; zero-crossings off.
+        // Real tremolo ~1.0 must hit full on (the old /1.5 then square capped
+        // peaks at ~0.44 — dimmer than idle, so invisible on parchment).
         val up = InkEngine.glintResonance(
             holding = true,
-            tremolo = 1.5f,
+            tremolo = 1f,
             tremoloGain = 1f,
             depth = 1f,
         )
@@ -582,56 +580,60 @@ class InkEngineTest {
             tremoloGain = 1f,
             depth = 1f,
         )
-        assertEquals(1f, up, 1e-4f)
-        assertEquals(0f, mid, 1e-4f)
-        assertEquals(0f, down, 1e-4f)
-        // Soft depth leaves residual sheen when the swell is off.
-        val softTrough = InkEngine.glintResonance(
+        assertEquals(1f, up.layerMult, 1e-4f)
+        assertEquals(1f, up.peak, 1e-4f)
+        assertEquals(0f, mid.layerMult, 1e-4f)
+        assertEquals(0f, mid.peak, 1e-4f)
+        assertEquals(1f, down.layerMult, 1e-4f) // |−1| = full on
+        assertEquals(1f, down.peak, 1e-4f)
+        // Soft depth leaves residual sheen at zero-crossing.
+        val softZero = InkEngine.glintResonance(
             holding = true,
-            tremolo = -1f,
+            tremolo = 0f,
             tremoloGain = 1f,
             depth = 0.4f,
         )
-        assertEquals(0.6f, softTrough, 1e-4f)
+        assertEquals(0.6f, softZero.layerMult, 1e-4f)
         // Half-ramped detection: blend from identity toward the gated pulse.
         val rampingPeak = InkEngine.glintResonance(
             holding = true,
-            tremolo = 1.5f,
+            tremolo = 1f,
             tremoloGain = 0.5f,
             depth = 1f,
         )
-        assertEquals(1f, rampingPeak, 1e-4f) // peak is already on → stays 1
+        assertEquals(1f, rampingPeak.layerMult, 1e-4f)
+        assertEquals(0.5f, rampingPeak.peak, 1e-4f)
         val rampingTrough = InkEngine.glintResonance(
             holding = true,
-            tremolo = -1f,
+            tremolo = 0f,
             tremoloGain = 0.5f,
             depth = 1f,
         )
-        assertEquals(0.5f, rampingTrough, 1e-4f) // halfway toward off
-        // Half swell (tremolo = 0.75) → rise 0.5 → on 0.25 after square.
+        assertEquals(0.5f, rampingTrough.layerMult, 1e-4f)
+        assertEquals(0f, rampingTrough.peak, 1e-4f)
+        // Half swell: |0.75| → on 0.75 (no destructive square).
         val halfSwell = InkEngine.glintResonance(
             holding = true,
             tremolo = 0.75f,
             tremoloGain = 1f,
             depth = 1f,
         )
-        assertEquals(0.25f, halfSwell, 1e-4f)
+        assertEquals(0.75f, halfSwell.layerMult, 1e-4f)
+        assertEquals(0.75f, halfSwell.peak, 1e-4f)
     }
 
     @Test
     fun `glint resonance shows no tell before the voice reverberates`() {
-        // Zero detection gain = exactly the idle alpha, even with a tremolo
-        // value on the wire: a word whose voice has not started pulsing must
-        // not dim or glow ahead of the shimmer.
+        // Zero detection gain = idle (layerMult 1, peak 0), even with a
+        // tremolo value on the wire.
         assertEquals(
-            1f,
+            InkEngine.GlintResonance.Idle,
             InkEngine.glintResonance(
                 holding = true,
                 tremolo = 1f,
                 tremoloGain = 0f,
                 depth = 1f,
             ),
-            0f,
         )
     }
 
