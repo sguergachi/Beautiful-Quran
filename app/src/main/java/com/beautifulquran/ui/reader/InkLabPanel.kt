@@ -233,11 +233,12 @@ fun InkLabPanel(
                             InkEngine.tuning = t.copy(glintResonance = it)
                         }
                         LabCaption(
-                            "Brightness pulse on the always-on wet-ink glint " +
-                                "from the reciter's tarjīʿ (reverberation on a " +
-                                "held note), detected live on the tapped PCM. " +
-                                "The sheen rides the wash mid-word and through " +
-                                "waqf holds; tarjīʿ only brightens peaks. No " +
+                            "Tarjīʿ (reverberation on a held note), detected " +
+                                "live on the tapped PCM, pulses the wet-ink " +
+                                "glint: troughs dim it to ~" +
+                                "${"%.0f".format(InkEngine.GLINT_RESONANCE_TROUGH_FLOOR * 100f)}% " +
+                                "sheen, crests brighten peaks. The floor keeps " +
+                                "parks and waqf holds visibly glinted. No " +
                                 "reverberation, no pulse: still wet gold. Off " +
                                 "keeps still wet gold.",
                         )
@@ -250,8 +251,10 @@ fun InkLabPanel(
                             InkEngine.tuning = t.copy(glintResonanceDepth = it)
                         }
                         LabCaption(
-                            "How hard tarjīʿ crests boost the wet sheen. " +
-                                "1 = full peak boost; 0 = no pulse. " +
+                            "How deep tarjīʿ troughs dim the wet sheen. " +
+                                "1 = dims to the floor (~" +
+                                "${"%.0f".format(InkEngine.GLINT_RESONANCE_TROUGH_FLOOR * 100f)}%); " +
+                                "0 = no pulse. " +
                                 "Shipped ~${"%.2f".format(InkEngine.GLINT_RESONANCE_DEPTH)}.",
                         )
                         TuningSlider(

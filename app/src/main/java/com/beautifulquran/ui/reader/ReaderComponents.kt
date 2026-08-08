@@ -1005,16 +1005,16 @@ private class InkMotion(
         get() = if (glintIsRepeat) repeatFeather else sweepFeather
 
     /**
-     * Wet-ink glint layer strength. Always full while Active + glinting —
-     * **not** multiplied by tarjīʿ. Killing layer alpha at pulse troughs made
-     * mid-word parks and waqf holds look un-glinted (the sheen vanished for
-     * half of every cycle). Tarjīʿ only brightens peaks via [glintPeak].
+     * Wet-ink glint layer strength. Full while Active + glinting, dimmed by
+     * tarjīʿ toward [InkEngine.GLINT_RESONANCE_TROUGH_FLOOR] at pulse troughs
+     * — the floor keeps parks and waqf holds visibly glinted while the pulse
+     * breathes with the voice. Idle / handoff: full sheen, no tell.
      */
     val glintLayerAlpha: Float
         get() = glintAlpha.value * glintCarryAlpha(
             replacedByRepeat = glintReplacedByRepeat,
             repeatProgress = repeatProgress,
-        )
+        ) * (if (isActive) tarji.value.layerMult else 1f)
 
     /** 0..1 crest of the tarjīʿ pulse — boosts tint/halo colour at peaks. */
     val glintPeak: Float
