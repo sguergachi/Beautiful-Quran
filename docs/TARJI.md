@@ -137,7 +137,7 @@ and feeds 20 ms hops.
     ghunnah-hummed hold and holds the whole 2.4 s hum, releasing as the voice
     slides into decay — exactly the product span.
 
-## 4. When the shimmer is allowed to show
+## 4. When the glimmer is allowed to pulse
 
 Three gates, all pure alpha (never positional — the reveal edge never moves
 mid-animation, so the bloom can never appear to restart):
@@ -149,34 +149,41 @@ mid-animation, so the bloom can never appear to restart):
 2.  **Audible reverberation:** `VoiceEnergy.shimmerGain (= isLive ?
     tremoloGain : 0) > 0.01`. No detection → still gold, even on the longest
     steady waqf. This is the product law the last round established.
-3.  **Active word:** `isActive` (and not a repeat terracotta word). The gate
-    hard-closes at handoff: the dry-down dissolve is never modulated.
+3.  **Active word:** `isActive` — first-pass white-gold **and** repeat
+    terracotta. The gate hard-closes at handoff: the dry-down dissolve is
+    never modulated.
 
-When all three pass, the gold's tint and halo ride
+When all three pass, tarjīʿ **turns the glimmer on and off** with the voice
+(not a soft breath around permanent sheen):
 
 ```
-1 + depth·g·tremolo   // synced to the voice
+rise  = clamp(tremolo / 1.5, 0, 1)       // positive half only
+on    = rise²                            // snappy peak
+gated = 1 − depth·(1 − on)
+mult  = 1 + g·(gated − 1)                // g = tremoloGain
 ```
 
-re-centred below 1 (`RESONANCE_CENTER 0.9`, bounded `[0.55, 1.25]`) so the
-gold can both brighten and dim. Before the fix the multiplier was centred
-on 1 — which clips at full opacity, so only the dimming half was visible
-(the halo dimming, the feather flicker); peaks never rose above the formed
-ink. The centre now eases in with the gain (`1 + (0.9−1)·g`) — at `g = 0`
-the multiplier is exactly 1, so a word gives **no tell** that it is about to
-shimmer. The halo's formation floor (`max(smootherstep(p), 0.88·g)`) scales
-the same way, for the same reason.
+At `depth = 1` (shipped) swells leave the sheen fully on and everything else
+extinguishes it — gold-on-gold needs that contrast. At `g = 0` the multiplier
+is exactly 1 — **no tell** before the voice actually reverberates. The halo
+forms only with the directional wash (`smootherstep(glintProgress)`); there is
+no whole-word formation floor when resonance engages.
+
+**Frame gate:** the Active strong-hold word runs a vsync sampler
+(`rememberTarjiGate`) that writes the multiplier every frame. The wash's
+Animatable stops invalidating draw once the word parks; without the sampler
+the pulse freezes on long closers (1:7) even when the detector is live.
 
 The free-running sine that used to run inside the waqf window on steady holds
 is gone — steady holds keep still gold.
 
 ### Ink Lab
 
-*   **Tarjīʿ** toggle (`glintResonance`), **Resonance strength**
-    (`glintResonanceDepth` 0–1), **Tarjīʿ max rate** (`glintResonanceMaxHz`
-    2–50 Hz, shipped 10). The max-rate band scans from that ceiling;
-    sub-harmonics are rejected. The panel now shows a live **Detector**
-    line under the toggle (polled every 200 ms while open):
+*   **Tarjīʿ** toggle (`glintResonance`), **Pulse depth**
+    (`glintResonanceDepth` 0–1, shipped 1), **Tarjīʿ max rate**
+    (`glintResonanceMaxHz` 2–50 Hz, shipped 10). The max-rate band scans from
+    that ceiling; sub-harmonics are rejected. The panel now shows a live
+    **Detector** line under the toggle (polled every 200 ms while open):
     `tarjīʿ · hold 1.2s · 4.8 Hz · gain 0.84` / `holding … — no tarjīʿ yet` /
     `listening…` / `silent — no PCM` — so vanishing shimmer is diagnosable
     (no hold, wrong rate, depth, silent sink).
@@ -241,8 +248,10 @@ cannot fake convergence.
 
 These live where the reset actually lives: the pure entry/residual helpers and
 the clock, not the glint paint adapters. A new shimmer knob must keep the
-contract `gain = 0 ⇒ multiplier ≡ 1` and `halo floor ∝ gain` so a not-yet-
-reverberating word stays pixel-identical to a plain word.
+contract `gain = 0 ⇒ multiplier ≡ 1` so a not-yet-reverberating word stays
+pixel-identical to a plain word. Do not reintroduce a whole-word halo
+formation floor keyed on detection gain — that lit the entire glyph slightly
+ahead of the directional reveal.
 
 ## 6. Tajweed nuance that gates all of this
 

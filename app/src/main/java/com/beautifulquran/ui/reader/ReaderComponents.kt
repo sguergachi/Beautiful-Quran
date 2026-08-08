@@ -49,12 +49,14 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.withFrameNanos
 
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -976,6 +978,13 @@ private class InkMotion(
     val glintIsRepeat: Boolean,
     private val glintReplacedByRepeat: Boolean,
     val waslPrefix: WaslPrefix?,
+    /**
+     * Frame-driven tarjīʿ multiplier (identity 1 when idle). Updated every
+     * vsync while the word is Active and eligible — without this the wash
+     * park freezes the last drawn alpha and the pulse never shows on long
+     * closers (1:7 الضَّالِّينَ).
+     */
+    private val tarjiMult: State<Float>,
 ) {
     val isActive: Boolean get() = ink.state == InkEngine.State.Active
     val repeat: Boolean get() = ink.repeat
@@ -995,46 +1004,18 @@ private class InkMotion(
     val glintFeather: Float?
         get() = if (glintIsRepeat) repeatFeather else sweepFeather
 
-    /** Attack/release envelope of a detected tarjīʿ, 0 when none. */
-    private fun resonanceGain(): Float =
-        com.beautifulquran.playback.VoiceEnergy.active?.shimmerGain ?: 0f
-
     val glintLayerAlpha: Float
         get() {
             val base = glintAlpha.value * glintCarryAlpha(
                 replacedByRepeat = glintReplacedByRepeat,
                 repeatProgress = repeatProgress,
             )
-            // Resonance only while the first-pass word is still being recited
-            // — the hold ends with the voice, so the dry-down after handoff
-            // stays still; repeat terracotta sheen is never modulated.
-            if (glintIsRepeat || base <= 0f || !isActive) return base
-            if (!glintResonating) return base
-            val voice = com.beautifulquran.playback.VoiceEnergy.active
-            return base * InkEngine.glintResonance(
-                holding = true,
-                tremolo = voice?.tremolo ?: 0f,
-                tremoloGain = resonanceGain(),
-            )
+            // Tarjīʿ turns the glimmer on and off with the voice while the
+            // word is still Active (first-pass gold and repeat terracotta
+            // alike). The dry-down after handoff stays still (tarjiMult → 1).
+            if (base <= 0f || !isActive) return base
+            return base * tarjiMult.value
         }
-
-    /** How engaged the tarjīʿ resonance is on this word, 0..1 — 0 means the
-     * word shows no sign of the effect at all (no halo floor, no swing). */
-    val resonanceEngaged: Float
-        get() {
-            if (glintIsRepeat || !isActive || glintAlpha.value <= 0f) return 0f
-            if (!InkEngine.tuning.glintResonance ||
-                InkEngine.tuning.glintResonanceDepth <= 0f
-            ) {
-                return 0f
-            }
-            if (sweep.pacing.value?.hasStrongHold != true) return 0f
-            return resonanceGain()
-        }
-
-    /** True while the glint is resonating (halo stays bright for the shimmer). */
-    val glintResonating: Boolean
-        get() = resonanceEngaged > 0.01f
 
     /** Whether the orange repeat overlay still has any ink to show. */
     val showRepeatLayer: Boolean get() = repeatAlpha > 0f
@@ -1095,15 +1076,50 @@ private fun Modifier.layeredGlintInk(motion: InkMotion, rtl: Boolean): Modifier 
 /** Layered-word adapter for the tight glyph halo. */
 private fun Modifier.layeredGlintHalo(motion: InkMotion): Modifier =
     bleedAlphaLayer {
-        // The halo's formation floor rises with the detection gain: an
-        // un-reverberating word keeps its ordinary formed halo, so nothing
-        // about it telegraphs the shimmer before the voice actually pulses.
-        val form = maxOf(
-            inkSmootherstep(motion.glintProgress),
-            0.88f * motion.resonanceEngaged,
-        )
-        motion.glintLayerAlpha * form
+        // Halo forms with the wash only — never a whole-word floor when
+        // tarjīʿ engages (that lit the entire glyph slightly ahead of the
+        // directional reveal). Tarjīʿ gates alpha via [glintLayerAlpha].
+        motion.glintLayerAlpha * inkSmootherstep(motion.glintProgress)
     }
+
+/**
+ * Per-frame tarjīʿ multiplier for one word. Identity (1) when the word is not
+ * Active or not eligible; otherwise samples [VoiceEnergy] every vsync so the
+ * glint draw path keeps pulsing after the wash park freezes its Animatable.
+ * Only the Active eligible word runs the loop — one float, one frame callback.
+ */
+@Composable
+private fun rememberTarjiGate(
+    active: Boolean,
+    eligible: Boolean,
+): State<Float> {
+    val mult = remember { mutableFloatStateOf(1f) }
+    val run = active && eligible &&
+        InkEngine.tuning.glintResonance &&
+        InkEngine.tuning.glintResonanceDepth > 0f
+    LaunchedEffect(run) {
+        if (!run) {
+            mult.floatValue = 1f
+            return@LaunchedEffect
+        }
+        while (true) {
+            withFrameNanos {
+                val voice = com.beautifulquran.playback.VoiceEnergy.active
+                val g = voice?.shimmerGain ?: 0f
+                mult.floatValue = if (g > 0.01f) {
+                    InkEngine.glintResonance(
+                        holding = true,
+                        tremolo = voice?.tremolo ?: 0f,
+                        tremoloGain = g,
+                    )
+                } else {
+                    1f
+                }
+            }
+        }
+    }
+    return mult
+}
 
 @Composable
 private fun rememberInkMotions(
@@ -1133,6 +1149,8 @@ private fun rememberInkMotions(
         }
         val glinting = glintInk != null && InkEngine.glinting(ink.state)
         val glintIdentity = rememberGlintIdentity(glinting, ink.repeat)
+        // Tarjīʿ only runs its vsync sampler on the Active strong-hold word.
+        val tarjiEligible = glinting && entryPacing?.hasStrongHold == true
         InkMotion(
             ink = ink,
             lyricInk = if (animateLyricInk) {
@@ -1162,6 +1180,10 @@ private fun rememberInkMotions(
             glintIsRepeat = glintIdentity.repeat,
             glintReplacedByRepeat = glintIdentity.replacedByRepeat,
             waslPrefix = waslPrefixes[index],
+            tarjiMult = rememberTarjiGate(
+                active = isActive,
+                eligible = tarjiEligible,
+            ),
         )
     }
 }
