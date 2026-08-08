@@ -137,6 +137,19 @@ class TarjiTest {
     }
 
     @Test
+    fun `raising the ceiling to 50 Hz admits fast vocal texture`() {
+        // ~17 Hz envelope texture with strong depth: rejected at the shipped
+        // ceiling but admitted when the Ink Lab slider is opened to 50 Hz.
+        val capped = Tarji()
+        feed(capped, heldNote(seconds = 2.5f, pitchHz = 130f, amHz = 17f, amDepth = 0.3f))
+        assertFalse(capped.reverberating)
+        val open = Tarji()
+        open.maxTremoloHz = 50f
+        feed(open, heldNote(seconds = 2.5f, pitchHz = 130f, amHz = 17f, amDepth = 0.3f))
+        assertTrue(open.reverberating)
+    }
+
+    @Test
     fun `detection releases smoothly when the reverberation stops`() {
         val d = Tarji()
         feed(d, heldNote(seconds = 2f, pitchHz = 130f, amHz = 5.5f, amDepth = 0.08f))
