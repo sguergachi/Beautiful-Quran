@@ -102,9 +102,13 @@ class HighlightClock(
         /**
          * Polls after a seek/handoff during which every regression is held and
          * forward jumps larger than [MAX_SETTLE_STEP_MS] are ignored.
-         * ~400 ms at the reader's 33 ms tick.
+         * ~1.2 s at the reader's 33 ms tick — long enough that a slow-converging
+         * post-handoff estimate (the audio pipeline can take the better part of
+         * a second to settle its playhead after an item change) snaps back
+         * *inside* the window instead of being read as a seek and replaying
+         * word 2/3's wash.
          */
-        const val SETTLE_SAMPLES = 12
+        const val SETTLE_SAMPLES = 36
 
         /** Largest forward step accepted during settle (~3× realtime at 33 ms). */
         const val MAX_SETTLE_STEP_MS = 100L

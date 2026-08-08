@@ -118,4 +118,29 @@ class HighlightClockTest {
         clock.sample("a", 5066) // settle exhausted
         assertEquals(1000L, clock.sample("a", 1000))
     }
+
+    @Test
+    fun `a snap-back after the old settle window is still held`() {
+        // The 1:7-word-3 replay: the handoff estimate creeps believably
+        // (≤100 ms/poll passes the step cap), then corrects back long after
+        // the old 12-poll settle had expired — that read as a seek and
+        // replayed the word's wash.
+        val clock = HighlightClock()
+        var clockMs = clock.sample("ayah 7", 0L)
+        // ~20 polls of believable creep into word 3's span.
+        for (i in 1..20) clockMs = clock.sample("ayah 7", i * 90L)
+        assertEquals(1800L, clockMs)
+        // The estimate snaps back to the true position — deep into the old
+        // window's past, but inside the longer one: held, not a "seek".
+        assertEquals(1800L, clock.sample("ayah 7", 300L))
+    }
+
+    @Test
+    fun `after the longer settle a snap-back is a genuine seek again`() {
+        val clock = HighlightClock()
+        var clockMs = clock.sample("ayah 7", 0L)
+        for (i in 1..40) clockMs = clock.sample("ayah 7", i * 90L)
+        assertEquals(3600L, clockMs)
+        assertEquals(300L, clock.sample("ayah 7", 300L))
+    }
 }
