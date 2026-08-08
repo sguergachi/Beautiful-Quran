@@ -154,13 +154,14 @@ object InkEngine {
         /** How far the wash still creeps while holding, so it breathes. */
         val holdCreep: Float = 0.3f,
         /**
-         * Soft white-gold shimmer while a long verse-closing waqf is sustained.
-         * Off: still gold, no voice-driven flicker. See [glintResonance].
+         * Tarjīʿ turns the wet-ink glimmer on and off with the reciter's
+         * measured reverberation. Off: still gold, no voice-driven pulse.
+         * See [glintResonance].
          */
         val glintResonance: Boolean = true,
         /**
-         * How hard voice energy (and the free-running carrier) swing glint
-         * alpha during a long waqf park. 0 = no shimmer; shipped
+         * How hard troughs extinguish the glimmer during tarjīʿ. 0 = no pulse
+         * (identity); 1 = full on/off with the voice; shipped
          * [GLINT_RESONANCE_DEPTH]. Auditionable in the Tajweed Ink Lab tab.
          */
         val glintResonanceDepth: Float = GLINT_RESONANCE_DEPTH,
@@ -482,14 +483,18 @@ object InkEngine {
     fun glinting(state: State): Boolean = state == State.Active
 
     /**
-     * Multiplier for wet-ink glint alpha while the reciter's tarjīʿ (ترجيع) —
-     * the repeated reverberation of the voice on a held note — is detected on
-     * the tapped PCM by [com.beautifulquran.playback.VoiceEnergy]. [tremolo]
-     * is that very oscillation (zero-centred, phase-locked to the voice) and
-     * [tremoloGain] its attack/release envelope, so the gold breathes exactly
-     * with the reciter and never pops at detection edges. **No detection, no
-     * shimmer**: a steady hold without audible reverberation keeps still
-     * gold. Pure and unit-tested.
+     * Multiplier that **turns the wet-ink glimmer on and off** with the
+     * reciter's tarjīʿ (ترجيع) — the repeated reverberation of the voice on a
+     * held note — detected on the tapped PCM by
+     * [com.beautifulquran.playback.VoiceEnergy]. [tremolo] is that oscillation
+     * (zero-centred, phase-locked to the voice) and [tremoloGain] its
+     * attack/release envelope.
+     *
+     * This is not a soft breath around a permanent sheen. Peaks of the
+     * measured pulse leave the glimmer fully on; troughs extinguish it
+     * (by [depth]). At [tremoloGain] = 0 the multiplier is exactly 1 — no
+     * tell before the voice actually reverberates. Steady holds without an
+     * audible pulse keep still gold. Pure and unit-tested.
      *
      * @param holding true while a reverberant hold is detected on an eligible
      * word (see the glint layer in ReaderComponents)
@@ -505,29 +510,24 @@ object InkEngine {
     ): Float {
         if (!holding || !enabled || depth <= 0f) return 1f
         val g = tremoloGain.coerceIn(0f, 1f)
-        // The swing stays gentle: deep dips read as the word resetting, and
-        // the tint clamps at full opacity anyway — so centre slightly below
-        // 1 and bound both ends. The centre itself eases in with the gain:
-        // at g = 0 the multiplier is exactly 1, so a word whose voice has
-        // not started reverberating shows no tell of the coming shimmer.
-        val voice = depth * g * tremolo.coerceIn(-1.5f, 1.5f)
-        val center = 1f + (RESONANCE_CENTER - 1f) * g
-        return (center + 0.5f * voice)
-            .coerceIn(MIN_RESONANCE_MULT, MAX_RESONANCE_MULT)
+        if (g <= 0f) return 1f
+        // Positive half of the oscillation only: swells flash the glimmer ON,
+        // troughs leave it OFF. Squared for a snappier, more legible pulse
+        // than a linear map (gold-on-gold is low contrast).
+        val rise = (tremolo.coerceIn(-1.5f, 1.5f) / 1.5f).coerceIn(0f, 1f)
+        val on = rise * rise
+        // depth=1 fully extinguishes at trough; lower leaves residual sheen.
+        val gated = 1f - depth.coerceIn(0f, 1f) * (1f - on)
+        // Attack/release blend from identity so detection edges never pop.
+        return 1f + g * (gated - 1f)
     }
 
-    /** Resting point of the resonance multiplier: just below full, so the
-     * gold can both brighten and dim with the voice. */
-    private const val RESONANCE_CENTER = 0.9f
-    /** Never dim formed ink past a breath — deeper dips read as a reset. */
-    private const val MIN_RESONANCE_MULT = 0.55f
-    private const val MAX_RESONANCE_MULT = 1.25f
-
     /**
-     * How hard live voice energy can swing the glint (± fraction of base alpha).
-     * Large enough to read on Nightfall's soft white-gold, not a disco strobe.
+     * How fully tarjīʿ troughs extinguish the glimmer (1 = full on/off with
+     * the voice). Shipped at full so the pulse reads as the glimmer itself
+     * turning on and off, not a mild breath of permanent gold.
      */
-    const val GLINT_RESONANCE_DEPTH = 0.42f
+    const val GLINT_RESONANCE_DEPTH = 1f
 
     /** Shipped tarjīʿ rate ceiling (Hz) — see [Tuning.glintResonanceMaxHz]. */
     const val GLINT_RESONANCE_MAX_HZ = 10f

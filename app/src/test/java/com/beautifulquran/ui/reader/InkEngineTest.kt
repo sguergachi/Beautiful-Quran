@@ -560,39 +560,62 @@ class InkEngineTest {
     }
 
     @Test
-    fun `glint resonance rides the detected tarji signal`() {
-        // Centred at 0.9 and bounded: brightening and dimming both read on a
-        // formed word, but a dip can never look like the ink resetting.
+    fun `glint resonance turns the glimmer on and off with the tarji pulse`() {
+        // Half-wave + square: only positive swells light the sheen; troughs off.
+        // tremolo +1.5 → full on; 0 and below → off. Gold-on-gold needs that
+        // contrast or the pulse is invisible on a parked 1:7 closer.
         val up = InkEngine.glintResonance(
             holding = true,
-            tremolo = 1f,
+            tremolo = 1.5f,
             tremoloGain = 1f,
-            depth = 0.4f,
+            depth = 1f,
+        )
+        val mid = InkEngine.glintResonance(
+            holding = true,
+            tremolo = 0f,
+            tremoloGain = 1f,
+            depth = 1f,
         )
         val down = InkEngine.glintResonance(
             holding = true,
             tremolo = -1f,
             tremoloGain = 1f,
+            depth = 1f,
+        )
+        assertEquals(1f, up, 1e-4f)
+        assertEquals(0f, mid, 1e-4f)
+        assertEquals(0f, down, 1e-4f)
+        // Soft depth leaves residual sheen when the swell is off.
+        val softTrough = InkEngine.glintResonance(
+            holding = true,
+            tremolo = -1f,
+            tremoloGain = 1f,
             depth = 0.4f,
         )
-        assertEquals(1.1f, up, 1e-4f)
-        assertEquals(0.7f, down, 1e-4f)
-        // Half-ramped detection: the centre and the swing both ease in.
-        val ramping = InkEngine.glintResonance(
+        assertEquals(0.6f, softTrough, 1e-4f)
+        // Half-ramped detection: blend from identity toward the gated pulse.
+        val rampingPeak = InkEngine.glintResonance(
             holding = true,
-            tremolo = 1f,
+            tremolo = 1.5f,
             tremoloGain = 0.5f,
-            depth = 0.4f,
+            depth = 1f,
         )
-        assertEquals(1.05f, ramping, 1e-4f)
-        // Even at max depth and a hard tremolo trough, the gold only breathes.
-        val maxDip = InkEngine.glintResonance(
+        assertEquals(1f, rampingPeak, 1e-4f) // peak is already on → stays 1
+        val rampingTrough = InkEngine.glintResonance(
             holding = true,
-            tremolo = -1.5f,
+            tremolo = -1f,
+            tremoloGain = 0.5f,
+            depth = 1f,
+        )
+        assertEquals(0.5f, rampingTrough, 1e-4f) // halfway toward off
+        // Half swell (tremolo = 0.75) → rise 0.5 → on 0.25 after square.
+        val halfSwell = InkEngine.glintResonance(
+            holding = true,
+            tremolo = 0.75f,
             tremoloGain = 1f,
             depth = 1f,
         )
-        assertEquals(0.55f, maxDip, 1e-4f)
+        assertEquals(0.25f, halfSwell, 1e-4f)
     }
 
     @Test

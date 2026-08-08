@@ -80,30 +80,34 @@ works on every output route and emulator), and `playback/Tarji` — a pure,
 unit-tested DSP core — tracks a **single held note** (voiced, pitch-stable
 ≥ ~0.4 s) and scans its amplitude envelope for a periodic oscillation in the
 tarjīʿ band (~1.5–10 Hz, tunable up to 50 Hz via the Ink Lab's
-**Tarjīʿ max rate**). The shimmer only answers on words carrying a **strong
+**Tarjīʿ max rate**). The pulse only answers on words carrying a **strong
 tajweed hold of their own** — a long madd, a ghunnah (the shadda نّ of
 ٱلنَّارِ), or the verse-closing waqf (`TajweedPacing.Curve.hasStrongHold`;
 a wasl entry alone sustains the previous word's nūn and never qualifies) —
-and starts the moment the reverberation is detected there, riding the
-*measured* oscillation itself, so the gold swells and rests exactly with the
-reciter's voice (`InkEngine.GLINT_RESONANCE_DEPTH` ~42 %). Two clock
+and starts the moment the reverberation is detected there.
+
+**Tarjīʿ is the turning on and off of the glimmer itself**, not a soft breath
+around permanent gold. Only the **positive half** of the measured oscillation
+flashes the wet-ink sheen on (squared for a snappy peak); troughs and the
+negative half leave it off (`InkEngine.GLINT_RESONANCE_DEPTH` = 1 by default;
+Ink Lab **Pulse depth** softens that). First-pass white-gold and **repeat
+terracotta** glimmers both take the same gate. A per-frame sampler on the
+Active strong-hold word keeps the pulse painting after the wash park freezes
+its Animatable — without that, long closers (1:7) looked still. Two clock
 corrections keep it in step: a phase lead covers the analysis lag, and the
 whole signal is delayed by the same output-route latency the highlight clock
 subtracts (the PCM tap hears the voice *before* the listener does). Detection
 ramps in and out under an attack/release envelope, so no edge ever pops.
 
-**No reverberation, no shimmer**: a steady hold without an audible pulse —
+**No reverberation, no pulse**: a steady hold without an audible pulse —
 even a long verse-closing waqf — keeps still gold. The gate also hard-closes
 at handoff: the dry-down dissolve after the voice moves on is never
-modulated, and repeat terracotta glint is never modulated either.
+modulated.
 
-How the shimmer **reads** on a formed, parked word (gold tint over formed
-ink is low-contrast, so a multiplier centred on 1 shows only the dimming
-half — every brightening peak clips at full opacity): the multiplier rests
-at 0.9 and is bounded to [0.55, 1.25], so the gold both brightens and dims
-with the voice, while a dip can never run deep enough to read as the ink
-resetting. The modulation is **pure alpha** — the reveal edge never moves
-mid-animation, so the bloom can never appear to restart.
+The modulation is **pure alpha** — the reveal edge never moves mid-animation,
+so the bloom can never appear to restart. The halo forms only with the
+directional wash (`smootherstep(glintProgress)`); there is no whole-word
+formation floor when resonance engages.
 
 ## Visual target
 
@@ -240,8 +244,8 @@ and inspect ink; the toggle is session-only and not part of `Tuning`.
 | Glint tint | `glintTintAlpha` | 0.62 | 0–1 | Peak strength of the crisp white-gold ink tint. |
 | Halo strength | `glintGlowAlpha` | 0.49 | 0–1 | Peak opacity of the blurred outline. |
 | Halo blur | `glintGlowRadius` | 10 | 0–10 | Renderer blur radius around the glyph outline; it is not a word-relative radial size. |
-| Waqf glint shimmer (Tajweed tab) | `glintResonance` | on | toggle | Soft white-gold breath on long verse-closing parks (voice energy + free carrier). |
-| Resonance strength (Tajweed tab) | `glintResonanceDepth` | 0.42 | 0–1 | How hard the gold swings with the held note; scales the free-running floor with it. |
+| Tarjīʿ (Tajweed tab) | `glintResonance` | on | toggle | Turns the wet-ink glimmer on and off with detected tarjīʿ (first-pass gold and repeat terracotta). |
+| Pulse depth (Tajweed tab) | `glintResonanceDepth` | 1.0 | 0–1 | How fully troughs extinguish the glimmer (1 = full on/off with the voice). |
 
 The scalar maps to Compose `Shadow.blurRadius` for per-word text and to dp for
 the shaped-path `BlurMaskFilter`; use the visual result, not physical units, as

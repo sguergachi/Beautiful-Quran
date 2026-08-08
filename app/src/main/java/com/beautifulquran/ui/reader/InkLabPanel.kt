@@ -233,23 +233,26 @@ fun InkLabPanel(
                             InkEngine.tuning = t.copy(glintResonance = it)
                         }
                         LabCaption(
-                            "White-gold breath that rides the reciter's " +
-                                "tarjīʿ — the reverberation of the voice on a " +
-                                "held note — detected live on the tapped PCM. " +
-                                "No reverberation, no shimmer: steady holds " +
-                                "keep still gold. Off keeps still gold.",
+                            "Turns the wet-ink glimmer on and off with the " +
+                                "reciter's tarjīʿ — the reverberation of the " +
+                                "voice on a held note — detected live on the " +
+                                "tapped PCM. Peaks light the sheen; troughs " +
+                                "extinguish it. First-pass gold and repeat " +
+                                "terracotta alike. No reverberation, no pulse: " +
+                                "steady holds keep still gold. Off keeps still gold.",
                         )
                         TarjiStatusLine()
                         TuningSlider(
-                            "Resonance strength",
+                            "Pulse depth",
                             t.glintResonanceDepth,
                             0f..1f,
                         ) {
                             InkEngine.tuning = t.copy(glintResonanceDepth = it)
                         }
                         LabCaption(
-                            "How hard the gold swings with the held note. " +
-                                "0 = no shimmer; shipped ~${"%.2f".format(InkEngine.GLINT_RESONANCE_DEPTH)}.",
+                            "How fully troughs extinguish the glimmer. " +
+                                "1 = full on/off with the voice; 0 = no pulse. " +
+                                "Shipped ~${"%.2f".format(InkEngine.GLINT_RESONANCE_DEPTH)}.",
                         )
                         TuningSlider(
                             "Tarjīʿ max rate",
