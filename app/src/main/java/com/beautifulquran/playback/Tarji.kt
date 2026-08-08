@@ -48,6 +48,10 @@ class Tarji {
     var lastClarity = 0f
         private set
 
+    /** Diagnostics: last measured envelope oscillation rate (Hz). */
+    var lastRateHz = 0f
+        private set
+
     /**
      * Read-out delay in content hops, set from the output route latency
      * (× playback speed) by [VoiceEnergy]: the PCM tap hears the voice
@@ -228,6 +232,7 @@ class Tarji {
         }
         val rateHz =
             if (bestLag > 0) 1000f / (bestLag * HOP_MS.toFloat()) else 0f
+        lastRateHz = rateHz
         // A pulse whose true period sits *below* the scan floor still
         // correlates at double that lag — without this check a 5.5 Hz vibrato
         // reads as 2.8 Hz and slips under a low rate ceiling.

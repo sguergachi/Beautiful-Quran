@@ -24,6 +24,16 @@ class VoiceEnergy {
     var reverberating = false
         private set
 
+    /** Diagnostics for the Ink Lab readout: current hold length and the
+     * measured oscillation rate (Hz). Undelayed — these are for humans. */
+    @Volatile
+    var holdMs = 0f
+        private set
+
+    @Volatile
+    var rateHz = 0f
+        private set
+
     /** The reverberation oscillation, zero-centred ~−1..1, in phase with the
      * voice. Ride this for the synced shimmer. */
     @Volatile
@@ -94,6 +104,8 @@ class VoiceEnergy {
         reverberating = tarji.syncReverberating
         tremolo = tarji.syncTremolo
         tremoloGain = tarji.syncTremoloGain
+        holdMs = tarji.holdMs
+        rateHz = tarji.lastRateHz
         lastFeedMs = SystemClock.elapsedRealtime()
     }
 
@@ -110,6 +122,8 @@ class VoiceEnergy {
         reverberating = false
         tremolo = 0f
         tremoloGain = 0f
+        holdMs = 0f
+        rateHz = 0f
         lastFeedMs = 0L
         decimSum = 0f
         decimCount = 0

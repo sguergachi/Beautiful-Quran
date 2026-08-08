@@ -239,6 +239,7 @@ fun InkLabPanel(
                                 "No reverberation, no shimmer: steady holds " +
                                 "keep still gold. Off keeps still gold.",
                         )
+                        TarjiStatusLine()
                         TuningSlider(
                             "Resonance strength",
                             t.glintResonanceDepth,
@@ -604,6 +605,34 @@ private fun LabCaption(text: String) {
             .fillMaxWidth()
             .padding(bottom = 4.dp),
     )
+}
+
+/**
+ * Live detector readout for the Tarjīʿ section — what the tapped-PCM
+ * detector is hearing right now, so tuning the sliders is done against the
+ * actual signal. Polls the volatile probe while the panel is open.
+ */
+@Composable
+private fun TarjiStatusLine() {
+    var status by remember { mutableStateOf("…") }
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        while (true) {
+            val v = com.beautifulquran.playback.VoiceEnergy.active
+            status = when {
+                v == null -> "no probe (player not created)"
+                !v.isLive -> "silent — no PCM from the player"
+                v.reverberating ->
+                    "tarjīʿ · hold ${"%.1f".format(v.holdMs / 1000f)}s · " +
+                        "${"%.1f".format(v.rateHz)} Hz · gain ${"%.2f".format(v.shimmerGain)}"
+                v.holdMs > 0f ->
+                    "holding ${"%.1f".format(v.holdMs / 1000f)}s · " +
+                        "${"%.1f".format(v.rateHz)} Hz — no tarjīʿ yet"
+                else -> "listening…"
+            }
+            kotlinx.coroutines.delay(200)
+        }
+    }
+    LabCaption("Detector: $status")
 }
 
 /**
