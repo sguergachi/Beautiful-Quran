@@ -577,14 +577,14 @@ class InkEngineTest {
         )
         assertEquals(1.1f, up, 1e-4f)
         assertEquals(0.7f, down, 1e-4f)
-        // Half-ramped detection halves the swing (no pops at the edges).
+        // Half-ramped detection: the centre and the swing both ease in.
         val ramping = InkEngine.glintResonance(
             holding = true,
             tremolo = 1f,
             tremoloGain = 0.5f,
             depth = 0.4f,
         )
-        assertEquals(1.0f, ramping, 1e-4f)
+        assertEquals(1.05f, ramping, 1e-4f)
         // Even at max depth and a hard tremolo trough, the gold only breathes.
         val maxDip = InkEngine.glintResonance(
             holding = true,
@@ -593,6 +593,23 @@ class InkEngineTest {
             depth = 1f,
         )
         assertEquals(0.55f, maxDip, 1e-4f)
+    }
+
+    @Test
+    fun `glint resonance shows no tell before the voice reverberates`() {
+        // Zero detection gain = exactly the idle alpha, even with a tremolo
+        // value on the wire: a word whose voice has not started pulsing must
+        // not dim or glow ahead of the shimmer.
+        assertEquals(
+            1f,
+            InkEngine.glintResonance(
+                holding = true,
+                tremolo = 1f,
+                tremoloGain = 0f,
+                depth = 1f,
+            ),
+            0f,
+        )
     }
 
     @Test

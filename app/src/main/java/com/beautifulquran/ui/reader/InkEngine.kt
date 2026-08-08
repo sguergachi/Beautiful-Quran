@@ -507,9 +507,12 @@ object InkEngine {
         val g = tremoloGain.coerceIn(0f, 1f)
         // The swing stays gentle: deep dips read as the word resetting, and
         // the tint clamps at full opacity anyway — so centre slightly below
-        // 1 and bound both ends.
+        // 1 and bound both ends. The centre itself eases in with the gain:
+        // at g = 0 the multiplier is exactly 1, so a word whose voice has
+        // not started reverberating shows no tell of the coming shimmer.
         val voice = depth * g * tremolo.coerceIn(-1.5f, 1.5f)
-        return (RESONANCE_CENTER + 0.5f * voice)
+        val center = 1f + (RESONANCE_CENTER - 1f) * g
+        return (center + 0.5f * voice)
             .coerceIn(MIN_RESONANCE_MULT, MAX_RESONANCE_MULT)
     }
 
