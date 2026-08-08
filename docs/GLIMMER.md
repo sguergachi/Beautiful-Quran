@@ -90,20 +90,21 @@ a wasl entry alone sustains the previous word's nūn and never qualifies) —
 and starts the moment the reverberation is detected there.
 
 The **wet-ink glint always rides the wash** for the whole Active word —
-mid-bloom and long waqf parks included. Tarjīʿ **dims** its layer at pulse
-troughs, but only down to `GLINT_RESONANCE_TROUGH_FLOOR` (~45% sheen) —
-never to zero, so holds always stay visibly glinted while the pulse clearly
-breathes with the voice.
+mid-bloom and long waqf parks included. **Tarjīʿ turns it on and off**: the
+glimmer itself extinguishes at pulse troughs and lights with the crests —
+the voice's reverberation is the glimmer. The attack/release ramp
+(`tremoloGain`) blends the transitions so no detection edge pops.
 
-**Tarjīʿ** is that **layer dim plus a brightness crest**: full-wave
+**Tarjīʿ** is that **on/off plus a brightness crest**: full-wave
 `|tremolo|` raises a peak that boosts tint/halo colour
-(`GLINT_RESONANCE_PEAK_BOOST`) while troughs drop the layer to the floor.
-Depth scales both (Ink Lab **Pulse depth**). Idle / no detection → peak 0,
-full sheen (no tell that a pulse is coming). First-pass white-gold and
-**repeat terracotta** both take the same gate. A per-frame sampler on the
-Active strong-hold word keeps the pulse updating after the wash park freezes
-its Animatable. Phase lead + output-latency delay keep the pulse with the
-ear.
+(`GLINT_RESONANCE_PEAK_BOOST`) while troughs drop the layer to zero at full
+depth. Depth scales both (Ink Lab **Pulse depth**; a non-zero
+`GLINT_RESONANCE_TROUGH_FLOOR` leaves residual sheen for a softer breathe).
+Idle / no detection → peak 0, full sheen (no tell that a pulse is coming).
+First-pass white-gold and **repeat terracotta** both take the same gate. A
+per-frame sampler on the Active strong-hold word keeps the pulse updating
+after the wash park freezes its Animatable. Phase lead + output-latency
+delay keep the pulse with the ear.
 
 **No reverberation, no pulse**: a steady hold without an audible pulse —
 even a long verse-closing waqf — keeps still gold. The gate also hard-closes
@@ -251,7 +252,7 @@ and inspect ink; the toggle is session-only and not part of `Tuning`.
 | Halo strength | `glintGlowAlpha` | 0.78 | 0–1 | Always-on halo; tarjīʿ peaks boost further. |
 | Halo blur | `glintGlowRadius` | 10 | 0–10 | Renderer blur radius around the glyph outline; it is not a word-relative radial size. |
 | Tarjīʿ (Tajweed tab) | `glintResonance` | on | toggle | Turns the wet-ink glimmer on and off with detected tarjīʿ (first-pass gold and repeat terracotta). |
-| Pulse depth (Tajweed tab) | `glintResonanceDepth` | 1.0 | 0–1 | How deeply tarjīʿ troughs dim the glimmer (1 = dims to the ~45% trough floor). |
+| Pulse depth (Tajweed tab) | `glintResonanceDepth` | 1.0 | 0–1 | How deeply tarjīʿ troughs extinguish the glimmer (1 = full on/off with the voice). |
 
 The scalar maps to Compose `Shadow.blurRadius` for per-word text and to dp for
 the shaped-path `BlurMaskFilter`; use the visual result, not physical units, as

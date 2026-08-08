@@ -162,8 +162,8 @@ object InkEngine {
          */
         val glintResonance: Boolean = true,
         /**
-         * How hard tarjīʿ troughs dim the glimmer's layer. 0 = no pulse
-         * (identity); 1 = dims to [GLINT_RESONANCE_TROUGH_FLOOR]; shipped
+         * How hard tarjīʿ troughs extinguish the glimmer's layer. 0 = no
+         * pulse (identity); 1 = full on/off with the voice; shipped
          * [GLINT_RESONANCE_DEPTH]. Auditionable in the Tajweed Ink Lab tab.
          */
         val glintResonanceDepth: Float = GLINT_RESONANCE_DEPTH,
@@ -518,14 +518,13 @@ object InkEngine {
      * Draw values for the tarjīʿ pulse on the wet-ink glint. Detected on the
      * tapped PCM by [com.beautifulquran.playback.VoiceEnergy].
      *
-     * The wet glint rides the wash for the whole Active word. Tarjīʿ dims its
-     * layer toward [GLINT_RESONANCE_TROUGH_FLOOR] at pulse troughs (so parks
-     * and holds never look un-glinted) and [peak] boosts tint/halo colour at
-     * crests.
+     * The wet glint rides the wash for the whole Active word. Tarjīʿ
+     * extinguishes its layer at pulse troughs — the glimmer itself turns on
+     * and off with the voice — and [peak] boosts tint/halo colour at crests.
      *
-     * @param layerMult multiplies the glint layer alpha (1 = full sheen;
-     * [GLINT_RESONANCE_TROUGH_FLOOR] = dimmest trough). Idle is always
-     * [Idle] — no tell before the voice reverberates.
+     * @param layerMult multiplies the glint layer alpha (1 = full sheen,
+     * 0 = extinguished at a full-depth trough). Idle is always [Idle] — no
+     * tell before the voice reverberates.
      * @param peak 0..1 how hard the pulse is cresting (0 = no detection /
      * trough).
      */
@@ -542,8 +541,7 @@ object InkEngine {
      * Maps the detected tarjīʿ signal into [GlintResonance] for the glint
      * paint path. Full-wave intensity: both peaks of the zero-centred
      * [tremolo] raise [GlintResonance.peak]; zero-crossings drop
-     * [GlintResonance.layerMult] toward the trough floor. Pure and
-     * unit-tested.
+     * [GlintResonance.layerMult] to zero at full depth. Pure and unit-tested.
      *
      * @param holding true while a reverberant hold is detected on an eligible
      * word (see the glint layer in ReaderComponents)
@@ -561,8 +559,8 @@ object InkEngine {
         val g = tremoloGain.coerceIn(0f, 1f)
         if (g <= 0f) return GlintResonance.Idle
         // Full-wave 0..1: |tremolo| at 1 → full sheen + full peak boost;
-        // zero-crossings dim the layer toward the trough floor. Depth scales
-        // both (1 = full dim + boost range).
+        // zero-crossings extinguish the layer at full depth. Depth scales
+        // both (1 = full on/off + boost range).
         val on = kotlin.math.abs(tremolo).coerceIn(0f, 1f)
         val d = depth.coerceIn(0f, 1f)
         val mult = 1f - g * d * (1f - on) * (1f - GLINT_RESONANCE_TROUGH_FLOOR)
@@ -577,10 +575,11 @@ object InkEngine {
 
     /**
      * Dimmest the wet-ink glint layer goes at a tarjīʿ trough (fraction of
-     * full sheen). Non-zero so long parks and waqf holds never read as
-     * un-glinted while the pulse clearly breathes with the voice.
+     * full sheen). Shipped 0 — the glimmer itself turns on and off with the
+     * voice at full depth; a non-zero value leaves residual sheen for a
+     * softer breathe.
      */
-    const val GLINT_RESONANCE_TROUGH_FLOOR = 0.45f
+    const val GLINT_RESONANCE_TROUGH_FLOOR = 0f
 
     /**
      * Extra tint/halo strength at a full tarjīʿ peak, as a fraction of the
