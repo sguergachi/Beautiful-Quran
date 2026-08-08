@@ -159,4 +159,25 @@ class TarjiTest {
         assertFalse(d.reverberating)
         assertTrue("release ramp keeps some gain briefly", d.tremoloGain < 1f)
     }
+
+    @Test
+    fun `slow tarji wins over faster envelope texture`() {
+        // Alafasy/Hani 1:7 closers carry both a slow tarjīʿ swell and ~25 Hz
+        // texture. The detector must lock the slow pulse, not let the texture
+        // veto it (the failure mode that left the Ink Lab on "no tarjīʿ yet").
+        val d = Tarji()
+        val n = (2.5f * Tarji.SAMPLE_RATE).toInt()
+        val wave = FloatArray(n) {
+            val t = it / Tarji.SAMPLE_RATE.toFloat()
+            val slow = 1f + 0.10f * sin(2f * PI.toFloat() * 2.2f * t)
+            val texture = 1f + 0.06f * sin(2f * PI.toFloat() * 25f * t)
+            (0.3f * slow * texture * sin(2f * PI.toFloat() * 140f * t)).toFloat()
+        }
+        feed(d, wave)
+        assertTrue("slow tarjīʿ must lock despite faster texture", d.reverberating)
+        assertTrue(
+            "rate should be the slow swell, not the 25 Hz texture (${d.lastRateHz})",
+            d.lastRateHz in 1.5f..6f,
+        )
+    }
 }

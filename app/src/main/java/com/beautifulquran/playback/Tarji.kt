@@ -67,6 +67,27 @@ class Tarji {
      */
     var maxTremoloHz = MAX_TREMOLO_HZ
 
+    /** Slowest envelope oscillation that still counts (Hz). Ink Lab. */
+    var minTremoloHz = MIN_TREMOLO_HZ
+
+    /** Hold length (ms) before reverberation is considered. Ink Lab. */
+    var holdMinMs = HOLD_MIN_MS.toFloat()
+
+    /** Minimum relative envelope AM depth to open the gate. Ink Lab. */
+    var minTremoloDepth = MIN_TREMOLO_DEPTH
+
+    /** Minimum envelope autocorrelation to call the pulse periodic. Ink Lab. */
+    var minPeriodicity = MIN_PERIODICITY
+
+    /** Pitch glide tolerance (fraction) while holding one note. Ink Lab. */
+    var maxPitchDrift = MAX_PITCH_DRIFT
+
+    /** Attack envelope of [tremoloGain] (ms). Ink Lab. */
+    var attackMs = ATTACK_MS
+
+    /** Release envelope of [tremoloGain] (ms). Ink Lab. */
+    var releaseMs = RELEASE_MS
+
     // Reported (delayed) views — what renderers should consume.
     private val histTremolo = FloatArray(HIST_HOPS)
     private val histGain = FloatArray(HIST_HOPS)
@@ -169,7 +190,11 @@ class Tarji {
         updateTremolo(rms)
 
         val target = if (reverberating) 1f else 0f
-        val tau = if (reverberating) ATTACK_MS else RELEASE_MS
+        val tau = if (reverberating) {
+            attackMs.coerceAtLeast(1f)
+        } else {
+            releaseMs.coerceAtLeast(1f)
+        }
         tremoloGain += (HOP_MS / tau) * (target - tremoloGain)
 
         histTremolo[histCount % HIST_HOPS] = tremolo
@@ -230,14 +255,29 @@ class Tarji {
                 bestLag = lag
             }
         }
+        // Ceiling game only: a low maxTremoloHz must not admit a faster pulse
+        // via its double/triple-period lag (5.5 Hz reading as 2.8 Hz under a
+        // 4 Hz ceiling). The old guard vetoed any pick whose *in-band* half
+        // was strong — that also killed real tarjīʿ on Alafasy/Hani 1:7 when
+        // fast ~10–25 Hz texture coexisted with the slow swell. Only an
+        // out-of-band short peak that is an exact submultiple of the pick
+        // counts as a ceiling cheat.
+        var shortPeakLag = 0
+        var shortPeakC = 0f
+        for (lag in 2 until minLag) {
+            val c = envCorr[lag]
+            if (c > shortPeakC) {
+                shortPeakC = c
+                shortPeakLag = lag
+            }
+        }
+        val harmonicLeak = shortPeakLag >= 2 && bestLag > 0 &&
+            bestLag % shortPeakLag == 0 && bestLag > shortPeakLag &&
+            shortPeakC >= HARMONIC_OF_BEST * bestC
+
         val rateHz =
             if (bestLag > 0) 1000f / (bestLag * HOP_MS.toFloat()) else 0f
         lastRateHz = rateHz
-        // A pulse whose true period sits *below* the scan floor still
-        // correlates at double that lag — without this check a 5.5 Hz vibrato
-        // reads as 2.8 Hz and slips under a low rate ceiling.
-        val harmonicLeak = bestLag > 0 && bestLag / 2 >= 2 &&
-            envCorr[bestLag / 2] >= 0.7f * bestC
 
         // Keep the signal smoothing even while gated off, so a lock-on starts
         // from the live envelope rather than a stale frozen value.
@@ -246,16 +286,22 @@ class Tarji {
         tremoloSmoothed += TREMOLO_EMA * (raw - tremoloSmoothed)
 
         // Hysteresis: stricter to switch on than to stay on — no flapping
-        // when the reverberation breathes near the gate.
-        val longEnough = holdMs >= HOLD_MIN_MS
-        val periodic = bestC >= MIN_PERIODICITY && !harmonicLeak &&
-            rateHz in MIN_TREMOLO_HZ..maxTremoloHz
-        val stillPeriodic = bestC >= MIN_PERIODICITY * 0.7f && !harmonicLeak &&
-            rateHz in (MIN_TREMOLO_HZ - 0.5f)..(maxTremoloHz + 1f)
+        // when the reverberation breathes near the gate. Gates are Ink-Lab-
+        // tunable (see [holdMinMs], [minPeriodicity], [minTremoloDepth],
+        // [minTremoloHz], [maxTremoloHz]).
+        val minHz = minTremoloHz.coerceAtLeast(0.5f)
+        val maxHz = maxTremoloHz.coerceAtLeast(minHz)
+        val depthGate = minTremoloDepth.coerceAtLeast(0f)
+        val periodGate = minPeriodicity.coerceIn(0.05f, 1f)
+        val longEnough = holdMs >= holdMinMs.coerceAtLeast(0f)
+        val periodic = bestC >= periodGate && !harmonicLeak &&
+            rateHz in minHz..maxHz
+        val stillPeriodic = bestC >= periodGate * 0.7f && !harmonicLeak &&
+            rateHz in (minHz - 0.5f)..(maxHz + 1f)
         reverberating = if (reverberating) {
-            longEnough && depth >= MIN_TREMOLO_DEPTH * DEPTH_OFF_RATIO && stillPeriodic
+            longEnough && depth >= depthGate * DEPTH_OFF_RATIO && stillPeriodic
         } else {
-            longEnough && depth >= MIN_TREMOLO_DEPTH && periodic
+            longEnough && depth >= depthGate && periodic
         }
 
         // Lead the measured oscillation by the analysis+smoothing lag, so the
@@ -281,7 +327,7 @@ class Tarji {
         var r = a / b
         while (r > 1.4142f) r /= 2f
         while (r < 0.7071f) r *= 2f
-        return abs(r - 1f) <= MAX_PITCH_DRIFT
+        return abs(r - 1f) <= maxPitchDrift
     }
 
     /** Normalized-autocorrelation pitch over the reciter's vocal range. */
@@ -322,33 +368,40 @@ class Tarji {
         private const val MIN_LAG = SAMPLE_RATE / 350 // 22
         private const val MAX_LAG = SAMPLE_RATE / 70 // 114
         private const val MIN_CLARITY = 0.5f
-        private const val MAX_PITCH_DRIFT = 0.08f
+        /** Pitch glide tolerance on long waqf holds (fraction). Real closers
+         * slide a little without leaving the note. Ink Lab: [maxPitchDrift]. */
+        const val MAX_PITCH_DRIFT = 0.12f
         private const val PITCH_EMA = 0.1f
-        private const val MAX_MISSES = 4
+        /** Brief unvoiced blips inside a long hold (hops of grace). */
+        private const val MAX_MISSES = 6
 
         private const val MIN_FLOOR = 0.006f
         private const val FLOOR_OF_PEAK = 0.15f
         private const val PEAK_DECAY = 0.997f
 
         /** Tarjīʿ lives around 1.5–10 Hz of envelope oscillation: slow ~2 Hz
-         * swells (Hani) to ~6–8 Hz vibrato (Alafasy), at any hop rate. The
-         * ceiling is Ink-Lab-tunable via [maxTremoloHz]. */
-        private const val MIN_TREMOLO_HZ = 1.5f
+         * swells (Hani) to ~6–8 Hz vibrato (Alafasy), at any hop rate.
+         * Ink Lab: [minTremoloHz] / [maxTremoloHz]. */
+        const val MIN_TREMOLO_HZ = 1.5f
         const val MAX_TREMOLO_HZ = 10f
-        private const val MIN_TREMOLO_DEPTH = 0.035f
-        /** Off-gate depth as a fraction of [MIN_TREMOLO_DEPTH] (hysteresis). */
+        /** Shipped AM depth gate — Ink Lab: [minTremoloDepth]. */
+        const val MIN_TREMOLO_DEPTH = 0.035f
+        /** Off-gate depth as a fraction of [minTremoloDepth] (hysteresis). */
         private const val DEPTH_OFF_RATIO = 0.7f
-        /** Envelope-autocorrelation periodicity needed to call it a pulse. */
-        private const val MIN_PERIODICITY = 0.4f
+        /** Envelope autocorrelation gate — Ink Lab: [minPeriodicity]. */
+        const val MIN_PERIODICITY = 0.4f
+        /** Out-of-band short peak must be this strong vs the in-band pick to
+         * count as a ceiling cheat (see harmonicLeak). */
+        private const val HARMONIC_OF_BEST = 0.85f
         // Band floor as an envelope-hop lag (20 ms hops): 1.5 Hz → 33.
         private const val MAX_ENV_LAG = 33
         private const val TREMOLO_EMA = 0.35f
         /** Analysis + smoothing lag the phase lead compensates (~45 ms). */
         private const val LAG_SEC = 0.045f
-        private const val ATTACK_MS = 250f
-        /** Slow release: sub-second lulls in a long hold's pulsing (the
-         * reciter breathing *within* the tarjīʿ) must not drop the shimmer. */
-        private const val RELEASE_MS = 800f
+        /** Shipped attack of [tremoloGain] — Ink Lab: [attackMs]. */
+        const val ATTACK_MS = 250f
+        /** Shipped release of [tremoloGain] — Ink Lab: [releaseMs]. */
+        const val RELEASE_MS = 800f
         /** Read-out history for the output-latency delay (~1.3 s). */
         private const val HIST_HOPS = 64
     }

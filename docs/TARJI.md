@@ -87,10 +87,12 @@ and feeds 20 ms hops.
         tunable `maxTremoloHz` 2–50 Hz (`VoiceEnergy.maxTremoloHz`). Raising it
         lets Hani's 2:16 closing elongation (fast texture ~16 Hz) shimmer.
     *   rate = envelope autocorrelation peak. Lags `minLag(maxTremoloHz)`..33
-        (1.5 Hz floor) with a **harmonic guard**: a true period above the scan
-        floor still correlates at double its lag — without the guard a 5.5 Hz
-        vibrato reads as 2.8 Hz and slips under a low ceiling. Guard rejects it
-        when `norm[bestLag/2] ≥ 0.7·best`.
+        (1.5 Hz floor) with a **ceiling-only harmonic guard**: a true period
+        above the scan floor still correlates at double its lag — without the
+        guard a 5.5 Hz vibrato reads as 2.8 Hz under a 4 Hz ceiling. Guard
+        rejects only when an *out-of-band* short peak is an exact submultiple
+        of the in-band pick. The old in-band half-lag veto also killed real
+        tarjīʿ on Alafasy/Hani 1:7 (slow swell + ~10–25 Hz texture).
     *   `periodic` needs `bestC ≥ 0.4` and rate in band.
 
     **Band limits and hop rate.** The envelope is sampled at 50 Hz (20 ms hops).
@@ -180,9 +182,10 @@ is gone — steady holds keep still gold.
 ### Ink Lab
 
 *   **Tarjīʿ** toggle (`glintResonance`), **Pulse depth**
-    (`glintResonanceDepth` 0–1, shipped 1), **Tarjīʿ max rate**
-    (`glintResonanceMaxHz` 2–50 Hz, shipped 10). The max-rate band scans from
-    that ceiling; sub-harmonics are rejected. The panel now shows a live
+    (`glintResonanceDepth` 0–1, shipped 1), **rate band**
+    (`tarjiMinHz` / `glintResonanceMaxHz`), **Hold before tarjīʿ ms**,
+    **Min depth**, **Min periodicity**, **Pitch drift**, **Attack / Release
+    ms**. All push live into `VoiceEnergy` → `Tarji`. The panel shows a live
     **Detector** line under the toggle (polled every 200 ms while open):
     `tarjīʿ · hold 1.2s · 4.8 Hz · gain 0.84` / `holding … — no tarjīʿ yet` /
     `listening…` / `silent — no PCM` — so vanishing shimmer is diagnosable
