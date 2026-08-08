@@ -180,4 +180,165 @@ class TarjiTest {
             d.lastRateHz in 1.5f..6f,
         )
     }
+
+    @Test
+    fun `ear delay scales wall-time latency by speed in content hops`() {
+        // Route preset only, 1×: 180 ms → 9 hops of 20 ms content.
+        assertEquals(9, Tarji.earDelayHops(routeMs = 180, sinkMs = 0, downstreamMs = 0, speed = 1f))
+        // At 0.75× the same wall latency spans fewer content hops.
+        assertEquals(6, Tarji.earDelayHops(routeMs = 180, sinkMs = 0, downstreamMs = 0, speed = 0.75f))
+        // The sink buffer + output path add on top (emulator-shaped: 252 + 80).
+        assertEquals(16, Tarji.earDelayHops(routeMs = 0, sinkMs = 252, downstreamMs = 80, speed = 1f))
+        assertEquals(12, Tarji.earDelayHops(routeMs = 0, sinkMs = 252, downstreamMs = 80, speed = 0.75f))
+        // The Sonic buffer is content-time: one hop, at any speed it exists.
+        assertEquals(7, Tarji.earDelayHops(routeMs = 180, sinkMs = 0, downstreamMs = 0, speed = 0.75f, sonicContentMs = 20f))
+        assertEquals(10, Tarji.earDelayHops(routeMs = 180, sinkMs = 0, downstreamMs = 0, speed = 1f, sonicContentMs = 20f))
+    }
+
+    @Test
+    fun `ear delay clamps negative and oversized inputs`() {
+        assertEquals(0, Tarji.earDelayHops(routeMs = -50, sinkMs = 0, downstreamMs = 0, speed = 1f))
+        // 2× speed over a 1.5 s path: 150 hops → clamped to the 64-hop history.
+        assertEquals(63, Tarji.earDelayHops(routeMs = 1_500, sinkMs = 0, downstreamMs = 0, speed = 2f))
+    }
+
+    @Test
+    fun `hop length at a real stream rate keeps the rate read in content time`() {
+        // 44.1 kHz decimates to 8820 Hz → floor gives 176 samples per 20 ms
+        // content hop (the old fixed 160 read 5 Hz as 5.63 Hz).
+        val d = Tarji()
+        d.hopSamples = 176
+        val n = (3f * 8_820f).toInt()
+        val wave = FloatArray(n) {
+            val t = it / 8_820f
+            val am = 1f + 0.1f * sin(2f * PI.toFloat() * 5f * t)
+            (0.3f * am * sin(2f * PI.toFloat() * 130f * t)).toFloat()
+        }
+        var i = 0
+        while (i + 176 <= wave.size) {
+            d.onSamples8k(wave.copyOfRange(i, i + 176), 176)
+            i += 176
+        }
+        assertTrue(d.reverberating)
+        assertTrue(
+            "rate must read ~5 Hz, not ~5.6 (${d.lastRateHz})",
+            d.lastRateHz in 4.5f..5.5f,
+        )
+    }
+
+    @Test
+    fun `delayed signal is phase-locked to the ear's envelope, not the tap's`() {
+        val d = Tarji()
+        d.delayHops = 10 // 200 ms of content: what the ear hears right now.
+        val amHz = 5.5f
+        val wave = heldNote(seconds = 3.5f, pitchHz = 130f, amHz = amHz, amDepth = 0.1f)
+        val hop = Tarji.HOP_SAMPLES
+        var locked = 0
+        var agreeing = 0
+        var i = 0
+        while (i + hop <= wave.size) {
+            d.onSamples8k(wave.copyOfRange(i, i + hop), hop)
+            if (d.reverberating) {
+                // The ear hears this hop 10 hops (200 ms) later than the tap.
+                val t = (i + hop / 2 - 10 * hop) / Tarji.SAMPLE_RATE.toFloat()
+                val am = sin(2f * PI.toFloat() * amHz * t)
+                if (kotlin.math.abs(am) > 0.5f) {
+                    locked++
+                    if (d.tremolo * am > 0f) agreeing++
+                }
+            }
+            i += hop
+        }
+        assertTrue("detector never locked", locked > 20)
+        assertTrue(
+            "delayed tremolo must ride the ear's swell ($agreeing/$locked)",
+            agreeing.toFloat() / locked > 0.8f,
+        )
+    }
+
+    @Test
+    fun `a deep slow vibrato never trips its own climax gate`() {
+        // A strong low-rate swell (Hani-style ghunnah) must not extinguish
+        // itself: the level EMA rides above the troughs.
+        val d = Tarji()
+        feed(d, heldNote(seconds = 3f, pitchHz = 130f, amHz = 2f, amDepth = 0.3f, level = 0.25f))
+        assertTrue("deep slow vibrato must hold", d.reverberating)
+        assertEquals("hold clock is running", 3_000f, d.holdMs, 100f)
+    }
+
+    @Test
+    fun `the climactic hold stops when the voice releases`() {
+        val d = Tarji()
+        // Vibrato hold, then the voice releases: level decaying exponentially.
+        feed(d, heldNote(seconds = 2f, pitchHz = 130f, amHz = 5.5f, amDepth = 0.12f))
+        assertTrue("hold must lock before the release", d.reverberating)
+        val releaseStart = d.holdMs
+        val release = FloatArray(Tarji.SAMPLE_RATE) {
+            val t = it / Tarji.SAMPLE_RATE.toFloat()
+            val decay = kotlin.math.exp(-t / 0.12f)
+            val am = 1f + 0.12f * sin(2f * PI.toFloat() * 5.5f * t)
+            (0.3f * decay * am * sin(2f * PI.toFloat() * 130f * t)).toFloat()
+        }
+        feed(d, release)
+        assertFalse("reverberation must end with the voice", d.reverberating)
+        assertTrue("the climax release must dry the gain fast", d.tremoloGain < 0.2f)
+        assertTrue("the dry signal must not pulse", kotlin.math.abs(d.tremolo) < 0.3f)
+    }
+
+    @Test
+    fun `Alafasy one seven - the waqf hold rides the build and stops at the release`() {
+        // The real 1:7 closer: a long vibrato hold on ٱلضَّالِّينَ followed by
+        // the voice releasing. The shimmer must ride the hold and stop when
+        // the climax ends — never re-lock on the decaying tail.
+        val wav = javaClass.classLoader.getResourceAsStream("tarji/alfasy_1_7_8k.wav")
+            ?: throw AssertionError("missing test audio resource")
+        val pcm = wav.use { it.readBytes() }
+        val samples = FloatArray((pcm.size - 44) / 2)
+        for (j in samples.indices) {
+            val i = 44 + j * 2
+            samples[j] = (pcm[i].toInt() and 0xFF or (pcm[i + 1].toInt() shl 8)).toShort() / 32768f
+        }
+        val d = Tarji()
+        var t = 0f
+        var onSpanStart = -1f
+        var firstOn = -1f
+        var spansInHold = 0
+        var lastOnEnd = -1f
+        var longestSpan = 0f
+        var consumed = 0
+        while (consumed + Tarji.HOP_SAMPLES <= samples.size) {
+            d.onSamples8k(samples.copyOfRange(consumed, consumed + Tarji.HOP_SAMPLES))
+            consumed += Tarji.HOP_SAMPLES
+            t += Tarji.HOP_MS / 1000f
+            if (d.reverberating) {
+                if (onSpanStart < 0f) onSpanStart = t
+            } else if (onSpanStart >= 0f) {
+                if (onSpanStart in 7.0f..12.4f && t - onSpanStart >= 0.4f) spansInHold++
+                if (onSpanStart >= 7.0f) lastOnEnd = t
+                if (firstOn < 0f && onSpanStart >= 6.8f && t - onSpanStart >= 0.2f) {
+                    firstOn = onSpanStart
+                }
+                if (onSpanStart >= 7.0f) longestSpan = maxOf(longestSpan, t - onSpanStart)
+                onSpanStart = -1f
+            }
+        }
+        if (onSpanStart >= 0f && onSpanStart in 7.0f..12.4f) {
+            spansInHold++
+            longestSpan = maxOf(longestSpan, t - onSpanStart)
+        }
+        assertTrue("the waqf hold must engage (spans: $spansInHold)", spansInHold >= 1)
+        assertTrue(
+            "the shimmer must start with the build, not late in the hold (first on: ${firstOn}s)",
+            firstOn in 6.8f..8.2f,
+        )
+        assertTrue(
+            "the shimmer must ride the whole crescendo, never dropping at the peak " +
+                "(longest span: ${longestSpan}s)",
+            longestSpan >= 3f,
+        )
+        assertTrue(
+            "no shimmer may ride the decayed tail (last on-end: ${lastOnEnd}s)",
+            lastOnEnd <= 12.45f,
+        )
+    }
 }

@@ -95,6 +95,30 @@ glimmer itself extinguishes at pulse troughs and lights with the crests —
 the voice's reverberation is the glimmer. The attack/release ramp
 (`tremoloGain`) blends the transitions so no detection edge pops.
 
+The shimmer is the **build to the climax**: it engages as the hold's
+reverberation starts (the hold gate is short, ~300 ms, so the build-up
+shows before the peak) and rides the whole crescent. A **deep-AM
+fallback** keeps it locked through the irregular crescendo: real builds
+(Alafasy 1:7) pulse unevenly and their envelope autocorrelation collapses
+to ~0.1–0.3 at the loudest point, so a strong amplitude modulation
+(≥ ~6% at an in-band rate, ceiling-cheat guard applied) is treated as
+self-evidently vibrating; the autocorr still rejects shallow noise swells.
+The pulse rate is **tracked with lag hysteresis**, so it stays locked to
+the voice's period instead of flapping across the autocorr's broad peak.
+
+The effect stops the moment the voice releases. The detector tracks the
+hold's envelope with a fast level EMA; once it sits below ~0.52 of the
+hold's own peak for two hops, the climactic reverberation is over. The
+shimmer **settles with the voice**: its strength follows the envelope's
+remaining intensity — full while the swell is strong (≥ 0.75 of the
+hold's peak) and fading as the voice dies toward the gate — so the word's
+end reads as the effect drying, never as a full-strength pulse past the
+climax. The dry-down is ~60 ms and the pulse signal is gain-damped, so the
+decaying tail after a waqf hold never flickers, and a deep vibrato never
+trips its own gate (the troughs stay above the gate). Mid-hold detection
+lulls are bridged by the slower release so the hold breathes without
+blinking.
+
 **Tarjīʿ** is that **on/off plus a brightness crest**: full-wave
 `|tremolo|` raises a peak that boosts tint/halo colour
 (`GLINT_RESONANCE_PEAK_BOOST`) while troughs drop the layer to zero at full
@@ -103,8 +127,25 @@ depth. Depth scales both (Ink Lab **Pulse depth**; a non-zero
 Idle / no detection → peak 0, full sheen (no tell that a pulse is coming).
 First-pass white-gold and **repeat terracotta** both take the same gate. A
 per-frame sampler on the Active strong-hold word keeps the pulse updating
-after the wash park freezes its Animatable. Phase lead + output-latency
-delay keep the pulse with the ear.
+after the wash park freezes its Animatable.
+
+The pulse is **delayed to the reader's clock** — the tap sits at the audio
+sink's input, so the signal is led forward by everything downstream before
+it is read out: the route preset (the same one the highlight clock
+subtracts) and the sink's own AudioTrack buffer (measured live via
+`AudioSink.getAudioTrackBufferSizeUs`, typically 40–100 ms and much more
+on emulators — the term that used to leave the shimmer a quarter-second
+ahead of the voice). That lands the shimmer on the playback head
+`positionMs` tracks — the same reference the word ink rides — so the pulse
+is in lockstep with the wash, not trailing the visible word. Wall-time
+components scale by playback speed; the Sonic resampler's own buffer (only
+present off 1×) does not. The Ink Lab's **Ear delay ms** nudges the last
+device-specific millimetre on top (add it back when a route genuinely
+lags the audible vibration). One analysis hop is exactly 20 ms of
+*content* at any source rate (44.1 kHz decimates to 8820 Hz → 176
+samples), so the delay, the rate read, and the phase lead are all in true
+content time. The live detector readout reports the applied total
+(`ear +N ms`) for diagnosis.
 
 **No reverberation, no pulse**: a steady hold without an audible pulse —
 even a long verse-closing waqf — keeps still gold. The gate also hard-closes
@@ -253,6 +294,7 @@ and inspect ink; the toggle is session-only and not part of `Tuning`.
 | Halo blur | `glintGlowRadius` | 10 | 0–10 | Renderer blur radius around the glyph outline; it is not a word-relative radial size. |
 | Tarjīʿ (Tajweed tab) | `glintResonance` | on | toggle | Turns the wet-ink glimmer on and off with detected tarjīʿ (first-pass gold and repeat terracotta). |
 | Pulse depth (Tajweed tab) | `glintResonanceDepth` | 1.0 | 0–1 | How deeply tarjīʿ troughs extinguish the glimmer (1 = full on/off with the voice). |
+| Ear delay ms (Tajweed tab) | `tarjiEarDelayMs` | 0 | 0–200 | Extra delay so the pulse lands on the ear, on top of the route preset + measured sink buffer + output path. |
 
 The scalar maps to Compose `Shadow.blurRadius` for per-word text and to dp for
 the shaped-path `BlurMaskFilter`; use the visual result, not physical units, as
