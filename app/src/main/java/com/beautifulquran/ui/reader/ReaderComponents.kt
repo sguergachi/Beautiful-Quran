@@ -1005,10 +1005,9 @@ private class InkMotion(
         get() = if (glintIsRepeat) repeatFeather else sweepFeather
 
     /**
-     * Wet-ink glint layer strength. Full while Active + glinting, dimmed by
-     * tarjīʿ toward [InkEngine.GLINT_RESONANCE_TROUGH_FLOOR] at pulse troughs
-     * — the floor keeps parks and waqf holds visibly glinted while the pulse
-     * breathes with the voice. Idle / handoff: full sheen, no tell.
+     * Wet-ink glint layer strength. Full while Active + glinting, extinguished
+     * by tarjīʿ at pulse troughs — the glimmer itself turns on and off with
+     * the voice. Idle / handoff: full sheen, no tell.
      */
     val glintLayerAlpha: Float
         get() = glintAlpha.value * glintCarryAlpha(

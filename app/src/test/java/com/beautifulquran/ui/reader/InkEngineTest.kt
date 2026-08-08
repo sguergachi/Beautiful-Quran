@@ -558,10 +558,9 @@ class InkEngineTest {
     }
 
     @Test
-    fun `glint resonance pulses with the tarji trough dim without killing base sheen`() {
-        // Trough-dim model: full-wave |tremolo| crests keep full sheen and
-        // drive the colour boost; zero-crossings dim the layer toward the
-        // non-zero trough floor.
+    fun `glint resonance turns the sheen on and off with the tarji pulse`() {
+        // On/off model: full-wave |tremolo| crests keep full sheen and drive
+        // the colour boost; zero-crossings extinguish the layer at full depth.
         val up = InkEngine.glintResonance(
             holding = true,
             tremolo = 1f,
@@ -587,7 +586,7 @@ class InkEngineTest {
             InkEngine.GLINT_RESONANCE_TROUGH_FLOOR,
             mid.layerMult,
             1e-4f,
-        ) // trough: dim to floor, never zero
+        ) // trough: off at full depth
         assertEquals(1f, down.peak, 1e-4f) // |−1| = full crest
         assertEquals(1f, down.layerMult, 1e-4f)
         val softDepth = InkEngine.glintResonance(
