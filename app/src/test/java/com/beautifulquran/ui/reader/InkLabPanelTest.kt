@@ -32,6 +32,12 @@ class InkLabPanelTest {
         assertTrue(text.contains("waqfLengthScale ="))
         assertTrue(text.contains("glintResonance ="))
         assertTrue(text.contains("glintResonanceDepth ="))
+        assertTrue(text.contains("tarjiHoldMinMs ="))
+        assertTrue(text.contains("tarjiMinDepth ="))
+        assertTrue(text.contains("tarjiMinPeriodicity ="))
+        assertTrue(text.contains("tarjiPitchDrift ="))
+        assertTrue(text.contains("tarjiAttackMs ="))
+        assertTrue(text.contains("tarjiReleaseMs ="))
         // Fields without lab sliders still snapshot so nothing is lost on apply.
         assertTrue(text.contains("sweepEaseX1 ="))
         assertTrue(text.contains("sweepEaseY2 ="))

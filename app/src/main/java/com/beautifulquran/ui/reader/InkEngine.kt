@@ -172,6 +172,22 @@ object InkEngine {
          * Auditionable in the Tajweed Ink Lab tab.
          */
         val glintResonanceMaxHz: Float = GLINT_RESONANCE_MAX_HZ,
+        /** Slowest voice oscillation that still counts (Hz). Shipped 1.5. */
+        val tarjiMinHz: Float = com.beautifulquran.playback.Tarji.MIN_TREMOLO_HZ,
+        /** Hold length (ms) before the detector considers tarjīʿ. Shipped 400. */
+        val tarjiHoldMinMs: Float =
+            com.beautifulquran.playback.Tarji.HOLD_MIN_MS.toFloat(),
+        /** Minimum relative envelope AM depth to open the gate. Shipped 0.035. */
+        val tarjiMinDepth: Float = com.beautifulquran.playback.Tarji.MIN_TREMOLO_DEPTH,
+        /** Minimum envelope autocorrelation (0–1) to call the pulse periodic. */
+        val tarjiMinPeriodicity: Float =
+            com.beautifulquran.playback.Tarji.MIN_PERIODICITY,
+        /** Pitch glide tolerance (fraction) while holding one note. */
+        val tarjiPitchDrift: Float = com.beautifulquran.playback.Tarji.MAX_PITCH_DRIFT,
+        /** Attack of the detection gain ramp (ms). */
+        val tarjiAttackMs: Float = com.beautifulquran.playback.Tarji.ATTACK_MS,
+        /** Release of the detection gain ramp (ms). */
+        val tarjiReleaseMs: Float = com.beautifulquran.playback.Tarji.RELEASE_MS,
     )
 
     /**
@@ -194,11 +210,23 @@ object InkEngine {
         get() = tuningState
         set(value) {
             tuningState = value
-            // The detector lives in the playback layer; push the rate gate.
-            com.beautifulquran.playback.VoiceEnergy.maxTremoloHz =
-                value.glintResonanceMaxHz
+            // The detector lives in the playback layer; push every Tarjīʿ knob.
+            pushTarjiTuning(value)
             persistLab()
         }
+
+    /** Mirror [Tuning] detector knobs into [com.beautifulquran.playback.VoiceEnergy]. */
+    private fun pushTarjiTuning(t: Tuning) {
+        val ve = com.beautifulquran.playback.VoiceEnergy
+        ve.maxTremoloHz = t.glintResonanceMaxHz
+        ve.minTremoloHz = t.tarjiMinHz
+        ve.holdMinMs = t.tarjiHoldMinMs
+        ve.minTremoloDepth = t.tarjiMinDepth
+        ve.minPeriodicity = t.tarjiMinPeriodicity
+        ve.maxPitchDrift = t.tarjiPitchDrift
+        ve.attackMs = t.tarjiAttackMs
+        ve.releaseMs = t.tarjiReleaseMs
+    }
 
     /** Progressive-vellum guide parameters, persisted by the same Ink Lab snapshot. */
     var contextualGuideTuning: ContextualGuideTuning
@@ -293,6 +321,7 @@ object InkEngine {
             highlightLeadState = snapshot.highlightLeadMs
             fadeLeadState = snapshot.fadeLeadMs
             outputLatencyOverrideState = snapshot.outputLatencyOverrideMs
+            pushTarjiTuning(tuningState)
         } finally {
             suppressLabPersist = previous
         }
@@ -313,6 +342,7 @@ object InkEngine {
             highlightLeadState = DEFAULT_HIGHLIGHT_LEAD_MS
             fadeLeadState = DEFAULT_FADE_LEAD_MS
             outputLatencyOverrideState = null
+            pushTarjiTuning(tuningState)
         } finally {
             suppressLabPersist = previous
         }

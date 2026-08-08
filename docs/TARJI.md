@@ -182,9 +182,10 @@ is gone — steady holds keep still gold.
 ### Ink Lab
 
 *   **Tarjīʿ** toggle (`glintResonance`), **Pulse depth**
-    (`glintResonanceDepth` 0–1, shipped 1), **Tarjīʿ max rate**
-    (`glintResonanceMaxHz` 2–50 Hz, shipped 10). The max-rate band scans from
-    that ceiling; sub-harmonics are rejected. The panel now shows a live
+    (`glintResonanceDepth` 0–1, shipped 1), **rate band**
+    (`tarjiMinHz` / `glintResonanceMaxHz`), **Hold before tarjīʿ ms**,
+    **Min depth**, **Min periodicity**, **Pitch drift**, **Attack / Release
+    ms**. All push live into `VoiceEnergy` → `Tarji`. The panel shows a live
     **Detector** line under the toggle (polled every 200 ms while open):
     `tarjīʿ · hold 1.2s · 4.8 Hz · gain 0.84` / `holding … — no tarjīʿ yet` /
     `listening…` / `silent — no PCM` — so vanishing shimmer is diagnosable

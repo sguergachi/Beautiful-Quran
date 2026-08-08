@@ -98,7 +98,15 @@ class VoiceEnergy {
         if (chunkFill == 0) return
         tarji.delayHops =
             (outputLatencyMs * playbackSpeed / Tarji.HOP_MS).toInt().coerceIn(0, 63)
+        // Ink Lab detector knobs (pushed from InkEngine.tuning).
         tarji.maxTremoloHz = maxTremoloHz
+        tarji.minTremoloHz = minTremoloHz
+        tarji.holdMinMs = holdMinMs
+        tarji.minTremoloDepth = minTremoloDepth
+        tarji.minPeriodicity = minPeriodicity
+        tarji.maxPitchDrift = maxPitchDrift
+        tarji.attackMs = attackMs
+        tarji.releaseMs = releaseMs
         tarji.onSamples8k(chunk, chunkFill)
         chunkFill = 0
         reverberating = tarji.syncReverberating
@@ -140,9 +148,14 @@ class VoiceEnergy {
         @Volatile
         var active: VoiceEnergy? = null
 
-        /** Fastest voice oscillation that still counts as tarjīʿ (Hz) —
-         * pushed from `InkEngine.tuning` (the Ink Lab rate slider). */
-        @Volatile
-        var maxTremoloHz: Float = Tarji.MAX_TREMOLO_HZ
+        /** Detector knobs pushed from `InkEngine.tuning` (Ink Lab Tarjīʿ). */
+        @Volatile var maxTremoloHz: Float = Tarji.MAX_TREMOLO_HZ
+        @Volatile var minTremoloHz: Float = Tarji.MIN_TREMOLO_HZ
+        @Volatile var holdMinMs: Float = Tarji.HOLD_MIN_MS.toFloat()
+        @Volatile var minTremoloDepth: Float = Tarji.MIN_TREMOLO_DEPTH
+        @Volatile var minPeriodicity: Float = Tarji.MIN_PERIODICITY
+        @Volatile var maxPitchDrift: Float = Tarji.MAX_PITCH_DRIFT
+        @Volatile var attackMs: Float = Tarji.ATTACK_MS
+        @Volatile var releaseMs: Float = Tarji.RELEASE_MS
     }
 }

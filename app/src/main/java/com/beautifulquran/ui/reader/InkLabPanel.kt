@@ -268,6 +268,78 @@ fun InkLabPanel(
                                 "Beyond ~25 Hz the 50 Hz envelope can't measure " +
                                 "the pulse — it answers on faith.",
                         )
+                        TuningSlider("Tarjīʿ min rate", t.tarjiMinHz, 0.5f..5f) {
+                            InkEngine.tuning = t.copy(tarjiMinHz = it)
+                        }
+                        LabCaption(
+                            "Slowest pulse that still counts (Hz). Raise it to " +
+                                "ignore slow breath swells; shipped ~1.5.",
+                        )
+                        TuningSlider(
+                            "Hold before tarjīʿ ms",
+                            t.tarjiHoldMinMs,
+                            100f..1200f,
+                            integer = true,
+                        ) {
+                            InkEngine.tuning = t.copy(tarjiHoldMinMs = it)
+                        }
+                        LabCaption(
+                            "How long a single note must be held before the " +
+                                "detector looks for reverberation. Lower for " +
+                                "shorter holds; shipped 400 ms.",
+                        )
+                        TuningSlider("Min depth", t.tarjiMinDepth, 0.01f..0.25f) {
+                            InkEngine.tuning = t.copy(tarjiMinDepth = it)
+                        }
+                        LabCaption(
+                            "How deep the voice amplitude must pulse (relative " +
+                                "AM). Lower = more sensitive; shipped ~0.035.",
+                        )
+                        TuningSlider(
+                            "Min periodicity",
+                            t.tarjiMinPeriodicity,
+                            0.15f..0.85f,
+                        ) {
+                            InkEngine.tuning = t.copy(tarjiMinPeriodicity = it)
+                        }
+                        LabCaption(
+                            "How regular the envelope pulse must be " +
+                                "(autocorrelation 0–1). Lower admits noisier " +
+                                "swells; shipped ~0.40.",
+                        )
+                        TuningSlider(
+                            "Pitch drift",
+                            t.tarjiPitchDrift,
+                            0.04f..0.30f,
+                        ) {
+                            InkEngine.tuning = t.copy(tarjiPitchDrift = it)
+                        }
+                        LabCaption(
+                            "How much the held note may glide without " +
+                                "restarting the hold clock. Higher keeps long " +
+                                "waqf holds alive; shipped ~0.12.",
+                        )
+                        TuningSlider(
+                            "Attack ms",
+                            t.tarjiAttackMs,
+                            50f..600f,
+                            integer = true,
+                        ) {
+                            InkEngine.tuning = t.copy(tarjiAttackMs = it)
+                        }
+                        TuningSlider(
+                            "Release ms",
+                            t.tarjiReleaseMs,
+                            100f..2000f,
+                            integer = true,
+                        ) {
+                            InkEngine.tuning = t.copy(tarjiReleaseMs = it)
+                        }
+                        LabCaption(
+                            "How fast the detection gain ramps in (attack) and " +
+                                "out (release). Long release bridges lulls inside " +
+                                "a hold; shipped 250 / 800 ms.",
+                        )
                     }
 
                     InkLabTab.Guide -> {
@@ -470,6 +542,13 @@ internal fun formatTuningCopy(t: InkEngine.Tuning): String {
         appendLine("    glintResonance = ${t.glintResonance},")
         appendLine("    glintResonanceDepth = ${f(t.glintResonanceDepth)},")
         appendLine("    glintResonanceMaxHz = ${f(t.glintResonanceMaxHz)},")
+        appendLine("    tarjiMinHz = ${f(t.tarjiMinHz)},")
+        appendLine("    tarjiHoldMinMs = ${f(t.tarjiHoldMinMs)},")
+        appendLine("    tarjiMinDepth = ${f(t.tarjiMinDepth)},")
+        appendLine("    tarjiMinPeriodicity = ${f(t.tarjiMinPeriodicity)},")
+        appendLine("    tarjiPitchDrift = ${f(t.tarjiPitchDrift)},")
+        appendLine("    tarjiAttackMs = ${f(t.tarjiAttackMs)},")
+        appendLine("    tarjiReleaseMs = ${f(t.tarjiReleaseMs)},")
         append(")")
     }
 }
