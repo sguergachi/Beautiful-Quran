@@ -1074,13 +1074,17 @@ private fun Modifier.layeredGlintInk(motion: InkMotion, rtl: Boolean): Modifier 
     )
 
 /** Layered-word adapter for the tight glyph halo. */
-private fun Modifier.layeredGlintHalo(motion: InkMotion): Modifier =
-    bleedAlphaLayer {
-        // Halo forms with the wash only — never a whole-word floor when
-        // tarjīʿ engages (that lit the entire glyph slightly ahead of the
-        // directional reveal). Tarjīʿ gates alpha via [glintLayerAlpha].
-        motion.glintLayerAlpha * inkSmootherstep(motion.glintProgress)
-    }
+private fun Modifier.layeredGlintHalo(motion: InkMotion, rtl: Boolean): Modifier =
+    // Same directional wash as the tint: the halo forms *during* the bloom on
+    // the revealed letters, not as a whole-word fade that only peels fully at
+    // progress 1 (that made mid-wash glimmer invisible). Tarjīʿ still gates
+    // strength via [glintLayerAlpha].
+    bleedAlphaLayer { motion.glintLayerAlpha }.letterFadeIn(
+        progress = { motion.glintProgress },
+        rtl = rtl,
+        restingAlpha = 0f,
+        feather = motion.glintFeather ?: InkEngine.tuning.washFeather,
+    )
 
 /**
  * Per-frame tarjīʿ multiplier for one word. Identity (1) when the word is not
@@ -1290,7 +1294,7 @@ private fun HighlightLayeredText(
                     ),
                 ),
                 color = glimmerInk.copy(alpha = 0.01f),
-                modifier = Modifier.layeredGlintHalo(motion),
+                modifier = Modifier.layeredGlintHalo(motion, rtl),
             )
         }
         Text(
