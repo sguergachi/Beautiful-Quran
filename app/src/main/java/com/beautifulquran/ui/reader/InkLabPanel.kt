@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -85,7 +84,7 @@ fun InkLabPanel(
     val context = LocalContext.current
     Column(
         horizontalAlignment = Alignment.End,
-        modifier = modifier.widthIn(max = 340.dp),
+        modifier = modifier.fillMaxWidth(),
     ) {
         // Collapsed the panel is just its name — a quiet ink label that
         // expands into the sliders, so the page stays readable while tuning.
