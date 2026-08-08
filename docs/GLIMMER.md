@@ -79,8 +79,8 @@ player's own PCM (no mic permission, no Visualizer — which also means it
 works on every output route and emulator), and `playback/Tarji` — a pure,
 unit-tested DSP core — tracks a **single held note** (voiced, pitch-stable
 ≥ ~0.4 s) and scans its amplitude envelope for a periodic oscillation in the
-tarjīʿ band (~1.5–10 Hz, envelope autocorrelation — slow Hani swells to fast
-Alafasy vibrato). The shimmer only answers on words carrying a **strong
+tarjīʿ band (~1.5–10 Hz, tunable up to 50 Hz via the Ink Lab's
+**Tarjīʿ max rate**). The shimmer only answers on words carrying a **strong
 tajweed hold of their own** — a long madd, a ghunnah (the shadda نّ of
 ٱلنَّارِ), or the verse-closing waqf (`TajweedPacing.Curve.hasStrongHold`;
 a wasl entry alone sustains the previous word's nūn and never qualifies) —
