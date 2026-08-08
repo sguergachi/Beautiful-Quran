@@ -1004,29 +1004,28 @@ private class InkMotion(
     val glintFeather: Float?
         get() = if (glintIsRepeat) repeatFeather else sweepFeather
 
+    /**
+     * Wet-ink glint layer strength. Always full while Active + glinting —
+     * **not** multiplied by tarjīʿ. Killing layer alpha at pulse troughs made
+     * mid-word parks and waqf holds look un-glinted (the sheen vanished for
+     * half of every cycle). Tarjīʿ only brightens peaks via [glintPeak].
+     */
     val glintLayerAlpha: Float
-        get() {
-            val base = glintAlpha.value * glintCarryAlpha(
-                replacedByRepeat = glintReplacedByRepeat,
-                repeatProgress = repeatProgress,
-            )
-            // Tarjīʿ turns the glimmer on and off with the voice while the
-            // word is still Active (first-pass gold and repeat terracotta
-            // alike). The dry-down after handoff stays still (layerMult → 1).
-            if (base <= 0f || !isActive) return base
-            return base * tarji.value.layerMult
-        }
+        get() = glintAlpha.value * glintCarryAlpha(
+            replacedByRepeat = glintReplacedByRepeat,
+            repeatProgress = repeatProgress,
+        )
 
     /** 0..1 crest of the tarjīʿ pulse — boosts tint/halo colour at peaks. */
     val glintPeak: Float
         get() = if (isActive) tarji.value.peak else 0f
 
-    /** Tint alpha: idle strength, lifted toward full opacity on tarjīʿ peaks. */
+    /** Tint alpha: always-on wet strength, lifted further on tarjīʿ peaks. */
     fun glintTintColorAlpha(base: Float): Float =
         (base * (1f + InkEngine.GLINT_RESONANCE_PEAK_BOOST * glintPeak))
             .coerceIn(0f, 1f)
 
-    /** Halo alpha: same peak lift as the tint (parchment needs the boost). */
+    /** Halo alpha: same peak lift as the tint. */
     fun glintGlowColorAlpha(base: Float): Float =
         (base * (1f + InkEngine.GLINT_RESONANCE_PEAK_BOOST * glintPeak))
             .coerceIn(0f, 1f)

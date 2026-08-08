@@ -98,9 +98,11 @@ object InkEngine {
         /** Dissolve of the white-gold first-gloss glint (see [glinting]) back
          *  to plain recited ink once the voice moves on to the next word. */
         val glintFadeMs: Int = 1_000,
-        /** Tint strength plus the subtle glyph-outline halo around Nightfall's glint. */
-        val glintTintAlpha: Float = 0.62f,
-        val glintGlowAlpha: Float = 0.49f,
+        /** Tint strength plus the glyph-outline halo around Nightfall's glint.
+         *  Must read over parchment base ink mid-wash and through long holds —
+         *  the old 0.62/0.49 pair was nearly invisible gold-on-parchment. */
+        val glintTintAlpha: Float = 0.88f,
+        val glintGlowAlpha: Float = 0.78f,
         val glintGlowRadius: Float = 10f,
         /** Width of the ink feather relative to the word (see
          *  ui/theme/Fade.kt: the wash reads as a whole-word breath). */
@@ -513,30 +515,29 @@ object InkEngine {
     fun glinting(state: State): Boolean = state == State.Active
 
     /**
-     * Draw values that **turn the wet-ink glimmer on and off** with the
-     * reciter's tarjīʿ (ترجيع) — the repeated reverberation of the voice on a
-     * held note — detected on the tapped PCM by
+     * Draw values for the tarjīʿ **brightness pulse** on top of the always-on
+     * wet-ink glint. Detected on the tapped PCM by
      * [com.beautifulquran.playback.VoiceEnergy].
      *
-     * @param layerMult multiplies glint layer alpha (1 = identity / idle full
-     * sheen; 0 = extinguished). Idle / no detection is always 1 — no tell.
-     * @param peak 0..1 how hard the pulse is cresting right now; boosts tint
-     * and halo colour so peaks read brighter than the idle sheen (gold-on-
-     * parchment is low contrast without it).
+     * The wet glint itself always rides the wash (layer alpha is not killed
+     * at troughs — that made mid-word / waqf holds look un-glinted). Tarjīʿ
+     * only drives [peak], which boosts tint/halo colour with the voice.
+     *
+     * @param peak 0..1 how hard the pulse is cresting (0 = no detection /
+     * trough). Idle is always [Idle] — no tell before the voice reverberates.
      */
     data class GlintResonance(
-        val layerMult: Float,
         val peak: Float,
     ) {
         companion object {
-            val Idle = GlintResonance(layerMult = 1f, peak = 0f)
+            val Idle = GlintResonance(peak = 0f)
         }
     }
 
     /**
      * Maps the detected tarjīʿ signal into [GlintResonance] for the glint
      * paint path. Full-wave intensity: both peaks of the zero-centred
-     * [tremolo] light the sheen; zero-crossings extinguish it. Pure and
+     * [tremolo] raise [GlintResonance.peak]; zero-crossings drop it. Pure and
      * unit-tested.
      *
      * @param holding true while a reverberant hold is detected on an eligible
@@ -554,30 +555,24 @@ object InkEngine {
         if (!holding || !enabled || depth <= 0f) return GlintResonance.Idle
         val g = tremoloGain.coerceIn(0f, 1f)
         if (g <= 0f) return GlintResonance.Idle
-        // Full-wave 0..1: |tremolo| at 1 → full on. Do NOT divide by 1.5 then
-        // square — that capped real peaks (~1.0) at ~0.44 and made the
-        // "shimmer" dimmer than the idle sheen (invisible on parchment).
+        // Full-wave 0..1: |tremolo| at 1 → full peak. Depth scales how hard
+        // the crest lifts the sheen (1 = full boost range).
         val on = kotlin.math.abs(tremolo).coerceIn(0f, 1f)
-        // depth=1 fully extinguishes at trough; lower leaves residual sheen.
-        val gated = 1f - depth.coerceIn(0f, 1f) * (1f - on)
-        // Attack/release blend from identity so detection edges never pop.
-        val mult = 1f + g * (gated - 1f)
-        return GlintResonance(layerMult = mult, peak = g * on)
+        return GlintResonance(peak = g * on * depth.coerceIn(0f, 1f))
     }
 
     /**
-     * How fully tarjīʿ troughs extinguish the glimmer (1 = full on/off with
-     * the voice). Shipped at full so the pulse reads as the glimmer itself
-     * turning on and off, not a mild breath of permanent gold.
+     * How hard tarjīʿ crests boost the wet-ink sheen (0 = no pulse, 1 = full
+     * peak boost). Shipped full.
      */
     const val GLINT_RESONANCE_DEPTH = 1f
 
     /**
      * Extra tint/halo strength at a full tarjīʿ peak, as a fraction of the
-     * shipped glint alphas. Peaks must outshine idle gold-on-parchment or the
-     * pulse is invisible.
+     * shipped glint alphas. Peaks must clearly outshine the always-on wet
+     * sheen or the pulse is invisible on parchment.
      */
-    const val GLINT_RESONANCE_PEAK_BOOST = 0.85f
+    const val GLINT_RESONANCE_PEAK_BOOST = 1.15f
 
     /** Shipped tarjīʿ rate ceiling (Hz) — see [Tuning.glintResonanceMaxHz]. */
     const val GLINT_RESONANCE_MAX_HZ = 10f

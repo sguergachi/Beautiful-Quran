@@ -233,13 +233,13 @@ fun InkLabPanel(
                             InkEngine.tuning = t.copy(glintResonance = it)
                         }
                         LabCaption(
-                            "Turns the wet-ink glimmer on and off with the " +
-                                "reciter's tarjīʿ — the reverberation of the " +
-                                "voice on a held note — detected live on the " +
-                                "tapped PCM. Peaks light the sheen; troughs " +
-                                "extinguish it. First-pass gold and repeat " +
-                                "terracotta alike. No reverberation, no pulse: " +
-                                "steady holds keep still gold. Off keeps still gold.",
+                            "Brightness pulse on the always-on wet-ink glint " +
+                                "from the reciter's tarjīʿ (reverberation on a " +
+                                "held note), detected live on the tapped PCM. " +
+                                "The sheen rides the wash mid-word and through " +
+                                "waqf holds; tarjīʿ only brightens peaks. No " +
+                                "reverberation, no pulse: still wet gold. Off " +
+                                "keeps still wet gold.",
                         )
                         TarjiStatusLine()
                         TuningSlider(
@@ -250,8 +250,8 @@ fun InkLabPanel(
                             InkEngine.tuning = t.copy(glintResonanceDepth = it)
                         }
                         LabCaption(
-                            "How fully troughs extinguish the glimmer. " +
-                                "1 = full on/off with the voice; 0 = no pulse. " +
+                            "How hard tarjīʿ crests boost the wet sheen. " +
+                                "1 = full peak boost; 0 = no pulse. " +
                                 "Shipped ~${"%.2f".format(InkEngine.GLINT_RESONANCE_DEPTH)}.",
                         )
                         TuningSlider(
