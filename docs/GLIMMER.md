@@ -46,9 +46,12 @@ directional wash, with the same duration, easing, direction, and feather:
 1. The normal base ink remains the source of legibility.
 2. During a repeat, the glimmer itself uses the dark terracotta repeat ink;
    white gold remains exclusive to first-pass words.
-3. A glyph-shaped white-gold halo forms behind the visible ink.
-4. A restrained white-gold tint forms inside the glyphs above the other ink.
-5. At the end of the word wash, tint and halo reach their peak together.
+3. A glyph-shaped white-gold halo forms behind the visible ink **on the same
+   directional wash as the tint** — during the bloom, not only after it.
+4. A restrained white-gold tint forms inside the glyphs above the other ink,
+   also wash-masked letter by letter.
+5. Tint and halo peak together when the wash completes; tarjīʿ may already be
+   pulsing the revealed portion mid-hold while the wash is still open.
 6. When the voice moves on, the extra glimmer recedes over `glintFadeMs` while
    the identical terracotta repeat ink remains intact underneath.
 
