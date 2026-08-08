@@ -125,6 +125,16 @@ python3 tools/test_build_db.py  # timing pipeline regressions (~1s, no Gradle)
   a different seed grows an entirely different composition.
 - To run the app in an emulator on Linux: `scripts/setup_android_emulator.sh`
   once, then `scripts/run_android_app.sh` (see README.md).
+- **Parallel emulators.** Several lean headless AVDs can run at once, one per
+  agent, each with its own adb serial. If your `scripts/run_android_app.sh`
+  run says the AVD is already in use (or you just don't want to disturb an
+  emulator another agent is using), boot your own: `scripts/emulators_up.sh N`
+  creates/starts `BeautifulQuran_API_35_0..N-1` and prints each one's agent
+  command — pick a free index and run it. `scripts/emulators_down.sh` stops
+  them all. Before stealing or killing an emulator, assume another agent may
+  be mid-test on it: prefer your own AVD index. Headless AVDs have no window;
+  drop `ANDROID_EMULATOR_HEADLESS=1` to restart yours windowed for a visual
+  check (that restarts only your own AVD).
 - CI runs on every push: verifies the DB asset exists and runs unit tests.
   On `master` only, it also builds the release APK and publishes it to the
   rolling `latest` GitHub release.
