@@ -89,19 +89,18 @@ tajweed hold of their own** — a long madd, a ghunnah (the shadda نّ of
 a wasl entry alone sustains the previous word's nūn and never qualifies) —
 and starts the moment the reverberation is detected there.
 
-**Tarjīʿ is the turning on and off of the glimmer itself**, not a soft breath
-around permanent gold. Full-wave `|tremolo|` intensity: both crests of the
-measured oscillation light the sheen; zero-crossings extinguish it
-(`InkEngine.GLINT_RESONANCE_DEPTH` = 1 by default; Ink Lab **Pulse depth**
-softens that). Peaks also **boost** tint/halo colour
-(`GLINT_RESONANCE_PEAK_BOOST`) so they outshine idle gold-on-parchment — a
-layer-alpha pulse alone is nearly invisible there. First-pass white-gold and
-**repeat terracotta** glimmers both take the same gate. A per-frame sampler on
-the Active strong-hold word keeps the pulse painting after the wash park
-freezes its Animatable. Two clock corrections keep it in step: a phase lead
-covers the analysis lag, and the whole signal is delayed by the same
-output-route latency the highlight clock subtracts. Detection ramps in and out
-under an attack/release envelope, so no edge ever pops.
+The **wet-ink glint always rides the wash** for the whole Active word —
+mid-bloom and long waqf parks included. It is never extinguished by tarjīʿ
+(killing layer alpha at pulse troughs made holds look un-glinted).
+
+**Tarjīʿ** is a **brightness pulse on that always-on sheen**: full-wave
+`|tremolo|` raises a peak that boosts tint/halo colour
+(`GLINT_RESONANCE_PEAK_BOOST`). Depth scales the boost (Ink Lab **Pulse
+depth**). Idle / no detection → peak 0, still the full wet glint (no tell
+that a pulse is coming). First-pass white-gold and **repeat terracotta**
+both take the same gate. A per-frame sampler on the Active strong-hold word
+keeps peaks updating after the wash park freezes its Animatable. Phase lead
++ output-latency delay keep the pulse with the ear.
 
 **No reverberation, no pulse**: a steady hold without an audible pulse —
 even a long verse-closing waqf — keeps still gold. The gate also hard-closes
@@ -245,8 +244,8 @@ and inspect ink; the toggle is session-only and not part of `Tuning`.
 |---|---|---:|---:|---|
 | Repeat ink | `repeatInkAlpha` | 1.0 | 0.2–1 | Peak strength of the orange repeat overlay (and search-hit flash). Hue stays theme-owned (`QuranAccents.repeatInk`). |
 | Glitter time ms | `glintFadeMs` | 1000 ms | 100–2400 ms | How long tint and halo recede after the word stops glimmering. |
-| Glint tint | `glintTintAlpha` | 0.62 | 0–1 | Peak strength of the crisp white-gold ink tint. |
-| Halo strength | `glintGlowAlpha` | 0.49 | 0–1 | Peak opacity of the blurred outline. |
+| Glint tint | `glintTintAlpha` | 0.88 | 0–1 | Always-on wet-ink tint (must read over parchment mid-wash). |
+| Halo strength | `glintGlowAlpha` | 0.78 | 0–1 | Always-on halo; tarjīʿ peaks boost further. |
 | Halo blur | `glintGlowRadius` | 10 | 0–10 | Renderer blur radius around the glyph outline; it is not a word-relative radial size. |
 | Tarjīʿ (Tajweed tab) | `glintResonance` | on | toggle | Turns the wet-ink glimmer on and off with detected tarjīʿ (first-pass gold and repeat terracotta). |
 | Pulse depth (Tajweed tab) | `glintResonanceDepth` | 1.0 | 0–1 | How fully troughs extinguish the glimmer (1 = full on/off with the voice). |
