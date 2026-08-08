@@ -253,14 +253,16 @@ fun InkLabPanel(
                         TuningSlider(
                             "Tarjīʿ max rate",
                             t.glintResonanceMaxHz,
-                            2f..10f,
+                            2f..50f,
                         ) {
                             InkEngine.tuning = t.copy(glintResonanceMaxHz = it)
                         }
                         LabCaption(
                             "Fastest voice pulse that still counts as tarjīʿ, " +
                                 "in Hz. Lower it and only slow, deep swells " +
-                                "move the gold; shipped ~${"%.0f".format(InkEngine.GLINT_RESONANCE_MAX_HZ)}.",
+                                "move the gold; shipped ~${"%.0f".format(InkEngine.GLINT_RESONANCE_MAX_HZ)}. " +
+                                "Beyond ~25 Hz the 50 Hz envelope can't measure " +
+                                "the pulse — it answers on faith.",
                         )
                     }
 
