@@ -88,6 +88,7 @@ class VoiceEnergy {
         if (chunkFill == 0) return
         tarji.delayHops =
             (outputLatencyMs * playbackSpeed / Tarji.HOP_MS).toInt().coerceIn(0, 63)
+        tarji.maxTremoloHz = maxTremoloHz
         tarji.onSamples8k(chunk, chunkFill)
         chunkFill = 0
         reverberating = tarji.syncReverberating
@@ -124,5 +125,10 @@ class VoiceEnergy {
          */
         @Volatile
         var active: VoiceEnergy? = null
+
+        /** Fastest voice oscillation that still counts as tarjīʿ (Hz) —
+         * pushed from `InkEngine.tuning` (the Ink Lab rate slider). */
+        @Volatile
+        var maxTremoloHz: Float = Tarji.MAX_TREMOLO_HZ
     }
 }

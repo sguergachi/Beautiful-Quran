@@ -164,6 +164,13 @@ object InkEngine {
          * [GLINT_RESONANCE_DEPTH]. Auditionable in the Tajweed Ink Lab tab.
          */
         val glintResonanceDepth: Float = GLINT_RESONANCE_DEPTH,
+        /**
+         * Fastest voice oscillation that still counts as tarjīʿ (Hz). Only
+         * pulses at or below this rate open the shimmer — lower it to answer
+         * just the slow, deep swells. Shipped [GLINT_RESONANCE_MAX_HZ].
+         * Auditionable in the Tajweed Ink Lab tab.
+         */
+        val glintResonanceMaxHz: Float = GLINT_RESONANCE_MAX_HZ,
     )
 
     /**
@@ -186,6 +193,9 @@ object InkEngine {
         get() = tuningState
         set(value) {
             tuningState = value
+            // The detector lives in the playback layer; push the rate gate.
+            com.beautifulquran.playback.VoiceEnergy.maxTremoloHz =
+                value.glintResonanceMaxHz
             persistLab()
         }
 
@@ -515,6 +525,9 @@ object InkEngine {
      * Large enough to read on Nightfall's soft white-gold, not a disco strobe.
      */
     const val GLINT_RESONANCE_DEPTH = 0.42f
+
+    /** Shipped tarjīʿ rate ceiling (Hz) — see [Tuning.glintResonanceMaxHz]. */
+    const val GLINT_RESONANCE_MAX_HZ = 10f
 
     /**
      * Ink for the surah-header basmalah calligraphy (a VectorDrawable, not

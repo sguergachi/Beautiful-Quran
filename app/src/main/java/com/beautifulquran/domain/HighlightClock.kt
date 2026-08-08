@@ -53,6 +53,11 @@ class HighlightClock(
     private var settlePolls = 0
     /** Consecutive polls where the raw series tracked realtime playback. */
     private var stablePolls = 0
+    /** False from arm until the estimate converges onto realtime playback.
+     * While false, *every* regression is held — a snap-back of a
+     * never-believable estimate is the artifact this class exists for, and
+     * accepting it would replay the word's wash. */
+    private var converged = true
 
     /** Settle ends only when the window ran its minimum *and* the estimate
      * has converged onto realtime playback (or the cap forces it). */
@@ -72,8 +77,9 @@ class HighlightClock(
         val regression = clockMs - rawMs
         val settling = inSettle
         if (regression > 0) {
-            // Settle holds every backward step; outside settle only small jitter.
-            if (settling || regression < seekThresholdMs) {
+            // Settle holds every backward step; outside settle only small
+            // jitter — and a *converged* clock's big step is a genuine seek.
+            if (settling || !converged || regression < seekThresholdMs) {
                 stablePolls = 0
                 if (settling) settlePolls++
                 return clockMs
@@ -91,6 +97,7 @@ class HighlightClock(
         }
         clockMs = rawMs
         stablePolls = if (advance <= believableStepMs) stablePolls + 1 else 0
+        if (stablePolls >= stablePollsNeeded) converged = true
         if (settling) settlePolls++
         return rawMs
     }
@@ -109,6 +116,7 @@ class HighlightClock(
         clockMs = rawMs
         settlePolls = 0
         stablePolls = 0
+        converged = stablePollsNeeded <= 0
         return rawMs
     }
 

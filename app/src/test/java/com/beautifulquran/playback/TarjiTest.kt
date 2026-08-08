@@ -114,6 +114,29 @@ class TarjiTest {
     }
 
     @Test
+    fun `the rate ceiling rejects pulses faster than it`() {
+        // 5.5 Hz pulse with a 4 Hz ceiling: out — including via the
+        // half-rate autocorrelation harmonic (5.5 Hz correlates at lag 2τ).
+        val capped = Tarji()
+        capped.maxTremoloHz = 4f
+        feed(capped, heldNote(seconds = 2.5f, pitchHz = 130f, amHz = 5.5f, amDepth = 0.08f))
+        assertFalse("5.5 Hz is above the 4 Hz ceiling", capped.reverberating)
+
+        // Default ceiling (10 Hz) hears the same pulse.
+        val open = Tarji()
+        feed(open, heldNote(seconds = 2.5f, pitchHz = 130f, amHz = 5.5f, amDepth = 0.08f))
+        assertTrue(open.reverberating)
+    }
+
+    @Test
+    fun `slow swells below a low ceiling still count`() {
+        val d = Tarji()
+        d.maxTremoloHz = 3f
+        feed(d, heldNote(seconds = 3f, pitchHz = 130f, amHz = 2f, amDepth = 0.08f))
+        assertTrue("a 2 Hz swell is under the 3 Hz ceiling", d.reverberating)
+    }
+
+    @Test
     fun `detection releases smoothly when the reverberation stops`() {
         val d = Tarji()
         feed(d, heldNote(seconds = 2f, pitchHz = 130f, amHz = 5.5f, amDepth = 0.08f))

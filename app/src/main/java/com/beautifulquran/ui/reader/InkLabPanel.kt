@@ -250,6 +250,18 @@ fun InkLabPanel(
                             "How hard the gold swings with the held note. " +
                                 "0 = no shimmer; shipped ~${"%.2f".format(InkEngine.GLINT_RESONANCE_DEPTH)}.",
                         )
+                        TuningSlider(
+                            "Tarjīʿ max rate",
+                            t.glintResonanceMaxHz,
+                            2f..10f,
+                        ) {
+                            InkEngine.tuning = t.copy(glintResonanceMaxHz = it)
+                        }
+                        LabCaption(
+                            "Fastest voice pulse that still counts as tarjīʿ, " +
+                                "in Hz. Lower it and only slow, deep swells " +
+                                "move the gold; shipped ~${"%.0f".format(InkEngine.GLINT_RESONANCE_MAX_HZ)}.",
+                        )
                     }
 
                     InkLabTab.Guide -> {
@@ -451,6 +463,7 @@ internal fun formatTuningCopy(t: InkEngine.Tuning): String {
         appendLine("    holdCreep = ${f(t.holdCreep)},")
         appendLine("    glintResonance = ${t.glintResonance},")
         appendLine("    glintResonanceDepth = ${f(t.glintResonanceDepth)},")
+        appendLine("    glintResonanceMaxHz = ${f(t.glintResonanceMaxHz)},")
         append(")")
     }
 }

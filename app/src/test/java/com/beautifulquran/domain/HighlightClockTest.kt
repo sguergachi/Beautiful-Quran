@@ -136,12 +136,13 @@ class HighlightClockTest {
     }
 
     @Test
-    fun `after the settle cap a snap-back is a genuine seek again`() {
+    fun `a big regression passes once the clock has converged`() {
         val clock = HighlightClock()
-        var clockMs = clock.sample("ayah 7", 0L)
-        for (i in 1..50) clockMs = clock.sample("ayah 7", i * 90L)
-        assertEquals(4500L, clockMs)
-        assertEquals(300L, clock.sample("ayah 7", 300L))
+        var clockMs = clock.sample("a", 0L)
+        // Believable playback: converges, minimum window passes.
+        for (i in 1..60) clockMs = clock.sample("a", i * 33L)
+        assertEquals(1980L, clockMs)
+        assertEquals(300L, clock.sample("a", 300L))
     }
 
     @Test
