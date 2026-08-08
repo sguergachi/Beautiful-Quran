@@ -344,8 +344,11 @@ fun Modifier.shapedWordBloom(
                             Paint(),
                         )
                     }
+                    // Glow rides the same DstIn directional wash as the tint —
+                    // do not also multiply by smootherstep(p): that whole-word
+                    // gate kept the halo invisible until the bloom finished.
                     val glowAlpha = bloom.layerAlpha.coerceIn(0f, 1f) *
-                        bloom.glowAlpha.coerceIn(0f, 1f) * inkSmootherstep(p)
+                        bloom.glowAlpha.coerceIn(0f, 1f)
                     if (glowAlpha > 0f) {
                         val halo = glyphHaloCache.haloFor(
                             textLayout = textLayout,
