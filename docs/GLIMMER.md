@@ -78,17 +78,24 @@ The glint **listens for it directly**. `VoiceTapAudioProcessor` mirrors the
 player's own PCM (no mic permission, no Visualizer — which also means it
 works on every output route and emulator), and `playback/Tarji` — a pure,
 unit-tested DSP core — tracks a **single held note** (voiced, pitch-stable
-≥ ~0.4 s) and scans its amplitude envelope for an oscillation in the tarjīʿ
-band (~3–9.5 Hz). The shimmer only answers on words carrying a **strong
-tajweed hold** — a long madd, a ghunnah (the shadda نّ of ٱلنَّارِ), or the
-verse-closing waqf; i.e. words the wash actually parks on — and starts the
-moment the reverberation is detected there, riding the *measured*
-oscillation itself, so the gold swells and rests exactly with the reciter's
-voice (`InkEngine.GLINT_RESONANCE_DEPTH` ~42 %). Two clock
+≥ ~0.4 s) and scans its amplitude envelope for a periodic oscillation in the
+tarjīʿ band (~1.5–10 Hz, envelope autocorrelation — slow Hani swells to fast
+Alafasy vibrato). The shimmer only answers on words carrying a **strong
+tajweed hold of their own** — a long madd, a ghunnah (the shadda نّ of
+ٱلنَّارِ), or the verse-closing waqf (`TajweedPacing.Curve.hasStrongHold`;
+a wasl entry alone sustains the previous word's nūn and never qualifies) —
+and starts the moment the reverberation is detected there, riding the
+*measured* oscillation itself, so the gold swells and rests exactly with the
+reciter's voice (`InkEngine.GLINT_RESONANCE_DEPTH` ~42 %). Two clock
 corrections keep it in step: a phase lead covers the analysis lag, and the
 whole signal is delayed by the same output-route latency the highlight clock
 subtracts (the PCM tap hears the voice *before* the listener does). Detection
 ramps in and out under an attack/release envelope, so no edge ever pops.
+
+**No reverberation, no shimmer**: a steady hold without an audible pulse —
+even a long verse-closing waqf — keeps still gold. The gate also hard-closes
+at handoff: the dry-down dissolve after the voice moves on is never
+modulated, and repeat terracotta glint is never modulated either.
 
 How the shimmer **reads** on a formed, parked word (gold tint over formed
 ink is low-contrast, so a multiplier centred on 1 shows only the dimming
@@ -97,15 +104,6 @@ at 0.9 and is bounded to [0.55, 1.25], so the gold both brightens and dims
 with the voice, while a dip can never run deep enough to read as the ink
 resetting. The modulation is **pure alpha** — the reveal edge never moves
 mid-animation, so the bloom can never appear to restart.
-
-A free-running carrier at ~5.5 Hz (`GLINT_RESONANCE_SINE` ~22 %) remains as
-a gentle floor for **steady** holds inside the waqf window
-(`TajweedPacing.Curve.inWaqfHold(t)`, from the closing word's first long
-hold park through the end of the sweep) — but only while a voiced note is
-actually being held (`Tarji.holdingNote`), so it goes still at verse decay
-and on pause, and cross-fades out as the voice signal locks on. The gate
-hard-closes at handoff: the dry-down dissolve after the voice moves on is
-never modulated, and repeat terracotta glint is never modulated either.
 
 ## Visual target
 

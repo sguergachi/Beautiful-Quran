@@ -36,12 +36,6 @@ class VoiceEnergy {
     var tremoloGain = 0f
         private set
 
-    /** True while a voiced single note is being held (with or without
-     * reverberation) — the still-gold sine floor only breathes then. */
-    @Volatile
-    var holdingNote = false
-        private set
-
     @Volatile
     private var lastFeedMs = 0L
 
@@ -99,7 +93,6 @@ class VoiceEnergy {
         reverberating = tarji.syncReverberating
         tremolo = tarji.syncTremolo
         tremoloGain = tarji.syncTremoloGain
-        holdingNote = tarji.syncHoldingNote
         lastFeedMs = SystemClock.elapsedRealtime()
     }
 
@@ -116,7 +109,6 @@ class VoiceEnergy {
         reverberating = false
         tremolo = 0f
         tremoloGain = 0f
-        holdingNote = false
         lastFeedMs = 0L
         decimSum = 0f
         decimCount = 0

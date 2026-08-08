@@ -236,8 +236,8 @@ fun InkLabPanel(
                             "White-gold breath that rides the reciter's " +
                                 "tarjīʿ — the reverberation of the voice on a " +
                                 "held note — detected live on the tapped PCM. " +
-                                "Steady waqf holds keep a soft free-running " +
-                                "floor. Off keeps still gold.",
+                                "No reverberation, no shimmer: steady holds " +
+                                "keep still gold. Off keeps still gold.",
                         )
                         TuningSlider(
                             "Resonance strength",

@@ -23,16 +23,25 @@ package com.beautifulquran.domain
  *
  * The clock therefore:
  * - never moves backward within one [key] for small regressions (jitter)
- * - after a key change, [acceptNextSample], or a large accepted seek, enters a
- *   short **settle** window that holds *all* regressions and ignores
- *   implausible forward jumps, so post-seek corrections cannot bounce the word
+ * - after a key change, [acceptNextSample], or a large accepted seek, enters
+ *   a **settle** window that holds *all* regressions and ignores implausible
+ *   forward jumps, so post-seek corrections cannot bounce the word. The
+ *   window lasts at least [MIN_SETTLE_POLLS] polls and ends once the
+ *   estimate has tracked realtime playback for [STABLE_POLLS_NEEDED]
+ *   consecutive polls — an estimate that is still creeping never converges,
+ *   so its eventual snap-back stays inside the window no matter how late it
+ *   arrives — with a hard cap at [SETTLE_CAP_POLLS] polls so a pathological
+ *   stream cannot wedge the clock.
  * - still accepts a large backward step outside settle as a genuine seek
  *   (loop restart, scrub) and re-arms settle
  */
 class HighlightClock(
     private val seekThresholdMs: Long = SEEK_THRESHOLD_MS,
-    private val settleSamples: Int = SETTLE_SAMPLES,
+    private val minSettlePolls: Int = MIN_SETTLE_POLLS,
+    private val stablePollsNeeded: Int = STABLE_POLLS_NEEDED,
+    private val settleCapPolls: Int = SETTLE_CAP_POLLS,
     private val maxSettleStepMs: Long = MAX_SETTLE_STEP_MS,
+    private val believableStepMs: Long = BELIEVABLE_STEP_MS,
 ) {
 
     private var key: Any? = null
@@ -40,8 +49,16 @@ class HighlightClock(
     /** When true, the next [sample] accepts [rawMs] without the jitter hold —
      * used after a user word-tap / seek so ink tracks the new position. */
     private var acceptNext = false
-    /** Polls remaining in the post-seek settle window. */
-    private var settleLeft = 0
+    /** Polls since the last arm (settle bookkeeping). */
+    private var settlePolls = 0
+    /** Consecutive polls where the raw series tracked realtime playback. */
+    private var stablePolls = 0
+
+    /** Settle ends only when the window ran its minimum *and* the estimate
+     * has converged onto realtime playback (or the cap forces it). */
+    private val inSettle: Boolean
+        get() = settlePolls < settleCapPolls &&
+            (settlePolls < minSettlePolls || stablePolls < stablePollsNeeded)
 
     /** [rawMs] filtered: monotonic within one [key], except genuine seeks. */
     fun sample(key: Any, rawMs: Long): Long {
@@ -53,24 +70,28 @@ class HighlightClock(
             return arm(key, rawMs)
         }
         val regression = clockMs - rawMs
+        val settling = inSettle
         if (regression > 0) {
             // Settle holds every backward step; outside settle only small jitter.
-            if (settleLeft > 0 || regression < seekThresholdMs) {
-                tickSettle()
+            if (settling || regression < seekThresholdMs) {
+                stablePolls = 0
+                if (settling) settlePolls++
                 return clockMs
             }
             // Genuine large seek (loop restart, unnoted scrub).
             return arm(key, rawMs)
         }
         val advance = rawMs - clockMs
-        if (settleLeft > 0 && advance > maxSettleStepMs) {
+        if (settling && advance > maxSettleStepMs) {
             // Post-seek estimate overshot — ignore until the playhead is
             // believable again rather than lighting word 2/3 early.
-            tickSettle()
+            stablePolls = 0
+            settlePolls++
             return clockMs
         }
         clockMs = rawMs
-        tickSettle()
+        stablePolls = if (advance <= believableStepMs) stablePolls + 1 else 0
+        if (settling) settlePolls++
         return rawMs
     }
 
@@ -86,12 +107,9 @@ class HighlightClock(
     private fun arm(key: Any, rawMs: Long): Long {
         this.key = key
         clockMs = rawMs
-        settleLeft = settleSamples
+        settlePolls = 0
+        stablePolls = 0
         return rawMs
-    }
-
-    private fun tickSettle() {
-        if (settleLeft > 0) settleLeft--
     }
 
     companion object {
@@ -99,18 +117,22 @@ class HighlightClock(
          * larger ones outside settle are real seeks (loop restart) and pass. */
         const val SEEK_THRESHOLD_MS = 250L
 
-        /**
-         * Polls after a seek/handoff during which every regression is held and
-         * forward jumps larger than [MAX_SETTLE_STEP_MS] are ignored.
-         * ~1.2 s at the reader's 33 ms tick — long enough that a slow-converging
-         * post-handoff estimate (the audio pipeline can take the better part of
-         * a second to settle its playhead after an item change) snaps back
-         * *inside* the window instead of being read as a seek and replaying
-         * word 2/3's wash.
-         */
-        const val SETTLE_SAMPLES = 36
+        /** Minimum settle length (~400 ms at the reader's 33 ms tick). */
+        const val MIN_SETTLE_POLLS = 12
+
+        /** Consecutive realtime-tracking polls that prove the estimate has
+         * converged and settle may end. */
+        const val STABLE_POLLS_NEEDED = 4
+
+        /** Hard ceiling on settle (~1.5 s) so a stream that never converges
+         * cannot hold regressions forever. */
+        const val SETTLE_CAP_POLLS = 45
 
         /** Largest forward step accepted during settle (~3× realtime at 33 ms). */
         const val MAX_SETTLE_STEP_MS = 100L
+
+        /** A forward step at most this large (~2× realtime) counts as the
+         * estimate tracking playback rather than still creeping. */
+        const val BELIEVABLE_STEP_MS = 66L
     }
 }
