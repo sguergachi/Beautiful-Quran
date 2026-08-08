@@ -230,14 +230,29 @@ class Tarji {
                 bestLag = lag
             }
         }
+        // Ceiling game only: a low maxTremoloHz must not admit a faster pulse
+        // via its double/triple-period lag (5.5 Hz reading as 2.8 Hz under a
+        // 4 Hz ceiling). The old guard vetoed any pick whose *in-band* half
+        // was strong — that also killed real tarjīʿ on Alafasy/Hani 1:7 when
+        // fast ~10–25 Hz texture coexisted with the slow swell. Only an
+        // out-of-band short peak that is an exact submultiple of the pick
+        // counts as a ceiling cheat.
+        var shortPeakLag = 0
+        var shortPeakC = 0f
+        for (lag in 2 until minLag) {
+            val c = envCorr[lag]
+            if (c > shortPeakC) {
+                shortPeakC = c
+                shortPeakLag = lag
+            }
+        }
+        val harmonicLeak = shortPeakLag >= 2 && bestLag > 0 &&
+            bestLag % shortPeakLag == 0 && bestLag > shortPeakLag &&
+            shortPeakC >= HARMONIC_OF_BEST * bestC
+
         val rateHz =
             if (bestLag > 0) 1000f / (bestLag * HOP_MS.toFloat()) else 0f
         lastRateHz = rateHz
-        // A pulse whose true period sits *below* the scan floor still
-        // correlates at double that lag — without this check a 5.5 Hz vibrato
-        // reads as 2.8 Hz and slips under a low rate ceiling.
-        val harmonicLeak = bestLag > 0 && bestLag / 2 >= 2 &&
-            envCorr[bestLag / 2] >= 0.7f * bestC
 
         // Keep the signal smoothing even while gated off, so a lock-on starts
         // from the live envelope rather than a stale frozen value.
@@ -322,9 +337,12 @@ class Tarji {
         private const val MIN_LAG = SAMPLE_RATE / 350 // 22
         private const val MAX_LAG = SAMPLE_RATE / 70 // 114
         private const val MIN_CLARITY = 0.5f
-        private const val MAX_PITCH_DRIFT = 0.08f
+        /** Pitch glide tolerance on long waqf holds (fraction). Real closers
+         * slide a little without leaving the note. */
+        private const val MAX_PITCH_DRIFT = 0.12f
         private const val PITCH_EMA = 0.1f
-        private const val MAX_MISSES = 4
+        /** Brief unvoiced blips inside a long hold (hops of grace). */
+        private const val MAX_MISSES = 6
 
         private const val MIN_FLOOR = 0.006f
         private const val FLOOR_OF_PEAK = 0.15f
@@ -340,6 +358,9 @@ class Tarji {
         private const val DEPTH_OFF_RATIO = 0.7f
         /** Envelope-autocorrelation periodicity needed to call it a pulse. */
         private const val MIN_PERIODICITY = 0.4f
+        /** Out-of-band short peak must be this strong vs the in-band pick to
+         * count as a ceiling cheat (see harmonicLeak). */
+        private const val HARMONIC_OF_BEST = 0.85f
         // Band floor as an envelope-hop lag (20 ms hops): 1.5 Hz → 33.
         private const val MAX_ENV_LAG = 33
         private const val TREMOLO_EMA = 0.35f
