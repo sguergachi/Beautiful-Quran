@@ -27,7 +27,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
@@ -286,7 +288,7 @@ fun InkLabPanel(
                         LabCaption(
                             "How long a single note must be held before the " +
                                 "detector looks for reverberation. Lower for " +
-                                "shorter holds; shipped 400 ms.",
+                                "shorter holds; shipped 300 ms.",
                         )
                         TuningSlider("Min depth", t.tarjiMinDepth, 0.01f..0.25f) {
                             InkEngine.tuning = t.copy(tarjiMinDepth = it)
@@ -335,10 +337,26 @@ fun InkLabPanel(
                         ) {
                             InkEngine.tuning = t.copy(tarjiReleaseMs = it)
                         }
+                        TuningSlider(
+                            "Ear delay ms",
+                            t.tarjiEarDelayMs,
+                            0f..200f,
+                            integer = true,
+                        ) {
+                            InkEngine.tuning = t.copy(tarjiEarDelayMs = it)
+                        }
                         LabCaption(
-                            "How fast the detection gain ramps in (attack) and " +
-                                "out (release). Long release bridges lulls inside " +
-                                "a hold; shipped 250 / 800 ms.",
+                            "Extra delay so the pulse lands on the voice: the " +
+                                "shimmer already lags by the route preset + " +
+                                "measured sink buffer, in lockstep with the " +
+                                "word ink. Raise if it still trails the " +
+                                "vibration, lower if it leads. Shipped 0.",
+                        )
+                        LabCaption(
+                            "How fast the detection gain ramps in (attack) " +
+                                "and out on mid-hold lulls (release). Once the " +
+                                "climactic hold ends the shimmer dries in " +
+                                "~120 ms regardless. Shipped 250 / 800 ms.",
                         )
                     }
 
@@ -549,6 +567,7 @@ internal fun formatTuningCopy(t: InkEngine.Tuning): String {
         appendLine("    tarjiPitchDrift = ${f(t.tarjiPitchDrift)},")
         appendLine("    tarjiAttackMs = ${f(t.tarjiAttackMs)},")
         appendLine("    tarjiReleaseMs = ${f(t.tarjiReleaseMs)},")
+        appendLine("    tarjiEarDelayMs = ${f(t.tarjiEarDelayMs)},")
         append(")")
     }
 }
@@ -693,29 +712,71 @@ private fun LabCaption(text: String) {
  * Live detector readout for the Tarjīʿ section — what the tapped-PCM
  * detector is hearing right now, so tuning the sliders is done against the
  * actual signal. Polls the volatile probe while the panel is open.
+ *
+ * The line itself is a signal meter: while tarjīʿ is active it flickers
+ * gold at the detected vibration's crests and back to the normal tint at
+ * its troughs — at the tarjīʿ frequency — so the signal is visible even
+ * when the shimmer is subtle. The color runs on the frame clock (the
+ * 200 ms text poll is far too slow for a 2–5 Hz flicker) and gates on the
+ * same delayed gain the glint renders with.
  */
 @Composable
 private fun TarjiStatusLine() {
     var status by remember { mutableStateOf("…") }
+    val idleColor = MaterialTheme.colorScheme.onSurfaceVariant
+    var signalColor by remember { mutableStateOf(idleColor) }
+    val gold = Color(0xFFF8E9BE) // the glint's white-gold
     androidx.compose.runtime.LaunchedEffect(Unit) {
         while (true) {
             val v = com.beautifulquran.playback.VoiceEnergy.active
             status = when {
                 v == null -> "no probe (player not created)"
                 !v.isLive -> "silent — no PCM from the player"
-                v.reverberating ->
-                    "tarjīʿ · hold ${"%.1f".format(v.holdMs / 1000f)}s · " +
-                        "${"%.1f".format(v.rateHz)} Hz · gain ${"%.2f".format(v.shimmerGain)}"
-                v.holdMs > 0f ->
-                    "holding ${"%.1f".format(v.holdMs / 1000f)}s · " +
-                        "${"%.1f".format(v.rateHz)} Hz — no tarjīʿ yet"
-                else -> "listening…"
+                else -> {
+                    val ear = " · ear +${v.earDelayTotalMs} ms"
+                    val tr = " · tr ${"%.2f".format(v.tremolo)}"
+                    val depth = " · depth ${"%.2f".format(InkEngine.tuning.glintResonanceDepth)}"
+                    if (v.reverberating) {
+                        "tarjīʿ · hold ${"%.1f".format(v.holdMs / 1000f)}s · " +
+                            "${"%.1f".format(v.rateHz)} Hz · gain ${"%.2f".format(v.shimmerGain)}" +
+                            ear + tr + depth
+                    } else if (v.holdMs > 0f) {
+                        "holding ${"%.1f".format(v.holdMs / 1000f)}s · " +
+                            "${"%.1f".format(v.rateHz)} Hz — no tarjīʿ yet" + ear + tr + depth
+                    } else {
+                        "listening…" + ear + tr + depth
+                    }
+                }
             }
             kotlinx.coroutines.delay(200)
         }
     }
-    LabCaption("Detector: $status")
+    // Frame-driven flicker meter: gold on the vibration's crests, normal at
+    // the troughs, gated by the rendered gain — the line pulses at exactly
+    // the rate the shimmer does.
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        while (true) {
+            withFrameNanos {
+                val v = com.beautifulquran.playback.VoiceEnergy.active
+                val g = v?.shimmerGain ?: 0f
+                val tr = v?.tremolo ?: 0f
+                signalColor = if (g > 0.01f && tr >= SIGNAL_METER_THRESHOLD) gold else idleColor
+            }
+        }
+    }
+    Text(
+        text = "Detector: $status",
+        style = MaterialTheme.typography.labelSmall,
+        color = signalColor,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 4.dp),
+    )
 }
+
+/** Crest level of the synced tarjīʿ signal that lights the detector line
+ * gold — the shimmer's own full-swing crests sit well above it. */
+private const val SIGNAL_METER_THRESHOLD = 0.3f
 
 /**
  * Decade base for the zero-including exponential map. Higher → more track

@@ -90,6 +90,7 @@ data class InkLabSnapshot(
     val tarjiPitchDrift: Float = com.beautifulquran.playback.Tarji.MAX_PITCH_DRIFT,
     val tarjiAttackMs: Float = com.beautifulquran.playback.Tarji.ATTACK_MS,
     val tarjiReleaseMs: Float = com.beautifulquran.playback.Tarji.RELEASE_MS,
+    val tarjiEarDelayMs: Float = 0f,
     val guideBodyEdge: Float = 0.5f,
     val guideFeatherWidth: Float = 0.2819f,
     val guideFadeSoftness: Float = 1.3329f,
@@ -143,6 +144,7 @@ data class InkLabSnapshot(
         tarjiPitchDrift = tarjiPitchDrift,
         tarjiAttackMs = tarjiAttackMs,
         tarjiReleaseMs = tarjiReleaseMs,
+        tarjiEarDelayMs = tarjiEarDelayMs,
     )
 
     fun toContextualGuideTuning(): ContextualGuideTuning = ContextualGuideTuning(
@@ -208,9 +210,10 @@ data class InkLabSnapshot(
             tarjiMinDepth = tuning.tarjiMinDepth,
             tarjiMinPeriodicity = tuning.tarjiMinPeriodicity,
             tarjiPitchDrift = tuning.tarjiPitchDrift,
-            tarjiAttackMs = tuning.tarjiAttackMs,
-            tarjiReleaseMs = tuning.tarjiReleaseMs,
-            guideBodyEdge = guide.bodyEdge,
+        tarjiAttackMs = tuning.tarjiAttackMs,
+        tarjiReleaseMs = tuning.tarjiReleaseMs,
+        tarjiEarDelayMs = tuning.tarjiEarDelayMs,
+        guideBodyEdge = guide.bodyEdge,
             guideFeatherWidth = guide.featherWidth,
             guideFadeSoftness = guide.fadeSoftness,
             guideBlurRadiusDp = guide.blurRadiusDp,

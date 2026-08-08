@@ -22,6 +22,7 @@ import com.beautifulquran.playback.AudioOutputLatency
 import com.beautifulquran.playback.NowPlaying
 import com.beautifulquran.playback.PlayerController
 import com.beautifulquran.playback.PlayerUiState
+import kotlin.math.roundToLong
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -251,6 +252,13 @@ class ReaderViewModel(
     /** Last applied lag/lead so a lab or route change can reset the clock. */
     private var lastOutputLatencyMs = -1L
     private var lastHighlightLeadMs = -1L
+
+    // Tarjīʿ backlog measurement: the tap session's anchor position (the
+    // media position when the sink refed) and the smoothed tap-to-head lag.
+    private var latchedTapSessionStart = 0L
+    private var tapSessionStartPosMs = 0L
+    private var measuredBacklogMs = 0.0
+    private var shimmerWasOn = false
     /**
      * User seek target (ayah → ms) applied on the next poll once that ayah is
      * the media item — so ink jumps to the tapped word without waiting for
@@ -278,8 +286,41 @@ class ReaderViewModel(
     private fun highlightPositionMs(forcedMediaMs: Long?, firstWordStartMs: Long): Long {
         val latencyMs = outputLatencyMs()
         // The tarjīʿ shimmer delays the tapped voice signal by the same
-        // latency so it lands on what the listener hears now.
-        com.beautifulquran.playback.VoiceEnergy.active?.outputLatencyMs = latencyMs
+        // latency (plus the sink's own buffer) so it lands on the same clock
+        // the highlight uses. The sink buffer is *measured*, not guessed:
+        // the tap's hop clock anchored at the session start minus
+        // positionMs is the true tap-to-playback-head backlog, smoothed so
+        // the media clock's own settling does not wobble the delay.
+        val voice = com.beautifulquran.playback.VoiceEnergy.active
+        voice?.outputLatencyMs = latencyMs
+        if (voice != null) {
+            if (voice.sessionStartWall != latchedTapSessionStart) {
+                latchedTapSessionStart = voice.sessionStartWall
+                tapSessionStartPosMs = player.positionMs
+            }
+            val lagMs = (
+                voice.sessionHopCount * com.beautifulquran.playback.Tarji.HOP_MS.toLong() +
+                    tapSessionStartPosMs - player.positionMs
+                ).coerceIn(-200L, 400L)
+            measuredBacklogMs += BACKLOG_EMA * (lagMs - measuredBacklogMs)
+            voice.measuredBacklogMs = measuredBacklogMs.roundToLong()
+            // Live tarjīʿ effect log: the shimmer's on/off transitions in
+            // media time (the same gain the renderer gates on), so the
+            // effect's engagement is confirmable in logcat as it happens.
+            val shimmerOn = voice.shimmerGain > 0.01f
+            if (shimmerOn != shimmerWasOn) {
+                shimmerWasOn = shimmerOn
+                android.util.Log.i(
+                    "TarjiEffect",
+                    if (shimmerOn) {
+                        "tarjīʿ shimmer ON at media ${player.positionMs} ms · " +
+                            "${"%.1f".format(voice.rateHz)} Hz · hold ${"%.1f".format(voice.holdMs / 1000f)}s"
+                    } else {
+                        "tarjīʿ shimmer OFF at media ${player.positionMs} ms"
+                    },
+                )
+            }
+        }
         val leadMs = InkEngine.highlightLeadMs.toLong().coerceAtLeast(0L)
         if (latencyMs != lastOutputLatencyMs || leadMs != lastHighlightLeadMs) {
             lastOutputLatencyMs = latencyMs
@@ -882,6 +923,8 @@ class ReaderViewModel(
         private const val TICK_MS = 33L
         private const val PAUSED_TICK_MS = 250L
         private const val START_SEEK_GRACE_MS = 1_500L
+        /** Tap-to-head backlog smoothing (τ ≈ 1.6 s at the 33 ms poll). */
+        private const val BACKLOG_EMA = 0.02
     }
 }
 

@@ -190,6 +190,13 @@ object InkEngine {
         val tarjiAttackMs: Float = com.beautifulquran.playback.Tarji.ATTACK_MS,
         /** Release of the detection gain ramp (ms). */
         val tarjiReleaseMs: Float = com.beautifulquran.playback.Tarji.RELEASE_MS,
+        /**
+         * Extra ear delay on the shimmer, on top of the route preset, the
+         * measured sink buffer, and the output path (ms). Shipped 0 — the
+         * measured terms already land the pulse on the ear; this nudges the
+         * last device-specific millimetre when it still trails or leads.
+         */
+        val tarjiEarDelayMs: Float = 0f,
     )
 
     /**
@@ -228,6 +235,7 @@ object InkEngine {
         ve.maxPitchDrift = t.tarjiPitchDrift
         ve.attackMs = t.tarjiAttackMs
         ve.releaseMs = t.tarjiReleaseMs
+        ve.earDelayMs = t.tarjiEarDelayMs
     }
 
     /** Progressive-vellum guide parameters, persisted by the same Ink Lab snapshot. */

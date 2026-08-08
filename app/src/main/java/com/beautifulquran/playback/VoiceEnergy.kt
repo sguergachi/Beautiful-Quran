@@ -2,6 +2,7 @@ package com.beautifulquran.playback
 
 import android.os.SystemClock
 import java.nio.ByteBuffer
+import kotlin.math.roundToInt
 
 /**
  * Live voice analysis of the reciter, feeding the glint's tarjīʿ shimmer.
@@ -58,6 +59,47 @@ class VoiceEnergy {
     @Volatile
     var outputLatencyMs = 0L
 
+    /** The audio sink's own AudioTrack buffer (wall ms), read live by the tap
+     * so the shimmer is delayed past the app's internal output buffer too —
+     * the dominant missing term on real devices and emulators alike. Used
+     * until the reader's measured backlog ([measuredBacklogMs]) lands. */
+    @Volatile
+    var sinkLatencyMs = 0L
+
+    /**
+     * Measured tap-to-playback-head backlog (wall ms), computed by the
+     * reader from this probe's hop clock against `positionMs` (the same
+     * clock the highlight uses) and pushed back here — the shimmer delay
+     * rides it once available, so the pulse is in lockstep with the word
+     * ink on any device without guessing.
+     */
+    @Volatile
+    var measuredBacklogMs = 0L
+
+    /** Wall clock of the current tap session's first hop — the reader
+     * latches `positionMs` at this moment to anchor the hop clock. */
+    @Volatile
+    var sessionStartWall = 0L
+
+    /** Hops the tap had already processed when the session started. */
+    @Volatile
+    var sessionStartHopCount = 0
+
+    /** Content hops processed since the tap session started. */
+    val sessionHopCount: Int
+        get() = tarji.hopCount - sessionStartHopCount
+
+    /** Called by the tap when the sink (re)configures: the hop clock is
+     * re-anchored at whatever content position the refeed starts from. */
+    fun resetTapSession() {
+        sessionStartWall = SystemClock.elapsedRealtime()
+        sessionStartHopCount = tarji.hopCount
+    }
+
+    /** Total tap-to-ear delay (wall ms) as currently applied — diagnostics. */
+    @Volatile
+    var earDelayTotalMs = 0L
+
     /** Current playback speed, pushed by [PlayerController] — the delay is in
      * wall time, the history in content hops, so the speed scales it. */
     @Volatile
@@ -78,6 +120,11 @@ class VoiceEnergy {
     fun onPcm16(buffer: ByteBuffer, channels: Int, sampleRate: Int) {
         if (channels <= 0 || sampleRate <= 0) return
         decimStep = maxOf(1, sampleRate / Tarji.SAMPLE_RATE)
+        // One hop must be exactly HOP_MS of content at the decimated rate:
+        // floor-decimation gives 8820 Hz for 44.1 kHz (176.4 samples).
+        tarji.hopSamples = (
+            (sampleRate / decimStep) * (Tarji.HOP_MS / 1000f)
+            ).roundToInt().coerceAtLeast(1)
         // PCM16 is little-endian regardless of the buffer's own order flag —
         // byte-swapped reads keep their energy but lose all periodicity.
         val buf = buffer.asReadOnlyBuffer().order(java.nio.ByteOrder.LITTLE_ENDIAN)
@@ -96,8 +143,17 @@ class VoiceEnergy {
 
     private fun flushChunk() {
         if (chunkFill == 0) return
-        tarji.delayHops =
-            (outputLatencyMs * playbackSpeed / Tarji.HOP_MS).toInt().coerceIn(0, 63)
+        val speed = playbackSpeed
+        val sonicMs =
+            if (kotlin.math.abs(speed - 1f) > 0.001f) Tarji.SONIC_LATENCY_MS else 0f
+        val sinkMs = if (measuredBacklogMs > 0L) measuredBacklogMs else sinkLatencyMs
+        tarji.delayHops = Tarji.earDelayHops(
+            routeMs = outputLatencyMs,
+            sinkMs = sinkMs,
+            speed = speed,
+            sonicContentMs = sonicMs + earDelayMs,
+        )
+        earDelayTotalMs = (outputLatencyMs + sinkMs + sonicMs + earDelayMs).toLong()
         // Ink Lab detector knobs (pushed from InkEngine.tuning).
         tarji.maxTremoloHz = maxTremoloHz
         tarji.minTremoloHz = minTremoloHz
@@ -117,6 +173,10 @@ class VoiceEnergy {
         lastFeedMs = SystemClock.elapsedRealtime()
     }
 
+    /** Total content hops processed since the tap session started. */
+    val hopCount: Int
+        get() = tarji.hopCount
+
     /** Detection goes silent when the PCM stops (pause, track change). */
     val isLive: Boolean
         get() = SystemClock.elapsedRealtime() - lastFeedMs < LIVE_WINDOW_MS
@@ -133,6 +193,9 @@ class VoiceEnergy {
         holdMs = 0f
         rateHz = 0f
         lastFeedMs = 0L
+        sinkLatencyMs = 0L
+        measuredBacklogMs = 0L
+        earDelayTotalMs = 0L
         decimSum = 0f
         decimCount = 0
         chunkFill = 0
@@ -157,5 +220,7 @@ class VoiceEnergy {
         @Volatile var maxPitchDrift: Float = Tarji.MAX_PITCH_DRIFT
         @Volatile var attackMs: Float = Tarji.ATTACK_MS
         @Volatile var releaseMs: Float = Tarji.RELEASE_MS
+        /** Ink Lab: extra ear delay on top of the measured terms (ms). */
+        @Volatile var earDelayMs: Float = 0f
     }
 }

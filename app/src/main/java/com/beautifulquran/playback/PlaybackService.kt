@@ -114,7 +114,8 @@ class PlaybackService : MediaLibraryService() {
     /**
      * The player's renderers, with [VoiceTapAudioProcessor] tapped into the
      * audio sink so [VoiceEnergy] sees the PCM the listener hears — no mic or
-     * Visualizer permission needed.
+     * Visualizer permission needed. The tap is handed the sink it runs in so
+     * it can read the real AudioTrack buffer for the ear delay.
      */
     @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
     private fun tarjiRenderersFactory(context: Context): DefaultRenderersFactory =
@@ -123,11 +124,16 @@ class PlaybackService : MediaLibraryService() {
                 context: Context,
                 enableFloatOutput: Boolean,
                 enableAudioTrackPlaybackParams: Boolean,
-            ): AudioSink = DefaultAudioSink.Builder(context)
-                .setEnableFloatOutput(enableFloatOutput)
-                .setEnableAudioTrackPlaybackParams(enableAudioTrackPlaybackParams)
-                .setAudioProcessors(arrayOf(VoiceTapAudioProcessor()))
-                .build()
+            ): AudioSink {
+                val tap = VoiceTapAudioProcessor()
+                val sink = DefaultAudioSink.Builder(context)
+                    .setEnableFloatOutput(enableFloatOutput)
+                    .setEnableAudioTrackPlaybackParams(enableAudioTrackPlaybackParams)
+                    .setAudioProcessors(arrayOf(tap))
+                    .build()
+                tap.attach(sink)
+                return sink
+            }
         }
 
     /**
