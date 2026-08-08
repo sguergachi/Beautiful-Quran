@@ -46,6 +46,7 @@ class HighlightClock(
 
     private var key: Any? = null
     private var clockMs = 0L
+    private var lastRawMs = 0L
     /** When true, the next [sample] accepts [rawMs] without the jitter hold —
      * used after a user word-tap / seek so ink tracks the new position. */
     private var acceptNext = false
@@ -82,24 +83,41 @@ class HighlightClock(
             if (settling || !converged || regression < seekThresholdMs) {
                 stablePolls = 0
                 if (settling) settlePolls++
+                lastRawMs = rawMs
                 return clockMs
             }
             // Genuine large seek (loop restart, unnoted scrub).
             return arm(key, rawMs)
         }
-        val advance = rawMs - clockMs
-        if (settling && advance > maxSettleStepMs) {
+        // rawMs >= clockMs from here.
+        val gap = rawMs - clockMs
+        val rawAdvance = rawMs - lastRawMs
+        when {
             // Post-seek estimate overshot — ignore until the playhead is
             // believable again rather than lighting word 2/3 early.
-            stablePolls = 0
-            settlePolls++
-            return clockMs
+            settling && rawAdvance > maxSettleStepMs -> {
+                stablePolls = 0
+                settlePolls++
+            }
+            // During settle a faster-than-believable gap is clamped, not
+            // taken verbatim: a creeping estimate would otherwise pull the
+            // clock far ahead of the voice and freeze the highlight there
+            // until playback catches up — the broken fast-forward. The
+            // clock may trail, never lead.
+            settling && gap > believableStepMs -> {
+                clockMs += believableStepMs
+                stablePolls = 0
+                settlePolls++
+            }
+            else -> {
+                clockMs = rawMs
+                stablePolls = if (rawAdvance in 0..believableStepMs) stablePolls + 1 else 0
+                if (stablePolls >= stablePollsNeeded) converged = true
+                if (settling) settlePolls++
+            }
         }
-        clockMs = rawMs
-        stablePolls = if (advance <= believableStepMs) stablePolls + 1 else 0
-        if (stablePolls >= stablePollsNeeded) converged = true
-        if (settling) settlePolls++
-        return rawMs
+        lastRawMs = rawMs
+        return clockMs
     }
 
     /**
@@ -114,6 +132,7 @@ class HighlightClock(
     private fun arm(key: Any, rawMs: Long): Long {
         this.key = key
         clockMs = rawMs
+        lastRawMs = rawMs
         settlePolls = 0
         stablePolls = 0
         converged = stablePollsNeeded <= 0
@@ -140,7 +159,8 @@ class HighlightClock(
         const val MAX_SETTLE_STEP_MS = 100L
 
         /** A forward step at most this large (~2× realtime) counts as the
-         * estimate tracking playback rather than still creeping. */
+         * estimate tracking playback; during settle, faster accepted steps
+         * are clamped to this rate so the clock can trail, never lead. */
         const val BELIEVABLE_STEP_MS = 66L
     }
 }
