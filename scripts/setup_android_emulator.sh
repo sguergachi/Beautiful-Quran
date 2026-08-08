@@ -13,6 +13,12 @@ ANDROID_IMAGE_FLAVOR="${ANDROID_IMAGE_FLAVOR:-google_apis}"
 ANDROID_IMAGE_ARCH="${ANDROID_IMAGE_ARCH:-x86_64}"
 ANDROID_AVD_NAME="${ANDROID_AVD_NAME:-BeautifulQuran_API_${ANDROID_API}}"
 ANDROID_DEVICE_ID="${ANDROID_DEVICE_ID:-pixel_7}"
+# Per-AVD resource profile. Parallel agent emulators should be lean
+# (ANDROID_AVD_RAM=2048 ANDROID_AVD_CORES=2); 4096/6 suits a single interactive
+# emulator. Values are baked into the AVD config and can be overridden per run
+# with `-memory`/`-cores` at emulator launch.
+ANDROID_AVD_RAM="${ANDROID_AVD_RAM:-4096}"
+ANDROID_AVD_CORES="${ANDROID_AVD_CORES:-6}"
 CMDLINE_TOOLS_VERSION="${ANDROID_CMDLINE_TOOLS_VERSION:-14742923}"
 CMDLINE_TOOLS_ZIP="commandlinetools-linux-${CMDLINE_TOOLS_VERSION}_latest.zip"
 CMDLINE_TOOLS_URL="${ANDROID_CMDLINE_TOOLS_URL:-https://dl.google.com/android/repository/$CMDLINE_TOOLS_ZIP}"
@@ -166,14 +172,14 @@ tune_avd_performance() {
     printf 'hw.gpu.mode=host\n' >> "$cfg"
   fi
   if grep -q '^hw.ramSize=' "$cfg"; then
-    sed -i 's/^hw\.ramSize=.*/hw.ramSize=4096/' "$cfg"
+    sed -i "s/^hw\\.ramSize=.*/hw.ramSize=$ANDROID_AVD_RAM/" "$cfg"
   else
-    printf 'hw.ramSize=4096\n' >> "$cfg"
+    printf 'hw.ramSize=%s\n' "$ANDROID_AVD_RAM" >> "$cfg"
   fi
   if grep -q '^hw.cpu.ncore=' "$cfg"; then
-    sed -i 's/^hw\.cpu\.ncore=.*/hw.cpu.ncore=6/' "$cfg"
+    sed -i "s/^hw\\.cpu\\.ncore=.*/hw.cpu.ncore=$ANDROID_AVD_CORES/" "$cfg"
   else
-    printf 'hw.cpu.ncore=6\n' >> "$cfg"
+    printf 'hw.cpu.ncore=%s\n' "$ANDROID_AVD_CORES" >> "$cfg"
   fi
 }
 
@@ -218,6 +224,8 @@ Run the app with:
 Useful overrides:
   ANDROID_AVD_NAME=$ANDROID_AVD_NAME scripts/run_android_app.sh
   ANDROID_API=$ANDROID_API ANDROID_IMAGE_ARCH=$ANDROID_IMAGE_ARCH scripts/setup_android_emulator.sh
+  ANDROID_AVD_RAM=$ANDROID_AVD_RAM ANDROID_AVD_CORES=$ANDROID_AVD_CORES scripts/setup_android_emulator.sh
+Run parallel agent emulators with: scripts/emulators_up.sh [count]
 EOF
 }
 

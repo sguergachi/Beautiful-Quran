@@ -14,7 +14,7 @@ ADB="$ANDROID_HOME/platform-tools/adb"
 BOOT_TIMEOUT_SECONDS="${BOOT_TIMEOUT_SECONDS:-180}"
 # Windowed is the default. Only set ANDROID_EMULATOR_HEADLESS=1 for CI/SSH.
 ANDROID_EMULATOR_HEADLESS="${ANDROID_EMULATOR_HEADLESS:-0}"
-EMULATOR_LOG="$REPO_ROOT/.android-emulator.log"
+EMULATOR_LOG="$REPO_ROOT/.android-emulator-${ANDROID_AVD_NAME}.log"
 # Set to 0 by configure_host_vulkan when the host Vulkan driver is broken.
 HOST_VULKAN_USABLE=1
 
