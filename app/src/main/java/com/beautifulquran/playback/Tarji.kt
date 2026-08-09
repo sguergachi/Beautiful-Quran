@@ -41,7 +41,8 @@ class Tarji {
         private set
 
     /** Attack/release envelope (0..1) on the whole effect — no pops at the
-     * detection edges. */
+     * detection edges. While an event builds, it tracks the swell: the first
+     * pulses of the hold are soft and reach full depth only near the crest. */
     var tremoloGain = 0f
         private set
 
@@ -187,6 +188,14 @@ class Tarji {
     private var eventRateHz = 0f
     private var levelTransitionGrace = 0
 
+    // Swell tracker: tarjīʿ is a *build* — the shimmer must arrive soft at
+    // the start of the hold and reach full depth only as the swell
+    // approaches the event's peak, never as a full-strength pulse from the
+    // first detected hop. [eventHops] counts hops since the event was
+    // acquired; the gain target ramps over [SWELL_RAMP_HOPS] from it, so a
+    // steady hold and a crescendo both ease in instead of blinking on.
+    private var eventHops = 0
+
     /** Consume [length] mono samples at the decimated rate (≈8 kHz). Called
      * on the audio thread. */
     fun onSamples8k(samples: FloatArray, length: Int = samples.size) {
@@ -233,6 +242,7 @@ class Tarji {
         steadyGap = 0
         eventRateHz = 0f
         levelTransitionGrace = 0
+        eventHops = 0
         trackedLag = 0
         trackedPitchLag = 0
         visualUsesAmplitude = false
@@ -294,6 +304,7 @@ class Tarji {
                 eventRateHz = 0f
                 levelTransitionGrace = 0
                 endOfHold = false
+                eventHops = 0
                 trackedLag = 0
                 trackedPitchLag = 0
             }
@@ -316,14 +327,19 @@ class Tarji {
 
         updateTremolo()
 
-        // The shimmer settles with the voice: its strength follows the
-        // envelope's remaining intensity, full while the swell is strong
-        // (≥ [CLIMAX_FULL] of the event's peak) and fading as the voice
-        // dies toward the climax gate — the end of the word reads as the
-        // effect drying, never as a full-strength pulse after the climax.
+        // The shimmer builds with the swell and settles with the voice. Its
+        // strength ramps in over the event's own build ([SWELL_RAMP_HOPS]) —
+        // the first pulses of a waqf hold are soft and full on/off depth is
+        // reached only as the swell approaches its crest, never a harsh blink
+        // from the first detected hop. It then rides the sustain and fades as
+        // the voice dies toward the climax gate ([CLIMAX_FULL] → [CLIMAX_OFF]
+        // of the event's peak), so the word's end reads as the effect drying,
+        // never as a full-strength pulse past the climax.
         val target = if (reverberating) {
+            eventHops++
+            val ramp = (eventHops.toFloat() / SWELL_RAMP_HOPS).coerceIn(0f, 1f)
             val level = if (eventPeak > 0f) climaxLevel / eventPeak else 1f
-            ((level - CLIMAX_OFF) / (CLIMAX_FULL - CLIMAX_OFF)).coerceIn(0f, 1f)
+            ramp * ((level - CLIMAX_OFF) / (CLIMAX_FULL - CLIMAX_OFF)).coerceIn(0f, 1f)
         } else {
             0f
         }
@@ -454,6 +470,7 @@ class Tarji {
             pulseUnder = 0
             eventRateHz = 0f
             levelTransitionGrace = 0
+            eventHops = 0
         }
 
         if (eventPeak > 0f) eventPeak = maxOf(climaxLevel, eventPeak)
@@ -508,6 +525,7 @@ class Tarji {
             eventPeak = climaxLevel
             eventRateHz = rateHz
             climaxUnder = 0
+            eventHops = 0
         }
 
         // The long track decides the event and its slow baseline, but the
@@ -954,6 +972,11 @@ class Tarji {
          * the effect settling rather than pulsing at full strength past the
          * climax. */
         private const val CLIMAX_FULL = 0.75f
+        /** Hops over which the shimmer's depth builds from the first detected
+         * pulse to full (1 s). The first pulses of a waqf hold are soft and
+         * the magnitude reaches full only as the swell approaches its crest,
+         * instead of turning on and off at full depth from the start. */
+        private const val SWELL_RAMP_HOPS = 50
         /** A sudden cadence change is a new articulation, not the same hold. */
         private const val MAX_EVENT_RATE_RATIO = 3f
         private const val EVENT_RATE_EMA = 0.1f
