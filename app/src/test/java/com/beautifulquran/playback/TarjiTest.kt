@@ -390,22 +390,84 @@ class TarjiTest {
     @Test
     fun `ear delay scales wall-time latency by speed in content hops`() {
         // Route preset only, 1×: 180 ms → 9 hops of 20 ms content.
-        assertEquals(9, Tarji.earDelayHops(routeMs = 180, sinkMs = 0, downstreamMs = 0, speed = 1f))
+        assertEquals(9f, Tarji.earDelayHops(routeMs = 180, sinkMs = 0, downstreamMs = 0, speed = 1f), 0f)
         // At 0.75× the same wall latency spans fewer content hops.
-        assertEquals(6, Tarji.earDelayHops(routeMs = 180, sinkMs = 0, downstreamMs = 0, speed = 0.75f))
+        assertEquals(6.75f, Tarji.earDelayHops(routeMs = 180, sinkMs = 0, downstreamMs = 0, speed = 0.75f), 0f)
         // The sink buffer + output path add on top (emulator-shaped: 252 + 80).
-        assertEquals(16, Tarji.earDelayHops(routeMs = 0, sinkMs = 252, downstreamMs = 80, speed = 1f))
-        assertEquals(12, Tarji.earDelayHops(routeMs = 0, sinkMs = 252, downstreamMs = 80, speed = 0.75f))
+        assertEquals(16.6f, Tarji.earDelayHops(routeMs = 0, sinkMs = 252, downstreamMs = 80, speed = 1f), 0.0001f)
+        assertEquals(12.45f, Tarji.earDelayHops(routeMs = 0, sinkMs = 252, downstreamMs = 80, speed = 0.75f), 0.0001f)
         // The Sonic buffer is content-time: one hop, at any speed it exists.
-        assertEquals(7, Tarji.earDelayHops(routeMs = 180, sinkMs = 0, downstreamMs = 0, speed = 0.75f, sonicContentMs = 20f))
-        assertEquals(10, Tarji.earDelayHops(routeMs = 180, sinkMs = 0, downstreamMs = 0, speed = 1f, sonicContentMs = 20f))
+        assertEquals(7.75f, Tarji.earDelayHops(routeMs = 180, sinkMs = 0, downstreamMs = 0, speed = 0.75f, sonicContentMs = 20f), 0f)
+        assertEquals(10f, Tarji.earDelayHops(routeMs = 180, sinkMs = 0, downstreamMs = 0, speed = 1f, sonicContentMs = 20f), 0f)
+    }
+
+    @Test
+    fun `measured content backlog is not scaled by playback speed twice`() {
+        val fromWallClock = Tarji.earDelayHops(routeMs = 0, sinkMs = 100, speed = 2f)
+        val fromContentClock = Tarji.earDelayHops(
+            routeMs = 0,
+            sinkMs = 0,
+            speed = 2f,
+            measuredSinkContentMs = 200.0,
+        )
+
+        assertEquals(10f, fromWallClock, 0f)
+        assertEquals(fromWallClock, fromContentClock, 0f)
+    }
+
+    @Test
+    fun `fractional ear delay interpolates between adjacent hops`() {
+        val d = Tarji()
+        val wave = heldNote(seconds = 3f, pitchHz = 130f, amHz = 5.5f, amDepth = 0.12f)
+        var previousTremolo = 0f
+        var currentTremolo = 0f
+        var previousGain = 0f
+        var currentGain = 0f
+        var i = 0
+        while (i + Tarji.HOP_SAMPLES <= wave.size) {
+            previousTremolo = currentTremolo
+            previousGain = currentGain
+            d.onSamples8k(wave.copyOfRange(i, i + Tarji.HOP_SAMPLES))
+            currentTremolo = d.tremolo
+            currentGain = d.tremoloGain
+            i += Tarji.HOP_SAMPLES
+        }
+        assertTrue(d.reverberating)
+        assertTrue("the interpolation must cross the history-ring wrap", d.hopCount > 64)
+
+        d.delayHops = 1f
+        assertEquals(previousTremolo, d.syncTremolo, 0.0001f)
+        assertEquals(previousGain, d.syncTremoloGain, 0.0001f)
+        d.delayHops = 0.5f
+        assertEquals((previousTremolo + currentTremolo) * 0.5f, d.syncTremolo, 0.0001f)
+        assertEquals((previousGain + currentGain) * 0.5f, d.syncTremoloGain, 0.0001f)
+    }
+
+    @Test
+    fun `fractional delay switches reverberation at the interpolated edge`() {
+        val d = Tarji()
+        val wave = heldNote(seconds = 3f, pitchHz = 130f, amHz = 5.5f, amDepth = 0.12f)
+        var wasReverberating = false
+        var i = 0
+        while (i + Tarji.HOP_SAMPLES <= wave.size) {
+            d.onSamples8k(wave.copyOfRange(i, i + Tarji.HOP_SAMPLES))
+            if (d.reverberating && !wasReverberating) break
+            wasReverberating = d.reverberating
+            i += Tarji.HOP_SAMPLES
+        }
+        assertTrue(d.reverberating)
+
+        d.delayHops = 0.49f
+        assertTrue(d.syncReverberating)
+        d.delayHops = 0.51f
+        assertFalse(d.syncReverberating)
     }
 
     @Test
     fun `ear delay clamps negative and oversized inputs`() {
-        assertEquals(0, Tarji.earDelayHops(routeMs = -50, sinkMs = 0, downstreamMs = 0, speed = 1f))
+        assertEquals(0f, Tarji.earDelayHops(routeMs = -50, sinkMs = 0, downstreamMs = 0, speed = 1f), 0f)
         // 2× speed over a 1.5 s path: 150 hops → clamped to the 64-hop history.
-        assertEquals(63, Tarji.earDelayHops(routeMs = 1_500, sinkMs = 0, downstreamMs = 0, speed = 2f))
+        assertEquals(63f, Tarji.earDelayHops(routeMs = 1_500, sinkMs = 0, downstreamMs = 0, speed = 2f), 0f)
     }
 
     @Test
@@ -457,7 +519,7 @@ class TarjiTest {
     @Test
     fun `delayed signal is phase-locked to the ear's envelope, not the tap's`() {
         val d = Tarji()
-        d.delayHops = 10 // 200 ms of content: what the ear hears right now.
+        d.delayHops = 10f // 200 ms of content: what the ear hears right now.
         val amHz = 5.5f
         val wave = heldNote(seconds = 3.5f, pitchHz = 130f, amHz = amHz, amDepth = 0.1f)
         val hop = Tarji.HOP_SAMPLES

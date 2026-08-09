@@ -51,7 +51,7 @@ Pin this: every new processor must.
 
 Pure, no Android imports, hop-count time only. Unit tests synthesize waves
 at 8 kHz directly. On device the tap decimates the sink's PCM to roughly
-8 kHz mono and publishes one detector state per exact 20 ms content hop.
+8 kHz mono and publishes one detector state per ~20 ms content hop.
 The original 2,048-sample handoff updated the renderer only every ~232–256 ms:
 four visible states per second cannot express a 5–10 Hz vocal pulse.
 
@@ -147,12 +147,16 @@ four visible states per second cannot express a 5–10 Hz vocal pulse.
     ~−1.5..1.5.
 
 6.  **Output latency.** The PCM tap hears the voice *before* the listener.
-    `ReaderViewModel` pushes the same route preset `HighlightClock` subtracts
-    plus a live tap-hop-vs-`positionMs` backlog measurement (the sink buffer is
-    the fallback until that measurement settles). With `playbackSpeed`, the
-    reported
+    `ReaderViewModel` pushes the same route preset `HighlightClock` subtracts.
+    The AudioTrack buffer supplies the session's initial tap-to-head delay;
+    exact tap content time versus `positionMs` then tracks only queue growth or
+    drain, without falling toward zero while an EMA warms up. Measured backlog
+    is already content-time, so playback speed is applied only to wall-time
+    route/buffer values. The reported
     `syncReverberating`/`syncTremolo`/`syncTremoloGain` are read through a
-    64-hop history ring on the same playback-head reference as the word ink.
+    64-hop history ring on the same playback-head reference as the word ink;
+    fractional reads interpolate between hops instead of rounding the shimmer
+    as much as 20 ms early.
     The hop clock includes the 80 ms analysis-frame warm-up; omitting those
     first three hops under-delays every session by 60 ms.
 

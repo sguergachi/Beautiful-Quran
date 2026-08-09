@@ -153,7 +153,7 @@ fresh gate with its terracotta wash.
 The pulse is **delayed to the reader's clock** — the tap sits at the audio
 sink's input, so the signal is led forward by everything downstream before
 it is read out: the route preset (the same one the highlight clock
-subtracts) and the sink's own AudioTrack buffer (measured live via
+subtracts) and the sink's own AudioTrack buffer (read via
 `AudioSink.getAudioTrackBufferSizeUs`, typically 40–100 ms and much more
 on emulators — the term that used to leave the shimmer a quarter-second
 ahead of the voice). That lands the shimmer on the playback head
@@ -162,9 +162,14 @@ is in lockstep with the wash, not trailing the visible word. Wall-time
 components scale by playback speed; the Sonic resampler's own buffer (only
 present off 1×) does not. The Ink Lab's **Ear delay ms** nudges the last
 device-specific millimetre on top (add it back when a route genuinely
-lags the audible vibration). One analysis hop stays at ~20 ms of
+lags the audible vibration). The sink capacity establishes the initial
+tap-to-head backlog; exact tap content time versus `positionMs` then follows
+queue growth/drain without a slow zero-based warm-up. The history read is
+fractional, so non-multiple device latency is not rounded up to 20 ms early.
+One analysis hop stays at ~20 ms of
 *content* at any source rate (44.1 kHz decimates to 8820 Hz → 176
-samples); pitch lags scale with that effective rate, and `VoiceEnergy`
+samples); its clock uses the exact 19.955 ms duration, pitch lags scale with
+that effective rate, and `VoiceEnergy`
 publishes after every hop. Do not
 batch the renderer handoff: the old 2,048-sample accumulator exposed only
 about four states per second and necessarily undersampled a 5–10 Hz shimmer.

@@ -2,6 +2,7 @@ package com.beautifulquran.playback
 
 import kotlin.math.abs
 import kotlin.math.ceil
+import kotlin.math.floor
 import kotlin.math.sqrt
 
 /**
@@ -64,13 +65,13 @@ class Tarji {
 
     /**
      * Read-out delay in content hops, set from the tap-to-ear latency
-     * (route + measured tap-to-playback-head backlog, × playback speed, plus
-     * the Sonic resampler's own content-time buffer at non-1× speed) by
+     * (wall-time route × playback speed + content-time tap backlog + the
+     * Sonic resampler's own content-time buffer at non-1× speed) by
      * [VoiceEnergy]: the PCM tap hears the voice *before* the listener does,
      * so the reported signal is delayed to match what is actually reaching
      * the ear right now.
      */
-    var delayHops = 0
+    var delayHops = 0f
 
     /**
      * Decimated samples per analysis hop, set by [VoiceEnergy] from the real
@@ -116,13 +117,22 @@ class Tarji {
     private var histCount = 0
 
     /** Tarjīʿ state as it reaches the ear now (delayed by [delayHops]). */
-    val syncReverberating: Boolean get() = histRev[histIndex()] != 0f
-    val syncTremolo: Float get() = histTremolo[histIndex()]
-    val syncTremoloGain: Float get() = histGain[histIndex()]
+    val syncReverberating: Boolean get() = delayed(histRev) >= 0.5f
+    val syncTremolo: Float get() = delayed(histTremolo)
+    val syncTremoloGain: Float get() = delayed(histGain)
 
-    private fun histIndex(): Int {
+    /** Linear read-out between analysis hops keeps device latency from being
+     * quantized up to 20 ms early. Detection itself remains hop-based. */
+    private fun delayed(history: FloatArray): Float {
+        if (histCount == 0) return 0f
+        val newest = histCount - 1
         val oldest = maxOf(0, histCount - HIST_HOPS)
-        return (maxOf(oldest, histCount - 1 - delayHops)) % HIST_HOPS
+        val position = (newest - delayHops.coerceAtLeast(0f)).coerceAtLeast(oldest.toFloat())
+        val before = floor(position).toInt()
+        val after = minOf(before + 1, newest)
+        val fraction = position - before
+        val a = history[before % HIST_HOPS]
+        return a + fraction * (history[after % HIST_HOPS] - a)
     }
 
     // Rolling 80 ms analysis frame at the decimated rate, plus a reuse
@@ -742,7 +752,8 @@ class Tarji {
          * ([downstreamMs]) is left out by default: the highlight does not
          * include it either, so the shimmer rides the same reference.
          * Wall-time components scale with [speed]; the Sonic buffer
-         * ([sonicContentMs]) is content-time and does not.
+         * ([sonicContentMs]) and optional live tap backlog
+         * ([measuredSinkContentMs]) are already content-time and do not.
          */
         fun earDelayHops(
             routeMs: Long,
@@ -750,10 +761,14 @@ class Tarji {
             speed: Float,
             downstreamMs: Long = 0,
             sonicContentMs: Float = 0f,
-        ): Int {
-            val wallMs = (routeMs + sinkMs + downstreamMs).coerceAtLeast(0L)
-            val wallHops = (wallMs * speed / HOP_MS).toInt()
-            return (wallHops + (sonicContentMs / HOP_MS).toInt()).coerceIn(0, HIST_HOPS - 1)
+            measuredSinkContentMs: Double? = null,
+        ): Float {
+            val safeSpeed = speed.coerceAtLeast(0f)
+            val routeContentMs = (routeMs + downstreamMs).coerceAtLeast(0L) * safeSpeed
+            val sinkContentMs = measuredSinkContentMs?.coerceAtLeast(0.0)?.toFloat()
+                ?: (sinkMs.coerceAtLeast(0L) * safeSpeed)
+            return ((routeContentMs + sinkContentMs + sonicContentMs) / HOP_MS)
+                .coerceIn(0f, HIST_HOPS - 1f)
         }
     }
 }
