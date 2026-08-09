@@ -74,10 +74,10 @@ class Tarji {
 
     /**
      * Decimated samples per analysis hop, set by [VoiceEnergy] from the real
-     * stream rate so one hop is exactly [HOP_MS] of *content* at any source
-     * rate (44.1 kHz decimates to 8820 Hz → 176.4 → 176 samples). The default
-     * 160 is exact for 8 kHz. Keeps the delay, rate reads, and phase lead in
-     * true content time instead of drifting with the integer decimation.
+     * stream rate so one hop stays at [HOP_MS] of *content* after integer
+     * decimation (44.1 kHz → 8820 Hz → 176 samples). The pitch lag range and
+     * reported frequency scale with this effective analysis rate instead of
+     * assuming every stream landed at exactly 8 kHz.
      */
     var hopSamples = HOP_SAMPLES
 
@@ -127,10 +127,13 @@ class Tarji {
 
     // Rolling 80 ms analysis frame at the decimated rate, plus a reuse
     // buffer for the linearised copy (the audio thread must not allocate per
-    // hop). [hopSamples] fixes a hop at exactly 20 ms of content.
+    // hop). [hopSamples] keeps a hop at approximately 20 ms of content.
     private var frame = FloatArray(FRAME_SAMPLES)
     private var work = FloatArray(FRAME_SAMPLES)
-    private val corrs = FloatArray(MAX_LAG + 1)
+    private var analysisSampleRate = SAMPLE_RATE
+    private var minPitchLag = SAMPLE_RATE / MAX_PITCH_HZ
+    private var maxPitchLag = SAMPLE_RATE / MIN_PITCH_HZ
+    private var corrs = FloatArray(maxPitchLag + 1)
     private var frameFill = 0
 
     // Per-hop envelope RMS series (64 hops ≈ 1.3 s).
@@ -171,6 +174,11 @@ class Tarji {
             // content. Restart the frame so the hop boundary stays aligned.
             frame = FloatArray(hop * FRAME_HOPS)
             work = FloatArray(hop * FRAME_HOPS)
+            analysisSampleRate = hop * 1000 / HOP_MS
+            minPitchLag = (analysisSampleRate / MAX_PITCH_HZ).coerceAtLeast(1)
+            maxPitchLag = (analysisSampleRate / MIN_PITCH_HZ)
+                .coerceIn(minPitchLag, frame.size - 1)
+            corrs = FloatArray(maxPitchLag + 1)
             frameFill = 0
         }
         for (i in 0 until length) {
@@ -309,6 +317,23 @@ class Tarji {
             endOfHold = true
             return
         }
+
+        // A sharp loudness step contains enough curved residual energy to
+        // resemble a fast pulse while the rolling window straddles both
+        // levels. Do not let that transition consume the word's one event;
+        // wait until the window's leading/trailing quarters describe the
+        // same sustained level. Real AM remains balanced around its mean.
+        val edgeSize = maxOf(1, n / 4)
+        var leadingLevel = 0f
+        var trailingLevel = 0f
+        for (j in 0 until edgeSize) {
+            leadingLevel += env[(start + j) % ENV_HOPS]
+            trailingLevel += env[(start + n - edgeSize + j) % ENV_HOPS]
+        }
+        leadingLevel /= edgeSize
+        trailingLevel /= edgeSize
+        val acquisitionLevelBalance =
+            minOf(leadingLevel, trailingLevel) / maxOf(leadingLevel, trailingLevel)
 
         // Remove the local level trend before measuring modulation. Merely
         // subtracting the mean makes a crescendo highly autocorrelated and
@@ -491,7 +516,8 @@ class Tarji {
             longEnough && depth >= depthGate * DEPTH_OFF_RATIO && stillPeriodic &&
                 !endOfHold
         } else {
-            longEnough && depth >= depthGate && periodic && !endOfHold
+            longEnough && acquisitionLevelBalance >= ACQUISITION_LEVEL_BALANCE &&
+                depth >= depthGate && periodic && !endOfHold
         }
         val rateRatio = if (eventRateHz > 0f && rateHz > 0f) {
             maxOf(eventRateHz / rateHz, rateHz / eventRateHz)
@@ -568,12 +594,12 @@ class Tarji {
     /** Normalized-autocorrelation pitch over the reciter's vocal range. */
     private fun pitch(): Pair<Float, Float> {
         var energy = 0f
-        for (j in 0 until frame.size - MAX_LAG) energy += work[j] * work[j]
+        for (j in 0 until frame.size - maxPitchLag) energy += work[j] * work[j]
         if (energy <= 1e-8f) return 0f to 0f
         var best = 0f
-        for (lag in MIN_LAG..MAX_LAG) {
+        for (lag in minPitchLag..maxPitchLag) {
             var corr = 0f
-            for (j in 0 until frame.size - MAX_LAG) corr += work[j] * work[j + lag]
+            for (j in 0 until frame.size - maxPitchLag) corr += work[j] * work[j + lag]
             corrs[lag] = corr
             if (corr > best) best = corr
         }
@@ -582,10 +608,10 @@ class Tarji {
         // and picking the plain max flips the estimate between L and 2L hop to
         // hop (which kept resetting the hold on real recitation). Take the
         // shortest period within 5% of the best instead.
-        var lag = MIN_LAG
-        while (lag <= MAX_LAG && corrs[lag] < 0.95f * best) lag++
-        if (lag > MAX_LAG) return 0f to 0f
-        return (SAMPLE_RATE / lag.toFloat()) to (best / energy)
+        var lag = minPitchLag
+        while (lag <= maxPitchLag && corrs[lag] < 0.95f * best) lag++
+        if (lag > maxPitchLag) return 0f to 0f
+        return (analysisSampleRate / lag.toFloat()) to (best / energy)
     }
 
     companion object {
@@ -603,8 +629,8 @@ class Tarji {
         const val HOLD_MIN_MS = 300
 
         // Reciter vocal range ~70–350 Hz (covers playback-speed shifts).
-        private const val MIN_LAG = SAMPLE_RATE / 350 // 22
-        private const val MAX_LAG = SAMPLE_RATE / 70 // 114
+        private const val MIN_PITCH_HZ = 70
+        private const val MAX_PITCH_HZ = 350
         private const val MIN_CLARITY = 0.5f
         /** Pitch glide tolerance on long waqf holds (fraction). Real closers
          * slide a little without leaving the note. Ink Lab: [maxPitchDrift]. */
@@ -616,14 +642,18 @@ class Tarji {
         private const val MIN_FLOOR = 0.006f
         private const val FLOOR_OF_PEAK = 0.15f
         private const val PEAK_DECAY = 0.997f
+        /** A window whose edge levels differ by nearly 3× is a level
+         * transition, not enough evidence to spend the word's event. */
+        private const val ACQUISITION_LEVEL_BALANCE = 0.35f
 
         /** Tarjīʿ lives around 1.5–10 Hz of envelope oscillation: slow ~2 Hz
          * swells (Hani) to ~6–8 Hz vibrato (Alafasy), at any hop rate.
          * Ink Lab: [minTremoloHz] / [maxTremoloHz]. */
         const val MIN_TREMOLO_HZ = 1.5f
         const val MAX_TREMOLO_HZ = 10f
-        /** Nyquist ceiling of the 50 Hz envelope clock. */
-        const val MAX_MEASURABLE_TREMOLO_HZ = 25f
+        /** Phase-safe ceiling of the rolling 80 ms RMS envelope. Above this,
+         * its first 12.5 Hz null attenuates then inverts the vocal pulse. */
+        const val MAX_MEASURABLE_TREMOLO_HZ = MAX_TREMOLO_HZ
         /** Shipped AM depth gate — Ink Lab: [minTremoloDepth]. */
         const val MIN_TREMOLO_DEPTH = 0.035f
         /** Relative AM depth at which the envelope is self-evidently

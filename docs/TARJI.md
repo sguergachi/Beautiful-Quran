@@ -61,9 +61,11 @@ four visible states per second cannot express a 5–10 Hz vocal pulse.
     every 20 ms, pushed into a 64-hop (≈1.3 s) envelope ring. `PEAK_DECAY`
     tracks the noise floor the hold gate uses.
 
-2.  **Pitch.** Normalized autocorrelation over the reciter range 70–350 Hz
-    (lags 22..114 at 8 kHz). The shortest lag within 5 % of the best wins
-    (otherwise lag *L* vs *2L* flips hop-to-hop and resets every hold).
+2.  **Pitch.** Normalized autocorrelation over the reciter range 70–350 Hz.
+    The lag range and Hz conversion scale with the decimated samples per hop
+    (lags 22..114 at 8 kHz, wider for the 176-sample 44.1 kHz path). The
+    shortest lag within 5 % of the best wins (otherwise lag *L* vs *2L* flips
+    hop-to-hop and resets every hold).
 
     **Octave folding on the hold check.** Autocorrelation flips freely between
     a period and its double on real voice. `samePitch(a, b)` folds ratios by
@@ -87,11 +89,8 @@ four visible states per second cannot express a 5–10 Hz vocal pulse.
     reverberation. Alternating residual crossings first prove that the shape
     oscillates; autocorrelation then measures its period.
 
-    *   depth = `√2 · rms(residual) / mean` — the shipped tarjīʿ band is
-        1.5–10 Hz, with the Ink Lab ceiling tunable to the envelope clock's
-        physical 25 Hz limit (`VoiceEnergy.maxTremoloHz`). Raising it admits
-        genuinely fast vocal texture without pretending aliased energy is a
-        measured rate.
+    *   depth = `√2 · rms(residual) / mean` — the shipped and phase-safe
+        tarjīʿ band is 1.5–10 Hz (`VoiceEnergy.maxTremoloHz`).
     *   rate = envelope autocorrelation peak. Lags `ceil(minLag(maxTremoloHz))`..33
         (1.5 Hz floor) with a **ceiling-only harmonic guard**: a true period
         above the scan floor still correlates at double its lag — without the
@@ -102,14 +101,19 @@ four visible states per second cannot express a 5–10 Hz vocal pulse.
         note scans only lags for which it has enough current samples; stale
         long-period bins from the preceding note must never seed its rate.
     *   acquisition needs alternating residual crossings, `bestC ≥ 0.4`, and
-        a rate in band. A raw-envelope correlation view is used only to bridge
-        the rolling window across a real level transition after detrended
-        evidence has already acquired the event.
+        a rate in band. The leading/trailing quarters of the window must also
+        be within ~3× level: a sharp loud-to-quiet step can leave a curved
+        detrended residual that resembles a fast pulse, and must not consume
+        the word before the quieter real sustain arrives. A raw-envelope
+        correlation view is used only to bridge a level transition after
+        detrended evidence has already acquired the event.
 
     **Band limits and hop rate.** The envelope is sampled at 50 Hz (20 ms hops).
-    Nyquist is 25 Hz, so both runtime controls and detector inputs are clamped
-    to 1.5–25 Hz. The 20 ms hop also low-passes the envelope: a 12 Hz AM loses
-    ~10 % of its depth to averaging, so faster texture needs more depth.
+    Its mathematical Nyquist limit is 25 Hz, but the rolling 80 ms RMS window
+    has its first null at 12.5 Hz and phase-inverts the lobe above it. Runtime
+    controls and detector inputs therefore stop at the phase-safe 10 Hz product
+    band; admitting 12.5–25 Hz would make some shimmer crests follow vocal
+    troughs.
 
     Hysteresis: stricter to switch *on* than to stay on (`DEPTH_OFF_RATIO`
     0.7, band widened by 1 Hz) — no flapping when the reverberation breathes.
@@ -318,10 +322,11 @@ ahead of the directional reveal.
     stays `holding … — no tarjīʿ yet` and still gold by design; a pulsing
     hold flips to `tarjīʿ` within ~0.6 s of the reverberation's onset and the
     gold rides it.
-*   Drag **Tarjīʿ max rate** toward 25 to let fast vocal texture (~12–17 Hz) in;
-    the harmonic guard keeps 5.5 Hz vibrato from masquerading at 2.8 Hz under
-    a low ceiling. The envelope hop is 20 ms (50 Hz → Nyquist 25 Hz), and the
-    controls stop at that measurable limit.
+*   **Tarjīʿ max rate** tops out at the phase-safe 10 Hz product band. The
+    harmonic guard keeps 5.5 Hz vibrato from masquerading at 2.8 Hz under a
+    lower ceiling. A reciter's higher vocal pitch is handled separately by the
+    70–350 Hz pitch tracker; it is not a reason to admit phase-inverted
+    high-rate envelope texture.
 *   Verify the no-reset law with
 
     ```bash

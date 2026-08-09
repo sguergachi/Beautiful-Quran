@@ -82,7 +82,7 @@ player's own PCM (no mic permission, no Visualizer — which also means it
 works on every output route and emulator), and `playback/Tarji` — a pure,
 unit-tested DSP core — tracks a **single held note** (voiced, pitch-stable
 ≥ ~0.3 s) and scans its amplitude envelope for a periodic oscillation in the
-tarjīʿ band (~1.5–10 Hz, tunable up to the measurable 25 Hz limit via the Ink Lab's
+phase-safe tarjīʿ band (~1.5–10 Hz, tunable downward via the Ink Lab's
 **Tarjīʿ max rate**). The pulse only answers on words carrying a **strong
 tajweed hold of their own** — a long madd, a ghunnah (the shadda نّ of
 ٱلنَّارِ), or the verse-closing waqf (`TajweedPacing.Curve.hasStrongHold`;
@@ -162,9 +162,10 @@ is in lockstep with the wash, not trailing the visible word. Wall-time
 components scale by playback speed; the Sonic resampler's own buffer (only
 present off 1×) does not. The Ink Lab's **Ear delay ms** nudges the last
 device-specific millimetre on top (add it back when a route genuinely
-lags the audible vibration). One analysis hop is exactly 20 ms of
+lags the audible vibration). One analysis hop stays at ~20 ms of
 *content* at any source rate (44.1 kHz decimates to 8820 Hz → 176
-samples), and `VoiceEnergy` publishes after every one of those hops. Do not
+samples); pitch lags scale with that effective rate, and `VoiceEnergy`
+publishes after every hop. Do not
 batch the renderer handoff: the old 2,048-sample accumulator exposed only
 about four states per second and necessarily undersampled a 5–10 Hz shimmer.
 The delay, rate read, and phase lead are therefore all in true content time.

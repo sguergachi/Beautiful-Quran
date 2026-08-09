@@ -267,8 +267,8 @@ fun InkLabPanel(
                             "Fastest voice pulse that still counts as tarjīʿ, " +
                                 "in Hz. Lower it and only slow, deep swells " +
                                 "move the gold; shipped ~${"%.0f".format(InkEngine.GLINT_RESONANCE_MAX_HZ)}. " +
-                                "The 50 Hz envelope clock can measure up to " +
-                                "${Tarji.MAX_MEASURABLE_TREMOLO_HZ.toInt()} Hz.",
+                                "The rolling RMS envelope stays phase-safe " +
+                                "through ${Tarji.MAX_MEASURABLE_TREMOLO_HZ.toInt()} Hz.",
                         )
                         TuningSlider(
                             "Tarjīʿ min rate",
