@@ -486,7 +486,10 @@ It is owned by each `InkMotion` through `rememberInkMotions` /
    `finishResidual` (true *only* for Active→Recited) lets it finish rather than
    snap. Leaving Active for Upcoming/Plain instead — a seek, a recess — abandons
    the residual immediately, because finishing toward full ink and then dimming
-   back would flash.
+   back would flash. English-only prose waits for that predecessor residual
+   before starting the next word, so a wrap never blooms the last word of one
+   line and the first word of the next line together. Arabic modes keep their
+   voice-led handoff and wasl behavior unchanged.
 2. **A persistent `Animatable` means the next word inherits progress 1.** The
    draw phase can read it before the effect's `snapTo(0f)` lands, which showed as
    a one-frame full-ink flash. `sweepEntryAction(…)` classifies each composition

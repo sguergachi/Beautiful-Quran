@@ -2,6 +2,7 @@ package com.beautifulquran.ui.reader
 
 import com.beautifulquran.domain.HighlightClock
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -89,6 +90,13 @@ class WashResetTest {
         assertEquals(0.62f, residualSweepAnchor(applied = false, currentProgress = 0.62f), 0f)
         // Only the untouched idle ceiling may rewind to 0 (it was never shown).
         assertEquals(0f, residualSweepAnchor(applied = false, currentProgress = 1f), 0f)
+    }
+
+    @Test
+    fun `English prose waits for the preceding wash to finish`() {
+        assertTrue(canStartSequentialSweep(predecessorProgress = null))
+        assertTrue(canStartSequentialSweep(predecessorProgress = 1f))
+        assertFalse(canStartSequentialSweep(predecessorProgress = 0.999f))
     }
 
     @Test
