@@ -105,12 +105,7 @@ object DevProfiling {
                 .setBufferSizeKb(TraceBufferKb)
                 .build()
             try {
-                requestProfiling(
-                    context,
-                    request,
-                    callbackExecutor,
-                    resultListener,
-                )
+                requestProfiling(context, request, callbackExecutor, listener)
             } catch (error: RuntimeException) {
                 Log.e(Tag, "Unable to start system trace ($tag)", error)
                 if (ceremonyStop.get() === stopSignal) ceremonyStop.set(null)
@@ -118,13 +113,26 @@ object DevProfiling {
             }
             Log.i(Tag, "Recording ${durationMs}ms system trace tag=$tag")
         }
+
+        /** API 35's [ProfilingResult] has no trigger type — the shared listener
+         * must not reference it or the result callback kills the app. */
+        private val listener = Consumer<ProfilingResult> { result ->
+            if (result.errorCode == ProfilingResult.ERROR_NONE) {
+                Log.i(Tag, "Profile ready: tag=${result.tag}, file=${result.resultFilePath}")
+            } else {
+                Log.e(
+                    Tag,
+                    "Profiling failed: code=${result.errorCode}, message=${result.errorMessage}",
+                )
+            }
+        }
     }
 
     @RequiresApi(37)
     private object Api37 {
         fun install(application: Application) {
             val manager = application.getSystemService(android.os.ProfilingManager::class.java)
-            manager.registerForAllProfilingResults(callbackExecutor, resultListener)
+            manager.registerForAllProfilingResults(callbackExecutor, listener)
             manager.addProfilingTriggers(
                 listOf(
                     ProfilingTrigger.TRIGGER_TYPE_COLD_START,
@@ -137,20 +145,21 @@ object DevProfiling {
             )
             Log.i(Tag, "Android 17 ProfilingManager triggers registered (cold start + fully drawn)")
         }
-    }
 
-    private val resultListener = Consumer<ProfilingResult> { result ->
-        if (result.errorCode == ProfilingResult.ERROR_NONE) {
-            Log.i(
-                Tag,
-                "Profile ready: type=${result.triggerType}, tag=${result.tag}, " +
-                    "file=${result.resultFilePath}",
-            )
-        } else {
-            Log.e(
-                Tag,
-                "Profiling failed: code=${result.errorCode}, message=${result.errorMessage}",
-            )
+        /** API 37 adds [ProfilingResult.triggerType]; safe to log here. */
+        private val listener = Consumer<ProfilingResult> { result ->
+            if (result.errorCode == ProfilingResult.ERROR_NONE) {
+                Log.i(
+                    Tag,
+                    "Profile ready: type=${result.triggerType}, tag=${result.tag}, " +
+                        "file=${result.resultFilePath}",
+                )
+            } else {
+                Log.e(
+                    Tag,
+                    "Profiling failed: code=${result.errorCode}, message=${result.errorMessage}",
+                )
+            }
         }
     }
 }
