@@ -57,9 +57,9 @@ four visible states per second cannot express a 5–10 Hz vocal pulse.
 
 ### Signal chain
 
-1.  **Frame → RMS.** Each 80 ms frame (4 hops) yields one RMS value pushed
-    into a 64-hop (≈1.3 s) envelope ring. `PEAK_DECAY` tracks the noise floor
-    the hold gate uses.
+1.  **Frame → RMS.** An 80 ms rolling frame (4 hops) yields one RMS value
+    every 20 ms, pushed into a 64-hop (≈1.3 s) envelope ring. `PEAK_DECAY`
+    tracks the noise floor the hold gate uses.
 
 2.  **Pitch.** Normalized autocorrelation over the reciter range 70–350 Hz
     (lags 22..114 at 8 kHz). The shortest lag within 5 % of the best wins
@@ -81,38 +81,53 @@ four visible states per second cannot express a 5–10 Hz vocal pulse.
     (`holdStartEnvCount`), not at "now" — otherwise the syllable attack ramp
     poisons the depth estimate for ~1 s.
 
-4.  **Envelope scan.** Over the within-hold window (20..64 hops) the demeaned
-    RMS envelope is scanned for a periodic oscillation:
+4.  **Envelope scan.** Over the within-hold window (20..64 hops), a linear
+    level trend is removed from the RMS envelope before it is scanned. This
+    matters: a plain crescendo is strongly autocorrelated but is not
+    reverberation. Alternating residual crossings first prove that the shape
+    oscillates; autocorrelation then measures its period.
 
-    *   depth = `√2 · rms(d) / mean` — the 1.5–10 Hz tarjīʿ band, ~2 Hz Hani
-        swells to ~6–8 Hz Alafasy vibrato. Default ceiling 10 Hz, Ink-Lab-
-        tunable `maxTremoloHz` 2–50 Hz (`VoiceEnergy.maxTremoloHz`). Raising it
-        lets Hani's 2:16 closing elongation (fast texture ~16 Hz) shimmer.
-    *   rate = envelope autocorrelation peak. Lags `minLag(maxTremoloHz)`..33
+    *   depth = `√2 · rms(residual) / mean` — the shipped tarjīʿ band is
+        1.5–10 Hz, with the Ink Lab ceiling tunable to the envelope clock's
+        physical 25 Hz limit (`VoiceEnergy.maxTremoloHz`). Raising it admits
+        genuinely fast vocal texture without pretending aliased energy is a
+        measured rate.
+    *   rate = envelope autocorrelation peak. Lags `ceil(minLag(maxTremoloHz))`..33
         (1.5 Hz floor) with a **ceiling-only harmonic guard**: a true period
         above the scan floor still correlates at double its lag — without the
         guard a 5.5 Hz vibrato reads as 2.8 Hz under a 4 Hz ceiling. Guard
         rejects only when an *out-of-band* short peak is an exact submultiple
         of the in-band pick. The old in-band half-lag veto also killed real
-        tarjīʿ on Alafasy/Hani 1:7 (slow swell + ~10–25 Hz texture).
-    *   `periodic` needs `bestC ≥ 0.4` and rate in band.
+        tarjīʿ on Alafasy/Hani 1:7 (slow swell + ~10–25 Hz texture). A new
+        note scans only lags for which it has enough current samples; stale
+        long-period bins from the preceding note must never seed its rate.
+    *   acquisition needs alternating residual crossings, `bestC ≥ 0.4`, and
+        a rate in band. A raw-envelope correlation view is used only to bridge
+        the rolling window across a real level transition after detrended
+        evidence has already acquired the event.
 
     **Band limits and hop rate.** The envelope is sampled at 50 Hz (20 ms hops).
-    Nyquist is 25 Hz — nothing above that is literally measurable. At high
-    ceilings the shimmer answers on the alias/faith, as the Ink Lab caption
-    says. The 20 ms hop also low-passes the envelope: a 12 Hz AM loses ~10 % of
-    its depth to averaging; faster texture needs more depth. Real closing
-    elongations carry depth ~0.6, so they clear the gate even fast.
+    Nyquist is 25 Hz, so both runtime controls and detector inputs are clamped
+    to 1.5–25 Hz. The 20 ms hop also low-passes the envelope: a 12 Hz AM loses
+    ~10 % of its depth to averaging, so faster texture needs more depth.
 
     Hysteresis: stricter to switch *on* than to stay on (`DEPTH_OFF_RATIO`
     0.7, band widened by 1 Hz) — no flapping when the reverberation breathes.
-    `tremoloGain` ramps 250 ms attack / 800 ms release. The long release
-    bridges sub-second lulls inside a long pulsing hold (the reciter breathing
-    *within* the tarjīʿ) without dropping the shimmer. Four consecutive hops
-    below the hold's climax gate declare the true release; that end is latched
-    until a new note, so a deep trough cannot produce an off/on blink inside
-    one crescendo. The released effect dries in 60 ms and cannot re-lock on
-    the tail.
+    `tremoloGain` ramps 250 ms attack / 800 ms release. Evidence readiness is
+    derived from the configured slowest period and the minimum correlation
+    pairs, rather than a hard-coded timeout. Ten hops without coherent pulse
+    evidence end an established event; deep AM can bridge a brief irregular
+    climax only after a genuine period has been acquired.
+
+    The level peak begins when tarjīʿ is first detected—not at the consonant
+    attack—so Hani's room echo cannot make the sustain look like a dying tail.
+    A sustained fall below 0.52 of that peak ends the event. If the same pulse
+    cadence continues at a quieter stable level, the detector re-normalizes the
+    peak and grants only enough time for the rolling window to replace the old
+    level. A large cadence change is a new articulation and is allowed to end.
+    After a genuinely steady gap, a second acoustic event may be acquired even
+    on the same pitch. The released effect uses a 60 ms time constant and
+    falls below the visual event gate in about 240 ms.
 
 5.  **Tremolo signal.** `(latest − mean)/amp` smoothed with a 0.35 EMA, then
     phase-lead-compensated by the analysis+smoothing lag (~45 ms):
@@ -136,21 +151,23 @@ four visible states per second cannot express a 5–10 Hz vocal pulse.
 
 ### What the real recordings taught us
 
-*   Alafasy 1:7's closer is 2.44 s (`[5530,7970]` for Hani Ar-Rifai's 2:16
-    analog) — but the detector's clock saw the hold only later; validated
-    offline with `ffmpeg → f32le 8 kHz → Tarji` on the everyayah MP3s.
+*   Alafasy 1:7's ḍād sustain produces one coherent event at ~7.68–9.74 s.
+    The later lām/nūn energy remains loud and uneven, but loses the original
+    pulse's coherence and must not inherit its deep-AM fallback.
+*   Hani 1:7 carries an echo-heavy attack followed by a faster event near the
+    shipped 10 Hz ceiling (~8.5–10.4 s). Referencing the detected sustain
+    instead of the much louder attack keeps that event alive. Later consonant
+    and echo pulses can still be real acoustic events; the per-word event gate
+    prevents them from visually relighting the same active word.
 *   A plain-periodicity scan locked on a 2 Hz swell reads it at ~16 Hz
     (lag 3 wins on a smooth decay) — the band floor **and** the low-pass
     interact. The autocorrelation scan plus the 1.5 Hz floor are both needed.
-*   Fast texture at 22 Hz aliases but still lands in-band — that is why the
-    50 Hz ceiling needs the harmonic guard.
-*   Measured on the real files: the shimmer locks ~130 ms into a
-    ghunnah-hummed hold and holds the whole 2.4 s hum, releasing as the voice
-    slides into decay — exactly the product span.
+*   Both full EveryAyah recordings are committed as 8 kHz regression fixtures;
+    the tests pin the different rooms, rates, and post-event consonant tails.
 
 ## 4. When the glimmer is allowed to pulse
 
-Three gates, all pure alpha (never positional — the reveal edge never moves
+Four gates, all pure alpha (never positional — the reveal edge never moves
 mid-animation, so the bloom can never appear to restart):
 
 1.  **Eligible word:** `TajweedPacing.Curve.hasStrongHold` — a hold on the
@@ -163,8 +180,13 @@ mid-animation, so the bloom can never appear to restart):
 3.  **Active word:** `isActive` — first-pass white-gold **and** repeat
     terracotta. The gate hard-closes at handoff: the dry-down dissolve is
     never modulated.
+4.  **One acoustic event per utterance:** `TarjiWordGate` ignores gain inherited
+    from the preceding word, waits for this utterance's live detection, lets
+    that sustain breathe, then latches off when it settles. A later consonant
+    or room-echo pulse cannot relight the same active word. A repeat transition
+    creates a fresh gate for the new performance event.
 
-When all three pass, tarjīʿ **turns the glimmer on and off** with the voice
+When all four pass, tarjīʿ **turns the glimmer on and off** with the voice
 (not a soft breath around permanent sheen). The sign is acoustic phase:
 positive is a vocal swell and negative is its trough.
 
@@ -291,15 +313,15 @@ ahead of the directional reveal.
 ## 7. How to audition and verify
 
 *   Nightfall/Royal Green, 1×, Hani Ar-Rifai 2:16's closer or 4:145's
-    ghunnah hum are the canonical ear cases — open the Ink Lab Tarjīʿ tab
+    ghunnah hum are the canonical ear cases — open the Ink Lab Tajweed tab
     and watch the **Detector** line. A steady hold without an audible pulse
     stays `holding … — no tarjīʿ yet` and still gold by design; a pulsing
     hold flips to `tarjīʿ` within ~0.6 s of the reverberation's onset and the
     gold rides it.
-*   Drag **Tarjīʿ max rate** to 50 to let fast vocal texture (~12–17 Hz) in;
+*   Drag **Tarjīʿ max rate** toward 25 to let fast vocal texture (~12–17 Hz) in;
     the harmonic guard keeps 5.5 Hz vibrato from masquerading at 2.8 Hz under
-    a low ceiling. The envelope hop is 20 ms (50 Hz → Nyquist 25 Hz); above
-    that the detector answers on the alias, faithfully — the caption says so.
+    a low ceiling. The envelope hop is 20 ms (50 Hz → Nyquist 25 Hz), and the
+    controls stop at that measurable limit.
 *   Verify the no-reset law with
 
     ```bash
