@@ -22,7 +22,8 @@ import com.beautifulquran.playback.AudioOutputLatency
 import com.beautifulquran.playback.NowPlaying
 import com.beautifulquran.playback.PlayerController
 import com.beautifulquran.playback.PlayerUiState
-import kotlin.math.roundToLong
+import com.beautifulquran.playback.TarjiBacklogAnchor
+import kotlin.math.abs
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -253,11 +254,11 @@ class ReaderViewModel(
     private var lastOutputLatencyMs = -1L
     private var lastHighlightLeadMs = -1L
 
-    // Tarjīʿ backlog measurement: the tap session's anchor position (the
-    // media position when the sink refed) and the smoothed tap-to-head lag.
+    // Tarjīʿ backlog measurement: stable absolute sink baseline plus relative
+    // tap/playback-head content clocks for the current sink session.
     private var latchedTapSessionStart = 0L
-    private var tapSessionStartPosMs = 0L
-    private var measuredBacklogMs = 0.0
+    private var tapBacklogAnchor: TarjiBacklogAnchor? = null
+    private var smoothedBacklogContentMs = 0.0
     private var shimmerWasOn = false
     /**
      * User seek target (ayah → ms) applied on the next poll once that ayah is
@@ -286,26 +287,43 @@ class ReaderViewModel(
     private fun highlightPositionMs(forcedMediaMs: Long?, firstWordStartMs: Long): Long {
         val latencyMs = outputLatencyMs()
         // The tarjīʿ shimmer delays the tapped voice signal by the same
-        // latency (plus the sink's own buffer) so it lands on the same clock
-        // the highlight uses. The sink buffer is *measured*, not guessed:
-        // the tap's hop clock anchored at the session start minus
-        // positionMs is the true tap-to-playback-head backlog, smoothed so
-        // the media clock's own settling does not wobble the delay.
+        // latency plus the sink buffer so it lands on the same clock the
+        // highlight uses. Once that buffer has filled, exact tap and playback
+        // content clocks track only queue growth/drain around the stable
+        // baseline; a small EMA rejects position polling jitter.
         val voice = com.beautifulquran.playback.VoiceEnergy.active
         voice?.outputLatencyMs = latencyMs
         if (voice != null) {
+            val speed = voice.playbackSpeed
             if (voice.sessionStartWall != latchedTapSessionStart) {
                 latchedTapSessionStart = voice.sessionStartWall
-                tapSessionStartPosMs = player.positionMs
-                measuredBacklogMs = 0.0
-                voice.measuredBacklogMs = 0L
+                tapBacklogAnchor = null
+                voice.measuredBacklogContentMs = -1.0
             }
-            val lagMs = (
-                voice.sessionHopCount * com.beautifulquran.playback.Tarji.HOP_MS.toLong() +
-                    tapSessionStartPosMs - player.positionMs
-                ).coerceIn(-200L, 400L)
-            measuredBacklogMs += BACKLOG_EMA * (lagMs - measuredBacklogMs)
-            voice.measuredBacklogMs = measuredBacklogMs.roundToLong()
+            var anchor = tapBacklogAnchor
+            if (
+                TarjiBacklogAnchor.isReady(
+                    tapContentMs = voice.sessionContentMs,
+                    sinkLatencyMs = voice.sinkLatencyMs,
+                    speed = speed,
+                ) &&
+                (anchor == null || abs(anchor.speed - speed) > 0.001f)
+            ) {
+                anchor = TarjiBacklogAnchor.capture(
+                    tapContentMs = voice.sessionContentMs,
+                    playbackContentMs = player.positionMs,
+                    sinkLatencyMs = voice.sinkLatencyMs,
+                    speed = speed,
+                )
+                tapBacklogAnchor = anchor
+                smoothedBacklogContentMs = anchor.backlogContentMs
+            }
+            if (anchor != null) {
+                val lagMs = anchor.estimate(voice.sessionContentMs, player.positionMs)
+                smoothedBacklogContentMs +=
+                    BACKLOG_EMA * (lagMs - smoothedBacklogContentMs)
+                voice.measuredBacklogContentMs = smoothedBacklogContentMs
+            }
             // Live tarjīʿ effect log: the shimmer's on/off transitions in
             // media time (the same gain the renderer gates on), so the
             // effect's engagement is confirmable in logcat as it happens.
@@ -925,8 +943,8 @@ class ReaderViewModel(
         private const val TICK_MS = 33L
         private const val PAUSED_TICK_MS = 250L
         private const val START_SEEK_GRACE_MS = 1_500L
-        /** Tap-to-head backlog smoothing (τ ≈ 1.6 s at the 33 ms poll). */
-        private const val BACKLOG_EMA = 0.02
+        /** Suppress 33 ms player-position jitter without a seconds-long drift. */
+        private const val BACKLOG_EMA = 0.2
     }
 }
 

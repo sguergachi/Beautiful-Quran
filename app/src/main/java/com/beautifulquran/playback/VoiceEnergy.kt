@@ -3,6 +3,7 @@ package com.beautifulquran.playback
 import android.os.SystemClock
 import java.nio.ByteBuffer
 import kotlin.math.roundToInt
+import kotlin.math.roundToLong
 
 /**
  * Live voice analysis of the reciter, feeding the glint's tarjīʿ shimmer.
@@ -62,32 +63,28 @@ class VoiceEnergy {
     /** The audio sink's own AudioTrack buffer (wall ms), read live by the tap
      * so the shimmer is delayed past the app's internal output buffer too —
      * the dominant missing term on real devices and emulators alike. Used
-     * until the reader's measured backlog ([measuredBacklogMs]) lands. */
+     * until the reader's measured backlog ([measuredBacklogContentMs]) lands. */
     @Volatile
     var sinkLatencyMs = 0L
 
     /**
-     * Measured tap-to-playback-head backlog (wall ms), computed by the
+     * Measured tap-to-playback-head backlog (content ms), computed by the
      * reader from this probe's hop clock against `positionMs` (the same
      * clock the highlight uses) and pushed back here — the shimmer delay
      * rides it once available, so the pulse is in lockstep with the word
      * ink on any device without guessing.
      */
     @Volatile
-    var measuredBacklogMs = 0L
+    var measuredBacklogContentMs = -1.0
 
-    /** Wall clock of the current tap session's first hop — the reader
-     * latches `positionMs` at this moment to anchor the hop clock. */
+    /** Identity timestamp for the current sink session. */
     @Volatile
     var sessionStartWall = 0L
 
-    /** Hops the tap had already processed when the session started. */
+    /** Exact source-content time processed since this tap session started. */
     @Volatile
-    var sessionStartHopCount = 0
-
-    /** Content hops processed since the tap session started. */
-    val sessionHopCount: Int
-        get() = tarji.hopCount - sessionStartHopCount
+    var sessionContentMs = 0.0
+        private set
 
     /** Called when the sink flushes or reconfigures. A discontinuity starts a
      * fresh acoustic event: no prior hold, phase, or partial hop may leak into
@@ -100,12 +97,12 @@ class VoiceEnergy {
         holdMs = 0f
         rateHz = 0f
         lastFeedMs = 0L
-        measuredBacklogMs = 0L
+        measuredBacklogContentMs = -1.0
+        sessionContentMs = 0.0
         decimSum = 0f
         decimCount = 0
         hopFill = 0
         sessionStartWall = SystemClock.elapsedRealtime()
-        sessionStartHopCount = tarji.hopCount
     }
 
     /** Total tap-to-ear delay (wall ms) as currently applied — diagnostics. */
@@ -123,6 +120,7 @@ class VoiceEnergy {
     private var decimStep = 6
     private var sourceSampleRate = 0
     private var analysisHop = FloatArray(Tarji.HOP_SAMPLES)
+    private var hopContentDurationMs = Tarji.HOP_MS.toDouble()
     private var hopFill = 0
 
     /**
@@ -133,7 +131,7 @@ class VoiceEnergy {
     fun onPcm16(buffer: ByteBuffer, channels: Int, sampleRate: Int) {
         if (channels <= 0 || sampleRate <= 0) return
         val nextDecimStep = maxOf(1, sampleRate / Tarji.SAMPLE_RATE)
-        // One hop must be exactly HOP_MS of content at the decimated rate:
+        // One hop stays near HOP_MS of content at the decimated rate:
         // floor-decimation gives 8820 Hz for 44.1 kHz (176.4 samples).
         val hopSamples = ((sampleRate / nextDecimStep) * (Tarji.HOP_MS / 1000f))
             .roundToInt()
@@ -145,6 +143,7 @@ class VoiceEnergy {
             decimCount = 0
             hopFill = 0
             analysisHop = FloatArray(hopSamples)
+            hopContentDurationMs = analysisHopContentMs(sampleRate, decimStep, hopSamples)
             tarji.hopSamples = hopSamples
         }
         // PCM16 is little-endian regardless of the buffer's own order flag —
@@ -163,21 +162,26 @@ class VoiceEnergy {
         }
     }
 
-    /** Analyze and publish one exact 20 ms content hop. The old 2,048-sample
+    /** Analyze and publish one ~20 ms content hop. The old 2,048-sample
      * batch exposed only ~4 detector values per second, undersampling the very
      * 5–10 Hz vocal pulse the renderer was meant to follow. */
     private fun analyzeHop() {
         val speed = playbackSpeed
         val sonicMs =
             if (kotlin.math.abs(speed - 1f) > 0.001f) Tarji.SONIC_LATENCY_MS else 0f
-        val sinkMs = if (measuredBacklogMs > 0L) measuredBacklogMs else sinkLatencyMs
+        val measuredContentMs = measuredBacklogContentMs.takeIf { it >= 0.0 }
         tarji.delayHops = Tarji.earDelayHops(
             routeMs = outputLatencyMs,
-            sinkMs = sinkMs,
+            sinkMs = sinkLatencyMs,
             speed = speed,
             sonicContentMs = sonicMs + earDelayMs,
+            measuredSinkContentMs = measuredContentMs,
         )
-        earDelayTotalMs = (outputLatencyMs + sinkMs + sonicMs + earDelayMs).toLong()
+        val safeSpeed = speed.coerceAtLeast(0.01f)
+        val sinkWallMs = measuredContentMs?.div(safeSpeed) ?: sinkLatencyMs.toDouble()
+        earDelayTotalMs = (
+            outputLatencyMs + sinkWallMs + (sonicMs + earDelayMs) / safeSpeed
+            ).roundToLong()
         // Ink Lab detector knobs (pushed from InkEngine.tuning).
         tarji.maxTremoloHz = maxTremoloHz
         tarji.minTremoloHz = minTremoloHz
@@ -188,6 +192,7 @@ class VoiceEnergy {
         tarji.attackMs = attackMs
         tarji.releaseMs = releaseMs
         tarji.onSamples8k(analysisHop)
+        sessionContentMs += hopContentDurationMs
         hopFill = 0
         reverberating = tarji.syncReverberating
         tremolo = tarji.syncTremolo
@@ -218,7 +223,8 @@ class VoiceEnergy {
         rateHz = 0f
         lastFeedMs = 0L
         sinkLatencyMs = 0L
-        measuredBacklogMs = 0L
+        measuredBacklogContentMs = -1.0
+        sessionContentMs = 0.0
         earDelayTotalMs = 0L
         decimSum = 0f
         decimCount = 0
