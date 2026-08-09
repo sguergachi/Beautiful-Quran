@@ -1084,6 +1084,55 @@ class TarjiTest {
     }
 
     @Test
+    fun `Alafasy one seven - the shimmer engages before the crest and dries after it`() {
+        // The user-visible shape of tarjīʿ is build → peak → dissipate: the
+        // shimmer must start ramping while the ḍād swell is still climbing
+        // (before its own loudest crest), then ride the crest and dry with
+        // the release — never arrive only at/after the peak. Detection uses a
+        // short minimum analysis window so the first decisive hop lands while
+        // the swell is still rising.
+        val samples = wavResource("alfasy_1_7_8k.wav")
+        val d = Tarji()
+        var consumed = 0
+        var firstVisible = -1f
+        var rmsAtFirst = 0f
+        var swellCrest = -1f
+        var crestRms = 0f
+        var dryEnd = -1f
+        while (consumed + Tarji.HOP_SAMPLES <= samples.size) {
+            var sumSq = 0f
+            for (i in consumed until consumed + Tarji.HOP_SAMPLES) {
+                sumSq += samples[i] * samples[i]
+            }
+            d.onSamples8k(samples.copyOfRange(consumed, consumed + Tarji.HOP_SAMPLES))
+            consumed += Tarji.HOP_SAMPLES
+            val t = consumed / Tarji.SAMPLE_RATE.toFloat()
+            if (t !in 7.0f..12.4f) continue
+            val hopRms = sqrt(sumSq / Tarji.HOP_SAMPLES)
+            if (d.reverberating && firstVisible < 0f) {
+                firstVisible = t
+                rmsAtFirst = hopRms
+            }
+            if (hopRms > crestRms) {
+                crestRms = hopRms
+                swellCrest = t
+            }
+            if (d.reverberating) dryEnd = t
+        }
+        assertTrue(
+            "shimmer must engage while the swell is still building, well before its crest " +
+                "(first visible: ${firstVisible}s at ${"%.0f".format(100 * rmsAtFirst / crestRms)}% of " +
+                "the ${"%.1f".format(swellCrest)}s crest)",
+            firstVisible in 7.0f..8.2f && rmsAtFirst < 0.85f * crestRms,
+        )
+        assertTrue(
+            "shimmer must dry with the release, not linger past the crest into the lām/nūn " +
+                "(dry end: ${dryEnd}s, crest: ${swellCrest}s)",
+            dryEnd > 0f && dryEnd <= 10.2f,
+        )
+    }
+
+    @Test
     fun `Hani one seven - the echoing fast hold engages without relighting the tail`() {
         val samples = wavResource("hani_1_7_8k.wav")
         val detector = Tarji()

@@ -659,11 +659,23 @@ class Tarji {
             }
         }
         if (!oscillatory) bestLag = 0
-        val trackedLag = when {
-            previousLag !in minLag..maxBandLag -> bestLag
-            bestLag == 0 || bandBestC < TRACKED_SWITCH_FLOOR -> previousLag
-            correlations[previousLag] >= TRACKED_LAG_KEEP * bandBestC -> previousLag
-            else -> bestLag
+        val windowTruncates = maxComputedLag < maxBandLag
+        // While the window is still growing it cannot yet resolve the slowest
+        // allowed lag, so any in-band pick sits at (or near) the truncation
+        // edge. Re-pick fresh every hop instead of carrying a stale lag across
+        // that growth: the old TRACKED_LAG_KEEP carry pinned a 5 Hz period to
+        // the edge lag it first saw and never let the true period in. The
+        // periodicity/depth gates already reject a weak edge correlation, so
+        // a fresh pick opens the gate only once the period is actually visible.
+        val trackedLag = if (windowTruncates) {
+            bestLag
+        } else {
+            when {
+                previousLag !in minLag..maxBandLag -> bestLag
+                bestLag == 0 || bandBestC < TRACKED_SWITCH_FLOOR -> previousLag
+                correlations[previousLag] >= TRACKED_LAG_KEEP * bandBestC -> previousLag
+                else -> bestLag
+            }
         }
 
         val rateHz = if (trackedLag > 0) {
@@ -854,7 +866,7 @@ class Tarji {
         private const val RMS_PHASE_LEAD_HOPS = (FRAME_HOPS - 1) * 0.5f
         private const val YIN_THRESHOLD = 0.15f
         private const val ENV_HOPS = 64
-        private const val MIN_ENV_HOPS = 20
+        private const val MIN_ENV_HOPS = 16
         private const val MIN_CORR_PAIRS = MIN_ENV_HOPS / 2
 
         /** Hold must survive this long before reverberation is considered.
