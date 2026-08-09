@@ -146,6 +146,7 @@ import com.beautifulquran.ui.theme.shapedWordBloom
 import com.beautifulquran.ui.theme.inkSmootherstep
 import com.beautifulquran.ui.theme.verticalFadingEdges
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.first
 
 private fun Int.toArabicIndic(): String =
     toString().map { '٠' + (it - '0') }.joinToString("")
@@ -595,6 +596,10 @@ internal fun residualSweepAnchor(applied: Boolean, currentProgress: Float): Floa
     return if (currentProgress >= 1f - 1e-4f) 0f else currentProgress
 }
 
+/** English prose starts a word only after its predecessor's residual wash ends. */
+internal fun canStartSequentialSweep(predecessorProgress: Float?): Boolean =
+    predecessorProgress == null || predecessorProgress >= 1f
+
 /**
  * Reveal start to feed [continuedSweepProgress] for one word this frame.
  * While Active the caller's wasl handoff edge wins; on Recited residual the
@@ -684,6 +689,8 @@ private fun rememberLetterSweep(
     activation: Long = 0L,
     /** Main-wash progress already laid by a wasl prefix on this word. */
     revealStart: Float = 0f,
+    /** English-only predecessor; keeps wrapped prose washes strictly serial. */
+    predecessor: State<Float>? = null,
 ): LetterSweep {
     // Survives Active → Recited so a short hold can finish its wash after
     // handoff instead of recreating at progress 1 (the old hard snap).
@@ -723,6 +730,13 @@ private fun rememberLetterSweep(
     // LaunchedEffect unmasks after snapTo(0).
     val applied = remember { mutableStateOf(true) }
     val revealStartState = rememberUpdatedState(displayRevealStart)
+    suspend fun awaitPredecessor() {
+        predecessor?.let { prior ->
+            if (!canStartSequentialSweep(prior.value)) {
+                snapshotFlow { prior.value }.first(::canStartSequentialSweep)
+            }
+        }
+    }
     SideEffect {
         if (entryAction == SweepEntryAction.Arm) {
             applied.value = false
@@ -753,6 +767,7 @@ private fun rememberLetterSweep(
             lockedMs.value = sweepMs
             lockedPacing.value = pacing
             lockedFeather.value = armFeather
+            awaitPredecessor()
             sweep.snapTo(0f)
             lifecycle.applied = true
             // Unmask after idle full-ink is gone — invalidates draw without
@@ -761,6 +776,7 @@ private fun rememberLetterSweep(
             val easing = if (pacing != null) LinearEasing else InkEngine.sweepEasing
             sweep.animateTo(1f, tween(sweepMs, easing = easing))
         } else if (finishResidual) {
+            awaitPredecessor()
             // A residual belongs to an *earlier* frame's entry, so here the
             // tracker is the only source — see the SideEffect above.
             // If Active ended before its reset coroutine ran, only rewind from
@@ -1149,6 +1165,8 @@ private fun rememberInkMotions(
     waslPrefixes: List<WaslPrefix?>,
     activation: Long = 0L,
     repeatGate: OrderedWashGate,
+    /** English prose waits for each predecessor's residual before blooming. */
+    sequentialSweeps: Boolean,
     /** Layered gloss fades word ink with [animatedInkAlpha]; shaped modes dim
      * opaque glyphs with paper covers, so they never run that clock. */
     animateLyricInk: Boolean,
@@ -1157,7 +1175,9 @@ private fun rememberInkMotions(
         "words, inks, and wasl prefixes must align"
     }
     val glintInk = LocalQuranAccents.current.glintInk
-    return inks.mapIndexed { index, ink ->
+    val motions = ArrayList<InkMotion>(inks.size)
+    var predecessor: State<Float>? = null
+    inks.forEachIndexed { index, ink ->
         val isActive = ink.state == InkEngine.State.Active
         val wordActivation = if (isActive) activation else 0L
         // Freeze tajweed for this activation so an Ink Lab toggle mid-word
@@ -1169,21 +1189,23 @@ private fun rememberInkMotions(
         val glintIdentity = rememberGlintIdentity(glinting, ink.repeat)
         // Tarjīʿ only runs its vsync sampler on the Active strong-hold word.
         val tarjiEligible = glinting && entryPacing?.hasStrongHold == true
-        InkMotion(
+        val sweep = rememberLetterSweep(
+            active = isActive,
+            finishResidual = ink.state == InkEngine.State.Recited,
+            sweepMs = activeSweepMs.takeIf { isActive },
+            pacing = entryPacing,
+            activation = wordActivation,
+            revealStart = activeRevealStart.takeIf { isActive } ?: 0f,
+            predecessor = predecessor.takeIf { sequentialSweeps },
+        )
+        motions += InkMotion(
             ink = ink,
             lyricInk = if (animateLyricInk) {
                 animatedInkAlpha(ink.state)
             } else {
                 rememberUpdatedState(ink.state.inkAlpha())
             },
-            sweep = rememberLetterSweep(
-                active = isActive,
-                finishResidual = ink.state == InkEngine.State.Recited,
-                sweepMs = activeSweepMs.takeIf { isActive },
-                pacing = entryPacing,
-                activation = wordActivation,
-                revealStart = activeRevealStart.takeIf { isActive } ?: 0f,
-            ),
+            sweep = sweep,
             repeatWash = rememberRepeatWash(
                 repeat = ink.repeat,
                 position = words[index].position,
@@ -1203,7 +1225,9 @@ private fun rememberInkMotions(
                 eligible = tarjiEligible,
             ),
         )
+        predecessor = sweep.progress
     }
+    return motions
 }
 
 /**
@@ -2498,6 +2522,7 @@ fun AyahBlock(
         waslPrefixes = waslPrefixes,
         activation = activation,
         repeatGate = repeatWashGate,
+        sequentialSweeps = readingMode == ReadingMode.ENGLISH_ONLY,
         animateLyricInk =
             readingMode == ReadingMode.ARABIC_ENGLISH && showGloss,
     )
