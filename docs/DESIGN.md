@@ -649,6 +649,8 @@ weight.
   the floating playback control slides up with the same fade + vertical
   motion as the reader's return-to-ayah / Back-to ornaments
   (`FloatingPaperControl`), using the shared **10 dp** bottom inset. The
+  current chapter and ayah form a compact quiet-green stadium with a right
+  arrow: tapping it returns to that verse in the reader. The
   enter/exit is also tied to the paper-stack page turn: returning to chapter
   selection plays the entrance; leaving for the reader plays the exit. A
   quiet Close in the corner dismisses the session (stops playback) so the

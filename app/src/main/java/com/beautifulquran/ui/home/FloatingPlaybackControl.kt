@@ -1,6 +1,7 @@
 package com.beautifulquran.ui.home
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -11,7 +12,9 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ArrowForward
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.FastForward
 import androidx.compose.material.icons.rounded.FastRewind
@@ -58,8 +61,9 @@ const val FloatingPlaybackCoverVisibleMaxPage = 0.45f
  * reader's embedded [com.beautifulquran.ui.reader.PlayerBar], but it lives as
  * quiet ink over the cover sheet — no card, elevation, or border — and slides
  * up only while a verse is loaded (playing or paused mid-session) and the
- * chapter-selection page is in view. An opaque paper [Surface] masks the list
- * beneath, matching the embedded bar. Uses the same enter/exit motion as
+ * chapter-selection page is in view. Its now-playing reference is a quiet
+ * green return pill. An opaque paper [Surface] masks the list beneath,
+ * matching the embedded bar. Uses the same enter/exit motion as
  * [com.beautifulquran.ui.theme.FloatingPaperControl]. A quiet Close dismisses
  * the session so the bar leaves with the shared exit animation.
  */
@@ -113,17 +117,22 @@ fun FloatingPlaybackControl(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.Center,
                         modifier = Modifier
+                            .padding(vertical = 4.dp)
+                            .background(
+                                MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
+                                RoundedCornerShape(50),
+                            )
                             .quietClickable(onClick = onOpenNowPlaying)
-                            .padding(horizontal = 48.dp, vertical = 2.dp)
+                            .padding(horizontal = 18.dp, vertical = 8.dp)
                             .semantics {
-                                contentDescription = "Open $chapterLabel · $ayahLabel"
+                                contentDescription = "Return to $chapterLabel · $ayahLabel"
                                 role = Role.Button
                             },
                     ) {
                         Text(
                             text = chapterLabel,
                             style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.82f),
+                            color = MaterialTheme.colorScheme.primary,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.widthIn(max = 200.dp),
@@ -131,13 +140,21 @@ fun FloatingPlaybackControl(
                         Text(
                             text = "  ·  ",
                             style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.28f),
+                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f),
                         )
                         Text(
                             text = ayahLabel,
                             style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f),
+                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.75f),
                             maxLines = 1,
+                        )
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Rounded.ArrowForward,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier
+                                .padding(start = 8.dp)
+                                .size(18.dp),
                         )
                     }
                     Row(
