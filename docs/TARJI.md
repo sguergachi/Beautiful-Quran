@@ -58,10 +58,12 @@ four visible states per second cannot express a 5–10 Hz vocal pulse.
 ### Signal chain
 
 1.  **Frame → RMS.** An 80 ms rolling frame (4 hops) yields one RMS value
-    every 20 ms, pushed into a 64-hop (≈1.3 s) envelope ring. `PEAK_DECAY`
-    tracks the noise floor the hold gate uses.
+    every 20 ms, pushed into a 64-hop (≈1.3 s) evidence ring. `PEAK_DECAY`
+    tracks the noise floor the hold gate uses. The newest 20 ms hop also gets
+    its own RMS; it is the live intensity phase, never the event classifier.
 
-2.  **Pitch.** Normalized autocorrelation over the reciter range 70–350 Hz.
+2.  **Pitch.** The established 80 ms normalized-autocorrelation tracker over
+    the reciter range 70–350 Hz remains the hold-identity clock.
     The lag range and Hz conversion scale with the decimated samples per hop
     (lags 22..114 at 8 kHz, wider for the 176-sample 44.1 kHz path). The
     shortest lag within 5 % of the best wins (otherwise lag *L* vs *2L* flips
@@ -73,6 +75,12 @@ four visible states per second cannot express a 5–10 Hz vocal pulse.
     running hold pitch is tracked *in the anchor's octave* so a one-hop flip
     never drags it.
 
+    A separate 40 ms YIN-style difference tracker supplies the modulation
+    path. Its sub-sample lag interpolation can see small periodic F0 movement
+    that the whole-lag hold tracker quantizes away. This separation is
+    intentional: better vibrato sensitivity must not move any existing hold,
+    word, climax, or echo-tail boundary.
+
 3.  **Hold.** A hold is a voiced, pitch-stable single note. `clarity ≥ 0.5`
     and `rms ≥ floor(MAX_FLOOR, 0.15·peak)` marks voiced; the pitch gate above
     keeps it one note. `holdMs += 20` while voiced+same-note; 6 hops of
@@ -83,13 +91,13 @@ four visible states per second cannot express a 5–10 Hz vocal pulse.
     (`holdStartEnvCount`), not at "now" — otherwise the syllable attack ramp
     poisons the depth estimate for ~1 s.
 
-4.  **Envelope scan.** Over the within-hold window (20..64 hops), a linear
-    level trend is removed from the RMS envelope before it is scanned. This
-    matters: a plain crescendo is strongly autocorrelated but is not
+4.  **Modulation scan.** Over the within-hold window (20..64 hops), a linear
+    trend is removed independently from the RMS and F0 tracks. This matters:
+    a plain crescendo or pitch glide is strongly autocorrelated but is not
     reverberation. Alternating residual crossings first prove that the shape
     oscillates; autocorrelation then measures its period.
 
-    *   depth = `√2 · rms(residual) / mean` — the shipped and phase-safe
+    *   depth = `√2 · rms(residual) / mean` — the shipped
         tarjīʿ band is 1.5–10 Hz (`VoiceEnergy.maxTremoloHz`).
     *   rate = envelope autocorrelation peak. Lags `ceil(minLag(maxTremoloHz))`..33
         (1.5 Hz floor) with a **ceiling-only harmonic guard**: a true period
@@ -107,13 +115,21 @@ four visible states per second cannot express a 5–10 Hz vocal pulse.
         the word before the quieter real sustain arrives. A raw-envelope
         correlation view is used only to bridge a level transition after
         detrended evidence has already acquired the event.
+    *   coherent amplitude modulation **or** coherent pitch modulation may
+        acquire the event. About ten cents of periodic F0 excursion clears
+        the pitch-depth floor. Pitch depth alone can never acquire or bridge:
+        note transitions and octave errors can be deep, so the pitch channel
+        must retain repeated-cycle evidence. Mixed AM+FM naturally passes;
+        amplitude is the preferred visual polarity when both acquire together.
+        The acquired phase channel stays fixed while it remains coherent, so
+        a near-threshold AM track cannot flip an FM-driven glint by one frame.
 
     **Band limits and hop rate.** The envelope is sampled at 50 Hz (20 ms hops).
     Its mathematical Nyquist limit is 25 Hz, but the rolling 80 ms RMS window
     has its first null at 12.5 Hz and phase-inverts the lobe above it. Runtime
-    controls and detector inputs therefore stop at the phase-safe 10 Hz product
-    band; admitting 12.5–25 Hz would make some shimmer crests follow vocal
-    troughs.
+    controls and detector inputs therefore stop at the 10 Hz product band.
+    The live 20 ms phase path no longer inverts there, but the long evidence
+    envelope is still the wrong classifier above its first null.
 
     Hysteresis: stricter to switch *on* than to stay on (`DEPTH_OFF_RATIO`
     0.7, band widened by 1 Hz) — no flapping when the reverberation breathes.
@@ -130,21 +146,17 @@ four visible states per second cannot express a 5–10 Hz vocal pulse.
     peak and grants only enough time for the rolling window to replace the old
     level. A large cadence change is a new articulation and is allowed to end.
     After a genuinely steady gap, a second acoustic event may be acquired even
-    on the same pitch. The released effect uses a 60 ms time constant and
-    falls below the visual event gate in about 240 ms.
+    on the same pitch. The released effect uses a 50 ms time constant and
+    falls below the visual event gate in about 200 ms.
 
-5.  **Tremolo signal.** `(latest − mean)/amp` smoothed with a 0.35 EMA, then
-    phase-lead-compensated by the analysis+smoothing lag (~45 ms):
-
-    ```
-    s(t+τ) ≈ s·cos ωτ + ṡ·sin ωτ / ω
-    ```
-
-    The angle remains `ωτ` across the entire admitted band: capping it
-    would turn the fixed time correction into a progressively shorter lead
-    and put upper-band shimmer back behind the voice. The gold therefore
-    swells *with* the voice, not 45 ms behind. `tremolo` is zero-centred,
-    ~−1.5..1.5.
+5.  **Live modulation signal.** Detection and visualization have different
+    clocks. The long detrended tracks decide whether a periodic held-note
+    event exists; they never synthesize its phase. For AM, `tremolo` is the
+    current 20 ms RMS relative to the event mean. There is no EMA and no
+    rate-dependent phase rotation. For pitch-only vibrato, it is the current
+    short-YIN F0 residual; a fixed half-hop projection merely aligns the
+    40 ms frame centre with the 20 ms RMS centre and does not depend on the
+    noisy modulation-rate bin. `tremolo` is zero-centred, ~−1.5..1.5.
 
 6.  **Output latency.** The PCM tap hears the voice *before* the listener.
     `ReaderViewModel` pushes the same route preset `HighlightClock` subtracts.
@@ -165,16 +177,22 @@ four visible states per second cannot express a 5–10 Hz vocal pulse.
 *   Alafasy 1:7's ḍād sustain produces one coherent event at ~7.68–9.74 s.
     The later lām/nūn energy remains loud and uneven, but loses the original
     pulse's coherence and must not inherit its deep-AM fallback.
-*   Hani 1:7 carries an echo-heavy attack followed by a faster event near the
-    shipped 10 Hz ceiling (~8.5–10.4 s). Referencing the detected sustain
-    instead of the much louder attack keeps that event alive. Later consonant
-    and echo pulses can still be real acoustic events; the per-word event gate
-    prevents them from visually relighting the same active word.
+*   Hani 1:7 carries an echo-heavy, high-F0 attack followed by a sustain around
+    ~8.5–10.4 s. Its audible AM fundamental is near 5 Hz, while the long-window
+    autocorrelation can jump among slow trend, harmonic, and 10 Hz bins. Rate
+    remains useful evidence, but it no longer rotates the visible phase.
+    Referencing the detected sustain instead of the much louder attack keeps
+    that event alive. Later consonant and echo pulses can still be real
+    acoustic events; the per-word event gate prevents them from visually
+    relighting the same active word.
 *   A plain-periodicity scan locked on a 2 Hz swell reads it at ~16 Hz
     (lag 3 wins on a smooth decay) — the band floor **and** the low-pass
     interact. The autocorrelation scan plus the 1.5 Hz floor are both needed.
-*   Both full EveryAyah recordings are committed as 8 kHz regression fixtures;
-    the tests pin the different rooms, rates, and post-event consonant tails.
+*   Both full EveryAyah recordings are committed as 8 kHz regression fixtures.
+    Besides event/tail topology, the tests require the shimmer's zero-hop
+    correlation with live 20 ms RMS to exceed 0.85 and beat either adjacent
+    hop. Synthetic fixtures independently pin AM-only, FM-only, and mixed
+    vibrato across the admitted band.
 
 ## 4. When the glimmer is allowed to pulse
 
@@ -329,11 +347,11 @@ ahead of the directional reveal.
     stays `holding … — no tarjīʿ yet` and still gold by design; a pulsing
     hold flips to `tarjīʿ` within ~0.6 s of the reverberation's onset and the
     gold rides it.
-*   **Tarjīʿ max rate** tops out at the phase-safe 10 Hz product band. The
+*   **Tarjīʿ max rate** tops out at the 10 Hz product band. The
     harmonic guard keeps 5.5 Hz vibrato from masquerading at 2.8 Hz under a
     lower ceiling. A reciter's higher vocal pitch is handled separately by the
-    70–350 Hz pitch tracker; it is not a reason to admit phase-inverted
-    high-rate envelope texture.
+    70–350 Hz pitch tracker; it is not a reason to admit high-rate envelope
+    texture.
 *   Verify the no-reset law with
 
     ```bash

@@ -2,6 +2,7 @@ package com.beautifulquran.playback
 
 import com.beautifulquran.ui.reader.TarjiWordGate
 import kotlin.math.PI
+import kotlin.math.pow
 import kotlin.math.sin
 import kotlin.math.sqrt
 import org.junit.Assert.assertEquals
@@ -69,6 +70,61 @@ class TarjiTest {
         }
     }
 
+    private fun realPhaseCorrelation(
+        name: String,
+        fromSeconds: Float,
+        toSeconds: Float,
+        rmsShiftHops: Int = 0,
+    ): Float {
+        val samples = wavResource(name)
+        val detector = Tarji()
+        val rms = mutableListOf<Float>()
+        val shimmer = mutableListOf<Float>()
+        var consumed = 0
+        while (consumed + Tarji.HOP_SAMPLES <= samples.size) {
+            var sumSq = 0f
+            for (i in consumed until consumed + Tarji.HOP_SAMPLES) {
+                sumSq += samples[i] * samples[i]
+            }
+            detector.onSamples8k(samples.copyOfRange(consumed, consumed + Tarji.HOP_SAMPLES))
+            consumed += Tarji.HOP_SAMPLES
+            val time = consumed / Tarji.SAMPLE_RATE.toFloat()
+            if (time in fromSeconds..toSeconds && detector.reverberating) {
+                rms += sqrt(sumSq / Tarji.HOP_SAMPLES)
+                shimmer += detector.tremolo
+            }
+        }
+        val from = maxOf(0, -rmsShiftHops)
+        val until = minOf(shimmer.size, rms.size - rmsShiftHops)
+        fun detrend(values: List<Float>, offset: Int): FloatArray {
+            val count = until - from
+            var mean = 0f
+            for (i in 0 until count) mean += values[offset + i]
+            mean /= count
+            val centre = (count - 1) * 0.5f
+            var numerator = 0f
+            var denominator = 0f
+            for (i in 0 until count) {
+                val x = i - centre
+                numerator += x * (values[offset + i] - mean)
+                denominator += x * x
+            }
+            val slope = numerator / denominator
+            return FloatArray(count) { i -> values[offset + i] - (mean + slope * (i - centre)) }
+        }
+        val x = detrend(shimmer, from)
+        val y = detrend(rms, from + rmsShiftHops)
+        var cross = 0f
+        var xEnergy = 0f
+        var yEnergy = 0f
+        for (i in x.indices) {
+            cross += x[i] * y[i]
+            xEnergy += x[i] * x[i]
+            yEnergy += y[i] * y[i]
+        }
+        return cross / sqrt(xEnergy * yEnergy)
+    }
+
     /** [seconds] of a held note at [pitchHz], with optional AM at [amHz]. */
     private fun heldNote(
         seconds: Float,
@@ -100,6 +156,29 @@ class TarjiTest {
         }
     }
 
+    /** A held note with independent pitch vibrato and intensity tremolo. */
+    private fun modulatedHeldNote(
+        seconds: Float,
+        pitchHz: Float,
+        rateHz: Float,
+        pitchDepthCents: Float = 0f,
+        amplitudeDepth: Float = 0f,
+        amplitudePhaseRadians: Float = 0f,
+    ): FloatArray {
+        val samples = FloatArray((seconds * Tarji.SAMPLE_RATE).toInt())
+        var carrierPhase = 0f
+        for (i in samples.indices) {
+            val t = i / Tarji.SAMPLE_RATE.toFloat()
+            val phase = 2f * PI.toFloat() * rateHz * t
+            val pitchModulation = sin(phase)
+            val amplitudeModulation = sin(phase + amplitudePhaseRadians)
+            val frequency = pitchHz * 2f.pow(pitchDepthCents * pitchModulation / 1_200f)
+            carrierPhase += 2f * PI.toFloat() * frequency / Tarji.SAMPLE_RATE
+            samples[i] = 0.3f * (1f + amplitudeDepth * amplitudeModulation) * sin(carrierPhase)
+        }
+        return samples
+    }
+
     @Test
     fun `hop clock includes the analysis frame warm-up`() {
         val d = Tarji()
@@ -119,6 +198,221 @@ class TarjiTest {
         assertTrue("reverberating hold must be detected", d.reverberating)
         assertTrue("attack envelope ramps in", d.tremoloGain > 0.5f)
         assertTrue("hold clock is running", d.holdMs >= 1_000f)
+    }
+
+    @Test
+    fun `pitch-only vibrato is tarji even when intensity is steady`() {
+        for (rateHz in listOf(2f, 5.5f, 9f)) {
+            val detector = Tarji()
+            feed(
+                detector,
+                modulatedHeldNote(
+                    seconds = 4f,
+                    pitchHz = 150f,
+                    rateHz = rateHz,
+                    pitchDepthCents = 30f,
+                ),
+            )
+            assertTrue("$rateHz Hz pitch vibrato must be detected", detector.reverberating)
+            assertTrue(
+                "$rateHz Hz pitch vibrato rate must stay in band (${detector.lastRateHz})",
+                detector.lastRateHz in Tarji.MIN_TREMOLO_HZ..Tarji.MAX_TREMOLO_HZ,
+            )
+        }
+    }
+
+    @Test
+    fun `subthreshold pitch movement does not create a shimmer`() {
+        val detector = Tarji()
+        feed(
+            detector,
+            modulatedHeldNote(
+                seconds = 4f,
+                pitchHz = 150f,
+                rateHz = 5.5f,
+                pitchDepthCents = 4f,
+            ),
+        )
+        assertFalse("imperceptible F0 estimator motion must stay still", detector.reverberating)
+    }
+
+    @Test
+    fun `pitch vibrato crosses the perceptible depth boundary cleanly`() {
+        val below = Tarji()
+        feed(
+            below,
+            modulatedHeldNote(
+                seconds = 4f,
+                pitchHz = 150f,
+                rateHz = 5.5f,
+                pitchDepthCents = 8f,
+            ),
+        )
+        assertFalse("subthreshold pitch motion must stay still", below.reverberating)
+
+        val above = Tarji()
+        feed(
+            above,
+            modulatedHeldNote(
+                seconds = 4f,
+                pitchHz = 150f,
+                rateHz = 5.5f,
+                pitchDepthCents = 12f,
+            ),
+        )
+        assertTrue("audible pitch vibrato must cross the gate", above.reverberating)
+    }
+
+    @Test
+    fun `pitch vibrato carries mixed modulation when amplitude is subthreshold`() {
+        val detector = Tarji()
+        feed(
+            detector,
+            modulatedHeldNote(
+                seconds = 4f,
+                pitchHz = 150f,
+                rateHz = 5.5f,
+                pitchDepthCents = 30f,
+                amplitudeDepth = 0.01f,
+            ),
+        )
+        assertTrue("pitch evidence must admit shallow mixed vibrato", detector.reverberating)
+    }
+
+    @Test
+    fun `mixed event keeps its acquired phase channel across AM hysteresis`() {
+        val detector = Tarji()
+        val rateHz = 5.5f
+        val wave = modulatedHeldNote(
+            seconds = 4f,
+            pitchHz = 150f,
+            rateHz = rateHz,
+            pitchDepthCents = 30f,
+            amplitudeDepth = 0.03f,
+            amplitudePhaseRadians = PI.toFloat(),
+        )
+        var cross = 0f
+        var voiceEnergy = 0f
+        var shimmerEnergy = 0f
+        var consumed = 0
+        while (consumed + Tarji.HOP_SAMPLES <= wave.size) {
+            detector.onSamples8k(wave.copyOfRange(consumed, consumed + Tarji.HOP_SAMPLES))
+            if (detector.reverberating) {
+                val t = (consumed + Tarji.HOP_SAMPLES / 2) / Tarji.SAMPLE_RATE.toFloat()
+                val pitchMotion = sin(2f * PI.toFloat() * rateHz * t)
+                cross += pitchMotion * detector.tremolo
+                voiceEnergy += pitchMotion * pitchMotion
+                shimmerEnergy += detector.tremolo * detector.tremolo
+            }
+            consumed += Tarji.HOP_SAMPLES
+        }
+        val correlation = cross / sqrt(voiceEnergy * shimmerEnergy)
+        assertTrue(
+            "subthreshold AM must not flip an FM event (correlation=$correlation)",
+            correlation > 0.85f,
+        )
+    }
+
+    @Test
+    fun `pitch-only shimmer follows the fundamental frequency motion`() {
+        for (rateHz in listOf(2f, 5.5f, 9f)) {
+            val detector = Tarji()
+            val wave = modulatedHeldNote(
+                seconds = 4f,
+                pitchHz = 150f,
+                rateHz = rateHz,
+                pitchDepthCents = 35f,
+            )
+            var cross = 0f
+            var voiceEnergy = 0f
+            var shimmerEnergy = 0f
+            var consumed = 0
+            while (consumed + Tarji.HOP_SAMPLES <= wave.size) {
+                detector.onSamples8k(wave.copyOfRange(consumed, consumed + Tarji.HOP_SAMPLES))
+                if (detector.reverberating) {
+                    val t = (consumed + Tarji.HOP_SAMPLES / 2) / Tarji.SAMPLE_RATE.toFloat()
+                    val pitchMotion = sin(2f * PI.toFloat() * rateHz * t)
+                    cross += pitchMotion * detector.tremolo
+                    voiceEnergy += pitchMotion * pitchMotion
+                    shimmerEnergy += detector.tremolo * detector.tremolo
+                }
+                consumed += Tarji.HOP_SAMPLES
+            }
+            val correlation = cross / sqrt(voiceEnergy * shimmerEnergy)
+            assertTrue(
+                "$rateHz Hz pitch shimmer must follow F0 (correlation=$correlation)",
+                correlation > 0.85f,
+            )
+        }
+    }
+
+    @Test
+    fun `mixed vibrato follows its audible intensity phase`() {
+        val detector = Tarji()
+        val rateHz = 6f
+        val wave = modulatedHeldNote(
+            seconds = 4f,
+            pitchHz = 150f,
+            rateHz = rateHz,
+            pitchDepthCents = 35f,
+            amplitudeDepth = 0.1f,
+        )
+        var cross = 0f
+        var voiceEnergy = 0f
+        var shimmerEnergy = 0f
+        var locked = 0
+        var consumed = 0
+        while (consumed + Tarji.HOP_SAMPLES <= wave.size) {
+            detector.onSamples8k(wave.copyOfRange(consumed, consumed + Tarji.HOP_SAMPLES))
+            if (detector.reverberating) {
+                val t = (consumed + Tarji.HOP_SAMPLES / 2) / Tarji.SAMPLE_RATE.toFloat()
+                val voice = sin(2f * PI.toFloat() * rateHz * t)
+                cross += voice * detector.tremolo
+                voiceEnergy += voice * voice
+                shimmerEnergy += detector.tremolo * detector.tremolo
+                locked++
+            }
+            consumed += Tarji.HOP_SAMPLES
+        }
+        val correlation = cross / sqrt(voiceEnergy * shimmerEnergy)
+        assertTrue("mixed vibrato never locked", locked > 20)
+        assertTrue("mixed shimmer must follow intensity (correlation=$correlation)", correlation > 0.85f)
+    }
+
+    @Test
+    fun `reset makes the detector equivalent to a fresh instance`() {
+        val reset = Tarji()
+        feed(
+            reset,
+            modulatedHeldNote(
+                seconds = 2f,
+                pitchHz = 240f,
+                rateHz = 9f,
+                pitchDepthCents = 35f,
+                amplitudeDepth = 0.1f,
+            ),
+        )
+        reset.reset()
+
+        val fresh = Tarji()
+        val wave = modulatedHeldNote(
+            seconds = 2f,
+            pitchHz = 150f,
+            rateHz = 5.5f,
+            pitchDepthCents = 30f,
+            amplitudeDepth = 0.01f,
+        )
+        var consumed = 0
+        while (consumed + Tarji.HOP_SAMPLES <= wave.size) {
+            val hop = wave.copyOfRange(consumed, consumed + Tarji.HOP_SAMPLES)
+            reset.onSamples8k(hop)
+            fresh.onSamples8k(hop)
+            assertEquals(fresh.reverberating, reset.reverberating)
+            assertEquals(fresh.holdMs, reset.holdMs, 0f)
+            assertEquals(fresh.tremolo, reset.tremolo, 1e-6f)
+            assertEquals(fresh.tremoloGain, reset.tremoloGain, 1e-6f)
+            consumed += Tarji.HOP_SAMPLES
+        }
     }
 
     @Test
@@ -190,6 +484,24 @@ class TarjiTest {
             assertTrue(
                 "$amHz Hz shimmer must follow the voice (correlation=$correlation)",
                 correlation > 0.85f,
+            )
+        }
+    }
+
+    @Test
+    fun `Alafasy and Hani one seven shimmer peaks land on the same acoustic hop`() {
+        val cases = listOf(
+            Triple("alfasy_1_7_8k.wav", 7.5f, 10.1f),
+            Triple("hani_1_7_8k.wav", 8.4f, 10.1f),
+        )
+        for ((name, start, end) in cases) {
+            val aligned = realPhaseCorrelation(name, start, end)
+            val oneHopEarly = realPhaseCorrelation(name, start, end, -1)
+            val oneHopLate = realPhaseCorrelation(name, start, end, 1)
+            assertTrue("$name must correlate with its live 20 ms RMS ($aligned)", aligned > 0.85f)
+            assertTrue(
+                "$name zero-lag peak must beat either adjacent hop ($oneHopEarly, $aligned, $oneHopLate)",
+                aligned > maxOf(oneHopEarly, oneHopLate) + 0.15f,
             )
         }
     }
@@ -273,10 +585,9 @@ class TarjiTest {
     }
 
     @Test
-    fun `a configured ceiling above the phase-safe band cannot admit inverted texture`() {
-        // The 80 ms RMS window has its first null at 12.5 Hz and inverts the
-        // envelope above it. A stale 25 Hz Lab value must not make a 17 Hz
-        // pulse animate opposite to the voice.
+    fun `a configured ceiling above the product band cannot admit fast texture`() {
+        // The 80 ms evidence window has its first null at 12.5 Hz. A stale
+        // 25 Hz Lab value must not turn 17 Hz texture into held-note tarjīʿ.
         val d = Tarji().apply { maxTremoloHz = 25f }
         feed(d, heldNote(seconds = 2.5f, pitchHz = 130f, amHz = 17f, amDepth = 0.3f))
         assertFalse(d.reverberating)

@@ -14,12 +14,12 @@ import kotlin.math.sqrt
  *
  * A hold is reported ([holdMs]) while successive 80 ms frames stay voiced
  * (periodic, above the noise floor) on one pitch. Once the hold is long
- * enough, the amplitude envelope is scanned for an oscillation in the
- * tarjīʿ band (~1.5–10 Hz): when its depth clears [MIN_TREMOLO_DEPTH],
- * [reverberating] turns on and [tremolo] exposes the oscillation itself,
- * zero-centred and in phase with the voice, so the glint rides the exact
- * reverberation the listener hears. [tremoloGain] ramps the effect in and
- * out so neither detection edge ever pops.
+ * enough, its intensity and fundamental-frequency tracks are scanned for an
+ * oscillation in the tarjīʿ band (~1.5–10 Hz). Either amplitude tremolo or
+ * pitch vibrato may open [reverberating]. [tremolo] exposes the live 20 ms
+ * modulation itself, zero-centred and in phase with the voice, so the glint
+ * rides the exact reverberation the listener hears. [tremoloGain] ramps the
+ * effect in and out so neither detection edge ever pops.
  *
  * Tarjīʿ is the *climax* of the hold: once the smoothed envelope falls
  * below half the detected event's peak (the voice releases), the
@@ -146,19 +146,30 @@ class Tarji {
     private var corrs = FloatArray(maxPitchLag + 1)
     private var frameFill = 0
 
-    // Per-hop envelope RMS series (64 hops ≈ 1.3 s).
+    // Long-window RMS and per-hop pitch series (64 hops ≈ 1.3 s). The 80 ms
+    // envelope rejects consonant texture during detection; [latestHopRms]
+    // drives the visual phase directly once that evidence has opened it.
     private val env = FloatArray(ENV_HOPS)
     private val envCorr = FloatArray(MAX_ENV_LAG + 2)
     private val envRawCorr = FloatArray(MAX_ENV_LAG + 2)
     private val envResidual = FloatArray(ENV_HOPS)
+    private val pitchEnv = FloatArray(ENV_HOPS)
+    private val pitchCorr = FloatArray(MAX_ENV_LAG + 2)
+    private val pitchResidual = FloatArray(ENV_HOPS)
+    private val amScan = ModulationScan()
+    private val fmScan = ModulationScan()
     private var envCount = 0
 
     private var holdPitchHz = 0f
     private var holdStartEnvCount = 0
     private var misses = 0
     private var peak = 0f
-    private var tremoloSmoothed = 0f
+    private var latestHopRms = 0f
+    private var modulationPitchHz = 0f
+    private var modulationClarity = 0f
     private var trackedLag = 0
+    private var trackedPitchLag = 0
+    private var visualUsesAmplitude = false
 
     // Climax tracker: tarjīʿ is the *building* reverberation of the hold,
     // peaking with the voice and ending when the voice releases. The level
@@ -209,7 +220,9 @@ class Tarji {
         holdPitchHz = 0f
         misses = 0
         peak = 0f
-        tremoloSmoothed = 0f
+        latestHopRms = 0f
+        modulationPitchHz = 0f
+        modulationClarity = 0f
         climaxLevel = 0f
         eventPeak = 0f
         endOfHold = false
@@ -219,6 +232,10 @@ class Tarji {
         eventRateHz = 0f
         levelTransitionGrace = 0
         trackedLag = 0
+        trackedPitchLag = 0
+        visualUsesAmplitude = false
+        amScan.clear()
+        fmScan.clear()
         frameFill = 0
         envCount = 0
         histCount = 0
@@ -234,6 +251,12 @@ class Tarji {
         var sumSq = 0f
         for (v in work) sumSq += v * v
         val rms = sqrt(sumSq / frame.size)
+        var hopSumSq = 0f
+        for (j in frame.size - hopSamples until frame.size) {
+            hopSumSq += work[j] * work[j]
+        }
+        val hopRms = sqrt(hopSumSq / hopSamples)
+        latestHopRms = hopRms
         peak = maxOf(rms, peak * PEAK_DECAY)
         val floor = maxOf(MIN_FLOOR, FLOOR_OF_PEAK * peak)
 
@@ -241,7 +264,8 @@ class Tarji {
         envCount++
         climaxLevel += CLIMAX_EMA * (rms - climaxLevel)
 
-        val (pitchHz, clarity) = pitch()
+        val (pitchHz, clarity) = holdPitch()
+        updateModulationPitch()
         lastPitchHz = pitchHz
         lastClarity = clarity
         val voiced = clarity >= MIN_CLARITY && rms >= floor
@@ -269,6 +293,7 @@ class Tarji {
                 levelTransitionGrace = 0
                 endOfHold = false
                 trackedLag = 0
+                trackedPitchLag = 0
             }
             misses = 0
         } else if (++misses > MAX_MISSES) {
@@ -276,6 +301,15 @@ class Tarji {
             holdPitchHz = 0f
             endOfHold = true
             trackedLag = 0
+            trackedPitchLag = 0
+        }
+
+        val pitchIndex = (envCount - 1) % ENV_HOPS
+        pitchEnv[pitchIndex] = when {
+            voiced && modulationClarity >= MIN_CLARITY && holdPitchHz > 0f ->
+                foldPitch(modulationPitchHz, holdPitchHz)
+            envCount > 1 -> pitchEnv[(envCount - 2) % ENV_HOPS]
+            else -> 0f
         }
 
         updateTremolo()
@@ -319,195 +353,85 @@ class Tarji {
             return
         }
         val start = envCount - n
-        var mean = 0f
-        for (j in 0 until n) mean += env[(start + j) % ENV_HOPS]
-        mean /= n
-        if (mean <= 0f) {
-            reverberating = false
-            endOfHold = true
-            return
-        }
-
-        // A sharp loudness step contains enough curved residual energy to
-        // resemble a fast pulse while the rolling window straddles both
-        // levels. Do not let that transition consume the word's one event;
-        // wait until the window's leading/trailing quarters describe the
-        // same sustained level. Real AM remains balanced around its mean.
-        val edgeSize = maxOf(1, n / 4)
-        var leadingLevel = 0f
-        var trailingLevel = 0f
-        for (j in 0 until edgeSize) {
-            leadingLevel += env[(start + j) % ENV_HOPS]
-            trailingLevel += env[(start + n - edgeSize + j) % ENV_HOPS]
-        }
-        leadingLevel /= edgeSize
-        trailingLevel /= edgeSize
-        val acquisitionLevelBalance =
-            minOf(leadingLevel, trailingLevel) / maxOf(leadingLevel, trailingLevel)
-
-        // Remove the local level trend before measuring modulation. Merely
-        // subtracting the mean makes a crescendo highly autocorrelated and
-        // can report a plain rising note as a fast pulse.
-        val centre = (n - 1) * 0.5f
-        var slopeNumerator = 0f
-        var slopeDenominator = 0f
-        for (j in 0 until n) {
-            val x = j - centre
-            slopeNumerator += x * (env[(start + j) % ENV_HOPS] - mean)
-            slopeDenominator += x * x
-        }
-        val slope = slopeNumerator / slopeDenominator.coerceAtLeast(1f)
-        var sumSq = 0f
-        for (j in 0 until n) {
-            val residual = env[(start + j) % ENV_HOPS] - (mean + slope * (j - centre))
-            envResidual[j] = residual
-            sumSq += residual * residual
-        }
-        val amp = sqrt(2f * sumSq / n) // sine-amplitude estimate
-        val depth = amp / mean
-
         val minHz = minTremoloHz.coerceIn(MIN_TREMOLO_HZ, MAX_MEASURABLE_TREMOLO_HZ)
         val maxHz = maxTremoloHz.coerceIn(minHz, MAX_MEASURABLE_TREMOLO_HZ)
         val minLag = ceil(1000f / (maxHz * HOP_MS)).toInt()
             .coerceIn(2, MAX_ENV_LAG)
         val maxBandLag = (1000f / (minHz * HOP_MS)).toInt()
             .coerceIn(minLag, MAX_ENV_LAG)
-        val crossingThreshold = amp * 0.1f
-        var previousSign = 0
-        var crossings = 0
-        for (j in 0 until n) {
-            val sign = when {
-                envResidual[j] > crossingThreshold -> 1
-                envResidual[j] < -crossingThreshold -> -1
-                else -> 0
-            }
-            if (sign != 0) {
-                if (previousSign != 0 && sign != previousSign) crossings++
-                previousSign = sign
-            }
-        }
-        val crossingRateHz = crossings * 1000f / (2f * (n - 1) * HOP_MS)
-        val oscillatory = crossings >= 2 &&
-            crossingRateHz in (minHz - 0.5f)..(maxHz + 1f)
-
-        // Periodicity of the detrended envelope: autocorrelation over the
-        // tarjīʿ band (1.5 Hz … maxTremoloHz). Alternating residual crossings
-        // first prove that the shape actually oscillates; correlation then
-        // measures its period without mistaking a crescendo for a pulse.
-        // One extra lag is evaluated for the above-ceiling harmonic guard.
-        val maxComputedLag = minOf(MAX_ENV_LAG + 1, n - MIN_CORR_PAIRS)
-        for (lag in 2..maxComputedLag) {
-            var corr = 0f
-            var e0 = 0f
-            var eL = 0f
-            var rawCorr = 0f
-            var rawE0 = 0f
-            var rawEL = 0f
-            for (j in 0 until n - lag) {
-                val a = envResidual[j]
-                val b = envResidual[j + lag]
-                corr += a * b
-                e0 += a * a
-                eL += b * b
-                val rawA = env[(start + j) % ENV_HOPS] - mean
-                val rawB = env[(start + j + lag) % ENV_HOPS] - mean
-                rawCorr += rawA * rawB
-                rawE0 += rawA * rawA
-                rawEL += rawB * rawB
-            }
-            envCorr[lag] = corr / (sqrt(e0 * eL) + 1e-9f)
-            envRawCorr[lag] = rawCorr / (sqrt(rawE0 * rawEL) + 1e-9f)
-        }
-
-        val candidateMax = minOf(maxBandLag, maxComputedLag)
-        var bandBestC = 0f
-        var rawBandBestC = 0f
-        var bestC = 0f
-        var bestLag = 0
-        if (candidateMax >= minLag) {
-            for (lag in minLag..candidateMax) {
-                val c = envCorr[lag]
-                bandBestC = maxOf(bandBestC, c)
-                rawBandBestC = maxOf(rawBandBestC, envRawCorr[lag])
-                if (c > bestC) {
-                    bestC = c
-                    bestLag = lag
-                }
-            }
-        }
-        if (!oscillatory) bestLag = 0
-
-        val acquiring = trackedLag !in minLag..maxBandLag
-        trackedLag = when {
-            acquiring -> bestLag
-            bestLag == 0 -> trackedLag
-            bestC < TRACKED_SWITCH_FLOOR -> trackedLag
-            envCorr[trackedLag] >= TRACKED_LAG_KEEP * bestC -> trackedLag
-            else -> bestLag
-        }
-        val rateHz =
-            if (trackedLag > 0) 1000f / (trackedLag * HOP_MS.toFloat()) else 0f
-        lastRateHz = rateHz
-
-        // Keep the signal smoothing even while gated off, so a lock-on starts
-        // from the live envelope rather than a stale frozen value.
-        val raw = if (amp > 1e-6f) {
-            (envResidual[n - 1] / amp).coerceIn(-1.5f, 1.5f)
-        } else {
-            0f
-        }
-        val prev = tremoloSmoothed
-        tremoloSmoothed += TREMOLO_EMA * (raw - tremoloSmoothed)
-
         val depthGate = minTremoloDepth.coerceAtLeast(0f)
         val periodGate = minPeriodicity.coerceIn(0.05f, 1f)
         val longEnough = holdMs >= holdMinMs.coerceAtLeast(0f)
 
-        // Ceiling-cheat guard: only current, local peaks above the configured
-        // ceiling may veto an in-band period. This also keeps a new note from
-        // inheriting stale correlation bins from the preceding note.
-        val cheatLo = (1000f / (2f * maxHz * HOP_MS)).toInt() + 1
-        val cheatHi = minOf(minLag - 1, maxComputedLag - 1)
-        var shortPeakLag = 0
-        var shortPeakC = 0f
-        if (cheatHi >= cheatLo) {
-            for (lag in maxOf(2, cheatLo)..cheatHi) {
-                val c = envCorr[lag]
-                val localPeak = c >= envCorr[lag - 1] && c >= envCorr[lag + 1]
-                if (localPeak && c > shortPeakC) {
-                    shortPeakC = c
-                    shortPeakLag = lag
-                }
-            }
+        scanModulation(
+            values = env,
+            residuals = envResidual,
+            correlations = envCorr,
+            rawCorrelations = envRawCorr,
+            n = n,
+            start = start,
+            minLag = minLag,
+            maxBandLag = maxBandLag,
+            minHz = minHz,
+            maxHz = maxHz,
+            periodGate = periodGate,
+            previousLag = trackedLag,
+            liveValue = latestHopRms,
+            deepGate = DEEP_DEPTH_GATE,
+            result = amScan,
+        )
+        trackedLag = amScan.trackedLag
+        if (!amScan.valid) {
+            reverberating = false
+            endOfHold = true
+            return
         }
-        val harmonicLeak = shortPeakLag >= 2 && trackedLag > 0 &&
-            trackedLag % shortPeakLag == 0 && trackedLag > shortPeakLag &&
-            trackedLag <= 3 * shortPeakLag &&
-            shortPeakC >= HARMONIC_OF_BEST * bandBestC
-        val coherent = trackedLag > 0 && oscillatory && bandBestC >= periodGate && !harmonicLeak &&
-            rateHz in minHz..maxHz
-        val lifecycleCoherent = trackedLag > 0 && oscillatory && rawBandBestC >= periodGate &&
-            !harmonicLeak && rateHz in minHz..maxHz
-        // Deep AM may bridge an irregular climax only after a genuine period
-        // has been acquired. Depth alone can never turn a trend into tarjīʿ.
-        val deep = trackedLag > 0 && oscillatory && depth >= DEEP_DEPTH_GATE &&
-            rateHz in minHz..maxHz && !harmonicLeak
-        val periodic = coherent || deep
-        val stillPeriodic = (trackedLag > 0 && oscillatory &&
-            bandBestC >= periodGate * 0.7f &&
-            !harmonicLeak && rateHz in (minHz - 0.5f)..(maxHz + 1f)) ||
-            (trackedLag > 0 && oscillatory &&
-                depth >= DEEP_DEPTH_GATE * DEPTH_OFF_RATIO &&
-                !harmonicLeak && rateHz in (minHz - 0.5f)..(maxHz + 1f))
+        val latestPitch = pitchEnv[(start + n - 1) % ENV_HOPS]
+        val previousPitch = pitchEnv[(start + n - 2) % ENV_HOPS]
+        scanModulation(
+            values = pitchEnv,
+            residuals = pitchResidual,
+            correlations = pitchCorr,
+            n = n,
+            start = start,
+            minLag = minLag,
+            maxBandLag = maxBandLag,
+            minHz = minHz,
+            maxHz = maxHz,
+            periodGate = periodGate,
+            previousLag = trackedPitchLag,
+            liveValue = latestPitch + PITCH_CENTER_LEAD_HOPS * (latestPitch - previousPitch),
+            result = fmScan,
+        )
+        trackedPitchLag = fmScan.trackedLag
+        val amOpen = amScan.depth >= depthGate && amScan.periodic
+        val amKeep = amScan.depth >= depthGate * DEPTH_OFF_RATIO && amScan.stillPeriodic
+        val fmOpen = fmScan.depth >= MIN_PITCH_DEPTH && fmScan.periodic
+        val fmKeep = fmScan.depth >= MIN_PITCH_DEPTH * DEPTH_OFF_RATIO && fmScan.stillPeriodic
+        // Prefer audible intensity when both forms acquire together. Keep
+        // that polarity for the event, however: hopping between AM and FM
+        // near a depth threshold would create a visible one-frame phase jump.
+        // Fall back only if the chosen form itself loses coherence.
+        visualUsesAmplitude = when {
+            !reverberating -> amOpen || !fmOpen
+            visualUsesAmplitude && !amKeep && fmKeep -> false
+            !visualUsesAmplitude && !fmKeep && amKeep -> true
+            else -> visualUsesAmplitude
+        }
+        val rateHz = if (visualUsesAmplitude) amScan.rateHz else fmScan.rateHz
+        val liveModulation = if (visualUsesAmplitude) amScan.raw else fmScan.raw
+        lastRateHz = rateHz
+        val anyCoherent = amScan.coherent || fmScan.coherent
+        val lifecycleCoherent = amScan.lifecycleCoherent || fmScan.coherent
 
         val gapBefore = steadyGap
         steadyGap = when {
-            coherent -> 0
-            depth < DEEP_DEPTH_GATE * DEPTH_OFF_RATIO -> steadyGap + 1
+            anyCoherent -> 0
+            !amKeep && !fmKeep -> steadyGap + 1
             steadyGap >= NEW_EVENT_GAP_PERSIST -> steadyGap
             else -> 0
         }
-        if (endOfHold && coherent && gapBefore >= NEW_EVENT_GAP_PERSIST) {
+        if (endOfHold && anyCoherent && gapBefore >= NEW_EVENT_GAP_PERSIST) {
             // A distinct oscillatory event may recur on the same pitch. Pitch
             // continuity is not event identity (connected words often share it).
             endOfHold = false
@@ -523,11 +447,10 @@ class Tarji {
         climaxUnder = if (under) climaxUnder + 1 else 0
         var climaxOver = climaxUnder >= CLIMAX_PERSIST
         val next = if (reverberating) {
-            longEnough && depth >= depthGate * DEPTH_OFF_RATIO && stillPeriodic &&
-                !endOfHold
+            longEnough && (amKeep || fmKeep) && !endOfHold
         } else {
-            longEnough && acquisitionLevelBalance >= ACQUISITION_LEVEL_BALANCE &&
-                depth >= depthGate && periodic && !endOfHold
+            longEnough && amScan.levelBalance >= ACQUISITION_LEVEL_BALANCE &&
+                (amOpen || fmOpen) && !endOfHold
         }
         val rateRatio = if (eventRateHz > 0f && rateHz > 0f) {
             maxOf(eventRateHz / rateHz, rateHz / eventRateHz)
@@ -538,7 +461,7 @@ class Tarji {
             eventRateHz += EVENT_RATE_EMA * (rateHz - eventRateHz)
         }
         val cadenceBridge = eventRateHz > 0f && rateRatio <= MAX_EVENT_RATE_RATIO &&
-            depth >= depthGate * DEPTH_OFF_RATIO
+            (amKeep || fmKeep)
         if (climaxOver && cadenceBridge) {
             // Same cadence at a new stable level is continued tarjīʿ, not a
             // release. Re-normalize without an off/on edge. A cadence jump,
@@ -573,57 +496,305 @@ class Tarji {
             climaxUnder = 0
         }
 
-        // Lead the measured oscillation by the analysis+smoothing lag, so the
-        // shimmer swells *with* the voice rather than trailing it: for a
-        // near-sinusoid at the measured rate, s(t+τ) ≈ s·cos ωτ + ṡ·sin ωτ / ω.
-        tremolo = if (reverberating) {
-            val omega = 2f * Math.PI.toFloat() * rateHz
-            val dS = (tremoloSmoothed - prev) * (1000f / HOP_MS)
-            // Keep the compensation as a fixed time lead. Capping this angle
-            // shortens the lead as cadence rises and reverses the upper band.
-            val wt = omega * LAG_SEC
-            (
-                tremoloSmoothed * kotlin.math.cos(wt) +
-                    (dS / omega) * kotlin.math.sin(wt)
-                ).coerceIn(-1.5f, 1.5f)
-        } else {
+        // Detection deliberately uses the long track; phase deliberately
+        // does not. The newest 20 ms residual is already the causal acoustic
+        // motion, so it needs no frequency-dependent guessed rotation.
+        tremolo = if (reverberating) liveModulation else {
             // Not reverberating: fade the stored signal with the gain so the
             // release dries to still ink instead of pulsing on tail noise.
-            tremoloSmoothed * tremoloGain
+            liveModulation * tremoloGain
         }
+    }
+
+    private class ModulationScan {
+        var valid = false
+        var rateHz = 0f
+        var depth = 0f
+        var raw = 0f
+        var coherent = false
+        var lifecycleCoherent = false
+        var periodic = false
+        var stillPeriodic = false
+        var levelBalance = 0f
+        var trackedLag = 0
+
+        fun clear() {
+            valid = false
+            rateHz = 0f
+            depth = 0f
+            raw = 0f
+            coherent = false
+            lifecycleCoherent = false
+            periodic = false
+            stillPeriodic = false
+            levelBalance = 0f
+            trackedLag = 0
+        }
+    }
+
+    /** Shared long-window evidence scan for intensity and F0 modulation. */
+    private fun scanModulation(
+        values: FloatArray,
+        residuals: FloatArray,
+        correlations: FloatArray,
+        rawCorrelations: FloatArray? = null,
+        n: Int,
+        start: Int,
+        minLag: Int,
+        maxBandLag: Int,
+        minHz: Float,
+        maxHz: Float,
+        periodGate: Float,
+        previousLag: Int,
+        liveValue: Float,
+        deepGate: Float? = null,
+        result: ModulationScan,
+    ) {
+        result.clear()
+        var mean = 0f
+        for (j in 0 until n) mean += values[(start + j) % ENV_HOPS]
+        mean /= n
+        if (mean <= 0f) return
+
+        val edgeSize = maxOf(1, n / 4)
+        var leadingLevel = 0f
+        var trailingLevel = 0f
+        for (j in 0 until edgeSize) {
+            leadingLevel += values[(start + j) % ENV_HOPS]
+            trailingLevel += values[(start + n - edgeSize + j) % ENV_HOPS]
+        }
+        val levelBalance = minOf(leadingLevel, trailingLevel) /
+            maxOf(leadingLevel, trailingLevel)
+
+        val centre = (n - 1) * 0.5f
+        var slopeNumerator = 0f
+        var slopeDenominator = 0f
+        for (j in 0 until n) {
+            val x = j - centre
+            slopeNumerator += x * (values[(start + j) % ENV_HOPS] - mean)
+            slopeDenominator += x * x
+        }
+        val slope = slopeNumerator / slopeDenominator.coerceAtLeast(1f)
+        var sumSq = 0f
+        for (j in 0 until n) {
+            val residual = values[(start + j) % ENV_HOPS] -
+                (mean + slope * (j - centre))
+            residuals[j] = residual
+            sumSq += residual * residual
+        }
+        val amp = sqrt(2f * sumSq / n)
+        val depth = amp / mean
+        val crossingThreshold = amp * 0.1f
+        var previousSign = 0
+        var crossings = 0
+        for (j in 0 until n) {
+            val sign = when {
+                residuals[j] > crossingThreshold -> 1
+                residuals[j] < -crossingThreshold -> -1
+                else -> 0
+            }
+            if (sign != 0) {
+                if (previousSign != 0 && sign != previousSign) crossings++
+                previousSign = sign
+            }
+        }
+        val crossingRateHz = crossings * 1000f / (2f * (n - 1) * HOP_MS)
+        val oscillatory = crossings >= 2 &&
+            crossingRateHz in (minHz - 0.5f)..(maxHz + 1f)
+
+        val maxComputedLag = minOf(MAX_ENV_LAG + 1, n - MIN_CORR_PAIRS)
+        for (lag in 2..maxComputedLag) {
+            var corr = 0f
+            var e0 = 0f
+            var eL = 0f
+            var rawCorr = 0f
+            var rawE0 = 0f
+            var rawEL = 0f
+            for (j in 0 until n - lag) {
+                val a = residuals[j]
+                val b = residuals[j + lag]
+                corr += a * b
+                e0 += a * a
+                eL += b * b
+                if (rawCorrelations != null) {
+                    val rawA = values[(start + j) % ENV_HOPS] - mean
+                    val rawB = values[(start + j + lag) % ENV_HOPS] - mean
+                    rawCorr += rawA * rawB
+                    rawE0 += rawA * rawA
+                    rawEL += rawB * rawB
+                }
+            }
+            correlations[lag] = corr / (sqrt(e0 * eL) + 1e-9f)
+            if (rawCorrelations != null) {
+                rawCorrelations[lag] = rawCorr / (sqrt(rawE0 * rawEL) + 1e-9f)
+            }
+        }
+
+        val candidateMax = minOf(maxBandLag, maxComputedLag)
+        var bandBestC = 0f
+        var rawBandBestC = 0f
+        var bestLag = 0
+        if (candidateMax >= minLag) {
+            for (lag in minLag..candidateMax) {
+                rawBandBestC = maxOf(rawBandBestC, rawCorrelations?.get(lag) ?: correlations[lag])
+                if (correlations[lag] > bandBestC) {
+                    bandBestC = correlations[lag]
+                    bestLag = lag
+                }
+            }
+        }
+        if (!oscillatory) bestLag = 0
+        val trackedLag = when {
+            previousLag !in minLag..maxBandLag -> bestLag
+            bestLag == 0 || bandBestC < TRACKED_SWITCH_FLOOR -> previousLag
+            correlations[previousLag] >= TRACKED_LAG_KEEP * bandBestC -> previousLag
+            else -> bestLag
+        }
+
+        val rateHz = if (trackedLag > 0) {
+            1000f / (trackedLag * HOP_MS.toFloat())
+        } else {
+            0f
+        }
+        val cheatLo = (1000f / (2f * maxHz * HOP_MS)).toInt() + 1
+        val cheatHi = minOf(minLag - 1, maxComputedLag - 1)
+        var shortPeakLag = 0
+        var shortPeakC = 0f
+        if (cheatHi >= cheatLo) {
+            for (lag in maxOf(2, cheatLo)..cheatHi) {
+                val c = correlations[lag]
+                if (c >= correlations[lag - 1] && c >= correlations[lag + 1] && c > shortPeakC) {
+                    shortPeakC = c
+                    shortPeakLag = lag
+                }
+            }
+        }
+        val harmonicLeak = shortPeakLag >= 2 && trackedLag > shortPeakLag &&
+            trackedLag % shortPeakLag == 0 && trackedLag <= 3 * shortPeakLag &&
+            shortPeakC >= HARMONIC_OF_BEST * bandBestC
+        val inBand = trackedLag > 0 && oscillatory && !harmonicLeak &&
+            rateHz in minHz..maxHz
+        val coherent = inBand && bandBestC >= periodGate
+        val deep = inBand && deepGate != null && depth >= deepGate
+        val stillPeriodic = inBand &&
+            (bandBestC >= periodGate * 0.7f ||
+                (deepGate != null && depth >= deepGate * DEPTH_OFF_RATIO))
+        val raw = if (amp > 1e-6f) {
+            ((liveValue - mean) / amp).coerceIn(-1.5f, 1.5f)
+        } else {
+            0f
+        }
+        result.valid = true
+        result.rateHz = rateHz
+        result.depth = depth
+        result.raw = raw
+        result.coherent = coherent
+        result.lifecycleCoherent = inBand && rawBandBestC >= periodGate
+        result.periodic = coherent || deep
+        result.stillPeriodic = stillPeriodic
+        result.levelBalance = levelBalance
+        result.trackedLag = trackedLag
     }
 
     /** Octave-folded pitch match: autocorrelation flips freely between a
      * period and its double on real voice, and those are the same note. */
     private fun samePitch(a: Float, b: Float): Boolean {
         if (a <= 0f || b <= 0f) return false
-        var r = a / b
-        while (r > 1.4142f) r /= 2f
-        while (r < 0.7071f) r *= 2f
+        val r = foldPitch(a, b) / b
         return abs(r - 1f) <= maxPitchDrift
     }
 
-    /** Normalized-autocorrelation pitch over the reciter's vocal range. */
-    private fun pitch(): Pair<Float, Float> {
+    private fun foldPitch(pitch: Float, anchor: Float): Float {
+        var folded = pitch
+        if (folded <= 0f || anchor <= 0f) return folded
+        var r = folded / anchor
+        while (r > 1.4142f) r /= 2f
+        while (r < 0.7071f) r *= 2f
+        folded = anchor * r
+        return folded
+    }
+
+    /** Stable 80 ms pitch used only for hold identity and lifecycle timing. */
+    private fun holdPitch(): Pair<Float, Float> {
         var energy = 0f
         for (j in 0 until frame.size - maxPitchLag) energy += work[j] * work[j]
         if (energy <= 1e-8f) return 0f to 0f
         var best = 0f
         for (lag in minPitchLag..maxPitchLag) {
-            var corr = 0f
-            for (j in 0 until frame.size - maxPitchLag) corr += work[j] * work[j + lag]
-            corrs[lag] = corr
-            if (corr > best) best = corr
+            var correlation = 0f
+            for (j in 0 until frame.size - maxPitchLag) {
+                correlation += work[j] * work[j + lag]
+            }
+            corrs[lag] = correlation
+            if (correlation > best) best = correlation
         }
         if (best <= 0f) return 0f to 0f
-        // Octave-stabilize: harmonics make lag multiples score near-identically,
-        // and picking the plain max flips the estimate between L and 2L hop to
-        // hop (which kept resetting the hold on real recitation). Take the
-        // shortest period within 5% of the best instead.
         var lag = minPitchLag
         while (lag <= maxPitchLag && corrs[lag] < 0.95f * best) lag++
         if (lag > maxPitchLag) return 0f to 0f
         return (analysisSampleRate / lag.toFloat()) to (best / energy)
+    }
+
+    /** Short, sub-lag YIN pitch used only for vibrato movement and phase. */
+    private fun updateModulationPitch() {
+        val pitchFrameSamples = hopSamples * PITCH_MODULATION_FRAME_HOPS
+        val pitchStart = frame.size - pitchFrameSamples
+        val pairs = pitchFrameSamples - maxPitchLag
+        if (pairs <= 0) {
+            modulationPitchHz = 0f
+            modulationClarity = 0f
+            return
+        }
+        var cumulativeDifference = 0f
+        corrs[0] = 1f
+        for (lag in 1..maxPitchLag) {
+            var difference = 0f
+            for (j in 0 until pairs) {
+                val delta = work[pitchStart + j] - work[pitchStart + j + lag]
+                difference += delta * delta
+            }
+            cumulativeDifference += difference
+            corrs[lag] = if (cumulativeDifference > 1e-8f) {
+                difference * lag / cumulativeDifference
+            } else {
+                1f
+            }
+        }
+
+        var lag = minPitchLag
+        while (lag < maxPitchLag) {
+            if (corrs[lag] < YIN_THRESHOLD) {
+                while (lag < maxPitchLag && corrs[lag + 1] < corrs[lag]) lag++
+                break
+            }
+            lag++
+        }
+        if (lag == maxPitchLag && corrs[lag] >= YIN_THRESHOLD) {
+            var bestValue = corrs[minPitchLag]
+            lag = minPitchLag
+            for (candidate in minPitchLag + 1..maxPitchLag) {
+                if (corrs[candidate] < bestValue) {
+                    bestValue = corrs[candidate]
+                    lag = candidate
+                }
+            }
+        }
+        val fractionalLag = if (lag in minPitchLag + 1 until maxPitchLag) {
+            val left = corrs[lag - 1]
+            val centre = corrs[lag]
+            val right = corrs[lag + 1]
+            val curvature = left - 2f * centre + right
+            val offset = if (abs(curvature) > 1e-9f) {
+                (0.5f * (left - right) / curvature).coerceIn(-0.5f, 0.5f)
+            } else {
+                0f
+            }
+            lag + offset
+        } else {
+            lag.toFloat()
+        }
+        modulationPitchHz = analysisSampleRate / fractionalLag
+        modulationClarity = (1f - corrs[lag]).coerceIn(0f, 1f)
     }
 
     companion object {
@@ -632,6 +803,9 @@ class Tarji {
         const val HOP_SAMPLES = SAMPLE_RATE * HOP_MS / 1000 // 160
         const val FRAME_SAMPLES = HOP_SAMPLES * 4 // 80 ms
         private const val FRAME_HOPS = 4
+        private const val PITCH_MODULATION_FRAME_HOPS = 2
+        private const val PITCH_CENTER_LEAD_HOPS = 0.5f
+        private const val YIN_THRESHOLD = 0.15f
         private const val ENV_HOPS = 64
         private const val MIN_ENV_HOPS = 20
         private const val MIN_CORR_PAIRS = MIN_ENV_HOPS / 2
@@ -663,8 +837,7 @@ class Tarji {
          * Ink Lab: [minTremoloHz] / [maxTremoloHz]. */
         const val MIN_TREMOLO_HZ = 1.5f
         const val MAX_TREMOLO_HZ = 10f
-        /** Phase-safe ceiling of the rolling 80 ms RMS envelope. Above this,
-         * its first 12.5 Hz null attenuates then inverts the vocal pulse. */
+        /** Product ceiling. Faster flutter is not a held-note reverberation. */
         const val MAX_MEASURABLE_TREMOLO_HZ = MAX_TREMOLO_HZ
         /** Shipped AM depth gate — Ink Lab: [minTremoloDepth]. */
         const val MIN_TREMOLO_DEPTH = 0.035f
@@ -673,6 +846,8 @@ class Tarji {
          * and their periodicity dips below the autocorr gate right at the
          * climax. Shallow noise swells stay rejected by the autocorr. */
         private const val DEEP_DEPTH_GATE = 0.06f
+        /** About ten cents of coherent F0 motion admits pitch-only vibrato. */
+        private const val MIN_PITCH_DEPTH = 0.006f
         /** Off-gate depth as a fraction of [minTremoloDepth] (hysteresis). */
         private const val DEPTH_OFF_RATIO = 0.7f
         /** Envelope autocorrelation gate — Ink Lab: [minPeriodicity]. */
@@ -690,9 +865,6 @@ class Tarji {
         private const val HARMONIC_OF_BEST = 0.85f
         // Band floor as an envelope-hop lag (20 ms hops): 1.5 Hz → 33.
         private const val MAX_ENV_LAG = 33
-        private const val TREMOLO_EMA = 0.35f
-        /** Analysis + smoothing lag the phase lead compensates (~45 ms). */
-        private const val LAG_SEC = 0.045f
         /** Shipped attack of [tremoloGain] — Ink Lab: [attackMs]. */
         const val ATTACK_MS = 250f
         /** Shipped release of [tremoloGain] (mid-hold lull bridge) — Ink Lab:
@@ -700,7 +872,7 @@ class Tarji {
         const val RELEASE_MS = 800f
         /** Release once the hold's climax is over (ms) — a near-instant dry,
          * so the shimmer never flickers into the tail or the next word. */
-        const val CLIMAX_RELEASE_MS = 60f
+        const val CLIMAX_RELEASE_MS = 50f
         /** Read-out history for the output-latency delay (~1.3 s). */
         private const val HIST_HOPS = 64
         /** Sonic resampler's own buffer, in *content* ms, when speed ≠ 1
