@@ -70,7 +70,7 @@ class TarjiTest {
         }
     }
 
-    private fun realPhaseCorrelation(
+    private fun realFlickerCorrelation(
         name: String,
         fromSeconds: Float,
         toSeconds: Float,
@@ -117,10 +117,12 @@ class TarjiTest {
         var cross = 0f
         var xEnergy = 0f
         var yEnergy = 0f
-        for (i in x.indices) {
-            cross += x[i] * y[i]
-            xEnergy += x[i] * x[i]
-            yEnergy += y[i] * y[i]
+        for (i in 1 until x.size) {
+            val shimmerChange = x[i] - x[i - 1]
+            val voiceChange = y[i] - y[i - 1]
+            cross += shimmerChange * voiceChange
+            xEnergy += shimmerChange * shimmerChange
+            yEnergy += voiceChange * voiceChange
         }
         return cross / sqrt(xEnergy * yEnergy)
     }
@@ -164,19 +166,45 @@ class TarjiTest {
         pitchDepthCents: Float = 0f,
         amplitudeDepth: Float = 0f,
         amplitudePhaseRadians: Float = 0f,
+        endPitchHz: Float = pitchHz,
+        startLevel: Float = 0.3f,
+        endLevel: Float = startLevel,
     ): FloatArray {
         val samples = FloatArray((seconds * Tarji.SAMPLE_RATE).toInt())
         var carrierPhase = 0f
         for (i in samples.indices) {
             val t = i / Tarji.SAMPLE_RATE.toFloat()
+            val progress = i / samples.lastIndex.toFloat()
             val phase = 2f * PI.toFloat() * rateHz * t
             val pitchModulation = sin(phase)
             val amplitudeModulation = sin(phase + amplitudePhaseRadians)
-            val frequency = pitchHz * 2f.pow(pitchDepthCents * pitchModulation / 1_200f)
+            val basePitch = pitchHz + (endPitchHz - pitchHz) * progress
+            val frequency = basePitch * 2f.pow(pitchDepthCents * pitchModulation / 1_200f)
+            val level = startLevel + (endLevel - startLevel) * progress
             carrierPhase += 2f * PI.toFloat() * frequency / Tarji.SAMPLE_RATE
-            samples[i] = 0.3f * (1f + amplitudeDepth * amplitudeModulation) * sin(carrierPhase)
+            samples[i] = level * (1f + amplitudeDepth * amplitudeModulation) * sin(carrierPhase)
         }
         return samples
+    }
+
+    private fun shimmerCorrelation(wave: FloatArray, rateHz: Float): Float {
+        val detector = Tarji()
+        var cross = 0f
+        var voiceEnergy = 0f
+        var shimmerEnergy = 0f
+        var consumed = 0
+        while (consumed + Tarji.HOP_SAMPLES <= wave.size) {
+            detector.onSamples8k(wave.copyOfRange(consumed, consumed + Tarji.HOP_SAMPLES))
+            if (detector.reverberating) {
+                val t = (consumed + Tarji.HOP_SAMPLES / 2) / Tarji.SAMPLE_RATE.toFloat()
+                val voice = sin(2f * PI.toFloat() * rateHz * t)
+                cross += voice * detector.tremolo
+                voiceEnergy += voice * voice
+                shimmerEnergy += detector.tremolo * detector.tremolo
+            }
+            consumed += Tarji.HOP_SAMPLES
+        }
+        return cross / sqrt(voiceEnergy * shimmerEnergy)
     }
 
     @Test
@@ -347,6 +375,59 @@ class TarjiTest {
     }
 
     @Test
+    fun `AM shimmer stays phase locked through a crescendo`() {
+        val rateHz = 5.5f
+        val correlation = shimmerCorrelation(
+            modulatedHeldNote(
+                seconds = 4f,
+                pitchHz = 150f,
+                rateHz = rateHz,
+                amplitudeDepth = 0.1f,
+                startLevel = 0.15f,
+                endLevel = 0.3f,
+            ),
+            rateHz,
+        )
+        assertTrue("crescendo AM phase must follow the voice (correlation=$correlation)", correlation > 0.85f)
+    }
+
+    @Test
+    fun `FM shimmer stays phase locked through an allowed pitch glide`() {
+        val rateHz = 5.5f
+        val correlation = shimmerCorrelation(
+            modulatedHeldNote(
+                seconds = 4f,
+                pitchHz = 150f,
+                endPitchHz = 162f,
+                rateHz = rateHz,
+                pitchDepthCents = 30f,
+            ),
+            rateHz,
+        )
+        assertTrue("gliding FM phase must follow F0 (correlation=$correlation)", correlation > 0.85f)
+    }
+
+    @Test
+    fun `pitch-only shimmer stays aligned at high carriers and the band ceiling`() {
+        for (pitchHz in listOf(250f, 340f)) {
+            val rateHz = 10f
+            val correlation = shimmerCorrelation(
+                modulatedHeldNote(
+                    seconds = 4f,
+                    pitchHz = pitchHz,
+                    rateHz = rateHz,
+                    pitchDepthCents = 35f,
+                ),
+                rateHz,
+            )
+            assertTrue(
+                "$pitchHz Hz carrier at 10 Hz must stay phase locked (correlation=$correlation)",
+                correlation > 0.9f,
+            )
+        }
+    }
+
+    @Test
     fun `mixed vibrato follows its audible intensity phase`() {
         val detector = Tarji()
         val rateHz = 6f
@@ -495,10 +576,10 @@ class TarjiTest {
             Triple("hani_1_7_8k.wav", 8.4f, 10.1f),
         )
         for ((name, start, end) in cases) {
-            val aligned = realPhaseCorrelation(name, start, end)
-            val oneHopEarly = realPhaseCorrelation(name, start, end, -1)
-            val oneHopLate = realPhaseCorrelation(name, start, end, 1)
-            assertTrue("$name must correlate with its live 20 ms RMS ($aligned)", aligned > 0.85f)
+            val aligned = realFlickerCorrelation(name, start, end)
+            val oneHopEarly = realFlickerCorrelation(name, start, end, -1)
+            val oneHopLate = realFlickerCorrelation(name, start, end, 1)
+            assertTrue("$name flicker must follow its live 20 ms RMS ($aligned)", aligned > 0.85f)
             assertTrue(
                 "$name zero-lag peak must beat either adjacent hop ($oneHopEarly, $aligned, $oneHopLate)",
                 aligned > maxOf(oneHopEarly, oneHopLate) + 0.15f,
@@ -628,6 +709,44 @@ class TarjiTest {
         assertTrue(d.tremoloGain > 0.5f)
         assertTrue(d.lastRateHz in 5f..6f)
         assertTrue("the word gate must still show the real event", lateVisibleHops >= 30)
+    }
+
+    @Test
+    fun `pitch vibrato acquires after an AM-only loud onset`() {
+        val rateHz = 5.5f
+        val seconds = 1.3f
+        val samples = FloatArray((seconds * Tarji.SAMPLE_RATE).toInt())
+        var carrierPhase = 0f
+        for (i in samples.indices) {
+            val t = i / Tarji.SAMPLE_RATE.toFloat()
+            val pitchMotion = sin(2f * PI.toFloat() * rateHz * t)
+            val frequency = 150f * 2f.pow(30f * pitchMotion / 1_200f)
+            val level = if (t < 0.2f) 0.3f else 0.06f
+            carrierPhase += 2f * PI.toFloat() * frequency / Tarji.SAMPLE_RATE
+            samples[i] = level * sin(carrierPhase)
+        }
+
+        val detector = Tarji()
+        var cross = 0f
+        var voiceEnergy = 0f
+        var shimmerEnergy = 0f
+        var consumed = 0
+        while (consumed + Tarji.HOP_SAMPLES <= samples.size) {
+            detector.onSamples8k(samples.copyOfRange(consumed, consumed + Tarji.HOP_SAMPLES))
+            if (detector.reverberating) {
+                val t = (consumed + Tarji.HOP_SAMPLES / 2) / Tarji.SAMPLE_RATE.toFloat()
+                val pitchMotion = sin(2f * PI.toFloat() * rateHz * t)
+                cross += pitchMotion * detector.tremolo
+                voiceEnergy += pitchMotion * pitchMotion
+                shimmerEnergy += detector.tremolo * detector.tremolo
+            }
+            consumed += Tarji.HOP_SAMPLES
+        }
+
+        assertTrue("AM level balance must not veto coherent FM", detector.reverberating)
+        assertTrue(detector.lastRateHz in 5f..6f)
+        val correlation = cross / sqrt(voiceEnergy * shimmerEnergy)
+        assertTrue("the loud AM onset must not capture FM phase ($correlation)", correlation > 0.85f)
     }
 
     @Test

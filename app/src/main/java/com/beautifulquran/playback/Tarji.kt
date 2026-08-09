@@ -167,6 +167,7 @@ class Tarji {
     private var latestHopRms = 0f
     private var modulationPitchHz = 0f
     private var modulationClarity = 0f
+    private var modulationPitchLeadHops = 0f
     private var trackedLag = 0
     private var trackedPitchLag = 0
     private var visualUsesAmplitude = false
@@ -223,6 +224,7 @@ class Tarji {
         latestHopRms = 0f
         modulationPitchHz = 0f
         modulationClarity = 0f
+        modulationPitchLeadHops = 0f
         climaxLevel = 0f
         eventPeak = 0f
         endOfHold = false
@@ -377,6 +379,7 @@ class Tarji {
             periodGate = periodGate,
             previousLag = trackedLag,
             liveValue = latestHopRms,
+            liveOffsetHops = RMS_PHASE_LEAD_HOPS,
             deepGate = DEEP_DEPTH_GATE,
             result = amScan,
         )
@@ -388,6 +391,7 @@ class Tarji {
         }
         val latestPitch = pitchEnv[(start + n - 1) % ENV_HOPS]
         val previousPitch = pitchEnv[(start + n - 2) % ENV_HOPS]
+        val beforePreviousPitch = pitchEnv[(start + n - 3) % ENV_HOPS]
         scanModulation(
             values = pitchEnv,
             residuals = pitchResidual,
@@ -400,7 +404,13 @@ class Tarji {
             maxHz = maxHz,
             periodGate = periodGate,
             previousLag = trackedPitchLag,
-            liveValue = latestPitch + PITCH_CENTER_LEAD_HOPS * (latestPitch - previousPitch),
+            liveValue = projectForward(
+                latestPitch,
+                previousPitch,
+                beforePreviousPitch,
+                modulationPitchLeadHops,
+            ),
+            liveOffsetHops = modulationPitchLeadHops,
             result = fmScan,
         )
         trackedPitchLag = fmScan.trackedLag
@@ -408,12 +418,16 @@ class Tarji {
         val amKeep = amScan.depth >= depthGate * DEPTH_OFF_RATIO && amScan.stillPeriodic
         val fmOpen = fmScan.depth >= MIN_PITCH_DEPTH && fmScan.periodic
         val fmKeep = fmScan.depth >= MIN_PITCH_DEPTH * DEPTH_OFF_RATIO && fmScan.stillPeriodic
+        // A level step can forge AM residuals, but it cannot forge coherent
+        // YIN pitch motion. Keep that AM-only guard out of FM acquisition and
+        // phase selection.
+        val amSafe = amOpen && amScan.levelBalance >= ACQUISITION_LEVEL_BALANCE
         // Prefer audible intensity when both forms acquire together. Keep
         // that polarity for the event, however: hopping between AM and FM
         // near a depth threshold would create a visible one-frame phase jump.
         // Fall back only if the chosen form itself loses coherence.
         visualUsesAmplitude = when {
-            !reverberating -> amOpen || !fmOpen
+            !reverberating -> amSafe || !fmOpen
             visualUsesAmplitude && !amKeep && fmKeep -> false
             !visualUsesAmplitude && !fmKeep && amKeep -> true
             else -> visualUsesAmplitude
@@ -446,11 +460,11 @@ class Tarji {
         val under = eventPeak > 0f && climaxLevel < CLIMAX_OFF * eventPeak
         climaxUnder = if (under) climaxUnder + 1 else 0
         var climaxOver = climaxUnder >= CLIMAX_PERSIST
+        val acquisitionOpen = amSafe || fmOpen
         val next = if (reverberating) {
             longEnough && (amKeep || fmKeep) && !endOfHold
         } else {
-            longEnough && amScan.levelBalance >= ACQUISITION_LEVEL_BALANCE &&
-                (amOpen || fmOpen) && !endOfHold
+            longEnough && acquisitionOpen && !endOfHold
         }
         val rateRatio = if (eventRateHz > 0f && rateHz > 0f) {
             maxOf(eventRateHz / rateHz, rateHz / eventRateHz)
@@ -496,9 +510,9 @@ class Tarji {
             climaxUnder = 0
         }
 
-        // Detection deliberately uses the long track; phase deliberately
-        // does not. The newest 20 ms residual is already the causal acoustic
-        // motion, so it needs no frequency-dependent guessed rotation.
+        // The long track decides the event and its slow baseline, but the
+        // live sample supplies the visible phase. Its timestamp comes from
+        // actual analysis support, never the noisy modulation-rate estimate.
         tremolo = if (reverberating) liveModulation else {
             // Not reverberating: fade the stored signal with the gain so the
             // release dries to still ink instead of pulsing on tail noise.
@@ -547,6 +561,7 @@ class Tarji {
         periodGate: Float,
         previousLag: Int,
         liveValue: Float,
+        liveOffsetHops: Float,
         deepGate: Float? = null,
         result: ModulationScan,
     ) {
@@ -679,8 +694,21 @@ class Tarji {
         val stillPeriodic = inBand &&
             (bandBestC >= periodGate * 0.7f ||
                 (deepGate != null && depth >= deepGate * DEPTH_OFF_RATIO))
+        var liveSlope = slope
+        if (trackedLag > 0) {
+            // A full-cycle difference cancels the coherent modulation, so
+            // the visual baseline follows a crescendo/glide without bending
+            // the pulse it is meant to reveal.
+            var cycleDifference = 0f
+            for (j in 0 until n - trackedLag) {
+                cycleDifference += values[(start + j + trackedLag) % ENV_HOPS] -
+                    values[(start + j) % ENV_HOPS]
+            }
+            liveSlope = cycleDifference / ((n - trackedLag) * trackedLag)
+        }
         val raw = if (amp > 1e-6f) {
-            ((liveValue - mean) / amp).coerceIn(-1.5f, 1.5f)
+            val liveBaseline = mean + liveSlope * (n - 1 + liveOffsetHops - centre)
+            ((liveValue - liveBaseline) / amp).coerceIn(-1.5f, 1.5f)
         } else {
             0f
         }
@@ -714,6 +742,21 @@ class Tarji {
         return folded
     }
 
+    /** Quadratic local projection from the YIN support centre to the newest
+     * 20 ms hop. It follows upper-band FM curvature without consulting the
+     * noisier long-window modulation-rate estimate. */
+    private fun projectForward(
+        latest: Float,
+        previous: Float,
+        beforePrevious: Float,
+        hops: Float,
+    ): Float {
+        val h = hops.coerceIn(0f, 1f)
+        return (h + 1f) * (h + 2f) * latest * 0.5f -
+            h * (h + 2f) * previous +
+            h * (h + 1f) * beforePrevious * 0.5f
+    }
+
     /** Stable 80 ms pitch used only for hold identity and lifecycle timing. */
     private fun holdPitch(): Pair<Float, Float> {
         var energy = 0f
@@ -743,6 +786,7 @@ class Tarji {
         if (pairs <= 0) {
             modulationPitchHz = 0f
             modulationClarity = 0f
+            modulationPitchLeadHops = 0f
             return
         }
         var cumulativeDifference = 0f
@@ -795,6 +839,9 @@ class Tarji {
         }
         modulationPitchHz = analysisSampleRate / fractionalLag
         modulationClarity = (1f - corrs[lag]).coerceIn(0f, 1f)
+        val supportCentre = (pairs - 1 + fractionalLag) * 0.5f
+        val liveCentre = pitchFrameSamples - (hopSamples + 1) * 0.5f
+        modulationPitchLeadHops = (liveCentre - supportCentre) / hopSamples
     }
 
     companion object {
@@ -804,7 +851,7 @@ class Tarji {
         const val FRAME_SAMPLES = HOP_SAMPLES * 4 // 80 ms
         private const val FRAME_HOPS = 4
         private const val PITCH_MODULATION_FRAME_HOPS = 2
-        private const val PITCH_CENTER_LEAD_HOPS = 0.5f
+        private const val RMS_PHASE_LEAD_HOPS = (FRAME_HOPS - 1) * 0.5f
         private const val YIN_THRESHOLD = 0.15f
         private const val ENV_HOPS = 64
         private const val MIN_ENV_HOPS = 20

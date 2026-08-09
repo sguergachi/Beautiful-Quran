@@ -109,12 +109,14 @@ four visible states per second cannot express a 5–10 Hz vocal pulse.
         note scans only lags for which it has enough current samples; stale
         long-period bins from the preceding note must never seed its rate.
     *   acquisition needs alternating residual crossings, `bestC ≥ 0.4`, and
-        a rate in band. The leading/trailing quarters of the window must also
-        be within ~3× level: a sharp loud-to-quiet step can leave a curved
-        detrended residual that resembles a fast pulse, and must not consume
-        the word before the quieter real sustain arrives. A raw-envelope
-        correlation view is used only to bridge a level transition after
-        detrended evidence has already acquired the event.
+        a rate in band. For **AM acquisition**, the leading/trailing quarters
+        of the window must also be within ~3× level: a sharp loud-to-quiet
+        step can leave a curved detrended residual that resembles a fast pulse,
+        and must not consume the word before the quieter real sustain arrives.
+        This level guard does not veto coherent YIN pitch motion or let unsafe
+        AM own an FM event's visual phase. A raw-envelope correlation view is
+        used only to bridge a level transition after detrended evidence has
+        already acquired the event.
     *   coherent amplitude modulation **or** coherent pitch modulation may
         acquire the event. About ten cents of periodic F0 excursion clears
         the pitch-depth floor. Pitch depth alone can never acquire or bridge:
@@ -152,11 +154,14 @@ four visible states per second cannot express a 5–10 Hz vocal pulse.
 5.  **Live modulation signal.** Detection and visualization have different
     clocks. The long detrended tracks decide whether a periodic held-note
     event exists; they never synthesize its phase. For AM, `tremolo` is the
-    current 20 ms RMS relative to the event mean. There is no EMA and no
-    rate-dependent phase rotation. For pitch-only vibrato, it is the current
-    short-YIN F0 residual; a fixed half-hop projection merely aligns the
-    40 ms frame centre with the 20 ms RMS centre and does not depend on the
-    noisy modulation-rate bin. `tremolo` is zero-centred, ~−1.5..1.5.
+    current 20 ms RMS relative to a linearly extrapolated local baseline. Its
+    slope is measured across complete modulation cycles, which cancels the
+    pulse itself while removing a crescendo. For pitch-only vibrato, it is the
+    current short-YIN F0 residual against the same trend model. The selected
+    YIN lag determines the analysis support centre (about 0.5–0.8 hop behind
+    the live RMS centre); a three-sample local projection follows the F0
+    curvature to the current hop. Neither path rotates phase from the noisy
+    modulation-rate bin. `tremolo` is zero-centred, ~−1.5..1.5.
 
 6.  **Output latency.** The PCM tap hears the voice *before* the listener.
     `ReaderViewModel` pushes the same route preset `HighlightClock` subtracts.
@@ -189,10 +194,11 @@ four visible states per second cannot express a 5–10 Hz vocal pulse.
     (lag 3 wins on a smooth decay) — the band floor **and** the low-pass
     interact. The autocorrelation scan plus the 1.5 Hz floor are both needed.
 *   Both full EveryAyah recordings are committed as 8 kHz regression fixtures.
-    Besides event/tail topology, the tests require the shimmer's zero-hop
-    correlation with live 20 ms RMS to exceed 0.85 and beat either adjacent
-    hop. Synthetic fixtures independently pin AM-only, FM-only, and mixed
-    vibrato across the admitted band.
+    Besides event/tail topology, the tests require the shimmer's flicker
+    changes to correlate with live 20 ms RMS changes above 0.85 at zero hop
+    and beat either adjacent hop. Synthetic fixtures independently pin
+    AM-only, FM-only, mixed, crescendo, pitch-glide, loud-onset, and
+    high-carrier/10 Hz edge cases.
 
 ## 4. When the glimmer is allowed to pulse
 

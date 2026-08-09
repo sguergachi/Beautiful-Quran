@@ -120,9 +120,12 @@ established 80 ms pitch tracker still owns hold identity, while a short,
 sub-lag YIN track detects periodic F0 motion without shifting any event or word
 boundary. Either channel may acquire tarjīʿ; when both exist, intensity owns
 the visual polarity because its swell/trough direction is what the listener
-hears directly. Pitch alone drives the shimmer only when AM is absent. The
-chosen phase channel remains fixed while it is coherent, preventing a
-near-threshold AM track from flipping an FM-driven glint by one frame.
+hears directly. The loudness-step guard applies only to AM: coherent pitch
+vibrato may still acquire after an echo-heavy attack, and unsafe AM evidence
+cannot capture that FM event's visual polarity. Pitch alone drives the shimmer
+when safe AM is absent. The chosen phase channel remains fixed while it is
+coherent, preventing a near-threshold AM track from flipping an FM-driven
+glint by one frame.
 
 The effect stops when the voice releases. The detector tracks the
 hold's envelope with a fast level EMA. Its peak reference starts when the
@@ -147,9 +150,12 @@ blinking.
 
 **Tarjīʿ** is that **on/off plus a brightness crest**. Event detection uses
 the long detrended tracks, but the visible phase comes from the current 20 ms
-RMS hop—no smoothing and no rate-dependent phase prediction. For pitch-only
-vibrato, the signed short-YIN residual is the fallback. Positive is the audible
-swell (or higher F0 when no intensity pulse exists), negative is its trough.
+RMS hop against a cycle-separated linear baseline, so a crescendo cannot bias
+the pulse. For pitch-only vibrato, the signed short-YIN residual is the
+fallback. Its actual lag-derived support centre is projected locally to the
+live hop; neither path uses rate-dependent phase rotation. Positive is the
+audible swell (or higher F0 when no intensity pulse exists), negative is its
+trough.
 The layer follows one smootherstepped `−1..1 → 0..1` cycle and only the
 positive crest boosts tint/halo colour (`GLINT_RESONANCE_PEAK_BOOST`). Never
 take `abs(tremolo)`: that makes the quiet trough bright and doubles the visual
