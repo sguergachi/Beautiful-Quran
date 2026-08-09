@@ -140,8 +140,11 @@ four visible states per second cannot express a 5–10 Hz vocal pulse.
     s(t+τ) ≈ s·cos ωτ + ṡ·sin ωτ / ω
     ```
 
-    so the gold swells *with* the voice, not 45 ms behind. `tremolo` is
-    zero-centred, ~−1.5..1.5.
+    The angle remains `ωτ` across the entire admitted band: capping it
+    would turn the fixed time correction into a progressively shorter lead
+    and put upper-band shimmer back behind the voice. The gold therefore
+    swells *with* the voice, not 45 ms behind. `tremolo` is zero-centred,
+    ~−1.5..1.5.
 
 6.  **Output latency.** The PCM tap hears the voice *before* the listener.
     `ReaderViewModel` pushes the same route preset `HighlightClock` subtracts

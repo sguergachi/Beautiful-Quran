@@ -569,7 +569,9 @@ class Tarji {
         tremolo = if (reverberating) {
             val omega = 2f * Math.PI.toFloat() * rateHz
             val dS = (tremoloSmoothed - prev) * (1000f / HOP_MS)
-            val wt = (omega * LAG_SEC).coerceAtMost(1.2f)
+            // Keep the compensation as a fixed time lead. Capping this angle
+            // shortens the lead as cadence rises and reverses the upper band.
+            val wt = omega * LAG_SEC
             (
                 tremoloSmoothed * kotlin.math.cos(wt) +
                     (dS / omega) * kotlin.math.sin(wt)

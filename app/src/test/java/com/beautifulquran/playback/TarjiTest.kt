@@ -3,6 +3,7 @@ package com.beautifulquran.playback
 import com.beautifulquran.ui.reader.TarjiWordGate
 import kotlin.math.PI
 import kotlin.math.sin
+import kotlin.math.sqrt
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -148,6 +149,49 @@ class TarjiTest {
             "tremolo must rise when the voice swells ($agreeing/$locked)",
             agreeing.toFloat() / locked > 0.8f,
         )
+    }
+
+    @Test
+    fun `tremolo stays phase-locked across the admitted band`() {
+        val cases = listOf(
+            1.5f to 0.12f,
+            5.5f to 0.12f,
+            8f to 0.12f,
+            Tarji.MAX_TREMOLO_HZ to 0.2f,
+        )
+        for ((amHz, amDepth) in cases) {
+            val d = Tarji()
+            val wave = heldNote(
+                seconds = 5f,
+                pitchHz = 130f,
+                amHz = amHz,
+                amDepth = amDepth,
+            )
+            var cross = 0f
+            var voiceEnergy = 0f
+            var tremoloEnergy = 0f
+            var locked = 0
+            var i = 0
+            while (i + Tarji.HOP_SAMPLES <= wave.size) {
+                d.onSamples8k(wave.copyOfRange(i, i + Tarji.HOP_SAMPLES))
+                if (d.reverberating) {
+                    val t = (i + Tarji.HOP_SAMPLES / 2) / Tarji.SAMPLE_RATE.toFloat()
+                    val voice = sin(2f * PI.toFloat() * amHz * t)
+                    cross += voice * d.tremolo
+                    voiceEnergy += voice * voice
+                    tremoloEnergy += d.tremolo * d.tremolo
+                    locked++
+                }
+                i += Tarji.HOP_SAMPLES
+            }
+
+            assertTrue("$amHz Hz detector never locked", locked > 20)
+            val correlation = cross / sqrt(voiceEnergy * tremoloEnergy)
+            assertTrue(
+                "$amHz Hz shimmer must follow the voice (correlation=$correlation)",
+                correlation > 0.85f,
+            )
+        }
     }
 
     @Test
