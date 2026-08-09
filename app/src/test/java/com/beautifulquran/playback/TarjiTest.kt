@@ -40,6 +40,15 @@ class TarjiTest {
     }
 
     @Test
+    fun `hop clock includes the analysis frame warm-up`() {
+        val d = Tarji()
+        repeat(4) {
+            feed(d, heldNote(seconds = 0.02f, pitchHz = 130f))
+            assertEquals(it + 1, d.hopCount)
+        }
+    }
+
+    @Test
     fun `tarji on a held note is detected and rides the reverberation`() {
         val d = Tarji()
         assertFalse(d.reverberating)
@@ -305,13 +314,34 @@ class TarjiTest {
         var spansInHold = 0
         var lastOnEnd = -1f
         var longestSpan = 0f
+        var swellRms = 0f
+        var swellCount = 0
+        var troughRms = 0f
+        var troughCount = 0
         var consumed = 0
         while (consumed + Tarji.HOP_SAMPLES <= samples.size) {
             d.onSamples8k(samples.copyOfRange(consumed, consumed + Tarji.HOP_SAMPLES))
+            var sumSq = 0f
+            for (i in consumed until consumed + Tarji.HOP_SAMPLES) {
+                sumSq += samples[i] * samples[i]
+            }
+            val hopRms = kotlin.math.sqrt(sumSq / Tarji.HOP_SAMPLES)
             consumed += Tarji.HOP_SAMPLES
             t += Tarji.HOP_MS / 1000f
             if (d.reverberating) {
                 if (onSpanStart < 0f) onSpanStart = t
+                if (t in 7.5f..12.2f) {
+                    when {
+                        d.tremolo > 0.45f -> {
+                            swellRms += hopRms
+                            swellCount++
+                        }
+                        d.tremolo < -0.45f -> {
+                            troughRms += hopRms
+                            troughCount++
+                        }
+                    }
+                }
             } else if (onSpanStart >= 0f) {
                 if (onSpanStart in 7.0f..12.4f && t - onSpanStart >= 0.4f) spansInHold++
                 if (onSpanStart >= 7.0f) lastOnEnd = t
@@ -326,7 +356,7 @@ class TarjiTest {
             spansInHold++
             longestSpan = maxOf(longestSpan, t - onSpanStart)
         }
-        assertTrue("the waqf hold must engage (spans: $spansInHold)", spansInHold >= 1)
+        assertEquals("the waqf crescendo must be one continuous acoustic event", 1, spansInHold)
         assertTrue(
             "the shimmer must start with the build, not late in the hold (first on: ${firstOn}s)",
             firstOn in 6.8f..8.2f,
@@ -339,6 +369,11 @@ class TarjiTest {
         assertTrue(
             "no shimmer may ride the decayed tail (last on-end: ${lastOnEnd}s)",
             lastOnEnd <= 12.45f,
+        )
+        assertTrue("real clip must expose both acoustic phases", swellCount > 5 && troughCount > 5)
+        assertTrue(
+            "positive tremolo must be the louder vocal swell, never the quiet trough",
+            swellRms / swellCount > troughRms / troughCount,
         )
     }
 }

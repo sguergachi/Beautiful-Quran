@@ -558,9 +558,9 @@ class InkEngineTest {
     }
 
     @Test
-    fun `glint resonance turns the sheen on and off with the tarji pulse`() {
-        // On/off model: full-wave |tremolo| crests keep full sheen and drive
-        // the colour boost; zero-crossings extinguish the layer at full depth.
+    fun `glint resonance follows one signed vocal envelope cycle`() {
+        // Positive is the audible swell, negative the trough. The old abs()
+        // mapping made both bright and therefore flickered at twice the voice.
         val up = InkEngine.glintResonance(
             holding = true,
             tremolo = 1f,
@@ -580,15 +580,15 @@ class InkEngineTest {
             depth = 1f,
         )
         assertEquals(1f, up.peak, 1e-4f)
-        assertEquals(1f, up.layerMult, 1e-4f) // crest: full sheen
+        assertEquals(1f, up.layerMult, 1e-4f) // vocal crest: full sheen
         assertEquals(0f, mid.peak, 1e-4f)
+        assertEquals(0.5f, mid.layerMult, 1e-4f) // mean level: half sheen
+        assertEquals(0f, down.peak, 1e-4f)
         assertEquals(
             InkEngine.GLINT_RESONANCE_TROUGH_FLOOR,
-            mid.layerMult,
+            down.layerMult,
             1e-4f,
-        ) // trough: off at full depth
-        assertEquals(1f, down.peak, 1e-4f) // |−1| = full crest
-        assertEquals(1f, down.layerMult, 1e-4f)
+        ) // vocal trough: off at full depth
         val softDepth = InkEngine.glintResonance(
             holding = true,
             tremolo = 1f,
@@ -599,7 +599,7 @@ class InkEngineTest {
         assertEquals(1f, softDepth.layerMult, 1e-4f)
         val midSoft = InkEngine.glintResonance(
             holding = true,
-            tremolo = 0f,
+            tremolo = -1f,
             tremoloGain = 1f,
             depth = 0.4f,
         )
@@ -616,15 +616,15 @@ class InkEngineTest {
         )
         assertEquals(0.5f, ramping.peak, 1e-4f)
         assertEquals(1f, ramping.layerMult, 1e-4f)
-        val midRamp = InkEngine.glintResonance(
+        val troughRamp = InkEngine.glintResonance(
             holding = true,
-            tremolo = 0f,
+            tremolo = -1f,
             tremoloGain = 0.5f,
             depth = 1f,
         )
         assertEquals(
             1f - 0.5f * (1f - InkEngine.GLINT_RESONANCE_TROUGH_FLOOR),
-            midRamp.layerMult,
+            troughRamp.layerMult,
             1e-4f,
         )
         val halfSwell = InkEngine.glintResonance(
@@ -633,7 +633,8 @@ class InkEngineTest {
             tremoloGain = 1f,
             depth = 1f,
         )
-        assertEquals(0.75f, halfSwell.peak, 1e-4f)
+        assertTrue(halfSwell.peak > 0.75f)
+        assertTrue(halfSwell.layerMult > mid.layerMult)
     }
 
     @Test

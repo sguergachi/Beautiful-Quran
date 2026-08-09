@@ -51,8 +51,8 @@ class VoiceEnergy {
     private var lastFeedMs = 0L
 
     /**
-     * Output route latency (sink buffer + Bluetooth etc.), pushed by the
-     * reader — the same estimate the highlight clock subtracts. The tap hears
+     * Output route latency (Bluetooth etc.), pushed by the reader — the same
+     * estimate the highlight clock subtracts. The tap hears
      * the voice before the listener does, so the reported signal is delayed
      * by exactly this to land on what reaches the ear now.
      */
@@ -89,9 +89,21 @@ class VoiceEnergy {
     val sessionHopCount: Int
         get() = tarji.hopCount - sessionStartHopCount
 
-    /** Called by the tap when the sink (re)configures: the hop clock is
-     * re-anchored at whatever content position the refeed starts from. */
+    /** Called when the sink flushes or reconfigures. A discontinuity starts a
+     * fresh acoustic event: no prior hold, phase, or partial hop may leak into
+     * the new media position. */
     fun resetTapSession() {
+        tarji.reset()
+        reverberating = false
+        tremolo = 0f
+        tremoloGain = 0f
+        holdMs = 0f
+        rateHz = 0f
+        lastFeedMs = 0L
+        measuredBacklogMs = 0L
+        decimSum = 0f
+        decimCount = 0
+        hopFill = 0
         sessionStartWall = SystemClock.elapsedRealtime()
         sessionStartHopCount = tarji.hopCount
     }
@@ -109,8 +121,9 @@ class VoiceEnergy {
     private var decimSum = 0f
     private var decimCount = 0
     private var decimStep = 6
-    private val chunk = FloatArray(2048)
-    private var chunkFill = 0
+    private var sourceSampleRate = 0
+    private var analysisHop = FloatArray(Tarji.HOP_SAMPLES)
+    private var hopFill = 0
 
     /**
      * Feed 16-bit PCM straight from the audio sink. Only reads [buffer]'s
@@ -119,12 +132,21 @@ class VoiceEnergy {
      */
     fun onPcm16(buffer: ByteBuffer, channels: Int, sampleRate: Int) {
         if (channels <= 0 || sampleRate <= 0) return
-        decimStep = maxOf(1, sampleRate / Tarji.SAMPLE_RATE)
+        val nextDecimStep = maxOf(1, sampleRate / Tarji.SAMPLE_RATE)
         // One hop must be exactly HOP_MS of content at the decimated rate:
         // floor-decimation gives 8820 Hz for 44.1 kHz (176.4 samples).
-        tarji.hopSamples = (
-            (sampleRate / decimStep) * (Tarji.HOP_MS / 1000f)
-            ).roundToInt().coerceAtLeast(1)
+        val hopSamples = ((sampleRate / nextDecimStep) * (Tarji.HOP_MS / 1000f))
+            .roundToInt()
+            .coerceAtLeast(1)
+        if (sampleRate != sourceSampleRate || analysisHop.size != hopSamples) {
+            sourceSampleRate = sampleRate
+            decimStep = nextDecimStep
+            decimSum = 0f
+            decimCount = 0
+            hopFill = 0
+            analysisHop = FloatArray(hopSamples)
+            tarji.hopSamples = hopSamples
+        }
         // PCM16 is little-endian regardless of the buffer's own order flag —
         // byte-swapped reads keep their energy but lose all periodicity.
         val buf = buffer.asReadOnlyBuffer().order(java.nio.ByteOrder.LITTLE_ENDIAN)
@@ -133,16 +155,18 @@ class VoiceEnergy {
             decimSum += buf.short / 32768f
             buf.position(buf.position() + 2 * (channels - 1))
             if (++decimCount >= decimStep) {
-                chunk[chunkFill++] = decimSum / decimStep
+                analysisHop[hopFill++] = decimSum / decimStep
                 decimSum = 0f
                 decimCount = 0
-                if (chunkFill >= chunk.size) flushChunk()
+                if (hopFill == analysisHop.size) analyzeHop()
             }
         }
     }
 
-    private fun flushChunk() {
-        if (chunkFill == 0) return
+    /** Analyze and publish one exact 20 ms content hop. The old 2,048-sample
+     * batch exposed only ~4 detector values per second, undersampling the very
+     * 5–10 Hz vocal pulse the renderer was meant to follow. */
+    private fun analyzeHop() {
         val speed = playbackSpeed
         val sonicMs =
             if (kotlin.math.abs(speed - 1f) > 0.001f) Tarji.SONIC_LATENCY_MS else 0f
@@ -163,8 +187,8 @@ class VoiceEnergy {
         tarji.maxPitchDrift = maxPitchDrift
         tarji.attackMs = attackMs
         tarji.releaseMs = releaseMs
-        tarji.onSamples8k(chunk, chunkFill)
-        chunkFill = 0
+        tarji.onSamples8k(analysisHop)
+        hopFill = 0
         reverberating = tarji.syncReverberating
         tremolo = tarji.syncTremolo
         tremoloGain = tarji.syncTremoloGain
@@ -198,7 +222,7 @@ class VoiceEnergy {
         earDelayTotalMs = 0L
         decimSum = 0f
         decimCount = 0
-        chunkFill = 0
+        hopFill = 0
     }
 
     companion object {

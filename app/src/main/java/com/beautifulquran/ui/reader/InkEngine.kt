@@ -9,6 +9,7 @@ import com.beautifulquran.domain.BasmalahWash
 import com.beautifulquran.domain.TajweedPacing
 import com.beautifulquran.ui.theme.ContextualGuideStyle
 import com.beautifulquran.ui.theme.ContextualGuideTuning
+import com.beautifulquran.ui.theme.inkSmootherstep
 
 /**
  * The reader's single source of truth for *how a word's ink should behave*.
@@ -547,9 +548,10 @@ object InkEngine {
 
     /**
      * Maps the detected tarjīʿ signal into [GlintResonance] for the glint
-     * paint path. Full-wave intensity: both peaks of the zero-centred
-     * [tremolo] raise [GlintResonance.peak]; zero-crossings drop
-     * [GlintResonance.layerMult] to zero at full depth. Pure and unit-tested.
+     * paint path. The signed envelope is load-bearing: a positive value is a
+     * vocal swell and a negative value is a vocal trough. Brightness follows
+     * that one cycle directly; taking `abs` would double the visual rate and
+     * flash on the quiet trough as well as the loud crest. Pure and unit-tested.
      *
      * @param holding true while a reverberant hold is detected on an eligible
      * word (see the glint layer in ReaderComponents)
@@ -566,13 +568,14 @@ object InkEngine {
         if (!holding || !enabled || depth <= 0f) return GlintResonance.Idle
         val g = tremoloGain.coerceIn(0f, 1f)
         if (g <= 0f) return GlintResonance.Idle
-        // Full-wave 0..1: |tremolo| at 1 → full sheen + full peak boost;
-        // zero-crossings extinguish the layer at full depth. Depth scales
-        // both (1 = full on/off + boost range).
-        val on = kotlin.math.abs(tremolo).coerceIn(0f, 1f)
+        // Map the measured envelope −1..1 to one visible 0..1 pulse. The
+        // smootherstep gives gold-on-parchment enough contrast without moving
+        // either the reveal edge or the acoustic crest.
+        val on = inkSmootherstep((tremolo.coerceIn(-1f, 1f) + 1f) * 0.5f)
+        val crest = inkSmootherstep(tremolo.coerceIn(0f, 1f))
         val d = depth.coerceIn(0f, 1f)
         val mult = 1f - g * d * (1f - on) * (1f - GLINT_RESONANCE_TROUGH_FLOOR)
-        return GlintResonance(peak = g * on * d, layerMult = mult)
+        return GlintResonance(peak = g * crest * d, layerMult = mult)
     }
 
     /**
