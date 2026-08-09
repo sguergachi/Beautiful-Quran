@@ -96,8 +96,9 @@ the voice's reverberation is the glimmer. The attack/release ramp
 (`tremoloGain`) blends the transitions so no detection edge pops.
 
 The shimmer is the **build to the climax**: it engages as the hold's
-reverberation starts (the hold gate is short, ~300 ms, so the build-up
-shows before the peak) and rides the whole crescent. A linear trend is removed
+reverberation starts (the hold gate is short, ~300 ms, and the minimum
+analysis window only ~320 ms, so the build-up shows before the peak)
+and rides the whole crescent. A linear trend is removed
 before periodicity is measured, and alternating crossings must prove the
 residual actually oscillates; a plain crescendo or sub-band swell cannot
 masquerade as tarjīʿ. A **deep-AM fallback** keeps an already acquired event
