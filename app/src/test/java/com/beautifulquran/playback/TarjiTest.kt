@@ -3,6 +3,7 @@ package com.beautifulquran.playback
 import com.beautifulquran.ui.reader.TarjiWordGate
 import kotlin.math.PI
 import kotlin.math.sin
+import kotlin.math.sqrt
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -151,6 +152,49 @@ class TarjiTest {
     }
 
     @Test
+    fun `tremolo stays phase-locked across the admitted band`() {
+        val cases = listOf(
+            1.5f to 0.12f,
+            5.5f to 0.12f,
+            8f to 0.12f,
+            Tarji.MAX_TREMOLO_HZ to 0.2f,
+        )
+        for ((amHz, amDepth) in cases) {
+            val d = Tarji()
+            val wave = heldNote(
+                seconds = 5f,
+                pitchHz = 130f,
+                amHz = amHz,
+                amDepth = amDepth,
+            )
+            var cross = 0f
+            var voiceEnergy = 0f
+            var tremoloEnergy = 0f
+            var locked = 0
+            var i = 0
+            while (i + Tarji.HOP_SAMPLES <= wave.size) {
+                d.onSamples8k(wave.copyOfRange(i, i + Tarji.HOP_SAMPLES))
+                if (d.reverberating) {
+                    val t = (i + Tarji.HOP_SAMPLES / 2) / Tarji.SAMPLE_RATE.toFloat()
+                    val voice = sin(2f * PI.toFloat() * amHz * t)
+                    cross += voice * d.tremolo
+                    voiceEnergy += voice * voice
+                    tremoloEnergy += d.tremolo * d.tremolo
+                    locked++
+                }
+                i += Tarji.HOP_SAMPLES
+            }
+
+            assertTrue("$amHz Hz detector never locked", locked > 20)
+            val correlation = cross / sqrt(voiceEnergy * tremoloEnergy)
+            assertTrue(
+                "$amHz Hz shimmer must follow the voice (correlation=$correlation)",
+                correlation > 0.85f,
+            )
+        }
+    }
+
+    @Test
     fun `steady hold without reverberation stays still`() {
         val d = Tarji()
         feed(d, heldNote(seconds = 2.5f, pitchHz = 130f))
@@ -229,16 +273,50 @@ class TarjiTest {
     }
 
     @Test
-    fun `raising the ceiling within the measurable band admits fast vocal texture`() {
-        // ~17 Hz envelope texture with strong depth: rejected at the shipped
-        // ceiling but admitted when the Ink Lab slider is opened to 25 Hz.
-        val capped = Tarji()
-        feed(capped, heldNote(seconds = 2.5f, pitchHz = 130f, amHz = 17f, amDepth = 0.3f))
-        assertFalse(capped.reverberating)
-        val open = Tarji()
-        open.maxTremoloHz = 25f
-        feed(open, heldNote(seconds = 2.5f, pitchHz = 130f, amHz = 17f, amDepth = 0.3f))
-        assertTrue(open.reverberating)
+    fun `a configured ceiling above the phase-safe band cannot admit inverted texture`() {
+        // The 80 ms RMS window has its first null at 12.5 Hz and inverts the
+        // envelope above it. A stale 25 Hz Lab value must not make a 17 Hz
+        // pulse animate opposite to the voice.
+        val d = Tarji().apply { maxTremoloHz = 25f }
+        feed(d, heldNote(seconds = 2.5f, pitchHz = 130f, amHz = 17f, amDepth = 0.3f))
+        assertFalse(d.reverberating)
+    }
+
+    @Test
+    fun `a quieter pulse after a loud steady onset acquires the real event`() {
+        val d = Tarji()
+        val wordGate = TarjiWordGate()
+        val loudOnset = heldNote(seconds = 1.5f, pitchHz = 130f, level = 0.35f)
+        var consumed = 0
+        while (consumed + Tarji.HOP_SAMPLES <= loudOnset.size) {
+            d.onSamples8k(loudOnset.copyOfRange(consumed, consumed + Tarji.HOP_SAMPLES))
+            wordGate.allows(d.tremoloGain, d.reverberating)
+            consumed += Tarji.HOP_SAMPLES
+        }
+        assertFalse(d.reverberating)
+
+        val quietPulse = heldNote(
+            seconds = 2.5f,
+            pitchHz = 130f,
+            amHz = 5.5f,
+            amDepth = 0.12f,
+            level = 0.06f,
+        )
+        consumed = 0
+        var lateVisibleHops = 0
+        while (consumed + Tarji.HOP_SAMPLES <= quietPulse.size) {
+            d.onSamples8k(quietPulse.copyOfRange(consumed, consumed + Tarji.HOP_SAMPLES))
+            consumed += Tarji.HOP_SAMPLES
+            val visible = wordGate.allows(d.tremoloGain, d.reverberating)
+            if (consumed >= 1.7f * Tarji.SAMPLE_RATE && visible) {
+                lateVisibleHops++
+            }
+        }
+
+        assertTrue("the level step must not consume the later coherent pulse", d.reverberating)
+        assertTrue(d.tremoloGain > 0.5f)
+        assertTrue(d.lastRateHz in 5f..6f)
+        assertTrue("the word gate must still show the real event", lateVisibleHops >= 30)
     }
 
     @Test
@@ -351,6 +429,28 @@ class TarjiTest {
         assertTrue(
             "rate must read ~5 Hz, not ~5.6 (${d.lastRateHz})",
             d.lastRateHz in 4.5f..5.5f,
+        )
+    }
+
+    @Test
+    fun `pitch tracking follows the decimated stream rate`() {
+        fun pitchAt(sampleRate: Int, hopSamples: Int): Float {
+            val d = Tarji().apply { this.hopSamples = hopSamples }
+            val wave = FloatArray(sampleRate * 2) {
+                val t = it / sampleRate.toFloat()
+                (0.3f * sin(2f * PI.toFloat() * 130f * t)).toFloat()
+            }
+            feed(d, wave)
+            return d.lastPitchHz
+        }
+
+        val pitch8k = pitchAt(sampleRate = 8_000, hopSamples = 160)
+        val pitch8820 = pitchAt(sampleRate = 8_820, hopSamples = 176)
+        assertEquals(
+            "the same voice must not shift when 44.1 kHz decimates to 8.82 kHz",
+            pitch8k,
+            pitch8820,
+            2f,
         )
     }
 

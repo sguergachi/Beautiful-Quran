@@ -1,5 +1,6 @@
 package com.beautifulquran.ui.reader
 
+import com.beautifulquran.playback.Tarji
 import com.beautifulquran.ui.theme.ContextualGuideTuning
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -80,6 +81,17 @@ class InkLabStoreTest {
         assertEquals(defaults.tajweedPacing, snap.tajweedPacing)
         assertEquals(defaults.waslHandoff, snap.waslHandoff, 0.0001f)
         assertEquals(ContextualGuideTuning(), snap.toContextualGuideTuning())
+    }
+
+    @Test
+    fun staleTarjiCeiling_isClampedWhenRestored() {
+        val tuning = InkLabSnapshot(glintResonanceMaxHz = 25f).toTuning()
+
+        assertEquals(
+            Tarji.MAX_MEASURABLE_TREMOLO_HZ,
+            tuning.glintResonanceMaxHz,
+            0f,
+        )
     }
 
     @Test

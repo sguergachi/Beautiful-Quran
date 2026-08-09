@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.SharedPreferences
 import androidx.core.content.edit
 import com.beautifulquran.domain.TajweedPacing
+import com.beautifulquran.playback.Tarji
 import com.beautifulquran.ui.theme.ContextualGuideTuning
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -83,13 +84,13 @@ data class InkLabSnapshot(
     val glintResonance: Boolean = true,
     val glintResonanceDepth: Float = InkEngine.GLINT_RESONANCE_DEPTH,
     val glintResonanceMaxHz: Float = InkEngine.GLINT_RESONANCE_MAX_HZ,
-    val tarjiMinHz: Float = com.beautifulquran.playback.Tarji.MIN_TREMOLO_HZ,
-    val tarjiHoldMinMs: Float = com.beautifulquran.playback.Tarji.HOLD_MIN_MS.toFloat(),
-    val tarjiMinDepth: Float = com.beautifulquran.playback.Tarji.MIN_TREMOLO_DEPTH,
-    val tarjiMinPeriodicity: Float = com.beautifulquran.playback.Tarji.MIN_PERIODICITY,
-    val tarjiPitchDrift: Float = com.beautifulquran.playback.Tarji.MAX_PITCH_DRIFT,
-    val tarjiAttackMs: Float = com.beautifulquran.playback.Tarji.ATTACK_MS,
-    val tarjiReleaseMs: Float = com.beautifulquran.playback.Tarji.RELEASE_MS,
+    val tarjiMinHz: Float = Tarji.MIN_TREMOLO_HZ,
+    val tarjiHoldMinMs: Float = Tarji.HOLD_MIN_MS.toFloat(),
+    val tarjiMinDepth: Float = Tarji.MIN_TREMOLO_DEPTH,
+    val tarjiMinPeriodicity: Float = Tarji.MIN_PERIODICITY,
+    val tarjiPitchDrift: Float = Tarji.MAX_PITCH_DRIFT,
+    val tarjiAttackMs: Float = Tarji.ATTACK_MS,
+    val tarjiReleaseMs: Float = Tarji.RELEASE_MS,
     val tarjiEarDelayMs: Float = 0f,
     val guideBodyEdge: Float = 0.5f,
     val guideFeatherWidth: Float = 0.2819f,
@@ -136,7 +137,10 @@ data class InkLabSnapshot(
         holdCreep = holdCreep,
         glintResonance = glintResonance,
         glintResonanceDepth = glintResonanceDepth,
-        glintResonanceMaxHz = glintResonanceMaxHz,
+        glintResonanceMaxHz = glintResonanceMaxHz.coerceIn(
+            Tarji.MIN_TREMOLO_HZ,
+            Tarji.MAX_MEASURABLE_TREMOLO_HZ,
+        ),
         tarjiMinHz = tarjiMinHz,
         tarjiHoldMinMs = tarjiHoldMinMs,
         tarjiMinDepth = tarjiMinDepth,
