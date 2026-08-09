@@ -1133,6 +1133,74 @@ class TarjiTest {
     }
 
     @Test
+    fun `Alafasy one seven - the pulse magnitude builds with the swell, soft at the start`() {
+        // The shimmer must arrive soft: the on/off depth (tremoloGain) starts
+        // near zero when the waqf's reverberation is first detected and only
+        // reaches its full strength as the swell approaches the crest. A
+        // full-depth pulse from the very first detected hop reads as a harsh
+        // blink — the build is the crescendo itself.
+        val samples = wavResource("alfasy_1_7_8k.wav")
+        val d = Tarji()
+        var consumed = 0
+        var firstRev = -1
+        var hops = 0
+        var buildGain = -1f
+        var nearCrestGain = -1f
+        while (consumed + Tarji.HOP_SAMPLES <= samples.size) {
+            d.onSamples8k(samples.copyOfRange(consumed, consumed + Tarji.HOP_SAMPLES))
+            consumed += Tarji.HOP_SAMPLES
+            hops++
+            val t = consumed / Tarji.SAMPLE_RATE.toFloat()
+            if (!d.reverberating) continue
+            if (firstRev < 0) firstRev = hops
+            val since = hops - firstRev
+            if (since in 6..18) buildGain = maxOf(buildGain, d.tremoloGain)
+            if (t in 9.6f..10.2f) nearCrestGain = maxOf(nearCrestGain, d.tremoloGain)
+        }
+        assertTrue("shimmer must engage within the waqf hold", firstRev >= 0)
+        assertTrue(
+            "the shimmer must settle to near full depth near the crest " +
+                "(near-crest peak: ${"%.2f".format(nearCrestGain)})",
+            nearCrestGain > 0.8f,
+        )
+        assertTrue(
+            "the first pulses must be soft, far below the depth reached near the crest " +
+                "(build: ${"%.2f".format(buildGain)}, near-crest: ${"%.2f".format(nearCrestGain)})",
+            buildGain < 0.5f * nearCrestGain,
+        )
+    }
+
+    @Test
+    fun `the shimmer magnitude ramps into the swell instead of starting at full depth`() {
+        // A held vibrato note must not blink at full on/off depth from the
+        // first detected hop: the depth eases in over the event's build.
+        val d = Tarji()
+        var consumed = 0
+        var firstRev = -1
+        var hops = 0
+        var early = -1f
+        var settled = -1f
+        val wave = heldNote(seconds = 3f, pitchHz = 130f, amHz = 2.5f, amDepth = 0.1f)
+        while (consumed + Tarji.HOP_SAMPLES <= wave.size) {
+            d.onSamples8k(wave.copyOfRange(consumed, consumed + Tarji.HOP_SAMPLES))
+            consumed += Tarji.HOP_SAMPLES
+            hops++
+            if (!d.reverberating) continue
+            if (firstRev < 0) firstRev = hops
+            val since = hops - firstRev
+            if (since in 5..15) early = maxOf(early, d.tremoloGain)
+            if (since >= 70) settled = maxOf(settled, d.tremoloGain)
+        }
+        assertTrue("a vibrato hold must be detected", firstRev >= 0)
+        assertTrue("the depth must settle to full", settled > 0.8f)
+        assertTrue(
+            "the first pulses must be soft, far below the settled depth " +
+                "(early: ${"%.2f".format(early)}, settled: ${"%.2f".format(settled)})",
+            early < 0.5f * settled,
+        )
+    }
+
+    @Test
     fun `Hani one seven - the echoing fast hold engages without relighting the tail`() {
         val samples = wavResource("hani_1_7_8k.wav")
         val detector = Tarji()

@@ -98,7 +98,9 @@ the voice's reverberation is the glimmer. The attack/release ramp
 The shimmer is the **build to the climax**: it engages as the hold's
 reverberation starts (the hold gate is short, ~300 ms, and the minimum
 analysis window only ~320 ms, so the build-up shows before the peak)
-and rides the whole crescent. A linear trend is removed
+and rides the whole crescent, its on/off depth ramping in over the
+event's first second so the crescendo opens soft instead of blinking on
+at full strength. A linear trend is removed
 before periodicity is measured, and alternating crossings must prove the
 residual actually oscillates; a plain crescendo or sub-band swell cannot
 masquerade as tarjīʿ. A **deep-AM fallback** keeps an already acquired event
@@ -142,7 +144,10 @@ shimmer **settles with the voice**: its strength follows the envelope's
 remaining intensity — full while the swell is strong (≥ 0.75 of the
 detected event's peak) and fading as the voice dies toward the gate — so the word's
 end reads as the effect drying, never as a full-strength pulse past the
-climax. The dry-down uses a 50 ms time constant and the pulse signal is
+climax. It also **builds with the voice**: the on/off depth ramps in over
+the event's own first second, so the first pulses of a waqf hold are soft
+and the full magnitude is reached only as the swell approaches its crest —
+never a full-depth blink from the first detected hop. The dry-down uses a 50 ms time constant and the pulse signal is
 gain-damped, falling below the visual gate in about 200 ms, so the
 decaying tail after a waqf hold never flickers, and a deep vibrato never
 trips its own gate (the troughs stay above the gate). Mid-hold detection
