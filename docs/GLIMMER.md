@@ -81,9 +81,9 @@ The glint **listens for it directly**. `VoiceTapAudioProcessor` mirrors the
 player's own PCM (no mic permission, no Visualizer — which also means it
 works on every output route and emulator), and `playback/Tarji` — a pure,
 unit-tested DSP core — tracks a **single held note** (voiced, pitch-stable
-≥ ~0.3 s) and scans its amplitude envelope for a periodic oscillation in the
-phase-safe tarjīʿ band (~1.5–10 Hz, tunable downward via the Ink Lab's
-**Tarjīʿ max rate**). The pulse only answers on words carrying a **strong
+≥ ~0.3 s) and scans both intensity and fundamental-frequency movement for a
+periodic oscillation in the tarjīʿ band (~1.5–10 Hz, tunable downward via the
+Ink Lab's **Tarjīʿ max rate**). The pulse only answers on words carrying a **strong
 tajweed hold of their own** — a long madd, a ghunnah (the shadda نّ of
 ٱلنَّارِ), or the verse-closing waqf (`TajweedPacing.Curve.hasStrongHold`;
 a wasl entry alone sustains the previous word's nūn and never qualifies) —
@@ -109,10 +109,23 @@ self-evidently vibrating. Evidence readiness is derived from the slowest
 configured period, and ten hops without coherent pulse evidence end the event.
 The fallback cannot carry Alafasy's ḍād event onward through the
 later lām/nūn merely because their envelope or room echo is uneven.
-The pulse rate is **tracked with lag hysteresis**, so it stays locked to
-the voice's period instead of flapping across the autocorr's broad peak. A
+The pulse rate is **tracked with lag hysteresis** for event evidence. It does
+not generate or rotate the visible phase: rate bins can jump across a broad
+autocorrelation peak on echo-heavy recordings. A
 new note scans only lags backed by its own samples; stale bins from the prior
 note are never eligible.
+
+Pitch vibrato and amplitude tremolo are separate evidence channels. The
+established 80 ms pitch tracker still owns hold identity, while a short,
+sub-lag YIN track detects periodic F0 motion without shifting any event or word
+boundary. Either channel may acquire tarjīʿ; when both exist, intensity owns
+the visual polarity because its swell/trough direction is what the listener
+hears directly. The loudness-step guard applies only to AM: coherent pitch
+vibrato may still acquire after an echo-heavy attack, and unsafe AM evidence
+cannot capture that FM event's visual polarity. Pitch alone drives the shimmer
+when safe AM is absent. The chosen phase channel remains fixed while it is
+coherent, preventing a near-threshold AM track from flipping an FM-driven
+glint by one frame.
 
 The effect stops when the voice releases. The detector tracks the
 hold's envelope with a fast level EMA. Its peak reference starts when the
@@ -128,15 +141,21 @@ shimmer **settles with the voice**: its strength follows the envelope's
 remaining intensity — full while the swell is strong (≥ 0.75 of the
 detected event's peak) and fading as the voice dies toward the gate — so the word's
 end reads as the effect drying, never as a full-strength pulse past the
-climax. The dry-down uses a 60 ms time constant and the pulse signal is
-gain-damped, falling below the visual gate in about 240 ms, so the
+climax. The dry-down uses a 50 ms time constant and the pulse signal is
+gain-damped, falling below the visual gate in about 200 ms, so the
 decaying tail after a waqf hold never flickers, and a deep vibrato never
 trips its own gate (the troughs stay above the gate). Mid-hold detection
 lulls are bridged by the slower release so the hold breathes without
 blinking.
 
-**Tarjīʿ** is that **on/off plus a brightness crest**. The detector preserves
-the signed envelope: positive is the audible swell, negative is its trough.
+**Tarjīʿ** is that **on/off plus a brightness crest**. Event detection uses
+the long detrended tracks, but the visible phase comes from the current 20 ms
+RMS hop against a cycle-separated linear baseline, so a crescendo cannot bias
+the pulse. For pitch-only vibrato, the signed short-YIN residual is the
+fallback. Its actual lag-derived support centre is projected locally to the
+live hop; neither path uses rate-dependent phase rotation. Positive is the
+audible swell (or higher F0 when no intensity pulse exists), negative is its
+trough.
 The layer follows one smootherstepped `−1..1 → 0..1` cycle and only the
 positive crest boosts tint/halo colour (`GLINT_RESONANCE_PEAK_BOOST`). Never
 take `abs(tremolo)`: that makes the quiet trough bright and doubles the visual
@@ -173,7 +192,7 @@ that effective rate, and `VoiceEnergy`
 publishes after every hop. Do not
 batch the renderer handoff: the old 2,048-sample accumulator exposed only
 about four states per second and necessarily undersampled a 5–10 Hz shimmer.
-The delay, rate read, and phase lead are therefore all in true content time.
+The delay, rate read, and live phase are therefore all in true content time.
 The live detector readout reports the applied total
 (`ear +N ms`) for diagnosis.
 
