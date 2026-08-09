@@ -1124,6 +1124,8 @@ private fun Modifier.layeredGlintHalo(motion: InkMotion, rtl: Boolean): Modifier
 private fun rememberTarjiGate(
     active: Boolean,
     eligible: Boolean,
+    activation: Long,
+    repeat: Boolean,
 ): State<InkEngine.GlintResonance> {
     val frame = remember {
         mutableStateOf(InkEngine.GlintResonance.Idle)
@@ -1131,16 +1133,17 @@ private fun rememberTarjiGate(
     val run = active && eligible &&
         InkEngine.tuning.glintResonance &&
         InkEngine.tuning.glintResonanceDepth > 0f
-    LaunchedEffect(run) {
+    LaunchedEffect(run, activation, repeat) {
         if (!run) {
             frame.value = InkEngine.GlintResonance.Idle
             return@LaunchedEffect
         }
+        val eventGate = TarjiWordGate()
         while (true) {
             withFrameNanos {
                 val voice = com.beautifulquran.playback.VoiceEnergy.active
                 val g = voice?.shimmerGain ?: 0f
-                frame.value = if (g > 0.01f) {
+                frame.value = if (eventGate.allows(g, voice?.reverberating == true)) {
                     InkEngine.glintResonance(
                         holding = true,
                         tremolo = voice?.tremolo ?: 0f,
@@ -1223,6 +1226,8 @@ private fun rememberInkMotions(
             tarji = rememberTarjiGate(
                 active = isActive,
                 eligible = tarjiEligible,
+                activation = wordActivation,
+                repeat = ink.repeat,
             ),
         )
         predecessor = sweep.progress

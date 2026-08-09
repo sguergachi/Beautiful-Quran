@@ -1,6 +1,7 @@
 package com.beautifulquran.playback
 
 import kotlin.math.abs
+import kotlin.math.ceil
 import kotlin.math.sqrt
 
 /**
@@ -20,9 +21,9 @@ import kotlin.math.sqrt
  * out so neither detection edge ever pops.
  *
  * Tarjīʿ is the *climax* of the hold: once the smoothed envelope falls
- * below half the hold's peak (the voice releases), the reverberation is
- * over and the effect stops — a fast dry-down, no flicker through the
- * decaying tail.
+ * below half the detected event's peak (the voice releases), the
+ * reverberation is over and the effect stops — a fast dry-down, no flicker
+ * through the decaying tail.
  *
  * Fed by [VoiceEnergy.onPcm16]; consumed read-only from the glint draw
  * path via the volatile mirrors in [VoiceEnergy].
@@ -132,9 +133,11 @@ class Tarji {
     private val corrs = FloatArray(MAX_LAG + 1)
     private var frameFill = 0
 
-    // Per-hop envelope RMS series (48 hops ≈ 1 s).
+    // Per-hop envelope RMS series (64 hops ≈ 1.3 s).
     private val env = FloatArray(ENV_HOPS)
-    private val envCorr = FloatArray(MAX_ENV_LAG + 1)
+    private val envCorr = FloatArray(MAX_ENV_LAG + 2)
+    private val envRawCorr = FloatArray(MAX_ENV_LAG + 2)
+    private val envResidual = FloatArray(ENV_HOPS)
     private var envCount = 0
 
     private var holdPitchHz = 0f
@@ -151,9 +154,13 @@ class Tarji {
     // well above the gate, so a deep hold never trips its own gate. A short
     // persistence kills single-hop noise dips.
     private var climaxLevel = 0f
-    private var holdPeak = 0f
+    private var eventPeak = 0f
     private var endOfHold = false
     private var climaxUnder = 0
+    private var pulseUnder = 0
+    private var steadyGap = 0
+    private var eventRateHz = 0f
+    private var levelTransitionGrace = 0
 
     /** Consume [length] mono samples at the decimated rate (≈8 kHz). Called
      * on the audio thread. */
@@ -186,9 +193,13 @@ class Tarji {
         peak = 0f
         tremoloSmoothed = 0f
         climaxLevel = 0f
-        holdPeak = 0f
+        eventPeak = 0f
         endOfHold = false
         climaxUnder = 0
+        pulseUnder = 0
+        steadyGap = 0
+        eventRateHz = 0f
+        levelTransitionGrace = 0
         trackedLag = 0
         frameFill = 0
         envCount = 0
@@ -221,7 +232,6 @@ class Tarji {
             val sameNote = holdPitchHz > 0f && samePitch(pitchHz, holdPitchHz)
             if (holdMs > 0f && sameNote) {
                 holdMs += HOP_MS
-                holdPeak = maxOf(holdPeak, rms)
                 // Track in the anchor's own octave — single-hop octave flips
                 // (lag L vs 2L scoring within noise) must not drag it.
                 var p = pitchHz
@@ -233,8 +243,12 @@ class Tarji {
                 holdMs = HOP_MS.toFloat()
                 holdPitchHz = pitchHz
                 holdStartEnvCount = envCount
-                holdPeak = rms
+                eventPeak = 0f
                 climaxUnder = 0
+                pulseUnder = 0
+                steadyGap = 0
+                eventRateHz = 0f
+                levelTransitionGrace = 0
                 endOfHold = false
                 trackedLag = 0
             }
@@ -246,15 +260,15 @@ class Tarji {
             trackedLag = 0
         }
 
-        updateTremolo(rms)
+        updateTremolo()
 
         // The shimmer settles with the voice: its strength follows the
         // envelope's remaining intensity, full while the swell is strong
-        // (≥ [CLIMAX_FULL] of the hold's peak) and fading as the voice
+        // (≥ [CLIMAX_FULL] of the event's peak) and fading as the voice
         // dies toward the climax gate — the end of the word reads as the
         // effect drying, never as a full-strength pulse after the climax.
         val target = if (reverberating) {
-            val level = if (holdPeak > 0f) climaxLevel / holdPeak else 1f
+            val level = if (eventPeak > 0f) climaxLevel / eventPeak else 1f
             ((level - CLIMAX_OFF) / (CLIMAX_FULL - CLIMAX_OFF)).coerceIn(0f, 1f)
         } else {
             0f
@@ -278,7 +292,7 @@ class Tarji {
     }
 
     /** Envelope oscillation scan over the held note's own envelope. */
-    private fun updateTremolo(latestRms: Float) {
+    private fun updateTremolo() {
         // Only envelope samples from within the hold: the syllable attack
         // ramp would otherwise poison the depth estimate for ~1 s.
         val n = minOf(envCount - holdStartEnvCount, ENV_HOPS)
@@ -295,67 +309,106 @@ class Tarji {
             endOfHold = true
             return
         }
+
+        // Remove the local level trend before measuring modulation. Merely
+        // subtracting the mean makes a crescendo highly autocorrelated and
+        // can report a plain rising note as a fast pulse.
+        val centre = (n - 1) * 0.5f
+        var slopeNumerator = 0f
+        var slopeDenominator = 0f
+        for (j in 0 until n) {
+            val x = j - centre
+            slopeNumerator += x * (env[(start + j) % ENV_HOPS] - mean)
+            slopeDenominator += x * x
+        }
+        val slope = slopeNumerator / slopeDenominator.coerceAtLeast(1f)
         var sumSq = 0f
         for (j in 0 until n) {
-            val d = env[(start + j) % ENV_HOPS] - mean
-            sumSq += d * d
+            val residual = env[(start + j) % ENV_HOPS] - (mean + slope * (j - centre))
+            envResidual[j] = residual
+            sumSq += residual * residual
         }
         val amp = sqrt(2f * sumSq / n) // sine-amplitude estimate
         val depth = amp / mean
 
-        // Periodicity of the demeaned envelope: autocorrelation over the
-        // tarjīʿ band (1.5 Hz … maxTremoloHz). Robust where crossings fail —
-        // reciters pulse anywhere from slow ~2 Hz swells (Hani) to ~6–8 Hz
-        // vibrato (Alafasy).
-        val minLag = (1000f / (maxTremoloHz * HOP_MS)).toInt()
-            .coerceIn(2, MAX_ENV_LAG - 4)
-        var bestC = 0f
-        var bestLag = 0
-        for (lag in 2..MAX_ENV_LAG) {
-            if (n - lag < MIN_ENV_HOPS / 2) break
+        val minHz = minTremoloHz.coerceIn(MIN_TREMOLO_HZ, MAX_MEASURABLE_TREMOLO_HZ)
+        val maxHz = maxTremoloHz.coerceIn(minHz, MAX_MEASURABLE_TREMOLO_HZ)
+        val minLag = ceil(1000f / (maxHz * HOP_MS)).toInt()
+            .coerceIn(2, MAX_ENV_LAG)
+        val maxBandLag = (1000f / (minHz * HOP_MS)).toInt()
+            .coerceIn(minLag, MAX_ENV_LAG)
+        val crossingThreshold = amp * 0.1f
+        var previousSign = 0
+        var crossings = 0
+        for (j in 0 until n) {
+            val sign = when {
+                envResidual[j] > crossingThreshold -> 1
+                envResidual[j] < -crossingThreshold -> -1
+                else -> 0
+            }
+            if (sign != 0) {
+                if (previousSign != 0 && sign != previousSign) crossings++
+                previousSign = sign
+            }
+        }
+        val crossingRateHz = crossings * 1000f / (2f * (n - 1) * HOP_MS)
+        val oscillatory = crossings >= 2 &&
+            crossingRateHz in (minHz - 0.5f)..(maxHz + 1f)
+
+        // Periodicity of the detrended envelope: autocorrelation over the
+        // tarjīʿ band (1.5 Hz … maxTremoloHz). Alternating residual crossings
+        // first prove that the shape actually oscillates; correlation then
+        // measures its period without mistaking a crescendo for a pulse.
+        // One extra lag is evaluated for the above-ceiling harmonic guard.
+        val maxComputedLag = minOf(MAX_ENV_LAG + 1, n - MIN_CORR_PAIRS)
+        for (lag in 2..maxComputedLag) {
             var corr = 0f
             var e0 = 0f
             var eL = 0f
+            var rawCorr = 0f
+            var rawE0 = 0f
+            var rawEL = 0f
             for (j in 0 until n - lag) {
-                val a = env[(start + j) % ENV_HOPS] - mean
-                val b = env[(start + j + lag) % ENV_HOPS] - mean
+                val a = envResidual[j]
+                val b = envResidual[j + lag]
                 corr += a * b
                 e0 += a * a
                 eL += b * b
+                val rawA = env[(start + j) % ENV_HOPS] - mean
+                val rawB = env[(start + j + lag) % ENV_HOPS] - mean
+                rawCorr += rawA * rawB
+                rawE0 += rawA * rawA
+                rawEL += rawB * rawB
             }
-            val norm = corr / (sqrt(e0 * eL) + 1e-9f)
-            envCorr[lag] = norm
-            if (lag >= minLag && norm > bestC) {
-                bestC = norm
-                bestLag = lag
-            }
+            envCorr[lag] = corr / (sqrt(e0 * eL) + 1e-9f)
+            envRawCorr[lag] = rawCorr / (sqrt(rawE0 * rawEL) + 1e-9f)
         }
 
-        // Stay on the envelope's period once acquired: the autocorr's band
-        // peak is broad and the best lag can flap hop to hop on real vibrato
-        // (5.5 → 10 → 2.8 Hz in a single hold), which would make the shimmer
-        // pulse at a different rate than the voice. Keep the previous lag
-        // while its correlation is still respectable — and never trust a
-        // switch when the whole autocorr has collapsed (bestC below
-        // [TRACKED_SWITCH_FLOOR] means the peak is noise).
-        val acquired = trackedLag !in 2..MAX_ENV_LAG
+        val candidateMax = minOf(maxBandLag, maxComputedLag)
+        var bandBestC = 0f
+        var rawBandBestC = 0f
+        var bestC = 0f
+        var bestLag = 0
+        if (candidateMax >= minLag) {
+            for (lag in minLag..candidateMax) {
+                val c = envCorr[lag]
+                bandBestC = maxOf(bandBestC, c)
+                rawBandBestC = maxOf(rawBandBestC, envRawCorr[lag])
+                if (c > bestC) {
+                    bestC = c
+                    bestLag = lag
+                }
+            }
+        }
+        if (!oscillatory) bestLag = 0
+
+        val acquiring = trackedLag !in minLag..maxBandLag
         trackedLag = when {
-            acquired -> bestLag
+            acquiring -> bestLag
             bestLag == 0 -> trackedLag
             bestC < TRACKED_SWITCH_FLOOR -> trackedLag
             envCorr[trackedLag] >= TRACKED_LAG_KEEP * bestC -> trackedLag
             else -> bestLag
-        }
-        if (acquired && trackedLag > 0 && bestC > 0f) {
-            // Octave-stable start: tarjīʿ is the *slow* swell — when the
-            // broad peak ties a period with its double (10 Hz texture vs the
-            // 5 Hz swell), the slowest equally-strong lag is the voice's
-            // period, not the texture's harmonic. Same rule the pitch uses.
-            var slowest = trackedLag
-            for (lag in trackedLag + 1..MAX_ENV_LAG) {
-                if (envCorr[lag] >= OCTAVE_START_KEEP * bestC) slowest = lag
-            }
-            trackedLag = slowest
         }
         val rateHz =
             if (trackedLag > 0) 1000f / (trackedLag * HOP_MS.toFloat()) else 0f
@@ -363,75 +416,125 @@ class Tarji {
 
         // Keep the signal smoothing even while gated off, so a lock-on starts
         // from the live envelope rather than a stale frozen value.
-        val raw = ((latestRms - mean) / amp).coerceIn(-1.5f, 1.5f)
+        val raw = if (amp > 1e-6f) {
+            (envResidual[n - 1] / amp).coerceIn(-1.5f, 1.5f)
+        } else {
+            0f
+        }
         val prev = tremoloSmoothed
         tremoloSmoothed += TREMOLO_EMA * (raw - tremoloSmoothed)
 
-        // Hysteresis: stricter to switch on than to stay on — no flapping
-        // when the reverberation breathes near the gate. Gates are Ink-Lab-
-        // tunable (see [holdMinMs], [minPeriodicity], [minTremoloDepth],
-        // [minTremoloHz], [maxTremoloHz]).
-        val minHz = minTremoloHz.coerceAtLeast(0.5f)
-        val maxHz = maxTremoloHz.coerceAtLeast(minHz)
         val depthGate = minTremoloDepth.coerceAtLeast(0f)
         val periodGate = minPeriodicity.coerceIn(0.05f, 1f)
         val longEnough = holdMs >= holdMinMs.coerceAtLeast(0f)
 
-        // Ceiling-cheat guard: a pulse above the ceiling must not slip in as
-        // its own double/triple period (5.5 Hz reading as 2.8 Hz under a
-        // 4 Hz ceiling). Only the (maxHz, 2×maxHz) cheat zone is scanned — a
-        // pick's *true* double lives there — so coexisting fast vocal texture
-        // (~10–25 Hz under a 10 Hz ceiling) never vetoes a real slow swell,
-        // which is what the old wide scan did (it killed tarjīʿ on Alafasy
-        // and Hani 1:7 when texture rode on the slow swell). The check runs
-        // against the tracked period — the one the gates actually use.
+        // Ceiling-cheat guard: only current, local peaks above the configured
+        // ceiling may veto an in-band period. This also keeps a new note from
+        // inheriting stale correlation bins from the preceding note.
         val cheatLo = (1000f / (2f * maxHz * HOP_MS)).toInt() + 1
+        val cheatHi = minOf(minLag - 1, maxComputedLag - 1)
         var shortPeakLag = 0
         var shortPeakC = 0f
-        for (lag in cheatLo until minLag) {
-            val c = envCorr[lag]
-            if (c > shortPeakC) {
-                shortPeakC = c
-                shortPeakLag = lag
+        if (cheatHi >= cheatLo) {
+            for (lag in maxOf(2, cheatLo)..cheatHi) {
+                val c = envCorr[lag]
+                val localPeak = c >= envCorr[lag - 1] && c >= envCorr[lag + 1]
+                if (localPeak && c > shortPeakC) {
+                    shortPeakC = c
+                    shortPeakLag = lag
+                }
             }
         }
         val harmonicLeak = shortPeakLag >= 2 && trackedLag > 0 &&
             trackedLag % shortPeakLag == 0 && trackedLag > shortPeakLag &&
-            // Only the pick's 2×/3× — the true ceiling cheat. Harmonics
-            // further out (a 2.1 Hz swell's 8th harmonic at 16.7 Hz) are
-            // voice texture riding the swell, not a cheat.
             trackedLag <= 3 * shortPeakLag &&
-            shortPeakC >= HARMONIC_OF_BEST * bestC
-        // Deep enough AM is self-evidently a vibration even when the swell is
-        // irregular: real crescents (Alafasy 1:7's build to the waqf) pulse
-        // unevenly and their envelope autocorrelation drops to ~0.1–0.3 while
-        // the voice is clearly shaking — the periodicity gate alone would
-        // drop the shimmer exactly at the climax. The rate band and the
-        // harmonic-leak guard still hold (a fast flutter must never enter as
-        // its own double period), and shallow noise swells stay rejected by
-        // the autocorr.
-        val deep = depth >= DEEP_DEPTH_GATE && rateHz in minHz..maxHz &&
-            !harmonicLeak
-        val periodic = (bestC >= periodGate && !harmonicLeak &&
-            rateHz in minHz..maxHz) || deep
-        val stillPeriodic = (bestC >= periodGate * 0.7f && !harmonicLeak &&
-            rateHz in (minHz - 0.5f)..(maxHz + 1f)) ||
-            (depth >= DEEP_DEPTH_GATE * DEPTH_OFF_RATIO && !harmonicLeak &&
-                rateHz in (minHz - 0.5f)..(maxHz + 1f))
-        // The climactic reverberation ends with the voice: once the fast
-        // envelope level has sat below [CLIMAX_OFF] of the hold's own peak
-        // for [CLIMAX_PERSIST] hops, the strong swell is over and the effect
-        // must stop — the dying tail is not tarjīʿ. The gate sits above the
-        // vibrato's smoothed troughs so a deep hold never trips its own gate.
-        val under = holdPeak > 0f && climaxLevel < CLIMAX_OFF * holdPeak
+            shortPeakC >= HARMONIC_OF_BEST * bandBestC
+        val coherent = trackedLag > 0 && oscillatory && bandBestC >= periodGate && !harmonicLeak &&
+            rateHz in minHz..maxHz
+        val lifecycleCoherent = trackedLag > 0 && oscillatory && rawBandBestC >= periodGate &&
+            !harmonicLeak && rateHz in minHz..maxHz
+        // Deep AM may bridge an irregular climax only after a genuine period
+        // has been acquired. Depth alone can never turn a trend into tarjīʿ.
+        val deep = trackedLag > 0 && oscillatory && depth >= DEEP_DEPTH_GATE &&
+            rateHz in minHz..maxHz && !harmonicLeak
+        val periodic = coherent || deep
+        val stillPeriodic = (trackedLag > 0 && oscillatory &&
+            bandBestC >= periodGate * 0.7f &&
+            !harmonicLeak && rateHz in (minHz - 0.5f)..(maxHz + 1f)) ||
+            (trackedLag > 0 && oscillatory &&
+                depth >= DEEP_DEPTH_GATE * DEPTH_OFF_RATIO &&
+                !harmonicLeak && rateHz in (minHz - 0.5f)..(maxHz + 1f))
+
+        val gapBefore = steadyGap
+        steadyGap = when {
+            coherent -> 0
+            depth < DEEP_DEPTH_GATE * DEPTH_OFF_RATIO -> steadyGap + 1
+            steadyGap >= NEW_EVENT_GAP_PERSIST -> steadyGap
+            else -> 0
+        }
+        if (endOfHold && coherent && gapBefore >= NEW_EVENT_GAP_PERSIST) {
+            // A distinct oscillatory event may recur on the same pitch. Pitch
+            // continuity is not event identity (connected words often share it).
+            endOfHold = false
+            eventPeak = 0f
+            climaxUnder = 0
+            pulseUnder = 0
+            eventRateHz = 0f
+            levelTransitionGrace = 0
+        }
+
+        if (eventPeak > 0f) eventPeak = maxOf(climaxLevel, eventPeak)
+        val under = eventPeak > 0f && climaxLevel < CLIMAX_OFF * eventPeak
         climaxUnder = if (under) climaxUnder + 1 else 0
-        val climaxOver = climaxUnder >= CLIMAX_PERSIST
-        if (climaxOver) endOfHold = true
-        reverberating = if (reverberating) {
+        var climaxOver = climaxUnder >= CLIMAX_PERSIST
+        val next = if (reverberating) {
             longEnough && depth >= depthGate * DEPTH_OFF_RATIO && stillPeriodic &&
                 !endOfHold
         } else {
             longEnough && depth >= depthGate && periodic && !endOfHold
+        }
+        val rateRatio = if (eventRateHz > 0f && rateHz > 0f) {
+            maxOf(eventRateHz / rateHz, rateHz / eventRateHz)
+        } else {
+            1f
+        }
+        if (reverberating && rateRatio <= MAX_EVENT_RATE_RATIO) {
+            eventRateHz += EVENT_RATE_EMA * (rateHz - eventRateHz)
+        }
+        val cadenceBridge = eventRateHz > 0f && rateRatio <= MAX_EVENT_RATE_RATIO &&
+            depth >= depthGate * DEPTH_OFF_RATIO
+        if (climaxOver && cadenceBridge) {
+            // Same cadence at a new stable level is continued tarjīʿ, not a
+            // release. Re-normalize without an off/on edge. A cadence jump,
+            // such as Hani 1:7 entering the later letters, still ends.
+            eventPeak = climaxLevel
+            climaxUnder = 0
+            climaxOver = false
+            // The rolling envelope briefly contains both loudness levels,
+            // which can obscure an otherwise unchanged pulse. Give it only
+            // long enough to replace that mixed analysis window.
+            levelTransitionGrace = LEVEL_TRANSITION_GRACE_HOPS
+        }
+        val evidenceReadyMs =
+            (maxBandLag + 1 + MIN_CORR_PAIRS) * HOP_MS.toFloat()
+        pulseUnder = when {
+            holdMs < evidenceReadyMs || lifecycleCoherent || levelTransitionGrace > 0 ||
+                (cadenceBridge && climaxUnder > 0) -> 0
+            eventPeak > 0f || next -> pulseUnder + 1
+            else -> 0
+        }
+        if (levelTransitionGrace > 0) levelTransitionGrace--
+        if (climaxOver || pulseUnder >= PULSE_GAP_PERSIST) {
+            endOfHold = true
+        }
+        reverberating = next && !endOfHold
+        if (eventPeak == 0f && reverberating) {
+            // A reverberant room can make the consonant attack much louder
+            // than the sustained voice (Hani 1:7). The climax belongs to the
+            // detected sustain, not that pre-event echo peak.
+            eventPeak = climaxLevel
+            eventRateHz = rateHz
+            climaxUnder = 0
         }
 
         // Lead the measured oscillation by the analysis+smoothing lag, so the
@@ -493,6 +596,7 @@ class Tarji {
         private const val FRAME_HOPS = 4
         private const val ENV_HOPS = 64
         private const val MIN_ENV_HOPS = 20
+        private const val MIN_CORR_PAIRS = MIN_ENV_HOPS / 2
 
         /** Hold must survive this long before reverberation is considered.
          * Kept short so the shimmer starts its build-up with the hold. */
@@ -518,6 +622,8 @@ class Tarji {
          * Ink Lab: [minTremoloHz] / [maxTremoloHz]. */
         const val MIN_TREMOLO_HZ = 1.5f
         const val MAX_TREMOLO_HZ = 10f
+        /** Nyquist ceiling of the 50 Hz envelope clock. */
+        const val MAX_MEASURABLE_TREMOLO_HZ = 25f
         /** Shipped AM depth gate — Ink Lab: [minTremoloDepth]. */
         const val MIN_TREMOLO_DEPTH = 0.035f
         /** Relative AM depth at which the envelope is self-evidently
@@ -537,10 +643,6 @@ class Tarji {
          * tracked period is never re-picked on it (aligned with the shipped
          * periodicity gate). */
         private const val TRACKED_SWITCH_FLOOR = 0.4f
-        /** At acquisition the tracked period is extended to the slowest lag
-         * correlating at least this much of the best — tarjīʿ is the slow
-         * swell, so a period tied with its double starts on the swell. */
-        private const val OCTAVE_START_KEEP = 0.85f
         /** Out-of-band short peak must be this strong vs the in-band pick to
          * count as a ceiling cheat (see harmonicLeak). */
         private const val HARMONIC_OF_BEST = 0.85f
@@ -567,21 +669,32 @@ class Tarji {
          * the vibrato's own troughs never reach the gate. */
         private const val CLIMAX_EMA_MS = 40f
         private const val CLIMAX_EMA = 0.39f // 1 − exp(−20/40)
-        /** Envelope level, as a fraction of the hold's peak, below which the
-         * climactic reverberation is over and the effect stops — the strong
-         * swell's end, not the release's last gasp. Sits above the vibrato's
-         * smoothed troughs (~0.57×peak at 30% depth) so a deep hold never
-         * trips its own gate. */
+        /** Envelope level, as a fraction of the detected event's peak, below
+         * which the climactic reverberation is over and the effect stops —
+         * the strong swell's end, not the release's last gasp. Sits above the
+         * vibrato's smoothed troughs (~0.57×peak at 30% depth) so a deep hold
+         * never trips its own gate. */
         private const val CLIMAX_OFF = 0.52f
-        /** Envelope level (fraction of the hold's peak) at which the shimmer
-         * is at full strength; between [CLIMAX_FULL] and [CLIMAX_OFF] it
-         * fades with the voice, so the word's end reads as the effect
-         * settling rather than pulsing at full strength past the climax. */
+        /** Envelope level (fraction of the detected event's peak) at which
+         * the shimmer is at full strength; between [CLIMAX_FULL] and
+         * [CLIMAX_OFF] it fades with the voice, so the word's end reads as
+         * the effect settling rather than pulsing at full strength past the
+         * climax. */
         private const val CLIMAX_FULL = 0.75f
-        /** Consecutive hops below [CLIMAX_OFF] before the climax is declared
-         * over. Four hops reject a real vibrato trough; once reached, the end
-         * stays latched until a genuinely new held note. */
-        private const val CLIMAX_PERSIST = 4
+        /** A sudden cadence change is a new articulation, not the same hold. */
+        private const val MAX_EVENT_RATE_RATIO = 3f
+        private const val EVENT_RATE_EMA = 0.1f
+        /** A falling envelope must outlast the adaptive peak before it is a
+         * release. A stable quieter pulse re-normalizes inside this window. */
+        private const val CLIMAX_PERSIST = 24
+        /** Maximum time for the rolling analysis window to forget a stable
+         * level change after cadence continuity has validated it. */
+        private const val LEVEL_TRANSITION_GRACE_HOPS = MAX_ENV_LAG + MIN_CORR_PAIRS
+        /** Deep modulation may bridge a brief irregular climax, but it cannot
+         * replace coherent pulse evidence across later letters of the hold. */
+        private const val PULSE_GAP_PERSIST = 10
+        /** Steady-envelope separation before the same pitch may start a new event. */
+        private const val NEW_EVENT_GAP_PERSIST = PULSE_GAP_PERSIST
 
         /**
          * Read-out delay in content hops that lands the reported signal on

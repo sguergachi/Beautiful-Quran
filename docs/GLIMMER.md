@@ -82,7 +82,7 @@ player's own PCM (no mic permission, no Visualizer — which also means it
 works on every output route and emulator), and `playback/Tarji` — a pure,
 unit-tested DSP core — tracks a **single held note** (voiced, pitch-stable
 ≥ ~0.3 s) and scans its amplitude envelope for a periodic oscillation in the
-tarjīʿ band (~1.5–10 Hz, tunable up to 50 Hz via the Ink Lab's
+tarjīʿ band (~1.5–10 Hz, tunable up to the measurable 25 Hz limit via the Ink Lab's
 **Tarjīʿ max rate**). The pulse only answers on words carrying a **strong
 tajweed hold of their own** — a long madd, a ghunnah (the shadda نّ of
 ٱلنَّارِ), or the verse-closing waqf (`TajweedPacing.Curve.hasStrongHold`;
@@ -97,25 +97,39 @@ the voice's reverberation is the glimmer. The attack/release ramp
 
 The shimmer is the **build to the climax**: it engages as the hold's
 reverberation starts (the hold gate is short, ~300 ms, so the build-up
-shows before the peak) and rides the whole crescent. A **deep-AM
-fallback** keeps it locked through the irregular crescendo: real builds
+shows before the peak) and rides the whole crescent. A linear trend is removed
+before periodicity is measured, and alternating crossings must prove the
+residual actually oscillates; a plain crescendo or sub-band swell cannot
+masquerade as tarjīʿ. A **deep-AM fallback** keeps an already acquired event
+locked through the irregular crescendo: real builds
 (Alafasy 1:7) pulse unevenly and their envelope autocorrelation collapses
 to ~0.1–0.3 at the loudest point, so a strong amplitude modulation
 (≥ ~6% at an in-band rate, ceiling-cheat guard applied) is treated as
-self-evidently vibrating; the autocorr still rejects shallow noise swells.
+self-evidently vibrating. Evidence readiness is derived from the slowest
+configured period, and ten hops without coherent pulse evidence end the event.
+The fallback cannot carry Alafasy's ḍād event onward through the
+later lām/nūn merely because their envelope or room echo is uneven.
 The pulse rate is **tracked with lag hysteresis**, so it stays locked to
-the voice's period instead of flapping across the autocorr's broad peak.
+the voice's period instead of flapping across the autocorr's broad peak. A
+new note scans only lags backed by its own samples; stale bins from the prior
+note are never eligible.
 
-The effect stops the moment the voice releases. The detector tracks the
-hold's envelope with a fast level EMA; once it stays below ~0.52 of the
-hold's own peak for four hops, the climactic reverberation is over. That
-release is latched until a new held note: one deep vibrato trough cannot
-extinguish and immediately re-arm the effect in the same crescendo. The
+The effect stops when the voice releases. The detector tracks the
+hold's envelope with a fast level EMA. Its peak reference starts when the
+reverberation is detected, not at the preceding consonant attack; this keeps
+Hani 1:7's echo-heavy, faster sustain from being misread as a release. A
+sustained fall below ~0.52 of that event peak ends the climax. The same pulse
+continuing at a quieter stable level re-normalizes the peak while the rolling
+analysis window catches up; a large cadence change does not. After a steady
+gap, a distinct acoustic event may begin on the same pitch, while the visual
+word gate still admits only the first event for that utterance. A repeat
+transition creates a fresh gate. The
 shimmer **settles with the voice**: its strength follows the envelope's
 remaining intensity — full while the swell is strong (≥ 0.75 of the
-hold's peak) and fading as the voice dies toward the gate — so the word's
+detected event's peak) and fading as the voice dies toward the gate — so the word's
 end reads as the effect drying, never as a full-strength pulse past the
-climax. The dry-down is ~60 ms and the pulse signal is gain-damped, so the
+climax. The dry-down uses a 60 ms time constant and the pulse signal is
+gain-damped, falling below the visual gate in about 240 ms, so the
 decaying tail after a waqf hold never flickers, and a deep vibrato never
 trips its own gate (the troughs stay above the gate). Mid-hold detection
 lulls are bridged by the slower release so the hold breathes without
@@ -131,7 +145,10 @@ rate relative to the voice. Depth scales both (Ink Lab **Pulse depth**; a non-ze
 Idle / no detection → peak 0, full sheen (no tell that a pulse is coming).
 First-pass white-gold and **repeat terracotta** both take the same gate. A
 per-frame sampler on the Active strong-hold word keeps the pulse updating
-after the wash park freezes its Animatable.
+after the wash park freezes its Animatable. Each utterance admits one acoustic
+event: inherited release gain is ignored, and after the event settles a later
+consonant or echo pulse cannot relight the word. A repeated utterance gets a
+fresh gate with its terracotta wash.
 
 The pulse is **delayed to the reader's clock** — the tap sits at the audio
 sink's input, so the signal is led forward by everything downstream before

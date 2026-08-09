@@ -33,6 +33,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import com.beautifulquran.playback.Tarji
 import com.beautifulquran.ui.theme.ContextualGuideTuning
 import com.beautifulquran.ui.theme.DisclosureChevron
 import com.beautifulquran.ui.theme.quietClickable
@@ -258,7 +259,7 @@ fun InkLabPanel(
                         TuningSlider(
                             "Tarjīʿ max rate",
                             t.glintResonanceMaxHz,
-                            2f..50f,
+                            Tarji.MIN_TREMOLO_HZ..Tarji.MAX_MEASURABLE_TREMOLO_HZ,
                         ) {
                             InkEngine.tuning = t.copy(glintResonanceMaxHz = it)
                         }
@@ -266,15 +267,20 @@ fun InkLabPanel(
                             "Fastest voice pulse that still counts as tarjīʿ, " +
                                 "in Hz. Lower it and only slow, deep swells " +
                                 "move the gold; shipped ~${"%.0f".format(InkEngine.GLINT_RESONANCE_MAX_HZ)}. " +
-                                "Beyond ~25 Hz the 50 Hz envelope can't measure " +
-                                "the pulse — it answers on faith.",
+                                "The 50 Hz envelope clock can measure up to " +
+                                "${Tarji.MAX_MEASURABLE_TREMOLO_HZ.toInt()} Hz.",
                         )
-                        TuningSlider("Tarjīʿ min rate", t.tarjiMinHz, 0.5f..5f) {
+                        TuningSlider(
+                            "Tarjīʿ min rate",
+                            t.tarjiMinHz,
+                            Tarji.MIN_TREMOLO_HZ..5f,
+                        ) {
                             InkEngine.tuning = t.copy(tarjiMinHz = it)
                         }
                         LabCaption(
                             "Slowest pulse that still counts (Hz). Raise it to " +
-                                "ignore slow breath swells; shipped ~1.5.",
+                                "ignore slow breath swells; the measurable " +
+                                "floor and shipped value are ~1.5.",
                         )
                         TuningSlider(
                             "Hold before tarjīʿ ms",
@@ -352,10 +358,10 @@ fun InkLabPanel(
                                 "vibration, lower if it leads. Shipped 0.",
                         )
                         LabCaption(
-                            "How fast the detection gain ramps in (attack) " +
+                                "How fast the detection gain ramps in (attack) " +
                                 "and out on mid-hold lulls (release). Once the " +
-                                "climactic hold ends the shimmer dries in " +
-                                "~120 ms regardless. Shipped 250 / 800 ms.",
+                                "climactic hold ends it uses a fixed fast " +
+                                "dry-down. Shipped 250 / 800 ms.",
                         )
                     }
 
