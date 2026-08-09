@@ -60,6 +60,13 @@ entry-mask, repeat gate/release, feather, and glint clocks. The renderers only
 adapt those deferred values to `letterFadeIn` layers or `ShapedWordBloom`;
 switching paint strategy does not create a second animation lifecycle.
 
+Tarjīʿ follows the same rule. The audio thread publishes one small volatile
+state per 20 ms content hop; only the Active strong-hold word runs a vsync
+sampler, and its `State` is consumed in the glint draw layer. Do not batch
+those audio updates: a 232–256 ms batch undersamples the 5–10 Hz effect. Do
+not collect them in composition either; that would recompose an ayah at audio
+rate for a paint-only alpha change.
+
 Because the active word's sweep is read inside that draw scope, the **whole
 bloom list is rebuilt every frame** — one `UpcomingDim` per unread word, up to
 127 of them on 2:282. So each bloom must derive only the geometry it actually

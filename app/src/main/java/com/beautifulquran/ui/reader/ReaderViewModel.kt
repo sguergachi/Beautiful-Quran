@@ -297,6 +297,8 @@ class ReaderViewModel(
             if (voice.sessionStartWall != latchedTapSessionStart) {
                 latchedTapSessionStart = voice.sessionStartWall
                 tapSessionStartPosMs = player.positionMs
+                measuredBacklogMs = 0.0
+                voice.measuredBacklogMs = 0L
             }
             val lagMs = (
                 voice.sessionHopCount * com.beautifulquran.playback.Tarji.HOP_MS.toLong() +

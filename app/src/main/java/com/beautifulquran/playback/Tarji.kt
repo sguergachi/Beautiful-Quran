@@ -13,7 +13,7 @@ import kotlin.math.sqrt
  * A hold is reported ([holdMs]) while successive 80 ms frames stay voiced
  * (periodic, above the noise floor) on one pitch. Once the hold is long
  * enough, the amplitude envelope is scanned for an oscillation in the
- * tarjīʿ band (~3–9.5 Hz): when its depth clears [MIN_TREMOLO_DEPTH],
+ * tarjīʿ band (~1.5–10 Hz): when its depth clears [MIN_TREMOLO_DEPTH],
  * [reverberating] turns on and [tremolo] exposes the oscillation itself,
  * zero-centred and in phase with the voice, so the glint rides the exact
  * reverberation the listener hears. [tremoloGain] ramps the effect in and
@@ -53,9 +53,9 @@ class Tarji {
     var lastClarity = 0f
         private set
 
-    /** Total content hops processed since the tap session started. */
-    val hopCount: Int
-        get() = histCount
+    /** Total content hops consumed, including the three-hop frame warm-up. */
+    var hopCount = 0
+        private set
 
     /** Diagnostics: last measured envelope oscillation rate (Hz). */
     var lastRateHz = 0f
@@ -63,7 +63,7 @@ class Tarji {
 
     /**
      * Read-out delay in content hops, set from the tap-to-ear latency
-     * (route + measured sink buffer + downstream HAL, × playback speed, plus
+     * (route + measured tap-to-playback-head backlog, × playback speed, plus
      * the Sonic resampler's own content-time buffer at non-1× speed) by
      * [VoiceEnergy]: the PCM tap hears the voice *before* the listener does,
      * so the reported signal is delayed to match what is actually reaching
@@ -152,7 +152,7 @@ class Tarji {
     // persistence kills single-hop noise dips.
     private var climaxLevel = 0f
     private var holdPeak = 0f
-    private var endOfHold = true
+    private var endOfHold = false
     private var climaxUnder = 0
 
     /** Consume [length] mono samples at the decimated rate (≈8 kHz). Called
@@ -169,7 +169,10 @@ class Tarji {
         for (i in 0 until length) {
             frame[frameFill % frame.size] = samples[i]
             frameFill++
-            if (frameFill >= frame.size && frameFill % hop == 0) onHop()
+            if (frameFill % hop == 0) {
+                hopCount++
+                if (frameFill >= frame.size) onHop()
+            }
         }
     }
 
@@ -184,12 +187,13 @@ class Tarji {
         tremoloSmoothed = 0f
         climaxLevel = 0f
         holdPeak = 0f
-        endOfHold = true
+        endOfHold = false
         climaxUnder = 0
         trackedLag = 0
         frameFill = 0
         envCount = 0
         histCount = 0
+        hopCount = 0
         holdStartEnvCount = 0
     }
 
@@ -230,11 +234,16 @@ class Tarji {
                 holdPitchHz = pitchHz
                 holdStartEnvCount = envCount
                 holdPeak = rms
+                climaxUnder = 0
+                endOfHold = false
+                trackedLag = 0
             }
             misses = 0
         } else if (++misses > MAX_MISSES) {
             holdMs = 0f
             holdPitchHz = 0f
+            endOfHold = true
+            trackedLag = 0
         }
 
         updateTremolo(rms)
@@ -275,7 +284,6 @@ class Tarji {
         val n = minOf(envCount - holdStartEnvCount, ENV_HOPS)
         if (n < MIN_ENV_HOPS) {
             reverberating = false
-            endOfHold = true
             return
         }
         val start = envCount - n
@@ -418,12 +426,12 @@ class Tarji {
         val under = holdPeak > 0f && climaxLevel < CLIMAX_OFF * holdPeak
         climaxUnder = if (under) climaxUnder + 1 else 0
         val climaxOver = climaxUnder >= CLIMAX_PERSIST
-        endOfHold = !longEnough || climaxOver
+        if (climaxOver) endOfHold = true
         reverberating = if (reverberating) {
             longEnough && depth >= depthGate * DEPTH_OFF_RATIO && stillPeriodic &&
-                !climaxOver
+                !endOfHold
         } else {
-            longEnough && depth >= depthGate && periodic && !climaxOver
+            longEnough && depth >= depthGate && periodic && !endOfHold
         }
 
         // Lead the measured oscillation by the analysis+smoothing lag, so the
@@ -571,8 +579,9 @@ class Tarji {
          * settling rather than pulsing at full strength past the climax. */
         private const val CLIMAX_FULL = 0.75f
         /** Consecutive hops below [CLIMAX_OFF] before the climax is declared
-         * over — single-hop noise dips must not cut the shimmer. */
-        private const val CLIMAX_PERSIST = 2
+         * over. Four hops reject a real vibrato trough; once reached, the end
+         * stays latched until a genuinely new held note. */
+        private const val CLIMAX_PERSIST = 4
 
         /**
          * Read-out delay in content hops that lands the reported signal on

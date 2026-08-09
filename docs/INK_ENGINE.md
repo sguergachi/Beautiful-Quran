@@ -394,6 +394,10 @@ tween-vs-snap rules, sweep entry and residual rules, repeat wash timing, the
   forms, and recede with the glint. The sheen stays legible against dark pages
   without becoming a hard or whole-word glow, adding no new motion—only a
   warm light that cools as the ink dries.
+  Tarjīʿ modulates only that glint layer: the signed vocal envelope maps once
+  from trough to crest. Its sign must not be folded with `abs`, which would
+  double the visual frequency and brighten the quiet half of the vibration.
+  The base/repeat wash position is never part of this modulation.
   [GLIMMER.md](GLIMMER.md) is the canonical cross-platform rendering,
   tuning, and visual-verification specification.
 - **Basmalah preface**: `prefaceState(isActive, dimmed)` /

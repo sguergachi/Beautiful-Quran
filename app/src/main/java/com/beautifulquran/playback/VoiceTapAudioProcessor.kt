@@ -62,11 +62,14 @@ class VoiceTapAudioProcessor : BaseAudioProcessor() {
         replaceOutputBuffer(remaining).put(inputBuffer).flip()
     }
 
+    override fun onFlush(streamMetadata: AudioProcessor.StreamMetadata) {
+        // Seek, handoff, or sink refeed: re-anchor the hop clock and clear the
+        // old acoustic event before any PCM from the new position arrives.
+        VoiceEnergy.active?.resetTapSession()
+    }
+
     override fun onReset() {
         format = null
-        // The sink (re)configured: the tap's hop clock is re-anchored at the
-        // refeed position, so the reader can measure the tap-to-playback-head
-        // backlog against the media clock.
         VoiceEnergy.active?.resetTapSession()
     }
 }

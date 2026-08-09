@@ -50,8 +50,10 @@ Pin this: every new processor must.
 ## 3. The detector (`playback/Tarji`)
 
 Pure, no Android imports, hop-count time only. Unit tests synthesize waves
-at 8 kHz directly. On device the tap decimates the sink's PCM to 8 kHz mono
-and feeds 20 ms hops.
+at 8 kHz directly. On device the tap decimates the sink's PCM to roughly
+8 kHz mono and publishes one detector state per exact 20 ms content hop.
+The original 2,048-sample handoff updated the renderer only every ~232–256 ms:
+four visible states per second cannot express a 5–10 Hz vocal pulse.
 
 ### Signal chain
 
@@ -71,15 +73,15 @@ and feeds 20 ms hops.
 
 3.  **Hold.** A hold is a voiced, pitch-stable single note. `clarity ≥ 0.5`
     and `rms ≥ floor(MAX_FLOOR, 0.15·peak)` marks voiced; the pitch gate above
-    keeps it one note. `holdMs += 20` while voiced+same-note; 4 hops of
+    keeps it one note. `holdMs += 20` while voiced+same-note; 6 hops of
     grace (`MAX_MISSES`) on estimation glitches; a pitch step restarts the hold.
-    `HOLD_MIN_MS = 400` before reverberation is considered.
+    `HOLD_MIN_MS = 300` before reverberation is considered.
 
     Windows for the envelope scan start **at the hold onset**
     (`holdStartEnvCount`), not at "now" — otherwise the syllable attack ramp
     poisons the depth estimate for ~1 s.
 
-4.  **Envelope scan.** Over the within-hold window (30..64 hops) the demeaned
+4.  **Envelope scan.** Over the within-hold window (20..64 hops) the demeaned
     RMS envelope is scanned for a periodic oscillation:
 
     *   depth = `√2 · rms(d) / mean` — the 1.5–10 Hz tarjīʿ band, ~2 Hz Hani
@@ -106,7 +108,11 @@ and feeds 20 ms hops.
     0.7, band widened by 1 Hz) — no flapping when the reverberation breathes.
     `tremoloGain` ramps 250 ms attack / 800 ms release. The long release
     bridges sub-second lulls inside a long pulsing hold (the reciter breathing
-    *within* the tarjīʿ) without dropping the shimmer.
+    *within* the tarjīʿ) without dropping the shimmer. Four consecutive hops
+    below the hold's climax gate declare the true release; that end is latched
+    until a new note, so a deep trough cannot produce an off/on blink inside
+    one crescendo. The released effect dries in 60 ms and cannot re-lock on
+    the tail.
 
 5.  **Tremolo signal.** `(latest − mean)/amp` smoothed with a 0.35 EMA, then
     phase-lead-compensated by the analysis+smoothing lag (~45 ms):
@@ -119,11 +125,14 @@ and feeds 20 ms hops.
     zero-centred, ~−1.5..1.5.
 
 6.  **Output latency.** The PCM tap hears the voice *before* the listener.
-    `VoiceEnergy.outputLatencyMs` (pushed from `ReaderViewModel`'s
-    `outputLatencyMs()` — the same estimate `HighlightClock` subtracts) and
-    `playbackSpeed` are pushed into the detector; the reported
+    `ReaderViewModel` pushes the same route preset `HighlightClock` subtracts
+    plus a live tap-hop-vs-`positionMs` backlog measurement (the sink buffer is
+    the fallback until that measurement settles). With `playbackSpeed`, the
+    reported
     `syncReverberating`/`syncTremolo`/`syncTremoloGain` are read through a
-    64-hop history ring delayed by `latencyMs·speed / 20 ms`.
+    64-hop history ring on the same playback-head reference as the word ink.
+    The hop clock includes the 80 ms analysis-frame warm-up; omitting those
+    first three hops under-delays every session by 60 ms.
 
 ### What the real recordings taught us
 
@@ -156,17 +165,21 @@ mid-animation, so the bloom can never appear to restart):
     never modulated.
 
 When all three pass, tarjīʿ **turns the glimmer on and off** with the voice
-(not a soft breath around permanent sheen):
+(not a soft breath around permanent sheen). The sign is acoustic phase:
+positive is a vocal swell and negative is its trough.
 
 ```
-rise  = clamp(tremolo / 1.5, 0, 1)       // positive half only
-on    = rise²                            // snappy peak
-gated = 1 − depth·(1 − on)
+pulse = smootherstep((clamp(tremolo, -1, 1) + 1) / 2)
+crest = smootherstep(clamp(tremolo, 0, 1))
+gated = 1 − depth·(1 − pulse)
 mult  = 1 + g·(gated − 1)                // g = tremoloGain
+peak  = g·depth·crest
 ```
 
-At `depth = 1` (shipped) swells leave the sheen fully on and everything else
-extinguishes it — gold-on-gold needs that contrast. At `g = 0` the multiplier
+At `depth = 1` (shipped) swells leave the sheen fully on and troughs
+extinguish it — gold-on-gold needs that contrast. `crest` alone boosts the
+colour. Never use `abs(tremolo)`: it flashes on both the loud crest and quiet
+trough, doubling the visual pulse rate. At `g = 0` the multiplier
 is exactly 1 — **no tell** before the voice actually reverberates. The halo
 forms only with the directional wash (`smootherstep(glintProgress)`); there is
 no whole-word formation floor when resonance engages.
@@ -190,6 +203,10 @@ is gone — steady holds keep still gold.
     `tarjīʿ · hold 1.2s · 4.8 Hz · gain 0.84` / `holding … — no tarjīʿ yet` /
     `listening…` / `silent — no PCM` — so vanishing shimmer is diagnosable
     (no hold, wrong rate, depth, silent sink).
+
+Any sink flush/seek/reconfiguration clears the detector, its history, and the
+partial PCM hop. A discontinuity is a new acoustic event; phase or gain from a
+previous word must never leak into it.
 
 ## 5. The sweep that must never restart — and the clock that kept restarting it
 
