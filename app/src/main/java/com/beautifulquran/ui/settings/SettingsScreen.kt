@@ -141,6 +141,7 @@ fun SettingsScreen(
     viewModel: SettingsViewModel,
     onBack: () -> Unit,
     onOpenTimingsLab: () -> Unit = {},
+    onOpenTarjiLab: () -> Unit = {},
     onOpenOrnamentsLab: () -> Unit = {},
     onRecordSystemTrace: () -> Unit = {},
 ) {
@@ -404,6 +405,7 @@ fun SettingsScreen(
                         }
                     },
                     onOpenTimingsLab = onOpenTimingsLab,
+                    onOpenTarjiLab = onOpenTarjiLab,
                     onOpenOrnamentsLab = onOpenOrnamentsLab,
                     onRecordSystemTrace = onRecordSystemTrace,
                 )
@@ -459,6 +461,7 @@ private fun DeveloperSection(
     onPasteCheckValues: (String) -> Unit,
     onPasteCheckFromClipboard: () -> Unit,
     onOpenTimingsLab: () -> Unit,
+    onOpenTarjiLab: () -> Unit,
     onOpenOrnamentsLab: () -> Unit,
     onRecordSystemTrace: () -> Unit,
 ) {
@@ -548,6 +551,18 @@ private fun DeveloperSection(
         color = MaterialTheme.colorScheme.primary,
     )
     Caption("Edit word-level timing marks; also opens from a word long-press.")
+
+    Spacer(Modifier.height(20.dp))
+    Text(
+        text = "Tarjīʿ Lab",
+        style = MaterialTheme.typography.bodyLarge,
+        modifier = Modifier
+            .fillMaxWidth()
+            .quietClickable(onClick = onOpenTarjiLab)
+            .padding(vertical = 6.dp),
+        color = MaterialTheme.colorScheme.primary,
+    )
+    Caption("Capture a word, see its waveform and tarjīʿ sine on a loop, and tune the detector. Also opens from a word long-press.")
 
     Spacer(Modifier.height(20.dp))
     Text(

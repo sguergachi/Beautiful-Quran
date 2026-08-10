@@ -63,6 +63,8 @@ app/                    The entire Android app (single Gradle module)
     ui/entrance/        Cold-start ceremony: the closed mushaf cover
     ui/home|reader|settings|theme/   Compose screens + design system
     timingslab/         In-app editor for word-timing corrections
+    tarjilab/           Dev lab: capture a word's PCM, loop it, and tune the
+                        tarjīʿ detector against waveform + sine visualization
   src/test/             JVM unit tests (JUnit 4)
 data/quran.db           Canonical committed SQLite database consumed by both apps
 data/lexicon.db         Lane's Lexicon, keyed by QAC root — the Root Viewer's
@@ -296,6 +298,7 @@ this document combined: `ReaderComponents.kt` (~36k tokens),
 | `docs/SHARE.md` | Gather mode and verse sharing — text + full-ink image shipped; video proposed |
 | `docs/VERSE_ACTIONS.md` | Bookmark · note · share UX — verse-first share plan (designed, not implemented) |
 | `docs/TIMINGS_LAB.md` | In-app timing editor + maintainer apply path (systematic first) |
+| `docs/TARJI_LAB.md` | The tarjīʿ lab — waveform + tarji sine loop tuning, samples, capture edges |
 | `tools/timing_patch_cases/README.md` | **Required** unit tests when landing a Lab/GitHub timing patch systematically |
 | `tools/timing_overrides/README.md` | Local patch reproduction; committed JSON is rejected |
 | `docs/WEB.md` | Web port plan — Focus / Highlight / Ink engines + paper reader in the browser |
