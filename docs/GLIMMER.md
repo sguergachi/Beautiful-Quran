@@ -77,6 +77,12 @@ held note — the pulsing a reciter carries into a long madd or waqf sustain.
 The ḥadīth of Ibn Mughaffal (Bukhārī 5048) describes the Prophet's ﷺ
 recitation with exactly this word: يُرَجِّعُ — "his voice reverberated".
 
+> **Tuning it:** the [Tarjīʿ Lab](TARJI_LAB.md) (developer mode, word
+> long-press) captures a word's PCM, loops it, plots the waveform, the
+> measured tarjīʿ sine and a fitted ideal sine, and re-runs the detector
+> offline on every knob edit — the fastest way to see why a word's pulse
+> misses and to make it right.
+
 The glint **listens for it directly**. `VoiceTapAudioProcessor` mirrors the
 player's own PCM (no mic permission, no Visualizer — which also means it
 works on every output route and emulator), and `playback/Tarji` — a pure,

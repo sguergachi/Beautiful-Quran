@@ -89,6 +89,8 @@ import com.beautifulquran.ui.share.ShareViewModel
 import com.beautifulquran.share.AyahRef
 import com.beautifulquran.timingslab.TimingsLabScreen
 import com.beautifulquran.timingslab.TimingsLabViewModel
+import com.beautifulquran.tarjilab.TarjiLabScreen
+import com.beautifulquran.tarjilab.TarjiLabViewModel
 import com.beautifulquran.ui.theme.BeautifulQuranTheme
 import com.beautifulquran.ui.theme.FloatingPaperControl
 import com.beautifulquran.ui.theme.InkRevealOverlay
@@ -279,6 +281,7 @@ private fun PaperStackApp(
     val settingsViewModel: SettingsViewModel = viewModel(factory = AppViewModelFactory)
     val timingsLabViewModel: TimingsLabViewModel = viewModel(factory = AppViewModelFactory)
     val ornamentsLabViewModel: OrnamentsLabViewModel = viewModel(factory = AppViewModelFactory)
+    val tarjiLabViewModel: TarjiLabViewModel = viewModel(factory = AppViewModelFactory)
     val rootViewerViewModel: RootViewerViewModel = viewModel(factory = AppViewModelFactory)
     val shareViewModel: ShareViewModel = viewModel(factory = AppViewModelFactory)
     val settings by app.settings.settings.collectAsStateWithLifecycle()
@@ -310,10 +313,14 @@ private fun PaperStackApp(
     /** The Ornaments Lab — same stack-level ink-bleed pattern as the Timings
      *  Lab; it only ever opens from Settings, never from a word hold. */
     var ornamentsLabVisible by remember { mutableStateOf(false) }
+    /** The Tarjīʿ Lab — same ink-bleed overlay, reachable from a word hold
+     *  (with the Timings Lab) or Settings; owns its own audio while open. */
+    var tarjiLabVisible by remember { mutableStateOf(false) }
     var chooserRendered by remember { mutableStateOf(false) }
     var rootRendered by remember { mutableStateOf(false) }
     var labRendered by remember { mutableStateOf(false) }
     var ornamentsLabRendered by remember { mutableStateOf(false) }
+    var tarjiLabRendered by remember { mutableStateOf(false) }
     var readerInkOverlayVisible by remember { mutableStateOf(false) }
     /** Send page (share) rendered lifetime — ShareHost reports this. */
     var shareSendRendered by remember { mutableStateOf(false) }
@@ -343,7 +350,8 @@ private fun PaperStackApp(
     val scope = rememberCoroutineScope()
     val settingsLayer = if (selectedSurahId == 0) AYAH_LAYER else SETTINGS_LAYER
     val overlayBlocking = labVisible || rootVisible || chooserVisible || ornamentsLabVisible ||
-        labRendered || rootRendered || chooserRendered || ornamentsLabRendered ||
+        tarjiLabVisible ||
+        labRendered || rootRendered || chooserRendered || ornamentsLabRendered || tarjiLabRendered ||
         readerInkOverlayVisible || shareUi.sendOpen || shareSendRendered
     val stackGesturesBlocked = rememberUpdatedState(
         ayahSelectorExpanded || overlayBlocking || entranceVisible,
@@ -416,6 +424,25 @@ private fun PaperStackApp(
         ornamentsLabVisible = false
     }
 
+    fun openTarjiLab(surahId: Int? = null, ayah: Int? = null, wordPosition: Int? = null) {
+        if (!developerModeEnabled) return
+        chooserVisible = false
+        rootVisible = false
+        labVisible = false
+        if (surahId != null && ayah != null) {
+            tarjiLabViewModel.changeTarget(surahId, ayah, wordPosition)
+        } else {
+            tarjiLabViewModel.initFromLastOpened()
+        }
+        tarjiLabVisible = true
+    }
+
+    fun closeTarjiLab() {
+        if (!tarjiLabVisible) return
+        tarjiLabViewModel.onExit()
+        tarjiLabVisible = false
+    }
+
     fun openRootViewer(surahId: Int, ayah: Int, wordPosition: Int) {
         chooserVisible = false
         labVisible = false
@@ -458,6 +485,7 @@ private fun PaperStackApp(
         pendingWord = null
         closeTimingsLab()
         closeOrnamentsLab()
+        closeTarjiLab()
         closeRootViewer(resumeReading = false)
         when (action) {
             is AssistantAction.OpenVerse -> {
@@ -609,6 +637,7 @@ private fun PaperStackApp(
     BackHandler(enabled = rootVisible) { closeRootViewer() }
     BackHandler(enabled = labVisible) { closeTimingsLab() }
     BackHandler(enabled = ornamentsLabVisible) { closeOrnamentsLab() }
+    BackHandler(enabled = tarjiLabVisible) { closeTarjiLab() }
 
     LaunchedEffect(selectedSurahId) {
         ayahSelectorExpanded = false
@@ -699,6 +728,7 @@ private fun PaperStackApp(
                     animateTo(if (selectedSurahId == 0) COVER_LAYER else AYAH_LAYER)
                 },
                 onOpenTimingsLab = { openTimingsLab() },
+                onOpenTarjiLab = { openTarjiLab() },
                 onOpenOrnamentsLab = { openOrnamentsLab() },
                 onRecordSystemTrace = onRecordSystemTrace,
             )
@@ -781,6 +811,11 @@ private fun PaperStackApp(
                                         val target = pendingWord ?: return@WordHoldChooser
                                         pendingWord = null
                                         openTimingsLab(target.first, target.second, target.third)
+                                    },
+                                    onOpenTarjiLab = {
+                                        val target = pendingWord ?: return@WordHoldChooser
+                                        pendingWord = null
+                                        openTarjiLab(target.first, target.second, target.third)
                                     },
                                     onDismiss = {
                                         chooserVisible = false
@@ -913,6 +948,29 @@ private fun PaperStackApp(
                         OrnamentsLabScreen(
                             viewModel = ornamentsLabViewModel,
                             onBack = ::closeOrnamentsLab,
+                        )
+                    }
+                }
+            }
+        }
+
+        // The Tarjīʿ Lab — the same ink-bleed language, its own slot: it can
+        // rise from a word hold or Settings and owns its audio while open
+        // (the captured word loops on its own track), so it must be able to
+        // close back to exactly the page it bloomed from.
+        InkRevealOverlay(
+            visible = tarjiLabVisible,
+            backgroundColor = overlayColors.background,
+            modifier = Modifier.zIndex(5f),
+            onRenderedChange = { tarjiLabRendered = it },
+        ) {
+            MaterialTheme(colorScheme = overlayColors, typography = MaterialTheme.typography) {
+                CompositionLocalProvider(LocalQuranAccents provides TimingsLabAccents) {
+                    Box(Modifier.fillMaxSize()) {
+                        Box(Modifier.matchParentSize().absorbPointerEvents())
+                        TarjiLabScreen(
+                            viewModel = tarjiLabViewModel,
+                            onBack = ::closeTarjiLab,
                         )
                     }
                 }

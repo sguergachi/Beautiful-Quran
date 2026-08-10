@@ -91,10 +91,66 @@ class VoiceEnergy {
     var sessionContentMs = 0.0
         private set
 
+    // ── Tarjīʿ Lab capture ────────────────────────────────────────────────
+    // The lab records the decimated analysis stream itself, then re-runs the
+    // pure detector offline with different knobs — no live capture needed to
+    // tune. Recording starts only on the first hop analyzed *after the next
+    // tap-session reset* (or after arming), so a seek's flush can never leak
+    // stale PCM of the old position into the capture.
+
+    /** True while a capture is being recorded. */
+    @Volatile
+    var captureActive = false
+        private set
+
+    /** Capture flags/counters are published across the audio↔UI thread
+     * boundary the same way the detector mirrors are: volatile handoff so
+     * the UI's reads of the hop arrays always see the audio thread's writes. */
+    @Volatile
+    private var captureArmed = false
+    @Volatile
+    private var capturePendingFreshStart = false
+    @Volatile
+    private var captureHopCount = 0
+    private var captureCapacityHops = MAX_CAPTURE_HOPS
+    private var captureSamples = FloatArray(0)
+    private var captureHopSamples = 0
+    private var captureHopContentMs = FloatArray(0)
+
+    /** Arm a lab capture of the decimated hop stream (UI thread). The next
+     * hop analyzed after the next sink reset — or after arming — begins the
+     * recording; hops are capped at [maxHops] (12 s at 20 ms). */
+    fun armCapture(maxHops: Int = MAX_CAPTURE_HOPS) {
+        captureArmed = true
+        captureCapacityHops = maxHops.coerceIn(MIN_CAPTURE_HOPS, MAX_CAPTURE_HOPS)
+        capturePendingFreshStart = true
+        captureActive = true
+    }
+
+    /** Stop recording and return what was captured, or null if no hop ever
+     * flowed through the tap (playback was not running). */
+    fun disarmCapture(): TarjiLabCapture? {
+        captureArmed = false
+        captureActive = false
+        if (captureHopCount == 0 || captureHopSamples <= 0) return null
+        val n = captureHopCount
+        val samples = FloatArray(n * captureHopSamples)
+        System.arraycopy(captureSamples, 0, samples, 0, samples.size)
+        val content = FloatArray(n)
+        System.arraycopy(captureHopContentMs, 0, content, 0, n)
+        return TarjiLabCapture(
+            sampleRate = Tarji.SAMPLE_RATE,
+            hopSamples = captureHopSamples,
+            hopContentMs = content,
+            pcm = samples,
+        )
+    }
+
     /** Called when the sink flushes or reconfigures. A discontinuity starts a
      * fresh acoustic event: no prior hold, phase, or partial hop may leak into
      * the new media position. */
     fun resetTapSession() {
+        capturePendingFreshStart = true
         tarji.reset()
         reverberating = false
         eventStartContentMs = -1.0
@@ -204,6 +260,7 @@ class VoiceEnergy {
         tarji.onSamples8k(analysisHop)
         sessionContentMs += hopContentDurationMs
         hopFill = 0
+        captureHop(hopContentDurationMs)
         reverberating = tarji.syncReverberating
         tremolo = tarji.syncTremolo
         tremoloGain = tarji.syncTremoloGain
@@ -217,6 +274,35 @@ class VoiceEnergy {
             ?.times(hopContentDurationMs)
             ?: -1.0
         lastFeedMs = SystemClock.elapsedRealtime()
+    }
+
+    /** Append this hop to the lab capture when armed. Runs on the audio
+     * thread; the buffers were sized at [armCapture], so no allocation here. */
+    private fun captureHop(hopContentDurationMs: Double) {
+        if (!captureArmed) return
+        if (capturePendingFreshStart) {
+            // First hop of a fresh tap session (post-seek flush) or of the
+            // arm itself: start recording here, in the new position.
+            capturePendingFreshStart = false
+            captureHopCount = 0
+            captureHopSamples = analysisHop.size
+            captureSamples = FloatArray(captureCapacityHops * analysisHop.size)
+            captureHopContentMs = FloatArray(captureCapacityHops)
+        }
+        if (captureHopCount >= captureCapacityHops) {
+            captureArmed = false
+            captureActive = false
+            return
+        }
+        System.arraycopy(
+            analysisHop,
+            0,
+            captureSamples,
+            captureHopCount * analysisHop.size,
+            analysisHop.size,
+        )
+        captureHopContentMs[captureHopCount] = sessionContentMs.toFloat()
+        captureHopCount++
     }
 
     /** Rebase the delayed event start onto the current media-item clock. */
@@ -249,6 +335,9 @@ class VoiceEnergy {
         get() = if (isLive) tremoloGain else 0f
 
     fun release() {
+        captureArmed = false
+        captureActive = false
+        captureHopCount = 0
         tarji.reset()
         reverberating = false
         eventStartContentMs = -1.0
@@ -270,6 +359,10 @@ class VoiceEnergy {
     companion object {
         const val NO_EVENT_MS = Long.MIN_VALUE
         private const val LIVE_WINDOW_MS = 350L
+
+        /** Lab capture cap: 12 s of 20 ms hops ≈ 600 hops ≈ 350 KB. */
+        private const val MAX_CAPTURE_HOPS = 600
+        private const val MIN_CAPTURE_HOPS = 16
 
         /**
          * The live probe owned by [PlayerController]. Draw-phase glint reads
