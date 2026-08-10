@@ -97,6 +97,7 @@ class TarjiLabViewModel(
     private var audioTrack: AudioTrack? = null
     private var previewRateHz = 0
     private var previewTotalFrames = 0
+    private var scrubWasPlaying = false
     private var ayahSegments: List<Segment> = emptyList()
     private var recitersCache: List<Reciter> = emptyList()
 
@@ -563,6 +564,20 @@ class TarjiLabViewModel(
         )
     }
 
+    /** Pause once at the start of a drag so repeated finger updates only move
+     * the hardware head instead of racing pause/play on every motion event. */
+    fun beginPreviewScrub() {
+        scrubWasPlaying = _ui.value.previewPlaying
+        if (scrubWasPlaying) pausePreview()
+    }
+
+    /** Restore playback only if the scrub began while the loop was playing. */
+    fun endPreviewScrub() {
+        if (!scrubWasPlaying) return
+        scrubWasPlaying = false
+        resumePreview()
+    }
+
     fun stopPreview() {
         audioTrack?.let {
             runCatching { it.pause() }
@@ -571,6 +586,7 @@ class TarjiLabViewModel(
         audioTrack = null
         previewRateHz = 0
         previewTotalFrames = 0
+        scrubWasPlaying = false
         _ui.value = _ui.value.copy(
             previewPlaying = false,
             previewStartWallMs = -1L,
