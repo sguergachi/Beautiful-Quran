@@ -67,13 +67,14 @@ with a debounce. Plus the effect's **pulse depth**, which the preview honors.
    capture can be retried from the same control.
 3. Use **Play loop** / **Pause loop** to audition the captured word. The
    control is a true toggle: pause keeps the loop sample position and Play
-   resumes from that same sample. Drag the scrub rail directly under the
-   waveform, or tap it, to jump to an exact point; the `time / duration`
-   readout makes the target explicit. The glowing word preview lives in the
-   top word row so the waveform and controls get the remaining space.
-4. Open **Detector tuning** only when adjusting the algorithm. **Tools**
-   contains the less-frequent Reset, Export, and Import actions, keeping the
-   primary capture/play/waveform workflow quiet.
+   resumes from that same sample. Tap or drag **anywhere on the full
+   waveform** to jump to an exact point; there is no separate scrub control.
+   The `time / duration` readout makes the target explicit. The glowing word
+   preview lives in the top word row so the waveform and controls get the
+   remaining space.
+4. **Detector tuning** stays visible below the waveform so the values are
+   always available while listening. **Tools** contains the less-frequent
+   Reset, Export, and Import actions, keeping the primary workflow quiet.
 5. Watch the gold sine and listen to the loop. Too few pulses? Lower
    **Min depth** / **hold min**, widen **Max rate**. Glimmer flickers into
    the next word? Raise **Release ms**. The sine vs the fitted dashed ideal
