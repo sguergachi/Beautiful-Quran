@@ -132,6 +132,8 @@ class VoiceEnergy {
     @Volatile
     private var eventStartContentMs = -1.0
 
+    private fun sonicContentMs(): Float = sonicContentLatencyMs(playbackSpeed)
+
     /**
      * Feed 16-bit PCM straight from the audio sink. Only reads [buffer]'s
      * content (position untouched); the tap passes it through afterwards.
@@ -176,8 +178,7 @@ class VoiceEnergy {
      * 5–10 Hz vocal pulse the renderer was meant to follow. */
     private fun analyzeHop() {
         val speed = playbackSpeed
-        val sonicMs =
-            if (kotlin.math.abs(speed - 1f) > 0.001f) Tarji.SONIC_LATENCY_MS else 0f
+        val sonicMs = sonicContentLatencyMs(speed)
         val measuredContentMs = measuredBacklogContentMs.takeIf { it >= 0.0 }
         tarji.delayHops = Tarji.earDelayHops(
             routeMs = outputLatencyMs,
@@ -204,15 +205,17 @@ class VoiceEnergy {
         sessionContentMs += hopContentDurationMs
         hopFill = 0
         reverberating = tarji.syncReverberating
+        tremolo = tarji.syncTremolo
+        tremoloGain = tarji.syncTremoloGain
+        holdMs = tarji.holdMs
+        rateHz = tarji.lastRateHz
+        // Publish ownership after every delayed render value so the UI cannot
+        // combine a new event start with the preceding event's gain.
         eventStartContentMs = tarji.syncEventStartHop
             .takeIf { it >= 0 }
             ?.toDouble()
             ?.times(hopContentDurationMs)
             ?: -1.0
-        tremolo = tarji.syncTremolo
-        tremoloGain = tarji.syncTremoloGain
-        holdMs = tarji.holdMs
-        rateHz = tarji.lastRateHz
         lastFeedMs = SystemClock.elapsedRealtime()
     }
 
@@ -224,7 +227,7 @@ class VoiceEnergy {
             return
         }
         val backlog = measuredBacklogContentMs.takeIf { it >= 0.0 }
-            ?: sinkLatencyMs.toDouble() * playbackSpeed.coerceAtLeast(0f)
+            ?: sinkLatencyMs.toDouble() * playbackSpeed.coerceAtLeast(0f) + sonicContentMs()
         eventStartMediaMs = mapTapContentToMediaMs(
             playbackPositionMs = playbackPositionMs,
             tapContentMs = sessionContentMs,

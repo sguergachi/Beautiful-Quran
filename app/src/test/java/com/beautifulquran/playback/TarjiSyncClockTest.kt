@@ -78,4 +78,11 @@ class TarjiSyncClockTest {
             ),
         )
     }
+
+    @Test
+    fun `sonic content latency is only added away from unity speed`() {
+        assertEquals(0f, sonicContentLatencyMs(1f), 0f)
+        assertEquals(Tarji.SONIC_LATENCY_MS, sonicContentLatencyMs(0.75f), 0f)
+        assertEquals(Tarji.SONIC_LATENCY_MS, sonicContentLatencyMs(1.25f), 0f)
+    }
 }

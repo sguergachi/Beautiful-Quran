@@ -1,5 +1,6 @@
 package com.beautifulquran.playback
 
+import kotlin.math.abs
 import kotlin.math.roundToLong
 
 /** Exact content duration represented by one decimated analysis hop. */
@@ -21,6 +22,10 @@ internal fun mapTapContentToMediaMs(
         eventStartContentMs -
         tapContentMs
     ).roundToLong()
+
+/** Content-time delay of Sonic's resampler away from unity playback speed. */
+internal fun sonicContentLatencyMs(speed: Float): Float =
+    if (abs(speed - 1f) > 0.001f) Tarji.SONIC_LATENCY_MS else 0f
 
 /**
  * Stable tap-to-playback-head clock for one sink session.
