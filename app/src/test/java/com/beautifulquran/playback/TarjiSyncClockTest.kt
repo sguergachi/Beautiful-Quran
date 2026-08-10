@@ -56,4 +56,26 @@ class TarjiSyncClockTest {
         assertEquals(150.0, anchor.backlogContentMs, 0.0)
         assertEquals(150.0, anchor.estimate(tapContentMs = 450.0, playbackContentMs = 250), 0.0)
     }
+
+    @Test
+    fun `tap event start maps back to the media item clock`() {
+        assertEquals(
+            58_220L,
+            mapTapContentToMediaMs(
+                playbackPositionMs = 57_970L,
+                tapContentMs = 58_220.0,
+                eventStartContentMs = 58_220.0,
+                backlogContentMs = 250.0,
+            ),
+        )
+        assertEquals(
+            58_300L,
+            mapTapContentToMediaMs(
+                playbackPositionMs = 57_970L,
+                tapContentMs = 58_220.0,
+                eventStartContentMs = 58_300.0,
+                backlogContentMs = 250.0,
+            ),
+        )
+    }
 }

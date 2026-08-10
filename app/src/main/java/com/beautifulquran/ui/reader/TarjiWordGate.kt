@@ -9,11 +9,20 @@ internal class TarjiWordGate {
     private var heard = false
     private var finished = false
 
-    fun allows(gain: Float, detected: Boolean): Boolean {
+    fun allows(
+        gain: Float,
+        detected: Boolean,
+        eventStartMs: Long,
+        wordStartMs: Long,
+    ): Boolean {
         if (finished) return false
-        // A fresh word may inherit the preceding word's fading gain. It has
-        // not heard its own event until the delayed detector is live too.
-        if (!heard && !detected) return false
+        // Event start and word start share the playback media clock. An event
+        // already underway belongs to the preceding utterance; a delayed
+        // event start cannot be paired with a newer raw detector generation.
+        val priorEvent = eventStartMs == NO_EVENT_MS ||
+            wordStartMs == NO_EVENT_MS ||
+            eventStartMs < wordStartMs
+        if (!heard && (!detected || priorEvent)) return false
         if (gain > MIN_GAIN) {
             heard = true
             return true
@@ -24,5 +33,6 @@ internal class TarjiWordGate {
 
     private companion object {
         const val MIN_GAIN = 0.01f
+        const val NO_EVENT_MS = Long.MIN_VALUE
     }
 }

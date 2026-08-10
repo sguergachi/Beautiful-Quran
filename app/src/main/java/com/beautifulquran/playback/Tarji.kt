@@ -35,6 +35,10 @@ class Tarji {
     var reverberating = false
         private set
 
+    /** Analysis-hop at which the current acoustic event was acquired. */
+    var eventStartHop = -1
+        private set
+
     /** The reverberation itself: zero-centred, ~−1..1, phase-locked to the
      * voice. Meaningful only while [reverberating]. */
     var tremolo = 0f
@@ -115,6 +119,7 @@ class Tarji {
     private val histTremolo = FloatArray(HIST_HOPS)
     private val histGain = FloatArray(HIST_HOPS)
     private val histRev = FloatArray(HIST_HOPS)
+    private val histEventStartHop = IntArray(HIST_HOPS)
     private var histCount = 0
 
     /** Tarjīʿ state as it reaches the ear now (delayed by [delayHops]). */
@@ -122,18 +127,39 @@ class Tarji {
     val syncTremolo: Float get() = delayed(histTremolo)
     val syncTremoloGain: Float get() = delayed(histGain)
 
+    /** Event identity on the same delayed clock as [syncReverberating]. */
+    val syncEventStartHop: Int
+        get() {
+            if (!syncReverberating || histCount == 0) return -1
+            val position = delayedPosition() ?: return -1
+            val before = floor(position).toInt()
+            val after = minOf(before + 1, histCount - 1)
+            val beforeIndex = before % HIST_HOPS
+            val afterIndex = after % HIST_HOPS
+            return when {
+                histRev[beforeIndex] >= 0.5f -> histEventStartHop[beforeIndex]
+                histRev[afterIndex] >= 0.5f -> histEventStartHop[afterIndex]
+                else -> -1
+            }
+        }
+
     /** Linear read-out between analysis hops keeps device latency from being
      * quantized up to 20 ms early. Detection itself remains hop-based. */
     private fun delayed(history: FloatArray): Float {
-        if (histCount == 0) return 0f
-        val newest = histCount - 1
-        val oldest = maxOf(0, histCount - HIST_HOPS)
-        val position = (newest - delayHops.coerceAtLeast(0f)).coerceAtLeast(oldest.toFloat())
+        val position = delayedPosition() ?: return 0f
         val before = floor(position).toInt()
-        val after = minOf(before + 1, newest)
+        val after = minOf(before + 1, histCount - 1)
         val fraction = position - before
         val a = history[before % HIST_HOPS]
         return a + fraction * (history[after % HIST_HOPS] - a)
+    }
+
+    private fun delayedPosition(): Float? {
+        if (histCount == 0) return null
+        val newest = histCount - 1
+        val oldest = maxOf(0, histCount - HIST_HOPS)
+        return (newest - delayHops.coerceAtLeast(0f))
+            .coerceAtLeast(oldest.toFloat())
     }
 
     // Rolling 80 ms analysis frame at the decimated rate, plus a reuse
@@ -224,6 +250,7 @@ class Tarji {
 
     fun reset() {
         reverberating = false
+        eventStartHop = -1
         tremolo = 0f
         tremoloGain = 0f
         holdMs = 0f
@@ -325,7 +352,9 @@ class Tarji {
             else -> 0f
         }
 
+        val wasReverberating = reverberating
         updateTremolo()
+        if (!wasReverberating && reverberating) eventStartHop = hopCount
 
         // The shimmer builds with the swell and settles with the voice. Its
         // strength ramps in over the event's own build ([SWELL_RAMP_HOPS]) —
@@ -358,6 +387,8 @@ class Tarji {
         histTremolo[histCount % HIST_HOPS] = tremolo
         histGain[histCount % HIST_HOPS] = tremoloGain
         histRev[histCount % HIST_HOPS] = if (reverberating) 1f else 0f
+        histEventStartHop[histCount % HIST_HOPS] =
+            if (reverberating) eventStartHop else -1
         histCount++
     }
 

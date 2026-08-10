@@ -1,11 +1,26 @@
 package com.beautifulquran.playback
 
+import kotlin.math.roundToLong
+
 /** Exact content duration represented by one decimated analysis hop. */
 internal fun analysisHopContentMs(
     sourceSampleRate: Int,
     decimation: Int,
     hopSamples: Int,
 ): Double = hopSamples * decimation * 1_000.0 / sourceSampleRate
+
+/** Map a tap-content timestamp onto the media-item clock at the playback head. */
+internal fun mapTapContentToMediaMs(
+    playbackPositionMs: Long,
+    tapContentMs: Double,
+    eventStartContentMs: Double,
+    backlogContentMs: Double,
+): Long = (
+    playbackPositionMs.toDouble() +
+        backlogContentMs +
+        eventStartContentMs -
+        tapContentMs
+    ).roundToLong()
 
 /**
  * Stable tap-to-playback-head clock for one sink session.

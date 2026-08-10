@@ -1126,6 +1126,7 @@ private fun rememberTarjiGate(
     eligible: Boolean,
     activation: Long,
     repeat: Boolean,
+    wordStartMs: Long,
 ): State<InkEngine.GlintResonance> {
     val frame = remember {
         mutableStateOf(InkEngine.GlintResonance.Idle)
@@ -1143,7 +1144,15 @@ private fun rememberTarjiGate(
             withFrameNanos {
                 val voice = com.beautifulquran.playback.VoiceEnergy.active
                 val g = voice?.shimmerGain ?: 0f
-                frame.value = if (eventGate.allows(g, voice?.reverberating == true)) {
+                frame.value = if (
+                    eventGate.allows(
+                        gain = g,
+                        detected = voice?.reverberating == true,
+                        eventStartMs = voice?.eventStartMediaMs
+                            ?: com.beautifulquran.playback.VoiceEnergy.NO_EVENT_MS,
+                        wordStartMs = wordStartMs,
+                    )
+                ) {
                     InkEngine.glintResonance(
                         holding = true,
                         tremolo = voice?.tremolo ?: 0f,
@@ -1167,6 +1176,7 @@ private fun rememberInkMotions(
     activeRevealStart: Float = 0f,
     waslPrefixes: List<WaslPrefix?>,
     activation: Long = 0L,
+    activeWordStartMs: Long = Long.MIN_VALUE,
     repeatGate: OrderedWashGate,
     /** English prose waits for each predecessor's residual before blooming. */
     sequentialSweeps: Boolean,
@@ -1228,6 +1238,7 @@ private fun rememberInkMotions(
                 eligible = tarjiEligible,
                 activation = wordActivation,
                 repeat = ink.repeat,
+                wordStartMs = activeWordStartMs,
             ),
         )
         predecessor = sweep.progress
@@ -2403,6 +2414,7 @@ fun AyahBlock(
     // word, corrected for the chosen playback speed.
     val sweepMs = InkEngine.sweepMs(activeWord, playbackSpeed)
     val activation = activeWord?.activation ?: 0L
+    val activeWordStartMs = activeWord?.startMs ?: Long.MIN_VALUE
 
     // Letter-level tajweed pacing of that sweep (Ink Lab toggle,
     // docs/TAJWEED_PACING.md): null keeps the plain constant-rate wash.
@@ -2526,6 +2538,7 @@ fun AyahBlock(
         } ?: 0f,
         waslPrefixes = waslPrefixes,
         activation = activation,
+        activeWordStartMs = activeWordStartMs,
         repeatGate = repeatWashGate,
         sequentialSweeps = readingMode == ReadingMode.ENGLISH_ONLY,
         animateLyricInk =

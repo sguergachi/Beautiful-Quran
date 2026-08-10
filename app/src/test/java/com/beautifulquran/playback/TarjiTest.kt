@@ -70,6 +70,13 @@ class TarjiTest {
         }
     }
 
+    private fun eventStartMs(detector: Tarji): Long =
+        detector.syncEventStartHop
+            .takeIf { it >= 0 }
+            ?.toLong()
+            ?.times(Tarji.HOP_MS)
+            ?: VoiceEnergy.NO_EVENT_MS
+
     private fun realFlickerCorrelation(
         name: String,
         fromSeconds: Float,
@@ -474,6 +481,8 @@ class TarjiTest {
             ),
         )
         reset.reset()
+        assertEquals(-1, reset.eventStartHop)
+        assertEquals(-1, reset.syncEventStartHop)
 
         val fresh = Tarji()
         val wave = modulatedHeldNote(
@@ -682,7 +691,12 @@ class TarjiTest {
         var consumed = 0
         while (consumed + Tarji.HOP_SAMPLES <= loudOnset.size) {
             d.onSamples8k(loudOnset.copyOfRange(consumed, consumed + Tarji.HOP_SAMPLES))
-            wordGate.allows(d.tremoloGain, d.reverberating)
+            wordGate.allows(
+                gain = d.tremoloGain,
+                detected = d.reverberating,
+                eventStartMs = eventStartMs(d),
+                wordStartMs = 0L,
+            )
             consumed += Tarji.HOP_SAMPLES
         }
         assertFalse(d.reverberating)
@@ -699,7 +713,12 @@ class TarjiTest {
         while (consumed + Tarji.HOP_SAMPLES <= quietPulse.size) {
             d.onSamples8k(quietPulse.copyOfRange(consumed, consumed + Tarji.HOP_SAMPLES))
             consumed += Tarji.HOP_SAMPLES
-            val visible = wordGate.allows(d.tremoloGain, d.reverberating)
+            val visible = wordGate.allows(
+                gain = d.tremoloGain,
+                detected = d.reverberating,
+                eventStartMs = eventStartMs(d),
+                wordStartMs = 0L,
+            )
             if (consumed >= 1.7f * Tarji.SAMPLE_RATE && visible) {
                 lateVisibleHops++
             }
@@ -891,6 +910,38 @@ class TarjiTest {
         assertTrue(d.syncReverberating)
         d.delayHops = 0.51f
         assertFalse(d.syncReverberating)
+    }
+
+    @Test
+    fun `delayed event identity stays with the delayed pulse`() {
+        val d = Tarji().apply { delayHops = 5f }
+        val wave = heldNote(seconds = 3f, pitchHz = 130f, amHz = 5.5f, amDepth = 0.12f)
+        var rawStartHop = -1
+        var syncStartHop = -1
+        var rawStartMs = -1L
+        var syncStartMs = -1L
+        var consumed = 0
+        while (consumed + Tarji.HOP_SAMPLES <= wave.size) {
+            d.onSamples8k(wave.copyOfRange(consumed, consumed + Tarji.HOP_SAMPLES))
+            consumed += Tarji.HOP_SAMPLES
+            val timeMs = consumed.toLong() * 1_000L / Tarji.SAMPLE_RATE
+            if (d.reverberating && rawStartHop < 0) {
+                rawStartHop = d.hopCount
+                rawStartMs = timeMs
+            }
+            if (d.syncReverberating && syncStartHop < 0) {
+                syncStartHop = d.syncEventStartHop
+                syncStartMs = timeMs
+            }
+        }
+        assertTrue("raw event must be detected", rawStartHop >= 0)
+        assertTrue("delayed event must be detected", syncStartHop >= 0)
+        assertEquals("delayed identity must name the same event", rawStartHop, syncStartHop)
+        assertTrue("delayed pulse must arrive after its raw onset", syncStartMs > rawStartMs)
+
+        feed(d, FloatArray(Tarji.SAMPLE_RATE))
+        assertFalse(d.syncReverberating)
+        assertEquals(-1, d.syncEventStartHop)
     }
 
     @Test
@@ -1229,7 +1280,12 @@ class TarjiTest {
             }
             if (
                 time >= 7.52f &&
-                wordGate.allows(detector.tremoloGain, detector.reverberating)
+                wordGate.allows(
+                    gain = detector.tremoloGain,
+                    detected = detector.reverberating,
+                    eventStartMs = eventStartMs(detector),
+                    wordStartMs = 0L,
+                )
             ) {
                 if (visualStart < 0f) visualStart = time
                 visualEnd = time

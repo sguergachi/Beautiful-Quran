@@ -26,6 +26,11 @@ class VoiceEnergy {
     var reverberating = false
         private set
 
+    /** Start of the delayed acoustic event on the media-item clock. */
+    @Volatile
+    var eventStartMediaMs = NO_EVENT_MS
+        private set
+
     /** Diagnostics for the Ink Lab readout: current hold length and the
      * measured oscillation rate (Hz). Undelayed — these are for humans. */
     @Volatile
@@ -92,6 +97,8 @@ class VoiceEnergy {
     fun resetTapSession() {
         tarji.reset()
         reverberating = false
+        eventStartContentMs = -1.0
+        eventStartMediaMs = NO_EVENT_MS
         tremolo = 0f
         tremoloGain = 0f
         holdMs = 0f
@@ -122,6 +129,8 @@ class VoiceEnergy {
     private var analysisHop = FloatArray(Tarji.HOP_SAMPLES)
     private var hopContentDurationMs = Tarji.HOP_MS.toDouble()
     private var hopFill = 0
+    @Volatile
+    private var eventStartContentMs = -1.0
 
     /**
      * Feed 16-bit PCM straight from the audio sink. Only reads [buffer]'s
@@ -195,11 +204,33 @@ class VoiceEnergy {
         sessionContentMs += hopContentDurationMs
         hopFill = 0
         reverberating = tarji.syncReverberating
+        eventStartContentMs = tarji.syncEventStartHop
+            .takeIf { it >= 0 }
+            ?.toDouble()
+            ?.times(hopContentDurationMs)
+            ?: -1.0
         tremolo = tarji.syncTremolo
         tremoloGain = tarji.syncTremoloGain
         holdMs = tarji.holdMs
         rateHz = tarji.lastRateHz
         lastFeedMs = SystemClock.elapsedRealtime()
+    }
+
+    /** Rebase the delayed event start onto the current media-item clock. */
+    fun updatePlaybackPosition(playbackPositionMs: Long) {
+        val start = eventStartContentMs
+        if (start < 0.0) {
+            eventStartMediaMs = NO_EVENT_MS
+            return
+        }
+        val backlog = measuredBacklogContentMs.takeIf { it >= 0.0 }
+            ?: sinkLatencyMs.toDouble() * playbackSpeed.coerceAtLeast(0f)
+        eventStartMediaMs = mapTapContentToMediaMs(
+            playbackPositionMs = playbackPositionMs,
+            tapContentMs = sessionContentMs,
+            eventStartContentMs = start,
+            backlogContentMs = backlog,
+        )
     }
 
     /** Total content hops processed since the tap session started. */
@@ -217,6 +248,8 @@ class VoiceEnergy {
     fun release() {
         tarji.reset()
         reverberating = false
+        eventStartContentMs = -1.0
+        eventStartMediaMs = NO_EVENT_MS
         tremolo = 0f
         tremoloGain = 0f
         holdMs = 0f
@@ -232,6 +265,7 @@ class VoiceEnergy {
     }
 
     companion object {
+        const val NO_EVENT_MS = Long.MIN_VALUE
         private const val LIVE_WINDOW_MS = 350L
 
         /**
