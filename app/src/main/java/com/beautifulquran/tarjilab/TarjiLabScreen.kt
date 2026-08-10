@@ -21,7 +21,6 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsIgnoringVisibility
@@ -68,7 +67,6 @@ import androidx.core.view.WindowCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.beautifulquran.ui.reader.InkEngine
 import com.beautifulquran.ui.theme.ArabicWordStyle
-import com.beautifulquran.ui.theme.DisclosureChevron
 import com.beautifulquran.ui.theme.quietClickable
 import kotlin.math.abs
 import kotlin.math.max
@@ -97,7 +95,6 @@ fun TarjiLabScreen(
     val ui by viewModel.ui.collectAsStateWithLifecycle()
     val context = LocalContext.current
     var toolsExpanded by remember { mutableStateOf(false) }
-    var tuningExpanded by remember { mutableStateOf(false) }
 
     // Frame-driven playhead for the canvas + preview word: the loop is
     // hardware-looped, so the wall clock modulo the capture duration is
@@ -223,23 +220,14 @@ fun TarjiLabScreen(
                 )
 
                 Spacer(Modifier.height(8.dp))
-                SectionToggle(
-                    label = "Detector tuning",
-                    expanded = tuningExpanded,
-                    onToggle = { tuningExpanded = !tuningExpanded },
+                KnobsPanel(
+                    ui = ui,
+                    onKnob = viewModel::updateKnobs,
+                    onDepth = { depth ->
+                        InkEngine.tuning = InkEngine.tuning.copy(glintResonanceDepth = depth)
+                    },
+                    modifier = Modifier.fillMaxWidth(),
                 )
-                if (tuningExpanded) {
-                    KnobsPanel(
-                        ui = ui,
-                        onKnob = viewModel::updateKnobs,
-                        onDepth = { depth ->
-                            InkEngine.tuning = InkEngine.tuning.copy(glintResonanceDepth = depth)
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .heightIn(max = 240.dp),
-                    )
-                }
             }
         }
     }
@@ -395,32 +383,6 @@ private fun ToolsRow(
             onClick = onImport,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-    }
-}
-
-@Composable
-private fun SectionToggle(
-    label: String,
-    expanded: Boolean,
-    onToggle: () -> Unit,
-) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier
-            .quietClickable(onClick = onToggle)
-            .padding(vertical = 6.dp),
-    ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelLarge,
-            color = if (expanded) {
-                MaterialTheme.colorScheme.primary
-            } else {
-                MaterialTheme.colorScheme.onSurfaceVariant
-            },
-        )
-        Spacer(Modifier.width(4.dp))
-        DisclosureChevron(expanded = expanded)
     }
 }
 
@@ -817,7 +779,6 @@ private fun KnobsPanel(
         modifier = modifier
             .clip(RoundedCornerShape(14.dp))
             .background(MaterialTheme.colorScheme.background.copy(alpha = 0.5f))
-            .verticalScroll(rememberScrollState())
             .padding(horizontal = 10.dp, vertical = 6.dp),
     ) {
         LabSlider(
