@@ -597,7 +597,34 @@ private fun WaveformPanel(
         Canvas(
             Modifier
                 .fillMaxWidth()
-                .height(if (capture == null) 156.dp else 190.dp),
+                .height(if (capture == null) 156.dp else 190.dp)
+                .pointerInput(durationMs) {
+                    if (durationMs <= 0f) return@pointerInput
+                    detectTapGestures { offset ->
+                        onScrub(
+                            (offset.x / size.width * durationMs)
+                                .coerceIn(0f, durationMs),
+                        )
+                    }
+                }
+                .pointerInput(durationMs) {
+                    if (durationMs <= 0f) return@pointerInput
+                    detectDragGestures(
+                        onDragStart = { offset ->
+                            onScrub(
+                                (offset.x / size.width * durationMs)
+                                    .coerceIn(0f, durationMs),
+                            )
+                        },
+                        onDrag = { change, _ ->
+                            change.consume()
+                            onScrub(
+                                (change.position.x / size.width * durationMs)
+                                    .coerceIn(0f, durationMs),
+                            )
+                        },
+                    )
+                },
         ) {
             if (capture == null || trace == null || peak <= 0f) {
                 drawGuide(guideText, guideColor)
@@ -680,13 +707,6 @@ private fun WaveformPanel(
                 )
             }
         }
-        if (capture != null && trace != null && durationMs > 0f) {
-            ScrubBar(
-                positionMs = playheadMs.coerceIn(0f, durationMs),
-                durationMs = durationMs,
-                onScrub = onScrub,
-            )
-        }
         Row(
             horizontalArrangement = Arrangement.SpaceBetween,
             modifier = Modifier
@@ -720,47 +740,6 @@ private fun WaveformPanel(
                 )
             }
         }
-    }
-}
-
-/** A thin scrub rail with a generous drag target for precise loop seeking. */
-@Composable
-private fun ScrubBar(
-    positionMs: Float,
-    durationMs: Float,
-    onScrub: (Float) -> Unit,
-) {
-    val track = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f)
-    val active = MaterialTheme.colorScheme.primary
-    val position = positionMs.coerceIn(0f, durationMs)
-    Canvas(
-        Modifier
-            .fillMaxWidth()
-            .height(28.dp)
-            .pointerInput(durationMs) {
-                detectTapGestures { offset ->
-                    onScrub((offset.x / size.width * durationMs).coerceIn(0f, durationMs))
-                }
-            }
-            .pointerInput(durationMs) {
-                detectDragGestures(
-                    onDragStart = { offset ->
-                        onScrub((offset.x / size.width * durationMs).coerceIn(0f, durationMs))
-                    },
-                    onDrag = { change, _ ->
-                        change.consume()
-                        onScrub((change.position.x / size.width * durationMs).coerceIn(0f, durationMs))
-                    },
-                )
-            },
-    ) {
-        val left = 6f
-        val right = size.width - 6f
-        val y = size.height / 2f
-        val x = left + (right - left) * (position / durationMs)
-        drawLine(track, Offset(left, y), Offset(right, y), strokeWidth = 2f, cap = StrokeCap.Round)
-        drawLine(active, Offset(left, y), Offset(x, y), strokeWidth = 3f, cap = StrokeCap.Round)
-        drawCircle(active, radius = 6f, center = Offset(x, y))
     }
 }
 
