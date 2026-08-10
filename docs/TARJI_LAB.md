@@ -67,12 +67,12 @@ with a debounce. Plus the effect's **pulse depth**, which the preview honors.
    capture can be retried from the same control.
 3. Use **Play loop** / **Pause loop** to audition the captured word. The
    control is a true toggle: pause keeps the loop sample position and Play
-   resumes from that same sample. Tap or drag **anywhere on the full
-   waveform** to jump to an exact point; there is no separate scrub control.
-   The `time / duration` readout makes the target explicit. The glowing word
-   preview lives in the top word row so the waveform and controls get the
-   remaining space. Capture and loop controls sit directly below the waveform,
-   where they stay beside the timing evidence they control.
+    resumes from that same sample. Tap or drag **anywhere on the full
+    waveform** to jump to an exact point; there is no separate scrub control.
+    The `time / duration` readout makes the target explicit. The glowing word
+    preview lives in the top word row so the waveform and controls get the
+    remaining space. Capture and loop controls sit directly below the waveform,
+    where they stay beside the timing evidence they control.
 4. **Detector tuning** stays visible below the waveform so the values are
    always available while listening. **Tools** contains the less-frequent
    Reset, Export, and Import actions, keeping the primary workflow quiet.
