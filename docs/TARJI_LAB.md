@@ -62,12 +62,23 @@ with a debounce. Plus the effect's **pulse depth**, which the preview honors.
 2. **Capture word** — the word plays once through the shared player at 1×
    (300 ms lead, 1 s tail of the waqf decay), and the tap records the hop
    stream; capture stops at the word's end automatically and the loop
-   starts.
-3. Watch the gold sine and listen to the loop. Too few pulses? Lower
+   starts. While it runs, the action becomes **Cancel capture** and shows a
+   percentage rail, so buffering or a long word never looks frozen; a failed
+   capture can be retried from the same control.
+3. Use **Play loop** / **Pause loop** to audition the captured word. The
+   control is a true toggle: pause keeps the loop sample position and Play
+   resumes from that same sample. Drag the scrub rail directly under the
+   waveform, or tap it, to jump to an exact point; the `time / duration`
+   readout makes the target explicit. The glowing word preview lives in the
+   top word row so the waveform and controls get the remaining space.
+4. Open **Detector tuning** only when adjusting the algorithm. **Tools**
+   contains the less-frequent Reset, Export, and Import actions, keeping the
+   primary capture/play/waveform workflow quiet.
+5. Watch the gold sine and listen to the loop. Too few pulses? Lower
    **Min depth** / **hold min**, widen **Max rate**. Glimmer flickers into
    the next word? Raise **Release ms**. The sine vs the fitted dashed ideal
    shows drift at a glance.
-4. **Reset knobs** restores shipped defaults (also resets the Ink Lab).
+6. **Reset knobs** restores shipped defaults (also resets the Ink Lab).
 
 ## Samples — the exchange format
 
@@ -96,6 +107,9 @@ recitations.
   signal, with no ear-delay term.
 - The loop is capped at 1 MB static buffer; a longer capture refuses to
   loop (a word never approaches it).
+- The waveform cursor reads the static `AudioTrack` playback head, not a
+  wall-clock estimate, so output scheduling and loop seams cannot make the
+  displayed time drift away from the sound.
 - Hardware loop points were reworked in API 37 (`setLoopPoints(start, end,
   loopCount)` with −1 = infinite); older platforms use the two-argument
   form via reflection, since the 37 stub no longer carries it.

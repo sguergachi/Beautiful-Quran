@@ -1,26 +1,39 @@
 package com.beautifulquran.tarjilab
 
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
 import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsIgnoringVisibility
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.Pause
+import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -28,6 +41,7 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -43,15 +57,18 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.view.WindowCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.beautifulquran.playback.TarjiLabCapture
 import com.beautifulquran.ui.reader.InkEngine
 import com.beautifulquran.ui.theme.ArabicWordStyle
+import com.beautifulquran.ui.theme.DisclosureChevron
 import com.beautifulquran.ui.theme.quietClickable
 import kotlin.math.abs
 import kotlin.math.max
@@ -71,6 +88,7 @@ private val GlintGold = Color(0xFFF8E9BE)
  * the ear. Exported samples ([TarjiLabCodec]) reproduce any capture
  * off-device for deriving a better detector.
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun TarjiLabScreen(
     viewModel: TarjiLabViewModel,
@@ -78,18 +96,24 @@ fun TarjiLabScreen(
 ) {
     val ui by viewModel.ui.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    var toolsExpanded by remember { mutableStateOf(false) }
+    var tuningExpanded by remember { mutableStateOf(false) }
 
     // Frame-driven playhead for the canvas + preview word: the loop is
     // hardware-looped, so the wall clock modulo the capture duration is
     // exact to the sample — no polling, no drift.
     var playheadMs by remember { mutableFloatStateOf(-1f) }
-    androidx.compose.runtime.LaunchedEffect(ui.previewPlaying, ui.previewDurationMs) {
+    androidx.compose.runtime.LaunchedEffect(
+        ui.previewPlaying,
+        ui.previewDurationMs,
+        ui.previewPositionMs,
+    ) {
         while (ui.previewPlaying) {
             withFrameNanos {
                 playheadMs = viewModel.previewPlayheadMs()
             }
         }
-        playheadMs = -1f
+        playheadMs = viewModel.previewPlayheadMs()
     }
 
     val importLauncher = rememberLauncherForActivityResult(
@@ -108,81 +132,116 @@ fun TarjiLabScreen(
         }
     }
 
+    val view = LocalView.current
+    DisposableEffect(view) {
+        val window = view.context.findActivity()?.window
+        val controller = window?.let { WindowCompat.getInsetsController(it, view) }
+        val previous = controller?.isAppearanceLightStatusBars
+        controller?.isAppearanceLightStatusBars = false
+        onDispose {
+            if (previous != null) controller.isAppearanceLightStatusBars = previous
+        }
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(horizontal = 16.dp)
-            .padding(top = 10.dp, bottom = 14.dp),
+            .background(MaterialTheme.colorScheme.background)
+            .windowInsetsPadding(WindowInsets.statusBarsIgnoringVisibility)
+            .navigationBarsPadding()
+            .padding(horizontal = 16.dp),
     ) {
-        LabHeader(ui, onBack, viewModel)
+        LabHeader(ui, onBack)
 
         if (ui.isLoading) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+                contentAlignment = Alignment.Center,
+            ) {
                 Text(
                     text = "Loading…",
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            return@Column
+        } else {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+                    .verticalScroll(rememberScrollState())
+                    .padding(bottom = 14.dp),
+            ) {
+                Spacer(Modifier.height(8.dp))
+                WordRow(ui, viewModel, playheadMs)
+
+                Spacer(Modifier.height(8.dp))
+                ActionRow(
+                    ui = ui,
+                    viewModel = viewModel,
+                    toolsExpanded = toolsExpanded,
+                    onToggleTools = { toolsExpanded = !toolsExpanded },
+                )
+                if (toolsExpanded) {
+                    ToolsRow(
+                        viewModel = viewModel,
+                        context = context,
+                        onImport = {
+                            importLauncher.launch(arrayOf("application/json", "text/*", "*/*"))
+                        },
+                    )
+                }
+                if (ui.capturing) {
+                    CaptureProgress(ui.captureProgress)
+                }
+
+                ui.captureError?.let {
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        text = it,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+                ui.note?.let {
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        text = it,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+
+                Spacer(Modifier.height(10.dp))
+                WaveformPanel(
+                    ui = ui,
+                    playheadMs = playheadMs,
+                    onScrub = viewModel::seekPreviewTo,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+
+                Spacer(Modifier.height(8.dp))
+                SectionToggle(
+                    label = "Detector tuning",
+                    expanded = tuningExpanded,
+                    onToggle = { tuningExpanded = !tuningExpanded },
+                )
+                if (tuningExpanded) {
+                    KnobsPanel(
+                        ui = ui,
+                        onKnob = viewModel::updateKnobs,
+                        onDepth = { depth ->
+                            InkEngine.tuning = InkEngine.tuning.copy(glintResonanceDepth = depth)
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 240.dp),
+                    )
+                }
+            }
         }
-
-        Spacer(Modifier.height(8.dp))
-        WordRow(ui, viewModel)
-
-        Spacer(Modifier.height(8.dp))
-        ActionRow(
-            ui = ui,
-            viewModel = viewModel,
-            onImport = {
-                importLauncher.launch(arrayOf("application/json", "text/*", "*/*"))
-            },
-        )
-
-        ui.captureError?.let {
-            Spacer(Modifier.height(4.dp))
-            Text(
-                text = it,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.error,
-            )
-        }
-        ui.note?.let {
-            Spacer(Modifier.height(4.dp))
-            Text(
-                text = it,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-
-        Spacer(Modifier.height(10.dp))
-        WaveformPanel(
-            ui = ui,
-            playheadMs = playheadMs,
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f),
-        )
-
-        Spacer(Modifier.height(10.dp))
-        PreviewWord(
-            ui = ui,
-            playheadMs = playheadMs,
-            modifier = Modifier.fillMaxWidth(),
-        )
-
-        Spacer(Modifier.height(10.dp))
-        KnobsPanel(
-            ui = ui,
-            onKnob = viewModel::updateKnobs,
-            onDepth = { depth ->
-                InkEngine.tuning = InkEngine.tuning.copy(glintResonanceDepth = depth)
-            },
-            modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(max = 250.dp),
-        )
     }
 }
 
@@ -190,7 +249,6 @@ fun TarjiLabScreen(
 private fun LabHeader(
     ui: TarjiLabViewModel.TarjiLabUiState,
     onBack: () -> Unit,
-    viewModel: TarjiLabViewModel,
 ) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -227,6 +285,7 @@ private fun LabHeader(
 private fun WordRow(
     ui: TarjiLabViewModel.TarjiLabUiState,
     viewModel: TarjiLabViewModel,
+    playheadMs: Float,
 ) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -241,12 +300,16 @@ private fun WordRow(
                 .quietClickable(onClick = viewModel::prevWord)
                 .padding(horizontal = 18.dp, vertical = 4.dp),
         )
-        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
-            Text(
-                text = ui.wordArabic,
-                style = ArabicWordStyle,
-                fontSize = 34.sp,
-                color = MaterialTheme.colorScheme.onSurface,
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.weight(1f),
+        ) {
+            PreviewWord(
+                ui = ui,
+                playheadMs = playheadMs,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(86.dp),
             )
             Text(
                 text = ui.wordTranslation,
@@ -270,34 +333,58 @@ private fun WordRow(
 private fun ActionRow(
     ui: TarjiLabViewModel.TarjiLabUiState,
     viewModel: TarjiLabViewModel,
-    onImport: () -> Unit,
+    toolsExpanded: Boolean,
+    onToggleTools: () -> Unit,
 ) {
-    val context = LocalContext.current
-    Row(
-        horizontalArrangement = Arrangement.spacedBy(14.dp),
-        verticalAlignment = Alignment.CenterVertically,
+    FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp),
+        maxItemsInEachRow = 3,
         modifier = Modifier.fillMaxWidth(),
     ) {
         WordAction(
-            label = if (ui.capturing) "Capturing…" else "Capture word",
+            label = if (ui.capturing) "Cancel capture" else "Capture word",
             onClick = viewModel::captureWord,
-            color = MaterialTheme.colorScheme.primary,
+            color = if (ui.capturing) {
+                MaterialTheme.colorScheme.error
+            } else {
+                MaterialTheme.colorScheme.primary
+            },
+        )
+        PreviewAction(
+            playing = ui.previewPlaying,
+            onClick = viewModel::togglePreview,
         )
         WordAction(
-            label = if (ui.previewPlaying) "Loop: on" else "Loop: off",
-            onClick = { if (ui.previewPlaying) viewModel.stopPreview() else viewModel.startPreview() },
-            color = if (ui.previewPlaying) {
+            label = "Tools",
+            onClick = onToggleTools,
+            color = if (toolsExpanded) {
                 MaterialTheme.colorScheme.primary
             } else {
                 MaterialTheme.colorScheme.onSurfaceVariant
             },
         )
+    }
+}
+
+@Composable
+private fun ToolsRow(
+    viewModel: TarjiLabViewModel,
+    context: android.content.Context,
+    onImport: () -> Unit,
+) {
+    FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 2.dp),
+    ) {
         WordAction(
             label = "Reset knobs",
             onClick = viewModel::resetKnobs,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        Spacer(Modifier.weight(1f))
         WordAction(
             label = "Export",
             onClick = { viewModel.exportSample(context) },
@@ -307,6 +394,111 @@ private fun ActionRow(
             label = "Import",
             onClick = onImport,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+@Composable
+private fun SectionToggle(
+    label: String,
+    expanded: Boolean,
+    onToggle: () -> Unit,
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .quietClickable(onClick = onToggle)
+            .padding(vertical = 6.dp),
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelLarge,
+            color = if (expanded) {
+                MaterialTheme.colorScheme.primary
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            },
+        )
+        Spacer(Modifier.width(4.dp))
+        DisclosureChevron(expanded = expanded)
+    }
+}
+
+@Composable
+private fun CaptureProgress(progress: Float) {
+    val active = MaterialTheme.colorScheme.primary
+    val track = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.25f)
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 3.dp),
+    ) {
+        Row(
+            horizontalArrangement = Arrangement.SpaceBetween,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text(
+                text = "Capturing ${(progress.coerceIn(0f, 1f) * 100f).roundToInt()}%",
+                style = MaterialTheme.typography.labelSmall,
+                color = active,
+            )
+            Text(
+                text = "Tap Cancel capture to stop",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Canvas(
+            Modifier
+                .fillMaxWidth()
+                .height(4.dp)
+                .padding(top = 2.dp),
+        ) {
+            drawLine(
+                color = track,
+                start = Offset.Zero.copy(y = size.height / 2f),
+                end = Offset(size.width, size.height / 2f),
+                strokeWidth = size.height,
+                cap = StrokeCap.Round,
+            )
+            drawLine(
+                color = active,
+                start = Offset.Zero.copy(y = size.height / 2f),
+                end = Offset(size.width * progress.coerceIn(0f, 1f), size.height / 2f),
+                strokeWidth = size.height,
+                cap = StrokeCap.Round,
+            )
+        }
+    }
+}
+
+/** Explicit transport control for the captured word loop. */
+@Composable
+private fun PreviewAction(
+    playing: Boolean,
+    onClick: () -> Unit,
+) {
+    val color = if (playing) {
+        MaterialTheme.colorScheme.primary
+    } else {
+        MaterialTheme.colorScheme.onSurfaceVariant
+    }
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .quietClickable(onClick = onClick)
+            .padding(vertical = 2.dp),
+    ) {
+        Icon(
+            imageVector = if (playing) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
+            contentDescription = if (playing) "Pause loop" else "Play loop",
+            tint = color,
+            modifier = Modifier.padding(end = 4.dp).width(24.dp),
+        )
+        Text(
+            text = if (playing) "Pause loop" else "Play loop",
+            style = MaterialTheme.typography.labelLarge,
+            color = color,
         )
     }
 }
@@ -338,7 +530,7 @@ private fun PreviewWord(
 ) {
     Box(
         contentAlignment = Alignment.Center,
-        modifier = modifier.height(112.dp),
+        modifier = modifier,
     ) {
         val trace = ui.trace
         if (trace != null && playheadMs >= 0f) {
@@ -367,7 +559,7 @@ private fun PreviewWord(
         Text(
             text = ui.wordArabic,
             style = ArabicWordStyle,
-            fontSize = 56.sp,
+            fontSize = 46.sp,
             color = GlintGold.copy(alpha = 0.96f),
         )
     }
@@ -379,6 +571,7 @@ private fun PreviewWord(
 private fun WaveformPanel(
     ui: TarjiLabViewModel.TarjiLabUiState,
     playheadMs: Float,
+    onScrub: (Float) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val capture = ui.capture
@@ -392,6 +585,7 @@ private fun WaveformPanel(
     } else {
         "No audio in this capture."
     }
+    val durationMs = trace?.let { it.hopCount * it.hopDurationMs } ?: 0f
     Column(modifier = modifier) {
         val peak = remember(capture) {
             capture?.pcm?.let { p ->
@@ -403,13 +597,12 @@ private fun WaveformPanel(
         Canvas(
             Modifier
                 .fillMaxWidth()
-                .weight(1f),
+                .height(if (capture == null) 156.dp else 190.dp),
         ) {
             if (capture == null || trace == null || peak <= 0f) {
                 drawGuide(guideText, guideColor)
                 return@Canvas
             }
-            val durationMs = trace.hopCount * trace.hopDurationMs
             val sineColor = GlintGold.copy(alpha = 0.95f)
             val fitColor = Color.White.copy(alpha = 0.55f)
             val revColor = GlintGold.copy(alpha = 0.10f)
@@ -487,13 +680,19 @@ private fun WaveformPanel(
                 )
             }
         }
+        if (capture != null && trace != null && durationMs > 0f) {
+            ScrubBar(
+                positionMs = playheadMs.coerceIn(0f, durationMs),
+                durationMs = durationMs,
+                onScrub = onScrub,
+            )
+        }
         Row(
             horizontalArrangement = Arrangement.SpaceBetween,
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(top = 2.dp),
         ) {
-            val durationMs = if (trace != null) trace.hopCount * trace.hopDurationMs else 0f
             val label = if (capture != null) {
                 val rate = ui.sineFit?.let { "${"%.1f".format(it.rateHz)} Hz" } ?: "—"
                 "captured ${"%.1f".format(durationMs / 1000f)}s · hop ${"%.1f".format(trace?.hopDurationMs)}ms · fit $rate"
@@ -505,6 +704,14 @@ private fun WaveformPanel(
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
             )
+            if (capture != null && durationMs > 0f) {
+                Text(
+                    text = "${formatScrubTime(playheadMs.coerceIn(0f, durationMs))} / " +
+                        formatScrubTime(durationMs),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
+                )
+            }
             if (ui.analyzing) {
                 Text(
                     text = "analyzing…",
@@ -515,6 +722,50 @@ private fun WaveformPanel(
         }
     }
 }
+
+/** A thin scrub rail with a generous drag target for precise loop seeking. */
+@Composable
+private fun ScrubBar(
+    positionMs: Float,
+    durationMs: Float,
+    onScrub: (Float) -> Unit,
+) {
+    val track = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f)
+    val active = MaterialTheme.colorScheme.primary
+    val position = positionMs.coerceIn(0f, durationMs)
+    Canvas(
+        Modifier
+            .fillMaxWidth()
+            .height(28.dp)
+            .pointerInput(durationMs) {
+                detectTapGestures { offset ->
+                    onScrub((offset.x / size.width * durationMs).coerceIn(0f, durationMs))
+                }
+            }
+            .pointerInput(durationMs) {
+                detectDragGestures(
+                    onDragStart = { offset ->
+                        onScrub((offset.x / size.width * durationMs).coerceIn(0f, durationMs))
+                    },
+                    onDrag = { change, _ ->
+                        change.consume()
+                        onScrub((change.position.x / size.width * durationMs).coerceIn(0f, durationMs))
+                    },
+                )
+            },
+    ) {
+        val left = 6f
+        val right = size.width - 6f
+        val y = size.height / 2f
+        val x = left + (right - left) * (position / durationMs)
+        drawLine(track, Offset(left, y), Offset(right, y), strokeWidth = 2f, cap = StrokeCap.Round)
+        drawLine(active, Offset(left, y), Offset(x, y), strokeWidth = 3f, cap = StrokeCap.Round)
+        drawCircle(active, radius = 6f, center = Offset(x, y))
+    }
+}
+
+private fun formatScrubTime(ms: Float): String =
+    "%.2fs".format(ms.coerceAtLeast(0f) / 1000f)
 
 private fun DrawScope.hopX(hop: Float, trace: TarjiLabTrace, width: Float): Float {
     val duration = trace.hopCount * trace.hopDurationMs
@@ -658,4 +909,10 @@ private fun LabSlider(
             modifier = Modifier.width(44.dp),
         )
     }
+}
+
+private tailrec fun Context.findActivity(): Activity? = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.findActivity()
+    else -> null
 }
