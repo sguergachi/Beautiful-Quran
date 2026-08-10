@@ -8,8 +8,8 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -174,6 +174,14 @@ fun TarjiLabScreen(
                 Spacer(Modifier.height(8.dp))
                 WordRow(ui, viewModel, playheadMs)
 
+                Spacer(Modifier.height(10.dp))
+                WaveformPanel(
+                    ui = ui,
+                    playheadMs = playheadMs,
+                    onScrub = viewModel::seekPreviewTo,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+
                 Spacer(Modifier.height(8.dp))
                 ActionRow(
                     ui = ui,
@@ -193,7 +201,6 @@ fun TarjiLabScreen(
                 if (ui.capturing) {
                     CaptureProgress(ui.captureProgress)
                 }
-
                 ui.captureError?.let {
                     Spacer(Modifier.height(4.dp))
                     Text(
@@ -210,14 +217,6 @@ fun TarjiLabScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-
-                Spacer(Modifier.height(10.dp))
-                WaveformPanel(
-                    ui = ui,
-                    playheadMs = playheadMs,
-                    onScrub = viewModel::seekPreviewTo,
-                    modifier = Modifier.fillMaxWidth(),
-                )
 
                 Spacer(Modifier.height(8.dp))
                 KnobsPanel(
@@ -562,30 +561,21 @@ private fun WaveformPanel(
                 .height(if (capture == null) 156.dp else 190.dp)
                 .pointerInput(durationMs) {
                     if (durationMs <= 0f) return@pointerInput
-                    detectTapGestures { offset ->
-                        onScrub(
-                            (offset.x / size.width * durationMs)
-                                .coerceIn(0f, durationMs),
-                        )
-                    }
-                }
-                .pointerInput(durationMs) {
-                    if (durationMs <= 0f) return@pointerInput
-                    detectDragGestures(
-                        onDragStart = { offset ->
-                            onScrub(
-                                (offset.x / size.width * durationMs)
-                                    .coerceIn(0f, durationMs),
-                            )
-                        },
-                        onDrag = { change, _ ->
+                    awaitEachGesture {
+                        val down = awaitFirstDown(requireUnconsumed = false)
+                        fun seek(x: Float) {
+                            onScrub((x / size.width * durationMs).coerceIn(0f, durationMs))
+                        }
+                        seek(down.position.x)
+                        down.consume()
+                        while (true) {
+                            val event = awaitPointerEvent()
+                            val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                            if (!change.pressed) break
                             change.consume()
-                            onScrub(
-                                (change.position.x / size.width * durationMs)
-                                    .coerceIn(0f, durationMs),
-                            )
-                        },
-                    )
+                            seek(change.position.x)
+                        }
+                    }
                 },
         ) {
             if (capture == null || trace == null || peak <= 0f) {
