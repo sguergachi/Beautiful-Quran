@@ -49,6 +49,8 @@ import kotlinx.coroutines.launch
 data class ActiveWord(
     val ayah: Int,
     val wordPosition: Int,
+    /** Start on the media-item timing clock, used for acoustic event ownership. */
+    val startMs: Long = 0L,
     val durationMs: Long,
     /** Voiced span of the word (segment end − start), without the karaoke
      * hold across the gap to the next word. Tajweed pacing distributes the
@@ -324,6 +326,7 @@ class ReaderViewModel(
                     BACKLOG_EMA * (lagMs - smoothedBacklogContentMs)
                 voice.measuredBacklogContentMs = smoothedBacklogContentMs
             }
+            voice.updatePlaybackPosition(player.positionMs)
             // Live tarjīʿ effect log: the shimmer's on/off transitions in
             // media time (the same gain the renderer gates on), so the
             // effect's engagement is confirmable in logcat as it happens.
@@ -391,6 +394,7 @@ class ReaderViewModel(
                 ActiveWord(
                     ayah = np.ayah,
                     wordPosition = it.position,
+                    startMs = it.startMs,
                     // Karaoke hold lifetime — sweep finishes as the next word
                     // lights, not merely when this segment's endMs elapses.
                     durationMs = (it.holdEndMs - it.startMs).coerceAtLeast(0L),

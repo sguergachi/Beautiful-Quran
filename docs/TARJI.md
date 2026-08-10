@@ -59,8 +59,11 @@ four visible states per second cannot express a 5–10 Hz vocal pulse.
 
 1.  **Frame → RMS.** An 80 ms rolling frame (4 hops) yields one RMS value
     every 20 ms, pushed into a 64-hop (≈1.3 s) evidence ring. `PEAK_DECAY`
-    tracks the noise floor the hold gate uses. The newest 20 ms hop also gets
-    its own RMS; it is the live intensity phase, never the event classifier.
+     tracks the noise floor the hold gate uses. The newest 20 ms hop also gets
+     its own RMS; it is the live intensity phase, never the event classifier.
+     The acquired event start travels in the same history clock as the
+     reverberation flag, so ownership never mixes raw detection with delayed
+     gain.
 
 2.  **Pitch.** The established 80 ms normalized-autocorrelation tracker over
     the reciter range 70–350 Hz remains the hold-identity clock.
@@ -219,7 +222,11 @@ mid-animation, so the bloom can never appear to restart):
     from the preceding word, waits for this utterance's live detection, lets
     that sustain breathe, then latches off when it settles. A later consonant
     or room-echo pulse cannot relight the same active word. A repeat transition
-    creates a fresh gate for the new performance event.
+    creates a fresh gate for the new performance event. The detector carries
+    the event's start through the same delayed history as its gain and pulse,
+    then maps that start to the media-item clock. A pulse whose start precedes
+    the active word cannot cross its boundary through output latency; only an
+    event that actually starts inside the word can arm it.
 
 When all four pass, tarjīʿ **turns the glimmer on and off** with the voice
 (not a soft breath around permanent sheen). The sign is acoustic phase:
