@@ -98,6 +98,7 @@ class TarjiLabViewModel(
     private var previewRateHz = 0
     private var previewTotalFrames = 0
     private var scrubWasPlaying = false
+    private var scrubActive = false
     private var ayahSegments: List<Segment> = emptyList()
     private var recitersCache: List<Reciter> = emptyList()
 
@@ -546,14 +547,14 @@ class TarjiLabViewModel(
         val position = normalizePreviewPosition(positionMs, durationMs)
         val wasPlaying = st.previewPlaying
         val track = audioTrack
+        var seekFailed = false
         if (track != null) {
             runCatching {
                 if (wasPlaying) track.pause()
                 track.setPlaybackHeadPosition(previewFrame(capture, position))
                 if (wasPlaying) track.play()
             }.onFailure {
-                _ui.value = st.copy(note = "Could not seek the preview loop.")
-                return
+                seekFailed = true
             }
         }
         _ui.value = st.copy(
@@ -561,21 +562,27 @@ class TarjiLabViewModel(
             previewStartWallMs = if (wasPlaying) SystemClock.elapsedRealtime() else -1L,
             previewDurationMs = durationMs,
             previewPositionMs = position,
+            note = if (seekFailed) "Could not seek the preview loop." else st.note,
         )
     }
 
     /** Pause once at the start of a drag so repeated finger updates only move
      * the hardware head instead of racing pause/play on every motion event. */
     fun beginPreviewScrub() {
+        scrubActive = true
         scrubWasPlaying = _ui.value.previewPlaying
         if (scrubWasPlaying) pausePreview()
     }
 
     /** Restore playback only if the scrub began while the loop was playing. */
     fun endPreviewScrub() {
-        if (!scrubWasPlaying) return
+        if (!scrubWasPlaying) {
+            scrubActive = false
+            return
+        }
         scrubWasPlaying = false
         resumePreview()
+        scrubActive = false
     }
 
     fun stopPreview() {
@@ -587,6 +594,7 @@ class TarjiLabViewModel(
         previewRateHz = 0
         previewTotalFrames = 0
         scrubWasPlaying = false
+        scrubActive = false
         _ui.value = _ui.value.copy(
             previewPlaying = false,
             previewStartWallMs = -1L,
@@ -600,6 +608,7 @@ class TarjiLabViewModel(
         val st = _ui.value
         val duration = st.previewDurationMs
         if (duration <= 0f) return -1f
+        if (scrubActive) return st.previewPositionMs.coerceIn(0f, duration)
         val track = audioTrack
         if (track != null && previewRateHz > 0 && previewTotalFrames > 0) {
             val head = track.playbackHeadPosition.toLong() and 0xFFFF_FFFFL
