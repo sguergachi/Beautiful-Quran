@@ -1905,7 +1905,9 @@ private fun ResponsiveHafsAyah(
             fontFamily = HafsFontFamily,
             fontSize = fontSize,
             lineHeight = 1.95.em,
-            textAlign = TextAlign.Center,
+            // Arabic verse copy owns the sheet's far-right rule; its position
+            // must not visually depend on the LTR translation below it.
+            textAlign = TextAlign.Right,
         ),
     )
     var layoutResult by remember { mutableStateOf<TextLayoutResult?>(null) }
