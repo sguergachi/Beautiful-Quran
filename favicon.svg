@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 108 108" role="img" aria-label="Beautiful Quran">
+  <!-- Tab favicon: paper ground so the gilt khatam reads at 16–32 px. -->
+  <rect width="108" height="108" fill="#FAF3E8"/>
+  <path fill="#C9A227" d="M28 28h52v52H28z"/>
+  <path fill="#C9A227" d="M54 18 90 54 54 90 18 54z"/>
+  <circle cx="54" cy="54" r="18" fill="#0E5C4A"/>
+  <circle cx="54" cy="54" r="11" fill="#FAF6EF"/>
+</svg>

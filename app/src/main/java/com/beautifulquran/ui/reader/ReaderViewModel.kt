@@ -22,6 +22,8 @@ import com.beautifulquran.playback.AudioOutputLatency
 import com.beautifulquran.playback.NowPlaying
 import com.beautifulquran.playback.PlayerController
 import com.beautifulquran.playback.PlayerUiState
+import com.beautifulquran.playback.TarjiBacklogAnchor
+import kotlin.math.abs
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -47,6 +49,8 @@ import kotlinx.coroutines.launch
 data class ActiveWord(
     val ayah: Int,
     val wordPosition: Int,
+    /** Start on the media-item timing clock, used for acoustic event ownership. */
+    val startMs: Long = 0L,
     val durationMs: Long,
     /** Voiced span of the word (segment end − start), without the karaoke
      * hold across the gap to the next word. Tajweed pacing distributes the
@@ -101,6 +105,8 @@ data class ReaderPlaybackSnapshot(
     val repeatMode: Int,
     val repeatRange: IntRange?,
     val speed: Float,
+    /** When false, restore the chapter queue without autoplay (paused open). */
+    val wasPlaying: Boolean = true,
 )
 
 internal data class PollingIdentity<K : Any>(
@@ -249,6 +255,13 @@ class ReaderViewModel(
     /** Last applied lag/lead so a lab or route change can reset the clock. */
     private var lastOutputLatencyMs = -1L
     private var lastHighlightLeadMs = -1L
+
+    // Tarjīʿ backlog measurement: stable absolute sink baseline plus relative
+    // tap/playback-head content clocks for the current sink session.
+    private var latchedTapSessionStart = 0L
+    private var tapBacklogAnchor: TarjiBacklogAnchor? = null
+    private var smoothedBacklogContentMs = 0.0
+    private var shimmerWasOn = false
     /**
      * User seek target (ayah → ms) applied on the next poll once that ayah is
      * the media item — so ink jumps to the tapped word without waiting for
@@ -275,6 +288,62 @@ class ReaderViewModel(
      */
     private fun highlightPositionMs(forcedMediaMs: Long?, firstWordStartMs: Long): Long {
         val latencyMs = outputLatencyMs()
+        // The tarjīʿ shimmer delays the tapped voice signal by the same
+        // latency plus the sink buffer so it lands on the same clock the
+        // highlight uses. Once that buffer has filled, exact tap and playback
+        // content clocks track only queue growth/drain around the stable
+        // baseline; a small EMA rejects position polling jitter.
+        val voice = com.beautifulquran.playback.VoiceEnergy.active
+        voice?.outputLatencyMs = latencyMs
+        if (voice != null) {
+            val speed = voice.playbackSpeed
+            if (voice.sessionStartWall != latchedTapSessionStart) {
+                latchedTapSessionStart = voice.sessionStartWall
+                tapBacklogAnchor = null
+                voice.measuredBacklogContentMs = -1.0
+            }
+            var anchor = tapBacklogAnchor
+            if (
+                TarjiBacklogAnchor.isReady(
+                    tapContentMs = voice.sessionContentMs,
+                    sinkLatencyMs = voice.sinkLatencyMs,
+                    speed = speed,
+                ) &&
+                (anchor == null || abs(anchor.speed - speed) > 0.001f)
+            ) {
+                anchor = TarjiBacklogAnchor.capture(
+                    tapContentMs = voice.sessionContentMs,
+                    playbackContentMs = player.positionMs,
+                    sinkLatencyMs = voice.sinkLatencyMs,
+                    speed = speed,
+                )
+                tapBacklogAnchor = anchor
+                smoothedBacklogContentMs = anchor.backlogContentMs
+            }
+            if (anchor != null) {
+                val lagMs = anchor.estimate(voice.sessionContentMs, player.positionMs)
+                smoothedBacklogContentMs +=
+                    BACKLOG_EMA * (lagMs - smoothedBacklogContentMs)
+                voice.measuredBacklogContentMs = smoothedBacklogContentMs
+            }
+            voice.updatePlaybackPosition(player.positionMs)
+            // Live tarjīʿ effect log: the shimmer's on/off transitions in
+            // media time (the same gain the renderer gates on), so the
+            // effect's engagement is confirmable in logcat as it happens.
+            val shimmerOn = voice.shimmerGain > 0.01f
+            if (shimmerOn != shimmerWasOn) {
+                shimmerWasOn = shimmerOn
+                android.util.Log.i(
+                    "TarjiEffect",
+                    if (shimmerOn) {
+                        "tarjīʿ shimmer ON at media ${player.positionMs} ms · " +
+                            "${"%.1f".format(voice.rateHz)} Hz · hold ${"%.1f".format(voice.holdMs / 1000f)}s"
+                    } else {
+                        "tarjīʿ shimmer OFF at media ${player.positionMs} ms"
+                    },
+                )
+            }
+        }
         val leadMs = InkEngine.highlightLeadMs.toLong().coerceAtLeast(0L)
         if (latencyMs != lastOutputLatencyMs || leadMs != lastHighlightLeadMs) {
             lastOutputLatencyMs = latencyMs
@@ -325,6 +394,7 @@ class ReaderViewModel(
                 ActiveWord(
                     ayah = np.ayah,
                     wordPosition = it.position,
+                    startMs = it.startMs,
                     // Karaoke hold lifetime — sweep finishes as the next word
                     // lights, not merely when this segment's endMs elapses.
                     durationMs = (it.holdEndMs - it.startMs).coerceAtLeast(0L),
@@ -681,6 +751,7 @@ class ReaderViewModel(
         startPositionMs: Long = 0L,
         preserveRepeatRange: Boolean = true,
         startWithBasmalah: Boolean = false,
+        autoplay: Boolean = true,
     ): Boolean {
         val content = _uiState.value.content ?: return false
         val reciter = _uiState.value.currentReciter ?: return false
@@ -693,6 +764,7 @@ class ReaderViewModel(
             startPositionMs = startPositionMs,
             preserveRepeatRange = preserveRepeatRange,
             startWithBasmalah = startWithBasmalah,
+            autoplay = autoplay,
         )
         return true
     }
@@ -778,10 +850,13 @@ class ReaderViewModel(
         return surah to focusedAyah.coerceAtLeast(1)
     }
 
-    /** Pauses a live reading session and returns enough state to restore it. */
+    /**
+     * Captures this chapter's playhead (playing or paused) so the root viewer
+     * can restore a full surah queue after word audition. Pauses only when
+     * audio is live. Null when the player is not on this chapter.
+     */
     fun pauseForRootViewer(): ReaderPlaybackSnapshot? {
         val state = playerState.value
-        if (!state.isPlaying) return null
         val nowPlaying = player.liveNowPlaying ?: state.nowPlaying ?: return null
         if (nowPlaying.surahId != surahId) return null
         val snapshot = ReaderPlaybackSnapshot(
@@ -790,12 +865,16 @@ class ReaderViewModel(
             repeatMode = state.repeatMode,
             repeatRange = state.repeatRange,
             speed = state.speed,
+            wasPlaying = state.isPlaying,
         )
-        player.pause()
+        if (state.isPlaying) player.pause()
         return snapshot
     }
 
-    /** Restores the chapter playlist displaced by the root viewer's audition. */
+    /**
+     * Restores the full chapter playlist displaced by the root viewer's
+     * audition. Auto-plays only when [ReaderPlaybackSnapshot.wasPlaying].
+     */
     fun resumeAfterRootViewer(snapshot: ReaderPlaybackSnapshot) {
         val playlistAyah = snapshot.ayah.coerceAtLeast(1)
         if (!startSurah(
@@ -803,6 +882,7 @@ class ReaderViewModel(
                 startPositionMs = snapshot.positionMs,
                 preserveRepeatRange = false,
                 startWithBasmalah = snapshot.ayah == BASMALAH_PLAYLIST_AYAH,
+                autoplay = snapshot.wasPlaying,
             )
         ) return
         player.setSpeed(snapshot.speed)
@@ -867,6 +947,8 @@ class ReaderViewModel(
         private const val TICK_MS = 33L
         private const val PAUSED_TICK_MS = 250L
         private const val START_SEEK_GRACE_MS = 1_500L
+        /** Suppress 33 ms player-position jitter without a seconds-long drift. */
+        private const val BACKLOG_EMA = 0.2
     }
 }
 

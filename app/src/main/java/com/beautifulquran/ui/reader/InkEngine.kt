@@ -9,6 +9,7 @@ import com.beautifulquran.domain.BasmalahWash
 import com.beautifulquran.domain.TajweedPacing
 import com.beautifulquran.ui.theme.ContextualGuideStyle
 import com.beautifulquran.ui.theme.ContextualGuideTuning
+import com.beautifulquran.ui.theme.inkSmootherstep
 
 /**
  * The reader's single source of truth for *how a word's ink should behave*.
@@ -98,9 +99,11 @@ object InkEngine {
         /** Dissolve of the white-gold first-gloss glint (see [glinting]) back
          *  to plain recited ink once the voice moves on to the next word. */
         val glintFadeMs: Int = 1_000,
-        /** Tint strength plus the subtle glyph-outline halo around Nightfall's glint. */
-        val glintTintAlpha: Float = 0.62f,
-        val glintGlowAlpha: Float = 0.49f,
+        /** Tint strength plus the glyph-outline halo around Nightfall's glint.
+         *  Must read over parchment base ink mid-wash and through long holds —
+         *  the old 0.62/0.49 pair was nearly invisible gold-on-parchment. */
+        val glintTintAlpha: Float = 0.88f,
+        val glintGlowAlpha: Float = 0.78f,
         val glintGlowRadius: Float = 10f,
         /** Width of the ink feather relative to the word (see
          *  ui/theme/Fade.kt: the wash reads as a whole-word breath). */
@@ -153,6 +156,48 @@ object InkEngine {
         val waqfLengthScale: Float = 1f,
         /** How far the wash still creeps while holding, so it breathes. */
         val holdCreep: Float = 0.3f,
+        /**
+         * Tarjīʿ turns the wet-ink glimmer on and off with the reciter's
+         * measured reverberation. Off: still gold, no voice-driven pulse.
+         * See [glintResonance].
+         */
+        val glintResonance: Boolean = true,
+        /**
+         * How hard tarjīʿ troughs extinguish the glimmer's layer. 0 = no
+         * pulse (identity); 1 = full on/off with the voice; shipped
+         * [GLINT_RESONANCE_DEPTH]. Auditionable in the Tajweed Ink Lab tab.
+         */
+        val glintResonanceDepth: Float = GLINT_RESONANCE_DEPTH,
+        /**
+         * Fastest voice oscillation that still counts as tarjīʿ (Hz). Only
+         * pulses at or below this rate open the shimmer — lower it to answer
+         * just the slow, deep swells. Shipped [GLINT_RESONANCE_MAX_HZ].
+         * Auditionable in the Tajweed Ink Lab tab.
+         */
+        val glintResonanceMaxHz: Float = GLINT_RESONANCE_MAX_HZ,
+        /** Slowest voice oscillation that still counts (Hz). Shipped 1.5. */
+        val tarjiMinHz: Float = com.beautifulquran.playback.Tarji.MIN_TREMOLO_HZ,
+        /** Hold length (ms) before the detector considers tarjīʿ. Shipped 400. */
+        val tarjiHoldMinMs: Float =
+            com.beautifulquran.playback.Tarji.HOLD_MIN_MS.toFloat(),
+        /** Minimum relative envelope AM depth to open the gate. Shipped 0.035. */
+        val tarjiMinDepth: Float = com.beautifulquran.playback.Tarji.MIN_TREMOLO_DEPTH,
+        /** Minimum envelope autocorrelation (0–1) to call the pulse periodic. */
+        val tarjiMinPeriodicity: Float =
+            com.beautifulquran.playback.Tarji.MIN_PERIODICITY,
+        /** Pitch glide tolerance (fraction) while holding one note. */
+        val tarjiPitchDrift: Float = com.beautifulquran.playback.Tarji.MAX_PITCH_DRIFT,
+        /** Attack of the detection gain ramp (ms). */
+        val tarjiAttackMs: Float = com.beautifulquran.playback.Tarji.ATTACK_MS,
+        /** Release of the detection gain ramp (ms). */
+        val tarjiReleaseMs: Float = com.beautifulquran.playback.Tarji.RELEASE_MS,
+        /**
+         * Extra ear delay on the shimmer, on top of the route preset, the
+         * measured sink buffer, and the output path (ms). Shipped 0 — the
+         * measured terms already land the pulse on the ear; this nudges the
+         * last device-specific millimetre when it still trails or leads.
+         */
+        val tarjiEarDelayMs: Float = 0f,
     )
 
     /**
@@ -175,8 +220,24 @@ object InkEngine {
         get() = tuningState
         set(value) {
             tuningState = value
+            // The detector lives in the playback layer; push every Tarjīʿ knob.
+            pushTarjiTuning(value)
             persistLab()
         }
+
+    /** Mirror [Tuning] detector knobs into [com.beautifulquran.playback.VoiceEnergy]. */
+    private fun pushTarjiTuning(t: Tuning) {
+        val ve = com.beautifulquran.playback.VoiceEnergy
+        ve.maxTremoloHz = t.glintResonanceMaxHz
+        ve.minTremoloHz = t.tarjiMinHz
+        ve.holdMinMs = t.tarjiHoldMinMs
+        ve.minTremoloDepth = t.tarjiMinDepth
+        ve.minPeriodicity = t.tarjiMinPeriodicity
+        ve.maxPitchDrift = t.tarjiPitchDrift
+        ve.attackMs = t.tarjiAttackMs
+        ve.releaseMs = t.tarjiReleaseMs
+        ve.earDelayMs = t.tarjiEarDelayMs
+    }
 
     /** Progressive-vellum guide parameters, persisted by the same Ink Lab snapshot. */
     var contextualGuideTuning: ContextualGuideTuning
@@ -271,6 +332,7 @@ object InkEngine {
             highlightLeadState = snapshot.highlightLeadMs
             fadeLeadState = snapshot.fadeLeadMs
             outputLatencyOverrideState = snapshot.outputLatencyOverrideMs
+            pushTarjiTuning(tuningState)
         } finally {
             suppressLabPersist = previous
         }
@@ -291,6 +353,7 @@ object InkEngine {
             highlightLeadState = DEFAULT_HIGHLIGHT_LEAD_MS
             fadeLeadState = DEFAULT_FADE_LEAD_MS
             outputLatencyOverrideState = null
+            pushTarjiTuning(tuningState)
         } finally {
             suppressLabPersist = previous
         }
@@ -459,6 +522,85 @@ object InkEngine {
      * [com.beautifulquran.domain.HighlightClock].
      */
     fun glinting(state: State): Boolean = state == State.Active
+
+    /**
+     * Draw values for the tarjīʿ pulse on the wet-ink glint. Detected on the
+     * tapped PCM by [com.beautifulquran.playback.VoiceEnergy].
+     *
+     * The wet glint rides the wash for the whole Active word. Tarjīʿ
+     * extinguishes its layer at pulse troughs — the glimmer itself turns on
+     * and off with the voice — and [peak] boosts tint/halo colour at crests.
+     *
+     * @param layerMult multiplies the glint layer alpha (1 = full sheen,
+     * 0 = extinguished at a full-depth trough). Idle is always [Idle] — no
+     * tell before the voice reverberates.
+     * @param peak 0..1 how hard the pulse is cresting (0 = no detection /
+     * trough).
+     */
+    data class GlintResonance(
+        val peak: Float,
+        val layerMult: Float = 1f,
+    ) {
+        companion object {
+            val Idle = GlintResonance(peak = 0f)
+        }
+    }
+
+    /**
+     * Maps the detected tarjīʿ signal into [GlintResonance] for the glint
+     * paint path. The signed envelope is load-bearing: a positive value is a
+     * vocal swell and a negative value is a vocal trough. Brightness follows
+     * that one cycle directly; taking `abs` would double the visual rate and
+     * flash on the quiet trough as well as the loud crest. Pure and unit-tested.
+     *
+     * @param holding true while a reverberant hold is detected on an eligible
+     * word (see the glint layer in ReaderComponents)
+     * @param tremolo synced tarjīʿ band signal −1..1 (0 = nothing detected)
+     * @param tremoloGain 0..1 attack/release ramp of the detected signal
+     */
+    fun glintResonance(
+        holding: Boolean,
+        tremolo: Float = 0f,
+        tremoloGain: Float = 0f,
+        depth: Float = tuning.glintResonanceDepth,
+        enabled: Boolean = tuning.glintResonance,
+    ): GlintResonance {
+        if (!holding || !enabled || depth <= 0f) return GlintResonance.Idle
+        val g = tremoloGain.coerceIn(0f, 1f)
+        if (g <= 0f) return GlintResonance.Idle
+        // Map the measured envelope −1..1 to one visible 0..1 pulse. The
+        // smootherstep gives gold-on-parchment enough contrast without moving
+        // either the reveal edge or the acoustic crest.
+        val on = inkSmootherstep((tremolo.coerceIn(-1f, 1f) + 1f) * 0.5f)
+        val crest = inkSmootherstep(tremolo.coerceIn(0f, 1f))
+        val d = depth.coerceIn(0f, 1f)
+        val mult = 1f - g * d * (1f - on) * (1f - GLINT_RESONANCE_TROUGH_FLOOR)
+        return GlintResonance(peak = g * crest * d, layerMult = mult)
+    }
+
+    /**
+     * How hard tarjīʿ crests boost the wet-ink sheen (0 = no pulse, 1 = full
+     * peak boost). Shipped full.
+     */
+    const val GLINT_RESONANCE_DEPTH = 1f
+
+    /**
+     * Dimmest the wet-ink glint layer goes at a tarjīʿ trough (fraction of
+     * full sheen). Shipped 0 — the glimmer itself turns on and off with the
+     * voice at full depth; a non-zero value leaves residual sheen for a
+     * softer breathe.
+     */
+    const val GLINT_RESONANCE_TROUGH_FLOOR = 0f
+
+    /**
+     * Extra tint/halo strength at a full tarjīʿ peak, as a fraction of the
+     * shipped glint alphas. Peaks must clearly outshine the always-on wet
+     * sheen or the pulse is invisible on parchment.
+     */
+    const val GLINT_RESONANCE_PEAK_BOOST = 1.15f
+
+    /** Shipped tarjīʿ rate ceiling (Hz) — see [Tuning.glintResonanceMaxHz]. */
+    const val GLINT_RESONANCE_MAX_HZ = 10f
 
     /**
      * Ink for the surah-header basmalah calligraphy (a VectorDrawable, not

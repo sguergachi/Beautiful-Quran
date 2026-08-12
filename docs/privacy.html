@@ -4,130 +4,60 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="color-scheme" content="light dark">
-  <meta name="description" content="Privacy policy for Beautiful Quran — no accounts, no analytics, no personal data collected.">
-  <link rel="icon" href="app/favicon.ico" sizes="48x48" />
-  <link rel="icon" href="app/favicon.svg" type="image/svg+xml" />
-  <link rel="apple-touch-icon" href="app/apple-touch-icon.png" />
+  <meta name="description" content="Privacy Policy for Beautiful Quran.">
+  <link rel="icon" href="app/favicon.ico" sizes="48x48">
+  <link rel="icon" href="app/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="app/apple-touch-icon.png">
   <title>Privacy Policy — Beautiful Quran</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,500;1,600&family=EB+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Noto+Naskh+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <script src="theme.js"></script>
-  <link rel="stylesheet" href="ornaments.css">
-  <link rel="stylesheet" href="styles.css">
+  <script src="theme.js"></script><link rel="stylesheet" href="ornaments.css"><link rel="stylesheet" href="styles.css">
 </head>
-<body>
-  <div class="page">
-    <nav class="top-nav" aria-label="Primary">
-      <a class="nav-brand" href="index.html">
-        <svg class="nav-mark" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-          <defs>
-            <linearGradient id="nav-gold" x1="0" y1="0" x2="100" y2="100" gradientUnits="userSpaceOnUse">
-              <stop offset="0" stop-color="var(--gold-deep)"/>
-              <stop offset="0.5" stop-color="var(--gold-bright)"/>
-              <stop offset="1" stop-color="var(--gold-deep)"/>
-            </linearGradient>
-          </defs>
-          <g stroke="url(#nav-gold)" stroke-width="2.2" stroke-linejoin="round" fill="none">
-            <path d="M17.47 17.47 L82.53 17.47 L82.53 82.53 L17.47 82.53 Z M50 4 L96 50 L50 96 L4 50 Z"/>
-          </g>
-          <circle cx="50" cy="50" r="4" fill="url(#nav-gold)"/>
-        </svg>
-        <span>Beautiful Quran</span>
-      </a>
-      <div class="nav-links">
-        <a href="index.html#features">Features</a>
-        <a href="index.html#screens">Screens</a>
-        <a href="privacy.html">Privacy</a>
-        <a href="https://github.com/sguergachi/Beautiful-Quran-">GitHub</a>
-      </div>
-    </nav>
+<body><div class="page">
+  <nav class="top-nav" aria-label="Primary"><a class="nav-brand" href="index.html"><span>Beautiful Quran</span></a>
+    <div class="nav-links"><a href="index.html#features">Features</a><a href="privacy.html">Privacy</a><a href="terms.html">Terms</a><a href="https://github.com/sguergachi/Beautiful-Quran">GitHub</a></div>
+  </nav>
+  <article class="privacy">
+    <h1>Privacy Policy</h1><p class="subtitle">Effective date: August 10, 2026</p>
 
-    <article class="privacy">
-      <h1>Privacy Policy</h1>
-      <p class="subtitle">Last updated: July 2026</p>
+    <h2>Scope and identity</h2>
+    <p>This Privacy Policy explains Beautiful Quran’s data practices. Beautiful Quran is an independent app, not an official Quran Foundation (QF), Quran.com, or QuranReflect application. It does not currently access QF’s authenticated APIs. This policy also states the controls that will apply before a content-only QF API integration is enabled.</p>
 
-      <h2>Summary</h2>
-      <p>
-        Beautiful Quran <strong>does not collect, store, or share any personal data</strong>.
-        There are no accounts, no analytics, no crash reporting, and no advertising SDKs.
-        Quran text and reading tools stay local. Recitation audio downloads as needed.
-      </p>
+    <h2>Data we store and why</h2>
+    <table>
+      <thead><tr><th>Data</th><th>Where it stays</th><th>Purpose</th></tr></thead>
+      <tbody>
+        <tr><td>Settings and reading position</td><td>Your device</td><td>Restore the reader’s appearance, reciter, and place.</td></tr>
+        <tr><td>Bookmarks and notes</td><td>Your device</td><td>Save passages and annotations you choose to create.</td></tr>
+        <tr><td>Quran databases and audio cache</td><td>Your device</td><td>Make reading and recently heard recitation available offline.</td></tr>
+        <tr><td>Public QF content and sync checkpoint, if enabled</td><td>Your device</td><td>Keep approved content current through Content Sync. QF is not sent your bookmarks, notes, reading history, or other user data.</td></tr>
+      </tbody>
+    </table>
+    <p>We do not operate accounts, collect email addresses, use analytics or crash reporting, sell personal information, or build advertising profiles. Public Quran text and related metadata obtained from QF will be retrieved as content; QF is not the source of user personal data for this app.</p>
 
-      <h2>What information we collect</h2>
-      <p>
-        None. The app does not collect any personal information, device identifiers,
-        usage statistics, or any other data. All preferences (reciter choice, theme,
-        font size, reading position) are stored locally on your device in standard
-        Android <code>SharedPreferences</code> and are never transmitted anywhere.
-      </p>
+    <h2>Sensitive religious information and consent</h2>
+    <p>Bookmarks, notes, reading activity, and other interactions with religious content may be sensitive personal data. Beautiful Quran does not transmit them today. Before an authenticated QF integration is released, the app will require separate, explicit, affirmative consent before enabling notes or processing other sensitive religious information. This consent will not be bundled with acceptance of these Terms and can be withdrawn by deleting the local data.</p>
+    <p>We will never sell, mine, or repurpose QF user data, and we will not use notes, reflections, or other user-generated content to train an AI model without separate, specific consent.</p>
 
-      <h2>Internet access</h2>
-      <p>
-        The app requests internet access only to stream recitation audio files from
-        <strong>everyayah.com</strong>, a public service that hosts Quran recitations.
-        Standard HTTP requests are made to fetch MP3 files. No identifying information
-        is sent with these requests beyond what your device and network normally
-        include in any HTTP request (e.g., IP address, User-Agent string).
-      </p>
-      <p>
-        Audio files are cached locally to reduce repeat downloads. This cache is
-        stored in the app's private files directory and is never transmitted or shared.
-      </p>
+    <h2>Network services and sharing</h2>
+    <p>The current app streams recitation audio from <a href="https://everyayah.com/">EveryAyah</a>. Standard network requests can expose ordinary connection data, such as IP address and User-Agent, to that host. We do not send it app-held notes, bookmarks, or reading history.</p>
+    <p>If enabled, QF Content API requests will retrieve public content only. Every processor that handles personal data for a future integration will be named here with a direct privacy-policy link before that integration launches. We will have an appropriate data-protection agreement with each such processor, requiring protection of user data, respect for Islamic content guidelines, and no misuse of Quranic content.</p>
 
-      <h2>Third-party services</h2>
-      <p>
-        The app connects to one external service:
-      </p>
-      <ul>
-        <li><strong>everyayah.com</strong> — hosts public-domain recitation audio. The app fetches MP3 files from this domain. No other third-party services, SDKs, or APIs are used.</li>
-      </ul>
-      <p>
-        The app uses no advertising, analytics, crash reporting, or push notification services.
-      </p>
+    <h2>Security</h2>
+    <p>Current local data is protected by Android app sandboxing and the device’s security controls. Before QF API use, the integration will use TLS 1.2 or later in transit, encryption at rest, least-privilege access controls, protected secret storage, and a defined secret-rotation cadence. We will keep only redacted operational logs necessary to operate and audit the integration.</p>
+    <p>Any actual or suspected unauthorized access, security breach, or data exposure involving QF APIs will be reported to QF within 24 hours. Our future QF integration will comply with Security Rule 6.9.</p>
 
-      <h2>Data storage</h2>
-      <p>
-        All app data is stored locally on your device:
-      </p>
-      <ul>
-        <li><strong>Quran text database</strong> — shipped with the app in the APK, extracted to the app's <code>noBackupFilesDir</code></li>
-        <li><strong>Audio cache</strong> — stored in <code>filesDir/audio</code>, excluded from system backups</li>
-        <li><strong>User preferences</strong> — stored in <code>SharedPreferences</code></li>
-      </ul>
+    <h2>Retention, deletion, and your choices</h2>
+    <p>Current app data remains on your device until you delete it, clear the app’s storage, or uninstall the app. You can remove individual bookmarks and notes in the app, or remove all local data through Android’s app-storage controls. The app has no user account, cloud backup, or developer-held copy of this data.</p>
+    <p>Any QF offline content will use a separate local cache and sync state. It will check for and apply changes at least every seven days, and will be deleted when QF access is terminated or revoked. If we ever introduce QF user scopes or a service that stores user data, we will first add in-app access, correction, token-revocation, and “Delete My Data” controls; hard deletion will occur within 30 days and backup deletion within 90 days.</p>
 
-      <h2>Children's privacy</h2>
-      <p>
-        The app does not collect any personal information from anyone, including
-        children under the age of 13. All content is religious text appropriate
-        for all ages.
-      </p>
+    <h2>Children and international transfers</h2>
+    <p>Beautiful Quran is not directed to children under 13 and does not knowingly collect personal data from children. We do not currently transfer user data internationally because we do not operate a user-data service. Any future international transfer will use appropriate legal safeguards, including Standard Contractual Clauses or an equivalent mechanism where required, and comply with applicable privacy law.</p>
 
-      <h2>Changes to this policy</h2>
-      <p>
-        If this policy changes in the future, the updated date at the top of this
-        page will be revised. The app itself will not change its data practices
-        without a corresponding update to this policy.
-      </p>
-
-      <h2>Contact</h2>
-      <p>
-        This app is open source. For questions about this policy, please open an
-        issue on the
-        <a href="https://github.com/sguergachi/Beautiful-Quran-">GitHub repository</a>.
-      </p>
-
-      <a href="index.html" class="back-link">← Back to Beautiful Quran</a>
-    </article>
-
-    <footer class="site-footer">
-      <div class="footer-links">
-        <a href="app/">Web reader</a>
-        <a href="privacy.html">Privacy policy</a>
-        <a href="https://github.com/sguergachi/Beautiful-Quran-">GitHub</a>
-      </div>
-      <p class="footer-note">Beautiful Quran · free, ad-free, open source</p>
-    </footer>
-  </div>
-</body>
-</html>
+    <h2>Changes and contact</h2>
+    <p>We will update this policy and its effective date before material data-practice changes take effect, and will notify users in the app. For privacy requests, including access or correction questions, contact <a href="mailto:sguergachi@gmail.com">sguergachi@gmail.com</a> or open an issue in the <a href="https://github.com/sguergachi/Beautiful-Quran/issues">Beautiful Quran GitHub repository</a>. We aim to respond within 30 days.</p>
+    <p>Beautiful Quran is an independent open-source project without a public business address. We provide email and GitHub Issues as its public contact channels. Before QF API launch, this page will be updated with the final list of any personal-data processors.</p>
+    <a href="index.html" class="back-link">← Back to Beautiful Quran</a>
+  </article>
+  <footer class="site-footer"><div class="footer-links"><a href="app/">Web reader</a><a href="privacy.html">Privacy policy</a><a href="terms.html">Terms of use</a><a href="https://github.com/sguergachi/Beautiful-Quran">GitHub</a></div><p class="footer-note">Beautiful Quran · free, ad-free, open source</p></footer>
+</div></body></html>

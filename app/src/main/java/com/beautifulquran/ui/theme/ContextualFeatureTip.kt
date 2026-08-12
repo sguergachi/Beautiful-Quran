@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
@@ -172,26 +173,35 @@ fun ContextualFeatureTip(
         ) {
             LessonCopy(title, body)
         }
+        // The paper pill is small; playback chrome sits under the same corner.
+        // Own a generous circular hit radius (not just the pill) on the initial
+        // pointer pass so a nearby thumb cannot fire Repeat / Play instead.
         Box(
             contentAlignment = Alignment.Center,
             modifier = Modifier
                 .align(Alignment.TopStart)
                 .offset(x = actionDp.x, y = actionDp.y)
+                .size(GuideDismissHitDiameter)
                 .graphicsLayer {
                     translationX = -size.width / 2f
                     translationY = -size.height / 2f
                     alpha = ink.value
                 }
-                .clip(RoundedCornerShape(50))
-                .background(buttonPaper)
-                .ownedQuietClickable(role = Role.Button) { dismissLatest.value() }
-                .padding(horizontal = 22.dp, vertical = 10.dp),
+                .ownedQuietClickable(role = Role.Button) { dismissLatest.value() },
         ) {
-            Text(
-                text = dismissLabel,
-                style = MaterialTheme.typography.bodyMedium,
-                color = buttonInk,
-            )
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(50))
+                    .background(buttonPaper)
+                    .padding(horizontal = 22.dp, vertical = 10.dp),
+            ) {
+                Text(
+                    text = dismissLabel,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = buttonInk,
+                )
+            }
         }
         Box(
             contentAlignment = Alignment.Center,
@@ -233,6 +243,12 @@ private fun LessonCopy(title: String, body: String) {
         )
     }
 }
+
+/**
+ * Diameter of the invisible dismiss zone centered on **Got it**. Large enough
+ * that a thumb aiming at the pill still owns the gesture over the player bar.
+ */
+internal val GuideDismissHitDiameter = 144.dp
 
 private fun Offset.coerceTo(surface: Size): Offset = Offset(
     x.coerceIn(0f, surface.width),

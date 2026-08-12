@@ -255,10 +255,13 @@ Word tap (short press) keeps today's behaviour: play/seek from that word.
 Only the **hold** opens the lexicon.
 
 Opening the viewer pauses an active chapter recitation. Closing it restores the
-same ayah position, speed, and repeat settings and resumes only when playback
-was active before the viewer opened. Concordance jumps do not resume the old
-location. The isolated word speaker may temporarily replace the playlist; the
-saved reading session is restored on exit.
+same ayah position, speed, and repeat settings (full chapter queue) and resumes
+only when playback was active before the viewer opened. If the chapter was only
+paused on the player, exit still rebuilds the full queue without autoplay so
+Play advances past the current verse. Concordance jumps do not resume the old
+location. The word speaker hard-stops at the word end on a full-chapter
+playlist (never a dead-end queue ending on that ayah); the saved reading
+session is restored on exit.
 
 ### Developer mode
 

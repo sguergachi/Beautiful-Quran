@@ -91,11 +91,36 @@ ANDROID_EMULATOR_HEADLESS=1 scripts/run_android_app.sh
 ```
 
 If the emulator window does not appear or booting times out, check
-`.android-emulator.log`. To make the SDK tools available in your current shell:
+`.android-emulator-<AVD>.log` (one per AVD). To make the SDK tools available
+in your current shell:
 
 ```bash
 source scripts/android_env.sh
 ```
+
+**Parallel emulators for agents.** Each agent gets its own lean, headless
+emulator with a distinct adb serial, so several can build and test
+simultaneously:
+
+```bash
+scripts/emulators_up.sh 3        # create + boot BeautifulQuran_API_35_0..2
+```
+
+Each agent then targets its own AVD through the normal run script (headless
+must match, or the emulator restarts with a window):
+
+```bash
+ANDROID_AVD_NAME=BeautifulQuran_API_35_1 ANDROID_EMULATOR_HEADLESS=1 \
+  scripts/run_android_app.sh
+```
+
+`scripts/emulators_up.sh` prints that command for every AVD. Agent AVDs are
+lean by default (2 GB RAM, 2 cores — override with `ANDROID_AVD_RAM` /
+`ANDROID_AVD_CORES`); keep an eye on the memory warning it prints, since each
+emulator needs ~1-2 GB of host RAM. Stop them all with
+`scripts/emulators_down.sh`. A single interactive emulator can instead be
+created heavier: `ANDROID_AVD_RAM=4096 ANDROID_AVD_CORES=6
+scripts/setup_android_emulator.sh`.
 
 **Host Vulkan.** The run script points the emulator at your GPU’s Vulkan ICD
 (NVIDIA / AMD / Intel) and the system `libvulkan`, and re-enables `Vulkan = on`
@@ -120,6 +145,7 @@ If host Vulkan is broken on your machine, you can still fall back with
 - [docs/GLIMMER.md](docs/GLIMMER.md) — the Nightfall white-gold fresh-ink glimmer, repeat retriggering, halo rendering, tuning, and artifact checks
 - [docs/ROOT_VIEWER.md](docs/ROOT_VIEWER.md) — hold-to-reveal root lexicon: counts, ayah concordance, jump-to-chapter
 - [docs/TIMINGS_LAB.md](docs/TIMINGS_LAB.md) — in-app timing editor (developer mode)
+- [docs/QF_CONTENT_SYNC.md](docs/QF_CONTENT_SYNC.md) — authenticated Quran Foundation Content API migration and offline-sync gate
 
 ## Data & attribution
 

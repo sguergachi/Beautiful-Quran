@@ -12,11 +12,18 @@ export const HOME_BOOKMARK_STYLES: HomeBookmarkStyle[] = [
 ]
 export type { BrushCircleStyle }
 
-/** Match Android SettingsScreen: 0.8f..1.6f with steps = 7 (8 snap points). */
+/** Match Android SettingsScreen: 0.8f..1.6f with 8 intervals (9 snap points). */
 export const FONT_SCALE_MIN = 0.8
 export const FONT_SCALE_MAX = 1.6
-export const FONT_SCALE_STEPS = 7
+export const FONT_SCALE_STEPS = 8
 export const FONT_SCALE_STEP = (FONT_SCALE_MAX - FONT_SCALE_MIN) / FONT_SCALE_STEPS
+
+/** Snap [scale] to the nearest stop, then move [deltaStops] (±1 for the A glyphs). */
+export function nudgeFontScale(scale: number, deltaStops: number): number {
+  const current = Math.round((scale - FONT_SCALE_MIN) / FONT_SCALE_STEP)
+  const next = Math.min(FONT_SCALE_STEPS, Math.max(0, current + deltaStops))
+  return FONT_SCALE_MIN + next * FONT_SCALE_STEP
+}
 
 export interface Settings {
   reciterId: number

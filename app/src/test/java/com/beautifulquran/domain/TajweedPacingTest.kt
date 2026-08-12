@@ -2,6 +2,7 @@ package com.beautifulquran.domain
 
 import com.beautifulquran.domain.TajweedPacing.Hold
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -121,6 +122,31 @@ class TajweedPacingTest {
         )
         val late = long.at(0.9f) - long.at(0.5f)
         assertTrue("long waqf should park the wash, moved $late", late < 0.08f)
+    }
+
+    @Test
+    fun `strong-hold eligibility covers madd ghunnah waqf but never wasl alone`() {
+        // Verse closer: the waqf park is a strong hold.
+        val closer = curveOf(
+            dallin,
+            hold = Hold(madd = false, isAyahFinal = true, waqfLengthScale = 0f),
+        )
+        assertTrue(closer.hasStrongHold)
+        // 4:145 ٱلنَّارِ — the shadda nūn's ghunnah (idghām of the article's
+        // lām into the nūn) is a strong mid-ayah hold, so voice-detected
+        // tarjīʿ may shimmer on it even though it is not a verse close.
+        val ghunnah = curveOf("ٱلنَّارِ", hold = Hold(ghunnah = true))
+        assertTrue(ghunnah.hasStrongHold)
+        // A wasl-entry hold sustains the *previous* word's nūn — the listener
+        // hears no hold on this word, so it must not resonate on its own.
+        // (مِنْ وَقَالَ: the nūn merges into وَقَالَ's و — idghām.)
+        val waslOnly = curveOf(
+            "وَقَالَ",
+            hold = Hold(madd = false, waqf = false, ghunnah = false),
+            prevArabic = "مِنۡ",
+        )
+        assertNotNull(waslOnly)
+        assertFalse(waslOnly!!.hasStrongHold)
     }
 
     @Test
