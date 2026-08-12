@@ -42,6 +42,7 @@ import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.input.pointer.PointerInputChange
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.input.pointer.util.VelocityTracker
@@ -100,9 +101,26 @@ internal fun collapsedRailHitHeightDp(ayahCount: Int, padDp: Float = 24f): Float
     return max(48f, collapsedStackSpanDp(ayahCount) + padDp)
 }
 
-/** A collapsed rail opens only after a stationary tap, never an edge drag. */
-internal fun isCollapsedRailTap(maxTravelPx: Float, touchSlopPx: Float): Boolean =
-    maxTravelPx <= touchSlopPx
+/** How the collapsed rail should react once its first gesture is unambiguous. */
+internal enum class CollapsedRailActivation { WAIT, TAP, VERTICAL_SCRUB, IGNORE }
+
+/**
+ * Keeps the system Back edge free while still allowing the rail's native
+ * up/down scrub gesture. Direction is decided only after touch slop.
+ */
+internal fun collapsedRailActivation(
+    movement: Offset,
+    released: Boolean,
+    touchSlopPx: Float,
+): CollapsedRailActivation = when {
+    movement.getDistance() > touchSlopPx -> if (abs(movement.y) > abs(movement.x)) {
+        CollapsedRailActivation.VERTICAL_SCRUB
+    } else {
+        CollapsedRailActivation.IGNORE
+    }
+    released -> CollapsedRailActivation.TAP
+    else -> CollapsedRailActivation.WAIT
+}
 
 /**
  * Ayah number → mushaf page number for ayahs that open a new page: the first
@@ -577,26 +595,32 @@ internal fun AyahSelectorRail(
                             // Invisible chrome (recitation follow mode) must not
                             // hijack page touches into a ghost selector.
                             if (chromeAlpha() < 0.1f) return@awaitEachGesture
+                            var activationChange: PointerInputChange? = null
                             if (!expanded) {
                                 // Do not claim an edge gesture on down: Android needs
-                                // that movement to recognize its Back swipe. The rail
-                                // opens only after an unmoved tap; its open wheel then
-                                // owns the next drag as usual.
-                                var maxTravelPx = 0f
-                                var released = false
+                                // horizontal movement to recognize its Back swipe. A
+                                // tap opens the wheel; a vertical drag opens and scrubs
+                                // it in the same gesture.
+                                var activation: CollapsedRailActivation? = null
                                 do {
                                     val event = awaitPointerEvent()
                                     val change = event.changes.firstOrNull { it.id == down.id } ?: break
-                                    maxTravelPx = max(
-                                        maxTravelPx,
-                                        (change.position - down.position).getDistance(),
+                                    val next = collapsedRailActivation(
+                                        movement = change.position - down.position,
+                                        released = !change.pressed,
+                                        touchSlopPx = viewConfiguration.touchSlop,
                                     )
-                                    if (!isCollapsedRailTap(maxTravelPx, viewConfiguration.touchSlop)) {
+                                    if (next == CollapsedRailActivation.IGNORE) {
                                         return@awaitEachGesture
                                     }
-                                    released = !change.pressed
-                                } while (!released)
-                                if (!released) return@awaitEachGesture
+                                    if (next != CollapsedRailActivation.WAIT) {
+                                        activation = next
+                                        if (next == CollapsedRailActivation.VERTICAL_SCRUB) {
+                                            activationChange = change
+                                        }
+                                    }
+                                } while (activation == null)
+                                if (activation == null) return@awaitEachGesture
 
                                 lastHapticAyah = currentAyah.value.coerceIn(1, ayahCount)
                                 dialPosition = currentPosition.value.coerceIn(1f, ayahCount.toFloat())
@@ -607,7 +631,9 @@ internal fun AyahSelectorRail(
                                         spring(dampingRatio = 0.85f, stiffness = 340f),
                                     )
                                 }
-                                return@awaitEachGesture
+                                if (activation == CollapsedRailActivation.TAP) {
+                                    return@awaitEachGesture
+                                }
                             }
 
                             val tickSpacingPx = 14.dp.toPx()
@@ -624,10 +650,28 @@ internal fun AyahSelectorRail(
                             // re-banding an already-banded value compounds the curve
                             // and made overscroll feel erratic.
                             var rawPosition = dialPosition
-                            while (true) {
+                            activationChange?.let { change ->
+                                val deltaAyah = -(change.position.y - down.position.y) / tickSpacingPx
+                                if (abs(deltaAyah) > 0.001f) {
+                                    dragged = true
+                                    rawPosition += deltaAyah
+                                    dialPosition = rubberBandDialPosition(
+                                        rawPosition,
+                                        1f,
+                                        ayahCount.toFloat(),
+                                    )
+                                }
+                                velocityTracker.addPosition(change.uptimeMillis, change.position)
+                                change.consume()
+                            }
+                            var released = activationChange?.pressed == false
+                            while (!released) {
                                 val event = awaitPointerEvent()
                                 val change = event.changes.firstOrNull { it.id == down.id } ?: break
-                                if (!change.pressed) break
+                                if (!change.pressed) {
+                                    released = true
+                                    break
+                                }
                                 val deltaAyah = -change.positionChange().y / tickSpacingPx
                                 if (abs(deltaAyah) > 0.001f) {
                                     dragged = true
