@@ -34,7 +34,7 @@ internal fun AyahRailTip(
         ContextualFeatureTip(
             visible = visible,
             title = "Find any ayah",
-            body = "Press and drag this rail.",
+            body = "Tap this rail, then drag it.",
             onDismiss = onDismiss,
             spotlightCenter = {
                 DpOffset(
