@@ -1,5 +1,6 @@
 package com.beautifulquran.ui.reader
 
+import androidx.compose.ui.geometry.Offset
 import com.beautifulquran.data.model.Ayah
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -36,9 +37,19 @@ class AyahSelectorRailTest {
     }
 
     @Test
-    fun collapsedRailOpensOnlyForATap() {
-        assertTrue(isCollapsedRailTap(maxTravelPx = 8f, touchSlopPx = 8f))
-        assertTrue(!isCollapsedRailTap(maxTravelPx = 8.1f, touchSlopPx = 8f))
+    fun collapsedRailGesture_allowsTapAndVerticalScrubButNotBackSwipe() {
+        assertEquals(
+            CollapsedRailActivation.TAP,
+            collapsedRailActivation(Offset.Zero, released = true, touchSlopPx = 8f),
+        )
+        assertEquals(
+            CollapsedRailActivation.VERTICAL_SCRUB,
+            collapsedRailActivation(Offset(0f, 8.1f), released = false, touchSlopPx = 8f),
+        )
+        assertEquals(
+            CollapsedRailActivation.IGNORE,
+            collapsedRailActivation(Offset(8.1f, 0f), released = false, touchSlopPx = 8f),
+        )
     }
 
     @Test
