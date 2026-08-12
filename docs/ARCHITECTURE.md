@@ -48,6 +48,12 @@ app (runtime)                                           ▼
    no navigation library at all (the four sheets are a hand-rolled paper
    stack in `MainActivity`). Every dependency earns its place.
 
+> **Quran Foundation Content API migration.** The current app is not yet an
+> authenticated QF integration. Any move to QF Content Sync must make the
+> local database an updatable cache, perform and apply a sync at least every
+> seven days, and keep credentials out of client builds. The required migration
+> gates live in [QF_CONTENT_SYNC.md](QF_CONTENT_SYNC.md).
+
 ## The data pipeline (`tools/build_db.py`)
 
 Sources (all fetched over HTTPS, cached in `tools/.cache/`):

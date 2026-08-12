@@ -38,7 +38,7 @@ data class TimingsPatch(
 object TimingsPatchExporter {
 
     private const val REPO_NEW_ISSUE_URL =
-        "https://github.com/sguergachi/Beautiful-Quran-/issues/new"
+        "https://github.com/sguergachi/Beautiful-Quran/issues/new"
 
     /** Build a [TimingsPatch] from the override store snapshot, grouped per
      * (reciter, surah, ayah) and sorted for review. */

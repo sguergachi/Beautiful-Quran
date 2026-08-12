@@ -120,6 +120,7 @@ If host Vulkan is broken on your machine, you can still fall back with
 - [docs/GLIMMER.md](docs/GLIMMER.md) — the Nightfall white-gold fresh-ink glimmer, repeat retriggering, halo rendering, tuning, and artifact checks
 - [docs/ROOT_VIEWER.md](docs/ROOT_VIEWER.md) — hold-to-reveal root lexicon: counts, ayah concordance, jump-to-chapter
 - [docs/TIMINGS_LAB.md](docs/TIMINGS_LAB.md) — in-app timing editor (developer mode)
+- [docs/QF_CONTENT_SYNC.md](docs/QF_CONTENT_SYNC.md) — authenticated Quran Foundation Content API migration and offline-sync gate
 
 ## Data & attribution
 

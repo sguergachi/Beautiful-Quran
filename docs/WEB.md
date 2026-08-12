@@ -10,7 +10,7 @@ engines with Vitest parity, WASM SQLite over the committed `quran.db`,
 paper-stack UI (Bookmarks / Home / Reader / Settings), cold-start entrance cover (closed
 mushaf + isti'adha text fade-in), directional ink wash, focus follow, bookmarks, root
 viewer, and a PWA shell. Production build is published to GitHub Pages at
-[`/app/`](https://sguergachi.github.io/Beautiful-Quran-/app/)
+[`/app/`](https://sguergachi.github.io/Beautiful-Quran/app/)
 (as an immutable Pages artifact built by CI from `master`). See
 `web/README.md` for run instructions. The sections
 below remain the design record and quality bar.
