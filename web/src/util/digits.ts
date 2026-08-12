@@ -11,8 +11,13 @@ export function formatReaderDigits(n: number, useArabicIndicDigits: boolean): st
   return useArabicIndicDigits ? toArabicIndic(n) : String(n)
 }
 
-/** Ornate ayah brackets follow the surrounding line's writing direction. */
+/**
+ * Ornate ayah brackets follow the surrounding line's writing direction.
+ * Characters are glued with WORD JOINER so the mark never wraps mid-unit
+ * (mirrors Android `formatAyahNumberMark`).
+ */
 export function formatAyahNumberMark(n: number, useArabicIndicDigits: boolean): string {
   const digits = formatReaderDigits(n, useArabicIndicDigits)
-  return useArabicIndicDigits ? `﴿${digits}﴾` : `﴾${digits}﴿`
+  const raw = useArabicIndicDigits ? `﴿${digits}﴾` : `﴾${digits}﴿`
+  return [...raw].join('\u2060')
 }

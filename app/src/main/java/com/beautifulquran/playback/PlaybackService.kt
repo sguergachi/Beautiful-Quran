@@ -18,7 +18,10 @@ import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.datasource.cache.CacheDataSource
 import androidx.media3.datasource.cache.LeastRecentlyUsedCacheEvictor
 import androidx.media3.datasource.cache.SimpleCache
+import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.audio.AudioSink
+import androidx.media3.exoplayer.audio.DefaultAudioSink
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.session.LibraryResult
 import androidx.media3.session.MediaLibraryService
@@ -69,7 +72,7 @@ class PlaybackService : MediaLibraryService() {
         // Surah-wide warming on unmetered networks stays in AudioPrefetcher —
         // PreloadConfiguration only looks ahead one item.
         @Suppress("UnstableApiUsage")
-        val player = ExoPlayer.Builder(this)
+        val player = ExoPlayer.Builder(this, tarjiRenderersFactory(this))
             .setMediaSourceFactory(DefaultMediaSourceFactory(cacheDataSource))
             .setAudioAttributes(
                 AudioAttributes.Builder()
@@ -107,6 +110,31 @@ class PlaybackService : MediaLibraryService() {
             .setSessionActivity(sessionActivity)
             .build()
     }
+
+    /**
+     * The player's renderers, with [VoiceTapAudioProcessor] tapped into the
+     * audio sink so [VoiceEnergy] sees the PCM the listener hears — no mic or
+     * Visualizer permission needed. The tap is handed the sink it runs in so
+     * it can read the real AudioTrack buffer for the ear delay.
+     */
+    @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
+    private fun tarjiRenderersFactory(context: Context): DefaultRenderersFactory =
+        object : DefaultRenderersFactory(context) {
+            override fun buildAudioSink(
+                context: Context,
+                enableFloatOutput: Boolean,
+                enableAudioTrackPlaybackParams: Boolean,
+            ): AudioSink {
+                val tap = VoiceTapAudioProcessor()
+                val sink = DefaultAudioSink.Builder(context)
+                    .setEnableFloatOutput(enableFloatOutput)
+                    .setEnableAudioTrackPlaybackParams(enableAudioTrackPlaybackParams)
+                    .setAudioProcessors(arrayOf(tap))
+                    .build()
+                tap.attach(sink)
+                return sink
+            }
+        }
 
     /**
      * Turns playback events into cache-warming hints. Reads the player (main

@@ -45,10 +45,13 @@ jobs:
           test -s ../data/lexicon.db && test -s dist/lexicon.db
           test -s ../data/dictionary.db && test -s dist/dictionary.db
 
+  # Soft-fail when the repo has no Pages site yet (private repos often don't).
+  # Vitest + web build above remain the hard gate.
   build-pages:
     if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/master'
     needs: test
     runs-on: ubuntu-latest
+    continue-on-error: true
     permissions:
       contents: read
       pages: write
@@ -80,6 +83,7 @@ jobs:
     if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/master'
     needs: build-pages
     runs-on: ubuntu-latest
+    continue-on-error: true
     permissions:
       pages: write
       id-token: write

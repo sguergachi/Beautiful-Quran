@@ -394,6 +394,10 @@ tween-vs-snap rules, sweep entry and residual rules, repeat wash timing, the
   forms, and recede with the glint. The sheen stays legible against dark pages
   without becoming a hard or whole-word glow, adding no new motion—only a
   warm light that cools as the ink dries.
+  Tarjīʿ modulates only that glint layer: the signed vocal envelope maps once
+  from trough to crest. Its sign must not be folded with `abs`, which would
+  double the visual frequency and brighten the quiet half of the vibration.
+  The base/repeat wash position is never part of this modulation.
   [GLIMMER.md](GLIMMER.md) is the canonical cross-platform rendering,
   tuning, and visual-verification specification.
 - **Basmalah preface**: `prefaceState(isActive, dimmed)` /
@@ -482,7 +486,10 @@ It is owned by each `InkMotion` through `rememberInkMotions` /
    `finishResidual` (true *only* for Active→Recited) lets it finish rather than
    snap. Leaving Active for Upcoming/Plain instead — a seek, a recess — abandons
    the residual immediately, because finishing toward full ink and then dimming
-   back would flash.
+   back would flash. English-only prose waits for that predecessor residual
+   before starting the next word, so a wrap never blooms the last word of one
+   line and the first word of the next line together. Arabic modes keep their
+   voice-led handoff and wasl behavior unchanged.
 2. **A persistent `Animatable` means the next word inherits progress 1.** The
    draw phase can read it before the effect's `snapTo(0f)` lands, which showed as
    a one-frame full-ink flash. `sweepEntryAction(…)` classifies each composition

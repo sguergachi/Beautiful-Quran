@@ -159,6 +159,48 @@ export function glinting(state: InkState): boolean {
   return state === InkState.Active
 }
 
+/** How hard live voice energy can swing the glint. Port of Android depth. */
+export const GLINT_RESONANCE_DEPTH = 0.42
+
+/**
+ * Free-running carrier under the voice signal (visible without Analyser).
+ * Port of Android `InkEngine.GLINT_RESONANCE_SINE`.
+ */
+export const GLINT_RESONANCE_SINE = 0.22
+
+/**
+ * Soft resonance rate in Hz — mid vocal-vibrato range.
+ * Port of Android `InkEngine.GLINT_RESONANCE_HZ`.
+ */
+export const GLINT_RESONANCE_HZ = 5.5
+
+/** @deprecated Use GLINT_RESONANCE_SINE. */
+export const GLINT_RESONANCE_AMP = GLINT_RESONANCE_SINE
+
+/**
+ * Multiplier for wet-ink glint while a long hold is sustained.
+ * Voice energy (vs resting) is primary; free sine keeps a visible floor.
+ * Port of Android `InkEngine.glintResonance`.
+ */
+export function glintResonance(
+  holding: boolean,
+  phaseSec: number,
+  voiceLevel = 0,
+  resting = 0,
+  depth = GLINT_RESONANCE_DEPTH,
+  sineAmp = GLINT_RESONANCE_SINE,
+  hz = GLINT_RESONANCE_HZ,
+): number {
+  if (!holding) return 1
+  const sine = sineAmp > 0 && hz > 0 ? Math.sin(2 * Math.PI * hz * phaseSec) : 0
+  // Silence must not dim the gold (Visualizer/Analyser unavailable).
+  const voiceDelta =
+    voiceLevel < 0.02 && resting < 0.02
+      ? 0
+      : Math.max(-1, Math.min(1, (voiceLevel - resting) / Math.max(0.04, resting)))
+  return Math.max(0.35, Math.min(1.65, 1 + depth * voiceDelta + sineAmp * sine))
+}
+
 export function prefaceState(isActive: boolean, dimmed: boolean): InkState {
   if (isActive) return InkState.Active
   if (dimmed) return InkState.Upcoming

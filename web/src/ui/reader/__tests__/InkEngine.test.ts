@@ -11,6 +11,7 @@ import {
   DEFAULT_HIGHLIGHT_LEAD_MS,
   sweepMs,
   glinting,
+  glintResonance,
   prefaceState,
   prefaceWashProgress,
   advancePrefaceWashProgress,
@@ -155,6 +156,23 @@ describe('InkEngine', () => {
     expect(glinting(InkState.Plain)).toBe(false)
     expect(glinting(InkState.Upcoming)).toBe(false)
     expect(glinting(InkState.Recited)).toBe(false)
+  })
+
+  it('glint resonance is identity when not holding', () => {
+    expect(glintResonance(false, 0.5)).toBe(1)
+  })
+
+  it('glint resonance tracks voice energy above resting', () => {
+    const hot = glintResonance(true, 0, 0.6, 0.3, 0.4, 0)
+    const cold = glintResonance(true, 0, 0.15, 0.3, 0.4, 0)
+    expect(hot).toBeGreaterThan(1)
+    expect(cold).toBeLessThan(1)
+  })
+
+  it('glint resonance free sine still breathes without voice', () => {
+    const hz = 5.5
+    expect(glintResonance(true, 0.25 / hz, 0, 0, 0, 0.22, hz)).toBeCloseTo(1.22, 4)
+    expect(glintResonance(true, 0.75 / hz, 0, 0, 0, 0.22, hz)).toBeCloseTo(0.78, 4)
   })
 
   it('only upcoming ink is faint', () => {

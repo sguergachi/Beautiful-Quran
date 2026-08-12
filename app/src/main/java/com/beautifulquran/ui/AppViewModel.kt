@@ -12,6 +12,7 @@ import com.beautifulquran.ui.rootviewer.RootViewerViewModel
 import com.beautifulquran.ui.settings.SettingsViewModel
 import com.beautifulquran.ui.share.ShareViewModel
 import com.beautifulquran.timingslab.TimingsLabViewModel
+import com.beautifulquran.tarjilab.TarjiLabViewModel
 
 /** Tiny hand-rolled DI: ViewModel factory backed by the Application singletons. */
 object AppViewModelFactory : ViewModelProvider.Factory {
@@ -37,6 +38,8 @@ object AppViewModelFactory : ViewModelProvider.Factory {
                 SettingsViewModel(app.repository, app.settings) as T
             modelClass.isAssignableFrom(TimingsLabViewModel::class.java) ->
                 TimingsLabViewModel(app.repository, app.settings, app.player, app.timingOverrides) as T
+            modelClass.isAssignableFrom(TarjiLabViewModel::class.java) ->
+                TarjiLabViewModel(app.repository, app.settings, app.player) as T
             modelClass.isAssignableFrom(RootViewerViewModel::class.java) ->
                 RootViewerViewModel(
                     app.repository,

@@ -534,6 +534,123 @@ class InkEngineTest {
     }
 
     @Test
+    fun `glint resonance is idle when not holding or disabled`() {
+        assertEquals(InkEngine.GlintResonance.Idle, InkEngine.glintResonance(holding = false))
+        assertEquals(
+            InkEngine.GlintResonance.Idle,
+            InkEngine.glintResonance(
+                holding = true,
+                tremolo = 1f,
+                tremoloGain = 1f,
+                depth = 0.4f,
+                enabled = false,
+            ),
+        )
+        assertEquals(
+            InkEngine.GlintResonance.Idle,
+            InkEngine.glintResonance(
+                holding = true,
+                tremolo = 1f,
+                tremoloGain = 1f,
+                depth = 0f,
+            ),
+        )
+    }
+
+    @Test
+    fun `glint resonance follows one signed vocal envelope cycle`() {
+        // Positive is the audible swell, negative the trough. The old abs()
+        // mapping made both bright and therefore flickered at twice the voice.
+        val up = InkEngine.glintResonance(
+            holding = true,
+            tremolo = 1f,
+            tremoloGain = 1f,
+            depth = 1f,
+        )
+        val mid = InkEngine.glintResonance(
+            holding = true,
+            tremolo = 0f,
+            tremoloGain = 1f,
+            depth = 1f,
+        )
+        val down = InkEngine.glintResonance(
+            holding = true,
+            tremolo = -1f,
+            tremoloGain = 1f,
+            depth = 1f,
+        )
+        assertEquals(1f, up.peak, 1e-4f)
+        assertEquals(1f, up.layerMult, 1e-4f) // vocal crest: full sheen
+        assertEquals(0f, mid.peak, 1e-4f)
+        assertEquals(0.5f, mid.layerMult, 1e-4f) // mean level: half sheen
+        assertEquals(0f, down.peak, 1e-4f)
+        assertEquals(
+            InkEngine.GLINT_RESONANCE_TROUGH_FLOOR,
+            down.layerMult,
+            1e-4f,
+        ) // vocal trough: off at full depth
+        val softDepth = InkEngine.glintResonance(
+            holding = true,
+            tremolo = 1f,
+            tremoloGain = 1f,
+            depth = 0.4f,
+        )
+        assertEquals(0.4f, softDepth.peak, 1e-4f)
+        assertEquals(1f, softDepth.layerMult, 1e-4f)
+        val midSoft = InkEngine.glintResonance(
+            holding = true,
+            tremolo = -1f,
+            tremoloGain = 1f,
+            depth = 0.4f,
+        )
+        assertEquals(
+            1f - 0.4f * (1f - InkEngine.GLINT_RESONANCE_TROUGH_FLOOR),
+            midSoft.layerMult,
+            1e-4f,
+        )
+        val ramping = InkEngine.glintResonance(
+            holding = true,
+            tremolo = 1f,
+            tremoloGain = 0.5f,
+            depth = 1f,
+        )
+        assertEquals(0.5f, ramping.peak, 1e-4f)
+        assertEquals(1f, ramping.layerMult, 1e-4f)
+        val troughRamp = InkEngine.glintResonance(
+            holding = true,
+            tremolo = -1f,
+            tremoloGain = 0.5f,
+            depth = 1f,
+        )
+        assertEquals(
+            1f - 0.5f * (1f - InkEngine.GLINT_RESONANCE_TROUGH_FLOOR),
+            troughRamp.layerMult,
+            1e-4f,
+        )
+        val halfSwell = InkEngine.glintResonance(
+            holding = true,
+            tremolo = 0.75f,
+            tremoloGain = 1f,
+            depth = 1f,
+        )
+        assertTrue(halfSwell.peak > 0.75f)
+        assertTrue(halfSwell.layerMult > mid.layerMult)
+    }
+
+    @Test
+    fun `glint resonance shows no tell before the voice reverberates`() {
+        assertEquals(
+            InkEngine.GlintResonance.Idle,
+            InkEngine.glintResonance(
+                holding = true,
+                tremolo = 1f,
+                tremoloGain = 0f,
+                depth = 1f,
+            ),
+        )
+    }
+
+    @Test
     fun `same-word repeat masks retained clock until reveal begins`() {
         val action = repeatWashAction(
             wasRepeat = false,

@@ -7,7 +7,7 @@ local.properties
 captures/
 .externalNativeBuild/
 .cxx/
-.android-emulator.log
+.android-emulator*.log
 web/node_modules/
 web/dist/
 web/public/quran.db

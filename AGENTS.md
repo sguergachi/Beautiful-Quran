@@ -63,6 +63,8 @@ app/                    The entire Android app (single Gradle module)
     ui/entrance/        Cold-start ceremony: the closed mushaf cover
     ui/home|reader|settings|theme/   Compose screens + design system
     timingslab/         In-app editor for word-timing corrections
+    tarjilab/           Dev lab: capture a word's PCM, loop it, and tune the
+                        tarjīʿ detector against waveform + sine visualization
   src/test/             JVM unit tests (JUnit 4)
 data/quran.db           Canonical committed SQLite database consumed by both apps
 data/lexicon.db         Lane's Lexicon, keyed by QAC root — the Root Viewer's
@@ -125,6 +127,16 @@ python3 tools/test_build_db.py  # timing pipeline regressions (~1s, no Gradle)
   a different seed grows an entirely different composition.
 - To run the app in an emulator on Linux: `scripts/setup_android_emulator.sh`
   once, then `scripts/run_android_app.sh` (see README.md).
+- **Parallel emulators.** Several lean headless AVDs can run at once, one per
+  agent, each with its own adb serial. If your `scripts/run_android_app.sh`
+  run says the AVD is already in use (or you just don't want to disturb an
+  emulator another agent is using), boot your own: `scripts/emulators_up.sh N`
+  creates/starts `BeautifulQuran_API_35_0..N-1` and prints each one's agent
+  command — pick a free index and run it. `scripts/emulators_down.sh` stops
+  them all. Before stealing or killing an emulator, assume another agent may
+  be mid-test on it: prefer your own AVD index. Headless AVDs have no window;
+  drop `ANDROID_EMULATOR_HEADLESS=1` to restart yours windowed for a visual
+  check (that restarts only your own AVD).
 - CI runs on every push: verifies the DB asset exists and runs unit tests.
   On `master` only, it also builds the release APK and publishes it to the
   rolling `latest` GitHub release.
@@ -286,6 +298,7 @@ this document combined: `ReaderComponents.kt` (~36k tokens),
 | `docs/SHARE.md` | Gather mode and verse sharing — text + full-ink image shipped; video proposed |
 | `docs/VERSE_ACTIONS.md` | Bookmark · note · share UX — verse-first share plan (designed, not implemented) |
 | `docs/TIMINGS_LAB.md` | In-app timing editor + maintainer apply path (systematic first) |
+| `docs/TARJI_LAB.md` | The tarjīʿ lab — waveform + tarji sine loop tuning, samples, capture edges |
 | `tools/timing_patch_cases/README.md` | **Required** unit tests when landing a Lab/GitHub timing patch systematically |
 | `tools/timing_overrides/README.md` | Local patch reproduction; committed JSON is rejected |
 | `docs/WEB.md` | Web port plan — Focus / Highlight / Ink engines + paper reader in the browser |

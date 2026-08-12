@@ -18,13 +18,14 @@ import androidx.compose.ui.unit.dp
 import com.beautifulquran.ui.theme.quietClickable
 
 /**
- * Developer-mode ink-bleed chooser: two quiet lines, no Material dialog.
- * See docs/ROOT_VIEWER.md.
+ * Developer-mode ink-bleed chooser: three quiet lines, no Material dialog.
+ * See docs/ROOT_VIEWER.md and docs/TARJI_LAB.md.
  */
 @Composable
 fun WordHoldChooser(
     onOpenRootViewer: () -> Unit,
     onOpenTimingsLab: () -> Unit,
+    onOpenTarjiLab: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     Box(
@@ -67,6 +68,17 @@ fun WordHoldChooser(
                 modifier = Modifier
                     .fillMaxWidth()
                     .quietClickable(onClick = onOpenTimingsLab)
+                    .padding(vertical = 12.dp),
+            )
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = "Tarjīʿ Lab",
+                style = MaterialTheme.typography.headlineMedium,
+                textAlign = TextAlign.Center,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.85f),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .quietClickable(onClick = onOpenTarjiLab)
                     .padding(vertical = 12.dp),
             )
             Spacer(Modifier.height(36.dp))

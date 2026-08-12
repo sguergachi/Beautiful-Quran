@@ -21,11 +21,20 @@ describe('formatReaderDigits', () => {
 })
 
 describe('formatAyahNumberMark', () => {
+  const wj = '\u2060'
+
   it('uses RTL bracket order with Arabic-Indic digits', () => {
-    expect(formatAyahNumberMark(12, true)).toBe('﴿١٢﴾')
+    expect(formatAyahNumberMark(12, true)).toBe(`﴿${wj}١${wj}٢${wj}﴾`)
   })
 
   it('uses LTR bracket order with Western digits', () => {
-    expect(formatAyahNumberMark(12, false)).toBe('﴾12﴿')
+    expect(formatAyahNumberMark(12, false)).toBe(`﴾${wj}1${wj}2${wj}﴿`)
+  })
+
+  it('glues mark characters so they cannot wrap mid-unit', () => {
+    const mark = formatAyahNumberMark(3, false)
+    expect(mark).toBe(`﴾${wj}3${wj}﴿`)
+    expect(mark.includes('﴾3')).toBe(false)
+    expect(mark.includes('3﴿')).toBe(false)
   })
 })

@@ -344,13 +344,15 @@ horizontal page turn — draggable, fling-able, with page-turn audio
   `FloatingPaperControl` (enter/exit + bottom inset) with the cover float. All scrolling and verse-position logic routes through the
   focus engine (`reader/focus/`, see below).
 - `settings/SettingsScreen` — reciter, reading mode, text size, display
-  toggles, theme, attributions; developer mode unlocks the Timings Lab.
+  toggles, theme, attributions; developer mode unlocks the Timings Lab and
+  the [Tarjīʿ Lab](TARJI_LAB.md).
 
 Ink-bleed overlays soak **the sheet they belong to**, not a full-screen
 layer above the stack: the repeat question and the
 [Root Word Viewer](ROOT_VIEWER.md) (default word long-press) live on the
-reader sheet; the [Timings Lab](TIMINGS_LAB.md) (developer mode) stays
-stack-level because Settings can open it too. Shared primitive:
+reader sheet; the [Timings Lab](TIMINGS_LAB.md) and the
+[Tarjīʿ Lab](TARJI_LAB.md) (developer mode) stay
+stack-level because Settings can open them too. Shared primitive:
 `InkRevealOverlay`. Media-session notifications are platform-exempt from
 `POST_NOTIFICATIONS`, so playback never gates on a notification-permission
 prompt.

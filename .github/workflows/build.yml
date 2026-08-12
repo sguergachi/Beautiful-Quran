@@ -64,12 +64,8 @@ jobs:
         if: github.ref == 'refs/heads/master'
         run: cp app/build/outputs/apk/release/app-release.apk BeautifulQuran.apk
 
-      - uses: actions/upload-artifact@v4
-        if: github.ref == 'refs/heads/master'
-        with:
-          name: BeautifulQuran-apk
-          path: BeautifulQuran.apk
-
+      # Release is the ship path. Artifact upload is optional convenience and
+      # must not fail the job when Actions storage quota is exhausted.
       - name: Publish APK to "latest" release
         if: github.ref == 'refs/heads/master'
         env:
@@ -87,5 +83,13 @@ jobs:
             echo "Release publish attempt $attempt failed; retrying…"
             sleep $((attempt * 2))
           done
-          echo "Failed to publish latest release after retries (APK is still available as a workflow artifact)."
+          echo "Failed to publish latest release after retries."
           exit 1
+
+      - uses: actions/upload-artifact@v4
+        if: github.ref == 'refs/heads/master'
+        continue-on-error: true
+        with:
+          name: BeautifulQuran-apk
+          path: BeautifulQuran.apk
+          retention-days: 3

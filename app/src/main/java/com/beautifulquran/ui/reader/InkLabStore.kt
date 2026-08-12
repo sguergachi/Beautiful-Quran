@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.SharedPreferences
 import androidx.core.content.edit
 import com.beautifulquran.domain.TajweedPacing
+import com.beautifulquran.playback.Tarji
 import com.beautifulquran.ui.theme.ContextualGuideTuning
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -60,8 +61,8 @@ data class InkLabSnapshot(
     val repeatFadeOutMs: Int = 900,
     val repeatInkAlpha: Float = 1f,
     val glintFadeMs: Int = 1_000,
-    val glintTintAlpha: Float = 0.62f,
-    val glintGlowAlpha: Float = 0.49f,
+    val glintTintAlpha: Float = 0.88f,
+    val glintGlowAlpha: Float = 0.78f,
     val glintGlowRadius: Float = 10f,
     val washFeather: Float = 1.6f,
     val sweepEaseX1: Float = 0.3f,
@@ -80,6 +81,17 @@ data class InkLabSnapshot(
     val waqfShare: Float = 0.5932f,
     val waqfLengthScale: Float = 1f,
     val holdCreep: Float = 0.3f,
+    val glintResonance: Boolean = true,
+    val glintResonanceDepth: Float = InkEngine.GLINT_RESONANCE_DEPTH,
+    val glintResonanceMaxHz: Float = InkEngine.GLINT_RESONANCE_MAX_HZ,
+    val tarjiMinHz: Float = Tarji.MIN_TREMOLO_HZ,
+    val tarjiHoldMinMs: Float = Tarji.HOLD_MIN_MS.toFloat(),
+    val tarjiMinDepth: Float = Tarji.MIN_TREMOLO_DEPTH,
+    val tarjiMinPeriodicity: Float = Tarji.MIN_PERIODICITY,
+    val tarjiPitchDrift: Float = Tarji.MAX_PITCH_DRIFT,
+    val tarjiAttackMs: Float = Tarji.ATTACK_MS,
+    val tarjiReleaseMs: Float = Tarji.RELEASE_MS,
+    val tarjiEarDelayMs: Float = 0f,
     val guideBodyEdge: Float = 0.5f,
     val guideFeatherWidth: Float = 0.2819f,
     val guideFadeSoftness: Float = 1.3329f,
@@ -123,6 +135,20 @@ data class InkLabSnapshot(
         waqfShare = waqfShare,
         waqfLengthScale = waqfLengthScale,
         holdCreep = holdCreep,
+        glintResonance = glintResonance,
+        glintResonanceDepth = glintResonanceDepth,
+        glintResonanceMaxHz = glintResonanceMaxHz.coerceIn(
+            Tarji.MIN_TREMOLO_HZ,
+            Tarji.MAX_MEASURABLE_TREMOLO_HZ,
+        ),
+        tarjiMinHz = tarjiMinHz,
+        tarjiHoldMinMs = tarjiHoldMinMs,
+        tarjiMinDepth = tarjiMinDepth,
+        tarjiMinPeriodicity = tarjiMinPeriodicity,
+        tarjiPitchDrift = tarjiPitchDrift,
+        tarjiAttackMs = tarjiAttackMs,
+        tarjiReleaseMs = tarjiReleaseMs,
+        tarjiEarDelayMs = tarjiEarDelayMs,
     )
 
     fun toContextualGuideTuning(): ContextualGuideTuning = ContextualGuideTuning(
@@ -180,7 +206,18 @@ data class InkLabSnapshot(
             waqfShare = tuning.waqfShare,
             waqfLengthScale = tuning.waqfLengthScale,
             holdCreep = tuning.holdCreep,
-            guideBodyEdge = guide.bodyEdge,
+            glintResonance = tuning.glintResonance,
+            glintResonanceDepth = tuning.glintResonanceDepth,
+            glintResonanceMaxHz = tuning.glintResonanceMaxHz,
+            tarjiMinHz = tuning.tarjiMinHz,
+            tarjiHoldMinMs = tuning.tarjiHoldMinMs,
+            tarjiMinDepth = tuning.tarjiMinDepth,
+            tarjiMinPeriodicity = tuning.tarjiMinPeriodicity,
+            tarjiPitchDrift = tuning.tarjiPitchDrift,
+        tarjiAttackMs = tuning.tarjiAttackMs,
+        tarjiReleaseMs = tuning.tarjiReleaseMs,
+        tarjiEarDelayMs = tuning.tarjiEarDelayMs,
+        guideBodyEdge = guide.bodyEdge,
             guideFeatherWidth = guide.featherWidth,
             guideFadeSoftness = guide.fadeSoftness,
             guideBlurRadiusDp = guide.blurRadiusDp,

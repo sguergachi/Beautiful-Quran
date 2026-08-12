@@ -181,6 +181,11 @@ object TajweedPacing {
         private val positions: FloatArray,
         /** Pronounced letters — drives the paced feather width. */
         val letterCount: Int,
+        /** At least one hold park on this word's *own* letters — a long madd,
+         * a ghunnah, or the waqf. A wasl-entry hold alone does not count: it
+         * sustains the *previous* word's nūn, so the listener hears no hold
+         * on this word. Gates the tarjīʿ shimmer's eligibility. */
+        val hasStrongHold: Boolean = false,
     ) {
         fun at(t: Float): Float {
             if (t >= 1f) return 1f
@@ -318,7 +323,12 @@ object TajweedPacing {
         positions[positions.lastIndex] = 1f
         times += 1f
         positions += 1f
-        return Curve(times.toFloatArray(), positions.toFloatArray(), letters)
+        return Curve(
+            times = times.toFloatArray(),
+            positions = positions.toFloatArray(),
+            letterCount = letters,
+            hasStrongHold = (0 until n).any { held[it] && !(waslEntry && it == 0) },
+        )
     }
 
     /**
