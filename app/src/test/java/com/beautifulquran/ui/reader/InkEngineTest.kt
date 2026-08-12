@@ -589,6 +589,14 @@ class InkEngineTest {
             down.layerMult,
             1e-4f,
         ) // vocal trough: off at full depth
+        val luminousTrough = InkEngine.glintResonance(
+            holding = true,
+            tremolo = -1f,
+            tremoloGain = 1f,
+            depth = 1f,
+            troughFloor = 0.25f,
+        )
+        assertEquals(0.25f, luminousTrough.layerMult, 1e-4f)
         val softDepth = InkEngine.glintResonance(
             holding = true,
             tremolo = 1f,

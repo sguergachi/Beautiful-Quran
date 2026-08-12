@@ -19,7 +19,7 @@ import kotlinx.serialization.json.Json
  */
 @Serializable
 data class TarjiLabSample(
-    val schema: Int = 1,
+    val schema: Int = 2,
     val label: String,
     val reciterId: Int,
     val reciterName: String,
@@ -35,6 +35,8 @@ data class TarjiLabSample(
     val firstHopMediaMs: Double,
     val pcmB64: String,
     val knobs: TarjiLabKnobs,
+    /** What the listener says the shimmer should do on this exact PCM. */
+    val expectation: TarjiLabExpectation = TarjiLabExpectation(),
     val notes: String = "",
 )
 
@@ -53,6 +55,7 @@ object TarjiLabCodec {
         wordPosition: Int,
         wordArabic: String,
         knobs: TarjiLabKnobs,
+        expectation: TarjiLabExpectation = TarjiLabExpectation(),
         notes: String = "",
     ): TarjiLabSample = TarjiLabSample(
         label = label,
@@ -68,6 +71,7 @@ object TarjiLabCodec {
         firstHopMediaMs = firstHopMediaMs,
         pcmB64 = pcmToBase64(capture),
         knobs = knobs,
+        expectation = expectation,
         notes = notes,
     )
 
@@ -75,7 +79,13 @@ object TarjiLabCodec {
         json.encodeToString(TarjiLabSample.serializer(), sample)
 
     fun decode(text: String): TarjiLabSample =
-        json.decodeFromString(TarjiLabSample.serializer(), text)
+        json.decodeFromString(TarjiLabSample.serializer(), text).let { sample ->
+            sample.copy(
+                expectation = sample.expectation.copy(
+                    crestMs = sample.expectation.crestMs.sorted(),
+                ),
+            )
+        }
 
     fun toCapture(sample: TarjiLabSample): TarjiLabCapture {
         val bytes = Base64.getDecoder().decode(sample.pcmB64)

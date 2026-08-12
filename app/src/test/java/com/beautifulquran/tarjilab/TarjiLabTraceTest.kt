@@ -66,6 +66,15 @@ class TarjiLabTraceTest {
             "rate tracks the AM: ${trace.meanRateHz} Hz",
             trace.meanRateHz in 4f..6f,
         )
+        assertTrue(
+            "loudness channel exposes its candidate rate",
+            span.any { trace.amplitudeRateHz[it] in 4f..6f },
+        )
+        assertTrue(
+            "loudness channel exposes depth and periodicity",
+            span.any { trace.amplitudeDepth[it] > 0.1f && trace.amplitudePeriodicity[it] > 0.2f },
+        )
+        assertTrue("AM supplies the visible pulse", span.any { trace.visualUsesAmplitude[it] })
         // Envelope RMS of level 0.3 sin ≈ 0.3/√2 ≈ 0.21 (modulated ±25%).
         val mid = trace.envRms[(span.first + span.last) / 2]
         assertTrue("env rms $mid", mid in 0.15f..0.3f)
