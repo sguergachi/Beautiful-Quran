@@ -10,6 +10,20 @@ measured tarjīʿ sine, and the fitted ideal sine — every knob edit re-runs
 the pure detector offline over the same capture, so each change is judged
 instantly against the same sound, on the loop, with the ear.**
 
+The Lab separates two jobs that used to be conflated:
+
+- **Detector tuning** changes what the current algorithm believes.
+- **Ear truth** records what the shimmer *should* do, independent of the
+  algorithm: no shimmer, or the audible onset, every desired brightness
+  crest, and the end. It is also an **auditionable target renderer**: the
+  word and a target sine play the authored pulse against the captured voice.
+  Crest spacing gives the target frequency while individual marks preserve
+  changing cadence and visual phase.
+
+An exported sample therefore contains both the detector settings and human
+ground truth. That is the evidence needed to improve the algorithm without
+overfitting one word by eye.
+
 > **Entry is developer-only**, like the [Timings Lab](TIMINGS_LAB.md): in
 > developer mode, long-press a word → **Tarjīʿ Lab** (also in Settings →
 > Developer). Without dev mode, a long-press opens the Root Word Viewer.
@@ -38,14 +52,27 @@ One strip shows, over the word's span (bracketed in gold):
   the detector's own mean rate over the reverberating span, so a glance
   tells you whether the pulse is clean and in phase,
 - the **reverberating span** as a translucent gold band,
+- the listener's **Ear truth** in primary ink: onset/end lines, a quiet span,
+  a continuous target sine, and a short tick for every desired brightness
+  crest,
 - the **playhead**, and the word itself below, wearing the shimmer: its
   white-gold glow is driven per frame by the same
   `InkEngine.glintResonance` mapping the reader renders — crests brighten,
   troughs extinguish.
 
-The caption under the canvas shows capture length, hop duration, and the
-fitted rate ("fit 5.0 Hz"); "analyzing…" flashes while a knob edit re-runs
-the detector.
+The compact readout under the canvas keeps time, fitted rate, and hop duration
+on one line. Two aligned evidence lanes report **loudness (AM)** and **pitch
+(FM)** rate, depth, and coherence; the lane currently supplying the visible
+pulse takes primary ink. This makes a wrong frequency choice explainable
+without squeezing the measurements into an ellipsized sentence.
+
+**Preview my target** switches the glowing word from detector output to Ear
+truth on the same hardware-loop playhead. Its target controls author the
+experience rather than the detector: **Target rate** creates a regular cadence
+around the last manually tapped crest (the phase anchor), while more crest taps
+can describe a reciter who accelerates or slows; **Target depth**, **Trough
+light**, **Build**, and **Dry** shape how strongly that pulse appears and how it
+arrives and settles. **Preview detector** is the immediate A/B comparison.
 
 ## The knobs
 
@@ -59,36 +86,50 @@ with a debounce. Plus the effect's **pulse depth**, which the preview honors.
 
 1. Long-press a word → **Tarjīʿ Lab** (or Settings → Developer → Tarjīʿ Lab;
    the word-stepper ‹ › walks the ayah's words).
-2. **Capture word** — the word plays once through the shared player at 1×
-   (300 ms lead, 1 s tail of the waqf decay), and the tap records the hop
-   stream; capture stops at the word's end automatically and the loop
-   starts. While it runs, the action becomes **Cancel capture** and shows a
-   percentage rail, so buffering or a long word never looks frozen; a failed
-   capture can be retried from the same control.
+2. The Lab **captures automatically and muted** at 1× (300 ms lead, 1 s tail
+   of the waqf decay). The percentage rail shows progress; capture always
+   pauses and restores player gain at completion, failure, navigation, or
+   exit, so a failed probe cannot leave the ayah playing. A failed automatic
+   capture exposes a quiet **Retry muted** action.
 3. Use **Play loop** / **Pause loop** to audition the captured word. The
    control is a true toggle: pause keeps the loop sample position and Play
     resumes from that same sample. Tap or drag **anywhere on the full
-    waveform** to jump to an exact point; there is no separate scrub control.
+    waveform** to choose an exact point; the loop stays paused there until
+    **Play loop** is pressed. There is no separate scrub control.
     The `time / duration` readout makes the target explicit. The glowing word
-    preview lives in the top word row so the waveform and controls get the
-    remaining space. Capture and loop controls sit directly below the waveform,
-    where they stay beside the timing evidence they control.
-4. **Detector tuning** stays visible below the waveform so the values are
-   always available while listening. **Tools** contains the less-frequent
-   Reset, Export, and Import actions, keeping the primary workflow quiet.
-5. Watch the gold sine and listen to the loop. Too few pulses? Lower
+    preview lives in the top word row so the waveform and transport get the
+    remaining space.
+4. Under **Ear truth**, leave a negative word as **No shimmer**. For a real
+   tarjīʿ, mark **start**, one audible **bright crest**, and **end**, then move
+   **Target rate** until the target sine and glowing word ride the voice. The
+   marked crest anchors phase. Tap further crests instead when cadence changes
+   through the hold. Marks can be made while the loop plays; **Remove latest
+   crest** and **Clear labels** repair mistakes.
+5. Tap **Preview my target** and tune **depth**, **trough light**, **build**,
+   and **dry** until the word shows the experience you want. Toggle back to
+   **Preview detector** for A/B. Add a note when the distinction matters (for
+   example, “follow pitch, not the room echo”).
+6. Read the comparison line: positive onset/end errors mean the detector is
+   late; the crest error measures phase alignment; the detector and Ear truth
+   rates expose a frequency mismatch directly.
+7. **Detector tuning** stays visible below the waveform so the values are
+   always available while listening. Import, Export, and Reset are quiet
+   header utilities rather than a transport-level “Tools” disclosure.
+8. Watch the gold sine and listen to the loop. Too few pulses? Lower
    **Min depth** / **hold min**, widen **Max rate**. Glimmer flickers into
    the next word? Raise **Release ms**. The sine vs the fitted dashed ideal
    shows drift at a glance.
-6. **Reset knobs** restores shipped defaults (also resets the Ink Lab).
+9. **Reset knobs** restores shipped defaults (also resets the Ink Lab).
 
 ## Samples — the exchange format
 
 **Export** writes a JSON sample to
 `Android/data/<app>/files/Download/tarji_<reciterId>_<surah>_<ayah>_w<word>.json`:
 word metadata, the decimated PCM (Base64, 16-bit LE), the true hop duration,
-the first hop's media position, and the knobs used. **Import** loads such a
-sample (file picker) and re-analyzes it — knobs included.
+the first hop's media position, the knobs used, the complete auditioned Ear
+truth signal (phase anchor plus visual style), and listening notes. **Import**
+loads such a sample (file picker) and re-analyzes it — knobs, labels, target
+preview, and style included. Unlabeled schema-1 samples remain importable.
 
 That file *is* the repro for any tarjīʿ issue: the waveform, sine, and fit
 reproduce identically off-device. `tools/tarji_samples/` is where samples

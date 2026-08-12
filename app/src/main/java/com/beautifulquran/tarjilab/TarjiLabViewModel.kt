@@ -71,6 +71,11 @@ class TarjiLabViewModel(
         val trace: TarjiLabTrace? = null,
         val sineFit: TarjiSineFit? = null,
         val knobs: TarjiLabKnobs = TarjiLabKnobs(),
+        /** Listener-authored ground truth for this exact capture. */
+        val expectation: TarjiLabExpectation = TarjiLabExpectation(),
+        /** Whether the word renders Ear truth instead of detector output. */
+        val previewingTarget: Boolean = false,
+        val sampleNotes: String = "",
         val capturing: Boolean = false,
         /** Capture progress from the requested word span, 0..1. */
         val captureProgress: Float = 0f,
@@ -84,6 +89,7 @@ class TarjiLabViewModel(
         val previewPositionMs: Float = 0f,
         /** When a sample was imported, its reciter name (the local reciter
          * may differ from the sample's). */
+        val sampleReciterId: Int? = null,
         val sampleReciterName: String? = null,
         val note: String? = null,
     )
@@ -97,7 +103,6 @@ class TarjiLabViewModel(
     private var audioTrack: AudioTrack? = null
     private var previewRateHz = 0
     private var previewTotalFrames = 0
-    private var scrubWasPlaying = false
     private var scrubActive = false
     private var ayahSegments: List<Segment> = emptyList()
     private var recitersCache: List<Reciter> = emptyList()
@@ -135,7 +140,7 @@ class TarjiLabViewModel(
 
     private fun load(surahId: Int, ayah: Int, focusWordPosition: Int?) {
         loadJob?.cancel()
-        captureJob?.cancel()
+        abortCapture()
         audioTrack?.let { runCatching { it.pause() } }
         _ui.value = TarjiLabUiState(
             isLoading = true,
@@ -178,6 +183,7 @@ class TarjiLabViewModel(
                 knobs = TarjiLabKnobs.fromTuning(InkEngine.tuning),
             )
             settingsRepo.updateListeningPosition(surahId, ayahRow.number)
+            captureWord()
         }
     }
 
@@ -189,15 +195,11 @@ class TarjiLabViewModel(
 
     // ── Capture ────────────────────────────────────────────────────────────
 
-    /** Play the word once through the shared player while the tap records
-     * its decimated stream, then stop at the span's end and loop it. */
-    fun captureWord() {
+    /** Automatically play the target span muted while the tap records it. */
+    private fun captureWord() {
         val st = _ui.value
         if (st.isLoading || st.reciter == null || st.wordPosition == 0) return
-        if (st.capturing) {
-            cancelCapture()
-            return
-        }
+        if (st.capturing) return
         stopPreview()
         val span = TarjiLabTrim.wordSpanMs(
             ayahSegments,
@@ -226,6 +228,7 @@ class TarjiLabViewModel(
         } else {
             startLabPlayback()
         }
+        player.setVolume(0f)
         ve.armCapture()
         player.setSpeed(1f)
         player.seekToWordAndPlay(st.ayah, span.first)
@@ -238,6 +241,7 @@ class TarjiLabViewModel(
         val deadline = SystemClock.elapsedRealtime() + CAPTURE_TIMEOUT_MS
         captureJob?.cancel()
         captureJob = viewModelScope.launch {
+            var seekLanded = false
             while (true) {
                 val active = VoiceEnergy.active?.captureActive == true
                 val durationMs = player.durationMs.takeIf { it > 0L }
@@ -246,11 +250,27 @@ class TarjiLabViewModel(
                 } else {
                     span.last
                 }
-                val progress = ((player.positionMs - span.first).toFloat() /
+                val positionMs = player.positionMs
+                val nowPlaying = player.liveNowPlaying
+                if (!seekLanded) {
+                    seekLanded = nowPlaying?.surahId == st.surahId &&
+                        nowPlaying.ayah == st.ayah &&
+                        nowPlaying.reciterId == st.reciter.id &&
+                        captureSeekHasLanded(positionMs, span.first)
+                    if (!seekLanded) {
+                        if (SystemClock.elapsedRealtime() > deadline) {
+                            finishCapture("Could not reach the word for muted capture.")
+                            return@launch
+                        }
+                        delay(POLL_MS)
+                        continue
+                    }
+                }
+                val progress = ((positionMs - span.first).toFloat() /
                     (spanEnd - span.first).coerceAtLeast(1L))
                     .coerceIn(0f, 1f)
                 _ui.value = _ui.value.copy(captureProgress = progress)
-                val done = !active || player.positionMs >= spanEnd
+                val done = !active || positionMs >= spanEnd
                 if (done) {
                     finishCapture(if (active) null else "Audio stopped before the word's end.")
                     return@launch
@@ -264,26 +284,28 @@ class TarjiLabViewModel(
         }
     }
 
-    /** Cancel an in-flight tap without leaving a stale capture armed. */
-    private fun cancelCapture() {
+    /** Retry is shown only after an automatic capture fails. */
+    fun retryCapture() {
+        if (!_ui.value.capturing) captureWord()
+    }
+
+    /** Stop every capture side effect, including a queued or failed player. */
+    private fun abortCapture() {
         captureJob?.cancel()
         captureJob = null
         VoiceEnergy.active?.disarmCapture()
         player.pause()
-        _ui.value = _ui.value.copy(
-            capturing = false,
-            captureProgress = 0f,
-            captureError = null,
-            note = "Capture cancelled.",
-        )
+        player.setVolume(1f)
     }
 
     private fun finishCapture(error: String?) {
         captureJob?.cancel()
+        captureJob = null
         val ve = VoiceEnergy.active
         val st = _ui.value
         val capture = ve?.disarmCapture()
         player.pause()
+        player.setVolume(1f)
         if (error != null || capture == null) {
             _ui.value = st.copy(
                 capturing = false,
@@ -318,10 +340,14 @@ class TarjiLabViewModel(
             captureProgress = 1f,
             capture = trimmed,
             firstHopMediaMs = firstHopMediaMs,
+            expectation = TarjiLabExpectation(),
+            previewingTarget = false,
+            sampleNotes = "",
             captureError = null,
+            previewDurationMs = trimmed.hopCount * trimmed.hopContentDurationMs(),
+            previewPositionMs = 0f,
         )
         reanalyze()
-        startPreview()
     }
 
     /** Loads this ayah as a single-item playlist through the shared player. */
@@ -336,6 +362,7 @@ class TarjiLabViewModel(
             surahName = st.surahName,
             preserveRepeatRange = false,
             includeBasmalahLeadIn = false,
+            autoplay = false,
         )
     }
 
@@ -383,6 +410,94 @@ class TarjiLabViewModel(
         val knobs = TarjiLabKnobs.fromTuning(InkEngine.tuning)
         _ui.value = _ui.value.copy(knobs = knobs)
         reanalyze()
+    }
+
+    // ── Ear truth ───────────────────────────────────────────────────────────────
+
+    /** Mark the current audible position as the desired shimmer onset. */
+    fun markExpectedStart() = updateExpectation { expectation, at, duration ->
+        expectation.markStart(at, duration)
+    }
+
+    /** Mark the current audible position as one desired brightness crest. */
+    fun addExpectedCrest() = updateExpectation { expectation, at, duration ->
+        expectation.addCrest(at, duration)
+    }
+
+    /** Mark the current audible position as the desired shimmer end. */
+    fun markExpectedEnd() = updateExpectation { expectation, at, duration ->
+        expectation.markEnd(at, duration)
+    }
+
+    fun removeLastExpectedCrest() {
+        val next = _ui.value.expectation.removeLastCrest()
+        _ui.value = _ui.value.copy(
+            expectation = next,
+            previewingTarget = _ui.value.previewingTarget && next.canPreview,
+            note = null,
+        )
+    }
+
+    fun expectNoShimmer() {
+        if (_ui.value.capture == null) return
+        _ui.value = _ui.value.copy(
+            expectation = TarjiLabExpectation.noShimmer(),
+            previewingTarget = true,
+            note = null,
+        )
+    }
+
+    fun clearExpectation() {
+        _ui.value = _ui.value.copy(
+            expectation = TarjiLabExpectation(),
+            previewingTarget = false,
+            note = null,
+        )
+    }
+
+    /** Regularize the authored pulse around its last listener-marked crest. */
+    fun setExpectedRate(rateHz: Float) {
+        val next = _ui.value.expectation.withRate(rateHz)
+        _ui.value = _ui.value.copy(
+            expectation = next,
+            previewingTarget = next.canPreview,
+            note = null,
+        )
+    }
+
+    fun updateTargetStyle(transform: (TarjiTargetStyle) -> TarjiTargetStyle) {
+        val st = _ui.value
+        val next = st.expectation.copy(style = transform(st.expectation.style))
+        _ui.value = st.copy(
+            expectation = next,
+            previewingTarget = next.canPreview,
+            note = null,
+        )
+    }
+
+    fun toggleTargetPreview() {
+        val st = _ui.value
+        if (!st.expectation.canPreview) return
+        _ui.value = st.copy(previewingTarget = !st.previewingTarget)
+    }
+
+    fun updateSampleNotes(notes: String) {
+        _ui.value = _ui.value.copy(sampleNotes = notes.take(MAX_NOTES_LENGTH))
+    }
+
+    private inline fun updateExpectation(
+        transform: (TarjiLabExpectation, Float, Float) -> TarjiLabExpectation,
+    ) {
+        val st = _ui.value
+        val capture = st.capture ?: return
+        val duration = capture.hopCount * capture.hopContentDurationMs()
+        val at = previewPlayheadMs().takeIf { it >= 0f } ?: st.previewPositionMs
+        val next = transform(st.expectation, at.coerceIn(0f, duration), duration)
+        _ui.value = st.copy(
+            expectation = next,
+            previewingTarget = next.canPreview,
+            note = null,
+        )
     }
 
     // ── Loop preview ───────────────────────────────────────────────────────
@@ -448,6 +563,14 @@ class TarjiLabViewModel(
             return
         }
         val totalFrames = capture.hopCount * capture.hopSamples
+        val durationMs = capture.hopCount * capture.hopContentDurationMs()
+        val positionMs = normalizePreviewPosition(startMs, durationMs)
+        val frame = previewFrame(capture, positionMs)
+        if (track.setPlaybackHeadPosition(frame) != AudioTrack.SUCCESS) {
+            track.release()
+            _ui.value = st.copy(note = "Could not seek the preview to the chosen sample.")
+            return
+        }
         if (!loopInfinitely(track, totalFrames)) {
             track.release()
             _ui.value = st.copy(note = "Could not arm the loop on this device.")
@@ -455,10 +578,6 @@ class TarjiLabViewModel(
         }
         previewRateHz = rate
         previewTotalFrames = totalFrames
-        val durationMs = capture.hopCount * capture.hopContentDurationMs()
-        val positionMs = normalizePreviewPosition(startMs, durationMs)
-        val frame = previewFrame(capture, positionMs)
-        runCatching { track.setPlaybackHeadPosition(frame) }
         audioTrack = track
         track.play()
         _ui.value = st.copy(
@@ -525,7 +644,7 @@ class TarjiLabViewModel(
         }
         val position = normalizePreviewPosition(st.previewPositionMs, st.previewDurationMs)
         runCatching {
-            track.setPlaybackHeadPosition(previewFrame(capture, position))
+            check(track.setPlaybackHeadPosition(previewFrame(capture, position)) == AudioTrack.SUCCESS)
             track.play()
         }.onSuccess {
             _ui.value = st.copy(
@@ -551,7 +670,7 @@ class TarjiLabViewModel(
         if (track != null) {
             runCatching {
                 if (wasPlaying) track.pause()
-                track.setPlaybackHeadPosition(previewFrame(capture, position))
+                check(track.setPlaybackHeadPosition(previewFrame(capture, position)) == AudioTrack.SUCCESS)
                 if (wasPlaying) track.play()
             }.onFailure {
                 seekFailed = true
@@ -566,22 +685,14 @@ class TarjiLabViewModel(
         )
     }
 
-    /** Pause once at the start of a drag so repeated finger updates only move
-     * the hardware head instead of racing pause/play on every motion event. */
+    /** A drag always leaves the loop paused at the chosen sample. */
     fun beginPreviewScrub() {
+        if (_ui.value.previewPlaying) pausePreview()
         scrubActive = true
-        scrubWasPlaying = _ui.value.previewPlaying
-        if (scrubWasPlaying) pausePreview()
     }
 
-    /** Restore playback only if the scrub began while the loop was playing. */
+    /** Return playhead ownership to the audio clock; Play resumes explicitly. */
     fun endPreviewScrub() {
-        if (!scrubWasPlaying) {
-            scrubActive = false
-            return
-        }
-        scrubWasPlaying = false
-        resumePreview()
         scrubActive = false
     }
 
@@ -593,7 +704,6 @@ class TarjiLabViewModel(
         audioTrack = null
         previewRateHz = 0
         previewTotalFrames = 0
-        scrubWasPlaying = false
         scrubActive = false
         _ui.value = _ui.value.copy(
             previewPlaying = false,
@@ -641,17 +751,26 @@ class TarjiLabViewModel(
             return
         }
         val reciter = st.reciter ?: return
+        val sampleReciterId = st.sampleReciterId ?: reciter.id
+        val sampleReciterName = st.sampleReciterName ?: reciter.name
         val sample = TarjiLabCodec.buildSample(
             capture = capture,
             firstHopMediaMs = st.firstHopMediaMs,
-            label = TarjiLabCodec.label(reciter.name, st.surahId, st.ayah, st.wordPosition),
-            reciterId = reciter.id,
-            reciterName = reciter.name,
+            label = TarjiLabCodec.label(
+                sampleReciterName,
+                st.surahId,
+                st.ayah,
+                st.wordPosition,
+            ),
+            reciterId = sampleReciterId,
+            reciterName = sampleReciterName,
             surahId = st.surahId,
             ayah = st.ayah,
             wordPosition = st.wordPosition,
             wordArabic = st.wordArabic,
             knobs = st.knobs,
+            expectation = st.expectation,
+            notes = st.sampleNotes,
         )
         val json = TarjiLabCodec.encode(sample)
         val dir = runCatching {
@@ -676,6 +795,7 @@ class TarjiLabViewModel(
     /** Load a [TarjiLabSample] (from the file picker): its capture replaces
      * the current one, its knobs become the lab's, and analysis re-runs. */
     fun importSample(json: String) {
+        abortCapture()
         stopPreview()
         val sample = runCatching { TarjiLabCodec.decode(json) }.getOrNull()
         if (sample == null) {
@@ -697,6 +817,7 @@ class TarjiLabViewModel(
             ayah = sample.ayah,
             wordPosition = sample.wordPosition,
             wordArabic = sample.wordArabic,
+            sampleReciterId = sample.reciterId,
             sampleReciterName = sample.reciterName,
             // The sample's word span is unknown without its ayah's marks —
             // drop the bracket rather than draw it against the wrong media.
@@ -705,6 +826,9 @@ class TarjiLabViewModel(
             capture = capture,
             firstHopMediaMs = sample.firstHopMediaMs,
             knobs = sample.knobs,
+            expectation = sample.expectation,
+            previewingTarget = sample.expectation.canPreview,
+            sampleNotes = sample.notes,
             captureError = null,
             note = "Loaded ${sample.label}",
         )
@@ -714,11 +838,8 @@ class TarjiLabViewModel(
     /** Called when the lab is left: silence the preview and the player. */
     fun onExit() {
         stopPreview()
-        captureJob?.cancel()
-        if (matchesLab(player.state.value)) {
-            player.setSpeed(1f)
-            if (player.state.value.isPlaying) player.pause()
-        }
+        abortCapture()
+        player.setSpeed(1f)
     }
 
     override fun onCleared() {
@@ -743,9 +864,15 @@ class TarjiLabViewModel(
         private const val CAPTURE_TIMEOUT_MS = 20_000L
         private const val POLL_MS = 40L
         private const val KNOB_DEBOUNCE_MS = 120L
+        private const val MAX_NOTES_LENGTH = 1_000
         /** Tail guard so the poll never chases the very last audio frames. */
         private const val END_GUARD_MS = 20L
         /** Static AudioTrack buffers above this are refused (dev-lab cap). */
         private const val MAX_STATIC_BYTES = 1_048_576
     }
 }
+
+/** Reject the stale pre-seek clock; the first poll after landing is close to
+ * the requested lead-in, while an old end-of-ayah position is not. */
+internal fun captureSeekHasLanded(positionMs: Long, targetStartMs: Long): Boolean =
+    positionMs in (targetStartMs - 80L).coerceAtLeast(0L)..(targetStartMs + 750L)

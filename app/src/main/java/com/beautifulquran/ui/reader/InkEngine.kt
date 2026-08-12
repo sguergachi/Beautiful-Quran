@@ -557,12 +557,15 @@ object InkEngine {
      * word (see the glint layer in ReaderComponents)
      * @param tremolo synced tarjīʿ band signal −1..1 (0 = nothing detected)
      * @param tremoloGain 0..1 attack/release ramp of the detected signal
+     * @param troughFloor remaining sheen at a full vocal trough; the reader
+     * uses the shipped constant while the Tarjīʿ Lab can audition a target
      */
     fun glintResonance(
         holding: Boolean,
         tremolo: Float = 0f,
         tremoloGain: Float = 0f,
         depth: Float = tuning.glintResonanceDepth,
+        troughFloor: Float = GLINT_RESONANCE_TROUGH_FLOOR,
         enabled: Boolean = tuning.glintResonance,
     ): GlintResonance {
         if (!holding || !enabled || depth <= 0f) return GlintResonance.Idle
@@ -574,7 +577,8 @@ object InkEngine {
         val on = inkSmootherstep((tremolo.coerceIn(-1f, 1f) + 1f) * 0.5f)
         val crest = inkSmootherstep(tremolo.coerceIn(0f, 1f))
         val d = depth.coerceIn(0f, 1f)
-        val mult = 1f - g * d * (1f - on) * (1f - GLINT_RESONANCE_TROUGH_FLOOR)
+        val floor = troughFloor.coerceIn(0f, 1f)
+        val mult = 1f - g * d * (1f - on) * (1f - floor)
         return GlintResonance(peak = g * crest * d, layerMult = mult)
     }
 
