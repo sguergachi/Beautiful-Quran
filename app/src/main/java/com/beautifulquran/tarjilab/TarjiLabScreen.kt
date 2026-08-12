@@ -56,6 +56,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
@@ -178,7 +179,9 @@ fun TarjiLabScreen(
                 WaveformPanel(
                     ui = ui,
                     playheadMs = playheadMs,
+                    onScrubStart = viewModel::beginPreviewScrub,
                     onScrub = viewModel::seekPreviewTo,
+                    onScrubEnd = viewModel::endPreviewScrub,
                     modifier = Modifier.fillMaxWidth(),
                 )
 
@@ -532,7 +535,9 @@ private fun PreviewWord(
 private fun WaveformPanel(
     ui: TarjiLabViewModel.TarjiLabUiState,
     playheadMs: Float,
+    onScrubStart: () -> Unit,
     onScrub: (Float) -> Unit,
+    onScrubEnd: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val capture = ui.capture
@@ -562,18 +567,26 @@ private fun WaveformPanel(
                 .pointerInput(durationMs) {
                     if (durationMs <= 0f) return@pointerInput
                     awaitEachGesture {
-                        val down = awaitFirstDown(requireUnconsumed = false)
-                        fun seek(x: Float) {
-                            onScrub((x / size.width * durationMs).coerceIn(0f, durationMs))
-                        }
-                        seek(down.position.x)
-                        down.consume()
-                        while (true) {
-                            val event = awaitPointerEvent()
-                            val change = event.changes.firstOrNull { it.id == down.id } ?: break
-                            if (!change.pressed) break
-                            change.consume()
-                            seek(change.position.x)
+                        onScrubStart()
+                        try {
+                            val down = awaitFirstDown(
+                                requireUnconsumed = false,
+                                pass = PointerEventPass.Initial,
+                            )
+                            fun seek(x: Float) {
+                                onScrub((x / size.width * durationMs).coerceIn(0f, durationMs))
+                            }
+                            seek(down.position.x)
+                            down.consume()
+                            while (true) {
+                                val event = awaitPointerEvent(PointerEventPass.Initial)
+                                val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                                if (!change.pressed) break
+                                change.consume()
+                                seek(change.position.x)
+                            }
+                        } finally {
+                            onScrubEnd()
                         }
                     }
                 },
