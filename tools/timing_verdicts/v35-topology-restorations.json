@@ -8,10 +8,10 @@
     "Alafasy_128kbps:5:44": {
       "verdict": "accept", "kinds": ["topology"],
       "baselinePayloadHash": "5b3c15a648d95be9a78449893bf559f1c33a74ebdf11a7e39dac0e744dad74ab",
-      "candidatePayloadHash": "9a721d15620b840088e5cf316576fb83360886f4818391772490aef909a77431",
+      "candidatePayloadHash": "eb877af2b8f0798caa81e3fa94e1907a47d706942c75a9a102ca7f24af5a5fae",
       "evidence": {
         "kind": "dual_model_topology", "artifact": "tools/timing_verdicts/v35-topology-restorations.json",
-        "summary": "Both models prefer merging the false word-6 split; the waveform is continuously voiced across its cut and free decoding is one word.",
+        "summary": "Both models prefer one word-6 occurrence; their forced starts (7,741 and 7,741 ms) corroborate the retained 7,770 ms onset, while the discarded 6,870 ms lead belongs to word 5.",
         "audioSha256": "eedfbdc758dfa5bd803b7ba7adf475e7562296de78c0995bd972501aa20032a8", "waveformVeto": false,
         "models": [{"name": "arabic-xlsr-ctc", "baselineScore": -1526.393, "candidateScore": -1486.402}, {"name": "mms-uroman-ctc", "baselineScore": -199.263, "candidateScore": -171.683}]
       }
@@ -19,10 +19,10 @@
     "Alafasy_128kbps:5:46": {
       "verdict": "accept", "kinds": ["topology"],
       "baselinePayloadHash": "cd8a371a7505e0f951bccc64521096c133b75c451a1f233a1f5382b67e964544",
-      "candidatePayloadHash": "2202c004b74463007963d1149c0d0a0e90bc34f2942d180c29fa486caa0ba859",
+      "candidatePayloadHash": "3868ef98756afc2df6b1fb9010a3a1fc4397ff4afd2dd79d802e8eec5982e931",
       "evidence": {
         "kind": "dual_model_topology", "artifact": "tools/timing_verdicts/v35-topology-restorations.json",
-        "summary": "Both models prefer merging the false word-17 split; the waveform is continuously voiced across its cut and free decoding is one word.",
+        "summary": "Both models prefer one word-17 occurrence; their forced starts (19,310 and 19,290 ms) corroborate the retained 19,350 ms onset, while the discarded 18,350 ms lead belongs to word 16.",
         "audioSha256": "bd57da8f86bc8e5f8df859be7b71f8ec6260be1aa2b691e9fd5bb8db6aa9f690", "waveformVeto": false,
         "models": [{"name": "arabic-xlsr-ctc", "baselineScore": -977.142, "candidateScore": -943.473}, {"name": "mms-uroman-ctc", "baselineScore": -136.484, "candidateScore": -119.373}]
       }
@@ -41,10 +41,10 @@
     "Alafasy_128kbps:67:22": {
       "verdict": "accept", "kinds": ["topology"],
       "baselinePayloadHash": "20f81418ccafa0468b0639eeae98228c820cdf5355cec53ff9ceb637c0435c0c",
-      "candidatePayloadHash": "32fd1308c1e745ee456c71de6d2e0f33c72b1b65e2d255c8127c0a54d354a00b",
+      "candidatePayloadHash": "85e8fc14abc9192428cd2a2d7c560f88c7b7362702985f7be6433d6df6ba5819",
       "evidence": {
         "kind": "dual_model_topology", "artifact": "tools/timing_verdicts/v35-topology-restorations.json",
-        "summary": "Both models prefer merging the false word-8 split; the waveform is continuously voiced across its cut and free decoding is one word.",
+        "summary": "Both models prefer one word-8 occurrence; their forced starts (10,845 and 10,805 ms) corroborate the retained 10,840 ms onset, while the discarded 10,070 ms lead belongs to word 7.",
         "audioSha256": "82adcf06b1fa2c26affcfd2314601054ad73fe97248382e5c3bf94d30e1cc5ab", "waveformVeto": false,
         "models": [{"name": "arabic-xlsr-ctc", "baselineScore": -269.056, "candidateScore": -227.037}, {"name": "mms-uroman-ctc", "baselineScore": -77.52, "candidateScore": -47.009}]
       }
@@ -62,20 +62,20 @@
     },
     "Abdurrahmaan_As-Sudais_192kbps:4:123": {
       "verdict": "accept", "kinds": ["added"], "baselinePayloadHash": null,
-      "candidatePayloadHash": "bd7febc697648f08e1930306b24a40c671a08c45af3ac995e44bc4a94acb4fc8",
+      "candidatePayloadHash": "bd032b76471a986ee84139c0379f0257e59c704d4646cfb66948a6869dfd852c",
       "evidence": {
         "kind": "dual_model_topology", "artifact": "tools/timing_verdicts/v35-topology-restorations.json",
-        "summary": "The recovered full-coverage row is independently force-alignable by both models; the former state withheld the entire audible ayah.",
+        "summary": "The recovered full-coverage row is independently force-alignable by both models; words 8–9 now use their dual-model Pareto starts (5,224 and 6,285 ms) rather than the earlier source boundaries.",
         "audioSha256": "5f5ec859a4f7d307521495f79e745aa29fe947bb86357833adabb6d714f7824d", "waveformVeto": false,
         "models": [{"name": "arabic-xlsr-ctc", "baselineScore": null, "candidateScore": -142.493}, {"name": "mms-uroman-ctc", "baselineScore": null, "candidateScore": -44.848}]
       }
     },
     "Abdurrahmaan_As-Sudais_192kbps:6:104": {
       "verdict": "accept", "kinds": ["added"], "baselinePayloadHash": null,
-      "candidatePayloadHash": "4f2255ad496fec24d4433845a897aa9f7dfda3d590fe0663d732bcca55af53c8",
+      "candidatePayloadHash": "036ffc16de11e44d80739ddee0b0718d27c710e91c089d0ad81b255112bb2c21",
       "evidence": {
         "kind": "dual_model_topology", "artifact": "tools/timing_verdicts/v35-topology-restorations.json",
-        "summary": "The recovered full-coverage row is independently force-alignable by both models; the former state withheld the entire audible ayah.",
+        "summary": "The recovered full-coverage row is independently force-alignable by both models; words 4–5 now use the dual-model Pareto repair (5,160 and 5,300 ms) rather than earlier source boundaries.",
         "audioSha256": "a3c39a164e1c9c4bfc2fa73eb34e30b106e06bb70f837dec11d0ad2550f033b2", "waveformVeto": false,
         "models": [{"name": "arabic-xlsr-ctc", "baselineScore": null, "candidateScore": -527.623}, {"name": "mms-uroman-ctc", "baselineScore": null, "candidateScore": -22.89}]
       }

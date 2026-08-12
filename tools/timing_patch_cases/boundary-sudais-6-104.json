@@ -1,0 +1,9 @@
+{
+  "id": "boundary-sudais-6-104",
+  "label": "Sudais 6:104 recovered words 4–5 use dual-model onsets",
+  "refs": ["Arabic XLSR fixed-sequence witness", "MMS Uroman fixed-sequence witness"],
+  "pipeline": "boundary_repair",
+  "input_segments": [[2,340,3020],[3,3020,4740],[4,4740,5230],[5,5230,6280],[6,6280,6780]],
+  "repair_segments": [[3,3020,5160],[4,5160,5300],[5,5300,6280]],
+  "expected_segments": [[2,340,3020],[3,3020,5160],[4,5160,5300],[5,5300,6280],[6,6280,6780]]
+}

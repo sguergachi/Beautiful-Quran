@@ -6,5 +6,5 @@
   "correction_position": 8,
   "requires_audio_verdict": true,
   "input_segments": [[7, 8825, 10070], [8, 10070, 10840], [8, 10840, 11540], [9, 11540, 12525]],
-  "expected_segments": [[7, 8825, 10070], [8, 10070, 11540], [9, 11540, 12525]]
+  "expected_segments": [[7, 8825, 10840], [8, 10840, 11540], [9, 11540, 12525]]
 }

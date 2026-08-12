@@ -1299,11 +1299,13 @@ def apply_one_utterance(segs, positions):
     ]
 
 
-def merge_same_position_pair(segs, position, requires_audio_verdict=False):
-    """Merge one acoustically-vetted adjacent duplicate occurrence.
+def discard_false_same_position_lead(segs, position, requires_audio_verdict=False):
+    """Discard one acoustically-vetted false lead before the real word.
 
     Equal positions can be a real re-say, so source topology alone is never
     enough. The correction file must explicitly declare its audio verdict.
+    The preceding word owns the false lead until the independently aligned
+    second onset; retaining the first onset would highlight this word early.
     """
     matches = [
         i
@@ -1312,16 +1314,21 @@ def merge_same_position_pair(segs, position, requires_audio_verdict=False):
     ]
     if len(matches) != 1:
         raise ValueError(
-            f"merge_same_position_pair expected one duplicate {position}, "
+            f"discard_false_same_position_lead expected one duplicate {position}, "
             f"found {len(matches)}"
         )
     if not requires_audio_verdict:
-        raise ValueError("merge_same_position_pair requires an audio verdict")
+        raise ValueError("discard_false_same_position_lead requires an audio verdict")
     i = matches[0]
+    if i == 0:
+        raise ValueError("false lead has no preceding word to retain its time")
+    out = [list(seg) for seg in segs]
+    real = out[i + 1]
+    out[i - 1][2] = real[1]
     return [
-        *[list(seg) for seg in segs[:i]],
-        [position, segs[i][1], segs[i + 1][2]],
-        *[list(seg) for seg in segs[i + 2 :]],
+        *out[:i],
+        real,
+        *out[i + 2 :],
     ]
 
 
@@ -1358,8 +1365,8 @@ def apply_timing_corrections(timing_rows, corrections_dir=CORRECTIONS_DIR):
                     by_key[key] = apply_one_utterance(
                         by_key[key], [int(p) for p in edit.get("positions") or []]
                     )
-                elif op == "merge_same_position_pair":
-                    by_key[key] = merge_same_position_pair(
+                elif op == "discard_false_same_position_lead":
+                    by_key[key] = discard_false_same_position_lead(
                         by_key[key],
                         int(edit["position"]),
                         bool(edit.get("requiresAudioVerdict")),
@@ -1380,7 +1387,15 @@ def apply_timing_corrections(timing_rows, corrections_dir=CORRECTIONS_DIR):
     ]
 
 
-def apply_timing_repairs(timing_rows, word_counts, clock_offsets=None, durations=None):
+def apply_timing_repairs(
+    timing_rows,
+    word_counts,
+    clock_offsets=None,
+    durations=None,
+    only_keys=None,
+    only_kinds=None,
+    skip_missing_boundary_keys=None,
+):
     """Apply auto-generated CTC-arbitrated repairs (tools/timing_repairs/*.json)
     on top of the current source rows. Structural differences and their
     immediate neighbours use the repair; matching segments retain current
@@ -1390,6 +1405,7 @@ def apply_timing_repairs(timing_rows, word_counts, clock_offsets=None, durations
     unrelated repair can still land without flattening a genuine repeat."""
     clock_offsets = clock_offsets or {}
     durations = durations or {}
+    skip_missing_boundary_keys = skip_missing_boundary_keys or set()
     slug_by_id = {r[0]: r[1] for r in RECITERS}
     by_key = {(rid, sid, ay): segs for (rid, sid, ay, segs) in timing_rows}
     files = sorted(REPAIRS_DIR.glob("*.json")) if REPAIRS_DIR.is_dir() else []
@@ -1430,6 +1446,15 @@ def apply_timing_repairs(timing_rows, word_counts, clock_offsets=None, durations
             offset = clock_offsets.get(key, 0)
             pre_raw = by_key.get(key)
             kind = edit.get("kind", "repair")
+            if only_keys is not None and key not in only_keys:
+                continue
+            if only_kinds is not None and kind not in only_kinds:
+                continue
+            # A boundary repair cannot create an absent row.  Defer it only
+            # when this row has a validated singleton-gap fallback; it is
+            # replayed immediately after that fallback is admitted below.
+            if kind == "boundary" and pre_raw is None and key in skip_missing_boundary_keys:
+                continue
             if kind == "boundary":
                 if pre_raw is None:
                     print(
@@ -2332,9 +2357,18 @@ def main():
         print("[typed corrections] applying irreducible timing verdicts")
         timing_rows = apply_timing_corrections(timing_rows)
 
+        # A boundary repair cannot create an absent row.  Defer only those
+        # impossible edits for rows that have a valid singleton-gap candidate;
+        # every repair which can complete a row still runs before the fallback.
+        row_keys = {(rid, sid, ay) for rid, sid, ay, _ in timing_rows}
+        deferred_boundary_keys = set(singleton_gap_candidates) - row_keys
         print("[repairs] applying tools/timing_repairs/*.json")
         timing_rows = apply_timing_repairs(
-            timing_rows, word_counts, timing_clock_offsets, audio_durations
+            timing_rows,
+            word_counts,
+            timing_clock_offsets,
+            audio_durations,
+            skip_missing_boundary_keys=deferred_boundary_keys,
         )
 
         print("[overrides] applying tools/timing_overrides/*.json")
@@ -2345,6 +2379,7 @@ def main():
         # A qdc singleton-gap rescue is a last resort: use it only when no
         # independently aligned or CTC-repaired row completed this ayah.
         rescued = 0
+        rescued_keys = set()
         if singleton_gap_candidates:
             recovered_rows = []
             for rid, sid, ay, segs in timing_rows:
@@ -2354,10 +2389,21 @@ def main():
                 if candidate and not _covers_all_words(current, word_counts[(sid, ay)]):
                     segs = json.dumps(candidate, separators=(",", ":"))
                     rescued += 1
+                    rescued_keys.add(key)
                 recovered_rows.append((rid, sid, ay, segs))
             timing_rows = recovered_rows
         if rescued:
             print(f"[coverage] recovered {rescued} singleton-gap qdc row(s)")
+        if rescued_keys:
+            print("[repairs] applying recovered-row boundary evidence")
+            timing_rows = apply_timing_repairs(
+                timing_rows,
+                word_counts,
+                timing_clock_offsets,
+                audio_durations,
+                only_keys=rescued_keys,
+                only_kinds={"boundary"},
+            )
 
         if audio_durations:
             timing_rows, refitted = refit_displaced_rows(

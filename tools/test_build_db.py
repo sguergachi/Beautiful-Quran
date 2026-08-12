@@ -28,6 +28,7 @@ from build_db import (  # noqa: E402
     apply_boundary_repair,
     apply_clocked_timing_repair,
     apply_one_utterance,
+    apply_timing_repairs,
     boundary_conflicts,
     clean_qdc_artifacts,
     complete_monotonic_row,
@@ -35,7 +36,7 @@ from build_db import (  # noqa: E402
     finalize_timing_rows,
     load_audio_durations,
     load_audio_onsets,
-    merge_same_position_pair,
+    discard_false_same_position_lead,
     normalize_text,
     offset_for_audio_onset,
     preserve_complete_repeat_topology,
@@ -211,7 +212,7 @@ def run_pipeline(case, segs):
     if pipeline == "timing_correction":
         position = case.get("correction_position")
         if position is not None:
-            return merge_same_position_pair(
+            return discard_false_same_position_lead(
                 segs, position, bool(case.get("requires_audio_verdict"))
             )
         positions = case.get("correction_positions")
@@ -616,6 +617,51 @@ def check_gloss_normalize():
     )
 
 
+def check_recovered_boundary_repairs():
+    """A missing row defers only its boundary repair until coverage recovers."""
+    edits = {
+        "edits": [
+            {
+                "reciterId": 1,
+                "surahId": 1,
+                "ayah": 1,
+                "kind": "boundary",
+                "segments": [[1, 0, 40], [2, 40, 100]],
+            },
+            {
+                "reciterId": 1,
+                "surahId": 1,
+                "ayah": 2,
+                "kind": "boundary",
+                "segments": [[1, 0, 40], [2, 40, 100]],
+            },
+        ]
+    }
+    source = json.dumps([[1, 0, 50], [2, 50, 100]], separators=(",", ":"))
+    with tempfile.TemporaryDirectory() as directory:
+        repairs = Path(directory)
+        (repairs / "fixture.json").write_text(json.dumps(edits), encoding="utf-8")
+        with patch("build_db.REPAIRS_DIR", repairs):
+            # A boundary repair cannot supply coverage for a missing row.
+            deferred = apply_timing_repairs(
+                [(1, 1, 2, source)],
+                {(1, 1): 2, (1, 2): 2},
+                skip_missing_boundary_keys={(1, 1, 1)},
+            )
+            # After fallback coverage, replay only the deferred row's boundary.
+            replayed = apply_timing_repairs(
+                [(1, 1, 1, source), (1, 1, 2, source)],
+                {(1, 1): 2, (1, 2): 2},
+                only_keys={(1, 1, 1)},
+                only_kinds={"boundary"},
+            )
+    return (
+        json.loads(deferred[0][3]) == [[1, 0, 40], [2, 40, 100]]
+        and json.loads(replayed[0][3]) == [[1, 0, 40], [2, 40, 100]]
+        and replayed[1][3] == source
+    )
+
+
 def check_timing_delta():
     """Fail closed unless every shipped timing delta has current evidence."""
     try:
@@ -696,12 +742,14 @@ def main():
     completion_ok = check_completion_pipeline()
     gloss_ok = check_gloss_normalize()
     database_ok = audit_bundled_db()
+    recovered_boundary_ok = check_recovered_boundary_repairs()
     timing_delta_ok, timing_delta_detail = check_timing_delta()
     print(f"  {'ok  ' if confidence_ok else 'FAIL'} weighted 2:214 confidence checks")
     print(f"  {'ok  ' if audio_onset_ok else 'FAIL'} audio evidence and onset checks")
     print(f"  {'ok  ' if completion_ok else 'FAIL'} complete fallback and physics checks")
     print(f"  {'ok  ' if gloss_ok else 'FAIL'} WBW gloss whitespace normalize")
     print(f"  {'ok  ' if database_ok else 'FAIL'} bundled timing database invariants")
+    print(f"  {'ok  ' if recovered_boundary_ok else 'FAIL'} recovered-row boundary deferral")
     print(f"  {'ok  ' if timing_delta_ok else 'FAIL'} fail-closed timing DB delta gate")
     if not confidence_ok:
         failures.append(("weighted confidence", "2:214 checks failed", None))
@@ -713,6 +761,8 @@ def main():
         failures.append(("gloss normalize", "trailing-space strip failed", None))
     if not database_ok:
         failures.append(("bundled database", "timing audit failed", None))
+    if not recovered_boundary_ok:
+        failures.append(("recovered-row boundary deferral", "repair ordering failed", None))
     if not timing_delta_ok:
         failures.append(("timing DB delta gate", timing_delta_detail, None))
     print()
@@ -724,7 +774,7 @@ def main():
                 for line in str(detail).splitlines():
                     print(f"    {line}")
         return 1
-    print(f"all {len(cases) + 6} cases pass ({CASES_DIR.relative_to(Path.cwd())})")
+    print(f"all {len(cases) + 7} cases pass ({CASES_DIR.relative_to(Path.cwd())})")
     return 0
 
 
