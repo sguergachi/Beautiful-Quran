@@ -6,8 +6,9 @@ sheet, dialog, card, tooltip, or modal layer.
 
 ## The contract
 
-The spotlighted feature is real and interactive. A guide that says “Press and
-drag this rail” must let that press open and drag the actual rail. A guide that
+The spotlighted feature is real and interactive. A guide that says “Tap this
+rail, then drag it” must let that tap open the actual rail and the following drag
+scrub it. A guide that
 says “Press and hold this ribbon” must let that hold open the actual note
 editor. The reader must not dismiss the lesson and repeat the gesture.
 
@@ -143,8 +144,8 @@ For the existing lessons, the acceptance actions are:
 
 - Bookmark note: hold the spotlighted ruby ribbon; the guide withdraws and the
   inline note editor opens focused. A short tap does not unbookmark it.
-- Ayah rail: press and drag the spotlighted collapsed rail; the guide withdraws
-  while the real scrub wheel blooms under the finger.
+- Ayah rail: tap the spotlighted collapsed rail, then drag the open wheel; the
+  guide withdraws as the wheel blooms.
 
 ## Common failures
 

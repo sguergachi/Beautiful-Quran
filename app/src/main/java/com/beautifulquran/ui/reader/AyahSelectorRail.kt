@@ -100,6 +100,10 @@ internal fun collapsedRailHitHeightDp(ayahCount: Int, padDp: Float = 24f): Float
     return max(48f, collapsedStackSpanDp(ayahCount) + padDp)
 }
 
+/** A collapsed rail opens only after a stationary tap, never an edge drag. */
+internal fun isCollapsedRailTap(maxTravelPx: Float, touchSlopPx: Float): Boolean =
+    maxTravelPx <= touchSlopPx
+
 /**
  * Ayah number → mushaf page number for ayahs that open a new page: the first
  * ayah whose page differs from the previous ayah's. The expanded wheel marks
@@ -573,6 +577,39 @@ internal fun AyahSelectorRail(
                             // Invisible chrome (recitation follow mode) must not
                             // hijack page touches into a ghost selector.
                             if (chromeAlpha() < 0.1f) return@awaitEachGesture
+                            if (!expanded) {
+                                // Do not claim an edge gesture on down: Android needs
+                                // that movement to recognize its Back swipe. The rail
+                                // opens only after an unmoved tap; its open wheel then
+                                // owns the next drag as usual.
+                                var maxTravelPx = 0f
+                                var released = false
+                                do {
+                                    val event = awaitPointerEvent()
+                                    val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                                    maxTravelPx = max(
+                                        maxTravelPx,
+                                        (change.position - down.position).getDistance(),
+                                    )
+                                    if (!isCollapsedRailTap(maxTravelPx, viewConfiguration.touchSlop)) {
+                                        return@awaitEachGesture
+                                    }
+                                    released = !change.pressed
+                                } while (!released)
+                                if (!released) return@awaitEachGesture
+
+                                lastHapticAyah = currentAyah.value.coerceIn(1, ayahCount)
+                                dialPosition = currentPosition.value.coerceIn(1f, ayahCount.toFloat())
+                                expanded = true
+                                scope.launch {
+                                    expansion.animateTo(
+                                        1f,
+                                        spring(dampingRatio = 0.85f, stiffness = 340f),
+                                    )
+                                }
+                                return@awaitEachGesture
+                            }
+
                             val tickSpacingPx = 14.dp.toPx()
                             val velocityTracker = VelocityTracker()
                             var dragged = false
@@ -581,14 +618,6 @@ internal fun AyahSelectorRail(
                             pendingCommitAyah = null
                             scope.launch { commitProgress.snapTo(0f) }
                             velocityTracker.addPosition(down.uptimeMillis, down.position)
-                            if (!expanded) {
-                                lastHapticAyah = currentAyah.value.coerceIn(1, ayahCount)
-                                dialPosition = currentPosition.value.coerceIn(1f, ayahCount.toFloat())
-                                expanded = true
-                            }
-                            scope.launch {
-                                expansion.animateTo(1f, spring(dampingRatio = 0.85f, stiffness = 340f))
-                            }
                             down.consume()
 
                             // Band the accumulated finger position once per frame;

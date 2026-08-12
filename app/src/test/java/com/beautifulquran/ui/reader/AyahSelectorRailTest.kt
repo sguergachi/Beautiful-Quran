@@ -36,6 +36,12 @@ class AyahSelectorRailTest {
     }
 
     @Test
+    fun collapsedRailOpensOnlyForATap() {
+        assertTrue(isCollapsedRailTap(maxTravelPx = 8f, touchSlopPx = 8f))
+        assertTrue(!isCollapsedRailTap(maxTravelPx = 8.1f, touchSlopPx = 8f))
+    }
+
+    @Test
     fun pageStartByAyah_marksFirstAyahOfEachPage() {
         val ayahs = listOf(
             ayah(1, page = 2), ayah(2, page = 2), ayah(3, page = 2),
