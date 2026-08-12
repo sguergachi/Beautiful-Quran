@@ -80,8 +80,10 @@ recitation with exactly this word: يُرَجِّعُ — "his voice reverberate
 > **Tuning it:** the [Tarjīʿ Lab](TARJI_LAB.md) (developer mode, word
 > long-press) captures a word's PCM, loops it, plots the waveform, the
 > measured tarjīʿ sine and a fitted ideal sine, and re-runs the detector
-> offline on every knob edit — the fastest way to see why a word's pulse
-> misses and to make it right.
+> offline on every knob edit. Its separate Ear-truth renderer lets the
+> listener author and A/B the desired onset, local pulse cadence/phase,
+> strength, trough, build, and dry-down. Exported captures therefore carry
+> both what the detector did and the exact effect it should have produced.
 
 The glint **listens for it directly**. `VoiceTapAudioProcessor` mirrors the
 player's own PCM (no mic permission, no Visualizer — which also means it

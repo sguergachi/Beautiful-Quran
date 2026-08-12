@@ -378,6 +378,10 @@ class PlayerController(private val context: Context) {
 
     fun setSpeed(speed: Float) = withController { it.setPlaybackSpeed(speed) }
 
+    /** Player-local gain; unlike device media volume this can mute a dev-lab
+     * capture without changing the listener's system setting. */
+    fun setVolume(volume: Float) = withController { it.volume = volume.coerceIn(0f, 1f) }
+
     /**
      * Stops playback and clears the queue. Invalidates every in-flight command
      * first so a [playSurah] still awaiting [MediaController] connection cannot

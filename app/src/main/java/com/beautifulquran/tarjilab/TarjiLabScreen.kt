@@ -28,6 +28,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Close
@@ -43,7 +44,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
@@ -95,7 +95,6 @@ fun TarjiLabScreen(
 ) {
     val ui by viewModel.ui.collectAsStateWithLifecycle()
     val context = LocalContext.current
-    var toolsExpanded by remember { mutableStateOf(false) }
 
     // Frame-driven playhead for the canvas + preview word: the loop is
     // hardware-looped, so the wall clock modulo the capture duration is
@@ -150,6 +149,14 @@ fun TarjiLabScreen(
             .padding(horizontal = 16.dp),
     ) {
         LabHeader(ui, onBack)
+        LabUtilities(
+            ui = ui,
+            viewModel = viewModel,
+            context = context,
+            onImport = {
+                importLauncher.launch(arrayOf("application/json", "text/*", "*/*"))
+            },
+        )
 
         if (ui.isLoading) {
             Box(
@@ -186,31 +193,34 @@ fun TarjiLabScreen(
                 )
 
                 Spacer(Modifier.height(8.dp))
-                ActionRow(
-                    ui = ui,
-                    viewModel = viewModel,
-                    toolsExpanded = toolsExpanded,
-                    onToggleTools = { toolsExpanded = !toolsExpanded },
-                )
-                if (toolsExpanded) {
-                    ToolsRow(
-                        viewModel = viewModel,
-                        context = context,
-                        onImport = {
-                            importLauncher.launch(arrayOf("application/json", "text/*", "*/*"))
-                        },
+                if (ui.capture != null) {
+                    PreviewAction(
+                        playing = ui.previewPlaying,
+                        onClick = viewModel::togglePreview,
                     )
                 }
+                EarTruthPanel(ui, viewModel)
                 if (ui.capturing) {
                     CaptureProgress(ui.captureProgress)
                 }
                 ui.captureError?.let {
-                    Spacer(Modifier.height(4.dp))
-                    Text(
-                        text = it,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.error,
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(
+                            text = it,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.weight(1f),
+                        )
+                        WordAction(
+                            label = "Retry muted",
+                            onClick = viewModel::retryCapture,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    }
                 }
                 ui.note?.let {
                     Spacer(Modifier.height(4.dp))
@@ -234,6 +244,181 @@ fun TarjiLabScreen(
         }
     }
 }
+
+/**
+ * Listener-authored ground truth. Unlike detector knobs, these marks say
+ * what the shimmer should do and therefore make an export useful as a
+ * positive or negative regression sample.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun EarTruthPanel(
+    ui: TarjiLabViewModel.TarjiLabUiState,
+    viewModel: TarjiLabViewModel,
+) {
+    val expectation = ui.expectation
+    val comparison = ui.trace?.let { compareTarjiExpectation(expectation, it) }
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 6.dp),
+    ) {
+        Text(
+            text = "Ear truth",
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurface,
+            fontWeight = FontWeight.Medium,
+        )
+        Text(
+            text = expectationSummary(expectation),
+            style = MaterialTheme.typography.labelSmall,
+            color = if (expectation.kind == TarjiExpectationKind.UNLABELED) {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            } else {
+                MaterialTheme.colorScheme.primary
+            },
+        )
+        comparisonSummary(expectation, comparison)?.let { summary ->
+            Text(
+                text = summary,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        if (ui.capture != null) {
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(14.dp),
+                verticalArrangement = Arrangement.spacedBy(0.dp),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                WordAction("Mark start", viewModel::markExpectedStart, MaterialTheme.colorScheme.primary)
+                WordAction("+ Bright crest", viewModel::addExpectedCrest, MaterialTheme.colorScheme.primary)
+                WordAction("Mark end", viewModel::markExpectedEnd, MaterialTheme.colorScheme.primary)
+                WordAction("No shimmer", viewModel::expectNoShimmer, MaterialTheme.colorScheme.onSurfaceVariant)
+                if (expectation.crestMs.isNotEmpty()) {
+                    WordAction(
+                        "Remove latest crest",
+                        viewModel::removeLastExpectedCrest,
+                        MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                if (expectation.kind != TarjiExpectationKind.UNLABELED) {
+                    WordAction(
+                        "Clear labels",
+                        viewModel::clearExpectation,
+                        MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                if (expectation.canPreview) {
+                    WordAction(
+                        if (ui.previewingTarget) "Preview detector" else "Preview my target",
+                        viewModel::toggleTargetPreview,
+                        MaterialTheme.colorScheme.primary,
+                    )
+                }
+            }
+            BasicTextField(
+                value = ui.sampleNotes,
+                onValueChange = viewModel::updateSampleNotes,
+                textStyle = MaterialTheme.typography.bodySmall.copy(
+                    color = MaterialTheme.colorScheme.onSurface,
+                ),
+                maxLines = 3,
+                decorationBox = { field ->
+                    Box(Modifier.padding(vertical = 4.dp)) {
+                        if (ui.sampleNotes.isEmpty()) {
+                            Text(
+                                text = "Listening note (optional)",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f),
+                            )
+                        }
+                        field()
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+            )
+            if (
+                expectation.kind == TarjiExpectationKind.PULSES &&
+                expectation.startMs != null && expectation.endMs != null &&
+                expectation.crestMs.isNotEmpty()
+            ) {
+                LabSlider(
+                    "Target rate Hz",
+                    expectation.rateHz ?: ui.trace?.meanRateHz?.takeIf { it > 0f } ?: 5f,
+                    1.5f..10f,
+                    decimals = 2,
+                    onChange = viewModel::setExpectedRate,
+                )
+            }
+            if (expectation.kind == TarjiExpectationKind.PULSES) {
+                Text(
+                    text = if (expectation.canPreview) {
+                        "Target appearance · ${if (ui.previewingTarget) "showing mine" else "showing detector"}"
+                    } else {
+                        "Mark start, at least two crests, and end to preview your shimmer."
+                    },
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                LabSlider("Target depth", expectation.style.depth, 0f..1f) { value ->
+                    viewModel.updateTargetStyle { it.copy(depth = value) }
+                }
+                LabSlider("Trough light", expectation.style.troughFloor, 0f..1f) { value ->
+                    viewModel.updateTargetStyle { it.copy(troughFloor = value) }
+                }
+                LabSlider("Build ms", expectation.style.buildMs, 0f..1_500f) { value ->
+                    viewModel.updateTargetStyle { it.copy(buildMs = value) }
+                }
+                LabSlider("Dry ms", expectation.style.dryMs, 0f..500f) { value ->
+                    viewModel.updateTargetStyle { it.copy(dryMs = value) }
+                }
+            }
+        } else {
+            Text(
+                text = "Capture a word, then mark onset, each brightness crest, and the end.",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f),
+            )
+        }
+    }
+}
+
+private fun expectationSummary(expectation: TarjiLabExpectation): String = when (expectation.kind) {
+    TarjiExpectationKind.UNLABELED -> "Unlabeled — the detector has no ear reference yet."
+    TarjiExpectationKind.NO_SHIMMER -> "Expected: no shimmer on this word."
+    TarjiExpectationKind.PULSES -> buildList {
+        expectation.startMs?.let { add("start ${formatScrubTime(it)}") }
+        add("${expectation.crestMs.size} bright crests")
+        expectation.endMs?.let { add("end ${formatScrubTime(it)}") }
+        expectation.rateHz?.let { add("${"%.2f".format(it)} Hz") }
+    }.joinToString(" · ")
+}
+
+private fun comparisonSummary(
+    expectation: TarjiLabExpectation,
+    comparison: TarjiExpectationComparison?,
+): String? {
+    if (comparison == null || expectation.kind == TarjiExpectationKind.UNLABELED) return null
+    if (expectation.kind == TarjiExpectationKind.NO_SHIMMER) {
+        return if (comparison.detectedStartMs == null) {
+            "Detector agrees: still gold."
+        } else {
+            "Detector disagrees: shimmer from ${formatScrubTime(comparison.detectedStartMs)}."
+        }
+    }
+    val parts = buildList {
+        comparison.detectedRateHz?.let { add("detector ${"%.2f".format(it)} Hz") }
+        comparison.startErrorMs?.let { add("onset ${formatSignedMs(it)}") }
+        comparison.endErrorMs?.let { add("end ${formatSignedMs(it)}") }
+        comparison.meanCrestErrorMs?.let { add("crest ±${it.roundToInt()} ms") }
+    }
+    return parts.takeIf { it.isNotEmpty() }?.joinToString(" · ")
+        ?: "Detector finds no shimmer yet."
+}
+
+private fun formatSignedMs(ms: Float): String =
+    "${if (ms >= 0f) "+" else "−"}${abs(ms).roundToInt()} ms"
 
 @Composable
 private fun LabHeader(
@@ -319,72 +504,34 @@ private fun WordRow(
     }
 }
 
+/** Quiet sample utilities live by the header, away from loop transport. */
 @Composable
-private fun ActionRow(
+private fun LabUtilities(
     ui: TarjiLabViewModel.TarjiLabUiState,
-    viewModel: TarjiLabViewModel,
-    toolsExpanded: Boolean,
-    onToggleTools: () -> Unit,
-) {
-    FlowRow(
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalArrangement = Arrangement.spacedBy(2.dp),
-        maxItemsInEachRow = 3,
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        WordAction(
-            label = if (ui.capturing) "Cancel capture" else "Capture word",
-            onClick = viewModel::captureWord,
-            color = if (ui.capturing) {
-                MaterialTheme.colorScheme.error
-            } else {
-                MaterialTheme.colorScheme.primary
-            },
-        )
-        PreviewAction(
-            playing = ui.previewPlaying,
-            onClick = viewModel::togglePreview,
-        )
-        WordAction(
-            label = "Tools",
-            onClick = onToggleTools,
-            color = if (toolsExpanded) {
-                MaterialTheme.colorScheme.primary
-            } else {
-                MaterialTheme.colorScheme.onSurfaceVariant
-            },
-        )
-    }
-}
-
-@Composable
-private fun ToolsRow(
     viewModel: TarjiLabViewModel,
     context: android.content.Context,
     onImport: () -> Unit,
 ) {
-    FlowRow(
-        horizontalArrangement = Arrangement.spacedBy(16.dp),
-        verticalArrangement = Arrangement.spacedBy(2.dp),
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(14.dp, Alignment.End),
+        verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .fillMaxWidth()
-            .padding(top = 2.dp),
+            .padding(top = 1.dp, bottom = 2.dp),
     ) {
-        WordAction(
-            label = "Reset knobs",
-            onClick = viewModel::resetKnobs,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        WordAction(
-            label = "Export",
-            onClick = { viewModel.exportSample(context) },
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
         WordAction(
             label = "Import",
             onClick = onImport,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+        if (ui.capture != null) {
+            WordAction(
+                label = "Export",
+                onClick = { viewModel.exportSample(context) },
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        WordAction("Reset", viewModel::resetKnobs, MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
@@ -402,12 +549,12 @@ private fun CaptureProgress(progress: Float) {
             modifier = Modifier.fillMaxWidth(),
         ) {
             Text(
-                text = "Capturing ${(progress.coerceIn(0f, 1f) * 100f).roundToInt()}%",
+                text = "Muted capture ${(progress.coerceIn(0f, 1f) * 100f).roundToInt()}%",
                 style = MaterialTheme.typography.labelSmall,
                 color = active,
             )
             Text(
-                text = "Tap Cancel capture to stop",
+                text = "automatic",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -498,12 +645,23 @@ private fun PreviewWord(
     ) {
         val trace = ui.trace
         if (trace != null && playheadMs >= 0f) {
-            val point = tracePointAt(trace, playheadMs)
-            val resonance = InkEngine.glintResonance(
-                holding = point.reverberating,
-                tremolo = point.tremolo,
-                tremoloGain = point.gain,
-            )
+            val resonance = if (ui.previewingTarget) {
+                val point = targetTarjiPointAt(ui.expectation, playheadMs)
+                InkEngine.glintResonance(
+                    holding = point.holding,
+                    tremolo = point.tremolo,
+                    tremoloGain = point.gain,
+                    depth = ui.expectation.style.depth,
+                    troughFloor = ui.expectation.style.troughFloor,
+                )
+            } else {
+                val point = tracePointAt(trace, playheadMs)
+                InkEngine.glintResonance(
+                    holding = point.reverberating,
+                    tremolo = point.tremolo,
+                    tremoloGain = point.gain,
+                )
+            }
             Canvas(Modifier.fillMaxSize()) {
                 val glow = 0.22f * resonance.layerMult + 0.9f * resonance.peak
                 if (glow > 0.01f) {
@@ -545,6 +703,7 @@ private fun WaveformPanel(
     val fit = ui.sineFit
     val waveColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f)
     val envColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)
+    val expectedColor = MaterialTheme.colorScheme.primary
     val guideColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
     val guideText = if (capture == null) {
         "No capture yet — Capture word plays it once, then loops."
@@ -567,12 +726,15 @@ private fun WaveformPanel(
                 .pointerInput(durationMs) {
                     if (durationMs <= 0f) return@pointerInput
                     awaitEachGesture {
+                        val down = awaitFirstDown(
+                            requireUnconsumed = false,
+                            pass = PointerEventPass.Initial,
+                        )
+                        // Scrub owns the playhead only after a real press.
+                        // Claiming it before awaitFirstDown pins the cursor
+                        // throughout idle time, even after Play is pressed.
                         onScrubStart()
                         try {
-                            val down = awaitFirstDown(
-                                requireUnconsumed = false,
-                                pass = PointerEventPass.Initial,
-                            )
                             fun seek(x: Float) {
                                 onScrub((x / size.width * durationMs).coerceIn(0f, durationMs))
                             }
@@ -598,6 +760,42 @@ private fun WaveformPanel(
             val sineColor = GlintGold.copy(alpha = 0.95f)
             val fitColor = Color.White.copy(alpha = 0.55f)
             val revColor = GlintGold.copy(alpha = 0.10f)
+
+            // Ear-truth overlay: a quiet span with exact onset/end lines and
+            // a short stroke at every desired brightness crest.
+            val expectation = ui.expectation
+            if (expectation.kind == TarjiExpectationKind.PULSES) {
+                val start = expectation.startMs
+                val end = expectation.endMs
+                if (start != null && end != null && end > start) {
+                    val left = start / durationMs * size.width
+                    val right = end / durationMs * size.width
+                    drawRect(
+                        expectedColor.copy(alpha = 0.08f),
+                        topLeft = Offset(left, 0f),
+                        size = androidx.compose.ui.geometry.Size(right - left, size.height),
+                    )
+                }
+                for (edge in listOfNotNull(start, end)) {
+                    val x = edge / durationMs * size.width
+                    drawLine(
+                        expectedColor.copy(alpha = 0.75f),
+                        Offset(x, 0f),
+                        Offset(x, size.height),
+                        strokeWidth = 1.5f,
+                    )
+                }
+                for (crest in expectation.crestMs) {
+                    val x = crest / durationMs * size.width
+                    drawLine(
+                        expectedColor,
+                        Offset(x, 0f),
+                        Offset(x, 14f),
+                        strokeWidth = 3f,
+                        cap = StrokeCap.Round,
+                    )
+                }
+            }
 
             // Reverberating band behind everything.
             trace.reverberatingSpan?.let { span ->
@@ -646,6 +844,7 @@ private fun WaveformPanel(
             fit?.let { f ->
                 drawFittedSine(f, fitColor, trace)
             }
+            drawTargetSine(ui.expectation, expectedColor, durationMs)
 
             // Word span bracket (capture lead → lead + word duration). Only
             // for live captures whose first hop has a media anchor.
@@ -672,39 +871,92 @@ private fun WaveformPanel(
                 )
             }
         }
-        Row(
-            horizontalArrangement = Arrangement.SpaceBetween,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 2.dp),
-        ) {
-            val label = if (capture != null) {
-                val rate = ui.sineFit?.let { "${"%.1f".format(it.rateHz)} Hz" } ?: "—"
-                "captured ${"%.1f".format(durationMs / 1000f)}s · hop ${"%.1f".format(trace?.hopDurationMs)}ms · fit $rate"
+        EvidenceReadout(ui, trace, playheadMs, durationMs)
+    }
+}
+
+@Composable
+private fun EvidenceReadout(
+    ui: TarjiLabViewModel.TarjiLabUiState,
+    trace: TarjiLabTrace?,
+    playheadMs: Float,
+    durationMs: Float,
+) {
+    val quiet = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.78f)
+    val point = trace?.let { tracePointAt(it, playheadMs.coerceAtLeast(0f)) }
+    Row(
+        horizontalArrangement = Arrangement.SpaceBetween,
+        modifier = Modifier.fillMaxWidth().padding(top = 3.dp),
+    ) {
+        Text(
+            text = if (durationMs > 0f) {
+                "${formatScrubTime(playheadMs.coerceIn(0f, durationMs))} / ${formatScrubTime(durationMs)}"
             } else {
-                "waveform · tarjīʿ sine"
-            }
-            Text(
-                text = label,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
-            )
-            if (capture != null && durationMs > 0f) {
-                Text(
-                    text = "${formatScrubTime(playheadMs.coerceIn(0f, durationMs))} / " +
-                        formatScrubTime(durationMs),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
-                )
-            }
-            if (ui.analyzing) {
-                Text(
-                    text = "analyzing…",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.primary,
-                )
-            }
-        }
+                "AUTOMATIC MUTED CAPTURE"
+            },
+            style = MaterialTheme.typography.labelSmall,
+            color = quiet,
+        )
+        Text(
+            text = when {
+                ui.analyzing -> "ANALYZING…"
+                trace != null -> {
+                    val fit = ui.sineFit?.let { "%.1f Hz".format(it.rateHz) } ?: "—"
+                    "FIT $fit  ·  HOP ${trace.hopDurationMs.roundToInt()} ms"
+                }
+                else -> "WAVEFORM · TARJĪʿ"
+            },
+            style = MaterialTheme.typography.labelSmall,
+            color = if (ui.analyzing) MaterialTheme.colorScheme.primary else quiet,
+        )
+    }
+    if (trace != null) {
+        EvidenceHeader()
+        EvidenceLane(
+            label = "LOUDNESS",
+            rateHz = point?.amplitudeRateHz ?: 0f,
+            depth = point?.amplitudeDepth ?: 0f,
+            coherence = point?.amplitudePeriodicity ?: 0f,
+            active = point?.reverberating == true && point.visualUsesAmplitude,
+        )
+        EvidenceLane(
+            label = "PITCH",
+            rateHz = point?.pitchModulationRateHz ?: 0f,
+            depth = point?.pitchModulationDepth ?: 0f,
+            coherence = point?.pitchModulationPeriodicity ?: 0f,
+            active = point?.reverberating == true && !point.visualUsesAmplitude,
+        )
+    }
+}
+
+@Composable
+private fun EvidenceHeader() {
+    val color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.48f)
+    Row(Modifier.fillMaxWidth().padding(top = 2.dp)) {
+        Text("", modifier = Modifier.weight(1.45f))
+        Text("RATE", style = MaterialTheme.typography.labelSmall, color = color, modifier = Modifier.weight(1f))
+        Text("DEPTH", style = MaterialTheme.typography.labelSmall, color = color, modifier = Modifier.weight(1f))
+        Text("COHERENCE", style = MaterialTheme.typography.labelSmall, color = color, modifier = Modifier.weight(1.25f))
+    }
+}
+
+@Composable
+private fun EvidenceLane(
+    label: String,
+    rateHz: Float,
+    depth: Float,
+    coherence: Float,
+    active: Boolean,
+) {
+    val color = if (active) MaterialTheme.colorScheme.primary
+    else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.78f)
+    fun value(value: Float, suffix: String = ""): String =
+        if (value > 0f) "%.2f%s".format(value, suffix) else "—"
+    Row(Modifier.fillMaxWidth()) {
+        Text(label, style = MaterialTheme.typography.labelSmall, color = color, modifier = Modifier.weight(1.45f))
+        Text(if (rateHz > 0f) "%.1f Hz".format(rateHz) else "—", style = MaterialTheme.typography.labelSmall, color = color, modifier = Modifier.weight(1f))
+        Text(value(depth), style = MaterialTheme.typography.labelSmall, color = color, modifier = Modifier.weight(1f))
+        Text(value(coherence), style = MaterialTheme.typography.labelSmall, color = color, modifier = Modifier.weight(1.25f))
     }
 }
 
@@ -756,6 +1008,32 @@ private fun DrawScope.drawFittedSine(
         last = point
         dash = !dash
         x += 3f
+    }
+}
+
+/** Listener-authored target pulse, including build and dry-down. */
+private fun DrawScope.drawTargetSine(
+    expectation: TarjiLabExpectation,
+    color: Color,
+    durationMs: Float,
+) {
+    if (!expectation.canPreview || expectation.kind != TarjiExpectationKind.PULSES) return
+    val mid = size.height * 0.5f
+    val amp = size.height * 0.30f
+    var previous: Offset? = null
+    var x = 0f
+    while (x <= size.width) {
+        val point = targetTarjiPointAt(expectation, x / size.width * durationMs)
+        if (point.holding) {
+            val next = Offset(x, mid - point.tremolo * point.gain * amp)
+            previous?.let {
+                drawLine(color.copy(alpha = 0.9f), it, next, strokeWidth = 2f)
+            }
+            previous = next
+        } else {
+            previous = null
+        }
+        x += 2f
     }
 }
 
@@ -821,6 +1099,7 @@ private fun LabSlider(
     label: String,
     value: Float,
     range: ClosedFloatingPointRange<Float>,
+    decimals: Int? = null,
     onChange: (Float) -> Unit,
 ) {
     Row(
@@ -845,8 +1124,11 @@ private fun LabSlider(
             modifier = Modifier.weight(1f),
         )
         Text(
-            text = if (range.endInclusive - range.start <= 1f) "%.2f".format(value)
-            else value.roundToInt().toString(),
+            text = when (decimals ?: if (range.endInclusive - range.start <= 1f) 2 else 0) {
+                0 -> value.roundToInt().toString()
+                1 -> "%.1f".format(value)
+                else -> "%.2f".format(value)
+            },
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.width(44.dp),

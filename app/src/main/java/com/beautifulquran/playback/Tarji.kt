@@ -68,6 +68,22 @@ class Tarji {
     var lastRateHz = 0f
         private set
 
+    /** Per-channel modulation evidence for the Tarjīʿ Lab. Read-only; these
+     * values do not participate in rendering or detector decisions. */
+    var lastAmplitudeRateHz = 0f
+        private set
+    var lastPitchModulationRateHz = 0f
+        private set
+    var lastAmplitudeDepth = 0f
+        private set
+    var lastPitchModulationDepth = 0f
+        private set
+    var lastAmplitudePeriodicity = 0f
+        private set
+    var lastPitchModulationPeriodicity = 0f
+        private set
+    val lastVisualUsesAmplitude: Boolean get() = visualUsesAmplitude
+
     /**
      * Read-out delay in content hops, set from the tap-to-ear latency
      * (wall-time route × playback speed + content-time tap backlog + the
@@ -270,6 +286,7 @@ class Tarji {
         eventRateHz = 0f
         levelTransitionGrace = 0
         eventHops = 0
+        clearModulationDiagnostics()
         trackedLag = 0
         trackedPitchLag = 0
         visualUsesAmplitude = false
@@ -399,6 +416,7 @@ class Tarji {
         val n = minOf(envCount - holdStartEnvCount, ENV_HOPS)
         if (n < MIN_ENV_HOPS) {
             reverberating = false
+            clearModulationDiagnostics()
             return
         }
         val start = envCount - n
@@ -431,9 +449,15 @@ class Tarji {
             result = amScan,
         )
         trackedLag = amScan.trackedLag
+        lastAmplitudeRateHz = amScan.rateHz
+        lastAmplitudeDepth = amScan.depth
+        lastAmplitudePeriodicity = amScan.periodicityScore
         if (!amScan.valid) {
             reverberating = false
             endOfHold = true
+            lastPitchModulationRateHz = 0f
+            lastPitchModulationDepth = 0f
+            lastPitchModulationPeriodicity = 0f
             return
         }
         val latestPitch = pitchEnv[(start + n - 1) % ENV_HOPS]
@@ -461,6 +485,9 @@ class Tarji {
             result = fmScan,
         )
         trackedPitchLag = fmScan.trackedLag
+        lastPitchModulationRateHz = fmScan.rateHz
+        lastPitchModulationDepth = fmScan.depth
+        lastPitchModulationPeriodicity = fmScan.periodicityScore
         val amOpen = amScan.depth >= depthGate && amScan.periodic
         val amKeep = amScan.depth >= depthGate * DEPTH_OFF_RATIO && amScan.stillPeriodic
         val fmOpen = fmScan.depth >= MIN_PITCH_DEPTH && fmScan.periodic
@@ -579,6 +606,7 @@ class Tarji {
         var periodic = false
         var stillPeriodic = false
         var levelBalance = 0f
+        var periodicityScore = 0f
         var trackedLag = 0
 
         fun clear() {
@@ -591,6 +619,7 @@ class Tarji {
             periodic = false
             stillPeriodic = false
             levelBalance = 0f
+            periodicityScore = 0f
             trackedLag = 0
         }
     }
@@ -782,7 +811,17 @@ class Tarji {
         result.periodic = coherent || deep
         result.stillPeriodic = stillPeriodic
         result.levelBalance = levelBalance
+        result.periodicityScore = bandBestC
         result.trackedLag = trackedLag
+    }
+
+    private fun clearModulationDiagnostics() {
+        lastAmplitudeRateHz = 0f
+        lastPitchModulationRateHz = 0f
+        lastAmplitudeDepth = 0f
+        lastPitchModulationDepth = 0f
+        lastAmplitudePeriodicity = 0f
+        lastPitchModulationPeriodicity = 0f
     }
 
     /** Octave-folded pitch match: autocorrelation flips freely between a

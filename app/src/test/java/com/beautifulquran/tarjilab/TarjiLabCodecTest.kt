@@ -5,6 +5,10 @@ import com.beautifulquran.playback.TarjiLabCapture
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.sin
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.jsonObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
@@ -35,6 +39,14 @@ class TarjiLabCodecTest {
     fun `sample round-trips through JSON`() {
         val capture = captureOf(note(1.0f))
         val knobs = TarjiLabKnobs(maxTremoloHz = 4f, minTremoloDepth = 0.05f, holdMinMs = 450f)
+        val expectation = TarjiLabExpectation(
+            kind = TarjiExpectationKind.PULSES,
+            startMs = 320f,
+            endMs = 860f,
+            crestMs = listOf(400f, 600f, 800f),
+            phaseAnchorMs = 600f,
+            style = TarjiTargetStyle(depth = 0.8f, troughFloor = 0.15f, buildMs = 700f),
+        )
         val sample = TarjiLabCodec.buildSample(
             capture = capture,
             firstHopMediaMs = 12345.6,
@@ -46,11 +58,13 @@ class TarjiLabCodecTest {
             wordPosition = 1,
             wordArabic = "نَعْبُدُ",
             knobs = knobs,
+            expectation = expectation,
             notes = "slow swell at the waqf",
         )
         val json = TarjiLabCodec.encode(sample)
         assertTrue(json.contains("نَعْبُدُ"))
         assertTrue(json.contains("slow swell at the waqf"))
+        assertTrue(json.contains("PULSES"))
 
         val decoded = TarjiLabCodec.decode(json)
         assertEquals(sample, decoded)
@@ -65,6 +79,12 @@ class TarjiLabCodecTest {
             )
         }
         assertEquals(20f, restored.hopContentDurationMs(), 1e-4f)
+
+        val legacyFields = Json.parseToJsonElement(json).jsonObject.toMutableMap()
+        legacyFields["schema"] = JsonPrimitive(1)
+        legacyFields.remove("expectation")
+        val legacy = TarjiLabCodec.decode(JsonObject(legacyFields).toString())
+        assertEquals(TarjiExpectationKind.UNLABELED, legacy.expectation.kind)
     }
 
     @Test

@@ -83,6 +83,13 @@ class TarjiLabTrace internal constructor(
     val rateHz: FloatArray,
     val pitchHz: FloatArray,
     val holdMs: FloatArray,
+    val amplitudeRateHz: FloatArray = FloatArray(hopCount),
+    val pitchModulationRateHz: FloatArray = FloatArray(hopCount),
+    val amplitudeDepth: FloatArray = FloatArray(hopCount),
+    val pitchModulationDepth: FloatArray = FloatArray(hopCount),
+    val amplitudePeriodicity: FloatArray = FloatArray(hopCount),
+    val pitchModulationPeriodicity: FloatArray = FloatArray(hopCount),
+    val visualUsesAmplitude: BooleanArray = BooleanArray(hopCount),
 ) {
     /** The closed span of hops where the detector held a reverberation. */
     val reverberatingSpan: IntRange?
@@ -138,6 +145,13 @@ fun analyzeTarjiCapture(
     val rate = FloatArray(n)
     val pitch = FloatArray(n)
     val hold = FloatArray(n)
+    val amRate = FloatArray(n)
+    val fmRate = FloatArray(n)
+    val amDepth = FloatArray(n)
+    val fmDepth = FloatArray(n)
+    val amPeriodicity = FloatArray(n)
+    val fmPeriodicity = FloatArray(n)
+    val usesAmplitude = BooleanArray(n)
     var resolved = -1
     for (i in 0 until n) {
         System.arraycopy(capture.pcm, i * capture.hopSamples, scratch, 0, capture.hopSamples)
@@ -153,6 +167,13 @@ fun analyzeTarjiCapture(
         rate[i] = detector.lastRateHz
         pitch[i] = detector.lastPitchHz
         hold[i] = detector.holdMs
+        amRate[i] = detector.lastAmplitudeRateHz
+        fmRate[i] = detector.lastPitchModulationRateHz
+        amDepth[i] = detector.lastAmplitudeDepth
+        fmDepth[i] = detector.lastPitchModulationDepth
+        amPeriodicity[i] = detector.lastAmplitudePeriodicity
+        fmPeriodicity[i] = detector.lastPitchModulationPeriodicity
+        usesAmplitude[i] = detector.lastVisualUsesAmplitude
     }
     if (resolved < 0) resolved = DETECTOR_FRAME_HOPS - 1
     return TarjiLabTrace(
@@ -166,6 +187,13 @@ fun analyzeTarjiCapture(
         rateHz = rate,
         pitchHz = pitch,
         holdMs = hold,
+        amplitudeRateHz = amRate,
+        pitchModulationRateHz = fmRate,
+        amplitudeDepth = amDepth,
+        pitchModulationDepth = fmDepth,
+        amplitudePeriodicity = amPeriodicity,
+        pitchModulationPeriodicity = fmPeriodicity,
+        visualUsesAmplitude = usesAmplitude,
     )
 }
 
@@ -185,12 +213,19 @@ class TarjiLabPoint(
     val gain: Float,
     val reverberating: Boolean,
     val rateHz: Float,
+    val amplitudeRateHz: Float,
+    val pitchModulationRateHz: Float,
+    val amplitudeDepth: Float,
+    val pitchModulationDepth: Float,
+    val amplitudePeriodicity: Float,
+    val pitchModulationPeriodicity: Float,
+    val visualUsesAmplitude: Boolean,
 )
 
 fun tracePointAt(trace: TarjiLabTrace, ms: Float): TarjiLabPoint {
     val first = trace.firstAnalysisHop
     val last = trace.hopCount - 1
-    if (last < first) return TarjiLabPoint(0f, 0f, false, 0f)
+    if (last < first) return TarjiLabPoint(0f, 0f, false, 0f, 0f, 0f, 0f, 0f, 0f, 0f, false)
     val hopDuration = trace.hopDurationMs
     var f = (ms / hopDuration) - 0.5f
     if (f < first) f = first.toFloat()
@@ -205,6 +240,13 @@ fun tracePointAt(trace: TarjiLabTrace, ms: Float): TarjiLabPoint {
         gain = lerp(trace.gain, before, after),
         reverberating = rev,
         rateHz = trace.rateHz[after].takeIf { rev } ?: 0f,
+        amplitudeRateHz = lerp(trace.amplitudeRateHz, before, after),
+        pitchModulationRateHz = lerp(trace.pitchModulationRateHz, before, after),
+        amplitudeDepth = lerp(trace.amplitudeDepth, before, after),
+        pitchModulationDepth = lerp(trace.pitchModulationDepth, before, after),
+        amplitudePeriodicity = lerp(trace.amplitudePeriodicity, before, after),
+        pitchModulationPeriodicity = lerp(trace.pitchModulationPeriodicity, before, after),
+        visualUsesAmplitude = trace.visualUsesAmplitude[after],
     )
 }
 
