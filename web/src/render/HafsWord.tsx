@@ -336,6 +336,8 @@ export function HafsWord({
       onContextMenu={onContextMenu}
       role="button"
       tabIndex={0}
+      lang="ar"
+      translate="no"
     >
       <span className="hafs-shell">
         <span className="word-ink-slot">

@@ -37,6 +37,7 @@ matrix, testing commands, current platform limits, and full-support checklist.
 ./gradlew assembleDebug       # Android; copies data/quran.db into generated assets
 npm --prefix web ci
 npm --prefix web run build    # Web; copies the same database into dist
+npm --prefix backend test     # Transitional QDC cache service
 ```
 
 ### Send a debug APK to your phone (KDE Connect)
@@ -180,6 +181,7 @@ If host Vulkan is broken on your machine, you can still fall back with
 - [docs/ROOT_VIEWER.md](docs/ROOT_VIEWER.md) — hold-to-reveal root lexicon: counts, ayah concordance, jump-to-chapter
 - [docs/TIMINGS_LAB.md](docs/TIMINGS_LAB.md) — in-app timing editor (developer mode)
 - [docs/QF_CONTENT_SYNC.md](docs/QF_CONTENT_SYNC.md) — authenticated Quran Foundation Content API migration and offline-sync gate
+- [backend/README.md](backend/README.md) — transitional legacy QDC cache, deployment controls, and authenticated migration seam
 
 ## Data & attribution
 
@@ -189,6 +191,6 @@ If host Vulkan is broken on your machine, you can still fall back with
 | Word-by-word gloss + transliteration | Quran.com dataset via npm | free with attribution |
 | Root / lemma / morphology | [Quranic Arabic Corpus](http://corpus.quran.com) v0.4 | free with attribution + link |
 | Word timing segments | [cpfair/quran-align](https://github.com/cpfair/quran-align) | CC-BY 4.0 |
-| Repeat-aware timing segments | [quran.com](https://quran.com) `qdc` audio API | free with attribution |
+| Repeat-aware timing segments | [quran.com](https://quran.com) legacy `qdc` audio API | no QDC-specific redistribution license located; migration/permission pending |
 | Recitation audio | [everyayah.com](https://everyayah.com) | free; rights remain with reciters |
 | Arabic typeface | KFGQPC HAFS Uthmanic Script, King Fahd Complex | free redistribution |

@@ -28,6 +28,7 @@ from difflib import SequenceMatcher
 import hashlib
 import io
 import json
+import os
 import re
 import sqlite3
 import sys
@@ -118,9 +119,12 @@ BASMALAH_WORDS = 4  # words in bismillah, prefixed to audio of every first ayah
 # from quran.com instead. The audio is the same everyayah recording we stream, so
 # the per-verse windows line up; we rebase each verse's gapless-file offsets to
 # ayah-relative ms. Map: our reciter id -> quran.com recitation id.
+QDC_CACHE_BASE_URL = os.environ.get("BQ_QDC_CACHE_BASE_URL", "").rstrip("/")
 QDC_URL = (
-    "https://api.quran.com/api/qdc/audio/reciters/{rid}"
-    "/audio_files?chapter_number={ch}&segments=true"
+    f"{QDC_CACHE_BASE_URL}/v1/legacy-qdc/recitations/{{rid}}/chapters/{{ch}}/audio-files"
+    if QDC_CACHE_BASE_URL
+    else "https://api.quran.com/api/qdc/audio/reciters/{rid}"
+         "/audio_files?chapter_number={ch}&segments=true"
 )
 QDC_REPEAT_RECITERS = {
     1: 7,  # Mishary Alafasy (murattal)

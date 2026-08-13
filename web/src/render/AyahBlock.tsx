@@ -123,7 +123,7 @@ function AyahBlockInner({
       />
 
       {arabicOnly ? (
-        <p className="hafs-ayah" dir="rtl">
+        <p className="hafs-ayah" lang="ar" dir="rtl" translate="no">
           {words.map((w, index) => {
             const ink = inks[index]!
             const isActive = ink.state === InkState.Active

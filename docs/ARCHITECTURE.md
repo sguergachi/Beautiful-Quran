@@ -31,10 +31,11 @@ app (runtime)                                           ▼
 
 ## Principles
 
-1. **Offline-first, no backend.** All text, translations, and word timings ship
-   inside the APK. Only recitation audio streams (and is cached, 1 GB LRU).
-   No accounts, no analytics, no API keys — the app works in airplane mode
-   once audio is cached.
+1. **Offline-first reader.** The released reader still has no accounts,
+   analytics, or API keys and works in airplane mode once audio is cached. A
+   separate transitional backend now exists only to bound and cache legacy QDC
+   timing fetches; it is not yet connected to the released clients. After QF
+   approval it becomes the server-side credential and Content Sync boundary.
 2. **The data pipeline is a build step, not app code.** Everything fragile
    about data (three sources with different word segmentations, a corrupt file
    in an upstream release, basmalah offsets) is resolved *once*, at build
@@ -53,6 +54,24 @@ app (runtime)                                           ▼
 > local database an updatable cache, perform and apply a sync at least every
 > seven days, and keep credentials out of client builds. The required migration
 > gates live in [QF_CONTENT_SYNC.md](QF_CONTENT_SYNC.md).
+
+### Transitional backend boundary
+
+```text
+Android / web (not wired yet)
+       │ conditional GET; no account or user data
+       ▼
+Beautiful Quran cache service ── private 6-day cache / 7-day hard expiry
+       │ fixed allowlisted path only
+       ▼
+legacy unauthenticated QDC endpoint
+```
+
+The service is dependency-free Node, accepts no arbitrary upstream URL, stores
+no client identifier, serializes upstream requests, writes cache files
+atomically, and exposes a secret-protected purge operation. See
+[`backend/README.md`](../backend/README.md). This is a transitional engineering
+control, not evidence of QF permission for the legacy endpoint.
 
 ## The data pipeline (`tools/build_db.py`)
 
