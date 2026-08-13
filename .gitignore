@@ -14,6 +14,7 @@ web/public/quran.db
 web/public/lexicon.db
 web/public/dictionary.db
 web/public/search_concepts.json
+backend/.cache/
 _site/
 
 # Source data cache for tools/build_db.py. The built database is committed

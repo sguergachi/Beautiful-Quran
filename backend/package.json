@@ -1,0 +1,12 @@
+{
+  "name": "beautiful-quran-content-cache",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "node src/server.mjs",
+    "test": "node --test"
+  }
+}

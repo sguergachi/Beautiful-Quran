@@ -14,6 +14,10 @@ GitHub Actions stages the marketing content from `docs/` and builds the reader
 under `/app/`, then deploys the combined tree as a GitHub Pages artifact. Build
 output is never committed back to `master`.
 
+Repository **Settings → Pages → Build and deployment → Source** must be
+**GitHub Actions**. Selecting the legacy `master /docs` source deploys only the
+marketing files and overwrites `/app/` with a 404.
+
 ## Quick start
 
 ```bash
