@@ -4,13 +4,22 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import {
+  APP_TO_QDC_RECITER,
   ContentUnavailableError,
   DAY_MS,
   LegacyQdcCache,
+  RecitationTimingCache,
+  createLegacyRecitationProvider,
   createLegacyQdcFetcher,
 } from "../src/cache.mjs";
 
 const BODY = JSON.stringify({ audio_files: [{ id: 1, verse_timings: [] }] });
+
+test("locks stable app reciter IDs to the transitional provider map", () => {
+  assert.deepEqual([...APP_TO_QDC_RECITER], [
+    [1, 7], [2, 6], [3, 2], [4, 9], [5, 3], [7, 5],
+  ]);
+});
 
 test("caches one upstream response and collapses concurrent misses", async (context) => {
   const directory = await temporaryDirectory(context);
@@ -164,6 +173,34 @@ test("legacy fetcher stops reading a response that exceeds its size limit", asyn
   });
 
   await assert.rejects(fetchContent({ reciterId: 7, chapter: 1 }), /size limit/);
+});
+
+test("normalizes all legacy chapters behind an app-reciter resource", async (context) => {
+  const directory = await temporaryDirectory(context);
+  const chapters = [];
+  const rawCache = {
+    get: async (reciterId, chapter) => {
+      chapters.push([reciterId, chapter]);
+      return { body: JSON.stringify({ chapter }) };
+    },
+  };
+  const provider = createLegacyRecitationProvider({
+    rawCache,
+    normalize: async ({ appReciterId, chapters: payloads }) => JSON.stringify({
+      schema_version: 1,
+      resource_group: "recitations",
+      resource_id: appReciterId,
+      records: payloads,
+    }),
+  });
+  const cache = new RecitationTimingCache({ cacheDir: directory, fetchSnapshot: provider });
+
+  const result = JSON.parse((await cache.get(1)).body);
+  assert.equal(result.records.length, 114);
+  assert.deepEqual(chapters[0], [7, 1]);
+  assert.deepEqual(chapters.at(-1), [7, 114]);
+  assert.equal((await cache.get(1)).cacheStatus, "hit");
+  assert.throws(() => cache.get(6), RangeError);
 });
 
 async function temporaryDirectory(context) {

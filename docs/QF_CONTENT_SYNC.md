@@ -40,26 +40,30 @@ changes at least every seven days, and applies corrections atomically.
 ## Current data flow
 
 ```text
-Released Android/web readers
-  ├─ read the committed quran.db (including legacy QDC-derived timing rows)
-  └─ stream recitation audio from EveryAyah
-
-Optional transitional build path (not connected to a released client)
-  └─ tools/build_db.py
-       └─ bounded Beautiful Quran cache service
-            └─ legacy unauthenticated api.quran.com QDC endpoint
-
-Approved target
-  └─ Android/web reader
-       └─ Beautiful Quran backend (no QF secret in a client)
-            └─ QF OAuth client-credentials + Content Sync API
-       └─ separate, atomic on-device QF cache
+Android / web reader
+  ├─ committed quran.db
+  │    └─ Quran text + independently licensed quran-align timing fallback
+  │       (no QDC-derived timing rows)
+  ├─ separate atomic device cache (SQLite on Android; IndexedDB on web)
+  └─ Beautiful Quran's QF-shaped Content Sync facade
+       └─ provider adapter today: legacy unauthenticated QDC endpoint
+       └─ provider adapter after approval: QF OAuth + authenticated Content API
 ```
 
-The transitional service mirrors the seven-day freshness ceiling, but that is
-an engineering control—not permission to use the legacy endpoint and not an
-authenticated Content Sync implementation. The legacy source and committed
-database must be disclosed to QF rather than represented as already approved.
+The Android and web clients do not know which upstream provider is active and
+never receive a QF client secret. They read fresh local rows first, start a
+background refresh after six days, reject runtime rows after seven days, and
+fall back to the bundled quran-align rows whenever the cache is unavailable.
+The backend runs the same cleaner, clock rebase, corrections, repairs, and
+physical finalizer that historically produced the reader rows. A parity audit
+of Alafasy found every historical row byte-for-byte identical, plus the one
+previously withheld ayah recovered from the open fallback.
+
+The transitional provider is still only an engineering control—not permission
+to use the legacy endpoint and not an authenticated QF integration. Its use
+must be disclosed to QF rather than represented as already approved. Production
+clients must not be pointed at it until a host is selected and named in the
+Privacy Policy.
 
 ## Already implemented
 
@@ -69,18 +73,38 @@ database must be disclosed to QF rather than represented as already approved.
 - [x] Browser-level `notranslate` protection and element-level protection for
   rendered Arabic Quran words.
 - [x] A separate Android SQLite cache for future QF content and sync state.
+- [x] A separate web IndexedDB cache; QF rows are never written into the
+  committed sql.js database.
 - [x] Sync-domain support for relative cursors, all pages, snapshots, upserts,
   row/resource deletion, invalidation markers, per-filter checkpoints, atomic
   application, and a full termination purge.
 - [x] The next token is committed only after all pages and snapshots succeed.
 - [x] A tested seven-day on-device freshness predicate.
+- [x] Local-first reader adapters on Android and web. They install refreshed
+  boundaries only while playback is quiet, so a sync cannot move the active
+  karaoke word underneath the listener.
+- [x] Launch/resource-open bootstrap and incremental refresh, six-day early
+  revalidation, single-flight refresh, and quran-align fallback on first use,
+  offline use, upstream failure, or expiry.
+- [x] A shared freshness clock: the facade reports the normalized snapshot's
+  actual age and clients preserve it, so backend and device TTLs cannot stack
+  into a 14-day window. Partial nonempty snapshots below 6,000 ayahs fail
+  before replacing a complete cache.
 - [x] A dependency-free transitional backend with a fixed endpoint allowlist,
   no arbitrary proxy URL, single-flight disk cache, atomic writes, integrity
   hashes, six-day revalidation, seven-day fail-closed behavior, conditional
   responses, bounded upstream traffic, redacted logs, and protected purge.
-- [x] CI tests the transitional service and the existing Android sync core.
-- [x] The database builder can opt into the cache service with
-  `BQ_QDC_CACHE_BASE_URL`; the released app remains unchanged for now.
+- [x] A stable backend facade matching the QF Content Sync shapes used by the
+  clients. The legacy provider and future authenticated provider sit behind
+  that boundary, so approval does not require an Android/web protocol change.
+- [x] The canonical timing normalizer accepts both the legacy response and the
+  authenticated chapter-reciter `audio_file.timestamps` response documented by
+  QF.
+- [x] `data/quran.db` was rebuilt with quran-align-only fallback rows, an
+  explicit provenance table, a no-backtrack database audit, a version bump,
+  and a pinned fingerprint. QDC timing rows are not committed.
+- [x] CI tests the backend, Python timing pipeline, Android cache, web cache,
+  and database provenance/freshness gates.
 
 ## Questions that require written QF confirmation
 
@@ -88,15 +112,14 @@ Include these in the application or follow-up email. Code cannot resolve them:
 
 - [ ] Does the approved `recitations` Content Sync resource include the exact
   word segments and repeat topology needed for karaoke-style highlighting?
-- [ ] May the current legacy-QDC-derived timing rows remain in the public
-  repository and existing releases while migration is underway? If not, ask
-  whether removing them from future releases is sufficient or whether QF
-  requires a repository-history purge.
+- [ ] Is transitional runtime use of the unauthenticated legacy QDC endpoint
+  acceptable while credentials are pending? Future source trees/releases no
+  longer contain QDC timing rows; ask whether QF expects any history cleanup.
 - [ ] Are transformations limited to timing cleanup, validation, indexing, and
   local storage acceptable, while the Quran text itself remains unchanged?
-- [ ] Is the transitional use of the unauthenticated legacy endpoint acceptable
-  until credentials are issued? The absence of a login or published legacy
-  terms must not be presented as affirmative permission.
+- [ ] Does QF want Beautiful Quran to use its upstream Content Sync snapshots,
+  the authenticated chapter-reciter endpoint with `segments=true`, or another
+  approved resource for repeat-aware chapter timing?
 - [ ] For this independent project, are email and GitHub Issues acceptable
   contact methods in place of a public home/business postal address?
 - [ ] Do QF's sensitive-religious-data consent requirements apply to notes and
@@ -128,30 +151,34 @@ Include these in the application or follow-up email. Code cannot resolve them:
 ### Content Sync correctness
 
 - [ ] Map QF's real JSON schema into the existing sync-domain types; do not
-  guess endpoint paths or response fields before prelive access is available.
-- [ ] Keep independent sync state for each exact resource/filter combination.
-- [ ] Bootstrap without a token, follow every relative page cursor, download
+  finalize upstream ID mappings before prelive access is available. The
+  documented chapter-reciter response shape is already supported.
+- [x] Keep independent sync state for each exact resource/filter combination.
+- [x] Bootstrap without a token, follow every relative page cursor, download
   every referenced snapshot, and apply the entire exchange in one transaction.
-- [ ] Make change application idempotent. Implement and integration-test row
+- [x] Make change application idempotent. Implement and test row
   upserts/deletes, resource deletes, invalidations, snapshots, interrupted
   pagination, duplicate delivery, and token rollback.
-- [ ] Trigger sync on first use, app launch, network restoration, and early
-  enough to complete before seven days. Add retries with bounded backoff.
-- [ ] Never label content older than seven days as current. Keep it readable
-  offline only if QF confirms that stale-on-failed-sync behavior; otherwise
-  withhold it and explain the state to the user.
+- [ ] Add an explicit network-restored trigger and bounded client retry backoff;
+  launch and resource-open triggers are implemented now.
+- [x] Never label content older than seven days as current. Expired runtime
+  rows are withheld and the independently licensed fallback remains readable.
 - [ ] Alert before content reaches the seven-day ceiling and on repeated sync,
   snapshot, purge, authentication, or integrity failures.
 
 ### Reader and database migration
 
-- [ ] Create the reader repository adapter that reads fresh QF rows from the
+- [x] Create the reader repository adapter that reads fresh content rows from the
   separate cache while retaining independently licensed morphology, layout,
   lexicon, dictionary, and other non-QF data.
-- [ ] Generate QF-origin content on the client/cache path rather than committing
+- [x] Generate provider-origin content on the runtime cache path rather than committing
   a newly generated QF database to Git.
-- [ ] Confirm parity for every supported reciter/chapter and the repeat-aware
-  HighlightEngine before removing legacy rows from `data/quran.db`.
+- [x] Remove QDC-derived rows from `data/quran.db`; every reciter keeps the open
+  quran-align offline fallback (four physically unsafe Shuraym rows remain
+  honestly withheld).
+- [ ] Run and retain the full-corpus parity report for all six runtime reciters
+  against the last historical release before production deployment. Alafasy
+  parity is complete; the other five still need the same recorded audit.
 - [ ] Remove the direct legacy importer and transitional endpoint after the QF
   migration is accepted. Keep the purge path long enough to delete legacy and
   QF caches safely.
@@ -208,13 +235,15 @@ Include these in the application or follow-up email. Code cannot resolve them:
 
 ## Approval status today
 
-The repository is ready to make an honest application and demonstrate the
-cache/sync direction, but it is **not ready to enable authenticated production
-traffic**. The hard blockers are QF approval and schema access, confirmation
-that repeat-aware recitation segments are available, a selected secure host,
-the authenticated adapter, client scheduling/reader wiring, final privacy
-processor disclosure, and the notes consent/deletion flow.
+The repository now demonstrates the intended cache/sync architecture and keeps
+QDC-derived timing rows out of the committed database. It is ready to support
+an honest application, but it is **not ready for authenticated production
+traffic**. The hard blockers are QF approval, final upstream resource/ID
+mapping, a selected secure host, the OAuth provider adapter, final privacy
+processor disclosure, network-restored scheduling/monitoring, full six-reciter
+parity evidence, and the notes consent/deletion flow.
 
-Keep `data/quran.db` for the current release as previously decided. Its
-continued legacy timing use is a permission question to disclose to QF, not a
-compliance conclusion this repository can make.
+It is also not a legal conclusion that transitional legacy access is allowed.
+That permission question remains explicit for QF. If QF asks for the legacy
+provider to stop, disable the backend, purge its cache, and clients continue on
+the quran-align fallback without an app update.

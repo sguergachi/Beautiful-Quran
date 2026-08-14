@@ -11,7 +11,10 @@ import com.beautifulquran.data.LexiconDatabase
 import com.beautifulquran.data.LexiconRepository
 import com.beautifulquran.data.QuranDatabase
 import com.beautifulquran.data.QuranRepository
+import com.beautifulquran.data.QfContentCacheDatabase
+import com.beautifulquran.data.RuntimeTimingCache
 import com.beautifulquran.data.SettingsRepository
+import com.beautifulquran.data.TimingContentSyncApi
 import com.beautifulquran.ornamentslab.OrnamentSeedStore
 import com.beautifulquran.playback.AudioOutputLatency
 import com.beautifulquran.playback.PlayerController
@@ -19,6 +22,9 @@ import com.beautifulquran.timingslab.TimingOverrides
 import com.beautifulquran.tarjilab.ReciterTarjiProfiles
 import com.beautifulquran.ui.reader.InkEngine
 import com.beautifulquran.ui.reader.InkLabStore
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableSharedFlow
 
 class QuranApp : Application() {
@@ -60,10 +66,22 @@ class QuranApp : Application() {
         super.onCreate()
         DevProfiling.install(this)
         val overrides = TimingOverrides(this)
-        repository = QuranRepository(QuranDatabase(this), overrides)
+        settings = SettingsRepository(this)
+        val runtimeTimings = BuildConfig.TIMING_CONTENT_BASE_URL
+            .takeIf { it.isNotBlank() }
+            ?.let { baseUrl ->
+                runCatching {
+                    RuntimeTimingCache(
+                        api = TimingContentSyncApi(baseUrl),
+                        store = QfContentCacheDatabase(this),
+                        scope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
+                    )
+                }.getOrNull()
+            }
+        repository = QuranRepository(QuranDatabase(this), overrides, runtimeTimings)
+        runtimeTimings?.refresh(settings.settings.value.reciterId)
         lexicon = LexiconRepository(LexiconDatabase(this))
         dictionary = DictionaryRepository(DictionaryDatabase(this))
-        settings = SettingsRepository(this)
         bookmarks = BookmarkRepository(this)
         annotations = AnnotationRepository(this)
         player = PlayerController(this)

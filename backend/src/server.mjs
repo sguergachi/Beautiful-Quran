@@ -6,13 +6,23 @@ import {
   ContentUnavailableError,
   DAY_MS,
   LegacyQdcCache,
+  RecitationTimingCache,
+  createLegacyRecitationProvider,
   createLegacyQdcFetcher,
-  validateQdcKey,
+  validateAppReciterId,
 } from "./cache.mjs";
+import { createRuntimeTimingNormalizer } from "./normalize.mjs";
 
-const CONTENT_ROUTE = /^\/v1\/legacy-qdc\/recitations\/(\d+)\/chapters\/(\d+)\/audio-files$/;
+const SNAPSHOT_ROUTE = /^\/api\/v4\/resources\/snapshots\/recitations\/(\d+)$/;
 
-export function createHandler({ cache, allowedOrigins, adminToken, requestsPerMinute = 600, now = Date.now }) {
+export function createHandler({
+  cache,
+  timingCache,
+  allowedOrigins,
+  adminToken,
+  requestsPerMinute = 600,
+  now = Date.now,
+}) {
   let windowStartedAt = now();
   let requestCount = 0;
 
@@ -29,29 +39,34 @@ export function createHandler({ cache, allowedOrigins, adminToken, requestsPerMi
 
       if (request.method === "OPTIONS") return sendEmpty(response, 204);
       if (request.method === "GET" && url.pathname === "/healthz") {
-        return sendJson(response, 200, { status: "ok", source: "legacy-qdc-transitional" });
+        return sendJson(response, 200, { status: "ok", source: "normalized-timing-facade" });
       }
       if (request.method === "DELETE" && url.pathname === "/admin/cache") {
         if (!adminToken) return sendJson(response, 404, { error: "not_found" });
         if (!validBearer(request.headers.authorization, adminToken)) {
           return sendJson(response, 401, { error: "unauthorized" });
         }
-        await cache.clear();
+        await Promise.all([cache.clear(), timingCache?.clear()]);
         return sendEmpty(response, 204);
       }
       if (!allowRequest()) return sendJson(response, 429, { error: "rate_limited" }, { "retry-after": "60" });
 
-      const match = request.method === "GET" && CONTENT_ROUTE.exec(url.pathname);
-      if (!match) return sendJson(response, 404, { error: "not_found" });
-      const reciterId = Number(match[1]);
-      const chapter = Number(match[2]);
-      validateQdcKey(reciterId, chapter);
-      const content = await cache.get(reciterId, chapter);
-      const headers = contentHeaders(content);
-      if (request.headers["if-none-match"] === content.etag) return sendEmpty(response, 304, headers);
-      status = 200;
-      response.writeHead(status, { ...headers, "content-type": "application/json; charset=utf-8" });
-      response.end(content.body);
+      if (request.method === "GET" && url.pathname === "/api/v4/resources/sync") {
+        if (!timingCache) return sendJson(response, 404, { error: "not_found" });
+        return serveSync(response, await syncedContent(url, timingCache, now));
+      }
+      const snapshotMatch = request.method === "GET" && SNAPSHOT_ROUTE.exec(url.pathname);
+      if (snapshotMatch) {
+        if (!timingCache) return sendJson(response, 404, { error: "not_found" });
+        const content = await timingCache.get(Number(snapshotMatch[1]));
+        const headers = { ...contentHeaders(content), "cache-control": "no-store" };
+        if (request.headers["if-none-match"] === content.etag) return sendEmpty(response, 304, headers);
+        response.writeHead(200, { ...headers, "content-type": "application/json; charset=utf-8" });
+        response.end(content.body);
+        return 200;
+      }
+
+      return sendJson(response, 404, { error: "not_found" });
     } catch (error) {
       if (error instanceof RangeError) status = sendJson(response, 400, { error: "invalid_resource" });
       else if (error instanceof ContentUnavailableError) status = sendJson(response, error.status, { error: error.code });
@@ -77,6 +92,52 @@ export function createHandler({ cache, allowedOrigins, adminToken, requestsPerMi
       return requestCount <= requestsPerMinute;
     }
   };
+}
+
+async function syncedContent(url, timingCache, now) {
+  const match = /^recitations:(\d+)$/.exec(url.searchParams.get("resources") || "");
+  if (!match) throw new RangeError("Expected one recitation resource");
+  const reciterId = validateAppReciterId(Number(match[1]));
+  const bootstrap = url.searchParams.get("bootstrap") === "true";
+  const previousToken = url.searchParams.get("sync_token");
+  if (bootstrap === Boolean(previousToken)) throw new RangeError("Expected bootstrap or sync_token");
+  const content = await timingCache.get(reciterId);
+  const contentAgeMs = now() - content.fetchedAtMs;
+  if (!Number.isFinite(contentAgeMs) || contentAgeMs < 0 || contentAgeMs > 7 * DAY_MS) {
+    throw new ContentUnavailableError("No current content is available");
+  }
+  const token = content.etag.slice(1, -1);
+  const changed = bootstrap || previousToken !== token;
+  return {
+    content,
+    body: {
+      sync: {
+        sync_until_sequence: content.fetchedAtMs,
+        content_age_ms: contentAgeMs,
+        has_more: false,
+        next_page_url: null,
+        next_sync_token: token,
+        mutations: changed ? [{
+          sequence: content.fetchedAtMs,
+          type: bootstrap ? "RESOURCE_CREATE" : "RESOURCE_INVALIDATE",
+          resource_group: "recitations",
+          resource_id: reciterId,
+          record_type: null,
+          record_key: null,
+          changed_at: new Date(content.fetchedAtMs || now()).toISOString(),
+          data: null,
+          snapshot_url: `/api/v4/resources/snapshots/recitations/${reciterId}`,
+        }] : [],
+      },
+    },
+  };
+}
+
+function serveSync(response, { content, body }) {
+  return sendJson(response, 200, body, {
+    ...contentHeaders(content),
+    "cache-control": "no-store",
+  });
 }
 
 function contentHeaders(content) {
@@ -135,6 +196,8 @@ export function configuration(environment = process.env) {
         .filter(Boolean),
     ),
     adminToken: environment.CACHE_ADMIN_TOKEN || "",
+    python: environment.PYTHON || "python3",
+    timingDatabase: environment.TIMING_REFERENCE_DB || resolve(fileURLToPath(new URL("../../data/quran.db", import.meta.url))),
   };
 }
 
@@ -147,12 +210,22 @@ function numberSetting(value, fallback) {
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const config = configuration();
   const cache = new LegacyQdcCache({
-    cacheDir: config.cacheDir,
+    cacheDir: resolve(config.cacheDir, "legacy"),
     fetchContent: createLegacyQdcFetcher(),
     revalidateAfterMs: config.revalidateAfterMs,
     maxAgeMs: config.maxAgeMs,
   });
-  createServer(createHandler({ cache, ...config })).listen(config.port, () => {
-    console.info(JSON.stringify({ event: "listening", port: config.port, source: "legacy-qdc-transitional" }));
+  const normalize = createRuntimeTimingNormalizer({
+    python: config.python,
+    database: config.timingDatabase,
+  });
+  const timingCache = new RecitationTimingCache({
+    cacheDir: resolve(config.cacheDir, "timings"),
+    fetchSnapshot: createLegacyRecitationProvider({ rawCache: cache, normalize }),
+    revalidateAfterMs: config.revalidateAfterMs,
+    maxAgeMs: config.maxAgeMs,
+  });
+  createServer(createHandler({ cache, timingCache, ...config })).listen(config.port, () => {
+    console.info(JSON.stringify({ event: "listening", port: config.port, source: "normalized-timing-facade" }));
   });
 }

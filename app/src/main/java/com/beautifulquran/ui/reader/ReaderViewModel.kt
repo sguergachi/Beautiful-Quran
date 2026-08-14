@@ -497,6 +497,23 @@ class ReaderViewModel(
                 _uiState.value = _uiState.value.copy(hasTimings = refreshed.isNotEmpty())
             }
         }
+        // A runtime snapshot may finish after the reader opens. Install it
+        // while quiet; never move karaoke boundaries under active playback.
+        viewModelScope.launch {
+            repository.runtimeTimingsChanged?.collect { reciterId ->
+                if (player.state.value.isPlaying) return@collect
+                val gen = sessions.generation
+                val id = sessions.surahId.takeIf { it != 0 } ?: return@collect
+                val reciter = _uiState.value.currentReciter
+                    ?.takeIf { it.id == reciterId }
+                    ?: return@collect
+                val refreshed = timingsWithBasmalahLeadIn(reciter.id, id)
+                if (!sessions.isCurrent(gen, id)) return@collect
+                if (player.state.value.isPlaying) return@collect
+                installTimings(refreshed)
+                _uiState.value = _uiState.value.copy(hasTimings = refreshed.isNotEmpty())
+            }
+        }
     }
 
     /**

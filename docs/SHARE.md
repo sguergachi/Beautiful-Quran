@@ -181,8 +181,8 @@ Each phase ships something usable on its own.
 
 ## Non-goals
 
-- No accounts, no upload, no link-sharing service. Text is `EXTRA_TEXT`; image
-  is a file + `ACTION_SEND` (invariant 6: offline-first, no backend).
+- No accounts, no upload, no user-content or link-sharing service. Text is
+  `EXTRA_TEXT`; image is a file + `ACTION_SEND` (the timing facade is unrelated).
 - No editing surface — no font pickers, no colour pickers, no stickers.
 - No range selection. Ordered taps are the model.
 - No drag-reorder or multi-theme matrix yet (image is fixed Paper).

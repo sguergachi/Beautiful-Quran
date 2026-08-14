@@ -10,8 +10,20 @@ data comes from, and the traps we hit making it ship.
 
 ## Current state
 
-Repeat-aware qdc timings are **shipped**. Measured against the committed
-`data/quran.db` (re-verified 2026-08-14):
+As of `quran-v54.db`, QDC-derived rows are **not shipped in the repository or
+database**. The committed database contains 43,646 one-pass quran-align rows
+and an explicit provenance marker. It is the complete first-install/offline
+fallback apart from six unsafe ayahs (one Alafasy and five Shuraym) that are
+honestly withheld and use whole-ayah highlighting.
+
+Repeat-aware timing is now a runtime resource. When the timing facade is
+configured, Android SQLite or browser IndexedDB restores a fresh snapshot
+immediately and refreshes it in the background. The backend applies this exact
+TimingEngine pipeline before returning any row. After six days it revalidates;
+after seven days the client rejects the runtime snapshot and falls back to
+quran-align. A sync that lands during playback is installed only while quiet.
+
+The last historical QDC-bearing database (`quran-v53.db`) had:
 
 | Fact | Value |
 |---|---|
@@ -25,18 +37,18 @@ Repeat-aware qdc timings are **shipped**. Measured against the committed
 load-bearing. Do not "tighten" it to `<`.** Two things depend on it:
 
 1. A genuine **single-word** repeat is two same-position segments — that is the
-   only shape it can have. Ear-confirmed example still live in the DB: Hani
+   only shape it can have. Ear-confirmed runtime example: Hani
    **4:163 word 20** (1180 ms + 1510 ms).
 2. A multi-word chain's **final** word returns to the high-water rather than
    below it (Mishary 2:14 replays 7…11; that closing `11` equals `maxBefore`).
    Under `<` the chain would drop its last word.
 
-Alignment artifacts that *would* read as false repeats are stripped at **build
-time**, by duration and ratio rather than by adjacency — see
-[Cleanup](#false-repeats-the-qdc-artifacts-we-scrub). Anything surviving into the
-DB is data the pipeline judged real. If you suspect a specific row is wrong,
-ear-check it and fix its class in `tools/build_db.py`; never with
-an engine-wide heuristic.
+Alignment artifacts that *would* read as false repeats are stripped by the
+**backend normalizer**, by duration and ratio rather than adjacency — see
+[Cleanup](#false-repeats-the-qdc-artifacts-we-scrub). Anything surviving into a
+runtime snapshot is data the pipeline judged real. If a specific row is wrong,
+ear-check it and fix its class in `tools/build_db.py`; never with an engine-wide
+heuristic or a client-side repair.
 
 ## What it is
 
@@ -112,7 +124,7 @@ ear-verified (Mishary 2:14, Hani 2:16); **verify the rest before enabling.**
 | AbdulBaset (murattal) | 2 | ✅ enabled (not ear-verified) |
 | Minshawi (murattal) | 9 | ✅ enabled (not ear-verified) |
 | Minshawi (mujawwad) | 8 | yes (very dense) |
-| As-Sudais | 3 | ✅ enabled (not ear-verified; also fills our missing-timings gap) |
+| As-Sudais | 3 | ✅ enabled at runtime (not ear-verified; quran-align fallback is complete) |
 | Ash-Shuraym | 10 | no (one-pass) |
 | AbdulBaset (mujawwad) | 1 | no (one-pass) |
 
@@ -139,7 +151,7 @@ only when the recitation advances past `highWater` onto new, unread words. The
 chain start is found by walking back from the active segment over the contiguous
 run of backtracked segments and taking the minimum position (see `activeInfo`).
 
-## TimingEngine V1.5 (`tools/build_db.py`)
+## TimingEngine V1.5 (`tools/build_db.py` + runtime normalizer)
 
 TimingEngine is deliberately not a source-voting system. Each input answers one
 question it is qualified to answer:
@@ -155,14 +167,15 @@ safety. Uncertainty never grows another heuristic branch: it falls back to the
 monotonic reference, or withholds word timing when even that is unsafe.
 
 Repeat-aware reciters are listed in `QDC_REPEAT_RECITERS` (map: our `reciter_id`
-→ quran.com recitation id). For those, the build fetches `qdc` segments instead
-of quran-align:
+→ quran.com recitation id). The backend's provider map mirrors those stable app
+IDs. `createLegacyRecitationProvider` fetches all chapters into a private raw
+cache, then `normalize_runtime_timings.py` produces the device snapshot:
 
-- `load_qdc_timings(qdc_id)` fetches all 114 surahs, **rebases** each verse's
-  gapless-file offsets to ayah-relative ms (`start − timestamp_from`), preserves
-  repeats, and caches the assembled result in `tools/.cache/qdc_<id>.json`.
-  The assembled qdc payloads and quran-align release are SHA-256 locked. A
-  source refresh therefore requires an explicit full-corpus audit.
+- `parse_source_chapters()` accepts today's legacy `verse_timings` and QF's
+  documented authenticated `audio_file.timestamps` shape. It rebases each
+  verse's gapless-file offsets to ayah-relative ms (`start − timestamp_from`)
+  and preserves repeats. `load_qdc_timings()` remains only for explicit
+  `--include-qdc-timings` parity audits; such a database must never be committed.
 - `adjust_qdc_segments()` clamps word positions to our canonical word count,
   drops zero-length spans, keeps repeats, and counts the repeat spans.
 - `rebase_qdc_clock()` translates the complete repeat-aware row by the upper
@@ -202,10 +215,11 @@ The finalizer then enforces four corpus laws:
    complete monotonic quran-align row; if that is also unsafe, word timings are
    withheld and the reader highlights the whole ayah.
 
-The 2026-07-30 audit checked all 6,236 ayahs for both Alafasy and Hani. Every
-shipped row is complete and physically valid; Hani ships all 6,236 rows.
-Alafasy 37:152 is deliberately withheld because neither source describes its
-audio safely.
+The first runtime parity audit checked Alafasy against all 6,235 rows of the
+last historical database: every row was byte-for-byte identical, and runtime
+normalization additionally recovered 37:152 from the quran-align fallback. The
+same retained report still needs to be run for the other five runtime reciters
+before production deployment.
 
 ### The small heuristic set
 
@@ -476,20 +490,16 @@ read ink together while 12 fades in white as a new word.
 
 ## Traps we hit (read before touching this)
 
-- **`quran.db` is a committed app asset.** Normal local and CI builds use
-  `data/quran.db` directly so they do not depend on the external
-  data sources. When repeat timing data changes, update `tools/build_db.py`,
-  rebuild the asset with `python3 tools/build_db.py`, and commit the regenerated
-  database with the code change.
-- **Bump the DB version when content changes.** `QuranDatabase.DB_FILE_NAME`
+- **Repeat rows never go into `quran.db`.** Change the canonical pipeline and
+  runtime normalizer tests, deploy the backend, and let Content Sync replace
+  device snapshots. The bundled quran-align rows stay unchanged.
+- **Bump the DB version when bundled fallback content changes.** `QuranDatabase.DB_FILE_NAME`
   (`quran-vN.db`) is the extraction key: the bundled asset is copied to internal
   storage only if that file doesn't already exist. Changing the DB's *content*
   without bumping the suffix means existing installs keep the stale cached copy —
-  which is exactly why the orange first "didn't appear." Adding repeats required
-  bumping `quran-v5.db` → `quran-v6.db`; the extractor's cleanup step deletes the
-  old file. (That pair is the historical example — the asset has been rebumped
-  many times since. Always read the live value from
-  `QuranDatabase.DB_FILE_NAME` rather than trusting any number here.)
+  which is exactly why the orange first "didn't appear" in the historical
+  bundled implementation. Always read the live value rather than trusting a
+  number here; runtime-only timing changes do not require a database bump.
 - **quran.com timestamps are gapless-file offsets**, not per-ayah. Always
   subtract the verse's `timestamp_from`. (The build does this; noted here because
   it's the first thing that looks wrong if you inspect the raw API.)
@@ -506,6 +516,8 @@ read ink together while 12 fades in white as a new word.
 ## Adding another repeat-aware reciter
 
 1. Add `our_reciter_id: qdc_id` to `QDC_REPEAT_RECITERS` in `tools/build_db.py`.
-2. `python3 tools/build_db.py` and check the printed repeat-span / coverage stats.
-3. Bump `QuranDatabase.DB_FILE_NAME` to the next `quran-vN.db`.
-4. Rebuild + reinstall; ear-verify a flagged ayah before trusting it.
+2. Add the same app-ID → provider-ID mapping in `backend/src/cache.mjs`.
+3. Run an audit normalization and check repeat-span, coverage, physical gates,
+   and exact reader parity without committing the audit database.
+4. Ear-verify a flagged ayah, then deploy the backend. No client or bundled DB
+   change is needed unless the reciter lacks a quran-align fallback.

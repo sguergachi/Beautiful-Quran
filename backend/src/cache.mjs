@@ -22,13 +22,12 @@ export function validateQdcKey(reciterId, chapter) {
 }
 
 /**
- * Transitional, disk-backed cache for the legacy unauthenticated QDC endpoint.
- * The authenticated QF adapter will replace this source after approval.
+ * Disk-backed, single-flight content cache shared by raw provider responses and
+ * normalized recitation snapshots.  Callers own key validation and fetching.
  */
-export class LegacyQdcCache {
+export class DiskContentCache {
   constructor({
     cacheDir,
-    fetchContent,
     now = Date.now,
     revalidateAfterMs = 6 * DAY_MS,
     maxAgeMs = 7 * DAY_MS,
@@ -38,7 +37,6 @@ export class LegacyQdcCache {
       throw new RangeError("Cache must revalidate before the seven-day limit");
     }
     this.cacheDir = cacheDir;
-    this.fetchContent = fetchContent;
     this.now = now;
     this.revalidateAfterMs = revalidateAfterMs;
     this.maxAgeMs = maxAgeMs;
@@ -49,13 +47,13 @@ export class LegacyQdcCache {
     this.purgePromise = null;
   }
 
-  async get(reciterId, chapter) {
-    const key = validateQdcKey(reciterId, chapter);
+  async get(key, fetchContent) {
+    if (!/^[a-z0-9-]+$/.test(key)) throw new RangeError("Invalid cache key");
     const generation = this.generation;
-    if (this.purgePromise) throw new ContentUnavailableError("QDC content is being purged");
+    if (this.purgePromise) throw new ContentUnavailableError("Content is being purged");
     const stored = await this.#read(key);
     if (generation !== this.generation || this.purgePromise) {
-      throw new ContentUnavailableError("QDC content was purged");
+      throw new ContentUnavailableError("Content was purged");
     }
     const nowMs = this.now();
     const cached = stored?.fetchedAtMs <= nowMs ? stored : null;
@@ -63,12 +61,12 @@ export class LegacyQdcCache {
     if (cached && ageMs <= this.revalidateAfterMs) return result(cached, "hit");
     if (nowMs < (this.retryAfter.get(key) ?? 0)) {
       if (cached && ageMs <= this.maxAgeMs) return result(cached, "refresh-deferred");
-      throw new ContentUnavailableError("No current QDC content is available");
+      throw new ContentUnavailableError("No current content is available");
     }
 
     try {
       return await this.#singleFlight(key, async () => {
-        const body = await this.fetchContent({ reciterId, chapter });
+        const body = await fetchContent();
         const entry = {
           version: 1,
           fetchedAtMs: this.now(),
@@ -81,14 +79,14 @@ export class LegacyQdcCache {
       });
     } catch (error) {
       if (generation !== this.generation) {
-        throw new ContentUnavailableError("QDC content was purged", error);
+        throw new ContentUnavailableError("Content was purged", error);
       }
       this.retryAfter.set(key, this.now() + this.retryAfterFailureMs);
       const fallbackAgeMs = cached ? this.now() - cached.fetchedAtMs : Infinity;
       if (cached && fallbackAgeMs >= 0 && fallbackAgeMs <= this.maxAgeMs) {
         return result(cached, "refresh-failed");
       }
-      throw new ContentUnavailableError("No current QDC content is available", error);
+      throw new ContentUnavailableError("No current content is available", error);
     }
   }
 
@@ -141,16 +139,81 @@ export class LegacyQdcCache {
     const temporary = `${target}.${process.pid}.${randomUUID()}.tmp`;
     try {
       await writeFile(temporary, JSON.stringify(entry), { encoding: "utf8", mode: 0o600 });
-      if (generation !== this.generation) throw new ContentUnavailableError("QDC content was purged");
+      if (generation !== this.generation) throw new ContentUnavailableError("Content was purged");
       await rename(temporary, target);
       if (generation !== this.generation) {
         await unlinkIfExists(target);
-        throw new ContentUnavailableError("QDC content was purged");
+        throw new ContentUnavailableError("Content was purged");
       }
     } finally {
       await unlinkIfExists(temporary);
     }
   }
+}
+
+/** Transitional raw cache for the legacy unauthenticated QDC endpoint. */
+export class LegacyQdcCache {
+  constructor(options) {
+    this.fetchContent = options.fetchContent;
+    this.disk = new DiskContentCache(options);
+  }
+
+  get(reciterId, chapter) {
+    const key = validateQdcKey(reciterId, chapter);
+    return this.disk.get(`legacy-${key}`, () => this.fetchContent({ reciterId, chapter }));
+  }
+
+  clear() {
+    return this.disk.clear();
+  }
+}
+
+/** Application reciter IDs whose repeat-aware source is fetched at runtime. */
+export const APP_TO_QDC_RECITER = new Map([
+  [1, 7],
+  [2, 6],
+  [3, 2],
+  [4, 9],
+  [5, 3],
+  [7, 5],
+]);
+
+export function validateAppReciterId(reciterId) {
+  if (!APP_TO_QDC_RECITER.has(reciterId)) throw new RangeError("Unsupported reciter");
+  return reciterId;
+}
+
+/**
+ * Stable reader-facing cache. The provider may be legacy today and QF
+ * authenticated later; clients always receive the same normalized snapshot.
+ */
+export class RecitationTimingCache {
+  constructor({ cacheDir, fetchSnapshot, ...options }) {
+    this.fetchSnapshot = fetchSnapshot;
+    this.disk = new DiskContentCache({ cacheDir, ...options });
+  }
+
+  get(reciterId) {
+    validateAppReciterId(reciterId);
+    return this.disk.get(`timings-${reciterId}`, () => this.fetchSnapshot({ reciterId }));
+  }
+
+  clear() {
+    return this.disk.clear();
+  }
+}
+
+export function createLegacyRecitationProvider({ rawCache, normalize }) {
+  return async ({ reciterId }) => {
+    const qdcReciterId = APP_TO_QDC_RECITER.get(validateAppReciterId(reciterId));
+    const chapters = await Promise.all(
+      Array.from({ length: 114 }, async (_, index) => {
+        const content = await rawCache.get(qdcReciterId, index + 1);
+        return JSON.parse(content.body);
+      }),
+    );
+    return normalize({ appReciterId: reciterId, chapters });
+  };
 }
 
 async function unlinkIfExists(path) {

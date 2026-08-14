@@ -103,6 +103,7 @@ class QuranRepository(
      * here instead of the bundled DB row. Null keeps this class usable from
      * JVM unit tests that don't ship an override store. */
     private val timingOverrides: TimingOverrides? = null,
+    private val runtimeTimings: RuntimeTimingCache? = null,
 ) {
 
     /** Change signal for the Lab's on-device corrections: emits whenever the
@@ -110,6 +111,9 @@ class QuranRepository(
      * re-pull it. Null when constructed without a store (JVM unit tests). */
     val timingOverridesChanged: StateFlow<Map<OverrideKey, List<Segment>>>?
         get() = timingOverrides?.overrides
+
+    /** Reciter IDs whose fresh runtime snapshot replaced the offline fallback. */
+    val runtimeTimingsChanged get() = runtimeTimings?.changes
 
     // @Volatile: read/written from Dispatchers.IO workers. Worst case without
     // a lock is one redundant query; the result is identical either way.
@@ -483,12 +487,17 @@ class QuranRepository(
             BundledTimingRows(segments, audioOnsets)
         }
 
-    /** The bundled DB timings for a reciter+surah, with **no** Lab overrides
-     * fused in — the shipped defaults. The Lab uses this to reset a single word
-     * back to how the app shipped it. */
+    private fun baseTimingRows(reciterId: Int, surahId: Int): BundledTimingRows =
+        runtimeTimings?.rows(reciterId, surahId)?.let {
+            BundledTimingRows(it.segments, it.audioOnsets)
+        } ?: bundledTimingRows(reciterId, surahId)
+
+    /** Fresh runtime timings, or the bundled quran-align fallback, with no Lab
+     * overrides fused in. The Lab uses this to reset a word to its current
+     * scholarly source rather than retaining a stale edit. */
     suspend fun bundledTimings(reciterId: Int, surahId: Int): Map<Int, List<Segment>> =
         withContext(Dispatchers.IO) {
-            bundledTimingRows(reciterId, surahId).segments
+            baseTimingRows(reciterId, surahId).segments
         }
 
     /** ayah number -> word segments, for one reciter and surah. Any
@@ -500,7 +509,7 @@ class QuranRepository(
      * describe the same marks. */
     suspend fun timings(reciterId: Int, surahId: Int): Map<Int, List<Segment>> =
         withContext(Dispatchers.IO) {
-            val bundled = bundledTimingRows(reciterId, surahId)
+            val bundled = baseTimingRows(reciterId, surahId)
             if (timingOverrides == null) return@withContext bundled.segments
             val overrides = timingOverrides.overrides.value
             if (overrides.isEmpty() || !overrides.keys.any { it.reciterId == reciterId && it.surahId == surahId }) {
