@@ -360,6 +360,22 @@ class TajweedPacingTest {
         assertNull(TajweedPacing.connection("مِن", "عَلِيمٌ"))
         // Fatḥatan before its carrier alif is still iẓhār before ʿayn.
         assertNull(TajweedPacing.connection("رُّسُلٗا", "عَلِيمٌ"))
+        // 4:143 إِلَىٰ هَـٰٓؤُلَآءِ — madd tabiʿi into iẓhār ه, not a nūn rule.
+        assertNull(TajweedPacing.connection("إِلَىٰ", "هَـٰٓؤُلَآءِ"))
+    }
+
+    @Test
+    fun `word-initial madd parks far enough that the opening letter blooms`() {
+        // 4:143 هَـٰٓؤُلَآءِ — madd muttasil on the first letter. Mid-slot of
+        // five uniform letters is 0.10 and leaves the ه at resting alpha
+        // under the paced feather. The park must clear that midpoint.
+        val curve = curveOf("هَـٰٓؤُلَآءِ")
+        val parked = curve.at(0.25f)
+        assertTrue("opening madd should be visibly into the word, at $parked", parked > 0.22f)
+        val held = curve.at(0.32f) - curve.at(0.25f)
+        val later = curve.at(0.85f) - curve.at(0.55f)
+        assertTrue("opening madd should park, moved $held", held < 0.08f)
+        assertTrue("the rest of the word should still cruise, moved $later", later > 0.15f)
     }
 
     @Test
@@ -491,7 +507,7 @@ class TajweedPacingTest {
             Hold(isAyahFinal = true, waqfShare = 0.8f),
             Hold(isAyahFinal = true, cruiseCap = 1f),
         )
-        for (word in listOf(dallin, sirat, anamta, qalu, nas)) {
+        for (word in listOf(dallin, sirat, anamta, qalu, nas, "هَـٰٓؤُلَآءِ")) {
             for (spoken in listOf(0.4f, 0.75f, 1f)) {
                 for (hold in holds) {
                     val curve = TajweedPacing.curve(word, spoken, hold) ?: continue

@@ -181,6 +181,11 @@ The model is therefore a **gated hint**, built from four parts:
   mid-bloom rather than sustained before or after itself. It creeps through
   `Hold.creep` of that slot while holding, so the ink breathes instead of
   freezing dead. Multiple holds in one word split the budget by excess counts.
+  A **word-initial** madd/ghunnah (not a wasl-entry) parks at least
+  `OPENING_HOLD_MIN` (0.28) into the word: first-slot mid is ~0.10 and, under
+  the paced feather, leaves that glyph at resting alpha for the whole hold —
+  the 4:143 `هَـٰٓؤُلَآءِ` case. That is not a wasl connection; iẓhār `ه`
+  after `إِلَىٰ` does not join.
 - **Waqf.** A verse's closing word is held **2.9× longer** than a mid-ayah word
   (median 2983 ms vs 1040 ms; `ٱلضَّآلِّينَ` in 1:7 runs 6505 ms). That slack is
   real rather than borrowed, so it is budgeted separately (`Hold.waqfShare`)

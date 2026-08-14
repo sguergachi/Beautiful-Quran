@@ -308,9 +308,14 @@ object TajweedPacing {
                 continue
             }
             // Park mid-letter: the glyph is caught half-bloomed, visibly being
-            // sustained, rather than held before or after itself.
+            // sustained, rather than held before or after itself. A word-initial
+            // madd/ghunnah (not a wasl-entry) needs a higher floor: first-slot
+            // mid is ~0.10 and stays at resting alpha under the paced feather.
             val slotStart = slotEnd - slotWidth(i, n, counts, lastPronounced)
-            glideTo(slotStart + HOLD_ANCHOR * (slotEnd - slotStart))
+            val mid = slotStart + HOLD_ANCHOR * (slotEnd - slotStart)
+            val openingOwn = !waslEntry && slotStart <= 0f &&
+                (counts[i] >= MADD_MUTTASIL || isGhunnah(events[i]))
+            glideTo(if (openingOwn) maxOf(mid, OPENING_HOLD_MIN) else mid)
             t += dwellShare * excess[i] / excessTotal
             x += creep * (slotEnd - slotStart)
             times += t * spoken
@@ -542,6 +547,13 @@ object TajweedPacing {
     /** Where inside its own slot the wash parks: half-way, so the held letter
      * is caught mid-bloom rather than sustained before or after itself. */
     private const val HOLD_ANCHOR = 0.5f
+    /**
+     * Floor on a word-initial madd/ghunnah park. Mid-slot of the first
+     * uniform letter is ~0.10 and leaves that glyph at resting alpha under
+     * the shipped paced feather (~1.11); 0.28 is mid-bloom of the opening
+     * edge (`0.5 * feather / (1 + feather)`). 4:143 `هَـٰٓؤُلَآءِ`.
+     */
+    private const val OPENING_HOLD_MIN = 0.28f
     /** Default junction for long donors; short donors may begin earlier. */
     private const val WASL_EXIT_FRACTION = 0.82f
     /** Floor on the wasl prefix bloom window (matches 1 − [WASL_EXIT_FRACTION]). */
