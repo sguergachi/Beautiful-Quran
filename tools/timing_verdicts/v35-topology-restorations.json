@@ -83,12 +83,13 @@
     "Saood_ash-Shuraym_128kbps:7:146": {
       "verdict": "accept", "kinds": ["topology"],
       "baselinePayloadHash": "c8605f86c88076868a808445203a33cd8fb24b376c5a6f6d3b7e8bf65a89322c",
-      "candidatePayloadHash": "e9996a06b38c2ef068b7699f00f8cbe1fc8f0e88332a36b646c415151c39c049",
+      "candidatePayloadHash": "821fe92077c5421515714a4407a981921cbbd39f55a59a76ecec330910e6dbc7",
       "evidence": {
         "kind": "dual_model_topology", "artifact": "tools/timing_verdicts/v35-topology-restorations.json",
-        "summary": "Both models strongly prefer the restored 1–29 re-say despite 147 extra labels; the baseline mapped a 20-second voiced interval as one word.",
+        "summary": "Both models strongly prefer the restored 1–29 re-say despite 147 extra labels; the baseline mapped a 20-second voiced interval as one word. Boundary review then corrected the first pass: Arabic XLSR starts words 24/25 at 14,987/15,747 ms; independent Quran phonetics emits wa at 14,988 ms, yaraw's r at 15,831 ms, and the next سَبِيلَ at 16,153 ms. The shipped handoffs are 14,980/15,740/16,120 ms.",
         "audioSha256": "605350c996dda34eec394a95e7c0cf3273b480107548165e20483338d209750a", "waveformVeto": false,
-        "models": [{"name": "arabic-xlsr-ctc", "baselineScore": -2845.413, "candidateScore": -1662.385}, {"name": "mms-uroman-ctc", "baselineScore": -552.253, "candidateScore": -206.49}]
+        "models": [{"name": "arabic-xlsr-ctc", "baselineScore": -2845.413, "candidateScore": -1662.385}, {"name": "mms-uroman-ctc", "baselineScore": -552.253, "candidateScore": -206.49}],
+        "boundaryWitnesses": [{"name": "arabic-xlsr-ctc", "wordStartsMs": {"24": 14987, "25": 15747}}, {"name": "quran-phonetics-free-ctc", "emissionsMs": {"wa": 14988, "yaraw_r": 15831, "next_sabila": 16153}}]
       }
     }
   }
