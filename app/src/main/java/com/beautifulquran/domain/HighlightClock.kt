@@ -22,8 +22,8 @@ package com.beautifulquran.domain
  * silent (the plain sweep has usually already reached full ink).
  *
  * The clock therefore:
- * - never moves backward within one [key] for small regressions (jitter)
- * - after a key change, [acceptNextSample], or a large accepted seek, enters
+ * - never moves backward within one [key] for position-estimate corrections
+ * - after a key change or [acceptNextSample], enters
  *   a **settle** window that holds *all* regressions and ignores implausible
  *   forward jumps, so post-seek corrections cannot bounce the word. The
  *   window lasts at least [MIN_SETTLE_POLLS] polls and ends once the
@@ -32,11 +32,11 @@ package com.beautifulquran.domain
  *   so its eventual snap-back stays inside the window no matter how late it
  *   arrives — with a hard cap at [SETTLE_CAP_POLLS] polls so a pathological
  *   stream cannot wedge the clock.
- * - still accepts a large backward step outside settle as a genuine seek
- *   (loop restart, scrub) and re-arms settle
+ * - accepts an authoritative seek/loop/adjustment only after
+ *   [acceptNextSample], driven by Media3's position-discontinuity event
+ *   rather than guessed from distance
  */
 class HighlightClock(
-    private val seekThresholdMs: Long = SEEK_THRESHOLD_MS,
     private val minSettlePolls: Int = MIN_SETTLE_POLLS,
     private val stablePollsNeeded: Int = STABLE_POLLS_NEEDED,
     private val settleCapPolls: Int = SETTLE_CAP_POLLS,
@@ -78,16 +78,13 @@ class HighlightClock(
         val regression = clockMs - rawMs
         val settling = inSettle
         if (regression > 0) {
-            // Settle holds every backward step; outside settle only small
-            // jitter — and a *converged* clock's big step is a genuine seek.
-            if (settling || !converged || regression < seekThresholdMs) {
-                stablePolls = 0
-                if (settling) settlePolls++
-                lastRawMs = rawMs
-                return clockMs
-            }
-            // Genuine large seek (loop restart, unnoted scrub).
-            return arm(key, rawMs)
+            // MediaController can correct its extrapolated position by any
+            // distance. Only a position-discontinuity event may authorize a
+            // backward move; distance alone once replayed the same word twice.
+            stablePolls = 0
+            if (settling) settlePolls++
+            lastRawMs = rawMs
+            return clockMs
         }
         // rawMs >= clockMs from here.
         val gap = rawMs - clockMs
@@ -140,10 +137,6 @@ class HighlightClock(
     }
 
     companion object {
-        /** Backward steps smaller than this are sampling jitter and held;
-         * larger ones outside settle are real seeks (loop restart) and pass. */
-        const val SEEK_THRESHOLD_MS = 250L
-
         /** Minimum settle length (~400 ms at the reader's 33 ms tick). */
         const val MIN_SETTLE_POLLS = 12
 

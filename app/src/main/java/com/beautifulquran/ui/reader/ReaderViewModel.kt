@@ -113,6 +113,8 @@ internal data class PollingIdentity<K : Any>(
     val sampleKey: K,
     /** Cancels a sleeping paused poll so resume samples immediately. */
     val isPlaying: Boolean,
+    /** Restarts immediately when Media3 reports any authoritative clock jump. */
+    val discontinuityId: Long,
 )
 
 /** Result of a ribbon tap; animation and contextual education have separate owners. */
@@ -128,7 +130,7 @@ internal fun <K : Any> pollingIdentity(
 ): PollingIdentity<K>? = state.nowPlaying
     ?.takeIf { it.surahId == loadedSurahId }
     ?.let(key)
-    ?.let { PollingIdentity(it, state.isPlaying) }
+    ?.let { PollingIdentity(it, state.isPlaying, state.positionEvents.clockId) }
 
 class ReaderViewModel(
     private val repository: QuranRepository,
@@ -248,10 +250,7 @@ class ReaderViewModel(
      * boundary — the source of the random full → faint → wash word flicker. */
     private val highlightClock = HighlightClock()
 
-    /** Bumps on genuine seeks so replaying the same Active word restarts ink. */
-    private var inkActivation = 0L
-    private var lastInkSampleKey: Any? = null
-    private var lastInkClockMs = -1L
+    private var lastClockEventId = player.state.value.positionEvents.clockId
     /** Last applied lag/lead so a lab or route change can reset the clock. */
     private var lastOutputLatencyMs = -1L
     private var lastHighlightLeadMs = -1L
@@ -262,13 +261,6 @@ class ReaderViewModel(
     private var tapBacklogAnchor: TarjiBacklogAnchor? = null
     private var smoothedBacklogContentMs = 0.0
     private var shimmerWasOn = false
-    /**
-     * User seek target (ayah → ms) applied on the next poll once that ayah is
-     * the media item — so ink jumps to the tapped word without waiting for
-     * MediaController's position estimate to catch up.
-     */
-    private var forcedHighlight: Pair<Int, Long>? = null
-
     /** Ink Lab → Highlight can override route detection with an absolute lag. */
     private fun outputLatencyMs(): Long =
         InkEngine.outputLatencyOverrideMs?.toLong() ?: outputLatency.latencyMs.value
@@ -282,11 +274,8 @@ class ReaderViewModel(
      * keeps that lead from crossing encoded opening silence. A route or lab
      * change steps query time, so arm [HighlightClock] to take it rather than
      * hold it as jitter.
-     *
-     * Forced word seeks stay on the media timeline so a tap lights the word
-     * that was just sought.
      */
-    private fun highlightPositionMs(forcedMediaMs: Long?, firstWordStartMs: Long): Long {
+    private fun highlightPositionMs(firstWordStartMs: Long): Long {
         val latencyMs = outputLatencyMs()
         // The tarjīʿ shimmer delays the tapped voice signal by the same
         // latency plus the sink buffer so it lands on the same clock the
@@ -350,7 +339,6 @@ class ReaderViewModel(
             lastHighlightLeadMs = leadMs
             highlightClock.acceptNextSample()
         }
-        if (forcedMediaMs != null) return forcedMediaMs
         return OutputLatency.highlightMs(
             mediaPositionMs = player.positionMs,
             latencyMs = latencyMs,
@@ -364,30 +352,18 @@ class ReaderViewModel(
      * holds while paused (like a lyrics player); it only clears when this
      * surah stops being the loaded one. */
     val activeWord: StateFlow<ActiveWord?> = pollingWhileLoaded(key = { it }) { np ->
-        val forced = forcedHighlight
-        val forcedMs = if (forced != null && forced.first == np.ayah) {
-            forcedHighlight = null
-            forced.second
-        } else {
-            null
+        val events = player.state.value.positionEvents
+        if (events.clockId != lastClockEventId) {
+            highlightClock.acceptNextSample()
+            lastClockEventId = events.clockId
         }
         val firstWordStartMs = preparedTimings[np.ayah]
             ?.segments
             ?.firstOrNull()
             ?.startMs
             ?: 0L
-        val rawMs = highlightPositionMs(forcedMs, firstWordStartMs)
+        val rawMs = highlightPositionMs(firstWordStartMs)
         val clockMs = highlightClock.sample(np, rawMs)
-        if (lastInkSampleKey != np) {
-            lastInkSampleKey = np
-        } else if (
-            lastInkClockMs >= 0L &&
-            clockMs + HighlightClock.SEEK_THRESHOLD_MS < lastInkClockMs
-        ) {
-            // Large backward jump within the same media item (scrub / unnoted seek).
-            inkActivation++
-        }
-        lastInkClockMs = clockMs
         preparedTimings[np.ayah]
             ?.activeInfo(clockMs)
             ?.let {
@@ -403,7 +379,7 @@ class ReaderViewModel(
                     isRepeat = it.isRepeat,
                     highWater = it.highWater,
                     repeatStart = it.repeatStart,
-                    activation = inkActivation,
+                    activation = events.inkId,
                 )
             }
     }
@@ -689,7 +665,6 @@ class ReaderViewModel(
         // During the basmalah lead-in, skip ahead into ayah 1.
         if (np.ayah == BASMALAH_PLAYLIST_AYAH) {
             longAyahMidpointConsumed = 0
-            noteInkRestart(1, seekMs = 0L)
             player.seekToAyah(1)
             return
         }
@@ -703,11 +678,9 @@ class ReaderViewModel(
         longAyahMidpointConsumed = FastForwardPolicy.nextConsumedAyah(action)
         when (action) {
             is FastForwardPolicy.Action.SeekToMidpoint -> {
-                noteInkRestart(action.ayah, seekMs = action.positionMs)
                 player.seekToWord(action.ayah, action.positionMs)
             }
             is FastForwardPolicy.Action.SeekToAyah -> {
-                noteInkRestart(action.ayah, seekMs = 0L)
                 player.seekToAyah(action.ayah)
             }
             FastForwardPolicy.Action.None -> Unit
@@ -717,21 +690,15 @@ class ReaderViewModel(
     fun fastBackward() {
         val np = playerState.value.nowPlaying?.takeIf { it.surahId == surahId } ?: return
         if (np.ayah == BASMALAH_PLAYLIST_AYAH) {
-            noteInkRestart(BASMALAH_PLAYLIST_AYAH, seekMs = 0L)
             player.seekToBasmalah()
             return
         }
         if (player.positionMs > START_SEEK_GRACE_MS) {
-            // Restart this ayah: pin ink at 0 and arm the clock settle window
-            // so post-seek position corrections cannot bounce word 2/3 and
-            // re-run the (tajweed) wash mid-hold.
-            noteInkRestart(np.ayah, seekMs = 0L)
             player.seekToAyah(np.ayah)
             return
         }
 
         if (np.ayah > 1) {
-            noteInkRestart(np.ayah - 1, seekMs = 0L)
             player.seekToAyah(np.ayah - 1)
         } else if (np.ayah == 1) {
             // Restart from the basmalah lead-in when present.
@@ -772,7 +739,6 @@ class ReaderViewModel(
     fun playFromAyah(ayah: Int) {
         // Playing a specific ayah abandons any active repeat range.
         // Chapter openings (ayah 1) include the basmalah lead-in.
-        noteInkRestart(ayah, seekMs = 0L)
         if (startSurah(ayah, preserveRepeatRange = false, startWithBasmalah = ayah == 1)) {
             rememberListened(ayah)
         }
@@ -787,7 +753,6 @@ class ReaderViewModel(
         // Always restart ink: tap-to-play must re-run the wash even when the
         // same word stays Active or the seek is shorter than the jitter hold.
         val seekMs = positionMs.coerceAtLeast(0L)
-        noteInkRestart(ayah, seekMs)
         if (np != null && np.surahId == surahId && np.reciterId == reciter.id) {
             if (!keepRepeat) player.clearRepeatRange()
             player.seekToWordAndPlay(ayah, seekMs)
@@ -799,20 +764,8 @@ class ReaderViewModel(
 
     /** Resume a loaded playlist from [ayah] and mark it as listened. */
     fun playLoadedFromAyah(ayah: Int) {
-        noteInkRestart(ayah, seekMs = 0L)
         player.playLoadedFromAyah(ayah)
         rememberListened(ayah)
-    }
-
-    /**
-     * User-initiated play/seek: bump ink activation, accept the next clock
-     * sample, and pin highlight to [seekMs] on [ayah] so the wash restarts
-     * on the word being played (not the pre-seek active word).
-     */
-    private fun noteInkRestart(ayah: Int, seekMs: Long) {
-        inkActivation++
-        highlightClock.acceptNextSample()
-        forcedHighlight = ayah to seekMs
     }
 
     /**
