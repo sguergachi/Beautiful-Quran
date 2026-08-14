@@ -1103,6 +1103,10 @@ private fun LemmaSingleSenseRow(
                 HafsFontFamily,
             ),
             modifier = Modifier
+                // Reserve the fixed elbow before this text is measured. An
+                // unweighted lemma could otherwise take the whole row and
+                // leave the one-sense connector with no width to draw.
+                .weight(1f, fill = false)
                 .alignByBaseline()
                 .tightenHafsTopBearing(AnalysisArabicBearingCrop),
         )
@@ -1136,7 +1140,7 @@ private fun LemmaSingleSenseRow(
             style = glossStyle,
             color = glossColor,
             modifier = Modifier
-                .weight(1f)
+                .weight(2f)
                 .alignByBaseline(),
         )
     }

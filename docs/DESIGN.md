@@ -92,10 +92,11 @@ remove the bookmark while the lesson is teaching that hold.
 
 The ayah rail is the second use. On the first settled chapter opening, its live
 collapsed stack stays clear at the selected edge while the same vellum occupies
-the unused opposite paper. “Find any ayah — Press and drag this rail” sits
-across from the spotlight. Dragging the real rail both dismisses the
-lesson and blooms the existing scrub wheel; an ordinary page drag, Back, or
-**Got it** also puts the lesson away. It never opens over active recitation,
+the unused opposite paper. “Find any ayah — Tap, or drag up and down on this rail” sits
+across from the spotlight. A tap blooms the existing scrub wheel; a vertical drag
+blooms it while selecting an ayah. Either dismisses the lesson. A horizontal edge
+swipe stays available to Back; an ordinary page drag or **Got it** also puts the
+lesson away. It never opens over active recitation,
 chapter-flight motion, or before the initial reading position has settled.
 
 The guide system remains disabled by default while this language is being

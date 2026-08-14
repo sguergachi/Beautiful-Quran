@@ -145,4 +145,21 @@ class WashResetTest {
             prev = c
         }
     }
+
+    @Test
+    fun `a late correction after false convergence cannot replay the bloom`() {
+        val clock = HighlightClock()
+        clock.acceptNextSample()
+        var prev = clock.sample("ayah 7", 0L)
+        // A stale MediaController estimate can look exactly like realtime for
+        // long enough to pass the old convergence gate.
+        for (i in 1..60) {
+            val current = clock.sample("ayah 7", i * 33L)
+            assertTrue(current >= prev)
+            prev = current
+        }
+        // Its eventual authoritative correction is not another performance
+        // event and therefore cannot move the ink clock backward.
+        assertEquals(prev, clock.sample("ayah 7", 100L))
+    }
 }

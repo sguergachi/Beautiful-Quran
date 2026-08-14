@@ -41,10 +41,11 @@ class HighlightClockTest {
     }
 
     @Test
-    fun `a genuine backward seek passes through outside settle`() {
+    fun `a confirmed backward seek passes through outside settle`() {
         val clock = HighlightClock(minSettlePolls = 0, stablePollsNeeded = 0)
         clock.sample("a", 5000)
-        // Word tap / loop restart: jump well past the jitter threshold.
+        // Media3 confirmed a word tap / loop restart.
+        clock.acceptNextSample()
         assertEquals(1000L, clock.sample("a", 1000))
         assertEquals(1033L, clock.sample("a", 1033))
     }
@@ -58,22 +59,15 @@ class HighlightClockTest {
     }
 
     @Test
-    fun `regression exactly at the threshold is a seek outside settle`() {
-        val clock = HighlightClock(seekThresholdMs = 250, minSettlePolls = 0, stablePollsNeeded = 0)
+    fun `large regression outside settle is still a position correction`() {
+        val clock = HighlightClock(minSettlePolls = 0, stablePollsNeeded = 0)
         clock.sample("a", 1000)
-        assertEquals(750L, clock.sample("a", 750))
-    }
-
-    @Test
-    fun `regression just under the threshold is jitter`() {
-        val clock = HighlightClock(seekThresholdMs = 250, minSettlePolls = 0, stablePollsNeeded = 0)
-        clock.sample("a", 1000)
-        assertEquals(1000L, clock.sample("a", 751))
+        assertEquals(1000L, clock.sample("a", 100))
     }
 
     @Test
     fun `acceptNextSample lets a short backward seek through`() {
-        val clock = HighlightClock(seekThresholdMs = 250)
+        val clock = HighlightClock()
         clock.sample("a", 1000)
         // Word tap 100 ms earlier would normally be held as jitter.
         clock.acceptNextSample()
@@ -99,7 +93,7 @@ class HighlightClockTest {
 
     @Test
     fun `settle holds large regressions that would otherwise count as seeks`() {
-        val clock = HighlightClock(seekThresholdMs = 250)
+        val clock = HighlightClock()
         clock.sample("a", 0)
         // 90 ms/poll creep: clamped to 66 and never "believable", so the
         // settle is very much still active.
@@ -111,12 +105,12 @@ class HighlightClockTest {
     }
 
     @Test
-    fun `after settle expires a large regression is accepted as a seek`() {
+    fun `after settle expires a large correction is still held`() {
         val clock = HighlightClock(minSettlePolls = 2, stablePollsNeeded = 0, maxSettleStepMs = 10_000)
         clock.sample("a", 5000)
         clock.sample("a", 5033) // settleLeft 1 → 0
         clock.sample("a", 5066) // settle exhausted
-        assertEquals(1000L, clock.sample("a", 1000))
+        assertEquals(5066L, clock.sample("a", 1000))
     }
 
     @Test
@@ -135,13 +129,13 @@ class HighlightClockTest {
     }
 
     @Test
-    fun `a big regression passes once the clock has converged`() {
+    fun `a big correction is held once the clock has converged`() {
         val clock = HighlightClock()
         var clockMs = clock.sample("a", 0L)
         // Believable playback: converges, minimum window passes.
         for (i in 1..60) clockMs = clock.sample("a", i * 33L)
         assertEquals(1980L, clockMs)
-        assertEquals(300L, clock.sample("a", 300L))
+        assertEquals(1980L, clock.sample("a", 300L))
     }
 
     @Test
@@ -170,12 +164,13 @@ class HighlightClockTest {
     @Test
     fun `settle ends early once the estimate tracks realtime`() {
         // Normal playback right after a handoff: ~33 ms steps are believable,
-        // so the minimum window applies and the guard lifts at poll 12 — a
-        // genuine seek after that must pass immediately.
+        // so the minimum window applies and the guard lifts at poll 12. A
+        // real seek still requires Media3's discontinuity event.
         val clock = HighlightClock()
         var clockMs = clock.sample("ayah 7", 0L)
         for (i in 1..12) clockMs = clock.sample("ayah 7", i * 33L)
         assertEquals(396L, clockMs)
+        clock.acceptNextSample()
         assertEquals(100L, clock.sample("ayah 7", 100L))
     }
 }
