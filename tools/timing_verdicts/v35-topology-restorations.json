@@ -52,10 +52,10 @@
     "Minshawy_Murattal_128kbps:18:16": {
       "verdict": "accept", "kinds": ["topology"],
       "baselinePayloadHash": "a968bbc74e6888e689b914527dad269ee3c0b7e553855a3240a34f277d3a86c9",
-      "candidatePayloadHash": "0806069b958977b212372e5667b567c4d8b5efcf8d95ab8762636ab76b627781",
+      "candidatePayloadHash": "39f9692997cc2e697aeac2c9451e9f462082ebea90e5cc026d0b2678c8aace16",
       "evidence": {
         "kind": "dual_model_topology", "artifact": "tools/timing_verdicts/v35-topology-restorations.json",
-        "summary": "Both models prefer the restored 7–14 re-say despite its extra labels; the baseline leaves its loud separately voiced interval unmapped.",
+        "summary": "Both models prefer the restored 7–14 re-say despite its extra labels; the baseline leaves its loud separately voiced interval unmapped. Boundary review also restored the first word to its 420 ms Arabic XLSR onset instead of beginning its wash at 0 ms.",
         "audioSha256": "4f0c627d434085674578cb55d4b4e8c53332a1c2819a2e7dcc6000626e2c81a6", "waveformVeto": false,
         "models": [{"name": "arabic-xlsr-ctc", "baselineScore": -1123.728, "candidateScore": -972.422}, {"name": "mms-uroman-ctc", "baselineScore": -207.706, "candidateScore": -146.847}]
       }
@@ -83,13 +83,13 @@
     "Saood_ash-Shuraym_128kbps:7:146": {
       "verdict": "accept", "kinds": ["topology"],
       "baselinePayloadHash": "c8605f86c88076868a808445203a33cd8fb24b376c5a6f6d3b7e8bf65a89322c",
-      "candidatePayloadHash": "821fe92077c5421515714a4407a981921cbbd39f55a59a76ecec330910e6dbc7",
+      "candidatePayloadHash": "8043e73d705f02f8066f3a929e2f5d2acb14eea5d9c18d75d825d02f4cc1432b",
       "evidence": {
         "kind": "dual_model_topology", "artifact": "tools/timing_verdicts/v35-topology-restorations.json",
-        "summary": "Both models strongly prefer the restored 1–29 re-say despite 147 extra labels; the baseline mapped a 20-second voiced interval as one word. Boundary review then corrected the first pass: Arabic XLSR starts words 24/25 at 14,987/15,747 ms; independent Quran phonetics emits wa at 14,988 ms, yaraw's r at 15,831 ms, and the next سَبِيلَ at 16,153 ms. The shipped handoffs are 14,980/15,740/16,120 ms.",
+        "summary": "Both models strongly prefer the restored 1–29 re-say despite 147 extra labels; the baseline mapped a 20-second voiced interval as one word. Boundary review restored word 1 to its 380 ms Arabic XLSR onset, then corrected the first pass: Arabic XLSR starts words 24/25 at 14,987/15,747 ms; independent Quran phonetics emits wa at 14,988 ms, yaraw's r at 15,831 ms, and the next سَبِيلَ at 16,153 ms. The shipped handoffs are 14,980/15,740/16,120 ms.",
         "audioSha256": "605350c996dda34eec394a95e7c0cf3273b480107548165e20483338d209750a", "waveformVeto": false,
         "models": [{"name": "arabic-xlsr-ctc", "baselineScore": -2845.413, "candidateScore": -1662.385}, {"name": "mms-uroman-ctc", "baselineScore": -552.253, "candidateScore": -206.49}],
-        "boundaryWitnesses": [{"name": "arabic-xlsr-ctc", "wordStartsMs": {"24": 14987, "25": 15747}}, {"name": "quran-phonetics-free-ctc", "emissionsMs": {"wa": 14988, "yaraw_r": 15831, "next_sabila": 16153}}]
+        "boundaryWitnesses": [{"name": "arabic-xlsr-ctc", "wordStartsMs": {"1": 380, "24": 14987, "25": 15747}}, {"name": "quran-phonetics-free-ctc", "emissionsMs": {"wa": 14988, "yaraw_r": 15831, "next_sabila": 16153}}]
       }
     }
   }
