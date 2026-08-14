@@ -295,6 +295,8 @@ object TajweedPacing {
         var t = 0f
         var x = 0f
         fun glideTo(target: Float) {
+            // Opening park can already sit past later slot ends.
+            if (target <= x) return
             t += (target - x) / cruiseRate
             x = target
             times += t * spoken

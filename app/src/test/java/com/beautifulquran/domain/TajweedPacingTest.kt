@@ -379,6 +379,21 @@ class TajweedPacingTest {
     }
 
     @Test
+    fun `opening hold floor stays monotone on a long word`() {
+        // 16:22 مُّسۡتَكۡبِرُونَ — 8 letters, first-letter ghunnah. The 0.28
+        // floor sits past the second slot; later cruise must not walk back.
+        val word = "مُّسۡتَكۡبِرُونَ"
+        val curve = curveOf(word, hold = Hold(ghunnah = true))
+        var last = -1f
+        for (i in 0..200) {
+            val v = curve.at(i / 200f)
+            assertTrue("monotone at $i ($last → $v)", v + 1e-6f >= last)
+            last = v
+        }
+        assertTrue("opening ghunnah still parks visibly", curve.at(0.30f) > 0.22f)
+    }
+
+    @Test
     fun `wasl ikhfa holds the next word's opening letter`() {
         // 2:26 مِن قَبۡلُ — nūn + qāf (ikhfāʾ): sustain the qāf.
         val qablu = "قَبۡلُ"
@@ -507,7 +522,7 @@ class TajweedPacingTest {
             Hold(isAyahFinal = true, waqfShare = 0.8f),
             Hold(isAyahFinal = true, cruiseCap = 1f),
         )
-        for (word in listOf(dallin, sirat, anamta, qalu, nas, "هَـٰٓؤُلَآءِ")) {
+        for (word in listOf(dallin, sirat, anamta, qalu, nas, "هَـٰٓؤُلَآءِ", "مُّسۡتَكۡبِرُونَ")) {
             for (spoken in listOf(0.4f, 0.75f, 1f)) {
                 for (hold in holds) {
                     val curve = TajweedPacing.curve(word, spoken, hold) ?: continue
