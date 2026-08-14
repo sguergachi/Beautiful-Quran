@@ -29,6 +29,13 @@ data class NowPlaying(
     val reciterId: Int,
 )
 
+/** Cumulative Media3 position events. Every jump advances [clockId], while
+ * only a new ink performance advances [inkId]. */
+data class PlaybackPositionEvents(
+    val clockId: Long = 0L,
+    val inkId: Long = 0L,
+)
+
 data class PlayerUiState(
     val isConnected: Boolean = false,
     val isPlaying: Boolean = false,
@@ -39,6 +46,21 @@ data class PlayerUiState(
     val repeatRange: IntRange? = null,
     val speed: Float = 1f,
     val error: String? = null,
+    val positionEvents: PlaybackPositionEvents = PlaybackPositionEvents(),
+)
+
+/** Only a deliberate seek, automatic repeat, or playlist replacement starts
+ * a new ink performance. Source corrections and skipped silence never do. */
+internal fun discontinuityRestartsInk(reason: Int): Boolean =
+    reason == Player.DISCONTINUITY_REASON_SEEK ||
+        reason == Player.DISCONTINUITY_REASON_AUTO_TRANSITION ||
+        reason == Player.DISCONTINUITY_REASON_REMOVE
+
+internal fun PlaybackPositionEvents.afterDiscontinuity(
+    reason: Int,
+): PlaybackPositionEvents = copy(
+    clockId = clockId + 1L,
+    inkId = inkId + if (discontinuityRestartsInk(reason)) 1L else 0L,
 )
 
 /**
@@ -109,7 +131,9 @@ class PlayerController(private val context: Context) {
                     this@PlayerController.controller = null
                     basmalahLeadIn = false
                     voiceEnergy.release()
-                    _state.value = PlayerUiState()
+                    _state.value = PlayerUiState(
+                        positionEvents = _state.value.positionEvents,
+                    )
                 }
             })
             .buildAsync()
@@ -122,6 +146,16 @@ class PlayerController(private val context: Context) {
     }
 
     private val listener = object : Player.Listener {
+        override fun onPositionDiscontinuity(
+            oldPosition: Player.PositionInfo,
+            newPosition: Player.PositionInfo,
+            reason: Int,
+        ) {
+            _state.value = _state.value.copy(
+                positionEvents = _state.value.positionEvents.afterDiscontinuity(reason),
+            )
+        }
+
         override fun onEvents(player: Player, events: Player.Events) {
             if (player.playbackState != Player.STATE_ENDED) {
                 endedLoopHandledIndex = null

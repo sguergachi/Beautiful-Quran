@@ -118,11 +118,12 @@ applies `distinctUntilChanged` on the **derived word position**, so
 downstream state changes ~2–3×/second during recitation, not 30×. The loop
 runs only while the surah is loaded (`flatMapLatest` + `WhileSubscribed`),
 drops to a gentle 250 ms poll while paused, and stops entirely when the
-reader leaves the screen. Play/pause is part of the `flatMapLatest` identity,
-so resuming cancels any paused sleep and samples immediately; a word tap cannot
-start audio up to 250 ms before its ink restart. Repeat / high-water tables are
-built once when timings load (`HighlightEngine.PreparedTimings`); the lookup
-itself is a binary search + O(1) table read that allocates nothing.
+reader leaves the screen. Play/pause and Media3's authoritative position-event
+counter are part of the `flatMapLatest` identity, so resuming or receiving any
+seek/loop/adjustment cancels a paused sleep and samples immediately; a word tap
+cannot start audio up to 250 ms before its ink restart. Repeat / high-water
+tables are built once when timings load (`HighlightEngine.PreparedTimings`);
+the lookup itself is a binary search + O(1) table read that allocates nothing.
 
 The *poll* is not allocation-free, though: every tick builds an
 `ActiveInfo` and an `ActiveWord`, and `distinctUntilChanged` discards them

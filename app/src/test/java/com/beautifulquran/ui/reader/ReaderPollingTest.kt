@@ -1,6 +1,7 @@
 package com.beautifulquran.ui.reader
 
 import com.beautifulquran.playback.NowPlaying
+import com.beautifulquran.playback.PlaybackPositionEvents
 import com.beautifulquran.playback.PlayerUiState
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
@@ -33,6 +34,23 @@ class ReaderPollingTest {
             pollingIdentity(playing, loadedSurahId = 2) { it },
             pollingIdentity(
                 playing.copy(isBuffering = true, speed = 1.5f, error = "ignored"),
+                loadedSurahId = 2,
+            ) { it },
+        )
+    }
+
+    @Test
+    fun `confirmed position event restarts the polling flow`() {
+        val playing = PlayerUiState(
+            isPlaying = true,
+            nowPlaying = NowPlaying(surahId = 2, ayah = 5, reciterId = 7),
+            positionEvents = PlaybackPositionEvents(clockId = 4L),
+        )
+
+        assertNotEquals(
+            pollingIdentity(playing, loadedSurahId = 2) { it },
+            pollingIdentity(
+                playing.copy(positionEvents = PlaybackPositionEvents(clockId = 5L)),
                 loadedSurahId = 2,
             ) { it },
         )

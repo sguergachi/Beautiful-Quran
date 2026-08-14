@@ -167,6 +167,12 @@ per-item derivedStateOf in the reader list  ──►  one ayah recomposes
   audible (`flatMapLatest` on the playing state) and publishes only *changes*
   (word boundaries), so downstream recomposition happens ~2–3×/sec during
   recitation, not 30×.
+- `HighlightClock` never guesses that a large backward position correction is
+  a seek. `PlayerController` publishes every authoritative Media3 discontinuity
+  to the clock but identifies only seeks/repeats/playlist replacement as new
+  ink performances. That Media3-owned ink generation is the word activation,
+  so a seek produces one bloom while later position adjustments rebase the
+  clock silently.
 - `HighlightEngine` holds a word lit through inter-word gaps (karaoke
   behavior), lights nothing before the first word (covers the basmalah lead
   on first-ayah audio) and nothing after the last word ends.
