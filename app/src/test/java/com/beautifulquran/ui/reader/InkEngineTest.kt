@@ -2,6 +2,8 @@ package com.beautifulquran.ui.reader
 
 import com.beautifulquran.data.model.Segment
 import com.beautifulquran.domain.BasmalahWash
+import com.beautifulquran.domain.HighlightEngine
+import com.beautifulquran.domain.OutputLatency
 import com.beautifulquran.ui.reader.InkEngine.State
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -511,6 +513,25 @@ class InkEngineTest {
         } finally {
             InkEngine.highlightLeadMs = savedLead
         }
+    }
+
+    @Test
+    fun `shipped clock does not advance past a short word`() {
+        // Shuraym 7:146's repeated "لا" lasts 160 ms. A shipped 114 ms
+        // lead lit the following "يتخذوه" for 71% of that word's voice.
+        val segments = listOf(
+            Segment(position = 21, startMs = 31_820, endMs = 31_980),
+            Segment(position = 22, startMs = 31_980, endMs = 32_980),
+        )
+
+        val duringLa = OutputLatency.highlightMs(
+            mediaPositionMs = 31_866,
+            latencyMs = 0,
+            leadMs = InkEngine.DEFAULT_HIGHLIGHT_LEAD_MS.toLong(),
+            leadNotBeforeMs = 19_920,
+        )
+
+        assertEquals(21, HighlightEngine.activeWord(segments, duringLa))
     }
 
     @Test

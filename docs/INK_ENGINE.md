@@ -437,12 +437,13 @@ tween-vs-snap rules, sweep entry and residual rules, repeat wash timing, the
   feather, sweep easing, and tajweed pacing. `InkEngine.tuning` is
   snapshot-backed (`mutableStateOf`), so release builds read constants while
   the Ink Lab can retune a live session.
-- **Sync knobs, deliberately outside `Tuning`**: `highlightLeadMs` (default 114),
+- **Sync knobs, deliberately outside `Tuning`**: `highlightLeadMs` (default 0),
   `fadeLeadMs` (default 500) and `outputLatencyOverrideMs` (null = use the route
   preset). These move *when* things fire rather than how the ink feels, so they
   stay out of the data class that **Copy values** transcribes — but they persist
   with it via `InkLabStore`. `fadeLeadMs` is how far the ayah focus/recess target
-  runs ahead of the audio; `highlightLeadMs` advances word ink only. Both start
+  runs ahead of the audio; a nonzero Ink Lab `highlightLeadMs` advances word ink
+  only. Both start
   from the same latency-corrected heard position, a contract enforced in
   `ReaderViewModel`; the highlight lead is suppressed during encoded silence
   before the first word — see

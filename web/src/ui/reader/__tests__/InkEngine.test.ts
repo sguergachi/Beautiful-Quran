@@ -40,6 +40,10 @@ function states(count: number, activeWord: ActiveWord | null): InkState[] {
 describe('InkEngine', () => {
   beforeEach(() => resetTuning())
 
+  it('ships with no word-boundary lead', () => {
+    expect(DEFAULT_HIGHLIGHT_LEAD_MS).toBe(0)
+  })
+
   it('idle ayah words are plain, recessed ayah words are upcoming', () => {
     expect(wordState(1, null, false, false)).toBe(InkState.Plain)
     expect(wordState(1, null, false, true)).toBe(InkState.Upcoming)

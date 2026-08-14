@@ -1,10 +1,11 @@
 # Output latency (Bluetooth karaoke sync)
 
-**Status: implemented on Android; web applies word-ink lead with LOCAL lag.**
+**Status: implemented on Android and web; shipped word selection uses LOCAL lag
+and no word-boundary lead.**
 The reader subtracts a small, route-based delay from the media playhead
 before the highlight clock and `HighlightEngine` see it. Web ports the pure
 `OutputLatency` helpers and feeds `highlightMs(..., leadMs)` into
-`HighlightClock` (default lead 114). Browser output-route classification is
+`HighlightClock` (default lead 0). Browser output-route classification is
 still hard, so web lag stays at LOCAL (0 ms) until a monitor exists.
 
 ## Why
@@ -49,7 +50,7 @@ the other consumers must not:
 
 | Consumer | Clock |
 |---|---|
-| Word ink (`activeWord`) | Heard position; + `highlightLeadMs` after word 1 starts |
+| Word ink (`activeWord`) | Heard position; optional explicit Ink Lab lead after word 1 starts |
 | Ayah fade lead (`ayahWithFadeLead`) | Heard position + its own `fadeLeadMs` |
 | Basmalah calligraphy wash | Heard position |
 
@@ -62,8 +63,9 @@ ink poll's behalf.
 item*, because the fade-led ayah names the next verse before a note of it is
 heard — persisting that recorded verses the listener never reached.
 
-**Highlight lead** (Ink Lab → Highlight, default 114; persists with other lab numbers) advances the
-query time so each word’s wash can start *before* its segment `startMs`. It is
+**Highlight lead** (Ink Lab → Highlight, default 0; persists with other lab numbers) advances the
+query time only when explicitly tuned, so each word’s wash can start *before*
+its segment `startMs`. It is
 the opposite direction of output lag: lag delays ink to match late audio; lead
 runs ink ahead of the timing table. That early budget also raises the short-hold
 sweep floor (`minSweepMs + highlightLeadMs`) so small words and wasl tails can

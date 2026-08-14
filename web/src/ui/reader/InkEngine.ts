@@ -109,7 +109,7 @@ export function word(
 }
 
 /** Port of Android `InkEngine.DEFAULT_HIGHLIGHT_LEAD_MS`. */
-export const DEFAULT_HIGHLIGHT_LEAD_MS = 114
+export const DEFAULT_HIGHLIGHT_LEAD_MS = 0
 
 /** Word-ink lead (ms). Live-tunable on Android; web keeps the shipped default. */
 let highlightLeadMs = DEFAULT_HIGHLIGHT_LEAD_MS

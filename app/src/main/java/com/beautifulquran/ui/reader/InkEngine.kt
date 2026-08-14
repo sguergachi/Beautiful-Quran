@@ -256,8 +256,9 @@ object InkEngine {
     /**
      * How early word ink runs ahead of [com.beautifulquran.domain.HighlightEngine]
      * segment times (ms). Added to the playhead before the engine query so
-     * the next word's wash can start before the timed startMs.
-     * Default [DEFAULT_HIGHLIGHT_LEAD_MS].
+     * the next word's wash can start before the timed startMs. The shipped
+     * default is zero: a nonzero value is an explicit Ink Lab audition, never
+     * a hidden change to the timing table's word boundary.
      */
     private var highlightLeadState by mutableStateOf(DEFAULT_HIGHLIGHT_LEAD_MS)
     var highlightLeadMs: Int
@@ -304,7 +305,7 @@ object InkEngine {
         }
 
     /** Shipped defaults for highlight sync (lab knobs start here). */
-    const val DEFAULT_HIGHLIGHT_LEAD_MS = 114
+    const val DEFAULT_HIGHLIGHT_LEAD_MS = 0
     const val DEFAULT_FADE_LEAD_MS = 500
 
     /**
