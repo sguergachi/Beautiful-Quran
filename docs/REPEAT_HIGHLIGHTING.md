@@ -11,15 +11,15 @@ data comes from, and the traps we hit making it ship.
 ## Current state
 
 Repeat-aware qdc timings are **shipped**. Measured against the committed
-`data/quran.db` (re-verified 2026-07-30):
+`data/quran.db` (re-verified 2026-08-14):
 
 | Fact | Value |
 |---|---|
-| Timing rows | 43,639 |
-| Genuine backtracks (`position < maxBefore`) | 9,129 |
-| Segments returning to the historical high-water (`position == maxBefore`) | 4,191 |
-| Consecutive same-position pairs | 1,074 |
-| Rows with a pair but no lower backtrack | 873 |
+| Timing rows | 43,641 |
+| Genuine backtracks (`position < maxBefore`) | 8,947 |
+| Segments returning to the historical high-water (`position == maxBefore`) | 4,111 |
+| Consecutive same-position pairs | 1,026 |
+| Rows with a pair but no lower backtrack | 838 |
 
 **`HighlightEngine`'s repeat test is `position <= maxBefore`, and the `<=` is
 load-bearing. Do not "tighten" it to `<`.** Two things depend on it:
@@ -420,6 +420,14 @@ HighlightEngine.PreparedTimings.activeInfo(positionMs)
   an in-flight wash (no `LaunchedEffect(activation)` cancel; no snap
   incomplete→full). Release finishes any residual progress by animating the
   remainder, then dissolves alpha (web: `runRepeatReleaseAsync`).
+
+  This replaced a serialized 450 ms minimum that could not stay on the audio
+  clock: short words accumulated queue debt even though their database
+  boundaries were correct. A corpus replay of the removed policy found visual
+  delay in 499 timing rows (70 reached at least 250 ms and 10 reached at least
+  450 ms). Shuraym 7:146 was 670 ms behind by repeated word 18; Minshawy 18:16
+  reached 215 ms at its final repeated word. The full Shuraym boundary chain is
+  an executable regression in `InkEngineTest`.
 - **The orange blooms from the read (full-ink) colour, not the dim unread one.**
   A repeated word was already recited, so its base ink stays full strength and
   the orange arrives as its **own directional wash on top** — it does not re-run

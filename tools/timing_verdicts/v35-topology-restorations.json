@@ -62,12 +62,12 @@
     },
     "Abdurrahmaan_As-Sudais_192kbps:4:123": {
       "verdict": "accept", "kinds": ["added"], "baselinePayloadHash": null,
-      "candidatePayloadHash": "bd032b76471a986ee84139c0379f0257e59c704d4646cfb66948a6869dfd852c",
+      "candidatePayloadHash": "93d6f9ac28f3323220105886cc4d87e70d598405af5f576b6c6d47ed1d6eb402",
       "evidence": {
         "kind": "dual_model_topology", "artifact": "tools/timing_verdicts/v35-topology-restorations.json",
-        "summary": "The recovered full-coverage row is independently force-alignable by both models; words 8–9 now use their dual-model Pareto starts (5,224 and 6,285 ms) rather than the earlier source boundaries.",
+        "summary": "The recovered full-coverage row is independently force-alignable by both models. Exact-audio spectrogram review places the word 7→8 acoustic handoff at 5,350–5,370 ms, corroborated by the Arabic XLSR word-8 onset at 5,544 ms and MMS edge alignment at 5,440 ms; the shipped handoff is 5,360 ms. Word 9 remains at its corroborated 6,285 ms onset.",
         "audioSha256": "5f5ec859a4f7d307521495f79e745aa29fe947bb86357833adabb6d714f7824d", "waveformVeto": false,
-        "models": [{"name": "arabic-xlsr-ctc", "baselineScore": null, "candidateScore": -142.493}, {"name": "mms-uroman-ctc", "baselineScore": null, "candidateScore": -44.848}]
+        "models": [{"name": "arabic-xlsr-ctc", "baselineScore": null, "candidateScore": -142.493, "word8StartMs": 5544}, {"name": "mms-uroman-ctc", "baselineScore": null, "candidateScore": -44.848, "word8EdgeMs": 5440}]
       }
     },
     "Abdurrahmaan_As-Sudais_192kbps:6:104": {

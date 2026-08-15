@@ -1,9 +1,9 @@
 {
   "id": "boundary-sudais-4-123",
-  "label": "Sudais 4:123 recovered words 8–9 use dual-model onsets",
-  "refs": ["Arabic XLSR fixed-sequence witness", "MMS Uroman fixed-sequence witness"],
+  "label": "Sudais 4:123 word 8 waits for the acoustic handoff",
+  "refs": ["exact-audio spectrogram", "Arabic XLSR fixed-sequence witness", "MMS edge alignment"],
   "pipeline": "boundary_repair",
   "input_segments": [[6,3930,4920],[7,4920,5110],[8,5110,6030],[9,6030,8170],[10,8170,8940]],
-  "repair_segments": [[7,4920,5224],[8,5224,6285],[9,6285,8170]],
-  "expected_segments": [[6,3930,4920],[7,4920,5224],[8,5224,6285],[9,6285,8170],[10,8170,8940]]
+  "repair_segments": [[7,4920,5360],[8,5360,6285],[9,6285,8170]],
+  "expected_segments": [[6,3930,4920],[7,4920,5360],[8,5360,6285],[9,6285,8170],[10,8170,8940]]
 }

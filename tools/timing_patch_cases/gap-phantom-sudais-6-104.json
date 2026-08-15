@@ -4,7 +4,7 @@
   "refs": ["everyayah audio ear/ASR check"],
   "pipeline": "clean_qdc_artifacts",
   "recover_singleton_gap": true,
-  "notes": "qdc labels the interval after word 2 as word 1, then resumes at word 4. The exact streamed MP3 is one pass, so this singleton is the missing word 3, not a repeat of word 1.",
+  "notes": "qdc labels the interval after word 2 as word 1, then resumes at word 4. The audio moves directly from word 2 to word 3 here, so this singleton is the missing word 3, not a repeat of word 1; the separate later repeat of words 9–11 remains genuine.",
   "input_positions": [
     1, 2, 1, 4, 5, 6, 7, 8, 9, 10, 11, 9, 10, 11,
     12, 13, 14, 15

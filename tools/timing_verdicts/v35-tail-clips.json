@@ -22,13 +22,20 @@
       "verdict": "accept",
       "kinds": ["timestamp"],
       "baselinePayloadHash": "4b9d99bbfcd074bd27d737911a83f4fa2912b2d3c3327eb9afa0205c1cd8a144",
-      "candidatePayloadHash": "4def96479dee2b189eddd7075d8ae121d702432db445af780586481bc2fdb6be",
+      "candidatePayloadHash": "2aa546be05b432ed876967a4db81853bc302fc29f861b41bb4b25b316bd37854",
       "evidence": {
-        "kind": "duration_tail_clip",
-        "summary": "The MPEG-frame duration is 3,532 ms; the baseline starts and all internal boundaries are retained and only its 23 ms unreachable tail is clipped.",
+        "kind": "dual_model_boundary",
+        "summary": "The final word boundary moves from 2,320 to the Arabic XLSR onset at 2,204 ms; independent MMS places it still earlier at 2,044 ms, so both witnesses improve. The MPEG-frame duration is 3,532 ms and its unreachable 23 ms tail remains clipped.",
         "artifact": "tools/timing_verdicts/v35-tail-clips.json",
         "audioSha256": "39c34956fe624fa8cdf47c88f2e0b700180a7f3828496958eae12e26066ecada",
-        "measuredDurationMs": 3532
+        "waveformVeto": false,
+        "models": [
+          {"name": "arabic-xlsr-ctc", "word3StartMs": 2204},
+          {"name": "mms-uroman-ctc", "word3StartMs": 2044}
+        ],
+        "measuredDurationMs": 3532,
+        "arabicXlsrWord3StartMs": 2204,
+        "mmsUromanWord3StartMs": 2044
       }
     }
   }
