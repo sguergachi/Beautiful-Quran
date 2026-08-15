@@ -295,7 +295,6 @@ object TajweedPacing {
         var t = 0f
         var x = 0f
         fun glideTo(target: Float) {
-            // Opening crawl can already sit past later slot ends.
             if (target <= x) return
             t += (target - x) / cruiseRate
             x = target
@@ -312,23 +311,11 @@ object TajweedPacing {
             // Park mid-letter: the glyph is caught half-bloomed, visibly being
             // sustained, rather than held before or after itself.
             val slotStart = slotEnd - slotWidth(i, n, counts, lastPronounced)
-            val mid = slotStart + HOLD_ANCHOR * (slotEnd - slotStart)
-            val openingOwn = !waslEntry && slotStart <= 0f &&
-                (counts[i] >= MADD_MUTTASIL || isGhunnah(events[i]))
-            if (openingOwn) {
-                // Spend the dwell crawling to a visible bloom. Parking at
-                // OPENING_HOLD_MIN froze a visible edge (start-stop).
-                t += dwellShare * excess[i] / excessTotal
-                x = maxOf(x, OPENING_HOLD_MIN)
-                times += t * spoken
-                positions += x
-            } else {
-                glideTo(mid)
-                t += dwellShare * excess[i] / excessTotal
-                x += creep * (slotEnd - slotStart)
-                times += t * spoken
-                positions += x
-            }
+            glideTo(slotStart + HOLD_ANCHOR * (slotEnd - slotStart))
+            t += dwellShare * excess[i] / excessTotal
+            x += creep * (slotEnd - slotStart)
+            times += t * spoken
+            positions += x
         }
         // A held final letter still has the tail of its own slot to cross.
         if (x < 1f) glideTo(1f)
@@ -556,13 +543,6 @@ object TajweedPacing {
     /** Where inside its own slot the wash parks: half-way, so the held letter
      * is caught mid-bloom rather than sustained before or after itself. */
     private const val HOLD_ANCHOR = 0.5f
-    /**
-     * Where a word-initial madd/ghunnah crawl finishes. Mid-slot of the
-     * first letter is ~0.10 (resting alpha under the paced feather); 0.28
-     * is mid-bloom of the opening edge. The dwell *moves* here — it does
-     * not park. 4:143 `هَـٰٓؤُلَآءِ`.
-     */
-    private const val OPENING_HOLD_MIN = 0.28f
     /** Default junction for long donors; short donors may begin earlier. */
     private const val WASL_EXIT_FRACTION = 0.82f
     /** Floor on the wasl prefix bloom window (matches 1 − [WASL_EXIT_FRACTION]). */

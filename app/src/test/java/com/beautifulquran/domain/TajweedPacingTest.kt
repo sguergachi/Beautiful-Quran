@@ -365,32 +365,14 @@ class TajweedPacingTest {
     }
 
     @Test
-    fun `word-initial madd crawls far enough that the opening letter blooms`() {
-        // 4:143 هَـٰٓؤُلَآءِ — madd muttasil on the first letter. The dwell
-        // must carry the wash past first-slot mid (0.10, still resting alpha)
-        // without freezing a visible edge.
+    fun `word-initial madd holds in its own first slot`() {
+        // 4:143 هَـٰٓؤُلَآءِ — do not pull the opening park to ~0.28; that
+        // froze a visible wash edge. Mid-slot of five letters is 0.10.
         val curve = curveOf("هَـٰٓؤُلَآءِ")
-        val midCrawl = curve.at(0.08f)
-        val endCrawl = curve.at(0.20f)
-        assertTrue("opening crawl should keep moving, $midCrawl → $endCrawl", endCrawl > midCrawl + 0.05f)
-        assertTrue("opening crawl should reach a visible bloom, at $endCrawl", endCrawl > 0.22f)
+        val held = curve.at(0.25f)
+        assertTrue("opening madd should stay in the first slot, at $held", held < 0.20f)
         val later = curve.at(0.85f) - curve.at(0.55f)
         assertTrue("the rest of the word should still cruise, moved $later", later > 0.15f)
-    }
-
-    @Test
-    fun `opening crawl stays monotone on a long word`() {
-        // 16:22 مُّسۡتَكۡبِرُونَ — 8 letters, first-letter ghunnah. The crawl
-        // finishes past the second slot; later cruise must not walk back.
-        val word = "مُّسۡتَكۡبِرُونَ"
-        val curve = curveOf(word, hold = Hold(ghunnah = true))
-        var last = -1f
-        for (i in 0..200) {
-            val v = curve.at(i / 200f)
-            assertTrue("monotone at $i ($last → $v)", v + 1e-6f >= last)
-            last = v
-        }
-        assertTrue("opening crawl still reaches a visible bloom", curve.at(0.30f) > 0.22f)
     }
 
     @Test
