@@ -119,6 +119,38 @@ describe('ornamentGenerator', () => {
     }
   })
 
+  it('medallion zones never graze, and never leave a bare core', () => {
+    // Mirrors the Android suite. Two motifs a hair apart read as a
+    // misprint, and a small motif floating in a bare field is the ugliest
+    // thing this generator can produce — both are structural, so both are
+    // pinned rather than left to the eye.
+    for (let seed = 0; seed < 400; seed++) {
+      const m = generateCoverOrnament(seed * 104729 + 13).medallion
+      const at = `seed ${seed}`
+      const radii = [
+        ...new Set(
+          m.strokes.map((s) =>
+            Math.round(Math.max(...s.points.map((p) => Math.hypot(p.x - 0.5, p.y - 0.5))) * 1e6),
+          ),
+        ),
+      ]
+        .map((r) => r / 1e6)
+        .sort((a, b) => b - a)
+
+      expect(radii[0]!).toBeCloseTo(0.485, 6)
+      expect(radii[1]! - radii[2]!, `${at}: star grazes the rule`).toBeGreaterThanOrEqual(0.028)
+      expect(radii.length, `${at}: too few zones`).toBeGreaterThanOrEqual(5)
+      expect(radii[radii.length - 1]!, `${at}: hollow core`).toBeLessThanOrEqual(0.1)
+      for (let i = 0; i + 1 < radii.length; i++) {
+        const outer = radii[i]!
+        const inner = radii[i + 1]!
+        expect(outer - inner, `${at}: zones nearly coincide`).toBeGreaterThanOrEqual(0.02)
+        // Below the two rules, every zone is sized from its parent.
+        if (i >= 1) expect(inner / outer, `${at}: speck in a bare zone`).toBeGreaterThanOrEqual(0.32)
+      }
+    }
+  })
+
   it('star-and-cross field kisses at every cell-edge midpoint', () => {
     // The star's four cardinal points must land exactly on the cell-edge
     // midpoints, so when the cell tiles each star meets its orthogonal
