@@ -1,0 +1,11 @@
+{
+  "id": "qdc-clock-tail-clamp-hani-88-25",
+  "label": "Hani 88:25 keeps its valid clock when only the final fade overruns",
+  "refs": ["exact EveryAyah Hani_Rifai_192kbps_088025.mp3"],
+  "pipeline": "qdc_clock_rebase",
+  "audio_duration_ms": 3532,
+  "input_segments": [[1,0,790],[2,790,2080],[3,2080,3315]],
+  "reference_segments": [[1,260,1030],[2,1030,2320],[3,2320,3555]],
+  "expected_segments": [[1,260,1030],[2,1030,2320],[3,2320,3532]],
+  "notes": "The duration correction is real, but it can only trim the 23 ms final tail; falling back to the raw QDC clock moves all three words early."
+}

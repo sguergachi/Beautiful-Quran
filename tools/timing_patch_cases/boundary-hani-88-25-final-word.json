@@ -1,0 +1,9 @@
+{
+  "id": "boundary-hani-88-25-final-word",
+  "label": "Hani 88:25 final word follows two independent CTC witnesses",
+  "refs": ["Arabic XLSR fixed-sequence witness", "MMS Uroman fixed-sequence witness"],
+  "pipeline": "boundary_repair",
+  "input_segments": [[1,260,1030],[2,1030,2320],[3,2320,3532]],
+  "repair_segments": [[2,1030,2204],[3,2204,3532]],
+  "expected_segments": [[1,260,1030],[2,1030,2204],[3,2204,3532]]
+}

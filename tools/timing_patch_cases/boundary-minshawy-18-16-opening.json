@@ -1,0 +1,10 @@
+{
+  "id": "boundary-minshawy-18-16-opening",
+  "label": "Minshawy 18:16 first word waits for the spoken onset",
+  "refs": ["Arabic XLSR fixed-sequence witness"],
+  "pipeline": "boundary_repair",
+  "occurrence": 1,
+  "input_segments": [[1,0,1140],[2,1140,3160]],
+  "repair_segments": [[1,420,1140]],
+  "expected_segments": [[1,420,1140],[2,1140,3160]]
+}

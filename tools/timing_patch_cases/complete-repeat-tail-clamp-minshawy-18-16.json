@@ -1,0 +1,17 @@
+{
+  "id": "complete-repeat-tail-clamp-minshawy-18-16",
+  "label": "Minshawy 18:16 keeps its complete audible phrase re-say",
+  "refs": ["raw QDC topology", "EveryAyah waveform review"],
+  "pipeline": "complete_repeat_topology",
+  "notes": "A complete repeat-aware source is safe to retain when only its final fade reaches beyond the measured MP3. Missing-source rows remain on the monotonic fallback because filling them could invent topology.",
+  "n_words": 4,
+  "audio_duration_ms": 1000,
+  "input_segments": [
+    [1, 0, 100], [2, 100, 200], [3, 200, 300],
+    [1, 320, 600], [2, 600, 700], [3, 700, 800], [4, 800, 1100]
+  ],
+  "expected_segments": [
+    [1, 0, 100], [2, 100, 200], [3, 200, 300],
+    [1, 320, 600], [2, 600, 700], [3, 700, 800], [4, 800, 1000]
+  ]
+}

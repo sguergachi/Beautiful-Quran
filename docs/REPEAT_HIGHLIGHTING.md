@@ -11,15 +11,15 @@ data comes from, and the traps we hit making it ship.
 ## Current state
 
 Repeat-aware qdc timings are **shipped**. Measured against the committed
-`data/quran.db` (re-verified 2026-07-30):
+`data/quran.db` (re-verified 2026-08-14):
 
 | Fact | Value |
 |---|---|
-| Timing rows | 43,639 |
-| Genuine backtracks (`position < maxBefore`) | 9,129 |
-| Segments returning to the historical high-water (`position == maxBefore`) | 4,191 |
-| Consecutive same-position pairs | 1,074 |
-| Rows with a pair but no lower backtrack | 873 |
+| Timing rows | 43,641 |
+| Genuine backtracks (`position < maxBefore`) | 8,947 |
+| Segments returning to the historical high-water (`position == maxBefore`) | 4,111 |
+| Consecutive same-position pairs | 1,026 |
+| Rows with a pair but no lower backtrack | 838 |
 
 **`HighlightEngine`'s repeat test is `position <= maxBefore`, and the `<=` is
 load-bearing. Do not "tighten" it to `<`.** Two things depend on it:
@@ -337,8 +337,10 @@ are **not audible repeats**. Artifact classes scrubbed in `clean_qdc_artifacts`
    (`QDC_SPAN_CONNECT_GAP`). Locked by `tools/timing_patch_cases/noncontiguous-*.json`.
 5. **Backtrack-gap phantoms.** A backtrack run followed by a resume that skips
    first-pass words occupies those missing words' time (`…11,8,9,13…`, word 12
-   absent). Relabel the run onto the gap. A real earlier re-say that resumes at
-   `highWater + 1` is untouched.
+   absent). A one-segment backtrack (`…2,1,4…`) is retried as a coverage-only
+   recovery only when no reference or CTC repair completes the row; it then
+   relabels onto word 3 rather than losing the sole coverage witness as a
+   stray. A real earlier re-say that resumes at `highWater + 1` is untouched.
 6. **Forward-gap duplicates.** A duplicated destination exactly accounts for
    an otherwise absent gap (`1,3,3,4` becomes `1,2,3,4`). If the skipped word
    appears anywhere later, the rule abstains; Alafasy 16:106 locks that
@@ -407,17 +409,25 @@ HighlightEngine.PreparedTimings.activeInfo(positionMs)
   entry or a genuine non-zero seek activation while that same word remains
   Active can begin that sweep. A session's older seek generation must not
   queue a second wash as each later chain member becomes Active.
-- **Sequential residual wash (law).** Members wash **one after another** in
-  **word-position order** via a per-ayah gate (`OrderedWashGate` /
-  web `createRepeatWashGate` — sorted by position, not mere enqueue FIFO).
-  Word *N+1* cannot start its orange feather until word *N* has finished 0→1.
-  On Android, duration follows the active word's measured sweep with
-  `Tuning.repeatSweepMs` as a floor, so a held word keeps its tajweed timing
-  while a short Active window still gets a full soft edge. Web, pending its
-  tajweed pacing port, uses `repeatSweepMs`. Active handoff must **not** cancel
+- **Audio-bound residual wash (law).** On Android, every live member begins at
+  its own spoken boundary and uses its measured audio dwell. A predecessor may
+  finish its soft residual edge concurrently, but can never queue ahead of the
+  word being spoken. `Tuning.repeatSweepMs` is only a fallback when no active-
+  word clock exists. Seeking into the middle of a chain marks earlier inactive
+  members complete and reveals only the current word; replaying the already-
+  heard prefix would manufacture seconds of lag. Web, pending its tajweed
+  pacing port, uses `repeatSweepMs`. Active handoff must **not** cancel
   an in-flight wash (no `LaunchedEffect(activation)` cancel; no snap
   incomplete→full). Release finishes any residual progress by animating the
   remainder, then dissolves alpha (web: `runRepeatReleaseAsync`).
+
+  This replaced a serialized 450 ms minimum that could not stay on the audio
+  clock: short words accumulated queue debt even though their database
+  boundaries were correct. A corpus replay of the removed policy found visual
+  delay in 499 timing rows (70 reached at least 250 ms and 10 reached at least
+  450 ms). Shuraym 7:146 was 670 ms behind by repeated word 18; Minshawy 18:16
+  reached 215 ms at its final repeated word. The full Shuraym boundary chain is
+  an executable regression in `InkEngineTest`.
 - **The orange blooms from the read (full-ink) colour, not the dim unread one.**
   A repeated word was already recited, so its base ink stays full strength and
   the orange arrives as its **own directional wash on top** — it does not re-run
@@ -433,15 +443,15 @@ HighlightEngine.PreparedTimings.activeInfo(positionMs)
   Android timing lives once in the ayah's per-word `InkMotion`
   (`rememberRepeatWash` is its internal repeat clock), shared by gloss, Hafs,
   and English; web uses `WordUnit` / `HafsWord`. On Android, chain entry captures the active
-  word's sweep duration, tajweed curve, and paced feather; the duration is
-  `max(sweepMs, Tuning.repeatSweepMs)` (450 ms by default). The capture happens
-  before the word waits in the position-ordered gate, so an Active handoff
-  cannot erase its pacing. On release, residual progress finishes under the
-  gate, then alpha dissolves over `Tuning.repeatFadeOutMs` (900 ms). Web keeps
-  the constant 450 ms clock until tajweed pacing is ported.
-  A chain member's displayed progress is pinned at 0 from its entry composition
-  until the ordered gate resets the retained animation clock, preventing a
-  one-frame full-orange/glimmer flash before the directional edge begins.
+  word's measured sweep duration, tajweed curve, and paced feather;
+  `Tuning.repeatSweepMs` (450 ms by default) is used only without a live timing
+  clock. Each word owns that captured animation, so an Active handoff cannot
+  erase its pacing and a prior residual cannot delay the new word. On release,
+  residual progress finishes independently, then alpha dissolves over
+  `Tuning.repeatFadeOutMs` (900 ms). Web keeps the constant 450 ms clock until
+  tajweed pacing is ported. A live chain member's displayed progress is pinned
+  at 0 until its retained animation clock resets, preventing a one-frame full-
+  orange/glimmer flash before the directional edge begins.
   On Nightfall, each newly active repeat word also
   replays the white-gold glimmer over that orange bloom: the repeat is a new
   event even though the word's base ink was already revealed. This includes

@@ -83,7 +83,7 @@ class InkLabPanelTest {
         InkEngine.highlightLeadMs = InkEngine.DEFAULT_HIGHLIGHT_LEAD_MS
         InkEngine.fadeLeadMs = InkEngine.DEFAULT_FADE_LEAD_MS
         InkEngine.outputLatencyOverrideMs = null
-        assertEquals(114, InkEngine.DEFAULT_HIGHLIGHT_LEAD_MS)
+        assertEquals(0, InkEngine.DEFAULT_HIGHLIGHT_LEAD_MS)
         assertEquals(InkEngine.DEFAULT_HIGHLIGHT_LEAD_MS, InkEngine.highlightLeadMs)
         assertEquals(500, InkEngine.DEFAULT_FADE_LEAD_MS)
         assertEquals(InkEngine.DEFAULT_FADE_LEAD_MS, InkEngine.fadeLeadMs)

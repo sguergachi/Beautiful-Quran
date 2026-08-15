@@ -34,7 +34,7 @@ class InkLabStoreTest {
 
         assertEquals(ink, InkLabSnapshot().toTuning())
         assertEquals(guide, InkLabSnapshot().toContextualGuideTuning())
-        assertEquals(114, InkEngine.DEFAULT_HIGHLIGHT_LEAD_MS)
+        assertEquals(0, InkEngine.DEFAULT_HIGHLIGHT_LEAD_MS)
         assertEquals(500, InkEngine.DEFAULT_FADE_LEAD_MS)
         assertNull(InkLabSnapshot().outputLatencyOverrideMs)
     }

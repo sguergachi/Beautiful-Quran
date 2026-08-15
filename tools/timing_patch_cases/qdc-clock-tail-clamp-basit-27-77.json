@@ -1,0 +1,11 @@
+{
+  "id": "qdc-clock-tail-clamp-basit-27-77",
+  "label": "Abdul Basit 27:77 keeps its valid clock when only the final fade overruns",
+  "refs": ["exact EveryAyah Abdul_Basit_Murattal_64kbps_027077.mp3"],
+  "pipeline": "qdc_clock_rebase",
+  "audio_duration_ms": 8391,
+  "input_segments": [[1,0,2660],[2,2660,3944],[3,3944,5618],[4,5618,8305]],
+  "reference_segments": [[1,717,2752],[2,2752,4036],[3,4036,5710],[4,5710,8397]],
+  "expected_segments": [[1,717,2752],[2,2752,4036],[3,4036,5710],[4,5710,8391]],
+  "notes": "The duration correction is real, but it can only trim the 6 ms final tail; falling back to raw QDC moves words 2–4 early."
+}

@@ -378,8 +378,9 @@ tween-vs-snap rules, sweep entry and residual rules, repeat wash timing, the
   sweep; `connection(prevArabic, arabic)` resolves the cross-word wasl rule
   without accelerating the donor word;
   `pacedFeather()` is the paced word's edge width. Repeat ink captures that
-  same curve and feather, and uses the measured sweep with `repeatSweepMs` as
-  its soft minimum. All gated on `Tuning.tajweedPacing` — see
+  same curve and feather, but its live clock is the raw spoken dwell from
+  `repeatDwellMs` with no visual minimum; `repeatSweepMs` is only the fallback
+  when no active timing clock exists. All gated on `Tuning.tajweedPacing` — see
   [TAJWEED_PACING.md](TAJWEED_PACING.md).
 - **`glinting(state)`** — the first-gloss glint rule:
   Active words wear the white-gold sheen (including seek/replay and
@@ -437,12 +438,13 @@ tween-vs-snap rules, sweep entry and residual rules, repeat wash timing, the
   feather, sweep easing, and tajweed pacing. `InkEngine.tuning` is
   snapshot-backed (`mutableStateOf`), so release builds read constants while
   the Ink Lab can retune a live session.
-- **Sync knobs, deliberately outside `Tuning`**: `highlightLeadMs` (default 114),
+- **Sync knobs, deliberately outside `Tuning`**: `highlightLeadMs` (default 0),
   `fadeLeadMs` (default 500) and `outputLatencyOverrideMs` (null = use the route
   preset). These move *when* things fire rather than how the ink feels, so they
   stay out of the data class that **Copy values** transcribes — but they persist
   with it via `InkLabStore`. `fadeLeadMs` is how far the ayah focus/recess target
-  runs ahead of the audio; `highlightLeadMs` advances word ink only. Both start
+  runs ahead of the audio; a nonzero Ink Lab `highlightLeadMs` advances word ink
+  only. Both start
   from the same latency-corrected heard position, a contract enforced in
   `ReaderViewModel`; the highlight lead is suppressed during encoded silence
   before the first word — see
@@ -451,7 +453,8 @@ tween-vs-snap rules, sweep entry and residual rules, repeat wash timing, the
 - **One motion lifecycle, two paint adapters.** `AyahBlock` derives the ayah's
   `InkEngine.Word` list once (the single `InkEngine.word(...)` call site), then
   builds one aligned `InkMotion` per word. `InkMotion` exclusively owns base
-  sweep entry/residual, wasl handoff, repeat sweep + ordered release, captured
+  sweep entry/residual, wasl handoff, repeat sweep + independent release,
+  captured
   feather/pacing, lyric alpha, and glint dry-down. The render branches receive
   those motions as paint-only inputs: `HighlightLayeredText` adapts them to the
   Arabic + gloss word layers, while `addShapedInkMotionBlooms` adapts the same

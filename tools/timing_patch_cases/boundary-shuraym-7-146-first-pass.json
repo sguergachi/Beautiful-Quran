@@ -1,0 +1,10 @@
+{
+  "id": "boundary-shuraym-7-146-first-pass",
+  "label": "Shuraym 7:146 first-pass 23–25 hands off on the spoken words",
+  "refs": ["Arabic XLSR fixed-sequence witness", "Quran phonetics free-decoding witness"],
+  "pipeline": "boundary_repair",
+  "notes": "The restored repeat is correct, but the prior repair started وَإِن 580 ms early and يَرَوْا 760 ms early. Arabic XLSR puts their onsets at 14987/15747 ms; independent phonetics emits wa at 14988 ms, yaraw's r at 15831 ms, and the following سَبِيلَ at 16153 ms. Keep a contiguous karaoke handoff at 14980/15740/16120 ms.",
+  "input_segments": [[22,12760,13780],[23,13780,14400],[24,14400,14980],[25,14980,16120],[26,16120,16760]],
+  "repair_segments": [[23,13780,14980],[24,14980,15740],[25,15740,16120]],
+  "expected_segments": [[22,12760,13780],[23,13780,14980],[24,14980,15740],[25,15740,16120],[26,16120,16760]]
+}

@@ -20148,6 +20148,29 @@
   {
    "reciterId": 7,
    "reciterSlug": "Hani_Rifai_192kbps",
+   "surahId": 88,
+   "ayah": 25,
+   "kind": "boundary",
+   "refs": [
+    "Arabic XLSR fixed-sequence witness",
+    "MMS Uroman fixed-sequence witness"
+   ],
+   "segments": [
+    [
+     2,
+     1030,
+     2204
+    ],
+    [
+     3,
+     2204,
+     3532
+    ]
+   ]
+  },
+  {
+   "reciterId": 7,
+   "reciterSlug": "Hani_Rifai_192kbps",
    "surahId": 89,
    "ayah": 16,
    "kind": "restore",

@@ -2,6 +2,8 @@ package com.beautifulquran.ui.reader
 
 import com.beautifulquran.data.model.Segment
 import com.beautifulquran.domain.BasmalahWash
+import com.beautifulquran.domain.HighlightEngine
+import com.beautifulquran.domain.OutputLatency
 import com.beautifulquran.ui.reader.InkEngine.State
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -491,6 +493,14 @@ class InkEngineTest {
     }
 
     @Test
+    fun `repeat dwell never inherits the visual sweep floor`() {
+        assertEquals(80, InkEngine.repeatDwellMs(active(1, durationMs = 80), 1f))
+        assertEquals(40, InkEngine.repeatDwellMs(active(1, durationMs = 80), 2f))
+        assertNull(InkEngine.repeatDwellMs(active(1, durationMs = 0), 1f))
+        assertNull(InkEngine.repeatDwellMs(activeWord = null, playbackSpeed = 1f))
+    }
+
+    @Test
     fun `highlight lead raises the short-hold sweep floor`() {
         val savedLead = InkEngine.highlightLeadMs
         try {
@@ -511,6 +521,37 @@ class InkEngineTest {
         } finally {
             InkEngine.highlightLeadMs = savedLead
         }
+    }
+
+    @Test
+    fun `shuraym repeated la begins on the voiced boundary`() {
+        // Fixed-transcript Arabic XLSR places the two spoken "لا" starts at
+        // 12,485 and 31,714 ms. The preceding words must end there; otherwise
+        // the repeat chain visibly remains a word behind despite correct
+        // topology.
+        val segments = listOf(
+            Segment(position = 20, startMs = 11_900, endMs = 12_485),
+            Segment(position = 21, startMs = 12_485, endMs = 12_760),
+            Segment(position = 22, startMs = 12_760, endMs = 13_780),
+            Segment(position = 20, startMs = 31_140, endMs = 31_714),
+            Segment(position = 21, startMs = 31_714, endMs = 31_980),
+            Segment(position = 22, startMs = 31_980, endMs = 32_980),
+        )
+
+        fun activeAt(mediaPositionMs: Long) = HighlightEngine.activeWord(
+            segments,
+            OutputLatency.highlightMs(
+                mediaPositionMs = mediaPositionMs,
+                latencyMs = 0,
+                leadMs = InkEngine.DEFAULT_HIGHLIGHT_LEAD_MS.toLong(),
+                leadNotBeforeMs = 380,
+            ),
+        )
+
+        assertEquals(21, activeAt(12_485))
+        assertEquals(22, activeAt(12_766))
+        assertEquals(21, activeAt(31_714))
+        assertEquals(22, activeAt(31_994))
     }
 
     @Test
@@ -680,7 +721,7 @@ class InkEngineTest {
     @Test
     fun `repeat wash holds on chain advance and restarts on seek`() {
         // Active handoff drops activation to 0 — must be Hold so the residual
-        // 0→1 wash is not cancelled/restarted (sequential finish law).
+        // 0→1 wash is not cancelled/restarted (audio-bound residual law).
         assertEquals(
             RepeatWashAction.Hold,
             repeatWashAction(
@@ -715,10 +756,40 @@ class InkEngineTest {
     }
 
     @Test
-    fun `repeat wash follows long dwell but keeps a soft minimum`() {
-        assertEquals(450, repeatWashDurationMs(activeSweepMs = null, minimumMs = 450))
-        assertEquals(450, repeatWashDurationMs(activeSweepMs = 140, minimumMs = 450))
-        assertEquals(1_800, repeatWashDurationMs(activeSweepMs = 1_800, minimumMs = 450))
+    fun `repeat wash follows live dwell and falls back only without a clock`() {
+        assertEquals(450, repeatWashDurationMs(activeSweepMs = null, fallbackMs = 450))
+        assertEquals(140, repeatWashDurationMs(activeSweepMs = 140, fallbackMs = 450))
+        assertEquals(1_800, repeatWashDurationMs(activeSweepMs = 1_800, fallbackMs = 450))
+    }
+
+    @Test
+    fun `seek history is complete while the spoken repeat member reveals`() {
+        assertEquals(RepeatWashEntryMode.Complete, repeatWashEntryMode(active = false))
+        assertEquals(RepeatWashEntryMode.Reveal, repeatWashEntryMode(active = true))
+    }
+
+    @Test
+    fun `shuraym repeat dwell stays on every spoken boundary`() {
+        // Shuraym 7:146 repeated positions 1–18. The old 450 ms floor added
+        // 670 ms of queue debt by position 17, leaving its orange wash on
+        // screen after position 18 was already being recited.
+        val starts = listOf(
+            19_920L, 20_620L, 20_900L, 21_760L, 22_420L, 23_640L,
+            23_800L, 24_360L, 24_960L, 25_540L, 26_200L, 26_620L,
+            27_060L, 27_760L, 28_040L, 28_660L, 29_580L, 30_140L,
+        )
+        var queuedStart = starts.first()
+        var oldFlooredStart = starts.first()
+        for (index in 0 until starts.lastIndex) {
+            assertEquals("position ${index + 1}", starts[index], queuedStart)
+            val dwellMs = (starts[index + 1] - starts[index]).toInt()
+            val liveDwellMs = InkEngine.repeatDwellMs(active(1, durationMs = dwellMs.toLong()), 1f)
+            queuedStart += repeatWashDurationMs(liveDwellMs, fallbackMs = 450)
+            oldFlooredStart += maxOf(dwellMs, 450)
+        }
+        assertEquals(starts.last(), queuedStart)
+        assertEquals(30_810L, oldFlooredStart)
+        assertEquals(670L, oldFlooredStart - starts.last())
     }
 
     @Test

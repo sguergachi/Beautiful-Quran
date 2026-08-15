@@ -20388,6 +20388,43 @@
      7243
     ]
    ]
+  },
+  {
+   "reciterId": 4,
+   "reciterSlug": "Minshawy_Murattal_128kbps",
+   "surahId": 18,
+   "ayah": 16,
+   "kind": "boundary",
+   "occurrence": 15,
+   "refs": [
+    "independent MMS phoneme witness",
+    "quran-align fixed-sequence witness"
+   ],
+   "segments": [
+    [
+     7,
+     16860,
+     18850
+    ]
+   ]
+  },
+  {
+   "reciterId": 4,
+   "reciterSlug": "Minshawy_Murattal_128kbps",
+   "surahId": 18,
+   "ayah": 16,
+   "kind": "boundary",
+   "occurrence": 1,
+   "refs": [
+    "Arabic XLSR fixed-sequence witness"
+   ],
+   "segments": [
+    [
+     1,
+     420,
+     1140
+    ]
+   ]
   }
  ]
 }

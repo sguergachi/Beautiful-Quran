@@ -88,7 +88,7 @@ object InkEngine {
         /** Letter-sweep duration clamps around the reciter's actual dwell. */
         val minSweepMs: Int = 140,
         val maxSweepMs: Int = 8_000,
-        /** Minimum repeat sweep (and fallback when no active timing exists). */
+        /** Repeat sweep fallback when no live active-word timing exists. */
         val repeatSweepMs: Int = 450,
         /** Dissolve of the orange wash once the repeat chain releases. */
         val repeatFadeOutMs: Int = 900,
@@ -256,8 +256,9 @@ object InkEngine {
     /**
      * How early word ink runs ahead of [com.beautifulquran.domain.HighlightEngine]
      * segment times (ms). Added to the playhead before the engine query so
-     * the next word's wash can start before the timed startMs.
-     * Default [DEFAULT_HIGHLIGHT_LEAD_MS].
+     * the next word's wash can start before the timed startMs. The shipped
+     * default is zero: a nonzero value is an explicit Ink Lab audition, never
+     * a hidden change to the timing table's word boundary.
      */
     private var highlightLeadState by mutableStateOf(DEFAULT_HIGHLIGHT_LEAD_MS)
     var highlightLeadMs: Int
@@ -304,7 +305,7 @@ object InkEngine {
         }
 
     /** Shipped defaults for highlight sync (lab knobs start here). */
-    const val DEFAULT_HIGHLIGHT_LEAD_MS = 114
+    const val DEFAULT_HIGHLIGHT_LEAD_MS = 0
     const val DEFAULT_FADE_LEAD_MS = 500
 
     /**
@@ -448,6 +449,14 @@ object InkEngine {
         val floor = minSweepFloorMs()
         if (raw <= 0) return floor
         return raw.coerceIn(floor, tuning.maxSweepMs)
+    }
+
+    /** Wall-clock dwell of the currently spoken repeat occurrence. Unlike
+     * [sweepMs], this deliberately has no visual minimum: stretching every
+     * short orange wash lets the rendered chain fall behind the voice. */
+    fun repeatDwellMs(activeWord: ActiveWord?, playbackSpeed: Float): Int? {
+        val word = activeWord ?: return null
+        return (word.durationMs / playbackSpeed).toInt().takeIf { it > 0 }
     }
 
     /**

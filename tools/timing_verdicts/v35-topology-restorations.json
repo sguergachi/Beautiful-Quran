@@ -1,0 +1,96 @@
+{
+  "schemaVersion": 1,
+  "baseline": {
+    "commit": "bb8856bc9f41912a6bef72d453045054cf62072b",
+    "databaseSha256": "a2b1eb2e103e20b4a9fdbe8580c66cc39f54e4db6e3128960926cd16bc19b8f4"
+  },
+  "verdicts": {
+    "Alafasy_128kbps:5:44": {
+      "verdict": "accept", "kinds": ["topology"],
+      "baselinePayloadHash": "5b3c15a648d95be9a78449893bf559f1c33a74ebdf11a7e39dac0e744dad74ab",
+      "candidatePayloadHash": "eb877af2b8f0798caa81e3fa94e1907a47d706942c75a9a102ca7f24af5a5fae",
+      "evidence": {
+        "kind": "dual_model_topology", "artifact": "tools/timing_verdicts/v35-topology-restorations.json",
+        "summary": "Both models prefer one word-6 occurrence; their forced starts (7,741 and 7,741 ms) corroborate the retained 7,770 ms onset, while the discarded 6,870 ms lead belongs to word 5.",
+        "audioSha256": "eedfbdc758dfa5bd803b7ba7adf475e7562296de78c0995bd972501aa20032a8", "waveformVeto": false,
+        "models": [{"name": "arabic-xlsr-ctc", "baselineScore": -1526.393, "candidateScore": -1486.402}, {"name": "mms-uroman-ctc", "baselineScore": -199.263, "candidateScore": -171.683}]
+      }
+    },
+    "Alafasy_128kbps:5:46": {
+      "verdict": "accept", "kinds": ["topology"],
+      "baselinePayloadHash": "cd8a371a7505e0f951bccc64521096c133b75c451a1f233a1f5382b67e964544",
+      "candidatePayloadHash": "3868ef98756afc2df6b1fb9010a3a1fc4397ff4afd2dd79d802e8eec5982e931",
+      "evidence": {
+        "kind": "dual_model_topology", "artifact": "tools/timing_verdicts/v35-topology-restorations.json",
+        "summary": "Both models prefer one word-17 occurrence; their forced starts (19,310 and 19,290 ms) corroborate the retained 19,350 ms onset, while the discarded 18,350 ms lead belongs to word 16.",
+        "audioSha256": "bd57da8f86bc8e5f8df859be7b71f8ec6260be1aa2b691e9fd5bb8db6aa9f690", "waveformVeto": false,
+        "models": [{"name": "arabic-xlsr-ctc", "baselineScore": -977.142, "candidateScore": -943.473}, {"name": "mms-uroman-ctc", "baselineScore": -136.484, "candidateScore": -119.373}]
+      }
+    },
+    "Alafasy_128kbps:6:61": {
+      "verdict": "accept", "kinds": ["topology"],
+      "baselinePayloadHash": "6aae116c7d9539022c11acede1f3d8d0ae42f49d8fe4b48cdce6e209dec39947",
+      "candidatePayloadHash": "69bb79c614745061615b2c7cdbec48d569593aedbc4307db95d0207dc1ac6fb9",
+      "evidence": {
+        "kind": "dual_model_topology", "artifact": "tools/timing_verdicts/v35-topology-restorations.json",
+        "summary": "Both models prefer the restored 8–14 re-say despite its extra labels; its onset follows the separately voiced post-pause interval.",
+        "audioSha256": "3eaf3e90cf57b8bd4e88b44d1e296319ce4cb1be26d4da18bc2e183260ecceaf", "waveformVeto": false,
+        "models": [{"name": "arabic-xlsr-ctc", "baselineScore": -1295.857, "candidateScore": -909.357}, {"name": "mms-uroman-ctc", "baselineScore": -115.804, "candidateScore": -90.622}]
+      }
+    },
+    "Alafasy_128kbps:67:22": {
+      "verdict": "accept", "kinds": ["topology"],
+      "baselinePayloadHash": "20f81418ccafa0468b0639eeae98228c820cdf5355cec53ff9ceb637c0435c0c",
+      "candidatePayloadHash": "85e8fc14abc9192428cd2a2d7c560f88c7b7362702985f7be6433d6df6ba5819",
+      "evidence": {
+        "kind": "dual_model_topology", "artifact": "tools/timing_verdicts/v35-topology-restorations.json",
+        "summary": "Both models prefer one word-8 occurrence; their forced starts (10,845 and 10,805 ms) corroborate the retained 10,840 ms onset, while the discarded 10,070 ms lead belongs to word 7.",
+        "audioSha256": "82adcf06b1fa2c26affcfd2314601054ad73fe97248382e5c3bf94d30e1cc5ab", "waveformVeto": false,
+        "models": [{"name": "arabic-xlsr-ctc", "baselineScore": -269.056, "candidateScore": -227.037}, {"name": "mms-uroman-ctc", "baselineScore": -77.52, "candidateScore": -47.009}]
+      }
+    },
+    "Minshawy_Murattal_128kbps:18:16": {
+      "verdict": "accept", "kinds": ["topology"],
+      "baselinePayloadHash": "a968bbc74e6888e689b914527dad269ee3c0b7e553855a3240a34f277d3a86c9",
+      "candidatePayloadHash": "39f9692997cc2e697aeac2c9451e9f462082ebea90e5cc026d0b2678c8aace16",
+      "evidence": {
+        "kind": "dual_model_topology", "artifact": "tools/timing_verdicts/v35-topology-restorations.json",
+        "summary": "Both models prefer the restored 7–14 re-say despite its extra labels; the baseline leaves its loud separately voiced interval unmapped. Boundary review also restored the first word to its 420 ms Arabic XLSR onset instead of beginning its wash at 0 ms.",
+        "audioSha256": "4f0c627d434085674578cb55d4b4e8c53332a1c2819a2e7dcc6000626e2c81a6", "waveformVeto": false,
+        "models": [{"name": "arabic-xlsr-ctc", "baselineScore": -1123.728, "candidateScore": -972.422}, {"name": "mms-uroman-ctc", "baselineScore": -207.706, "candidateScore": -146.847}]
+      }
+    },
+    "Abdurrahmaan_As-Sudais_192kbps:4:123": {
+      "verdict": "accept", "kinds": ["added"], "baselinePayloadHash": null,
+      "candidatePayloadHash": "93d6f9ac28f3323220105886cc4d87e70d598405af5f576b6c6d47ed1d6eb402",
+      "evidence": {
+        "kind": "dual_model_topology", "artifact": "tools/timing_verdicts/v35-topology-restorations.json",
+        "summary": "The recovered full-coverage row is independently force-alignable by both models. Exact-audio spectrogram review places the word 7→8 acoustic handoff at 5,350–5,370 ms, corroborated by the Arabic XLSR word-8 onset at 5,544 ms and MMS edge alignment at 5,440 ms; the shipped handoff is 5,360 ms. Word 9 remains at its corroborated 6,285 ms onset.",
+        "audioSha256": "5f5ec859a4f7d307521495f79e745aa29fe947bb86357833adabb6d714f7824d", "waveformVeto": false,
+        "models": [{"name": "arabic-xlsr-ctc", "baselineScore": null, "candidateScore": -142.493, "word8StartMs": 5544}, {"name": "mms-uroman-ctc", "baselineScore": null, "candidateScore": -44.848, "word8EdgeMs": 5440}]
+      }
+    },
+    "Abdurrahmaan_As-Sudais_192kbps:6:104": {
+      "verdict": "accept", "kinds": ["added"], "baselinePayloadHash": null,
+      "candidatePayloadHash": "036ffc16de11e44d80739ddee0b0718d27c710e91c089d0ad81b255112bb2c21",
+      "evidence": {
+        "kind": "dual_model_topology", "artifact": "tools/timing_verdicts/v35-topology-restorations.json",
+        "summary": "The recovered full-coverage row is independently force-alignable by both models; words 4–5 now use the dual-model Pareto repair (5,160 and 5,300 ms) rather than earlier source boundaries.",
+        "audioSha256": "a3c39a164e1c9c4bfc2fa73eb34e30b106e06bb70f837dec11d0ad2550f033b2", "waveformVeto": false,
+        "models": [{"name": "arabic-xlsr-ctc", "baselineScore": null, "candidateScore": -527.623}, {"name": "mms-uroman-ctc", "baselineScore": null, "candidateScore": -22.89}]
+      }
+    },
+    "Saood_ash-Shuraym_128kbps:7:146": {
+      "verdict": "accept", "kinds": ["topology"],
+      "baselinePayloadHash": "c8605f86c88076868a808445203a33cd8fb24b376c5a6f6d3b7e8bf65a89322c",
+      "candidatePayloadHash": "1aba481e36e1a2a56d4cd963b34dcc052cdfa83f0fb8424cf96328618f05dd49",
+      "evidence": {
+        "kind": "dual_model_topology", "artifact": "tools/timing_verdicts/v35-topology-restorations.json",
+        "summary": "Both models strongly prefer the restored 1–29 re-say despite 147 extra labels; the baseline mapped a 20-second voiced interval as one word. Boundary review restored word 1 to its 380 ms Arabic XLSR onset, then corrected the first pass: Arabic XLSR starts words 24/25 at 14,987/15,747 ms; independent Quran phonetics emits wa at 14,988 ms, yaraw's r at 15,831 ms, and the next سَبِيلَ at 16,153 ms. The shipped handoffs are 14,980/15,740/16,120 ms. Arabic XLSR also starts word 21 at 12,485 and 31,714 ms; its prior 12,600/31,820 ms handoffs left the chain on word 20 throughout that spoken لَا, so both preceding segments now end at those witnessed starts.",
+        "audioSha256": "605350c996dda34eec394a95e7c0cf3273b480107548165e20483338d209750a", "waveformVeto": false,
+        "models": [{"name": "arabic-xlsr-ctc", "baselineScore": -2845.413, "candidateScore": -1662.385}, {"name": "mms-uroman-ctc", "baselineScore": -552.253, "candidateScore": -206.49}],
+        "boundaryWitnesses": [{"name": "arabic-xlsr-ctc", "wordStartsMs": {"1": 380, "24": 14987, "25": 15747}}, {"name": "quran-phonetics-free-ctc", "emissionsMs": {"wa": 14988, "yaraw_r": 15831, "next_sabila": 16153}}]
+      }
+    }
+  }
+}

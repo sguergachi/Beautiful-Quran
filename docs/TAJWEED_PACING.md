@@ -365,9 +365,10 @@ Two refinements built into the curve, not the callers:
   the bezier. The 48-step mask quantization is applied *after* the curve, so
   plateaus render as repeated identical masks — free.
 - **Repeat wash** — a repeated active word captures the same curve and paced
-  feather as first-pass ink. Its clock follows the measured word sweep with
-  `repeatSweepMs` as a minimum, preserving the sequential residual finish for
-  short segments while long madd/waqf repeats visibly sustain.
+  feather as first-pass ink. Its live clock follows the raw spoken dwell with
+  no visual minimum, so short segments cannot accumulate delay; `repeatSweepMs`
+  is only the fallback when no active timing clock exists. Each word owns its
+  residual finish independently, while long madd/waqf repeats visibly sustain.
   `secondaryAlpha` gloss/translit tracking (it reads the paced sweep value,
   so the gloss breath follows the dwell), all `HighlightEngine` semantics,
   the 33 ms poll.

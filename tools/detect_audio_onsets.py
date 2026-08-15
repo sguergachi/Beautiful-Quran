@@ -77,7 +77,25 @@ def parse_frame_header(data, i):
         bitrates[bitrate_index] * 1000,
         SAMPLE_RATES[version][rate_index],
         ((data[i + 3] >> 6) & 3) == 3,  # mono
+        (data[i + 2] >> 1) & 1,  # padding bit
     )
+
+
+def frame_size(frame):
+    """Return the byte length of one Layer III frame from its header."""
+    version, bitrate, sample_rate, _, padding = frame
+    # Layer III uses 1,152 samples/frame in MPEG1 and 576 in MPEG2/2.5.
+    coefficient = 144 if version == 3 else 72
+    return coefficient * bitrate // sample_rate + padding
+
+
+def has_following_frame(data, start, frame):
+    """Reject header-shaped ID3/payload bytes before trusting a candidate."""
+    next_start = start + frame_size(frame)
+    if next_start + FRAME_HEADER_BYTES > len(data):
+        return False
+    following = parse_frame_header(data, next_start)
+    return following is not None and following[0] == frame[0] and following[2] == frame[2]
 
 
 def duration_ms(prefix, total_bytes):
@@ -92,9 +110,9 @@ def duration_ms(prefix, total_bytes):
     start = id3_size(prefix)
     for i in range(start, len(prefix) - 4):
         frame = parse_frame_header(prefix, i)
-        if frame is None:
+        if frame is None or not has_following_frame(prefix, i, frame):
             continue
-        version, bitrate, sample_rate, mono = frame
+        version, bitrate, sample_rate, mono, _ = frame
         samples = 1152 if version == 3 else 576
         side_info = (17 if mono else 32) if version == 3 else (9 if mono else 17)
         tag = i + FRAME_HEADER_BYTES + side_info
@@ -103,7 +121,7 @@ def duration_ms(prefix, total_bytes):
             frames = int.from_bytes(prefix[tag + 8:tag + 12], "big")
             if flags & 1 and frames:
                 return round(frames * samples * 1000 / sample_rate)
-        return round((total_bytes - start) * 8000 / bitrate)
+        return round((total_bytes - i) * 8000 / bitrate)
     raise RuntimeError("no MPEG audio frame in the opening bytes")
 
 
@@ -172,6 +190,16 @@ def measure_duration(slug, verse):
     return duration_ms(prefix, total_bytes)
 
 
+def measure_local_duration(audio_root, slug, verse):
+    """Read the same MPEG-header duration from an exact cached EveryAyah MP3."""
+    path = audio_root / f"{slug}_{verse[0]:03d}{verse[1]:03d}.mp3"
+    if not path.is_file():
+        raise FileNotFoundError(path)
+    with path.open("rb") as audio:
+        prefix = audio.read(DURATION_RANGE_BYTES)
+    return duration_ms(prefix, path.stat().st_size)
+
+
 def scan(slug, work, workers, measure):
     """Run one measurement across the verse list, reporting progress."""
     measured = {}
@@ -227,12 +255,12 @@ def detector_metadata():
     }
 
 
-def refresh_durations(slug, work, workers, output):
+def refresh_durations(slug, work, workers, output, measure=measure_duration):
     """Re-measure only the duration ceilings, leaving recorded onsets alone."""
     if not output.exists():
         raise SystemExit(f"{output} is missing — run a full scan first")
     payload = json.loads(output.read_text())
-    measured = scan(slug, work, workers, measure_duration)
+    measured = scan(slug, work, workers, measure)
     payload["schema"] = 2
     payload["detector"] = detector_metadata()
     payload["durations"] = sorted_by_verse(
@@ -251,21 +279,35 @@ def main():
         action="store_true",
         help="refresh recording lengths only, without decoding any audio",
     )
+    parser.add_argument(
+        "--audio-root",
+        type=Path,
+        help="exact cached EveryAyah MP3 directory for an offline duration refresh",
+    )
     parser.add_argument("--workers", type=int, default=12)
     args = parser.parse_args()
     if not OUT.exists():
         raise SystemExit(f"{OUT} is missing")
+    if args.audio_root and not args.durations_only:
+        raise SystemExit("--audio-root requires --durations-only")
+    if args.audio_root and not args.audio_root.is_dir():
+        raise SystemExit(f"--audio-root is not a directory: {args.audio_root}")
 
     work = verses(args.verse)
     output = AUDIO_ONSETS_DIR / f"{args.reciter}.json"
+    if args.audio_root:
+        def measure(slug, verse):
+            return measure_local_duration(args.audio_root, slug, verse)
+    else:
+        measure = measure_duration
     if args.durations_only:
         if args.verse:
             print(
                 f"{verse_key(work[0])} duration: "
-                f"{measure_duration(args.reciter, work[0])} ms"
+                f"{measure(args.reciter, work[0])} ms"
             )
             return
-        refresh_durations(args.reciter, work, args.workers, output)
+        refresh_durations(args.reciter, work, args.workers, output, measure)
         return
 
     if not shutil.which("ffmpeg"):

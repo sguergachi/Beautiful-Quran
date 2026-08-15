@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+import subprocess
 import sys
 import tempfile
 from pathlib import Path
@@ -27,6 +28,7 @@ from build_db import (  # noqa: E402
     apply_boundary_repair,
     apply_clocked_timing_repair,
     apply_one_utterance,
+    apply_timing_repairs,
     boundary_conflicts,
     clean_qdc_artifacts,
     complete_monotonic_row,
@@ -34,8 +36,10 @@ from build_db import (  # noqa: E402
     finalize_timing_rows,
     load_audio_durations,
     load_audio_onsets,
+    discard_false_same_position_lead,
     normalize_text,
     offset_for_audio_onset,
+    preserve_complete_repeat_topology,
     preserve_peer_repeats,
     recover_negative_opening,
     refit_displaced_rows,
@@ -45,14 +49,23 @@ from build_db import (  # noqa: E402
     trim_to_next_start,
 )
 import detect_audio_onsets as onset_detector  # noqa: E402
+from timing_delta import (  # noqa: E402
+    build_delta,
+    load_verdict_ledger,
+    read_git_timing_rows,
+    read_timing_rows,
+    rejected_changes,
+)
 
 CASES_DIR = TOOLS / "timing_patch_cases"
+VERDICTS_DIR = TOOLS / "timing_verdicts"
 PIPELINES = frozenset(
     {
         "adjust_qdc_segments",
         "boundary_repair",
         "clean_qdc_artifacts",
         "clock_shifted_repair",
+        "complete_repeat_topology",
         "erases_span_repeat",
         "leading_silence_offset",
         "preserve_peer_repeats",
@@ -146,7 +159,9 @@ def run_pipeline(case, segs):
             "noncontiguous_orphans": 0,
             "gap_phantoms": 0,
         }
-        return clean_qdc_artifacts(segs, stats)
+        return clean_qdc_artifacts(
+            segs, stats, case.get("recover_singleton_gap", False)
+        )
     if pipeline == "recover_negative_opening":
         recovered, _ = recover_negative_opening(segs)
         return recovered
@@ -164,12 +179,20 @@ def run_pipeline(case, segs):
         n_words = case.get("n_words") or max(p for p, _, _ in segs)
         return adjust_qdc_segments(segs, n_words, stats)
     if pipeline == "boundary_repair":
-        return apply_boundary_repair(segs, resolve_repair(case))
+        return apply_boundary_repair(segs, resolve_repair(case), case.get("occurrence"))
     if pipeline == "clock_shifted_repair":
         offset = case.get("clock_offset_ms")
         if offset is None:
             raise SystemExit(f"{case.get('_path')}: need clock_offset_ms")
         return apply_clocked_timing_repair(segs, resolve_repair(case), offset)
+    if pipeline == "complete_repeat_topology":
+        n_words = case.get("n_words")
+        duration = case.get("audio_duration_ms")
+        if n_words is None or duration is None:
+            raise SystemExit(f"{case.get('_path')}: need n_words and audio_duration_ms")
+        return preserve_complete_repeat_topology(
+            segs, n_words, case.get("audio_onset_ms"), duration
+        )
     if pipeline == "erases_span_repeat":
         repair = resolve_repair(case)
         got = erases_span_repeat(segs, repair)
@@ -187,6 +210,11 @@ def run_pipeline(case, segs):
             raise SystemExit(f"{case.get('_path')}: need audio_onset_ms")
         return offset_for_audio_onset(segs, onset)
     if pipeline == "timing_correction":
+        position = case.get("correction_position")
+        if position is not None:
+            return discard_false_same_position_lead(
+                segs, position, bool(case.get("requires_audio_verdict"))
+            )
         positions = case.get("correction_positions")
         if positions is None:
             raise SystemExit(f"{case.get('_path')}: need correction_positions")
@@ -260,15 +288,25 @@ def check_audio_onset_pipeline():
         pass
 
     # An MPEG1 Layer III 128 kbps 44.1 kHz stereo frame carrying a Xing count.
+    # A valid header must be followed by its next frame: ID3/payload bytes can
+    # otherwise happen to look like an MPEG header and invent a huge duration.
+    def frame(payload=b""):
+        result = bytearray(417)  # floor(144 * 128000 / 44100)
+        result[:4] = b"\xff\xfb\x90\x00"
+        result[4:4 + len(payload)] = payload
+        return bytes(result)
+
     xing = (
         b"ID3\x04\x00\x00\x00\x00\x00\x0a" + b"\x00" * 10
-        + b"\xff\xfb\x90\x00" + b"\x00" * 32
-        + b"Xing" + (1).to_bytes(4, "big") + (100).to_bytes(4, "big")
+        + frame(b"\x00" * 32 + b"Xing" + (1).to_bytes(4, "big") + (100).to_bytes(4, "big"))
+        + frame()
     )
     # 100 frames x 1152 samples at 44.1 kHz, not the 128 kbps the name implies.
     parser &= onset_detector.duration_ms(xing, 999_999) == 2_612
-    cbr = b"\xff\xfb\x90\x00" + b"\x00" * 64
+    cbr = frame() + frame()
     parser &= onset_detector.duration_ms(cbr, 160_000) == 10_000
+    fake_header = b"\xff\xfb\x90\x00" + b"\x00" * 496 + cbr
+    parser &= onset_detector.duration_ms(fake_header, 160_500) == 10_000
 
     with (
         patch.object(
@@ -292,6 +330,10 @@ def check_audio_onset_pipeline():
 
     with tempfile.TemporaryDirectory() as temp_dir:
         evidence = Path(temp_dir)
+        (evidence / "Hani_Rifai_192kbps_005109.mp3").write_bytes(cbr)
+        parser &= onset_detector.measure_local_duration(
+            evidence, "Hani_Rifai_192kbps", (5, 109)
+        ) == onset_detector.duration_ms(cbr, len(cbr))
         (evidence / "test.json").write_text(json.dumps({
             "reciterId": 1,
             "reciterSlug": "Alafasy_128kbps",
@@ -316,6 +358,11 @@ def check_audio_onset_pipeline():
     physical = refitted == [(1, 2, 253)]
     physical &= json.loads(rows[0][3]) == [[1, 190, 2_080], [2, 2_080, 14_580]]
     physical &= rows[1][3] == anchored
+    unknown = [[1, 260, 1_030], [2, 1_030, 2_320], [3, 2_320, 3_555]]
+    rows, refitted = refit_displaced_rows(
+        [(1, 88, 25, unknown)], {(1, 88, 25): 3_532}, {}
+    )
+    physical &= refitted == [] and rows[0][3] == unknown
     physical &= trim_to_next_start(
         [[13, 11_950, 12_550], [15, 12_540, 15_040]]
     ) == [[13, 11_950, 12_540], [15, 12_540, 15_040]]
@@ -473,18 +520,36 @@ def audit_bundled_db():
         (4, 4, 88): 5_968,
         (7, 5, 109): 6_636,
     }
-    exact &= {
-        (s, a) for rid, s, a in timings if rid == 7
-    } == set(counts)
-    exact &= set(counts) - {
-        (s, a) for rid, s, a in timings if rid == 1
-    } == {(37, 152)}
+    # A withheld row is an intentional whole-ayah fallback only when neither
+    # source can describe the streamed recording safely. Pin every reciter's
+    # known exceptions so an accidental coverage loss cannot hide in the
+    # broad per-reciter coverage threshold.
+    expected_withheld = {
+        1: {(37, 152)},
+        2: set(),
+        3: set(),
+        4: set(),
+        5: {
+            (2, 25), (2, 198), (2, 223), (7, 5),
+            (13, 37), (73, 4),
+        },
+        6: {(12, 50), (12, 75), (12, 76), (91, 15)},
+        7: set(),
+    }
+    exact &= all(
+        set(counts) - {(s, a) for rid_, s, a in timings if rid_ == rid}
+        == withheld
+        for rid, withheld in expected_withheld.items()
+    )
     for key, subsequence in {
         (7, 9, 33): [13, 9, 10, 14],
         (7, 22, 55): [15, 7, 8, 16],
         (7, 44, 22): [6, 1, 2, 3],
         (7, 74, 52): [7, 4, 8],
         (7, 4, 4): [12, 12],
+        # This incomplete QDC row omits canonical word 23. Interpolating it
+        # would alter the repeat order, so the monotonic witness must remain.
+        (3, 7, 155): list(range(1, 42)),
     }.items():
         positions = order(timings[key])
         exact &= any(
@@ -552,6 +617,86 @@ def check_gloss_normalize():
     )
 
 
+def check_recovered_boundary_repairs():
+    """A missing row defers only its boundary repair until coverage recovers."""
+    edits = {
+        "edits": [
+            {
+                "reciterId": 1,
+                "surahId": 1,
+                "ayah": 1,
+                "kind": "boundary",
+                "segments": [[1, 0, 40], [2, 40, 100]],
+            },
+            {
+                "reciterId": 1,
+                "surahId": 1,
+                "ayah": 2,
+                "kind": "boundary",
+                "segments": [[1, 0, 40], [2, 40, 100]],
+            },
+        ]
+    }
+    source = json.dumps([[1, 0, 50], [2, 50, 100]], separators=(",", ":"))
+    with tempfile.TemporaryDirectory() as directory:
+        repairs = Path(directory)
+        (repairs / "fixture.json").write_text(json.dumps(edits), encoding="utf-8")
+        with patch("build_db.REPAIRS_DIR", repairs):
+            # A boundary repair cannot supply coverage for a missing row or a
+            # row that is present but lacks the repaired position.
+            deferred = apply_timing_repairs(
+                [(1, 1, 2, source)],
+                {(1, 1): 2, (1, 2): 2},
+                skip_missing_boundary_keys={(1, 1, 1)},
+            )
+            deferred_incomplete = apply_timing_repairs(
+                [(1, 1, 1, json.dumps([[1, 0, 100]]))],
+                {(1, 1): 2, (1, 2): 2},
+                skip_missing_boundary_keys={(1, 1, 1), (1, 1, 2)},
+            )
+            # After fallback coverage, replay only the deferred row's boundary.
+            replayed = apply_timing_repairs(
+                [(1, 1, 1, source), (1, 1, 2, source)],
+                {(1, 1): 2, (1, 2): 2},
+                only_keys={(1, 1, 1)},
+                only_kinds={"boundary"},
+            )
+    return (
+        json.loads(deferred[0][3]) == [[1, 0, 40], [2, 40, 100]]
+        and json.loads(deferred_incomplete[0][3]) == [[1, 0, 100]]
+        and json.loads(replayed[0][3]) == [[1, 0, 40], [2, 40, 100]]
+        and replayed[1][3] == source
+    )
+
+
+def check_timing_delta():
+    """Fail closed unless every shipped timing delta has current evidence."""
+    try:
+        base = subprocess.run(
+            ["git", "merge-base", "HEAD", "origin/master"],
+            cwd=ROOT,
+            text=True,
+            capture_output=True,
+            check=True,
+        ).stdout.strip()
+        ledger = {}
+        for path in sorted(VERDICTS_DIR.glob("*.json")):
+            entries = load_verdict_ledger(path)
+            duplicate = set(ledger) & set(entries)
+            if duplicate:
+                raise ValueError(f"duplicate timing verdict(s): {sorted(duplicate)}")
+            ledger.update(entries)
+        report = build_delta(
+            read_git_timing_rows(base), read_timing_rows(ROOT / "data" / "quran.db"), ledger
+        )
+        rejected = rejected_changes(report["changes"])
+    except (OSError, subprocess.CalledProcessError, ValueError, sqlite3.Error) as exc:
+        return False, str(exc)
+    if rejected:
+        return False, "; ".join(f"{change['key']}: {reason}" for change, reason in rejected)
+    return True, f"{report['summary']['changedRows']} accepted timing DB delta(s)"
+
+
 def main():
     cases = load_cases()
     failures = []
@@ -604,11 +749,15 @@ def main():
     completion_ok = check_completion_pipeline()
     gloss_ok = check_gloss_normalize()
     database_ok = audit_bundled_db()
+    recovered_boundary_ok = check_recovered_boundary_repairs()
+    timing_delta_ok, timing_delta_detail = check_timing_delta()
     print(f"  {'ok  ' if confidence_ok else 'FAIL'} weighted 2:214 confidence checks")
     print(f"  {'ok  ' if audio_onset_ok else 'FAIL'} audio evidence and onset checks")
     print(f"  {'ok  ' if completion_ok else 'FAIL'} complete fallback and physics checks")
     print(f"  {'ok  ' if gloss_ok else 'FAIL'} WBW gloss whitespace normalize")
     print(f"  {'ok  ' if database_ok else 'FAIL'} bundled timing database invariants")
+    print(f"  {'ok  ' if recovered_boundary_ok else 'FAIL'} recovered-row boundary deferral")
+    print(f"  {'ok  ' if timing_delta_ok else 'FAIL'} fail-closed timing DB delta gate")
     if not confidence_ok:
         failures.append(("weighted confidence", "2:214 checks failed", None))
     if not audio_onset_ok:
@@ -619,6 +768,10 @@ def main():
         failures.append(("gloss normalize", "trailing-space strip failed", None))
     if not database_ok:
         failures.append(("bundled database", "timing audit failed", None))
+    if not recovered_boundary_ok:
+        failures.append(("recovered-row boundary deferral", "repair ordering failed", None))
+    if not timing_delta_ok:
+        failures.append(("timing DB delta gate", timing_delta_detail, None))
     print()
     if failures:
         print(f"{len(failures)} FAILURE(S):")
@@ -628,7 +781,7 @@ def main():
                 for line in str(detail).splitlines():
                     print(f"    {line}")
         return 1
-    print(f"all {len(cases) + 5} cases pass ({CASES_DIR.relative_to(Path.cwd())})")
+    print(f"all {len(cases) + 7} cases pass ({CASES_DIR.relative_to(Path.cwd())})")
     return 0
 
 
