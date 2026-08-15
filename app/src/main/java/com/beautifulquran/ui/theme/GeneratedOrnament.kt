@@ -206,6 +206,52 @@ private fun bandCenter(geometry: CoverFrameGeometry): Float =
     (geometry.outerInsetPx + geometry.innerInsetPx) / 2f
 
 /**
+ * Diameter of the corner seal's normalised (0..1) drawing box, sized so the
+ * seal's outermost feature lands exactly on [CoverFrameGeometry.starRadiusPx].
+ *
+ * The seal's bezel tips sit at [RosetteSpec.tipRadius] — 0.58–0.66 of the box,
+ * not 0.5 — so drawing it at `starRadiusPx * 2` overhangs the intended radius
+ * by ~30% and breaks the outer gilt rule. Both the seals and the band's
+ * channel mouth read this, so they stay one piece of geometry.
+ */
+internal fun sealBoxPx(geometry: CoverFrameGeometry, seal: RosetteSpec): Float {
+    val extent = max(0.5f, seal.tipRadius.toFloat())
+    return geometry.starRadiusPx / extent
+}
+
+private const val INV_SQRT2 = 0.70710678f
+
+/**
+ * Screen corner radius that produced [outerCornerPx], undoing the concentric
+ * inset. Floored at the inset, which is exactly what a collapsed (square)
+ * frame corner means.
+ */
+private fun screenRadius(geometry: CoverFrameGeometry, outerCornerPx: Float): Float =
+    outerCornerPx + geometry.outerInsetPx
+
+/**
+ * Distance from both screen edges to a corner seal's centre, for a corner
+ * whose display radius is [screenRadiusPx].
+ *
+ * The two gilt rules are concentric *rounded* rects, so at a rounded corner
+ * the band turns: the point where the two straight centrelines would cross
+ * — the miter — sits outside the band's own arc, by 0.41 × its distance to
+ * the arc's centre. Seating the seal there pushed it out through the outer
+ * rule on any phone with a generous corner radius. The seal instead rides
+ * the band's centreline arc at 45°, which puts its disc exactly inscribed
+ * in the band's corner annulus: tangent to the outer rule and tangent to
+ * the inner one, the same fit it has along the straight runs.
+ *
+ * When the arc has collapsed — a square display, or a radius the inset has
+ * used up — this returns the miter point, so the two cases meet smoothly.
+ */
+internal fun sealCenterPx(geometry: CoverFrameGeometry, screenRadiusPx: Float): Float {
+    val c = bandCenter(geometry)
+    val arc = screenRadiusPx - c
+    return if (arc > 0f) screenRadiusPx - arc * INV_SQRT2 else c
+}
+
+/**
  * The four corner seals — small stars of the medallion's family, the hubs
  * the border band's channels taper onto. Part of the tooled binding, so
  * they are complete from the first frame: the board arrives already bound,
@@ -227,19 +273,26 @@ fun GeneratedCornerSeals(
         modifier
             .fillMaxSize()
             .drawWithCache {
-                val d = geometry.starRadiusPx * 2f
+                val d = sealBoxPx(geometry, spec)
                 val paths = RosettePaths(
                     spec,
                     d,
                     ruleWidth = 1.dp.toPx(),
                     hairWidth = 1.dp.toPx(),
                 )
-                val c = bandCenter(geometry)
+                // Each corner rides its own arc: displays may report four
+                // different radii, and a seal seated for the wrong one
+                // leaves the band.
+                val oc = geometry.outerCorners
+                val tl = sealCenterPx(geometry, screenRadius(geometry, oc.topLeft))
+                val tr = sealCenterPx(geometry, screenRadius(geometry, oc.topRight))
+                val bl = sealCenterPx(geometry, screenRadius(geometry, oc.bottomLeft))
+                val br = sealCenterPx(geometry, screenRadius(geometry, oc.bottomRight))
                 val corners = listOf(
-                    Offset(c, c),
-                    Offset(size.width - c, c),
-                    Offset(c, size.height - c),
-                    Offset(size.width - c, size.height - c),
+                    Offset(tl, tl),
+                    Offset(size.width - tr, tr),
+                    Offset(bl, size.height - bl),
+                    Offset(size.width - br, size.height - br),
                 )
                 onDrawBehind {
                     val gold = goldBrush(brightGold, deepGold, sheen.value.coerceIn(0f, 1f))
@@ -252,15 +305,15 @@ fun GeneratedCornerSeals(
 }
 
 /**
- * The generated border frieze: the band pattern runs along all four sides
- * between the two gilt rules as a railed channel whose mouth tapers onto
- * the corner seal's petal tip — the seal's bezel points down the band's
- * axis and the band's rails converge onto that point, so border and corner
- * ornament are one continuous piece of geometry. Each run fits a whole
- * number of periods (the period stretches a little to fit), so the pattern
- * arrives at every corner at the same phase. The band is the binding's
- * tooling, not illumination — it is complete from the first frame, never
- * animated. [seal] supplies the petal-tip radius.
+ * The generated border frieze: the band pattern runs along the straight
+ * part of all four sides, between the two gilt rules, as a railed channel
+ * whose mouth tapers open where the band leaves the corner — the seal is
+ * seated on that corner's arc, so border and corner ornament read as one
+ * continuous piece of tooling rather than a stamp over a strip. Each run
+ * fits a whole number of periods (the period stretches a little to fit),
+ * so the pattern arrives at every corner at the same phase. The band is
+ * the binding's tooling, not illumination — it is complete from the first
+ * frame, never animated. [seal] supplies the petal-tip radius.
  */
 @Composable
 fun GeneratedBorderBand(
@@ -283,12 +336,18 @@ fun GeneratedBorderBand(
                 val c = bandCenter(geometry)
                 val w = size.width
                 val h = size.height
-                // The seal's petal tip aims down the band's axis; the run
-                // begins one taper past it, and the channel mouth converges
-                // onto the tip.
-                val tipU = c + geometry.starRadiusPx * 2f * seal.tipRadius.toFloat()
+                // The frieze only runs along the straight part of the band:
+                // past the corner arc (where the seal is seated) and past
+                // the seal's own reach, whichever is further out. The
+                // channel mouth then tapers into the run from there. All
+                // four runs share one start so the pattern stays in phase,
+                // so the widest corner sets it.
+                val arcEnd = screenRadius(geometry, geometry.outerCorners.max)
+                val sealU = sealCenterPx(geometry, arcEnd) +
+                    sealBoxPx(geometry, seal) * seal.tipRadius.toFloat()
                 val taper = bandH * 0.8f
-                val bandStart = tipU + taper
+                val bandStart = max(sealU, arcEnd) + taper
+                val tipU = bandStart - taper
                 val periodPx = (spec.period * bandH).toFloat()
 
                 // (u along the side, v across the band) → screen, per side;

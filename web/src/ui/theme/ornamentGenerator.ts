@@ -259,7 +259,13 @@ function assignBirths(strokes: OrnamentStroke[]): OrnamentStroke[] {
   })
 }
 
-/** The medallion — rings, pearls, {n/k} star, secondary motif, heart. */
+/**
+ * The medallion — a shamsa read as four concentric zones, outside in: the
+ * gilt rules with their pearl band, the {n/k} star, a secondary motif, and
+ * the core. Every zone is sized from the one outside it (independent ranges
+ * let neighbouring radii collide or nearly coincide), the core is never
+ * empty, and weight thins inward so a dense fold stays legible.
+ */
 function generateMedallion(rng: Mulberry32): RosetteSpec {
   const u = rng.next()
   const fold = u < 0.3 ? 8 : u < 0.55 ? 10 : u < 0.85 ? 12 : 16
@@ -267,55 +273,75 @@ function generateMedallion(rng: Mulberry32): RosetteSpec {
   const seg = fold * 12
   const strokes: OrnamentStroke[] = []
 
+  // Zone 1 — the doubled rule and the pearl band it carries.
   const r1 = 0.485
   const r2 = rng.range(0.34, 0.385)
   strokes.push(circleStroke(r1, seg, 'hairline'))
   strokes.push(circleStroke(r2, seg, 'hairline'))
 
+  // Zone 2 — the star. Its tips stop a clear gap short of the inner rule
+  // so the two never graze; the star owns the widest zone.
   const ks = allowedStarKs(fold)
   const k = ks[rng.int(ks.length)]!
-  const rs = rng.range(0.3, 0.345)
+  const rs = r2 - rng.range(0.03, 0.052)
   strokes.push(...starPolygons(fold, k, rs, ROT0, 'rule'))
 
+  // Dense folds carry their inner zones as hairlines.
+  const innerWeight: StrokeWeight = fold >= 12 ? 'hairline' : 'rule'
+
+  // Zone 3 — the secondary motif, a fixed fraction of the star so the
+  // annulus between them stays legible at every fold.
+  const rMid = rs * rng.range(0.66, 0.74)
   const variant = rng.int(3)
   if (variant === 0) {
-    // A second star, half a step out of phase — the woven double star.
-    const k2 = ks[rng.int(ks.length)]!
-    const rs2 = rng.range(0.2, 0.25)
-    strokes.push(...starPolygons(fold, k2, rs2, ROT0 + Math.PI / fold, 'rule'))
+    // The woven double star: a second {n/k2} half a step out of phase. k2
+    // must differ from k — the same star drawn smaller is an echo, not a
+    // weave (at fold 8 the pair is the khatam itself).
+    const i2 = rng.int(ks.length)
+    const k2 = ks[i2] === k ? ks[(i2 + 1) % ks.length]! : ks[i2]!
+    strokes.push(...starPolygons(fold, k2, rMid, ROT0 + Math.PI / fold, innerWeight))
   } else if (variant === 1) {
-    const cusp = rng.range(0.16, 0.19)
-    const tip = rng.range(0.24, 0.285)
-    strokes.push(corollaStroke(fold, cusp, tip, ROT0, 'rule'))
+    const cusp = rMid * rng.range(0.6, 0.68)
+    strokes.push(corollaStroke(fold, cusp, rMid, ROT0, innerWeight))
   } else {
-    // A ring of kites between the star tips, points outward.
-    const rTip = rng.range(0.26, 0.295)
-    const rBase = rng.range(0.125, 0.155)
-    const rMid = rBase + (rTip - rBase) * rng.range(0.45, 0.6)
+    // A ring of kites in the star's interstices, points outward.
+    const rBase = rMid * rng.range(0.42, 0.5)
+    const rWaist = rBase + (rMid - rBase) * rng.range(0.45, 0.6)
     for (let i = 0; i < fold; i++) {
       const a = ROT0 + (i + 0.5) * step
       strokes.push({
         points: [
-          polar(a, rTip),
-          polar(a - step * 0.28, rMid),
+          polar(a, rMid),
+          polar(a - step * 0.28, rWaist),
           polar(a, rBase),
-          polar(a + step * 0.28, rMid),
+          polar(a + step * 0.28, rWaist),
         ],
         closed: true,
-        weight: 'rule',
+        weight: innerWeight,
         birth: 0,
         span: 1,
       })
     }
   }
 
-  const heartR = rng.range(0.06, 0.08)
-  strokes.push(circleStroke(heartR, seg, 'hairline'))
-  if (rng.chance(0.45)) {
-    // A tiny {n/2} echo of the main star at the heart.
-    const heartStarR = rng.range(0.1, 0.135)
-    strokes.push(...starPolygons(fold, 2, heartStarR, ROT0, 'hairline'))
+  // Zone 4 — the core, always inked: whatever room zone 3 leaves gets a
+  // small rosette of its own rather than a bare field around the heart.
+  const rCore = rMid * rng.range(0.5, 0.6)
+  const coreRecipe = rng.int(3)
+  if (coreRecipe === 0) {
+    const i3 = rng.int(ks.length)
+    strokes.push(...starPolygons(fold, ks[i3]!, rCore, ROT0 + Math.PI / fold, 'hairline'))
+  } else if (coreRecipe === 1) {
+    strokes.push(corollaStroke(fold, rCore * rng.range(0.46, 0.56), rCore, ROT0, 'hairline'))
+  } else {
+    // A plain ring alone leaves the centre a bare target, so this one is
+    // always pearled below.
+    strokes.push(circleStroke(rCore, seg, 'hairline'))
   }
+
+  // The heart: a hairline ring inside the core, its pearl at the centre.
+  const heartR = rCore * rng.range(0.34, 0.44)
+  strokes.push(circleStroke(heartR, seg, 'hairline'))
 
   const dots: OrnamentDot[] = []
   const pearlCount = rng.chance(0.5) ? fold * 2 : fold
@@ -325,7 +351,16 @@ function generateMedallion(rng: Mulberry32): RosetteSpec {
     const radius = pearlCount > fold && i % 2 === 1 ? 0.009 : 0.016
     dots.push({ x: p.x, y: p.y, radius, birth: 0.58 + (0.34 * i) / pearlCount })
   }
-  dots.push({ x: 0.5, y: 0.5, radius: 0.028, birth: 0.93 })
+  // A pearl in each of the core's own interstices, so the centre reads as
+  // worked metal even when its rosette is a plain ring.
+  if (rng.chance(0.5) || coreRecipe === 2) {
+    const pearlR = (rCore + heartR) / 2
+    for (let i = 0; i < fold; i++) {
+      const p = polar(ROT0 + (i + 0.5) * step, pearlR)
+      dots.push({ x: p.x, y: p.y, radius: 0.01, birth: 0.62 + (0.3 * i) / fold })
+    }
+  }
+  dots.push({ x: 0.5, y: 0.5, radius: Math.min(0.028, heartR * 0.62), birth: 0.93 })
 
   return { fold, strokes: assignBirths(strokes), dots, tipRadius: 0 }
 }
