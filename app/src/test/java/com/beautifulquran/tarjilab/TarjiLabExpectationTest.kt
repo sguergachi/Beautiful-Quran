@@ -10,6 +10,20 @@ import org.junit.Test
 class TarjiLabExpectationTest {
 
     @Test
+    fun `hold window is the labeled ground truth`() {
+        val expectation = TarjiLabExpectation()
+            .withWindow(TarjiHoldWindow(200f, 900f), 2_000f)
+            .labeled(TarjiExpectationKind.PULSES)
+            .withEnvelope(listOf(0.2f, 0.8f, 0.4f))
+
+        assertTrue(expectation.hasWindow)
+        assertEquals(200f, expectation.startMs)
+        assertEquals(900f, expectation.endMs)
+        assertEquals(listOf(0.2f, 0.8f, 0.4f), expectation.envelope)
+        assertTrue(expectation.canPreview)
+    }
+
+    @Test
     fun `crest marks derive a robust target frequency`() {
         val expectation = TarjiLabExpectation()
             .markStart(200f, 2_000f)
