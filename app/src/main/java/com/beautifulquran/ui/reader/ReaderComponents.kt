@@ -261,6 +261,8 @@ private data class RepeatWash(
 
 internal enum class RepeatWashAction { Hold, Reveal, Release }
 
+internal enum class RepeatWashEntryMode { Reveal, Complete }
+
 internal fun repeatWashAction(
     wasRepeat: Boolean,
     previousActivation: Long,
@@ -273,24 +275,34 @@ internal fun repeatWashAction(
     else -> RepeatWashAction.Hold
 }
 
+/** Only the word currently being spoken reveals. Earlier members exposed by
+ * a seek are history and must already be fully orange, not queued for replay. */
+internal fun repeatWashEntryMode(active: Boolean): RepeatWashEntryMode =
+    if (active) RepeatWashEntryMode.Reveal else RepeatWashEntryMode.Complete
+
 private class RepeatWashLifecycle(
     var repeat: Boolean = false,
     var activation: Long = 0L,
 )
 
-internal fun repeatWashDurationMs(activeSweepMs: Int?, minimumMs: Int): Int =
-    maxOf(activeSweepMs ?: 0, minimumMs)
+/** Follow the live word's measured dwell. The soft fallback is only for an
+ * entry that has no active-word clock (for example restored UI state). */
+internal fun repeatWashDurationMs(activeSweepMs: Int?, fallbackMs: Int): Int =
+    activeSweepMs?.coerceAtLeast(1) ?: fallbackMs.coerceAtLeast(1)
 
 /**
  * Orange wash for one word in a repeat chain.
  *
- * **Sequential residual finish (law):**
- * - [InkEngine.Tuning.repeatSweepMs] is the minimum duration, so short words
- *   still get a full soft edge while longer words follow the reciter's dwell.
+ * **Audio-bound residual finish (law):**
+ * - A live word uses its measured dwell. [InkEngine.Tuning.repeatSweepMs] is
+ *   only the fallback when no active-word clock exists.
  * - Tajweed-paced entries map that clock through the same captured curve and
  *   feather as first-pass ink.
- * - A shared per-ayah [OrderedWashGate] runs members **one after another by
- *   word position**; N+1 cannot start until N's 0→1 completes.
+ * - Every active member begins immediately at its spoken boundary. A prior
+ *   member may finish its residual edge concurrently, but can never block the
+ *   word the reciter is saying now.
+ * - Seeking into a chain completes earlier, inactive members immediately and
+ *   reveals only the currently spoken member.
  * - [snapshotFlow] + collect (not `LaunchedEffect(activation)`) so Active
  *   advancing (activation → 0) **does not cancel** an in-flight wash. The
  *   feather always runs out; Hold is a no-op after completion.
@@ -300,18 +312,16 @@ internal fun repeatWashDurationMs(activeSweepMs: Int?, minimumMs: Int): Int =
 @Composable
 private fun rememberRepeatWash(
     repeat: Boolean,
-    /** 1-based word position — orders the per-ayah gate. */
-    position: Int,
-    /** Shared by every word in this ayah so chain members reveal in order. */
-    gate: OrderedWashGate,
-    /** Active word dwell; null for queued members revealed by a seek. */
+    /** True only for the word whose repeat occurrence is being spoken now. */
+    active: Boolean,
+    /** Raw active-word dwell; null when there is no live timing clock. */
     activeSweepMs: Int? = null,
     /** Tajweed curve for the active repeated word. */
     pacing: TajweedPacing.Curve? = null,
     /** Bumps on seek for the active word so replaying it re-runs orange too. */
     activation: Long = 0L,
 ): RepeatWash {
-    val clock = remember { Animatable(if (repeat) 0f else 1f) }
+    val clock = remember { Animatable(if (repeat && active) 0f else 1f) }
     val alpha = remember { Animatable(if (repeat) 1f else 0f) }
     val lockedPacing = remember { mutableStateOf<TajweedPacing.Curve?>(null) }
     val lockedFeather = remember { mutableStateOf<Float?>(null) }
@@ -327,7 +337,7 @@ private fun rememberRepeatWash(
     val entryPending = remember { mutableStateOf(false) }
     SideEffect {
         when (entryAction) {
-            RepeatWashAction.Reveal -> entryPending.value = true
+            RepeatWashAction.Reveal -> entryPending.value = active
             RepeatWashAction.Release -> entryPending.value = false
             RepeatWashAction.Hold -> Unit
         }
@@ -338,6 +348,7 @@ private fun rememberRepeatWash(
     val activationState = rememberUpdatedState(activation)
     val activeSweepState = rememberUpdatedState(activeSweepMs)
     val pacingState = rememberUpdatedState(pacing)
+    val activeState = rememberUpdatedState(active)
     LaunchedEffect(Unit) {
         snapshotFlow { repeatState.value to activationState.value }.collect { (rep, act) ->
             val action = repeatWashAction(
@@ -350,47 +361,58 @@ private fun rememberRepeatWash(
             lifecycle.activation = act
             when (action) {
                 RepeatWashAction.Reveal -> {
-                    // Capture at chain entry: this word can stop being Active
-                    // while it waits behind an earlier member in the gate.
-                    val entryPacing = pacingState.value
-                    val sweepMs = repeatWashDurationMs(
-                        activeSweepMs = activeSweepState.value,
-                        minimumMs = InkEngine.tuning.repeatSweepMs,
-                    )
-                    val easing =
-                        if (entryPacing != null) LinearEasing else InkEngine.sweepEasing
-                    gate.run(position) {
-                        // Dropped from the chain while queued — skip start.
-                        if (!repeatState.value) return@run
-                        lockedDurationMs.intValue = sweepMs
-                        lockedPacing.value = entryPacing
-                        lockedFeather.value =
-                            if (entryPacing != null) InkEngine.pacedFeather() else null
-                        clock.snapTo(0f)
-                        entryPending.value = false
-                        alpha.snapTo(1f)
-                        clock.animateTo(1f, tween(sweepMs, easing = easing))
+                    when (repeatWashEntryMode(activeState.value)) {
+                        RepeatWashEntryMode.Complete -> {
+                            // A seek can expose the whole already-spoken prefix
+                            // in one frame. It is history, not an animation queue.
+                            clock.snapTo(1f)
+                            entryPending.value = false
+                            alpha.snapTo(1f)
+                            lockedPacing.value = null
+                            lockedFeather.value = null
+                        }
+                        RepeatWashEntryMode.Reveal -> {
+                            // Capture at chain entry. This collector lets the
+                            // residual finish after handoff without blocking
+                            // the next word's independent reveal.
+                            val entryPacing = pacingState.value
+                            val sweepMs = repeatWashDurationMs(
+                                activeSweepMs = activeSweepState.value,
+                                fallbackMs = InkEngine.tuning.repeatSweepMs,
+                            )
+                            val easing = if (entryPacing != null) {
+                                LinearEasing
+                            } else {
+                                InkEngine.sweepEasing
+                            }
+                            lockedDurationMs.intValue = sweepMs
+                            lockedPacing.value = entryPacing
+                            lockedFeather.value = if (entryPacing != null) {
+                                InkEngine.pacedFeather()
+                            } else {
+                                null
+                            }
+                            clock.snapTo(0f)
+                            entryPending.value = false
+                            alpha.snapTo(1f)
+                            clock.animateTo(1f, tween(sweepMs, easing = easing))
+                        }
                     }
                 }
                 RepeatWashAction.Release -> {
-                    // Residual under the gate (no overlap with next reveal);
-                    // alpha dissolve is outside so chain clear doesn't serialize
-                    // N× fadeMs on the ordered queue.
+                    // Finish this word's own residual without blocking the
+                    // currently spoken member, then dissolve.
                     if (clock.value < 1f && alpha.value > 0f) {
-                        gate.run(position) {
-                            if (clock.value < 1f) {
-                                val remain =
-                                    ((1f - clock.value) * lockedDurationMs.intValue)
-                                        .toInt()
-                                        .coerceAtLeast(1)
-                                val easing = if (lockedPacing.value != null) {
-                                    LinearEasing
-                                } else {
-                                    InkEngine.sweepEasing
-                                }
-                                clock.animateTo(1f, tween(remain, easing = easing))
-                            }
+                        val remain =
+                            ((1f - clock.value) * lockedDurationMs.intValue)
+                                .toInt()
+                                .coerceAtLeast(1)
+                        val easing = if (lockedPacing.value != null) {
+                            LinearEasing
+                        } else {
+                            InkEngine.sweepEasing
                         }
+                        clock.animateTo(1f, tween(remain, easing = easing))
                     }
                     if (alpha.value > 0f) {
                         alpha.animateTo(
@@ -1172,12 +1194,12 @@ private fun rememberInkMotions(
     words: List<Word>,
     inks: List<InkEngine.Word>,
     activeSweepMs: Int?,
+    activeRepeatDwellMs: Int?,
     pacing: TajweedPacing.Curve? = null,
     activeRevealStart: Float = 0f,
     waslPrefixes: List<WaslPrefix?>,
     activation: Long = 0L,
     activeWordStartMs: Long = Long.MIN_VALUE,
-    repeatGate: OrderedWashGate,
     /** English prose waits for each predecessor's residual before blooming. */
     sequentialSweeps: Boolean,
     /** Layered gloss fades word ink with [animatedInkAlpha]; shaped modes dim
@@ -1221,9 +1243,8 @@ private fun rememberInkMotions(
             sweep = sweep,
             repeatWash = rememberRepeatWash(
                 repeat = ink.repeat,
-                position = words[index].position,
-                gate = repeatGate,
-                activeSweepMs = activeSweepMs.takeIf { isActive },
+                active = isActive,
+                activeSweepMs = activeRepeatDwellMs.takeIf { isActive },
                 pacing = entryPacing,
                 // Only the active word carries a non-zero seek generation so
                 // a mid-chain handoff (activation → 0) is Hold, not re-Reveal.
@@ -2415,6 +2436,9 @@ fun AyahBlock(
     // The letter fade paces itself to how long the reciter dwells on the
     // word, corrected for the chosen playback speed.
     val sweepMs = InkEngine.sweepMs(activeWord, playbackSpeed)
+    // Repeat washes share the same audio handoff but must not inherit the
+    // ordinary sweep's visual minimum and continue past the spoken word.
+    val repeatDwellMs = InkEngine.repeatDwellMs(activeWord, playbackSpeed)
     val activation = activeWord?.activation ?: 0L
     val activeWordStartMs = activeWord?.startMs ?: Long.MIN_VALUE
 
@@ -2524,14 +2548,13 @@ fun AyahBlock(
         }
     }
 
-    // One motion owner for every renderer. The shared gate serializes orange
-    // chain entries; no text branch creates its own clock or lifecycle state.
-    val repeatWashGate = remember { OrderedWashGate() }
-    LaunchedEffect(repeatWashGate) { repeatWashGate.pump() }
+    // One motion owner for every renderer; no text branch creates its own
+    // clock or lifecycle state.
     val motions = rememberInkMotions(
         words = ayah.words,
         inks = inks,
         activeSweepMs = sweepMs,
+        activeRepeatDwellMs = repeatDwellMs,
         // English has no Arabic letter-pacing paint, but shares every other
         // lifecycle rule and the same low-level shaped bloom primitive.
         pacing = pacing.takeUnless { readingMode == ReadingMode.ENGLISH_ONLY },
@@ -2541,7 +2564,6 @@ fun AyahBlock(
         waslPrefixes = waslPrefixes,
         activation = activation,
         activeWordStartMs = activeWordStartMs,
-        repeatGate = repeatWashGate,
         sequentialSweeps = readingMode == ReadingMode.ENGLISH_ONLY,
         animateLyricInk =
             readingMode == ReadingMode.ARABIC_ENGLISH && showGloss,

@@ -451,6 +451,14 @@ object InkEngine {
         return raw.coerceIn(floor, tuning.maxSweepMs)
     }
 
+    /** Wall-clock dwell of the currently spoken repeat occurrence. Unlike
+     * [sweepMs], this deliberately has no visual minimum: stretching every
+     * short orange wash lets the rendered chain fall behind the voice. */
+    fun repeatDwellMs(activeWord: ActiveWord?, playbackSpeed: Float): Int? {
+        val word = activeWord ?: return null
+        return (word.durationMs / playbackSpeed).toInt().takeIf { it > 0 }
+    }
+
     /**
      * The active word's tajweed pacing curve — how the sweep's linear clock
      * maps to wash position so the ink sustains the letter the reciter is
