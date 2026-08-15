@@ -1,0 +1,10 @@
+{
+  "id": "boundary-shuraym-7-146-first-la-handoff",
+  "label": "Shuraym 7:146 first-pass la does not stay on the preceding word",
+  "refs": ["Arabic XLSR fixed-sequence witness", "Quran phonetics free-decoding witness"],
+  "pipeline": "boundary_repair",
+  "notes": "Arabic XLSR places word 21 لَا at 12,485 ms and word 22 at 12,766 ms. The old 12,600 ms handoff kept word 20 active through the 120 ms spoken لَا.",
+  "input_segments": [[20,11900,12600],[21,12600,12760],[22,12760,13780]],
+  "repair_segments": [[20,11900,12485],[21,12485,12760]],
+  "expected_segments": [[20,11900,12485],[21,12485,12760],[22,12760,13780]]
+}

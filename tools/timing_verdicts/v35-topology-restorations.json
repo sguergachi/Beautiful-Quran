@@ -83,10 +83,10 @@
     "Saood_ash-Shuraym_128kbps:7:146": {
       "verdict": "accept", "kinds": ["topology"],
       "baselinePayloadHash": "c8605f86c88076868a808445203a33cd8fb24b376c5a6f6d3b7e8bf65a89322c",
-      "candidatePayloadHash": "8043e73d705f02f8066f3a929e2f5d2acb14eea5d9c18d75d825d02f4cc1432b",
+      "candidatePayloadHash": "1aba481e36e1a2a56d4cd963b34dcc052cdfa83f0fb8424cf96328618f05dd49",
       "evidence": {
         "kind": "dual_model_topology", "artifact": "tools/timing_verdicts/v35-topology-restorations.json",
-        "summary": "Both models strongly prefer the restored 1–29 re-say despite 147 extra labels; the baseline mapped a 20-second voiced interval as one word. Boundary review restored word 1 to its 380 ms Arabic XLSR onset, then corrected the first pass: Arabic XLSR starts words 24/25 at 14,987/15,747 ms; independent Quran phonetics emits wa at 14,988 ms, yaraw's r at 15,831 ms, and the next سَبِيلَ at 16,153 ms. The shipped handoffs are 14,980/15,740/16,120 ms.",
+        "summary": "Both models strongly prefer the restored 1–29 re-say despite 147 extra labels; the baseline mapped a 20-second voiced interval as one word. Boundary review restored word 1 to its 380 ms Arabic XLSR onset, then corrected the first pass: Arabic XLSR starts words 24/25 at 14,987/15,747 ms; independent Quran phonetics emits wa at 14,988 ms, yaraw's r at 15,831 ms, and the next سَبِيلَ at 16,153 ms. The shipped handoffs are 14,980/15,740/16,120 ms. Arabic XLSR also starts word 21 at 12,485 and 31,714 ms; its prior 12,600/31,820 ms handoffs left the chain on word 20 throughout that spoken لَا, so both preceding segments now end at those witnessed starts.",
         "audioSha256": "605350c996dda34eec394a95e7c0cf3273b480107548165e20483338d209750a", "waveformVeto": false,
         "models": [{"name": "arabic-xlsr-ctc", "baselineScore": -2845.413, "candidateScore": -1662.385}, {"name": "mms-uroman-ctc", "baselineScore": -552.253, "candidateScore": -206.49}],
         "boundaryWitnesses": [{"name": "arabic-xlsr-ctc", "wordStartsMs": {"1": 380, "24": 14987, "25": 15747}}, {"name": "quran-phonetics-free-ctc", "emissionsMs": {"wa": 14988, "yaraw_r": 15831, "next_sabila": 16153}}]

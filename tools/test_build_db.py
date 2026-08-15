@@ -642,11 +642,17 @@ def check_recovered_boundary_repairs():
         repairs = Path(directory)
         (repairs / "fixture.json").write_text(json.dumps(edits), encoding="utf-8")
         with patch("build_db.REPAIRS_DIR", repairs):
-            # A boundary repair cannot supply coverage for a missing row.
+            # A boundary repair cannot supply coverage for a missing row or a
+            # row that is present but lacks the repaired position.
             deferred = apply_timing_repairs(
                 [(1, 1, 2, source)],
                 {(1, 1): 2, (1, 2): 2},
                 skip_missing_boundary_keys={(1, 1, 1)},
+            )
+            deferred_incomplete = apply_timing_repairs(
+                [(1, 1, 1, json.dumps([[1, 0, 100]]))],
+                {(1, 1): 2, (1, 2): 2},
+                skip_missing_boundary_keys={(1, 1, 1), (1, 1, 2)},
             )
             # After fallback coverage, replay only the deferred row's boundary.
             replayed = apply_timing_repairs(
@@ -657,6 +663,7 @@ def check_recovered_boundary_repairs():
             )
     return (
         json.loads(deferred[0][3]) == [[1, 0, 40], [2, 40, 100]]
+        and json.loads(deferred_incomplete[0][3]) == [[1, 0, 100]]
         and json.loads(replayed[0][3]) == [[1, 0, 40], [2, 40, 100]]
         and replayed[1][3] == source
     )

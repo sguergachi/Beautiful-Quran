@@ -47,6 +47,6 @@ class QuranDatabase(private val context: Context) {
         // (or content — e.g. a new reciter), so updated installs re-extract.
         // `data/quran.db.sha256` pins this to the asset it was bumped for;
         // DatabaseFingerprintTest fails if the two drift apart.
-        internal const val DB_FILE_NAME = "quran-v45.db"
+        internal const val DB_FILE_NAME = "quran-v46.db"
     }
 }

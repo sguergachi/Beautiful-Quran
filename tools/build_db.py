@@ -1450,10 +1450,10 @@ def apply_timing_repairs(
                 continue
             if only_kinds is not None and kind not in only_kinds:
                 continue
-            # A boundary repair cannot create an absent row.  Defer it only
-            # when this row has a validated singleton-gap fallback; it is
+            # A boundary repair cannot create a missing position either. Defer
+            # it when this row has a validated singleton-gap fallback; it is
             # replayed immediately after that fallback is admitted below.
-            if kind == "boundary" and pre_raw is None and key in skip_missing_boundary_keys:
+            if kind == "boundary" and key in skip_missing_boundary_keys:
                 continue
             if kind == "boundary":
                 if pre_raw is None:
@@ -2357,11 +2357,11 @@ def main():
         print("[typed corrections] applying irreducible timing verdicts")
         timing_rows = apply_timing_corrections(timing_rows)
 
-        # A boundary repair cannot create an absent row.  Defer only those
-        # impossible edits for rows that have a valid singleton-gap candidate;
-        # every repair which can complete a row still runs before the fallback.
-        row_keys = {(rid, sid, ay) for rid, sid, ay, _ in timing_rows}
-        deferred_boundary_keys = set(singleton_gap_candidates) - row_keys
+        # A boundary repair cannot create the singleton gap itself.  Hold all
+        # of this candidate row's boundary edits until its coverage fallback is
+        # chosen; non-boundary repairs still get the first chance to complete
+        # the source row without using the fallback.
+        deferred_boundary_keys = set(singleton_gap_candidates)
         print("[repairs] applying tools/timing_repairs/*.json")
         timing_rows = apply_timing_repairs(
             timing_rows,

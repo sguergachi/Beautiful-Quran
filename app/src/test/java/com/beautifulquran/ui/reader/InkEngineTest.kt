@@ -516,22 +516,34 @@ class InkEngineTest {
     }
 
     @Test
-    fun `shipped clock does not advance past a short word`() {
-        // Shuraym 7:146's repeated "لا" lasts 160 ms. A shipped 114 ms
-        // lead lit the following "يتخذوه" for 71% of that word's voice.
+    fun `shuraym repeated la begins on the voiced boundary`() {
+        // Fixed-transcript Arabic XLSR places the two spoken "لا" starts at
+        // 12,485 and 31,714 ms. The preceding words must end there; otherwise
+        // the repeat chain visibly remains a word behind despite correct
+        // topology.
         val segments = listOf(
-            Segment(position = 21, startMs = 31_820, endMs = 31_980),
+            Segment(position = 20, startMs = 11_900, endMs = 12_485),
+            Segment(position = 21, startMs = 12_485, endMs = 12_760),
+            Segment(position = 22, startMs = 12_760, endMs = 13_780),
+            Segment(position = 20, startMs = 31_140, endMs = 31_714),
+            Segment(position = 21, startMs = 31_714, endMs = 31_980),
             Segment(position = 22, startMs = 31_980, endMs = 32_980),
         )
 
-        val duringLa = OutputLatency.highlightMs(
-            mediaPositionMs = 31_866,
-            latencyMs = 0,
-            leadMs = InkEngine.DEFAULT_HIGHLIGHT_LEAD_MS.toLong(),
-            leadNotBeforeMs = 19_920,
+        fun activeAt(mediaPositionMs: Long) = HighlightEngine.activeWord(
+            segments,
+            OutputLatency.highlightMs(
+                mediaPositionMs = mediaPositionMs,
+                latencyMs = 0,
+                leadMs = InkEngine.DEFAULT_HIGHLIGHT_LEAD_MS.toLong(),
+                leadNotBeforeMs = 380,
+            ),
         )
 
-        assertEquals(21, HighlightEngine.activeWord(segments, duringLa))
+        assertEquals(21, activeAt(12_485))
+        assertEquals(22, activeAt(12_766))
+        assertEquals(21, activeAt(31_714))
+        assertEquals(22, activeAt(31_994))
     }
 
     @Test

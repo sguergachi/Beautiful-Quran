@@ -20,6 +20,46 @@
       "occurrence": 1,
       "refs": ["Arabic XLSR fixed-sequence witness"],
       "segments": [[1,380,1140]]
+    },
+    {
+      "reciterId": 6,
+      "reciterSlug": "Saood_ash-Shuraym_128kbps",
+      "surahId": 7,
+      "ayah": 146,
+      "kind": "boundary",
+      "occurrence": 20,
+      "refs": ["Arabic XLSR fixed-sequence witness", "Quran phonetics free-decoding witness"],
+      "segments": [[20,11900,12485]]
+    },
+    {
+      "reciterId": 6,
+      "reciterSlug": "Saood_ash-Shuraym_128kbps",
+      "surahId": 7,
+      "ayah": 146,
+      "kind": "boundary",
+      "occurrence": 21,
+      "refs": ["Arabic XLSR fixed-sequence witness", "Quran phonetics free-decoding witness"],
+      "segments": [[21,12485,12760]]
+    },
+    {
+      "reciterId": 6,
+      "reciterSlug": "Saood_ash-Shuraym_128kbps",
+      "surahId": 7,
+      "ayah": 146,
+      "kind": "boundary",
+      "occurrence": 49,
+      "refs": ["Arabic XLSR fixed-sequence witness", "Quran phonetics free-decoding witness"],
+      "segments": [[20,31140,31714]]
+    },
+    {
+      "reciterId": 6,
+      "reciterSlug": "Saood_ash-Shuraym_128kbps",
+      "surahId": 7,
+      "ayah": 146,
+      "kind": "boundary",
+      "occurrence": 50,
+      "refs": ["Arabic XLSR fixed-sequence witness", "Quran phonetics free-decoding witness"],
+      "segments": [[21,31714,31980]]
     }
   ]
 }

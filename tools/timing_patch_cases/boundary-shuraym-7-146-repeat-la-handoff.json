@@ -1,0 +1,10 @@
+{
+  "id": "boundary-shuraym-7-146-repeat-la-handoff",
+  "label": "Shuraym 7:146 repeat-pass la does not stay on the preceding word",
+  "refs": ["Arabic XLSR fixed-sequence witness", "Quran phonetics free-decoding witness"],
+  "pipeline": "boundary_repair",
+  "notes": "Arabic XLSR places repeated word 21 لَا at 31,714 ms and word 22 at 31,994 ms. The old 31,820 ms handoff kept word 20 active through the 120 ms spoken لَا.",
+  "input_segments": [[20,31140,31820],[21,31820,31980],[22,31980,32980]],
+  "repair_segments": [[20,31140,31714],[21,31714,31980]],
+  "expected_segments": [[20,31140,31714],[21,31714,31980],[22,31980,32980]]
+}
