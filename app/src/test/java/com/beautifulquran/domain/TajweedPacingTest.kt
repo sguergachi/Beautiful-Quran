@@ -365,23 +365,23 @@ class TajweedPacingTest {
     }
 
     @Test
-    fun `word-initial madd parks far enough that the opening letter blooms`() {
-        // 4:143 هَـٰٓؤُلَآءِ — madd muttasil on the first letter. Mid-slot of
-        // five uniform letters is 0.10 and leaves the ه at resting alpha
-        // under the paced feather. The park must clear that midpoint.
+    fun `word-initial madd crawls far enough that the opening letter blooms`() {
+        // 4:143 هَـٰٓؤُلَآءِ — madd muttasil on the first letter. The dwell
+        // must carry the wash past first-slot mid (0.10, still resting alpha)
+        // without freezing a visible edge.
         val curve = curveOf("هَـٰٓؤُلَآءِ")
-        val parked = curve.at(0.25f)
-        assertTrue("opening madd should be visibly into the word, at $parked", parked > 0.22f)
-        val held = curve.at(0.32f) - curve.at(0.25f)
+        val midCrawl = curve.at(0.08f)
+        val endCrawl = curve.at(0.20f)
+        assertTrue("opening crawl should keep moving, $midCrawl → $endCrawl", endCrawl > midCrawl + 0.05f)
+        assertTrue("opening crawl should reach a visible bloom, at $endCrawl", endCrawl > 0.22f)
         val later = curve.at(0.85f) - curve.at(0.55f)
-        assertTrue("opening madd should park, moved $held", held < 0.08f)
         assertTrue("the rest of the word should still cruise, moved $later", later > 0.15f)
     }
 
     @Test
-    fun `opening hold floor stays monotone on a long word`() {
-        // 16:22 مُّسۡتَكۡبِرُونَ — 8 letters, first-letter ghunnah. The 0.28
-        // floor sits past the second slot; later cruise must not walk back.
+    fun `opening crawl stays monotone on a long word`() {
+        // 16:22 مُّسۡتَكۡبِرُونَ — 8 letters, first-letter ghunnah. The crawl
+        // finishes past the second slot; later cruise must not walk back.
         val word = "مُّسۡتَكۡبِرُونَ"
         val curve = curveOf(word, hold = Hold(ghunnah = true))
         var last = -1f
@@ -390,7 +390,7 @@ class TajweedPacingTest {
             assertTrue("monotone at $i ($last → $v)", v + 1e-6f >= last)
             last = v
         }
-        assertTrue("opening ghunnah still parks visibly", curve.at(0.30f) > 0.22f)
+        assertTrue("opening crawl still reaches a visible bloom", curve.at(0.30f) > 0.22f)
     }
 
     @Test
