@@ -213,7 +213,11 @@ fun HomeScreen(
                 .padding(padding)
                 .fillMaxSize()
                 .pointerInput(searchFocused, searchPaneVisible, searchBounds, searchPaneBounds) {
-                    if (!searchFocused) return@pointerInput
+                    // Empty-query dials only: an outside tap dismisses without
+                    // activating the list under the pane. Once a query is up,
+                    // result rows must receive the gesture (they clear focus
+                    // themselves on open). Scroll still dismisses while focused.
+                    if (!searchFocused || !searchPaneVisible) return@pointerInput
                     awaitEachGesture {
                         awaitFirstDown(
                             requireUnconsumed = false,
@@ -222,8 +226,7 @@ fun HomeScreen(
                         val up = waitForUpOrCancellation(pass = PointerEventPass.Initial)
                             ?: return@awaitEachGesture
                         val tappedSearch = searchBounds?.contains(up.position) == true
-                        val tappedPane = searchPaneVisible &&
-                            searchPaneBounds?.contains(up.position) == true
+                        val tappedPane = searchPaneBounds?.contains(up.position) == true
                         if (!tappedSearch && !tappedPane) {
                             up.consume()
                             focusManager.clearFocus()
