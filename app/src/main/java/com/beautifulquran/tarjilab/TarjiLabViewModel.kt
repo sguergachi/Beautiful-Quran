@@ -4,6 +4,7 @@ import android.content.Context
 import android.media.AudioAttributes
 import android.media.AudioFormat
 import android.media.AudioTrack
+import android.media.PlaybackParams
 import android.os.Environment
 import android.os.SystemClock
 import androidx.lifecycle.ViewModel
@@ -65,8 +66,13 @@ class TarjiLabViewModel(
         val knobs: TarjiLabKnobs = TarjiLabKnobs(),
         /** Listener-authored hold window, label, and optional envelope. */
         val expectation: TarjiLabExpectation = TarjiLabExpectation(),
-        val tool: TarjiLabTool = TarjiLabTool.LISTEN,
+        val tool: TarjiLabTool = TarjiLabTool.HOLD,
+        val previewSpeed: TarjiPreviewSpeed = TarjiPreviewSpeed.FULL,
+        val previewScope: TarjiPreviewScope = TarjiPreviewScope.HOLD,
+        val view: TarjiViewWindow = TarjiViewWindow.fit(0f),
         val sampleNotes: String = "",
+        /** True while a hold handle is being dragged — the only time we print the range. */
+        val holdEditing: Boolean = false,
         val capturing: Boolean = false,
         /** Capture progress from the requested word span, 0..1. */
         val captureProgress: Float = 0f,
@@ -97,6 +103,7 @@ class TarjiLabViewModel(
     private var previewLoopStart = 0
     private var previewLoopEnd = 0
     private var scrubActive = false
+    private var holdEditActive = false
     private var ayahSegments: List<Segment> = emptyList()
     private var recitersCache: List<Reciter> = emptyList()
 
@@ -135,11 +142,13 @@ class TarjiLabViewModel(
         loadJob?.cancel()
         abortCapture()
         audioTrack?.let { runCatching { it.pause() } }
+        val keepTool = _ui.value.tool
         _ui.value = TarjiLabUiState(
             isLoading = true,
             surahId = surahId,
             ayah = ayah,
             knobs = knobsForReciter(settingsRepo.settings.value.reciterId),
+            tool = keepTool,
         )
         loadJob = viewModelScope.launch {
             val reciters = repository.reciters()
@@ -175,6 +184,7 @@ class TarjiLabViewModel(
                 wordStartMs = span?.first ?: 0L,
                 wordEndMs = span?.last ?: 0L,
                 knobs = knobsForReciter(reciter.id),
+                tool = _ui.value.tool,
             )
             settingsRepo.updateListeningPosition(surahId, ayahRow.number)
             captureWord()
@@ -343,6 +353,7 @@ class TarjiLabViewModel(
             captureError = null,
             previewDurationMs = captureMs,
             previewPositionMs = 0f,
+            view = TarjiViewWindow.fit(captureMs),
         )
         reanalyze()
     }
@@ -430,16 +441,88 @@ class TarjiLabViewModel(
     }
 
     fun setTool(tool: TarjiLabTool) {
-        _ui.value = _ui.value.copy(tool = tool, note = null)
+        val st = _ui.value
+        val expectation = if (
+            tool == TarjiLabTool.SHAPE && st.expectation.envelope.isEmpty()
+        ) {
+            st.expectation.withEnvelope(st.trace?.let { envelopeFromTrace(it) }.orEmpty())
+        } else {
+            st.expectation
+        }
+        _ui.value = st.copy(tool = tool, expectation = expectation, note = null)
     }
 
-    fun setHoldWindow(window: TarjiHoldWindow) {
+    fun setPreviewSpeed(speed: TarjiPreviewSpeed) {
+        val st = _ui.value
+        val visual = if (st.previewPlaying) previewPlayheadMs() else st.previewPositionMs
+        _ui.value = st.copy(
+            previewSpeed = speed,
+            previewPositionMs = visual.coerceAtLeast(0f),
+            previewStartWallMs = if (st.previewPlaying) {
+                SystemClock.elapsedRealtime()
+            } else {
+                st.previewStartWallMs
+            },
+        )
+        applyPreviewSpeed()
+        if (st.previewPlaying && st.capture != null && visual >= 0f) {
+            runCatching {
+                audioTrack?.setPlaybackHeadPosition(previewFrame(st.capture, visual))
+            }
+        }
+    }
+
+    fun zoomViewAt(focusMs: Float, scale: Float) {
+        val st = _ui.value
+        val capture = st.capture ?: return
+        val captureMs = capture.hopCount * capture.hopContentDurationMs()
+        _ui.value = st.copy(view = zoomView(st.view, captureMs, focusMs, scale))
+    }
+
+    fun panViewBy(deltaMs: Float) {
+        val st = _ui.value
+        val capture = st.capture ?: return
+        val captureMs = capture.hopCount * capture.hopContentDurationMs()
+        _ui.value = st.copy(view = panView(st.view, captureMs, deltaMs))
+    }
+
+    fun fitView() {
+        val st = _ui.value
+        val capture = st.capture ?: return
+        _ui.value = st.copy(
+            view = TarjiViewWindow.fit(capture.hopCount * capture.hopContentDurationMs()),
+        )
+    }
+
+    /** Pause so a hold drag cannot fight the hardware loop. */
+    fun beginHoldEdit() {
+        if (_ui.value.previewPlaying) pausePreview()
+        holdEditActive = true
+        _ui.value = _ui.value.copy(holdEditing = true)
+    }
+
+    /**
+     * Move the hold. Does not touch [AudioTrack] — mid-drag
+     * [android.media.AudioTrack.setLoopPoints] fails silently and leaves
+     * Play looping the *previous* range. Play rebuilds the loop.
+     */
+    fun setHoldWindow(window: TarjiHoldWindow, playheadMs: Float? = null) {
         val st = _ui.value
         val capture = st.capture ?: return
         val captureMs = capture.hopCount * capture.hopContentDurationMs()
         val next = st.expectation.withWindow(window, captureMs)
-        _ui.value = st.copy(expectation = next, note = null)
-        if (st.previewPlaying) applyLoopWindow()
+        val hold = next.window ?: return
+        _ui.value = st.copy(
+            expectation = next,
+            previewPositionMs = (playheadMs ?: playheadAfterHoldEdit(hold))
+                .coerceIn(hold.startMs, (hold.endMs - 1f).coerceAtLeast(hold.startMs)),
+            note = null,
+        )
+    }
+
+    fun endHoldEdit() {
+        holdEditActive = false
+        _ui.value = _ui.value.copy(holdEditing = false)
     }
 
     fun paintEnvelopeAt(x: Float, y: Float, width: Float, height: Float) {
@@ -457,13 +540,21 @@ class TarjiLabViewModel(
             y = y,
             width = width,
             height = height,
+            view = st.view,
         )
-        _ui.value = st.copy(expectation = st.expectation.withEnvelope(painted), note = null)
+        val atMs = viewMs(x, width, st.view)
+        _ui.value = st.copy(
+            expectation = st.expectation.withEnvelope(painted),
+            previewPositionMs = if (st.previewPlaying) st.previewPositionMs else atMs,
+            note = null,
+        )
     }
 
-    fun clearEnvelope() {
+    /** Put the stroke back to what the current knobs hear. */
+    fun resetEnvelopeToKnobs() {
         val st = _ui.value
-        _ui.value = st.copy(expectation = st.expectation.withEnvelope(emptyList()), note = null)
+        val seeded = st.trace?.let { envelopeFromTrace(it) } ?: return
+        _ui.value = st.copy(expectation = st.expectation.withEnvelope(seeded), note = null)
     }
 
     fun labelHold() {
@@ -478,6 +569,16 @@ class TarjiLabViewModel(
         if (_ui.value.capture == null) return
         _ui.value = _ui.value.copy(
             expectation = _ui.value.expectation.labeled(TarjiExpectationKind.NO_SHIMMER),
+            note = null,
+        )
+    }
+
+    /** Tap the hold to flip its life: wave ↔ flat. */
+    fun toggleHoldLife() {
+        if (_ui.value.capture == null || _ui.value.expectation.window == null) return
+        val next = nextHoldLife(_ui.value.expectation.kind)
+        _ui.value = _ui.value.copy(
+            expectation = _ui.value.expectation.labeled(next),
             note = null,
         )
     }
@@ -503,18 +604,29 @@ class TarjiLabViewModel(
 
     // ── Loop preview ───────────────────────────────────────────────────────
 
-    /** Toggle the captured loop without destroying its current position. */
-    fun togglePreview() {
-        if (_ui.value.previewPlaying) pausePreview() else resumePreview()
+    /** Toggle the hold loop without destroying its current position. */
+    fun togglePreview() = togglePreview(TarjiPreviewScope.HOLD)
+
+    /** Toggle a loop of the whole captured word. */
+    fun toggleWordPreview() = togglePreview(TarjiPreviewScope.WORD)
+
+    private fun togglePreview(scope: TarjiPreviewScope) {
+        val st = _ui.value
+        if (st.previewPlaying && st.previewScope == scope) {
+            pausePreview()
+            return
+        }
+        val captureMs = st.capture?.let { it.hopCount * it.hopContentDurationMs() } ?: 0f
+        val window = previewLoopWindow(scope, st.expectation.window, captureMs)
+        startPreviewAt(playheadForPlay(st.previewPositionMs, window), scope)
     }
 
     /** Play the selected hold window on a seamless hardware loop. */
     fun startPreview() {
-        val window = currentWindow()
-        startPreviewAt(window?.startMs ?: 0f)
+        startPreviewAt(currentHold()?.startMs ?: 0f, TarjiPreviewScope.HOLD)
     }
 
-    private fun startPreviewAt(startMs: Float) {
+    private fun startPreviewAt(startMs: Float, scope: TarjiPreviewScope) {
         stopPreview()
         val st = _ui.value
         val capture = st.capture ?: run {
@@ -564,7 +676,11 @@ class TarjiLabViewModel(
         }
         val totalFrames = capture.hopCount * capture.hopSamples
         val durationMs = capture.hopCount * capture.hopContentDurationMs()
-        val loop = loopRange(capture, durationMs)
+        val loop = loopRange(
+            previewLoopWindow(scope, st.expectation.window, durationMs),
+            capture,
+            durationMs,
+        )
         val positionMs = startMs.coerceIn(loop.startMs, (loop.endMs - 1f).coerceAtLeast(loop.startMs))
         val frame = previewFrame(capture, positionMs).coerceIn(loop.startFrame, loop.endFrame - 1)
         if (track.setPlaybackHeadPosition(frame) != AudioTrack.SUCCESS) {
@@ -582,9 +698,11 @@ class TarjiLabViewModel(
         previewLoopStart = loop.startFrame
         previewLoopEnd = loop.endFrame
         audioTrack = track
+        applyPreviewSpeed()
         track.play()
         _ui.value = st.copy(
             previewPlaying = true,
+            previewScope = scope,
             previewStartWallMs = SystemClock.elapsedRealtime(),
             previewDurationMs = durationMs,
             previewPositionMs = positionMs,
@@ -621,32 +739,6 @@ class TarjiLabViewModel(
         }.getOrDefault(false)
     }
 
-    private fun applyLoopWindow() {
-        val track = audioTrack ?: return
-        val capture = _ui.value.capture ?: return
-        val durationMs = capture.hopCount * capture.hopContentDurationMs()
-        val loop = loopRange(capture, durationMs)
-        val head = previewPlayheadMs().takeIf { it >= 0f } ?: loop.startMs
-        val frame = previewFrame(capture, head.coerceIn(loop.startMs, (loop.endMs - 1f).coerceAtLeast(loop.startMs)))
-            .coerceIn(loop.startFrame, loop.endFrame - 1)
-        val wasPlaying = _ui.value.previewPlaying
-        runCatching {
-            if (wasPlaying) track.pause()
-            check(track.setPlaybackHeadPosition(frame) == AudioTrack.SUCCESS)
-            check(loopInfinitely(track, loop.startFrame, loop.endFrame))
-            if (wasPlaying) track.play()
-        }
-        previewLoopStart = loop.startFrame
-        previewLoopEnd = loop.endFrame
-        previewTotalFrames = capture.hopCount * capture.hopSamples
-        if (wasPlaying) {
-            _ui.value = _ui.value.copy(
-                previewStartWallMs = SystemClock.elapsedRealtime(),
-                previewPositionMs = frame * 1_000f / previewRateHz.coerceAtLeast(1),
-            )
-        }
-    }
-
     private data class LoopRange(
         val startMs: Float,
         val endMs: Float,
@@ -654,15 +746,13 @@ class TarjiLabViewModel(
         val endFrame: Int,
     )
 
-    private fun currentWindow(): TarjiHoldWindow? {
-        val st = _ui.value
-        val capture = st.capture ?: return st.expectation.window
-        val captureMs = capture.hopCount * capture.hopContentDurationMs()
-        return st.expectation.window ?: TarjiHoldWindow(0f, captureMs)
-    }
+    private fun currentHold(): TarjiHoldWindow? = _ui.value.expectation.window
 
-    private fun loopRange(capture: TarjiLabCapture, captureMs: Float): LoopRange {
-        val window = currentWindow() ?: TarjiHoldWindow(0f, captureMs)
+    private fun loopRange(
+        window: TarjiHoldWindow,
+        capture: TarjiLabCapture,
+        captureMs: Float,
+    ): LoopRange {
         val frames = loopFrames(window, captureMs, capture.hopCount, capture.hopSamples)
         return LoopRange(
             startMs = window.startMs,
@@ -685,41 +775,17 @@ class TarjiLabViewModel(
         )
     }
 
-    /** Resume an existing paused track, or build one if the sample was loaded
-     * but has not played yet. */
-    private fun resumePreview() {
-        val st = _ui.value
-        val capture = st.capture ?: run {
-            startPreview()
-            return
-        }
-        val track = audioTrack
-        if (track == null) {
-            startPreviewAt(st.previewPositionMs)
-            return
-        }
-        val position = normalizePreviewPosition(st.previewPositionMs, st.previewDurationMs)
-        runCatching {
-            check(track.setPlaybackHeadPosition(previewFrame(capture, position)) == AudioTrack.SUCCESS)
-            track.play()
-        }.onSuccess {
-            _ui.value = st.copy(
-                previewPlaying = true,
-                previewStartWallMs = SystemClock.elapsedRealtime(),
-                previewPositionMs = position,
-            )
-        }.onFailure {
-            _ui.value = st.copy(note = "Could not resume the preview loop.")
-        }
-    }
-
     /** Move the loop to [positionMs]. Dragging works while playing or paused. */
     fun seekPreviewTo(positionMs: Float) {
         val st = _ui.value
         val capture = st.capture ?: return
         val durationMs = st.previewDurationMs.takeIf { it > 0f }
             ?: capture.hopCount * capture.hopContentDurationMs()
-        val loop = loopRange(capture, durationMs)
+        val loop = loopRange(
+            previewLoopWindow(st.previewScope, st.expectation.window, durationMs),
+            capture,
+            durationMs,
+        )
         val position = if (st.previewPlaying) {
             positionMs.coerceIn(loop.startMs, (loop.endMs - 1f).coerceAtLeast(loop.startMs))
         } else {
@@ -768,6 +834,7 @@ class TarjiLabViewModel(
         previewLoopStart = 0
         previewLoopEnd = 0
         scrubActive = false
+        holdEditActive = false
         _ui.value = _ui.value.copy(
             previewPlaying = false,
             previewStartWallMs = -1L,
@@ -776,14 +843,27 @@ class TarjiLabViewModel(
         )
     }
 
-    /** Wall-clock playhead (ms) inside the preview loop, or −1 when stopped. */
+    /** Playhead (ms) inside the preview loop, or −1 when stopped. */
     fun previewPlayheadMs(): Float {
         val st = _ui.value
         val duration = st.previewDurationMs
         if (duration <= 0f) return -1f
-        if (scrubActive) return st.previewPositionMs.coerceIn(0f, duration)
+        if (scrubActive || holdEditActive) return st.previewPositionMs.coerceIn(0f, duration)
+        val fallback = previewLoopWindow(st.previewScope, st.expectation.window, duration)
+        val loopStartMs = if (previewRateHz > 0) {
+            previewLoopStart * 1_000f / previewRateHz
+        } else {
+            fallback.startMs
+        }
+        val loopEndMs = if (previewRateHz > 0) {
+            val endFrame = previewLoopEnd.takeIf { it > previewLoopStart } ?: previewTotalFrames
+            endFrame * 1_000f / previewRateHz
+        } else {
+            fallback.endMs
+        }
+        val atUnity = kotlin.math.abs(st.previewSpeed.factor - 1f) < 0.01f
         val track = audioTrack
-        if (track != null && previewRateHz > 0 && previewTotalFrames > 0) {
+        if (atUnity && track != null && previewRateHz > 0 && previewTotalFrames > 0) {
             val head = track.playbackHeadPosition.toLong() and 0xFFFF_FFFFL
             val loopStart = previewLoopStart
             val loopEnd = previewLoopEnd.takeIf { it > loopStart } ?: previewTotalFrames
@@ -794,7 +874,24 @@ class TarjiLabViewModel(
         val anchor = st.previewPositionMs.coerceIn(0f, duration)
         if (!st.previewPlaying || st.previewStartWallMs < 0L) return anchor
         val elapsed = (SystemClock.elapsedRealtime() - st.previewStartWallMs).toFloat()
-        return (anchor + elapsed) % duration
+        return loopPlayheadMs(
+            anchor,
+            elapsed,
+            st.previewSpeed.factor,
+            loopStartMs,
+            loopEndMs,
+        )
+    }
+
+    private fun applyPreviewSpeed() {
+        val track = audioTrack ?: return
+        val speed = _ui.value.previewSpeed.factor
+        val stretched = runCatching {
+            track.playbackParams = PlaybackParams().setSpeed(speed).setPitch(1f)
+        }.isSuccess
+        if (!stretched && previewRateHz > 0) {
+            runCatching { track.playbackRate = (previewRateHz * speed).toInt() }
+        }
     }
 
     private fun previewFrame(capture: TarjiLabCapture, positionMs: Float): Int {
@@ -894,10 +991,11 @@ class TarjiLabViewModel(
             firstHopMediaMs = sample.firstHopMediaMs,
             knobs = sample.knobs,
             expectation = sample.expectation,
-            tool = TarjiLabTool.LISTEN,
+            tool = _ui.value.tool,
             sampleNotes = sample.notes,
             captureError = null,
             note = "Loaded ${sample.label}",
+            view = TarjiViewWindow.fit(capture.hopCount * capture.hopContentDurationMs()),
         )
         reanalyze()
     }

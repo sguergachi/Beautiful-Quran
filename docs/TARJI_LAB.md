@@ -45,27 +45,51 @@ One strip shows the word's span:
 - your **hand-shaped envelope**, when you have drawn one,
 - the **playhead**.
 
-**Listen** scrubs the whole capture. **Hold** drags the gold edges (or
-the band) to mark the note. **Shape** lets you draw over the hold to
-sculpt the signature. **Play hold** loops only that window, on a
-hardware-looped AudioTrack, so the pulse you see is the pulse you hear.
+The lab is the waveform. Gold handles *are* the hold; the range is
+printed on the canvas only while a handle moves. **Play** loops that
+band; **Play whole word** loops the captured word. Both run at
+1× / ½ / ¼. Pinch the waveform to zoom a section (Fit
+returns to the whole capture). Speed and the two play controls sit on
+the left of the transport; Listen / Hold / Shape sit as icon-only
+ink-spot tools flush right, with empty paper between. They change what
+the finger does on the canvas. Entering Shape draws the detector
+envelope on the graph so there is a line to sculpt. A tap outside
+the band does nothing until the finger moves.
 
-The compact readout under the canvas is time, the hold, and how the
-detector's span compares (late start is a positive error). Label a
-negative word **Still** so a false trigger is a disagreement, not a
-missing sine.
+The Arabic word is the proof, not a caption. It grows when **Tune** is
+put away, and the waveform takes the leftover paper. Chrome below the
+scope is reserved so capture progress, notes, and Reset never shove
+the page. Reset sits under the graph, above the modes, right-aligned
+in Shape, and puts the stroke back to what the current knobs hear.
 
-The word above the canvas still wears the live detector's glint, so a
-knob change is judged with the ear on the loop.
+Each tool owns what the graph shows:
+
+- **Listen** — the voice and the playhead. One finger seeks.
+- **Hold** — the gold band is yours. Drag the handles. Tap the band:
+  bright gold is vibrato, dim gold is still. A fainter gold band is
+  where the detector hears a hold.
+- **Shape** — the bright primary stroke *is* the shimmer. High is a
+  crest, low is a trough. The gold bead is the playhead on that
+  stroke; the Arabic word wears that height. Draw, then Play.
+
+Pinch spreads a section (two fingers apart). Two-finger swipe pans
+when zoomed. Fit returns to the whole capture. The graph is excluded
+from the system back-edge swipe so a handle on the paper's rim stays
+a handle. Play at 1× / ½ / ¼
+keeps the playhead on the ear. With Tune closed, a faded key shows
+only the marks the current tool uses.
+
+**Tune** unfolds this reciter's knobs, Export, and Import.
 
 ## The knobs
 
-The same eight detector knobs as the Ink Lab's Tarjīʿ section — one
-source of truth (`TarjiLabKnobs` ↔ `InkEngine.Tuning`) — stored as a
-**per-reciter profile**. What you perfect here is what that reciter
-ships. Every edit writes the profile, pushes `VoiceEnergy`, and
-re-analyzes the capture. **Reset reciter** restores shipped defaults
-for this reciter only.
+Behind **Tune**: the same eight detector knobs as the Ink Lab's Tarjīʿ
+section — one source of truth (`TarjiLabKnobs` ↔ `InkEngine.Tuning`) —
+stored as a **per-reciter profile**. They change what the *algorithm*
+hears (the faint gold band in Hold), not the stroke you draw.
+**Glint depth** is the only look knob: how hard the word flashes.
+**Reset** restores shipped defaults for this reciter only. Export /
+Import live here, not in the header.
 
 The names are the signature, not a frequency author:
 
@@ -83,14 +107,14 @@ The names are the signature, not a frequency author:
    Lab; the word-stepper ‹ › walks the ayah). The Lab captures
    automatically and muted at 1× (300 ms lead, 1 s tail).
 2. Switch to **Hold** and drag the gold edges around the climactic note.
-   Play loops that window.
-3. Label **Has vibrato** or **Still**. Still words are the negative
-   samples — room echo, consonants, breath.
+   Play loops that window; Play whole word loops the capture.
+3. Tap the gold hold: wave means vibrato, flat means still. The word
+   follows.
 4. Optionally switch to **Shape** and draw the envelope you want the
-   algorithm to treat as this reciter's signature.
-5. Tune this reciter's knobs until the detector rail agrees with your
-   hold. Read the comparison line: positive start/end errors mean the
-   detector is late.
+   algorithm to treat as this reciter's signature. The word wears that
+   shape.
+5. Tune this reciter's knobs until the thin detector rail agrees with
+   your gold hold.
 6. Add a note when the room or the mic matters. **Export** the sample.
 
 ## Samples — the exchange format

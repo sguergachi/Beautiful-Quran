@@ -153,7 +153,7 @@ in [CONTEXTUAL_GUIDES.md](CONTEXTUAL_GUIDES.md).
 > is painted in `background`, and fading to `surface` here turned the wheel's
 > own dissolve into a visible plate over its top and bottom rows.
 
-### The selection marks (`ui/theme/BrushMarks.kt`)
+### The selection marks (`ui/theme/BrushMarks.kt`, `ui/theme/InkSpot.kt`)
 
 Material's radio buttons, checkboxes and segmented containers are all forbidden
 above, so the app draws its own marks. They live in one place and **any surface
@@ -166,8 +166,15 @@ may use them** — they are not Settings-only, which is where they started.
 | On / off | `InkCheck` — an empty ring that a brush check paints into |
 | A quiet "this one" dot | `InkDisc` |
 | Circle something that is *not* a plain text choice | `rememberInkBrushCircle` + `Modifier.inkBrushCircleTarget` / `Modifier.inkBrushCircleMark` |
+| A short tool or icon strip | `InkSpotChoiceRow` / `InkSpotChoice` — circular vellum ink-drop. Effect alone: `Modifier.inkSpotHighlight` |
 | Raw geometry (custom canvases) | `inkBrushCirclePath`, `inkBrushCheckPath` |
 | Touch feedback on a pick / toggle | `View.paperSelectHaptic()`, `View.paperToggleHaptic(turningOn)` |
+
+The ink-spot is a circular drop of ink on vellum: a round pooled
+centre, a fibre rim, and a capillary halo that fades before the box
+edge so nothing clips. It spreads in 170 ms. On Android 13+ the same
+progressive-vellum pigment the contextual guides use (hash, fibre,
+tooth, glaze) *is* the stain; older platforms keep three soft circles.
 
 The circle is a filled calligraphic stroke on an oval centreline: it overshoots
 its own join at both ends and bows outward on entry / inward on exit, so the tips

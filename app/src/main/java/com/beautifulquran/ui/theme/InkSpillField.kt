@@ -222,34 +222,11 @@ private fun GradientInkSpillField(
     }
 }
 
-private const val VellumFieldFunctions = """
+/** Shared AGSL pigment: hash, fibre, tooth, glaze. Used by the guide field
+ *  and by the ink-spot selector so both are the same paper. */
+internal const val VellumPigmentFunctions = """
     float smoother(float value) {
         return value * value * value * (value * (value * 6.0 - 15.0) + 10.0);
-    }
-
-    float2 orientedCoordinates(float2 point) {
-        float2 crossAxis = float2(-flow.y, flow.x);
-        if (abs(crossAxis.y) > 0.0001) {
-            if (crossAxis.y < 0.0) crossAxis = -crossAxis;
-        } else if (crossAxis.x < 0.0) {
-            crossAxis = -crossAxis;
-        }
-        float alongMin = min(0.0, flow.x * resolution.x)
-            + min(0.0, flow.y * resolution.y);
-        float crossMin = min(0.0, crossAxis.x * resolution.x)
-            + min(0.0, crossAxis.y * resolution.y);
-        float alongSpan = max(
-            abs(flow.x) * resolution.x + abs(flow.y) * resolution.y,
-            1.0
-        );
-        float crossSpan = max(
-            abs(crossAxis.x) * resolution.x + abs(crossAxis.y) * resolution.y,
-            1.0
-        );
-        return float2(
-            (dot(point, flow) - alongMin) / alongSpan,
-            (dot(point, crossAxis) - crossMin) / crossSpan
-        );
     }
 
     float hash(float2 point) {
@@ -282,6 +259,40 @@ private const val VellumFieldFunctions = """
         ));
         float tooth = noise((point + float2(61.0, 157.0)) * 0.057);
         return pooling * 0.42 + fibres * 0.3 + tooth * 0.28;
+    }
+
+    float vellumCoverage(float density) {
+        float wash = pow(density, max(0.7, fadeSoftness * 0.58));
+        // A second translucent glaze adds pigment depth without moving the
+        // diffusion contour or hardening its paper-side tail.
+        return 1.0 - pow(1.0 - wash, 1.18);
+    }
+"""
+
+private const val VellumFieldFunctions = """
+    float2 orientedCoordinates(float2 point) {
+        float2 crossAxis = float2(-flow.y, flow.x);
+        if (abs(crossAxis.y) > 0.0001) {
+            if (crossAxis.y < 0.0) crossAxis = -crossAxis;
+        } else if (crossAxis.x < 0.0) {
+            crossAxis = -crossAxis;
+        }
+        float alongMin = min(0.0, flow.x * resolution.x)
+            + min(0.0, flow.y * resolution.y);
+        float crossMin = min(0.0, crossAxis.x * resolution.x)
+            + min(0.0, crossAxis.y * resolution.y);
+        float alongSpan = max(
+            abs(flow.x) * resolution.x + abs(flow.y) * resolution.y,
+            1.0
+        );
+        float crossSpan = max(
+            abs(crossAxis.x) * resolution.x + abs(crossAxis.y) * resolution.y,
+            1.0
+        );
+        return float2(
+            (dot(point, flow) - alongMin) / alongSpan,
+            (dot(point, crossAxis) - crossMin) / crossSpan
+        );
     }
 
     float vellumDensity(float2 fragCoord) {
@@ -333,13 +344,6 @@ private const val VellumFieldFunctions = """
             / (1.0 + exp(-buttonAbsorbed / buttonDiffusion));
         return 1.0 - (1.0 - lessonDensity) * (1.0 - buttonDensity);
     }
-
-    float vellumCoverage(float density) {
-        float wash = pow(density, max(0.7, fadeSoftness * 0.58));
-        // A second translucent glaze adds pigment depth without moving the
-        // diffusion contour or hardening its paper-side tail.
-        return 1.0 - pow(1.0 - wash, 1.18);
-    }
 """
 
 private const val VellumFieldShader = """
@@ -357,7 +361,7 @@ private const val VellumFieldShader = """
     uniform float vellumGrain;
     uniform float verticalTaper;
     layout(color) uniform half4 inkColor;
-""" + VellumFieldFunctions + """
+""" + VellumPigmentFunctions + VellumFieldFunctions + """
     half4 main(float2 fragCoord) {
         float density = vellumDensity(fragCoord);
         float coverage = vellumCoverage(density);
@@ -382,6 +386,58 @@ private const val VellumFieldShader = """
         float fromSource = orientedCoordinates(fragCoord).x;
         float sourcePool = smoother(clamp((0.5 - fromSource) / 0.5, 0.0, 1.0));
         coverage = 1.0 - pow(1.0 - coverage, 1.0 + 0.75 * sourcePool);
+        half alpha = inkColor.a * half(coverage * progress);
+        return half4(inkColor.rgb * alpha, alpha);
+    }
+"""
+
+/**
+ * A circular ink drop on vellum. The silhouette is a circle; fibre and
+ * a capillary halo live only in the rim so the box never clips a lobe.
+ * [progress] grows the soak.
+ */
+internal const val VellumSpotShader = """
+    uniform float2 resolution;
+    uniform float progress;
+    uniform float seed;
+    uniform float fadeSoftness;
+    uniform float vellumGrain;
+    layout(color) uniform half4 inkColor;
+""" + VellumPigmentFunctions + """
+    half4 main(float2 fragCoord) {
+        float2 res = max(resolution, float2(1.0, 1.0));
+        float reach = 0.5 * min(res.x, res.y);
+        float2 origin = fragCoord + float2(seed * 17.0, seed * 11.0);
+        float2 center = 0.5 * res + (float2(
+            hash(float2(seed, 1.3)),
+            hash(float2(seed, 4.7))
+        ) - 0.5) * reach * 0.04;
+        float2 p = (fragCoord - center) / reach;
+        float r = length(p);
+        float ang = atan(p.y, p.x);
+        float fibre = brushedPigment(origin);
+        // Rim-only irregularity — the drop stays a circle.
+        float rimWobble = 0.025 * sin(ang * 3.0 + seed)
+            + 0.02 * (fibre - 0.5);
+        float radius = 0.56 + rimWobble;
+        float soak = mix(0.55, 1.0, progress);
+        float edge = r - radius * soak;
+        float body = 1.0 - smoother(clamp(edge / 0.18 + 0.15, 0.0, 1.0));
+        float pool = 1.0 - smoother(clamp(r / 0.34, 0.0, 1.0));
+        float density = body * (0.40 + 0.60 * pool);
+        float halo = exp(-max(edge, 0.0) * 18.0) * 0.38 * progress;
+        density = max(density, halo * (0.35 + 0.65 * fibre));
+        float rim = 4.0 * density * (1.0 - density);
+        float grain = max(vellumGrain, 0.08);
+        density = clamp(
+            density * (1.0 + (fibre - 0.5) * grain * (1.6 + 2.2 * rim))
+                + (hash(floor(origin)) - 0.5) * rim / 200.0,
+            0.0,
+            1.0
+        );
+        // Hard zero before the box edge so Compose never shears the drop.
+        density *= 1.0 - smoother(clamp((r - 0.92) / 0.08, 0.0, 1.0));
+        float coverage = vellumCoverage(density);
         half alpha = inkColor.a * half(coverage * progress);
         return half4(inkColor.rgb * alpha, alpha);
     }
