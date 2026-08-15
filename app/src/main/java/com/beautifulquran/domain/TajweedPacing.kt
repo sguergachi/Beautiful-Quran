@@ -295,7 +295,7 @@ object TajweedPacing {
         var t = 0f
         var x = 0f
         fun glideTo(target: Float) {
-            // Opening park can already sit past later slot ends.
+            // Opening crawl can already sit past later slot ends.
             if (target <= x) return
             t += (target - x) / cruiseRate
             x = target
@@ -310,18 +310,25 @@ object TajweedPacing {
                 continue
             }
             // Park mid-letter: the glyph is caught half-bloomed, visibly being
-            // sustained, rather than held before or after itself. A word-initial
-            // madd/ghunnah (not a wasl-entry) needs a higher floor: first-slot
-            // mid is ~0.10 and stays at resting alpha under the paced feather.
+            // sustained, rather than held before or after itself.
             val slotStart = slotEnd - slotWidth(i, n, counts, lastPronounced)
             val mid = slotStart + HOLD_ANCHOR * (slotEnd - slotStart)
             val openingOwn = !waslEntry && slotStart <= 0f &&
                 (counts[i] >= MADD_MUTTASIL || isGhunnah(events[i]))
-            glideTo(if (openingOwn) maxOf(mid, OPENING_HOLD_MIN) else mid)
-            t += dwellShare * excess[i] / excessTotal
-            x += creep * (slotEnd - slotStart)
-            times += t * spoken
-            positions += x
+            if (openingOwn) {
+                // Spend the dwell crawling to a visible bloom. Parking at
+                // OPENING_HOLD_MIN froze a visible edge (start-stop).
+                t += dwellShare * excess[i] / excessTotal
+                x = maxOf(x, OPENING_HOLD_MIN)
+                times += t * spoken
+                positions += x
+            } else {
+                glideTo(mid)
+                t += dwellShare * excess[i] / excessTotal
+                x += creep * (slotEnd - slotStart)
+                times += t * spoken
+                positions += x
+            }
         }
         // A held final letter still has the tail of its own slot to cross.
         if (x < 1f) glideTo(1f)
@@ -550,10 +557,10 @@ object TajweedPacing {
      * is caught mid-bloom rather than sustained before or after itself. */
     private const val HOLD_ANCHOR = 0.5f
     /**
-     * Floor on a word-initial madd/ghunnah park. Mid-slot of the first
-     * uniform letter is ~0.10 and leaves that glyph at resting alpha under
-     * the shipped paced feather (~1.11); 0.28 is mid-bloom of the opening
-     * edge (`0.5 * feather / (1 + feather)`). 4:143 `هَـٰٓؤُلَآءِ`.
+     * Where a word-initial madd/ghunnah crawl finishes. Mid-slot of the
+     * first letter is ~0.10 (resting alpha under the paced feather); 0.28
+     * is mid-bloom of the opening edge. The dwell *moves* here — it does
+     * not park. 4:143 `هَـٰٓؤُلَآءِ`.
      */
     private const val OPENING_HOLD_MIN = 0.28f
     /** Default junction for long donors; short donors may begin earlier. */

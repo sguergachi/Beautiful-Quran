@@ -99,11 +99,13 @@ fun PaperSearchField(
                     field()
                 }
                 if (value.isNotEmpty()) {
+                    // Own the tap on Initial so BasicTextField cannot steal it
+                    // while focused (plain quietClickable loses to the field).
                     Box(
                         contentAlignment = Alignment.Center,
                         modifier = Modifier
                             .size(44.dp)
-                            .quietClickable(role = Role.Button) { onValueChange("") }
+                            .ownedQuietClickable(role = Role.Button) { onValueChange("") }
                             .semantics { this.contentDescription = clearContentDescription },
                     ) {
                         Icon(
