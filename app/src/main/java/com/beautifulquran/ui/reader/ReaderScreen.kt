@@ -47,11 +47,13 @@ import androidx.compose.foundation.layout.statusBarsIgnoringVisibility
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.automirrored.rounded.MenuBook
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.KeyboardArrowUp
@@ -117,9 +119,11 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import com.beautifulquran.data.AyahSelectorSide
+import com.beautifulquran.data.ReadingLayout
 import com.beautifulquran.data.ReadingMode
 import com.beautifulquran.data.model.Surah
 import com.beautifulquran.domain.BASMALAH_PLAYLIST_AYAH
+import com.beautifulquran.domain.MushafToken
 import com.beautifulquran.ui.reader.focus.FocusEngine
 import com.beautifulquran.ui.reader.focus.rememberReaderFocusController
 import com.beautifulquran.ui.theme.FloatingPaperControl
@@ -236,6 +240,25 @@ fun ReaderScreen(
     // one ayah block — never the whole screen.
     val activeWordState = viewModel.activeWord.collectAsStateWithLifecycle()
     val settings by viewModel.settings.settings.collectAsStateWithLifecycle()
+    val mushafUi by viewModel.mushaf.collectAsStateWithLifecycle()
+    val mushafMode = settings.readingLayout == ReadingLayout.MUSHAF
+    LaunchedEffect(mushafMode) {
+        if (mushafMode) viewModel.ensureMushaf()
+    }
+    val mushafCatalog = mushafUi?.catalog
+    val mushafPagerState = rememberPagerState(
+        initialPage = 0,
+        pageCount = { mushafCatalog?.pageCount ?: 1 },
+    )
+    LaunchedEffect(mushafCatalog, surahId, startAyah, startWordPosition) {
+        val catalog = mushafCatalog ?: return@LaunchedEffect
+        val page = catalog.pageOf(
+            surahId,
+            startAyah?.coerceAtLeast(1) ?: 1,
+            startWordPosition ?: 1,
+        )
+        mushafPagerState.scrollToPage((page - 1).coerceIn(0, catalog.pageCount - 1))
+    }
     val bookmarkedAyahs by viewModel.bookmarkedAyahs.collectAsStateWithLifecycle()
     // Like bookmarkedAyahs: read per-ayah so a note change recomposes only
     // that one block.
@@ -471,7 +494,7 @@ fun ReaderScreen(
         // Immersive reading hides the status bar — but not while the Timings
         // Lab sheet is riding over this reader: the Lab is a workbench, and
         // its playback must not push the clock off its own header.
-        if (recitingActive && !keepStatusBarVisible) {
+        if (recitingActive && !keepStatusBarVisible && !mushafMode) {
             controller?.hide(WindowInsetsCompat.Type.statusBars())
             controller?.systemBarsBehavior =
                 androidx.core.view.WindowInsetsControllerCompat
@@ -1035,6 +1058,7 @@ fun ReaderScreen(
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = topBar@{
+            if (mushafMode) return@topBar
             if (editingAnnotationAyah != 0) {
                 // Reclaim the app bar while writing, but keep ink below a
                 // visible system status bar. Recitation already hides it.
@@ -1089,19 +1113,29 @@ fun ReaderScreen(
                         }
                         val live = uiState.content?.surah
                         val pinned = pinnedTopNavTitle
+                        val mushafSurah = if (mushafMode) {
+                            val page = mushafCatalog?.page(mushafPagerState.currentPage + 1)
+                            page?.primarySurahId?.let { mushafUi?.surahsById?.get(it) } ?: live
+                        } else {
+                            null
+                        }
                         // While advancing, keep painting the pinned previous
                         // chapter so its fade-out has something to fade.
                         val displayNumber = pinned?.first
+                            ?: mushafSurah?.id
                             ?: live?.takeIf { scrolledPastHeader && !chapterAdvancing }?.id
                         val displayArabic = pinned?.second
+                            ?: mushafSurah?.nameArabic
                             ?: live?.takeIf { scrolledPastHeader && !chapterAdvancing }?.nameArabic
                         val displayTranslit = pinned?.third
+                            ?: mushafSurah?.nameTransliteration
                             ?: live?.takeIf { scrolledPastHeader && !chapterAdvancing }
                                 ?.nameTransliteration
                         val topTitleAlpha by animateFloatAsState(
                             targetValue = when {
                                 // Next-chapter advance: always fade the top name away.
                                 chapterAdvancing -> 0f
+                                mushafMode && (mushafSurah != null || live != null) -> 1f
                                 scrolledPastHeader && live != null -> 1f
                                 else -> 0f
                             },
@@ -1136,12 +1170,16 @@ fun ReaderScreen(
                             enabled = search.active || !recitingActive,
                         ) {
                             Icon(
-                                imageVector = if (search.active) {
-                                    Icons.Rounded.Close
-                                } else {
-                                    Icons.AutoMirrored.Rounded.ArrowBack
+                                imageVector = when {
+                                    search.active -> Icons.Rounded.Close
+                                    mushafMode -> Icons.AutoMirrored.Rounded.MenuBook
+                                    else -> Icons.AutoMirrored.Rounded.ArrowBack
                                 },
-                                contentDescription = if (search.active) "Close search" else "Back",
+                                contentDescription = when {
+                                    search.active -> "Close search"
+                                    mushafMode -> "Chapters"
+                                    else -> "Back"
+                                },
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant
                                     .copy(alpha = 0.55f),
                             )
@@ -1194,18 +1232,22 @@ fun ReaderScreen(
                             )
                         }
                     } else {
-                        IconButton(
-                            onClick = { search.active = true },
-                            enabled = !recitingActive,
-                        ) {
-                            Icon(
-                                Icons.Rounded.Search,
-                                contentDescription = "Search in surah",
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
-                                modifier = Modifier
-                                    .offset(x = 4.dp)
-                                    .size(26.dp),
-                            )
+                        if (!mushafMode) {
+                            IconButton(
+                                onClick = { search.active = true },
+                                enabled = !recitingActive,
+                            ) {
+                                Icon(
+                                    Icons.Rounded.Search,
+                                    contentDescription = "Search in surah",
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
+                                    modifier = Modifier
+                                        .offset(x = 4.dp)
+                                        .size(26.dp),
+                                )
+                            }
+                        } else {
+                            Spacer(Modifier.width(48.dp))
                         }
                         IconButton(
                             onClick = onOpenSettings,
@@ -1227,7 +1269,8 @@ fun ReaderScreen(
                 ),
             )
         },
-        bottomBar = {
+        bottomBar = bottomBar@{
+            if (mushafMode) return@bottomBar
             Column {
                 // Errors stay a quiet line on the sheet above the player.
                 // Return-to-ayah / Back-to float above the bar (see content).
@@ -1858,7 +1901,11 @@ fun ReaderScreen(
             // grows with pull (Column height) — not a graphicsLayer sibling that
             // can be covered by the full-size LazyColumn layer. (Drawing at y=0
             // of the scaffold body put the chrome under the TopAppBar.)
-            val topInset = padding.calculateTopPadding()
+            val topInset = if (mushafMode) {
+                statusBarTop
+            } else {
+                padding.calculateTopPadding()
+            }
             val previous = uiState.previousSurah
             val revealPx = when {
                 previousPageExitNow > 0f ->
@@ -1901,7 +1948,103 @@ fun ReaderScreen(
                         }
                     }
                 }
-                LazyColumn(
+                val mushafReady = mushafUi
+                if (mushafMode && mushafReady != null) {
+                    MushafReadingSheet(
+                        reciterName = uiState.currentReciter?.name.orEmpty(),
+                        playerState = playerState,
+                        isThisSurahLoaded = isThisSurahPlaying,
+                        enabled = !contextualGuideOpen,
+                        onOpenSettings = onOpenSettings,
+                        onPlayPause = {
+                            if (isThisSurahPlaying) {
+                                if (playerState.isPlaying) {
+                                    viewModel.player.togglePlayPause()
+                                } else {
+                                    dispatch(ReaderInteractionEvent.EnableFollow)
+                                    if (requestedJumpAyah > 0) {
+                                        viewModel.playLoadedFromAyah(selectedPlaybackAyah())
+                                    } else {
+                                        viewModel.player.togglePlayPause()
+                                    }
+                                }
+                            } else {
+                                dispatch(ReaderInteractionEvent.EnableFollow)
+                                viewModel.playFromAyah(selectedPlaybackAyah())
+                            }
+                        },
+                        onFastBackward = viewModel::fastBackward,
+                        onFastForward = viewModel::fastForward,
+                        onRepeatClick = { showRepeatDialog = true },
+                        onSpeed = viewModel::cycleSpeed,
+                        modifier = Modifier.weight(1f),
+                    ) {
+                    val mushafSurahId = content.surah.id
+                    val mushafDispatch = rememberUpdatedState(
+                        { event: ReaderInteractionEvent -> dispatch(event) },
+                    )
+                    val mushafRootMoved = rememberUpdatedState(onRootReturnUserMoved)
+                    val mushafOpenRoot = rememberUpdatedState(onOpenRootViewer)
+                    val onMushafTurnedPage = remember {
+                        {
+                            mushafDispatch.value(ReaderInteractionEvent.UserMovedPage)
+                            mushafRootMoved.value()
+                        }
+                    }
+                    val onMushafWordClick = remember(mushafSurahId, viewModel) {
+                        { token: MushafToken ->
+                            if (token.surahId == mushafSurahId) {
+                                val segment = viewModel.segmentsFor(token.ayah)
+                                    ?.firstOrNull { it.position == token.word.position }
+                                mushafDispatch.value(ReaderInteractionEvent.EnableFollow)
+                                if (segment != null) {
+                                    viewModel.playFromWord(token.ayah, segment.startMs)
+                                } else {
+                                    viewModel.playFromAyah(token.ayah)
+                                }
+                            }
+                        }
+                    }
+                    val onMushafWordLongClick = remember(haptics) {
+                        { token: MushafToken ->
+                            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                            mushafOpenRoot.value(token.surahId, token.ayah, token.word.position)
+                        }
+                    }
+                    val onMushafAyahClick = remember(mushafSurahId, viewModel) {
+                        { token: MushafToken ->
+                            if (token.surahId == mushafSurahId) {
+                                mushafDispatch.value(ReaderInteractionEvent.EnableFollow)
+                                viewModel.playFromAyah(token.ayah)
+                            }
+                        }
+                    }
+                    MushafPager(
+                        catalog = mushafReady.catalog,
+                        content = content,
+                        surahsById = mushafReady.surahsById,
+                        pagerState = mushafPagerState,
+                        activeWordState = activeWordState,
+                        activeAyah = activeAyah,
+                        recitingActive = recitingActive,
+                        isThisSurahPlaying = isThisSurahPlaying,
+                        playbackSpeed = playerState.speed,
+                        fontScale = settings.fontScale,
+                        sheen = sheen,
+                        followEnabled = followEnabled,
+                        loadedSurahId = mushafSurahId,
+                        flashWordPosition = startWordPosition,
+                        onUserTurnedPage = onMushafTurnedPage,
+                        onWordClick = onMushafWordClick,
+                        onWordLongClick = onMushafWordLongClick,
+                        onAyahClick = onMushafAyahClick,
+                        onOpenChapters = onBack,
+                        onOpenSettings = onOpenSettings,
+                        chromeEnabled = !contextualGuideOpen,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                    }
+                } else LazyColumn(
                     state = listState,
                     userScrollEnabled = !chapterAdvancing,
                     contentPadding = PaddingValues(
@@ -2382,7 +2525,7 @@ fun ReaderScreen(
             }
             // Page-boundary marks for the expanded selector wheel.
             val railPageStarts = remember(content.surah.id) { pageStartByAyah(content.ayahs) }
-            if (editingAnnotationAyah == 0) {
+            if (!mushafMode && editingAnnotationAyah == 0) {
                 AyahSelectorRail(
                     ayahCount = content.surah.ayahCount,
                     side = selectorSide,
@@ -2399,6 +2542,17 @@ fun ReaderScreen(
                                 resumeFollowIfPlaying = isThisSurahPlaying,
                             ),
                         )
+                        if (mushafMode) {
+                            val catalog = mushafCatalog
+                            if (catalog != null) {
+                                scope.launch {
+                                    mushafPagerState.scrollToPage(
+                                        (catalog.pageOf(content.surah.id, ayah) - 1)
+                                            .coerceIn(0, catalog.pageCount - 1),
+                                    )
+                                }
+                            }
+                        }
                     },
                     onExpandedChange = { expanded ->
                         ayahSelectorExpanded = expanded
@@ -2465,7 +2619,7 @@ fun ReaderScreen(
         }
 
         AyahRailTip(
-            visible = ayahRailTipVisible,
+            visible = ayahRailTipVisible && !mushafMode,
             railSide = settings.ayahSelectorSide,
             targetCenterY = with(density) { ayahRailTipCenterY.toDp() },
             onDismiss = {

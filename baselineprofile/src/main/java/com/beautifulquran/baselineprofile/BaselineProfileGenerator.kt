@@ -59,10 +59,22 @@ class BaselineProfileGenerator {
         chapterList?.fling(Direction.UP)
 
         device.findObject(By.text("Al-Fatihah")).click()
-        check(device.wait(Until.hasObject(By.text("The Opening")), UiTimeoutMs)) {
+        // Default reading layout is the mushaf pager, not the scroll sheet.
+        check(
+            device.wait(Until.hasObject(By.desc("Chapters")), UiTimeoutMs) ||
+                device.wait(Until.hasObject(By.text("The Opening")), UiTimeoutMs),
+        ) {
             "Reader did not become ready"
         }
         SystemClock.sleep(500)
+
+        val midX = device.displayWidth / 2
+        val midY = device.displayHeight / 2
+        // RTL reverse pager: a leftward swipe turns toward later pages.
+        device.swipe(midX + 400, midY, midX - 400, midY, 40)
+        device.waitForIdle()
+        device.swipe(midX - 400, midY, midX + 400, midY, 40)
+        device.waitForIdle()
 
         val reader = device.findObject(By.scrollable(true))
         reader?.fling(Direction.DOWN)

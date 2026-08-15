@@ -18,6 +18,28 @@ one at a time. Navigation glides the next sheet in from the side (a
 quarter-width slide softened with a fade, 380 ms); nothing stacks, nothing
 floats, nothing casts a shadow.
 
+In **Mushaf** layout (Settings → Reading) the Reader sheet is a full-screen
+leaf: the gilt frame is the screen, and the running header, folio, and
+transport sit in the page gutters — not in a bar above or below the book.
+A short page (al-Fātiḥah) sits in the middle of the well; a full
+Madinah page fills it. The gilt frame sits under the status bar
+and above the home indicator — it does not wrap the system chrome,
+so the corner seals are not clipped. A swipe turns the whole leaf
+(header, text, folio, and gilt) the way iBooks turns a page.
+Transport is a quiet line of ink on the paper *under* the book —
+it never sits on the gilt. The running header
+sits in the top gutter just inside the gilt; the text well starts
+a book margin below it. Play does not hide the status bar or collapse that
+inset — the frame stays put. Ayah marks sit inside an edge gutter
+so circled numbers are not clipped.
+QCF lines are the printed Madinah lines: one size, even
+15-line leading, leftover width shared between words
+(no U+0020).
+Horizontal swipe turns the 604 Madinah pages; the outer stack no longer
+steals that gesture. The ayah rail is scroll-only. A chapter-list tap opens
+the reader on that chapter's first page. Scroll layout keeps the original
+vertical verse sheet.
+
 Hard rules:
 
 - **No borders, no dividers, no cards, no elevation.** Hierarchy comes from
@@ -557,13 +579,18 @@ image, so it is crisp at any density and nearly free to render.
   tapping the calligraphy) prepends Al-Fatihah 1:1 audio before the first ayah;
   word taps skip the lead-in.
 - **Restraint rule:** ornament appears in exactly three places on the open
-  book — the surah header (rosette + weave), ayah number marks, and the home
-  title mark. The one place allowed to be lavish is the closed book: the
-  [entrance cover](#the-entrance) is bound leather, and binding is where a
-  mushaf has always carried its gold. Nothing else on the sheet is decorated.
-  Mushaf **page breaks** are not ornament: a whisper-gold hairline with small
-  page numbers (Western left, Arabic-Indic right) marks Madinah page
-  boundaries in the continuous scroll — functional wayfinding only.
+  *scroll* reader — the surah header (rosette + weave), ayah number marks, and
+  the home title mark. Mushaf layout uses a quiet slice of the ornament kit:
+  a doubled gilt hairline and four small generated corner seals
+  (`pageOrnamentSeed`). No frieze band — that stays on the closed cover. A
+  compact chapter rosette still opens a new surah. Never lavish — the closed
+  book is still the only place allowed to carry full binding gold. Mushaf
+  **page breaks** in scroll layout are not ornament: a whisper-gold hairline
+  with small page numbers (Western left, Arabic-Indic right) marks Madinah
+  page boundaries in the continuous scroll — functional wayfinding only. The
+  mushaf text is KFGQPC Uthmanic Hafs v22, one RTL run per Madinah line,
+  word-gap justified to the page width — not QCF page fonts (those fought
+  the ink wash).
 
 ## The entrance
 

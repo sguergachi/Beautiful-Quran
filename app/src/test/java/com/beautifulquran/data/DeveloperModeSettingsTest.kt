@@ -26,6 +26,15 @@ class DeveloperModeSettingsTest {
     }
 
     @Test
+    fun `reading layout defaults to mushaf pages`() {
+        assertEquals(ReadingLayout.MUSHAF, Settings().readingLayout)
+        assertEquals(
+            ReadingLayout.SCROLL,
+            Settings().copy(readingLayout = ReadingLayout.SCROLL).readingLayout,
+        )
+    }
+
+    @Test
     fun `developer mode toggles via copy`() {
         val on = Settings().copy(developerModeEnabled = true)
         assertTrue(on.developerModeEnabled)

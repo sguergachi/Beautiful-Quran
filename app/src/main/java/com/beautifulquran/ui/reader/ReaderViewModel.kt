@@ -15,6 +15,7 @@ import com.beautifulquran.data.model.SurahContent
 import com.beautifulquran.domain.BASMALAH_PLAYLIST_AYAH
 import com.beautifulquran.domain.HighlightClock
 import com.beautifulquran.domain.HighlightEngine
+import com.beautifulquran.domain.MushafCatalog
 import com.beautifulquran.domain.OutputLatency
 import com.beautifulquran.domain.SURAH_FATIHA
 import com.beautifulquran.domain.surahOpensWithBasmalahPreface
@@ -67,6 +68,11 @@ data class ActiveWord(
      * same word stays Active (tap the current word to play it from the start).
      */
     val activation: Long = 0L,
+)
+
+data class MushafUi(
+    val catalog: MushafCatalog,
+    val surahsById: Map<Int, Surah>,
 )
 
 data class ReaderUiState(
@@ -143,6 +149,18 @@ class ReaderViewModel(
 
     private val _uiState = MutableStateFlow(ReaderUiState())
     val uiState: StateFlow<ReaderUiState> = _uiState
+
+    private val _mushaf = MutableStateFlow<MushafUi?>(null)
+    val mushaf: StateFlow<MushafUi?> = _mushaf
+
+    fun ensureMushaf() {
+        if (_mushaf.value != null) return
+        viewModelScope.launch {
+            val catalog = repository.mushafCatalog()
+            val surahs = repository.surahs().associateBy { it.id }
+            _mushaf.value = MushafUi(catalog, surahs)
+        }
+    }
 
     /**
      * Verse under the reading line (scroll / rail / follow). Used for Assistant

@@ -97,6 +97,7 @@ Requires **JDK 21**. No Android device/emulator is needed for tests.
 ./gradlew testDebugUnitTest     # unit tests — run these before committing
 ./gradlew assembleDebug         # debug APK
 ./gradlew assembleRelease       # what CI ships (R8-minified; falls back to debug keystore)
+scripts/send_apk_to_phone.sh    # build debug APK and share via KDE Connect (see README)
 python3 tools/test_build_db.py  # timing pipeline regressions (~1s, no Gradle)
 ```
 

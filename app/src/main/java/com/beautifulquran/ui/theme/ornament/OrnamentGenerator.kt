@@ -807,6 +807,9 @@ fun generateCoverOrnament(seed: Int): CoverOrnament {
 fun chapterOrnamentSeed(chapterNumber: Int, ayahCount: Int): Int =
     ayahCount * 114 + chapterNumber
 
+/** Distinct cover-grammar seed per Madinah page; sits above every chapter seed. */
+fun pageOrnamentSeed(page: Int): Int = 1_000_000 + page
+
 /**
  * Grow a chapter's rosette and backing field — no corner seal or border,
  * which the header has no use for — from [seed]. Same star-polygon and

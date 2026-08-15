@@ -24,6 +24,15 @@ class AyahNumberMarkTest {
     }
 
     @Test
+    fun `mushaf mark is end-of-ayah plus Arabic-Indic digits`() {
+        assertEquals(
+            "\u06DD${wordJoiner}١${wordJoiner}٢",
+            formatMushafAyahMark(12),
+        )
+        assertFalse(formatMushafAyahMark(3).contains('﴿'))
+    }
+
+    @Test
     fun `mark characters are glued so they cannot line-break mid unit`() {
         val mark = formatAyahNumberMark(3, useArabicIndicDigits = false)
         assertEquals("﴾${wordJoiner}3${wordJoiner}﴿", mark)

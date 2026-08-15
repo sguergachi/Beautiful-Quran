@@ -14,6 +14,13 @@ import com.beautifulquran.R
 val HafsFontFamily = FontFamily(Font(R.font.hafs_uthmanic))
 
 /**
+ * Digital Khatt New Madina — Unicode Madinah-1420 face with real joining
+ * (init/medi/fina/rlig/curs). Mushaf pages only; the scroll reader keeps
+ * [HafsFontFamily]. SIL OFL 1.1.
+ */
+val MushafFontFamily = FontFamily(Font(R.font.digital_khatt_new_madina))
+
+/**
  * EB Garamond — the book face. Everything English is set in it: translations,
  * glosses, lists, labels, even the speed chip. Bundled with true italics and
  * optical weights so emphasis never falls back to a synthetic slant.

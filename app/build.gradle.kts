@@ -144,8 +144,47 @@ val syncQuranDbAsset by tasks.registering(Sync::class) {
     }
 }
 
+val syncQcfFonts by tasks.registering {
+    val partsDir = layout.projectDirectory.dir("qcf-v2-fonts")
+    val outDir = layout.buildDirectory.dir("generated/quranAssets/qcf-v2-fonts")
+    inputs.dir(partsDir)
+    outputs.dir(outDir)
+    doLast {
+        val dest = outDir.get().asFile
+        dest.mkdirs()
+        dest.listFiles()?.filter { it.extension == "ttf" }?.forEach { it.delete() }
+        if (dest.resolve("QCF2001.qcf").isFile) return@doLast
+        val parts = partsDir.asFile.listFiles { _, name ->
+            name.startsWith("qcf-v2-fonts.tar.xz.part")
+        }?.sortedBy { it.name }.orEmpty()
+        if (parts.isEmpty()) {
+            logger.warn("No QCF V2 font archive parts in ${partsDir.asFile}; mushaf pages fall back to Hafs.")
+            return@doLast
+        }
+        val archive = temporaryDir.resolve("qcf-v2-fonts.tar.xz")
+        archive.outputStream().use { out ->
+            parts.forEach { part -> part.inputStream().use { it.copyTo(out) } }
+        }
+        val extract = ProcessBuilder(
+            "bash", "-lc",
+            "xz -dc '${archive.absolutePath}' | tar -x -C '${dest.parentFile.absolutePath}'",
+        ).inheritIO().start()
+        check(extract.waitFor() == 0) { "Failed to extract QCF V2 fonts" }
+        check(dest.resolve("QCF2001.ttf").isFile) {
+            "QCF extract did not produce ${dest.resolve("QCF2001.ttf")}"
+        }
+        // `.ttf` is noCompress — 208 MB stored raw. `.qcf` is the same SFNT
+        // bytes so Typeface can still read them, and aapt deflates the pack.
+        dest.listFiles { _, name -> name.endsWith(".ttf") }?.forEach { ttf ->
+            check(ttf.renameTo(ttf.resolveSibling(ttf.nameWithoutExtension + ".qcf"))) {
+                "Failed to rename ${ttf.name} for APK deflate"
+            }
+        }
+    }
+}
+
 tasks.named("preBuild") {
-    dependsOn(syncQuranDbAsset)
+    dependsOn(syncQuranDbAsset, syncQcfFonts)
 }
 
 // DatabaseFingerprintTest reads these straight off disk, outside anything

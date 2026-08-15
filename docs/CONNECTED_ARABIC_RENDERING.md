@@ -101,41 +101,28 @@ For our product language:
 
 ## Current Status
 
-**The QCF Mushaf renderer was built and then removed. Everything below the
-"Recommended Direction" heading is a plan or a rejected design, not a
-description of the app.** Verified against the tree 2026-07-24.
+Mushaf pages now paint **QCF V2 page glyphs**. The scroll reader stays on
+Unicode Hafs. Everything below the "Recommended Direction" heading is
+historical plan / rejected design (glyph-span colour flips), not the
+current app.
 
-What actually ships in Arabic-only mode:
+What actually ships:
 
-- One bundled Arabic face: `KFGQPC HAFS Uthmanic Script`
-  (`res/font/hafs_uthmanic.ttf`, `HafsFontFamily` in `ui/theme/Type.kt`). No QCF
-  page fonts are bundled.
-- `ResponsiveHafsAyah` (`ui/reader/ReaderComponents.kt`) builds **one
-  `AnnotatedString` per ayah** from `ayah.words[].arabic`, with one contiguous
-  colour span per word — per-glyph spans break Uthmanic joining (#133).
+- Scroll / Arabic-only ayahs: `KFGQPC HAFS Uthmanic Script`
+  (`res/font/hafs_uthmanic.ttf`) via `ResponsiveHafsAyah` — one
+  `AnnotatedString` per ayah, one contiguous colour span per word.
+- Mushaf layout (`MushafHafsLine`): **QCF V2 page fonts** (Uthman Taha
+  handwritten word glyphs + circled marks) on Madinah `qcf_page` /
+  `qcf_line` breaks. Glyphs are concatenated with no U+0020 and no
+  extra U+0020. Leftover width is Row weight-spacers so each line
+  fills the page like the printed 15-line mushaf. Never ﴿N﴾.
+  Digital Khatt is the Unicode fallback only.
+  Ink is `shapedWordBloom`.
 - Highlight is the **soft directional ink wash**, not colour animation:
   `Modifier.shapedWordBloom` paints draw-phase paper covers and washes over the
   already-shaped run (`UpcomingDim` / `InkReveal` / `ColorReveal`). Glyphs stay
   full-opacity ink under a paper cover; see AGENTS.md invariant 7 and
   docs/INK_ENGINE.md.
-
-What remains of the QCF work:
-
-- **Data only.** `tools/build_db.py` still imports Mushaf page JSON from
-  `zonetecde/mushaf-layout`, and the `words` table still carries `qcf_v2`,
-  `qcf_page`, `qcf_line`, `qcf_span_end`. `QuranRepository.surahContent` still
-  selects them into `Word`. **No UI reads any of those four fields** — they are
-  dormant columns kept so the renderer could be revived without a data rebuild.
-- `scripts/fetch_qcf_v2_fonts.sh` still exists but nothing depends on it, and
-  the fonts it fetches are deliberately not committed.
-- Removal history: `430da8dc` / #97 "Remove QCF Mushaf renderer and unbundle
-  page fonts", then `3ed33b68` / #98 "Remove ArabicRenderMode toggle, always use
-  ResponsiveHafs". The rejection reason is unchanged from the notes below — the
-  glyph-span approach fought the ink wash and the font swap rearranged text
-  mid-scroll.
-
-Why the plan is kept: the connected-script goal was never achieved, only
-deferred. If it is revisited, the data pipeline half is already done.
 
 ## Recommended Direction
 
@@ -307,12 +294,9 @@ For Digital Khatt v2:
 Status: implemented as bundled QCF V2 font loading.
 
 - Added `QcfFontProvider`.
-- Added `scripts/fetch_qcf_v2_fonts.sh` to prefetch all 604 page fonts into
-  `app/src/main/assets/qcf-v2-fonts`.
-- Fonts are copied from assets into `noBackupFilesDir/qcf-v2-fonts` before
-  loading with `Typeface.createFromFile`.
-- Arabic-only no-gloss mode preloads the current surah's required page fonts
-  before rendering QCF text.
+- `syncQcfFonts` extracts the tracked `app/qcf-v2-fonts/*.part*` archive into
+  generated assets as `QCF2NNN.qcf` (SFNT bytes, not `.ttf`) so aapt deflates
+  them. `MushafQcfFonts` loads each page with `Typeface.createFromAsset`.
 - QCF glyphs do not fall back to Hafs Arabic text inside the visible list,
   avoiding font-swap reflow.
 

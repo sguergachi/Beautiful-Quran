@@ -39,6 +39,17 @@ class CoverFrameGeometryTest {
     }
 
     @Test
+    fun `open mushaf page frame is slimmer than the cover and holds a band`() {
+        val page = mushafPageFrameGeometry(density)
+        val cover = coverFrameGeometry(ScreenCornerRadiiPx.Zero, density)
+        assertTrue(page.outerInsetPx < cover.outerInsetPx)
+        assertTrue(page.innerInsetPx > page.outerInsetPx)
+        assertTrue(page.starRadiusPx > 0f)
+        assertTrue(page.starRadiusPx <= page.outerInsetPx)
+        assertTrue(page.outerCorners.topLeft > 0f)
+    }
+
+    @Test
     fun `outer inset stays within the readable clamp on large radii`() {
         val huge = coverFrameGeometry(ScreenCornerRadiiPx(400f, 400f, 400f, 400f), density)
         assertTrue(huge.outerInsetPx <= 40f * density * 1.01f)

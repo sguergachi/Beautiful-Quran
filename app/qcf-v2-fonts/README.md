@@ -1,9 +1,8 @@
 # QCF V2 page fonts (tracked, not bundled)
 
 These are the split `qcf-v2-fonts.tar.xz.part*` archives of the 604 QCF/QPC V2
-per-page Mushaf fonts. They are **kept under version control but deliberately
-excluded from the app bundle**: they live here, outside `app/src/main/assets/`,
-so Gradle never packages them into the APK (~100 MB of fonts).
+per-page Mushaf fonts. `syncQcfFonts` extracts them into generated assets as
+`.qcf` (same SFNT bytes, not `.ttf`) so aapt deflates them in the APK.
 
 The app currently renders Arabic-only mode with the responsive Hafs renderer
 only; the QCF ("Mushaf") renderer and its `QcfFontProvider` were removed. These

@@ -27,3 +27,12 @@ HSPLcom/beautifulquran/data/QuranRepository;->**(**)**
 HSPLcom/beautifulquran/playback/PlayerController;->**(**)**
 HSPLcom/beautifulquran/playback/PlaybackService;->**(**)**
 HSPLcom/beautifulquran/playback/AudioPrefetcher;->**(**)**
+
+# Mushaf pager: page fonts, 15-line layout, leaf swipe.
+HSPLcom/beautifulquran/ui/reader/MushafPagerKt;->**(**)**
+HSPLcom/beautifulquran/ui/reader/MushafHafsLineKt;->**(**)**
+HSPLcom/beautifulquran/ui/reader/MushafReadingSheetKt;->**(**)**
+HSPLcom/beautifulquran/ui/reader/MushafPageFrameKt;->**(**)**
+HSPLcom/beautifulquran/ui/reader/MushafQcfFonts;->**(**)**
+HSPLcom/beautifulquran/domain/MushafCatalog;->**(**)**
+HSPLcom/beautifulquran/domain/MushafPageFitKt;->**(**)**
