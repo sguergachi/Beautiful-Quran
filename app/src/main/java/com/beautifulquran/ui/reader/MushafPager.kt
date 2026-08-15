@@ -171,7 +171,7 @@ internal fun MushafPager(
                         modifier = Modifier
                             .weight(1f)
                             .fillMaxWidth()
-                            .padding(top = MushafTextGutter),
+                            .padding(top = MushafTextGutter, bottom = MushafTailGutter),
                     )
                     MushafPageFolio(page.page)
                 }

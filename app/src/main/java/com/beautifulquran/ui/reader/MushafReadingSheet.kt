@@ -42,6 +42,13 @@ import com.beautifulquran.ui.theme.ownedQuietClickable
 internal val MushafGutterSlot = 48.dp
 internal val MushafGutterBand = 40.dp
 internal val MushafTextGutter = 16.dp
+
+/**
+ * Tail margin under the text block. Slightly shallower than the head gutter so
+ * the folio sits on paper, not against the last line — a printed leaf carries
+ * more air above the block than below it.
+ */
+internal val MushafTailGutter = 14.dp
 /**
  * Book window: the gilt leaf turns above; transport is a quiet line of
  * ink on the paper under the book — never on the gilt.
