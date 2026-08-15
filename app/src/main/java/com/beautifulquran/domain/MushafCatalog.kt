@@ -30,6 +30,12 @@ data class MushafPage(
     val primarySurahId: Int
         get() = lines.firstOrNull()?.tokens?.firstOrNull()?.surahId ?: 0
 
+    /** Juzʾ this page opens in — the running head's second figure. */
+    val juz: Int
+        get() = lines.firstOrNull()?.tokens?.firstOrNull()
+            ?.let { juzOf(it.surahId, it.ayah) }
+            ?: 1
+
     val ayahKeys: Set<Pair<Int, Int>> by lazy {
         buildSet {
             lines.forEach { line ->

@@ -1955,6 +1955,7 @@ fun ReaderScreen(
                         playerState = playerState,
                         isThisSurahLoaded = isThisSurahPlaying,
                         enabled = !contextualGuideOpen,
+                        onOpenChapters = onBack,
                         onOpenSettings = onOpenSettings,
                         onPlayPause = {
                             if (isThisSurahPlaying) {
@@ -2030,7 +2031,6 @@ fun ReaderScreen(
                         isThisSurahPlaying = isThisSurahPlaying,
                         playbackSpeed = playerState.speed,
                         fontScale = settings.fontScale,
-                        sheen = sheen,
                         followEnabled = followEnabled,
                         loadedSurahId = mushafSurahId,
                         flashWordPosition = startWordPosition,
@@ -2038,9 +2038,6 @@ fun ReaderScreen(
                         onWordClick = onMushafWordClick,
                         onWordLongClick = onMushafWordLongClick,
                         onAyahClick = onMushafAyahClick,
-                        onOpenChapters = onBack,
-                        onOpenSettings = onOpenSettings,
-                        chromeEnabled = !contextualGuideOpen,
                         modifier = Modifier.fillMaxSize(),
                     )
                     }

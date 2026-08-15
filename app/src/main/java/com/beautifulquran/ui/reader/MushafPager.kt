@@ -58,10 +58,22 @@ import com.beautifulquran.domain.MushafToken
 import com.beautifulquran.domain.BASMALAH_UTHMANI
 import com.beautifulquran.domain.buildMushafQcfLine
 import com.beautifulquran.domain.mushafFontPreloadPages
+import com.beautifulquran.domain.mushafGridSlots
 import com.beautifulquran.domain.mushafFontPxFromMeasuredLine
 import com.beautifulquran.domain.mushafFontPxMatchWidth
 import com.beautifulquran.domain.surahOpensWithBasmalahPreface
 import com.beautifulquran.ui.theme.MushafFontFamily
+
+/** Ayah-mark overhang allowance at each end of a line. */
+internal val MushafEdgeGutter = 4.dp
+
+/**
+ * The width fit measures one concatenated run; the line draws one [Text]
+ * per word, so per-word rounding can sum a hair wider. Fit against a
+ * slightly narrower page than the one that draws it — the longest line
+ * then lands inside the box instead of exactly on it.
+ */
+private val MushafFitSlack = 4.dp
 
 /**
  * Virtualized 604-page mushaf. Only the settled page runs ink clocks;
@@ -79,7 +91,6 @@ internal fun MushafPager(
     isThisSurahPlaying: Boolean,
     playbackSpeed: Float,
     fontScale: Float,
-    sheen: State<Float>,
     followEnabled: Boolean,
     loadedSurahId: Int,
     flashWordPosition: Int?,
@@ -87,9 +98,6 @@ internal fun MushafPager(
     onWordClick: (MushafToken) -> Unit,
     onWordLongClick: (MushafToken) -> Unit,
     onAyahClick: (MushafToken) -> Unit,
-    onOpenChapters: () -> Unit,
-    onOpenSettings: () -> Unit,
-    chromeEnabled: Boolean,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -140,41 +148,37 @@ internal fun MushafPager(
             val settled by remember {
                 derivedStateOf { pageIndex == pagerState.settledPage }
             }
-            MushafPageFrame(
-                page = page.page,
-                sheen = sheen,
-                modifier = Modifier.fillMaxSize(),
+            Column(
+                Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = MushafPageMargin),
             ) {
-                Column(Modifier.fillMaxSize()) {
-                    MushafPageHeader(
-                        surahNameArabic = surahsById[page.primarySurahId]?.nameArabic,
-                        enabled = chromeEnabled,
-                        onOpenChapters = onOpenChapters,
-                        onOpenSettings = onOpenSettings,
-                    )
-                    MushafPageSheet(
-                        page = page,
-                        content = content,
-                        surahsById = surahsById,
-                        liveInk = settled,
-                        activeWordState = activeWordState,
-                        activeAyah = activeAyah.takeIf { settled },
-                        recitingActive = recitingActive && settled,
-                        isThisSurahPlaying = isThisSurahPlaying && settled,
-                        playbackSpeed = playbackSpeed,
-                        fontScale = fontScale,
-                        loadedSurahId = loadedSurahId,
-                        flashWordPosition = flashWordPosition.takeIf { settled },
-                        onWordClick = onWordClick,
-                        onWordLongClick = onWordLongClick,
-                        onAyahClick = onAyahClick,
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxWidth()
-                            .padding(top = MushafTextGutter, bottom = MushafTailGutter),
-                    )
-                    MushafPageFolio(page.page)
-                }
+                MushafPageHeader(
+                    surahNameArabic = surahsById[page.primarySurahId]?.nameArabic,
+                    juz = page.juz,
+                )
+                MushafPageSheet(
+                    page = page,
+                    content = content,
+                    surahsById = surahsById,
+                    liveInk = settled,
+                    activeWordState = activeWordState,
+                    activeAyah = activeAyah.takeIf { settled },
+                    recitingActive = recitingActive && settled,
+                    isThisSurahPlaying = isThisSurahPlaying && settled,
+                    playbackSpeed = playbackSpeed,
+                    fontScale = fontScale,
+                    loadedSurahId = loadedSurahId,
+                    flashWordPosition = flashWordPosition.takeIf { settled },
+                    onWordClick = onWordClick,
+                    onWordLongClick = onWordLongClick,
+                    onAyahClick = onAyahClick,
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .padding(top = MushafTextGutter, bottom = MushafTailGutter),
+                )
+                MushafPageFolio(page.page)
             }
         }
     }
@@ -236,10 +240,13 @@ private fun MushafPageSheet(
     }
     BoxWithConstraints(modifier.fillMaxSize()) {
             val density = LocalDensity.current
-            val edgeGutterPx = with(density) { 10.dp.toPx() }
+            // The only inset left inside the text block: enough for a circled
+            // ayah mark's overhang at the line end, and nothing more.
+            val edgeGutterPx = with(density) { MushafEdgeGutter.toPx() }
+            val fitInsetPx = with(density) { (MushafEdgeGutter + MushafFitSlack).toPx() }
             val availableH = (constraints.maxHeight.toFloat() - edgeGutterPx)
                 .coerceAtLeast(1f)
-            val availableW = (constraints.maxWidth.toFloat() - edgeGutterPx * 2)
+            val availableW = (constraints.maxWidth.toFloat() - fitInsetPx * 2)
                 .coerceAtLeast(1f)
             val measurer = rememberTextMeasurer()
             val probePx = 48f
@@ -278,14 +285,16 @@ private fun MushafPageSheet(
             val slotCount = (page.lines.size +
                 page.surahStarts.count { surahOpensWithBasmalahPreface(it.surahId) })
                 .coerceAtLeast(1)
-            val lineSlot = with(density) { (availableH / slotCount).toDp() }
+            val lineSlot = with(density) {
+                (availableH / mushafGridSlots(slotCount)).toDp()
+            }
             CompositionLocalProvider(
                 LocalLayoutDirection provides LayoutDirection.Rtl,
             ) {
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(horizontal = 6.dp),
+                        .padding(horizontal = MushafEdgeGutter),
                     verticalArrangement = Arrangement.Center,
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
@@ -416,7 +425,8 @@ private fun fitMushafFontPx(
     val extraHeads = page.surahStarts.count { surahOpensWithBasmalahPreface(it.surahId) }
     val heightPx = mushafFontPxFromMeasuredLine(
         pageHeightPx = availableH,
-        lineCount = (page.lines.size + extraHeads).coerceAtLeast(1),
+        // Grid, not line count: a short page is set at a full page's size.
+        lineCount = mushafGridSlots(page.lines.size + extraHeads),
         measuredLineHeightPx = tallest.toFloat(),
         probeFontPx = probePx,
         fontScale = fontScale,

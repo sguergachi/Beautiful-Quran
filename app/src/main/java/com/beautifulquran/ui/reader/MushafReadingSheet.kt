@@ -29,9 +29,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import androidx.media3.common.Player
 import com.beautifulquran.playback.PlayerUiState
@@ -39,19 +43,23 @@ import com.beautifulquran.ui.theme.HafsFontFamily
 import com.beautifulquran.ui.theme.LocalQuranAccents
 import com.beautifulquran.ui.theme.ownedQuietClickable
 
-internal val MushafGutterSlot = 48.dp
-internal val MushafGutterBand = 40.dp
-internal val MushafTextGutter = 16.dp
-
-/**
- * Tail margin under the text block. Slightly shallower than the head gutter so
- * the folio sits on paper, not against the last line — a printed leaf carries
- * more air above the block than below it.
- */
+internal val MushafGutterSlot = 44.dp
+/** Running head band — a tap target tall, nothing more. */
+internal val MushafRunningHead = 36.dp
+/** Folio line: type only, so it costs a line of ink and no more. */
+internal val MushafFolioBand = 24.dp
+/** Fore-edge margin. The page has no frame, so this is the whole margin. */
+internal val MushafPageMargin = 14.dp
+/** Running head to first line of revelation. */
+internal val MushafTextGutter = 10.dp
+/** Last line to folio. A book's tail margin is the deeper of the two. */
 internal val MushafTailGutter = 14.dp
 /**
- * Book window: the gilt leaf turns above; transport is a quiet line of
- * ink on the paper under the book — never on the gilt.
+ * Book window: the leaf turns above; transport is a quiet line of ink on
+ * the paper under the page. No frame — the paper runs to the edges and the
+ * text block is the only thing composed on it. Chapters and settings live
+ * down here at the fore-edges, with the book's other controls: the leaf
+ * itself stays scripture and running head only.
  */
 @Composable
 internal fun MushafReadingSheet(
@@ -59,6 +67,7 @@ internal fun MushafReadingSheet(
     playerState: PlayerUiState,
     isThisSurahLoaded: Boolean,
     enabled: Boolean,
+    onOpenChapters: () -> Unit,
     onOpenSettings: () -> Unit,
     onPlayPause: () -> Unit,
     onFastBackward: () -> Unit,
@@ -76,12 +85,33 @@ internal fun MushafReadingSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(top = 8.dp, bottom = 4.dp),
+                .padding(horizontal = MushafPageMargin, vertical = 2.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .height(44.dp),
+            ) {
+            GutterIcon(
+                onClick = onOpenChapters,
+                enabled = enabled,
+                image = Icons.AutoMirrored.Rounded.MenuBook,
+                label = "Chapters",
+                tint = quiet.copy(alpha = 0.7f),
+                modifier = Modifier.align(Alignment.CenterStart),
+            )
+            GutterIcon(
+                onClick = onOpenSettings,
+                enabled = enabled,
+                image = Icons.Rounded.Tune,
+                label = "Settings",
+                tint = quiet.copy(alpha = 0.7f),
+                modifier = Modifier.align(Alignment.CenterEnd),
+            )
             Row(
                 modifier = Modifier
-                    .fillMaxWidth()
+                    .align(Alignment.Center)
                     .height(44.dp),
                 horizontalArrangement = Arrangement.Center,
                 verticalAlignment = Alignment.CenterVertically,
@@ -147,6 +177,7 @@ internal fun MushafReadingSheet(
                     textAlign = TextAlign.Center,
                 )
             }
+            }
             if (reciterName.isNotEmpty()) {
                 Text(
                     text = reciterName,
@@ -164,68 +195,82 @@ internal fun MushafReadingSheet(
     }
 }
 
+/**
+ * The printed page's own running head: surah name at the fore-edge the
+ * reading starts from, juzʾ at the other. No controls — the leaf carries
+ * nothing but what the mushaf prints on it.
+ */
 @Composable
 internal fun MushafPageHeader(
     surahNameArabic: String?,
-    enabled: Boolean,
-    onOpenChapters: () -> Unit,
-    onOpenSettings: () -> Unit,
+    juz: Int,
     modifier: Modifier = Modifier,
 ) {
-    val quiet = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.48f)
-    val gold = LocalQuranAccents.current.gold.copy(alpha = 0.58f)
+    val gold = LocalQuranAccents.current.gold.copy(alpha = 0.50f)
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .height(MushafGutterBand),
+            .height(MushafRunningHead),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(Modifier.width(MushafGutterSlot), contentAlignment = Alignment.Center) {
-            IconButton(onClick = onOpenChapters, enabled = enabled, modifier = Modifier.size(40.dp)) {
-                Icon(
-                    Icons.AutoMirrored.Rounded.MenuBook,
-                    contentDescription = "Chapters",
-                    tint = quiet,
-                    modifier = Modifier.size(20.dp),
-                )
-            }
-        }
+        Text(
+            text = "ٱلْجُزْءُ ${juz.toArabicIndic()}",
+            fontFamily = HafsFontFamily,
+            fontSize = 12.sp,
+            color = gold.copy(alpha = 0.38f),
+            textAlign = TextAlign.Start,
+            maxLines = 1,
+            modifier = Modifier.weight(1f),
+        )
         Text(
             text = surahNameArabic?.let { "سُورَةُ $it" }.orEmpty(),
             fontFamily = HafsFontFamily,
-            fontSize = 14.sp,
+            fontSize = 13.sp,
             color = gold,
-            textAlign = TextAlign.Center,
+            textAlign = TextAlign.End,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f),
         )
-        Box(Modifier.width(MushafGutterSlot), contentAlignment = Alignment.Center) {
-            IconButton(onClick = onOpenSettings, enabled = enabled, modifier = Modifier.size(40.dp)) {
-                Icon(
-                    Icons.Rounded.Tune,
-                    contentDescription = "Settings",
-                    tint = quiet,
-                    modifier = Modifier.size(20.dp),
-                )
-            }
-        }
     }
 }
 
+/**
+ * Folio: the mushaf's own Arabic-Indic figure, with the Western numeral
+ * as a faint letterspaced gloss beside it — the same pairing the scroll
+ * layout's page-break hairline uses, minus the dot that made it a label.
+ */
 @Composable
 internal fun MushafPageFolio(page: Int, modifier: Modifier = Modifier) {
-    val gold = LocalQuranAccents.current.gold.copy(alpha = 0.58f)
+    val gold = LocalQuranAccents.current.gold
+    val folio = buildAnnotatedString {
+        withStyle(
+            SpanStyle(
+                color = gold.copy(alpha = 0.38f),
+                fontSize = 9.sp,
+                letterSpacing = 0.14.em,
+            ),
+        ) {
+            append("$page")
+        }
+        append("  ")
+        withStyle(
+            SpanStyle(
+                color = gold.copy(alpha = 0.46f),
+                fontFamily = HafsFontFamily,
+                fontSize = 12.sp,
+            ),
+        ) {
+            append(page.toArabicIndic())
+        }
+    }
     Text(
-        text = "$page  ·  ${page.toArabicIndic()}",
-        style = MaterialTheme.typography.labelSmall.copy(
-            fontSize = 11.sp,
-            color = gold,
-        ),
+        text = folio,
+        style = MaterialTheme.typography.labelSmall,
         textAlign = TextAlign.Center,
         modifier = modifier
             .fillMaxWidth()
-            .height(MushafGutterBand)
+            .height(MushafFolioBand)
             .wrapContentHeight(Alignment.CenterVertically),
     )
 }
@@ -237,8 +282,9 @@ private fun GutterIcon(
     image: androidx.compose.ui.graphics.vector.ImageVector,
     label: String,
     tint: androidx.compose.ui.graphics.Color,
+    modifier: Modifier = Modifier,
 ) {
-    IconButton(onClick = onClick, enabled = enabled, modifier = Modifier.size(40.dp)) {
+    IconButton(onClick = onClick, enabled = enabled, modifier = modifier.size(40.dp)) {
         Icon(image, contentDescription = label, tint = tint, modifier = Modifier.size(20.dp))
     }
 }

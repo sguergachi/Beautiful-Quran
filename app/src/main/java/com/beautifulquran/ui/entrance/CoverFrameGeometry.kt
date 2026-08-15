@@ -146,27 +146,3 @@ fun coverFrameGeometry(
         starRadiusPx = starRadius,
     )
 }
-
-/**
- * Slimmer open-page frame: enough margin for a generated frieze and corner
- * seals, without the cover's leather-board insets eating the text block.
- */
-fun mushafPageFrameGeometry(density: Float): CoverFrameGeometry {
-    val outer = 14f * density
-    val gap = 5f * density
-    val curve = 18f * density
-    val inner = outer + gap
-    fun corners(inset: Float) = ScreenCornerRadiiPx(
-        topLeft = (curve - inset).coerceAtLeast(5f * density),
-        topRight = (curve - inset).coerceAtLeast(5f * density),
-        bottomRight = (curve - inset).coerceAtLeast(5f * density),
-        bottomLeft = (curve - inset).coerceAtLeast(5f * density),
-    )
-    return CoverFrameGeometry(
-        outerInsetPx = outer,
-        innerInsetPx = inner,
-        outerCorners = corners(outer),
-        innerCorners = corners(inner),
-        starRadiusPx = (outer * 0.62f).coerceIn(6f * density, 8f * density),
-    )
-}

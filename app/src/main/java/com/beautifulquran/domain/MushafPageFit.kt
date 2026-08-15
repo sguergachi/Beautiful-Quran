@@ -3,6 +3,19 @@ package com.beautifulquran.domain
 /** Line-height multiple of the Hafs face used to pack a mushaf page. */
 const val MUSHAF_LINE_EM = 2.2f
 
+/** Every Madinah page is set on the same 15-line grid. */
+const val MUSHAF_LINES_PER_PAGE = 15
+
+/**
+ * Slots to divide the text well by. A full page fills it; a short page
+ * (al-Fātiḥah, a surah's last lines) keeps the *same* leading as a full
+ * page and sits in the middle of the well rather than stretching across
+ * it — one grid for all 604 pages, as the printed mushaf is set. Pages
+ * carrying a basmalah preface run past 15 and simply pack tighter.
+ */
+fun mushafGridSlots(slotCount: Int): Int =
+    maxOf(slotCount, MUSHAF_LINES_PER_PAGE).coerceAtLeast(1)
+
 /** Smallest / largest fitted page size, in px, so a short page never balloons. */
 const val MUSHAF_MIN_FONT_PX = 28f
 const val MUSHAF_MAX_FONT_PX = 128f

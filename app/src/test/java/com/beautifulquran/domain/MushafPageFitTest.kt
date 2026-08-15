@@ -95,4 +95,16 @@ class MushafPageFitTest {
             0.01f,
         )
     }
+
+    @Test
+    fun `a full page fills the well and a short page keeps its leading`() {
+        // 15 lines divide the whole well; 8 lines take 8 of the same slots
+        // and centre, rather than stretching one page's leading to fit.
+        assertEquals(15, mushafGridSlots(15))
+        assertEquals(15, mushafGridSlots(8))
+        assertEquals(15, mushafGridSlots(1))
+        // A basmalah preface can push a page past the grid; it packs tighter.
+        assertEquals(16, mushafGridSlots(16))
+        assertEquals(15, mushafGridSlots(0))
+    }
 }

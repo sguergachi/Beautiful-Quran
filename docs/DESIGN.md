@@ -19,19 +19,24 @@ quarter-width slide softened with a fade, 380 ms); nothing stacks, nothing
 floats, nothing casts a shadow.
 
 In **Mushaf** layout (Settings → Reading) the Reader sheet is a full-screen
-leaf: the gilt frame is the screen, and the running header, folio, and
-transport sit in the page gutters — not in a bar above or below the book.
+leaf with **no frame** — iBooks, not a gilt box. The paper runs to the
+edges and the text block is the only composed thing on it: a thin running
+head (chapter name in quiet gold, chapters and settings at the fore-edges),
+the text well, and a folio line of type. Nothing rules, borders, or seals
+the page; the ornament kit stays on the closed cover. The margins are a
+book's, not a chrome's — a single fore-edge margin plus an edge gutter for
+the circled ayah marks' overhang, so the revelation is the widest thing on
+the screen and the fitted glyphs are as large as that width allows.
 A short page (al-Fātiḥah) sits in the middle of the well; a full
-Madinah page fills it. The gilt frame sits under the status bar
-and above the home indicator — it does not wrap the system chrome,
-so the corner seals are not clipped. A swipe turns the whole leaf
-(header, text, folio, and gilt) the way iBooks turns a page.
-Transport is a quiet line of ink on the paper *under* the book —
-it never sits on the gilt. The running header
-sits in the top gutter just inside the gilt; the text well starts
-a book margin below it. Play does not hide the status bar or collapse that
-inset — the frame stays put. Ayah marks sit inside an edge gutter
-so circled numbers are not clipped.
+Madinah page fills it. A swipe turns the whole leaf (running head, text,
+folio) the way iBooks turns a page.
+Transport is a quiet line of ink on the paper *under* the page.
+Play does not hide the status bar or collapse that inset — the page
+stays put.
+The width fit measures against a slightly narrower page than the one that
+draws it: the fit measures one concatenated run while the line draws one
+`Text` per word, and that slack is what keeps the longest line off the
+edge.
 QCF lines are the printed Madinah lines: one size, even
 15-line leading, leftover width shared between words
 (no U+0020).
@@ -580,10 +585,10 @@ image, so it is crisp at any density and nearly free to render.
   word taps skip the lead-in.
 - **Restraint rule:** ornament appears in exactly three places on the open
   *scroll* reader — the surah header (rosette + weave), ayah number marks, and
-  the home title mark. Mushaf layout uses a quiet slice of the ornament kit:
-  a doubled gilt hairline and four small generated corner seals
-  (`pageOrnamentSeed`). No frieze band — that stays on the closed cover. A
-  compact chapter rosette still opens a new surah. Never lavish — the closed
+  the home title mark. Mushaf layout carries **no ornament at all** — no
+  rule, no band, no corner seals: the printed line and its circled ayah
+  marks are the whole page, and every pixel the frame used to hold is text.
+  A compact chapter rosette still opens a new surah. Never lavish — the closed
   book is still the only place allowed to carry full binding gold. Mushaf
   **page breaks** in scroll layout are not ornament: a whisper-gold hairline
   with small page numbers (Western left, Arabic-Indic right) marks Madinah
