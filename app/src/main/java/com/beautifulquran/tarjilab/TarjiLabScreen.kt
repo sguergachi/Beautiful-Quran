@@ -428,25 +428,12 @@ private fun TransportRow(
                 contentDescription = if (holdPlaying) "Pause hold" else "Play hold",
                 onClick = viewModel::togglePreview,
             )
-            Text(
-                text = if (wordPlaying) "Pause word" else "Play word",
-                style = MaterialTheme.typography.labelLarge,
-                color = if (wordPlaying) {
-                    MaterialTheme.colorScheme.primary
-                } else {
-                    MaterialTheme.colorScheme.onSurface
-                },
-                maxLines = 1,
-                softWrap = false,
-                modifier = Modifier
-                    .quietClickable(
-                        enabled = ui.capture != null,
-                        onClick = viewModel::toggleWordPreview,
-                    )
-                    .padding(horizontal = 6.dp, vertical = 8.dp)
-                    .semantics {
-                        contentDescription = if (wordPlaying) "Pause word" else "Play whole word"
-                    },
+            PreviewButton(
+                playing = wordPlaying,
+                enabled = ui.capture != null,
+                contentDescription = if (wordPlaying) "Pause word" else "Play whole word",
+                onClick = viewModel::toggleWordPreview,
+                wholeWord = true,
             )
         }
         InkSpotChoiceRow(
@@ -494,21 +481,43 @@ private fun PreviewButton(
     enabled: Boolean,
     contentDescription: String,
     onClick: () -> Unit,
+    wholeWord: Boolean = false,
 ) {
     val color = if (playing) {
         MaterialTheme.colorScheme.primary
     } else {
         MaterialTheme.colorScheme.onSurface
     }
-    Icon(
-        imageVector = if (playing) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
-        contentDescription = contentDescription,
-        tint = color,
-        modifier = Modifier
-            .size(44.dp)
-            .quietClickable(enabled = enabled, onClick = onClick)
-            .padding(8.dp),
-    )
+    val tap = Modifier
+        .size(44.dp)
+        .quietClickable(enabled = enabled, onClick = onClick)
+        .padding(8.dp)
+        .semantics { this.contentDescription = contentDescription }
+    if (playing) {
+        Icon(
+            imageVector = Icons.Rounded.Pause,
+            contentDescription = contentDescription,
+            tint = color,
+            modifier = tap,
+        )
+    } else if (wholeWord) {
+        Box(modifier = tap, contentAlignment = Alignment.Center) {
+            Canvas(Modifier.fillMaxSize()) { drawPlayWordBars(color) }
+            Icon(
+                imageVector = Icons.Rounded.PlayArrow,
+                contentDescription = contentDescription,
+                tint = color,
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
+    } else {
+        Icon(
+            imageVector = Icons.Rounded.PlayArrow,
+            contentDescription = contentDescription,
+            tint = color,
+            modifier = tap,
+        )
+    }
 }
 
 private val TarjiLabTool.label: String
@@ -526,6 +535,24 @@ private fun ModeIcon(tool: TarjiLabTool, color: Color, modifier: Modifier) {
             TarjiLabTool.HOLD -> drawHoldIcon(color)
             TarjiLabTool.SHAPE -> drawShapeIcon(color)
         }
+    }
+}
+
+/** Quiet word-bars behind the same-size Play glyph. */
+private fun DrawScope.drawPlayWordBars(color: Color) {
+    val mid = size.height * 0.50f
+    val stroke = minOf(size.width, size.height) * 0.10f
+    val bars = floatArrayOf(0.36f, 0.72f, 0.50f, 0.28f)
+    bars.forEachIndexed { i, amp ->
+        val x = size.width * (0.10f + i * 0.26f)
+        val half = size.height * amp * 0.42f
+        drawLine(
+            color.copy(alpha = color.alpha * 0.42f),
+            Offset(x, mid - half),
+            Offset(x, mid + half),
+            strokeWidth = stroke,
+            cap = StrokeCap.Round,
+        )
     }
 }
 

@@ -47,9 +47,9 @@ One strip shows the word's span:
 
 The lab is the waveform. Gold handles *are* the hold; the range is
 printed on the canvas only while a handle moves. **Play** loops that
-band; **Play whole word** loops the captured word. Both run at
+band; the play-and-waveform icon loops the captured word. Both run at
 1× / ½ / ¼. Pinch the waveform to zoom a section (Fit
-returns to the whole capture). Speed and the two play controls sit on
+returns to the whole capture). Speed and the two play icons sit on
 the left of the transport; Listen / Hold / Shape sit as icon-only
 ink-spot tools flush right, with empty paper between. They change what
 the finger does on the canvas. Entering Shape draws the detector
@@ -107,7 +107,7 @@ The names are the signature, not a frequency author:
    Lab; the word-stepper ‹ › walks the ayah). The Lab captures
    automatically and muted at 1× (300 ms lead, 1 s tail).
 2. Switch to **Hold** and drag the gold edges around the climactic note.
-   Play loops that window; Play whole word loops the capture.
+   Play loops that window; the play-and-waveform icon loops the capture.
 3. Tap the gold hold: wave means vibrato, flat means still. The word
    follows.
 4. Optionally switch to **Shape** and draw the envelope you want the
