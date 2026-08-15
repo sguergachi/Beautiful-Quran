@@ -43,6 +43,7 @@ class TarjiLabCodecTest {
             kind = TarjiExpectationKind.PULSES,
             startMs = 320f,
             endMs = 860f,
+            envelope = listOf(0.1f, 0.6f, 0.4f),
             crestMs = listOf(400f, 600f, 800f),
             phaseAnchorMs = 600f,
             style = TarjiTargetStyle(depth = 0.8f, troughFloor = 0.15f, buildMs = 700f),
@@ -67,6 +68,8 @@ class TarjiLabCodecTest {
         assertTrue(json.contains("PULSES"))
 
         val decoded = TarjiLabCodec.decode(json)
+        assertEquals(3, decoded.schema)
+        assertEquals(listOf(0.1f, 0.6f, 0.4f), decoded.expectation.envelope)
         assertEquals(sample, decoded)
         assertNotNull(TarjiLabCodec.toCapture(decoded))
         val restored = TarjiLabCodec.toCapture(decoded)!!

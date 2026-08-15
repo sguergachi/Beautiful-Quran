@@ -5,11 +5,11 @@ import kotlin.math.cos
 import kotlin.math.min
 import kotlinx.serialization.Serializable
 
-/** Whether a captured word should shimmer according to the listener's ear. */
+/** Whether this word's hold is a reciter vibrato, a still note, or unlabeled. */
 @Serializable
 enum class TarjiExpectationKind { UNLABELED, NO_SHIMMER, PULSES }
 
-/** The visual character the listener wants once the right pulse is found. */
+/** Kept so schema-2 samples still decode. The lab no longer authors a sine. */
 @Serializable
 data class TarjiTargetStyle(
     val depth: Float = 1f,
@@ -19,8 +19,9 @@ data class TarjiTargetStyle(
 )
 
 /**
- * Human ground truth for one capture. Times are relative to the captured
- * audio, and [crestMs] records the moments the shimmer should be brightest.
+ * Human ground truth for one capture. The product is a hold window
+ * ([startMs]..[endMs]) plus an optional hand-shaped [envelope] — not a
+ * target frequency. Crest/style fields remain so older samples import.
  */
 @Serializable
 data class TarjiLabExpectation(
@@ -31,11 +32,23 @@ data class TarjiLabExpectation(
     /** Crest that owns phase when a regular target rate is auditioned. */
     val phaseAnchorMs: Float? = null,
     val style: TarjiTargetStyle = TarjiTargetStyle(),
+    /** Hop-aligned 0..1 signature shape, empty when the ear has not drawn. */
+    val envelope: List<Float> = emptyList(),
 ) {
+    val hasWindow: Boolean
+        get() = startMs != null && endMs != null && endMs > startMs
+
+    val window: TarjiHoldWindow?
+        get() {
+            val start = startMs ?: return null
+            val end = endMs ?: return null
+            if (end <= start) return null
+            return TarjiHoldWindow(start, end)
+        }
+
     val canPreview: Boolean
         get() = kind == TarjiExpectationKind.NO_SHIMMER ||
-            (kind == TarjiExpectationKind.PULSES &&
-                startMs != null && endMs != null && crestMs.size >= 2)
+            (kind == TarjiExpectationKind.PULSES && hasWindow)
 
     /** Robust target rate from the median interval between marked crests. */
     val rateHz: Float?
@@ -55,10 +68,12 @@ data class TarjiLabExpectation(
 
     fun markStart(ms: Float, durationMs: Float): TarjiLabExpectation {
         val at = ms.coerceIn(0f, durationMs)
+        val end = endMs?.takeIf { it > at + TarjiHoldWindow.MIN_HOLD_MS }
+            ?: (at + TarjiHoldWindow.MIN_HOLD_MS).coerceAtMost(durationMs)
         return copy(
-            kind = TarjiExpectationKind.PULSES,
+            kind = if (kind == TarjiExpectationKind.NO_SHIMMER) kind else TarjiExpectationKind.PULSES,
             startMs = at,
-            endMs = endMs?.takeIf { it > at },
+            endMs = end.takeIf { it > at },
             crestMs = crestMs.filter { it >= at },
             phaseAnchorMs = phaseAnchorMs?.takeIf { it >= at },
         )
@@ -66,14 +81,30 @@ data class TarjiLabExpectation(
 
     fun markEnd(ms: Float, durationMs: Float): TarjiLabExpectation {
         val at = ms.coerceIn(0f, durationMs)
+        val start = startMs?.takeIf { it < at - TarjiHoldWindow.MIN_HOLD_MS }
+            ?: (at - TarjiHoldWindow.MIN_HOLD_MS).coerceAtLeast(0f)
         return copy(
-            kind = TarjiExpectationKind.PULSES,
-            startMs = startMs?.takeIf { it < at },
+            kind = if (kind == TarjiExpectationKind.NO_SHIMMER) kind else TarjiExpectationKind.PULSES,
+            startMs = start.takeIf { it < at },
             endMs = at,
             crestMs = crestMs.filter { it <= at },
             phaseAnchorMs = phaseAnchorMs?.takeIf { it <= at },
         )
     }
+
+    fun withWindow(window: TarjiHoldWindow, captureMs: Float): TarjiLabExpectation {
+        val next = TarjiHoldWindow.of(window.startMs, window.endMs, captureMs)
+        return copy(
+            startMs = next.startMs,
+            endMs = next.endMs,
+            crestMs = crestMs.filter { it in next.startMs..next.endMs },
+            phaseAnchorMs = phaseAnchorMs?.takeIf { it in next.startMs..next.endMs },
+        )
+    }
+
+    fun withEnvelope(values: List<Float>): TarjiLabExpectation = copy(envelope = values)
+
+    fun labeled(kind: TarjiExpectationKind): TarjiLabExpectation = copy(kind = kind)
 
     fun addCrest(ms: Float, durationMs: Float): TarjiLabExpectation {
         val at = ms.coerceIn(0f, durationMs)

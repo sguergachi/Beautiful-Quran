@@ -16,10 +16,14 @@ import kotlinx.serialization.json.Json
  * [pcmB64] is the decimated mono stream as 16-bit little-endian PCM
  * (Base64). [firstHopMediaMs] is the media-clock position of the first
  * captured hop, so the word span is recoverable against the ayah's marks.
+ *
+ * Schema 3 is a reciter-signature sample: PCM + hold window + optional
+ * hand-shaped envelope + this reciter's knobs. Schema 2 (crest/sine
+ * authoring) still imports.
  */
 @Serializable
 data class TarjiLabSample(
-    val schema: Int = 2,
+    val schema: Int = 3,
     val label: String,
     val reciterId: Int,
     val reciterName: String,
