@@ -259,14 +259,13 @@ private fun MushafTitleCartouche(
 
 /**
  * The hairline under the leaf: a rule that separates the page from the
- * transport and, filled from the fore-edge inward, shows where in the book the
- * reader has got to. It is the one progress indicator a book can carry without
- * becoming an app — a line drawn along the paper's edge, not a bar with a
- * handle.
+ * transport, carrying a single thumb where the reader has got to in the book.
  *
- * It reads the *page*, not the playback, so it answers while you turn leaves
- * as well as while you listen. The fill is the same ink as the rule, only
- * denser: this is furniture, and gold on the leaf means illumination.
+ * A ribbon marks a place; it does not colour in the pages behind it. So the
+ * rule stays one weight end to end and the thumb alone moves along it — it
+ * reads the *page*, not the playback, so it answers while leaves are turned as
+ * well as while they are recited. Furniture, so ink: gold on the leaf means
+ * illumination.
  */
 @Composable
 internal fun MushafProgressRule(
@@ -288,21 +287,13 @@ internal fun MushafProgressRule(
             size = Size(size.width, rule),
             cornerRadius = CornerRadius(rule, rule),
         )
-        val done = size.width * at
-        if (done > 0f) {
-            // Right to left: the book's own direction of travel.
-            drawRoundRect(
-                color = ink.copy(alpha = 0.55f),
-                topLeft = Offset(size.width - done, midY - rule / 2f),
-                size = Size(done, rule),
-                cornerRadius = CornerRadius(rule, rule),
-            )
-        }
         // The thumb: where in the book this leaf sits. A little thicker than
         // the rule and rounded, so it reads as a marker laid on the line
-        // rather than a control fixed to it.
+        // rather than a control fixed to it. Right to left, the book's own
+        // direction of travel.
         val thumbW = size.height * 3.2f
-        val thumbX = (size.width - done - thumbW / 2f).coerceIn(0f, size.width - thumbW)
+        val thumbX = (size.width * (1f - at) - thumbW / 2f)
+            .coerceIn(0f, size.width - thumbW)
         drawRoundRect(
             color = ink.copy(alpha = 0.62f),
             topLeft = Offset(thumbX, 0f),

@@ -68,12 +68,12 @@ The page fonts carry no space glyph, so the air between a verse's closing
 letter and its circled mark is let out of that letter's own advance (0.10 em).
 Printed, a mark never sits hard against the word it closes.
 
-The rule dividing the leaf from the transport doubles as the reader's place in
-the book: the same ink as the rule, only denser, filling from the fore-edge
-inward by *leaf*, with a rounded thumb a little thicker than the rule marking
-where this page sits among the 604. It answers while pages are turned as well
-as while they are recited. Furniture, so never gold — a line drawn along the
-paper's edge rather than a bar with a handle.
+The rule dividing the leaf from the transport carries the reader's place in
+the book: one weight end to end, with a rounded thumb a little thicker than
+the rule marking where this leaf sits among the 604. A ribbon marks a place;
+it does not colour in the pages behind it, so nothing fills. It answers while
+pages are turned as well as while they are recited. Furniture, so never gold —
+a line drawn along the paper's edge rather than a bar with a handle.
 
 A turning leaf dissolves into both fore-edges, paper drawn back over the
 outermost 76dp in proportion to the pager's offset. Only while it moves: a
