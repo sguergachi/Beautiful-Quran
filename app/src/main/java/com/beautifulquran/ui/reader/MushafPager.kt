@@ -59,9 +59,8 @@ import com.beautifulquran.domain.BASMALAH_UTHMANI
 import com.beautifulquran.domain.buildMushafQcfLine
 import com.beautifulquran.domain.mushafFontPreloadPages
 import com.beautifulquran.domain.mushafGridSlots
+import com.beautifulquran.domain.mushafUniformFontPx
 import com.beautifulquran.domain.mushafLineSlotPx
-import com.beautifulquran.domain.mushafFontPxFromMeasuredLine
-import com.beautifulquran.domain.mushafFontPxMatchWidth
 import com.beautifulquran.domain.surahOpensWithBasmalahPreface
 import com.beautifulquran.ui.theme.MushafFontFamily
 
@@ -69,10 +68,10 @@ import com.beautifulquran.ui.theme.MushafFontFamily
 internal val MushafEdgeGutter = 4.dp
 
 /**
- * The width fit measures one concatenated run; the line draws one [Text]
- * per word, so per-word rounding can sum a hair wider. Fit against a
- * slightly narrower page than the one that draws it — the longest line
- * then lands inside the box instead of exactly on it.
+ * A line is measured as one concatenated run but drawn one [Text] per word,
+ * so per-word rounding can sum a hair wider. Size against a slightly narrower
+ * page than the one that draws it — a full line then lands inside the box
+ * instead of exactly on it.
  */
 private val MushafFitSlack = 4.dp
 
@@ -106,9 +105,15 @@ internal fun MushafPager(
         mutableIntStateOf(pagerState.currentPage)
     }
     LaunchedEffect(followEnabled, loadedSurahId, catalog, pagerState) {
-        snapshotFlow { activeWordState.value }
-            .collect { word ->
+        snapshotFlow { activeWordState.value to isThisSurahPlaying }
+            .collect { (word, playingHere) ->
                 if (!followEnabled || word == null) return@collect
+                // The active word carries no surah of its own. Right after a
+                // tap that loaded another chapter, the word still belongs to
+                // the outgoing one — following it would turn the leaf out from
+                // under the reader, to whatever page that verse number happens
+                // to fall on in the new surah. Wait for the player to arrive.
+                if (!playingHere) return@collect
                 val page = catalog.pageOf(loadedSurahId, word.ayah, word.wordPosition)
                 val index = (page - 1).coerceIn(0, catalog.pageCount - 1)
                 if (pagerState.currentPage != index) {
@@ -249,43 +254,21 @@ private fun MushafPageSheet(
                 .coerceAtLeast(1f)
             val availableW = (constraints.maxWidth.toFloat() - fitInsetPx * 2)
                 .coerceAtLeast(1f)
-            val measurer = rememberTextMeasurer()
-            val probePx = 48f
-            val probeSp = with(density) { probePx.toSp() }
-            val qcfFace = pageFont != null
-            val measureStyle = remember(probeSp, pageFont) {
-                TextStyle(
-                    fontFamily = pageFont ?: MushafFontFamily,
-                    fontSize = probeSp,
-                    lineHeight = MUSHAF_LINE_EM.em,
-                    textDirection = TextDirection.Rtl,
-                    fontFeatureSettings = if (qcfFace) null else "'liga' 1, 'calt' 1, 'rlig' 1, 'rclt' 1",
-                    platformStyle = PlatformTextStyle(includeFontPadding = false),
-                )
-            }
-            val fontPx = remember(
-                page.page,
-                availableH,
-                availableW,
-                fontScale,
-                pageFont,
-                measureStyle,
-            ) {
-                fitMushafFontPx(
-                    measurer = measurer,
-                    page = page,
-                    measureStyle = measureStyle,
-                    qcfFace = qcfFace,
-                    availableH = availableH,
-                    targetWidthPx = availableW,
-                    fontScale = fontScale,
-                    probePx = probePx,
-                )
-            }
-            val fontSp = with(density) { fontPx.toSp() }
             val slotCount = (page.lines.size +
                 page.surahStarts.count { surahOpensWithBasmalahPreface(it.surahId) })
                 .coerceAtLeast(1)
+            // One size for the whole book: the measure, not this page's own
+            // longest line. Fitting each leaf to itself made the hand grow and
+            // shrink as the pages turned.
+            val fontPx = remember(availableH, availableW, fontScale, slotCount) {
+                mushafUniformFontPx(
+                    measureWidthPx = availableW,
+                    wellHeightPx = availableH,
+                    slots = mushafGridSlots(slotCount),
+                    fontScale = fontScale,
+                )
+            }
+            val fontSp = with(density) { fontPx.toSp() }
             val lineSlot = with(density) {
                 mushafLineSlotPx(
                     pageHeightPx = availableH,
@@ -401,57 +384,6 @@ private fun rememberMushafRecessPack(dimmed: Boolean): AyahInkPack {
         markAlpha = markAlpha,
         searchHitWash = idleRepeat,
     )
-}
-
-private fun fitMushafFontPx(
-    measurer: TextMeasurer,
-    page: MushafPage,
-    measureStyle: TextStyle,
-    qcfFace: Boolean,
-    availableH: Float,
-    targetWidthPx: Float,
-    fontScale: Float,
-    probePx: Float,
-): Float {
-    var longest = 1f
-    var tallest = 1
-    page.lines.forEach { line ->
-        val sample = if (qcfFace) buildMushafQcfLine(line.tokens).text else line.widthSample()
-        val result = measurer.measure(
-            text = sample,
-            style = measureStyle,
-            constraints = Constraints(),
-            maxLines = 1,
-            softWrap = false,
-        )
-        longest = maxOf(longest, result.size.width.toFloat())
-        tallest = maxOf(tallest, result.size.height)
-    }
-    val extraHeads = page.surahStarts.count { surahOpensWithBasmalahPreface(it.surahId) }
-    val heightPx = mushafFontPxFromMeasuredLine(
-        pageHeightPx = availableH,
-        // Grid, not line count: a short page is set at a full page's size.
-        lineCount = mushafGridSlots(page.lines.size + extraHeads),
-        measuredLineHeightPx = tallest.toFloat(),
-        probeFontPx = probePx,
-        fontScale = fontScale,
-    )
-    return minOf(
-        heightPx,
-        mushafFontPxMatchWidth(
-            currentPx = probePx,
-            measuredWidthPx = longest,
-            targetWidthPx = targetWidthPx,
-        ),
-    )
-}
-
-private fun MushafLine.widthSample(): String = buildString {
-    tokens.forEachIndexed { i, token ->
-        if (i > 0) append(' ')
-        append(token.word.arabic)
-        if (token.endsAyah) append(formatMushafAyahMark(token.ayah))
-    }
 }
 
 @Composable

@@ -119,6 +119,29 @@ class MushafPageFitTest {
     }
 
     @Test
+    fun `every leaf of the book is set at the same size`() {
+        // The size is a property of the measure, not of the page: two leaves
+        // in the same well get the same type however long their lines run.
+        val a = mushafUniformFontPx(measureWidthPx = 964f, wellHeightPx = 1833f, slots = 15)
+        val b = mushafUniformFontPx(measureWidthPx = 964f, wellHeightPx = 1833f, slots = 15)
+        assertEquals(a, b, 0f)
+        assertEquals(964f / MUSHAF_DESIGN_LINE_EM, a, 0.01f)
+    }
+
+    @Test
+    fun `a short well caps the size so fifteen lines still fit`() {
+        val font = mushafUniformFontPx(measureWidthPx = 2000f, wellHeightPx = 900f, slots = 15)
+        assertEquals(900f / (15f * MUSHAF_LINE_PITCH_EM), font, 0.01f)
+    }
+
+    @Test
+    fun `only a line past the measure is set tighter`() {
+        assertEquals(1f, mushafLineSqueeze(naturalWidthPx = 800f, measureWidthPx = 964f), 0f)
+        assertEquals(1f, mushafLineSqueeze(naturalWidthPx = 964f, measureWidthPx = 964f), 0f)
+        assertEquals(0.8f, mushafLineSqueeze(naturalWidthPx = 1205f, measureWidthPx = 964f), 0.001f)
+    }
+
+    @Test
     fun `a page that cannot afford its pitch keeps its share of the well`() {
         // Tall type in a short well: the slot must not exceed the well's own
         // share, or fifteen lines would run off the leaf.

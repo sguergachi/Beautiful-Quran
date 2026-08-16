@@ -25,19 +25,30 @@ internal class ReaderSessionGate {
         private set
 
     /**
+     * Word within [pendingPlayAyah] the autoplay should open on, when the
+     * request came from a tap on a specific word (a mushaf leaf whose surah
+     * was not the loaded one). Resolved to a seek once that chapter's timings
+     * are in hand; null means start at the top of the verse.
+     */
+    var pendingPlayWord: Int? = null
+        private set
+
+    /**
      * Starts a new navigation request. Callers must cancel any prior load job
      * so only this generation's materialize may [isCurrent]-pass to install.
      */
-    fun begin(surahId: Int, pendingPlayAyah: Int? = null): Long {
+    fun begin(surahId: Int, pendingPlayAyah: Int? = null, pendingPlayWord: Int? = null): Long {
         generation += 1L
         this.surahId = surahId
         this.pendingPlayAyah = pendingPlayAyah
+        this.pendingPlayWord = pendingPlayWord
         return generation
     }
 
     /** Same chapter still loading: attach or replace autoplay without a new gen. */
-    fun setPendingPlay(ayah: Int) {
+    fun setPendingPlay(ayah: Int, word: Int? = null) {
         pendingPlayAyah = ayah
+        pendingPlayWord = word
     }
 
     /**
@@ -49,6 +60,13 @@ internal class ReaderSessionGate {
         val ayah = pendingPlayAyah
         pendingPlayAyah = null
         return ayah
+    }
+
+    /** Word for the autoplay just taken by [takePendingPlay]; clears it. */
+    fun takePendingPlayWord(): Int? {
+        val word = pendingPlayWord
+        pendingPlayWord = null
+        return word
     }
 
     fun isCurrent(gen: Long): Boolean = gen == generation

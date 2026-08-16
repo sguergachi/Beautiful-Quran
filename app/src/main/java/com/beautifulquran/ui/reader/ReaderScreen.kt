@@ -2003,19 +2003,17 @@ fun ReaderScreen(
                         { token: MushafToken ->
                             mushafDispatch.value(ReaderInteractionEvent.EnableFollow)
                             if (token.surahId == mushafSurahId) {
-                                val segment = viewModel.segmentsFor(token.ayah)
-                                    ?.firstOrNull { it.position == token.word.position }
-                                if (segment != null) {
-                                    viewModel.playFromWord(token.ayah, segment.startMs)
-                                } else {
-                                    viewModel.playFromAyah(token.ayah)
-                                }
+                                viewModel.playFromAyahWord(token.ayah, token.word.position)
                             } else {
                                 // The reader turned past a surah boundary: the
                                 // leaf is another surah's, whose timings are not
-                                // loaded. Load it and open at the tapped verse
+                                // loaded. Load it and open on the tapped word
                                 // rather than swallowing the tap.
-                                viewModel.load(token.surahId, startPlaybackAtAyah = token.ayah)
+                                viewModel.load(
+                                    surahId = token.surahId,
+                                    startPlaybackAtAyah = token.ayah,
+                                    startPlaybackAtWord = token.word.position,
+                                )
                             }
                         }
                     }

@@ -34,8 +34,10 @@ import androidx.compose.ui.text.font.FontFamily
 import com.beautifulquran.domain.MUSHAF_LINE_EM
 import com.beautifulquran.domain.MushafLine
 import com.beautifulquran.domain.MushafToken
+import com.beautifulquran.domain.buildMushafQcfLine
 import com.beautifulquran.domain.mushafGapSpacingPx
 import com.beautifulquran.domain.mushafLineJustifies
+import com.beautifulquran.domain.mushafLineSqueeze
 import com.beautifulquran.domain.qcfTrailingMark
 import com.beautifulquran.domain.qcfWordGlyphs
 import com.beautifulquran.ui.theme.LocalQuranAccents
@@ -194,20 +196,43 @@ private fun MushafQcfPageLine(
     onAyahClick: (MushafToken) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val style = remember(fontSize, pageFont) {
-        TextStyle(
+    val density = LocalDensity.current
+    val hitSlopPx = with(density) { 8.dp.toPx() }
+    val justify = mushafLineJustifies(line.tokens.size)
+    val measurer = rememberTextMeasurer()
+    BoxWithConstraints(modifier.fillMaxWidth()) {
+    val measureWidthPx = constraints.maxWidth.toFloat()
+    // The book is set at one size (see MUSHAF_DESIGN_LINE_EM). A line whose
+    // glyph run still runs past the measure — a few dozen in the whole mushaf —
+    // is set that little bit tighter, so one long line never drags its page's
+    // type down with it.
+    val squeeze = remember(line, fontSize, pageFont, measureWidthPx) {
+        val probe = TextStyle(
             fontFamily = pageFont,
             fontSize = fontSize,
+            textDirection = TextDirection.Rtl,
+            platformStyle = PlatformTextStyle(includeFontPadding = false),
+        )
+        val natural = measurer.measure(
+            text = buildMushafQcfLine(line.tokens).text,
+            style = probe,
+            constraints = Constraints(),
+            maxLines = 1,
+            softWrap = false,
+        ).size.width.toFloat()
+        mushafLineSqueeze(naturalWidthPx = natural, measureWidthPx = measureWidthPx)
+    }
+    val style = remember(fontSize, pageFont, squeeze) {
+        TextStyle(
+            fontFamily = pageFont,
+            fontSize = fontSize * squeeze,
             lineHeight = MUSHAF_LINE_EM.em,
             textDirection = TextDirection.Rtl,
             platformStyle = PlatformTextStyle(includeFontPadding = false),
         )
     }
-    val density = LocalDensity.current
-    val hitSlopPx = with(density) { 8.dp.toPx() }
-    val justify = mushafLineJustifies(line.tokens.size)
     Row(
-        modifier = modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth(),
         // A justified line carries its own weight spacers, so it starts at the
         // fore-edge and fills the measure. A short line — al-Fātiḥah, a surah's
         // closing line — is centred on the page, the way it is printed, never
@@ -231,6 +256,7 @@ private fun MushafQcfPageLine(
                 onAyahClick = onAyahClick,
             )
         }
+    }
     }
 }
 

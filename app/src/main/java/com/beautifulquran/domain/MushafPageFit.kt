@@ -42,6 +42,50 @@ const val MUSHAF_MIN_FONT_PX = 28f
 const val MUSHAF_MAX_FONT_PX = 128f
 
 /**
+ * The mushaf's measure, in em of the QCF V2 page faces — the width one line of
+ * the book is set to.
+ *
+ * A printed mushaf is one book: every one of the 604 leaves carries the same
+ * hand at the same size, and the reader must never see the type change as the
+ * page turns. So the size cannot be fitted to each page's own longest line,
+ * which is what made a leaf's glyphs jump by a third from one page to the next.
+ *
+ * The QCF word glyphs are not pre-justified — measured with HarfBuzz over all
+ * 9,000 lines of the mushaf, a line's glyph run spans 14.1 em (p10) to 16.9 em
+ * (p90), with a long tail. 19.0 em covers 99.5% of them, so the type is set
+ * once, from the measure, and holds for the whole book; the handful of longer
+ * lines are drawn shrunk to their line rather than shrinking their page.
+ */
+const val MUSHAF_DESIGN_LINE_EM = 19.0f
+
+/**
+ * The one type size for every leaf: the measure divided by the design line,
+ * never taller than the well can carry fifteen lines of. [fontScale] is the
+ * reader's nudge around it, not a free resize.
+ */
+fun mushafUniformFontPx(
+    measureWidthPx: Float,
+    wellHeightPx: Float,
+    slots: Int,
+    fontScale: Float = 1f,
+): Float {
+    if (measureWidthPx <= 0f || wellHeightPx <= 0f || slots <= 0) return MUSHAF_MIN_FONT_PX
+    val fromMeasure = measureWidthPx / MUSHAF_DESIGN_LINE_EM
+    val fromWell = wellHeightPx / (slots * MUSHAF_LINE_PITCH_EM)
+    return (minOf(fromMeasure, fromWell) * fontScale.coerceIn(0.88f, 1.12f))
+        .coerceIn(MUSHAF_MIN_FONT_PX, MUSHAF_MAX_FONT_PX)
+}
+
+/**
+ * Scale for a single line whose glyph run runs past the measure — the rare
+ * long line is set a little tighter instead of pulling its whole page down.
+ */
+fun mushafLineSqueeze(naturalWidthPx: Float, measureWidthPx: Float): Float {
+    if (naturalWidthPx <= 0f || measureWidthPx <= 0f) return 1f
+    return minOf(1f, measureWidthPx / naturalWidthPx)
+}
+
+/**
  * Font size in pixels so [lineCount] mushaf lines fill [pageHeightPx].
  * [fontScale] is a reader nudge around the fitted size, not a free resize.
  */
