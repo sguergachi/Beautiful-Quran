@@ -26,6 +26,7 @@ import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
@@ -42,6 +43,7 @@ import com.beautifulquran.domain.qcfTrailingMark
 import com.beautifulquran.domain.qcfWordGlyphs
 import com.beautifulquran.ui.theme.LocalQuranAccents
 import com.beautifulquran.ui.theme.MushafFontFamily
+import com.beautifulquran.ui.theme.PaperCoverPad
 import com.beautifulquran.ui.theme.ShapedWordBloom
 import com.beautifulquran.ui.theme.shapedWordBloom
 
@@ -345,6 +347,7 @@ private fun MushafQcfWord(
                 liveInk = liveInk,
                 blooms = blooms,
                 layout = { layoutResult },
+                coverPad = 0.dp,
             )
             .wordTapTarget(
                 words = listOf(token.word),
@@ -363,6 +366,8 @@ private fun Modifier.mushafLineInk(
     liveInk: Boolean,
     blooms: () -> List<ShapedWordBloom>,
     layout: () -> TextLayoutResult?,
+    /** Zero for a per-word node, whose neighbours are other nodes to paint over. */
+    coverPad: Dp = PaperCoverPad,
 ): Modifier = if (!liveInk) {
     this
 } else {
@@ -371,6 +376,7 @@ private fun Modifier.mushafLineInk(
         layout = layout,
         rtl = true,
         feather = InkEngine.tuning.washFeather,
+        coverPad = coverPad,
     )
 }
 

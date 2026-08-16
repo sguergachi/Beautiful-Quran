@@ -209,6 +209,18 @@ fun Modifier.shapedWordBloom(
     rtl: Boolean,
     /** Feather width relative to the word; see [InkWashFeather]. */
     feather: Float = InkWashFeather,
+    /**
+     * How far a word's paper mask reaches past its box, for glyph overhang.
+     *
+     * Right when the words of a line share one [Text] — the mask covers its
+     * own word's overhang and any neighbour ink it laps is redrawn by the same
+     * text pass. Wrong when each word is its own node, as on the mushaf leaf:
+     * there the mask is the last thing drawn over that word's box, so the reach
+     * paints paper across the neighbouring word's ink and its ayah mark, and
+     * the page looks chewed at every word boundary while it recites. Those
+     * callers pass zero.
+     */
+    coverPad: Dp = PaperCoverPad,
 ): Modifier {
     val stops = FloatArray(InkProfileStops) { i -> i / (InkProfileStops - 1f) }
     val lineBoundsCache = LineBoundsCache()
@@ -240,7 +252,7 @@ fun Modifier.shapedWordBloom(
                     // Bleed only horizontally: vertical padding lets an
                     // unread line's paper mask climb into the preceding line
                     // and fade a read word's descender (g/j/p/q/y).
-                    val pad = PaperCoverPad.toPx()
+                    val pad = coverPad.toPx()
                     lineBounds.forEach { bounds ->
                         val cover = linePaperCoverBounds(bounds, pad)
                         clipRect(
@@ -270,7 +282,7 @@ fun Modifier.shapedWordBloom(
                             (1f - bloom.restingAlpha) * (if (rtl) s else 1f - s)
                         bloom.paper.copy(alpha = (1f - glyphAlpha).coerceIn(0f, 1f))
                     }
-                    val pad = PaperCoverPad.toPx()
+                    val pad = coverPad.toPx()
                     lineBounds.forEach { bounds ->
                         val cover = linePaperCoverBounds(bounds, pad)
                         // The clip/draw rect already includes [pad] for glyph
@@ -548,7 +560,8 @@ private val FadeLayerBleed = 14.dp
 /** Horizontal pad beyond [TextLayoutResult.getPathForRange] when painting
  * paper covers. Vertical expansion is forbidden because it masks glyphs on
  * adjacent lines. */
-private val PaperCoverPad = 4.dp
+/** How far a word's paper mask reaches past its box, for glyph overhang. */
+internal val PaperCoverPad = 4.dp
 
 /** Expands a word mask for horizontal glyph overhang without crossing its line. */
 internal fun linePaperCoverBounds(lineBounds: Rect, horizontalPad: Float): Rect =
