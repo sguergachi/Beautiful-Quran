@@ -89,6 +89,9 @@ internal val MushafEdgeGutter = 12.dp
  */
 private val MushafFitSlack = 4.dp
 
+/** Paper under the folio, so the figure sits with the leaf and not the rule. */
+private val MushafFolioTail = 22.dp
+
 /** How far a turning leaf dissolves in from each fore-edge. */
 private val MushafForeEdgeFade = 76.dp
 
@@ -258,7 +261,14 @@ internal fun MushafPager(
                 )
                 MushafPageFolio(
                     page = page.page,
-                    modifier = Modifier.padding(horizontal = MushafEdgeGutter),
+                    // Paper under the folio, inside the leaf. Shrinking the
+                    // folio's own band only fed the weighted text block above
+                    // it, which pushed the last line down by as much as the
+                    // figure rose; the gap has to be taken out of the leaf's
+                    // tail for the number to group with the page.
+                    modifier = Modifier
+                        .padding(horizontal = MushafEdgeGutter)
+                        .padding(bottom = MushafFolioTail),
                 )
             }
         }

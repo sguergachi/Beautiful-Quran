@@ -26,6 +26,13 @@ margins are a book's, not a chrome's — a single fore-edge margin plus an edge
 gutter deep enough for a circled ayah mark's medallion, which inks about half
 its own width past its advance and is sliced by anything narrower.
 
+**The folio belongs to the leaf.** It is set nearer the last line of
+revelation than the rule beneath it, because proximity is what assigns it:
+measured against the transport instead, it drifts every time the chrome
+changes. Its gap comes out of the leaf's own tail — shrinking the folio's band
+only feeds the weighted text block above it, which pushes the last line down
+by as much as the figure rises.
+
 **One measure.** Running head, title band and folio all hang on the text
 block's own margin. Three different edges on one leaf is the loudest
 typographic fault the page can carry.

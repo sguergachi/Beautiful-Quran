@@ -68,11 +68,18 @@ internal val MushafRunningHead = 36.dp
  */
 internal const val MushafTapPageHoldMs = 1_500L
 /**
- * Folio band. The figure is centred in it, so the page number floats midway
- * between the last line of revelation and the transport rather than hanging
- * off the text block.
+ * Folio band, with the figure centred in it.
+ *
+ * The page number belongs to the leaf, so it must sit nearer the last line of
+ * revelation than the rule below it — proximity is what assigns it. Measured
+ * against the transport instead, it drifted every time the chrome changed:
+ * when the progress rule arrived between them it left the folio 120px under
+ * the text and 64px over the rule, reading as part of the controls.
  */
-internal val MushafFolioBand = 44.dp
+internal val MushafFolioBand = 30.dp
+/** Paper above and below the rule that divides the leaf from the transport. */
+private val MushafRuleTailAir = 10.dp
+
 /** Each folio figure's column, equal either side of the centre line. */
 private val MushafFolioColumn = 40.dp
 /** Paper between the two figures. */
@@ -139,7 +146,12 @@ internal fun MushafReadingSheet(
         }
         MushafProgressRule(
             progress = chapterProgress,
-            modifier = Modifier.padding(horizontal = MushafPageMargin + MushafEdgeGutter),
+            // Paper between the leaf's own tail and the rule, so the folio
+            // groups with the page above it rather than with the controls.
+            modifier = Modifier.padding(
+                horizontal = MushafPageMargin + MushafEdgeGutter,
+                vertical = MushafRuleTailAir,
+            ),
         )
         Column(
             modifier = Modifier
