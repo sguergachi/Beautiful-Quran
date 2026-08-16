@@ -89,17 +89,26 @@ fun mushafUniformFontPx(
  * as the measure allows, which is what makes the ink read heavy and full rather
  * than thin and small.
  *
- * Bounded both ways so no line ever reads as a different hand from the one
- * above it; whatever the bounds leave over is closed by the word gaps.
+ * Bounded above so no line ever reads as a different hand from the one above
+ * it, and whatever that leaves over is closed by the word gaps. There is no
+ * such bound below: a line that will not fit must be written to fit, because
+ * the alternative is ink over the fore-edge, where the leaf clips it and the
+ * circled ayah mark riding at the line end comes out sliced in half.
  */
 fun mushafLineFill(naturalWidthPx: Float, measureWidthPx: Float): Float {
     if (naturalWidthPx <= 0f || measureWidthPx <= 0f) return 1f
     return (measureWidthPx / naturalWidthPx)
         .coerceIn(MUSHAF_MIN_LINE_SQUEEZE, MUSHAF_MAX_LINE_STRETCH)
+        // Never wider than the measure, whatever the bounds say.
+        .coerceAtMost(measureWidthPx / naturalWidthPx)
 }
 
-/** A crowded line is never set smaller than this share of the book's size. */
-const val MUSHAF_MIN_LINE_SQUEEZE = 0.90f
+/**
+ * Floor for a crowded line — a guard against absurdity, not a promise: a line
+ * that needs to close up further than this still does, since fitting the
+ * measure comes first.
+ */
+const val MUSHAF_MIN_LINE_SQUEEZE = 0.70f
 
 /** Nor a sparse one larger than this, however much paper it has to cross. */
 const val MUSHAF_MAX_LINE_STRETCH = 1.16f

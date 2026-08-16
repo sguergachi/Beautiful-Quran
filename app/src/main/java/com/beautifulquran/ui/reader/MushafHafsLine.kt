@@ -220,7 +220,14 @@ private fun MushafQcfPageLine(
             maxLines = 1,
             softWrap = false,
         ).size.width.toFloat()
-        mushafLineFill(naturalWidthPx = natural, measureWidthPx = measureWidthPx)
+        // The line is measured as one run but drawn one [Text] per word, and
+        // each of those rounds its width up. Fit to a measure a pixel per word
+        // short of the real one: fitted exactly, that rounding pushes the last
+        // word — and the circled ayah mark riding on it — past the edge.
+        mushafLineFill(
+            naturalWidthPx = natural,
+            measureWidthPx = (measureWidthPx - line.tokens.size).coerceAtLeast(1f),
+        )
     }
     val style = remember(fontSize, pageFont, fill) {
         TextStyle(
@@ -328,7 +335,11 @@ private fun MushafQcfWord(
         style = style,
         maxLines = 1,
         softWrap = false,
-        overflow = TextOverflow.Clip,
+        // Never slice a glyph at its box. The circled ayah mark is the last
+        // glyph of a verse-closing word and its medallion inks wider than its
+        // advance, so clipping to the measured box cuts the number in half —
+        // which is exactly what the line end showed.
+        overflow = TextOverflow.Visible,
         modifier = Modifier
             .mushafLineInk(
                 liveInk = liveInk,

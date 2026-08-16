@@ -143,17 +143,22 @@ class MushafPageFitTest {
         assertEquals(1.06f, mushafLineFill(naturalWidthPx = 910f, measureWidthPx = 964f), 0.005f)
         // Crowded line: closed up to fit.
         assertEquals(0.95f, mushafLineFill(naturalWidthPx = 1015f, measureWidthPx = 964f), 0.005f)
-        // Neither past the bounds, so no line reads as a different hand.
+        // Never opened past the bound, so no line reads as a different hand.
         assertEquals(
             MUSHAF_MAX_LINE_STRETCH,
             mushafLineFill(naturalWidthPx = 400f, measureWidthPx = 964f),
             0.001f,
         )
-        assertEquals(
-            MUSHAF_MIN_LINE_SQUEEZE,
-            mushafLineFill(naturalWidthPx = 1500f, measureWidthPx = 964f),
-            0.001f,
-        )
+    }
+
+    @Test
+    fun `no line is ever left wider than the measure`() {
+        // Fitting the leaf beats holding the hand: ink over the fore-edge is
+        // clipped, and the ayah mark at the line end comes out sliced.
+        listOf(1000f, 1100f, 1500f, 2200f).forEach { natural ->
+            val fill = mushafLineFill(naturalWidthPx = natural, measureWidthPx = 964f)
+            assertTrue("$natural overflowed", natural * fill <= 964f + 0.01f)
+        }
     }
 
     @Test

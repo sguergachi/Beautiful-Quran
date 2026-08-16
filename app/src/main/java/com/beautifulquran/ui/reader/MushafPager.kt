@@ -64,8 +64,15 @@ import com.beautifulquran.domain.mushafLineSlotPx
 import com.beautifulquran.domain.surahOpensWithBasmalahPreface
 import com.beautifulquran.ui.theme.MushafFontFamily
 
-/** Ayah-mark overhang allowance at each end of a line. */
-internal val MushafEdgeGutter = 4.dp
+/**
+ * Ayah-mark overhang allowance at each end of a line.
+ *
+ * A circled mark's medallion inks about half its own width wider than its
+ * advance, so a line fitted flush to the text block leaves that overhang
+ * hanging outside it, where it is clipped and the number comes out sliced.
+ * Reserve enough paper at both fore-edges for the medallion to sit whole.
+ */
+internal val MushafEdgeGutter = 12.dp
 
 /**
  * A line is measured as one concatenated run but drawn one [Text] per word,

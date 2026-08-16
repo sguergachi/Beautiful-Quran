@@ -498,10 +498,14 @@ fun ReaderScreen(
         } else {
             window?.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         }
-        // Immersive reading hides the status bar — but not while the Timings
-        // Lab sheet is riding over this reader: the Lab is a workbench, and
-        // its playback must not push the clock off its own header.
-        if (recitingActive && !keepStatusBarVisible && !mushafMode) {
+        // Immersive reading hides the status bar — in the mushaf too, where the
+        // leaf reserves its top inset from statusBarsIgnoringVisibility, so the
+        // page holds still as the clock goes. (It was held back while the mushaf
+        // still had a gilt frame, which jumped into the cutout when the bar
+        // left; the frame is gone.) The one exception is the Timings Lab sheet
+        // riding over this reader: the Lab is a workbench, and its playback must
+        // not push the clock off its own header.
+        if (recitingActive && !keepStatusBarVisible) {
             controller?.hide(WindowInsetsCompat.Type.statusBars())
             controller?.systemBarsBehavior =
                 androidx.core.view.WindowInsetsControllerCompat
