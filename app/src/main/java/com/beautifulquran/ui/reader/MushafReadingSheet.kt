@@ -3,6 +3,7 @@ package com.beautifulquran.ui.reader
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -25,6 +26,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -39,13 +41,21 @@ import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import androidx.media3.common.Player
 import com.beautifulquran.playback.PlayerUiState
+import com.beautifulquran.ui.theme.GeneratedHeadRule
 import com.beautifulquran.ui.theme.HafsFontFamily
+import com.beautifulquran.ui.theme.ornament.generateCoverOrnament
 import com.beautifulquran.ui.theme.LocalQuranAccents
 import com.beautifulquran.ui.theme.ownedQuietClickable
 
 internal val MushafGutterSlot = 44.dp
 /** Running head band — a tap target tall, nothing more. */
 internal val MushafRunningHead = 36.dp
+/** Juzʾ slot in the running head, mirrored on the far side to centre the name. */
+private val MushafHeadJuzSlot = 56.dp
+/** Height of the tooled bar flanking the chapter name. */
+private val MushafHeadRuleBand = 9.dp
+/** One frieze for every leaf's running head, from the ornament kit. */
+private const val MushafHeadOrnamentSeed = 2_000_003
 /** Folio line: type only, so it costs a line of ink and no more. */
 internal val MushafFolioBand = 24.dp
 /** Fore-edge margin. The page has no frame, so this is the whole margin. */
@@ -207,6 +217,10 @@ internal fun MushafPageHeader(
     modifier: Modifier = Modifier,
 ) {
     val gold = LocalQuranAccents.current.gold.copy(alpha = 0.50f)
+    // One frieze for the whole book, as a printed mushaf tools the same bar on
+    // every leaf — not a per-page novelty. Grown from the ornament kit like the
+    // cover's band, so the head belongs to the same hand as the binding.
+    val frieze = remember { generateCoverOrnament(MushafHeadOrnamentSeed).border }
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -220,18 +234,38 @@ internal fun MushafPageHeader(
             color = gold.copy(alpha = 0.38f),
             textAlign = TextAlign.Start,
             maxLines = 1,
-            modifier = Modifier.weight(1f),
+            modifier = Modifier.width(MushafHeadJuzSlot),
+        )
+        GeneratedHeadRule(
+            spec = frieze,
+            ink = gold.copy(alpha = 0.30f),
+            fadeAtStart = true,
+            modifier = Modifier
+                .weight(1f)
+                .height(MushafHeadRuleBand)
+                .padding(horizontal = 8.dp),
         )
         Text(
             text = surahNameArabic?.let { "سُورَةُ $it" }.orEmpty(),
             fontFamily = HafsFontFamily,
             fontSize = 13.sp,
             color = gold,
-            textAlign = TextAlign.End,
+            textAlign = TextAlign.Center,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f),
         )
+        GeneratedHeadRule(
+            spec = frieze,
+            ink = gold.copy(alpha = 0.30f),
+            fadeAtStart = false,
+            modifier = Modifier
+                .weight(1f)
+                .height(MushafHeadRuleBand)
+                .padding(horizontal = 8.dp),
+        )
+        // Balances the juzʾ slot so the chapter name sits optically centred
+        // between its two bars rather than pushed toward the fore-edge.
+        Spacer(Modifier.width(MushafHeadJuzSlot))
     }
 }
 

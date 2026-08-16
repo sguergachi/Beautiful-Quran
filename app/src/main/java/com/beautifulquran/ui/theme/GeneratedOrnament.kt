@@ -9,6 +9,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathMeasure
@@ -403,4 +404,78 @@ fun Modifier.generatedFieldWeave(
         }
         drawPath(weave, ink.copy(alpha = ink.alpha * a), style = stroke)
     }
+}
+
+/**
+ * One run of the border frieze, laid along a horizontal rule — the tooled
+ * bar a printed mushaf sets on either side of the surah name in its running
+ * head. Same pattern vocabulary as [GeneratedBorderBand], but a single side
+ * with no seals to converge on: the run simply fades out at its outer end,
+ * so the bar reaches away from the title and dissolves into the margin
+ * instead of stopping on a cut period.
+ *
+ * Static like the rest of the head — part of the page's typography, not a
+ * ceremony — and drawn with a gradient rather than a layer, so a leaf can
+ * carry two of them without an offscreen buffer.
+ */
+@Composable
+fun GeneratedHeadRule(
+    spec: BorderSpec,
+    ink: Color,
+    /** True when the bar's outer end (the one that fades) is on the left. */
+    fadeAtStart: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    Spacer(
+        modifier.drawWithCache {
+            val bandH = size.height.coerceAtLeast(1f)
+            val periodPx = (spec.period * bandH).toFloat().coerceAtLeast(1f)
+            val hair = Path()
+            val rule = Path()
+            val dots = ArrayList<Pair<Offset, Float>>()
+            // Whole periods only, laid from the inner end so the pattern meets
+            // the title on the same phase every time. A slot too narrow for one
+            // period carries no bar at all rather than a clipped fragment —
+            // a long chapter name simply takes the room.
+            val tiles = (size.width / periodPx).toInt()
+            val run = tiles * periodPx
+            val originX = if (fadeAtStart) size.width - run else 0f
+            val place = { u: Float, v: Float ->
+                Offset(originX + u, (v - 0.5f) * bandH + size.height / 2f)
+            }
+            for (k in 0 until tiles) {
+                val u0 = k * periodPx
+                for (s in spec.strokes) {
+                    val path = if (s.weight == StrokeWeight.Rule) rule else hair
+                    s.points.forEachIndexed { i, p ->
+                        val pt = place(u0 + (p.x * bandH).toFloat(), p.y.toFloat())
+                        if (i == 0) path.moveTo(pt.x, pt.y) else path.lineTo(pt.x, pt.y)
+                    }
+                    if (s.closed) path.close()
+                }
+                for (d in spec.dots) {
+                    dots.add(
+                        place(u0 + (d.x * bandH).toFloat(), d.y.toFloat()) to
+                            (d.radius * bandH).toFloat(),
+                    )
+                }
+            }
+            // Fades over the outer third, so the bar arrives at the title at
+            // full ink and leaves for the fore-edge as a whisper.
+            val brush = Brush.horizontalGradient(
+                colorStops = if (fadeAtStart) {
+                    arrayOf(0f to Color.Transparent, 0.38f to ink, 1f to ink)
+                } else {
+                    arrayOf(0f to ink, 0.62f to ink, 1f to Color.Transparent)
+                },
+            )
+            val hairStroke = Stroke(width = 1.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
+            val ruleStroke = Stroke(width = 1.2.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
+            onDrawBehind {
+                drawPath(hair, brush, style = hairStroke)
+                drawPath(rule, brush, style = ruleStroke)
+                for ((center, r) in dots) drawCircle(brush, radius = r, center = center)
+            }
+        },
+    )
 }
