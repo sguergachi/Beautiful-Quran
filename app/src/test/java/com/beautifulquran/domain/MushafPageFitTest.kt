@@ -135,15 +135,23 @@ class MushafPageFitTest {
     }
 
     @Test
-    fun `only a line past the measure is set tighter`() {
-        assertEquals(1f, mushafLineSqueeze(naturalWidthPx = 800f, measureWidthPx = 964f), 0f)
-        assertEquals(1f, mushafLineSqueeze(naturalWidthPx = 964f, measureWidthPx = 964f), 0f)
-        // A crowded line closes up a little...
-        assertEquals(0.95f, mushafLineSqueeze(naturalWidthPx = 1015f, measureWidthPx = 964f), 0.001f)
-        // ...but never past the floor, so no line reads as a different hand.
+    fun `a line is fitted to the measure by its own hand`() {
+        // Exactly the measure: written as the book is set.
+        assertEquals(1f, mushafLineFill(naturalWidthPx = 964f, measureWidthPx = 964f), 0f)
+        // Sparse line: opened up to reach the margin, rather than leaving
+        // rivers of paper between its words.
+        assertEquals(1.06f, mushafLineFill(naturalWidthPx = 910f, measureWidthPx = 964f), 0.005f)
+        // Crowded line: closed up to fit.
+        assertEquals(0.95f, mushafLineFill(naturalWidthPx = 1015f, measureWidthPx = 964f), 0.005f)
+        // Neither past the bounds, so no line reads as a different hand.
+        assertEquals(
+            MUSHAF_MAX_LINE_STRETCH,
+            mushafLineFill(naturalWidthPx = 400f, measureWidthPx = 964f),
+            0.001f,
+        )
         assertEquals(
             MUSHAF_MIN_LINE_SQUEEZE,
-            mushafLineSqueeze(naturalWidthPx = 1500f, measureWidthPx = 964f),
+            mushafLineFill(naturalWidthPx = 1500f, measureWidthPx = 964f),
             0.001f,
         )
     }

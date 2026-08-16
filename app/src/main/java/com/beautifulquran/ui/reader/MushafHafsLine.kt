@@ -37,7 +37,7 @@ import com.beautifulquran.domain.MushafToken
 import com.beautifulquran.domain.buildMushafQcfLine
 import com.beautifulquran.domain.mushafGapSpacingPx
 import com.beautifulquran.domain.mushafLineJustifies
-import com.beautifulquran.domain.mushafLineSqueeze
+import com.beautifulquran.domain.mushafLineFill
 import com.beautifulquran.domain.qcfTrailingMark
 import com.beautifulquran.domain.qcfWordGlyphs
 import com.beautifulquran.ui.theme.LocalQuranAccents
@@ -206,7 +206,7 @@ private fun MushafQcfPageLine(
     // glyph run still runs past the measure — a few dozen in the whole mushaf —
     // is set that little bit tighter, so one long line never drags its page's
     // type down with it.
-    val squeeze = remember(line, fontSize, pageFont, measureWidthPx) {
+    val fill = remember(line, fontSize, pageFont, measureWidthPx) {
         val probe = TextStyle(
             fontFamily = pageFont,
             fontSize = fontSize,
@@ -220,12 +220,12 @@ private fun MushafQcfPageLine(
             maxLines = 1,
             softWrap = false,
         ).size.width.toFloat()
-        mushafLineSqueeze(naturalWidthPx = natural, measureWidthPx = measureWidthPx)
+        mushafLineFill(naturalWidthPx = natural, measureWidthPx = measureWidthPx)
     }
-    val style = remember(fontSize, pageFont, squeeze) {
+    val style = remember(fontSize, pageFont, fill) {
         TextStyle(
             fontFamily = pageFont,
-            fontSize = fontSize * squeeze,
+            fontSize = fontSize * fill,
             lineHeight = MUSHAF_LINE_EM.em,
             textDirection = TextDirection.Rtl,
             platformStyle = PlatformTextStyle(includeFontPadding = false),

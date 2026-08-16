@@ -11,7 +11,7 @@ const val MUSHAF_LINE_EM = 2.2f
  * the type, not to the leftover height: pitch from the glyph size, and let the
  * spare height fall into the head and tail margins instead.
  */
-const val MUSHAF_LINE_PITCH_EM = 2.05f
+const val MUSHAF_LINE_PITCH_EM = 1.85f
 
 /**
  * Line box height for a fitted page: the printed pitch, never more than the
@@ -58,7 +58,7 @@ const val MUSHAF_MAX_FONT_PX = 128f
  * their word gaps; longer ones are drawn a little tighter by
  * [mushafLineSqueeze], the way a calligrapher fits a crowded line.
  */
-const val MUSHAF_DESIGN_LINE_EM = 16.2f
+const val MUSHAF_DESIGN_LINE_EM = 15.6f
 
 /**
  * The one type size for every leaf: the measure divided by the design line,
@@ -79,16 +79,30 @@ fun mushafUniformFontPx(
 }
 
 /**
- * Scale for a single line whose glyph run runs past the measure — the rare
- * long line is set a little tighter instead of pulling its whole page down.
+ * How a line is fitted to the measure: the scale that makes its glyph run span
+ * the page exactly.
+ *
+ * This is the difference between a printed mushaf and a stretched one. The
+ * page is justified by the *hand* — a crowded line written a little tighter, a
+ * sparse one a little more openly — not by pulling the words apart and leaving
+ * rivers of paper between them. Scaling the line also keeps the glyphs as large
+ * as the measure allows, which is what makes the ink read heavy and full rather
+ * than thin and small.
+ *
+ * Bounded both ways so no line ever reads as a different hand from the one
+ * above it; whatever the bounds leave over is closed by the word gaps.
  */
-fun mushafLineSqueeze(naturalWidthPx: Float, measureWidthPx: Float): Float {
+fun mushafLineFill(naturalWidthPx: Float, measureWidthPx: Float): Float {
     if (naturalWidthPx <= 0f || measureWidthPx <= 0f) return 1f
-    return (measureWidthPx / naturalWidthPx).coerceIn(MUSHAF_MIN_LINE_SQUEEZE, 1f)
+    return (measureWidthPx / naturalWidthPx)
+        .coerceIn(MUSHAF_MIN_LINE_SQUEEZE, MUSHAF_MAX_LINE_STRETCH)
 }
 
 /** A crowded line is never set smaller than this share of the book's size. */
-const val MUSHAF_MIN_LINE_SQUEEZE = 0.88f
+const val MUSHAF_MIN_LINE_SQUEEZE = 0.90f
+
+/** Nor a sparse one larger than this, however much paper it has to cross. */
+const val MUSHAF_MAX_LINE_STRETCH = 1.16f
 
 /**
  * Font size in pixels so [lineCount] mushaf lines fill [pageHeightPx].
