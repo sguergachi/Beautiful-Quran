@@ -272,7 +272,9 @@ private fun MushafPageSheet(
                 .coerceAtLeast(1f)
             val availableW = (constraints.maxWidth.toFloat() - fitInsetPx * 2)
                 .coerceAtLeast(1f)
-            val slotCount = (page.lines.size +
+            // Every chapter opening costs the grid a line for its title band,
+            // and another for the basmalah under it where the chapter takes one.
+            val slotCount = (page.lines.size + page.surahStarts.size +
                 page.surahStarts.count { surahOpensWithBasmalahPreface(it.surahId) })
                 .coerceAtLeast(1)
             // One size for the whole book: the measure, not this page's own
@@ -306,6 +308,18 @@ private fun MushafPageSheet(
                 ) {
                     page.lines.forEachIndexed { index, line ->
                         page.surahStarts.firstOrNull { it.beforeLineIndex == index }?.let { start ->
+                            Box(
+                                Modifier
+                                    .fillMaxWidth()
+                                    .height(lineSlot),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                MushafSurahTitleBand(
+                                    surahNameArabic = surahsById[start.surahId]?.nameArabic,
+                                    fontSize = fontSp * 0.60f,
+                                    bandHeight = lineSlot * 0.30f,
+                                )
+                            }
                             if (surahOpensWithBasmalahPreface(start.surahId)) {
                                 Box(
                                     Modifier

@@ -36,6 +36,8 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
@@ -279,6 +281,56 @@ internal fun MushafPageHeader(
         // Balances the juzʾ slot so the chapter name sits optically centred
         // between its two bars rather than pushed toward the fore-edge.
         Spacer(Modifier.width(MushafHeadJuzSlot))
+    }
+}
+
+/**
+ * A chapter opening on the leaf: the surah's name in gold, with a run of the
+ * binding's frieze reaching out to either side — the illuminated title band a
+ * traditional mushaf sets above the basmalah. It takes one line of the page's
+ * grid, like the basmalah under it, so the 15-line rhythm still holds.
+ */
+@Composable
+internal fun MushafSurahTitleBand(
+    surahNameArabic: String?,
+    fontSize: TextUnit,
+    bandHeight: Dp,
+    modifier: Modifier = Modifier,
+) {
+    val gold = LocalQuranAccents.current.gold
+    val frieze = remember { generateCoverOrnament(MushafHeadOrnamentSeed).border }
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        // Laid inside the page's right-to-left run: the first bar sits at the
+        // fore-edge on the right, so it is the one that fades to its right.
+        GeneratedHeadRule(
+            spec = frieze,
+            ink = gold.copy(alpha = 0.42f),
+            fadeAtStart = false,
+            modifier = Modifier
+                .weight(1f)
+                .height(bandHeight)
+                .padding(horizontal = 12.dp),
+        )
+        Text(
+            text = surahNameArabic?.let { "سُورَةُ $it" }.orEmpty(),
+            fontFamily = HafsFontFamily,
+            fontSize = fontSize,
+            color = gold,
+            textAlign = TextAlign.Center,
+            maxLines = 1,
+        )
+        GeneratedHeadRule(
+            spec = frieze,
+            ink = gold.copy(alpha = 0.42f),
+            fadeAtStart = true,
+            modifier = Modifier
+                .weight(1f)
+                .height(bandHeight)
+                .padding(horizontal = 12.dp),
+        )
     }
 }
 
