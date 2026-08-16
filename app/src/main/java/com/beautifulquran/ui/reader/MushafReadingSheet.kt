@@ -1,5 +1,6 @@
 package com.beautifulquran.ui.reader
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -30,6 +31,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -65,8 +70,12 @@ private val MushafHeadRuleBand = 9.dp
 internal const val MushafTapPageHoldMs = 1_500L
 /** One frieze for every leaf's running head, from the ornament kit. */
 private const val MushafHeadOrnamentSeed = 2_000_003
-/** Folio line: type only, so it costs a line of ink and no more. */
-internal val MushafFolioBand = 24.dp
+/**
+ * Folio band. The figure is centred in it, so the page number floats midway
+ * between the last line of revelation and the transport rather than hanging
+ * off the text block.
+ */
+internal val MushafFolioBand = 44.dp
 /** Fore-edge margin. The page has no frame, so this is the whole margin. */
 internal val MushafPageMargin = 10.dp
 /** Running head to first line of revelation. */
@@ -231,11 +240,10 @@ internal fun MushafPageHeader(
     juz: Int,
     modifier: Modifier = Modifier,
 ) {
+    // Type alone up here. One illumination to a leaf, and it belongs to the
+    // chapter's own title band below — the running head is a finding aid, and a
+    // second frieze on the same page only competes with it.
     val gold = LocalQuranAccents.current.gold.copy(alpha = 0.50f)
-    // One frieze for the whole book, as a printed mushaf tools the same bar on
-    // every leaf — not a per-page novelty. Grown from the ornament kit like the
-    // cover's band, so the head belongs to the same hand as the binding.
-    val frieze = remember { generateCoverOrnament(MushafHeadOrnamentSeed).border }
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -246,50 +254,24 @@ internal fun MushafPageHeader(
             text = "ٱلْجُزْءُ ${juz.toArabicIndic()}",
             fontFamily = HafsFontFamily,
             fontSize = 12.sp,
-            color = gold.copy(alpha = 0.38f),
+            color = gold.copy(alpha = 0.34f),
             textAlign = TextAlign.Start,
             maxLines = 1,
-            modifier = Modifier.width(MushafHeadJuzSlot),
-        )
-        GeneratedHeadRule(
-            spec = frieze,
-            ink = gold.copy(alpha = 0.30f),
-            fadeAtStart = true,
-            modifier = Modifier
-                .weight(1f)
-                .height(MushafHeadRuleBand)
-                .padding(horizontal = 8.dp),
+            modifier = Modifier.weight(1f),
         )
         Text(
             text = surahNameArabic?.let { "سُورَةُ $it" }.orEmpty(),
             fontFamily = HafsFontFamily,
             fontSize = 13.sp,
-            color = gold,
-            textAlign = TextAlign.Center,
+            color = gold.copy(alpha = 0.62f),
+            textAlign = TextAlign.End,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f),
         )
-        GeneratedHeadRule(
-            spec = frieze,
-            ink = gold.copy(alpha = 0.30f),
-            fadeAtStart = false,
-            modifier = Modifier
-                .weight(1f)
-                .height(MushafHeadRuleBand)
-                .padding(horizontal = 8.dp),
-        )
-        // Balances the juzʾ slot so the chapter name sits optically centred
-        // between its two bars rather than pushed toward the fore-edge.
-        Spacer(Modifier.width(MushafHeadJuzSlot))
     }
 }
 
-/**
- * A chapter opening on the leaf: the surah's name in gold, with a run of the
- * binding's frieze reaching out to either side — the illuminated title band a
- * traditional mushaf sets above the basmalah. It takes one line of the page's
- * grid, like the basmalah under it, so the 15-line rhythm still holds.
- */
 @Composable
 internal fun MushafSurahTitleBand(
     surahNameArabic: String?,
@@ -298,39 +280,90 @@ internal fun MushafSurahTitleBand(
     modifier: Modifier = Modifier,
 ) {
     val gold = LocalQuranAccents.current.gold
-    val frieze = remember { generateCoverOrnament(MushafHeadOrnamentSeed).border }
     Row(
         modifier = modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        // Laid inside the page's right-to-left run: the first bar sits at the
-        // fore-edge on the right, so it is the one that fades to its right.
-        GeneratedHeadRule(
-            spec = frieze,
-            ink = gold.copy(alpha = 0.42f),
-            fadeAtStart = false,
+        MushafTitleRule(
+            ink = gold,
+            towardStart = true,
             modifier = Modifier
                 .weight(1f)
                 .height(bandHeight)
-                .padding(horizontal = 12.dp),
+                .padding(horizontal = 14.dp),
         )
         Text(
-            text = surahNameArabic?.let { "سُورَةُ $it" }.orEmpty(),
+            text = surahNameArabic.orEmpty(),
             fontFamily = HafsFontFamily,
             fontSize = fontSize,
             color = gold,
             textAlign = TextAlign.Center,
             maxLines = 1,
         )
-        GeneratedHeadRule(
-            spec = frieze,
-            ink = gold.copy(alpha = 0.42f),
-            fadeAtStart = true,
+        MushafTitleRule(
+            ink = gold,
             modifier = Modifier
                 .weight(1f)
                 .height(bandHeight)
-                .padding(horizontal = 12.dp),
+                .padding(horizontal = 14.dp),
         )
+    }
+}
+
+/**
+ * The rule either side of a chapter's name: two hairlines with a lozenge
+ * closing them at the title, dissolving toward the fore-edge.
+ *
+ * A tooled lattice was too loud for a line of type to sit in — it competed
+ * with the name instead of carrying it. Ruled bands are what a printed mushaf
+ * actually sets a title on, and they leave the gold to the name.
+ */
+@Composable
+private fun MushafTitleRule(
+    ink: Color,
+    /** True for the rule whose title end is its left, mirroring the pair. */
+    towardStart: Boolean = false,
+    modifier: Modifier = Modifier,
+) {
+    Canvas(modifier) {
+        val mid = size.height / 2f
+        val spread = size.height * 0.22f
+        val hair = size.height * 0.055f
+        // Full ink where it meets the name, gone by the margin. The rule is
+        // laid in the page's right-to-left run, so each side already fades
+        // away from the title it starts at.
+        val brush = if (towardStart) {
+            Brush.horizontalGradient(
+                0f to ink.copy(alpha = 0.62f),
+                0.55f to ink.copy(alpha = 0.34f),
+                1f to Color.Transparent,
+            )
+        } else {
+            Brush.horizontalGradient(
+                0f to Color.Transparent,
+                0.45f to ink.copy(alpha = 0.34f),
+                1f to ink.copy(alpha = 0.62f),
+            )
+        }
+        for (dy in floatArrayOf(-spread, spread)) {
+            drawLine(
+                brush = brush,
+                start = Offset(0f, mid + dy),
+                end = Offset(size.width, mid + dy),
+                strokeWidth = hair,
+            )
+        }
+        // Lozenge finial, closing the pair at the title end.
+        val r = size.height * 0.30f
+        val cx = if (towardStart) r else size.width - r
+        val lozenge = Path().apply {
+            moveTo(cx, mid - r)
+            lineTo(cx + r * 0.62f, mid)
+            lineTo(cx, mid + r)
+            lineTo(cx - r * 0.62f, mid)
+            close()
+        }
+        drawPath(lozenge, color = ink.copy(alpha = 0.62f))
     }
 }
 
