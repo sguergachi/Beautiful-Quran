@@ -51,6 +51,9 @@ import com.beautifulquran.ui.theme.shapedWordBloom
 
 private const val MARK_SIZE_RATIO = 20f / 30f
 
+/** Air between a verse's closing letter and its circled mark. */
+private val MushafMarkGap = 0.10.em
+
 /**
  * One Madinah line. QCF V2 is one handwritten word-glyph per token
  * (no U+0020). Leftover width is [Spacer] weights so the line fills
@@ -291,7 +294,20 @@ private fun MushafQcfWord(
     val rendered = remember(word, mark, palette.fullInkColor, ayahMarkInk) {
         val ranges = listOf(0 until word.length)
         val text = buildAnnotatedString {
-            withStyle(SpanStyle(color = palette.fullInkColor)) { append(word) }
+            withStyle(SpanStyle(color = palette.fullInkColor)) {
+                if (mark.isEmpty() || word.length < 2) {
+                    append(word)
+                } else {
+                    // A hair of air before the medallion. The page fonts carry
+                    // no space glyph, so the gap is let out of the closing
+                    // letter's own advance rather than typed — printed, a mark
+                    // never sits hard against the word it closes.
+                    append(word.substring(0, word.length - 1))
+                    withStyle(SpanStyle(letterSpacing = MushafMarkGap)) {
+                        append(word.substring(word.length - 1))
+                    }
+                }
+            }
             if (mark.isNotEmpty()) {
                 withStyle(SpanStyle(color = ayahMarkInk)) { append(mark) }
             }

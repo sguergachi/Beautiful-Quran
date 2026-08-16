@@ -56,17 +56,28 @@ a running head is for finding a place, and the transliterated name is how the
 book names chapters in Latin everywhere else. It stands off the block by
 about a line's pitch.
 
-A chapter opening carries the one illumination allowed on the leaf: its name
-in gold between two ruled bands, each closing on a lozenge at the title and
-dissolving toward the margin. Ruled bands, not a tooled lattice — a frieze
-loud enough for a cover competes with the line of type sitting in it. The
-band takes one line of the page's grid, as the basmalah beneath it does, so
+A chapter opening carries the one illumination allowed on the leaf: an ʿunwān
+panel — a capsule tapering to a point at either end, doubled gilt rule, the
+chapter's own ground tooled fine inside it, a shamsa drawn (never gilded) at
+each end, and the name on a tapered paper cartouche. Rectangles and gilded
+studs both read as UI; a drawn capsule reads as a plate set into the page. The
+panel takes one line of the page's grid, as the basmalah beneath it does, so
 the fifteen-line rhythm still holds.
 
-The rule dividing the leaf from the transport doubles as the chapter's
-progress: the same ink as the rule, only denser, filling from the fore-edge
-inward by verse. Furniture, so never gold — a line drawn along the paper's
-edge rather than a bar with a handle.
+The page fonts carry no space glyph, so the air between a verse's closing
+letter and its circled mark is let out of that letter's own advance (0.10 em).
+Printed, a mark never sits hard against the word it closes.
+
+The rule dividing the leaf from the transport doubles as the reader's place in
+the book: the same ink as the rule, only denser, filling from the fore-edge
+inward by *leaf*, with a rounded thumb a little thicker than the rule marking
+where this page sits among the 604. It answers while pages are turned as well
+as while they are recited. Furniture, so never gold — a line drawn along the
+paper's edge rather than a bar with a handle.
+
+A turning leaf dissolves into both fore-edges, paper drawn back over the
+outermost 76dp in proportion to the pager's offset. Only while it moves: a
+settled leaf carries none of it.
 
 A short page (al-Fātiḥah) sits in the middle of the well; a full Madinah page
 fills it. A swipe turns the whole leaf (running head, text, folio) the way

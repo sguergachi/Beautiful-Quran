@@ -89,6 +89,9 @@ internal val MushafEdgeGutter = 12.dp
  */
 private val MushafFitSlack = 4.dp
 
+/** How far a turning leaf dissolves in from each fore-edge. */
+private val MushafForeEdgeFade = 76.dp
+
 /**
  * Paper drawn back over both fore-edges while a leaf is in motion, so a page
  * dissolves into the margin as it turns instead of sliding off a hard edge.
@@ -102,9 +105,11 @@ private fun Modifier.mushafForeEdgeFade(
     offsetFraction: () -> Float,
 ): Modifier = drawWithContent {
     drawContent()
-    val turning = (abs(offsetFraction()) * 2.4f).coerceIn(0f, 1f)
+    val turning = (abs(offsetFraction()) * 3.4f).coerceIn(0f, 1f)
     if (turning <= 0.01f) return@drawWithContent
-    val band = (MushafPageMargin + MushafEdgeGutter).toPx()
+    // Deep enough to take the last words of a line with it: a leaf that only
+    // faded its margin looked no different from one that slid off the edge.
+    val band = MushafForeEdgeFade.toPx()
     val edge = paper.copy(alpha = turning)
     drawRect(
         brush = Brush.horizontalGradient(
@@ -371,8 +376,10 @@ private fun MushafPageSheet(
                             ) {
                                 MushafSurahTitleBand(
                                     surah = surahsById[start.surahId],
-                                    fontSize = fontSp * 0.52f,
-                                    bandHeight = lineSlot * 0.92f,
+                                    fontSize = fontSp * 0.80f,
+                                    // Air above and below: the panel is a plate
+                                    // set into the page, not another line of it.
+                                    bandHeight = lineSlot * 0.86f,
                                 )
                             }
                             if (surahOpensWithBasmalahPreface(start.surahId)) {

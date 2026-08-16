@@ -1,5 +1,8 @@
 package com.beautifulquran.ui.reader
 
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -9,11 +12,13 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.GenericShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -22,6 +27,8 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.luminance
@@ -40,8 +47,45 @@ import com.beautifulquran.ui.theme.generatedFieldWeave
 import com.beautifulquran.ui.theme.ornament.chapterOrnamentSeed
 import com.beautifulquran.ui.theme.ornament.generateChapterOrnament
 
-/** Corner easing anywhere on the leaf: a hairline, never a curve. */
-private const val MushafPanelCornerPx = 3f
+/** The rule itself stays a hairline; the thumb is what gives the band height. */
+private val MushafThumbHeight = 3.dp
+private const val MushafRuleWeightPx = 1f
+
+/** How far each end of the panel draws in, as a share of its height. */
+private const val MushafPanelTaper = 0.55f
+
+/** The name's cartouche closes harder, so it reads as a lozenge. */
+private const val MushafCartoucheTaper = 0.62f
+
+/**
+ * A capsule that tapers to a point at either end: flat above and below, with
+ * each end drawn in to a vertex on the centre line and eased so the corner
+ * reads as a drawn stroke rather than a mitre.
+ */
+private fun taperedCapsulePath(size: Size, taper: Float): Path {
+    val h = size.height
+    val w = size.width
+    val t = (h * taper).coerceAtMost(w / 2f)
+    val ease = h * 0.16f
+    return Path().apply {
+        moveTo(t, 0f)
+        lineTo(w - t, 0f)
+        quadraticTo(w - t + ease, 0f, w - t + ease * 1.4f, h * 0.30f)
+        lineTo(w, h / 2f)
+        lineTo(w - t + ease * 1.4f, h * 0.70f)
+        quadraticTo(w - t + ease, h, w - t, h)
+        lineTo(t, h)
+        quadraticTo(t - ease, h, t - ease * 1.4f, h * 0.70f)
+        lineTo(0f, h / 2f)
+        lineTo(t - ease * 1.4f, h * 0.30f)
+        quadraticTo(t - ease, 0f, t, 0f)
+        close()
+    }
+}
+
+private fun taperedCapsuleShape(taper: Float): Shape = GenericShape { size, _ ->
+    addPath(taperedCapsulePath(size, taper))
+}
 
 /**
  * The ʿunwān panel that opens a chapter on the leaf.
@@ -95,16 +139,17 @@ internal fun MushafSurahTitleBand(
         modifier = modifier.fillMaxWidth().height(bandHeight),
         contentAlignment = Alignment.Center,
     ) {
-        // A printed panel is ruled, not rounded. Nothing on the leaf carries
-        // more than a hairline's easing at its corners.
-        val corner = with(density) { MushafPanelCornerPx.toDp() }
+        // The panel is a capsule that tapers to a point at either end, the way
+        // a ribbon cartouche is drawn — a rectangle reads as a UI card however
+        // finely it is ruled.
+        val capsule = remember { taperedCapsuleShape(MushafPanelTaper) }
         // The ground is laid once and mirrored at the fold, so the panel is
         // symmetrical about its own centre — a tiling cut by the two ends at
         // whatever phase it happened to reach is not.
         Row(
             Modifier
                 .fillMaxSize()
-                .clip(androidx.compose.foundation.shape.RoundedCornerShape(corner))
+                .clip(capsule)
                 .padding(2.5.dp),
         ) {
             val ground = Modifier
@@ -124,17 +169,17 @@ internal fun MushafSurahTitleBand(
             Box(ground.graphicsLayer { scaleX = -1f })
         }
         Canvas(Modifier.fillMaxSize()) {
-            val r = MushafPanelCornerPx
-            // Doubled rule: the panel's edge, then a hairline just inside it.
-            drawRoundRect(
+            // Doubled rule, both following the taper: the panel's edge, then a
+            // hairline just inside it.
+            drawPath(
+                taperedCapsulePath(size, MushafPanelTaper),
                 color = rule,
-                cornerRadius = CornerRadius(r, r),
                 style = Stroke(width = 1.2.dp.toPx()),
             )
             inset(3.dp.toPx()) {
-                drawRoundRect(
+                drawPath(
+                    taperedCapsulePath(this.size, MushafPanelTaper),
                     color = hair,
-                    cornerRadius = CornerRadius(r, r),
                     style = Stroke(width = 0.8.dp.toPx()),
                 )
             }
@@ -143,18 +188,18 @@ internal fun MushafSurahTitleBand(
             Modifier.fillMaxSize().padding(horizontal = bandHeight * 0.14f),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            MushafShamsa(ornament, bandHeight)
+            MushafShamsa(ornament, bandHeight, groundAlpha)
             Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
                 MushafTitleCartouche(
                     name = surah?.nameArabic.orEmpty(),
                     fontSize = fontSize,
-                    height = bandHeight * 0.66f,
+                    height = bandHeight * 0.54f,
                     paper = paper,
                     rule = rule,
                     ink = accents.gold,
                 )
             }
-            MushafShamsa(ornament, bandHeight)
+            MushafShamsa(ornament, bandHeight, groundAlpha)
         }
     }
 }
@@ -168,14 +213,15 @@ internal fun MushafSurahTitleBand(
 private fun MushafShamsa(
     ornament: com.beautifulquran.ui.theme.ornament.ChapterOrnament,
     bandHeight: Dp,
+    groundAlpha: Float,
 ) {
     GeneratedInkRosette(
         spec = ornament.rosette,
         size = bandHeight * 0.60f,
-        // Ink, not gold: gilt at this size reads as a stud pressed into the
-        // page. The star is a drawing the panel encloses, and the gold in the
-        // band belongs to its rules and the chapter's name.
-        ink = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.42f),
+        // The same gold ink the ground is tooled in, struck a little firmer —
+        // drawn, never gilded: leaf and emboss at this size close the star up
+        // into a stud pressed into the page.
+        ink = LocalQuranAccents.current.gold.copy(alpha = groundAlpha * 2.4f),
         strokeWidth = 0.7.dp,
     )
 }
@@ -192,13 +238,11 @@ private fun MushafTitleCartouche(
 ) {
     Box(contentAlignment = Alignment.Center) {
         Canvas(Modifier.matchParentSize()) {
-            val r = MushafPanelCornerPx
-            drawRoundRect(color = paper, cornerRadius = CornerRadius(r, r))
-            drawRoundRect(
-                color = rule,
-                cornerRadius = CornerRadius(r, r),
-                style = Stroke(width = 0.8.dp.toPx()),
-            )
+            // The cartouche tapers like the panel around it, so the two read as
+            // one drawing rather than a box inside a box.
+            val path = taperedCapsulePath(size, MushafCartoucheTaper)
+            drawPath(path, color = paper)
+            drawPath(path, color = rule, style = Stroke(width = 0.8.dp.toPx()))
         }
         Text(
             text = name,
@@ -207,21 +251,22 @@ private fun MushafTitleCartouche(
             color = ink,
             textAlign = TextAlign.Center,
             maxLines = 1,
-            modifier = Modifier.padding(horizontal = height * 0.42f, vertical = height * 0.14f),
+            // Room for the taper to close either side of the name.
+            modifier = Modifier.padding(horizontal = height * 0.85f, vertical = height * 0.10f),
         )
     }
 }
 
 /**
  * The hairline under the leaf: a rule that separates the page from the
- * transport and, filled from the fore-edge inward, shows how far into the
- * chapter the recitation has come. It is the one progress indicator a book can
- * carry without becoming an app — a line drawn along the paper's edge, not a
- * bar with a handle.
+ * transport and, filled from the fore-edge inward, shows where in the book the
+ * reader has got to. It is the one progress indicator a book can carry without
+ * becoming an app — a line drawn along the paper's edge, not a bar with a
+ * handle.
  *
- * The fill is the same ink as the rule, only denser: this is furniture, and
- * gold on the leaf means illumination. Read as a pencil drawn along the edge,
- * darkening the part of the chapter already recited.
+ * It reads the *page*, not the playback, so it answers while you turn leaves
+ * as well as while you listen. The fill is the same ink as the rule, only
+ * denser: this is furniture, and gold on the leaf means illumination.
  */
 @Composable
 internal fun MushafProgressRule(
@@ -229,17 +274,40 @@ internal fun MushafProgressRule(
     modifier: Modifier = Modifier,
 ) {
     val ink = MaterialTheme.colorScheme.onBackground
-    Canvas(modifier.fillMaxWidth().height(1.dp)) {
-        val h = size.height
-        drawRect(color = ink.copy(alpha = 0.10f), size = Size(size.width, h))
-        val done = (size.width * progress.coerceIn(0f, 1f))
+    val at by animateFloatAsState(
+        targetValue = progress.coerceIn(0f, 1f),
+        animationSpec = tween(320, easing = FastOutSlowInEasing),
+        label = "mushafProgress",
+    )
+    Canvas(modifier.fillMaxWidth().height(MushafThumbHeight)) {
+        val rule = MushafRuleWeightPx
+        val midY = size.height / 2f
+        drawRoundRect(
+            color = ink.copy(alpha = 0.10f),
+            topLeft = Offset(0f, midY - rule / 2f),
+            size = Size(size.width, rule),
+            cornerRadius = CornerRadius(rule, rule),
+        )
+        val done = size.width * at
         if (done > 0f) {
             // Right to left: the book's own direction of travel.
-            drawRect(
-                color = ink.copy(alpha = 0.46f),
-                topLeft = Offset(size.width - done, 0f),
-                size = Size(done, h),
+            drawRoundRect(
+                color = ink.copy(alpha = 0.55f),
+                topLeft = Offset(size.width - done, midY - rule / 2f),
+                size = Size(done, rule),
+                cornerRadius = CornerRadius(rule, rule),
             )
         }
+        // The thumb: where in the book this leaf sits. A little thicker than
+        // the rule and rounded, so it reads as a marker laid on the line
+        // rather than a control fixed to it.
+        val thumbW = size.height * 3.2f
+        val thumbX = (size.width - done - thumbW / 2f).coerceIn(0f, size.width - thumbW)
+        drawRoundRect(
+            color = ink.copy(alpha = 0.62f),
+            topLeft = Offset(thumbX, 0f),
+            size = Size(thumbW, size.height),
+            cornerRadius = CornerRadius(size.height, size.height),
+        )
     }
 }

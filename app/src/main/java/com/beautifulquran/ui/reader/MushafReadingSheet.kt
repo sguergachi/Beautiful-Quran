@@ -1,6 +1,9 @@
 package com.beautifulquran.ui.reader
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -27,6 +30,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -35,6 +39,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -68,6 +73,11 @@ internal const val MushafTapPageHoldMs = 1_500L
  * off the text block.
  */
 internal val MushafFolioBand = 44.dp
+/** Each folio figure's column, equal either side of the centre line. */
+private val MushafFolioColumn = 40.dp
+/** Paper between the two figures. */
+private val MushafFolioSpread = 28.dp
+
 /** Fore-edge margin. The page has no frame, so this is the whole margin. */
 internal val MushafPageMargin = 10.dp
 /**
@@ -115,6 +125,14 @@ internal fun MushafReadingSheet(
     // forward. Chapters, settings, repeat and speed are for choosing what to
     // hear, not for hearing it, so they leave the paper until playback stops.
     val reciting = playerState.isPlaying && isThisSurahLoaded
+    // Reciting, the choosers recede almost to nothing rather than blinking out
+    // of the row: the same fade the scroll layout gives its chrome, so the
+    // transport never jumps under the finger.
+    val secondaryFade by animateFloatAsState(
+        targetValue = if (reciting) 0.05f else 1f,
+        animationSpec = tween(InkEngine.tuning.recessMs, easing = FastOutSlowInEasing),
+        label = "mushafSecondaryFade",
+    )
     Column(modifier.fillMaxSize()) {
         Box(Modifier.weight(1f).fillMaxWidth()) {
             content()
@@ -134,7 +152,7 @@ internal fun MushafReadingSheet(
                     .fillMaxWidth()
                     .height(44.dp),
             ) {
-            if (!reciting) {
+            Box(Modifier.matchParentSize().graphicsLayer { alpha = secondaryFade }) {
                 GutterIcon(
                     onClick = onOpenChapters,
                     enabled = enabled,
@@ -161,7 +179,7 @@ internal fun MushafReadingSheet(
             ) {
                 val rangeActive = playerState.repeatRange != null
                 val singleAyah = playerState.repeatRange?.let { it.first == it.last } == true
-                if (!reciting) GutterIcon(
+                GutterIcon(
                     onClick = onRepeatClick,
                     enabled = enabled,
                     image = if (playerState.repeatMode == Player.REPEAT_MODE_ONE || singleAyah) {
@@ -175,6 +193,7 @@ internal fun MushafReadingSheet(
                     } else {
                         MaterialTheme.colorScheme.primary
                     },
+                    modifier = Modifier.graphicsLayer { alpha = secondaryFade },
                 )
                 GutterIcon(
                     onClick = onFastBackward,
@@ -210,12 +229,13 @@ internal fun MushafReadingSheet(
                     label = "Next",
                     tint = primary,
                 )
-                if (!reciting) Text(
+                Text(
                     text = "${if (playerState.speed % 1f == 0f) playerState.speed.toInt() else playerState.speed}×",
                     style = MaterialTheme.typography.labelSmall,
                     color = if (playerState.speed == 1f) quiet else MaterialTheme.colorScheme.onBackground,
                     modifier = Modifier
                         .width(MushafGutterSlot)
+                        .graphicsLayer { alpha = secondaryFade }
                         .ownedQuietClickable(role = Role.Button, onClick = onSpeed),
                     textAlign = TextAlign.Center,
                 )
@@ -329,37 +349,40 @@ private fun MushafHeadStack(
 internal fun MushafPageFolio(page: Int, modifier: Modifier = Modifier) {
     // In ink, like the running head: at gold-on-cream the figure measured
     // 1.5:1 against the paper and simply vanished.
+    //
+    // The two figures are set well apart and hung on the leaf's centre line —
+    // which is the play button's line too — so the folio reads as a pair of
+    // marks either side of the spine rather than one clump of digits.
     val ink = MaterialTheme.colorScheme.onBackground
-    val folio = buildAnnotatedString {
-        withStyle(
-            SpanStyle(
-                color = ink.copy(alpha = 0.50f),
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(MushafFolioBand),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = "$page",
+            style = MaterialTheme.typography.labelSmall.copy(
                 fontSize = 9.sp,
                 letterSpacing = 0.14.em,
             ),
-        ) {
-            append("$page")
-        }
-        append("  ")
-        withStyle(
-            SpanStyle(
-                color = ink.copy(alpha = 0.54f),
-                fontFamily = HafsFontFamily,
-                fontSize = 12.sp,
-            ),
-        ) {
-            append(page.toArabicIndic())
-        }
+            color = ink.copy(alpha = 0.50f),
+            textAlign = TextAlign.End,
+            maxLines = 1,
+            modifier = Modifier.width(MushafFolioColumn),
+        )
+        Spacer(Modifier.width(MushafFolioSpread))
+        Text(
+            text = page.toArabicIndic(),
+            fontFamily = HafsFontFamily,
+            fontSize = 12.sp,
+            color = ink.copy(alpha = 0.54f),
+            textAlign = TextAlign.Start,
+            maxLines = 1,
+            modifier = Modifier.width(MushafFolioColumn),
+        )
     }
-    Text(
-        text = folio,
-        style = MaterialTheme.typography.labelSmall,
-        textAlign = TextAlign.Center,
-        modifier = modifier
-            .fillMaxWidth()
-            .height(MushafFolioBand)
-            .wrapContentHeight(Alignment.CenterVertically),
-    )
 }
 
 @Composable
