@@ -323,9 +323,9 @@ private fun MushafPageSheet(
                                 contentAlignment = Alignment.Center,
                             ) {
                                 MushafSurahTitleBand(
-                                    surahNameArabic = surahsById[start.surahId]?.nameArabic,
-                                    fontSize = fontSp * 0.60f,
-                                    bandHeight = lineSlot * 0.30f,
+                                    surah = surahsById[start.surahId],
+                                    fontSize = fontSp * 0.52f,
+                                    bandHeight = lineSlot * 0.92f,
                                 )
                             }
                             if (surahOpensWithBasmalahPreface(start.surahId)) {
@@ -390,7 +390,14 @@ private fun MushafPageInkClocks(
                     flashWordPosition = flashWordPosition?.takeIf { ayah.number == activeWord?.ayah },
                 )
             } else {
-                rememberMushafRecessPack(dimmed = recitingActive)
+                // A leaf is read once and filled in. A verse already recited
+                // keeps its ink, so the page darkens line by line and the
+                // reader can see how much of it is done; only what is still
+                // to come waits in the recess. (The scroll layout recesses
+                // both sides of the active verse, because there is no page
+                // there to complete — just a river of text going by.)
+                val recited = activeAyah != null && ayah.number < activeAyah
+                rememberMushafRecessPack(dimmed = recitingActive && !recited)
             }
             SideEffect {
                 packsState[ayah.surahId to ayah.number] = pack

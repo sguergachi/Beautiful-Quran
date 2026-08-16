@@ -1989,6 +1989,19 @@ fun ReaderScreen(
                         onFastForward = viewModel::fastForward,
                         onRepeatClick = { showRepeatDialog = true },
                         onSpeed = viewModel::cycleSpeed,
+                        // By verse, which is the unit a mushaf reader counts in
+                        // — and the only one the player exposes without polling
+                        // a position every frame for a hairline.
+                        chapterProgress = content.surah.ayahCount
+                            .takeIf { it > 0 }
+                            ?.let { count ->
+                                val at = if (isThisSurahPlaying) {
+                                    activeAyah ?: playerState.nowPlaying?.ayah ?: 0
+                                } else {
+                                    0
+                                }
+                                (at.toFloat() / count).coerceIn(0f, 1f)
+                            } ?: 0f,
                         modifier = Modifier.weight(1f),
                     ) {
                     val mushafSurahId = content.surah.id

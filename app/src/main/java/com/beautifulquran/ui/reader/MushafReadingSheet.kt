@@ -98,6 +98,8 @@ internal fun MushafReadingSheet(
     onFastForward: () -> Unit,
     onRepeatClick: () -> Unit,
     onSpeed: () -> Unit,
+    /** How far into the chapter the recitation has come, 0..1. */
+    chapterProgress: Float,
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit,
 ) {
@@ -117,6 +119,10 @@ internal fun MushafReadingSheet(
         Box(Modifier.weight(1f).fillMaxWidth()) {
             content()
         }
+        MushafProgressRule(
+            progress = chapterProgress,
+            modifier = Modifier.padding(horizontal = MushafPageMargin + MushafEdgeGutter),
+        )
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -311,98 +317,6 @@ private fun MushafHeadStack(
                 modifier = Modifier.fillMaxWidth(),
             )
         }
-    }
-}
-
-@Composable
-internal fun MushafSurahTitleBand(
-    surahNameArabic: String?,
-    fontSize: TextUnit,
-    bandHeight: Dp,
-    modifier: Modifier = Modifier,
-) {
-    val gold = LocalQuranAccents.current.gold
-    Row(
-        modifier = modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        // The rules run the full text measure; the only inset is the air the
-        // name needs, so the band hangs on the same margin as the scripture.
-        MushafTitleRule(
-            ink = gold,
-            towardStart = true,
-            modifier = Modifier.weight(1f).height(bandHeight),
-        )
-        Text(
-            text = surahNameArabic.orEmpty(),
-            fontFamily = HafsFontFamily,
-            fontSize = fontSize,
-            color = gold,
-            textAlign = TextAlign.Center,
-            maxLines = 1,
-            modifier = Modifier.padding(horizontal = 14.dp),
-        )
-        MushafTitleRule(
-            ink = gold,
-            modifier = Modifier.weight(1f).height(bandHeight),
-        )
-    }
-}
-
-/**
- * The rule either side of a chapter's name: two hairlines with a lozenge
- * closing them at the title, dissolving toward the fore-edge.
- *
- * A tooled lattice was too loud for a line of type to sit in — it competed
- * with the name instead of carrying it. Ruled bands are what a printed mushaf
- * actually sets a title on, and they leave the gold to the name.
- */
-@Composable
-private fun MushafTitleRule(
-    ink: Color,
-    /** True for the rule whose title end is its left, mirroring the pair. */
-    towardStart: Boolean = false,
-    modifier: Modifier = Modifier,
-) {
-    Canvas(modifier) {
-        val mid = size.height / 2f
-        val spread = size.height * 0.22f
-        val hair = size.height * 0.055f
-        // Full ink where it meets the name, gone by the margin. The rule is
-        // laid in the page's right-to-left run, so each side already fades
-        // away from the title it starts at.
-        val brush = if (towardStart) {
-            Brush.horizontalGradient(
-                0f to ink.copy(alpha = 0.62f),
-                0.55f to ink.copy(alpha = 0.34f),
-                1f to Color.Transparent,
-            )
-        } else {
-            Brush.horizontalGradient(
-                0f to Color.Transparent,
-                0.45f to ink.copy(alpha = 0.34f),
-                1f to ink.copy(alpha = 0.62f),
-            )
-        }
-        for (dy in floatArrayOf(-spread, spread)) {
-            drawLine(
-                brush = brush,
-                start = Offset(0f, mid + dy),
-                end = Offset(size.width, mid + dy),
-                strokeWidth = hair,
-            )
-        }
-        // Lozenge finial, closing the pair at the title end.
-        val r = size.height * 0.30f
-        val cx = if (towardStart) r else size.width - r
-        val lozenge = Path().apply {
-            moveTo(cx, mid - r)
-            lineTo(cx + r * 0.62f, mid)
-            lineTo(cx, mid + r)
-            lineTo(cx - r * 0.62f, mid)
-            close()
-        }
-        drawPath(lozenge, color = ink.copy(alpha = 0.62f))
     }
 }
 
