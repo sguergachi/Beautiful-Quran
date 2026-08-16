@@ -138,7 +138,14 @@ class MushafPageFitTest {
     fun `only a line past the measure is set tighter`() {
         assertEquals(1f, mushafLineSqueeze(naturalWidthPx = 800f, measureWidthPx = 964f), 0f)
         assertEquals(1f, mushafLineSqueeze(naturalWidthPx = 964f, measureWidthPx = 964f), 0f)
-        assertEquals(0.8f, mushafLineSqueeze(naturalWidthPx = 1205f, measureWidthPx = 964f), 0.001f)
+        // A crowded line closes up a little...
+        assertEquals(0.95f, mushafLineSqueeze(naturalWidthPx = 1015f, measureWidthPx = 964f), 0.001f)
+        // ...but never past the floor, so no line reads as a different hand.
+        assertEquals(
+            MUSHAF_MIN_LINE_SQUEEZE,
+            mushafLineSqueeze(naturalWidthPx = 1500f, measureWidthPx = 964f),
+            0.001f,
+        )
     }
 
     @Test

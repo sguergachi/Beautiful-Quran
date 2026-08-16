@@ -49,7 +49,7 @@ internal val MushafRunningHead = 36.dp
 /** Folio line: type only, so it costs a line of ink and no more. */
 internal val MushafFolioBand = 24.dp
 /** Fore-edge margin. The page has no frame, so this is the whole margin. */
-internal val MushafPageMargin = 14.dp
+internal val MushafPageMargin = 10.dp
 /** Running head to first line of revelation. */
 internal val MushafTextGutter = 10.dp
 /** Last line to folio. A book's tail margin is the deeper of the two. */

@@ -11,7 +11,7 @@ const val MUSHAF_LINE_EM = 2.2f
  * the type, not to the leftover height: pitch from the glyph size, and let the
  * spare height fall into the head and tail margins instead.
  */
-const val MUSHAF_LINE_PITCH_EM = 1.85f
+const val MUSHAF_LINE_PITCH_EM = 2.05f
 
 /**
  * Line box height for a fitted page: the printed pitch, never more than the
@@ -51,12 +51,14 @@ const val MUSHAF_MAX_FONT_PX = 128f
  * which is what made a leaf's glyphs jump by a third from one page to the next.
  *
  * The QCF word glyphs are not pre-justified — measured with HarfBuzz over all
- * 9,000 lines of the mushaf, a line's glyph run spans 14.1 em (p10) to 16.9 em
- * (p90), with a long tail. 19.0 em covers 99.5% of them, so the type is set
- * once, from the measure, and holds for the whole book; the handful of longer
- * lines are drawn shrunk to their line rather than shrinking their page.
+ * ~9,000 lines of the mushaf (tools/measure_mushaf_lines.py), a line's glyph
+ * run spans 14.1 em (p10) through 15.6 em (p50) to 16.9 em (p90). The median
+ * line is the book's measure: setting the type from it fills the page with the
+ * largest hand the leaf can carry. Shorter runs close the small remainder with
+ * their word gaps; longer ones are drawn a little tighter by
+ * [mushafLineSqueeze], the way a calligrapher fits a crowded line.
  */
-const val MUSHAF_DESIGN_LINE_EM = 19.0f
+const val MUSHAF_DESIGN_LINE_EM = 16.2f
 
 /**
  * The one type size for every leaf: the measure divided by the design line,
@@ -82,8 +84,11 @@ fun mushafUniformFontPx(
  */
 fun mushafLineSqueeze(naturalWidthPx: Float, measureWidthPx: Float): Float {
     if (naturalWidthPx <= 0f || measureWidthPx <= 0f) return 1f
-    return minOf(1f, measureWidthPx / naturalWidthPx)
+    return (measureWidthPx / naturalWidthPx).coerceIn(MUSHAF_MIN_LINE_SQUEEZE, 1f)
 }
+
+/** A crowded line is never set smaller than this share of the book's size. */
+const val MUSHAF_MIN_LINE_SQUEEZE = 0.88f
 
 /**
  * Font size in pixels so [lineCount] mushaf lines fill [pageHeightPx].
