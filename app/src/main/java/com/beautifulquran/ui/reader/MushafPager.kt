@@ -24,7 +24,8 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -237,7 +238,11 @@ private fun MushafPageSheet(
             content.ayahs.firstOrNull { it.number == ayah }
         }
     }
-    val packsState = remember { mutableStateOf(emptyMap<Pair<Int, Int>, AyahInkPack>()) }
+    // A snapshot map, not a state holding an immutable one: the old form
+    // rebuilt the whole map once per ayah on every composition (fifteen copies
+    // a page) and invalidated every reader each time. Writes are per key now,
+    // and the draw side still registers its read so a pack swap repaints.
+    val packsState = remember { mutableStateMapOf<Pair<Int, Int>, AyahInkPack>() }
     if (liveInk) {
         MushafPageInkClocks(
             ayahs = ayahsOnPage,
@@ -367,7 +372,7 @@ private fun MushafPageInkClocks(
     isThisSurahPlaying: Boolean,
     playbackSpeed: Float,
     flashWordPosition: Int?,
-    packsState: MutableState<Map<Pair<Int, Int>, AyahInkPack>>,
+    packsState: SnapshotStateMap<Pair<Int, Int>, AyahInkPack>,
 ) {
     ayahs.forEach { ayah ->
         key(ayah.surahId, ayah.number) {
@@ -389,7 +394,7 @@ private fun MushafPageInkClocks(
                 rememberMushafRecessPack(dimmed = recitingActive)
             }
             SideEffect {
-                packsState.value = packsState.value + ((ayah.surahId to ayah.number) to pack)
+                packsState[ayah.surahId to ayah.number] = pack
             }
         }
     }

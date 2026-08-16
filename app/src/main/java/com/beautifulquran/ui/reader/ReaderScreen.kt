@@ -2009,12 +2009,15 @@ fun ReaderScreen(
                             mushafTappedPage = null
                         }
                     }
-                    val onMushafTurnedPage = {
-                        mushafTappedPage = null
-                        mushafDispatch.value(ReaderInteractionEvent.UserMovedPage)
-                        mushafRootMoved.value()
+                    val onMushafTurnedPage = remember {
+                        {
+                            mushafTappedPage = null
+                            mushafDispatch.value(ReaderInteractionEvent.UserMovedPage)
+                            mushafRootMoved.value()
+                        }
                     }
-                    val onMushafWordClick = { token: MushafToken ->
+                    val onMushafWordClick = remember(mushafSurahId, viewModel, mushafReady.catalog) {
+                        { token: MushafToken ->
                             mushafTappedPage = mushafReady.catalog.pageOf(
                                 token.surahId,
                                 token.ayah,
@@ -2034,6 +2037,7 @@ fun ReaderScreen(
                                     startPlaybackAtWord = token.word.position,
                                 )
                             }
+                        }
                     }
                     val onMushafWordLongClick = remember(haptics) {
                         { token: MushafToken ->
@@ -2041,7 +2045,8 @@ fun ReaderScreen(
                             mushafOpenRoot.value(token.surahId, token.ayah, token.word.position)
                         }
                     }
-                    val onMushafAyahClick = { token: MushafToken ->
+                    val onMushafAyahClick = remember(mushafSurahId, viewModel, mushafReady.catalog) {
+                        { token: MushafToken ->
                         mushafTappedPage = mushafReady.catalog.pageOf(
                             token.surahId,
                             token.ayah,
@@ -2052,6 +2057,7 @@ fun ReaderScreen(
                             viewModel.playFromAyah(token.ayah)
                         } else {
                             viewModel.load(token.surahId, startPlaybackAtAyah = token.ayah)
+                        }
                         }
                     }
                     MushafPager(

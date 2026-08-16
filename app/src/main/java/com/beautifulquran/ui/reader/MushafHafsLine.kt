@@ -8,7 +8,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.ui.Alignment
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.State
+import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -58,7 +58,7 @@ private const val MARK_SIZE_RATIO = 20f / 30f
 @Composable
 internal fun MushafHafsLine(
     line: MushafLine,
-    packs: State<Map<Pair<Int, Int>, AyahInkPack>>,
+    packs: SnapshotStateMap<Pair<Int, Int>, AyahInkPack>,
     fontSize: TextUnit,
     liveInk: Boolean,
     onWordClick: (MushafToken) -> Unit,
@@ -188,7 +188,7 @@ private fun MushafQcfPageLine(
     line: MushafLine,
     pageFont: FontFamily,
     fontSize: TextUnit,
-    packs: State<Map<Pair<Int, Int>, AyahInkPack>>,
+    packs: SnapshotStateMap<Pair<Int, Int>, AyahInkPack>,
     liveInk: Boolean,
     palette: WordInkPalette,
     ayahMarkInk: androidx.compose.ui.graphics.Color,
@@ -273,7 +273,7 @@ private fun MushafQcfPageLine(
 private fun MushafQcfWord(
     token: MushafToken,
     style: TextStyle,
-    packs: State<Map<Pair<Int, Int>, AyahInkPack>>,
+    packs: SnapshotStateMap<Pair<Int, Int>, AyahInkPack>,
     liveInk: Boolean,
     palette: WordInkPalette,
     ayahMarkInk: androidx.compose.ui.graphics.Color,
@@ -301,7 +301,7 @@ private fun MushafQcfWord(
         if (!liveInk) {
             emptyList()
         } else {
-            val pack = packs.value[token.surahId to token.ayah]
+            val pack = packs[token.surahId to token.ayah]
             val motion = pack?.motions?.getOrNull(token.word.position - 1)
             if (pack == null || motion == null) {
                 val cover = pack?.recessCover?.value ?: 0f
@@ -440,13 +440,13 @@ private fun buildMushafLine(
 
 private fun buildLineBlooms(
     line: MushafLine,
-    packs: State<Map<Pair<Int, Int>, AyahInkPack>>,
+    packs: SnapshotStateMap<Pair<Int, Int>, AyahInkPack>,
     rendered: RenderedLineText,
     palette: WordInkPalette,
     glintInk: androidx.compose.ui.graphics.Color?,
 ) = buildList {
     line.tokens.forEachIndexed { tokenIndex, token ->
-        val pack = packs.value[token.surahId to token.ayah] ?: return@forEachIndexed
+        val pack = packs[token.surahId to token.ayah] ?: return@forEachIndexed
         val range = rendered.wordRanges.getOrNull(tokenIndex) ?: return@forEachIndexed
         val motion = pack.motions.getOrNull(token.word.position - 1)
         if (motion == null) {

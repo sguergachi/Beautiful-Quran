@@ -19,24 +19,50 @@ quarter-width slide softened with a fade, 380 ms); nothing stacks, nothing
 floats, nothing casts a shadow.
 
 In **Mushaf** layout (Settings → Reading) the Reader sheet is a full-screen
-leaf with **no frame** — iBooks, not a gilt box. The paper runs to the
-edges and the text block is the only composed thing on it: a thin running
-head (chapter name in quiet gold, chapters and settings at the fore-edges),
-the text well, and a folio line of type. Nothing rules, borders, or seals
-the page; the ornament kit stays on the closed cover. The margins are a
-book's, not a chrome's — a single fore-edge margin plus an edge gutter for
-the circled ayah marks' overhang, so the revelation is the widest thing on
-the screen and the fitted glyphs are as large as that width allows.
-A short page (al-Fātiḥah) sits in the middle of the well; a full
-Madinah page fills it. A swipe turns the whole leaf (running head, text,
-folio) the way iBooks turns a page.
-Transport is a quiet line of ink on the paper *under* the page.
-Play does not hide the status bar or collapse that inset — the page
-stays put.
-The width fit measures against a slightly narrower page than the one that
-draws it: the fit measures one concatenated run while the line draws one
-`Text` per word, and that slack is what keeps the longest line off the
-edge.
+leaf with **no frame** — iBooks, not a gilt box. The paper runs to the edges
+and the text block is the only composed thing on it: a running head, the text
+well, a chapter's title band where one opens, and a folio line of type. The
+margins are a book's, not a chrome's — a single fore-edge margin plus an edge
+gutter deep enough for a circled ayah mark's medallion, which inks about half
+its own width past its advance and is sliced by anything narrower.
+
+**One measure.** Running head, title band and folio all hang on the text
+block's own margin. Three different edges on one leaf is the loudest
+typographic fault the page can carry.
+
+**Rank by role, not by taste.** The revelation is the darkest thing on the
+page (~15:1 against the paper). Back / play / forward carry real ink (~4.7:1)
+because they are what a listener reaches for; chapters, settings, repeat and
+speed recede (~2.1:1) because they choose what to hear rather than hear it —
+and while a chapter recites they leave the transport altogether. Running head
+and folio are quiet ink (~3–3.5:1), never gold: gold loses contrast on cream,
+and at 9 sp a gold folio disappears.
+
+**Gold is illumination, ink is furniture.** On the leaf gold means the ayah
+marks, a chapter's name in its title band, and that band's lozenges. The
+running head and folio are wayfinding, so they are ink in both themes.
+
+The running head is type alone: the chapter at the spine, the juzʾ at the
+fore-edge, each carrying its name twice — Arabic over a Latin gloss — so the
+two ends read as one mirrored pair. Transliteration, not translated meaning:
+a running head is for finding a place, and the transliterated name is how the
+book names chapters in Latin everywhere else. It stands off the block by
+about a line's pitch.
+
+A chapter opening carries the one illumination allowed on the leaf: its name
+in gold between two ruled bands, each closing on a lozenge at the title and
+dissolving toward the margin. Ruled bands, not a tooled lattice — a frieze
+loud enough for a cover competes with the line of type sitting in it. The
+band takes one line of the page's grid, as the basmalah beneath it does, so
+the fifteen-line rhythm still holds.
+
+A short page (al-Fātiḥah) sits in the middle of the well; a full Madinah page
+fills it. A swipe turns the whole leaf (running head, text, folio) the way
+iBooks turns a page. Transport is a quiet line of ink on the paper *under* the
+page. Reciting hides the status bar, as the scroll layout does; the leaf
+reserves its top inset from `statusBarsIgnoringVisibility`, so the page holds
+still as the clock goes.
+
 QCF lines are the printed Madinah lines: one size, even
 15-line leading, leftover width shared between words
 (no U+0020).
@@ -585,17 +611,32 @@ image, so it is crisp at any density and nearly free to render.
   word taps skip the lead-in.
 - **Restraint rule:** ornament appears in exactly three places on the open
   *scroll* reader — the surah header (rosette + weave), ayah number marks, and
-  the home title mark. Mushaf layout carries **no ornament at all** — no
-  rule, no band, no corner seals: the printed line and its circled ayah
-  marks are the whole page, and every pixel the frame used to hold is text.
-  A compact chapter rosette still opens a new surah. Never lavish — the closed
+  the home title mark. Mushaf layout carries **one**: the ruled title band at a
+  chapter's opening. No frame, no corner seals, no running-head frieze — the
+  printed line and its circled ayah marks are the rest of the page, and every
+  pixel the frame used to hold is text. A compact chapter rosette still opens a
+  new surah in the scroll layout. Never lavish — the closed
   book is still the only place allowed to carry full binding gold. Mushaf
   **page breaks** in scroll layout are not ornament: a whisper-gold hairline
   with small page numbers (Western left, Arabic-Indic right) marks Madinah
   page boundaries in the continuous scroll — functional wayfinding only. The
-  mushaf text is KFGQPC Uthmanic Hafs v22, one RTL run per Madinah line,
-  word-gap justified to the page width — not QCF page fonts (those fought
-  the ink wash).
+  mushaf text is the QCF V2 Madinah page fonts, one word-glyph per token, with
+  KFGQPC Uthmanic Hafs standing in until a page's face has loaded. The book is
+  set at **one size throughout**: measured with HarfBuzz over all ~9,000 lines
+  (`tools/measure_mushaf_lines.py`), a line's glyph run spans 14.1 em (p10)
+  through 15.6 (p50) to 16.9 (p90), so no leaf can be sized from its own
+  longest line without the hand growing and shrinking as the pages turn. The
+  size comes from the median line and the well; each line is then fitted to the
+  measure by its own scale (`mushafLineFill`) rather than by stretching the
+  word gaps, which keeps the glyphs as large as the leaf allows instead of
+  opening rivers of paper between them. Fitting the measure always wins over
+  holding that scale: ink over the fore-edge is clipped, and the circled mark
+  riding at a line's end is what gets sliced.
+
+  The recess mask that dims an unrecited word reaches past its box for glyph
+  overhang — right when a line shares one `Text`, wrong on the mushaf leaf
+  where every word is its own node and the reach paints over its neighbours.
+  Per-word callers pass `coverPad = 0`.
 
 ## The entrance
 

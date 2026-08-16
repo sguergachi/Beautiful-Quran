@@ -48,19 +48,13 @@ import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import androidx.media3.common.Player
 import com.beautifulquran.playback.PlayerUiState
-import com.beautifulquran.ui.theme.GeneratedHeadRule
 import com.beautifulquran.ui.theme.HafsFontFamily
-import com.beautifulquran.ui.theme.ornament.generateCoverOrnament
 import com.beautifulquran.ui.theme.LocalQuranAccents
 import com.beautifulquran.ui.theme.ownedQuietClickable
 
 internal val MushafGutterSlot = 44.dp
 /** Running head band — a tap target tall, nothing more. */
 internal val MushafRunningHead = 36.dp
-/** Juzʾ slot in the running head, mirrored on the far side to centre the name. */
-private val MushafHeadJuzSlot = 56.dp
-/** Height of the tooled bar flanking the chapter name. */
-private val MushafHeadRuleBand = 9.dp
 /**
  * How long a tapped leaf is held against playback follow. Long enough for a
  * seek to land and the position poll to report a word from where the reader
@@ -68,8 +62,6 @@ private val MushafHeadRuleBand = 9.dp
  * turns it.
  */
 internal const val MushafTapPageHoldMs = 1_500L
-/** One frieze for every leaf's running head, from the ornament kit. */
-private const val MushafHeadOrnamentSeed = 2_000_003
 /**
  * Folio band. The figure is centred in it, so the page number floats midway
  * between the last line of revelation and the transport rather than hanging
