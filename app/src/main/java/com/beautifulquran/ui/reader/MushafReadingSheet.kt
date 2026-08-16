@@ -95,6 +95,10 @@ internal fun MushafReadingSheet(
     content: @Composable () -> Unit,
 ) {
     val quiet = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.48f)
+    // Reciting, the leaf keeps only what a listener reaches for: back, pause,
+    // forward. Chapters, settings, repeat and speed are for choosing what to
+    // hear, not for hearing it, so they leave the paper until playback stops.
+    val reciting = playerState.isPlaying && isThisSurahLoaded
     Column(modifier.fillMaxSize()) {
         Box(Modifier.weight(1f).fillMaxWidth()) {
             content()
@@ -110,22 +114,24 @@ internal fun MushafReadingSheet(
                     .fillMaxWidth()
                     .height(44.dp),
             ) {
-            GutterIcon(
-                onClick = onOpenChapters,
-                enabled = enabled,
-                image = Icons.AutoMirrored.Rounded.MenuBook,
-                label = "Chapters",
-                tint = quiet.copy(alpha = 0.7f),
-                modifier = Modifier.align(Alignment.CenterStart),
-            )
-            GutterIcon(
-                onClick = onOpenSettings,
-                enabled = enabled,
-                image = Icons.Rounded.Tune,
-                label = "Settings",
-                tint = quiet.copy(alpha = 0.7f),
-                modifier = Modifier.align(Alignment.CenterEnd),
-            )
+            if (!reciting) {
+                GutterIcon(
+                    onClick = onOpenChapters,
+                    enabled = enabled,
+                    image = Icons.AutoMirrored.Rounded.MenuBook,
+                    label = "Chapters",
+                    tint = quiet.copy(alpha = 0.7f),
+                    modifier = Modifier.align(Alignment.CenterStart),
+                )
+                GutterIcon(
+                    onClick = onOpenSettings,
+                    enabled = enabled,
+                    image = Icons.Rounded.Tune,
+                    label = "Settings",
+                    tint = quiet.copy(alpha = 0.7f),
+                    modifier = Modifier.align(Alignment.CenterEnd),
+                )
+            }
             Row(
                 modifier = Modifier
                     .align(Alignment.Center)
@@ -135,7 +141,7 @@ internal fun MushafReadingSheet(
             ) {
                 val rangeActive = playerState.repeatRange != null
                 val singleAyah = playerState.repeatRange?.let { it.first == it.last } == true
-                GutterIcon(
+                if (!reciting) GutterIcon(
                     onClick = onRepeatClick,
                     enabled = enabled,
                     image = if (playerState.repeatMode == Player.REPEAT_MODE_ONE || singleAyah) {
@@ -184,7 +190,7 @@ internal fun MushafReadingSheet(
                     label = "Next",
                     tint = quiet,
                 )
-                Text(
+                if (!reciting) Text(
                     text = "${if (playerState.speed % 1f == 0f) playerState.speed.toInt() else playerState.speed}×",
                     style = MaterialTheme.typography.labelSmall,
                     color = if (playerState.speed == 1f) quiet else MaterialTheme.colorScheme.onBackground,
