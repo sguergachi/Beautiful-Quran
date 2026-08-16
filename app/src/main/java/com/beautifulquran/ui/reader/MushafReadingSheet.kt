@@ -78,8 +78,12 @@ private const val MushafHeadOrnamentSeed = 2_000_003
 internal val MushafFolioBand = 44.dp
 /** Fore-edge margin. The page has no frame, so this is the whole margin. */
 internal val MushafPageMargin = 10.dp
-/** Running head to first line of revelation. */
-internal val MushafTextGutter = 10.dp
+/**
+ * Running head to first line of revelation. A head that sits closer than
+ * about a line's pitch reads as part of the block instead of standing off it;
+ * at 10dp it stood off by half a line while the tail margin ran to a full one.
+ */
+internal val MushafTextGutter = 20.dp
 /** Last line to folio. A book's tail margin is the deeper of the two. */
 internal val MushafTailGutter = 14.dp
 /**
