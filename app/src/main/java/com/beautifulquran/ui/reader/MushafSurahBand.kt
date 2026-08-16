@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.GenericShape
@@ -34,6 +35,9 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.drawscope.inset
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.PlatformTextStyle
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.style.LineHeightStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
@@ -46,6 +50,9 @@ import com.beautifulquran.ui.theme.LocalQuranAccents
 import com.beautifulquran.ui.theme.generatedFieldWeave
 import com.beautifulquran.ui.theme.ornament.chapterOrnamentSeed
 import com.beautifulquran.ui.theme.ornament.generateChapterOrnament
+
+/** How far the chapter's name rides above its line box, in ems of itself. */
+private const val MushafNameLift = 0.30f
 
 /** The rule itself stays a hairline; the thumb is what gives the band height. */
 private val MushafThumbHeight = 3.dp
@@ -236,6 +243,7 @@ private fun MushafTitleCartouche(
     rule: Color,
     ink: Color,
 ) {
+    val nameLift = with(LocalDensity.current) { (fontSize.toPx() * MushafNameLift).toDp() }
     Box(contentAlignment = Alignment.Center) {
         Canvas(Modifier.matchParentSize()) {
             // The cartouche tapers like the panel around it, so the two read as
@@ -246,13 +254,34 @@ private fun MushafTitleCartouche(
         }
         Text(
             text = name,
-            fontFamily = HafsFontFamily,
-            fontSize = fontSize,
-            color = ink,
-            textAlign = TextAlign.Center,
+            // Centred on its ink, not on its line box: the Hafs face carries
+            // more space above the baseline than below, so a name laid in a
+            // default line box sits low in the cartouche however evenly it is
+            // padded. Trimming the leading and centring what is left puts the
+            // letters themselves on the panel's centre line.
+            style = TextStyle(
+                fontFamily = HafsFontFamily,
+                fontSize = fontSize,
+                color = ink,
+                textAlign = TextAlign.Center,
+                platformStyle = PlatformTextStyle(includeFontPadding = false),
+                lineHeightStyle = LineHeightStyle(
+                    alignment = LineHeightStyle.Alignment.Center,
+                    trim = LineHeightStyle.Trim.Both,
+                ),
+            ),
             maxLines = 1,
-            // Room for the taper to close either side of the name.
-            modifier = Modifier.padding(horizontal = height * 0.85f, vertical = height * 0.10f),
+            // The taper eats into the cartouche from both ends, so the name
+            // needs its margin measured past the point where the sides start
+            // drawing in — otherwise the letters sit in the closing wedge.
+            //
+            // The lift is the last of it: even trimmed, the Hafs em box keeps
+            // headroom for marks this name does not carry, so its ink hangs
+            // below the centre line. Raise it by that much and the letters sit
+            // on the panel's own centre.
+            modifier = Modifier
+                .offset(y = -nameLift)
+                .padding(horizontal = height * 1.25f, vertical = height * 0.16f),
         )
     }
 }

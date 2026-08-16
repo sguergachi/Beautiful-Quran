@@ -376,10 +376,10 @@ private fun MushafPageSheet(
                             ) {
                                 MushafSurahTitleBand(
                                     surah = surahsById[start.surahId],
-                                    fontSize = fontSp * 0.80f,
+                                    fontSize = fontSp * 0.95f,
                                     // Air above and below: the panel is a plate
                                     // set into the page, not another line of it.
-                                    bandHeight = lineSlot * 0.86f,
+                                    bandHeight = lineSlot * 0.94f,
                                 )
                             }
                             if (surahOpensWithBasmalahPreface(start.surahId)) {
