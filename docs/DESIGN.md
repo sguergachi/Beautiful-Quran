@@ -56,6 +56,11 @@ loud enough for a cover competes with the line of type sitting in it. The
 band takes one line of the page's grid, as the basmalah beneath it does, so
 the fifteen-line rhythm still holds.
 
+The rule dividing the leaf from the transport doubles as the chapter's
+progress: the same ink as the rule, only denser, filling from the fore-edge
+inward by verse. Furniture, so never gold — a line drawn along the paper's
+edge rather than a bar with a handle.
+
 A short page (al-Fātiḥah) sits in the middle of the well; a full Madinah page
 fills it. A swipe turns the whole leaf (running head, text, folio) the way
 iBooks turns a page. Transport is a quiet line of ink on the paper *under* the

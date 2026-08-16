@@ -194,15 +194,18 @@ private fun MushafTitleCartouche(
  * The hairline under the leaf: a rule that separates the page from the
  * transport and, filled from the fore-edge inward, shows how far into the
  * chapter the recitation has come. It is the one progress indicator a book can
- * carry without becoming an app — a thread of gold laid along the paper's
- * edge, not a bar with a handle.
+ * carry without becoming an app — a line drawn along the paper's edge, not a
+ * bar with a handle.
+ *
+ * The fill is the same ink as the rule, only denser: this is furniture, and
+ * gold on the leaf means illumination. Read as a pencil drawn along the edge,
+ * darkening the part of the chapter already recited.
  */
 @Composable
 internal fun MushafProgressRule(
     progress: Float,
     modifier: Modifier = Modifier,
 ) {
-    val accents = LocalQuranAccents.current
     val ink = MaterialTheme.colorScheme.onBackground
     Canvas(modifier.fillMaxWidth().height(1.dp)) {
         val h = size.height
@@ -211,7 +214,7 @@ internal fun MushafProgressRule(
         if (done > 0f) {
             // Right to left: the book's own direction of travel.
             drawRect(
-                color = accents.gold.copy(alpha = 0.55f),
+                color = ink.copy(alpha = 0.46f),
                 topLeft = Offset(size.width - done, 0f),
                 size = Size(done, h),
             )
