@@ -59,6 +59,7 @@ import com.beautifulquran.domain.BASMALAH_UTHMANI
 import com.beautifulquran.domain.buildMushafQcfLine
 import com.beautifulquran.domain.mushafFontPreloadPages
 import com.beautifulquran.domain.mushafGridSlots
+import com.beautifulquran.domain.mushafLineSlotPx
 import com.beautifulquran.domain.mushafFontPxFromMeasuredLine
 import com.beautifulquran.domain.mushafFontPxMatchWidth
 import com.beautifulquran.domain.surahOpensWithBasmalahPreface
@@ -286,7 +287,11 @@ private fun MushafPageSheet(
                 page.surahStarts.count { surahOpensWithBasmalahPreface(it.surahId) })
                 .coerceAtLeast(1)
             val lineSlot = with(density) {
-                (availableH / mushafGridSlots(slotCount)).toDp()
+                mushafLineSlotPx(
+                    pageHeightPx = availableH,
+                    slots = mushafGridSlots(slotCount),
+                    fontPx = fontPx,
+                ).toDp()
             }
             CompositionLocalProvider(
                 LocalLayoutDirection provides LayoutDirection.Rtl,

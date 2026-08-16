@@ -3,6 +3,27 @@ package com.beautifulquran.domain
 /** Line-height multiple of the Hafs face used to pack a mushaf page. */
 const val MUSHAF_LINE_EM = 2.2f
 
+/**
+ * Line pitch as a multiple of the fitted glyph size — the leading the printed
+ * Madinah page is set on. A phone's text well is proportionally taller than
+ * that page, so dividing the well by fifteen sets the lines further apart than
+ * the mushaf ever does and the page reads loose and airy. Leading belongs to
+ * the type, not to the leftover height: pitch from the glyph size, and let the
+ * spare height fall into the head and tail margins instead.
+ */
+const val MUSHAF_LINE_PITCH_EM = 1.85f
+
+/**
+ * Line box height for a fitted page: the printed pitch, never more than the
+ * well's own share of the height (a short page must still fit).
+ */
+fun mushafLineSlotPx(pageHeightPx: Float, slots: Int, fontPx: Float): Float {
+    if (slots <= 0) return pageHeightPx.coerceAtLeast(1f)
+    val share = pageHeightPx / slots
+    val pitch = fontPx * MUSHAF_LINE_PITCH_EM
+    return if (pitch <= 0f) share else minOf(share, pitch)
+}
+
 /** Every Madinah page is set on the same 15-line grid. */
 const val MUSHAF_LINES_PER_PAGE = 15
 

@@ -461,7 +461,14 @@ fun ReaderScreen(
     }
     val currentMatch = search.index.coerceIn(0, (searchMatches.size - 1).coerceAtLeast(0))
 
-    val isThisSurahPlaying = playerState.nowPlaying?.surahId == surahId
+    // The chapter actually on the page, which is not always the navigation
+    // argument: a mushaf tap past a surah boundary loads that surah in place,
+    // without renavigating (the pager must stay on the leaf the reader is
+    // looking at). Transport, ink and follow all key off what is rendered —
+    // comparing against the stale argument leaves the play button convinced
+    // nothing of "this" surah is playing, so pause restarts instead of pausing.
+    val renderedSurahId = uiState.content?.surah?.id ?: surahId
+    val isThisSurahPlaying = playerState.nowPlaying?.surahId == renderedSurahId
     // Lead-adjusted: crosses to the next ayah ~500ms before the current one's
     // audio ends, so the block fade to the next ayah starts a touch early.
     val activeAyahState = viewModel.activeAyah.collectAsStateWithLifecycle()
@@ -2704,7 +2711,7 @@ fun ReaderScreen(
                             ayahCount = repeatContent.surah.ayahCount,
                             repeatMode = playerState.repeatMode,
                             repeatRange = playerState.repeatRange
-                                .takeIf { playerState.nowPlaying?.surahId == surahId },
+                                .takeIf { playerState.nowPlaying?.surahId == renderedSurahId },
                             currentAyah = repeatStartAyah,
                             retainedChoice = retainedRepeatChoice,
                             onDismiss = { showRepeatDialog = false },

@@ -107,4 +107,22 @@ class MushafPageFitTest {
         assertEquals(16, mushafGridSlots(16))
         assertEquals(15, mushafGridSlots(0))
     }
+
+    @Test
+    fun `leading comes from the type, not the leftover height`() {
+        // A width-bound page: the well is far taller than fifteen lines of
+        // this size need, so the pitch stays the printed one and the spare
+        // height falls into the margins instead of pulling the lines apart.
+        val slot = mushafLineSlotPx(pageHeightPx = 1833f, slots = 15, fontPx = 56f)
+        assertEquals(56f * MUSHAF_LINE_PITCH_EM, slot, 0.01f)
+        assertTrue(slot < 1833f / 15f)
+    }
+
+    @Test
+    fun `a page that cannot afford its pitch keeps its share of the well`() {
+        // Tall type in a short well: the slot must not exceed the well's own
+        // share, or fifteen lines would run off the leaf.
+        val slot = mushafLineSlotPx(pageHeightPx = 900f, slots = 15, fontPx = 56f)
+        assertEquals(60f, slot, 0.01f)
+    }
 }
