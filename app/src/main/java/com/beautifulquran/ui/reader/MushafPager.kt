@@ -256,19 +256,18 @@ private fun MushafPageSheet(
         )
     }
     val context = LocalContext.current
-    var pageFont by remember(page.page) {
-        mutableStateOf(
-            MushafQcfFonts.cached(page.page)
-                ?: if (liveInk) MushafQcfFonts.family(context, page.page) else null,
-        )
-    }
+    // Only what is already resident may be read here: building a page face is
+    // Typeface.createFromAsset over a multi-megabyte font, and composition runs
+    // on the UI thread. A miss draws the Hafs stand-in for a frame while the
+    // effect below loads the real one — which is precisely what that fallback
+    // path is for. (It used to load inline on a miss, which cost a frame the
+    // first time a leaf was opened, and every time after the cache window had
+    // moved on from it.)
+    var pageFont by remember(page.page) { mutableStateOf(MushafQcfFonts.cached(page.page)) }
     LaunchedEffect(page.page, context) {
-        if (MushafQcfFonts.cached(page.page) == null) {
-            pageFont = withContext(Dispatchers.Default) {
-                MushafQcfFonts.family(context, page.page)
-            }
-        } else {
-            pageFont = MushafQcfFonts.cached(page.page)
+        if (pageFont != null) return@LaunchedEffect
+        pageFont = withContext(Dispatchers.Default) {
+            MushafQcfFonts.family(context, page.page)
         }
     }
     BoxWithConstraints(modifier.fillMaxSize()) {

@@ -14,6 +14,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.text.SpanStyle
@@ -297,6 +299,19 @@ private fun MushafQcfWord(
         RenderedLineText(text = text, wordRanges = ranges, markRange = 0..-1)
     }
     var layoutResult by remember { mutableStateOf<TextLayoutResult?>(null) }
+    // A word waiting its turn is dimmed by its own alpha, not by paper laid
+    // over it. A paper mask is a rectangle on a word's box, and a QCF glyph
+    // inks past that box — so the mask left the overhang at full strength,
+    // which on a dark leaf reads as a white peak stuck to the letter. Alpha
+    // takes the glyph exactly as it is drawn, tail and all, and cannot reach
+    // the word beside it. Read in the layer block, so the dim animates in the
+    // draw phase without recomposing the leaf.
+    val recessAlpha = {
+        val pack = packs[token.surahId to token.ayah]
+        val motion = pack?.motions?.getOrNull(token.word.position - 1)
+        if (!liveInk || pack == null || motion != null) 1f
+        else (1f - pack.recessCover.value).coerceIn(0f, 1f)
+    }
     val blooms = {
         if (!liveInk) {
             emptyList()
@@ -304,18 +319,7 @@ private fun MushafQcfWord(
             val pack = packs[token.surahId to token.ayah]
             val motion = pack?.motions?.getOrNull(token.word.position - 1)
             if (pack == null || motion == null) {
-                val cover = pack?.recessCover?.value ?: 0f
-                if (cover > 0f) {
-                    listOf(
-                        ShapedWordBloom.UpcomingDim(
-                            range = rendered.wordRanges.first(),
-                            paper = palette.paperColor,
-                            coverAlpha = cover,
-                        ),
-                    )
-                } else {
-                    emptyList()
-                }
+                emptyList()
             } else {
                 buildShapedBlooms(
                     motions = listOf(motion),
@@ -343,6 +347,14 @@ private fun MushafQcfWord(
         // which is exactly what the line end showed.
         overflow = TextOverflow.Visible,
         modifier = Modifier
+            .graphicsLayer {
+                alpha = recessAlpha()
+                // Modulate, never composite: a leaf carries ~150 word nodes,
+                // and letting alpha < 1 buy each one an offscreen buffer would
+                // cost far more than the mask it replaced. Glyphs on a line do
+                // not overlap, so modulating is also correct.
+                compositingStrategy = CompositingStrategy.ModulateAlpha
+            }
             .mushafLineInk(
                 liveInk = liveInk,
                 blooms = blooms,
