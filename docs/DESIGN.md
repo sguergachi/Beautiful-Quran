@@ -39,8 +39,15 @@ and folio are quiet ink (~3–3.5:1), never gold: gold loses contrast on cream,
 and at 9 sp a gold folio disappears.
 
 **Gold is illumination, ink is furniture.** On the leaf gold means the ayah
-marks, a chapter's name in its title band, and that band's lozenges. The
-running head and folio are wayfinding, so they are ink in both themes.
+marks, a chapter's name in its ʿunwān panel, and that panel's rules and
+shamsas. The running head and folio are wayfinding, so they are ink in both
+themes.
+
+Gold does not carry one weight across both leaves: it gains contrast on
+Nightfall's near-black and loses it on cream, so anything drawn faintly in
+gold — the panel's tooled ground above all — is weighed against the paper it
+sits on rather than given a single alpha (`paper.luminance()`). Ink needs no
+such correction; that is the other reason furniture is ink.
 
 The running head is type alone: the chapter at the spine, the juzʾ at the
 fore-edge, each carrying its name twice — Arabic over a Latin gloss — so the

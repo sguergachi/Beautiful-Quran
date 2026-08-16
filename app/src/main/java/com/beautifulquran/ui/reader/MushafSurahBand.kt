@@ -22,6 +22,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.drawscope.inset
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
@@ -80,6 +81,11 @@ internal fun MushafSurahTitleBand(
     val sheen: State<Float> = remember { mutableFloatStateOf(1f) }
     val rule = accents.gold.copy(alpha = 0.50f)
     val hair = accents.gold.copy(alpha = 0.28f)
+    // Gold gains contrast on a dark leaf and loses it on cream, so the tooled
+    // ground cannot carry one alpha across both: at the weight that reads as a
+    // whisper on Nightfall it disappears into paper. Weigh it against the leaf
+    // it is tooled into.
+    val groundAlpha = if (paper.luminance() > 0.5f) 0.20f else 0.07f
 
     Box(
         modifier = modifier.fillMaxWidth().height(bandHeight),
@@ -98,8 +104,8 @@ internal fun MushafSurahTitleBand(
                     field = ornament.field.copy(
                         cellWidthDp = ornament.field.cellWidthDp * 0.42,
                     ),
-                    ink = accents.gold.copy(alpha = 0.07f),
-                    embossLight = accents.embossLight.copy(alpha = 0.04f),
+                    ink = accents.gold.copy(alpha = groundAlpha),
+                    embossLight = accents.embossLight.copy(alpha = groundAlpha * 0.55f),
                 ),
         )
         Canvas(Modifier.fillMaxSize()) {
