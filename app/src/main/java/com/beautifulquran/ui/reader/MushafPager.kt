@@ -35,6 +35,11 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -63,6 +68,7 @@ import com.beautifulquran.domain.mushafGridSlots
 import com.beautifulquran.domain.mushafUniformFontPx
 import com.beautifulquran.domain.mushafLineSlotPx
 import com.beautifulquran.domain.surahOpensWithBasmalahPreface
+import kotlin.math.abs
 import com.beautifulquran.ui.theme.MushafFontFamily
 
 /**
@@ -82,6 +88,44 @@ internal val MushafEdgeGutter = 12.dp
  * instead of exactly on it.
  */
 private val MushafFitSlack = 4.dp
+
+/**
+ * Paper drawn back over both fore-edges while a leaf is in motion, so a page
+ * dissolves into the margin as it turns instead of sliding off a hard edge.
+ *
+ * Only while it moves: the fade follows the pager's offset, so a settled leaf
+ * carries none of it and the revelation is never dimmed at rest. The band is
+ * the leaf's own margin, so even at full strength it washes paper, not text.
+ */
+private fun Modifier.mushafForeEdgeFade(
+    paper: Color,
+    offsetFraction: () -> Float,
+): Modifier = drawWithContent {
+    drawContent()
+    val turning = (abs(offsetFraction()) * 2.4f).coerceIn(0f, 1f)
+    if (turning <= 0.01f) return@drawWithContent
+    val band = (MushafPageMargin + MushafEdgeGutter).toPx()
+    val edge = paper.copy(alpha = turning)
+    drawRect(
+        brush = Brush.horizontalGradient(
+            0f to edge,
+            1f to Color.Transparent,
+            startX = 0f,
+            endX = band,
+        ),
+        size = Size(band, size.height),
+    )
+    drawRect(
+        brush = Brush.horizontalGradient(
+            0f to Color.Transparent,
+            1f to edge,
+            startX = size.width - band,
+            endX = size.width,
+        ),
+        topLeft = Offset(size.width - band, 0f),
+        size = Size(band, size.height),
+    )
+}
 
 /**
  * Virtualized 604-page mushaf. Only the settled page runs ink clocks;
@@ -159,12 +203,15 @@ internal fun MushafPager(
                 }
             }
     }
+    val paper = MaterialTheme.colorScheme.background
     HorizontalPager(
         state = pagerState,
         beyondViewportPageCount = 1,
         reverseLayout = true,
         key = { it },
-        modifier = modifier.fillMaxSize(),
+        modifier = modifier
+            .fillMaxSize()
+            .mushafForeEdgeFade(paper) { pagerState.currentPageOffsetFraction },
     ) { pageIndex ->
         val page = catalog.page(pageIndex + 1)
         if (page == null) {

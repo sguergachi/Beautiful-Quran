@@ -3,6 +3,7 @@ package com.beautifulquran.ui.reader
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -22,20 +23,25 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.drawscope.inset
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.times
 import com.beautifulquran.data.model.Surah
-import com.beautifulquran.ui.theme.GeneratedChapterRosette
+import com.beautifulquran.ui.theme.GeneratedInkRosette
 import com.beautifulquran.ui.theme.HafsFontFamily
 import com.beautifulquran.ui.theme.LocalQuranAccents
 import com.beautifulquran.ui.theme.generatedFieldWeave
 import com.beautifulquran.ui.theme.ornament.chapterOrnamentSeed
 import com.beautifulquran.ui.theme.ornament.generateChapterOrnament
+
+/** Corner easing anywhere on the leaf: a hairline, never a curve. */
+private const val MushafPanelCornerPx = 3f
 
 /**
  * The ʿunwān panel that opens a chapter on the leaf.
@@ -76,9 +82,6 @@ internal fun MushafSurahTitleBand(
             ),
         )
     }
-    // The panel is tooled metal, not a ceremony: no build wash, so it is whole
-    // from the first frame the leaf is drawn.
-    val sheen: State<Float> = remember { mutableFloatStateOf(1f) }
     val rule = accents.gold.copy(alpha = 0.50f)
     val hair = accents.gold.copy(alpha = 0.28f)
     // Gold gains contrast on a dark leaf and loses it on cream, so the tooled
@@ -86,17 +89,27 @@ internal fun MushafSurahTitleBand(
     // whisper on Nightfall it disappears into paper. Weigh it against the leaf
     // it is tooled into.
     val groundAlpha = if (paper.luminance() > 0.5f) 0.20f else 0.07f
+    val density = LocalDensity.current
 
     Box(
         modifier = modifier.fillMaxWidth().height(bandHeight),
         contentAlignment = Alignment.Center,
     ) {
-        val corner = bandHeight * 0.22f
-        Box(
+        // A printed panel is ruled, not rounded. Nothing on the leaf carries
+        // more than a hairline's easing at its corners.
+        val corner = with(density) { MushafPanelCornerPx.toDp() }
+        // The ground is laid once and mirrored at the fold, so the panel is
+        // symmetrical about its own centre — a tiling cut by the two ends at
+        // whatever phase it happened to reach is not.
+        Row(
             Modifier
                 .fillMaxSize()
                 .clip(androidx.compose.foundation.shape.RoundedCornerShape(corner))
-                .padding(2.5.dp)
+                .padding(2.5.dp),
+        ) {
+            val ground = Modifier
+                .weight(1f)
+                .fillMaxHeight()
                 .generatedFieldWeave(
                     // Tooling, not pattern: the chapter's own ground tiled
                     // small enough that it reads as texture inside the rules
@@ -106,10 +119,12 @@ internal fun MushafSurahTitleBand(
                     ),
                     ink = accents.gold.copy(alpha = groundAlpha),
                     embossLight = accents.embossLight.copy(alpha = groundAlpha * 0.55f),
-                ),
-        )
+                )
+            Box(ground)
+            Box(ground.graphicsLayer { scaleX = -1f })
+        }
         Canvas(Modifier.fillMaxSize()) {
-            val r = corner.toPx()
+            val r = MushafPanelCornerPx
             // Doubled rule: the panel's edge, then a hairline just inside it.
             drawRoundRect(
                 color = rule,
@@ -119,7 +134,7 @@ internal fun MushafSurahTitleBand(
             inset(3.dp.toPx()) {
                 drawRoundRect(
                     color = hair,
-                    cornerRadius = CornerRadius(r * 0.7f, r * 0.7f),
+                    cornerRadius = CornerRadius(r, r),
                     style = Stroke(width = 0.8.dp.toPx()),
                 )
             }
@@ -128,7 +143,7 @@ internal fun MushafSurahTitleBand(
             Modifier.fillMaxSize().padding(horizontal = bandHeight * 0.14f),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            MushafShamsa(ornament, bandHeight, sheen)
+            MushafShamsa(ornament, bandHeight)
             Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
                 MushafTitleCartouche(
                     name = surah?.nameArabic.orEmpty(),
@@ -139,28 +154,29 @@ internal fun MushafSurahTitleBand(
                     ink = accents.gold,
                 )
             }
-            MushafShamsa(ornament, bandHeight, sheen)
+            MushafShamsa(ornament, bandHeight)
         }
     }
 }
 
-/** The sun medallion closing one end of the panel. */
+/**
+ * The shamsa closing one end of the panel — drawn, not gilded. At this size a
+ * gold-and-emboss rosette closes up into a solid disc and reads as a button
+ * stuck to the paper; struck in one hairline it stays a drawing.
+ */
 @Composable
 private fun MushafShamsa(
     ornament: com.beautifulquran.ui.theme.ornament.ChapterOrnament,
     bandHeight: Dp,
-    sheen: State<Float>,
 ) {
-    val accents = LocalQuranAccents.current
-    GeneratedChapterRosette(
+    GeneratedInkRosette(
         spec = ornament.rosette,
-        size = bandHeight * 0.62f,
-        brightGold = accents.goldBright,
-        deepGold = accents.goldDeep,
-        embossDark = accents.embossDark,
-        embossLight = accents.embossLight,
-        sheen = sheen,
-        modifier = Modifier.size(bandHeight * 0.62f),
+        size = bandHeight * 0.60f,
+        // Ink, not gold: gilt at this size reads as a stud pressed into the
+        // page. The star is a drawing the panel encloses, and the gold in the
+        // band belongs to its rules and the chapter's name.
+        ink = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.42f),
+        strokeWidth = 0.7.dp,
     )
 }
 
@@ -176,7 +192,7 @@ private fun MushafTitleCartouche(
 ) {
     Box(contentAlignment = Alignment.Center) {
         Canvas(Modifier.matchParentSize()) {
-            val r = size.height / 2f
+            val r = MushafPanelCornerPx
             drawRoundRect(color = paper, cornerRadius = CornerRadius(r, r))
             drawRoundRect(
                 color = rule,
@@ -191,7 +207,7 @@ private fun MushafTitleCartouche(
             color = ink,
             textAlign = TextAlign.Center,
             maxLines = 1,
-            modifier = Modifier.padding(horizontal = height * 0.5f, vertical = height * 0.12f),
+            modifier = Modifier.padding(horizontal = height * 0.42f, vertical = height * 0.14f),
         )
     }
 }
