@@ -54,6 +54,13 @@ internal val MushafRunningHead = 36.dp
 private val MushafHeadJuzSlot = 56.dp
 /** Height of the tooled bar flanking the chapter name. */
 private val MushafHeadRuleBand = 9.dp
+/**
+ * How long a tapped leaf is held against playback follow. Long enough for a
+ * seek to land and the position poll to report a word from where the reader
+ * actually tapped, short enough that a verse crossing onto the next page still
+ * turns it.
+ */
+internal const val MushafTapPageHoldMs = 1_500L
 /** One frieze for every leaf's running head, from the ornament kit. */
 private const val MushafHeadOrnamentSeed = 2_000_003
 /** Folio line: type only, so it costs a line of ink and no more. */

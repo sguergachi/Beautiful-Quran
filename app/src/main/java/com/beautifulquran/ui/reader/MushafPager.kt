@@ -100,6 +100,13 @@ internal fun MushafPager(
     fontScale: Float,
     followEnabled: Boolean,
     loadedSurahId: Int,
+    /**
+     * The leaf the reader just tapped on, held against playback follow until
+     * the clock catches up (or the hold lapses). Without it the poll's word
+     * from before the seek turns the page back and forward again under the
+     * finger.
+     */
+    heldPage: Int?,
     flashWordPosition: Int?,
     onUserTurnedPage: () -> Unit,
     onWordClick: (MushafToken) -> Unit,
@@ -111,7 +118,7 @@ internal fun MushafPager(
     var followPage by remember {
         mutableIntStateOf(pagerState.currentPage)
     }
-    LaunchedEffect(followEnabled, loadedSurahId, catalog, pagerState) {
+    LaunchedEffect(followEnabled, loadedSurahId, catalog, pagerState, heldPage) {
         snapshotFlow { activeWordState.value to isThisSurahPlaying }
             .collect { (word, playingHere) ->
                 if (!followEnabled || word == null) return@collect
@@ -122,6 +129,10 @@ internal fun MushafPager(
                 // to fall on in the new surah. Wait for the player to arrive.
                 if (!playingHere) return@collect
                 val page = catalog.pageOf(loadedSurahId, word.ayah, word.wordPosition)
+                // Still hearing the word from before the tap: stay on the leaf
+                // the reader is looking at rather than turning to wherever that
+                // word lives and straight back.
+                if (heldPage != null && page != heldPage) return@collect
                 val index = (page - 1).coerceIn(0, catalog.pageCount - 1)
                 if (pagerState.currentPage != index) {
                     followPage = index

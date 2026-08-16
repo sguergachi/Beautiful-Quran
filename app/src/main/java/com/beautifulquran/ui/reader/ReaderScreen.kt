@@ -1997,14 +1997,29 @@ fun ReaderScreen(
                     )
                     val mushafRootMoved = rememberUpdatedState(onRootReturnUserMoved)
                     val mushafOpenRoot = rememberUpdatedState(onOpenRootViewer)
-                    val onMushafTurnedPage = remember {
-                        {
-                            mushafDispatch.value(ReaderInteractionEvent.UserMovedPage)
-                            mushafRootMoved.value()
+                    // The leaf the reader tapped on. The active word carries no
+                    // page of its own and the position poll can still be
+                    // reporting the word from before the seek, which used to
+                    // turn the page back and then forward again under the
+                    // finger. Hold the pager here until the clock catches up.
+                    var mushafTappedPage by remember { mutableStateOf<Int?>(null) }
+                    LaunchedEffect(mushafTappedPage) {
+                        if (mushafTappedPage != null) {
+                            delay(MushafTapPageHoldMs)
+                            mushafTappedPage = null
                         }
                     }
-                    val onMushafWordClick = remember(mushafSurahId, viewModel) {
-                        { token: MushafToken ->
+                    val onMushafTurnedPage = {
+                        mushafTappedPage = null
+                        mushafDispatch.value(ReaderInteractionEvent.UserMovedPage)
+                        mushafRootMoved.value()
+                    }
+                    val onMushafWordClick = { token: MushafToken ->
+                            mushafTappedPage = mushafReady.catalog.pageOf(
+                                token.surahId,
+                                token.ayah,
+                                token.word.position,
+                            )
                             mushafDispatch.value(ReaderInteractionEvent.EnableFollow)
                             if (token.surahId == mushafSurahId) {
                                 viewModel.playFromAyahWord(token.ayah, token.word.position)
@@ -2019,7 +2034,6 @@ fun ReaderScreen(
                                     startPlaybackAtWord = token.word.position,
                                 )
                             }
-                        }
                     }
                     val onMushafWordLongClick = remember(haptics) {
                         { token: MushafToken ->
@@ -2027,14 +2041,17 @@ fun ReaderScreen(
                             mushafOpenRoot.value(token.surahId, token.ayah, token.word.position)
                         }
                     }
-                    val onMushafAyahClick = remember(mushafSurahId, viewModel) {
-                        { token: MushafToken ->
-                            mushafDispatch.value(ReaderInteractionEvent.EnableFollow)
-                            if (token.surahId == mushafSurahId) {
-                                viewModel.playFromAyah(token.ayah)
-                            } else {
-                                viewModel.load(token.surahId, startPlaybackAtAyah = token.ayah)
-                            }
+                    val onMushafAyahClick = { token: MushafToken ->
+                        mushafTappedPage = mushafReady.catalog.pageOf(
+                            token.surahId,
+                            token.ayah,
+                            token.word.position,
+                        )
+                        mushafDispatch.value(ReaderInteractionEvent.EnableFollow)
+                        if (token.surahId == mushafSurahId) {
+                            viewModel.playFromAyah(token.ayah)
+                        } else {
+                            viewModel.load(token.surahId, startPlaybackAtAyah = token.ayah)
                         }
                     }
                     MushafPager(
@@ -2051,6 +2068,7 @@ fun ReaderScreen(
                         followEnabled = followEnabled,
                         loadedSurahId = mushafSurahId,
                         flashWordPosition = startWordPosition,
+                        heldPage = mushafTappedPage,
                         onUserTurnedPage = onMushafTurnedPage,
                         onWordClick = onMushafWordClick,
                         onWordLongClick = onMushafWordLongClick,
