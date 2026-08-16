@@ -1994,15 +1994,21 @@ fun ReaderScreen(
                     }
                     val onMushafWordClick = remember(mushafSurahId, viewModel) {
                         { token: MushafToken ->
+                            mushafDispatch.value(ReaderInteractionEvent.EnableFollow)
                             if (token.surahId == mushafSurahId) {
                                 val segment = viewModel.segmentsFor(token.ayah)
                                     ?.firstOrNull { it.position == token.word.position }
-                                mushafDispatch.value(ReaderInteractionEvent.EnableFollow)
                                 if (segment != null) {
                                     viewModel.playFromWord(token.ayah, segment.startMs)
                                 } else {
                                     viewModel.playFromAyah(token.ayah)
                                 }
+                            } else {
+                                // The reader turned past a surah boundary: the
+                                // leaf is another surah's, whose timings are not
+                                // loaded. Load it and open at the tapped verse
+                                // rather than swallowing the tap.
+                                viewModel.load(token.surahId, startPlaybackAtAyah = token.ayah)
                             }
                         }
                     }
@@ -2014,9 +2020,11 @@ fun ReaderScreen(
                     }
                     val onMushafAyahClick = remember(mushafSurahId, viewModel) {
                         { token: MushafToken ->
+                            mushafDispatch.value(ReaderInteractionEvent.EnableFollow)
                             if (token.surahId == mushafSurahId) {
-                                mushafDispatch.value(ReaderInteractionEvent.EnableFollow)
                                 viewModel.playFromAyah(token.ayah)
+                            } else {
+                                viewModel.load(token.surahId, startPlaybackAtAyah = token.ayah)
                             }
                         }
                     }

@@ -208,7 +208,11 @@ private fun MushafQcfPageLine(
     val justify = mushafLineJustifies(line.tokens.size)
     Row(
         modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.Start,
+        // A justified line carries its own weight spacers, so it starts at the
+        // fore-edge and fills the measure. A short line — al-Fātiḥah, a surah's
+        // closing line — is centred on the page, the way it is printed, never
+        // hung off the right margin.
+        horizontalArrangement = if (justify) Arrangement.Start else Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically,
     ) {
         line.tokens.forEachIndexed { index, token ->
