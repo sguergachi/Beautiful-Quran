@@ -179,6 +179,7 @@ internal fun MushafPager(
             ) {
                 MushafPageHeader(
                     surahNameArabic = surahsById[page.primarySurahId]?.nameArabic,
+                    surahNameLatin = surahsById[page.primarySurahId]?.nameTransliteration,
                     juz = page.juz,
                 )
                 MushafPageSheet(
@@ -202,7 +203,10 @@ internal fun MushafPager(
                         .fillMaxWidth()
                         .padding(top = MushafTextGutter, bottom = MushafTailGutter),
                 )
-                MushafPageFolio(page.page)
+                MushafPageFolio(
+                    page = page.page,
+                    modifier = Modifier.padding(horizontal = MushafEdgeGutter),
+                )
             }
         }
     }

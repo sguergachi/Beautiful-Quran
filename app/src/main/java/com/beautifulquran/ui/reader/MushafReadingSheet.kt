@@ -105,7 +105,14 @@ internal fun MushafReadingSheet(
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit,
 ) {
-    val quiet = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.48f)
+    // Rank by role, not by taste. Back / play / forward are what a listener
+    // reaches for, so they carry real ink; chapters, settings, repeat and speed
+    // choose what to hear rather than hearing it, so they sit back. They used
+    // to be the other way round — the secondaries darker than the play button,
+    // and the whole bar too faint to read as active at all.
+    val ink = MaterialTheme.colorScheme.onBackground
+    val primary = ink.copy(alpha = 0.62f)
+    val quiet = ink.copy(alpha = 0.34f)
     // Reciting, the leaf keeps only what a listener reaches for: back, pause,
     // forward. Chapters, settings, repeat and speed are for choosing what to
     // hear, not for hearing it, so they leave the paper until playback stops.
@@ -131,7 +138,7 @@ internal fun MushafReadingSheet(
                     enabled = enabled,
                     image = Icons.AutoMirrored.Rounded.MenuBook,
                     label = "Chapters",
-                    tint = quiet.copy(alpha = 0.7f),
+                    tint = quiet,
                     modifier = Modifier.align(Alignment.CenterStart),
                 )
                 GutterIcon(
@@ -139,7 +146,7 @@ internal fun MushafReadingSheet(
                     enabled = enabled,
                     image = Icons.Rounded.Tune,
                     label = "Settings",
-                    tint = quiet.copy(alpha = 0.7f),
+                    tint = quiet,
                     modifier = Modifier.align(Alignment.CenterEnd),
                 )
             }
@@ -172,14 +179,14 @@ internal fun MushafReadingSheet(
                     enabled = enabled && isThisSurahLoaded,
                     image = Icons.Rounded.FastRewind,
                     label = "Previous",
-                    tint = quiet,
+                    tint = primary,
                 )
                 IconButton(onClick = onPlayPause, enabled = enabled, modifier = Modifier.size(44.dp)) {
                     if (playerState.isBuffering && isThisSurahLoaded) {
                         CircularProgressIndicator(
                             modifier = Modifier.size(18.dp),
                             strokeWidth = 1.5.dp,
-                            color = quiet,
+                            color = primary,
                         )
                     } else {
                         Icon(
@@ -189,7 +196,7 @@ internal fun MushafReadingSheet(
                                 Icons.Rounded.PlayArrow
                             },
                             contentDescription = if (playerState.isPlaying) "Pause" else "Play",
-                            tint = quiet,
+                            tint = primary,
                             modifier = Modifier.size(26.dp),
                         )
                     }
@@ -199,7 +206,7 @@ internal fun MushafReadingSheet(
                     enabled = enabled && isThisSurahLoaded,
                     image = Icons.Rounded.FastForward,
                     label = "Next",
-                    tint = quiet,
+                    tint = primary,
                 )
                 if (!reciting) Text(
                     text = "${if (playerState.speed % 1f == 0f) playerState.speed.toInt() else playerState.speed}×",
@@ -237,38 +244,77 @@ internal fun MushafReadingSheet(
 @Composable
 internal fun MushafPageHeader(
     surahNameArabic: String?,
+    surahNameLatin: String?,
     juz: Int,
     modifier: Modifier = Modifier,
 ) {
-    // Type alone up here. One illumination to a leaf, and it belongs to the
-    // chapter's own title band below — the running head is a finding aid, and a
-    // second frieze on the same page only competes with it.
-    val gold = LocalQuranAccents.current.gold.copy(alpha = 0.50f)
+    // Type alone up here, and in ink rather than gold: gold is illumination —
+    // ayah marks and the chapter's title — while the running head is a finding
+    // aid. Gold also loses what little contrast it has on cream, which is why
+    // this line used to disappear on paper.
+    //
+    // Each end carries the same thing twice, Arabic over Latin, so the two read
+    // as one mirrored pair rather than two labels: the chapter at the spine,
+    // the juzʾ at the fore-edge.
+    val ink = MaterialTheme.colorScheme.onBackground
     Row(
         modifier = modifier
             .fillMaxWidth()
+            .padding(horizontal = MushafEdgeGutter)
             .height(MushafRunningHead),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        MushafHeadStack(
+            arabic = "ٱلْجُزْءُ ${juz.toArabicIndic()}",
+            latin = "Part $juz",
+            ink = ink,
+            align = TextAlign.Start,
+            modifier = Modifier.weight(1f),
+        )
+        MushafHeadStack(
+            arabic = surahNameArabic?.let { "سُورَةُ $it" }.orEmpty(),
+            latin = surahNameLatin.orEmpty(),
+            ink = ink,
+            align = TextAlign.End,
+            modifier = Modifier.weight(1f),
+        )
+    }
+}
+
+/** One end of the running head: the name in the book's hand, glossed beneath. */
+@Composable
+private fun MushafHeadStack(
+    arabic: String,
+    latin: String,
+    ink: Color,
+    align: TextAlign,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
         Text(
-            text = "ٱلْجُزْءُ ${juz.toArabicIndic()}",
+            text = arabic,
             fontFamily = HafsFontFamily,
             fontSize = 12.sp,
-            color = gold.copy(alpha = 0.34f),
-            textAlign = TextAlign.Start,
-            maxLines = 1,
-            modifier = Modifier.weight(1f),
-        )
-        Text(
-            text = surahNameArabic?.let { "سُورَةُ $it" }.orEmpty(),
-            fontFamily = HafsFontFamily,
-            fontSize = 13.sp,
-            color = gold.copy(alpha = 0.62f),
-            textAlign = TextAlign.End,
+            color = ink.copy(alpha = 0.30f),
+            textAlign = align,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f),
+            modifier = Modifier.fillMaxWidth(),
         )
+        if (latin.isNotEmpty()) {
+            Text(
+                text = latin,
+                style = MaterialTheme.typography.labelSmall.copy(
+                    fontSize = 8.5.sp,
+                    letterSpacing = 0.10.em,
+                ),
+                color = ink.copy(alpha = 0.44f),
+                textAlign = align,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
     }
 }
 
@@ -284,13 +330,12 @@ internal fun MushafSurahTitleBand(
         modifier = modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        // The rules run the full text measure; the only inset is the air the
+        // name needs, so the band hangs on the same margin as the scripture.
         MushafTitleRule(
             ink = gold,
             towardStart = true,
-            modifier = Modifier
-                .weight(1f)
-                .height(bandHeight)
-                .padding(horizontal = 14.dp),
+            modifier = Modifier.weight(1f).height(bandHeight),
         )
         Text(
             text = surahNameArabic.orEmpty(),
@@ -299,13 +344,11 @@ internal fun MushafSurahTitleBand(
             color = gold,
             textAlign = TextAlign.Center,
             maxLines = 1,
+            modifier = Modifier.padding(horizontal = 14.dp),
         )
         MushafTitleRule(
             ink = gold,
-            modifier = Modifier
-                .weight(1f)
-                .height(bandHeight)
-                .padding(horizontal = 14.dp),
+            modifier = Modifier.weight(1f).height(bandHeight),
         )
     }
 }
@@ -374,21 +417,23 @@ private fun MushafTitleRule(
  */
 @Composable
 internal fun MushafPageFolio(page: Int, modifier: Modifier = Modifier) {
-    val gold = LocalQuranAccents.current.gold
+    // In ink, like the running head: at gold-on-cream the figure measured
+    // 1.5:1 against the paper and simply vanished.
+    val ink = MaterialTheme.colorScheme.onBackground
     val folio = buildAnnotatedString {
         withStyle(
             SpanStyle(
-                color = gold.copy(alpha = 0.38f),
+                color = ink.copy(alpha = 0.50f),
                 fontSize = 9.sp,
                 letterSpacing = 0.14.em,
             ),
         ) {
             append("$page")
         }
-        append("  ")
+        append("  ")
         withStyle(
             SpanStyle(
-                color = gold.copy(alpha = 0.46f),
+                color = ink.copy(alpha = 0.54f),
                 fontFamily = HafsFontFamily,
                 fontSize = 12.sp,
             ),
