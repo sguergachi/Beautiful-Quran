@@ -545,7 +545,7 @@ private fun DeveloperSection(
     if (BuildConfig.DEBUG && Build.VERSION.SDK_INT >= 35) {
         Spacer(Modifier.height(20.dp))
         Text(
-            text = "Record 10-second system trace",
+            text = "Record & send performance profile",
             style = MaterialTheme.typography.bodyLarge,
             modifier = Modifier
                 .fillMaxWidth()
@@ -555,9 +555,9 @@ private fun DeveloperSection(
         )
         Caption(
             if (Build.VERSION.SDK_INT >= 37) {
-                "ProfilingManager SystemTraceRequestBuilder + cold-start triggers; path logged under BeautifulQuranProfile."
+                "Records ten seconds — use the app while it runs — then opens the share sheet. Also registers cold-start triggers."
             } else {
-                "ProfilingManager SystemTraceRequestBuilder (API 35+); path logged under BeautifulQuranProfile. Cold-start triggers need API 37."
+                "Records ten seconds — use the app while it runs — then opens the share sheet. Cold-start triggers need API 37."
             },
         )
     }

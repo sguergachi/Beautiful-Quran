@@ -25,6 +25,7 @@ import androidx.compose.runtime.State
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.snapshots.SnapshotStateMap
@@ -240,9 +241,21 @@ internal fun MushafPager(
             }
     }
     val paper = MaterialTheme.colorScheme.background
+    // Opening a chapter should cost one leaf, not three. Holding a neighbour
+    // composed either side is what makes a page turn smooth, but doing it
+    // before the first frame means ~450 word nodes are composed, measured and
+    // indexed while the reader is still coming up — profiled as the reader's
+    // worst frames by a wide margin, most of the time inside Compose's own
+    // spatial index walking the tree. The neighbours are composed one frame
+    // later instead: the open is a single leaf, and the turn is still warm.
+    var holdNeighbours by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        withFrameNanos { }
+        holdNeighbours = true
+    }
     HorizontalPager(
         state = pagerState,
-        beyondViewportPageCount = 1,
+        beyondViewportPageCount = if (holdNeighbours) 1 else 0,
         reverseLayout = true,
         key = { it },
         modifier = modifier
