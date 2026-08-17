@@ -1,11 +1,12 @@
 package com.beautifulquran.ui.reader
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.ui.Alignment
+import androidx.compose.foundation.text.BasicText
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.snapshots.SnapshotStateMap
@@ -17,6 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLayoutResult
@@ -63,6 +65,14 @@ internal fun MushafHafsLine(
     line: MushafLine,
     packs: SnapshotStateMap<Pair<Int, Int>, AyahInkPack>,
     fontSize: TextUnit,
+    /**
+     * The line's measure, in px. Passed down rather than read from a
+     * [BoxWithConstraints] of its own: every line on a leaf is set to the same
+     * measure, which the leaf has already computed, and a subcomposition per
+     * line cost fifteen of them per page — forty-five live in the pager —
+     * for a number that never differs between them.
+     */
+    measureWidthPx: Float,
     liveInk: Boolean,
     onWordClick: (MushafToken) -> Unit,
     onWordLongClick: (MushafToken) -> Unit,
@@ -79,6 +89,7 @@ internal fun MushafHafsLine(
             line = line,
             pageFont = pageFont,
             fontSize = fontSize,
+            measureWidthPx = measureWidthPx,
             packs = packs,
             liveInk = liveInk,
             palette = palette,
@@ -107,7 +118,7 @@ internal fun MushafHafsLine(
     val hitSlopPx = with(density) { 8.dp.toPx() }
     val measurer = rememberTextMeasurer()
 
-    BoxWithConstraints(modifier.fillMaxWidth()) {
+    Box(modifier.fillMaxWidth()) {
         val natural = remember(line, palette.fullInkColor, ayahMarkInk, fontSize, useQcf) {
             if (useQcf) {
                 qcfRendered(line, palette.fullInkColor, ayahMarkInk)
@@ -115,7 +126,7 @@ internal fun MushafHafsLine(
                 buildMushafLine(line, palette.fullInkColor, ayahMarkInk, fontSize, gapSpacing = 0.sp)
             }
         }
-        val naturalWidth = remember(natural.text, style, constraints.maxWidth) {
+        val naturalWidth = remember(natural.text, style, measureWidthPx) {
             measurer.measure(
                 text = natural.text,
                 style = style,
@@ -129,7 +140,7 @@ internal fun MushafHafsLine(
         } else {
             mushafGapSpacingPx(
                 naturalWidthPx = naturalWidth.toFloat(),
-                pageWidthPx = constraints.maxWidth.toFloat(),
+                pageWidthPx = measureWidthPx,
                 gapCount = (line.tokens.size - 1).coerceAtLeast(0),
                 fontPx = with(density) { fontSize.toPx() },
             )
@@ -191,6 +202,7 @@ private fun MushafQcfPageLine(
     line: MushafLine,
     pageFont: FontFamily,
     fontSize: TextUnit,
+    measureWidthPx: Float,
     packs: SnapshotStateMap<Pair<Int, Int>, AyahInkPack>,
     liveInk: Boolean,
     palette: WordInkPalette,
@@ -205,8 +217,6 @@ private fun MushafQcfPageLine(
     val hitSlopPx = with(density) { 8.dp.toPx() }
     val justify = mushafLineJustifies(line.tokens.size)
     val measurer = rememberTextMeasurer()
-    BoxWithConstraints(modifier.fillMaxWidth()) {
-    val measureWidthPx = constraints.maxWidth.toFloat()
     // The book is set at one size (see MUSHAF_DESIGN_LINE_EM). A line whose
     // glyph run still runs past the measure — a few dozen in the whole mushaf —
     // is set that little bit tighter, so one long line never drags its page's
@@ -254,8 +264,14 @@ private fun MushafQcfPageLine(
             platformStyle = PlatformTextStyle(includeFontPadding = false),
         )
     }
+    // Coloured once for the line. A Material [Text] resolves the ambient text
+    // style and content colour on every call, and a leaf carries ~150 word
+    // nodes: folding the colour into the style here lets each word draw with
+    // foundation's BasicText, which does none of that work.
+    val wordStyle = remember(style, palette.fullInkColor) { style.copy(color = palette.fullInkColor) }
+    val markStyle = remember(style, ayahMarkInk) { style.copy(color = ayahMarkInk) }
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         // A justified line carries its own weight spacers, so it starts at the
         // fore-edge and fills the measure. A short line — al-Fātiḥah, a surah's
         // closing line — is centred on the page, the way it is printed, never
@@ -267,7 +283,7 @@ private fun MushafQcfPageLine(
             if (justify && index > 0) Spacer(Modifier.weight(1f))
             MushafQcfWord(
                 token = token,
-                style = style,
+                style = wordStyle,
                 packs = packs,
                 liveInk = liveInk,
                 palette = palette,
@@ -291,10 +307,9 @@ private fun MushafQcfPageLine(
                     if (!liveInk || pack == null) 1f
                     else (pack.markAlpha.value * (1f - pack.recessCover.value)).coerceIn(0f, 1f)
                 }
-                Text(
+                BasicText(
                     text = mark,
-                    style = style,
-                    color = ayahMarkInk,
+                    style = markStyle,
                     maxLines = 1,
                     softWrap = false,
                     overflow = TextOverflow.Visible,
@@ -305,7 +320,6 @@ private fun MushafQcfPageLine(
                 )
             }
         }
-    }
     }
 }
 
@@ -325,15 +339,18 @@ private fun MushafQcfWord(
 ) {
     val raw = token.word.qcfV2
     val word = if (raw.isNotEmpty()) qcfWordGlyphs(raw) else token.word.arabic
-    val rendered = remember(word, palette.fullInkColor) {
+    val rendered = remember(word) {
         // The word alone. Its circled mark, if it closes a verse, is set as its
         // own cell of the line (see [MushafQcfPageLine]) so the line's spacing
         // falls either side of it evenly — glued to the word, a mark took the
         // gap on one side only and the page read lopsided around every verse.
-        val text = buildAnnotatedString {
-            withStyle(SpanStyle(color = palette.fullInkColor)) { append(word) }
-        }
-        RenderedLineText(text = text, wordRanges = listOf(0 until word.length), markRange = 0..-1)
+        // No colour span: the ink is in the style now, and a span costs the
+        // paragraph a resolve pass per word.
+        RenderedLineText(
+            text = AnnotatedString(word),
+            wordRanges = listOf(0 until word.length),
+            markRange = 0..-1,
+        )
     }
     var layoutResult by remember { mutableStateOf<TextLayoutResult?>(null) }
     // A word waiting its turn is dimmed by its own alpha, not by paper laid
@@ -390,8 +407,8 @@ private fun MushafQcfWord(
             }
         }
     }
-    Text(
-        text = rendered.text,
+    BasicText(
+        text = word,
         style = style,
         maxLines = 1,
         softWrap = false,

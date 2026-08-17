@@ -394,6 +394,11 @@ private fun MushafPageSheet(
                 )
             }
             val fontSp = with(density) { fontPx.toSp() }
+            // Every line on the leaf is set to this one measure — the leaf
+            // inside its gutters. Computed once here rather than by a
+            // BoxWithConstraints per line (see [MushafHafsLine]).
+            val lineMeasurePx = (constraints.maxWidth.toFloat() - edgeGutterPx * 2)
+                .coerceAtLeast(1f)
             // One slot is one unit of the leaf's grid, whatever the page holds.
             val lineSlot = with(density) {
                 (availableH / mushafGridSlots(slotCount)).toDp()
@@ -445,6 +450,7 @@ private fun MushafPageSheet(
                                 line = line,
                                 packs = packsState,
                                 fontSize = fontSp,
+                                measureWidthPx = lineMeasurePx,
                                 liveInk = liveInk,
                                 onWordClick = onWordClick,
                                 onWordLongClick = onWordLongClick,

@@ -17,6 +17,12 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.BeautifulQuran.Splash">
 
+        <!-- Lets `simpleperf`/Perfetto sample a release build from the shell.
+             A release build is the only honest thing to profile — debug Compose
+             carries checks R8 strips — and without this the profilers refuse
+             the process. Costs nothing at runtime and exposes no data to apps. -->
+        <profileable android:shell="true" />
+
         <!-- Android 17 foreground AppFunctions. This activity-scoped metadata
              lets Gemini associate "bookmark this" with this exact reader. -->
         <property
