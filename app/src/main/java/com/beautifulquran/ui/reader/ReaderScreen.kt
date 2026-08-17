@@ -1960,7 +1960,12 @@ fun ReaderScreen(
                     }
                 }
                 val mushafReady = mushafUi
-                if (mushafMode && mushafReady != null) {
+                // The leaf opens as a leaf. Falling through to the scroll
+                // layout while the catalog builds meant a chapter opened in the
+                // wrong mode and changed under the reader a moment later; the
+                // sheet is up immediately and its paper is simply blank until
+                // the pages arrive.
+                if (mushafMode) {
                     MushafReadingSheet(
                         reciterName = uiState.currentReciter?.name.orEmpty(),
                         playerState = playerState,
@@ -2000,7 +2005,20 @@ fun ReaderScreen(
                             } ?: 0f,
                         modifier = Modifier.weight(1f),
                     ) {
+                    if (mushafReady == null) {
+                        Box(Modifier.fillMaxSize())
+                    } else {
                     val mushafSurahId = content.surah.id
+                    // Deferred: the leaf reads playback where it uses it, so a
+                    // play or a pause never recomposes the pages themselves.
+                    val mushafPlayback = remember { mutableStateOf(MushafPlayback(null, false, false)) }
+                    SideEffect {
+                        mushafPlayback.value = MushafPlayback(
+                            activeAyah = activeAyah,
+                            reciting = recitingActive,
+                            playingHere = isThisSurahPlaying,
+                        )
+                    }
                     val mushafDispatch = rememberUpdatedState(
                         { event: ReaderInteractionEvent -> dispatch(event) },
                     )
@@ -2075,9 +2093,7 @@ fun ReaderScreen(
                         surahsById = mushafReady.surahsById,
                         pagerState = mushafPagerState,
                         activeWordState = activeWordState,
-                        activeAyah = activeAyah,
-                        recitingActive = recitingActive,
-                        isThisSurahPlaying = isThisSurahPlaying,
+                        playback = mushafPlayback,
                         playbackSpeed = playerState.speed,
                         fontScale = settings.fontScale,
                         followEnabled = followEnabled,
@@ -2090,6 +2106,7 @@ fun ReaderScreen(
                         onAyahClick = onMushafAyahClick,
                         modifier = Modifier.fillMaxSize(),
                     )
+                    }
                     }
                 } else LazyColumn(
                     state = listState,

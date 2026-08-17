@@ -17,7 +17,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.MenuBook
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.FastForward
 import androidx.compose.material.icons.rounded.FastRewind
 import androidx.compose.material.icons.rounded.Pause
@@ -52,6 +52,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import androidx.media3.common.Player
+import com.beautifulquran.domain.MushafGrid
+import com.beautifulquran.domain.MushafType
+import kotlin.math.pow
 import com.beautifulquran.playback.PlayerUiState
 import com.beautifulquran.ui.theme.HafsFontFamily
 import com.beautifulquran.ui.theme.LocalQuranAccents
@@ -84,9 +87,11 @@ private val MushafRuleTailAir = 10.dp
 private val MushafFolioColumn = 40.dp
 /** Paper between the two figures. */
 private val MushafFolioSpread = 28.dp
+/** The lozenge set between them. */
+private val MushafFolioDiamond = 5.dp
 
 /** Fore-edge margin. The page has no frame, so this is the whole margin. */
-internal val MushafPageMargin = 10.dp
+internal val MushafPageMargin = 7.dp
 /**
  * Running head to first line of revelation. A head that sits closer than
  * about a line's pitch reads as part of the block instead of standing off it;
@@ -168,7 +173,7 @@ internal fun MushafReadingSheet(
                 GutterIcon(
                     onClick = onOpenChapters,
                     enabled = enabled,
-                    image = Icons.AutoMirrored.Rounded.MenuBook,
+                    image = Icons.AutoMirrored.Rounded.ArrowBack,
                     label = "Chapters",
                     tint = quiet,
                     modifier = Modifier.align(Alignment.CenterStart),
@@ -280,6 +285,8 @@ internal fun MushafPageHeader(
     surahNameArabic: String?,
     surahNameLatin: String?,
     juz: Int,
+    unit: Dp,
+    glyphSize: TextUnit,
     modifier: Modifier = Modifier,
 ) {
     // Type alone up here, and in ink rather than gold: gold is illumination —
@@ -295,7 +302,7 @@ internal fun MushafPageHeader(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = MushafEdgeGutter)
-            .height(MushafRunningHead),
+            .height(unit * MushafGrid.RUNNING_HEAD),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         MushafHeadStack(
@@ -303,6 +310,7 @@ internal fun MushafPageHeader(
             latin = "Part $juz",
             ink = ink,
             align = TextAlign.Start,
+            glyphSize = glyphSize,
             modifier = Modifier.weight(1f),
         )
         MushafHeadStack(
@@ -310,6 +318,7 @@ internal fun MushafPageHeader(
             latin = surahNameLatin.orEmpty(),
             ink = ink,
             align = TextAlign.End,
+            glyphSize = glyphSize,
             modifier = Modifier.weight(1f),
         )
     }
@@ -322,13 +331,14 @@ private fun MushafHeadStack(
     latin: String,
     ink: Color,
     align: TextAlign,
+    glyphSize: TextUnit,
     modifier: Modifier = Modifier,
 ) {
     Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
         Text(
             text = arabic,
             fontFamily = HafsFontFamily,
-            fontSize = 12.sp,
+            fontSize = glyphSize * MushafType.RATIO.pow(MushafType.FURNITURE),
             color = ink.copy(alpha = 0.30f),
             textAlign = align,
             maxLines = 1,
@@ -339,7 +349,7 @@ private fun MushafHeadStack(
             Text(
                 text = latin,
                 style = MaterialTheme.typography.labelSmall.copy(
-                    fontSize = 8.5.sp,
+                    fontSize = glyphSize * MushafType.RATIO.pow(MushafType.GLOSS),
                     letterSpacing = 0.10.em,
                 ),
                 color = ink.copy(alpha = 0.44f),
@@ -358,7 +368,12 @@ private fun MushafHeadStack(
  * layout's page-break hairline uses, minus the dot that made it a label.
  */
 @Composable
-internal fun MushafPageFolio(page: Int, modifier: Modifier = Modifier) {
+internal fun MushafPageFolio(
+    page: Int,
+    unit: Dp,
+    glyphSize: TextUnit,
+    modifier: Modifier = Modifier,
+) {
     // In ink, like the running head: at gold-on-cream the figure measured
     // 1.5:1 against the paper and simply vanished.
     //
@@ -369,14 +384,14 @@ internal fun MushafPageFolio(page: Int, modifier: Modifier = Modifier) {
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .height(MushafFolioBand),
+            .height(unit * MushafGrid.FOLIO),
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
             text = "$page",
             style = MaterialTheme.typography.labelSmall.copy(
-                fontSize = 9.sp,
+                fontSize = glyphSize * MushafType.RATIO.pow(MushafType.GLOSS),
                 letterSpacing = 0.14.em,
             ),
             color = ink.copy(alpha = 0.50f),
@@ -384,11 +399,32 @@ internal fun MushafPageFolio(page: Int, modifier: Modifier = Modifier) {
             maxLines = 1,
             modifier = Modifier.width(MushafFolioColumn),
         )
-        Spacer(Modifier.width(MushafFolioSpread))
+        Box(
+            Modifier.width(MushafFolioSpread),
+            contentAlignment = Alignment.Center,
+        ) {
+            // A lozenge between the two figures: the mark a compositor sets
+            // between a pair, so the folio reads as one thing rather than two
+            // numbers that happen to share a line.
+            Canvas(Modifier.size(MushafFolioDiamond)) {
+                val r = size.minDimension / 2f
+                val c = Offset(size.width / 2f, size.height / 2f)
+                drawPath(
+                    Path().apply {
+                        moveTo(c.x, c.y - r)
+                        lineTo(c.x + r * 0.62f, c.y)
+                        lineTo(c.x, c.y + r)
+                        lineTo(c.x - r * 0.62f, c.y)
+                        close()
+                    },
+                    color = ink.copy(alpha = 0.34f),
+                )
+            }
+        }
         Text(
             text = page.toArabicIndic(),
             fontFamily = HafsFontFamily,
-            fontSize = 12.sp,
+            fontSize = glyphSize * MushafType.RATIO.pow(MushafType.FURNITURE),
             color = ink.copy(alpha = 0.54f),
             textAlign = TextAlign.Start,
             maxLines = 1,

@@ -83,20 +83,25 @@ class MushafPageFitTest {
     }
 
     @Test
-    fun `a line is fitted to the measure by its own hand`() {
-        // Exactly the measure: written as the book is set.
+    fun `the hand never grows to fill paper`() {
+        // The book is set at one size. A line short of the measure stays at
+        // that size and closes the remainder with its word gaps — it is not
+        // opened up, however much paper it has to cross.
         assertEquals(1f, mushafLineFill(naturalWidthPx = 964f, measureWidthPx = 964f), 0f)
-        // Sparse line: opened up to reach the margin, rather than leaving
-        // rivers of paper between its words.
-        assertEquals(1.06f, mushafLineFill(naturalWidthPx = 910f, measureWidthPx = 964f), 0.005f)
-        // Crowded line: closed up to fit.
+        assertEquals(1f, mushafLineFill(naturalWidthPx = 910f, measureWidthPx = 964f), 0f)
+        assertEquals(1f, mushafLineFill(naturalWidthPx = 400f, measureWidthPx = 964f), 0f)
+    }
+
+    @Test
+    fun `only a line wider than the measure closes up, and barely`() {
+        // Anchoring the size on the widest line the book contains leaves about
+        // one line in a hundred over the measure; those close by a few percent
+        // rather than clipping.
         assertEquals(0.95f, mushafLineFill(naturalWidthPx = 1015f, measureWidthPx = 964f), 0.005f)
-        // Never opened past the bound, so no line reads as a different hand.
-        assertEquals(
-            MUSHAF_MAX_LINE_STRETCH,
-            mushafLineFill(naturalWidthPx = 400f, measureWidthPx = 964f),
-            0.001f,
-        )
+        // The floor is advisory: a line far past the measure still closes all
+        // the way, because ink over the fore-edge is clipped and a sliced ayah
+        // mark is worse than a line set a little tighter.
+        assertEquals(964f / 1500f, mushafLineFill(naturalWidthPx = 1500f, measureWidthPx = 964f), 0.001f)
     }
 
     @Test

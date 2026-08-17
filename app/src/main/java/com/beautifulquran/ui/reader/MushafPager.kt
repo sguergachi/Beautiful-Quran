@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -17,6 +18,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.State
@@ -49,7 +51,9 @@ import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
@@ -57,6 +61,7 @@ import com.beautifulquran.data.model.Ayah
 import com.beautifulquran.data.model.Surah
 import com.beautifulquran.data.model.SurahContent
 import com.beautifulquran.domain.MUSHAF_LINE_EM
+import com.beautifulquran.domain.MUSHAF_LINE_PITCH_EM
 import com.beautifulquran.domain.MushafCatalog
 import com.beautifulquran.domain.MushafLine
 import com.beautifulquran.domain.MushafPage
@@ -64,12 +69,26 @@ import com.beautifulquran.domain.MushafToken
 import com.beautifulquran.domain.BASMALAH_UTHMANI
 import com.beautifulquran.domain.buildMushafQcfLine
 import com.beautifulquran.domain.mushafFontPreloadPages
+import com.beautifulquran.domain.MushafGrid
+import com.beautifulquran.domain.MushafType
 import com.beautifulquran.domain.mushafGridSlots
 import com.beautifulquran.domain.mushafUniformFontPx
 import com.beautifulquran.domain.mushafLineSlotPx
 import com.beautifulquran.domain.surahOpensWithBasmalahPreface
 import kotlin.math.abs
 import com.beautifulquran.ui.theme.MushafFontFamily
+
+/**
+ * What the leaf needs to know about playback, in one place so it can be handed
+ * over as a single [State] and read where it is used rather than where the page
+ * is built — a play or a pause then never recomposes the pages themselves.
+ */
+@Immutable
+internal data class MushafPlayback(
+    val activeAyah: Int?,
+    val reciting: Boolean,
+    val playingHere: Boolean,
+)
 
 /**
  * Ayah-mark overhang allowance at each end of a line.
@@ -79,7 +98,7 @@ import com.beautifulquran.ui.theme.MushafFontFamily
  * hanging outside it, where it is clipped and the number comes out sliced.
  * Reserve enough paper at both fore-edges for the medallion to sit whole.
  */
-internal val MushafEdgeGutter = 12.dp
+internal val MushafEdgeGutter = 10.dp
 
 /**
  * A line is measured as one concatenated run but drawn one [Text] per word,
@@ -87,52 +106,65 @@ internal val MushafEdgeGutter = 12.dp
  * page than the one that draws it — a full line then lands inside the box
  * instead of exactly on it.
  */
-private val MushafFitSlack = 4.dp
-
-/** Paper under the folio, so the figure sits with the leaf and not the rule. */
-private val MushafFolioTail = 22.dp
-
-/** How far a turning leaf dissolves in from each fore-edge. */
-private val MushafForeEdgeFade = 76.dp
+private val MushafFitSlack = 2.dp
 
 /**
- * Paper drawn back over both fore-edges while a leaf is in motion, so a page
- * dissolves into the margin as it turns instead of sliding off a hard edge.
- *
- * Only while it moves: the fade follows the pager's offset, so a settled leaf
- * carries none of it and the revelation is never dimmed at rest. The band is
- * the leaf's own margin, so even at full strength it washes paper, not text.
+ * The page's own hand, as the chrome sees it: the size a line of revelation is
+ * set in on this leaf, which anchors the whole type scale (see [MushafType]).
+ * Read from the grid rather than measured, so the running head and folio can
+ * be sized before a page font has even loaded.
  */
-private fun Modifier.mushafForeEdgeFade(
-    paper: Color,
-    offsetFraction: () -> Float,
-): Modifier = drawWithContent {
+@Composable
+private fun leafGlyphSize(unit: Dp, fontScale: Float): TextUnit = with(LocalDensity.current) {
+    (unit.toPx() / MUSHAF_LINE_PITCH_EM * fontScale.coerceIn(0.88f, 1.12f)).toSp()
+}
+
+/** How far a turning leaf dissolves in from each fore-edge. */
+private val MushafForeEdgeFade = 58.dp
+
+/**
+ * Both fore-edges feathered into the paper, always.
+ *
+ * A leaf in a bound book does not end at a cut line: it turns away from the
+ * eye. So the edges are opaque paper at the very margin and feather inward
+ * over [MushafForeEdgeFade] — always, not only while a page moves. Tying it to
+ * the pager's offset meant the effect appeared halfway through a swipe and
+ * vanished again, which reads as a glitch rather than as the shape of a book;
+ * and the band is the leaf's own margin, so at rest it washes paper, never
+ * text.
+ */
+private fun Modifier.mushafForeEdgeFade(paper: Color): Modifier = drawWithContent {
     drawContent()
-    val turning = (abs(offsetFraction()) * 3.4f).coerceIn(0f, 1f)
-    if (turning <= 0.01f) return@drawWithContent
-    // Deep enough to take the last words of a line with it: a leaf that only
-    // faded its margin looked no different from one that slid off the edge.
     val band = MushafForeEdgeFade.toPx()
-    val edge = paper.copy(alpha = turning)
-    drawRect(
-        brush = Brush.horizontalGradient(
-            0f to edge,
-            1f to Color.Transparent,
-            startX = 0f,
-            endX = band,
-        ),
-        size = Size(band, size.height),
-    )
-    drawRect(
-        brush = Brush.horizontalGradient(
-            0f to Color.Transparent,
-            1f to edge,
-            startX = size.width - band,
-            endX = size.width,
-        ),
-        topLeft = Offset(size.width - band, 0f),
-        size = Size(band, size.height),
-    )
+    for (side in 0..1) {
+        val fromLeft = side == 0
+        drawRect(
+            brush = Brush.horizontalGradient(
+                // Opaque across the leaf's own margin, then a long whisper over
+                // the first letters: the edge has to dissolve, but a reader
+                // must still be able to read the word it dissolves.
+                colorStops = if (fromLeft) {
+                    arrayOf(
+                        0f to paper,
+                        0.30f to paper.copy(alpha = 0.92f),
+                        0.52f to paper.copy(alpha = 0.34f),
+                        1f to Color.Transparent,
+                    )
+                } else {
+                    arrayOf(
+                        0f to Color.Transparent,
+                        0.48f to paper.copy(alpha = 0.34f),
+                        0.70f to paper.copy(alpha = 0.92f),
+                        1f to paper,
+                    )
+                },
+                startX = if (fromLeft) 0f else size.width - band,
+                endX = if (fromLeft) band else size.width,
+            ),
+            topLeft = Offset(if (fromLeft) 0f else size.width - band, 0f),
+            size = Size(band, size.height),
+        )
+    }
 }
 
 /**
@@ -146,9 +178,12 @@ internal fun MushafPager(
     surahsById: Map<Int, Surah>,
     pagerState: PagerState,
     activeWordState: State<ActiveWord?>,
-    activeAyah: Int?,
-    recitingActive: Boolean,
-    isThisSurahPlaying: Boolean,
+    /**
+     * Playback, deferred. Passed as one [State] rather than three values so a
+     * play or a pause does not recompose every leaf in the pager — only the ink
+     * clocks, which is where the swap of packs actually belongs.
+     */
+    playback: State<MushafPlayback>,
     playbackSpeed: Float,
     fontScale: Float,
     followEnabled: Boolean,
@@ -172,7 +207,7 @@ internal fun MushafPager(
         mutableIntStateOf(pagerState.currentPage)
     }
     LaunchedEffect(followEnabled, loadedSurahId, catalog, pagerState, heldPage) {
-        snapshotFlow { activeWordState.value to isThisSurahPlaying }
+        snapshotFlow { activeWordState.value to playback.value.playingHere }
             .collect { (word, playingHere) ->
                 if (!followEnabled || word == null) return@collect
                 // The active word carries no surah of its own. Right after a
@@ -219,7 +254,7 @@ internal fun MushafPager(
         key = { it },
         modifier = modifier
             .fillMaxSize()
-            .mushafForeEdgeFade(paper) { pagerState.currentPageOffsetFraction },
+            .mushafForeEdgeFade(paper),
     ) { pageIndex ->
         val page = catalog.page(pageIndex + 1)
         if (page == null) {
@@ -228,25 +263,34 @@ internal fun MushafPager(
             val settled by remember {
                 derivedStateOf { pageIndex == pagerState.settledPage }
             }
-            Column(
+            BoxWithConstraints(
                 Modifier
                     .fillMaxSize()
                     .padding(horizontal = MushafPageMargin),
             ) {
+            val density = LocalDensity.current
+            // One unit for the whole leaf — see MushafGrid. Every band below is
+            // a whole number of them, so the head, the well, the tail and the
+            // folio all sit on the same rhythm as the lines of revelation.
+            val unit = with(density) {
+                MushafGrid.unitPx(constraints.maxHeight.toFloat()).toDp()
+            }
+            Column(Modifier.fillMaxSize()) {
                 MushafPageHeader(
                     surahNameArabic = surahsById[page.primarySurahId]?.nameArabic,
                     surahNameLatin = surahsById[page.primarySurahId]?.nameTransliteration,
                     juz = page.juz,
+                    unit = unit,
+                    glyphSize = leafGlyphSize(unit, fontScale),
                 )
+                Spacer(Modifier.height(unit * MushafGrid.HEAD_GUTTER))
                 MushafPageSheet(
                     page = page,
                     content = content,
                     surahsById = surahsById,
                     liveInk = settled,
                     activeWordState = activeWordState,
-                    activeAyah = activeAyah.takeIf { settled },
-                    recitingActive = recitingActive && settled,
-                    isThisSurahPlaying = isThisSurahPlaying && settled,
+                    playback = playback,
                     playbackSpeed = playbackSpeed,
                     fontScale = fontScale,
                     loadedSurahId = loadedSurahId,
@@ -254,22 +298,19 @@ internal fun MushafPager(
                     onWordClick = onWordClick,
                     onWordLongClick = onWordLongClick,
                     onAyahClick = onAyahClick,
+                    unit = unit,
                     modifier = Modifier
-                        .weight(1f)
-                        .fillMaxWidth()
-                        .padding(top = MushafTextGutter, bottom = MushafTailGutter),
+                        .height(unit * MushafGrid.TEXT_LINES)
+                        .fillMaxWidth(),
                 )
+                Spacer(Modifier.height(unit * MushafGrid.TAIL))
                 MushafPageFolio(
                     page = page.page,
-                    // Paper under the folio, inside the leaf. Shrinking the
-                    // folio's own band only fed the weighted text block above
-                    // it, which pushed the last line down by as much as the
-                    // figure rose; the gap has to be taken out of the leaf's
-                    // tail for the number to group with the page.
-                    modifier = Modifier
-                        .padding(horizontal = MushafEdgeGutter)
-                        .padding(bottom = MushafFolioTail),
+                    unit = unit,
+                    glyphSize = leafGlyphSize(unit, fontScale),
+                    modifier = Modifier.padding(horizontal = MushafEdgeGutter),
                 )
+            }
             }
         }
     }
@@ -282,9 +323,7 @@ private fun MushafPageSheet(
     surahsById: Map<Int, Surah>,
     liveInk: Boolean,
     activeWordState: State<ActiveWord?>,
-    activeAyah: Int?,
-    recitingActive: Boolean,
-    isThisSurahPlaying: Boolean,
+    playback: State<MushafPlayback>,
     playbackSpeed: Float,
     fontScale: Float,
     loadedSurahId: Int,
@@ -292,6 +331,7 @@ private fun MushafPageSheet(
     onWordClick: (MushafToken) -> Unit,
     onWordLongClick: (MushafToken) -> Unit,
     onAyahClick: (MushafToken) -> Unit,
+    unit: Dp,
     modifier: Modifier = Modifier,
 ) {
     val ayahsOnPage = remember(page.page, content.surah.id, content.ayahs) {
@@ -309,9 +349,7 @@ private fun MushafPageSheet(
         MushafPageInkClocks(
             ayahs = ayahsOnPage,
             activeWordState = activeWordState,
-            activeAyah = activeAyah,
-            recitingActive = recitingActive,
-            isThisSurahPlaying = isThisSurahPlaying,
+            playback = playback,
             playbackSpeed = playbackSpeed,
             flashWordPosition = flashWordPosition,
             packsState = packsState,
@@ -350,21 +388,22 @@ private fun MushafPageSheet(
             // One size for the whole book: the measure, not this page's own
             // longest line. Fitting each leaf to itself made the hand grow and
             // shrink as the pages turned.
-            val fontPx = remember(availableH, availableW, fontScale, slotCount) {
+            val unitPx = with(density) { unit.toPx() }
+            val fontPx = remember(unitPx, availableW, fontScale, slotCount) {
                 mushafUniformFontPx(
                     measureWidthPx = availableW,
-                    wellHeightPx = availableH,
+                    // The well is the grid's fifteen units; a page carrying a
+                    // chapter's opening asks for more slots than that and packs
+                    // them into the same well.
+                    wellHeightPx = unitPx * mushafGridSlots(slotCount),
                     slots = mushafGridSlots(slotCount),
                     fontScale = fontScale,
                 )
             }
             val fontSp = with(density) { fontPx.toSp() }
+            // One slot is one unit of the leaf's grid, whatever the page holds.
             val lineSlot = with(density) {
-                mushafLineSlotPx(
-                    pageHeightPx = availableH,
-                    slots = mushafGridSlots(slotCount),
-                    fontPx = fontPx,
-                ).toDp()
+                (availableH / mushafGridSlots(slotCount)).toDp()
             }
             CompositionLocalProvider(
                 LocalLayoutDirection provides LayoutDirection.Rtl,
@@ -430,9 +469,7 @@ private fun MushafPageSheet(
 private fun MushafPageInkClocks(
     ayahs: List<Ayah>,
     activeWordState: State<ActiveWord?>,
-    activeAyah: Int?,
-    recitingActive: Boolean,
-    isThisSurahPlaying: Boolean,
+    playback: State<MushafPlayback>,
     playbackSpeed: Float,
     flashWordPosition: Int?,
     packsState: SnapshotStateMap<Pair<Int, Int>, AyahInkPack>,
@@ -442,6 +479,9 @@ private fun MushafPageInkClocks(
             val activeWord by remember(ayah.number) {
                 derivedStateOf { activeWordState.value?.takeIf { it.ayah == ayah.number } }
             }
+            val activeAyah = playback.value.activeAyah
+            val recitingActive = playback.value.reciting
+            val isThisSurahPlaying = playback.value.playingHere
             val policyActive = isThisSurahPlaying &&
                 (activeWord != null || ayah.number == activeAyah)
             val pack = if (policyActive) {

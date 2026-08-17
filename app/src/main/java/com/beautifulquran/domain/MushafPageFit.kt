@@ -52,13 +52,19 @@ const val MUSHAF_MAX_FONT_PX = 128f
  *
  * The QCF word glyphs are not pre-justified — measured with HarfBuzz over all
  * ~9,000 lines of the mushaf (tools/measure_mushaf_lines.py), a line's glyph
- * run spans 14.1 em (p10) through 15.6 em (p50) to 16.9 em (p90). The median
- * line is the book's measure: setting the type from it fills the page with the
- * largest hand the leaf can carry. Shorter runs close the small remainder with
- * their word gaps; longer ones are drawn a little tighter by
- * [mushafLineSqueeze], the way a calligrapher fits a crowded line.
+ * run spans 14.1 em (p10) through 15.6 em (p50) to 18.7 em (p99), and no
+ * constant word space closes that spread (searched: the best leaves 17.8%).
+ *
+ * So a page cannot both hold one hand and have every line reach both margins
+ * by spacing alone, and something must give. It is not the hand: a leaf whose
+ * type changes size line by line reads as a fault, however cleverly fitted.
+ * The measure is taken from the widest line the book contains, so the type is
+ * one size everywhere and no line can overrun; each line then closes what it
+ * lacks with its word gaps, as a compositor does. This is where the reference
+ * implementations land too — quran.com fixes the size per scale step and lets
+ * the line be what it is.
  */
-const val MUSHAF_DESIGN_LINE_EM = 15.6f
+const val MUSHAF_DESIGN_LINE_EM = 18.7f
 
 /**
  * The one type size for every leaf: the measure divided by the design line,
@@ -104,14 +110,14 @@ fun mushafLineFill(naturalWidthPx: Float, measureWidthPx: Float): Float {
 }
 
 /**
- * Floor for a crowded line — a guard against absurdity, not a promise: a line
- * that needs to close up further than this still does, since fitting the
- * measure comes first.
+ * Floor for the handful of lines wider than the measure even at the book's own
+ * size — a guard against clipping, not a design device. Anchoring on the p99
+ * line leaves about one line in a hundred to close up, by a few percent.
  */
-const val MUSHAF_MIN_LINE_SQUEEZE = 0.70f
+const val MUSHAF_MIN_LINE_SQUEEZE = 0.93f
 
-/** Nor a sparse one larger than this, however much paper it has to cross. */
-const val MUSHAF_MAX_LINE_STRETCH = 1.16f
+/** A line is never opened up: the hand does not grow to fill paper. */
+const val MUSHAF_MAX_LINE_STRETCH = 1.0f
 
 
 

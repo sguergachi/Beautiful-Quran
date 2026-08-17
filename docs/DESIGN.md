@@ -82,9 +82,11 @@ it does not colour in the pages behind it, so nothing fills. It answers while
 pages are turned as well as while they are recited. Furniture, so never gold —
 a line drawn along the paper's edge rather than a bar with a handle.
 
-A turning leaf dissolves into both fore-edges, paper drawn back over the
-outermost 76dp in proportion to the pager's offset. Only while it moves: a
-settled leaf carries none of it.
+Both fore-edges are feathered into the paper, always — opaque across the
+leaf's own margin, then a long whisper over the first letters. A leaf in a
+bound book does not end at a cut line, it turns away from the eye; tying the
+effect to the pager's offset made it appear halfway through a swipe and vanish
+again, which reads as a glitch rather than as the shape of a book.
 
 A short page (al-Fātiḥah) sits in the middle of the well; a full Madinah page
 fills it. A swipe turns the whole leaf (running head, text, folio) the way
