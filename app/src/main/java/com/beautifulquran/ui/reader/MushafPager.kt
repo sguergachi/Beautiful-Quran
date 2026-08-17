@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.LinearOutSlowInEasing
@@ -396,17 +397,29 @@ private fun MushafPageSheet(
     // short fade: paper settling into the light, rather than type jumping.
     // The wait is capped, so a page whose face never loads still shows itself
     // in the stand-in rather than staying blank.
+    // Every leaf begins at nothing and is brought up, whether or not its face
+    // had to be fetched: a cached face otherwise meant a chapter snapped into
+    // existence while an uncached one faded, so the same act looked like two
+    // different things depending on what had been read before.
     var faceOverdue by remember(page.page) { mutableStateOf(false) }
     LaunchedEffect(page.page) {
         delay(MushafLeafFaceWaitMs)
         faceOverdue = true
     }
     val leafReady = pageFont != null || faceOverdue
-    val leafFade by animateFloatAsState(
-        targetValue = if (leafReady) 1f else 0f,
-        animationSpec = tween(MushafLeafFadeMs, easing = LinearOutSlowInEasing),
-        label = "mushafLeafFade",
-    )
+    val leafFade = remember(page.page) { Animatable(0f) }
+    // Settled is its own flag so the fade itself can be read in the draw phase:
+    // reading an Animatable in composition would recompose the whole leaf on
+    // every frame of its own entrance.
+    var leafSettled by remember(page.page) { mutableStateOf(false) }
+    LaunchedEffect(page.page, leafReady) {
+        if (!leafReady) return@LaunchedEffect
+        leafFade.animateTo(
+            targetValue = 1f,
+            animationSpec = tween(MushafLeafFadeMs, easing = LinearOutSlowInEasing),
+        )
+        leafSettled = true
+    }
     BoxWithConstraints(
         modifier
             .fillMaxSize()
@@ -415,7 +428,11 @@ private fun MushafPageSheet(
             // current by walking its whole subhierarchy — on a leaf that is
             // every word on the page (see [MushafHafsLine]).
             .then(
-                if (leafFade < 1f) Modifier.graphicsLayer { alpha = leafFade } else Modifier,
+                if (leafSettled) {
+                    Modifier
+                } else {
+                    Modifier.graphicsLayer { alpha = leafFade.value }
+                },
             ),
     ) {
             val density = LocalDensity.current
