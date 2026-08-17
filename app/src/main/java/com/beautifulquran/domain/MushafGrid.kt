@@ -14,13 +14,12 @@ import kotlin.math.pow
  * The unit is one line's pitch, and the leaf is [SLOTS] of them:
  *
  * ```
- *   1   running head
- *   1   head gutter
+ *   1   running head, its own air included
  *  15   the revelation — the Madinah page's own grid
  *   1   tail, the last line to the folio
  *   1   folio
  *  ---
- *  19
+ *  18
  * ```
  *
  * The type well is exactly fifteen units whatever the leaf's height, so the
@@ -29,7 +28,14 @@ import kotlin.math.pow
  */
 object MushafGrid {
     const val RUNNING_HEAD = 1
-    const val HEAD_GUTTER = 1
+
+    /**
+     * Nothing: the head band carries its own air, and the unit it used to take
+     * is worth more to the revelation. Folding it in makes the type about 6%
+     * larger on the same leaf, which is the whole of the difference between a
+     * page that reads generously and one that reads careful.
+     */
+    const val HEAD_GUTTER = 0
     const val TEXT_LINES = MUSHAF_LINES_PER_PAGE
     const val TAIL = 1
     const val FOLIO = 1

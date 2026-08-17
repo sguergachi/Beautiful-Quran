@@ -7,8 +7,8 @@ import org.junit.Test
 class MushafGridTest {
 
     @Test
-    fun `the leaf is nineteen units and fifteen of them are revelation`() {
-        assertEquals(19, MushafGrid.SLOTS)
+    fun `the leaf is eighteen units and fifteen of them are revelation`() {
+        assertEquals(18, MushafGrid.SLOTS)
         assertEquals(15, MushafGrid.TEXT_LINES)
         // Head, gutter, tail and folio are the other four.
         assertEquals(
@@ -19,7 +19,7 @@ class MushafGridTest {
 
     @Test
     fun `every band on the leaf is a whole number of units`() {
-        val leaf = 2033f
+        val leaf = 2004f
         val unit = MushafGrid.unitPx(leaf)
         val bands = listOf(
             MushafGrid.RUNNING_HEAD,

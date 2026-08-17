@@ -52,9 +52,6 @@ import com.beautifulquran.ui.theme.shapedWordBloom
 
 private const val MARK_SIZE_RATIO = 20f / 30f
 
-/** Air between a verse's closing letter and its circled mark. */
-private val MushafMarkGap = 0.10.em
-
 /**
  * One Madinah line. QCF V2 is one handwritten word-glyph per token
  * (no U+0020). Leftover width is [Spacer] weights so the line fills
@@ -274,6 +271,18 @@ private fun MushafQcfPageLine(
                 onWordLongClick = onWordLongClick,
                 onAyahClick = onAyahClick,
             )
+            val mark = token.word.qcfV2.takeIf { it.isNotEmpty() }?.let(::qcfTrailingMark).orEmpty()
+            if (mark.isNotEmpty()) {
+                if (justify) Spacer(Modifier.weight(1f))
+                Text(
+                    text = mark,
+                    style = style,
+                    color = ayahMarkInk,
+                    maxLines = 1,
+                    softWrap = false,
+                    overflow = TextOverflow.Visible,
+                )
+            }
         }
     }
     }
@@ -295,29 +304,15 @@ private fun MushafQcfWord(
 ) {
     val raw = token.word.qcfV2
     val word = if (raw.isNotEmpty()) qcfWordGlyphs(raw) else token.word.arabic
-    val mark = if (raw.isNotEmpty()) qcfTrailingMark(raw) else ""
-    val rendered = remember(word, mark, palette.fullInkColor, ayahMarkInk) {
-        val ranges = listOf(0 until word.length)
+    val rendered = remember(word, palette.fullInkColor) {
+        // The word alone. Its circled mark, if it closes a verse, is set as its
+        // own cell of the line (see [MushafQcfPageLine]) so the line's spacing
+        // falls either side of it evenly — glued to the word, a mark took the
+        // gap on one side only and the page read lopsided around every verse.
         val text = buildAnnotatedString {
-            withStyle(SpanStyle(color = palette.fullInkColor)) {
-                if (mark.isEmpty() || word.length < 2) {
-                    append(word)
-                } else {
-                    // A hair of air before the medallion. The page fonts carry
-                    // no space glyph, so the gap is let out of the closing
-                    // letter's own advance rather than typed — printed, a mark
-                    // never sits hard against the word it closes.
-                    append(word.substring(0, word.length - 1))
-                    withStyle(SpanStyle(letterSpacing = MushafMarkGap)) {
-                        append(word.substring(word.length - 1))
-                    }
-                }
-            }
-            if (mark.isNotEmpty()) {
-                withStyle(SpanStyle(color = ayahMarkInk)) { append(mark) }
-            }
+            withStyle(SpanStyle(color = palette.fullInkColor)) { append(word) }
         }
-        RenderedLineText(text = text, wordRanges = ranges, markRange = 0..-1)
+        RenderedLineText(text = text, wordRanges = listOf(0 until word.length), markRange = 0..-1)
     }
     var layoutResult by remember { mutableStateOf<TextLayoutResult?>(null) }
     // A word waiting its turn is dimmed by its own alpha, not by paper laid
