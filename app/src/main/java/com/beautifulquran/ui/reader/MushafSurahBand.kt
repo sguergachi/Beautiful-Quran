@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.GenericShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -154,10 +155,10 @@ internal fun MushafSurahTitleBand(
         modifier = modifier.fillMaxWidth().height(bandHeight),
         contentAlignment = Alignment.Center,
     ) {
-        // The panel is a capsule that tapers to a point at either end, the way
-        // a ribbon cartouche is drawn — a rectangle reads as a UI card however
-        // finely it is ruled.
-        val capsule = remember { taperedCapsuleShape(MushafPanelTaper) }
+        // The panel is a plain ruled box: a band across the leaf, squared at
+        // the ends. The capsule belongs to the cartouche inside it, which is
+        // the thing that holds the name.
+        val capsule = remember { RoundedCornerShape(MushafPanelCornerPx.dp / 3f) }
         // The ground is laid once and mirrored at the fold, so the panel is
         // symmetrical about its own centre — a tiling cut by the two ends at
         // whatever phase it happened to reach is not.
@@ -186,17 +187,10 @@ internal fun MushafSurahTitleBand(
         Canvas(Modifier.fillMaxSize()) {
             // Doubled rule, both following the taper: the panel's edge, then a
             // hairline just inside it.
-            drawPath(
-                taperedCapsulePath(size, MushafPanelTaper),
-                color = rule,
-                style = Stroke(width = 1.2.dp.toPx()),
-            )
+            val r = CornerRadius(MushafPanelCornerPx, MushafPanelCornerPx)
+            drawRoundRect(color = rule, cornerRadius = r, style = Stroke(width = 1.2.dp.toPx()))
             inset(3.dp.toPx()) {
-                drawPath(
-                    taperedCapsulePath(this.size, MushafPanelTaper),
-                    color = hair,
-                    style = Stroke(width = 0.8.dp.toPx()),
-                )
+                drawRoundRect(color = hair, cornerRadius = r, style = Stroke(width = 0.8.dp.toPx()))
             }
         }
         Row(
@@ -254,11 +248,10 @@ private fun MushafTitleCartouche(
     val nameLift = with(LocalDensity.current) { (fontSize.toPx() * MushafNameLift).toDp() }
     Box(contentAlignment = Alignment.Center) {
         Canvas(Modifier.matchParentSize()) {
-            // The cartouche tapers like the panel around it, so the two read as
-            // one drawing rather than a box inside a box.
-            val path = taperedCapsulePath(size, MushafCartoucheTaper)
-            drawPath(path, color = paper)
-            drawPath(path, color = rule, style = Stroke(width = 0.8.dp.toPx()))
+            // A capsule: the panel is the band, this is what carries the name.
+            val r = CornerRadius(size.height / 2f, size.height / 2f)
+            drawRoundRect(color = paper, cornerRadius = r)
+            drawRoundRect(color = rule, cornerRadius = r, style = Stroke(width = 0.8.dp.toPx()))
         }
         Text(
             text = name,
