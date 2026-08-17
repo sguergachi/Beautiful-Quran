@@ -10,7 +10,7 @@ class MushafGridTest {
     fun `the leaf is eighteen units and fifteen of them are revelation`() {
         assertEquals(18, MushafGrid.SLOTS)
         assertEquals(15, MushafGrid.TEXT_LINES)
-        // Head, gutter, tail and folio are the other four.
+        // Head, gutter and folio are the other three.
         assertEquals(
             MushafGrid.SLOTS - MushafGrid.TEXT_LINES,
             MushafGrid.RUNNING_HEAD + MushafGrid.HEAD_GUTTER + MushafGrid.TAIL + MushafGrid.FOLIO,

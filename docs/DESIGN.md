@@ -26,6 +26,13 @@ margins are a book's, not a chrome's — a single fore-edge margin plus an edge
 gutter deep enough for a circled ayah mark's medallion, which inks about half
 its own width past its advance and is sliced by anything narrower.
 
+The leaf is an eighteen-unit column of one line's pitch: running head, a whole
+unit of paper under it, the fifteen lines of revelation, and the folio band —
+so the head stands a line clear of the text and the chrome is measured in the
+same breath as the scripture. The unit a tail margin would take goes to the
+revelation instead; the folio's figure, centred in its own band, already sits
+half a line clear of the last line.
+
 **The folio belongs to the leaf.** It is set nearer the last line of
 revelation than the rule beneath it, because proximity is what assigns it:
 measured against the transport instead, it drifts every time the chrome
