@@ -117,13 +117,27 @@ fun mushafLineCondense(naturalWidthPx: Float, measureWidthPx: Float): Float {
     if (naturalWidthPx <= 0f || measureWidthPx <= 0f) return 1f
     val needed = measureWidthPx / naturalWidthPx
     // A line at or inside the measure is never touched: it fills by gap.
-    return if (needed >= 1f) 1f else needed.coerceAtLeast(MUSHAF_MIN_LINE_CONDENSE)
+    // Past it, the line is condensed by exactly what it needs and never
+    // clamped: a line is drawn one node per word, so a clamp does not stop at
+    // a tidy overhang — the cells run past the measure, their weight spacers
+    // collapse to nothing, and the glyphs paint over their neighbours. That is
+    // what put a word on top of the circled ١٢ on page 79. Fit is a guarantee
+    // here; how tight a line may get before it stops reading as the page's own
+    // hand is a property of the data, asserted over the whole mushaf by
+    // MushafPageFitTest against MUSHAF_MIN_LINE_CONDENSE.
+    return if (needed >= 1f) 1f else needed
 }
 
 /**
- * How far a line may be condensed before the fit is not worth it: measured over
- * the mushaf, only 1.1% of lines ask for more than this, and they come from the
- * few pages whose runs are anomalous.
+ * How far a line is expected to be condensed at worst — the point past which a
+ * line stops reading as the same hand as the page around it.
+ *
+ * This is a *measured expectation*, not a runtime clamp. Over the mushaf 1.1%
+ * of lines ask for more than this, and they come from the few pages whose runs
+ * are anomalous; clamping them was silently breaking their layout, so they are
+ * now set as tight as they need to be. The constant survives as the threshold
+ * the corpus is held to, so a data change that makes some line absurdly long
+ * fails a test instead of quietly squeezing a page.
  */
 const val MUSHAF_MIN_LINE_CONDENSE = 0.86f
 

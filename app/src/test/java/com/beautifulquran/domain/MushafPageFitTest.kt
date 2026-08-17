@@ -94,25 +94,27 @@ class MushafPageFitTest {
     fun `a line past the measure is condensed, not resized`() {
         // Measured over the mushaf, half the condensed lines need under 3.5%.
         assertEquals(0.95f, mushafLineCondense(naturalWidthPx = 1015f, measureWidthPx = 964f), 0.005f)
-        // And never past the floor, which about one line in a hundred reaches.
-        assertEquals(
-            MUSHAF_MIN_LINE_CONDENSE,
-            mushafLineCondense(naturalWidthPx = 1500f, measureWidthPx = 964f),
-            0.001f,
+        // The typographic expectation: the lines that ask for real condensing
+        // are rare, and this is about as tight as the corpus gets.
+        assertTrue(
+            "the anomalous runs should sit near the expected worst case",
+            mushafLineCondense(naturalWidthPx = 1120f, measureWidthPx = 964f) >=
+                MUSHAF_MIN_LINE_CONDENSE,
         )
     }
 
     @Test
-    fun `no line is left wider than the measure until the floor is reached`() {
-        // Ink over the fore-edge is clipped and the mark at a line's end is
-        // what gets sliced, so a line is condensed until it fits — down to the
-        // floor, which only the anomalous runs reach.
-        listOf(1000f, 1100f).forEach { natural ->
+    fun `no line is ever left wider than the measure`() {
+        // A line is drawn one node per word, so a line left wider than its
+        // measure does not overhang tidily: its cells overrun, the weight
+        // spacers between them collapse, and glyphs paint over their
+        // neighbours — a word landed on the circled ١٢ of page 79 this way.
+        // Fit is therefore absolute, including for the runs that ask to be set
+        // tighter than MUSHAF_MIN_LINE_CONDENSE (53 lines of the mushaf do).
+        listOf(1000f, 1100f, 1500f, 2200f).forEach { natural ->
             val k = mushafLineCondense(naturalWidthPx = natural, measureWidthPx = 964f)
             assertTrue("$natural overflowed", natural * k <= 964f + 0.01f)
         }
-        val floored = mushafLineCondense(naturalWidthPx = 2200f, measureWidthPx = 964f)
-        assertEquals(MUSHAF_MIN_LINE_CONDENSE, floored, 0.001f)
     }
 
     @Test

@@ -225,13 +225,20 @@ private fun MushafQcfPageLine(
             maxLines = 1,
             softWrap = false,
         ).size.width.toFloat()
-        // The line is measured as one run but drawn one [Text] per word, and
-        // each of those rounds its width up. Fit to a measure a pixel per word
+        // The line is measured as one run but drawn one [Text] per cell, and
+        // each of those rounds its width up. Fit to a measure a pixel per cell
         // short of the real one: fitted exactly, that rounding pushes the last
         // word — and the circled ayah mark riding on it — past the edge.
+        // A verse-closing mark is a cell of its own (see the Row below), so it
+        // has to be counted here too; counting words alone left every line that
+        // closes a verse one rounding short, which is exactly the line that can
+        // least afford it.
+        val cells = line.tokens.size + line.tokens.count { token ->
+            token.word.qcfV2.isNotEmpty() && qcfTrailingMark(token.word.qcfV2).isNotEmpty()
+        }
         mushafLineCondense(
             naturalWidthPx = natural,
-            measureWidthPx = (measureWidthPx - line.tokens.size).coerceAtLeast(1f),
+            measureWidthPx = (measureWidthPx - cells).coerceAtLeast(1f),
         )
     }
     // Condensed, never resized. A line brought inside the measure keeps its
@@ -274,6 +281,16 @@ private fun MushafQcfPageLine(
             val mark = token.word.qcfV2.takeIf { it.isNotEmpty() }?.let(::qcfTrailingMark).orEmpty()
             if (mark.isNotEmpty()) {
                 if (justify) Spacer(Modifier.weight(1f))
+                // The mark is its own cell, so it sits outside the word's ink
+                // node and needs the verse's own alphas applied here: the focus
+                // alpha the scrolling reader gives every mark, and the recess
+                // that dims a verse waiting its turn. Read in the layer block
+                // so both animate without recomposing the leaf.
+                val markInkAlpha = {
+                    val pack = packs[token.surahId to token.ayah]
+                    if (!liveInk || pack == null) 1f
+                    else (pack.markAlpha.value * (1f - pack.recessCover.value)).coerceIn(0f, 1f)
+                }
                 Text(
                     text = mark,
                     style = style,
@@ -281,6 +298,10 @@ private fun MushafQcfPageLine(
                     maxLines = 1,
                     softWrap = false,
                     overflow = TextOverflow.Visible,
+                    modifier = Modifier.graphicsLayer {
+                        alpha = markInkAlpha()
+                        compositingStrategy = CompositingStrategy.ModulateAlpha
+                    },
                 )
             }
         }
@@ -325,8 +346,20 @@ private fun MushafQcfWord(
     val recessAlpha = {
         val pack = packs[token.surahId to token.ayah]
         val motion = pack?.motions?.getOrNull(token.word.position - 1)
-        if (!liveInk || pack == null || motion != null) 1f
-        else (1f - pack.recessCover.value).coerceIn(0f, 1f)
+        when {
+            !liveInk || pack == null -> 1f
+            // No motion: a whole verse waiting its turn, dimmed as a block.
+            motion == null -> (1f - pack.recessCover.value).coerceIn(0f, 1f)
+            // The same rule the scrolling reader applies in [layeredBaseInk]:
+            // the wash owns ink strength while a word is revealing, and the
+            // lyric alpha applies once settled — which is what dims the words
+            // still ahead of the voice *inside* the verse being recited. The
+            // page used to return 1f for every word that had a motion at all,
+            // so the active verse lit whole and there was no word-by-word fade
+            // on the leaf, only at verse boundaries.
+            motion.isActive || motion.sweepProgress < 1f -> 1f
+            else -> motion.lyricAlpha
+        }
     }
     val blooms = {
         if (!liveInk) {
