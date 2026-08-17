@@ -11,6 +11,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.LinearOutSlowInEasing
+import kotlinx.coroutines.delay
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -43,6 +45,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -108,6 +111,16 @@ internal val MushafEdgeGutter = 10.dp
  * instead of exactly on it.
  */
 private val MushafFitSlack = 2.dp
+
+/** How long a leaf takes to come up once its page face has landed. */
+private const val MushafLeafFadeMs = 180
+
+/**
+ * How long a leaf waits for its own face before showing itself in the Hafs
+ * stand-in. Long enough for a warm cache hit or a cold read off the asset,
+ * short enough that a reader never sits looking at blank paper.
+ */
+private const val MushafLeafFaceWaitMs = 450L
 
 /**
  * The page's own hand, as the chrome sees it: the size a line of revelation is
@@ -376,7 +389,35 @@ private fun MushafPageSheet(
             MushafQcfFonts.family(context, page.page)
         }
     }
-    BoxWithConstraints(modifier.fillMaxSize()) {
+    // A leaf is set in the Hafs stand-in until its own page face arrives, and
+    // the two are not the same width, so the first frames of a newly opened
+    // page reflow under the reader's eye — the type jumps as the real face
+    // lands. Hold the leaf back until its face is in hand and bring it up on a
+    // short fade: paper settling into the light, rather than type jumping.
+    // The wait is capped, so a page whose face never loads still shows itself
+    // in the stand-in rather than staying blank.
+    var faceOverdue by remember(page.page) { mutableStateOf(false) }
+    LaunchedEffect(page.page) {
+        delay(MushafLeafFaceWaitMs)
+        faceOverdue = true
+    }
+    val leafReady = pageFont != null || faceOverdue
+    val leafFade by animateFloatAsState(
+        targetValue = if (leafReady) 1f else 0f,
+        animationSpec = tween(MushafLeafFadeMs, easing = LinearOutSlowInEasing),
+        label = "mushafLeafFade",
+    )
+    BoxWithConstraints(
+        modifier
+            .fillMaxSize()
+            // Only while it is actually fading. A graphicsLayer marks the node
+            // transformed, and Compose keeps a transformed node's rect index
+            // current by walking its whole subhierarchy — on a leaf that is
+            // every word on the page (see [MushafHafsLine]).
+            .then(
+                if (leafFade < 1f) Modifier.graphicsLayer { alpha = leafFade } else Modifier,
+            ),
+    ) {
             val density = LocalDensity.current
             // The only inset left inside the text block: enough for a circled
             // ayah mark's overhang at the line end, and nothing more.
