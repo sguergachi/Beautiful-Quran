@@ -76,15 +76,21 @@ fun coverFrameMarginsDp(
  * corner is [R − D] — the classic concentric rounded-rect relationship —
  * so the doubled gilt rule reads as designed for that phone's silhouette
  * rather than a fixed square-ish border floating inside it. The khatam
- * star at each corner scales with the inset so the ornament stays in
- * proportion to the margin it sits in.
+ * star at each corner is sized to the band it is seated in, so it reads as
+ * a hub of the border rather than an ornament laid over its edge.
  */
 data class CoverFrameGeometry(
     val outerInsetPx: Float,
     val innerInsetPx: Float,
     val outerCorners: ScreenCornerRadiiPx,
     val innerCorners: ScreenCornerRadiiPx,
-    /** Radius of each corner khatam, sized to the frame's margin. */
+    /**
+     * On-screen radius of each corner khatam — the distance from the seal's
+     * centre to its outermost feature (the bezel tip), not the radius of
+     * some nominal box the ornament then overhangs. The seal is seated on
+     * the band's centreline, so this is half the border's thickness: the
+     * khatam fills the band exactly and never breaks either gilt rule.
+     */
     val starRadiusPx: Float,
 )
 
@@ -94,8 +100,8 @@ data class CoverFrameGeometry(
  * [density] is px-per-dp. The outer inset scales with the screen radius
  * (~48% of the largest corner) and is clamped so every phone gets a
  * generous gilt margin without flattening the concentric curve. The inner
- * rule sits a fixed gap inside the outer; corner stars scale with the
- * outer inset so they read as pressed seals, not pinpricks.
+ * rule sits a fixed gap inside the outer; corner stars span that gap so
+ * they read as pressed seals set into the band, not pinpricks over it.
  */
 fun coverFrameGeometry(
     screen: ScreenCornerRadiiPx,
@@ -120,11 +126,12 @@ fun coverFrameGeometry(
     // corner radius at zero when the curve is used up.
     val innerInset = outerInset + ruleGap
 
-    // Corner seals: ~70% of the outer margin. Floor at 18 dp when the
-    // margin can hold it; on tight radii, stay inside the available inset.
-    val starFloor = minOf(18f * density, outerInset * 0.85f)
-    val starRadius = (outerInset * 0.70f)
-        .coerceIn(starFloor, 28f * density)
+    // Corner seals are hubs of the border band, not stamps in the margin:
+    // the seal's outer extent is half the band, so its bezel tips land on
+    // the two gilt rules. Sizing it from the outer inset instead let the
+    // seal grow past the outer rule on phones whose margin is wider than
+    // the band (the ornament's bezel reaches well past its nominal box).
+    val starRadius = ruleGap / 2f
 
     fun concentric(r: Float, inset: Float): Float {
         val base = if (screen.max > 0f) r else fallbackR

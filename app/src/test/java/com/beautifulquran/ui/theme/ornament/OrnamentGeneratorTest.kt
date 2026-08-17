@@ -7,6 +7,7 @@ import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.atan2
 import kotlin.math.cos
+import kotlin.math.hypot
 import kotlin.math.sin
 
 class OrnamentGeneratorTest {
@@ -190,6 +191,48 @@ class OrnamentGeneratorTest {
                     abs(d - pentagramStep) >= 0.05,
                 )
             }
+        }
+    }
+
+    /** Radius of every stroke's outermost point, largest first, deduped. */
+    private fun zoneRadii(m: RosetteSpec): List<Double> =
+        m.strokes
+            .map { s -> s.points.maxOf { hypot(it.x - 0.5, it.y - 0.5) } }
+            .distinctBy { Math.round(it * 1e6) }
+            .sortedDescending()
+
+    @Test
+    fun `medallion zones never graze each other`() {
+        // Two motifs a hair apart read as a misprint, not as a decision —
+        // the defect that let the star's tips kiss the pearl band's rule.
+        for (seed in 0 until 400) {
+            val m = generateCoverOrnament(seed * 104729 + 13).medallion
+            val radii = zoneRadii(m)
+            for ((a, b) in radii.zipWithNext()) {
+                assertTrue(
+                    "seed $seed: zones at $a and $b nearly coincide",
+                    a - b >= 0.02,
+                )
+            }
+            // The star must clear the band's inner rule outright.
+            assertEquals(0.485, radii[0], 1e-6)
+            assertTrue("seed $seed: star grazes the rule", radii[1] - radii[2] >= 0.028)
+        }
+    }
+
+    @Test
+    fun `medallion is never a small motif floating in a bare field`() {
+        // Each zone stays a readable fraction of the one outside it, and
+        // the innermost one reaches the centre — no bare core.
+        for (seed in 0 until 400) {
+            val m = generateCoverOrnament(seed * 104729 + 13).medallion
+            val radii = zoneRadii(m)
+            // Below the two rules, every zone is sized from its parent.
+            for ((a, b) in radii.drop(1).zipWithNext()) {
+                assertTrue("seed $seed: $b is a speck inside $a", b / a >= 0.32)
+            }
+            assertTrue("seed $seed: hollow core (${radii.last()})", radii.last() <= 0.10)
+            assertTrue("seed $seed: too few zones", radii.size >= 5)
         }
     }
 

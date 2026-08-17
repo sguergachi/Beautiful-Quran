@@ -292,9 +292,23 @@ private fun assignBirths(strokes: List<OrnamentStroke>): List<OrnamentStroke> {
 }
 
 /**
- * The medallion: hairline rings, a pearl band, an {n/k} star, one of three
- * secondary motifs (counter-rotated star / ogee corolla / kite ring), and a
- * heart. Fold, star indices, radii, and recipe all come from [rng].
+ * The medallion — a shamsa read as four concentric zones, outside in: the
+ * gilt rules with their pearl band, the {n/k} star, a secondary motif, and
+ * the core. Fold, star indices, and each zone's recipe come from [rng].
+ *
+ * The zoning, not the motif list, is what makes these read as illumination
+ * rather than as clip art. Three rules hold it together:
+ *
+ *  - **Every zone is sized from the one outside it**, never sampled on its
+ *    own absolute range. Independent ranges let neighbouring radii collide
+ *    or nearly coincide, and a star tip that grazes the band's rule reads
+ *    as a misprint rather than as a decision.
+ *  - **The core is never empty.** A small motif floating in a wide bare
+ *    field is the single ugliest thing this generator used to produce; the
+ *    inner zones fill whatever room the star leaves them.
+ *  - **Weight thins inward.** Rule-weight everywhere turns a high fold into
+ *    a hairball, so the dense folds carry their inner zones as hairlines —
+ *    the hierarchy illuminators use to keep a crowded rosette legible.
  */
 private fun generateMedallion(rng: Mulberry32): RosetteSpec {
     val u = rng.next()
@@ -303,45 +317,56 @@ private fun generateMedallion(rng: Mulberry32): RosetteSpec {
     val seg = fold * 12
     val strokes = ArrayList<OrnamentStroke>()
 
+    // Zone 1 — the doubled rule and the pearl band it carries.
     val r1 = 0.485
     val r2 = rng.range(0.34, 0.385)
     strokes.add(circleStroke(r1, seg, StrokeWeight.Hairline))
     strokes.add(circleStroke(r2, seg, StrokeWeight.Hairline))
 
+    // Zone 2 — the star. Its tips stop a clear gap short of the inner rule
+    // so the two never graze; the star owns the widest zone.
     val ks = allowedStarKs(fold)
-    val k = ks[rng.int(ks.size)]
-    val rs = rng.range(0.30, 0.345)
+    val kIndex = rng.int(ks.size)
+    val k = ks[kIndex]
+    val rs = r2 - rng.range(0.030, 0.052)
     strokes.addAll(starPolygons(fold, k, rs, ROT0, StrokeWeight.Rule))
 
+    // Dense folds carry their inner zones as hairlines.
+    val innerWeight = if (fold >= 12) StrokeWeight.Hairline else StrokeWeight.Rule
+
+    // Zone 3 — the secondary motif, a fixed fraction of the star so the
+    // annulus between them stays legible at every fold.
+    val rMid = rs * rng.range(0.66, 0.74)
     when (rng.int(3)) {
         0 -> {
-            // A second star, half a step out of phase — the woven double star.
-            val k2 = ks[rng.int(ks.size)]
-            val rs2 = rng.range(0.20, 0.25)
-            strokes.addAll(starPolygons(fold, k2, rs2, ROT0 + PI / fold, StrokeWeight.Rule))
+            // The woven double star: a second {n/k2} half a step out of
+            // phase. k2 must differ from k — the same star drawn smaller is
+            // an echo, not a weave (at fold 8 the pair is the khatam
+            // itself: two squares crossed by the octagram).
+            val i2 = rng.int(ks.size)
+            val k2 = if (ks[i2] == k) ks[(i2 + 1) % ks.size] else ks[i2]
+            strokes.addAll(starPolygons(fold, k2, rMid, ROT0 + PI / fold, innerWeight))
         }
         1 -> {
-            val cusp = rng.range(0.16, 0.19)
-            val tip = rng.range(0.24, 0.285)
-            strokes.add(corollaStroke(fold, cusp, tip, ROT0, StrokeWeight.Rule))
+            val cusp = rMid * rng.range(0.60, 0.68)
+            strokes.add(corollaStroke(fold, cusp, rMid, ROT0, innerWeight))
         }
         else -> {
-            // A ring of kites between the star tips, points outward.
-            val rTip = rng.range(0.26, 0.295)
-            val rBase = rng.range(0.125, 0.155)
-            val rMid = rBase + (rTip - rBase) * rng.range(0.45, 0.60)
+            // A ring of kites in the star's interstices, points outward.
+            val rBase = rMid * rng.range(0.42, 0.50)
+            val rWaist = rBase + (rMid - rBase) * rng.range(0.45, 0.60)
             for (i in 0 until fold) {
                 val a = ROT0 + (i + 0.5) * step
                 strokes.add(
                     OrnamentStroke(
                         listOf(
-                            polar(a, rTip),
-                            polar(a - step * 0.28, rMid),
+                            polar(a, rMid),
+                            polar(a - step * 0.28, rWaist),
                             polar(a, rBase),
-                            polar(a + step * 0.28, rMid),
+                            polar(a + step * 0.28, rWaist),
                         ),
                         closed = true,
-                        weight = StrokeWeight.Rule,
+                        weight = innerWeight,
                         birth = 0.0,
                         span = 1.0,
                     ),
@@ -350,13 +375,29 @@ private fun generateMedallion(rng: Mulberry32): RosetteSpec {
         }
     }
 
-    val heartR = rng.range(0.06, 0.08)
-    strokes.add(circleStroke(heartR, seg, StrokeWeight.Hairline))
-    if (rng.chance(0.45)) {
-        // A tiny {n/2} echo of the main star at the heart.
-        val heartStarR = rng.range(0.10, 0.135)
-        strokes.addAll(starPolygons(fold, 2, heartStarR, ROT0, StrokeWeight.Hairline))
+    // Zone 4 — the core, always inked: whatever room zone 3 leaves gets a
+    // small rosette of its own rather than a bare field around the heart.
+    val rCore = rMid * rng.range(0.50, 0.60)
+    val coreRecipe = rng.int(3)
+    when (coreRecipe) {
+        0 -> {
+            val i3 = rng.int(ks.size)
+            strokes.addAll(
+                starPolygons(fold, ks[i3], rCore, ROT0 + PI / fold, StrokeWeight.Hairline),
+            )
+        }
+        1 -> strokes.add(
+            corollaStroke(fold, rCore * rng.range(0.46, 0.56), rCore, ROT0, StrokeWeight.Hairline),
+        )
+        // A plain ring alone leaves the centre a bare target, so this one is
+        // always pearled below — a ring of gold beads is the third thing
+        // illuminators put at a rosette's heart, and it needs the beads.
+        else -> strokes.add(circleStroke(rCore, seg, StrokeWeight.Hairline))
     }
+
+    // The heart: a hairline ring inside the core, its pearl at the centre.
+    val heartR = rCore * rng.range(0.34, 0.44)
+    strokes.add(circleStroke(heartR, seg, StrokeWeight.Hairline))
 
     val dots = ArrayList<OrnamentDot>()
     val pearlCount = if (rng.chance(0.5)) fold * 2 else fold
@@ -366,7 +407,16 @@ private fun generateMedallion(rng: Mulberry32): RosetteSpec {
         val radius = if (pearlCount > fold && i % 2 == 1) 0.009 else 0.016
         dots.add(OrnamentDot(p.x, p.y, radius, 0.58 + 0.34 * i / pearlCount))
     }
-    dots.add(OrnamentDot(0.5, 0.5, 0.028, 0.93))
+    // A pearl in each of the core's own interstices, so the centre reads as
+    // worked metal even when its rosette is a plain ring.
+    if (rng.chance(0.5) || coreRecipe == 2) {
+        val pearlR = (rCore + heartR) / 2.0
+        for (i in 0 until fold) {
+            val p = polar(ROT0 + (i + 0.5) * step, pearlR)
+            dots.add(OrnamentDot(p.x, p.y, 0.010, 0.62 + 0.30 * i / fold))
+        }
+    }
+    dots.add(OrnamentDot(0.5, 0.5, min(0.028, heartR * 0.62), 0.93))
 
     return RosetteSpec(fold, assignBirths(strokes), dots)
 }

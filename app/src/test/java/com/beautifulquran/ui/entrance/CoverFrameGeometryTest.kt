@@ -35,7 +35,7 @@ class CoverFrameGeometryTest {
         assertTrue(g.innerCorners.topLeft >= 0f)
         assertTrue(g.innerInsetPx > g.outerInsetPx)
         assertTrue(g.starRadiusPx > 0f)
-        assertTrue(g.starRadiusPx <= g.outerInsetPx * 0.95f + 0.01f)
+        assertEquals(g.innerInsetPx - g.outerInsetPx, g.starRadiusPx * 2f, 0.01f)
     }
 
     @Test
@@ -43,7 +43,8 @@ class CoverFrameGeometryTest {
         val huge = coverFrameGeometry(ScreenCornerRadiiPx(400f, 400f, 400f, 400f), density)
         assertTrue(huge.outerInsetPx <= 40f * density * 1.01f)
         assertTrue(huge.outerCorners.topLeft > 0f)
-        assertTrue(huge.starRadiusPx <= 28f * density * 1.01f)
+        // A wide gilt margin must not grow the seal past the band it sits in.
+        assertEquals(huge.innerInsetPx - huge.outerInsetPx, huge.starRadiusPx * 2f, 0.01f)
     }
 
     @Test
@@ -55,14 +56,30 @@ class CoverFrameGeometryTest {
     }
 
     @Test
-    fun `typical phone gets a generous margin and proportional corner seals`() {
+    fun `typical phone gets a generous margin and band-sized corner seals`() {
         // ~50 dp corner at xxhdpi — common modern phone silhouette.
         val screen = ScreenCornerRadiiPx(150f, 150f, 150f, 150f)
         val g = coverFrameGeometry(screen, density)
         assertTrue(g.outerInsetPx >= 22f * density * 0.99f)
-        assertTrue(g.starRadiusPx >= 18f * density)
-        // Star stays smaller than the outer margin it lives in.
-        assertTrue(g.starRadiusPx < g.outerInsetPx * 1.05f)
+        assertSealInsideBand(g)
+    }
+
+    @Test
+    fun `corner seal never breaks the outer gilt rule`() {
+        // Pixel-10-ish silhouette: the margin is narrower than the band, so
+        // a seal sized from the outer inset used to overhang the outer rule.
+        for (r in listOf(0f, 30f, 90f, 150f, 400f)) {
+            val g = coverFrameGeometry(ScreenCornerRadiiPx(r, r, r, r), density)
+            assertSealInsideBand(g)
+        }
+    }
+
+    /** The seal is seated on the band's centreline; its outer extent must
+     *  land on the outer rule and its inner extent on the inner rule. */
+    private fun assertSealInsideBand(g: CoverFrameGeometry) {
+        val bandCenter = (g.outerInsetPx + g.innerInsetPx) / 2f
+        assertEquals(g.outerInsetPx, bandCenter - g.starRadiusPx, 0.01f)
+        assertEquals(g.innerInsetPx, bandCenter + g.starRadiusPx, 0.01f)
     }
 
     @Test
