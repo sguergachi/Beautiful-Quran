@@ -313,9 +313,13 @@ private fun MushafQcfPageLine(
                     maxLines = 1,
                     softWrap = false,
                     overflow = TextOverflow.Visible,
-                    modifier = Modifier.graphicsLayer {
-                        alpha = markInkAlpha()
-                        compositingStrategy = CompositingStrategy.ModulateAlpha
+                    modifier = if (liveInk) {
+                        Modifier.graphicsLayer {
+                            alpha = markInkAlpha()
+                            compositingStrategy = CompositingStrategy.ModulateAlpha
+                        }
+                    } else {
+                        Modifier
                     },
                 )
             }
@@ -418,14 +422,28 @@ private fun MushafQcfWord(
         // which is exactly what the line end showed.
         overflow = TextOverflow.Visible,
         modifier = Modifier
-            .graphicsLayer {
-                alpha = recessAlpha()
-                // Modulate, never composite: a leaf carries ~150 word nodes,
-                // and letting alpha < 1 buy each one an offscreen buffer would
-                // cost far more than the mask it replaced. Glyphs on a line do
-                // not overlap, so modulating is also correct.
-                compositingStrategy = CompositingStrategy.ModulateAlpha
-            }
+            // Only while there is ink to animate. A graphicsLayer marks its
+            // node transformed, and Compose then keeps that node's rect index
+            // up to date by walking its whole subhierarchy — profiled on
+            // device, insertOrUpdateTransformedNodeSubhierarchy is the single
+            // hottest method in the reader, and a leaf hands it ~150 nodes.
+            // Reading and turning pages need none of it: the alpha is 1 and
+            // the wash is already gated the same way (see [mushafLineInk]).
+            .then(
+                if (!liveInk) {
+                    Modifier
+                } else {
+                    Modifier.graphicsLayer {
+                        alpha = recessAlpha()
+                        // Modulate, never composite: a leaf carries ~150 word
+                        // nodes, and letting alpha < 1 buy each one an offscreen
+                        // buffer would cost far more than the mask it replaced.
+                        // Glyphs on a line do not overlap, so modulating is also
+                        // correct.
+                        compositingStrategy = CompositingStrategy.ModulateAlpha
+                    }
+                },
+            )
             .mushafLineInk(
                 liveInk = liveInk,
                 blooms = blooms,
