@@ -119,8 +119,13 @@ private fun leafGlyphSize(unit: Dp, fontScale: Float): TextUnit = with(LocalDens
     (unit.toPx() / MUSHAF_LINE_PITCH_EM * fontScale.coerceIn(0.88f, 1.12f)).toSp()
 }
 
-/** How far a turning leaf dissolves in from each fore-edge. */
-private val MushafForeEdgeFade = 58.dp
+/**
+ * How far the leaf feathers in from each fore-edge: exactly the paper outside
+ * the text measure — the margin and the mark gutter, and not a hair more. The
+ * edge of a page may dissolve; the revelation may not.
+ */
+private val MushafForeEdgeFade
+    @Composable get() = MushafPageMargin + MushafEdgeGutter
 
 /**
  * Both fore-edges feathered into the paper, always.
@@ -133,36 +138,24 @@ private val MushafForeEdgeFade = 58.dp
  * and the band is the leaf's own margin, so at rest it washes paper, never
  * text.
  */
-private fun Modifier.mushafForeEdgeFade(paper: Color): Modifier = drawWithContent {
+private fun Modifier.mushafForeEdgeFade(paper: Color, band: Dp): Modifier = drawWithContent {
     drawContent()
-    val band = MushafForeEdgeFade.toPx()
+    val bandPx = band.toPx()
     for (side in 0..1) {
         val fromLeft = side == 0
         drawRect(
             brush = Brush.horizontalGradient(
-                // Opaque across the leaf's own margin, then a long whisper over
-                // the first letters: the edge has to dissolve, but a reader
-                // must still be able to read the word it dissolves.
+                // Solid at the very edge, gone by the time the measure begins.
                 colorStops = if (fromLeft) {
-                    arrayOf(
-                        0f to paper,
-                        0.30f to paper.copy(alpha = 0.92f),
-                        0.52f to paper.copy(alpha = 0.34f),
-                        1f to Color.Transparent,
-                    )
+                    arrayOf(0f to paper, 0.45f to paper.copy(alpha = 0.70f), 1f to Color.Transparent)
                 } else {
-                    arrayOf(
-                        0f to Color.Transparent,
-                        0.48f to paper.copy(alpha = 0.34f),
-                        0.70f to paper.copy(alpha = 0.92f),
-                        1f to paper,
-                    )
+                    arrayOf(0f to Color.Transparent, 0.55f to paper.copy(alpha = 0.70f), 1f to paper)
                 },
-                startX = if (fromLeft) 0f else size.width - band,
-                endX = if (fromLeft) band else size.width,
+                startX = if (fromLeft) 0f else size.width - bandPx,
+                endX = if (fromLeft) bandPx else size.width,
             ),
-            topLeft = Offset(if (fromLeft) 0f else size.width - band, 0f),
-            size = Size(band, size.height),
+            topLeft = Offset(if (fromLeft) 0f else size.width - bandPx, 0f),
+            size = Size(bandPx, size.height),
         )
     }
 }
@@ -254,7 +247,7 @@ internal fun MushafPager(
         key = { it },
         modifier = modifier
             .fillMaxSize()
-            .mushafForeEdgeFade(paper),
+            .mushafForeEdgeFade(paper, MushafForeEdgeFade),
     ) { pageIndex ->
         val page = catalog.page(pageIndex + 1)
         if (page == null) {
