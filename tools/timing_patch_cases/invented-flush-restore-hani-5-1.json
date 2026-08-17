@@ -1,0 +1,19 @@
+{
+  "id": "invented-flush-restore-hani-5-1",
+  "label": "Hani 5:1 restore must not split opening ياأيها into a flush repeat",
+  "refs": ["GitHub issue #723 class", "same restore-invented flush as 66:7"],
+  "pipeline": "invented_flush_restore",
+  "notes": "Same class as 66:7: qdc has one word 1, CTC restore emits a flush [1,1]. Collapse. 5:1 is يَاأَيُّهَا الَّذِينَ آمَنُوا.",
+  "input_segments": [
+    [1, 267, 1710],
+    [2, 1710, 2720],
+    [3, 2720, 3850]
+  ],
+  "repair_segments": [
+    [1, 267, 1080],
+    [1, 1080, 1840],
+    [2, 1840, 2860],
+    [3, 2860, 3860]
+  ],
+  "expected_positions": [1, 2, 3]
+}

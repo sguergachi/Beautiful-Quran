@@ -178,6 +178,16 @@ generator invariant; the guard is the safety net for committed files.
 Same-word peer pairs are protected per position rather than by skipping the
 row; see `repair-preserve-peer-while-filling-word.json`.
 
+### Apply-time guard (flush restore)
+
+The generator must not emit a `restore` whose new same-word halves sit closer
+than 300 ms (invariant 1 above). Older committed files still do: Hani **66:7**,
+**5:1**, and **33:69** split يَـٰٓأَيُّهَا flush, which the Lab then heard as a
+false orange repeat (#723). `collapse_invented_flush_repeats` merges those
+invented pairs before rebase, so a real paused restore still lands and a
+source peer pair such as Hani 4:4 is untouched. Cases:
+`invented-flush-restore-hani-66-7.json` and siblings.
+
 ## Retirement policy
 
 These whole rows remain generated CTC evidence, not hand-maintained patches.

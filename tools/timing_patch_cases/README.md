@@ -27,6 +27,7 @@ Agents landing a GitHub `Timings patch` issue must follow the full checklist in
    - stale full-row repair timing → `rebase_timing_repair`
    - repair row on a translated source clock → `clock_shifted_repair`
    - qdc row on the wrong MP3 clock → `qdc_clock_rebase`
+   - restore invents a flush same-word pair (gap < 300 ms) → `invented_flush_restore`
    - independently supported local boundary → `boundary_repair`
    - irreducible verified topology → a typed operation in
      `tools/timing_corrections/`
@@ -62,7 +63,7 @@ a case under this directory.
 |---|---|---|
 | `id` | yes | stable slug; should match the filename stem |
 | `label` | yes | one-line human name (shown on failure) |
-| `pipeline` | yes | `clean_qdc_artifacts`, `timing_correction`, `preserve_peer_repeats`, `erases_span_repeat`, `rebase_timing_repair`, `clock_shifted_repair`, `complete_repeat_topology`, `qdc_clock_rebase`, `boundary_repair`, `leading_silence_offset`, `recover_negative_opening`, or `adjust_qdc_segments` |
+| `pipeline` | yes | `clean_qdc_artifacts`, `timing_correction`, `preserve_peer_repeats`, `erases_span_repeat`, `invented_flush_restore`, `rebase_timing_repair`, `clock_shifted_repair`, `complete_repeat_topology`, `qdc_clock_rebase`, `boundary_repair`, `leading_silence_offset`, `recover_negative_opening`, or `adjust_qdc_segments` |
 | `input_positions` | * | 1-based word indices in time order (synthetic equal durations) |
 | `expected_positions` | * | positions after the pipeline step |
 | `input_segments` | * | full `[[pos, start_ms, end_ms], …]` when times matter |

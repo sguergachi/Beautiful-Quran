@@ -426,6 +426,12 @@ QDC_SPLIT_FRAGMENT_CEIL_MS = 700  # in [FRAGMENT_MS, CEIL) it is a fragment only
 QDC_SPLIT_FRAGMENT_RATIO = 0.40  # shorter/longer below this = a split fragment,
 #                                  not a peer utterance
 
+# CTC restore requires a pause this long to emit a same-word repeat
+# (timing_repairs/README.md "repeat-vs-split invariant"). Committed restore
+# files still invent flush pairs (Hani 66:7 / 5:1 / 33:69 ياأيها); apply-time
+# collapse is the safety net, same idea as span-protect.
+CTC_REPEAT_MIN_PAUSE_MS = 300
+
 QDC_SPIKE_JUMP = 3  # a forward jump this large that instantly retreats is noise
 # Positions in a backtrack run within this distance count as one contiguous
 # span-repeat (allows one dropped word inside a real re-say, e.g. 9,10,12,13).
@@ -639,6 +645,49 @@ def erases_span_repeat(pre_segs, repair_segs):
     return multi_position_span_repeat(pre_segs) and not multi_position_span_repeat(
         repair_segs
     )
+
+
+def opening_ya_ayyuha_positions(words):
+    """Positions whose text is يَاأَيُّهَا — the #723 false-split class."""
+    return {
+        pos
+        for pos, text in (words or {}).items()
+        if text.startswith("ي") and "أَيّ" in text
+    }
+
+
+def collapse_invented_flush_repeats(current, repaired, only_positions=None):
+    """Refuse a restore that invents a same-word pair closer than CTC's pause.
+
+    Real single-word re-says that qdc already has stay intact (Hani 4:4): this
+    only merges a flush pair the source row does not already carry. A genuine
+    restore that qdc flattened still lands when its halves are ≥300 ms apart.
+    ``only_positions`` restricts the apply-time class (يَاأَيُّهَا); tests omit
+    it to pin the generator invariant itself.
+    """
+    source_count = {}
+    source_span = {}
+    for pos, start, end in current:
+        source_count[pos] = source_count.get(pos, 0) + 1
+        source_span.setdefault(pos, [pos, start, end])
+    out = []
+    i = 0
+    while i < len(repaired):
+        pos, start, end = repaired[i]
+        nxt = repaired[i + 1] if i + 1 < len(repaired) else None
+        if (
+            nxt is not None
+            and nxt[0] == pos
+            and nxt[1] - end < CTC_REPEAT_MIN_PAUSE_MS
+            and source_count.get(pos, 0) < 2
+            and (only_positions is None or pos in only_positions)
+        ):
+            out.append(list(source_span.get(pos, [pos, start, nxt[2]])))
+            i += 2
+            continue
+        out.append([pos, start, end])
+        i += 1
+    return out
 
 
 def preserve_peer_repeats(current, repaired):
@@ -1395,6 +1444,7 @@ def apply_timing_repairs(
     only_keys=None,
     only_kinds=None,
     skip_missing_boundary_keys=None,
+    word_text=None,
 ):
     """Apply auto-generated CTC-arbitrated repairs (tools/timing_repairs/*.json)
     on top of the current source rows. Structural differences and their
@@ -1405,6 +1455,7 @@ def apply_timing_repairs(
     unrelated repair can still land without flattening a genuine repeat."""
     clock_offsets = clock_offsets or {}
     durations = durations or {}
+    word_text = word_text or {}
     skip_missing_boundary_keys = skip_missing_boundary_keys or set()
     slug_by_id = {r[0]: r[1] for r in RECITERS}
     by_key = {(rid, sid, ay): segs for (rid, sid, ay, segs) in timing_rows}
@@ -1419,6 +1470,7 @@ def apply_timing_repairs(
     rebased = 0
     clock_rejected = 0
     clock_untranslated = 0
+    flush_collapsed = 0
     for path in files:
         try:
             payload = json.loads(path.read_text(encoding="utf-8"))
@@ -1486,6 +1538,15 @@ def apply_timing_repairs(
                     span_protected += 1
                     continue
             current = json.loads(pre_raw) if isinstance(pre_raw, str) else pre_raw or []
+            collapsed = collapse_invented_flush_repeats(
+                current, segs, opening_ya_ayyuha_positions(word_text.get((sid, ay)))
+            )
+            if collapsed != segs:
+                flush_collapsed += 1
+                segs = collapsed
+                if [s[0] for s in segs] == [s[0] for s in current]:
+                    # Invented flush was the only structural change; keep qdc.
+                    continue
             duration = durations.get(key)
             merged = apply_clocked_timing_repair(current, segs, offset)
             if offset and not fits_audio(merged, duration):
@@ -1512,7 +1573,8 @@ def apply_timing_repairs(
         f"{rebased} rebased, {span_protected} span-protected, "
         f"{peer_protected} peer repeat(s) preserved, "
         f"{clock_rejected} unsafe-clock skipped, "
-        f"{clock_untranslated} kept on the file clock — {by_kind}"
+        f"{clock_untranslated} kept on the file clock, "
+        f"{flush_collapsed} invented flush restore(s) collapsed — {by_kind}"
     )
     return new_rows
 
@@ -2369,6 +2431,7 @@ def main():
             timing_clock_offsets,
             audio_durations,
             skip_missing_boundary_keys=deferred_boundary_keys,
+            word_text=word_text,
         )
 
         print("[overrides] applying tools/timing_overrides/*.json")
@@ -2403,6 +2466,7 @@ def main():
                 audio_durations,
                 only_keys=rescued_keys,
                 only_kinds={"boundary"},
+                word_text=word_text,
             )
 
         if audio_durations:

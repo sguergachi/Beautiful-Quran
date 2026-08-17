@@ -31,6 +31,7 @@ from build_db import (  # noqa: E402
     apply_timing_repairs,
     boundary_conflicts,
     clean_qdc_artifacts,
+    collapse_invented_flush_repeats,
     complete_monotonic_row,
     erases_span_repeat,
     finalize_timing_rows,
@@ -67,6 +68,7 @@ PIPELINES = frozenset(
         "clock_shifted_repair",
         "complete_repeat_topology",
         "erases_span_repeat",
+        "invented_flush_restore",
         "leading_silence_offset",
         "preserve_peer_repeats",
         "qdc_clock_rebase",
@@ -192,6 +194,12 @@ def run_pipeline(case, segs):
             raise SystemExit(f"{case.get('_path')}: need n_words and audio_duration_ms")
         return preserve_complete_repeat_topology(
             segs, n_words, case.get("audio_onset_ms"), duration
+        )
+    if pipeline == "invented_flush_restore":
+        return apply_clocked_timing_repair(
+            segs,
+            collapse_invented_flush_repeats(segs, resolve_repair(case)),
+            case.get("clock_offset_ms") or 0,
         )
     if pipeline == "erases_span_repeat":
         repair = resolve_repair(case)

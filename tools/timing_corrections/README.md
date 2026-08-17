@@ -14,7 +14,8 @@ Supported operations:
   utterance while preserving the first `A` and final `B` boundaries.
 - `discard_false_same_position_lead`: remove one audio-proven false duplicate
   and retain the second occurrence's onset; the preceding word owns the
-  discarded lead interval.
+  discarded lead interval. Hani 66:6 لَّا (#721) is this shape: the first
+  15 is still voiced شداد, not a second لا.
 
 Every entry carries evidence provenance. The build fails if its expected source
 shape no longer exists, so a pinned-source refresh cannot silently retain a

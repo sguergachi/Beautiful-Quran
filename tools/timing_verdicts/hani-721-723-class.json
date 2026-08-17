@@ -1,0 +1,77 @@
+{
+  "schemaVersion": 1,
+  "baseline": {
+    "commit": "9e0dc4b45462ce593a287363e4e96224c0aea313",
+    "databaseSha256": "74cc1ed57045b3e76a6d065b85c2a764763b0601dc4d5502ce58c081fc1d3d09"
+  },
+  "verdicts": {
+    "Hani_Rifai_192kbps:66:6": {
+      "verdict": "accept",
+      "kinds": ["topology"],
+      "baselinePayloadHash": "b7b51773b2f24a5ea1218e16bdd8da99cd00a16c5240f55da4fa792e94f093c8",
+      "candidatePayloadHash": "15f5f889b6e7fe9974501360751bf4ae98a8db8fb6352b8b01df887e14ce3459",
+      "evidence": {
+        "kind": "dual_model_topology",
+        "artifact": "tools/timing_verdicts/hani-721-723-class.json",
+        "summary": "Lab #721 deleted the false second لَّا. Waveform shows 19700-20700 is still voiced شداد, not a re-say. Arabic XLSR prefers one word 15 (-0.157→-0.133). Quran-align first-start MAE 169→121 ms; its word-15 onset 21300 ms corroborates keeping the later 20700 ms span and giving the lead to word 14. Word 7 نارا,نارا is an untouched real re-say.",
+        "audioSha256": "0c35e4be2e30eafe49a79a54dceda6e6c6ab696f1d33600bd26b59ad2216d2ae",
+        "waveformVeto": false,
+        "models": [
+          {"name": "arabic-xlsr-ctc", "baselineScore": -0.157, "candidateScore": -0.133},
+          {"name": "quran-align", "baselineMaeMs": 169, "candidateMaeMs": 121, "word15StartMs": 21300}
+        ]
+      }
+    },
+    "Hani_Rifai_192kbps:66:7": {
+      "verdict": "accept",
+      "kinds": ["topology"],
+      "baselinePayloadHash": "ada7801bc2606f45c0149d4e741a0bce3523e2cd1f8901bb430721b7e7c06189",
+      "candidatePayloadHash": "e04d8a24c309bcb997436fc3ee8bf59f1789a2e9020f689a5e41143a55919804",
+      "evidence": {
+        "kind": "dual_model_topology",
+        "artifact": "tools/timing_verdicts/hani-721-723-class.json",
+        "summary": "Lab #723 and the CTC restore-vs-split invariant: the flush [1,1] on يَاأَيُّهَا is an invented mid-madd split (gap 0). Collapse to one span. Word 1 starts at the quran-align/voice onset 1030 ms. تعتذروا/اليوم handoff follows Lab 5621/6115; quran-align word 6 at 5740 ms prefers that over the shipped 6990 ms sliver. XLSR -0.163→-0.100; align MAE 256→87 ms.",
+        "audioSha256": "7f2159753bb2d88721f431c1b6e9cb187e4981d604f3595170cf3d7e43b72344",
+        "waveformVeto": false,
+        "models": [
+          {"name": "arabic-xlsr-ctc", "baselineScore": -0.163, "candidateScore": -0.100},
+          {"name": "quran-align", "baselineMaeMs": 256, "candidateMaeMs": 87, "word1StartMs": 1030, "word6StartMs": 5740}
+        ]
+      }
+    },
+    "Hani_Rifai_192kbps:5:1": {
+      "verdict": "accept",
+      "kinds": ["topology"],
+      "baselinePayloadHash": "7bcaeac19be67d3e18fff16d436a057710c1a8195f5c1547ed0547eda71c365b",
+      "candidatePayloadHash": "2c4b073444c0d41544629bbe4a1c3412d44bcece1433d4da736c3c917801d8b5",
+      "evidence": {
+        "kind": "dual_model_topology",
+        "artifact": "tools/timing_verdicts/hani-721-723-class.json",
+        "summary": "Same restore-invented flush split of opening يَاأَيُّهَا as 66:7. qdc had one word 1; CTC restore emitted gap-0 [1,1]. Collapse. Onset 267 ms kept. XLSR -0.294→-0.263.",
+        "audioSha256": "2d0e4c383eb5de3c54dbad092c0683273f7ef4dda34faa319c4c71564d0950d4",
+        "waveformVeto": false,
+        "models": [
+          {"name": "arabic-xlsr-ctc", "baselineScore": -0.294, "candidateScore": -0.263},
+          {"name": "quran-align", "baselineMaeMs": 54, "candidateMaeMs": 54, "word1StartMs": 490}
+        ]
+      }
+    },
+    "Hani_Rifai_192kbps:33:69": {
+      "verdict": "accept",
+      "kinds": ["topology"],
+      "baselinePayloadHash": "be915941a38df85440bc69cc4fb134f4f4bfa4c0acfe061594b256838ca23cd8",
+      "candidatePayloadHash": "a7714419a68c50894848a453d858f74a4ca87f0e2d16eaf70fb37194671cc124",
+      "evidence": {
+        "kind": "dual_model_topology",
+        "artifact": "tools/timing_verdicts/hani-721-723-class.json",
+        "summary": "Same restore-invented flush split of opening يَاأَيُّهَا as 66:7 / 5:1. Collapse to one span. Word 1 starts at the quran-align onset 650 ms. XLSR -0.278→-0.237; align MAE 73→35 ms.",
+        "audioSha256": "a3b396724b6316c1ee68de84278a398034fab13347702de4be514e252915f040",
+        "waveformVeto": false,
+        "models": [
+          {"name": "arabic-xlsr-ctc", "baselineScore": -0.278, "candidateScore": -0.237},
+          {"name": "quran-align", "baselineMaeMs": 73, "candidateMaeMs": 35, "word1StartMs": 650}
+        ]
+      }
+    }
+  }
+}
