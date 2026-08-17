@@ -428,9 +428,18 @@ QDC_SPLIT_FRAGMENT_RATIO = 0.40  # shorter/longer below this = a split fragment,
 
 # CTC restore requires a pause this long to emit a same-word repeat
 # (timing_repairs/README.md "repeat-vs-split invariant"). Committed restore
-# files still invent flush pairs (Hani 66:7 / 5:1 / 33:69 ياأيها); apply-time
-# collapse is the safety net, same idea as span-protect.
+# files still invent flush pairs; apply-time collapse is the safety net,
+# same idea as span-protect.
 CTC_REPEAT_MIN_PAUSE_MS = 300
+# XLSR forced-alignment prefers the invented flush pair on these rows.
+# Reciter id, surah, ayah. Measured 2026-08-17 against everyayah audio.
+FLUSH_RESTORE_KEEP_INVENTED = frozenset({
+    (1, 7, 158), (1, 13, 25), (1, 20, 58), (1, 23, 50), (1, 25, 9),
+    (1, 34, 6), (1, 66, 12),
+    (5, 5, 45), (5, 9, 33), (5, 10, 6), (5, 10, 57), (5, 34, 36),
+    (5, 39, 54), (5, 41, 47), (5, 45, 18),
+    (7, 18, 20), (7, 27, 13), (7, 89, 16),
+})
 
 QDC_SPIKE_JUMP = 3  # a forward jump this large that instantly retreats is noise
 # Positions in a backtrack run within this distance count as one contiguous
@@ -647,23 +656,12 @@ def erases_span_repeat(pre_segs, repair_segs):
     )
 
 
-def opening_ya_ayyuha_positions(words):
-    """Positions whose text is يَاأَيُّهَا — the #723 false-split class."""
-    return {
-        pos
-        for pos, text in (words or {}).items()
-        if text.startswith("ي") and "أَيّ" in text
-    }
-
-
 def collapse_invented_flush_repeats(current, repaired, only_positions=None):
     """Refuse a restore that invents a same-word pair closer than CTC's pause.
 
     Real single-word re-says that qdc already has stay intact (Hani 4:4): this
     only merges a flush pair the source row does not already carry. A genuine
     restore that qdc flattened still lands when its halves are ≥300 ms apart.
-    ``only_positions`` restricts the apply-time class (يَاأَيُّهَا); tests omit
-    it to pin the generator invariant itself.
     """
     source_count = {}
     source_span = {}
@@ -1538,8 +1536,9 @@ def apply_timing_repairs(
                     span_protected += 1
                     continue
             current = json.loads(pre_raw) if isinstance(pre_raw, str) else pre_raw or []
-            collapsed = collapse_invented_flush_repeats(
-                current, segs, opening_ya_ayyuha_positions(word_text.get((sid, ay)))
+            collapsed = (
+                segs if key in FLUSH_RESTORE_KEEP_INVENTED
+                else collapse_invented_flush_repeats(current, segs)
             )
             if collapsed != segs:
                 flush_collapsed += 1
