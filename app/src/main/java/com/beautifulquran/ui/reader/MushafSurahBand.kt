@@ -39,6 +39,7 @@ import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.LineHeightStyle
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
@@ -58,6 +59,9 @@ private const val MushafNameLift = 0.30f
 private val MushafThumbHeight = 3.dp
 private const val MushafRuleWeightPx = 1f
 
+/** Corner easing anywhere on the leaf: a hairline, never a curve. */
+private const val MushafPanelCornerPx = 3f
+
 /** How far each end of the panel draws in, as a share of its height. */
 private const val MushafPanelTaper = 0.55f
 
@@ -65,27 +69,31 @@ private const val MushafPanelTaper = 0.55f
 private const val MushafCartoucheTaper = 0.62f
 
 /**
- * A capsule that tapers to a point at either end: flat above and below, with
- * each end drawn in to a vertex on the centre line and eased so the corner
- * reads as a drawn stroke rather than a mitre.
+ * A capsule whose ends are drawn in and then squared off: the sides step
+ * inward over [taper] and close on a short flat end, eased by a hairline
+ * radius. Points at the ends read as a banner ribbon; a squared return reads
+ * as a plate, which is what a panel ruled into a page should be.
  */
 private fun taperedCapsulePath(size: Size, taper: Float): Path {
     val h = size.height
     val w = size.width
     val t = (h * taper).coerceAtMost(w / 2f)
-    val ease = h * 0.16f
+    // The flat the taper closes on, and the hairline that softens its corners.
+    val flat = h * 0.34f
+    val r = MushafPanelCornerPx
     return Path().apply {
         moveTo(t, 0f)
         lineTo(w - t, 0f)
-        quadraticTo(w - t + ease, 0f, w - t + ease * 1.4f, h * 0.30f)
-        lineTo(w, h / 2f)
-        lineTo(w - t + ease * 1.4f, h * 0.70f)
-        quadraticTo(w - t + ease, h, w - t, h)
+        lineTo(w - r, (h - flat) / 2f)
+        quadraticTo(w, (h - flat) / 2f, w, (h - flat) / 2f + r)
+        lineTo(w, (h + flat) / 2f - r)
+        quadraticTo(w, (h + flat) / 2f, w - r, (h + flat) / 2f)
+        lineTo(w - t, h)
         lineTo(t, h)
-        quadraticTo(t - ease, h, t - ease * 1.4f, h * 0.70f)
-        lineTo(0f, h / 2f)
-        lineTo(t - ease * 1.4f, h * 0.30f)
-        quadraticTo(t - ease, 0f, t, 0f)
+        lineTo(r, (h + flat) / 2f)
+        quadraticTo(0f, (h + flat) / 2f, 0f, (h + flat) / 2f - r)
+        lineTo(0f, (h - flat) / 2f + r)
+        quadraticTo(0f, (h - flat) / 2f, r, (h - flat) / 2f)
         close()
     }
 }
@@ -271,6 +279,12 @@ private fun MushafTitleCartouche(
                 ),
             ),
             maxLines = 1,
+            // Trimming the line box to the type's own metrics leaves the box
+            // shorter than the ink: a bowl that dips below the baseline (ب) or
+            // a tail that sweeps under it (ر) falls outside and is cut, which
+            // is how a chapter's name came to be missing letters. Never clip a
+            // glyph at its box — the same law the page's words are set under.
+            overflow = TextOverflow.Visible,
             // The taper eats into the cartouche from both ends, so the name
             // needs its margin measured past the point where the sides start
             // drawing in — otherwise the letters sit in the closing wedge.
@@ -281,7 +295,7 @@ private fun MushafTitleCartouche(
             // on the panel's own centre.
             modifier = Modifier
                 .offset(y = -nameLift)
-                .padding(horizontal = height * 1.25f, vertical = height * 0.16f),
+                .padding(horizontal = height * 1.45f, vertical = height * 0.26f),
         )
     }
 }
@@ -299,9 +313,18 @@ private fun MushafTitleCartouche(
 @Composable
 internal fun MushafProgressRule(
     progress: Float,
+    /** True while the reciter has the leaf: the marker steps back. */
+    reciting: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     val ink = MaterialTheme.colorScheme.onBackground
+    // A ribbon is for finding your place, not for watching. While the page is
+    // being recited it fades almost out, and comes back when the reading does.
+    val thumbInk by animateFloatAsState(
+        targetValue = if (reciting) 0.06f else 0.62f,
+        animationSpec = tween(InkEngine.tuning.recessMs, easing = FastOutSlowInEasing),
+        label = "mushafThumb",
+    )
     val at by animateFloatAsState(
         targetValue = progress.coerceIn(0f, 1f),
         animationSpec = tween(320, easing = FastOutSlowInEasing),
@@ -324,7 +347,7 @@ internal fun MushafProgressRule(
         val thumbX = (size.width * (1f - at) - thumbW / 2f)
             .coerceIn(0f, size.width - thumbW)
         drawRoundRect(
-            color = ink.copy(alpha = 0.62f),
+            color = ink.copy(alpha = thumbInk),
             topLeft = Offset(thumbX, 0f),
             size = Size(thumbW, size.height),
             cornerRadius = CornerRadius(size.height, size.height),

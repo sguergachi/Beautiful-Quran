@@ -151,6 +151,7 @@ internal fun MushafReadingSheet(
         }
         MushafProgressRule(
             progress = chapterProgress,
+            reciting = reciting,
             // Paper between the leaf's own tail and the rule, so the folio
             // groups with the page above it rather than with the controls.
             modifier = Modifier.padding(

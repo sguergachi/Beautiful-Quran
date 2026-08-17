@@ -334,7 +334,12 @@ private fun MushafQcfWord(
         } else {
             val pack = packs[token.surahId to token.ayah]
             val motion = pack?.motions?.getOrNull(token.word.position - 1)
-            if (pack == null || motion == null) {
+            if (pack == null || motion == null ||
+                (!motion.isActive && motion.ink.state == InkEngine.State.Upcoming)
+            ) {
+                // Waiting words carry no bloom at all now: their dim is the
+                // node's own alpha, so nothing rectangular is ever drawn over
+                // a glyph.
                 emptyList()
             } else {
                 buildShapedBlooms(

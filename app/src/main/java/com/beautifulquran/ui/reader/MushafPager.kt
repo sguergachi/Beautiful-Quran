@@ -418,7 +418,7 @@ private fun MushafPageSheet(
                             ) {
                                 MushafSurahTitleBand(
                                     surah = surahsById[start.surahId],
-                                    fontSize = fontSp * 0.95f,
+                                    fontSize = fontSp * 1.08f,
                                     // Air above and below: the panel is a plate
                                     // set into the page, not another line of it.
                                     bandHeight = lineSlot * 0.94f,
