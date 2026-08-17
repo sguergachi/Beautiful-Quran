@@ -25,6 +25,7 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDirection
+import androidx.compose.ui.text.style.TextGeometricTransform
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Constraints
@@ -40,7 +41,7 @@ import com.beautifulquran.domain.MushafToken
 import com.beautifulquran.domain.buildMushafQcfLine
 import com.beautifulquran.domain.mushafGapSpacingPx
 import com.beautifulquran.domain.mushafLineJustifies
-import com.beautifulquran.domain.mushafLineFill
+import com.beautifulquran.domain.mushafLineCondense
 import com.beautifulquran.domain.qcfTrailingMark
 import com.beautifulquran.domain.qcfWordGlyphs
 import com.beautifulquran.ui.theme.LocalQuranAccents
@@ -213,7 +214,7 @@ private fun MushafQcfPageLine(
     // glyph run still runs past the measure — a few dozen in the whole mushaf —
     // is set that little bit tighter, so one long line never drags its page's
     // type down with it.
-    val fill = remember(line, fontSize, pageFont, measureWidthPx) {
+    val condense = remember(line, fontSize, pageFont, measureWidthPx) {
         val probe = TextStyle(
             fontFamily = pageFont,
             fontSize = fontSize,
@@ -231,17 +232,21 @@ private fun MushafQcfPageLine(
         // each of those rounds its width up. Fit to a measure a pixel per word
         // short of the real one: fitted exactly, that rounding pushes the last
         // word — and the circled ayah mark riding on it — past the edge.
-        mushafLineFill(
+        mushafLineCondense(
             naturalWidthPx = natural,
             measureWidthPx = (measureWidthPx - line.tokens.size).coerceAtLeast(1f),
         )
     }
-    val style = remember(fontSize, pageFont, fill) {
+    // Condensed, never resized. A line brought inside the measure keeps its
+    // height, weight and colour — the page still reads as one hand — where a
+    // line set at a different size reads as a fault.
+    val style = remember(fontSize, pageFont, condense) {
         TextStyle(
             fontFamily = pageFont,
-            fontSize = fontSize * fill,
+            fontSize = fontSize,
             lineHeight = MUSHAF_LINE_EM.em,
             textDirection = TextDirection.Rtl,
+            textGeometricTransform = TextGeometricTransform(scaleX = condense),
             platformStyle = PlatformTextStyle(includeFontPadding = false),
         )
     }

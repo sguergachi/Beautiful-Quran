@@ -83,35 +83,36 @@ class MushafPageFitTest {
     }
 
     @Test
-    fun `the hand never grows to fill paper`() {
-        // The book is set at one size. A line short of the measure stays at
-        // that size and closes the remainder with its word gaps — it is not
-        // opened up, however much paper it has to cross.
-        assertEquals(1f, mushafLineFill(naturalWidthPx = 964f, measureWidthPx = 964f), 0f)
-        assertEquals(1f, mushafLineFill(naturalWidthPx = 910f, measureWidthPx = 964f), 0f)
-        assertEquals(1f, mushafLineFill(naturalWidthPx = 400f, measureWidthPx = 964f), 0f)
+    fun `a line inside the measure is never touched`() {
+        // Three lines in four fill by gap alone; the letterforms are left be.
+        assertEquals(1f, mushafLineCondense(naturalWidthPx = 964f, measureWidthPx = 964f), 0f)
+        assertEquals(1f, mushafLineCondense(naturalWidthPx = 910f, measureWidthPx = 964f), 0f)
+        assertEquals(1f, mushafLineCondense(naturalWidthPx = 400f, measureWidthPx = 964f), 0f)
     }
 
     @Test
-    fun `only a line wider than the measure closes up, and barely`() {
-        // Anchoring the size on the widest line the book contains leaves about
-        // one line in a hundred over the measure; those close by a few percent
-        // rather than clipping.
-        assertEquals(0.95f, mushafLineFill(naturalWidthPx = 1015f, measureWidthPx = 964f), 0.005f)
-        // The floor is advisory: a line far past the measure still closes all
-        // the way, because ink over the fore-edge is clipped and a sliced ayah
-        // mark is worse than a line set a little tighter.
-        assertEquals(964f / 1500f, mushafLineFill(naturalWidthPx = 1500f, measureWidthPx = 964f), 0.001f)
+    fun `a line past the measure is condensed, not resized`() {
+        // Measured over the mushaf, half the condensed lines need under 3.5%.
+        assertEquals(0.95f, mushafLineCondense(naturalWidthPx = 1015f, measureWidthPx = 964f), 0.005f)
+        // And never past the floor, which about one line in a hundred reaches.
+        assertEquals(
+            MUSHAF_MIN_LINE_CONDENSE,
+            mushafLineCondense(naturalWidthPx = 1500f, measureWidthPx = 964f),
+            0.001f,
+        )
     }
 
     @Test
-    fun `no line is ever left wider than the measure`() {
-        // Fitting the leaf beats holding the hand: ink over the fore-edge is
-        // clipped, and the ayah mark at the line end comes out sliced.
-        listOf(1000f, 1100f, 1500f, 2200f).forEach { natural ->
-            val fill = mushafLineFill(naturalWidthPx = natural, measureWidthPx = 964f)
-            assertTrue("$natural overflowed", natural * fill <= 964f + 0.01f)
+    fun `no line is left wider than the measure until the floor is reached`() {
+        // Ink over the fore-edge is clipped and the mark at a line's end is
+        // what gets sliced, so a line is condensed until it fits — down to the
+        // floor, which only the anomalous runs reach.
+        listOf(1000f, 1100f).forEach { natural ->
+            val k = mushafLineCondense(naturalWidthPx = natural, measureWidthPx = 964f)
+            assertTrue("$natural overflowed", natural * k <= 964f + 0.01f)
         }
+        val floored = mushafLineCondense(naturalWidthPx = 2200f, measureWidthPx = 964f)
+        assertEquals(MUSHAF_MIN_LINE_CONDENSE, floored, 0.001f)
     }
 
     @Test

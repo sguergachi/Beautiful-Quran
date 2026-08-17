@@ -50,21 +50,35 @@ const val MUSHAF_MAX_FONT_PX = 128f
  * page turns. So the size cannot be fitted to each page's own longest line,
  * which is what made a leaf's glyphs jump by a third from one page to the next.
  *
- * The QCF word glyphs are not pre-justified — measured with HarfBuzz over all
- * ~9,000 lines of the mushaf (tools/measure_mushaf_lines.py), a line's glyph
- * run spans 14.1 em (p10) through 15.6 em (p50) to 18.7 em (p99), and no
- * constant word space closes that spread (searched: the best leaves 17.8%).
+ * The QCF page faces carry each word as it was drawn on that line, and nothing
+ * else: no space glyph of any kind (checked — U+0020, U+00A0, the thin spaces,
+ * tatweel: none are in the cmap). The Madinah page's justification therefore
+ * lives in the space *between* words, which the font does not carry and the
+ * renderer must supply. Measured with HarfBuzz over all ~8,800 lines
+ * (tools/verify_mushaf_lines.py), a line's glyph run spans 14.2 em (p10)
+ * through 15.6 (p50) to 18.7 (p99) — and the line data is right: it agrees
+ * word for word with the layout the fonts were cut for.
  *
- * So a page cannot both hold one hand and have every line reach both margins
- * by spacing alone, and something must give. It is not the hand: a leaf whose
- * type changes size line by line reads as a fault, however cleverly fitted.
- * The measure is taken from the widest line the book contains, so the type is
- * one size everywhere and no line can overrun; each line then closes what it
- * lacks with its word gaps, as a compositor does. This is where the reference
- * implementations land too — quran.com fixes the size per scale step and lets
- * the line be what it is.
+ * So the composition is the classic one:
+ *
+ * ```
+ *   line = Σ glyph advances + (words − 1) × gap
+ * ```
+ *
+ * with one size for the whole book and the gap solved per line. The size is
+ * anchored where the two costs balance, which is measurable rather than a
+ * matter of taste. At 16.4 em: three lines in four fill by gap alone at a
+ * median 0.12 em — an ordinary word space — and the rest are condensed
+ * horizontally, half of them by under 3.5% and only 1.1% of all lines by more
+ * than 12%. Anchoring on the widest line instead (18.7) leaves 99% of the page
+ * gapping at a median 0.40 em, which is the "spread out" leaf; anchoring on
+ * the median (15.6) throws 44% of lines into condensing.
+ *
+ * Condensed, never resized: a line set narrower keeps its height, weight and
+ * colour, so the page still reads as one hand. Changing the size line by line
+ * does not, which is why it reads as a fault.
  */
-const val MUSHAF_DESIGN_LINE_EM = 18.7f
+const val MUSHAF_DESIGN_LINE_EM = 16.4f
 
 /**
  * The one type size for every leaf: the measure divided by the design line,
@@ -85,8 +99,8 @@ fun mushafUniformFontPx(
 }
 
 /**
- * How a line is fitted to the measure: the scale that makes its glyph run span
- * the page exactly.
+ * How far a line's letterforms are condensed to bring it inside the measure —
+ * 1.0 for the three lines in four that need no condensing at all.
  *
  * This is the difference between a printed mushaf and a stretched one. The
  * page is justified by the *hand* — a crowded line written a little tighter, a
@@ -95,29 +109,25 @@ fun mushafUniformFontPx(
  * as the measure allows, which is what makes the ink read heavy and full rather
  * than thin and small.
  *
- * Bounded above so no line ever reads as a different hand from the one above
- * it, and whatever that leaves over is closed by the word gaps. There is no
- * such bound below: a line that will not fit must be written to fit, because
- * the alternative is ink over the fore-edge, where the leaf clips it and the
- * circled ayah mark riding at the line end comes out sliced in half.
+ * Ink over the fore-edge is clipped and the circled mark riding at a line's end
+ * is what gets sliced, so a line that will not fit is made to fit — but by its
+ * letterforms narrowing, never by its size changing.
  */
-fun mushafLineFill(naturalWidthPx: Float, measureWidthPx: Float): Float {
+fun mushafLineCondense(naturalWidthPx: Float, measureWidthPx: Float): Float {
     if (naturalWidthPx <= 0f || measureWidthPx <= 0f) return 1f
-    return (measureWidthPx / naturalWidthPx)
-        .coerceIn(MUSHAF_MIN_LINE_SQUEEZE, MUSHAF_MAX_LINE_STRETCH)
-        // Never wider than the measure, whatever the bounds say.
-        .coerceAtMost(measureWidthPx / naturalWidthPx)
+    val needed = measureWidthPx / naturalWidthPx
+    // A line at or inside the measure is never touched: it fills by gap.
+    return if (needed >= 1f) 1f else needed.coerceAtLeast(MUSHAF_MIN_LINE_CONDENSE)
 }
 
 /**
- * Floor for the handful of lines wider than the measure even at the book's own
- * size — a guard against clipping, not a design device. Anchoring on the p99
- * line leaves about one line in a hundred to close up, by a few percent.
+ * How far a line may be condensed before the fit is not worth it: measured over
+ * the mushaf, only 1.1% of lines ask for more than this, and they come from the
+ * few pages whose runs are anomalous.
  */
-const val MUSHAF_MIN_LINE_SQUEEZE = 0.93f
+const val MUSHAF_MIN_LINE_CONDENSE = 0.86f
 
-/** A line is never opened up: the hand does not grow to fill paper. */
-const val MUSHAF_MAX_LINE_STRETCH = 1.0f
+/** Never stretch a word gap past this fraction of the page's own size. */
 
 
 
