@@ -294,8 +294,12 @@ private fun MushafQcfPageLine(
     // and drifting apart in the next. So the line is spaced by ink: the paper
     // between one word's last stroke and the next word's first is made equal,
     // which is what a printed line does.
-    val cells = remember(rawCells, condense) {
-        if (condense == 1f) rawCells else rawCells.map { it.scaled(condense) }
+    // Measured again at the size they are drawn, not scaled arithmetically from
+    // the unscaled measurement: the rasteriser's ink at a given textScaleX is
+    // not exactly that many times its ink at 1, and over nine cells the
+    // difference left a line sixty pixels short of its own margin.
+    val cells = remember(line, pageTypeface, linePx, condense) {
+        if (condense == 1f) rawCells else mushafLineCells(line, pageTypeface, linePx, condense)
     }
     Layout(
         modifier = modifier.fillMaxWidth(),
@@ -381,8 +385,15 @@ private fun mushafLineCells(
     }
     val bounds = android.graphics.Rect()
     val out = ArrayList<MushafCell>(line.tokens.size + 4)
+    // One cell per drawn child, empty or not: the layout emits a node for every
+    // word whether or not it carries glyphs, and a cell list that skipped the
+    // empty ones put every following word on the wrong origin — the line then
+    // ended short of its own margin by about a word.
     fun add(text: String) {
-        if (text.isEmpty()) return
+        if (text.isEmpty()) {
+            out += MushafCell(0f, 0f, 0f)
+            return
+        }
         val advance = paint.measureText(text)
         paint.getTextBounds(text, 0, text.length, bounds)
         out += MushafCell(advance, bounds.left.toFloat(), bounds.right.toFloat())
@@ -390,7 +401,7 @@ private fun mushafLineCells(
     line.tokens.forEach { token ->
         val raw = token.word.qcfV2
         add(if (raw.isNotEmpty()) qcfWordGlyphs(raw) else token.word.arabic)
-        if (raw.isNotEmpty()) add(qcfTrailingMark(raw))
+        if (raw.isNotEmpty() && qcfTrailingMark(raw).isNotEmpty()) add(qcfTrailingMark(raw))
     }
     return out
 }
@@ -412,8 +423,15 @@ internal fun mushafCellOrigins(
     val n = minOf(cells.size, count)
     val origins = FloatArray(count)
     if (n == 0) return origins
-    val gap = fit.gapPx
     val inkTotal = (0 until n).sumOf { cells[it].inkWidth.toDouble() }.toFloat()
+    // A flush line divides what is actually left, so it ends on the margin
+    // whatever the rasteriser did with the letterforms. The fit has already
+    // chosen the scale that makes this residue the space we want.
+    val gap = if (fit.flush && n > 1) {
+        ((width - inkTotal) / (n - 1)).coerceAtLeast(0f)
+    } else {
+        fit.gapPx
+    }
     // A flush line starts at the fore-edge; a short one is centred on the page,
     // the way a chapter's closing line is printed. Either way the words sit the
     // same distance apart — the page's own space.

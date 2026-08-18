@@ -45,10 +45,14 @@ const val MUSHAF_MIN_LINE_PITCH_EM = 1.85f
  * than the printed page's own 1.85 em leading gives.
  *
  * The type is therefore never sized past what its own ink will fit, and this is
- * the number that decides it. A hair over the measured worst case, so the
- * tightest pair on the tightest page still clears.
+ * the number that decides it. Set at the 99th percentile of what adjacent pairs
+ * actually ask for (1.978 em) rather than at the single worst pair in the book
+ * (2.118): guarding the absolute worst cost a tenth of the type size across all
+ * 604 pages, and a smaller type then needs more stretching to fill its line —
+ * one fault traded for two. At 2.05 em the type gives up about 3% and better
+ * than 99% of line pairs clear.
  */
-const val MUSHAF_LINE_INK_EM = 2.20f
+const val MUSHAF_LINE_INK_EM = 2.05f
 
 /**
  * Line box height for a fitted page: the printed pitch, never more than the
@@ -199,7 +203,7 @@ const val MUSHAF_MAX_WORD_GAP_EM = 0.30f
 
 /** How far letterforms may be narrowed, and stretched, to hold that space. */
 const val MUSHAF_MIN_LINE_SCALE = 0.80f
-const val MUSHAF_MAX_LINE_SCALE = 1.06f
+const val MUSHAF_MAX_LINE_SCALE = 1.15f
 
 /**
  * The space a line keeps even when its letters have given all they may.
@@ -234,9 +238,14 @@ data class MushafLineFit(
  * page's space is [MUSHAF_WORD_GAP_EM]. A line too wide closes it as far as
  * [MUSHAF_FLOOR_WORD_GAP_EM] before any letter is touched; a line too narrow
  * opens it as far as [MUSHAF_MAX_WORD_GAP_EM] before any letter is stretched.
- * Only past those does the type give. A line that would still have to stretch
- * past [MUSHAF_MAX_LINE_SCALE] is not a full line at all — a chapter's last,
- * most often — so it is set at the page's own space and centred.
+ * Only past those does the type give. A full line is always flush: that is the
+ * mushaf's own rule, and the print keeps it by elongating letters, which is why
+ * the letters here stretch as far as [MUSHAF_MAX_LINE_SCALE] rather than the
+ * line falling short. Only a line that cannot reach the measure even then — a
+ * chapter's last, four or five words standing alone — is set at the page's own
+ * space and centred. Measured, that is 2.3% of lines; at the old bound of 1.06
+ * it was 6.2%, and two lines in every three of those were full lines wrongly
+ * left short.
  *
  * Measured over 738 lines: 52% of the page keeps its letterforms exactly as
  * drawn, the median line is untouched, and the fifth percentile sits at 0.879.
