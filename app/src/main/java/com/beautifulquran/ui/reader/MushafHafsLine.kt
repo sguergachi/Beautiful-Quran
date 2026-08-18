@@ -47,6 +47,8 @@ import com.beautifulquran.domain.buildMushafQcfLine
 import com.beautifulquran.domain.mushafGapSpacingPx
 import com.beautifulquran.domain.mushafLineJustifies
 import com.beautifulquran.domain.MUSHAF_WORD_GAP_EM
+import com.beautifulquran.domain.MUSHAF_MAX_LINE_SCALE
+import com.beautifulquran.domain.MUSHAF_MIN_LINE_SCALE
 import com.beautifulquran.domain.MushafLineFit
 import com.beautifulquran.domain.mushafLineFit
 import com.beautifulquran.domain.mushafLineCondense
@@ -236,15 +238,21 @@ private fun MushafQcfPageLine(
     val linePx = with(density) { fontSize.toPx() }
     // What the words actually mark, measured from the page's own face and
     // unscaled. Everything about the line's fit follows from this.
-    val rawCells = remember(line, pageTypeface, linePx) {
-        mushafLineCells(line, pageTypeface, linePx, condense = 1f)
+    val texts = remember(line) { mushafLineTexts(line) }
+    val rawCells = remember(texts, pageTypeface, linePx) {
+        mushafLineCells(texts, pageTypeface, linePx, condense = 1f)
     }
+    // What each join already carries. Spacing by ink *box* set every join the
+    // same distance apart and so no two of them the same paper apart — a word
+    // closing on an open ن leaves a pocket its neighbour belongs in, and the
+    // box does not know it is there.
+    val joinsEm = remember(texts, pageTypeface) { mushafLineJoins(texts, pageTypeface) }
     // A word space is guaranteed first and the letters give way to it, which is
     // the order a compositor works in. Fitting the advance run to the measure
     // instead left the spacing to be whatever paper happened to remain: over
     // 738 lines that put a third of them under 0.10 em and the tightest tenth
     // into overlap. See MUSHAF_MIN_WORD_GAP_EM.
-    val fit = remember(rawCells, measureWidthPx, linePx, justify) {
+    val fit = remember(rawCells, joinsEm, measureWidthPx, linePx, justify) {
         if (!justify) {
             // Too few words to justify: the page's own space, centred.
             MushafLineFit(
@@ -252,7 +260,16 @@ private fun MushafQcfPageLine(
                 gapPx = MUSHAF_WORD_GAP_EM * linePx,
                 flush = false,
             )
+        } else if (joinsEm.size == (rawCells.size - 1).coerceAtLeast(0) && joinsEm.isNotEmpty()) {
+            mushafInkLineFit(
+                inkWidthPx = rawCells.sumOf { it.inkWidth.toDouble() }.toFloat(),
+                joins = joinsEm,
+                measureWidthPx = measureWidthPx,
+                fontPx = linePx,
+            )
         } else {
+            // No page face yet, so no profiles: fall back to fitting by box,
+            // which is what this did before the ink was measured.
             mushafLineFit(
                 inkWidthPx = rawCells.sumOf { it.inkWidth.toDouble() }.toFloat(),
                 gapCount = (rawCells.size - 1).coerceAtLeast(0),
@@ -298,9 +315,13 @@ private fun MushafQcfPageLine(
     // the unscaled measurement: the rasteriser's ink at a given textScaleX is
     // not exactly that many times its ink at 1, and over nine cells the
     // difference left a line sixty pixels short of its own margin.
-    val cells = remember(line, pageTypeface, linePx, condense) {
-        if (condense == 1f) rawCells else mushafLineCells(line, pageTypeface, linePx, condense)
+    val cells = remember(texts, pageTypeface, linePx, condense) {
+        if (condense == 1f) rawCells else mushafLineCells(texts, pageTypeface, linePx, condense)
     }
+    // A narrowing scales a join's pocket exactly as it scales the strokes
+    // either side of it, so the em measurement holds at any width and only the
+    // size of the em changes.
+    val emPx = linePx * condense
     Layout(
         modifier = modifier.fillMaxWidth(),
         content = {
@@ -354,7 +375,14 @@ private fun MushafQcfPageLine(
         val placeables = measurables.map { it.measure(Constraints()) }
         val height = placeables.maxOfOrNull { it.height } ?: 0
         val width = constraints.maxWidth
-        val origins = mushafCellOrigins(cells, placeables.size, width.toFloat(), fit)
+        val origins = mushafCellOrigins(
+            cells = cells,
+            count = placeables.size,
+            width = width.toFloat(),
+            fit = fit,
+            joins = joinsEm,
+            emPx = emPx,
+        )
         layout(width, height) {
             placeables.forEachIndexed { i, p ->
                 p.place(origins.getOrElse(i) { 0f }.roundToInt(), (height - p.height) / 2)
@@ -372,8 +400,26 @@ internal class MushafCell(val advance: Float, val inkLeft: Float, val inkRight: 
     fun scaled(k: Float) = MushafCell(advance * k, inkLeft * k, inkRight * k)
 }
 
+/**
+ * What the line draws, one string per node.
+ *
+ * One entry per drawn child, empty or not: the layout emits a node for every
+ * word whether or not it carries glyphs, and a list that skipped the empty ones
+ * put every following word on the wrong origin — the line then ended short of
+ * its own margin by about a word.
+ */
+private fun mushafLineTexts(line: MushafLine): List<String> {
+    val out = ArrayList<String>(line.tokens.size + 4)
+    line.tokens.forEach { token ->
+        val raw = token.word.qcfV2
+        out += if (raw.isNotEmpty()) qcfWordGlyphs(raw) else token.word.arabic
+        if (raw.isNotEmpty() && qcfTrailingMark(raw).isNotEmpty()) out += qcfTrailingMark(raw)
+    }
+    return out
+}
+
 private fun mushafLineCells(
-    line: MushafLine,
+    texts: List<String>,
     typeface: android.graphics.Typeface?,
     fontPx: Float,
     condense: Float,
@@ -384,26 +430,33 @@ private fun mushafLineCells(
         textScaleX = condense
     }
     val bounds = android.graphics.Rect()
-    val out = ArrayList<MushafCell>(line.tokens.size + 4)
-    // One cell per drawn child, empty or not: the layout emits a node for every
-    // word whether or not it carries glyphs, and a cell list that skipped the
-    // empty ones put every following word on the wrong origin — the line then
-    // ended short of its own margin by about a word.
-    fun add(text: String) {
+    return texts.map { text ->
         if (text.isEmpty()) {
-            out += MushafCell(0f, 0f, 0f)
-            return
+            MushafCell(0f, 0f, 0f)
+        } else {
+            val advance = paint.measureText(text)
+            paint.getTextBounds(text, 0, text.length, bounds)
+            MushafCell(advance, bounds.left.toFloat(), bounds.right.toFloat())
         }
-        val advance = paint.measureText(text)
-        paint.getTextBounds(text, 0, text.length, bounds)
-        out += MushafCell(advance, bounds.left.toFloat(), bounds.right.toFloat())
     }
-    line.tokens.forEach { token ->
-        val raw = token.word.qcfV2
-        add(if (raw.isNotEmpty()) qcfWordGlyphs(raw) else token.word.arabic)
-        if (raw.isNotEmpty() && qcfTrailingMark(raw).isNotEmpty()) add(qcfTrailingMark(raw))
-    }
-    return out
+}
+
+/**
+ * What each join between two words offers, in em — the white it already
+ * carries, and the closest the two come.
+ *
+ * Held in em because it is a property of the two letterforms and nothing else:
+ * a horizontal narrowing scales it exactly as it scales the ink either side,
+ * and the type size scales it too, so the raster work is done once per glyph
+ * for the whole book. See [MushafInkProfiles].
+ */
+private fun mushafLineJoins(
+    texts: List<String>,
+    typeface: android.graphics.Typeface?,
+): List<MushafInkJoin> {
+    if (texts.size < 2 || typeface == null) return emptyList()
+    val profiles = texts.map { MushafInkProfiles.of(typeface, it) }
+    return List(texts.size - 1) { i -> mushafInkJoin(profiles[i], profiles[i + 1]) }
 }
 
 /**
@@ -419,6 +472,10 @@ internal fun mushafCellOrigins(
     count: Int,
     width: Float,
     fit: MushafLineFit,
+    /** What each join already carries, in em, fore-edge first. */
+    joins: List<MushafInkJoin> = emptyList(),
+    /** How many px the line's em comes to, once narrowed. */
+    emPx: Float = 0f,
 ): FloatArray {
     val n = minOf(cells.size, count)
     val origins = FloatArray(count)
@@ -426,25 +483,182 @@ internal fun mushafCellOrigins(
     val inkTotal = (0 until n).sumOf { cells[it].inkWidth.toDouble() }.toFloat()
     // A flush line divides what is actually left, so it ends on the margin
     // whatever the rasteriser did with the letterforms. The fit has already
-    // chosen the scale that makes this residue the space we want.
-    val gap = if (fit.flush && n > 1) {
-        ((width - inkTotal) / (n - 1)).coerceAtLeast(0f)
+    // chosen the scale that makes this residue the space it wants.
+    val spread = if (fit.flush && n > 1) {
+        (width - inkTotal).coerceAtLeast(0f)
     } else {
-        fit.gapPx
+        fit.gapPx * (n - 1)
     }
+    val steps = mushafJoinSteps(joins, n, spread, emPx)
     // A flush line starts at the fore-edge; a short one is centred on the page,
-    // the way a chapter's closing line is printed. Either way the words sit the
-    // same distance apart — the page's own space.
+    // the way a chapter's closing line is printed.
     var inkRight = if (fit.flush) {
         width
     } else {
-        width - ((width - (inkTotal + (n - 1) * gap)) / 2f).coerceAtLeast(0f)
+        width - ((width - (inkTotal + spread)) / 2f).coerceAtLeast(0f)
     }
     for (i in 0 until n) {
         origins[i] = inkRight - cells[i].inkRight
-        inkRight -= cells[i].inkWidth + gap
+        inkRight -= cells[i].inkWidth + steps.getOrElse(i) { 0f }
     }
     return origins
+}
+
+/**
+ * How far apart to set each pair of ink boxes so that every join on the line
+ * carries the same *white*, given [spread] px of paper to divide between them.
+ *
+ * Dividing the paper equally between the boxes is what a line of Latin type
+ * does, and it is wrong here: Arabic words nest, and how much white a join
+ * already holds at the moment its boxes touch varies threefold along one line.
+ * So the paper is divided to level the white instead — every join set to the
+ * same measure `level` of it — except where a join's two words run alongside
+ * each other and would weld at that setting. Those are held at their own floor
+ * and the rest of the line absorbs the difference.
+ *
+ * `level` is found by bisection because the floors make the total a piecewise
+ * function of it; twenty-four halvings settle it well inside a pixel. It is
+ * free to go negative, and must be: a pair that nests deeply carries a third of
+ * an em of white with its boxes already touching, so levelling a line down to
+ * an ordinary word space means drawing that pair's boxes *through* each other.
+ * Held at zero, those joins could never give anything back, and the whole of a
+ * dense line's shortfall fell on the pairs that had least to spare.
+ */
+private fun mushafJoinSteps(
+    joins: List<MushafInkJoin>,
+    n: Int,
+    spread: Float,
+    emPx: Float,
+): FloatArray {
+    val steps = FloatArray(n)
+    if (n < 2) return steps
+    if (joins.size < n - 1 || emPx <= 0f) {
+        val even = spread / (n - 1)
+        for (i in 0 until n - 1) steps[i] = even
+        return steps
+    }
+    val floors = FloatArray(n - 1) { joins[it].floorEm * emPx }
+    val papers = FloatArray(n - 1) { joins[it].paper * emPx }
+    var floorTotal = 0f
+    var paperTotal = 0f
+    var ceiling = Float.MAX_VALUE
+    for (i in 0 until n - 1) {
+        floorTotal += floors[i]
+        paperTotal += papers[i]
+        ceiling = minOf(ceiling, papers[i] + floors[i])
+    }
+    if (floorTotal >= spread) {
+        // The line is denser than bare clearance allows — the fit condenses to
+        // avoid this, but it stops at MUSHAF_MIN_LINE_SCALE and a line may
+        // arrive here anyway. What is missing then comes off each join in
+        // proportion to the white it holds of its own, so the joins that have
+        // none keep what little the floor gave them and no two words weld.
+        var slackTotal = 0f
+        for (i in 0 until n - 1) slackTotal += joins[i].closest
+        val short = floorTotal - spread
+        for (i in 0 until n - 1) {
+            steps[i] = floors[i] - if (slackTotal > 0f) {
+                short * joins[i].closest / slackTotal
+            } else {
+                short / (n - 1)
+            }
+        }
+        return steps
+    }
+    // Every join sits on its floor at `low` and none of them does at `high`,
+    // so the level the line wants lies between.
+    var low = ceiling
+    var high = (spread + paperTotal) / (n - 1)
+    repeat(24) {
+        val mid = (low + high) / 2f
+        var sum = 0f
+        for (i in 0 until n - 1) sum += maxOf(mid - papers[i], floors[i])
+        if (sum < spread) low = mid else high = mid
+    }
+    val level = (low + high) / 2f
+    for (i in 0 until n - 1) steps[i] = maxOf(level - papers[i], floors[i])
+    return steps
+}
+
+/**
+ * The level of white a line settles at when [spreadEm] em of paper is divided
+ * between [joins] — the same bisection [mushafJoinSteps] runs, asked in em and
+ * before anything is placed, so the fit can ask what a setting would cost.
+ */
+private fun mushafWhiteLevel(joins: List<MushafInkJoin>, spreadEm: Float): Float {
+    if (joins.isEmpty()) return 0f
+    var paperTotal = 0f
+    var ceiling = Float.MAX_VALUE
+    for (join in joins) {
+        paperTotal += join.paper
+        ceiling = minOf(ceiling, join.paper + join.floorEm)
+    }
+    var low = ceiling
+    var high = (spreadEm + paperTotal) / joins.size
+    if (high <= low) return low
+    repeat(24) {
+        val mid = (low + high) / 2f
+        var sum = 0f
+        for (join in joins) sum += maxOf(mid - join.paper, join.floorEm)
+        if (sum < spreadEm) low = mid else high = mid
+    }
+    return (low + high) / 2f
+}
+
+/**
+ * How far the line's letters are narrowed, and whether it reaches its margins.
+ *
+ * The fit this replaces reserved a fixed word space per *gap between ink
+ * boxes*, which is not a quantity the eye can see: on a join where the next
+ * word tucks under an open ن, a fifth of an em between the boxes is half an em
+ * of visible white, and on a join where two flat ends meet it is a fifth. So
+ * lines were condensed to buy space they did not need, and every line paid for
+ * it in letterform — measured over forty pages, only about half a page's lines
+ * came through at their own width.
+ *
+ * Reserving the white each join actually needs instead, the same forty pages
+ * leave seven lines in ten untouched, and the ones that do give way give up
+ * less. The order is still a compositor's: the white is guaranteed first and
+ * the letters yield to it, never the reverse.
+ */
+internal fun mushafInkLineFit(
+    inkWidthPx: Float,
+    joins: List<MushafInkJoin>,
+    measureWidthPx: Float,
+    fontPx: Float,
+): MushafLineFit {
+    if (inkWidthPx <= 0f || measureWidthPx <= 0f || fontPx <= 0f || joins.isEmpty()) {
+        return MushafLineFit(scale = 1f, gapPx = MUSHAF_WORD_GAP_EM * fontPx, flush = false)
+    }
+    val ink = inkWidthPx / fontPx
+    val measure = measureWidthPx / fontPx
+    var tight = 0f
+    for (join in joins) tight += join.fitFloorEm
+    if (ink + tight > measure) {
+        // Denser than the line's own white will allow: narrow the letters until
+        // it is not, and stop at the point where narrowing itself starts to
+        // read as a fault.
+        val scale = (measure / (ink + tight)).coerceAtLeast(MUSHAF_MIN_LINE_SCALE)
+        return MushafLineFit(scale = scale, gapPx = 0f, flush = true)
+    }
+    // Room to spare. Level the white as far as a line is set, and see what the
+    // letters would have to do to take up whatever is still left.
+    var opened = 0f
+    for (join in joins) opened += maxOf(MUSHAF_MAX_WHITE_LEVEL_EM - join.paper, join.floorEm)
+    val needed = measure / (ink + opened)
+    if (needed <= 1f) return MushafLineFit(scale = 1f, gapPx = 0f, flush = true)
+    if (needed <= MUSHAF_MAX_LINE_SCALE) {
+        return MushafLineFit(scale = needed, gapPx = 0f, flush = true)
+    }
+    // Neither the letters at their bound nor the white at its own reaches the
+    // margin alone. Take both, and if the white still has to open past what
+    // reads as one line of text, leave the line short and centred instead —
+    // which is how the print sets a line that will not fill.
+    val stretched = mushafWhiteLevel(joins, measure / MUSHAF_MAX_LINE_SCALE - ink)
+    if (stretched <= MUSHAF_STRETCH_WHITE_LEVEL_EM) {
+        return MushafLineFit(scale = MUSHAF_MAX_LINE_SCALE, gapPx = 0f, flush = true)
+    }
+    return MushafLineFit(scale = 1f, gapPx = MUSHAF_WORD_GAP_EM * fontPx, flush = false)
 }
 
 @Composable
