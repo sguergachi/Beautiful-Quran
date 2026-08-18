@@ -113,8 +113,15 @@ internal val MushafEdgeGutter = 10.dp
  */
 private val MushafFitSlack = 2.dp
 
-/** How long a leaf takes to come up once its page face has landed. */
-private const val MushafLeafFadeMs = 180
+/**
+ * How long a leaf takes to come up once its page face has landed.
+ *
+ * Long enough to be read as paper settling rather than as a frame that
+ * happened to be missing: at 180ms, under an easing that front-loads the
+ * alpha, nearly all of it landed inside the first four frames and the page
+ * simply appeared.
+ */
+private const val MushafLeafFadeMs = 420
 
 /**
  * How long a leaf waits for its own face before showing itself in the Hafs
@@ -416,7 +423,9 @@ private fun MushafPageSheet(
         if (!leafReady) return@LaunchedEffect
         leafFade.animateTo(
             targetValue = 1f,
-            animationSpec = tween(MushafLeafFadeMs, easing = LinearOutSlowInEasing),
+            // Eased at both ends: a fade that starts fast is the one that
+            // reads as a snap, however long it is nominally given.
+            animationSpec = tween(MushafLeafFadeMs, easing = FastOutSlowInEasing),
         )
         leafSettled = true
     }

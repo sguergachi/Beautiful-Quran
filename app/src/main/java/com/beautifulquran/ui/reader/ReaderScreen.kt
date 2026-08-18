@@ -141,6 +141,14 @@ import kotlin.math.abs
 /** Paused highlight polling is 250 ms; leave one scheduling beat for a fresh sample. */
 private const val HELD_WORD_REFRESH_MS = 300L
 
+/**
+ * How long a chapter takes to settle onto the paper when it first opens.
+ *
+ * The old 220ms, coming straight off a progress wheel, read as the page
+ * appearing from nowhere rather than as ink arriving on paper.
+ */
+private const val ReaderEntranceFadeMs = 450
+
 /** One-shot request to reveal a held word after opening or foreground resume. */
 private data class WordFocusRequest(
     val generation: Int,
@@ -1351,7 +1359,10 @@ fun ReaderScreen(
                 readerContentAlpha.snapTo(0f)
                 readerContentAlpha.animateTo(
                     targetValue = 1f,
-                    animationSpec = tween(durationMillis = 220),
+                    animationSpec = tween(
+                        durationMillis = ReaderEntranceFadeMs,
+                        easing = FastOutSlowInEasing,
+                    ),
                 )
             }
         }
@@ -1360,9 +1371,13 @@ fun ReaderScreen(
             if (chapterAdvancing) readerContentAlpha.snapTo(1f)
         }
         if (content == null) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator()
-            }
+            // Blank paper, not a spinner. A chapter takes a moment to come off
+            // the disk, and a Material wheel spinning on the leaf is exactly the
+            // chrome this reader does not have — and the wheel is what made the
+            // page seem to appear out of nowhere, because the eye was fixed on
+            // a moving thing that vanished the instant the text arrived. Empty
+            // paper waits quietly, and the text settles onto it.
+            Box(Modifier.fillMaxSize())
             return@Scaffold
         }
 
