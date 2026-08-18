@@ -394,56 +394,71 @@ internal fun MushafPageFolio(
     // The two figures are set well apart and hung on the leaf's centre line —
     // which is the play button's line too — so the folio reads as a pair of
     // marks either side of the spine rather than one clump of digits.
+    //
+    // The pair sits on one baseline, not on one centre line. Two scripts at
+    // two sizes have boxes of very different depth — Hafs carries an ascent
+    // half again as tall as the Latin face's — so centring the boxes stood
+    // the numerals a few pixels apart and the folio read as a typo. The
+    // figures align by baseline instead, and the band centres the pair as a
+    // whole; the row is left unbounded so the deeper Arabic box, which is
+    // taller than the 0.4-unit band by design, is not clipped to it.
     val ink = MaterialTheme.colorScheme.onBackground
-    Row(
+    Box(
         modifier = modifier
             .fillMaxWidth()
             .height(unit * MushafGrid.FOLIO),
-        horizontalArrangement = Arrangement.Center,
-        verticalAlignment = Alignment.CenterVertically,
+        contentAlignment = Alignment.Center,
     ) {
-        Text(
-            text = "$page",
-            style = MaterialTheme.typography.labelSmall.copy(
-                fontSize = glyphSize * MushafType.RATIO.pow(MushafType.HEAD),
-                letterSpacing = 0.14.em,
-            ),
-            color = ink.copy(alpha = 0.50f),
-            textAlign = TextAlign.End,
-            maxLines = 1,
-            modifier = Modifier.width(MushafFolioColumn),
-        )
-        Box(
-            Modifier.width(MushafFolioSpread),
-            contentAlignment = Alignment.Center,
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .wrapContentHeight(align = Alignment.CenterVertically, unbounded = true),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            // A lozenge between the two figures: the mark a compositor sets
-            // between a pair, so the folio reads as one thing rather than two
-            // numbers that happen to share a line.
-            Canvas(Modifier.size(MushafFolioDiamond)) {
-                val r = size.minDimension / 2f
-                val c = Offset(size.width / 2f, size.height / 2f)
-                drawPath(
-                    Path().apply {
-                        moveTo(c.x, c.y - r)
-                        lineTo(c.x + r * 0.62f, c.y)
-                        lineTo(c.x, c.y + r)
-                        lineTo(c.x - r * 0.62f, c.y)
-                        close()
-                    },
-                    color = ink.copy(alpha = 0.34f),
-                )
+            Text(
+                text = "$page",
+                style = MaterialTheme.typography.labelSmall.copy(
+                    fontSize = glyphSize * MushafType.RATIO.pow(MushafType.HEAD),
+                    letterSpacing = 0.14.em,
+                ),
+                color = ink.copy(alpha = 0.50f),
+                textAlign = TextAlign.End,
+                maxLines = 1,
+                modifier = Modifier.width(MushafFolioColumn).alignByBaseline(),
+            )
+            Box(
+                Modifier.width(MushafFolioSpread),
+                contentAlignment = Alignment.Center,
+            ) {
+                // A lozenge between the two figures: the mark a compositor sets
+                // between a pair, so the folio reads as one thing rather than two
+                // numbers that happen to share a line.
+                Canvas(Modifier.size(MushafFolioDiamond)) {
+                    val r = size.minDimension / 2f
+                    val c = Offset(size.width / 2f, size.height / 2f)
+                    drawPath(
+                        Path().apply {
+                            moveTo(c.x, c.y - r)
+                            lineTo(c.x + r * 0.62f, c.y)
+                            lineTo(c.x, c.y + r)
+                            lineTo(c.x - r * 0.62f, c.y)
+                            close()
+                        },
+                        color = ink.copy(alpha = 0.34f),
+                    )
+                }
             }
+            Text(
+                text = page.toArabicIndic(),
+                fontFamily = HafsFontFamily,
+                fontSize = glyphSize * MushafType.RATIO.pow(MushafType.FOLIO_FIGURE),
+                color = ink.copy(alpha = 0.54f),
+                textAlign = TextAlign.Start,
+                maxLines = 1,
+                modifier = Modifier.width(MushafFolioColumn).alignByBaseline(),
+            )
         }
-        Text(
-            text = page.toArabicIndic(),
-            fontFamily = HafsFontFamily,
-            fontSize = glyphSize * MushafType.RATIO.pow(MushafType.FOLIO_FIGURE),
-            color = ink.copy(alpha = 0.54f),
-            textAlign = TextAlign.Start,
-            maxLines = 1,
-            modifier = Modifier.width(MushafFolioColumn),
-        )
     }
 }
 

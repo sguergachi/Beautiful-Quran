@@ -126,6 +126,19 @@ together set the mark's ink 0.373 em from its neighbours where two words stood
 that verse stood from each other. `MUSHAF_MARK_WHITE_K` levels it at 0.85 of the
 line's white, which sets it the same distance as a word.
 
+A share alone is a straight line, and on a sparse line — one verse ending and the
+next beginning on the same measure, four or five words to fill it — a straight
+line still opens the mark too far: every join on such a line is set wide, and
+because the roundel is short and round the white above and below it joins the
+white beside it and reads as a hole in the verse. Past
+`MUSHAF_MARK_WHITE_KNEE_EM` (0.42 em) the mark keeps only
+`MUSHAF_MARK_WHITE_SLOPE` (0.45) of each further em, so it still opens as its
+line opens — an absolute cap was tried first and read worse, the mark pinned at
+0.1 em beside words set half an em apart — but it is never the widest join on
+its own line. Below the knee nothing moves: over a hundred pages the median mark
+join is unchanged and only the top of the distribution comes in, 0.277 em at the
+95th percentile to 0.222.
+
 ## 9. Leading is set by the ink, not by the nominal size
 
 These faces mark up to 1.368 em above the baseline and 0.747 em below: a line

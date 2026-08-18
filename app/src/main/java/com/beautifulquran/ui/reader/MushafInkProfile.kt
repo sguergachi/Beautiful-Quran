@@ -157,9 +157,32 @@ internal class MushafInkJoin(
             hardWhiteEm * MUSHAF_FIT_WHITE_K - closest,
         )
 
-    /** The share of the line's white this join is levelled to. */
-    val levelK: Float
-        get() = if (mark) MUSHAF_MARK_WHITE_K else 1f
+    /**
+     * The white this join is set to when the line levels at [level].
+     *
+     * A word join takes the level itself. A mark join takes a share of it, and
+     * past a knee only a fraction of what is added — so a roundel opens as the
+     * line opens, but never becomes the widest join on its own line.
+     */
+    fun whiteAt(level: Float): Float {
+        if (!mark) return level
+        val share = level * MUSHAF_MARK_WHITE_K
+        if (share <= MUSHAF_MARK_WHITE_KNEE_EM) return share
+        return MUSHAF_MARK_WHITE_KNEE_EM +
+            (share - MUSHAF_MARK_WHITE_KNEE_EM) * MUSHAF_MARK_WHITE_SLOPE
+    }
+
+    /** The level at which this join takes [white] — the inverse of [whiteAt]. */
+    fun levelFor(white: Float): Float {
+        if (!mark) return white
+        val share = if (white <= MUSHAF_MARK_WHITE_KNEE_EM) {
+            white
+        } else {
+            MUSHAF_MARK_WHITE_KNEE_EM +
+                (white - MUSHAF_MARK_WHITE_KNEE_EM) / MUSHAF_MARK_WHITE_SLOPE
+        }
+        return share / MUSHAF_MARK_WHITE_K
+    }
 }
 
 /**
@@ -257,6 +280,26 @@ private const val MUSHAF_MARK_HARD_WHITE_EM = 0.13f
  * words; at this share they are set the same distance as words are.
  */
 private const val MUSHAF_MARK_WHITE_K = 0.85f
+
+/**
+ * The white past which a verse mark's joins stop opening with the line.
+ *
+ * The share above is a straight line, and on a sparse line — one verse ending
+ * and the next beginning on the same measure, with four or five words to fill
+ * it — a straight line is not enough. Every join on such a line is set wide,
+ * the mark's along with them, and because the roundel is short and round the
+ * white above and below it joins the white beside it and reads as a hole in the
+ * verse. Past this knee the mark keeps only MUSHAF_MARK_WHITE_SLOPE of each
+ * further em, so it still opens as the line opens — the pinned mark an absolute
+ * cap gave, beside words set half an em apart, read worse than the hole did —
+ * but it is no longer the widest join on its line. Below the knee nothing
+ * changes: over a hundred pages the median mark join is untouched and only the
+ * top of the distribution comes in, from 0.277 em at the 95th to 0.222.
+ */
+private const val MUSHAF_MARK_WHITE_KNEE_EM = 0.42f
+
+/** The part of each further em of white a verse mark keeps past the knee. */
+private const val MUSHAF_MARK_WHITE_SLOPE = 0.45f
 
 /** The headroom the fit reserves over the floor, so levelling has room to work. */
 private const val MUSHAF_FIT_WHITE_K = 1.20f

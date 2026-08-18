@@ -554,21 +554,13 @@ private fun mushafJoinSteps(
         for (i in 0 until n - 1) steps[i] = even
         return steps
     }
-    val floors = FloatArray(n - 1) { joins[it].floorEm * emPx }
-    val papers = FloatArray(n - 1) { joins[it].paper * emPx }
-    // A verse mark is levelled to a share of what the words get, so its joins
-    // meet the level on a shallower slope and sit on their floors for longer.
-    val shares = FloatArray(n - 1) { joins[it].levelK }
+    // In em, like the level itself: a verse mark's white bends at a knee set in
+    // em, so the bisection cannot be run in pixels and read the same.
+    val active = if (joins.size == n - 1) joins else joins.subList(0, n - 1)
+    val floors = FloatArray(n - 1) { active[it].floorEm * emPx }
+    val spreadEm = spread / emPx
     var floorTotal = 0f
-    var paperTotal = 0f
-    var shareTotal = 0f
-    var ceiling = Float.MAX_VALUE
-    for (i in 0 until n - 1) {
-        floorTotal += floors[i]
-        paperTotal += papers[i]
-        shareTotal += shares[i]
-        ceiling = minOf(ceiling, (papers[i] + floors[i]) / shares[i])
-    }
+    for (i in 0 until n - 1) floorTotal += floors[i]
     if (floorTotal >= spread) {
         // The line is denser than bare clearance allows — the fit condenses to
         // avoid this, but it stops at MUSHAF_MIN_LINE_SCALE and a line may
@@ -576,30 +568,30 @@ private fun mushafJoinSteps(
         // proportion to the white it holds of its own, so the joins that have
         // none keep what little the floor gave them and no two words weld.
         var slackTotal = 0f
-        for (i in 0 until n - 1) slackTotal += joins[i].closest
+        for (i in 0 until n - 1) slackTotal += active[i].closest
         val short = floorTotal - spread
         for (i in 0 until n - 1) {
             steps[i] = floors[i] - if (slackTotal > 0f) {
-                short * joins[i].closest / slackTotal
+                short * active[i].closest / slackTotal
             } else {
                 short / (n - 1)
             }
         }
         return steps
     }
-    // Every join sits on its floor at `low` and none of them does at `high`,
-    // so the level the line wants lies between.
-    var low = ceiling
-    var high = (spread + paperTotal) / shareTotal
-    repeat(24) {
-        val mid = (low + high) / 2f
-        var sum = 0f
-        for (i in 0 until n - 1) sum += maxOf(mid * shares[i] - papers[i], floors[i])
-        if (sum < spread) low = mid else high = mid
+    val level = mushafWhiteLevel(active, spreadEm)
+    for (i in 0 until n - 1) {
+        val join = active[i]
+        steps[i] = maxOf(join.whiteAt(level) - join.paper, join.floorEm) * emPx
     }
-    val level = (low + high) / 2f
-    for (i in 0 until n - 1) steps[i] = maxOf(level * shares[i] - papers[i], floors[i])
     return steps
+}
+
+/** What [joins] take between them when the line levels at [level], in em. */
+private fun mushafWhiteSum(joins: List<MushafInkJoin>, level: Float): Float {
+    var sum = 0f
+    for (join in joins) sum += maxOf(join.whiteAt(level) - join.paper, join.floorEm)
+    return sum
 }
 
 /**
@@ -609,22 +601,26 @@ private fun mushafJoinSteps(
  */
 private fun mushafWhiteLevel(joins: List<MushafInkJoin>, spreadEm: Float): Float {
     if (joins.isEmpty()) return 0f
+    // Every join sits on its floor at `low`, so the level the line wants is at
+    // or above it. It is not bounded from above by anything as simple: a mark's
+    // white climbs more slowly than the level does, and past its knee slower
+    // still, so the bracket is opened until it holds rather than solved for.
     var paperTotal = 0f
-    var shareTotal = 0f
-    var ceiling = Float.MAX_VALUE
+    var low = Float.MAX_VALUE
     for (join in joins) {
         paperTotal += join.paper
-        shareTotal += join.levelK
-        ceiling = minOf(ceiling, (join.paper + join.floorEm) / join.levelK)
+        low = minOf(low, join.levelFor(join.paper + join.floorEm))
     }
-    var low = ceiling
-    var high = (spreadEm + paperTotal) / shareTotal
-    if (high <= low) return low
+    if (mushafWhiteSum(joins, low) >= spreadEm) return low
+    var high = maxOf(low + 1f, spreadEm + paperTotal)
+    var opens = 0
+    while (mushafWhiteSum(joins, high) < spreadEm && opens < 32) {
+        high = low + (high - low) * 2f
+        opens++
+    }
     repeat(24) {
         val mid = (low + high) / 2f
-        var sum = 0f
-        for (join in joins) sum += maxOf(mid * join.levelK - join.paper, join.floorEm)
-        if (sum < spreadEm) low = mid else high = mid
+        if (mushafWhiteSum(joins, mid) < spreadEm) low = mid else high = mid
     }
     return (low + high) / 2f
 }
@@ -669,7 +665,7 @@ internal fun mushafInkLineFit(
     // letters would have to do to take up whatever is still left.
     var opened = 0f
     for (join in joins) {
-        opened += maxOf(MUSHAF_MAX_WHITE_LEVEL_EM * join.levelK - join.paper, join.floorEm)
+        opened += maxOf(join.whiteAt(MUSHAF_MAX_WHITE_LEVEL_EM) - join.paper, join.floorEm)
     }
     val needed = measure / (ink + opened)
     if (needed <= 1f) return MushafLineFit(scale = 1f, gapPx = 0f, flush = true)
