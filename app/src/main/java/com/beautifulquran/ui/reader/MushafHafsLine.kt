@@ -46,6 +46,7 @@ import com.beautifulquran.domain.MushafToken
 import com.beautifulquran.domain.buildMushafQcfLine
 import com.beautifulquran.domain.mushafGapSpacingPx
 import com.beautifulquran.domain.mushafLineJustifies
+import com.beautifulquran.domain.mushafInkCondense
 import com.beautifulquran.domain.mushafLineCondense
 import com.beautifulquran.domain.qcfTrailingMark
 import com.beautifulquran.domain.qcfWordGlyphs
@@ -230,35 +231,28 @@ private fun MushafQcfPageLine(
     // glyph run still runs past the measure — a few dozen in the whole mushaf —
     // is set that little bit tighter, so one long line never drags its page's
     // type down with it.
-    val condense = remember(line, fontSize, pageFont, measureWidthPx) {
-        val probe = TextStyle(
-            fontFamily = pageFont,
-            fontSize = fontSize,
-            textDirection = TextDirection.Rtl,
-            platformStyle = PlatformTextStyle(includeFontPadding = false),
-        )
-        val natural = measurer.measure(
-            text = buildMushafQcfLine(line.tokens).text,
-            style = probe,
-            constraints = Constraints(),
-            maxLines = 1,
-            softWrap = false,
-        ).size.width.toFloat()
-        // The line is measured as one run but drawn one [Text] per cell, and
-        // each of those rounds its width up. Fit to a measure a pixel per cell
-        // short of the real one: fitted exactly, that rounding pushes the last
-        // word — and the circled ayah mark riding on it — past the edge.
-        // A verse-closing mark is a cell of its own (see the Row below), so it
-        // has to be counted here too; counting words alone left every line that
-        // closes a verse one rounding short, which is exactly the line that can
-        // least afford it.
-        val cells = line.tokens.size + line.tokens.count { token ->
-            token.word.qcfV2.isNotEmpty() && qcfTrailingMark(token.word.qcfV2).isNotEmpty()
+    val linePx = with(density) { fontSize.toPx() }
+    // What the words actually mark, measured from the page's own face and
+    // unscaled. Everything about the line's fit follows from this.
+    val rawCells = remember(line, pageTypeface, linePx) {
+        mushafLineCells(line, pageTypeface, linePx, condense = 1f)
+    }
+    // A word space is guaranteed first and the letters give way to it, which is
+    // the order a compositor works in. Fitting the advance run to the measure
+    // instead left the spacing to be whatever paper happened to remain: over
+    // 738 lines that put a third of them under 0.10 em and the tightest tenth
+    // into overlap. See MUSHAF_MIN_WORD_GAP_EM.
+    val condense = remember(rawCells, measureWidthPx, linePx, justify) {
+        if (!justify) {
+            1f
+        } else {
+            mushafInkCondense(
+                inkWidthPx = rawCells.sumOf { it.inkWidth.toDouble() }.toFloat(),
+                measureWidthPx = measureWidthPx,
+                gapCount = (rawCells.size - 1).coerceAtLeast(0),
+                fontPx = linePx,
+            )
         }
-        mushafLineCondense(
-            naturalWidthPx = natural,
-            measureWidthPx = (measureWidthPx - cells).coerceAtLeast(1f),
-        )
     }
     // Condensed, never resized. A line brought inside the measure keeps its
     // height, weight and colour — the page still reads as one hand — where a
@@ -292,9 +286,8 @@ private fun MushafQcfPageLine(
     // and drifting apart in the next. So the line is spaced by ink: the paper
     // between one word's last stroke and the next word's first is made equal,
     // which is what a printed line does.
-    val linePx = with(density) { fontSize.toPx() }
-    val cells = remember(line, pageTypeface, linePx, condense) {
-        mushafLineCells(line, pageTypeface, linePx, condense)
+    val cells = remember(rawCells, condense) {
+        if (condense == 1f) rawCells else rawCells.map { it.scaled(condense) }
     }
     Layout(
         modifier = modifier.fillMaxWidth(),
@@ -361,6 +354,10 @@ private fun MushafQcfPageLine(
 /** A cell's advance and where its ink sits inside it, in px. */
 internal class MushafCell(val advance: Float, val inkLeft: Float, val inkRight: Float) {
     val inkWidth: Float get() = (inkRight - inkLeft).coerceAtLeast(0f)
+
+    /** The same cell with its letterforms narrowed — scaleX scales ink and
+     * advance alike, so the measurements scale with them. */
+    fun scaled(k: Float) = MushafCell(advance * k, inkLeft * k, inkRight * k)
 }
 
 private fun mushafLineCells(

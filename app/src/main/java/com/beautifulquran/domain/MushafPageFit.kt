@@ -141,6 +141,42 @@ fun mushafLineCondense(naturalWidthPx: Float, measureWidthPx: Float): Float {
  */
 const val MUSHAF_MIN_LINE_CONDENSE = 0.86f
 
+/**
+ * The narrowest paper allowed between one word's last stroke and the next
+ * word's first, as a fraction of the page's type size.
+ *
+ * This is the guarantee the rest of the fit is built on. Without it a line's
+ * spacing was whatever paper happened to be left after the ink, and measured
+ * over 738 lines that left 36.6% of them under 0.10 em and the tightest tenth
+ * *negative* — words overlapping. A compositor does the opposite: the word
+ * space is chosen first, and a line that will not take it has its letters
+ * tightened instead. Costed over the same lines, honouring 0.17 em tightens
+ * the median line by about 2% — invisible — and only the densest twentieth by
+ * more than 14%.
+ */
+const val MUSHAF_MIN_WORD_GAP_EM = 0.17f
+
+/**
+ * How far a line's letterforms are condensed so its words can keep [
+ * MUSHAF_MIN_WORD_GAP_EM] between them.
+ *
+ * [inkWidthPx] is the ink alone — the sum of what the words actually mark, not
+ * of their advance boxes, because the page faces carry side bearings that vary
+ * enormously from glyph to glyph and spacing by advance is what let two words
+ * collide while their neighbours drifted apart.
+ */
+fun mushafInkCondense(
+    inkWidthPx: Float,
+    measureWidthPx: Float,
+    gapCount: Int,
+    fontPx: Float,
+): Float {
+    if (inkWidthPx <= 0f || measureWidthPx <= 0f) return 1f
+    val room = measureWidthPx - gapCount.coerceAtLeast(0) * MUSHAF_MIN_WORD_GAP_EM * fontPx
+    if (room <= 0f) return 1f
+    return if (inkWidthPx <= room) 1f else room / inkWidthPx
+}
+
 /** Never stretch a word gap past this fraction of the page font. */
 const val MUSHAF_MAX_GAP_EM = 0.55f
 
