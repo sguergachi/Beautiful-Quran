@@ -204,10 +204,10 @@ private val MUSHAF_NO_JOIN = MushafInkJoin(0f, 0f, 0f)
  * pair that runs alongside — where the eye reads a channel, not a point — and
  * not on a pair that merely grazes.
  */
-internal const val MUSHAF_MIN_WHITE_EM = 0.20f
+internal const val MUSHAF_MIN_WHITE_EM = 0.24f
 
 /** No two words come closer than this anywhere, whatever the rest of the join reads. */
-internal const val MUSHAF_HARD_WHITE_EM = 0.14f
+internal const val MUSHAF_HARD_WHITE_EM = 0.20f
 
 /** The headroom the fit reserves over the floor, so levelling has room to work. */
 private const val MUSHAF_FIT_WHITE_K = 1.20f
