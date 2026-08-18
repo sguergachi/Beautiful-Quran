@@ -365,7 +365,7 @@ private fun MushafHeadLabel(
     Text(
         text = text,
         style = MaterialTheme.typography.labelSmall.copy(
-            fontSize = glyphSize * MushafType.RATIO.pow(MushafType.FURNITURE),
+            fontSize = glyphSize * MushafType.RATIO.pow(MushafType.HEAD),
             letterSpacing = 0.10.em,
         ),
         color = ink.copy(alpha = 0.44f),

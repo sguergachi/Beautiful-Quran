@@ -57,9 +57,12 @@ const val MUSHAF_MIN_LINE_PITCH_EM = 1.85f
  * lines were laid out in the well less an edge gutter, so a nominal 2.05 was
  * 2.018 of real leading and the difference was type size lost to an inset that
  * was only ever meant to hold a circled ayah mark's overhang at the *line end*.
- * The number here is what the page is actually set on.
+ * The number here is what the page is actually set on, and it now sits where
+ * the measurement put it rather than a hedge above: 1.99 against a 99th
+ * percentile of 1.978. This is the floor. Below it the descenders that 817
+ * measured line pairs asked to clear stop clearing.
  */
-const val MUSHAF_LINE_INK_EM = 2.02f
+const val MUSHAF_LINE_INK_EM = 1.99f
 
 /**
  * Line box height for a fitted page: the printed pitch, never more than the

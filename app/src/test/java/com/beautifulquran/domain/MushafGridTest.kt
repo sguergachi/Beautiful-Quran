@@ -8,7 +8,7 @@ class MushafGridTest {
 
     @Test
     fun `fifteen of the leaf's units are revelation and the chrome takes the rest`() {
-        assertEquals(16.35f, MushafGrid.SLOTS, 0.001f)
+        assertEquals(16.12f, MushafGrid.SLOTS, 0.001f)
         assertEquals(15, MushafGrid.TEXT_LINES)
         // The head asks for half a line now that it carries one, not two.
         assertEquals(
@@ -51,5 +51,7 @@ class MushafGridTest {
         val b = MushafType.stepPx(glyph, -2) / MushafType.stepPx(glyph, -1)
         assertEquals(a, b, 0.0001f)
         assertTrue(MushafType.stepPx(glyph, MushafType.GLOSS) < MushafType.stepPx(glyph, MushafType.FURNITURE))
+        // The running head is the smallest hand on the leaf.
+        assertTrue(MushafType.stepPx(glyph, MushafType.HEAD) < MushafType.stepPx(glyph, MushafType.GLOSS))
     }
 }
