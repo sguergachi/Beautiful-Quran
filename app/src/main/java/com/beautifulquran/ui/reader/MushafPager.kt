@@ -306,6 +306,14 @@ internal fun MushafPager(
             BoxWithConstraints(
                 Modifier
                     .fillMaxSize()
+                    // Each leaf gets a surface of its own, so turning the page
+                    // moves something already recorded instead of drawing it
+                    // again. Without this the pager's offset dirtied the leaf's
+                    // display list on every frame of a swipe and all ~150 of its
+                    // word nodes were re-recorded: measured, that was the whole
+                    // of the hitch — 99th percentile 101ms against 38 with it,
+                    // and half as many frames blamed on the UI thread.
+                    .graphicsLayer { }
                     .padding(horizontal = MushafPageMargin),
             ) {
             val density = LocalDensity.current
