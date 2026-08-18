@@ -405,7 +405,7 @@ internal fun MushafPageFolio(
         Text(
             text = "$page",
             style = MaterialTheme.typography.labelSmall.copy(
-                fontSize = glyphSize * MushafType.RATIO.pow(MushafType.GLOSS),
+                fontSize = glyphSize * MushafType.RATIO.pow(MushafType.HEAD),
                 letterSpacing = 0.14.em,
             ),
             color = ink.copy(alpha = 0.50f),
@@ -438,7 +438,7 @@ internal fun MushafPageFolio(
         Text(
             text = page.toArabicIndic(),
             fontFamily = HafsFontFamily,
-            fontSize = glyphSize * MushafType.RATIO.pow(MushafType.FURNITURE),
+            fontSize = glyphSize * MushafType.RATIO.pow(MushafType.FOLIO_FIGURE),
             color = ink.copy(alpha = 0.54f),
             textAlign = TextAlign.Start,
             maxLines = 1,

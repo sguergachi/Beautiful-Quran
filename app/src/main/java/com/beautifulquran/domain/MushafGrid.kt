@@ -17,9 +17,9 @@ import kotlin.math.pow
  *  0.3  running head — the smallest hand on the leaf
  * 0.32  head gutter — enough paper to stand the head off the text
  *  15   the revelation — the Madinah page's own grid
- *  0.5  folio, its figure centred in the band
+ *  0.4  folio, its figure centred in the band
  *  ---
- * 16.12
+ * 16.02
  * ```
  *
  * The furniture is trimmed to what it actually needs to read as furniture,
@@ -63,7 +63,7 @@ object MushafGrid {
      * two steps down the scale, so a whole unit was mostly paper around it.
      */
     const val TAIL = 0f
-    const val FOLIO = 0.50f
+    const val FOLIO = 0.40f
 
     /** The whole leaf, in units. */
     const val SLOTS = RUNNING_HEAD + HEAD_GUTTER + TEXT_LINES + TAIL + FOLIO
@@ -88,10 +88,13 @@ object MushafGrid {
  *
  * ```
  *   0   the revelation, and a chapter's name in its panel — the same hand
- *  -2   the folio's figure
- *  -3   its Latin gloss
- *  -4   the running head
+ *  -3   the folio's own Arabic figure
+ *  -4   the running head, and the Latin numeral glossing the folio
  * ```
+ *
+ * The two figures of the folio stand a step apart because they are two
+ * scripts: a Hafs numeral set at a Latin numeral's size reads smaller than it,
+ * and the step is what makes the pair match to the eye rather than on paper.
  */
 object MushafType {
     /** Major third. */
@@ -104,19 +107,18 @@ object MushafType {
     /** A chapter's name is written in the page's own hand. */
     const val TITLE = 0
 
-    /** Wayfinding: the folio's figure. */
-    const val FURNITURE = -2
-
-    /** The Latin gloss beside it. */
-    const val GLOSS = -3
+    /** The folio's own Arabic figure. */
+    const val FOLIO_FIGURE = -3
 
     /**
-     * The running head — the smallest hand on the leaf.
+     * The leaf's smallest hand: the running head, and the Latin numeral that
+     * glosses the folio — one size for everything you read once a page turn
+     * and then ignore for fifteen lines.
      *
-     * It stood with the folio at [FURNITURE] and read as a heading, which is
-     * two steps too loud for a chapter name you glance at once a page turn and
-     * then ignore for fifteen lines. Two steps down is a 36% cut, and the band
-     * it sits in shrinks with it: paper the revelation takes.
+     * The head stood two steps under the revelation and the folio's figures
+     * one step under that, which made wayfinding the second loudest thing on
+     * the page. Both came down; the bands they sit in came down with them, and
+     * the paper is the revelation's.
      */
     const val HEAD = -4
 }
