@@ -15,7 +15,7 @@
       "evidence": {
         "kind": "dual_model_topology",
         "artifact": "tools/timing_verdicts/invented-flush-restore-class.json",
-        "summary": "CTC restore invented a flush same-word pair (gap < 300 ms) that qdc did not have. XLSR forced-alignment prefers one span. Quran-align first-start MAE does not regress.",
+        "summary": "CTC restore invented a flush same-word pair (gap < 300 ms) that qdc did not have. XLSR and MMS/uroman forced-alignment both prefer one span.",
         "audioSha256": "ebab12b996ba3ff04ae97ffa280c7610a114b2e677c9b43b76571dc3fdc6edc2",
         "waveformVeto": false,
         "models": [
@@ -25,9 +25,9 @@
             "candidateScore": -0.078
           },
           {
-            "name": "quran-align",
-            "baselineMaeMs": 217,
-            "candidateMaeMs": 217
+            "name": "mms-uroman-ctc",
+            "baselineScore": -0.145,
+            "candidateScore": -0.069
           }
         ]
       }
@@ -42,7 +42,7 @@
       "evidence": {
         "kind": "dual_model_topology",
         "artifact": "tools/timing_verdicts/invented-flush-restore-class.json",
-        "summary": "CTC restore invented a flush same-word pair (gap < 300 ms) that qdc did not have. XLSR forced-alignment prefers one span. Quran-align first-start MAE does not regress.",
+        "summary": "CTC restore invented a flush same-word pair (gap < 300 ms) that qdc did not have. XLSR and MMS/uroman forced-alignment both prefer one span.",
         "audioSha256": "7c875fe928fa534c1b4c50617742aa271f36461ffbe697adc1efe67880659daa",
         "waveformVeto": false,
         "models": [
@@ -52,9 +52,9 @@
             "candidateScore": -0.295
           },
           {
-            "name": "quran-align",
-            "baselineMaeMs": 196,
-            "candidateMaeMs": 196
+            "name": "mms-uroman-ctc",
+            "baselineScore": -0.085,
+            "candidateScore": -0.069
           }
         ]
       }
@@ -69,7 +69,7 @@
       "evidence": {
         "kind": "dual_model_topology",
         "artifact": "tools/timing_verdicts/invented-flush-restore-class.json",
-        "summary": "CTC restore invented a flush same-word pair (gap < 300 ms) that qdc did not have. XLSR forced-alignment prefers one span. Quran-align first-start MAE does not regress.",
+        "summary": "CTC restore invented a flush same-word pair (gap < 300 ms) that qdc did not have. XLSR and MMS/uroman forced-alignment both prefer one span.",
         "audioSha256": "ae665c949b9028be1d7e451b22e50c3904459528f91fe6e8de0cd1fe065aec5a",
         "waveformVeto": false,
         "models": [
@@ -79,9 +79,9 @@
             "candidateScore": -0.46
           },
           {
-            "name": "quran-align",
-            "baselineMaeMs": 455,
-            "candidateMaeMs": 455
+            "name": "mms-uroman-ctc",
+            "baselineScore": -0.121,
+            "candidateScore": -0.055
           }
         ]
       }
@@ -96,7 +96,7 @@
       "evidence": {
         "kind": "dual_model_topology",
         "artifact": "tools/timing_verdicts/invented-flush-restore-class.json",
-        "summary": "CTC restore invented a flush same-word pair (gap < 300 ms) that qdc did not have. XLSR forced-alignment prefers one span. Quran-align first-start MAE does not regress.",
+        "summary": "CTC restore invented a flush same-word pair (gap < 300 ms) that qdc did not have. XLSR and MMS/uroman forced-alignment both prefer one span.",
         "audioSha256": "267d1912259341a217fb25cbf86bf27bc557c93d58cb414825725cd34716b29a",
         "waveformVeto": false,
         "models": [
@@ -106,9 +106,9 @@
             "candidateScore": -0.399
           },
           {
-            "name": "quran-align",
-            "baselineMaeMs": 2740,
-            "candidateMaeMs": 2740
+            "name": "mms-uroman-ctc",
+            "baselineScore": -0.155,
+            "candidateScore": -0.036
           }
         ]
       }
@@ -123,7 +123,7 @@
       "evidence": {
         "kind": "dual_model_topology",
         "artifact": "tools/timing_verdicts/invented-flush-restore-class.json",
-        "summary": "CTC restore invented a flush same-word pair (gap < 300 ms) that qdc did not have. XLSR forced-alignment prefers one span. Quran-align first-start MAE does not regress.",
+        "summary": "CTC restore invented a flush same-word pair (gap < 300 ms) that qdc did not have. XLSR and MMS/uroman forced-alignment both prefer one span.",
         "audioSha256": "135dcad3947d36f5dd54a0baccc8c07b41324b5b313b052511b4784066267935",
         "waveformVeto": false,
         "models": [
@@ -133,9 +133,9 @@
             "candidateScore": -0.125
           },
           {
-            "name": "quran-align",
-            "baselineMaeMs": 46,
-            "candidateMaeMs": 46
+            "name": "mms-uroman-ctc",
+            "baselineScore": -0.218,
+            "candidateScore": -0.163
           }
         ]
       }
@@ -150,7 +150,7 @@
       "evidence": {
         "kind": "dual_model_topology",
         "artifact": "tools/timing_verdicts/invented-flush-restore-class.json",
-        "summary": "CTC restore invented a flush same-word pair (gap < 300 ms) that qdc did not have. XLSR forced-alignment prefers one span. Quran-align first-start MAE does not regress.",
+        "summary": "CTC restore invented a flush same-word pair (gap < 300 ms) that qdc did not have. XLSR and MMS/uroman forced-alignment both prefer one span.",
         "audioSha256": "a1961a483113866b116e0f365a72fdbca3a4af3e725c9c83c86ebe3f4248ec7a",
         "waveformVeto": false,
         "models": [
@@ -160,9 +160,9 @@
             "candidateScore": -0.228
           },
           {
-            "name": "quran-align",
-            "baselineMaeMs": 176,
-            "candidateMaeMs": 176
+            "name": "mms-uroman-ctc",
+            "baselineScore": -0.068,
+            "candidateScore": -0.046
           }
         ]
       }
@@ -177,7 +177,7 @@
       "evidence": {
         "kind": "dual_model_topology",
         "artifact": "tools/timing_verdicts/invented-flush-restore-class.json",
-        "summary": "CTC restore invented a flush same-word pair (gap < 300 ms) that qdc did not have. XLSR forced-alignment prefers one span. Quran-align first-start MAE does not regress.",
+        "summary": "CTC restore invented a flush same-word pair (gap < 300 ms) that qdc did not have. XLSR and MMS/uroman forced-alignment both prefer one span.",
         "audioSha256": "a8cb8124174a5ef8950729cab5c883fecdf500de53439091945789d585f07f04",
         "waveformVeto": false,
         "models": [
@@ -187,10 +187,9 @@
             "candidateScore": -0.193
           },
           {
-            "name": "ctc-repeat-vs-split-invariant",
-            "sourceOccurrences": 1,
-            "restoreGapMs": 0,
-            "requiredPauseMs": 300
+            "name": "mms-uroman-ctc",
+            "baselineScore": -0.189,
+            "candidateScore": -0.029
           }
         ]
       }
@@ -205,7 +204,7 @@
       "evidence": {
         "kind": "dual_model_topology",
         "artifact": "tools/timing_verdicts/invented-flush-restore-class.json",
-        "summary": "CTC restore invented a flush same-word pair (gap < 300 ms) that qdc did not have. XLSR forced-alignment prefers one span. Quran-align first-start MAE does not regress.",
+        "summary": "CTC restore invented a flush same-word pair (gap < 300 ms) that qdc did not have. XLSR and MMS/uroman forced-alignment both prefer one span.",
         "audioSha256": "6912405af2ff340fee7487176d483c58eaed4668a3cc691afa85dfc2eb89badb",
         "waveformVeto": false,
         "models": [
@@ -215,10 +214,9 @@
             "candidateScore": -0.257
           },
           {
-            "name": "ctc-repeat-vs-split-invariant",
-            "sourceOccurrences": 1,
-            "restoreGapMs": 0,
-            "requiredPauseMs": 300
+            "name": "mms-uroman-ctc",
+            "baselineScore": -0.236,
+            "candidateScore": -0.125
           }
         ]
       }
@@ -233,7 +231,7 @@
       "evidence": {
         "kind": "dual_model_topology",
         "artifact": "tools/timing_verdicts/invented-flush-restore-class.json",
-        "summary": "CTC restore invented a flush same-word pair (gap < 300 ms) that qdc did not have. XLSR forced-alignment prefers one span. Quran-align first-start MAE does not regress.",
+        "summary": "CTC restore invented a flush same-word pair (gap < 300 ms) that qdc did not have. XLSR and MMS/uroman forced-alignment both prefer one span.",
         "audioSha256": "8fa9100cb32a7137b77080cfe9973ffa6ac596957734fedbca745268fe772ab0",
         "waveformVeto": false,
         "models": [
@@ -243,10 +241,9 @@
             "candidateScore": -0.169
           },
           {
-            "name": "ctc-repeat-vs-split-invariant",
-            "sourceOccurrences": 1,
-            "restoreGapMs": 0,
-            "requiredPauseMs": 300
+            "name": "mms-uroman-ctc",
+            "baselineScore": -0.159,
+            "candidateScore": -0.073
           }
         ]
       }
@@ -261,7 +258,7 @@
       "evidence": {
         "kind": "dual_model_topology",
         "artifact": "tools/timing_verdicts/invented-flush-restore-class.json",
-        "summary": "CTC restore invented a flush same-word pair (gap < 300 ms) that qdc did not have. XLSR forced-alignment prefers one span. Quran-align first-start MAE does not regress.",
+        "summary": "CTC restore invented a flush same-word pair (gap < 300 ms) that qdc did not have. MMS/uroman forced-alignment prefers one span. XLSR is within 0.01 of the invented pair.",
         "audioSha256": "10f7c8d0dadcce44e9071bbfcd16d09664a3e879d6c32bf4a078a8538a9f0cae",
         "waveformVeto": false,
         "models": [
@@ -271,36 +268,9 @@
             "candidateScore": -0.349
           },
           {
-            "name": "quran-align",
-            "baselineMaeMs": 266,
-            "candidateMaeMs": 266
-          }
-        ]
-      }
-    },
-    "Alafasy_128kbps:7:39": {
-      "verdict": "accept",
-      "kinds": [
-        "topology"
-      ],
-      "baselinePayloadHash": "343516281fdbf98f4f56f697864cb4e58a5a4386cabb97fbd532b30130b81040",
-      "candidatePayloadHash": "f2bfed862f0dafb8093951114caabea0087a313d36a8537fdcee7909737f7b09",
-      "evidence": {
-        "kind": "dual_model_topology",
-        "artifact": "tools/timing_verdicts/invented-flush-restore-class.json",
-        "summary": "CTC restore invented a flush same-word pair (gap < 300 ms) that qdc did not have. XLSR forced-alignment prefers one span. Quran-align first-start MAE does not regress.",
-        "audioSha256": "e5f9214da010a8d1fe7170834152edac12e99afff9af2cf73ae2be7643a3a069",
-        "waveformVeto": false,
-        "models": [
-          {
-            "name": "arabic-xlsr-ctc",
-            "baselineScore": -0.364,
-            "candidateScore": -0.381
-          },
-          {
-            "name": "quran-align",
-            "baselineMaeMs": 104,
-            "candidateMaeMs": 104
+            "name": "mms-uroman-ctc",
+            "baselineScore": -0.046,
+            "candidateScore": -0.03
           }
         ]
       }
@@ -315,7 +285,7 @@
       "evidence": {
         "kind": "dual_model_topology",
         "artifact": "tools/timing_verdicts/invented-flush-restore-class.json",
-        "summary": "CTC restore invented a flush same-word pair (gap < 300 ms) that qdc did not have. XLSR forced-alignment prefers one span. Quran-align first-start MAE does not regress.",
+        "summary": "CTC restore invented a flush same-word pair (gap < 300 ms) that qdc did not have. XLSR and MMS/uroman forced-alignment both prefer one span.",
         "audioSha256": "ca5b7de52efbf0b38a5e74dcbcf5c56f0d52dd9f076461fc586d7c25829b2e7d",
         "waveformVeto": false,
         "models": [
@@ -325,9 +295,9 @@
             "candidateScore": -0.16
           },
           {
-            "name": "quran-align",
-            "baselineMaeMs": 81,
-            "candidateMaeMs": 81
+            "name": "mms-uroman-ctc",
+            "baselineScore": -0.102,
+            "candidateScore": -0.01
           }
         ]
       }
@@ -342,7 +312,7 @@
       "evidence": {
         "kind": "dual_model_topology",
         "artifact": "tools/timing_verdicts/invented-flush-restore-class.json",
-        "summary": "CTC restore invented a flush same-word pair (gap < 300 ms) that qdc did not have. XLSR forced-alignment prefers one span. Quran-align first-start MAE does not regress.",
+        "summary": "CTC restore invented a flush same-word pair (gap < 300 ms) that qdc did not have. XLSR and MMS/uroman forced-alignment both prefer one span.",
         "audioSha256": "eb6631816af62e90e425f4df75ef59fdbe3a125f7b2d92f55c6dc63734e56f24",
         "waveformVeto": false,
         "models": [
@@ -352,9 +322,9 @@
             "candidateScore": -0.186
           },
           {
-            "name": "quran-align",
-            "baselineMaeMs": 12,
-            "candidateMaeMs": 12
+            "name": "mms-uroman-ctc",
+            "baselineScore": -0.082,
+            "candidateScore": -0.025
           }
         ]
       }
@@ -369,7 +339,7 @@
       "evidence": {
         "kind": "dual_model_topology",
         "artifact": "tools/timing_verdicts/invented-flush-restore-class.json",
-        "summary": "CTC restore invented a flush same-word pair (gap < 300 ms) that qdc did not have. XLSR forced-alignment prefers one span. Quran-align first-start MAE does not regress.",
+        "summary": "CTC restore invented a flush same-word pair (gap < 300 ms) that qdc did not have. XLSR and MMS/uroman forced-alignment both prefer one span.",
         "audioSha256": "ae64d13241a3e855fb7eea0eff87024c3a38d9b69ecfd477859639228e4128d5",
         "waveformVeto": false,
         "models": [
@@ -379,9 +349,9 @@
             "candidateScore": -0.382
           },
           {
-            "name": "quran-align",
-            "baselineMaeMs": 102,
-            "candidateMaeMs": 102
+            "name": "mms-uroman-ctc",
+            "baselineScore": -0.081,
+            "candidateScore": -0.058
           }
         ]
       }
@@ -396,7 +366,7 @@
       "evidence": {
         "kind": "dual_model_topology",
         "artifact": "tools/timing_verdicts/invented-flush-restore-class.json",
-        "summary": "Same invented flush \u064a\u0627\u0623\u064a\u0647\u0627 split as Hani 66:7.",
+        "summary": "CTC restore invented a flush same-word pair (gap < 300 ms) that qdc did not have. MMS/uroman forced-alignment prefers one span. XLSR is within 0.01 of the invented pair.",
         "audioSha256": "f2500b1ad01aa20593caecd35391b3b8a20e65ec7d8d1e1d78ac1c0a1fac2b13",
         "waveformVeto": false,
         "models": [
@@ -406,9 +376,9 @@
             "candidateScore": -0.507
           },
           {
-            "name": "quran-align",
-            "baselineMaeMs": 1135,
-            "candidateMaeMs": 1135
+            "name": "mms-uroman-ctc",
+            "baselineScore": -0.052,
+            "candidateScore": -0.036
           }
         ]
       }
@@ -423,7 +393,7 @@
       "evidence": {
         "kind": "dual_model_topology",
         "artifact": "tools/timing_verdicts/invented-flush-restore-class.json",
-        "summary": "CTC restore invented a flush same-word pair (gap < 300 ms) that qdc did not have. XLSR forced-alignment prefers one span. Quran-align first-start MAE does not regress.",
+        "summary": "CTC restore invented a flush same-word pair (gap < 300 ms) that qdc did not have. MMS/uroman forced-alignment prefers one span. XLSR is within 0.01 of the invented pair.",
         "audioSha256": "0e743392babbd9e16fb97a2af61ab0f5db223e660194973da065dc571675089a",
         "waveformVeto": false,
         "models": [
@@ -433,9 +403,9 @@
             "candidateScore": -0.211
           },
           {
-            "name": "quran-align",
-            "baselineMaeMs": 43,
-            "candidateMaeMs": 43
+            "name": "mms-uroman-ctc",
+            "baselineScore": -0.089,
+            "candidateScore": -0.082
           }
         ]
       }
@@ -450,7 +420,7 @@
       "evidence": {
         "kind": "dual_model_topology",
         "artifact": "tools/timing_verdicts/invented-flush-restore-class.json",
-        "summary": "Same invented flush \u064a\u0627\u0623\u064a\u0647\u0627 split as 66:7.",
+        "summary": "CTC restore invented a flush same-word pair (gap < 300 ms) that qdc did not have. XLSR and MMS/uroman forced-alignment both prefer one span.",
         "audioSha256": "2d0e4c383eb5de3c54dbad092c0683273f7ef4dda34faa319c4c71564d0950d4",
         "waveformVeto": false,
         "models": [
@@ -460,9 +430,9 @@
             "candidateScore": -0.263
           },
           {
-            "name": "quran-align",
-            "baselineMaeMs": 54,
-            "candidateMaeMs": 54
+            "name": "mms-uroman-ctc",
+            "baselineScore": -0.09,
+            "candidateScore": -0.06
           }
         ]
       }
@@ -477,7 +447,7 @@
       "evidence": {
         "kind": "dual_model_topology",
         "artifact": "tools/timing_verdicts/invented-flush-restore-class.json",
-        "summary": "CTC restore invented a flush same-word pair (gap < 300 ms) that qdc did not have. XLSR forced-alignment prefers one span. Quran-align first-start MAE does not regress.",
+        "summary": "CTC restore invented a flush same-word pair (gap < 300 ms) that qdc did not have. XLSR and MMS/uroman forced-alignment both prefer one span.",
         "audioSha256": "013744e9be3219ff1514d7f82fc28f35f0ab4c76b6f55a20b874f08906d6b968",
         "waveformVeto": false,
         "models": [
@@ -487,9 +457,9 @@
             "candidateScore": -0.416
           },
           {
-            "name": "quran-align",
-            "baselineMaeMs": 274,
-            "candidateMaeMs": 274
+            "name": "mms-uroman-ctc",
+            "baselineScore": -0.095,
+            "candidateScore": -0.079
           }
         ]
       }
@@ -504,7 +474,7 @@
       "evidence": {
         "kind": "dual_model_topology",
         "artifact": "tools/timing_verdicts/invented-flush-restore-class.json",
-        "summary": "CTC restore invented a flush same-word pair (gap < 300 ms) that qdc did not have. XLSR forced-alignment prefers one span. Quran-align first-start MAE does not regress.",
+        "summary": "CTC restore invented a flush same-word pair (gap < 300 ms) that qdc did not have. XLSR and MMS/uroman forced-alignment both prefer one span.",
         "audioSha256": "5a8ee6b3c711378e5f46f93055468b2a4fceda33e97dfe507a416d3d874fb4cd",
         "waveformVeto": false,
         "models": [
@@ -514,9 +484,9 @@
             "candidateScore": -0.506
           },
           {
-            "name": "quran-align",
-            "baselineMaeMs": 91,
-            "candidateMaeMs": 91
+            "name": "mms-uroman-ctc",
+            "baselineScore": -0.089,
+            "candidateScore": -0.06
           }
         ]
       }
@@ -531,7 +501,7 @@
       "evidence": {
         "kind": "dual_model_topology",
         "artifact": "tools/timing_verdicts/invented-flush-restore-class.json",
-        "summary": "Same invented flush \u064a\u0627\u0623\u064a\u0647\u0627 split as 66:7; word 1 starts at align 650 ms.",
+        "summary": "CTC restore invented a flush same-word pair (gap < 300 ms) that qdc did not have. XLSR and MMS/uroman forced-alignment both prefer one span.",
         "audioSha256": "a3b396724b6316c1ee68de84278a398034fab13347702de4be514e252915f040",
         "waveformVeto": false,
         "models": [
@@ -541,9 +511,9 @@
             "candidateScore": -0.237
           },
           {
-            "name": "quran-align",
-            "baselineMaeMs": 72,
-            "candidateMaeMs": 35
+            "name": "mms-uroman-ctc",
+            "baselineScore": -0.211,
+            "candidateScore": -0.178
           }
         ]
       }
@@ -558,7 +528,7 @@
       "evidence": {
         "kind": "dual_model_topology",
         "artifact": "tools/timing_verdicts/invented-flush-restore-class.json",
-        "summary": "CTC restore invented a flush same-word pair (gap < 300 ms) that qdc did not have. XLSR forced-alignment prefers one span. Quran-align first-start MAE does not regress.",
+        "summary": "CTC restore invented a flush same-word pair (gap < 300 ms) that qdc did not have. XLSR and MMS/uroman forced-alignment both prefer one span.",
         "audioSha256": "96a13e9b7c7a60e366f0b70dd1ab0e665f44ce65aba9a792eb9d8dcd534fccd7",
         "waveformVeto": false,
         "models": [
@@ -568,9 +538,9 @@
             "candidateScore": -0.139
           },
           {
-            "name": "quran-align",
-            "baselineMaeMs": 34,
-            "candidateMaeMs": 34
+            "name": "mms-uroman-ctc",
+            "baselineScore": -0.207,
+            "candidateScore": -0.054
           }
         ]
       }
@@ -585,7 +555,7 @@
       "evidence": {
         "kind": "dual_model_topology",
         "artifact": "tools/timing_verdicts/invented-flush-restore-class.json",
-        "summary": "CTC restore invented a flush same-word pair (gap < 300 ms) that qdc did not have. XLSR forced-alignment prefers one span. Quran-align first-start MAE does not regress.",
+        "summary": "CTC restore invented a flush same-word pair (gap < 300 ms) that qdc did not have. XLSR and MMS/uroman forced-alignment both prefer one span.",
         "audioSha256": "a3ceee8f3c265bc802c9762fab1cb39ef0957eea775b86199c1b12da7def276c",
         "waveformVeto": false,
         "models": [
@@ -595,9 +565,9 @@
             "candidateScore": -0.15
           },
           {
-            "name": "quran-align",
-            "baselineMaeMs": 326,
-            "candidateMaeMs": 326
+            "name": "mms-uroman-ctc",
+            "baselineScore": -0.146,
+            "candidateScore": -0.051
           }
         ]
       }
@@ -612,7 +582,7 @@
       "evidence": {
         "kind": "dual_model_topology",
         "artifact": "tools/timing_verdicts/invented-flush-restore-class.json",
-        "summary": "Lab #721: first \u0644\u0627 is a voiced \u0634\u062f\u0627\u062f lead. discard_false_same_position_lead.",
+        "summary": "CTC restore invented a flush same-word pair (gap < 300 ms) that qdc did not have. XLSR and MMS/uroman forced-alignment both prefer one span.",
         "audioSha256": "0c35e4be2e30eafe49a79a54dceda6e6c6ab696f1d33600bd26b59ad2216d2ae",
         "waveformVeto": false,
         "models": [
@@ -622,9 +592,9 @@
             "candidateScore": -0.133
           },
           {
-            "name": "quran-align",
-            "baselineMaeMs": 169,
-            "candidateMaeMs": 121
+            "name": "mms-uroman-ctc",
+            "baselineScore": -0.084,
+            "candidateScore": -0.078
           }
         ]
       }
@@ -639,7 +609,7 @@
       "evidence": {
         "kind": "dual_model_topology",
         "artifact": "tools/timing_verdicts/invented-flush-restore-class.json",
-        "summary": "Lab #723: invented flush \u064a\u0627\u0623\u064a\u0647\u0627 split collapsed; \u062a\u0639\u062a\u0630\u0631\u0648\u0627/\u0627\u0644\u064a\u0648\u0645 boundary 5621/6115; word 1 starts at align/voice 1030 ms.",
+        "summary": "CTC restore invented a flush same-word pair (gap < 300 ms) that qdc did not have. XLSR and MMS/uroman forced-alignment both prefer one span.",
         "audioSha256": "7f2159753bb2d88721f431c1b6e9cb187e4981d604f3595170cf3d7e43b72344",
         "waveformVeto": false,
         "models": [
@@ -649,9 +619,9 @@
             "candidateScore": -0.1
           },
           {
-            "name": "quran-align",
-            "baselineMaeMs": 255,
-            "candidateMaeMs": 87
+            "name": "mms-uroman-ctc",
+            "baselineScore": -0.115,
+            "candidateScore": -0.064
           }
         ]
       }
@@ -666,7 +636,7 @@
       "evidence": {
         "kind": "dual_model_topology",
         "artifact": "tools/timing_verdicts/invented-flush-restore-class.json",
-        "summary": "CTC restore invented a flush same-word pair (gap < 300 ms) that qdc did not have. XLSR forced-alignment prefers one span. Quran-align first-start MAE does not regress.",
+        "summary": "CTC restore invented a flush same-word pair (gap < 300 ms) that qdc did not have. MMS/uroman forced-alignment prefers one span. XLSR is within 0.01 of the invented pair.",
         "audioSha256": "4f5248644ce7f52dcb8137700ed6bc0b2421f8f7e1e8b4ebce95700784116909",
         "waveformVeto": false,
         "models": [
@@ -676,9 +646,9 @@
             "candidateScore": -0.133
           },
           {
-            "name": "quran-align",
-            "baselineMaeMs": 147,
-            "candidateMaeMs": 147
+            "name": "mms-uroman-ctc",
+            "baselineScore": -0.044,
+            "candidateScore": -0.032
           }
         ]
       }
@@ -693,7 +663,7 @@
       "evidence": {
         "kind": "dual_model_topology",
         "artifact": "tools/timing_verdicts/invented-flush-restore-class.json",
-        "summary": "CTC restore invented a flush same-word pair (gap < 300 ms) that qdc did not have. XLSR forced-alignment prefers one span. Quran-align first-start MAE does not regress.",
+        "summary": "CTC restore invented a flush same-word pair (gap < 300 ms) that qdc did not have. XLSR and MMS/uroman forced-alignment both prefer one span.",
         "audioSha256": "b121b40a7f2fe3c46fe197df0e6f22a3768ad5afdc3a8265e46a86e3ecefc38c",
         "waveformVeto": false,
         "models": [
@@ -703,9 +673,9 @@
             "candidateScore": -0.301
           },
           {
-            "name": "quran-align",
-            "baselineMaeMs": 582,
-            "candidateMaeMs": 582
+            "name": "mms-uroman-ctc",
+            "baselineScore": -0.086,
+            "candidateScore": -0.041
           }
         ]
       }
@@ -720,7 +690,7 @@
       "evidence": {
         "kind": "dual_model_topology",
         "artifact": "tools/timing_verdicts/invented-flush-restore-class.json",
-        "summary": "CTC restore invented a flush same-word pair (gap < 300 ms) that qdc did not have. XLSR forced-alignment prefers one span. Quran-align first-start MAE does not regress.",
+        "summary": "CTC restore invented a flush same-word pair (gap < 300 ms) that qdc did not have. XLSR and MMS/uroman forced-alignment both prefer one span.",
         "audioSha256": "03dd0b99bb4b18df17a4e0c5a10c355c73636ee515d05fa2491d9349fb7ba544",
         "waveformVeto": false,
         "models": [
@@ -730,9 +700,9 @@
             "candidateScore": -0.313
           },
           {
-            "name": "quran-align",
-            "baselineMaeMs": 781,
-            "candidateMaeMs": 781
+            "name": "mms-uroman-ctc",
+            "baselineScore": -0.069,
+            "candidateScore": -0.039
           }
         ]
       }
@@ -747,7 +717,7 @@
       "evidence": {
         "kind": "dual_model_topology",
         "artifact": "tools/timing_verdicts/invented-flush-restore-class.json",
-        "summary": "CTC restore invented a flush same-word pair (gap < 300 ms) that qdc did not have. XLSR forced-alignment prefers one span. Quran-align first-start MAE does not regress.",
+        "summary": "CTC restore invented a flush same-word pair (gap < 300 ms) that qdc did not have. XLSR and MMS/uroman forced-alignment both prefer one span.",
         "audioSha256": "8f3e48fb42f4bcbce04db3836a353626edc12ac7f64a63ab85ad20d2a525dc12",
         "waveformVeto": false,
         "models": [
@@ -757,9 +727,9 @@
             "candidateScore": -0.272
           },
           {
-            "name": "quran-align",
-            "baselineMaeMs": 704,
-            "candidateMaeMs": 704
+            "name": "mms-uroman-ctc",
+            "baselineScore": -0.07,
+            "candidateScore": -0.035
           }
         ]
       }
@@ -774,7 +744,7 @@
       "evidence": {
         "kind": "dual_model_topology",
         "artifact": "tools/timing_verdicts/invented-flush-restore-class.json",
-        "summary": "CTC restore invented a flush same-word pair (gap < 300 ms) that qdc did not have. XLSR forced-alignment prefers one span. Quran-align first-start MAE does not regress.",
+        "summary": "CTC restore invented a flush same-word pair (gap < 300 ms) that qdc did not have. XLSR and MMS/uroman forced-alignment both prefer one span.",
         "audioSha256": "838fc032646e0b1458448cd1c45af2a5c3a1aadcea6990c293ab3922b22227c0",
         "waveformVeto": false,
         "models": [
@@ -784,9 +754,9 @@
             "candidateScore": -0.158
           },
           {
-            "name": "quran-align",
-            "baselineMaeMs": 53,
-            "candidateMaeMs": 53
+            "name": "mms-uroman-ctc",
+            "baselineScore": -0.095,
+            "candidateScore": -0.009
           }
         ]
       }
@@ -801,7 +771,7 @@
       "evidence": {
         "kind": "dual_model_topology",
         "artifact": "tools/timing_verdicts/invented-flush-restore-class.json",
-        "summary": "CTC restore invented a flush same-word pair (gap < 300 ms) that qdc did not have. XLSR forced-alignment prefers one span. Quran-align first-start MAE does not regress.",
+        "summary": "CTC restore invented a flush same-word pair (gap < 300 ms) that qdc did not have. XLSR and MMS/uroman forced-alignment both prefer one span.",
         "audioSha256": "b2820cbf01f5e0b45cb65e425e2f12c8df9602a2872f2962d90aa491c7af8c61",
         "waveformVeto": false,
         "models": [
@@ -811,9 +781,9 @@
             "candidateScore": -0.093
           },
           {
-            "name": "quran-align",
-            "baselineMaeMs": 438,
-            "candidateMaeMs": 438
+            "name": "mms-uroman-ctc",
+            "baselineScore": -0.143,
+            "candidateScore": -0.105
           }
         ]
       }
@@ -828,7 +798,7 @@
       "evidence": {
         "kind": "dual_model_topology",
         "artifact": "tools/timing_verdicts/invented-flush-restore-class.json",
-        "summary": "CTC restore invented a flush same-word pair (gap < 300 ms) that qdc did not have. XLSR forced-alignment prefers one span. Quran-align first-start MAE does not regress.",
+        "summary": "CTC restore invented a flush same-word pair (gap < 300 ms) that qdc did not have. XLSR and MMS/uroman forced-alignment both prefer one span.",
         "audioSha256": "351e97db0b318ba7b6886076644351f13480f13c642859be44207a1ab9734626",
         "waveformVeto": false,
         "models": [
@@ -838,9 +808,9 @@
             "candidateScore": -0.167
           },
           {
-            "name": "quran-align",
-            "baselineMaeMs": 324,
-            "candidateMaeMs": 324
+            "name": "mms-uroman-ctc",
+            "baselineScore": -0.072,
+            "candidateScore": -0.05
           }
         ]
       }
@@ -855,7 +825,7 @@
       "evidence": {
         "kind": "dual_model_topology",
         "artifact": "tools/timing_verdicts/invented-flush-restore-class.json",
-        "summary": "CTC restore invented a flush same-word pair (gap < 300 ms) that qdc did not have. XLSR forced-alignment prefers one span. Quran-align first-start MAE does not regress.",
+        "summary": "CTC restore invented a flush same-word pair (gap < 300 ms) that qdc did not have. XLSR and MMS/uroman forced-alignment both prefer one span.",
         "audioSha256": "7169e937fb9f50b1a38f9e85c4ab052fbfefe631310b9b02c23df7496787f539",
         "waveformVeto": false,
         "models": [
@@ -865,9 +835,9 @@
             "candidateScore": -0.253
           },
           {
-            "name": "quran-align",
-            "baselineMaeMs": 250,
-            "candidateMaeMs": 250
+            "name": "mms-uroman-ctc",
+            "baselineScore": -0.059,
+            "candidateScore": -0.045
           }
         ]
       }
@@ -882,7 +852,7 @@
       "evidence": {
         "kind": "dual_model_topology",
         "artifact": "tools/timing_verdicts/invented-flush-restore-class.json",
-        "summary": "CTC restore invented a flush same-word pair (gap < 300 ms) that qdc did not have. XLSR forced-alignment prefers one span. Quran-align first-start MAE does not regress.",
+        "summary": "CTC restore invented a flush same-word pair (gap < 300 ms) that qdc did not have. XLSR and MMS/uroman forced-alignment both prefer one span.",
         "audioSha256": "cc7c7a9de95fbe7dc1bc312aa9602a439545cd46ada6fbef233120d1a091d4d7",
         "waveformVeto": false,
         "models": [
@@ -892,9 +862,9 @@
             "candidateScore": -0.131
           },
           {
-            "name": "quran-align",
-            "baselineMaeMs": 223,
-            "candidateMaeMs": 223
+            "name": "mms-uroman-ctc",
+            "baselineScore": -0.048,
+            "candidateScore": -0.032
           }
         ]
       }
@@ -909,7 +879,7 @@
       "evidence": {
         "kind": "dual_model_topology",
         "artifact": "tools/timing_verdicts/invented-flush-restore-class.json",
-        "summary": "CTC restore invented a flush same-word pair (gap < 300 ms) that qdc did not have. XLSR forced-alignment prefers one span. Quran-align first-start MAE does not regress.",
+        "summary": "CTC restore invented a flush same-word pair (gap < 300 ms) that qdc did not have. XLSR and MMS/uroman forced-alignment both prefer one span.",
         "audioSha256": "0fa9ea72e1cabc5db8f4cdb6ae978ce3e1b85116573024767954e4d954cb5b51",
         "waveformVeto": false,
         "models": [
@@ -919,9 +889,9 @@
             "candidateScore": -0.099
           },
           {
-            "name": "quran-align",
-            "baselineMaeMs": 424,
-            "candidateMaeMs": 424
+            "name": "mms-uroman-ctc",
+            "baselineScore": -0.098,
+            "candidateScore": -0.038
           }
         ]
       }
@@ -936,7 +906,7 @@
       "evidence": {
         "kind": "dual_model_topology",
         "artifact": "tools/timing_verdicts/invented-flush-restore-class.json",
-        "summary": "CTC restore invented a flush same-word pair (gap < 300 ms) that qdc did not have. XLSR forced-alignment prefers one span. Quran-align first-start MAE does not regress.",
+        "summary": "CTC restore invented a flush same-word pair (gap < 300 ms) that qdc did not have. XLSR and MMS/uroman forced-alignment both prefer one span.",
         "audioSha256": "2a5f1c429c61576a347f4c85f27a6e3f82619deabbe36d612a04209e3fe52eb3",
         "waveformVeto": false,
         "models": [
@@ -946,9 +916,9 @@
             "candidateScore": -0.237
           },
           {
-            "name": "quran-align",
-            "baselineMaeMs": 560,
-            "candidateMaeMs": 560
+            "name": "mms-uroman-ctc",
+            "baselineScore": -0.305,
+            "candidateScore": -0.223
           }
         ]
       }
@@ -963,7 +933,7 @@
       "evidence": {
         "kind": "dual_model_topology",
         "artifact": "tools/timing_verdicts/invented-flush-restore-class.json",
-        "summary": "CTC restore invented a flush same-word pair (gap < 300 ms) that qdc did not have. XLSR forced-alignment prefers one span. Quran-align first-start MAE does not regress.",
+        "summary": "CTC restore invented a flush same-word pair (gap < 300 ms) that qdc did not have. XLSR and MMS/uroman forced-alignment both prefer one span.",
         "audioSha256": "d9b90102419372a630b8e3f72bd1bb44e15470cbab7e41b803a5795d9fc275e1",
         "waveformVeto": false,
         "models": [
@@ -973,9 +943,9 @@
             "candidateScore": -0.461
           },
           {
-            "name": "quran-align",
-            "baselineMaeMs": 49,
-            "candidateMaeMs": 49
+            "name": "mms-uroman-ctc",
+            "baselineScore": -0.166,
+            "candidateScore": -0.062
           }
         ]
       }
@@ -990,7 +960,7 @@
       "evidence": {
         "kind": "dual_model_topology",
         "artifact": "tools/timing_verdicts/invented-flush-restore-class.json",
-        "summary": "CTC restore invented a flush same-word pair (gap < 300 ms) that qdc did not have. XLSR forced-alignment prefers one span. Quran-align first-start MAE does not regress.",
+        "summary": "CTC restore invented a flush same-word pair (gap < 300 ms) that qdc did not have. XLSR and MMS/uroman forced-alignment both prefer one span.",
         "audioSha256": "63ace2c2802c3b2dd7075331ea2d8dc36b153169ccb84e398bb37f50a547ff4b",
         "waveformVeto": false,
         "models": [
@@ -1000,9 +970,9 @@
             "candidateScore": -0.135
           },
           {
-            "name": "quran-align",
-            "baselineMaeMs": 201,
-            "candidateMaeMs": 201
+            "name": "mms-uroman-ctc",
+            "baselineScore": -0.129,
+            "candidateScore": -0.044
           }
         ]
       }
@@ -1017,7 +987,7 @@
       "evidence": {
         "kind": "dual_model_topology",
         "artifact": "tools/timing_verdicts/invented-flush-restore-class.json",
-        "summary": "CTC restore invented a flush same-word pair (gap < 300 ms) that qdc did not have. XLSR forced-alignment prefers one span. Quran-align first-start MAE does not regress.",
+        "summary": "CTC restore invented a flush same-word pair (gap < 300 ms) that qdc did not have. XLSR and MMS/uroman forced-alignment both prefer one span.",
         "audioSha256": "c249e26a01cdf9383ba8ab00bc0089ce96962c255cdb55de42b882b983194c8e",
         "waveformVeto": false,
         "models": [
@@ -1027,9 +997,9 @@
             "candidateScore": -0.448
           },
           {
-            "name": "quran-align",
-            "baselineMaeMs": 133,
-            "candidateMaeMs": 133
+            "name": "mms-uroman-ctc",
+            "baselineScore": -0.069,
+            "candidateScore": -0.038
           }
         ]
       }
@@ -1044,7 +1014,7 @@
       "evidence": {
         "kind": "dual_model_topology",
         "artifact": "tools/timing_verdicts/invented-flush-restore-class.json",
-        "summary": "CTC restore invented a flush same-word pair (gap < 300 ms) that qdc did not have. XLSR forced-alignment prefers one span. Quran-align first-start MAE does not regress.",
+        "summary": "CTC restore invented a flush same-word pair (gap < 300 ms) that qdc did not have. XLSR and MMS/uroman forced-alignment both prefer one span.",
         "audioSha256": "e61f7b1ca45c77cbc3d443954f120a2ba9812b19feecfc657aee327c6daa2863",
         "waveformVeto": false,
         "models": [
@@ -1054,9 +1024,9 @@
             "candidateScore": -0.307
           },
           {
-            "name": "quran-align",
-            "baselineMaeMs": 308,
-            "candidateMaeMs": 308
+            "name": "mms-uroman-ctc",
+            "baselineScore": -0.155,
+            "candidateScore": -0.081
           }
         ]
       }

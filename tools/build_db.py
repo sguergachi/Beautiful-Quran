@@ -431,10 +431,10 @@ QDC_SPLIT_FRAGMENT_RATIO = 0.40  # shorter/longer below this = a split fragment,
 # files still invent flush pairs; apply-time collapse is the safety net,
 # same idea as span-protect.
 CTC_REPEAT_MIN_PAUSE_MS = 300
-# XLSR forced-alignment prefers the invented flush pair on these rows.
-# Reciter id, surah, ayah. Measured 2026-08-17 against everyayah audio.
+# A second-model witness prefers the invented flush pair on these rows.
+# Reciter id, surah, ayah. XLSR 2026-08-17; Alafasy 7:39 also MMS/uroman 2026-08-18.
 FLUSH_RESTORE_KEEP_INVENTED = frozenset({
-    (1, 7, 158), (1, 13, 25), (1, 20, 58), (1, 23, 50), (1, 25, 9),
+    (1, 7, 39), (1, 7, 158), (1, 13, 25), (1, 20, 58), (1, 23, 50), (1, 25, 9),
     (1, 34, 6), (1, 66, 12),
     (5, 5, 45), (5, 9, 33), (5, 10, 6), (5, 10, 57), (5, 34, 36),
     (5, 39, 54), (5, 41, 47), (5, 45, 18),

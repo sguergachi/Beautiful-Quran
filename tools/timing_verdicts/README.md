@@ -8,7 +8,9 @@ rejected, or incomplete verdict.
 
 The verdict is deliberately not an auto-repair instruction: unknown evidence
 means the candidate row is not shipped. For a topology change, the evidence must
-record two independent acoustic model witnesses and a clear waveform veto. For
+record two independent acoustic model witnesses and a clear waveform veto.
+The two CTC witnesses are Arabic XLSR and MMS/uroman (`--romanize` on
+`tools/audit_forced_alignment.py`). Quran-align MAE is not a second CTC. For
 a boundary change, both witnesses must show a Pareto non-regression. A corrected
 duration may instead use `duration_tail_clip`, but it can shorten only the final
 segment end; it cannot move a word start or an internal boundary.
