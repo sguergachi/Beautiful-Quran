@@ -27,14 +27,23 @@ import kotlin.math.pow
  * breath as the scripture rather than against it.
  */
 object MushafGrid {
-    const val RUNNING_HEAD = 1
+    /**
+     * The running head is one small label at each fore-edge, so it asks for
+     * rather less than a line of the revelation's own pitch.
+     *
+     * It used to carry the chapter and the juzʾ twice over, Arabic above Latin,
+     * and a full unit went on saying the same thing in two hands. One line of
+     * wayfinding needs about half of that, and the paper saved goes to the
+     * text, which is what the leaf is for.
+     */
+    const val RUNNING_HEAD = 0.55f
 
     /**
      * A whole line of paper between the head and the first line of revelation.
      * A running head that sits closer reads as part of the text block rather
      * than as a head standing over it.
      */
-    const val HEAD_GUTTER = 1
+    const val HEAD_GUTTER = 1f
     const val TEXT_LINES = MUSHAF_LINES_PER_PAGE
     /**
      * Nothing between the last line and the folio band. The folio's figure is
@@ -43,8 +52,8 @@ object MushafGrid {
      * where it keeps the type about 6% larger than an eighteen-unit leaf that
      * spends it here.
      */
-    const val TAIL = 0
-    const val FOLIO = 1
+    const val TAIL = 0f
+    const val FOLIO = 1f
 
     /** The whole leaf, in units. */
     const val SLOTS = RUNNING_HEAD + HEAD_GUTTER + TEXT_LINES + TAIL + FOLIO

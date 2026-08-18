@@ -7,13 +7,14 @@ import org.junit.Test
 class MushafGridTest {
 
     @Test
-    fun `the leaf is eighteen units and fifteen of them are revelation`() {
-        assertEquals(18, MushafGrid.SLOTS)
+    fun `fifteen of the leaf's units are revelation and the chrome takes the rest`() {
+        assertEquals(17.55f, MushafGrid.SLOTS, 0.001f)
         assertEquals(15, MushafGrid.TEXT_LINES)
-        // Head, gutter and folio are the other three.
+        // The head asks for half a line now that it carries one, not two.
         assertEquals(
             MushafGrid.SLOTS - MushafGrid.TEXT_LINES,
             MushafGrid.RUNNING_HEAD + MushafGrid.HEAD_GUTTER + MushafGrid.TAIL + MushafGrid.FOLIO,
+            0.001f,
         )
     }
 
@@ -24,11 +25,11 @@ class MushafGridTest {
         val bands = listOf(
             MushafGrid.RUNNING_HEAD,
             MushafGrid.HEAD_GUTTER,
-            MushafGrid.TEXT_LINES,
+            MushafGrid.TEXT_LINES.toFloat(),
             MushafGrid.TAIL,
             MushafGrid.FOLIO,
         )
-        assertEquals(leaf, bands.sumOf { it } * unit, 0.5f)
+        assertEquals(leaf, bands.sum() * unit, 0.5f)
         assertEquals(MushafGrid.textWellPx(leaf), unit * 15, 0.01f)
     }
 

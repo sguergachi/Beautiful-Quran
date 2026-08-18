@@ -91,7 +91,14 @@ private val MushafFolioSpread = 28.dp
 private val MushafFolioDiamond = 5.dp
 
 /** Fore-edge margin. The page has no frame, so this is the whole margin. */
-internal val MushafPageMargin = 7.dp
+/**
+ * Paper outside the mark gutter.
+ *
+ * The leaf's type is bound by its width, not its height — the well has room to
+ * spare, and every pixel of measure is a pixel of type. So this is as narrow as
+ * the fore-edge fade can be drawn over without reaching the mark gutter.
+ */
+internal val MushafPageMargin = 4.dp
 /**
  * Running head to first line of revelation. A head that sits closer than
  * about a line's pitch reads as part of the block instead of standing off it;
@@ -313,9 +320,10 @@ internal fun MushafPageHeader(
     // aid. Gold also loses what little contrast it has on cream, which is why
     // this line used to disappear on paper.
     //
-    // Each end carries the same thing twice, Arabic over Latin, so the two read
-    // as one mirrored pair rather than two labels: the chapter at the spine,
-    // the juzʾ at the fore-edge.
+    // One label at each end, in the reader's own language: the chapter at the
+    // spine, the juzʾ at the fore-edge. It carried the Arabic above the Latin
+    // as well, which said the same thing twice and cost the leaf a whole line
+    // of paper for the saying — paper the revelation now has instead.
     val ink = MaterialTheme.colorScheme.onBackground
     Row(
         modifier = modifier
@@ -324,17 +332,15 @@ internal fun MushafPageHeader(
             .height(unit * MushafGrid.RUNNING_HEAD),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        MushafHeadStack(
-            arabic = "ٱلْجُزْءُ ${juz.toArabicIndic()}",
-            latin = "Part $juz",
+        MushafHeadLabel(
+            text = "Part $juz",
             ink = ink,
             align = TextAlign.Start,
             glyphSize = glyphSize,
             modifier = Modifier.weight(1f),
         )
-        MushafHeadStack(
-            arabic = surahNameArabic?.let { "سُورَةُ $it" }.orEmpty(),
-            latin = surahNameLatin.orEmpty(),
+        MushafHeadLabel(
+            text = surahNameLatin.orEmpty(),
             ink = ink,
             align = TextAlign.End,
             glyphSize = glyphSize,
@@ -343,42 +349,31 @@ internal fun MushafPageHeader(
     }
 }
 
-/** One end of the running head: the name in the book's hand, glossed beneath. */
+/** One end of the running head: a single line of wayfinding. */
 @Composable
-private fun MushafHeadStack(
-    arabic: String,
-    latin: String,
+private fun MushafHeadLabel(
+    text: String,
     ink: Color,
     align: TextAlign,
     glyphSize: TextUnit,
     modifier: Modifier = Modifier,
 ) {
-    Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(
-            text = arabic,
-            fontFamily = HafsFontFamily,
-            fontSize = glyphSize * MushafType.RATIO.pow(MushafType.FURNITURE),
-            color = ink.copy(alpha = 0.30f),
-            textAlign = align,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.fillMaxWidth(),
-        )
-        if (latin.isNotEmpty()) {
-            Text(
-                text = latin,
-                style = MaterialTheme.typography.labelSmall.copy(
-                    fontSize = glyphSize * MushafType.RATIO.pow(MushafType.GLOSS),
-                    letterSpacing = 0.10.em,
-                ),
-                color = ink.copy(alpha = 0.44f),
-                textAlign = align,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.fillMaxWidth(),
-            )
-        }
+    if (text.isEmpty()) {
+        Box(modifier)
+        return
     }
+    Text(
+        text = text,
+        style = MaterialTheme.typography.labelSmall.copy(
+            fontSize = glyphSize * MushafType.RATIO.pow(MushafType.FURNITURE),
+            letterSpacing = 0.10.em,
+        ),
+        color = ink.copy(alpha = 0.44f),
+        textAlign = align,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+        modifier = modifier,
+    )
 }
 
 /**

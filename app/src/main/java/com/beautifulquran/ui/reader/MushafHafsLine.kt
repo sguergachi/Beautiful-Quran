@@ -28,6 +28,7 @@ import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.text.style.TextGeometricTransform
+import androidx.compose.ui.text.style.TextMotion
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Constraints
@@ -270,6 +271,8 @@ private fun MushafQcfPageLine(
             textDirection = TextDirection.Rtl,
             textGeometricTransform = TextGeometricTransform(scaleX = condense),
             platformStyle = PlatformTextStyle(includeFontPadding = false),
+            // AB: linear metrics + subpixel positioning (no grid fitting)
+            textMotion = TextMotion.Animated,
         )
     }
     // Coloured once for the line. A Material [Text] resolves the ambient text
