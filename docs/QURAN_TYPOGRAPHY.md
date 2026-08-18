@@ -42,9 +42,10 @@ that may stand short is a chapter's last, where the text simply runs out.
 Quran.com's own reading view sets `text-align: justify; text-align-last:
 justify`, i.e. flush including the final line of each element.
 
-**We follow it.** Lines reach the measure by space and by letterform (rule 4).
-Measured, 2.3% of lines cannot reach it even at the bounds we allow — four- and
-five-word lines, a chapter's last — and only those are centred.
+**We follow it.** Lines reach the measure by space and by letterform (rule 4),
+and where neither alone suffices the letters are held at their bound and the
+space carries the rest. Measured, 1.2% of lines cannot reach it even so — four-
+and five-word lines, a chapter's last — and only those are centred.
 
 ## 4. The line is filled by the letterform, not by the space
 
@@ -80,8 +81,10 @@ ink inside the next), and the loosest hundredth reached 1.17 em, a river.
 **Our rule.** The page is set on one word space, `MUSHAF_WORD_GAP_EM` = 0.18 em.
 A line too wide closes it to 0.13 em before any letter is touched; a line too
 narrow opens it to 0.30 em before any letter is stretched. Past those, the
-letterform gives. Result over the same lines: 52% of the page keeps its
-letterforms exactly as drawn.
+letterform gives — and past *that*, on a line that still will not reach its
+margin, the letters stop at 1.15 and the space opens to 0.45 em rather than let
+the line stand short (rule 3). Result over the same lines: 52% of the page keeps
+its letterforms exactly as drawn.
 
 ## 6. The space is measured between ink, not between boxes
 
