@@ -528,10 +528,15 @@ private fun MushafPageSheet(
     ) {
             val density = LocalDensity.current
             // The only inset left inside the text block: enough for a circled
-            // ayah mark's overhang at the line end, and nothing more.
+            // ayah mark's overhang at the line end, and nothing more. It is an
+            // inset of the *measure* — taking it off the height as well made
+            // the leading a fortieth shorter than MUSHAF_LINE_INK_EM claims and
+            // charged the type for the difference. The height gives up nothing
+            // but rounding slack, so fifteen slots still land inside the well.
             val edgeGutterPx = with(density) { MushafEdgeGutter.toPx() }
-            val fitInsetPx = with(density) { (MushafEdgeGutter + MushafFitSlack).toPx() }
-            val availableH = (constraints.maxHeight.toFloat() - edgeGutterPx)
+            val fitSlackPx = with(density) { MushafFitSlack.toPx() }
+            val fitInsetPx = edgeGutterPx + fitSlackPx
+            val availableH = (constraints.maxHeight.toFloat() - fitSlackPx)
                 .coerceAtLeast(1f)
             val availableW = (constraints.maxWidth.toFloat() - fitInsetPx * 2)
                 .coerceAtLeast(1f)

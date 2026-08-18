@@ -14,12 +14,12 @@ import kotlin.math.pow
  * The unit is one line's pitch, and the leaf is [SLOTS] of them:
  *
  * ```
- *  0.5  running head
- * 0.45  head gutter — enough paper to stand the head off the text
+ * 0.45  running head
+ * 0.35  head gutter — enough paper to stand the head off the text
  *  15   the revelation — the Madinah page's own grid
- * 0.65  folio, its figure centred in the band
+ * 0.55  folio, its figure centred in the band
  *  ---
- * 16.6
+ * 16.35
  * ```
  *
  * The furniture is trimmed to what it actually needs to read as furniture,
@@ -43,7 +43,7 @@ object MushafGrid {
      * wayfinding needs about half of that, and the paper saved goes to the
      * text, which is what the leaf is for.
      */
-    const val RUNNING_HEAD = 0.5f
+    const val RUNNING_HEAD = 0.45f
 
     /**
      * Paper between the head and the first line of revelation. A running head
@@ -52,7 +52,7 @@ object MushafGrid {
      * pitch to do that. Just under half a unit still clears the head band by
      * more than the head's own type is tall, and the rest goes to the text.
      */
-    const val HEAD_GUTTER = 0.45f
+    const val HEAD_GUTTER = 0.35f
     const val TEXT_LINES = MUSHAF_LINES_PER_PAGE
     /**
      * Nothing between the last line and the folio band. The folio's figure is
@@ -63,7 +63,7 @@ object MushafGrid {
      * two steps down the scale, so a whole unit was mostly paper around it.
      */
     const val TAIL = 0f
-    const val FOLIO = 0.65f
+    const val FOLIO = 0.55f
 
     /** The whole leaf, in units. */
     const val SLOTS = RUNNING_HEAD + HEAD_GUTTER + TEXT_LINES + TAIL + FOLIO

@@ -49,10 +49,17 @@ const val MUSHAF_MIN_LINE_PITCH_EM = 1.85f
  * actually ask for (1.978 em) rather than at the single worst pair in the book
  * (2.118): guarding the absolute worst cost a tenth of the type size across all
  * 604 pages, and a smaller type then needs more stretching to fill its line —
- * one fault traded for two. At 2.05 em the type gives up about 3% and better
- * than 99% of line pairs clear.
+ * one fault traded for two. At this leading the type gives up about 3% and
+ * better than 99% of line pairs clear.
+ *
+ * It reads 2.02 rather than the 2.05 it carried for a while because it is now
+ * the pitch itself. The type used to be sized against the whole well while the
+ * lines were laid out in the well less an edge gutter, so a nominal 2.05 was
+ * 2.018 of real leading and the difference was type size lost to an inset that
+ * was only ever meant to hold a circled ayah mark's overhang at the *line end*.
+ * The number here is what the page is actually set on.
  */
-const val MUSHAF_LINE_INK_EM = 2.05f
+const val MUSHAF_LINE_INK_EM = 2.02f
 
 /**
  * Line box height for a fitted page: the printed pitch, never more than the
