@@ -488,6 +488,7 @@ private fun MushafPageSheet(
         delay(MushafLeafFaceWaitMs)
         faceOverdue = true
     }
+    val pageTypeface = remember(pageFont) { MushafQcfFonts.cachedTypeface(page.page) }
     val leafReady = pageFont != null || faceOverdue
     // A face already resident cannot reflow, so there is nothing for this fade
     // to hide and the leaf starts fully inked. The chapter's own entrance is
@@ -623,6 +624,7 @@ private fun MushafPageSheet(
                                 packs = packsState,
                                 fontSize = fontSp,
                                 measureWidthPx = lineMeasurePx,
+                                pageTypeface = pageTypeface,
                                 liveInk = liveInk,
                                 onWordClick = onWordClick,
                                 onWordLongClick = onWordLongClick,

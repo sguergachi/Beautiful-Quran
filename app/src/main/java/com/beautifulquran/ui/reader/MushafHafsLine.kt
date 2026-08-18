@@ -37,6 +37,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.layout.Layout
+import kotlin.math.roundToInt
 import com.beautifulquran.domain.MUSHAF_LINE_EM
 import com.beautifulquran.domain.MushafLine
 import com.beautifulquran.domain.MushafToken
@@ -75,6 +77,8 @@ internal fun MushafHafsLine(
      * for a number that never differs between them.
      */
     measureWidthPx: Float,
+    /** The page's own face, for measuring where each word's ink falls. */
+    pageTypeface: android.graphics.Typeface? = null,
     liveInk: Boolean,
     onWordClick: (MushafToken) -> Unit,
     onWordLongClick: (MushafToken) -> Unit,
@@ -92,6 +96,7 @@ internal fun MushafHafsLine(
             pageFont = pageFont,
             fontSize = fontSize,
             measureWidthPx = measureWidthPx,
+            pageTypeface = pageTypeface,
             packs = packs,
             liveInk = liveInk,
             palette = palette,
@@ -205,6 +210,7 @@ private fun MushafQcfPageLine(
     pageFont: FontFamily,
     fontSize: TextUnit,
     measureWidthPx: Float,
+    pageTypeface: android.graphics.Typeface?,
     packs: SnapshotStateMap<Pair<Int, Int>, AyahInkPack>,
     liveInk: Boolean,
     palette: WordInkPalette,
@@ -272,61 +278,150 @@ private fun MushafQcfPageLine(
     // foundation's BasicText, which does none of that work.
     val wordStyle = remember(style, palette.fullInkColor) { style.copy(color = palette.fullInkColor) }
     val markStyle = remember(style, ayahMarkInk) { style.copy(color = ayahMarkInk) }
-    Row(
+    // Where each cell's ink actually falls, not where its advance box does.
+    //
+    // The page faces carry the print's own side bearings, and they differ
+    // enormously from glyph to glyph: measured on page 3, splitting a line's
+    // leftover paper evenly between advance boxes put visual gaps of 0.21,
+    // -0.48, 0.27, 0.40, 0.20 and 0.17 em on one line — one pair of words
+    // overlapping by half an em while another sat twice as far apart as its
+    // neighbour. That is what reads as letters running together in one place
+    // and drifting apart in the next. So the line is spaced by ink: the paper
+    // between one word's last stroke and the next word's first is made equal,
+    // which is what a printed line does.
+    val linePx = with(density) { fontSize.toPx() }
+    val cells = remember(line, pageTypeface, linePx, condense) {
+        mushafLineCells(line, pageTypeface, linePx, condense)
+    }
+    Layout(
         modifier = modifier.fillMaxWidth(),
-        // A justified line carries its own weight spacers, so it starts at the
-        // fore-edge and fills the measure. A short line — al-Fātiḥah, a surah's
-        // closing line — is centred on the page, the way it is printed, never
-        // hung off the right margin.
-        horizontalArrangement = if (justify) Arrangement.Start else Arrangement.Center,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        line.tokens.forEachIndexed { index, token ->
-            if (justify && index > 0) Spacer(Modifier.weight(1f))
-            MushafQcfWord(
-                token = token,
-                style = wordStyle,
-                packs = packs,
-                liveInk = liveInk,
-                palette = palette,
-                ayahMarkInk = ayahMarkInk,
-                glintInk = glintInk,
-                hitSlopPx = hitSlopPx,
-                onWordClick = onWordClick,
-                onWordLongClick = onWordLongClick,
-                onAyahClick = onAyahClick,
-            )
-            val mark = token.word.qcfV2.takeIf { it.isNotEmpty() }?.let(::qcfTrailingMark).orEmpty()
-            if (mark.isNotEmpty()) {
-                if (justify) Spacer(Modifier.weight(1f))
-                // The mark is its own cell, so it sits outside the word's ink
-                // node and needs the verse's own alphas applied here: the focus
-                // alpha the scrolling reader gives every mark, and the recess
-                // that dims a verse waiting its turn. Read in the layer block
-                // so both animate without recomposing the leaf.
-                val markInkAlpha = {
-                    val pack = packs[token.surahId to token.ayah]
-                    if (!liveInk || pack == null) 1f
-                    else (pack.markAlpha.value * (1f - pack.recessCover.value)).coerceIn(0f, 1f)
-                }
-                BasicText(
-                    text = mark,
-                    style = markStyle,
-                    maxLines = 1,
-                    softWrap = false,
-                    overflow = TextOverflow.Visible,
-                    modifier = if (liveInk) {
-                        Modifier.graphicsLayer {
-                            alpha = markInkAlpha()
-                            compositingStrategy = CompositingStrategy.ModulateAlpha
-                        }
-                    } else {
-                        Modifier
-                    },
+        content = {
+            line.tokens.forEach { token ->
+                MushafQcfWord(
+                    token = token,
+                    style = wordStyle,
+                    packs = packs,
+                    liveInk = liveInk,
+                    palette = palette,
+                    ayahMarkInk = ayahMarkInk,
+                    glintInk = glintInk,
+                    hitSlopPx = hitSlopPx,
+                    onWordClick = onWordClick,
+                    onWordLongClick = onWordLongClick,
+                    onAyahClick = onAyahClick,
                 )
+                val mark = token.word.qcfV2.takeIf { it.isNotEmpty() }
+                    ?.let(::qcfTrailingMark).orEmpty()
+                if (mark.isNotEmpty()) {
+                    // The mark is its own cell, so it sits outside the word's
+                    // ink node and needs the verse's own alphas applied here:
+                    // the focus alpha the scrolling reader gives every mark, and
+                    // the recess that dims a verse waiting its turn. Read in the
+                    // layer block so both animate without recomposing the leaf.
+                    val markInkAlpha = {
+                        val pack = packs[token.surahId to token.ayah]
+                        if (!liveInk || pack == null) 1f
+                        else (pack.markAlpha.value * (1f - pack.recessCover.value))
+                            .coerceIn(0f, 1f)
+                    }
+                    BasicText(
+                        text = mark,
+                        style = markStyle,
+                        maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Visible,
+                        modifier = if (liveInk) {
+                            Modifier.graphicsLayer {
+                                alpha = markInkAlpha()
+                                compositingStrategy = CompositingStrategy.ModulateAlpha
+                            }
+                        } else {
+                            Modifier
+                        },
+                    )
+                }
+            }
+        },
+    ) { measurables, constraints ->
+        val placeables = measurables.map { it.measure(Constraints()) }
+        val height = placeables.maxOfOrNull { it.height } ?: 0
+        val width = constraints.maxWidth
+        val origins = mushafCellOrigins(cells, placeables.size, width.toFloat(), justify)
+        layout(width, height) {
+            placeables.forEachIndexed { i, p ->
+                p.place(origins.getOrElse(i) { 0f }.roundToInt(), (height - p.height) / 2)
             }
         }
     }
+}
+
+/** A cell's advance and where its ink sits inside it, in px. */
+internal class MushafCell(val advance: Float, val inkLeft: Float, val inkRight: Float) {
+    val inkWidth: Float get() = (inkRight - inkLeft).coerceAtLeast(0f)
+}
+
+private fun mushafLineCells(
+    line: MushafLine,
+    typeface: android.graphics.Typeface?,
+    fontPx: Float,
+    condense: Float,
+): List<MushafCell> {
+    val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+        this.typeface = typeface
+        textSize = fontPx
+        textScaleX = condense
+    }
+    val bounds = android.graphics.Rect()
+    val out = ArrayList<MushafCell>(line.tokens.size + 4)
+    fun add(text: String) {
+        if (text.isEmpty()) return
+        val advance = paint.measureText(text)
+        paint.getTextBounds(text, 0, text.length, bounds)
+        out += MushafCell(advance, bounds.left.toFloat(), bounds.right.toFloat())
+    }
+    line.tokens.forEach { token ->
+        val raw = token.word.qcfV2
+        add(if (raw.isNotEmpty()) qcfWordGlyphs(raw) else token.word.arabic)
+        if (raw.isNotEmpty()) add(qcfTrailingMark(raw))
+    }
+    return out
+}
+
+/**
+ * Left origin for each cell, right to left across [width].
+ *
+ * A justified line divides the paper left over between the cells' *ink*, so
+ * every join carries the same air. A short line — al-Fātiḥah, a chapter's
+ * closing line — keeps the face's own advances and is centred, the way it is
+ * printed.
+ */
+internal fun mushafCellOrigins(
+    cells: List<MushafCell>,
+    count: Int,
+    width: Float,
+    justify: Boolean,
+): FloatArray {
+    val n = minOf(cells.size, count)
+    val origins = FloatArray(count)
+    if (n == 0) return origins
+    if (!justify || n == 1) {
+        val total = (0 until n).sumOf { cells[it].advance.toDouble() }.toFloat()
+        var x = ((width - total) / 2f).coerceAtLeast(0f) + total
+        for (i in 0 until n) {
+            x -= cells[i].advance
+            origins[i] = x
+        }
+        return origins
+    }
+    val inkTotal = (0 until n).sumOf { cells[it].inkWidth.toDouble() }.toFloat()
+    val gap = ((width - inkTotal) / (n - 1)).coerceAtLeast(0f)
+    var inkRight = width
+    for (i in 0 until n) {
+        val cell = cells[i]
+        origins[i] = inkRight - cell.inkRight
+        inkRight -= cell.inkWidth + gap
+    }
+    return origins
 }
 
 @Composable

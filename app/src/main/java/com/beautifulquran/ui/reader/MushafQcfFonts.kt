@@ -22,29 +22,40 @@ internal object MushafQcfFonts {
     /** Comfortably more than the pager's composed-plus-warmed window of five. */
     private const val MAX_RESIDENT = 12
 
-    private val families = object : LinkedHashMap<Int, FontFamily>(
+    /**
+     * Both forms of one face. A line is drawn as [FontFamily] text, but it is
+     * *spaced* from the [Typeface]'s own ink bounds (see [MushafQcfPageLine]),
+     * and building a second copy would mean a second native font per page.
+     */
+    private class Face(val family: FontFamily, val typeface: Typeface)
+
+    private val families = object : LinkedHashMap<Int, Face>(
         MAX_RESIDENT,
         0.75f,
         /* accessOrder = */ true,
     ) {
-        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<Int, FontFamily>): Boolean =
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<Int, Face>): Boolean =
             size > MAX_RESIDENT
     }
 
     @Synchronized
-    fun cached(page: Int): FontFamily? = families[page]
+    fun cached(page: Int): FontFamily? = families[page]?.family
+
+    /** The resident face itself, for measuring where a word's ink actually is. */
+    @Synchronized
+    fun cachedTypeface(page: Int): Typeface? = families[page]?.typeface
 
     fun family(context: Context, page: Int): FontFamily? {
         cached(page)?.let { return it }
         // Built outside the lock: createFromAsset reads the file, and the UI
         // thread asks for the settled page while a warm-up is still running.
-        val family = typeface(context, page)?.let(::FontFamily) ?: return null
-        return put(page, family)
+        val face = typeface(context, page) ?: return null
+        return put(page, Face(FontFamily(face), face)).family
     }
 
     @Synchronized
-    private fun put(page: Int, family: FontFamily): FontFamily =
-        families.getOrPut(page) { family }
+    private fun put(page: Int, face: Face): Face =
+        families.getOrPut(page) { face }
 
     fun preload(context: Context, pages: Iterable<Int>) {
         pages.forEach { family(context, it) }
