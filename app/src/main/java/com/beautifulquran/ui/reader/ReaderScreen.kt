@@ -1,5 +1,6 @@
 package com.beautifulquran.ui.reader
 
+import com.beautifulquran.DevProfiling
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
@@ -1354,8 +1355,10 @@ fun ReaderScreen(
                 return@LaunchedEffect
             }
             if (content == null) {
+                DevProfiling.mark("readerContentNull")
                 readerContentAlpha.snapTo(0f)
             } else {
+                DevProfiling.mark("readerContentReady s${content.surah.id}")
                 readerContentAlpha.snapTo(0f)
                 readerContentAlpha.animateTo(
                     targetValue = 1f,

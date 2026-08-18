@@ -62,6 +62,7 @@ import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
+import com.beautifulquran.DevProfiling
 import com.beautifulquran.data.model.Ayah
 import com.beautifulquran.data.model.Surah
 import com.beautifulquran.data.model.SurahContent
@@ -121,7 +122,7 @@ private val MushafFitSlack = 2.dp
  * alpha, nearly all of it landed inside the first four frames and the page
  * simply appeared.
  */
-private const val MushafLeafFadeMs = 420
+private const val MushafLeafFadeMs = 220
 
 /**
  * How long a leaf waits for its own face before showing itself in the Hafs
@@ -129,6 +130,18 @@ private const val MushafLeafFadeMs = 420
  * short enough that a reader never sits looking at blank paper.
  */
 private const val MushafLeafFaceWaitMs = 450L
+
+/**
+ * How long the pager waits before holding a neighbour composed either side.
+ *
+ * Opening or closing a chapter turns the paper stack under an animating
+ * transform, and Compose keeps the rect index of everything beneath such a
+ * transform current by walking it — profiled during open/close, that walk is
+ * the reader's hottest work by a wide margin, and every node the neighbours
+ * add is another step of it. So the neighbours wait until the entrance is
+ * over; a turn taken inside that window simply composes its leaf on demand.
+ */
+private const val MushafNeighbourHoldDelayMs = 520L
 
 /**
  * The page's own hand, as the chrome sees it: the size a line of revelation is
@@ -271,7 +284,7 @@ internal fun MushafPager(
     // later instead: the open is a single leaf, and the turn is still warm.
     var holdNeighbours by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
-        withFrameNanos { }
+        delay(MushafNeighbourHoldDelayMs)
         holdNeighbours = true
     }
     HorizontalPager(
@@ -390,12 +403,18 @@ private fun MushafPageSheet(
     // path is for. (It used to load inline on a miss, which cost a frame the
     // first time a leaf was opened, and every time after the cache window had
     // moved on from it.)
-    var pageFont by remember(page.page) { mutableStateOf(MushafQcfFonts.cached(page.page)) }
+    val residentFace = remember(page.page) { MushafQcfFonts.cached(page.page) }
+    var pageFont by remember(page.page) { mutableStateOf(residentFace) }
     LaunchedEffect(page.page, context) {
-        if (pageFont != null) return@LaunchedEffect
+        if (pageFont != null) {
+            DevProfiling.mark("leafFaceCached p${page.page}")
+            return@LaunchedEffect
+        }
+        DevProfiling.mark("leafFaceLoadStart p${page.page}")
         pageFont = withContext(Dispatchers.Default) {
             MushafQcfFonts.family(context, page.page)
         }
+        DevProfiling.mark("leafFaceLoaded p${page.page}")
     }
     // A leaf is set in the Hafs stand-in until its own page face arrives, and
     // the two are not the same width, so the first frames of a newly opened
@@ -414,13 +433,18 @@ private fun MushafPageSheet(
         faceOverdue = true
     }
     val leafReady = pageFont != null || faceOverdue
-    val leafFade = remember(page.page) { Animatable(0f) }
+    // A face already resident cannot reflow, so there is nothing for this fade
+    // to hide and the leaf starts fully inked. The chapter's own entrance is
+    // the reader's (see ReaderEntranceFadeMs); running a second fade inside it
+    // only made the text arrive later than the page it is written on.
+    val leafFade = remember(page.page) { Animatable(if (residentFace != null) 1f else 0f) }
     // Settled is its own flag so the fade itself can be read in the draw phase:
     // reading an Animatable in composition would recompose the whole leaf on
     // every frame of its own entrance.
-    var leafSettled by remember(page.page) { mutableStateOf(false) }
+    var leafSettled by remember(page.page) { mutableStateOf(residentFace != null) }
     LaunchedEffect(page.page, leafReady) {
-        if (!leafReady) return@LaunchedEffect
+        if (leafSettled || !leafReady) return@LaunchedEffect
+        DevProfiling.mark("leafFadeStart p${page.page}")
         leafFade.animateTo(
             targetValue = 1f,
             // Eased at both ends: a fade that starts fast is the one that
@@ -428,6 +452,7 @@ private fun MushafPageSheet(
             animationSpec = tween(MushafLeafFadeMs, easing = FastOutSlowInEasing),
         )
         leafSettled = true
+        DevProfiling.mark("leafFadeDone p${page.page}")
     }
     BoxWithConstraints(
         modifier
