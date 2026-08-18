@@ -179,7 +179,10 @@ def run_pipeline(case, segs):
             "gap_phantoms": 0,
         }
         n_words = case.get("n_words") or max(p for p, _, _ in segs)
-        return adjust_qdc_segments(segs, n_words, stats)
+        words = None
+        if case.get("words"):
+            words = {int(pos): arabic for pos, arabic in case["words"].items()}
+        return adjust_qdc_segments(segs, n_words, stats, words=words)
     if pipeline == "boundary_repair":
         return apply_boundary_repair(segs, resolve_repair(case), case.get("occurrence"))
     if pipeline == "clock_shifted_repair":

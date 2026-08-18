@@ -858,7 +858,58 @@ def recover_negative_opening(segs):
     return shifted, True
 
 
-def adjust_qdc_segments(segs, n_words, stats, recover_singleton_gap=False):
+def _arabic_letters(text):
+    """Substantial Arabic letters only; used to spot QAC-glued ما tokens."""
+    return "".join(ch for ch in text if "ء" <= ch <= "ي")
+
+
+def fused_ma_position(words):
+    """QAC position where ما is glued to the previous token, so qdc has +1.
+
+    qdc times وَمَا / لِيَ (and لو/ما, ما/منا) as two words. QAC writes one
+    (وَمَالِيَ, لَّوۡمَا, مَامِنَّا). Clamping the leftover last index onto
+    n_words invents a flush pair and shifts every later highlight.
+    """
+    if not words:
+        return None
+    for pos in sorted(words):
+        letters = _arabic_letters(words[pos])
+        if "مالي" in letters or "مامنا" in letters or letters.endswith("لوما"):
+            return pos
+    return None
+
+
+def fold_qdc_fused_ma(segs, n_words, words):
+    """Map a strict 1..n+1 qdc row onto n QAC words by merging the glued ما."""
+    if not segs or not words:
+        return None
+    ordered = sorted(segs, key=lambda seg: seg[1])
+    if [pos for pos, _, _ in ordered] != list(range(1, n_words + 2)):
+        return None
+    fuse = fused_ma_position(words)
+    if fuse is None:
+        return None
+    out = []
+    held = None
+    for pos, start, end in ordered:
+        if pos < fuse:
+            out.append([pos, start, end])
+        elif pos == fuse:
+            held = [fuse, start, end]
+        elif pos == fuse + 1:
+            if held is None:
+                return None
+            held[2] = end
+            out.append(held)
+            held = None
+        else:
+            out.append([pos - 1, start, end])
+    if held is not None or [pos for pos, _, _ in out] != list(range(1, n_words + 1)):
+        return None
+    return out
+
+
+def adjust_qdc_segments(segs, n_words, stats, recover_singleton_gap=False, words=None):
     """Clamp quran.com segments (already 1-based, ayah-relative) to our canonical
     word count while PRESERVING repeats; scrub aligner artifacts that would read
     as repeats that aren't in the audio; count the re-recited spans."""
@@ -868,6 +919,10 @@ def adjust_qdc_segments(segs, n_words, stats, recover_singleton_gap=False):
     segs, shifted = recover_negative_opening(segs)
     if shifted:
         stats["opening_shift"] += 1
+    folded = fold_qdc_fused_ma(segs, n_words, words)
+    if folded is not None:
+        stats["fused_ma"] = stats.get("fused_ma", 0) + 1
+        segs = folded
     adjusted = []
     for pos, start, end in sorted(segs, key=lambda s: s[1]):
         if start < 0:
@@ -2319,6 +2374,7 @@ def main():
                         data.get(key),
                         n,
                         stats,
+                        words=word_text.get(key),
                     )
                     row_key = (rid, key[0], key[1])
                     reference = reciter_alignment.get(row_key)
@@ -2328,6 +2384,7 @@ def main():
                         rescued = adjust_qdc_segments(
                             data.get(key), n, rescue_stats,
                             recover_singleton_gap=True,
+                            words=word_text.get(key),
                         )
                         if _covers_all_words(rescued, n) and fits_audio(rescued, duration):
                             singleton_gap_candidates[row_key] = rescued
