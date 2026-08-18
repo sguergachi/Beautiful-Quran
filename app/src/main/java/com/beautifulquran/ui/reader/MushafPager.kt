@@ -83,9 +83,18 @@ import com.beautifulquran.domain.mushafLineSlotPx
 import com.beautifulquran.domain.surahOpensWithBasmalahPreface
 import kotlin.math.abs
 import com.beautifulquran.ui.theme.MushafBasmalahFontFamily
+import androidx.compose.foundation.Canvas
+import androidx.core.content.res.ResourcesCompat
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.graphics.toArgb
+import com.beautifulquran.R
+import com.beautifulquran.ui.theme.MUSHAF_BASMALAH_INK_MID_EM
 import com.beautifulquran.ui.theme.MUSHAF_BASMALAH_GLYPH
-import com.beautifulquran.ui.theme.MUSHAF_BASMALAH_EM_WIDTH
+import com.beautifulquran.ui.theme.MUSHAF_BASMALAH_HAND_SCALE
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.material3.LocalTextStyle
+import androidx.compose.ui.text.style.LineHeightStyle
 import com.beautifulquran.ui.theme.MushafFontFamily
 
 /**
@@ -118,11 +127,6 @@ internal val MushafEdgeGutter = 10.dp
  */
 private val MushafFitSlack = 2.dp
 
-/**
- * How much of the measure the basmalah spans on a chapter's opening leaf —
- * centred, and well inside the text block, the way the Madinah page sets it.
- */
-private const val MushafBasmalahMeasureShare = 0.70f
 
 /**
  * How long a leaf takes to come up once its page face has landed.
@@ -587,7 +591,10 @@ private fun MushafPageSheet(
                                         .height(lineSlot),
                                     contentAlignment = Alignment.Center,
                                 ) {
-                                    MushafBasmalahLine(measureWidthPx = lineMeasurePx)
+                                    MushafBasmalahLine(
+                                        fontSize = fontSp,
+                                        slotHeight = lineSlot,
+                                    )
                                 }
                             }
                         }
@@ -688,25 +695,35 @@ private fun rememberMushafRecessPack(dimmed: Boolean): AyahInkPack {
 }
 
 @Composable
-private fun MushafBasmalahLine(measureWidthPx: Float) {
-    // The print's own basmalah, in the hand the rest of the leaf is written in.
-    // It was set as Unicode in the reading face, which the page faces do not
-    // share: on a chapter's opening leaf it arrived in a different hand from
-    // every line beneath it. QCF2BSML carries it as a single glyph, so it is
-    // sized by its own width rather than by a text size — six and a half times
-    // its type size wide — and set to span this fraction of the measure, as it
-    // does on the printed page.
-    val fontPx = measureWidthPx * MushafBasmalahMeasureShare / MUSHAF_BASMALAH_EM_WIDTH
-    Text(
-        text = MUSHAF_BASMALAH_GLYPH,
-        fontFamily = MushafBasmalahFontFamily,
-        fontSize = with(LocalDensity.current) { fontPx.toSp() },
-        color = MaterialTheme.colorScheme.onBackground,
-        textAlign = TextAlign.Center,
-        maxLines = 1,
-        overflow = TextOverflow.Visible,
-        modifier = Modifier.fillMaxWidth(),
-    )
+private fun MushafBasmalahLine(fontSize: TextUnit, slotHeight: Dp) {
+    // Written in the page's own hand: the leaf's type size, scaled by what the
+    // header face needs to ink as tall as a word of the verse beneath it, and
+    // placed by its own ink rather than by its line box — the box is nearly two
+    // ems tall around ink that fills two thirds of one, so letting a Text centre
+    // it dropped the phrase onto the first verse.
+    val density = LocalDensity.current
+    val ink = MaterialTheme.colorScheme.onBackground
+    val context = LocalContext.current
+    val face = remember(context) { ResourcesCompat.getFont(context, R.font.qcf2_bsml) }
+    val fontPx = with(density) { fontSize.toPx() } * MUSHAF_BASMALAH_HAND_SCALE
+    val paint = remember(face, fontPx, ink) {
+        android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+            typeface = face
+            textSize = fontPx
+            color = ink.toArgb()
+            textAlign = android.graphics.Paint.Align.CENTER
+        }
+    }
+    Canvas(Modifier.fillMaxWidth().height(slotHeight)) {
+        drawIntoCanvas { canvas ->
+            canvas.nativeCanvas.drawText(
+                MUSHAF_BASMALAH_GLYPH,
+                size.width / 2f,
+                size.height / 2f + MUSHAF_BASMALAH_INK_MID_EM * fontPx,
+                paint,
+            )
+        }
+    }
 }
 
 

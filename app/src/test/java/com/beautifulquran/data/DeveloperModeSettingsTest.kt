@@ -26,11 +26,14 @@ class DeveloperModeSettingsTest {
     }
 
     @Test
-    fun `reading layout defaults to mushaf pages`() {
-        assertEquals(ReadingLayout.MUSHAF, Settings().readingLayout)
+    fun `reading layout defaults to the scrolling reader`() {
+        // Mushaf pages are something a reader turns on, not something an
+        // upgrade turns on for them: the leaf has no word gloss and no
+        // translation, and those settings vanish with it.
+        assertEquals(ReadingLayout.SCROLL, Settings().readingLayout)
         assertEquals(
-            ReadingLayout.SCROLL,
-            Settings().copy(readingLayout = ReadingLayout.SCROLL).readingLayout,
+            ReadingLayout.MUSHAF,
+            Settings().copy(readingLayout = ReadingLayout.MUSHAF).readingLayout,
         )
     }
 
