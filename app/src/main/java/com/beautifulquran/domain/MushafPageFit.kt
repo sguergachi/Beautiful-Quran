@@ -186,17 +186,20 @@ data class MushafLineFit(
  * tightest tenth *overlapping*, and the loosest hundredth at 1.17 em, which is
  * a river down the page.
  *
- * A compositor chooses the space and makes the line fit around it, which is
- * what this does. The space is [MUSHAF_WORD_GAP_EM] wherever it can be. A line
- * too wide for it narrows its letters; one too narrow opens its space as far as
- * [MUSHAF_MAX_WORD_GAP_EM] and only then stretches. A line that would have to
- * stretch past [MUSHAF_MAX_LINE_SCALE] is not a full line at all — a chapter's
- * last, most often — so it is set at the page's own space and centred, the way
- * it is printed.
+ A compositor chooses the space and makes the line fit around it, which is
+ * what this does — and the space is what gives first, in both directions,
+ * because the letterform is the one thing on the page that is not ours. The
+ * page's space is [MUSHAF_WORD_GAP_EM]. A line too wide closes it as far as
+ * [MUSHAF_FLOOR_WORD_GAP_EM] before any letter is touched; a line too narrow
+ * opens it as far as [MUSHAF_MAX_WORD_GAP_EM] before any letter is stretched.
+ * Only past those does the type give. A line that would still have to stretch
+ * past [MUSHAF_MAX_LINE_SCALE] is not a full line at all — a chapter's last,
+ * most often — so it is set at the page's own space and centred.
  *
- * Measured over the same 738 lines: 72% are set at exactly the page's space,
- * none wider than 0.30 em, letterforms hold between 0.80 and 1.06 with a median
- * of 0.978, and 6.2% stand short.
+ * Measured over 738 lines: 52% of the page keeps its letterforms exactly as
+ * drawn, the median line is untouched, and the fifth percentile sits at 0.879.
+ * Holding the space fixed instead and making the letters give left only 28%
+ * untouched for the same worst case.
  */
 fun mushafLineFit(
     inkWidthPx: Float,
@@ -211,13 +214,16 @@ fun mushafLineFit(
     }
     val needed = inkWidthPx + gaps * ideal
     if (needed > measureWidthPx) {
-        val scale = (measureWidthPx - gaps * ideal) / inkWidthPx
-        if (scale >= MUSHAF_MIN_LINE_SCALE) return MushafLineFit(scale, ideal, flush = true)
-        // The space gives only as far as its floor, and the letters take the
-        // rest — narrowing past their usual limit if this line demands it.
-        // Clamping the letters here instead drove the space to nothing, which
-        // is how a dense line came out with its words touching.
+        // The space gives before the letters do. A word set narrower than it
+        // was drawn is a word altered; a space a little tighter is still a
+        // space, and the eye reads the line either way. Measured over 738
+        // lines, letting the space close to its floor first leaves 52% of the
+        // page with its letterforms untouched, against 28% when the space is
+        // held at the page's own and the letters made to give — for the same
+        // worst case on the densest lines.
+        val closed = (measureWidthPx - inkWidthPx) / gaps
         val floorGap = MUSHAF_FLOOR_WORD_GAP_EM * fontPx
+        if (closed >= floorGap) return MushafLineFit(scale = 1f, gapPx = closed, flush = true)
         return MushafLineFit(
             scale = (measureWidthPx - gaps * floorGap) / inkWidthPx,
             gapPx = floorGap,
