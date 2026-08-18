@@ -113,7 +113,18 @@ justification, with air either side. It is not punctuation hung off the last
 word: glued to the word it took the gap on one side only, and the page read
 lopsided around every verse.
 
-**We follow it.** The mark is its own cell of the line, spaced like any other.
+**We follow it.** The mark is its own cell of the line, and it is levelled with
+the rest — but not on a word's terms. The clearance floors exist so that two
+words never read as one; a closed gold roundel carries no letterform and cannot
+weld to anything, so it is held only far enough off not to touch
+(`MUSHAF_MARK_MIN_WHITE_EM`). And the levelling reads the paper a join carries
+down the rows its two sides share, of which a mark — a short glyph sitting on
+the baseline — shares about half what a word does, missing the open band above
+and below it that the eye plainly sees. Measured over forty pages, both faults
+together set the mark's ink 0.373 em from its neighbours where two words stood
+0.132 em apart: the roundel stood further from its own verse than the words of
+that verse stood from each other. `MUSHAF_MARK_WHITE_K` levels it at 0.85 of the
+line's white, which sets it the same distance as a word.
 
 ## 9. Leading is set by the ink, not by the nominal size
 

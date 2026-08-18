@@ -123,7 +123,17 @@ internal class MushafInkJoin(
     val closest: Float,
     val tight: Float,
     val paper: Float,
+    /** Whether a verse mark stands on one side of this join. */
+    val mark: Boolean = false,
 ) {
+    /** The white this join is set to when the line has the paper for it. */
+    private val minWhiteEm: Float
+        get() = if (mark) MUSHAF_MARK_MIN_WHITE_EM else MUSHAF_MIN_WHITE_EM
+
+    /** The closest the two may come anywhere, whatever the rest of the join reads. */
+    private val hardWhiteEm: Float
+        get() = if (mark) MUSHAF_MARK_HARD_WHITE_EM else MUSHAF_HARD_WHITE_EM
+
     /**
      * The least this join's two ink boxes may be set apart, in em.
      *
@@ -131,7 +141,7 @@ internal class MushafInkJoin(
      * neighbour's and the ink still stand clear.
      */
     val floorEm: Float
-        get() = max(MUSHAF_MIN_WHITE_EM - tight, MUSHAF_HARD_WHITE_EM - closest)
+        get() = max(minWhiteEm - tight, hardWhiteEm - closest)
 
     /**
      * The same floor with the headroom the fit reserves.
@@ -143,9 +153,13 @@ internal class MushafInkJoin(
      */
     val fitFloorEm: Float
         get() = max(
-            MUSHAF_MIN_WHITE_EM * MUSHAF_FIT_WHITE_K - tight,
-            MUSHAF_HARD_WHITE_EM * MUSHAF_FIT_WHITE_K - closest,
+            minWhiteEm * MUSHAF_FIT_WHITE_K - tight,
+            hardWhiteEm * MUSHAF_FIT_WHITE_K - closest,
         )
+
+    /** The share of the line's white this join is levelled to. */
+    val levelK: Float
+        get() = if (mark) MUSHAF_MARK_WHITE_K else 1f
 }
 
 /**
@@ -153,7 +167,12 @@ internal class MushafInkJoin(
  * — where [right] is the word nearer the fore-edge and [left] the one that
  * follows it across the line.
  */
-internal fun mushafInkJoin(right: MushafInkProfile?, left: MushafInkProfile?): MushafInkJoin {
+internal fun mushafInkJoin(
+    right: MushafInkProfile?,
+    left: MushafInkProfile?,
+    /** Whether a verse mark stands on one side of the join. */
+    mark: Boolean = false,
+): MushafInkJoin {
     if (right == null || left == null) return MUSHAF_NO_JOIN
     // The white the join carries is read straight off the scanlines the two
     // words both write on: that is the paper the eye sees between them, and a
@@ -178,7 +197,7 @@ internal fun mushafInkJoin(right: MushafInkProfile?, left: MushafInkProfile?): M
     // diagonally counts as the near miss it is.
     val lo = min(right.firstRow, left.firstRow)
     val hi = max(right.firstRow + right.rows, left.firstRow + left.rows)
-    if (hi <= lo) return MUSHAF_NO_JOIN
+    if (hi <= lo) return MushafInkJoin(0f, 0f, 0f, mark)
     val shares = FloatArray(hi - lo) { right.leftReachAt(lo + it) + left.rightReachAt(lo + it) }
     java.util.Arrays.sort(shares)
     val quarter = max(1, (shares.size * MUSHAF_JOIN_TIGHT_FRACTION).roundToInt())
@@ -191,6 +210,7 @@ internal fun mushafInkJoin(right: MushafInkProfile?, left: MushafInkProfile?): M
         tight = ((tight / quarter).toFloat() - MUSHAF_PROFILE_SLACK_EM)
             .coerceIn(0f, MUSHAF_JOIN_MAX_EM),
         paper = paper,
+        mark = mark,
     )
 }
 
@@ -208,6 +228,35 @@ internal const val MUSHAF_MIN_WHITE_EM = 0.24f
 
 /** No two words come closer than this anywhere, whatever the rest of the join reads. */
 internal const val MUSHAF_HARD_WHITE_EM = 0.20f
+
+/**
+ * What a verse mark asks for, where a word asks [MUSHAF_MIN_WHITE_EM].
+ *
+ * The floors above are a weld test: two words set too close read as one word,
+ * and the whole point of the clearance is that the reader never has to work out
+ * where one ends. A verse mark cannot weld. It is a closed round ornament in
+ * gold, it carries no letterform, and no amount of nearness makes it read as
+ * part of the word beside it — so it is held only far enough off that the two
+ * do not touch. Held to the word floors it stood off from its own verse further
+ * than the words of that verse stood from each other.
+ */
+private const val MUSHAF_MARK_MIN_WHITE_EM = 0.16f
+
+/** The closest a verse mark comes to the ink beside it. */
+private const val MUSHAF_MARK_HARD_WHITE_EM = 0.13f
+
+/**
+ * The share of the line's white a verse mark's joins are levelled to.
+ *
+ * Levelling reads the paper a join carries down the rows its two sides share,
+ * and a mark shares few: it is a short glyph on the baseline, so the reading
+ * covers about half the height a word's does and misses the open band above and
+ * below it entirely. The eye does not — it reads the whole column — so at a
+ * level that looks right between two words the mark looks adrift. Measured over
+ * forty pages, the mark's boxes were set 0.373 em apart against 0.132 em for
+ * words; at this share they are set the same distance as words are.
+ */
+private const val MUSHAF_MARK_WHITE_K = 0.85f
 
 /** The headroom the fit reserves over the floor, so levelling has room to work. */
 private const val MUSHAF_FIT_WHITE_K = 1.20f

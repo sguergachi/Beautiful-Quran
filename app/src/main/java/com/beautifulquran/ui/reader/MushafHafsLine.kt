@@ -239,8 +239,9 @@ private fun MushafQcfPageLine(
     // What the words actually mark, measured from the page's own face and
     // unscaled. Everything about the line's fit follows from this.
     val texts = remember(line) { mushafLineTexts(line) }
-    val rawCells = remember(texts, pageTypeface, linePx) {
-        mushafLineCells(texts, pageTypeface, linePx, condense = 1f)
+    val glyphs = remember(texts) { texts.map { it.text } }
+    val rawCells = remember(glyphs, pageTypeface, linePx) {
+        mushafLineCells(glyphs, pageTypeface, linePx, condense = 1f)
     }
     // What each join already carries. Spacing by ink *box* set every join the
     // same distance apart and so no two of them the same paper apart — a word
@@ -315,8 +316,8 @@ private fun MushafQcfPageLine(
     // the unscaled measurement: the rasteriser's ink at a given textScaleX is
     // not exactly that many times its ink at 1, and over nine cells the
     // difference left a line sixty pixels short of its own margin.
-    val cells = remember(texts, pageTypeface, linePx, condense) {
-        if (condense == 1f) rawCells else mushafLineCells(texts, pageTypeface, linePx, condense)
+    val cells = remember(glyphs, pageTypeface, linePx, condense) {
+        if (condense == 1f) rawCells else mushafLineCells(glyphs, pageTypeface, linePx, condense)
     }
     // A narrowing scales a join's pocket exactly as it scales the strokes
     // either side of it, so the em measurement holds at any width and only the
@@ -408,15 +409,29 @@ internal class MushafCell(val advance: Float, val inkLeft: Float, val inkRight: 
  * put every following word on the wrong origin — the line then ended short of
  * its own margin by about a word.
  */
-private fun mushafLineTexts(line: MushafLine): List<String> {
-    val out = ArrayList<String>(line.tokens.size + 4)
+private fun mushafLineTexts(line: MushafLine): List<MushafLineText> {
+    val out = ArrayList<MushafLineText>(line.tokens.size + 4)
     line.tokens.forEach { token ->
         val raw = token.word.qcfV2
-        out += if (raw.isNotEmpty()) qcfWordGlyphs(raw) else token.word.arabic
-        if (raw.isNotEmpty() && qcfTrailingMark(raw).isNotEmpty()) out += qcfTrailingMark(raw)
+        out += MushafLineText(
+            text = if (raw.isNotEmpty()) qcfWordGlyphs(raw) else token.word.arabic,
+            mark = false,
+        )
+        if (raw.isNotEmpty() && qcfTrailingMark(raw).isNotEmpty()) {
+            out += MushafLineText(text = qcfTrailingMark(raw), mark = true)
+        }
     }
     return out
 }
+
+/**
+ * One cell of a line, and whether it is a verse mark rather than a word.
+ *
+ * The mark is a cell of its own — see docs/QURAN_TYPOGRAPHY.md rule 8 — but it
+ * is not a word, and the joins either side of it are not word joins: see
+ * MUSHAF_MARK_WHITE_K.
+ */
+private class MushafLineText(val text: String, val mark: Boolean)
 
 private fun mushafLineCells(
     texts: List<String>,
@@ -451,12 +466,14 @@ private fun mushafLineCells(
  * for the whole book. See [MushafInkProfiles].
  */
 private fun mushafLineJoins(
-    texts: List<String>,
+    texts: List<MushafLineText>,
     typeface: android.graphics.Typeface?,
 ): List<MushafInkJoin> {
     if (texts.size < 2 || typeface == null) return emptyList()
-    val profiles = texts.map { MushafInkProfiles.of(typeface, it) }
-    return List(texts.size - 1) { i -> mushafInkJoin(profiles[i], profiles[i + 1]) }
+    val profiles = texts.map { MushafInkProfiles.of(typeface, it.text) }
+    return List(texts.size - 1) { i ->
+        mushafInkJoin(profiles[i], profiles[i + 1], texts[i].mark || texts[i + 1].mark)
+    }
 }
 
 /**
@@ -539,13 +556,18 @@ private fun mushafJoinSteps(
     }
     val floors = FloatArray(n - 1) { joins[it].floorEm * emPx }
     val papers = FloatArray(n - 1) { joins[it].paper * emPx }
+    // A verse mark is levelled to a share of what the words get, so its joins
+    // meet the level on a shallower slope and sit on their floors for longer.
+    val shares = FloatArray(n - 1) { joins[it].levelK }
     var floorTotal = 0f
     var paperTotal = 0f
+    var shareTotal = 0f
     var ceiling = Float.MAX_VALUE
     for (i in 0 until n - 1) {
         floorTotal += floors[i]
         paperTotal += papers[i]
-        ceiling = minOf(ceiling, papers[i] + floors[i])
+        shareTotal += shares[i]
+        ceiling = minOf(ceiling, (papers[i] + floors[i]) / shares[i])
     }
     if (floorTotal >= spread) {
         // The line is denser than bare clearance allows — the fit condenses to
@@ -568,15 +590,15 @@ private fun mushafJoinSteps(
     // Every join sits on its floor at `low` and none of them does at `high`,
     // so the level the line wants lies between.
     var low = ceiling
-    var high = (spread + paperTotal) / (n - 1)
+    var high = (spread + paperTotal) / shareTotal
     repeat(24) {
         val mid = (low + high) / 2f
         var sum = 0f
-        for (i in 0 until n - 1) sum += maxOf(mid - papers[i], floors[i])
+        for (i in 0 until n - 1) sum += maxOf(mid * shares[i] - papers[i], floors[i])
         if (sum < spread) low = mid else high = mid
     }
     val level = (low + high) / 2f
-    for (i in 0 until n - 1) steps[i] = maxOf(level - papers[i], floors[i])
+    for (i in 0 until n - 1) steps[i] = maxOf(level * shares[i] - papers[i], floors[i])
     return steps
 }
 
@@ -588,18 +610,20 @@ private fun mushafJoinSteps(
 private fun mushafWhiteLevel(joins: List<MushafInkJoin>, spreadEm: Float): Float {
     if (joins.isEmpty()) return 0f
     var paperTotal = 0f
+    var shareTotal = 0f
     var ceiling = Float.MAX_VALUE
     for (join in joins) {
         paperTotal += join.paper
-        ceiling = minOf(ceiling, join.paper + join.floorEm)
+        shareTotal += join.levelK
+        ceiling = minOf(ceiling, (join.paper + join.floorEm) / join.levelK)
     }
     var low = ceiling
-    var high = (spreadEm + paperTotal) / joins.size
+    var high = (spreadEm + paperTotal) / shareTotal
     if (high <= low) return low
     repeat(24) {
         val mid = (low + high) / 2f
         var sum = 0f
-        for (join in joins) sum += maxOf(mid - join.paper, join.floorEm)
+        for (join in joins) sum += maxOf(mid * join.levelK - join.paper, join.floorEm)
         if (sum < spreadEm) low = mid else high = mid
     }
     return (low + high) / 2f
@@ -644,7 +668,9 @@ internal fun mushafInkLineFit(
     // Room to spare. Level the white as far as a line is set, and see what the
     // letters would have to do to take up whatever is still left.
     var opened = 0f
-    for (join in joins) opened += maxOf(MUSHAF_MAX_WHITE_LEVEL_EM - join.paper, join.floorEm)
+    for (join in joins) {
+        opened += maxOf(MUSHAF_MAX_WHITE_LEVEL_EM * join.levelK - join.paper, join.floorEm)
+    }
     val needed = measure / (ink + opened)
     if (needed <= 1f) return MushafLineFit(scale = 1f, gapPx = 0f, flush = true)
     if (needed <= MUSHAF_MAX_LINE_SCALE) {
