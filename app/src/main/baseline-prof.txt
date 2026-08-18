@@ -32,7 +32,8 @@ HSPLcom/beautifulquran/playback/AudioPrefetcher;->**(**)**
 HSPLcom/beautifulquran/ui/reader/MushafPagerKt;->**(**)**
 HSPLcom/beautifulquran/ui/reader/MushafHafsLineKt;->**(**)**
 HSPLcom/beautifulquran/ui/reader/MushafReadingSheetKt;->**(**)**
-HSPLcom/beautifulquran/ui/reader/MushafPageFrameKt;->**(**)**
+HSPLcom/beautifulquran/ui/reader/MushafSurahBandKt;->**(**)**
+HSPLcom/beautifulquran/ui/reader/AyahInkMotionsKt;->**(**)**
 HSPLcom/beautifulquran/ui/reader/MushafQcfFonts;->**(**)**
 HSPLcom/beautifulquran/domain/MushafCatalog;->**(**)**
 HSPLcom/beautifulquran/domain/MushafPageFitKt;->**(**)**

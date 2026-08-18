@@ -82,6 +82,10 @@ import com.beautifulquran.domain.mushafUniformFontPx
 import com.beautifulquran.domain.mushafLineSlotPx
 import com.beautifulquran.domain.surahOpensWithBasmalahPreface
 import kotlin.math.abs
+import com.beautifulquran.ui.theme.MushafBasmalahFontFamily
+import com.beautifulquran.ui.theme.MUSHAF_BASMALAH_GLYPH
+import com.beautifulquran.ui.theme.MUSHAF_BASMALAH_EM_WIDTH
+import androidx.compose.ui.text.style.TextOverflow
 import com.beautifulquran.ui.theme.MushafFontFamily
 
 /**
@@ -113,6 +117,12 @@ internal val MushafEdgeGutter = 10.dp
  * instead of exactly on it.
  */
 private val MushafFitSlack = 2.dp
+
+/**
+ * How much of the measure the basmalah spans on a chapter's opening leaf —
+ * centred, and well inside the text block, the way the Madinah page sets it.
+ */
+private const val MushafBasmalahMeasureShare = 0.70f
 
 /**
  * How long a leaf takes to come up once its page face has landed.
@@ -522,10 +532,14 @@ private fun MushafPageSheet(
             val fontPx = remember(unitPx, availableW, fontScale, slotCount) {
                 mushafUniformFontPx(
                     measureWidthPx = availableW,
-                    // The well is the grid's fifteen units; a page carrying a
-                    // chapter's opening asks for more slots than that and packs
-                    // them into the same well.
-                    wellHeightPx = unitPx * mushafGridSlots(slotCount),
+                    // The well is the grid's fifteen units, whatever the page
+                    // holds: a leaf carrying a chapter's opening asks for more
+                    // slots than that and packs them into the same paper. Both
+                    // arguments used to be scaled by the slot count, which
+                    // cancelled and left the guard unable to bite — a chapter
+                    // opening kept type cut for a full slot while its slot had
+                    // shrunk to about 0.88 of one.
+                    wellHeightPx = unitPx * MushafGrid.TEXT_LINES,
                     slots = mushafGridSlots(slotCount),
                     fontScale = fontScale,
                 )
@@ -573,7 +587,7 @@ private fun MushafPageSheet(
                                         .height(lineSlot),
                                     contentAlignment = Alignment.Center,
                                 ) {
-                                    MushafBasmalahLine(fontSize = fontSp)
+                                    MushafBasmalahLine(measureWidthPx = lineMeasurePx)
                                 }
                             }
                         }
@@ -674,13 +688,23 @@ private fun rememberMushafRecessPack(dimmed: Boolean): AyahInkPack {
 }
 
 @Composable
-private fun MushafBasmalahLine(fontSize: androidx.compose.ui.unit.TextUnit) {
+private fun MushafBasmalahLine(measureWidthPx: Float) {
+    // The print's own basmalah, in the hand the rest of the leaf is written in.
+    // It was set as Unicode in the reading face, which the page faces do not
+    // share: on a chapter's opening leaf it arrived in a different hand from
+    // every line beneath it. QCF2BSML carries it as a single glyph, so it is
+    // sized by its own width rather than by a text size — six and a half times
+    // its type size wide — and set to span this fraction of the measure, as it
+    // does on the printed page.
+    val fontPx = measureWidthPx * MushafBasmalahMeasureShare / MUSHAF_BASMALAH_EM_WIDTH
     Text(
-        text = BASMALAH_UTHMANI,
-        fontFamily = MushafFontFamily,
-        fontSize = fontSize * 0.78f,
+        text = MUSHAF_BASMALAH_GLYPH,
+        fontFamily = MushafBasmalahFontFamily,
+        fontSize = with(LocalDensity.current) { fontPx.toSp() },
         color = MaterialTheme.colorScheme.onBackground,
         textAlign = TextAlign.Center,
+        maxLines = 1,
+        overflow = TextOverflow.Visible,
         modifier = Modifier.fillMaxWidth(),
     )
 }

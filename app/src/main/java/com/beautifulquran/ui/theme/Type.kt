@@ -21,6 +21,24 @@ val HafsFontFamily = FontFamily(Font(R.font.hafs_uthmanic))
 val MushafFontFamily = FontFamily(Font(R.font.digital_khatt_new_madina))
 
 /**
+ * QCF2BSML — the Madinah print's own header face, in the same hand as the 604
+ * page faces.
+ *
+ * It carries one glyph per surah header and one for the basmalah, addressed by
+ * single characters rather than by Arabic text: the page fonts have no space
+ * glyph and no Unicode Arabic at all, so a basmalah written as Unicode fell
+ * back to the reading face and arrived on the leaf in a different hand from
+ * every other line on it. See [MUSHAF_BASMALAH_GLYPH].
+ */
+val MushafBasmalahFontFamily = FontFamily(Font(R.font.qcf2_bsml))
+
+/** The basmalah, as one glyph of [MushafBasmalahFontFamily]. */
+const val MUSHAF_BASMALAH_GLYPH = "\u00F3"
+
+/** How wide that glyph is drawn, in multiples of its own type size. */
+const val MUSHAF_BASMALAH_EM_WIDTH = 6.4116f
+
+/**
  * EB Garamond — the book face. Everything English is set in it: translations,
  * glosses, lists, labels, even the speed chip. Bundled with true italics and
  * optical weights so emphasis never falls back to a synthetic slant.

@@ -238,7 +238,14 @@ internal fun MushafReadingSheet(
                             } else {
                                 Icons.Rounded.PlayArrow
                             },
-                            contentDescription = if (playerState.isPlaying) "Pause" else "Play",
+                            // The same condition the icon is drawn from: while
+                            // another chapter plays this button shows Play, and
+                            // used to be announced as Pause.
+                            contentDescription = if (playerState.isPlaying && isThisSurahLoaded) {
+                                "Pause"
+                            } else {
+                                "Play"
+                            },
                             tint = primary,
                             modifier = Modifier.size(26.dp),
                         )

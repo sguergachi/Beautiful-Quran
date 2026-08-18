@@ -141,17 +141,6 @@ fun mushafLineCondense(naturalWidthPx: Float, measureWidthPx: Float): Float {
  */
 const val MUSHAF_MIN_LINE_CONDENSE = 0.86f
 
-/** Never stretch a word gap past this fraction of the page's own size. */
-
-
-
-/**
- * Extra letter-spacing (px) to put on each inter-word space so a mushaf
- * line fills [pageWidthPx]. Zero when the line already spans the page or
- * there is nothing to stretch.
- */
-
-
 /** Never stretch a word gap past this fraction of the page font. */
 const val MUSHAF_MAX_GAP_EM = 0.55f
 

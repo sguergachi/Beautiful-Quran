@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.GenericShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -29,7 +28,6 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
@@ -63,45 +61,7 @@ private const val MushafRuleWeightPx = 1f
 /** Corner easing anywhere on the leaf: a hairline, never a curve. */
 private const val MushafPanelCornerPx = 3f
 
-/** How far each end of the panel draws in, as a share of its height. */
-private const val MushafPanelTaper = 0.55f
 
-/** The name's cartouche closes harder, so it reads as a lozenge. */
-private const val MushafCartoucheTaper = 0.62f
-
-/**
- * A capsule whose ends are drawn in and then squared off: the sides step
- * inward over [taper] and close on a short flat end, eased by a hairline
- * radius. Points at the ends read as a banner ribbon; a squared return reads
- * as a plate, which is what a panel ruled into a page should be.
- */
-private fun taperedCapsulePath(size: Size, taper: Float): Path {
-    val h = size.height
-    val w = size.width
-    val t = (h * taper).coerceAtMost(w / 2f)
-    // The flat the taper closes on, and the hairline that softens its corners.
-    val flat = h * 0.34f
-    val r = MushafPanelCornerPx
-    return Path().apply {
-        moveTo(t, 0f)
-        lineTo(w - t, 0f)
-        lineTo(w - r, (h - flat) / 2f)
-        quadraticTo(w, (h - flat) / 2f, w, (h - flat) / 2f + r)
-        lineTo(w, (h + flat) / 2f - r)
-        quadraticTo(w, (h + flat) / 2f, w - r, (h + flat) / 2f)
-        lineTo(w - t, h)
-        lineTo(t, h)
-        lineTo(r, (h + flat) / 2f)
-        quadraticTo(0f, (h + flat) / 2f, 0f, (h + flat) / 2f - r)
-        lineTo(0f, (h - flat) / 2f + r)
-        quadraticTo(0f, (h - flat) / 2f, r, (h - flat) / 2f)
-        close()
-    }
-}
-
-private fun taperedCapsuleShape(taper: Float): Shape = GenericShape { size, _ ->
-    addPath(taperedCapsulePath(size, taper))
-}
 
 /**
  * The ʿunwān panel that opens a chapter on the leaf.

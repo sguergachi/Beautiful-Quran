@@ -761,6 +761,21 @@ fun ReaderScreen(
 
     /** The first ayah of the loaded chapter on the leaf in view, or null when
      * the reader is not on a leaf. */
+    // Read in the draw/derived phase, not in the reader's own scope: reading
+    // pagerState.currentPage directly here recomposed the entire reader body on
+    // every settled page, which is exactly what MushafPager takes such care to
+    // avoid by handing playback down as one State.
+    val mushafLeafProgress = remember(mushafCatalog) {
+        derivedStateOf {
+            val pages = mushafCatalog?.pageCount ?: return@derivedStateOf 0f
+            if (pages <= 0) return@derivedStateOf 0f
+            ((mushafPagerState.currentPage + 1).toFloat() / pages).coerceIn(0f, 1f)
+        }
+    }
+    val mushafLeafSurahId = remember(mushafCatalog) {
+        derivedStateOf { mushafCatalog?.page(mushafPagerState.currentPage + 1)?.primarySurahId }
+    }
+
     fun mushafScrolledAyah(): Int? {
         if (!mushafMode) return null
         val catalog = mushafCatalog ?: return null
@@ -1152,8 +1167,7 @@ fun ReaderScreen(
                         val live = uiState.content?.surah
                         val pinned = pinnedTopNavTitle
                         val mushafSurah = if (mushafMode) {
-                            val page = mushafCatalog?.page(mushafPagerState.currentPage + 1)
-                            page?.primarySurahId?.let { mushafUi?.surahsById?.get(it) } ?: live
+                            mushafLeafSurahId.value?.let { mushafUi?.surahsById?.get(it) } ?: live
                         } else {
                             null
                         }
@@ -2033,12 +2047,7 @@ fun ReaderScreen(
                         // Where the reader is in the book, by leaf — so the rule
                         // answers while pages are turned as well as while they
                         // are recited, and the thumb has something to mark.
-                        chapterProgress = mushafCatalog?.pageCount
-                            ?.takeIf { it > 0 }
-                            ?.let { pages ->
-                                ((mushafPagerState.currentPage + 1).toFloat() / pages)
-                                    .coerceIn(0f, 1f)
-                            } ?: 0f,
+                        chapterProgress = mushafLeafProgress.value,
                         modifier = Modifier.weight(1f),
                     ) {
                     if (mushafReady == null) {
@@ -2642,17 +2651,11 @@ fun ReaderScreen(
                                 resumeFollowIfPlaying = isThisSurahPlaying,
                             ),
                         )
-                        if (mushafMode) {
-                            val catalog = mushafCatalog
-                            if (catalog != null) {
-                                scope.launch {
-                                    mushafPagerState.scrollToPage(
-                                        (catalog.pageOf(content.surah.id, ayah) - 1)
-                                            .coerceIn(0, catalog.pageCount - 1),
-                                    )
-                                }
-                            }
-                        }
+                        // No leaf to turn here: the rail is composed only when
+                        // the reader is *not* in mushaf mode (see the gate on
+                        // this whole block), so a branch turning the pager from
+                        // it was unreachable. Should the rail ever be shown over
+                        // a leaf, it will need turning again.
                     },
                     onExpandedChange = { expanded ->
                         ayahSelectorExpanded = expanded

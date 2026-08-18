@@ -193,16 +193,21 @@ class QuranRepository(
     /**
      * 604 Madinah pages from the dormant qcf_page / qcf_line columns.
      * Cached for the process lifetime — the asset is immutable.
+     *
+     * Ordered by surah as well as verse: two chapters never share a line in the
+     * Madinah layout, so today this changes nothing, but ordering by verse
+     * number alone would interleave their words if one ever did. The check in
+     * tools/verify_mushaf_lines.py orders the same way.
      */
     suspend fun mushafCatalog(): MushafCatalog = withContext(Dispatchers.IO) {
         mushafCatalog ?: run {
             val sources = queryList(
                 """
-                SELECT surah_id, ayah_number, position, arabic, translation_en,
-                       transliteration, qcf_v2, qcf_page, qcf_line, qcf_span_end
+                SELECT surah_id, ayah_number, position, arabic,
+                       qcf_v2, qcf_page, qcf_line, qcf_span_end
                 FROM words
                 WHERE qcf_page BETWEEN 1 AND 604
-                ORDER BY qcf_page, qcf_line, ayah_number, position
+                ORDER BY qcf_page, qcf_line, surah_id, ayah_number, position
                 """.trimIndent(),
             ) { c ->
                 MushafSourceWord(
@@ -211,12 +216,17 @@ class QuranRepository(
                     word = Word(
                         position = c.getInt(2),
                         arabic = c.getString(3),
-                        translation = c.getString(4),
-                        transliteration = c.getString(5),
-                        qcfV2 = c.getString(6),
-                        qcfPage = c.getInt(7),
-                        qcfLine = c.getInt(8),
-                        qcfSpanEnd = c.getInt(9),
+                        // The leaf draws the page face and nothing else. Gloss
+                        // and transliteration belong to the scrolling reader,
+                        // which loads them per chapter in surahContent() — held
+                        // here they were ~77,000 strings of each, retained for
+                        // the process lifetime, for text no leaf ever draws.
+                        translation = "",
+                        transliteration = "",
+                        qcfV2 = c.getString(4),
+                        qcfPage = c.getInt(5),
+                        qcfLine = c.getInt(6),
+                        qcfSpanEnd = c.getInt(7),
                     ),
                 )
             }
