@@ -2062,6 +2062,7 @@ fun ReaderScreen(
                             activeAyah = activeAyah,
                             reciting = recitingActive,
                             playingHere = isThisSurahPlaying,
+                            basmalahActive = isThisSurahPlaying && activeBasmalah == true,
                         )
                     }
                     val mushafDispatch = rememberUpdatedState(
@@ -2135,6 +2136,7 @@ fun ReaderScreen(
                     MushafPager(
                         catalog = mushafReady.catalog,
                         content = content,
+                        basmalahWash = viewModel.basmalahWashProgress,
                         surahsById = mushafReady.surahsById,
                         pagerState = mushafPagerState,
                         activeWordState = activeWordState,

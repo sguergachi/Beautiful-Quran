@@ -95,6 +95,10 @@ import com.beautifulquran.ui.theme.MUSHAF_BASMALAH_HAND_SCALE
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.ui.text.style.LineHeightStyle
+import kotlinx.coroutines.flow.StateFlow
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.animation.core.snap
+import com.beautifulquran.ui.theme.letterFadeIn
 import com.beautifulquran.ui.theme.MushafFontFamily
 
 /**
@@ -107,6 +111,8 @@ internal data class MushafPlayback(
     val activeAyah: Int?,
     val reciting: Boolean,
     val playingHere: Boolean,
+    /** The chapter's opening basmalah is the thing being recited. */
+    val basmalahActive: Boolean = false,
 )
 
 /**
@@ -217,6 +223,8 @@ private fun Modifier.mushafForeEdgeFade(paper: Color, band: Dp): Modifier = draw
 internal fun MushafPager(
     catalog: MushafCatalog,
     content: SurahContent,
+    /** The chapter-opening basmalah's reveal, 0..1, or null when it is idle. */
+    basmalahWash: StateFlow<Float?>,
     surahsById: Map<Int, Surah>,
     pagerState: PagerState,
     activeWordState: State<ActiveWord?>,
@@ -361,6 +369,7 @@ internal fun MushafPager(
                 )
                 Spacer(Modifier.height(unit * MushafGrid.HEAD_GUTTER))
                 MushafPageSheet(
+                    basmalahWash = basmalahWash,
                     page = page,
                     content = content,
                     surahsById = surahsById,
@@ -396,6 +405,7 @@ internal fun MushafPager(
 private fun MushafPageSheet(
     page: MushafPage,
     content: SurahContent,
+    basmalahWash: StateFlow<Float?>,
     surahsById: Map<Int, Surah>,
     liveInk: Boolean,
     activeWordState: State<ActiveWord?>,
@@ -594,6 +604,10 @@ private fun MushafPageSheet(
                                     MushafBasmalahLine(
                                         fontSize = fontSp,
                                         slotHeight = lineSlot,
+                                        active = playback.value.basmalahActive,
+                                        dimmed = playback.value.reciting &&
+                                            !playback.value.basmalahActive,
+                                        wash = basmalahWash,
                                     )
                                 }
                             }
@@ -695,7 +709,13 @@ private fun rememberMushafRecessPack(dimmed: Boolean): AyahInkPack {
 }
 
 @Composable
-private fun MushafBasmalahLine(fontSize: TextUnit, slotHeight: Dp) {
+private fun MushafBasmalahLine(
+    fontSize: TextUnit,
+    slotHeight: Dp,
+    active: Boolean,
+    dimmed: Boolean,
+    wash: StateFlow<Float?>,
+) {
     // Written in the page's own hand: the leaf's type size, scaled by what the
     // header face needs to ink as tall as a word of the verse beneath it, and
     // placed by its own ink rather than by its line box — the box is nearly two
@@ -714,7 +734,38 @@ private fun MushafBasmalahLine(fontSize: TextUnit, slotHeight: Dp) {
             textAlign = android.graphics.Paint.Align.CENTER
         }
     }
-    Canvas(Modifier.fillMaxWidth().height(slotHeight)) {
+    // The basmalah is recited before the chapter's first verse, so it takes the
+    // same ink as any other line: washed letter by letter while it is being
+    // read, dimmed back while the reader is elsewhere in the chapter. The wash
+    // masks the glyph's own drawing, so it follows the phrase's own contour.
+    val inkState = InkEngine.prefaceState(isActive = active, dimmed = dimmed)
+    val lyricInk by animateFloatAsState(
+        targetValue = inkState.inkAlpha(),
+        animationSpec = if (inkState == InkEngine.State.Active) {
+            snap()
+        } else {
+            tween(InkEngine.tuning.inkFadeMs, easing = FastOutSlowInEasing)
+        },
+        label = "mushafBasmalahInk",
+    )
+    val washValue = wash.collectAsStateWithLifecycle()
+    Canvas(
+        Modifier
+            .fillMaxWidth()
+            .height(slotHeight)
+            .then(
+                if (active) {
+                    Modifier.letterFadeIn(
+                        progress = { washValue.value?.coerceIn(0f, 1f) ?: 0f },
+                        rtl = true,
+                        restingAlpha = InkEngine.State.Upcoming.inkAlpha(),
+                        feather = InkEngine.prefaceFeather(),
+                    )
+                } else {
+                    Modifier.graphicsLayer { alpha = lyricInk }
+                },
+            ),
+    ) {
         drawIntoCanvas { canvas ->
             canvas.nativeCanvas.drawText(
                 MUSHAF_BASMALAH_GLYPH,

@@ -50,6 +50,8 @@ import com.beautifulquran.ui.theme.LocalQuranAccents
 import com.beautifulquran.ui.theme.MushafFontFamily
 import com.beautifulquran.ui.theme.PaperCoverPad
 import com.beautifulquran.ui.theme.ShapedWordBloom
+import com.beautifulquran.ui.theme.glyphLayerAlpha
+import com.beautifulquran.ui.theme.letterFadeIn
 import com.beautifulquran.ui.theme.shapedWordBloom
 
 private const val MARK_SIZE_RATIO = 20f / 30f
@@ -371,16 +373,34 @@ private fun MushafQcfWord(
             !liveInk || pack == null -> 1f
             // No motion: a whole verse waiting its turn, dimmed as a block.
             motion == null -> (1f - pack.recessCover.value).coerceIn(0f, 1f)
-            // The same rule the scrolling reader applies in [layeredBaseInk]:
-            // the wash owns ink strength while a word is revealing, and the
-            // lyric alpha applies once settled — which is what dims the words
-            // still ahead of the voice *inside* the verse being recited. The
-            // page used to return 1f for every word that had a motion at all,
-            // so the active verse lit whole and there was no word-by-word fade
-            // on the leaf, only at verse boundaries.
-            motion.isActive || motion.sweepProgress < 1f -> 1f
+            // The wash owns ink strength while a word is revealing; the lyric
+            // alpha applies once settled, and before the word has begun — which
+            // is what dims the words still ahead of the voice inside the verse
+            // being recited, and what keeps a waiting word off the layered
+            // wash path entirely (see wordSweep).
+            motion.isActive || (motion.sweepProgress > 0f && motion.sweepProgress < 1f) -> 1f
             else -> motion.lyricAlpha
         }
+    }
+    // The reveal of the one word being recited, read in the draw phase.
+    //
+    // A word that has not begun reports a finished wash on purpose: the wash
+    // opens an offscreen layer for as long as it is running, and a leaf holds
+    // ~150 words. Their waiting dim is a flat alpha instead (see recessAlpha),
+    // so only the word actually under the voice pays for a layer.
+    val wordSweep = {
+        val motion = packs[token.surahId to token.ayah]
+            ?.motions?.getOrNull(token.word.position - 1)
+        when {
+            motion == null || motion.repeat -> 1f
+            motion.isActive || motion.sweepProgress > 0f -> motion.sweepProgress
+            else -> 1f
+        }
+    }
+    val wordFeather = {
+        packs[token.surahId to token.ayah]
+            ?.motions?.getOrNull(token.word.position - 1)
+            ?.washFeather ?: InkEngine.tuning.washFeather
     }
     val blooms = {
         if (!liveInk) {
@@ -407,6 +427,11 @@ private fun MushafQcfWord(
                     flashWordPosition = null,
                     searchHitWash = pack.searchHitWash,
                     waslInk = palette.fullInkColor,
+                    // The reveal is washed onto this word's own layer below,
+                    // where it follows the letterform. Paper laid over the line
+                    // box cannot: it left tails, high marks and the circled
+                    // number standing at full strength beside faint letters.
+                    baseReveal = false,
                 )
             }
         }
@@ -433,15 +458,20 @@ private fun MushafQcfWord(
                 if (!liveInk) {
                     Modifier
                 } else {
-                    Modifier.graphicsLayer {
-                        alpha = recessAlpha()
-                        // Modulate, never composite: a leaf carries ~150 word
-                        // nodes, and letting alpha < 1 buy each one an offscreen
-                        // buffer would cost far more than the mask it replaced.
-                        // Glyphs on a line do not overlap, so modulating is also
-                        // correct.
-                        compositingStrategy = CompositingStrategy.ModulateAlpha
-                    }
+                    // Both washes work on the word's own drawing, so the ink is
+                    // masked by its own coverage — a tail, a mark, the circled
+                    // number all fade with the letter they belong to, and no
+                    // edge can fall across a stroke. This is the same pair the
+                    // scrolling reader uses; the leaf used to lay paper over a
+                    // rectangle instead, which is what showed as clipping.
+                    Modifier
+                        .glyphLayerAlpha { recessAlpha() }
+                        .letterFadeIn(
+                            progress = { wordSweep() },
+                            rtl = true,
+                            restingAlpha = InkEngine.State.Upcoming.inkAlpha(),
+                            feather = wordFeather(),
+                        )
                 },
             )
             .mushafLineInk(

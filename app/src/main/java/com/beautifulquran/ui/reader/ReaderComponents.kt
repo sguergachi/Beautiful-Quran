@@ -1560,10 +1560,23 @@ private fun MutableList<ShapedWordBloom>.addShapedInkMotionBlooms(
     glintInk: Color?,
     /** Arabic-only wasl pre-ink; English has no connected-letter paint. */
     waslInk: Color? = null,
+    /**
+     * Whether the base reveal is drawn here, as paper pulled back off the
+     * glyphs, or by the caller.
+     *
+     * The paper form covers a rectangle on the line box, so it can only ever
+     * be as precise as that box: ink that leaves it — an Arabic tail, a mark
+     * riding high, the circled ayah number — is not covered, and stands at full
+     * strength beside letters that are still faint. Where each word is its own
+     * node, as on the mushaf leaf, the caller washes the node's own layer
+     * instead ([Modifier.letterFadeIn]), which masks the glyph by its own
+     * coverage and cannot cut across a letterform.
+     */
+    baseReveal: Boolean = true,
 ) {
     motions.forEachIndexed { index, motion ->
         val range = ranges.getOrNull(index) ?: return@forEachIndexed
-        if (!motion.repeat && motion.sweepProgress < 1f) {
+        if (baseReveal && !motion.repeat && motion.sweepProgress < 1f) {
             add(
                 ShapedWordBloom.InkReveal(
                     range = range,
@@ -1647,6 +1660,8 @@ internal fun buildShapedBlooms(
     searchHitWash: RepeatWash,
     /** Arabic-only wasl pre-ink; English has no connected-letter paint. */
     waslInk: Color? = null,
+    /** See [addShapedInkMotionBlooms]. */
+    baseReveal: Boolean = true,
 ): List<ShapedWordBloom> {
     val recess = recessCover()
     val upcomingCover = 1f - InkEngine.State.Upcoming.inkAlpha()
@@ -1688,6 +1703,7 @@ internal fun buildShapedBlooms(
         palette = palette,
         glintInk = glintInk,
         waslInk = waslInk,
+        baseReveal = baseReveal,
     )
     // Home search-hit flash: same ColorReveal wash as the orange repeat
     // bloom — directional mask + dissolve × 2.
