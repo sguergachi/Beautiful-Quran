@@ -46,7 +46,9 @@ import com.beautifulquran.domain.MushafToken
 import com.beautifulquran.domain.buildMushafQcfLine
 import com.beautifulquran.domain.mushafGapSpacingPx
 import com.beautifulquran.domain.mushafLineJustifies
-import com.beautifulquran.domain.mushafInkCondense
+import com.beautifulquran.domain.MUSHAF_WORD_GAP_EM
+import com.beautifulquran.domain.MushafLineFit
+import com.beautifulquran.domain.mushafLineFit
 import com.beautifulquran.domain.mushafLineCondense
 import com.beautifulquran.domain.qcfTrailingMark
 import com.beautifulquran.domain.qcfWordGlyphs
@@ -242,18 +244,24 @@ private fun MushafQcfPageLine(
     // instead left the spacing to be whatever paper happened to remain: over
     // 738 lines that put a third of them under 0.10 em and the tightest tenth
     // into overlap. See MUSHAF_MIN_WORD_GAP_EM.
-    val condense = remember(rawCells, measureWidthPx, linePx, justify) {
+    val fit = remember(rawCells, measureWidthPx, linePx, justify) {
         if (!justify) {
-            1f
+            // Too few words to justify: the page's own space, centred.
+            MushafLineFit(
+                scale = 1f,
+                gapPx = MUSHAF_WORD_GAP_EM * linePx,
+                flush = false,
+            )
         } else {
-            mushafInkCondense(
+            mushafLineFit(
                 inkWidthPx = rawCells.sumOf { it.inkWidth.toDouble() }.toFloat(),
-                measureWidthPx = measureWidthPx,
                 gapCount = (rawCells.size - 1).coerceAtLeast(0),
+                measureWidthPx = measureWidthPx,
                 fontPx = linePx,
             )
         }
     }
+    val condense = fit.scale
     // Condensed, never resized. A line brought inside the measure keeps its
     // height, weight and colour — the page still reads as one hand — where a
     // line set at a different size reads as a fault.
@@ -342,7 +350,7 @@ private fun MushafQcfPageLine(
         val placeables = measurables.map { it.measure(Constraints()) }
         val height = placeables.maxOfOrNull { it.height } ?: 0
         val width = constraints.maxWidth
-        val origins = mushafCellOrigins(cells, placeables.size, width.toFloat(), justify)
+        val origins = mushafCellOrigins(cells, placeables.size, width.toFloat(), fit)
         layout(width, height) {
             placeables.forEachIndexed { i, p ->
                 p.place(origins.getOrElse(i) { 0f }.roundToInt(), (height - p.height) / 2)
@@ -399,27 +407,24 @@ internal fun mushafCellOrigins(
     cells: List<MushafCell>,
     count: Int,
     width: Float,
-    justify: Boolean,
+    fit: MushafLineFit,
 ): FloatArray {
     val n = minOf(cells.size, count)
     val origins = FloatArray(count)
     if (n == 0) return origins
-    if (!justify || n == 1) {
-        val total = (0 until n).sumOf { cells[it].advance.toDouble() }.toFloat()
-        var x = ((width - total) / 2f).coerceAtLeast(0f) + total
-        for (i in 0 until n) {
-            x -= cells[i].advance
-            origins[i] = x
-        }
-        return origins
-    }
+    val gap = fit.gapPx
     val inkTotal = (0 until n).sumOf { cells[it].inkWidth.toDouble() }.toFloat()
-    val gap = ((width - inkTotal) / (n - 1)).coerceAtLeast(0f)
-    var inkRight = width
+    // A flush line starts at the fore-edge; a short one is centred on the page,
+    // the way a chapter's closing line is printed. Either way the words sit the
+    // same distance apart — the page's own space.
+    var inkRight = if (fit.flush) {
+        width
+    } else {
+        width - ((width - (inkTotal + (n - 1) * gap)) / 2f).coerceAtLeast(0f)
+    }
     for (i in 0 until n) {
-        val cell = cells[i]
-        origins[i] = inkRight - cell.inkRight
-        inkRight -= cell.inkWidth + gap
+        origins[i] = inkRight - cells[i].inkRight
+        inkRight -= cells[i].inkWidth + gap
     }
     return origins
 }

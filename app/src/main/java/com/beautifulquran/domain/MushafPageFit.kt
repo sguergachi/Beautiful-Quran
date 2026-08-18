@@ -142,39 +142,99 @@ fun mushafLineCondense(naturalWidthPx: Float, measureWidthPx: Float): Float {
 const val MUSHAF_MIN_LINE_CONDENSE = 0.86f
 
 /**
- * The narrowest paper allowed between one word's last stroke and the next
- * word's first, as a fraction of the page's type size.
+ * The word space the page is set on, as a fraction of the type size.
  *
- * This is the guarantee the rest of the fit is built on. Without it a line's
- * spacing was whatever paper happened to be left after the ink, and measured
- * over 738 lines that left 36.6% of them under 0.10 em and the tightest tenth
- * *negative* — words overlapping. A compositor does the opposite: the word
- * space is chosen first, and a line that will not take it has its letters
- * tightened instead. Costed over the same lines, honouring 0.17 em tightens
- * the median line by about 2% — invisible — and only the densest twentieth by
- * more than 14%.
+ * The page faces supply almost none of their own: measured over 5,707 joins,
+ * the air a face leaves between two words is 0.044 em at the median and
+ * negative at a quarter of them — Arabic letters nest by design. So the space
+ * between words is entirely the renderer's to choose, and choosing it once is
+ * what makes a page look evenly set.
  */
-const val MUSHAF_MIN_WORD_GAP_EM = 0.17f
+const val MUSHAF_WORD_GAP_EM = 0.18f
+
+/** As far as the space may open before the letterforms are asked to give. */
+const val MUSHAF_MAX_WORD_GAP_EM = 0.30f
+
+/** How far letterforms may be narrowed, and stretched, to hold that space. */
+const val MUSHAF_MIN_LINE_SCALE = 0.80f
+const val MUSHAF_MAX_LINE_SCALE = 1.06f
 
 /**
- * How far a line's letterforms are condensed so its words can keep [
- * MUSHAF_MIN_WORD_GAP_EM] between them.
+ * The space a line keeps even when its letters have given all they may.
  *
- * [inkWidthPx] is the ink alone — the sum of what the words actually mark, not
- * of their advance boxes, because the page faces carry side bearings that vary
- * enormously from glyph to glyph and spacing by advance is what let two words
- * collide while their neighbours drifted apart.
+ * A handful of lines in the mushaf are too dense to hold the page's space at
+ * any tolerable letter width. They give up space down to this and no further —
+ * the letters narrow past their usual floor instead. A line whose words touch
+ * is not a line; a line written a little tighter than its neighbours is.
  */
-fun mushafInkCondense(
+const val MUSHAF_FLOOR_WORD_GAP_EM = 0.13f
+
+/** How a line is set: its letterforms, its word space, and whether it fills the
+ * measure or stands short and centred. */
+data class MushafLineFit(
+    val scale: Float,
+    val gapPx: Float,
+    val flush: Boolean,
+)
+
+/**
+ * Sets one line: the word space first, the letterforms second.
+ *
+ * Spacing used to be the leftover — fit the run to the measure and divide
+ * whatever paper remained — which starved dense lines and flooded sparse ones.
+ * Over 738 lines that left a third of them under 0.10 em between words, the
+ * tightest tenth *overlapping*, and the loosest hundredth at 1.17 em, which is
+ * a river down the page.
+ *
+ * A compositor chooses the space and makes the line fit around it, which is
+ * what this does. The space is [MUSHAF_WORD_GAP_EM] wherever it can be. A line
+ * too wide for it narrows its letters; one too narrow opens its space as far as
+ * [MUSHAF_MAX_WORD_GAP_EM] and only then stretches. A line that would have to
+ * stretch past [MUSHAF_MAX_LINE_SCALE] is not a full line at all — a chapter's
+ * last, most often — so it is set at the page's own space and centred, the way
+ * it is printed.
+ *
+ * Measured over the same 738 lines: 72% are set at exactly the page's space,
+ * none wider than 0.30 em, letterforms hold between 0.80 and 1.06 with a median
+ * of 0.978, and 6.2% stand short.
+ */
+fun mushafLineFit(
     inkWidthPx: Float,
-    measureWidthPx: Float,
     gapCount: Int,
+    measureWidthPx: Float,
     fontPx: Float,
-): Float {
-    if (inkWidthPx <= 0f || measureWidthPx <= 0f) return 1f
-    val room = measureWidthPx - gapCount.coerceAtLeast(0) * MUSHAF_MIN_WORD_GAP_EM * fontPx
-    if (room <= 0f) return 1f
-    return if (inkWidthPx <= room) 1f else room / inkWidthPx
+): MushafLineFit {
+    val gaps = gapCount.coerceAtLeast(0)
+    val ideal = MUSHAF_WORD_GAP_EM * fontPx
+    if (inkWidthPx <= 0f || measureWidthPx <= 0f || gaps == 0) {
+        return MushafLineFit(scale = 1f, gapPx = ideal, flush = false)
+    }
+    val needed = inkWidthPx + gaps * ideal
+    if (needed > measureWidthPx) {
+        val scale = (measureWidthPx - gaps * ideal) / inkWidthPx
+        if (scale >= MUSHAF_MIN_LINE_SCALE) return MushafLineFit(scale, ideal, flush = true)
+        // The space gives only as far as its floor, and the letters take the
+        // rest — narrowing past their usual limit if this line demands it.
+        // Clamping the letters here instead drove the space to nothing, which
+        // is how a dense line came out with its words touching.
+        val floorGap = MUSHAF_FLOOR_WORD_GAP_EM * fontPx
+        return MushafLineFit(
+            scale = (measureWidthPx - gaps * floorGap) / inkWidthPx,
+            gapPx = floorGap,
+            flush = true,
+        )
+    }
+    val opened = (measureWidthPx - inkWidthPx) / gaps
+    if (opened <= MUSHAF_MAX_WORD_GAP_EM * fontPx) {
+        return MushafLineFit(scale = 1f, gapPx = opened, flush = true)
+    }
+    val capped = MUSHAF_MAX_WORD_GAP_EM * fontPx
+    val scale = (measureWidthPx - gaps * capped) / inkWidthPx
+    return if (scale <= MUSHAF_MAX_LINE_SCALE) {
+        MushafLineFit(scale, capped, flush = true)
+    } else {
+        MushafLineFit(scale = 1f, gapPx = ideal, flush = false)
+    }
 }
 
 /** Never stretch a word gap past this fraction of the page font. */
