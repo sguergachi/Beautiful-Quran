@@ -256,10 +256,24 @@ internal fun MushafPager(
                 }
             }
     }
+    // The reader is opened at a chapter's own page by a scroll issued from
+    // ReaderScreen, which lands before anyone has touched the leaf. Seeded at
+    // page zero, that arrival looked exactly like a reader turning the page:
+    // follow was switched off and the return-to-root pill armed away before a
+    // single frame of playback, for every chapter that does not begin on page
+    // one. The first settled page is therefore where following starts, not a
+    // turn away from it.
+    var followSeeded by remember { mutableStateOf(false) }
     LaunchedEffect(pagerState) {
         snapshotFlow { pagerState.currentPage to pagerState.isScrollInProgress }
             .collect { (page, scrolling) ->
-                if (!scrolling && page != followPage) {
+                if (scrolling) return@collect
+                if (!followSeeded) {
+                    followSeeded = true
+                    followPage = page
+                    return@collect
+                }
+                if (page != followPage) {
                     followPage = page
                     onUserTurnedPage()
                 }
@@ -393,6 +407,16 @@ private fun MushafPageSheet(
     // a page) and invalidated every reader each time. Writes are per key now,
     // and the draw side still registers its read so a pack swap repaints.
     val packsState = remember { mutableStateMapOf<Pair<Int, Int>, AyahInkPack>() }
+    // A pack outlives the clocks that fed it. When a leaf's ayahs change — a
+    // tap that loads the chapter on the other side of a page boundary — the
+    // old ayah's animations leave composition and their values freeze wherever
+    // they stood. The entry left behind still answers for those words, so they
+    // kept whatever dim they were last given instead of falling back to full
+    // ink. Drop what the leaf no longer carries.
+    LaunchedEffect(ayahsOnPage) {
+        val live = ayahsOnPage.mapTo(HashSet()) { it.surahId to it.number }
+        packsState.keys.retainAll(live)
+    }
     if (liveInk) {
         MushafPageInkClocks(
             ayahs = ayahsOnPage,

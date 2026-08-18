@@ -28,3 +28,6 @@ images/
 
 # OptMem runtime lock — recreated on every memo command.
 .optmem/memory/.lock
+
+# Screenshots from the dev loop — never part of the app.
+.tmp-shots/

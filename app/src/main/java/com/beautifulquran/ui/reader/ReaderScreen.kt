@@ -759,17 +759,35 @@ fun ReaderScreen(
         }
     }
 
+    /** The first ayah of the loaded chapter on the leaf in view, or null when
+     * the reader is not on a leaf. */
+    fun mushafScrolledAyah(): Int? {
+        if (!mushafMode) return null
+        val catalog = mushafCatalog ?: return null
+        val page = catalog.page(mushafPagerState.currentPage + 1) ?: return null
+        return page.ayahKeys
+            .filter { it.first == renderedSurahId }
+            .minOfOrNull { it.second }
+    }
+
     fun selectedPlaybackAyah(): Int {
         val ayahCount = uiState.content?.surah?.ayahCount ?: return startAyah ?: 1
         return ReaderInteraction.selectedPlaybackAyah(
             state = interaction,
             isThisSurahPlaying = isThisSurahPlaying,
             activeAyah = activeAyah,
-            scrolledAyah = scrolledAyah.value,
+            // Where the reader is looking. On a scrolling page that is the
+            // focused verse of the list; on a leaf the list is never composed,
+            // so its focus stays pinned at the first verse and pressing play on
+            // page forty of al-Baqarah began the chapter again — and follow
+            // then turned the leaf back to page two. A leaf answers with the
+            // first verse it carries of the chapter being read.
+            scrolledAyah = mushafScrolledAyah() ?: scrolledAyah.value,
             fallbackAyah = startAyah ?: 1,
             ayahCount = ayahCount,
         )
     }
+
 
     // Lyric-style auto scroll: the focus engine keeps the active target
     // anchored — a verse's whole body if it fits, its top pinned if taller than

@@ -170,10 +170,14 @@ internal fun MushafReadingSheet(
                     .fillMaxWidth()
                     .height(44.dp),
             ) {
+            // Faded to 5% while reciting — and untouchable with it. Alpha
+            // alone left an invisible Chapters button under the thumb at the
+            // fore-edge, which walked the reader out of the page mid-recitation.
+            val secondaryEnabled = enabled && !reciting
             Box(Modifier.matchParentSize().graphicsLayer { alpha = secondaryFade }) {
                 GutterIcon(
                     onClick = onOpenChapters,
-                    enabled = enabled,
+                    enabled = secondaryEnabled,
                     image = Icons.AutoMirrored.Rounded.ArrowBack,
                     label = "Chapters",
                     tint = quiet,
@@ -181,7 +185,7 @@ internal fun MushafReadingSheet(
                 )
                 GutterIcon(
                     onClick = onOpenSettings,
-                    enabled = enabled,
+                    enabled = secondaryEnabled,
                     image = Icons.Rounded.Tune,
                     label = "Settings",
                     tint = quiet,
@@ -199,7 +203,7 @@ internal fun MushafReadingSheet(
                 val singleAyah = playerState.repeatRange?.let { it.first == it.last } == true
                 GutterIcon(
                     onClick = onRepeatClick,
-                    enabled = enabled,
+                    enabled = secondaryEnabled,
                     image = if (playerState.repeatMode == Player.REPEAT_MODE_ONE || singleAyah) {
                         Icons.Rounded.RepeatOne
                     } else {
@@ -254,7 +258,14 @@ internal fun MushafReadingSheet(
                     modifier = Modifier
                         .width(MushafGutterSlot)
                         .graphicsLayer { alpha = secondaryFade }
-                        .ownedQuietClickable(role = Role.Button, onClick = onSpeed),
+                        .then(
+                            // Faded out of sight, and out of reach with it.
+                            if (secondaryEnabled) {
+                                Modifier.ownedQuietClickable(role = Role.Button, onClick = onSpeed)
+                            } else {
+                                Modifier
+                            },
+                        ),
                     textAlign = TextAlign.Center,
                 )
             }
