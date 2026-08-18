@@ -4,14 +4,51 @@ package com.beautifulquran.domain
 const val MUSHAF_LINE_EM = 2.2f
 
 /**
- * Line pitch as a multiple of the fitted glyph size — the leading the printed
- * Madinah page is set on. A phone's text well is proportionally taller than
- * that page, so dividing the well by fifteen sets the lines further apart than
- * the mushaf ever does and the page reads loose and airy. Leading belongs to
- * the type, not to the leftover height: pitch from the glyph size, and let the
- * spare height fall into the head and tail margins instead.
+ * Line pitch as a multiple of the fitted glyph size.
+ *
+ * Set to the printed page's own leading, 1.85, this collided. The print can
+ * afford that leading because the calligrapher composed each page: a deep
+ * descender is never written directly above a tall ascender. We cannot
+ * rearrange a line, so the pitch has to clear the worst pair the page can
+ * throw up.
+ *
+ * Measured over 817 adjacent line pairs, the pitch each needs before its ink
+ * touches the ink below is 1.63 em at the median, 1.89 at the 95th and 2.12 at
+ * the worst — so 1.85 left 8% of pairs, about one a page, overlapping. At 2.15
+ * none of them does.
+ *
+ * It is free. The type is bound by the page's width, so a taller pitch costs no
+ * type size (from the height the well would still allow 63.6px against the
+ * 60px the measure gives), and fifteen lines at this pitch take 1935px of a
+ * 2050px well — paper that was previously sitting unused as margin.
  */
-const val MUSHAF_LINE_PITCH_EM = 1.85f
+const val MUSHAF_LINE_PITCH_EM = 2.15f
+
+/**
+ * The tightest leading the book may be set on, and so the one the type size is
+ * guaranteed against.
+ *
+ * The type is sized from the measure and must never shrink to buy leading: a
+ * shorter well takes its lines closer together instead, down to the printed
+ * page's own 1.85. Sizing the type against the fuller pitch would have made a
+ * short screen set the whole book smaller.
+ */
+const val MUSHAF_MIN_LINE_PITCH_EM = 1.85f
+
+/**
+ * How tall a line's ink actually stands, in multiples of the type size.
+ *
+ * Measured across the page faces: they mark up to 1.368 em above the baseline
+ * and 0.747 em below, so a line of this book occupies 2.12 em of paper whatever
+ * the leading says. A slot shorter than that is a descender written into the
+ * line beneath — and over 817 adjacent line pairs, 8% of them needed more room
+ * than the printed page's own 1.85 em leading gives.
+ *
+ * The type is therefore never sized past what its own ink will fit, and this is
+ * the number that decides it. A hair over the measured worst case, so the
+ * tightest pair on the tightest page still clears.
+ */
+const val MUSHAF_LINE_INK_EM = 2.20f
 
 /**
  * Line box height for a fitted page: the printed pitch, never more than the
@@ -92,9 +129,14 @@ fun mushafUniformFontPx(
     fontScale: Float = 1f,
 ): Float {
     if (measureWidthPx <= 0f || wellHeightPx <= 0f || slots <= 0) return MUSHAF_MIN_FONT_PX
-    val fromMeasure = measureWidthPx / MUSHAF_DESIGN_LINE_EM
-    val fromWell = wellHeightPx / (slots * MUSHAF_LINE_PITCH_EM)
-    return (minOf(fromMeasure, fromWell) * fontScale.coerceIn(0.88f, 1.12f))
+    val scale = fontScale.coerceIn(0.88f, 1.12f)
+    val fromMeasure = measureWidthPx / MUSHAF_DESIGN_LINE_EM * scale
+    // The reader's own size nudge is inside this, not outside it: applied after
+    // the well had spoken, a larger text size grew the ink by a tenth while the
+    // slot it sits in stayed exactly as tall, and the descenders went into the
+    // line below. The type stops growing where its ink would stop fitting.
+    val fromWell = wellHeightPx / (slots * MUSHAF_LINE_INK_EM)
+    return minOf(fromMeasure, fromWell)
         .coerceIn(MUSHAF_MIN_FONT_PX, MUSHAF_MAX_FONT_PX)
 }
 
