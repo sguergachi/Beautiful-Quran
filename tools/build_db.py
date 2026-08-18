@@ -431,14 +431,15 @@ QDC_SPLIT_FRAGMENT_RATIO = 0.40  # shorter/longer below this = a split fragment,
 # files still invent flush pairs; apply-time collapse is the safety net,
 # same idea as span-protect.
 CTC_REPEAT_MIN_PAUSE_MS = 300
-# A second-model witness prefers the invented flush pair on these rows.
-# Reciter id, surah, ayah. XLSR 2026-08-17; Alafasy 7:39 also MMS/uroman 2026-08-18.
+# MMS/uroman prefers the invented flush pair on these rows. Arabic XLSR is
+# the model that invented the split, so it is not allowed to keep one.
+# Reciter id, surah, ayah. MMS 2026-08-18 against everyayah audio.
 FLUSH_RESTORE_KEEP_INVENTED = frozenset({
     (1, 7, 39), (1, 7, 158), (1, 13, 25), (1, 20, 58), (1, 23, 50), (1, 25, 9),
     (1, 34, 6), (1, 66, 12),
     (5, 5, 45), (5, 9, 33), (5, 10, 6), (5, 10, 57), (5, 34, 36),
-    (5, 39, 54), (5, 41, 47), (5, 45, 18),
-    (7, 18, 20), (7, 27, 13), (7, 89, 16),
+    (5, 39, 54), (5, 45, 18),
+    (7, 18, 20), (7, 89, 16),
 })
 
 QDC_SPIKE_JUMP = 3  # a forward jump this large that instantly retreats is noise

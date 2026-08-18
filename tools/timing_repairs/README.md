@@ -183,10 +183,13 @@ row; see `repair-preserve-peer-while-filling-word.json`.
 The generator must not emit a `restore` whose new same-word halves sit closer
 than 300 ms (invariant 1 above). Older committed files still do: Hani **66:7**,
 **5:1**, and **33:69** split يَـٰٓأَيُّهَا flush, which the Lab then heard as a
-false orange repeat (#723). `collapse_invented_flush_repeats` merges those
-invented pairs before rebase, so a real paused restore still lands and a
-source peer pair such as Hani 4:4 is untouched. Cases:
-`invented-flush-restore-hani-66-7.json` and siblings.
+false orange repeat (#723). Arabic CTC is **suspect** on that shape — it is
+the model that invented the pair — so a later XLSR score cannot keep one.
+`gen_repairs.py` flags those rows `flush-restore`. Apply-time
+`collapse_invented_flush_repeats` is the safety net; a pair stays only when
+independent MMS/uroman prefers it (`FLUSH_RESTORE_KEEP_INVENTED`). A real
+paused restore still lands, and a source peer pair such as Hani 4:4 is
+untouched. Cases: `invented-flush-restore-hani-66-7.json` and siblings.
 
 ## Retirement policy
 

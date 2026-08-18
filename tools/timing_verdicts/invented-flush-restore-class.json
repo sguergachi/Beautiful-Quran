@@ -1030,6 +1030,62 @@
           }
         ]
       }
+    },
+    "Abdurrahmaan_As-Sudais_192kbps:41:47": {
+      "verdict": "accept",
+      "kinds": [
+        "topology"
+      ],
+      "baselinePayloadHash": "f126496814ee1662552ba36704b680734ad19b38cc42f037ce0a4e03f07e1742",
+      "candidatePayloadHash": "2fbd22360bb468e6500f2115ca3066570eaee72a36972c408bf0824aa466c2e0",
+      "evidence": {
+        "kind": "dual_model_topology",
+        "artifact": "tools/timing_verdicts/invented-flush-restore-class.json",
+        "summary": "CTC restore invented a flush same-word pair (gap < 300 ms) that qdc did not have. Arabic CTC is the model that invented the split, so it is not a witness. Independent MMS/uroman prefers one span.",
+        "audioSha256": "d2dbba409e0861508ffffd6768b237e20fafe389927f1c0eb9abd460700649ac",
+        "waveformVeto": false,
+        "models": [
+          {
+            "name": "mms-uroman-ctc",
+            "baselineScore": -0.098,
+            "candidateScore": -0.059
+          },
+          {
+            "name": "ctc-repeat-vs-split-invariant",
+            "sourceOccurrences": 1,
+            "restoreGapMs": 0,
+            "requiredPauseMs": 300
+          }
+        ]
+      }
+    },
+    "Hani_Rifai_192kbps:27:13": {
+      "verdict": "accept",
+      "kinds": [
+        "topology"
+      ],
+      "baselinePayloadHash": "f31e7996d95fe5b1cf8e5637c648d78eed41bbebbd61b697f2a089dd152abf5e",
+      "candidatePayloadHash": "59720bfa738a772a28911cebf04205a16f3e8bc26d113dddbf6929bc8fce7fc3",
+      "evidence": {
+        "kind": "dual_model_topology",
+        "artifact": "tools/timing_verdicts/invented-flush-restore-class.json",
+        "summary": "CTC restore invented a flush same-word pair (gap < 300 ms) that qdc did not have. Arabic CTC is the model that invented the split, so it is not a witness. Independent MMS/uroman prefers one span.",
+        "audioSha256": "c2088f048fcea66ed680233a252f492a5b1239ae66eded71379c598c765c518b",
+        "waveformVeto": false,
+        "models": [
+          {
+            "name": "mms-uroman-ctc",
+            "baselineScore": -0.124,
+            "candidateScore": -0.109
+          },
+          {
+            "name": "ctc-repeat-vs-split-invariant",
+            "sourceOccurrences": 1,
+            "restoreGapMs": 0,
+            "requiredPauseMs": 300
+          }
+        ]
+      }
     }
   }
 }
