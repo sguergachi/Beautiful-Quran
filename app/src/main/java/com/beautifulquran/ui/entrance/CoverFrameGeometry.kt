@@ -99,10 +99,11 @@ data class CoverFrameGeometry(
  *
  * [density] is px-per-dp. The outer inset scales with the screen radius
  * (~48% of the largest corner) and is clamped so every phone gets a
- * generous gilt margin without flattening the concentric curve. The inner
- * rule sits a fixed gap inside the outer and uses the same [R − D] law,
- * so the pair stays concentric. Corner stars span that gap so they read
- * as pressed seals set into the band, not pinpricks over it.
+ * generous gilt margin. The inner rule uses the same [R − D] law, so
+ * the pair stays concentric. If the 26 dp band would eat the leftover
+ * curve (inner radius 0 → a square opening), the margin, then the gap,
+ * shrink so the inner rule keeps a visible concentric fillet. Corner
+ * stars span that gap so they read as pressed seals set into the band.
  */
 fun coverFrameGeometry(
     screen: ScreenCornerRadiiPx,
@@ -110,21 +111,38 @@ fun coverFrameGeometry(
 ): CoverFrameGeometry {
     val minInset = 22f * density
     val maxInset = 40f * density
+    val minOuterInset = 12f * density
+    val minGap = 16f * density
+    val minInnerR = 8f * density
     // The border zone between the two rules carries the generated frieze —
-    // a real mushaf border band, not a pinstripe — so the gap is generous.
-    val ruleGap = 26f * density
+    // a real mushaf border band, not a pinstripe — so the gap starts generous.
+    var ruleGap = 26f * density
     // Sharp-cornered surfaces still need a designed frame; invent a modest
     // radius so the gilt rule does not collapse to a hard rectangle.
     val fallbackR = 36f * density
     val designR = if (screen.max > 0f) screen.max else fallbackR
+    // Size the leftover curve from the tightest real corner so no side
+    // of the inner rule squares off.
+    val positives = listOf(
+        screen.topLeft, screen.topRight, screen.bottomRight, screen.bottomLeft,
+    ).filter { it > 0f }
+    val curveR = if (positives.isEmpty()) fallbackR else positives.min()
 
     // Leave at least ~45% of the design radius on the outer rule so the
     // corner still reads as a curve, not a clipped square.
-    val outerInset = (designR * 0.48f)
+    var outerInset = (designR * 0.48f)
         .coerceIn(minInset, maxInset)
         .coerceAtMost(designR * 0.55f)
-    // The inner rule sits the full band gap inside; concentric() floors its
-    // corner radius at zero when the curve is used up.
+    // A 26 dp band on a ~50 dp phone eats R − outerInset and the inner
+    // rule becomes a square. Pull the outer rule toward the edge, then
+    // slim the band, until the inner fillet keeps [minInnerR].
+    val room = curveR - minInnerR
+    if (room >= minOuterInset + minGap && outerInset + ruleGap > room) {
+        outerInset = (room - ruleGap).coerceAtLeast(minOuterInset)
+        if (outerInset + ruleGap > room) {
+            ruleGap = (room - outerInset).coerceAtLeast(minGap)
+        }
+    }
     val innerInset = outerInset + ruleGap
 
     // Corner seals are hubs of the border band, not stamps in the margin:

@@ -50,7 +50,7 @@ class CoverFrameGeometryTest {
         val g = coverFrameGeometry(ScreenCornerRadiiPx.Zero, density)
         assertTrue(g.outerInsetPx > 0f)
         assertTrue(g.outerCorners.topLeft > 0f)
-        assertTrue(g.innerCorners.topLeft >= 0f)
+        assertTrue(g.innerCorners.topLeft > 0f)
         assertTrue(g.innerInsetPx > g.outerInsetPx)
         assertTrue(g.starRadiusPx > 0f)
         assertEquals(g.innerInsetPx - g.outerInsetPx, g.starRadiusPx * 2f, 0.01f)
@@ -74,11 +74,17 @@ class CoverFrameGeometryTest {
     }
 
     @Test
-    fun `typical phone gets a generous margin and band-sized corner seals`() {
-        // ~50 dp corner at xxhdpi — common modern phone silhouette.
+    fun `typical phone keeps a concentric inner curve`() {
+        // ~50 dp corner at xxhdpi — the 26 dp band used to eat the leftover
+        // radius and square the inner rule.
         val screen = ScreenCornerRadiiPx(150f, 150f, 150f, 150f)
         val g = coverFrameGeometry(screen, density)
-        assertTrue(g.outerInsetPx >= 22f * density * 0.99f)
+        assertTrue(g.innerCorners.topLeft >= 8f * density - 0.01f)
+        assertEquals(
+            g.outerCorners.topLeft - (g.innerInsetPx - g.outerInsetPx),
+            g.innerCorners.topLeft,
+            0.01f,
+        )
         assertSealInsideBand(g)
     }
 
