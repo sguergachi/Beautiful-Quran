@@ -168,8 +168,8 @@ fun GildedRosette(
  * full-bleed on the cover.
  *
  * [geometry] is the concentric inset/radius set derived from the display's
- * corner radii ([com.beautifulquran.ui.entrance.coverFrameGeometry]) so the
- * gilt rule shares the phone's silhouette rather than a fixed square frame.
+ * corner radii ([com.beautifulquran.ui.entrance.coverFrameGeometry]) so
+ * both gilt rules share the phone's silhouette.
  */
 @Composable
 fun MushafCoverFrame(

@@ -67,10 +67,11 @@ export function coverLayout(width: number, height: number): CoverLayout {
   const ruleGap = clamp(unit * 1.95, 18, outerInset * 0.85)
   const innerInset = outerInset + ruleGap
 
-  // Concentric radii from an invented design corner (~7.5% of short).
+  // Band width is fixed. Only the inner corner radius changes:
+  // inner = outer − gap, floored so the opening does not square off.
   const designR = short * 0.075
   const outerRadius = Math.max(0, designR - outerInset * 0.15)
-  const innerRadius = Math.max(0, outerRadius - ruleGap * 0.55)
+  const innerRadius = Math.max(20, outerRadius - ruleGap)
 
   // Corner seals: diameter ≈ 1.35–1.5× outer inset — pressed into the margin,
   // not pinpricks. Floor so small boards still read as seals.

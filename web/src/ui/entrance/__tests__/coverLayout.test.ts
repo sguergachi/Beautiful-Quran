@@ -7,6 +7,10 @@ describe('coverLayout', () => {
     const sheet = coverLayout(896, 900)
 
     expect(phone.outerInset).toBeGreaterThan(18)
+    expect(phone.innerRadius).toBeCloseTo(
+      Math.max(20, phone.outerRadius - (phone.innerInset - phone.outerInset)),
+      5,
+    )
     expect(phone.starSize).toBeGreaterThan(phone.outerInset)
     expect(phone.starSize).toBeLessThan(phone.outerInset * 1.7)
     expect(phone.innerInset).toBeGreaterThan(phone.outerInset)

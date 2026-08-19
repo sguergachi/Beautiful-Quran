@@ -123,9 +123,10 @@ const TAU = 2 * Math.PI
 const ROT0 = -Math.PI / 2
 
 /**
- * Corner-seal ring radius in the unit box. Renderers terminate the border
- * band's runs against this ring (rim = radius × seal diameter), so it is
- * part of the seal ↔ border contract on both platforms.
+ * Construction radius in the unit box where the seal's bezel cusps sit.
+ * The band's rails already are the inner/outer of the border; a drawn
+ * circle here would be a third hoop around the star. The constant stays
+ * so the bezel and the band still meet.
  */
 export const SEAL_RING_RADIUS = 0.46
 
@@ -367,11 +368,12 @@ function generateMedallion(rng: Mulberry32): RosetteSpec {
 
 /**
  * The corner seal — a late-inking small star of the medallion's family
- * (never 6-fold: that would force the hexagram) inside a mandatory ring,
- * wrapped in a four-petal ogee bezel whose tips lie on the compass axes.
- * Two of those tips aim straight down the border band's two runs at each
- * corner — the band's channel tapers onto them — so seal and border are
- * one piece of geometry, not a stamp over a strip.
+ * (never 6-fold: that would force the hexagram), wrapped in a four-petal
+ * ogee bezel whose tips lie on the compass axes. Two of those tips aim
+ * straight down the border band's two runs at each corner — the band's
+ * channel tapers onto them — so seal and border are one piece of geometry,
+ * not a stamp over a strip. No enclosing circle: the frame's two gilt
+ * rules are already the band's inner and outer.
  */
 function generateSeal(rng: Mulberry32, fold: number): RosetteSpec {
   let m = fold >= 12 ? fold / 2 : fold
@@ -382,8 +384,7 @@ function generateSeal(rng: Mulberry32, fold: number): RosetteSpec {
   const tip = rng.range(0.58, 0.66)
 
   const strokes: OrnamentStroke[] = []
-  strokes.push(circleStroke(SEAL_RING_RADIUS, m * 12, 'hairline'))
-  // Bezel cusps on the diagonals, on the ring itself; tips on the axes.
+  // Bezel cusps on the diagonals at SEAL_RING_RADIUS; tips on the axes.
   strokes.push(corollaStroke(4, SEAL_RING_RADIUS, tip, ROT0 - Math.PI / 4, 'hairline'))
   strokes.push(...starPolygons(m, k, starR, ROT0, 'hairline'))
   const n = strokes.length
