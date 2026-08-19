@@ -153,6 +153,48 @@ class MushafPageDialTest {
     }
 
     @Test
+    fun `coming off the line the finger pressed on is leaving, either way`() {
+        // The rule is the instrument. There is nothing above or below it to
+        // aim at, so travel across it can only mean the reader is done — and
+        // it is read as a displacement from the press, so a slow deliberate
+        // lift counts exactly as much as a flick.
+        val press = 2143f
+        val stray = 74f
+        assertTrue(mushafDialStrayed(press - stray - 1f, press, stray))
+        assertTrue(mushafDialStrayed(press + stray + 1f, press, stray))
+        // Ordinary drift along a scrub is still on the line.
+        assertFalse(mushafDialStrayed(press, press, stray))
+        assertFalse(mushafDialStrayed(press - stray * 0.5f, press, stray))
+        assertFalse(mushafDialStrayed(press + stray * 0.5f, press, stray))
+    }
+
+    @Test
+    fun `the stray band clears the grab strip's own half-height`() {
+        // Inside the strip the finger is still on the rule it took hold of.
+        // If the band were narrower than the paper the reader is allowed to
+        // press, a scrub could end itself without the hand leaving the target.
+        assertTrue(MushafDialStray > MushafDialTouch / 2f)
+    }
+
+    @Test
+    fun `the run-out resists, so overshooting the last leaf costs nothing`() {
+        // Sweeping down to a chapter's last leaf overshoots the end of the
+        // measure — that is what aiming at an end looks like. Crossing starts
+        // a clock; coming back inside is what clears it, and the caller does
+        // that by resetting the count, so a brush past never reaches here.
+        assertFalse(mushafDialShouldLeaveTrough(0f, false))
+        assertFalse(mushafDialShouldLeaveTrough(MUSHAF_DIAL_RUNOUT_S * 0.5f, false))
+        assertTrue(mushafDialShouldLeaveTrough(MUSHAF_DIAL_RUNOUT_S, false))
+        assertTrue(mushafDialShouldLeaveTrough(MUSHAF_DIAL_RUNOUT_S * 2f, false))
+        // Straying takes no dwell at all: the two ways out are weighted
+        // differently on purpose, and this is the asymmetry.
+        assertTrue(mushafDialShouldLeaveTrough(0f, true))
+        // And the resistance is a beat, not a wait — under the hold that
+        // opened the trough, or leaving would cost more than arriving.
+        assertTrue(MUSHAF_DIAL_RUNOUT_S in 0.1f..MUSHAF_DIAL_HOLD_S)
+    }
+
+    @Test
     fun `the speed estimate converges on what the finger is doing`() {
         var speed = 0f
         repeat(40) { speed = mushafDialSpeed(speed, 800f, 0.016f) }

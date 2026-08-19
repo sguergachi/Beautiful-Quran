@@ -144,15 +144,23 @@ moved; so the difference is captured at the click and paid off underneath the
 opening animation. The leaf under the thumb when the trough opens is the leaf
 that was under it when the hold began.
 
-**Two things close it.** Letting go — the reader has chosen. Or carrying the
-finger off either end of the trough's measure: the chapter has run out and the
-reader is asking for the book back. So the chapter's leaves stop short of the
-rule's ends, and what stands beyond the last of them at each side is the
-**run-out** — a hand's width of bare rule that is nothing but the way out.
-Reaching the last leaf and sitting on it is normal and does nothing; crossing
-past it is the ask. Either way the trough collapses back into the hairline,
-which is how the reader sees they are back at chapters, and the same line that
-let them out keeps them out until the hand is back over the measure.
+**Three things close it, and all three are places.** Letting go — the reader
+has chosen. Carrying the finger off either end of the trough's measure: the
+chapter's leaves stop short of the rule's ends, and what stands beyond the last
+of them at each side is the **run-out**, a hand's width of bare rule that is
+nothing but the way out. Or coming off the line the finger pressed on at all —
+up onto the leaf, down into the transport — which is the **stray**.
+
+The last two are not weighted the same, and the asymmetry is the design. The
+end of the measure is somewhere the reader legitimately aims: the chapter's
+last leaf sits right against it, and a sweep down to that leaf overshoots. So
+the run-out **resists** — crossing it starts a beat rather than firing, and
+coming back inside clears the beat, which is what makes an overshoot free.
+Across the rule there is nothing to aim at; the line *is* the instrument, so
+leaving it counts at once, and it is read as a displacement from the press so
+that a slow deliberate lift works as well as a flick. Either way the trough
+collapses back into the hairline, and the same pair that let the reader out
+keeps it shut until the hand is back on the line and over the measure.
 
 **Speed does not close it**, and this is the correction to an earlier rule that
 said it did. Moving off at pace looked like "the reader is steering again", but

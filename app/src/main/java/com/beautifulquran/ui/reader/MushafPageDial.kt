@@ -91,15 +91,26 @@ import kotlin.math.roundToInt
  * offset carried at entry and decayed away underneath the animation buys that.
  * Coming back out is the same sentence read backwards.
  *
- * Two things close it: letting go, and carrying the finger off either end of
- * the measure — which is what running out of chapter feels like from inside
- * the trough, and is the way back to the whole book. So the chapter's leaves
- * stop short of the rule's ends and leave a run-out of bare rule beyond the
- * last of them at each side; crossing into it is leaving. Speed is not one of
- * the two. A reader working quickly inside a long chapter is doing the tier's
- * own job, and taking the tier away for it made the dial something you had to
- * move gingerly in. Either way the trough collapses back into the hairline,
- * which is how the reader is told the ground has changed back.
+ * Three things close it, and speed is not one of them. A reader working
+ * quickly inside a long chapter is doing the tier's own job, and taking the
+ * tier away for it made the dial something you had to move gingerly in. The
+ * three are all places, not paces.
+ *
+ * Letting go — the reader has chosen. Carrying the finger off either end of
+ * the measure: the chapter's leaves stop short of the rule's ends and leave a
+ * *run-out* of bare rule beyond the last of them at each side, and staying out
+ * there is running out of chapter. Or coming off the line the finger pressed
+ * on at all, up onto the leaf or down into the transport — the *stray*.
+ *
+ * The last two are weighted differently, because they are not the same kind of
+ * boundary. The end of the measure is somewhere the reader legitimately aims:
+ * the chapter's last leaf lives right against it, and a sweep down to that leaf
+ * overshoots. So going past has to be *held* for a beat to count, and coming
+ * back inside clears the count — the overshoot costs nothing. Across the rule
+ * there is nothing to aim at, so the stray takes effect at once. Either way the
+ * trough collapses back into the hairline, which is how the reader is told the
+ * ground has changed back, and the same pair keeps it shut until the hand is
+ * back on the line and over the measure.
  *
  * Which leaves the thumb somewhere to be. In the chapter tier a gain that is
  * not 1:1 cannot both keep the thumb under the finger and keep it at the
@@ -150,6 +161,45 @@ internal const val MUSHAF_DIAL_HOLD_S = 0.26f
  * leaf behind it, is what running out of chapter looks like.
  */
 internal val MushafDialRunOut = 26.dp
+
+/**
+ * How far off the line the finger pressed on it may drift, in dp, before the
+ * trough takes that as leaving too.
+ *
+ * The run-out is the way out along the rule; this is the way out across it,
+ * and it is the shorter one. A reader deep in a long chapter should not have
+ * to walk to an end of the measure to be given the book back — lifting away
+ * from the line is the same thought, said with the hand they already have on
+ * the glass, and it does not cost them the place they were looking at on the
+ * way past.
+ *
+ * Measured from the press, not from the last frame: what is being asked is
+ * "have you left the line you took hold of", which is a displacement. A rate
+ * would be a speed test again, and a slow deliberate lift away is exactly the
+ * gesture that has to work. It sits outside the grab strip's own half-height,
+ * so ordinary drift along a scrub — a thumb rolling as the arm extends — is
+ * still on the line.
+ */
+internal val MushafDialStray = 28.dp
+
+/**
+ * How long the finger has to stay out in the run-out, in seconds, before the
+ * trough actually gives way.
+ *
+ * The run-out's width is room to aim; this is its resistance. A sweep down the
+ * last few leaves of a chapter overshoots the end of the measure — that is
+ * what aiming at an end looks like — and the reader who then comes back to the
+ * leaf they wanted should find the trough where they left it, not the whole
+ * book. So crossing the line starts a clock rather than firing, and coming
+ * back inside stops and clears it.
+ *
+ * Short enough that leaving is one continuous motion and not a wait: by the
+ * time a hand that means it has arrived and stopped, this is already spent.
+ * The stray test does not take it — coming off the line is unambiguous, and
+ * making the reader hold a lifted thumb in mid-drift would be resistance
+ * against nothing.
+ */
+internal const val MUSHAF_DIAL_RUNOUT_S = 0.18f
 
 /**
  * How fast the estimate follows a hand that is speeding up, in seconds.
@@ -225,6 +275,37 @@ internal fun mushafDialPastTrough(xPx: Float, widthPx: Float, troughInsetPx: Flo
     val inset = troughInsetPx.coerceIn(0f, widthPx / 2f)
     return xPx < inset || xPx > widthPx - inset
 }
+
+/**
+ * Whether a finger at [yPx] has come off the line it pressed on at
+ * [pressYPx], by more than [strayPx].
+ *
+ * The other half of the same rule [mushafDialPastTrough] states: the trough
+ * lives in a place, and a hand that is not in that place is not in the
+ * trough. Either direction, because the rule has a leaf above it and the
+ * transport below, and reaching for either is the same "I am done here".
+ *
+ * It reads a displacement from the press rather than a movement between
+ * frames on purpose. A rate would be the speed test this replaced wearing a
+ * second hat, and would punish the slow deliberate lift away — which is the
+ * gesture, not the accident.
+ */
+internal fun mushafDialStrayed(yPx: Float, pressYPx: Float, strayPx: Float): Boolean =
+    abs(yPx - pressYPx) > strayPx
+
+/**
+ * The whole close law: whether a hand that has been in the run-out for
+ * [runOutSeconds], and is or is not [strayed] off the line, has left.
+ *
+ * The two ways out are not weighted the same, and that asymmetry is the
+ * point. Along the rule, the end of the measure is somewhere the reader
+ * legitimately aims — the last leaf of the chapter lives right against it —
+ * so going past has to be held to count, and a moment out there on the way to
+ * that leaf costs nothing. Across the rule there is nothing to aim at: the
+ * line is the instrument, and coming off it can only mean leaving.
+ */
+internal fun mushafDialShouldLeaveTrough(runOutSeconds: Float, strayed: Boolean): Boolean =
+    strayed || runOutSeconds >= MUSHAF_DIAL_RUNOUT_S
 
 /**
  * Whether a haptic tick is due, given the hand has travelled [travelDp] and
@@ -375,7 +456,7 @@ private val MushafDialChapterTick = 5.dp
 /** A leaf in the open trough: taller, because now it is the thing being aimed at. */
 private val MushafDialPageTick = 7.dp
 /** The grab strip: a tap target's worth of paper hung around the rule. */
-private val MushafDialTouch = 40.dp
+internal val MushafDialTouch = 40.dp
 /** How far that strip reaches up into the leaf's tail, clear of the last line. */
 private val MushafDialTouchLift = 14.dp
 /** Paper between the top of the comb and the foot of the label. */
@@ -706,6 +787,13 @@ internal fun MushafPageDial(
                         val insetPx = MushafDialEdgeInset.toPx()
                         val widthPxNow = size.width.toFloat()
                         val troughInsetPx = insetPx + MushafDialRunOut.toPx()
+                        val strayPx = MushafDialStray.toPx()
+                        // The line the reader took hold of. Fixed for the
+                        // whole gesture: the question the stray test asks is
+                        // whether they have left it, and a reference that
+                        // crept along with the finger could not be left.
+                        val pressY = down.position.y
+                        var handY = pressY
                         var lastX = down.position.x
                         // What the hand has travelled since the meter last
                         // looked, in dp. The pointer loop fills it; the frame
@@ -722,6 +810,9 @@ internal fun MushafPageDial(
                         // the click would move the book under a still hand.
                         var settleOffset = 0f
                         var heldS = 0f
+                        // How long the hand has been out in the run-out. The
+                        // width of it is room to aim; this is its resistance.
+                        var runOutS = 0f
                         var travelDp = 0f
                         var sinceTickS = 0f
                         var lastChapter = mushafDialChapterRun(
@@ -766,6 +857,19 @@ internal fun MushafPageDial(
                                 travelDp += abs(dxDp)
                                 sinceTickS += dt
                                 val handPx = handX.floatValue
+                                // Out along the rule, or off across it. The
+                                // trough is a place; both of these say the
+                                // hand is no longer in it, and the same pair
+                                // that lets the reader out keeps them out
+                                // until they are back on the line and over the
+                                // measure. Only the leaving is weighted — the
+                                // guard takes either at once, because a hand
+                                // that is out there is over no leaf whether it
+                                // has been for a moment or a second.
+                                val past =
+                                    mushafDialPastTrough(handPx, widthPxNow, troughInsetPx)
+                                val strayed = mushafDialStrayed(handY, pressY, strayPx)
+                                runOutS = if (past) runOutS + dt else 0f
                                 if (open) {
                                     // Absolute, inside the chapter: the finger
                                     // names a place between the two ends.
@@ -778,7 +882,7 @@ internal fun MushafPageDial(
                                         troughRun.last.toFloat(),
                                     )
                                     dialPage.floatValue = raw
-                                    if (mushafDialPastTrough(handPx, widthPxNow, troughInsetPx)) {
+                                    if (mushafDialShouldLeaveTrough(runOutS, strayed)) {
                                         open = false
                                         trough = false
                                         heldS = 0f
@@ -827,15 +931,14 @@ internal fun MushafPageDial(
                                 // stillness is what the top of every stroke
                                 // looks like.
                                 heldS = if (abs(speed) < MUSHAF_DIAL_HOLD_DP_S) heldS + dt else 0f
-                                // The same line that shut it also keeps it
+                                // The same pair that shut it also keeps it
                                 // shut. A finger that has just carried off an
-                                // end is sitting in the run-out and holding
-                                // perfectly still, and the trough it left has
-                                // no leaf out there to open onto; it re-opens
-                                // once the hand is back over the measure.
-                                if (!mushafDialPastTrough(handPx, widthPxNow, troughInsetPx) &&
-                                    mushafDialShouldOpen(speed, heldS)
-                                ) {
+                                // end, or lifted away from the line, is
+                                // holding perfectly still out there and the
+                                // trough it left has no leaf under it; it
+                                // re-opens once the hand is back on the line
+                                // and over the measure.
+                                if (!past && !strayed && mushafDialShouldOpen(speed, heldS)) {
                                     // Enter on the leaf the hand is actually
                                     // on, and let the trough's absolute scale
                                     // arrive underneath it.
@@ -858,6 +961,11 @@ internal fun MushafPageDial(
                             if (!change.pressed) break
                             val dxPx = change.position.x - lastX
                             lastX = change.position.x
+                            // Read but never clamped: how far off the line the
+                            // hand has gone is the whole question, so the
+                            // travel that leaves the strip is the travel that
+                            // matters. The meter drains it.
+                            handY = change.position.y
                             handX.floatValue =
                                 mushafDialClampToTrack(change.position.x, widthPxNow, insetPx)
                             if (dxPx == 0f) continue
