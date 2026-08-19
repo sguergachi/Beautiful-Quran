@@ -480,11 +480,21 @@ class MushafPageDialTest {
 
     @Test
     fun `the label names a chapter in the comb, and the leaf itself in the trough`() {
-        val leaf = MushafDialLabel(chapter = "Al-Baqarah", fromAyah = 6, toAyah = 16)
-        assertEquals("Al-Baqarah", mushafDialLabelText(leaf, zoomed = false, page = 42))
-        assertEquals("Al-Baqarah 6–16  ·  42", mushafDialLabelText(leaf, zoomed = true, page = 42))
+        val leaf = MushafDialLabel(number = 2, chapter = "Al-Baqarah", fromAyah = 6, toAyah = 16)
+        assertEquals("2  Al-Baqarah", mushafDialLabelHead(leaf, zoomed = false, page = 42))
+        assertEquals("Al-Baqarah  ·  pg. 42", mushafDialLabelHead(leaf, zoomed = true, page = 42))
+        assertEquals("Ayah 6–16", mushafDialLabelFoot(leaf, zoomed = true))
         // A leaf holding one verse says one number, not "282-282".
-        val long = MushafDialLabel(chapter = "Al-Baqarah", fromAyah = 282, toAyah = 282)
-        assertEquals("Al-Baqarah 282  ·  49", mushafDialLabelText(long, zoomed = true, page = 49))
+        val one = MushafDialLabel(number = 2, chapter = "Al-Baqarah", fromAyah = 282, toAyah = 282)
+        assertEquals("Ayah 282", mushafDialLabelFoot(one, zoomed = true))
+    }
+
+    @Test
+    fun `the comb keeps the verse line's paper without writing on it`() {
+        // The head must not move when the trough opens, so the foot is empty
+        // rather than absent at chapter tier — the Column reserves both lines
+        // either way.
+        val leaf = MushafDialLabel(number = 2, chapter = "Al-Baqarah", fromAyah = 6, toAyah = 16)
+        assertEquals("", mushafDialLabelFoot(leaf, zoomed = false))
     }
 }

@@ -802,6 +802,7 @@ fun ReaderScreen(
             val surah = mushafUi?.surahsById?.get(leaf.primarySurahId) ?: return@label null
             val ayahs = leaf.ayahKeys.filter { it.first == leaf.primarySurahId }.map { it.second }
             MushafDialLabel(
+                number = leaf.primarySurahId,
                 chapter = surah.nameTransliteration,
                 fromAyah = ayahs.minOrNull() ?: 1,
                 toAyah = ayahs.maxOrNull() ?: 1,

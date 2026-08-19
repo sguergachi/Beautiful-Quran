@@ -10,10 +10,12 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.requiredHeight
+import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.systemGestureExclusion
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -455,32 +457,48 @@ internal fun mushafDialTrackFraction(xPx: Float, widthPx: Float, insetPx: Float)
 }
 
 /**
- * What the dial writes over the thumb: the leaf's chapter, and the run of
- * verses the leaf holds.
+ * What the dial writes over the thumb: the leaf's chapter, by number and by
+ * name, and the run of verses the leaf holds.
  *
  * The range is only printed once the trough is open and a single leaf is a
- * thing the hand can aim at — see [mushafDialLabelText].
+ * thing the hand can aim at — see [mushafDialLabelFoot].
  */
-internal data class MushafDialLabel(val chapter: String, val fromAyah: Int, val toAyah: Int)
+internal data class MushafDialLabel(
+    val number: Int,
+    val chapter: String,
+    val fromAyah: Int,
+    val toAyah: Int,
+)
 
 /**
- * The label over the thumb, at the granularity the dial is actually working at.
+ * The line the label always writes, at the granularity the dial is working at.
  *
- * Chapter tier, the chapter alone. The reader crossing the book is steering by
- * chapters, and a verse range that turns over between every pair of frames is
- * not something anyone reads — worse, it invites them to aim with it.
+ * Chapter tier, the chapter and nothing else — but by its number as well as its
+ * name, set the way the index sets them, because a reader crossing the book at
+ * this speed is counting chapters and the number is the thing they are counting.
  *
- * In the trough the leaf itself is the target, so the label names the leaf the
- * way the leaf names itself: its folio, and the verses standing on it. The
- * chapter stays at the front because the trough is a magnification of one, and
- * a number alone would leave the reader with nothing to check it against.
+ * In the trough the leaf is the target, so the head names the leaf: the chapter
+ * it stands in, then its folio. The chapter stays at the front because the
+ * trough is a magnification of one, and a folio alone would leave the reader
+ * with nothing to check it against.
  */
-internal fun mushafDialLabelText(label: MushafDialLabel, zoomed: Boolean, page: Int): String {
-    if (!zoomed) return label.chapter
+internal fun mushafDialLabelHead(label: MushafDialLabel, zoomed: Boolean, page: Int): String =
+    if (zoomed) "${label.chapter}  ·  pg. $page" else "${label.number}  ${label.chapter}"
+
+/**
+ * The line only the trough writes: the verses standing on the leaf.
+ *
+ * At chapter tier it is empty rather than absent. The label keeps both lines'
+ * worth of paper at either tier, so opening the trough writes into the gap the
+ * head was already sitting above instead of shoving the head upward — the type
+ * over a thumb should not jump when the comb does.
+ */
+internal fun mushafDialLabelFoot(label: MushafDialLabel, zoomed: Boolean): String {
+    if (!zoomed) return ""
     val verses =
         if (label.toAyah <= label.fromAyah) "${label.fromAyah}"
         else "${label.fromAyah}–${label.toAyah}"
-    return "${label.chapter} $verses  ·  $page"
+    return "Ayah $verses"
 }
 
 /**
@@ -833,14 +851,17 @@ internal fun MushafPageDial(
             // behind it is a card, and the leaf does not carry cards. It takes
             // the transport's own small hand, because it stands on the
             // transport's paper rather than on the leaf.
-            Text(
-                text = mushafDialLabelText(hud, trough, hudPage),
-                style = MaterialTheme.typography.labelSmall.copy(letterSpacing = 0.08.em),
-                color = ink.copy(alpha = 0.72f),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
+            val hudType = MaterialTheme.typography.labelSmall.copy(letterSpacing = 0.08.em)
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier
                     .align(Alignment.TopStart)
+                    // Measured out of the slot's reach. The dial's own band is
+                    // 13 dp — a hairline's worth — and the label does not live
+                    // in it; it stands on the leaf's bottom margin above. Left
+                    // to the slot's constraints the second line has nowhere to
+                    // be measured into and silently collapses to nothing.
+                    .wrapContentSize(Alignment.TopStart, unbounded = true)
                     .onSizeChanged {
                         hudWidthPx = it.width
                         hudHeightPx = it.height
@@ -849,14 +870,42 @@ internal fun MushafPageDial(
                         // Over the thumb, which is over the finger.
                         val left = (handX.floatValue - hudWidthPx / 2f)
                             .coerceIn(0f, (widthPx - hudWidthPx).coerceAtLeast(0).toFloat())
-                        IntOffset(
-                            left.roundToInt(),
-                            -(hudHeightPx + MushafDialHudAir.toPx() + MushafDialPageTick.toPx())
-                                .roundToInt(),
-                        )
+                        // Clear of the tallest tick, and measured from the
+                        // rule rather than from the top of the slot. The slot
+                        // carries paper above the rule that the label was
+                        // being lifted over as well, and a two-line label
+                        // lifted that far lands on the leaf's last line of
+                        // script. Held off the rule itself, it sits in the
+                        // margin the folio stands in — which is the one thing
+                        // on the leaf the label is already saying.
+                        val foot = MushafDialRuleY.toPx() -
+                            MushafDialPageTick.toPx() -
+                            MushafDialHudAir.toPx()
+                        IntOffset(left.roundToInt(), (foot - hudHeightPx).roundToInt())
                     }
                     .graphicsLayer { alpha = expand.value },
-            )
+            ) {
+                Text(
+                    text = mushafDialLabelHead(hud, trough, hudPage),
+                    style = hudType,
+                    color = ink.copy(alpha = 0.72f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                // The verses sit under the leaf's own name and are read after
+                // it, so they are set below it in the lighter ink the running
+                // head uses for everything subordinate.
+                Text(
+                    // A hard space when there is nothing to say: an empty
+                    // string measures to no line at all, and the reservation
+                    // the two-line label depends on would collapse with it.
+                    text = mushafDialLabelFoot(hud, trough).ifEmpty { " " },
+                    style = hudType,
+                    color = ink.copy(alpha = 0.48f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
         // The grab strip. It hangs around the rule rather than replacing it:
         // the rule keeps the band it has always had, and the paper the finger
