@@ -1,0 +1,22 @@
+{
+  "id": "false-peer-split-hani-66-6",
+  "label": "Hani 66:6 first لَّا is a false lead; شداد owns that interval",
+  "refs": ["GitHub issue #721", "ear + waveform: 19700-20700 is still voiced شداد"],
+  "pipeline": "timing_correction",
+  "correction_position": 15,
+  "requires_audio_verdict": true,
+  "notes": "qdc/shipped label a pause-less 1000+1080 ms pair as لَّا,لا. CTC unsplits (one utterance) but peer-protect keeps both because both halves are substantial — the Hani 4:4 fence. Lab deleted the first 15 and left a gap. Energy is continuous through 15a, so the class op gives that lead to word 14 (شداد) and keeps one لَّا. Word 7 نارا,نارا is a real re-say and is untouched.",
+  "input_segments": [
+    [13, 17730, 19150],
+    [14, 19150, 19700],
+    [15, 19700, 20700],
+    [15, 20700, 21780],
+    [16, 21780, 22800]
+  ],
+  "expected_segments": [
+    [13, 17730, 19150],
+    [14, 19150, 20700],
+    [15, 20700, 21780],
+    [16, 21780, 22800]
+  ]
+}

@@ -1,0 +1,792 @@
+{
+  "schemaVersion": 1,
+  "baseline": {
+    "commit": "9e0dc4b45462ce593a287363e4e96224c0aea313",
+    "databaseSha256": "74cc1ed57045b3e76a6d065b85c2a764763b0601dc4d5502ce58c081fc1d3d09"
+  },
+  "verdicts": {
+    "Alafasy_128kbps:15:7": {
+      "verdict": "accept",
+      "kinds": [
+        "timestamp"
+      ],
+      "baselinePayloadHash": "646c68119984a9c130cfd4008f063c512a43ca2a391cfaf28c297955ce16b7cf",
+      "candidatePayloadHash": "85761c0cd59c0e02f359e59e6ec1b19cecc8349d153de0f1eff68052d892d987",
+      "evidence": {
+        "kind": "dual_model_boundary",
+        "artifact": "tools/timing_verdicts/qdc-fused-ma-class.json",
+        "summary": "qdc times وَمَا+لِيَ (or لو+ما / ما+منا) as two words; QAC writes one. Clamping the extra last index invented a flush pair and skipped the real next word. Fold the extra token at the glued ما.",
+        "audioSha256": "01a7ad6851eb12fabbf1e4e56a07a264b67ff3a7f63ca047295934405dda7284",
+        "waveformVeto": false,
+        "models": [
+          {
+            "name": "qdc-fused-ma",
+            "qdcPositions": 8,
+            "qacWords": 7,
+            "fusePosition": 1
+          },
+          {
+            "name": "qdc-token-map",
+            "source": "raw qdc 1..n+1 remapped onto QAC n"
+          }
+        ]
+      }
+    },
+    "Alafasy_128kbps:27:20": {
+      "verdict": "accept",
+      "kinds": [
+        "timestamp"
+      ],
+      "baselinePayloadHash": "847e2036b5800043219146392602403f854fa69f85bac20de3ec294b50499c48",
+      "candidatePayloadHash": "1217f2fd23a0e1c9907508958b7cb7f93d87da27122562ba4858788fe29c5048",
+      "evidence": {
+        "kind": "dual_model_boundary",
+        "artifact": "tools/timing_verdicts/qdc-fused-ma-class.json",
+        "summary": "qdc times وَمَا+لِيَ (or لو+ما / ما+منا) as two words; QAC writes one. Clamping the extra last index invented a flush pair and skipped the real next word. Fold the extra token at the glued ما.",
+        "audioSha256": "57541b9d1679636e0cad873ee55655a34c03d71f8f0413a2bb6f798cba38a452",
+        "waveformVeto": false,
+        "models": [
+          {
+            "name": "qdc-fused-ma",
+            "qdcPositions": 12,
+            "qacWords": 11,
+            "fusePosition": 4
+          },
+          {
+            "name": "qdc-token-map",
+            "source": "raw qdc 1..n+1 remapped onto QAC n"
+          }
+        ]
+      }
+    },
+    "Alafasy_128kbps:36:22": {
+      "verdict": "accept",
+      "kinds": [
+        "topology"
+      ],
+      "baselinePayloadHash": "5a3f4a457967bb48256aeedc134a1a821f008dc5af6580fabe5e3db1be7b22e2",
+      "candidatePayloadHash": "b046e4a20c45fc9130a23713d727450fd79b719e12c62219798803bd7cbc4f47",
+      "evidence": {
+        "kind": "dual_model_topology",
+        "artifact": "tools/timing_verdicts/qdc-fused-ma-class.json",
+        "summary": "qdc times وَمَا+لِيَ (or لو+ما / ما+منا) as two words; QAC writes one. Clamping the extra last index invented a flush pair and skipped the real next word. Fold the extra token at the glued ما.",
+        "audioSha256": "ca5b7de52efbf0b38a5e74dcbcf5c56f0d52dd9f076461fc586d7c25829b2e7d",
+        "waveformVeto": false,
+        "models": [
+          {
+            "name": "qdc-fused-ma",
+            "qdcPositions": 8,
+            "qacWords": 7,
+            "fusePosition": 1
+          },
+          {
+            "name": "qdc-token-map",
+            "source": "raw qdc 1..n+1 remapped onto QAC n"
+          }
+        ]
+      }
+    },
+    "Alafasy_128kbps:37:164": {
+      "verdict": "accept",
+      "kinds": [
+        "topology"
+      ],
+      "baselinePayloadHash": "ed7e51482fd041c1d30de1aea8974b0f95485a9db983ae2895115656b82dd7ea",
+      "candidatePayloadHash": "37e10ddf44d67af70e19f2320d14dd97780e1d66627d62e6aa07b080a070a387",
+      "evidence": {
+        "kind": "dual_model_topology",
+        "artifact": "tools/timing_verdicts/qdc-fused-ma-class.json",
+        "summary": "qdc times وَمَا+لِيَ (or لو+ما / ما+منا) as two words; QAC writes one. Clamping the extra last index invented a flush pair and skipped the real next word. Fold the extra token at the glued ما.",
+        "audioSha256": "eb6631816af62e90e425f4df75ef59fdbe3a125f7b2d92f55c6dc63734e56f24",
+        "waveformVeto": false,
+        "models": [
+          {
+            "name": "qdc-fused-ma",
+            "qdcPositions": 6,
+            "qacWords": 5,
+            "fusePosition": 1
+          },
+          {
+            "name": "qdc-token-map",
+            "source": "raw qdc 1..n+1 remapped onto QAC n"
+          }
+        ]
+      }
+    },
+    "Alafasy_128kbps:41:47": {
+      "verdict": "accept",
+      "kinds": [
+        "topology"
+      ],
+      "baselinePayloadHash": "d74bb7b632e3b2845067d52f9937d3f25f1f6d493d49a43c63d44e832811ac78",
+      "candidatePayloadHash": "0b2bd71ac5cd86ca7cd988a362c024a8c20a661aa8b96c0e0057d3f22c4cb7a7",
+      "evidence": {
+        "kind": "dual_model_topology",
+        "artifact": "tools/timing_verdicts/qdc-fused-ma-class.json",
+        "summary": "qdc times وَمَا+لِيَ (or لو+ما / ما+منا) as two words; QAC writes one. Clamping the extra last index invented a flush pair and skipped the real next word. Fold the extra token at the glued ما.",
+        "audioSha256": "ae64d13241a3e855fb7eea0eff87024c3a38d9b69ecfd477859639228e4128d5",
+        "waveformVeto": false,
+        "models": [
+          {
+            "name": "qdc-fused-ma",
+            "qdcPositions": 28,
+            "qacWords": 27,
+            "fusePosition": 25
+          },
+          {
+            "name": "qdc-token-map",
+            "source": "raw qdc 1..n+1 remapped onto QAC n"
+          }
+        ]
+      }
+    },
+    "Husary_64kbps:15:7": {
+      "verdict": "accept",
+      "kinds": [
+        "timestamp"
+      ],
+      "baselinePayloadHash": "3059ee4239d724f534ae8ce55a842712d9968623ac4f54be2eb95040154f4272",
+      "candidatePayloadHash": "cf1119ab7af9dd88212eb62b7f9a538a13ef0bde2c7d0ef41d2ec70ef3d2c953",
+      "evidence": {
+        "kind": "dual_model_boundary",
+        "artifact": "tools/timing_verdicts/qdc-fused-ma-class.json",
+        "summary": "qdc times وَمَا+لِيَ (or لو+ما / ما+منا) as two words; QAC writes one. Clamping the extra last index invented a flush pair and skipped the real next word. Fold the extra token at the glued ما.",
+        "audioSha256": "33fe1745952866d37bf91580efbd138d4411bd6f39093e20ab5e321a750ab50d",
+        "waveformVeto": false,
+        "models": [
+          {
+            "name": "qdc-fused-ma",
+            "qdcPositions": 8,
+            "qacWords": 7,
+            "fusePosition": 1
+          },
+          {
+            "name": "qdc-token-map",
+            "source": "raw qdc 1..n+1 remapped onto QAC n"
+          }
+        ]
+      }
+    },
+    "Husary_64kbps:27:20": {
+      "verdict": "accept",
+      "kinds": [
+        "timestamp"
+      ],
+      "baselinePayloadHash": "4106f1393b26bd4a756b732d12a0694b701eece6eafcd0bd208f07a37848b2cb",
+      "candidatePayloadHash": "5721193cbd91e19015e1ad979d193a9c545c29936e9fbe0ed86b1d05ffd9b7cd",
+      "evidence": {
+        "kind": "dual_model_boundary",
+        "artifact": "tools/timing_verdicts/qdc-fused-ma-class.json",
+        "summary": "qdc times وَمَا+لِيَ (or لو+ما / ما+منا) as two words; QAC writes one. Clamping the extra last index invented a flush pair and skipped the real next word. Fold the extra token at the glued ما.",
+        "audioSha256": "6def32f45ef547d06c9a93d5664f3abb42cbe2d441980da5335e5aa6bc9b0f67",
+        "waveformVeto": false,
+        "models": [
+          {
+            "name": "qdc-fused-ma",
+            "qdcPositions": 12,
+            "qacWords": 11,
+            "fusePosition": 4
+          },
+          {
+            "name": "qdc-token-map",
+            "source": "raw qdc 1..n+1 remapped onto QAC n"
+          }
+        ]
+      }
+    },
+    "Husary_64kbps:36:22": {
+      "verdict": "accept",
+      "kinds": [
+        "topology"
+      ],
+      "baselinePayloadHash": "fa5ab0e66a8c9680191b58c457f83d9b0a3ae54c94e5d73ecad1e751a4d96b29",
+      "candidatePayloadHash": "fa01fdcf556006b0fd421c67f64179a0a6c940008f3290c1e86800390676cd27",
+      "evidence": {
+        "kind": "dual_model_topology",
+        "artifact": "tools/timing_verdicts/qdc-fused-ma-class.json",
+        "summary": "qdc times وَمَا+لِيَ (or لو+ما / ما+منا) as two words; QAC writes one. Clamping the extra last index invented a flush pair and skipped the real next word. Fold the extra token at the glued ما.",
+        "audioSha256": "838fc032646e0b1458448cd1c45af2a5c3a1aadcea6990c293ab3922b22227c0",
+        "waveformVeto": false,
+        "models": [
+          {
+            "name": "qdc-fused-ma",
+            "qdcPositions": 8,
+            "qacWords": 7,
+            "fusePosition": 1
+          },
+          {
+            "name": "qdc-token-map",
+            "source": "raw qdc 1..n+1 remapped onto QAC n"
+          }
+        ]
+      }
+    },
+    "Husary_64kbps:37:164": {
+      "verdict": "accept",
+      "kinds": [
+        "topology"
+      ],
+      "baselinePayloadHash": "b4d1dceb1f9873c20b054faf76cde1cd5128fb2cd11470c9010e21f83db22149",
+      "candidatePayloadHash": "e1fa0877f8de89e7482d4064296fc7c70427e1249186058b87832a03d9b67794",
+      "evidence": {
+        "kind": "dual_model_topology",
+        "artifact": "tools/timing_verdicts/qdc-fused-ma-class.json",
+        "summary": "qdc times وَمَا+لِيَ (or لو+ما / ما+منا) as two words; QAC writes one. Clamping the extra last index invented a flush pair and skipped the real next word. Fold the extra token at the glued ما.",
+        "audioSha256": "b2820cbf01f5e0b45cb65e425e2f12c8df9602a2872f2962d90aa491c7af8c61",
+        "waveformVeto": false,
+        "models": [
+          {
+            "name": "qdc-fused-ma",
+            "qdcPositions": 6,
+            "qacWords": 5,
+            "fusePosition": 1
+          },
+          {
+            "name": "qdc-token-map",
+            "source": "raw qdc 1..n+1 remapped onto QAC n"
+          }
+        ]
+      }
+    },
+    "Husary_64kbps:41:47": {
+      "verdict": "accept",
+      "kinds": [
+        "topology"
+      ],
+      "baselinePayloadHash": "4159df2703dca8d85c2403dd405f01676c2e99039962bb300014867993cfd91d",
+      "candidatePayloadHash": "2fbb10c34e26795d83c637548ae0997952cbf7192ffe5c65a5562e3613029934",
+      "evidence": {
+        "kind": "dual_model_topology",
+        "artifact": "tools/timing_verdicts/qdc-fused-ma-class.json",
+        "summary": "qdc times وَمَا+لِيَ (or لو+ما / ما+منا) as two words; QAC writes one. Clamping the extra last index invented a flush pair and skipped the real next word. Fold the extra token at the glued ما.",
+        "audioSha256": "7169e937fb9f50b1a38f9e85c4ab052fbfefe631310b9b02c23df7496787f539",
+        "waveformVeto": false,
+        "models": [
+          {
+            "name": "qdc-fused-ma",
+            "qdcPositions": 28,
+            "qacWords": 27,
+            "fusePosition": 25
+          },
+          {
+            "name": "qdc-token-map",
+            "source": "raw qdc 1..n+1 remapped onto QAC n"
+          }
+        ]
+      }
+    },
+    "Abdul_Basit_Murattal_64kbps:15:7": {
+      "verdict": "accept",
+      "kinds": [
+        "timestamp"
+      ],
+      "baselinePayloadHash": "5bd36af6d4cb71cb3c43db5d7c03bd48e0ec5ed36c9370eab244d83e4bfc473d",
+      "candidatePayloadHash": "1cfec8f107167fc80bc1fdb3e95bdde248c62daf15aa813d96a18662c2f17e19",
+      "evidence": {
+        "kind": "dual_model_boundary",
+        "artifact": "tools/timing_verdicts/qdc-fused-ma-class.json",
+        "summary": "qdc times وَمَا+لِيَ (or لو+ما / ما+منا) as two words; QAC writes one. Clamping the extra last index invented a flush pair and skipped the real next word. Fold the extra token at the glued ما.",
+        "audioSha256": "8679af5fba50ed27d0e75915170949879470acaecfaba1d23bde24bae65716cd",
+        "waveformVeto": false,
+        "models": [
+          {
+            "name": "qdc-fused-ma",
+            "qdcPositions": 8,
+            "qacWords": 7,
+            "fusePosition": 1
+          },
+          {
+            "name": "qdc-token-map",
+            "source": "raw qdc 1..n+1 remapped onto QAC n"
+          }
+        ]
+      }
+    },
+    "Abdul_Basit_Murattal_64kbps:27:20": {
+      "verdict": "accept",
+      "kinds": [
+        "timestamp"
+      ],
+      "baselinePayloadHash": "285471feb0cc4af733db6dd7d90f257511dd01256f3d1ab2ffb36324a15e03cd",
+      "candidatePayloadHash": "8fb0cb06ca279b4799f5fd19b4ed43c5cc0f5beba1040aa6f1ff0bd364d479c9",
+      "evidence": {
+        "kind": "dual_model_boundary",
+        "artifact": "tools/timing_verdicts/qdc-fused-ma-class.json",
+        "summary": "qdc times وَمَا+لِيَ (or لو+ما / ما+منا) as two words; QAC writes one. Clamping the extra last index invented a flush pair and skipped the real next word. Fold the extra token at the glued ما.",
+        "audioSha256": "81e174b4cc91f7ec31828940c54341175583ea8a0d565a476af917a37f4b8059",
+        "waveformVeto": false,
+        "models": [
+          {
+            "name": "qdc-fused-ma",
+            "qdcPositions": 12,
+            "qacWords": 11,
+            "fusePosition": 4
+          },
+          {
+            "name": "qdc-token-map",
+            "source": "raw qdc 1..n+1 remapped onto QAC n"
+          }
+        ]
+      }
+    },
+    "Abdul_Basit_Murattal_64kbps:36:22": {
+      "verdict": "accept",
+      "kinds": [
+        "topology"
+      ],
+      "baselinePayloadHash": "40aa031ef0788ff5865e9f715345c736dc08f3b3417b5b0268f9628200e91132",
+      "candidatePayloadHash": "c8e91617f37405bebda40b15920a58f0053096cecb98f0029a6807b3d303c32a",
+      "evidence": {
+        "kind": "dual_model_topology",
+        "artifact": "tools/timing_verdicts/qdc-fused-ma-class.json",
+        "summary": "qdc times وَمَا+لِيَ (or لو+ما / ما+منا) as two words; QAC writes one. Clamping the extra last index invented a flush pair and skipped the real next word. Fold the extra token at the glued ما.",
+        "audioSha256": "267d1912259341a217fb25cbf86bf27bc557c93d58cb414825725cd34716b29a",
+        "waveformVeto": false,
+        "models": [
+          {
+            "name": "qdc-fused-ma",
+            "qdcPositions": 8,
+            "qacWords": 7,
+            "fusePosition": 1
+          },
+          {
+            "name": "qdc-token-map",
+            "source": "raw qdc 1..n+1 remapped onto QAC n"
+          }
+        ]
+      }
+    },
+    "Abdul_Basit_Murattal_64kbps:37:164": {
+      "verdict": "accept",
+      "kinds": [
+        "topology"
+      ],
+      "baselinePayloadHash": "0b66c8fb547a1cbfa92b27048b2a6f0604fe20262277cce6cecca74e84d14004",
+      "candidatePayloadHash": "782a789d1a14b386adee6274758a66a1fa9e66b5ffc82432d0d829a05ecc7b00",
+      "evidence": {
+        "kind": "dual_model_topology",
+        "artifact": "tools/timing_verdicts/qdc-fused-ma-class.json",
+        "summary": "qdc times وَمَا+لِيَ (or لو+ما / ما+منا) as two words; QAC writes one. Clamping the extra last index invented a flush pair and skipped the real next word. Fold the extra token at the glued ما.",
+        "audioSha256": "135dcad3947d36f5dd54a0baccc8c07b41324b5b313b052511b4784066267935",
+        "waveformVeto": false,
+        "models": [
+          {
+            "name": "qdc-fused-ma",
+            "qdcPositions": 6,
+            "qacWords": 5,
+            "fusePosition": 1
+          },
+          {
+            "name": "qdc-token-map",
+            "source": "raw qdc 1..n+1 remapped onto QAC n"
+          }
+        ]
+      }
+    },
+    "Abdul_Basit_Murattal_64kbps:41:47": {
+      "verdict": "accept",
+      "kinds": [
+        "topology"
+      ],
+      "baselinePayloadHash": "8e88ca7b0a15cdcba6b7aefd36c7dcbdab0e0665be6befe88bd291c56f49f490",
+      "candidatePayloadHash": "cdf8b97dbb0cffb2ebe3ca736f1ed2a7317b65fdb188a94e17a372f7d42be209",
+      "evidence": {
+        "kind": "dual_model_topology",
+        "artifact": "tools/timing_verdicts/qdc-fused-ma-class.json",
+        "summary": "qdc times وَمَا+لِيَ (or لو+ما / ما+منا) as two words; QAC writes one. Clamping the extra last index invented a flush pair and skipped the real next word. Fold the extra token at the glued ما.",
+        "audioSha256": "a1961a483113866b116e0f365a72fdbca3a4af3e725c9c83c86ebe3f4248ec7a",
+        "waveformVeto": false,
+        "models": [
+          {
+            "name": "qdc-fused-ma",
+            "qdcPositions": 28,
+            "qacWords": 27,
+            "fusePosition": 25
+          },
+          {
+            "name": "qdc-token-map",
+            "source": "raw qdc 1..n+1 remapped onto QAC n"
+          }
+        ]
+      }
+    },
+    "Minshawy_Murattal_128kbps:15:7": {
+      "verdict": "accept",
+      "kinds": [
+        "timestamp"
+      ],
+      "baselinePayloadHash": "8a29b2dce70318e38758e81be28a67ce2a0f9ea0e9cfc3f57c10cfad06a05709",
+      "candidatePayloadHash": "a6ed24925c1aff7e5e3a0031dedc5bbfc697930fe949a91bbaf9f5155d2750ee",
+      "evidence": {
+        "kind": "dual_model_boundary",
+        "artifact": "tools/timing_verdicts/qdc-fused-ma-class.json",
+        "summary": "qdc times وَمَا+لِيَ (or لو+ما / ما+منا) as two words; QAC writes one. Clamping the extra last index invented a flush pair and skipped the real next word. Fold the extra token at the glued ما.",
+        "audioSha256": "e5e080079f088271b0a1630516b10cfde2528818cd42c6388c7db7a5b80f2589",
+        "waveformVeto": false,
+        "models": [
+          {
+            "name": "qdc-fused-ma",
+            "qdcPositions": 8,
+            "qacWords": 7,
+            "fusePosition": 1
+          },
+          {
+            "name": "qdc-token-map",
+            "source": "raw qdc 1..n+1 remapped onto QAC n"
+          }
+        ]
+      }
+    },
+    "Minshawy_Murattal_128kbps:27:20": {
+      "verdict": "accept",
+      "kinds": [
+        "timestamp"
+      ],
+      "baselinePayloadHash": "7010119a49f50c1e85ebcb7258d61f21654ecc5d095a999abc4787842fdcdf6a",
+      "candidatePayloadHash": "7ede1364a996a26e348b471e78947a73344728284c64ed5c7d86c000e29a4264",
+      "evidence": {
+        "kind": "dual_model_boundary",
+        "artifact": "tools/timing_verdicts/qdc-fused-ma-class.json",
+        "summary": "qdc times وَمَا+لِيَ (or لو+ما / ما+منا) as two words; QAC writes one. Clamping the extra last index invented a flush pair and skipped the real next word. Fold the extra token at the glued ما.",
+        "audioSha256": "182ec08cb5e1e791cc747e96cd067e01cbffac8128dfaa3eaac9195b866023bc",
+        "waveformVeto": false,
+        "models": [
+          {
+            "name": "qdc-fused-ma",
+            "qdcPositions": 12,
+            "qacWords": 11,
+            "fusePosition": 4
+          },
+          {
+            "name": "qdc-token-map",
+            "source": "raw qdc 1..n+1 remapped onto QAC n"
+          }
+        ]
+      }
+    },
+    "Minshawy_Murattal_128kbps:36:22": {
+      "verdict": "accept",
+      "kinds": [
+        "topology"
+      ],
+      "baselinePayloadHash": "021421ee3afc902e7a805b29e3e1e4d8da9ed2c86fa8b032109b4a9c8bbfd4e3",
+      "candidatePayloadHash": "b95971e651fbb23c74902073c216fb3c0936d6559276185a1e25ccc7afad861c",
+      "evidence": {
+        "kind": "dual_model_topology",
+        "artifact": "tools/timing_verdicts/qdc-fused-ma-class.json",
+        "summary": "qdc times وَمَا+لِيَ (or لو+ما / ما+منا) as two words; QAC writes one. Clamping the extra last index invented a flush pair and skipped the real next word. Fold the extra token at the glued ما.",
+        "audioSha256": "d9b90102419372a630b8e3f72bd1bb44e15470cbab7e41b803a5795d9fc275e1",
+        "waveformVeto": false,
+        "models": [
+          {
+            "name": "qdc-fused-ma",
+            "qdcPositions": 8,
+            "qacWords": 7,
+            "fusePosition": 1
+          },
+          {
+            "name": "qdc-token-map",
+            "source": "raw qdc 1..n+1 remapped onto QAC n"
+          }
+        ]
+      }
+    },
+    "Minshawy_Murattal_128kbps:37:164": {
+      "verdict": "accept",
+      "kinds": [
+        "topology"
+      ],
+      "baselinePayloadHash": "8a49aa9db0ff1f4be71b567d291968861868cc01ce2d5d4ab6d4448f12f6b4ac",
+      "candidatePayloadHash": "711005d70e55323ed6f587a9ddf98e0922e3fd04633f0b7ee9563e632435c7aa",
+      "evidence": {
+        "kind": "dual_model_topology",
+        "artifact": "tools/timing_verdicts/qdc-fused-ma-class.json",
+        "summary": "qdc times وَمَا+لِيَ (or لو+ما / ما+منا) as two words; QAC writes one. Clamping the extra last index invented a flush pair and skipped the real next word. Fold the extra token at the glued ما.",
+        "audioSha256": "63ace2c2802c3b2dd7075331ea2d8dc36b153169ccb84e398bb37f50a547ff4b",
+        "waveformVeto": false,
+        "models": [
+          {
+            "name": "qdc-fused-ma",
+            "qdcPositions": 6,
+            "qacWords": 5,
+            "fusePosition": 1
+          },
+          {
+            "name": "qdc-token-map",
+            "source": "raw qdc 1..n+1 remapped onto QAC n"
+          }
+        ]
+      }
+    },
+    "Minshawy_Murattal_128kbps:41:47": {
+      "verdict": "accept",
+      "kinds": [
+        "topology"
+      ],
+      "baselinePayloadHash": "1c64bd634b35a6f230a36936804231d815afa1c9b024edae83fe4f147412d2a7",
+      "candidatePayloadHash": "484c2b6b12271db9858091249acc7681ca9f95f003f61aadfdba2b47a3910e5f",
+      "evidence": {
+        "kind": "dual_model_topology",
+        "artifact": "tools/timing_verdicts/qdc-fused-ma-class.json",
+        "summary": "qdc times وَمَا+لِيَ (or لو+ما / ما+منا) as two words; QAC writes one. Clamping the extra last index invented a flush pair and skipped the real next word. Fold the extra token at the glued ما.",
+        "audioSha256": "c249e26a01cdf9383ba8ab00bc0089ce96962c255cdb55de42b882b983194c8e",
+        "waveformVeto": false,
+        "models": [
+          {
+            "name": "qdc-fused-ma",
+            "qdcPositions": 28,
+            "qacWords": 27,
+            "fusePosition": 25
+          },
+          {
+            "name": "qdc-token-map",
+            "source": "raw qdc 1..n+1 remapped onto QAC n"
+          }
+        ]
+      }
+    },
+    "Abdurrahmaan_As-Sudais_192kbps:15:7": {
+      "verdict": "accept",
+      "kinds": [
+        "timestamp"
+      ],
+      "baselinePayloadHash": "c9d60a7cae693dcf7ea9d6bd5ef9a62f8104d842ccf6f1027056831bc20dabd5",
+      "candidatePayloadHash": "06bbc36228f8a3eea284d1658b0771fdf78e3fdb531057049b29fa3df381355b",
+      "evidence": {
+        "kind": "dual_model_boundary",
+        "artifact": "tools/timing_verdicts/qdc-fused-ma-class.json",
+        "summary": "qdc times وَمَا+لِيَ (or لو+ما / ما+منا) as two words; QAC writes one. Clamping the extra last index invented a flush pair and skipped the real next word. Fold the extra token at the glued ما.",
+        "audioSha256": "33771fec476937eb12f38bd5306584f638de822cd2dc90ff90bb8b70d85d076d",
+        "waveformVeto": false,
+        "models": [
+          {
+            "name": "qdc-fused-ma",
+            "qdcPositions": 8,
+            "qacWords": 7,
+            "fusePosition": 1
+          },
+          {
+            "name": "qdc-token-map",
+            "source": "raw qdc 1..n+1 remapped onto QAC n"
+          }
+        ]
+      }
+    },
+    "Abdurrahmaan_As-Sudais_192kbps:27:20": {
+      "verdict": "accept",
+      "kinds": [
+        "timestamp"
+      ],
+      "baselinePayloadHash": "8d1d64355dcd54fb828baed441627a4539350268c05a7b36c840caac1f577981",
+      "candidatePayloadHash": "e8ca737281212656fd9ae245cdf36202c8cba772280186c98dd7f4999fee2424",
+      "evidence": {
+        "kind": "dual_model_boundary",
+        "artifact": "tools/timing_verdicts/qdc-fused-ma-class.json",
+        "summary": "qdc times وَمَا+لِيَ (or لو+ما / ما+منا) as two words; QAC writes one. Clamping the extra last index invented a flush pair and skipped the real next word. Fold the extra token at the glued ما.",
+        "audioSha256": "b916bd9e962fe8f4d736822e6fbc0a0b8884ca72d3eb459a30023520a3084931",
+        "waveformVeto": false,
+        "models": [
+          {
+            "name": "qdc-fused-ma",
+            "qdcPositions": 12,
+            "qacWords": 11,
+            "fusePosition": 4
+          },
+          {
+            "name": "qdc-token-map",
+            "source": "raw qdc 1..n+1 remapped onto QAC n"
+          }
+        ]
+      }
+    },
+    "Abdurrahmaan_As-Sudais_192kbps:36:22": {
+      "verdict": "accept",
+      "kinds": [
+        "topology"
+      ],
+      "baselinePayloadHash": "c32ef88cd98ac39eb7089941eb8f312a3d69e841af6307aa498d2179c3ef8e63",
+      "candidatePayloadHash": "175382cb0dbefd7d4e41cdbdeaf60f924ec260f38a16683814c7cc94c826aec6",
+      "evidence": {
+        "kind": "dual_model_topology",
+        "artifact": "tools/timing_verdicts/qdc-fused-ma-class.json",
+        "summary": "qdc times وَمَا+لِيَ (or لو+ما / ما+منا) as two words; QAC writes one. Clamping the extra last index invented a flush pair and skipped the real next word. Fold the extra token at the glued ما.",
+        "audioSha256": "a8cb8124174a5ef8950729cab5c883fecdf500de53439091945789d585f07f04",
+        "waveformVeto": false,
+        "models": [
+          {
+            "name": "qdc-fused-ma",
+            "qdcPositions": 8,
+            "qacWords": 7,
+            "fusePosition": 1
+          },
+          {
+            "name": "qdc-token-map",
+            "source": "raw qdc 1..n+1 remapped onto QAC n"
+          }
+        ]
+      }
+    },
+    "Abdurrahmaan_As-Sudais_192kbps:37:164": {
+      "verdict": "accept",
+      "kinds": [
+        "topology"
+      ],
+      "baselinePayloadHash": "6ece9c313915e3d66352bc21aafb5603c8123a98c46e0c19a82cf3aaedc45870",
+      "candidatePayloadHash": "aaecfe8b1cfb55036784ee6b230146fc404936137b4c53308a52f494a828f25f",
+      "evidence": {
+        "kind": "dual_model_topology",
+        "artifact": "tools/timing_verdicts/qdc-fused-ma-class.json",
+        "summary": "qdc times وَمَا+لِيَ (or لو+ما / ما+منا) as two words; QAC writes one. Clamping the extra last index invented a flush pair and skipped the real next word. Fold the extra token at the glued ما.",
+        "audioSha256": "6912405af2ff340fee7487176d483c58eaed4668a3cc691afa85dfc2eb89badb",
+        "waveformVeto": false,
+        "models": [
+          {
+            "name": "qdc-fused-ma",
+            "qdcPositions": 6,
+            "qacWords": 5,
+            "fusePosition": 1
+          },
+          {
+            "name": "qdc-token-map",
+            "source": "raw qdc 1..n+1 remapped onto QAC n"
+          }
+        ]
+      }
+    },
+    "Abdurrahmaan_As-Sudais_192kbps:41:47": {
+      "verdict": "accept",
+      "kinds": [
+        "topology"
+      ],
+      "baselinePayloadHash": "f126496814ee1662552ba36704b680734ad19b38cc42f037ce0a4e03f07e1742",
+      "candidatePayloadHash": "8d248bd7e111706a1ce7a7720ae5d0b47203709b36f657d7e5ed5fcf529ac185",
+      "evidence": {
+        "kind": "dual_model_topology",
+        "artifact": "tools/timing_verdicts/qdc-fused-ma-class.json",
+        "summary": "qdc times وَمَا+لِيَ (or لو+ما / ما+منا) as two words; QAC writes one. Clamping the extra last index invented a flush pair and skipped the real next word. Fold the extra token at the glued ما.",
+        "audioSha256": "d2dbba409e0861508ffffd6768b237e20fafe389927f1c0eb9abd460700649ac",
+        "waveformVeto": false,
+        "models": [
+          {
+            "name": "qdc-fused-ma",
+            "qdcPositions": 28,
+            "qacWords": 27,
+            "fusePosition": 25
+          },
+          {
+            "name": "qdc-token-map",
+            "source": "raw qdc 1..n+1 remapped onto QAC n"
+          }
+        ]
+      }
+    },
+    "Hani_Rifai_192kbps:15:7": {
+      "verdict": "accept",
+      "kinds": [
+        "timestamp"
+      ],
+      "baselinePayloadHash": "fa14b76cc4cc2133eda290e4d559d0c83f7422a097a78ee1a9906faa26618719",
+      "candidatePayloadHash": "a78b567c4520a46998b67fe88585282b6d8b94661ab7e169c41efcde6fcac65b",
+      "evidence": {
+        "kind": "dual_model_boundary",
+        "artifact": "tools/timing_verdicts/qdc-fused-ma-class.json",
+        "summary": "qdc times وَمَا+لِيَ (or لو+ما / ما+منا) as two words; QAC writes one. Clamping the extra last index invented a flush pair and skipped the real next word. Fold the extra token at the glued ما.",
+        "audioSha256": "44bf12d3ed2b4ce2aee5d4450c36846a9c4ca83406bee31cf9b4707f60a2b967",
+        "waveformVeto": false,
+        "models": [
+          {
+            "name": "qdc-fused-ma",
+            "qdcPositions": 8,
+            "qacWords": 7,
+            "fusePosition": 1
+          },
+          {
+            "name": "qdc-token-map",
+            "source": "raw qdc 1..n+1 remapped onto QAC n"
+          }
+        ]
+      }
+    },
+    "Hani_Rifai_192kbps:27:20": {
+      "verdict": "accept",
+      "kinds": [
+        "timestamp"
+      ],
+      "baselinePayloadHash": "517c04fc6f893c00ab8a5b6b07a467c09657f07bfbb5c1940d21efe1aa7d33ba",
+      "candidatePayloadHash": "500bb3fa644b20ae79c213042bfeeae5cb7305b346a4e623f389c55a9b0e7cd7",
+      "evidence": {
+        "kind": "dual_model_boundary",
+        "artifact": "tools/timing_verdicts/qdc-fused-ma-class.json",
+        "summary": "qdc times وَمَا+لِيَ (or لو+ما / ما+منا) as two words; QAC writes one. Clamping the extra last index invented a flush pair and skipped the real next word. Fold the extra token at the glued ما.",
+        "audioSha256": "136412c6b0352458b79f1476f47c6c1be743d1e1f6ba04913b3d66025e9bfb17",
+        "waveformVeto": false,
+        "models": [
+          {
+            "name": "qdc-fused-ma",
+            "qdcPositions": 12,
+            "qacWords": 11,
+            "fusePosition": 4
+          },
+          {
+            "name": "qdc-token-map",
+            "source": "raw qdc 1..n+1 remapped onto QAC n"
+          }
+        ]
+      }
+    },
+    "Hani_Rifai_192kbps:36:22": {
+      "verdict": "accept",
+      "kinds": [
+        "topology"
+      ],
+      "baselinePayloadHash": "6d204f7a2e90ee03bb117b8b40b1338512c263dccf0b7b58d7dd563681637c8e",
+      "candidatePayloadHash": "6bc7ca97554875c5c795822805b4be3aa33219f1bf11ed408470346181353832",
+      "evidence": {
+        "kind": "dual_model_topology",
+        "artifact": "tools/timing_verdicts/qdc-fused-ma-class.json",
+        "summary": "qdc times وَمَا+لِيَ (or لو+ما / ما+منا) as two words; QAC writes one. Clamping the extra last index invented a flush pair and skipped the real next word. Fold the extra token at the glued ما.",
+        "audioSha256": "96a13e9b7c7a60e366f0b70dd1ab0e665f44ce65aba9a792eb9d8dcd534fccd7",
+        "waveformVeto": false,
+        "models": [
+          {
+            "name": "qdc-fused-ma",
+            "qdcPositions": 8,
+            "qacWords": 7,
+            "fusePosition": 1
+          },
+          {
+            "name": "qdc-token-map",
+            "source": "raw qdc 1..n+1 remapped onto QAC n"
+          }
+        ]
+      }
+    },
+    "Hani_Rifai_192kbps:37:164": {
+      "verdict": "accept",
+      "kinds": [
+        "topology"
+      ],
+      "baselinePayloadHash": "37826e27f1310fefe034b51c688e637073e5b2081d0286bfe29d1a827bce6cf3",
+      "candidatePayloadHash": "8dc073896d674c37e2b473c4f7ad543f883f1adb225ba55f3903d7b2de8c260b",
+      "evidence": {
+        "kind": "dual_model_topology",
+        "artifact": "tools/timing_verdicts/qdc-fused-ma-class.json",
+        "summary": "qdc times وَمَا+لِيَ (or لو+ما / ما+منا) as two words; QAC writes one. Clamping the extra last index invented a flush pair and skipped the real next word. Fold the extra token at the glued ما.",
+        "audioSha256": "a3ceee8f3c265bc802c9762fab1cb39ef0957eea775b86199c1b12da7def276c",
+        "waveformVeto": false,
+        "models": [
+          {
+            "name": "qdc-fused-ma",
+            "qdcPositions": 6,
+            "qacWords": 5,
+            "fusePosition": 1
+          },
+          {
+            "name": "qdc-token-map",
+            "source": "raw qdc 1..n+1 remapped onto QAC n"
+          }
+        ]
+      }
+    }
+  }
+}

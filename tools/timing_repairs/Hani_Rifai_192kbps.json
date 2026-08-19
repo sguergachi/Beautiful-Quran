@@ -19823,6 +19823,30 @@
   {
    "reciterId": 7,
    "reciterSlug": "Hani_Rifai_192kbps",
+   "surahId": 66,
+   "ayah": 7,
+   "kind": "boundary",
+   "refs": [
+    "GitHub issue #723",
+    "Lab ear",
+    "CTC restore 5/6 handoff"
+   ],
+   "segments": [
+    [
+     5,
+     4560,
+     5571
+    ],
+    [
+     6,
+     6065,
+     7310
+    ]
+   ]
+  },
+  {
+   "reciterId": 7,
+   "reciterSlug": "Hani_Rifai_192kbps",
    "surahId": 68,
    "ayah": 51,
    "kind": "drop",

@@ -1,0 +1,16 @@
+{
+  "schema": 1,
+  "reciter": "Hani_Rifai_192kbps",
+  "edits": [
+    {
+      "reciterId": 7,
+      "surahId": 66,
+      "ayah": 6,
+      "op": "discard_false_same_position_lead",
+      "position": 15,
+      "requiresAudioVerdict": true,
+      "evidence": ["Lab ear", "waveform", "CTC unsplit"],
+      "refs": ["GitHub issue #721"]
+    }
+  ]
+}

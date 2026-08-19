@@ -426,6 +426,22 @@ QDC_SPLIT_FRAGMENT_CEIL_MS = 700  # in [FRAGMENT_MS, CEIL) it is a fragment only
 QDC_SPLIT_FRAGMENT_RATIO = 0.40  # shorter/longer below this = a split fragment,
 #                                  not a peer utterance
 
+# CTC restore requires a pause this long to emit a same-word repeat
+# (timing_repairs/README.md "repeat-vs-split invariant"). Committed restore
+# files still invent flush pairs; apply-time collapse is the safety net,
+# same idea as span-protect.
+CTC_REPEAT_MIN_PAUSE_MS = 300
+# MMS/uroman prefers the invented flush pair on these rows. Arabic XLSR is
+# the model that invented the split, so it is not allowed to keep one.
+# Reciter id, surah, ayah. MMS 2026-08-18 against everyayah audio.
+FLUSH_RESTORE_KEEP_INVENTED = frozenset({
+    (1, 7, 39), (1, 7, 158), (1, 13, 25), (1, 20, 58), (1, 23, 50), (1, 25, 9),
+    (1, 34, 6), (1, 66, 12),
+    (5, 5, 45), (5, 9, 33), (5, 10, 6), (5, 10, 57), (5, 34, 36),
+    (5, 39, 54), (5, 45, 18),
+    (7, 18, 20), (7, 89, 16),
+})
+
 QDC_SPIKE_JUMP = 3  # a forward jump this large that instantly retreats is noise
 # Positions in a backtrack run within this distance count as one contiguous
 # span-repeat (allows one dropped word inside a real re-say, e.g. 9,10,12,13).
@@ -641,6 +657,38 @@ def erases_span_repeat(pre_segs, repair_segs):
     )
 
 
+def collapse_invented_flush_repeats(current, repaired, only_positions=None):
+    """Refuse a restore that invents a same-word pair closer than CTC's pause.
+
+    Real single-word re-says that qdc already has stay intact (Hani 4:4): this
+    only merges a flush pair the source row does not already carry. A genuine
+    restore that qdc flattened still lands when its halves are ≥300 ms apart.
+    """
+    source_count = {}
+    source_span = {}
+    for pos, start, end in current:
+        source_count[pos] = source_count.get(pos, 0) + 1
+        source_span.setdefault(pos, [pos, start, end])
+    out = []
+    i = 0
+    while i < len(repaired):
+        pos, start, end = repaired[i]
+        nxt = repaired[i + 1] if i + 1 < len(repaired) else None
+        if (
+            nxt is not None
+            and nxt[0] == pos
+            and nxt[1] - end < CTC_REPEAT_MIN_PAUSE_MS
+            and source_count.get(pos, 0) < 2
+            and (only_positions is None or pos in only_positions)
+        ):
+            out.append(list(source_span.get(pos, [pos, start, nxt[2]])))
+            i += 2
+            continue
+        out.append([pos, start, end])
+        i += 1
+    return out
+
+
 def preserve_peer_repeats(current, repaired):
     """Keep substantial same-word re-says while applying unrelated repairs.
 
@@ -810,7 +858,58 @@ def recover_negative_opening(segs):
     return shifted, True
 
 
-def adjust_qdc_segments(segs, n_words, stats, recover_singleton_gap=False):
+def _arabic_letters(text):
+    """Substantial Arabic letters only; used to spot QAC-glued ما tokens."""
+    return "".join(ch for ch in text if "ء" <= ch <= "ي")
+
+
+def fused_ma_position(words):
+    """QAC position where ما is glued to the previous token, so qdc has +1.
+
+    qdc times وَمَا / لِيَ (and لو/ما, ما/منا) as two words. QAC writes one
+    (وَمَالِيَ, لَّوۡمَا, مَامِنَّا). Clamping the leftover last index onto
+    n_words invents a flush pair and shifts every later highlight.
+    """
+    if not words:
+        return None
+    for pos in sorted(words):
+        letters = _arabic_letters(words[pos])
+        if "مالي" in letters or "مامنا" in letters or letters.endswith("لوما"):
+            return pos
+    return None
+
+
+def fold_qdc_fused_ma(segs, n_words, words):
+    """Map a strict 1..n+1 qdc row onto n QAC words by merging the glued ما."""
+    if not segs or not words:
+        return None
+    ordered = sorted(segs, key=lambda seg: seg[1])
+    if [pos for pos, _, _ in ordered] != list(range(1, n_words + 2)):
+        return None
+    fuse = fused_ma_position(words)
+    if fuse is None:
+        return None
+    out = []
+    held = None
+    for pos, start, end in ordered:
+        if pos < fuse:
+            out.append([pos, start, end])
+        elif pos == fuse:
+            held = [fuse, start, end]
+        elif pos == fuse + 1:
+            if held is None:
+                return None
+            held[2] = end
+            out.append(held)
+            held = None
+        else:
+            out.append([pos - 1, start, end])
+    if held is not None or [pos for pos, _, _ in out] != list(range(1, n_words + 1)):
+        return None
+    return out
+
+
+def adjust_qdc_segments(segs, n_words, stats, recover_singleton_gap=False, words=None):
     """Clamp quran.com segments (already 1-based, ayah-relative) to our canonical
     word count while PRESERVING repeats; scrub aligner artifacts that would read
     as repeats that aren't in the audio; count the re-recited spans."""
@@ -820,6 +919,10 @@ def adjust_qdc_segments(segs, n_words, stats, recover_singleton_gap=False):
     segs, shifted = recover_negative_opening(segs)
     if shifted:
         stats["opening_shift"] += 1
+    folded = fold_qdc_fused_ma(segs, n_words, words)
+    if folded is not None:
+        stats["fused_ma"] = stats.get("fused_ma", 0) + 1
+        segs = folded
     adjusted = []
     for pos, start, end in sorted(segs, key=lambda s: s[1]):
         if start < 0:
@@ -1395,6 +1498,7 @@ def apply_timing_repairs(
     only_keys=None,
     only_kinds=None,
     skip_missing_boundary_keys=None,
+    word_text=None,
 ):
     """Apply auto-generated CTC-arbitrated repairs (tools/timing_repairs/*.json)
     on top of the current source rows. Structural differences and their
@@ -1405,6 +1509,7 @@ def apply_timing_repairs(
     unrelated repair can still land without flattening a genuine repeat."""
     clock_offsets = clock_offsets or {}
     durations = durations or {}
+    word_text = word_text or {}
     skip_missing_boundary_keys = skip_missing_boundary_keys or set()
     slug_by_id = {r[0]: r[1] for r in RECITERS}
     by_key = {(rid, sid, ay): segs for (rid, sid, ay, segs) in timing_rows}
@@ -1419,6 +1524,7 @@ def apply_timing_repairs(
     rebased = 0
     clock_rejected = 0
     clock_untranslated = 0
+    flush_collapsed = 0
     for path in files:
         try:
             payload = json.loads(path.read_text(encoding="utf-8"))
@@ -1486,6 +1592,16 @@ def apply_timing_repairs(
                     span_protected += 1
                     continue
             current = json.loads(pre_raw) if isinstance(pre_raw, str) else pre_raw or []
+            collapsed = (
+                segs if key in FLUSH_RESTORE_KEEP_INVENTED
+                else collapse_invented_flush_repeats(current, segs)
+            )
+            if collapsed != segs:
+                flush_collapsed += 1
+                segs = collapsed
+                if [s[0] for s in segs] == [s[0] for s in current]:
+                    # Invented flush was the only structural change; keep qdc.
+                    continue
             duration = durations.get(key)
             merged = apply_clocked_timing_repair(current, segs, offset)
             if offset and not fits_audio(merged, duration):
@@ -1512,7 +1628,8 @@ def apply_timing_repairs(
         f"{rebased} rebased, {span_protected} span-protected, "
         f"{peer_protected} peer repeat(s) preserved, "
         f"{clock_rejected} unsafe-clock skipped, "
-        f"{clock_untranslated} kept on the file clock — {by_kind}"
+        f"{clock_untranslated} kept on the file clock, "
+        f"{flush_collapsed} invented flush restore(s) collapsed — {by_kind}"
     )
     return new_rows
 
@@ -2257,6 +2374,7 @@ def main():
                         data.get(key),
                         n,
                         stats,
+                        words=word_text.get(key),
                     )
                     row_key = (rid, key[0], key[1])
                     reference = reciter_alignment.get(row_key)
@@ -2266,6 +2384,7 @@ def main():
                         rescued = adjust_qdc_segments(
                             data.get(key), n, rescue_stats,
                             recover_singleton_gap=True,
+                            words=word_text.get(key),
                         )
                         if _covers_all_words(rescued, n) and fits_audio(rescued, duration):
                             singleton_gap_candidates[row_key] = rescued
@@ -2369,6 +2488,7 @@ def main():
             timing_clock_offsets,
             audio_durations,
             skip_missing_boundary_keys=deferred_boundary_keys,
+            word_text=word_text,
         )
 
         print("[overrides] applying tools/timing_overrides/*.json")
@@ -2403,6 +2523,7 @@ def main():
                 audio_durations,
                 only_keys=rescued_keys,
                 only_kinds={"boundary"},
+                word_text=word_text,
             )
 
         if audio_durations:

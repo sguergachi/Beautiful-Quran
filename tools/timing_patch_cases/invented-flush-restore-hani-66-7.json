@@ -1,0 +1,21 @@
+{
+  "id": "invented-flush-restore-hani-66-7",
+  "label": "Hani 66:7 restore must not split ياأيها into a flush repeat",
+  "refs": ["GitHub issue #723", "timing_repairs/README.md repeat-vs-split invariant"],
+  "pipeline": "invented_flush_restore",
+  "notes": "CTC restore invented [1,1] with gap 0. qdc had one opening madd. Invariant (1) requires ≥300 ms to restore a repeat, so collapse back to one span. Lab deleted the second 1 and left a gap; the class fix is merge, not a hole.",
+  "input_segments": [
+    [1, 50, 2310],
+    [2, 2310, 3350],
+    [3, 3350, 4280],
+    [4, 4280, 4610]
+  ],
+  "repair_segments": [
+    [1, 50, 1610],
+    [1, 1610, 2430],
+    [2, 2430, 3510],
+    [3, 3510, 4330],
+    [4, 4330, 4770]
+  ],
+  "expected_positions": [1, 2, 3, 4]
+}

@@ -19,6 +19,11 @@ reciter audit, for example:
     /home/sammy/qasr/venv/bin/python tools/audit_forced_alignment.py \\
       --reciter-id 1 --output /home/sammy/qasr/audits/alafasy.jsonl --resume
 
+The second CTC witness is MMS/uroman (no Arabic letters in its vocab):
+
+    ... --model MahmoudAshraf/mms-300m-1130-forced-aligner --romanize \\
+      --output /tmp/mms.jsonl
+
 For parallel machines/workers, split the deterministic selected-row order:
 
     ... --all-reciters --shard 1/8 --output /home/sammy/qasr/audits/1-of-8.jsonl
@@ -48,6 +53,7 @@ ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_DB = ROOT / "data" / "quran.db"
 DEFAULT_QASR = Path.home() / "qasr"
 MODEL_NAME = "jonatasgrosman/wav2vec2-large-xlsr-53-arabic"
+MMS_MODEL_NAME = "MahmoudAshraf/mms-300m-1130-forced-aligner"
 
 # The recognizer's ordinary output is unvowelled.  Normalize Uthmani spellings
 # to that alphabet before constructing the fixed transcript.  These are the
@@ -58,6 +64,22 @@ MODEL_LETTER_FOLDS = str.maketrans({
     "ٱ": "ا", "أ": "ا", "إ": "ا", "آ": "ا", "ى": "ي",
     "ة": "ه", "ؤ": "و", "ئ": "ي",
 })
+
+# Official MMS/uroman Arabic folds from ctc-forced-aligner norm_config["ara"].
+# Apply these before romanizing so Uthmani maddah/wasl marks do not become the
+# Latin letters "maddah".  Then keep only the MMS latin vocabulary.
+MMS_ARABIC_FOLDS = str.maketrans({
+    "ٱ": "ا",
+    "ٰ": "ا",
+    "ۥ": "و",
+    "ۦ": "ي",
+    "ـ": None,
+    "ٓ": None,
+    "ٔ": "ء",
+    "ٕ": "ء",
+    **{chr(code): None for code in range(0x064B, 0x0653)},
+})
+MMS_VOCAB_CHARS = frozenset("abcdefghijklmnopqrstuvwxyz'")
 
 
 @dataclass(frozen=True)
@@ -90,6 +112,38 @@ def normalize_for_model(text: str) -> str:
             if "ء" <= char <= "ي":
                 letters.append(char)
     return "".join(letters)
+
+
+def normalize_for_mms(text: str, romanizer) -> str:
+    """Return the MMS latin spelling for one Quran word.
+
+    Folds Uthmani marks the way the official MMS aligner does, romanizes with
+    uroman ``ara``, then keeps only ``a-z`` and apostrophe.
+    """
+    folded: list[str] = []
+    for char in text.translate(MMS_ARABIC_FOLDS):
+        if unicodedata.category(char).startswith("M"):
+            continue
+        folded.append(char)
+    roman = romanizer.romanize_string("".join(folded), lcode="ara")
+    letters = [char for char in roman.lower() if char in MMS_VOCAB_CHARS]
+    if not letters:
+        raise ValueError("romanizer produced no MMS letters")
+    return "".join(letters)
+
+
+def blank_id_for(tokenizer) -> int:
+    """Return the CTC blank id: ``<blank>`` when the tokenizer has one, else pad."""
+    vocabulary = tokenizer.get_vocab()
+    blank_id = getattr(tokenizer, "blank_token_id", None)
+    if blank_id is not None:
+        return int(blank_id)
+    for token in (getattr(tokenizer, "blank_token", None), "<blank>"):
+        if token and token in vocabulary:
+            return int(vocabulary[token])
+    if tokenizer.pad_token_id is not None:
+        return int(tokenizer.pad_token_id)
+    raise ValueError("CTC tokenizer lacks a usable blank")
 
 
 def sha256(path: Path) -> str:
@@ -224,13 +278,14 @@ def forced_ctc_viterbi(
 def target_labels(
     occurrences: Sequence[Occurrence],
     vocabulary: dict[str, int],
-    delimiter: str,
+    delimiter: str | None,
 ) -> tuple[list[int], list[int | None], str]:
     """Encode every stored occurrence as one CTC transcript, repeats intact.
 
     ``label_occurrences`` maps each label to the stored occurrence that owns
     it; delimiter labels map to ``None``.  This lets a report distinguish two
-    identical canonical words recited at different moments.
+    identical canonical words recited at different moments.  MMS has no word
+    delimiter token, so ``delimiter`` may be ``None`` and letters concatenate.
     """
     labels: list[int] = []
     label_occurrences: list[int | None] = []
@@ -238,7 +293,7 @@ def target_labels(
     for occurrence_index, occurrence in enumerate(occurrences):
         if not occurrence.normalized:
             raise ValueError(f"position {occurrence.position} normalizes to no model letters")
-        if occurrence_index:
+        if occurrence_index and delimiter is not None:
             labels.append(vocabulary[delimiter])
             label_occurrences.append(None)
         for char in occurrence.normalized:
@@ -249,7 +304,8 @@ def target_labels(
             labels.append(vocabulary[char])
             label_occurrences.append(occurrence_index)
         rendered_words.append(occurrence.normalized)
-    return labels, label_occurrences, delimiter.join(rendered_words)
+    joiner = delimiter or ""
+    return labels, label_occurrences, joiner.join(rendered_words)
 
 
 def occurrence_frame_evidence(
@@ -299,7 +355,13 @@ def occurrence_frame_evidence(
     return evidence
 
 
-def timing_occurrences(db: sqlite3.Connection, reciter_id: int, surah: int, ayah: int) -> list[Occurrence]:
+def timing_occurrences(
+    db: sqlite3.Connection,
+    reciter_id: int,
+    surah: int,
+    ayah: int,
+    normalize=normalize_for_model,
+) -> list[Occurrence]:
     """Load the exact stored occurrence sequence for a timing row."""
     row = db.execute(
         "SELECT segments FROM timings WHERE reciter_id=? AND surah_id=? AND ayah_number=?",
@@ -325,7 +387,7 @@ def timing_occurrences(db: sqlite3.Connection, reciter_id: int, surah: int, ayah
         occurrences.append(Occurrence(
             position=int(position),
             arabic=arabic,
-            normalized=normalize_for_model(arabic),
+            normalized=normalize(arabic),
             start_ms=int(start_ms),
             end_ms=int(end_ms),
         ))
@@ -385,15 +447,34 @@ def force_one(
     ayah: int,
     min_label_probability: float,
     max_residual_ms: int,
+    romanize: bool = False,
+    model_name: str = MODEL_NAME,
+    romanizer=None,
 ) -> dict:
     """Generate one self-contained audio-evidence report object."""
-    occurrences = timing_occurrences(db, reciter_id, surah, ayah)
+    if romanize:
+        if romanizer is None:
+            try:
+                import uroman as ur
+            except ModuleNotFoundError as error:
+                raise RuntimeError(
+                    "uroman is required for --romanize; use /home/sammy/qasr/venv/bin/python"
+                ) from error
+            romanizer = ur.Uroman()
+        occurrences = timing_occurrences(
+            db, reciter_id, surah, ayah,
+            normalize=lambda text: normalize_for_mms(text, romanizer),
+        )
+    else:
+        occurrences = timing_occurrences(db, reciter_id, surah, ayah)
     path = audio_path(qasr_root, slug, surah, ayah)
     vocabulary = processor.tokenizer.get_vocab()
-    blank_id = processor.tokenizer.pad_token_id
-    delimiter = processor.tokenizer.word_delimiter_token
-    if blank_id is None or not delimiter or delimiter not in vocabulary:
-        raise ValueError("CTC tokenizer lacks a usable blank or word delimiter")
+    blank_id = blank_id_for(processor.tokenizer)
+    delimiter = None if romanize else processor.tokenizer.word_delimiter_token
+    if delimiter is not None and delimiter not in vocabulary:
+        raise ValueError("CTC tokenizer lacks a usable word delimiter")
+    if delimiter is None and not romanize:
+        raise ValueError("CTC tokenizer lacks a usable word delimiter")
     labels, label_occurrences, transcript = target_labels(occurrences, vocabulary, delimiter)
 
     sample_rate = processor.feature_extractor.sampling_rate
@@ -460,7 +541,7 @@ def force_one(
     return {
         "schema": 1,
         "kind": "ctc_fixed_sequence_audio_audit",
-        "model": MODEL_NAME,
+        "model": model_name,
         "ctcDevice": str(device),
         "reciterId": reciter_id,
         "reciterSlug": slug,
@@ -536,6 +617,11 @@ def argument_parser() -> argparse.ArgumentParser:
                         help=f"qasr cache root (default: {DEFAULT_QASR})")
     parser.add_argument("--db", type=Path, default=DEFAULT_DB, help="timing database to audit")
     parser.add_argument("--model", default=MODEL_NAME, help="locally cached Hugging Face CTC model")
+    parser.add_argument(
+        "--romanize",
+        action="store_true",
+        help="uroman+MMS latin transcript (required for the MMS forced-aligner)",
+    )
     parser.add_argument("--device", choices=("auto", "cpu", "cuda"), default="auto")
     parser.add_argument("--min-label-probability", type=float, default=0.15,
                         help="below this mean CTC label probability, mark word review")
@@ -575,6 +661,15 @@ def main(argv: Sequence[str] | None = None) -> int:
             print("no rows left to audit", flush=True)
             return 0
         processor, model, device = load_model(args.model, args.device)
+        romanizer = None
+        if args.romanize:
+            try:
+                import uroman as ur
+            except ModuleNotFoundError as error:
+                raise SystemExit(
+                    "uroman is required for --romanize; use /home/sammy/qasr/venv/bin/python"
+                ) from error
+            romanizer = ur.Uroman()
         args.output.parent.mkdir(parents=True, exist_ok=True)
         mode = "a" if args.resume else "w"
         success = review_words = errors = 0
@@ -587,6 +682,9 @@ def main(argv: Sequence[str] | None = None) -> int:
                         surah=surah, ayah=ayah,
                         min_label_probability=args.min_label_probability,
                         max_residual_ms=args.max_residual_ms,
+                        romanize=args.romanize,
+                        model_name=args.model,
+                        romanizer=romanizer,
                     )
                     success += 1
                     review_words += evidence["reviewCount"]

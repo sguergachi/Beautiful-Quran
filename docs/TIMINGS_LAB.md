@@ -225,6 +225,8 @@ Free, no backend, no auth beyond the GitHub account:
    | Topology cannot distinguish a false loop from a genuine repeat | narrow typed operation under `tools/timing_corrections/` | `pipeline: timing_correction` case |
    | Drop repair that flattens a real span-repeat | `apply_timing_repairs` span-protect (and regenerate repairs) | `pipeline: erases_span_repeat` case in `timing_patch_cases/` |
    | Repair flattens a peer same-word re-say while fixing elsewhere | per-position `preserve_peer_repeats` | `pipeline: preserve_peer_repeats` case |
+   | Restore invents a flush same-word pair (gap < 300 ms) | `collapse_invented_flush_repeats` in `apply_timing_repairs` | `pipeline: invented_flush_restore` case |
+   | qdc has 1..n+1 because QAC glued ما (وَمَالِيَ) | `fold_qdc_fused_ma` in `adjust_qdc_segments` | `pipeline: adjust_qdc_segments` case |
    | Repeat-vs-split / CTC | `tools/timing_repairs/` generator | `~/qasr` tests + rebuild repairs |
    | Boundary displacement without a topology change | weighted qdc / quran-align evidence, then a surgical `kind: "boundary"` repair | `pipeline: boundary_repair` focused case |
    | Incomplete row or unsafe MP3 clock | source/class fix; finalizer completes, falls back, or withholds | completion/physics checks in `tools/test_build_db.py` |
