@@ -102,25 +102,37 @@ chapters, and could not slow down to look at where they had got to without the
 ground changing underneath them. Speed sets nothing now. The tier is something
 the reader *does* — they hold still, and it opens.
 
-**Chapters is the default, at any speed.** Whatever the hand is doing, a drag
-along the rule slides the book's own scale under it: one stroke of the measure
-is all 604 leaves, so all the way left is the back of the book and all the way
-right is al-Fātiḥah, on any phone width. That is not a number, it is a relation
-between the book and the screen — a gain that stops in juzʾ 25 and asks for a
-second stroke has failed at the only thing a coarse tier is for. The comb the
-reader steers by is the chapter openings, pinned to the thumb and travelling
-exactly as far as the finger does; a click of haptic marks each one, spaced by
-distance and by time rather than by crossings, because at the book's scale the
-openings are three points of screen apart and one tick each is a buzz.
+**Chapters is the default, at any speed.** A hand anywhere on the rule opens it
+into the comb of chapter openings, and that comb is nailed to the rule: leaf 1
+at the right end, leaf 604 at the left, the whole book laid across the measure
+and not moving. So all the way left really is the back of the book and all the
+way right is al-Fātiḥah, in one stroke, on any phone width. A comb carried
+along under the thumb instead was tried and is wrong twice over: it slides off
+its own measure, leaving the last chapter stranded mid-rule with bare line
+beyond it and no way to tell the end of the book from the end of the comb; and
+after the first stroke that ran past an end, neither end means anything any
+more.
 
-**Hold still, and the tier under your finger opens.** A quarter second at rest
+**What the reader has hold of at that tier is the comb itself, not a marker.**
+No thumb rides the line while the comb is up — the chapter their finger is in
+is drawn as a thickened bracket, one cell of the comb, and that cell is the
+thing they are steering. A marker riding along beside all that was a second
+answer to a question the comb had already answered, and it turned the gesture
+into dragging a knob past some scenery. A click of haptic marks each opening
+crossed, spaced by distance and by time rather than by crossings, because at
+the book's scale the openings are three points of screen apart and one tick
+each is a buzz.
+
+**Hold still, and the cell under your finger opens.** A quarter second at rest
 — past the stall in an ordinary rough stroke, short of a wait — and a click of
-haptic says so. The chapter's bracket, until then a short thickened span of the
-hairline on the book's scale, stretches out until it is the whole measure and
+haptic says so. The bracket stretches out until it is the whole measure and
 deep enough to have leaves standing in it: a rounded trough where the line was.
 Each of the chapter's leaves flies from where it stood on the book's scale out
 to where it stands in the trough, so the opening is a magnification the eye can
-follow and not a second drawing fading in over the first.
+follow and not a second drawing fading in over the first. And now a seat mark
+appears inside it — the marker the chapter tier did without, because here it is
+the right answer: the chapter has become a measure of its own, and a mark
+standing in it is the thing the reader scrubs with.
 
 Inside the trough the mapping is **absolute to that chapter**: the right end is
 its first leaf, the left end its last, and every place between names one leaf
@@ -143,12 +155,13 @@ are back at chapters. After an edge pop-out the finger is still sitting at the
 end and still still, so the hold is refused until it moves away — otherwise the
 trough would spring open again on the very next frame.
 
-The label above the thumb says which tier is running, and says it in what it
+The label above the finger says which tier is running, and says it in what it
 counts. In the comb it is the chapter's name alone: a verse number turning over
 by hundreds between frames is noise, and worse, it invites the reader to aim
-with it. In the trough it adds the range of verses that leaf actually carries —
-the thing they are choosing between at that scale, and the only scale at which
-the number means anything.
+with it. In the trough the leaf itself is the target, so the label names it the
+way the leaf names itself — its folio, and the verses standing on it. The
+chapter stays at the front of that, because a folio alone would leave the
+reader with nothing to check it against.
 
 The tier machine runs on the **frame clock**, not on pointer events. A finger
 that stops moving stops reporting, so an estimate fed only by events freezes at
@@ -158,21 +171,13 @@ stillness is a real measurement of zero. Which also means the reader never has
 to hunt for a threshold: coming to rest is the gesture, and coming to rest is
 something a hand does without being asked.
 
-The thumb goes to the finger on contact and stays under it for the whole drag.
-A mark that lags reads as a control that is not listening, and being right
-about what it points at does not buy that back. So the thumb is where the
-finger is and the comb slides beneath it, which is what a magnifier does
-anyway; the leaf is named by the teeth, by the trough and by the label above
-them, not by how far along a hairline the mark has got. On release the trough
-shuts and the thumb walks back to that leaf's seat in the same motion, and the
-rule is a place-marker again.
-
-That return needs somewhere to go, or it reads as the marker wandering off on
-its own. The leaf's actual place in the book is drawn throughout the scrub as a
-small dim twin of the thumb — plainly the same mark, smaller — so the
-destination was always on the rule; it dissolves as the thumb arrives, being
-the same mark. It stands down inside the trough, where the measure has stopped
-being the book and a mark at the book's scale would be a mark in the wrong one.
+Both tiers are read the same way: where the finger stands along the measure is
+where it stands in the book, or in the chapter. Nothing accumulates, so nothing
+drifts — the bracket is under the finger because the comb it is bracketing is
+under the finger, and the two ends keep meaning the two ends however long the
+reader works at it. On release the trough shuts, the seat mark fades back up
+out of it and walks to the landed leaf's own place on the rule in one motion,
+and the rule is a place-marker again.
 
 What the hand comes off on is what the tier promised. In the trough the reader
 picked a leaf and gets that leaf. In the comb they picked a chapter and get its

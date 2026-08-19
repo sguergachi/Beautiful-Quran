@@ -165,14 +165,6 @@ internal const val MUSHAF_DIAL_SPEED_RISE_TAU_S = 0.05f
  */
 internal const val MUSHAF_DIAL_SPEED_FALL_TAU_S = 0.06f
 
-/**
- * How far past either end of the book the dial may be dragged, in dp.
- *
- * Measured on screen rather than in leaves so the rubber reads the same
- * whatever the scale it is stretching against.
- */
-internal const val MUSHAF_DIAL_SLACK_DP = 18f
-
 /** The tactile rhythm the dial keeps: no tick closer than this to the last. */
 internal const val MUSHAF_DIAL_HAPTIC_PITCH_DP = 4f
 
@@ -181,21 +173,6 @@ internal const val MUSHAF_DIAL_HAPTIC_MIN_S = 0.045f
 
 /** How fast the entry offset is paid off, in seconds. See [mushafDialTroughPage]. */
 internal const val MUSHAF_DIAL_TROUGH_SETTLE_TAU_S = 0.11f
-
-/**
- * Leaves per dp in the chapter tier, on a rule with [trackDp] of usable
- * measure holding [pageCount] leaves.
- *
- * The whole book across the whole measure, and so exactly the rule's own
- * scale: the comb of chapters travels with the finger point for point, and
- * "drag to the left edge" and "arrive at an-Nās" are the same gesture on any
- * width of phone. Derived rather than declared, because that property is a
- * relation between the book and the screen and not a number.
- */
-internal fun mushafDialBookGain(pageCount: Int, trackDp: Float): Float {
-    if (trackDp <= 0f) return 1f
-    return (pageCount - 1).coerceAtLeast(1) / trackDp
-}
 
 /**
  * The running speed estimate after a sample [instantDpPerSec] arriving
@@ -214,14 +191,6 @@ internal fun mushafDialSpeed(previous: Float, instantDpPerSec: Float, dtSeconds:
     val alpha = 1f - exp(-dtSeconds / tau)
     return previous + (instant - previous) * alpha
 }
-
-/**
- * How far past an end the dial may be dragged, in leaves, at this [gain].
- *
- * See [MUSHAF_DIAL_SLACK_DP]: that screen distance converted into the units
- * the dial actually holds.
- */
-internal fun mushafDialSlack(gain: Float): Float = MUSHAF_DIAL_SLACK_DP * gain
 
 /**
  * Whether a hand this still, for this long, has asked for the trough.
@@ -283,20 +252,6 @@ internal fun mushafDialTroughPage(fraction: Float, run: IntRange): Float {
 }
 
 /**
- * Where the mark for [page] stands, in px from the left of the rule, given the
- * thumb at [thumbXPx] over leaf [at] and [pitchPx] of screen per leaf.
- *
- * The comb is pinned to the thumb rather than to the paper. In the chapter
- * tier that is the whole readout: the hand pushes the book's own scale along,
- * one point of screen to one point, so what the reader sees moving under their
- * thumb is exactly what they are spending.
- *
- * Leaf numbers grow leftward, as the book does.
- */
-internal fun mushafDialTickX(thumbXPx: Float, page: Int, at: Float, pitchPx: Float): Float =
-    thumbXPx - (page - at) * pitchPx
-
-/**
  * Where the thumb may stand when it is following a finger at [xPx], on a rule
  * [widthPx] wide holding [insetPx] back at each end.
  *
@@ -349,15 +304,19 @@ internal data class MushafDialLabel(val chapter: String, val fromAyah: Int, val 
  *
  * Chapter tier, the chapter alone. The reader crossing the book is steering by
  * chapters, and a verse range that turns over between every pair of frames is
- * not something anyone reads — worse, it invites them to aim with it. In the
- * trough the leaf is the target, so the label says which verses are on it.
+ * not something anyone reads — worse, it invites them to aim with it.
+ *
+ * In the trough the leaf itself is the target, so the label names the leaf the
+ * way the leaf names itself: its folio, and the verses standing on it. The
+ * chapter stays at the front because the trough is a magnification of one, and
+ * a number alone would leave the reader with nothing to check it against.
  */
-internal fun mushafDialLabelText(label: MushafDialLabel, zoomed: Boolean): String {
+internal fun mushafDialLabelText(label: MushafDialLabel, zoomed: Boolean, page: Int): String {
     if (!zoomed) return label.chapter
     val verses =
         if (label.toAyah <= label.fromAyah) "${label.fromAyah}"
         else "${label.fromAyah}–${label.toAyah}"
-    return "${label.chapter}  $verses"
+    return "${label.chapter} $verses  ·  $page"
 }
 
 /**
@@ -542,10 +501,18 @@ internal fun MushafPageDial(
             // is not. See the note at the head of this file for why the thumb
             // follows the finger rather than the page.
             val thumbX = if (scrubbing || handed) handX.floatValue else seatX
-            // The book's own scale: the whole 604 across the measure. Both
-            // tiers are drawn from it — the chapter tier stands on it, and the
-            // trough is what one chapter's worth of it stretches into.
-            val bookPitchPx = (size.width - 2f * inset) / (pages - 1).coerceAtLeast(1)
+            // The book's own scale: leaf 1 at the right end of the measure,
+            // leaf 604 at the left, nailed to the rule. Both tiers are drawn
+            // from it — the chapter comb stands on it, and the trough is what
+            // one chapter's worth of it stretches into.
+            //
+            // Nailed, not carried under the thumb: a comb that travels with
+            // the hand runs off the end of its own measure, and the reader is
+            // left looking at bare rule beyond the last chapter with no way to
+            // tell whether that is the end of the book or the end of the comb.
+            // The book does not move. The reader moves along it.
+            fun bookX(page: Float) =
+                mushafDialTrackX(1f - mushafDialFraction(page, pages), size.width, inset)
             val run = troughRun
             val runSpan = (run.last - run.first).coerceAtLeast(1)
             val headroom = ruleY - 1.5.dp.toPx()
@@ -562,8 +529,8 @@ internal fun MushafPageDial(
             // the only way to say "you are inside this chapter now" to a reader
             // whose own finger is covering the line.
             if (lift > 0.004f && chapterMarks.isNotEmpty()) {
-                val fromX = mushafDialTickX(thumbX, run.first, at, bookPitchPx)
-                val toX = mushafDialTickX(thumbX, run.last, at, bookPitchPx)
+                val fromX = bookX(run.first.toFloat())
+                val toX = bookX(run.last.toFloat())
                 val minW = MushafDialBracketMin.toPx()
                 val centre = (fromX + toX) / 2f
                 val half = maxOf(abs(fromX - toX), minW) / 2f
@@ -578,16 +545,17 @@ internal fun MushafPageDial(
                 )
             }
 
-            // The chapter tier's comb: one mark per chapter opening, pinned to
-            // the thumb on the book's scale, so it slides exactly as far as the
-            // hand does. This is what the reader steers by by default, at any
-            // speed — it is not taken away for going fast or for going slow.
+            // The chapter tier's comb: one mark per chapter opening, standing
+            // where that chapter stands in the book, end to end of the rule.
+            // This is what the reader steers by by default, at any speed — it
+            // is not taken away for going fast or for going slow, and it does
+            // not move, so the far left really is the back of the book.
             val combInk = lift * (1f - open)
             if (combInk > 0.004f) {
                 val tick = MushafDialChapterTick.toPx()
                 var previousX = Float.MAX_VALUE
                 for (mark in chapterMarks) {
-                    val x = mushafDialTickX(thumbX, mark, at, bookPitchPx)
+                    val x = bookX(mark.toFloat())
                     if (x < -rule || x > size.width + rule) continue
                     // Marks run leftward as the number grows. The short
                     // chapters at the back of the book share leaves, so
@@ -614,13 +582,13 @@ internal fun MushafPageDial(
                 val tick = MushafDialPageTick.toPx()
                 val strength = lift * open
                 for (page in run.first..run.last) {
-                    val bookX = mushafDialTickX(thumbX, page, at, bookPitchPx)
+                    val seat = bookX(page.toFloat())
                     val troughX = mushafDialTrackX(
                         1f - (page - run.first).toFloat() / runSpan,
                         size.width,
                         inset,
                     )
-                    val x = lerp(bookX, troughX, open)
+                    val x = lerp(seat, troughX, open)
                     if (x < -rule || x > size.width + rule) continue
                     val length = (tick * strength).coerceAtMost(headroom)
                     if (length <= 0.4f) continue
@@ -633,46 +601,34 @@ internal fun MushafPageDial(
                 }
             }
 
-            // The seat: this leaf's place in the book, kept in view for the
-            // whole scrub. Without it the thumb's return has no destination
-            // and reads as the marker wandering off on its own; with it the
-            // thumb is plainly going home to a mark that was always there.
-            // It dissolves as the thumb arrives, being the same mark — and it
-            // stands down inside the trough, where the measure has stopped
-            // being the book and its seat would be a mark in another scale.
-            if (lift > 0.004f && open < 0.996f) {
-                val thumbWNow = (MushafDialThumbHeight.toPx() +
-                    (MushafDialThumbHeldHeight - MushafDialThumbHeight).toPx() * lift) *
-                    MushafDialThumbAspect
-                val apart = (abs(thumbX - seatX) / thumbWNow).coerceIn(0f, 1f)
-                val seatAlpha = 0.26f * lift * apart * (1f - open)
-                if (seatAlpha > 0.004f) {
-                    val seatH = MushafDialThumbHeight.toPx()
-                    val seatW = seatH * MushafDialThumbAspect * MushafDialSeatWidth
-                    drawRoundRect(
-                        color = ink.copy(alpha = seatAlpha),
-                        topLeft = Offset(
-                            (seatX - seatW / 2f).coerceIn(0f, size.width - seatW),
-                            ruleY - seatH / 2f,
-                        ),
-                        size = Size(seatW, seatH),
-                        cornerRadius = CornerRadius(seatH, seatH),
-                    )
-                }
+            // The marker, and when there is one at all.
+            //
+            // At rest it is the ribbon: this leaf's place among the 604, the
+            // only thing on the rule. Under a hand at chapter granularity it
+            // goes out entirely — what the reader has hold of there is the
+            // *comb*, and the cell of it their finger is in is drawn as the
+            // bracket. A marker riding the line beside all that is a second
+            // answer to a question the comb has already answered, and it
+            // turned the gesture into dragging a knob past some scenery.
+            //
+            // It comes back inside the trough, where it is the right answer:
+            // the chapter has been magnified into a measure of its own, and a
+            // seat mark standing in it is what the reader scrubs with. It
+            // fades back in as the trough shuts, so the rule ends the gesture
+            // holding a place again.
+            val marker = maxOf(open, 1f - lift)
+            if (thumbInk * marker > 0.004f) {
+                val thumbH = MushafDialThumbHeight.toPx() +
+                    (MushafDialThumbHeldHeight - MushafDialThumbHeight).toPx() * lift
+                val thumbW = thumbH * MushafDialThumbAspect
+                val left = (thumbX - thumbW / 2f).coerceIn(0f, size.width - thumbW)
+                drawRoundRect(
+                    color = ink.copy(alpha = thumbInk * marker),
+                    topLeft = Offset(left, ruleY - thumbH / 2f),
+                    size = Size(thumbW, thumbH),
+                    cornerRadius = CornerRadius(thumbH, thumbH),
+                )
             }
-            // The thumb: where in the book this leaf sits. A little thicker
-            // than the rule and rounded, so it reads as a marker laid on the
-            // line rather than a control fixed to it.
-            val thumbH = MushafDialThumbHeight.toPx() +
-                (MushafDialThumbHeldHeight - MushafDialThumbHeight).toPx() * lift
-            val thumbW = thumbH * MushafDialThumbAspect
-            val left = (thumbX - thumbW / 2f).coerceIn(0f, size.width - thumbW)
-            drawRoundRect(
-                color = ink.copy(alpha = thumbInk),
-                topLeft = Offset(left, ruleY - thumbH / 2f),
-                size = Size(thumbW, thumbH),
-                cornerRadius = CornerRadius(thumbH, thumbH),
-            )
         }
         if (hud != null) {
             // Type alone, no capsule: on this paper anything with a ground
@@ -680,7 +636,7 @@ internal fun MushafPageDial(
             // the transport's own small hand, because it stands on the
             // transport's paper rather than on the leaf.
             Text(
-                text = mushafDialLabelText(hud, trough),
+                text = mushafDialLabelText(hud, trough, hudPage),
                 style = MaterialTheme.typography.labelSmall.copy(letterSpacing = 0.08.em),
                 color = ink.copy(alpha = 0.72f),
                 maxLines = 1,
@@ -731,11 +687,6 @@ internal fun MushafPageDial(
                         handed = false
                         val insetPx = MushafDialEdgeInset.toPx()
                         val widthPxNow = size.width.toFloat()
-                        val trackDp = (widthPxNow - 2f * insetPx) / density
-                        // The chapter tier's scale: the book across the
-                        // measure, so the comb travels with the finger.
-                        val bookGain = mushafDialBookGain(pages, trackDp)
-                        val slack = mushafDialSlack(bookGain)
                         val edgePx = MUSHAF_DIAL_EDGE_DP * density
                         var lastX = down.position.x
                         // What the hand has travelled since the meter last
@@ -838,18 +789,21 @@ internal fun MushafPageDial(
                                     }
                                     continue
                                 }
-                                // The chapter tier: push the book's own scale
-                                // along, one point of screen to one point.
-                                if (dxDp != 0f) {
-                                    // Accumulate raw and band once: re-banding
-                                    // an already-banded value compounds the
-                                    // curve.
-                                    raw = (raw - dxDp * bookGain)
-                                        .coerceIn(1f - slack, pages + slack)
-                                    dialPage.floatValue =
-                                        rubberBandDialPosition(raw, 1f, pages.toFloat())
-                                }
-                                val landed = dialPage.floatValue.roundToInt().coerceIn(1, pages)
+                                // The chapter tier, read the same way the
+                                // trough is: the finger's place along the
+                                // measure names a place in the book, right end
+                                // to left end. The comb it is reading is
+                                // nailed to the rule, so any other mapping
+                                // would put the bracket somewhere the reader's
+                                // own finger is not — and both ends would stop
+                                // meaning the ends of the book after the first
+                                // stroke that ran past one.
+                                raw = mushafDialTroughPage(
+                                    mushafDialTrackFraction(handPx, widthPxNow, insetPx),
+                                    1..pages,
+                                )
+                                dialPage.floatValue = raw
+                                val landed = raw.roundToInt().coerceIn(1, pages)
                                 val chapter = mushafDialChapterRun(chapterMarks, landed, pages)
                                 if (chapter.first != lastChapter) {
                                     if (mushafDialHapticDue(travelDp, sinceTickS)) {

@@ -12,35 +12,43 @@ import org.junit.Test
  */
 class MushafPageDialTest {
 
-    /** A phone's width less the rule's two 14dp insets. */
-    private val trackDp = 360f - 28f
-    private val bookGain = mushafDialBookGain(604, trackDp)
+    /** A phone's rule, in px, and the inset each end is held back by. */
+    private val widthPx = 1080f
+    private val insetPx = 42f
 
     @Test
-    fun `one stroke of the measure is the whole book`() {
-        // The chapter tier's only promise: drag from one end of the rule to
-        // the other and you have crossed all 604. Not "most of them" with a
-        // fudge factor — the last leaf has to be reachable in one stroke or
-        // "all the way left is the last chapter" is not true.
-        assertEquals(603f, bookGain * trackDp, 0.5f)
+    fun `the whole book lies across the measure, right end to left end`() {
+        // The chapter tier reads the finger's place along the rule as a place
+        // in the book — the same law the trough uses, over the whole 604. So
+        // the far right is al-Fatihah and the far left is the back of the
+        // book, in one stroke, on any width of phone.
+        val book = 1..604
+        assertEquals(1f, mushafDialTroughPage(1f, book), 1e-4f)
+        assertEquals(604f, mushafDialTroughPage(0f, book), 1e-4f)
     }
 
     @Test
-    fun `the book's scale is a relation to the screen, not a number`() {
-        // A tablet's wider rule spends more screen on the same book, so a dp
-        // buys fewer leaves. Hard-coding leaves-per-dp would make the sweep
-        // overshoot on a small phone and fall short on a large one.
-        val narrow = mushafDialBookGain(604, 300f)
-        val wide = mushafDialBookGain(604, 900f)
-        assertTrue("wide $wide must be gentler than narrow $narrow", wide < narrow)
-        assertEquals(603f, narrow * 300f, 0.5f)
-        assertEquals(603f, wide * 900f, 0.5f)
+    fun `the comb the finger reads stands where the finger says it is`() {
+        // The comb is nailed to the rule, and the tier is read off the same
+        // scale, so a mark's place on screen and the finger's place over it
+        // are the same arithmetic run in opposite directions. Anything else
+        // and the bracket lands somewhere the reader's finger is not.
+        for (page in intArrayOf(1, 2, 50, 300, 603, 604)) {
+            val x = mushafDialTrackX(1f - mushafDialFraction(page.toFloat(), 604), widthPx, insetPx)
+            val read = mushafDialTroughPage(mushafDialTrackFraction(x, widthPx, insetPx), 1..604)
+            assertEquals(page.toFloat(), read, 0.01f)
+        }
     }
 
     @Test
-    fun `a book with no length still has a usable scale`() {
-        assertTrue(mushafDialBookGain(1, trackDp) > 0f)
-        assertEquals(1f, mushafDialBookGain(604, 0f), 1e-6f)
+    fun `the comb never runs off the end of its own rule`() {
+        // What a comb carried under the thumb did: slide until the last
+        // chapter sat mid-rule with bare line beyond it, and the reader could
+        // not tell the end of the book from the end of the comb.
+        for (page in intArrayOf(1, 604)) {
+            val x = mushafDialTrackX(1f - mushafDialFraction(page.toFloat(), 604), widthPx, insetPx)
+            assertTrue("leaf $page stood at $x", x >= insetPx - 0.01f && x <= widthPx - insetPx + 0.01f)
+        }
     }
 
     @Test
@@ -213,15 +221,6 @@ class MushafPageDialTest {
     }
 
     @Test
-    fun `the rubber gives the same on screen whatever the book's length`() {
-        // Slack is held in dp and converted, not held in leaves: eighteen
-        // leaves of overshoot is a whole screen in a short book and invisible
-        // in a long one.
-        assertEquals(MUSHAF_DIAL_SLACK_DP, mushafDialSlack(bookGain) / bookGain, 1e-3f)
-        assertTrue(mushafDialSlack(bookGain) > mushafDialSlack(mushafDialBookGain(30, trackDp)))
-    }
-
-    @Test
     fun `the book runs right to left, end to end`() {
         assertEquals(0f, mushafDialFraction(1f, 604), 1e-6f)
         assertEquals(1f, mushafDialFraction(604f, 604), 1e-6f)
@@ -240,45 +239,6 @@ class MushafPageDialTest {
         assertTrue(rubberBandDialPosition(-9f, 1f, 604f) > -9f)
         assertTrue(rubberBandDialPosition(700f, 1f, 604f) > 604f)
         assertTrue(rubberBandDialPosition(700f, 1f, 604f) < 700f)
-    }
-
-    @Test
-    fun `a comb mark stands at the book's pitch, pinned to the thumb`() {
-        val pitchPx = 3f
-        val here = mushafDialTickX(thumbXPx = 500f, page = 100, at = 100f, pitchPx = pitchPx)
-        val next = mushafDialTickX(thumbXPx = 500f, page = 101, at = 100f, pitchPx = pitchPx)
-        assertEquals(500f, here, 1e-3f)
-        assertEquals(pitchPx, here - next, 1e-3f)
-    }
-
-    @Test
-    fun `later leaves stand to the left, as the book runs`() {
-        val ahead = mushafDialTickX(400f, page = 300, at = 290f, pitchPx = 10f)
-        val behind = mushafDialTickX(400f, page = 280, at = 290f, pitchPx = 10f)
-        assertTrue("later leaf must sit left of the thumb", ahead < 400f)
-        assertTrue("earlier leaf must sit right of the thumb", behind > 400f)
-    }
-
-    @Test
-    fun `a fractional leaf slides the comb rather than jumping it`() {
-        val pitchPx = 20f
-        val at = mushafDialTickX(500f, page = 100, at = 100f, pitchPx = pitchPx)
-        val halfway = mushafDialTickX(500f, page = 100, at = 100.5f, pitchPx = pitchPx)
-        assertEquals(pitchPx / 2f, halfway - at, 1e-3f)
-    }
-
-    @Test
-    fun `the comb travels exactly as far as the hand does`() {
-        // The chapter tier's whole feel: the comb is pinned to the thumb, so
-        // a chapter mark under the finger stays under the finger. Push the
-        // book's scale by a dp of screen and the comb moves that same dp.
-        val pitchPx = 3f
-        val gain = 1f / 3f // leaves per px at this pitch
-        val before = mushafDialTickX(500f, page = 120, at = 100f, pitchPx = pitchPx)
-        // Ten px of screen to the right is ten px of comb to the right, and
-        // the leaf under the thumb drops by what those ten px are worth.
-        val after = mushafDialTickX(510f, page = 120, at = 100f - 10f * gain, pitchPx = pitchPx)
-        assertEquals(before, after, 1e-3f)
     }
 
     @Test
@@ -403,12 +363,12 @@ class MushafPageDialTest {
     }
 
     @Test
-    fun `the label names a chapter in the comb and a run of verses in the trough`() {
+    fun `the label names a chapter in the comb, and the leaf itself in the trough`() {
         val leaf = MushafDialLabel(chapter = "Al-Baqarah", fromAyah = 6, toAyah = 16)
-        assertEquals("Al-Baqarah", mushafDialLabelText(leaf, zoomed = false))
-        assertEquals("Al-Baqarah  6–16", mushafDialLabelText(leaf, zoomed = true))
+        assertEquals("Al-Baqarah", mushafDialLabelText(leaf, zoomed = false, page = 42))
+        assertEquals("Al-Baqarah 6–16  ·  42", mushafDialLabelText(leaf, zoomed = true, page = 42))
         // A leaf holding one verse says one number, not "282-282".
         val long = MushafDialLabel(chapter = "Al-Baqarah", fromAyah = 282, toAyah = 282)
-        assertEquals("Al-Baqarah  282", mushafDialLabelText(long, zoomed = true))
+        assertEquals("Al-Baqarah 282  ·  49", mushafDialLabelText(long, zoomed = true, page = 49))
     }
 }
