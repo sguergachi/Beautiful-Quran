@@ -176,7 +176,7 @@ keeps it shut until the hand is back on the line and over the measure.
 resting in the run-out is over no leaf, so it should not be handed a trough it
 did not ask for. But it also means a reader who has just walked out and wants
 straight back in gets nothing for holding, and a control whose only answer to a
-held finger is silence reads as broken. So a hold of about six ordinary holds
+held finger is silence reads as broken. So a hold of about eight ordinary holds
 opens the trough from wherever the finger is, guard and all: at that length it
 cannot be the tail of a stroke, and there is nothing else a motionless finger
 out there could mean. Opening this way takes the line it finds as the line it

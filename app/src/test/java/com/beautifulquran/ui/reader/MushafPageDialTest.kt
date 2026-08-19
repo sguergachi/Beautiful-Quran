@@ -98,10 +98,11 @@ class MushafPageDialTest {
 
     @Test
     fun `the hold is short enough to feel like a gesture and long enough to be one`() {
-        // A quarter second: past a stall in an ordinary stroke, short of a
-        // wait. And the threshold sits far below any real steering speed, so
-        // a reader creeping through the chapters is not clicked into a trough.
-        assertTrue(MUSHAF_DIAL_HOLD_S in 0.18f..0.35f)
+        // A sixth of a second: past a stall in an ordinary stroke, short of
+        // anything a finger on glass would call a wait. And the threshold sits
+        // far below any real steering speed, so a reader creeping through the
+        // chapters is not clicked into a trough.
+        assertTrue(MUSHAF_DIAL_HOLD_S in 0.12f..0.24f)
         assertTrue(MUSHAF_DIAL_HOLD_DP_S < 30f)
     }
 
