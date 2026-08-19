@@ -235,7 +235,13 @@ close a `Timings patch — …` GitHub issue, **do this checklist in order**:
 4. **Implement the class fix** + add the patch case (input = broken shape,
    expected = Lab/ear topology). Run `python3 tools/test_build_db.py`.
 5. **Rebuild**: `python3 tools/build_db.py`, bump `DB_FILE_NAME`, commit DB +
-   cases.
+   cases. A rebuild usually improves rows besides yours, and the fail-closed
+   delta gate withholds every one of them. Transplanting only your rows is the
+   quick way past that, and it is how the shipped database drifted away from
+   its own pipeline for eight versions (4861e0de → af9959bd). Give the rest
+   verdicts, or record them in
+   [tools/timing_verdicts/OUTSTANDING.md](tools/timing_verdicts/OUTSTANDING.md)
+   — never leave them silently unshipped.
 6. **Do not** land per-ayah overrides. Delete any local reproduction JSON
    before committing.
 
