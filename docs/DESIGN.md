@@ -121,7 +121,12 @@ answer to a question the comb had already answered, and it turned the gesture
 into dragging a knob past some scenery. A click of haptic marks each opening
 crossed, spaced by distance and by time rather than by crossings, because at
 the book's scale the openings are three points of screen apart and one tick
-each is a buzz.
+each is a buzz. The comb's own teeth are drawn stronger than the trough's
+leaves, which looks backwards and is not: the trough's leaves are tall and
+spread across a whole measure, while these are hairlines at a hundred and
+fourteen to a screen, and at furniture weight they read as a smudge on the rule
+rather than as marks a reader can count and aim between — which is the only
+thing they are for. Weight here buys legibility at a pitch, not emphasis.
 
 **Hold still, and the cell under your finger opens.** A quarter second at rest
 — past the stall in an ordinary rough stroke, short of a wait — and a click of
@@ -161,6 +166,18 @@ leaving it counts at once, and it is read as a displacement from the press so
 that a slow deliberate lift works as well as a flick. Either way the trough
 collapses back into the hairline, and the same pair that let the reader out
 keeps it shut until the hand is back on the line and over the measure.
+
+**A hand can insist.** That guard is there to stop an *accident* — a finger
+resting in the run-out is over no leaf, so it should not be handed a trough it
+did not ask for. But it also means a reader who has just walked out and wants
+straight back in gets nothing for holding, and a control whose only answer to a
+held finger is silence reads as broken. So a hold of about six ordinary holds
+opens the trough from wherever the finger is, guard and all: at that length it
+cannot be the tail of a stroke, and there is nothing else a motionless finger
+out there could mean. Opening this way takes the line it finds as the line it
+was pressed on and suspends the run-out until the hand is back over the
+measure — otherwise the resistance, which is far shorter than the hold that
+beat it, would take the trough back in the same breath it was given.
 
 **Speed does not close it**, and this is the correction to an earlier rule that
 said it did. Moving off at pace looked like "the reader is steering again", but

@@ -106,6 +106,32 @@ class MushafPageDialTest {
     }
 
     @Test
+    fun `an insistent hold asks for the trough from anywhere, and costs more`() {
+        // The stillness test is the same one; only the clock is longer. It has
+        // to be long enough that nothing a reader does on the way somewhere
+        // reaches it, which means clearly past the ordinary hold, and short
+        // enough to still be a pause rather than a wait.
+        assertTrue(mushafDialInsists(0f, MUSHAF_DIAL_INSIST_S))
+        assertFalse(mushafDialInsists(0f, MUSHAF_DIAL_INSIST_S * 0.9f))
+        assertFalse(mushafDialInsists(MUSHAF_DIAL_HOLD_DP_S * 3f, 10f))
+        assertTrue(MUSHAF_DIAL_INSIST_S > MUSHAF_DIAL_HOLD_S * 4f)
+        assertTrue(MUSHAF_DIAL_INSIST_S in 1f..2.5f)
+    }
+
+    @Test
+    fun `every ordinary hold is already an insistent one waiting`() {
+        // The two are nested, not rival: a hold that has reached the long
+        // clock has certainly passed the short one. So the guarded path can
+        // never be the *only* one to fire at a moment the insistent path
+        // would, and the placement guard is the only thing separating them.
+        var held = 0f
+        while (held <= 3f) {
+            if (mushafDialInsists(0f, held)) assertTrue(mushafDialShouldOpen(0f, held))
+            held += 0.02f
+        }
+    }
+
+    @Test
     fun `the trough is left by going past an end of it, and by nothing else`() {
         // A 360 dp rule at 3x: the measure runs from the trough inset to that
         // far from the other end, and the run-out is what lies beyond.

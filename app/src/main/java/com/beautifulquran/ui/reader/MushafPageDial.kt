@@ -112,6 +112,15 @@ import kotlin.math.roundToInt
  * ground has changed back, and the same pair keeps it shut until the hand is
  * back on the line and over the measure.
  *
+ * Except that a hand can insist. Holding still for about six times the
+ * ordinary hold opens the trough from wherever the finger is, guard and all —
+ * because the guard is there to stop an *accident*, and a finger that has sat
+ * motionless out in the run-out for a second and a half is not one. A control
+ * whose only answer to a held finger is silence reads as broken. The insistent
+ * open takes the line it finds as the line it was pressed on, and forgives the
+ * run-out until the hand is back over the measure; otherwise it would hand the
+ * trough over and take it back in the same breath.
+ *
  * Which leaves the thumb somewhere to be. In the chapter tier a gain that is
  * not 1:1 cannot both keep the thumb under the finger and keep it at the
  * leaf's own seat on the rule; it is the *finger* the thumb belongs to. A
@@ -142,6 +151,29 @@ internal const val MUSHAF_DIAL_HOLD_DP_S = 16f
  * gesture rather than a wait.
  */
 internal const val MUSHAF_DIAL_HOLD_S = 0.26f
+
+/**
+ * How long a hand has to stay still, in seconds, to open the trough from
+ * anywhere at all: the insistent hold.
+ *
+ * The ordinary hold asks where the finger is, because the guard that keeps the
+ * trough shut after a reader has walked out of it is the same guard. That is
+ * right for the common case and wrong for the reader who has walked out and
+ * wants straight back in: they are sitting in the run-out, or off the line,
+ * holding perfectly still, and nothing happens. A control whose only answer to
+ * a held finger is silence reads as broken, wherever the finger is.
+ *
+ * So a hold long enough that it cannot be the tail of a stroke is taken as an
+ * instruction rather than a position, and it overrides both places. It costs
+ * about six ordinary holds — long enough that no scrub ever reaches it by
+ * accident, short enough to be a pause and not a wait.
+ *
+ * Opening this way re-anchors the gesture: the line the finger is on becomes
+ * the line it pressed on, and the run-out is forgiven until the hand is back
+ * over the measure. Otherwise the reader would be handed the trough and have
+ * it taken away again in the same fifth of a second, over and over.
+ */
+internal const val MUSHAF_DIAL_INSIST_S = 1.5f
 
 /**
  * How much bare rule the trough leaves standing past its own last leaf at
@@ -258,6 +290,18 @@ internal fun mushafDialSpeed(previous: Float, instantDpPerSec: Float, dtSeconds:
  */
 internal fun mushafDialShouldOpen(speedDpPerSec: Float, heldSeconds: Float): Boolean =
     abs(speedDpPerSec) < MUSHAF_DIAL_HOLD_DP_S && heldSeconds >= MUSHAF_DIAL_HOLD_S
+
+/**
+ * Whether a hand this still, for this much longer, has asked for the trough
+ * from wherever it happens to be sitting.
+ *
+ * The same test as [mushafDialShouldOpen] with a longer clock, and the only
+ * one that is not asked about the finger's place. A reader out in the run-out
+ * or off the line has been told no by the guard; holding through this says
+ * they meant it, and there is nothing else a held finger out there could mean.
+ */
+internal fun mushafDialInsists(speedDpPerSec: Float, heldSeconds: Float): Boolean =
+    abs(speedDpPerSec) < MUSHAF_DIAL_HOLD_DP_S && heldSeconds >= MUSHAF_DIAL_INSIST_S
 
 /**
  * Whether a finger at [xPx] has carried off the end of the trough's measure,
@@ -665,7 +709,14 @@ internal fun MushafPageDial(
                     val length = (tick * combInk).coerceAtMost(headroom)
                     if (length <= 0.4f) continue
                     drawRoundRect(
-                        color = ink.copy(alpha = 0.34f * combInk),
+                        // Stronger than the trough's own leaves, which is the
+                        // right way round: those are five dp tall and spread
+                        // across a whole measure, these are hairlines at a
+                        // hundred and fourteen to a screen. At furniture
+                        // weight the comb read as a smudge on the rule rather
+                        // than as marks a reader could count and aim between,
+                        // which is the only thing it is for.
+                        color = ink.copy(alpha = 0.54f * combInk),
                         topLeft = Offset(x - rule / 2f, ruleY - length),
                         size = Size(rule, length),
                         cornerRadius = CornerRadius(rule, rule),
@@ -788,11 +839,12 @@ internal fun MushafPageDial(
                         val widthPxNow = size.width.toFloat()
                         val troughInsetPx = insetPx + MushafDialRunOut.toPx()
                         val strayPx = MushafDialStray.toPx()
-                        // The line the reader took hold of. Fixed for the
-                        // whole gesture: the question the stray test asks is
-                        // whether they have left it, and a reference that
-                        // crept along with the finger could not be left.
-                        val pressY = down.position.y
+                        // The line the reader took hold of. It does not creep
+                        // along with the finger — the question the stray test
+                        // asks is whether they have left it, and a reference
+                        // that followed them could not be left. It moves once,
+                        // and only when an insistent hold declares a new one.
+                        var pressY = down.position.y
                         var handY = pressY
                         var lastX = down.position.x
                         // What the hand has travelled since the meter last
@@ -813,6 +865,14 @@ internal fun MushafPageDial(
                         // How long the hand has been out in the run-out. The
                         // width of it is room to aim; this is its resistance.
                         var runOutS = 0f
+                        // Whether the trough standing open was asked for from
+                        // out in the run-out. The resistance is suspended
+                        // while it is — a trough handed over out there would
+                        // otherwise be taken back within the fifth of a second
+                        // it takes the same clock to fill again. It lapses the
+                        // moment the hand is back over the measure, which is
+                        // the moment the ordinary law can be obeyed.
+                        var insisted = false
                         var travelDp = 0f
                         var sinceTickS = 0f
                         var lastChapter = mushafDialChapterRun(
@@ -869,7 +929,8 @@ internal fun MushafPageDial(
                                 val past =
                                     mushafDialPastTrough(handPx, widthPxNow, troughInsetPx)
                                 val strayed = mushafDialStrayed(handY, pressY, strayPx)
-                                runOutS = if (past) runOutS + dt else 0f
+                                if (!past) insisted = false
+                                runOutS = if (past && !insisted) runOutS + dt else 0f
                                 if (open) {
                                     // Absolute, inside the chapter: the finger
                                     // names a place between the two ends.
@@ -937,8 +998,24 @@ internal fun MushafPageDial(
                                 // holding perfectly still out there and the
                                 // trough it left has no leaf under it; it
                                 // re-opens once the hand is back on the line
-                                // and over the measure.
-                                if (!past && !strayed && mushafDialShouldOpen(speed, heldS)) {
+                                // and over the measure — or once the hand has
+                                // held long enough to say it meant it, which
+                                // is asked of nowhere in particular.
+                                val insists = mushafDialInsists(speed, heldS)
+                                if (insists ||
+                                    (!past && !strayed && mushafDialShouldOpen(speed, heldS))
+                                ) {
+                                    if (insists) {
+                                        // The hold names its own line, and
+                                        // buys off the run-out until the hand
+                                        // is back over the measure. Without
+                                        // both, the frame after this one would
+                                        // read the guard it just overrode and
+                                        // shut what it had opened.
+                                        pressY = handY
+                                        insisted = past
+                                        runOutS = 0f
+                                    }
                                     // Enter on the leaf the hand is actually
                                     // on, and let the trough's absolute scale
                                     // arrive underneath it.
