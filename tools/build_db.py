@@ -82,10 +82,21 @@ QAC_MORPHOLOGY_URL = (
     "https://raw.githubusercontent.com/cltk/arabic_morphology_quranic-corpus"
     "/master/quranic-corpus-morphology-0.4.txt"
 )
+# The QCF V2 page fonts address their glyphs by position: font QCF2{page} maps
+# U+FC41 onward, one codepoint per glyph, to the words of that page in reading
+# order. So a word's page is not a label that can be taken from anywhere — it
+# selects the font that draws it, and a word carrying page N's codepoints under
+# page N+1's label is drawn by the wrong font and comes out as different words
+# (or, where N+1's font has no glyph there, as tofu). Quran.com's v4 API is the
+# layout the fonts were cut for and reports page, line and codepoint per word
+# from one source, so the three cannot drift apart; assert_qcf_v2_runs() checks
+# that they haven't. The zonetecde/mushaf-layout mirror used to fill this role
+# and broke the invariant on 31 pages (see docs/CHESTERTON.md).
 MUSHAF_LAYOUT_PAGE_URL = (
-    "https://raw.githubusercontent.com/zonetecde/mushaf-layout"
-    "/refs/heads/main/mushaf/page-{page:03d}.json"
+    "https://api.quran.com/api/v4/verses/by_page/{page}?words=true&per_page=50"
+    "&word_fields=location,line_number,char_type_name,code_v2,text_uthmani,page_number"
 )
+QCF_V2_FIRST_CODEPOINT = 0xFC41
 
 # id, everyayah slug (audio dir + timing file key), display name, style
 RECITERS = [
@@ -237,35 +248,93 @@ def load_wbw(tgz: Path):
 
 
 def load_qcf_v2_layout():
-    """Return {(surah, ayah): [(word, glyph, page, line), ...]} from the public
-    precomputed Madani Mushaf layout. Some visual words intentionally cover
-    multiple canonical timing words; they are aligned later per ayah."""
+    """Return {(surah, ayah): [(word, glyph, page, line), ...]} for the Madani
+    Mushaf layout the QCF V2 page fonts were cut for. Some visual words
+    intentionally cover multiple canonical timing words; they are aligned later
+    per ayah.
+
+    The ayah circle is its own word to the API ("end"); it carries no position
+    of its own, so its codepoint is folded onto the word it follows — which is
+    how the fonts lay it out and how qcf_v2 stores it."""
     out = {}
+    seen = set()
     for page in range(1, 605):
         raw = fetch_text(MUSHAF_LAYOUT_PAGE_URL.format(page=page), f"mushaf-page-{page:03d}.json")
         data = json.loads(raw)
-        for line in data.get("lines", []):
-            if line.get("type") != "text":
-                continue
-            line_number = int(line.get("line") or 0)
-            for word in line.get("words", []):
+        for verse in data.get("verses", []):
+            previous = None
+            for word in verse.get("words", []):
+                glyph = normalize_text(word.get("code_v2") or "")
+                if not glyph:
+                    continue
+                # A verse that straddles a page break is returned by both of the
+                # pages it touches; the word's own page_number is the one that
+                # counts, so take each word once, from whichever page listed it
+                # first.
+                if word.get("char_type_name") == "end":
+                    if previous is not None:
+                        key, index = previous
+                        text, mark, mark_page, mark_line = out[key][index]
+                        out[key][index] = (text, f"{mark} {glyph}", mark_page, mark_line)
+                    continue
                 location = word.get("location", "")
                 parts = location.split(":")
                 if len(parts) != 3:
                     continue
-                glyph = normalize_text(word.get("qpcV2") or "")
-                if not glyph:
+                if location in seen:
+                    previous = None
                     continue
+                seen.add(location)
                 key = (int(parts[0]), int(parts[1]))
                 out.setdefault(key, []).append(
                     (
-                        normalize_text(word.get("word") or ""),
+                        normalize_text(word.get("text_uthmani") or ""),
                         glyph,
-                        page,
-                        line_number,
+                        int(word.get("page_number") or 0),
+                        int(word.get("line_number") or 0),
                     )
                 )
+                previous = (key, len(out[key]) - 1)
     return out
+
+
+def assert_qcf_v2_runs(layout):
+    """Fail the build unless every page's glyphs are the font's own run.
+
+    Font QCF2{page} maps U+FC41, U+FC42, ... to that page's words in reading
+    order and nothing else, so the codepoints of a page, read in order, must be
+    exactly that contiguous run. When they are not, some word is labelled with a
+    page whose font cannot draw it: the leaf renders another page's words, or
+    tofu. This is the one invariant that ties the layout to the fonts we ship,
+    and it is cheap — check it rather than trust the source."""
+    pages = {}
+    for (surah, ayah), entries in layout.items():
+        for position, (_text, glyph, page, _line) in enumerate(entries, start=1):
+            pages.setdefault(page, []).append((surah, ayah, position, glyph))
+    broken = []
+    for page in sorted(pages):
+        codes = [
+            ord(ch)
+            for _s, _a, _p, glyph in sorted(pages[page])
+            for ch in glyph
+            if not ch.isspace()
+        ]
+        expected = list(range(QCF_V2_FIRST_CODEPOINT, QCF_V2_FIRST_CODEPOINT + len(codes)))
+        if codes == expected:
+            continue
+        at = next(
+            (i for i, (got, want) in enumerate(zip(codes, expected)) if got != want),
+            min(len(codes), len(expected)),
+        )
+        broken.append(
+            f"page {page}: glyph {at} is U+{codes[at]:04X}, "
+            f"expected U+{expected[at]:04X} ({len(codes)} glyphs)"
+        )
+    if broken:
+        raise SystemExit(
+            "QCF V2 layout does not match the page fonts:\n  "
+            + "\n  ".join(broken)
+        )
 
 
 def align_qcf_words(arabic_words, qcf_words, surah, ayah):
@@ -2182,6 +2251,7 @@ def main():
 
     print("[3/6] fetching QCF V2 mushaf layout")
     qcf_v2 = load_qcf_v2_layout()
+    assert_qcf_v2_runs(qcf_v2)
     print(f"  qcf v2 ayahs: {len(qcf_v2)}")
 
     print("[4/6] building words table")

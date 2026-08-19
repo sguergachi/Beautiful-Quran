@@ -105,10 +105,11 @@ const val MUSHAF_MAX_FONT_PX = 128f
  * else: no space glyph of any kind (checked — U+0020, U+00A0, the thin spaces,
  * tatweel: none are in the cmap). The Madinah page's justification therefore
  * lives in the space *between* words, which the font does not carry and the
- * renderer must supply. Measured with HarfBuzz over all ~8,800 lines
- * (tools/verify_mushaf_lines.py), a line's glyph run spans 14.2 em (p10)
- * through 15.6 (p50) to 18.7 (p99) — and the line data is right: it agrees
- * word for word with the layout the fonts were cut for.
+ * renderer must supply. Measured with HarfBuzz over all 8,820 lines
+ * (tools/measure_mushaf_lines.py), a line's glyph run spans 15.40 em (p10)
+ * through 15.57 (p50) to 16.54 (p99), longest 18.17 — a printed page is
+ * composed to one measure, so the run is nearly constant and what varies is
+ * how much space the compositor had to give away.
  *
  * So the composition is the classic one:
  *
@@ -118,12 +119,17 @@ const val MUSHAF_MAX_FONT_PX = 128f
  *
  * with one size for the whole book and the gap solved per line. The size is
  * anchored where the two costs balance, which is measurable rather than a
- * matter of taste. At 16.4 em: three lines in four fill by gap alone at a
- * median 0.12 em — an ordinary word space — and the rest are condensed
- * horizontally, half of them by under 3.5% and only 1.1% of all lines by more
- * than 12%. Anchoring on the widest line instead (18.7) leaves 99% of the page
- * gapping at a median 0.40 em, which is the "spread out" leaf; anchoring on
- * the median (15.6) throws 44% of lines into condensing.
+ * matter of taste. At 16.4 em: 96% of lines fill by gap alone at a median
+ * 0.11 em — an ordinary word space — and the remaining 4% are condensed
+ * horizontally, half of them by under 0.6% and not one line in the book by
+ * more than 12%. Anchoring on the longest line instead (18.2) gaps every line
+ * at a median 0.34 em, which is the "spread out" leaf; anchoring on the median
+ * (15.6) throws 39% of lines into condensing.
+ *
+ * These figures are from the corrected layout: until quran-v48 the line data
+ * came from a mirror that broke lines in the wrong places, which spread the
+ * same measurement over 14.2–18.7 em and made the page look composed to a
+ * measure it was never set to.
  *
  * Condensed, never resized: a line set narrower keeps its height, weight and
  * colour, so the page still reads as one hand. Changing the size line by line
