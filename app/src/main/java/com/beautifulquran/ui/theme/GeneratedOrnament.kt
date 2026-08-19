@@ -113,9 +113,9 @@ private fun DrawScope.drawRosette(
 }
 
 /**
- * The generated medallion — this launch's own star composition at the
- * ceremonial centre of the cover. [build] 0..1 inks it in stroke by stroke;
- * [sheen] tilts the leaf, both read only at draw time.
+ * A rosette at the ceremonial centre of the cover. The cover passes the
+ * fixed crescent-and-Allah mark; [build] 0..1 inks it stroke by stroke
+ * and [sheen] tilts the leaf, both read only at draw time.
  */
 @Composable
 fun GeneratedMedallion(
@@ -255,7 +255,7 @@ internal fun sealCenterPx(geometry: CoverFrameGeometry, screenRadiusPx: Float): 
  * The four corner seals — small stars of the medallion's family, the hubs
  * the border band's channels taper onto. Part of the tooled binding, so
  * they are complete from the first frame: the board arrives already bound,
- * only the illumination (medallion, field) inks in. Fills the cover;
+ * only the illumination (monogram, field) inks in. Fills the cover;
  * positions come from [geometry].
  */
 @Composable

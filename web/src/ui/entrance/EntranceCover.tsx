@@ -8,6 +8,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { animate, type AnimationPlaybackControls } from 'motion'
 import { washMaskImage } from '../theme/Fade'
 import { coverLayout, coverLayoutCssVars } from './coverLayout'
+import { coverMonogram } from '../theme/coverMonogram'
 import { generateCoverOrnament, type CoverOrnament, type RosetteSpec } from '../theme/ornamentGenerator'
 import {
   fieldWeaveBackground,
@@ -364,7 +365,7 @@ export function EntranceCover({
         <div className="entrance-content">
           <div className="entrance-air entrance-air--top" />
           <GeneratedRosette
-            spec={ornament.medallion}
+            spec={coverMonogram}
             built={built}
             className="entrance-medallion"
           />

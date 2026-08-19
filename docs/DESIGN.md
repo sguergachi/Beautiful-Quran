@@ -499,9 +499,10 @@ image, so it is crisp at any density and nearly free to render.
   open book is not fixed: a seeded generator
   (`ui/theme/ornament/OrnamentGenerator.kt`, mirrored line-for-line in
   `web/src/ui/theme/ornamentGenerator.ts` over an identical mulberry32
-  stream) composes the geometry from that vocabulary. The cover's medallion,
+  stream) composes the geometry from that vocabulary. The cover's
   corner seals, border frieze, and leather field all grow from one random
-  seed per launch. The **surah header is seeded per chapter** instead — one
+  seed per launch. The cover's centre mark is the fixed crescent-and-Allah
+  monogram (`CoverMonogram`) — two offset open arcs, no enclosing hoop. The **surah header is seeded per chapter** instead — one
   `chapterOrnamentSeed(chapterNumber, ayahCount)` grows both the rosette
   *and* the field tooled behind it (`ChapterOrnament`/`generateChapterOrnament`),
   so the header's whole ornament is this chapter's own, not a rosette
@@ -514,9 +515,9 @@ image, so it is crisp at any density and nearly free to render.
   only) come from five band grammars of tooled bindings: a zigzag lattice
   with pearls in its diamonds, a two-strand cable with pearl eyes, a Hankin
   strip, a nested lozenge chain, and a khatam chain of small eight-fold
-  stars linked by diamonds. On the cover, the **medallion and field build
+  stars linked by diamonds. On the cover, the **monogram and field build
   in real time** — strokes ink themselves in along their length across
-  ~3.4 s, field first, then medallion outside-in — so the illumination is
+  ~3.4 s, field first, then the crescent and الله — so the illumination is
   drawn before the reader's eyes, not stamped; the **border and corner
   seals are static**, complete from the very first frame, the binding's
   tooling rather than illumination. The **surah header's rosette and field
@@ -592,11 +593,14 @@ three moments:
    are one continuous piece of geometry. The frame, border, and seals
    are the binding's tooling and render complete on the very first
    frame — no wash, no fade. Tooled *inside* that frame, this launch's
-   generated Hankin field (whisper ink) and the generated medallion
-   (`GeneratedMedallion`) with the title **القرآن الكريم** beneath it
+   generated Hankin field (whisper ink) and the cover monogram — a
+   crescent of two offset open arcs (the one correct internal/external
+   pair; no enclosing hoop) with a geometric الله in the opening
+   (`CoverMonogram`) — and the title **القرآن الكريم** beneath it
    in the Hafs hand, leafed in gold, ink themselves onto the leather in
    real time as the ceremony arrives — the illumination, drawn before
-   the reader's eyes.
+   the reader's eyes. The generated shamsa stays the chapter-header
+   language and the Ornaments Lab; it is not a badge around the mark.
    The frame's inset and corner radii are derived from the display's
    rounded corners (`WindowInsets.getRoundedCorner`, via
    `coverFrameGeometry`) so the gilt rule is concentric with the phone's
@@ -622,7 +626,7 @@ three moments:
 (The web entrance is also the loading screen: the cover is up from the first
 paint while `quran.db` streams in, with progress inked onto the leather; the
 du'a wash and hinge open wait until the book is ready. Frame insets, corner
-seals, medallion, and type are derived from the live board width × height via
+seals, monogram, and type are derived from the live board width × height via
 a 48-unit modular grid (`coverLayout`) so ornaments stay pressed seals — not
 fixed pinpricks — across phone and sheet-column boards.)
 
