@@ -150,9 +150,10 @@ private const val TAU = 2.0 * PI
 private const val ROT0 = -PI / 2.0
 
 /**
- * Corner-seal ring radius in the unit box. Renderers terminate the border
- * band's runs against this ring (rim = radius × seal diameter), so it is
- * part of the seal ↔ border contract on both platforms.
+ * Construction radius in the unit box where the seal's bezel cusps sit.
+ * The band's rails already are the inner/outer of the border; a drawn
+ * circle here would be a third hoop around the star. The constant stays
+ * so the bezel and the band still meet.
  */
 const val SEAL_RING_RADIUS = 0.46
 
@@ -424,11 +425,12 @@ private fun generateMedallion(rng: Mulberry32): RosetteSpec {
 /**
  * The corner seal: a smaller star of the medallion's family (halved above
  * 12 so seals stay legible at seal size — never to 6, which would force
- * the hexagram) inside a mandatory hairline ring, wrapped in a four-petal
- * ogee bezel whose tips lie on the compass axes. Two of those tips aim
- * straight down the border band's two runs at each corner — the band's
- * channel tapers onto them — so seal and border are one piece of geometry,
- * not a stamp over a strip. Seals ink in late, after the medallion.
+ * the hexagram), wrapped in a four-petal ogee bezel whose tips lie on
+ * the compass axes. Two of those tips aim straight down the border band's
+ * two runs at each corner — the band's channel tapers onto them — so
+ * seal and border are one piece of geometry, not a stamp over a strip.
+ * No enclosing circle: the frame's two gilt rules are already the band's
+ * inner and outer. Seals ink in late, after the medallion.
  */
 private fun generateSeal(rng: Mulberry32, fold: Int): RosetteSpec {
     var m = if (fold >= 12) fold / 2 else fold
@@ -439,8 +441,7 @@ private fun generateSeal(rng: Mulberry32, fold: Int): RosetteSpec {
     val tip = rng.range(0.58, 0.66)
 
     val strokes = ArrayList<OrnamentStroke>()
-    strokes.add(circleStroke(SEAL_RING_RADIUS, m * 12, StrokeWeight.Hairline))
-    // Bezel cusps on the diagonals, on the ring itself; tips on the axes.
+    // Bezel cusps on the diagonals at SEAL_RING_RADIUS; tips on the axes.
     strokes.add(corollaStroke(4, SEAL_RING_RADIUS, tip, ROT0 - PI / 4.0, StrokeWeight.Hairline))
     strokes.addAll(starPolygons(m, k, starR, ROT0, StrokeWeight.Hairline))
     val n = strokes.size

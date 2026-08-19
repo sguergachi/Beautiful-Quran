@@ -179,7 +179,7 @@ function chamferBackground(taper: number, bandH: number, vertical: boolean): str
 }
 
 /**
- * The border frieze against the inner gilt fillet: each side's band
+ * The border frieze between the frame's two gilt rules: each side's band
  * is a railed channel whose mouth tapers onto the corner seal's petal tip
  * — the seal's bezel points down the band's axis and the rails converge
  * onto that point, so border and corner ornament are one continuous piece

@@ -1,6 +1,7 @@
 package com.beautifulquran.ui.theme.ornament
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import kotlin.math.PI
@@ -66,6 +67,15 @@ class OrnamentGeneratorTest {
             assertEquals(0.0, o.medallion.tipRadius, 1e-9)
             assertTrue(o.cornerSeal.tipRadius > SEAL_RING_RADIUS)
             assertTrue(o.cornerSeal.tipRadius <= 0.7)
+            // The frame's two gilt rules are the band's inner/outer; a
+            // closed circle at the seal radius would be a third hoop.
+            for (s in o.cornerSeal.strokes) {
+                if (!s.closed) continue
+                val ring = s.points.all { p ->
+                    abs(hypot(p.x - 0.5, p.y - 0.5) - SEAL_RING_RADIUS) < 0.02
+                }
+                assertFalse("seal must not draw an enclosing ring", ring)
+            }
             for (s in o.medallion.strokes) {
                 assertTrue(s.points.size >= 2)
                 assertTrue(s.birth >= 0.0 && s.birth + s.span <= 1.0001)

@@ -583,15 +583,14 @@ three moments:
    `WindowManager.currentWindowMetrics`, so the gilt frame is correct on
    the first Compose frame and splash hands off without waiting for
    Compose's inset mirror. Fixed across themes — a bound book
-   keeps its own boards (`Theme.kt`'s `Cover*` values) — framed by the
-   generated border frieze and an inner gilt fillet (`MushafCoverFrame`),
-   with no outer hoop around the band. A second concentric rounded-rect
-   around the tapered corners reads as a badge-ring, not as the band's
-   own outer rail. Each side is a railed channel fitting a whole number
-   of pattern periods, and its mouth tapers onto the corner seal's petal
-   tip (each seal wears a four-petal ogee bezel whose tips aim down the
-   band axes), so border and corner ornaments are one continuous piece
-   of geometry. The frame, border, and seals
+   keeps its own boards (`Theme.kt`'s `Cover*` values) — framed in a
+   doubled gilt rule (`MushafCoverFrame`) with the generated border
+   frieze running between the rules — each side is a railed channel
+   fitting a whole number of pattern periods, and its mouth tapers onto
+   the corner seal's petal tip (each seal wears a four-petal ogee bezel
+   whose tips aim down the band axes — no enclosing ring around the
+   star; the two gilt rules are already the band's inner and outer),
+   so border and corner ornaments are one continuous piece of geometry. The frame, border, and seals
    are the binding's tooling and render complete on the very first
    frame — no wash, no fade. Tooled *inside* that frame, this launch's
    generated Hankin field (whisper ink) and the generated medallion

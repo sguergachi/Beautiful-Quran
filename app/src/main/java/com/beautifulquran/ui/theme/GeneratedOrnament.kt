@@ -306,7 +306,7 @@ fun GeneratedCornerSeals(
 
 /**
  * The generated border frieze: the band pattern runs along the straight
- * part of all four sides, against the inner gilt fillet, as a railed channel
+ * part of all four sides, between the two gilt rules, as a railed channel
  * whose mouth tapers open where the band leaves the corner — the seal is
  * seated on that corner's arc, so border and corner ornament read as one
  * continuous piece of tooling rather than a stamp over a strip. Each run

@@ -161,13 +161,15 @@ fun GildedRosette(
 }
 
 /**
- * The tooled inner fillet of the entrance cover — the gilt rule the
- * generated frieze and corner seals sit against. There is no outer hoop:
- * a second concentric rounded-rect around the tapered band reads as a
- * badge-ring, not as the band's own outer rail. [geometry] still carries
- * both insets so the band and seals keep their seat; only the inner rule
- * is drawn. The corner radii come from the display so the fillet shares
- * the phone's silhouette.
+ * The tooled frame of the entrance cover: a doubled gilt rule following the
+ * sheet's edge — the fillets a hand-bound mushaf carries on its leather.
+ * The generated border frieze and corner seals (GeneratedOrnament.kt) live
+ * between and over these rules. Fills whatever it is given; meant to sit
+ * full-bleed on the cover.
+ *
+ * [geometry] is the concentric inset/radius set derived from the display's
+ * corner radii ([com.beautifulquran.ui.entrance.coverFrameGeometry]) so the
+ * gilt rule shares the phone's silhouette rather than a fixed square frame.
  */
 @Composable
 fun MushafCoverFrame(
@@ -180,9 +182,29 @@ fun MushafCoverFrame(
     modifier: Modifier = Modifier,
 ) {
     Canvas(modifier) {
+        val outerInset = geometry.outerInsetPx
         val innerInset = geometry.innerInsetPx
         val rule = Stroke(width = 2.dp.toPx())
+        val hairline = Stroke(width = 1.dp.toPx())
+
+        val oc = geometry.outerCorners
         val ic = geometry.innerCorners
+        val outer = Path().apply {
+            addRoundRect(
+                RoundRect(
+                    rect = Rect(
+                        left = outerInset,
+                        top = outerInset,
+                        right = size.width - outerInset,
+                        bottom = size.height - outerInset,
+                    ),
+                    topLeft = CornerRadius(oc.topLeft, oc.topLeft),
+                    topRight = CornerRadius(oc.topRight, oc.topRight),
+                    bottomRight = CornerRadius(oc.bottomRight, oc.bottomRight),
+                    bottomLeft = CornerRadius(oc.bottomLeft, oc.bottomLeft),
+                ),
+            )
+        }
         val inner = Path().apply {
             addRoundRect(
                 RoundRect(
@@ -199,9 +221,11 @@ fun MushafCoverFrame(
                 ),
             )
         }
-        embossed(inner, rule, embossDark, embossLight)
+        embossed(outer, rule, embossDark, embossLight)
+
         val gold = goldBrush(brightGold, deepGold, sheen.value.coerceIn(0f, 1f))
-        drawPath(inner, gold, style = rule)
+        drawPath(outer, gold, style = rule)
+        drawPath(inner, gold, style = hairline)
     }
 }
 
