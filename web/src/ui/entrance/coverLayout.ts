@@ -67,12 +67,11 @@ export function coverLayout(width: number, height: number): CoverLayout {
   const ruleGap = clamp(unit * 1.95, 18, outerInset * 0.85)
   const innerInset = outerInset + ruleGap
 
-  // innerRadius = outerRadius − gap (Cloud Four / iOS concentric).
-  // Budget the invented corner so the inner fillet stays a curve.
-  const minInnerR = 20
-  const designR = Math.max(short * 0.12, innerInset + minInnerR)
-  const outerRadius = Math.max(0, designR - outerInset)
-  const innerRadius = Math.max(0, outerRadius - ruleGap)
+  // Band width is fixed. Only the inner corner radius changes:
+  // inner = outer − gap, floored so the opening does not square off.
+  const designR = short * 0.075
+  const outerRadius = Math.max(0, designR - outerInset * 0.15)
+  const innerRadius = Math.max(20, outerRadius - ruleGap)
 
   // Corner seals: diameter ≈ 1.35–1.5× outer inset — pressed into the margin,
   // not pinpricks. Floor so small boards still read as seals.

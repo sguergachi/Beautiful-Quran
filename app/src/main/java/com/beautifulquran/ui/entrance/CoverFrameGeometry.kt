@@ -72,12 +72,11 @@ fun coverFrameMarginsDp(
  * Concentric gilt-frame insets, corner radii, and corner-ornament size for
  * the entrance cover.
  *
- * Nested rounded rects share a corner centre. The rule (Cloud Four, iOS
- * ConcentricRectangle) is **innerRadius = outerRadius − gap**. Same as
- * [R − D] from the screen: outer = R − outerInset, inner = R − innerInset
- * = outer − band. If the band is wider than the leftover curve, inner
- * floors at 0 and reads as a square — so the margin and gap must fit
- * inside R minus a visible inner fillet. The khatam is sized to the band.
+ * Leather margin and band width are fixed (22–40 dp and 26 dp). Outer
+ * corners follow the screen ([R − outerInset]). Inner corners are the
+ * only thing that changes: **innerRadius = outerRadius − gap**, floored
+ * so a leftover of 0 does not square the opening. The khatam is sized
+ * to the (unchanged) band.
  */
 data class CoverFrameGeometry(
     val outerInsetPx: Float,
@@ -97,50 +96,24 @@ data class CoverFrameGeometry(
 /**
  * Derive a cover-frame geometry from the display's corner radii.
  *
- * [density] is px-per-dp. The band and leather margin must fit inside
- * the tightest screen corner minus a visible inner fillet, otherwise
- * `inner = outer − gap` hits 0 and the opening squares off. Inner
- * corners are derived from the outer (`outer − gap`), never independently.
+ * [density] is px-per-dp. Margin and band width do not change with the
+ * screen curve. Only the inner corner radius is derived: outer − gap,
+ * never below 20 dp so the opening stays a fillet.
  */
 fun coverFrameGeometry(
     screen: ScreenCornerRadiiPx,
     density: Float,
 ): CoverFrameGeometry {
-    val preferInset = 22f * density
+    val minInset = 22f * density
     val maxInset = 40f * density
-    val minInset = 12f * density
-    val preferGap = 26f * density
-    val minGap = 16f * density
-    // Below ~20 dp a fillet reads as a square next to the outer rule.
+    val ruleGap = 26f * density
     val minInnerR = 20f * density
     val fallbackR = 36f * density
     val designR = if (screen.max > 0f) screen.max else fallbackR
-    val positives = listOf(
-        screen.topLeft, screen.topRight, screen.bottomRight, screen.bottomLeft,
-    ).filter { it > 0f }
-    val curveR = if (positives.isEmpty()) fallbackR else positives.min()
 
-    var outerInset = (designR * 0.48f)
-        .coerceIn(preferInset, maxInset)
+    val outerInset = (designR * 0.48f)
+        .coerceIn(minInset, maxInset)
         .coerceAtMost(designR * 0.55f)
-    var ruleGap = preferGap
-    // innerRadius = outerRadius − gap. Budget R so that leftover
-    // (R − outerInset − gap) stays a real curve, not 0–8 dp.
-    val room = (curveR - minInnerR).coerceAtLeast(0f)
-    if (room > 0f && outerInset + ruleGap > room) {
-        if (room >= minInset + minGap) {
-            val scale = room / (outerInset + ruleGap)
-            outerInset = (outerInset * scale).coerceAtLeast(minInset)
-            ruleGap = (room - outerInset).coerceAtLeast(minGap)
-            if (outerInset + ruleGap > room) {
-                outerInset = (room - ruleGap).coerceAtLeast(minInset)
-                ruleGap = (room - outerInset).coerceAtLeast(minGap)
-            }
-        } else {
-            outerInset = room * 0.45f
-            ruleGap = room - outerInset
-        }
-    }
     val innerInset = outerInset + ruleGap
     val starRadius = ruleGap / 2f
 
@@ -155,10 +128,9 @@ fun coverFrameGeometry(
         bottomRight = concentric(screen.bottomRight, outerInset),
         bottomLeft = concentric(screen.bottomLeft, outerInset),
     )
-    // Textbook pair: innerRadius = outerRadius − gap. Do not recompute
-    // from the screen independently (that is how a corner floors to 0
-    // while its outer neighbour stays round).
-    fun innerOf(outer: Float) = (outer - ruleGap).coerceAtLeast(0f)
+    // Only the inner radius changes: outer − gap, floored so a leftover
+    // of 0 does not square the opening. Band width stays [ruleGap].
+    fun innerOf(outer: Float) = (outer - ruleGap).coerceAtLeast(minInnerR)
     val innerCorners = ScreenCornerRadiiPx(
         topLeft = innerOf(outerCorners.topLeft),
         topRight = innerOf(outerCorners.topRight),
