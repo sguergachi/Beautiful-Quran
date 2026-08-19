@@ -509,10 +509,13 @@ def audit_bundled_db():
         [7, 5_970, 6_710],
         [8, 6_710, 7_540],
     ]
+    # 5b632415: the measured 1,951 ms onset clamps word 1 alone. The row later
+    # moved onto its file clock (+100 ms, quran-v49), which shifted every other
+    # boundary — the clamped opening is what this pin is here to hold.
     exact &= timings[(7, 4, 148)][:3] == [
-        [1, 1_951, 4_690],
-        [2, 4_690, 5_410],
-        [3, 5_410, 6_290],
+        [1, 1_951, 4_790],
+        [2, 4_790, 5_510],
+        [3, 5_510, 6_390],
     ]
     exact &= {
         key: timings[key][0][1]
@@ -652,25 +655,45 @@ def check_qcf_v2_page_runs():
 
 
 def check_qcf_v2_run_assertion():
-    """assert_qcf_v2_runs must reject the shape that shipped broken.
+    """assert_qcf_v2_runs must reject the shapes that shipped broken.
 
-    The layout below is page 2 wearing one of page 1's codepoints — the exact
-    off-by-one-page defect, in miniature."""
+    Two of them: page 2 wearing one of page 1's codepoints -- the exact
+    off-by-one-page defect, in miniature -- and a layout that came back empty,
+    which a run check alone would call perfect."""
     first = QCF_V2_FIRST_CODEPOINT
-    good = {
-        (1, 1): [("w", chr(first), 1, 1), ("w", chr(first + 1), 1, 1)],
-        (1, 2): [("w", chr(first), 2, 1), ("w", chr(first + 1), 2, 1)],
-    }
+
+    def book(pages):
+        return {
+            (1, page): [("w", chr(first + i), page, 1) for i in codes]
+            for page, codes in pages.items()
+        }
+
+    good = book({page: (0, 1) for page in range(1, 605)})
     assert_qcf_v2_runs(good)
-    broken = {
-        (1, 1): [("w", chr(first), 1, 1), ("w", chr(first + 1), 1, 1)],
-        (1, 2): [("w", chr(first + 2), 2, 1), ("w", chr(first), 2, 1)],
-    }
+
+    checks = []
+    broken = book({page: (0, 1) for page in range(1, 605)})
+    broken[(1, 2)] = [("w", chr(first + 2), 2, 1), ("w", chr(first), 2, 1)]
     try:
         assert_qcf_v2_runs(broken)
+        checks.append(False)
     except SystemExit as e:
-        return "page 2" in str(e)
-    return False
+        checks.append("page 2" in str(e))
+
+    short = book({page: (0, 1) for page in range(1, 604)})
+    try:
+        assert_qcf_v2_runs(short)
+        checks.append(False)
+    except SystemExit as e:
+        checks.append("no glyphs at all" in str(e))
+
+    try:
+        assert_qcf_v2_runs({})
+        checks.append(False)
+    except SystemExit as e:
+        checks.append("no glyphs at all" in str(e))
+
+    return all(checks)
 
 
 def check_recovered_boundary_repairs():
@@ -723,6 +746,14 @@ def check_recovered_boundary_repairs():
         and json.loads(replayed[0][3]) == [[1, 0, 40], [2, 40, 100]]
         and replayed[1][3] == source
     )
+
+
+def check_rebase_clip_constants():
+    """The gate's tail-clip ceiling has to be the one the build actually uses."""
+    from build_db import MAX_REBASE_TAIL_CLIP_MS as built
+    from timing_delta import MAX_REBASE_TAIL_CLIP_MS as gated
+
+    return built == gated
 
 
 def check_timing_delta():
@@ -808,6 +839,7 @@ def main():
     qcf_runs_ok = check_qcf_v2_page_runs()
     qcf_assert_ok = check_qcf_v2_run_assertion()
     recovered_boundary_ok = check_recovered_boundary_repairs()
+    rebase_clip_ok = check_rebase_clip_constants()
     timing_delta_ok, timing_delta_detail = check_timing_delta()
     print(f"  {'ok  ' if confidence_ok else 'FAIL'} weighted 2:214 confidence checks")
     print(f"  {'ok  ' if audio_onset_ok else 'FAIL'} audio evidence and onset checks")
@@ -817,6 +849,7 @@ def main():
     print(f"  {'ok  ' if qcf_runs_ok else 'FAIL'} bundled QCF V2 page/font glyph runs")
     print(f"  {'ok  ' if qcf_assert_ok else 'FAIL'} QCF V2 run assertion rejects a wrong page")
     print(f"  {'ok  ' if recovered_boundary_ok else 'FAIL'} recovered-row boundary deferral")
+    print(f"  {'ok  ' if rebase_clip_ok else 'FAIL'} rebase tail-clip ceiling shared by build and gate")
     print(f"  {'ok  ' if timing_delta_ok else 'FAIL'} fail-closed timing DB delta gate")
     if not confidence_ok:
         failures.append(("weighted confidence", "2:214 checks failed", None))
@@ -834,6 +867,10 @@ def main():
         failures.append(("QCF V2 run assertion", "a wrong page number was not rejected", None))
     if not recovered_boundary_ok:
         failures.append(("recovered-row boundary deferral", "repair ordering failed", None))
+    if not rebase_clip_ok:
+        failures.append(
+            ("rebase tail clip", "build_db and timing_delta disagree on the ceiling", None)
+        )
     if not timing_delta_ok:
         failures.append(("timing DB delta gate", timing_delta_detail, None))
     print()

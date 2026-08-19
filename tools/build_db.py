@@ -259,7 +259,7 @@ def load_qcf_v2_layout():
     out = {}
     seen = set()
     for page in range(1, 605):
-        raw = fetch_text(MUSHAF_LAYOUT_PAGE_URL.format(page=page), f"mushaf-page-{page:03d}.json")
+        raw = fetch_text(MUSHAF_LAYOUT_PAGE_URL.format(page=page), f"mushaf-page-qdc-{page:03d}.json")
         data = json.loads(raw)
         for verse in data.get("verses", []):
             previous = None
@@ -329,6 +329,13 @@ def assert_qcf_v2_runs(layout):
         broken.append(
             f"page {page}: glyph {at} is U+{codes[at]:04X}, "
             f"expected U+{expected[at]:04X} ({len(codes)} glyphs)"
+        )
+    missing = [page for page in range(1, 605) if page not in pages]
+    if missing:
+        broken.insert(
+            0,
+            f"{len(missing)} page(s) carry no glyphs at all, from page {missing[0]}"
+            " — the source is empty or its shape changed",
         )
     if broken:
         raise SystemExit(

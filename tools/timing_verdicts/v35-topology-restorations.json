@@ -27,17 +27,6 @@
         "models": [{"name": "arabic-xlsr-ctc", "baselineScore": -977.142, "candidateScore": -943.473}, {"name": "mms-uroman-ctc", "baselineScore": -136.484, "candidateScore": -119.373}]
       }
     },
-    "Alafasy_128kbps:6:61": {
-      "verdict": "accept", "kinds": ["topology"],
-      "baselinePayloadHash": "6aae116c7d9539022c11acede1f3d8d0ae42f49d8fe4b48cdce6e209dec39947",
-      "candidatePayloadHash": "69bb79c614745061615b2c7cdbec48d569593aedbc4307db95d0207dc1ac6fb9",
-      "evidence": {
-        "kind": "dual_model_topology", "artifact": "tools/timing_verdicts/v35-topology-restorations.json",
-        "summary": "Both models prefer the restored 8–14 re-say despite its extra labels; its onset follows the separately voiced post-pause interval.",
-        "audioSha256": "3eaf3e90cf57b8bd4e88b44d1e296319ce4cb1be26d4da18bc2e183260ecceaf", "waveformVeto": false,
-        "models": [{"name": "arabic-xlsr-ctc", "baselineScore": -1295.857, "candidateScore": -909.357}, {"name": "mms-uroman-ctc", "baselineScore": -115.804, "candidateScore": -90.622}]
-      }
-    },
     "Alafasy_128kbps:67:22": {
       "verdict": "accept", "kinds": ["topology"],
       "baselinePayloadHash": "20f81418ccafa0468b0639eeae98228c820cdf5355cec53ff9ceb637c0435c0c",
@@ -90,6 +79,20 @@
         "audioSha256": "605350c996dda34eec394a95e7c0cf3273b480107548165e20483338d209750a", "waveformVeto": false,
         "models": [{"name": "arabic-xlsr-ctc", "baselineScore": -2845.413, "candidateScore": -1662.385}, {"name": "mms-uroman-ctc", "baselineScore": -552.253, "candidateScore": -206.49}],
         "boundaryWitnesses": [{"name": "arabic-xlsr-ctc", "wordStartsMs": {"1": 380, "24": 14987, "25": 15747}}, {"name": "quran-phonetics-free-ctc", "emissionsMs": {"wa": 14988, "yaraw_r": 15831, "next_sabila": 16153}}]
+      }
+    }
+  },
+  "supersededVerdicts": {
+    "Alafasy_128kbps:6:61": {
+      "_note": "Superseded. The topology this verdict restored is the shipped baseline, and the row's live verdict is the file_clock_rebase in v49-file-clock-rebase.json, whose baseline hash is this candidate hash. Kept as the record of how the restored topology was accepted.",
+      "verdict": "accept", "kinds": ["topology"],
+      "baselinePayloadHash": "6aae116c7d9539022c11acede1f3d8d0ae42f49d8fe4b48cdce6e209dec39947",
+      "candidatePayloadHash": "69bb79c614745061615b2c7cdbec48d569593aedbc4307db95d0207dc1ac6fb9",
+      "evidence": {
+        "kind": "dual_model_topology", "artifact": "tools/timing_verdicts/v35-topology-restorations.json",
+        "summary": "Both models prefer the restored 8–14 re-say despite its extra labels; its onset follows the separately voiced post-pause interval.",
+        "audioSha256": "3eaf3e90cf57b8bd4e88b44d1e296319ce4cb1be26d4da18bc2e183260ecceaf", "waveformVeto": false,
+        "models": [{"name": "arabic-xlsr-ctc", "baselineScore": -1295.857, "candidateScore": -909.357}, {"name": "mms-uroman-ctc", "baselineScore": -115.804, "candidateScore": -90.622}]
       }
     }
   }

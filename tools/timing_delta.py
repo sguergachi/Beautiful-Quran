@@ -32,6 +32,11 @@ from typing import Any, Iterable
 
 RowKey = tuple[str, int, int]
 
+# Mirrors build_db.MAX_REBASE_TAIL_CLIP_MS: an MPEG header describes the playable
+# frame envelope, and a source's final word mark can sit a few milliseconds past
+# it. A clock translation may clip that fade; it may not shorten anything else.
+MAX_REBASE_TAIL_CLIP_MS = 50
+
 
 def row_key_string(key: RowKey) -> str:
     """Return the stable ledger key for a reciter/ayah timing row."""
@@ -303,6 +308,72 @@ def _entry_problem(change: dict[str, Any]) -> str | None:
             return "duration tail clip must shorten only the final end"
         if evidence.get("measuredDurationMs") != new_segments[-1][2]:
             return "duration tail clip must end at its measured duration"
+        return None
+
+    # A whole row may also be moved from its source's window clock onto the clock
+    # of the file the app streams. That is not a boundary judgement, and no
+    # acoustic model is asked for one: the row keeps its shape exactly, every
+    # boundary moves by one offset, and the only new number is the file's own
+    # measured length. The checks below are what make it safe to say so — one
+    # shared offset, an opening that may leave it only in the two named ways
+    # below, and a final fade clipped by no more than MAX_REBASE_TAIL_CLIP_MS.
+    # Anything else is a re-clock in disguise, and needs two witnesses.
+    if evidence["kind"] == "file_clock_rebase":
+        if change["kinds"] != ["timestamp"]:
+            return "file clock rebase may only change timestamps"
+        old, new = change["old"], change["new"]
+        if old["audioOnsetMs"] != new["audioOnsetMs"]:
+            return "file clock rebase may not change audio onset"
+        old_segments, new_segments = old["segments"], new["segments"]
+        if len(old_segments) != len(new_segments) or [
+            seg[0] for seg in old_segments
+        ] != [seg[0] for seg in new_segments]:
+            return "file clock rebase may not change positions"
+        offset = evidence.get("clockOffsetMs")
+        if isinstance(offset, bool) or not isinstance(offset, int) or offset == 0:
+            return "file clock rebase needs a non-zero integer clockOffsetMs"
+        shifted = [
+            [position, start + offset, end + offset]
+            for position, start, end in old_segments
+        ]
+        if [seg[1] for seg in shifted[1:]] != [seg[1] for seg in new_segments[1:]]:
+            return "file clock rebase must move every start by one offset"
+        if [seg[2] for seg in shifted[:-1]] != [seg[2] for seg in new_segments[:-1]]:
+            return "file clock rebase must move every internal end by one offset"
+        # Only the opening boundary may sit off the shared offset, and only in
+        # one of the two ways the build can put it there: restored later from
+        # the reference alignment (the source clamps a negative first start to
+        # zero), or pinned back onto the measured start of the voice. Each has
+        # to be named, because they bound the value from opposite sides.
+        opening = new_segments[0][1]
+        if opening != shifted[0][1]:
+            restored = evidence.get("openingStartMs")
+            pinned = evidence.get("measuredOnsetMs")
+            if (restored is None) == (pinned is None):
+                return "an opening off the shared offset must be recorded, one way"
+            if restored is not None:
+                if opening != restored:
+                    return "the recorded opening is not the one in the row"
+                if opening <= shifted[0][1] or opening >= new_segments[0][2]:
+                    return "a restored opening may only move later, and never past its word"
+            else:
+                if opening != pinned:
+                    return "the pinned opening is not the measured onset"
+                if opening < old_segments[0][1] or opening > shifted[0][1]:
+                    return "a pinned opening may only move back towards the measured voice"
+        duration = evidence.get("measuredDurationMs")
+        if duration != new_segments[-1][2]:
+            return "file clock rebase must end at its measured duration"
+        clip = shifted[-1][2] - duration
+        if clip < 0 or clip > MAX_REBASE_TAIL_CLIP_MS:
+            return (
+                "a rebased row may end at the measured duration only by clipping a"
+                f" final fade of at most {MAX_REBASE_TAIL_CLIP_MS} ms"
+            )
+        if any(a[2] > b[1] for a, b in zip(new_segments, new_segments[1:])) or any(
+            seg[1] >= seg[2] for seg in new_segments
+        ):
+            return "file clock rebase must leave the row strictly increasing"
         return None
 
     # Structural and ordinary boundary changes need the two independent
