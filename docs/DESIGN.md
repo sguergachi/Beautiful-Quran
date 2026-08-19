@@ -601,11 +601,10 @@ three moments:
    The frame's inset and corner radii are derived from the display's
    rounded corners (`WindowInsets.getRoundedCorner`, via
    `coverFrameGeometry`) so **both** gilt rules are concentric with the
-   phone's silhouette — the inner radius is the outer minus the band
-   gap. If the band would eat the leftover curve, the margin then the
-   gap shrink so the inner rule stays a fillet, not a square. The cover
-   reads as cut for that screen, not a fixed square border floating
-   inside it.
+   phone's silhouette — the nested-corner law `innerRadius = outerRadius
+   − gap`. The margin and band fit inside the leftover screen curve so
+   the inner rule stays a fillet (never a square). The cover reads as
+   cut for that screen.
 2. **The isti'adha.** After a brief hold, **أعوذ بالله من الشيطان الرجيم**
    fades in as text — Arabic letter-washed onto the cover, English italic
    beneath — a quiet pause before reading begins. No audio: the du'a is

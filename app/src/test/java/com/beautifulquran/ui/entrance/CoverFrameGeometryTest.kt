@@ -75,15 +75,15 @@ class CoverFrameGeometryTest {
 
     @Test
     fun `typical phone keeps a concentric inner curve`() {
-        // ~50 dp corner at xxhdpi — the 26 dp band used to eat the leftover
-        // radius and square the inner rule.
+        // ~50 dp corner: a 22+26 dp budget used to leave inner R ≈ 0–8 dp
+        // (a square). innerRadius = outerRadius − gap must stay a fillet.
         val screen = ScreenCornerRadiiPx(150f, 150f, 150f, 150f)
         val g = coverFrameGeometry(screen, density)
-        assertTrue(g.innerCorners.topLeft >= 8f * density - 0.01f)
-        assertEquals(
-            g.outerCorners.topLeft - (g.innerInsetPx - g.outerInsetPx),
-            g.innerCorners.topLeft,
-            0.01f,
+        val gap = g.innerInsetPx - g.outerInsetPx
+        assertEquals(g.outerCorners.topLeft - gap, g.innerCorners.topLeft, 0.01f)
+        assertTrue(
+            "inner looks square if it is under 20 dp: ${g.innerCorners.topLeft}",
+            g.innerCorners.topLeft >= 20f * density - 0.01f,
         )
         assertSealInsideBand(g)
     }
