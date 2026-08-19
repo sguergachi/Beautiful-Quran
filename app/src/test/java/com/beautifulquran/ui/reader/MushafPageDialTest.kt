@@ -98,11 +98,12 @@ class MushafPageDialTest {
 
     @Test
     fun `the hold is short enough to feel like a gesture and long enough to be one`() {
-        // A sixth of a second: past a stall in an ordinary stroke, short of
-        // anything a finger on glass would call a wait. And the threshold sits
-        // far below any real steering speed, so a reader creeping through the
-        // chapters is not clicked into a trough.
-        assertTrue(MUSHAF_DIAL_HOLD_S in 0.12f..0.24f)
+        // An eighth of a second: past the turn at the top of a stroke, short
+        // of anything a finger on glass would call a wait. What keeps it
+        // honest at that length is the speed gate, not the clock — the gate
+        // sits far below any real steering speed, so a reader creeping through
+        // the chapters is not clicked into a trough.
+        assertTrue(MUSHAF_DIAL_HOLD_S in 0.08f..0.18f)
         assertTrue(MUSHAF_DIAL_HOLD_DP_S < 30f)
     }
 
@@ -216,9 +217,16 @@ class MushafPageDialTest {
         // Straying takes no dwell at all: the two ways out are weighted
         // differently on purpose, and this is the asymmetry.
         assertTrue(mushafDialShouldLeaveTrough(0f, true))
-        // And the resistance is a beat, not a wait — under the hold that
-        // opened the trough, or leaving would cost more than arriving.
-        assertTrue(MUSHAF_DIAL_RUNOUT_S in 0.1f..MUSHAF_DIAL_HOLD_S)
+        // And the resistance is a beat, not a wait. It used to be pinned under
+        // the hold that opened the trough, on the reasoning that leaving must
+        // not cost more than arriving. That tie is gone deliberately: the hold
+        // has since been walked down twice toward the floor its speed gate
+        // allows, and entering and leaving turned out not to be one act.
+        // Arriving should cost as close to nothing as possible; leaving is the
+        // one place a little stickiness is wanted, because the end of the
+        // measure is somewhere the reader legitimately aims. What still has to
+        // hold is that it is a beat in absolute terms.
+        assertTrue(MUSHAF_DIAL_RUNOUT_S in 0.1f..0.3f)
     }
 
     @Test

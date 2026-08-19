@@ -75,7 +75,7 @@ import kotlin.math.roundToInt
  * chapter; the haptics tick chapters; a release lands on the chapter's first
  * leaf. Nothing about that changes with speed.
  *
- * Page tier — held open. Stay still for under a fifth of a second and the rule
+ * Page tier — held open. Stay still for an eighth of a second and the rule
  * gives a click and the bracket *stretches*: the chapter's own capsule opens
  * out until it is the whole measure, a rounded trough with the chapter's
  * leaves standing in it, receding to furniture ink as it goes — a marker
@@ -113,8 +113,9 @@ import kotlin.math.roundToInt
  * ground has changed back, and the same pair keeps it shut until the hand is
  * back on the line and over the measure.
  *
- * Except that a hand can insist. Holding still for eight times the ordinary
- * hold opens the trough from wherever the finger is, guard and all —
+ * Except that a hand can insist. Holding still for a second and a half — many
+ * ordinary holds over — opens the trough from wherever the finger is, guard and
+ * all —
  * because the guard is there to stop an *accident*, and a finger that has sat
  * motionless out in the run-out for a second and a half is not one. A control
  * whose only answer to a held finger is silence reads as broken. The insistent
@@ -149,16 +150,21 @@ internal const val MUSHAF_DIAL_HOLD_DP_S = 16f
  *
  * Long enough that the pause at the end of an ordinary stroke does not open
  * it by accident, short enough that "hold on the chapter you want" is one
- * gesture rather than a wait. It sits at the floor of that range rather than
- * in the middle of it: a quarter second measured out on a stopwatch is
- * nothing, but a quarter second with a finger pressed to glass waiting for a
- * control to answer is a control thinking about it. The reader is not being
- * asked to prove patience here — the run-out and the stray are what make an
- * accidental open cheap to undo, and they take the pressure off this number.
- * It is the same length as the run-out's own resistance, which is right:
- * getting in and getting out should cost the same beat.
+ * gesture rather than a wait. It sits at the floor of that range and has been
+ * walked down to it twice: a quarter second on a stopwatch is nothing, but a
+ * quarter second with a finger pressed to glass waiting for a control to
+ * answer is a control thinking about it, and the same is true at a fifth. The
+ * reader is not being asked to prove patience here — the run-out and the stray
+ * are what make an accidental open cheap to undo, and they take almost all the
+ * pressure off this number.
+ *
+ * What is left holding the floor up is the speed gate above, not this: an
+ * eighth of a second of true stillness is longer than the pause at the top of
+ * a stroke, where the hand is turning rather than stopped and is still moving
+ * far faster than [MUSHAF_DIAL_HOLD_DP_S]. Going much below this would start
+ * opening the trough on the turn.
  */
-internal const val MUSHAF_DIAL_HOLD_S = 0.18f
+internal const val MUSHAF_DIAL_HOLD_S = 0.12f
 
 /**
  * How long a hand has to stay still, in seconds, to open the trough from
@@ -173,7 +179,7 @@ internal const val MUSHAF_DIAL_HOLD_S = 0.18f
  *
  * So a hold long enough that it cannot be the tail of a stroke is taken as an
  * instruction rather than a position, and it overrides both places. It costs
- * about eight ordinary holds — long enough that no scrub ever reaches it by
+ * a dozen ordinary holds — long enough that no scrub ever reaches it by
  * accident, short enough to be a pause and not a wait.
  *
  * Opening this way re-anchors the gesture: the line the finger is on becomes
@@ -235,6 +241,12 @@ internal val MushafDialStray = 28.dp
  *
  * Short enough that leaving is one continuous motion and not a wait: by the
  * time a hand that means it has arrived and stopped, this is already spent.
+ * It is no longer tied to the hold, which it once matched. Entering and
+ * leaving looked like one beat when they were the same number, but they are
+ * not the same act: entering should cost as close to nothing as the speed gate
+ * allows, while leaving is precisely where a little stickiness is wanted. So
+ * the hold has walked down and this has stayed where it was.
+ *
  * The stray test does not take it — coming off the line is unambiguous, and
  * making the reader hold a lifted thumb in mid-drift would be resistance
  * against nothing.
