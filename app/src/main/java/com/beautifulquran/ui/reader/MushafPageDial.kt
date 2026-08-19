@@ -110,18 +110,25 @@ import kotlin.math.roundToInt
  * back inside clears the count — the overshoot costs nothing. Across the rule
  * there is nothing to aim at, so the stray takes effect at once. Either way the
  * trough collapses back into the hairline, which is how the reader is told the
- * ground has changed back, and the same pair keeps it shut until the hand is
- * back on the line and over the measure.
+ * ground has changed back, and the closing stands until the hand *travels*
+ * again. Not until it is back somewhere in particular — that was tried, and it
+ * was wrong twice over. A thumb sweeping the rule pivots from the wrist and
+ * ends a long stroke well off the line it started on, and the chapter tier lays
+ * the whole book across the full measure while the run-out is measured against
+ * the trough's shorter one, so the first and last forty leaves of the book
+ * stand inside the run-out by construction. Guarding on position refused the
+ * ordinary hold to most long strokes and to al-Fātiḥa. Guarding on travel asks
+ * the right question: a hold that has not moved since the close is the same
+ * gesture still going, and a hold after fresh steering is a new request.
  *
- * Except that a hand can insist. Holding still for a second and a half — many
- * ordinary holds over — opens the trough from wherever the finger is, guard and
- * all —
- * because the guard is there to stop an *accident*, and a finger that has sat
- * motionless out in the run-out for a second and a half is not one. A control
- * whose only answer to a held finger is silence reads as broken. The insistent
- * open takes the line it finds as the line it was pressed on, and forgives the
- * run-out until the hand is back over the measure; otherwise it would hand the
- * trough over and take it back in the same breath.
+ * Which leaves one case: a hand that has not moved and wants back in anyway.
+ * Holding still for a second and a half — many ordinary holds over — opens the
+ * trough regardless, because a finger that has sat motionless that long is not
+ * an accident. A control whose only answer to a held finger is silence reads as
+ * broken. Either way of opening takes the line it finds as the line the trough
+ * is held by, and forgives the run-out until the hand is back over the measure;
+ * otherwise the trough would read its own closing law on the next frame and
+ * shut what it had just opened.
  *
  * Which leaves the thumb somewhere to be. In the chapter tier a gain that is
  * not 1:1 cannot both keep the thumb under the finger and keep it at the
@@ -913,7 +920,26 @@ internal fun MushafPageDial(
                         // it takes the same clock to fill again. It lapses the
                         // moment the hand is back over the measure, which is
                         // the moment the ordinary law can be obeyed.
-                        var insisted = false
+                        var spared = false
+                        // Whether a closing still stands. It is what stops a
+                        // hand that has just been handed the book back from
+                        // being handed the trough again while it sits there
+                        // not having moved — and it is *all* that stops it.
+                        // Position used to: the ordinary open was refused to
+                        // anyone out in the run-out or off their press line.
+                        // Both refusals turned out to fire constantly during
+                        // honest use. A thumb sweeping the length of the rule
+                        // pivots from the wrist and traces an arc, so it ends
+                        // a long stroke well off the line it started on; and
+                        // the chapter tier lays the whole book across the full
+                        // measure while the run-out is measured against the
+                        // trough's shorter one, so the first and last forty
+                        // leaves of the book stand *inside* the run-out by
+                        // construction. Between them that refused the ordinary
+                        // hold to most long strokes and to al-Fatiha, leaving
+                        // the insistent hold to do it — which is why holding
+                        // still took a second and a half instead of an eighth.
+                        var shut = false
                         var travelDp = 0f
                         var sinceTickS = 0f
                         var lastChapter = mushafDialChapterRun(
@@ -970,8 +996,8 @@ internal fun MushafPageDial(
                                 val past =
                                     mushafDialPastTrough(handPx, widthPxNow, troughInsetPx)
                                 val strayed = mushafDialStrayed(handY, pressY, strayPx)
-                                if (!past) insisted = false
-                                runOutS = if (past && !insisted) runOutS + dt else 0f
+                                if (!past) spared = false
+                                runOutS = if (past && !spared) runOutS + dt else 0f
                                 if (open) {
                                     // Absolute, inside the chapter: the finger
                                     // names a place between the two ends.
@@ -988,6 +1014,7 @@ internal fun MushafPageDial(
                                         open = false
                                         trough = false
                                         heldS = 0f
+                                        shut = true
                                         view.performHapticFeedback(HapticFeedbackConstants.CONTEXT_CLICK)
                                         scope.launch { zoom.animateTo(0f, MushafDialZoomOut) }
                                     }
@@ -1033,30 +1060,31 @@ internal fun MushafPageDial(
                                 // stillness is what the top of every stroke
                                 // looks like.
                                 heldS = if (abs(speed) < MUSHAF_DIAL_HOLD_DP_S) heldS + dt else 0f
-                                // The same pair that shut it also keeps it
-                                // shut. A finger that has just carried off an
-                                // end, or lifted away from the line, is
-                                // holding perfectly still out there and the
-                                // trough it left has no leaf under it; it
-                                // re-opens once the hand is back on the line
-                                // and over the measure — or once the hand has
-                                // held long enough to say it meant it, which
-                                // is asked of nowhere in particular.
+                                // Travel lifts the closing. A hold that has
+                                // not moved since the trough was taken away is
+                                // the same gesture still going; a hold that
+                                // follows fresh steering is a new request, and
+                                // the reader has said so with the only thing
+                                // they can say it with. Asking what they have
+                                // *done* rather than where they are is what
+                                // keeps this from refusing honest holds.
+                                if (abs(speed) >= MUSHAF_DIAL_HOLD_DP_S) shut = false
                                 val insists = mushafDialInsists(speed, heldS)
-                                if (insists ||
-                                    (!past && !strayed && mushafDialShouldOpen(speed, heldS))
+                                if ((!shut || insists) &&
+                                    mushafDialShouldOpen(speed, heldS)
                                 ) {
-                                    if (insists) {
-                                        // The hold names its own line, and
-                                        // buys off the run-out until the hand
-                                        // is back over the measure. Without
-                                        // both, the frame after this one would
-                                        // read the guard it just overrode and
-                                        // shut what it had opened.
-                                        pressY = handY
-                                        insisted = past
-                                        runOutS = 0f
-                                    }
+                                    // The trough names its own line and buys
+                                    // off the run-out as it opens, wherever
+                                    // the hand happens to be. Both are needed
+                                    // whichever hold got here: a trough opened
+                                    // from off the press line, or from inside
+                                    // the run-out — and the chapter tier puts
+                                    // the ends of the book there — would read
+                                    // its own closing law on the very next
+                                    // frame and shut what it had just opened.
+                                    pressY = handY
+                                    spared = past
+                                    runOutS = 0f
                                     // Enter on the leaf the hand is actually
                                     // on, and let the trough's absolute scale
                                     // arrive underneath it.

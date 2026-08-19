@@ -123,9 +123,10 @@ class MushafPageDialTest {
     @Test
     fun `every ordinary hold is already an insistent one waiting`() {
         // The two are nested, not rival: a hold that has reached the long
-        // clock has certainly passed the short one. So the guarded path can
-        // never be the *only* one to fire at a moment the insistent path
-        // would, and the placement guard is the only thing separating them.
+        // clock has certainly passed the short one. So the insistent path can
+        // only ever *widen* what opens the trough, never move it — the standing
+        // closing is the one thing separating them, and it is lifted by travel
+        // rather than by where the finger has got to.
         var held = 0f
         while (held <= 3f) {
             if (mushafDialInsists(0f, held)) assertTrue(mushafDialShouldOpen(0f, held))
@@ -146,6 +147,29 @@ class MushafPageDialTest {
         assertFalse(mushafDialPastTrough(troughInset, width, troughInset))
         assertFalse(mushafDialPastTrough(width - troughInset, width, troughInset))
         assertFalse(mushafDialPastTrough(width / 2f, width, troughInset))
+    }
+
+    @Test
+    fun `the ends of the book stand in the run-out, so place cannot guard the open`() {
+        // The regression this pins: the chapter tier lays all 604 leaves across
+        // the *full* measure, while the run-out is measured against the
+        // trough's shorter one. So a finger on al-Fatihah or an-Nas is "past
+        // the trough" by construction, and while the ordinary open was refused
+        // to anyone standing there, the two ends of the book — the two places
+        // a reader most often sweeps to — could only be opened by holding for
+        // a second and a half. What lets the trough open is now what the hand
+        // has done since the last closing, not where it has got to.
+        val width = 1080f
+        val density = 2.625f
+        val inset = 14f * density
+        val troughInset = (14f + 26f) * density
+        for (page in intArrayOf(1, 604)) {
+            val x = mushafDialTrackX(1f - mushafDialFraction(page.toFloat(), 604), width, inset)
+            assertTrue("leaf $page stood at $x", mushafDialPastTrough(x, width, troughInset))
+        }
+        // And the middle of the book is not, so this is a fact about the ends.
+        val middle = mushafDialTrackX(1f - mushafDialFraction(302f, 604), width, inset)
+        assertFalse(mushafDialPastTrough(middle, width, troughInset))
     }
 
     @Test
