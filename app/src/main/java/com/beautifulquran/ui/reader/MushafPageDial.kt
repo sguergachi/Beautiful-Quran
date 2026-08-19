@@ -76,9 +76,10 @@ import kotlin.math.roundToInt
  * leaf. Nothing about that changes with speed.
  *
  * Page tier — held open. Stay still for a quarter of a second and the rule
- * gives a click and *swells*: the chapter's own span of hairline stretches out
- * until it is the whole measure, a rounded trough with the chapter's leaves
- * standing in it. Inside the trough the mapping is absolute and it is the
+ * gives a click and the bracket *stretches*: the chapter's own capsule opens
+ * out until it is the whole measure, a rounded trough with the chapter's
+ * leaves standing in it, receding to furniture ink as it goes — a marker
+ * becoming a channel. Inside the trough the mapping is absolute and it is the
  * chapter's, not the book's: the right end is the chapter's first leaf, the
  * left end its last, and the thumb goes wherever the finger is between them.
  * That is the difference in one line — in the chapter tier the reader moves
@@ -505,12 +506,26 @@ internal val MushafDialTouch = 40.dp
 private val MushafDialTouchLift = 14.dp
 /** Paper between the top of the comb and the foot of the label. */
 private val MushafDialHudAir = 2.dp
-/** The chapter's span on the book's scale, before it stretches out. */
-private val MushafDialBracket = 1.5.dp
-/** What that span swells to once it is the whole measure: the trough. */
-private val MushafDialTrough = 4.dp
-/** The bracket never draws shorter than this, or a one-leaf chapter is a dot. */
-private val MushafDialBracketMin = 8.dp
+/**
+ * The bracket's weight, closed and open alike — the held thumb's own.
+ *
+ * One constant, because the bracket and the trough are one mark. It used to be
+ * a hairline that fattened as it stretched, on the reasoning that the trough
+ * had to be deep enough to stand leaves in; but at the chapter tier the
+ * bracket *is* the marker, the only thing the reader has under their finger,
+ * and a hairline is not a thing you hold. Made the seat mark's weight it reads
+ * as the same mark it is, and stretching is then the whole of what opening
+ * does to it. The character still changes at the click, in ink rather than in
+ * depth: a solid marker becomes a channel with leaves standing in it.
+ */
+private val MushafDialBracket = MushafDialThumbHeldHeight
+/**
+ * The bracket never draws shorter than this, or a one-leaf chapter is a dot.
+ *
+ * The seat mark's own length: a short chapter's cell is that mark exactly, not
+ * a stub of something else.
+ */
+private val MushafDialBracketMin = MushafDialThumbHeldHeight * MushafDialThumbAspect
 
 /**
  * The hairline under the leaf: a rule that separates the page from the
@@ -661,10 +676,12 @@ internal fun MushafPageDial(
             val headroom = ruleY - 1.5.dp.toPx()
 
             // The bracket, and what it becomes. In the chapter tier it is a
-            // short thickened span of rule around the chapter the thumb is in,
-            // drawn on the book's scale like everything else in that tier.
-            // Hold still and it stretches out until it is the whole measure and
-            // deep enough to have leaves standing in it: the trough.
+            // short capsule of the seat mark's own weight and ink, sitting over
+            // the chapter the finger is in, drawn on the book's scale like
+            // everything else in that tier — the marker the reader has hold of,
+            // which is why it is not a hairline. Hold still and it stretches
+            // out until it is the whole measure with leaves standing in it, and
+            // recedes to furniture ink as it goes: the trough.
             //
             // It is not a fill. It does not run from an end of the rule and it
             // does not grow with progress — at rest it is not there at all. It
@@ -679,9 +696,14 @@ internal fun MushafPageDial(
                 val half = maxOf(abs(fromX - toX), minW) / 2f
                 val left = lerp(centre - half, troughInset, open)
                 val right = lerp(centre + half, size.width - troughInset, open)
-                val weight = lerp(MushafDialBracket.toPx(), MushafDialTrough.toPx(), open)
+                val weight = MushafDialBracket.toPx()
                 drawRoundRect(
-                    color = ink.copy(alpha = (0.13f + 0.07f * open) * lift),
+                    // The seat mark's ink while it is a marker, falling back to
+                    // furniture as it becomes a channel. Reversed from how it
+                    // was, and the reversal is the point: the reader's hand is
+                    // on the cell, not on the measure, and the whole measure
+                    // carrying a marker's weight would read as a fill.
+                    color = ink.copy(alpha = lerp(thumbInk, 0.20f, open) * lift),
                     topLeft = Offset(left, ruleY - weight / 2f),
                     size = Size((right - left).coerceAtLeast(weight), weight),
                     cornerRadius = CornerRadius(weight, weight),

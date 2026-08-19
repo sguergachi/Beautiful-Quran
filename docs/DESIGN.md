@@ -115,8 +115,10 @@ more.
 
 **What the reader has hold of at that tier is the comb itself, not a marker.**
 No thumb rides the line while the comb is up — the chapter their finger is in
-is drawn as a thickened bracket, one cell of the comb, and that cell is the
-thing they are steering. A marker riding along beside all that was a second
+is drawn as a bracket, one cell of the comb, and that cell is the thing they
+are steering. It carries the seat mark's weight and ink — a rounded capsule,
+not a thickened hairline — because at that tier the bracket *is* the marker,
+and a hairline is not something a reader can believe they have hold of. A marker riding along beside all that was a second
 answer to a question the comb had already answered, and it turned the gesture
 into dragging a knob past some scenery. A click of haptic marks each opening
 crossed, spaced by distance and by time rather than by crossings, because at
@@ -131,7 +133,10 @@ thing they are for. Weight here buys legibility at a pitch, not emphasis.
 **Hold still, and the cell under your finger opens.** A quarter second at rest
 — past the stall in an ordinary rough stroke, short of a wait — and a click of
 haptic says so. The bracket stretches out until it is the whole measure and
-deep enough to have leaves standing in it: a rounded trough where the line was.
+with leaves standing in it: a rounded trough where the line was. The mark does
+not fatten on the way; it only stretches, and recedes from the marker's ink to
+furniture's as it goes, because a measure-wide bar at a marker's weight would
+read as a fill.
 Each of the chapter's leaves flies from where it stood on the book's scale out
 to where it stands in the trough, so the opening is a magnification the eye can
 follow and not a second drawing fading in over the first. And now a seat mark
