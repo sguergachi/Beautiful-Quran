@@ -12,7 +12,7 @@
     "prebuild:pages": "npm run sync:data",
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
-    "build:pages": "tsc --noEmit && VITE_BASE=/Beautiful-Quran-/app/ vite build --outDir ../_site/app --emptyOutDir",
+    "build:pages": "tsc --noEmit && VITE_BASE=/Beautiful-Quran/app/ vite build --outDir ../_site/app --emptyOutDir",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest"
