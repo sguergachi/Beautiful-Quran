@@ -624,9 +624,6 @@ internal fun MushafPageDial(
     // a short bracket on the book's scale, and 1 is that bracket stretched
     // across the whole measure with its leaves standing in it.
     val zoom = remember { Animatable(0f) }
-    // The same thing as a fact rather than as a frame value, for the label and
-    // for the pointer loop. Two recompositions per transition, not per frame.
-    var trough by remember { mutableStateOf(false) }
     // Which chapter the trough is holding. Read in the draw phase, so it is
     // written before the animation starts and left alone until the next entry.
     var troughRun by remember { mutableStateOf(1..1) }
@@ -891,25 +888,53 @@ internal fun MushafPageDial(
                     }
                     .graphicsLayer { alpha = expand.value },
             ) {
-                Text(
-                    text = mushafDialLabelHead(hud, trough, hudPage),
-                    style = hudType,
-                    color = ink.copy(alpha = 0.72f),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
+                // The head is set twice, once as each tier reads the leaf, and
+                // the two are cross-faded on the trough's own opening. The
+                // tiers do not change their minds at an instant: the bracket
+                // takes about a quarter second to stretch into the trough, and
+                // wording that swapped on the first frame of that was
+                // answering a question the rule had not finished asking.
+                //
+                // Stacked rather than sequenced, so the block stays as wide as
+                // the wider of the two readings throughout and the centring
+                // does not slide out from under the type as the words change.
+                // Both alphas are read in the draw phase, so the whole
+                // transition costs no recomposition at all.
+                Box(contentAlignment = Alignment.Center) {
+                    Text(
+                        text = mushafDialLabelHead(hud, zoomed = false, page = hudPage),
+                        style = hudType,
+                        color = ink.copy(alpha = 0.72f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.graphicsLayer { alpha = 1f - zoom.value },
+                    )
+                    Text(
+                        text = mushafDialLabelHead(hud, zoomed = true, page = hudPage),
+                        style = hudType,
+                        color = ink.copy(alpha = 0.72f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.graphicsLayer { alpha = zoom.value },
+                    )
+                }
                 // The verses sit under the leaf's own name and are read after
                 // it, so they are set below it in the lighter ink the running
                 // head uses for everything subordinate.
+                //
+                // Only one tier writes this line at all, so its cross-fade is
+                // the line against nothing — which is the fade itself, and
+                // wants no second setting to fade against. What the comb
+                // writes here is the hard space: an empty string measures to
+                // no line, and the paper the verses arrive on has to be
+                // already theirs, or the head would step down as they came in.
                 Text(
-                    // A hard space when there is nothing to say: an empty
-                    // string measures to no line at all, and the reservation
-                    // the two-line label depends on would collapse with it.
-                    text = mushafDialLabelFoot(hud, trough).ifEmpty { " " },
+                    text = mushafDialLabelFoot(hud, zoomed = true).ifEmpty { " " },
                     style = hudType,
                     color = ink.copy(alpha = 0.48f),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.graphicsLayer { alpha = zoom.value },
                 )
             }
         }
@@ -1067,7 +1092,6 @@ internal fun MushafPageDial(
                                     dialPage.floatValue = raw
                                     if (mushafDialShouldLeaveTrough(runOutS, strayed)) {
                                         open = false
-                                        trough = false
                                         heldS = 0f
                                         shut = true
                                         view.performHapticFeedback(HapticFeedbackConstants.CONTEXT_CLICK)
@@ -1148,7 +1172,6 @@ internal fun MushafPageDial(
                                     settleOffset =
                                         raw - mushafDialTroughPage(fraction, chapter)
                                     open = true
-                                    trough = true
                                     heldS = 0f
                                     view.performHapticFeedback(HapticFeedbackConstants.CONTEXT_CLICK)
                                     scope.launch { zoom.animateTo(1f, MushafDialZoomIn) }
@@ -1186,7 +1209,6 @@ internal fun MushafPageDial(
                         // The thumb marks a place; it is not a flywheel. A
                         // release lands where the hand left it — no decay, no
                         // overshoot to read past.
-                        trough = false
                         scope.launch {
                             expand.animateTo(0f, spring(dampingRatio = 1f, stiffness = 150f))
                         }
