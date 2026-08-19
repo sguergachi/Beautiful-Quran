@@ -259,6 +259,19 @@ fun ReaderScreen(
         initialPage = 0,
         pageCount = { mushafCatalog?.pageCount ?: 1 },
     )
+    // Where a dial scrub landed. The reader owns the pager, so the dial hands
+    // a leaf back rather than scrolling it itself; the effect is the third and
+    // last writer of the pager's position.
+    var mushafSeekPage by remember { mutableStateOf<Int?>(null) }
+    // Read as a lambda by the pager, so a hand landing on the rule fades the
+    // folio without recomposing 604 leaves' worth of reader around it.
+    val mushafScrubbing = remember { mutableStateOf(false) }
+    LaunchedEffect(mushafSeekPage) {
+        val target = mushafSeekPage ?: return@LaunchedEffect
+        val catalog = mushafCatalog ?: return@LaunchedEffect
+        mushafPagerState.scrollToPage((target - 1).coerceIn(0, catalog.pageCount - 1))
+        mushafSeekPage = null
+    }
     LaunchedEffect(mushafCatalog, surahId, startAyah, startWordPosition) {
         val catalog = mushafCatalog ?: return@LaunchedEffect
         val page = catalog.pageOf(
@@ -765,11 +778,35 @@ fun ReaderScreen(
     // pagerState.currentPage directly here recomposed the entire reader body on
     // every settled page, which is exactly what MushafPager takes such care to
     // avoid by handing playback down as one State.
-    val mushafLeafProgress = remember(mushafCatalog) {
-        derivedStateOf {
-            val pages = mushafCatalog?.pageCount ?: return@derivedStateOf 0f
-            if (pages <= 0) return@derivedStateOf 0f
-            ((mushafPagerState.currentPage + 1).toFloat() / pages).coerceIn(0f, 1f)
+    val mushafLeafPage = remember(mushafCatalog) {
+        { mushafPagerState.currentPage + 1 }
+    }
+    // The leaves that open a juzʾ, walked once when the catalog arrives: the
+    // dial stands these taller than their neighbours so a fast scrub still has
+    // thirty landmarks to read even when single leaves have closed up.
+    val mushafJuzPages = remember(mushafCatalog) {
+        val catalog = mushafCatalog ?: return@remember emptySet<Int>()
+        buildSet {
+            var previous = 0
+            for (page in 1..catalog.pageCount) {
+                val juz = catalog.page(page)?.juz ?: continue
+                if (juz != previous) add(page)
+                previous = juz
+            }
+        }
+    }
+    // What the dial writes over its thumb. The scrubbed leaf almost never
+    // belongs to the chapter that is loaded, so this reads the leaf's own
+    // chapter rather than the reader's.
+    val mushafPageLabel = remember(mushafCatalog, mushafUi) {
+        label@{ page: Int ->
+            val catalog = mushafCatalog ?: return@label null
+            val leaf = catalog.page(page) ?: return@label null
+            val surah = mushafUi?.surahsById?.get(leaf.primarySurahId) ?: return@label null
+            val ayah = leaf.ayahKeys
+                .filter { it.first == leaf.primarySurahId }
+                .minOfOrNull { it.second } ?: 1
+            MushafDialLabel(chapter = surah.nameTransliteration, ayah = ayah)
         }
     }
     val mushafLeafSurahId = remember(mushafCatalog) {
@@ -2046,8 +2083,14 @@ fun ReaderScreen(
                         onSpeed = viewModel::cycleSpeed,
                         // Where the reader is in the book, by leaf — so the rule
                         // answers while pages are turned as well as while they
-                        // are recited, and the thumb has something to mark.
-                        chapterProgress = mushafLeafProgress.value,
+                        // are recited, and the thumb has something to mark and
+                        // something to be dragged along.
+                        leafPage = mushafLeafPage,
+                        pageCount = mushafCatalog?.pageCount ?: 1,
+                        majorPages = mushafJuzPages,
+                        pageLabel = mushafPageLabel,
+                        onSeekPage = { mushafSeekPage = it },
+                        onScrubbing = { mushafScrubbing.value = it },
                         modifier = Modifier.weight(1f),
                     ) {
                     if (mushafReady == null) {
@@ -2147,6 +2190,7 @@ fun ReaderScreen(
                         loadedSurahId = mushafSurahId,
                         flashWordPosition = startWordPosition,
                         heldPage = mushafTappedPage,
+                        scrubbing = { mushafScrubbing.value },
                         onUserTurnedPage = onMushafTurnedPage,
                         onWordClick = onMushafWordClick,
                         onWordLongClick = onMushafWordLongClick,

@@ -246,6 +246,13 @@ internal fun MushafPager(
      */
     heldPage: Int?,
     flashWordPosition: Int?,
+    /**
+     * True while the page dial is under a hand. The folio and the dial's label
+     * both name a leaf, one the reader is on and one they are heading for, and
+     * they sit in the same band — so the folio gives the band up for as long
+     * as the scrub lasts rather than arguing with it.
+     */
+    scrubbing: () -> Boolean,
     onUserTurnedPage: () -> Unit,
     onWordClick: (MushafToken) -> Unit,
     onWordLongClick: (MushafToken) -> Unit,
@@ -389,11 +396,18 @@ internal fun MushafPager(
                         .fillMaxWidth(),
                 )
                 Spacer(Modifier.height(unit * MushafGrid.TAIL))
+                val folioInk by animateFloatAsState(
+                    targetValue = if (scrubbing()) 0f else 1f,
+                    animationSpec = tween(InkEngine.tuning.recessMs, easing = FastOutSlowInEasing),
+                    label = "mushafFolioStandDown",
+                )
                 MushafPageFolio(
                     page = page.page,
                     unit = unit,
                     glyphSize = leafGlyphSize(unit, fontScale),
-                    modifier = Modifier.padding(horizontal = MushafEdgeGutter),
+                    modifier = Modifier
+                        .padding(horizontal = MushafEdgeGutter)
+                        .graphicsLayer { alpha = folioInk },
                 )
             }
             }

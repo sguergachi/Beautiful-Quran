@@ -89,6 +89,39 @@ it does not colour in the pages behind it, so nothing fills. It answers while
 pages are turned as well as while they are recited. Furniture, so never gold —
 a line drawn along the paper's edge rather than a bar with a handle.
 
+That rule also drives. A leaf carries no ayah rail and no bottom bar, so
+without it the only way to page 400 is 393 swipes. A hand laid anywhere along
+the line — not on the thumb; the thumb is a mark, not a knob to find — opens it
+into what it has always been a picture of: a row of very fine dial markers, one
+per leaf, standing up under the hand and dissolving back into the hairline a
+lens-width either side. The teeth are set at the pitch the current pointer gain
+buys, so the comb is an honest readout and not an ornament — slow, and it opens
+to fourteen points of screen per leaf, wide enough to aim at; flick, and one
+hand-width is worth the whole book, the pitch falls under a pixel and the teeth
+are simply not drawn, which is the true reading of *too fast to see leaves*.
+Between those the gain is interpolated geometrically, so there is no seam to
+feel. Nothing is animated into place: every tooth's height and strength is
+recomputed from its distance to the finger, the way the ayah rail's own marks
+are. The line itself thickens and the thumb grows a little while the hand is
+down — the rule has been taken hold of, and it says so.
+
+This does not make it a bar with a handle. At rest it is the line it always
+was, byte for byte — the comb has no existence except under a hand, and it is
+that same line resolved rather than a control grown on top of it. Above the
+thumb the leaf it will land on is named in type alone, chapter and verse, with
+no capsule and no ground: ink on paper, not a float. Nothing commits until the
+hand comes off. The leaf's own folio names a page too, and the two would argue
+in the same band, so the folio stands down for as long as the scrub lasts.
+During recitation the thumb has receded almost to nothing; a press brings it
+straight back, because on a leaf this is the only wayfinding there is and a
+control you cannot see is not a control.
+
+The thumb's travel stops short of the paper's edge at both ends while the line
+runs the full measure. That inset is not for looks: both ends of this rule lie
+inside the system's own back-gesture strip, and a thumb parked there is a thumb
+the OS takes the press for — the first leaf and the last would be the two you
+could not grab.
+
 Both fore-edges are feathered into the paper, always — solid at the very edge
 and gone by the time the measure begins. The band is exactly the paper outside
 the text: the margin and the mark gutter, not a hair more. A leaf in a bound

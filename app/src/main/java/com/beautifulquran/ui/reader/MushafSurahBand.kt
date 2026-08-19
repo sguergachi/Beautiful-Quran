@@ -54,10 +54,6 @@ import com.beautifulquran.ui.theme.ornament.generateChapterOrnament
 /** How far the chapter's name rides above its line box, in ems of itself. */
 private const val MushafNameLift = 0.30f
 
-/** The rule itself stays a hairline; the thumb is what gives the band height. */
-private val MushafThumbHeight = 3.dp
-private const val MushafRuleWeightPx = 1f
-
 /** Corner easing anywhere on the leaf: a hairline, never a curve. */
 private const val MushafPanelCornerPx = 3f
 
@@ -249,61 +245,6 @@ private fun MushafTitleCartouche(
             modifier = Modifier
                 .offset(y = -nameLift)
                 .padding(horizontal = height * 1.45f, vertical = height * 0.26f),
-        )
-    }
-}
-
-/**
- * The hairline under the leaf: a rule that separates the page from the
- * transport, carrying a single thumb where the reader has got to in the book.
- *
- * A ribbon marks a place; it does not colour in the pages behind it. So the
- * rule stays one weight end to end and the thumb alone moves along it — it
- * reads the *page*, not the playback, so it answers while leaves are turned as
- * well as while they are recited. Furniture, so ink: gold on the leaf means
- * illumination.
- */
-@Composable
-internal fun MushafProgressRule(
-    progress: Float,
-    /** True while the reciter has the leaf: the marker steps back. */
-    reciting: Boolean = false,
-    modifier: Modifier = Modifier,
-) {
-    val ink = MaterialTheme.colorScheme.onBackground
-    // A ribbon is for finding your place, not for watching. While the page is
-    // being recited it fades almost out, and comes back when the reading does.
-    val thumbInk by animateFloatAsState(
-        targetValue = if (reciting) 0.06f else 0.62f,
-        animationSpec = tween(InkEngine.tuning.recessMs, easing = FastOutSlowInEasing),
-        label = "mushafThumb",
-    )
-    val at by animateFloatAsState(
-        targetValue = progress.coerceIn(0f, 1f),
-        animationSpec = tween(320, easing = FastOutSlowInEasing),
-        label = "mushafProgress",
-    )
-    Canvas(modifier.fillMaxWidth().height(MushafThumbHeight)) {
-        val rule = MushafRuleWeightPx
-        val midY = size.height / 2f
-        drawRoundRect(
-            color = ink.copy(alpha = 0.10f),
-            topLeft = Offset(0f, midY - rule / 2f),
-            size = Size(size.width, rule),
-            cornerRadius = CornerRadius(rule, rule),
-        )
-        // The thumb: where in the book this leaf sits. A little thicker than
-        // the rule and rounded, so it reads as a marker laid on the line
-        // rather than a control fixed to it. Right to left, the book's own
-        // direction of travel.
-        val thumbW = size.height * 3.2f
-        val thumbX = (size.width * (1f - at) - thumbW / 2f)
-            .coerceIn(0f, size.width - thumbW)
-        drawRoundRect(
-            color = ink.copy(alpha = thumbInk),
-            topLeft = Offset(thumbX, 0f),
-            size = Size(thumbW, size.height),
-            cornerRadius = CornerRadius(size.height, size.height),
         )
     }
 }

@@ -127,8 +127,19 @@ internal fun MushafReadingSheet(
     onFastForward: () -> Unit,
     onRepeatClick: () -> Unit,
     onSpeed: () -> Unit,
-    /** How far into the chapter the recitation has come, 0..1. */
-    chapterProgress: Float,
+    /** The leaf in view, 1-based. A lambda, so turning a page redraws the
+     * dial rather than recomposing the reader that hosts this sheet. */
+    leafPage: () -> Int,
+    /** Leaves in the book — 604, once the catalog is up. */
+    pageCount: Int,
+    /** Leaves that open a juzʾ: the dial's landmarks. */
+    majorPages: Set<Int>,
+    /** What the dial writes over its thumb for a given leaf. */
+    pageLabel: (Int) -> MushafDialLabel?,
+    /** Where a scrub landed, once the hand comes off the rule. */
+    onSeekPage: (Int) -> Unit,
+    /** Raised while a hand is on the rule. */
+    onScrubbing: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit,
 ) {
@@ -156,14 +167,22 @@ internal fun MushafReadingSheet(
         Box(Modifier.weight(1f).fillMaxWidth()) {
             content()
         }
-        MushafProgressRule(
-            progress = chapterProgress,
+        MushafPageDial(
+            leafPage = leafPage,
+            pageCount = pageCount,
+            majorPages = majorPages,
+            pageLabel = pageLabel,
+            onSeekPage = onSeekPage,
+            onScrubbing = onScrubbing,
             reciting = reciting,
             // Paper between the leaf's own tail and the rule, so the folio
             // groups with the page above it rather than with the controls.
+            // The air above now belongs to the dial's own band, which stands
+            // the comb up inside it: the rule's line has not moved.
             modifier = Modifier.padding(
-                horizontal = MushafPageMargin + MushafEdgeGutter,
-                vertical = MushafRuleTailAir,
+                start = MushafPageMargin + MushafEdgeGutter,
+                end = MushafPageMargin + MushafEdgeGutter,
+                bottom = MushafRuleTailAir,
             ),
         )
         Column(
