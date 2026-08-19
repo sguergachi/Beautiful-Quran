@@ -15,7 +15,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.requiredHeight
-import androidx.compose.foundation.layout.wrapContentSize
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.systemGestureExclusion
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -861,7 +861,13 @@ internal fun MushafPageDial(
                     // in it; it stands on the leaf's bottom margin above. Left
                     // to the slot's constraints the second line has nowhere to
                     // be measured into and silently collapses to nothing.
-                    .wrapContentSize(Alignment.TopStart, unbounded = true)
+                    //
+                    // Height only. Freeing the width as well would take the
+                    // rule's own width off the label, and a line that is never
+                    // told how much paper it has cannot ellipsise: at a large
+                    // font scale the head would run off the glass instead of
+                    // ending in a full stop.
+                    .wrapContentHeight(Alignment.Top, unbounded = true)
                     .onSizeChanged {
                         hudWidthPx = it.width
                         hudHeightPx = it.height
@@ -1201,12 +1207,19 @@ internal fun MushafPageDial(
                         handed = true
                         scrubbing = false
                         reportScrub.value(false)
+                        // One motion: the trough shuts back into the line
+                        // while the thumb rides down onto the seat. Same spec
+                        // on both, so they still arrive together — but the
+                        // close is not the ride's child. A hand that comes
+                        // back before the ride is over cancels the ride, and a
+                        // close cancelled halfway leaves the next stroke
+                        // steering the chapter tier underneath a trough that
+                        // is still half open, with the last chapter's leaves
+                        // standing across the rule. Nothing would shut it
+                        // again until that stroke opened the trough itself.
+                        scope.launch { zoom.animateTo(0f, MushafDialZoomOut) }
                         glide = scope.launch {
                             resting.snapTo(landed.toFloat())
-                            // One motion: the trough shuts back into the line
-                            // while the thumb rides down onto the seat. Same
-                            // spec on both, so they arrive together.
-                            launch { zoom.animateTo(0f, MushafDialZoomOut) }
                             animate(
                                 initialValue = handX.floatValue,
                                 targetValue = seat,
