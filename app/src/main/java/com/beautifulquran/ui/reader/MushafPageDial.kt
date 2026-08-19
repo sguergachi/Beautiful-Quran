@@ -2,6 +2,7 @@ package com.beautifulquran.ui.reader
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
@@ -17,6 +18,7 @@ import androidx.compose.foundation.systemGestureExclusion
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -41,6 +43,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import android.view.HapticFeedbackConstants
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.ceil
@@ -58,11 +61,21 @@ import kotlin.math.roundToInt
  * a leaf — the ayah rail and the bottom bar are both off in mushaf mode — so
  * without this the only way to page 400 is four hundred swipes.
  *
- * The dial is *relative*, not absolute: what the finger buys per dp of travel
- * depends on how fast it is travelling. Slow, and a dp is a fourteenth of a
- * leaf; fast, and it is four leaves. That is the whole trick of a good dial,
- * and it means the thumb necessarily drifts away from the finger — which is
- * correct, and is how every dial of this kind behaves.
+ * What the finger buys per dp of travel depends on how fast it is travelling.
+ * Slow, and a dp is a fourteenth of a leaf; fast, and it is four leaves. That
+ * is the whole trick of a good dial.
+ *
+ * Which leaves the thumb somewhere to be. A gain that is not 1:1 cannot both
+ * keep the thumb under the finger and keep it at the leaf's own seat on the
+ * rule: the two diverge by construction. It is the *finger* the thumb belongs
+ * to. A marker that lags the hand reads as a control that is not listening,
+ * and no amount of correctness in what it points at buys that back. So while
+ * the hand is down the thumb is simply under it, and the comb slides beneath
+ * — which is what a magnifier does, and what the reader is looking at anyway:
+ * the leaf is named by the comb and by the label above it, not by where the
+ * thumb has got to along a 604-leaf line. On release the comb closes and the
+ * thumb glides to the leaf's true seat in the same motion, and the rule is a
+ * place-marker again.
  *
  * The magnification is not decoration. The rule reads as a hairline because
  * 604 leaves across a phone's width is half a pixel each; under the finger the
@@ -219,6 +232,19 @@ internal fun mushafDialTickX(thumbXPx: Float, page: Int, at: Float, pitchPx: Flo
  * not grab. So the thumb's travel stops short of the paper's edge while the
  * line itself still runs the full measure.
  */
+/**
+ * Where the thumb may stand when it is following a finger at [xPx], on a rule
+ * [widthPx] wide holding [insetPx] back at each end.
+ *
+ * The same two ends [mushafDialTrackX] respects, for the same reason: the
+ * thumb tracks the hand, and a hand can reach into the system's back-gesture
+ * strip even though a leaf's seat never maps there.
+ */
+internal fun mushafDialClampToTrack(xPx: Float, widthPx: Float, insetPx: Float): Float {
+    val inset = insetPx.coerceIn(0f, widthPx / 2f)
+    return xPx.coerceIn(inset, (widthPx - inset).coerceAtLeast(inset))
+}
+
 internal fun mushafDialTrackX(fraction: Float, widthPx: Float, insetPx: Float): Float {
     val inset = insetPx.coerceIn(0f, widthPx / 2f)
     return inset + (widthPx - 2f * inset) * fraction.coerceIn(0f, 1f)
@@ -297,6 +323,11 @@ internal fun MushafPageDial(
     val dialPage = remember { mutableFloatStateOf(settled.toFloat()) }
     val dialPitchDp = remember { mutableFloatStateOf(mushafDialPitchDp(MUSHAF_DIAL_FINE_GAIN)) }
     val expand = remember { Animatable(0f) }
+    // Where the thumb is drawn, in px along the rule, whenever the hand owns
+    // it: the finger's own x during a drag, then the glide home afterwards.
+    val handX = remember { mutableFloatStateOf(0f) }
+    var handed by remember { mutableStateOf(false) }
+    var glide by remember { mutableStateOf<Job?>(null) }
     var widthPx by remember { mutableIntStateOf(0) }
     var hudWidthPx by remember { mutableIntStateOf(0) }
     var hudHeightPx by remember { mutableIntStateOf(0) }
@@ -310,11 +341,17 @@ internal fun MushafPageDial(
         animationSpec = tween(InkEngine.tuning.recessMs, easing = FastOutSlowInEasing),
         label = "mushafThumb",
     )
-    val resting by animateFloatAsState(
-        targetValue = settled.toFloat(),
-        animationSpec = tween(320, easing = FastOutSlowInEasing),
-        label = "mushafProgress",
-    )
+    // Driven rather than declared, because a scrub's release has to put this
+    // exactly on the leaf it landed on. Left as a tween toward the pager's
+    // page, a several-hundred-leaf animation would still be running underneath
+    // when the thumb finished gliding home, and the marker would set off again
+    // on its own the instant the glide handed back.
+    val resting = remember { Animatable(settled.toFloat()) }
+    LaunchedEffect(settled) {
+        if (resting.value != settled.toFloat()) {
+            resting.animateTo(settled.toFloat(), tween(320, easing = FastOutSlowInEasing))
+        }
+    }
     // Rounded, so the label recomposes once per leaf crossed rather than once
     // per frame; its x follows the finger in the layout phase instead.
     // Keyed on the count: the catalog arrives after the first composition, and
@@ -333,7 +370,7 @@ internal fun MushafPageDial(
     ) {
         Canvas(Modifier.fillMaxWidth().height(MushafDialSlot)) {
             val ruleY = MushafDialRuleY.toPx()
-            val at = if (scrubbing) dialPage.floatValue else resting
+            val at = if (scrubbing || handed) dialPage.floatValue else resting.value
             val lift = expand.value
             // The line thickens under the hand along its whole length: the
             // reader has taken hold of the rule, not of a knob on it.
@@ -346,7 +383,11 @@ internal fun MushafPageDial(
                 cornerRadius = CornerRadius(rule, rule),
             )
             val inset = MushafDialEdgeInset.toPx()
-            val thumbX = mushafDialTrackX(1f - mushafDialFraction(at, pages), size.width, inset)
+            val seatX = mushafDialTrackX(1f - mushafDialFraction(at, pages), size.width, inset)
+            // Under the hand while there is one, at the leaf's seat when there
+            // is not. See the note at the head of this file for why the thumb
+            // follows the finger rather than the page.
+            val thumbX = if (scrubbing || handed) handX.floatValue else seatX
             // The comb: one mark per leaf, at the pitch the current gain buys.
             // Standing them up is what shows the reader the granularity — and
             // when the pitch falls under a pixel there is nothing honest to
@@ -411,13 +452,8 @@ internal fun MushafPageDial(
                         hudHeightPx = it.height
                     }
                     .offset {
-                        val at = dialPage.floatValue
-                        val x = mushafDialTrackX(
-                            1f - mushafDialFraction(at, pages),
-                            widthPx.toFloat(),
-                            MushafDialEdgeInset.toPx(),
-                        )
-                        val left = (x - hudWidthPx / 2f)
+                        // Over the thumb, which is over the finger.
+                        val left = (handX.floatValue - hudWidthPx / 2f)
                             .coerceIn(0f, (widthPx - hudWidthPx).coerceAtLeast(0).toFloat())
                         IntOffset(
                             left.roundToInt(),
@@ -449,6 +485,12 @@ internal fun MushafPageDial(
                         val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
                         if (pages <= 1) return@awaitEachGesture
                         down.consume()
+                        // A glide home may still be running from the last
+                        // scrub; the hand takes the thumb back off it.
+                        glide?.cancel()
+                        handed = false
+                        val insetPx = MushafDialEdgeInset.toPx()
+                        val widthPxNow = size.width.toFloat()
                         var lastX = down.position.x
                         var lastTime = down.uptimeMillis
                         var speed = 0f
@@ -456,6 +498,11 @@ internal fun MushafPageDial(
                         var moved = false
                         var lastHaptic = settledState.value
                         dialPage.floatValue = raw
+                        // The thumb goes to the finger on contact, before any
+                        // movement: the reader has taken hold of the rule
+                        // here, and the mark belongs where the hand is.
+                        handX.floatValue =
+                            mushafDialClampToTrack(down.position.x, widthPxNow, insetPx)
                         dialPitchDp.floatValue = mushafDialPitchDp(MUSHAF_DIAL_FINE_GAIN)
                         scrubbing = true
                         reportScrub.value(true)
@@ -469,6 +516,8 @@ internal fun MushafPageDial(
                             val dt = ((change.uptimeMillis - lastTime).coerceAtLeast(0L)) / 1000f
                             lastX = change.position.x
                             lastTime = change.uptimeMillis
+                            handX.floatValue =
+                                mushafDialClampToTrack(change.position.x, widthPxNow, insetPx)
                             if (dxPx == 0f) continue
                             moved = true
                             val dxDp = dxPx / density
@@ -505,8 +554,27 @@ internal fun MushafPageDial(
                             seek.value(landed)
                         }
                         dialPage.floatValue = landed.toFloat()
+                        // Hand the thumb back to the rule. It walks from where
+                        // the finger left it to the landed leaf's own seat
+                        // while the comb closes over it, one motion — cutting
+                        // it there instead would read as the marker jumping.
+                        val seat = mushafDialTrackX(
+                            1f - mushafDialFraction(landed.toFloat(), pages),
+                            widthPxNow,
+                            insetPx,
+                        )
+                        handed = true
                         scrubbing = false
                         reportScrub.value(false)
+                        glide = scope.launch {
+                            resting.snapTo(landed.toFloat())
+                            animate(
+                                initialValue = handX.floatValue,
+                                targetValue = seat,
+                                animationSpec = spring(dampingRatio = 1f, stiffness = 200f),
+                            ) { value, _ -> handX.floatValue = value }
+                            handed = false
+                        }
                     }
                 },
         )

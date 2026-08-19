@@ -229,4 +229,40 @@ class MushafPageDialTest {
         assertEquals(30f, mushafDialTrackX(-0.4f, 1000f, 30f), 1e-3f)
         assertEquals(970f, mushafDialTrackX(1.6f, 1000f, 30f), 1e-3f)
     }
+
+    @Test
+    fun `a finger at either screen edge still leaves the thumb clear of it`() {
+        val width = 1000f
+        val inset = 40f
+        assertEquals(inset, mushafDialClampToTrack(-120f, width, inset), 0.001f)
+        assertEquals(width - inset, mushafDialClampToTrack(9_999f, width, inset), 0.001f)
+    }
+
+    @Test
+    fun `a finger inside the track is left exactly where it is`() {
+        // The whole point of tracking: no smoothing, no lag, no correction.
+        assertEquals(371.5f, mushafDialClampToTrack(371.5f, 1000f, 40f), 0.0f)
+    }
+
+    @Test
+    fun `the hand and the leaf's seat share the same two ends`() {
+        val width = 1000f
+        val inset = 40f
+        assertEquals(
+            mushafDialTrackX(0f, width, inset),
+            mushafDialClampToTrack(-1f, width, inset),
+            0.001f,
+        )
+        assertEquals(
+            mushafDialTrackX(1f, width, inset),
+            mushafDialClampToTrack(width + 1f, width, inset),
+            0.001f,
+        )
+    }
+
+    @Test
+    fun `the clamp survives a rule narrower than its own insets`() {
+        assertEquals(20f, mushafDialClampToTrack(0f, 40f, 90f), 0.001f)
+        assertEquals(20f, mushafDialClampToTrack(40f, 40f, 90f), 0.001f)
+    }
 }

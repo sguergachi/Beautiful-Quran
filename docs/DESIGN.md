@@ -105,6 +105,17 @@ recomputed from its distance to the finger, the way the ayah rail's own marks
 are. The line itself thickens and the thumb grows a little while the hand is
 down — the rule has been taken hold of, and it says so.
 
+The thumb goes to the finger on contact and stays under it for the whole drag.
+A gain that is not one leaf to one dp cannot do both things at once — keep the
+mark under the hand, and keep it at the leaf's own seat along the 604 — and it
+is the hand the mark belongs to: one that lags reads as a control that is not
+listening, and being right about what it points at does not buy that back. So
+the thumb is where the finger is and the comb slides beneath it, which is what
+a magnifier does anyway; the leaf is named by the teeth and by the label above
+them, not by how far along a hairline the mark has got. On release the comb
+closes and the thumb walks back to that leaf's seat in the same motion, and the
+rule is a place-marker again.
+
 This does not make it a bar with a handle. At rest it is the line it always
 was, byte for byte — the comb has no existence except under a hand, and it is
 that same line resolved rather than a control grown on top of it. Above the
