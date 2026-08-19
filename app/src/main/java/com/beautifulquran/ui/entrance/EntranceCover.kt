@@ -70,7 +70,6 @@ import com.beautifulquran.ui.theme.MushafCoverFrame
 import com.beautifulquran.ui.theme.generatedFieldWeave
 import com.beautifulquran.ui.theme.gilded
 import com.beautifulquran.ui.theme.letterFadeIn
-import com.beautifulquran.ui.theme.ornament.CoverMonogram
 import com.beautifulquran.ui.theme.ornament.CoverOrnament
 import com.beautifulquran.ui.theme.quietClickable
 import kotlinx.coroutines.delay
@@ -121,7 +120,7 @@ private val CoverOpenEasing = CubicBezierEasing(0.24f, 0.02f, 0.12f, 1f)
 
 /**
  * The ornament build: the generated geometry inks itself onto the leather
- * over this long — field wash first, monogram strokes in sequence, border
+ * over this long — field wash first, medallion strokes in sequence, border
  * frieze, then seals and pearls. Web uses the same schedule.
  */
 private const val ORNAMENT_BUILD_MS = 3_400
@@ -133,7 +132,7 @@ private const val COVER_FRAME_SCALE = 1.10f
  * The entrance ceremony: the closed mushaf. A deep-green leather board,
  * tooled with the star-and-cross weave, framed and cornered in gilt,
  * concentric with the phone's screen radius so the cover feels cut for this
- * device, carrying the crescent-and-Allah mark and the title in the Hafs
+ * device, carrying the gilded khatam medallion and the title in the Hafs
  * hand. The isti'adha then fades in as text — its Arabic ink washes across
  * the cover — and after a brief hold the board swings open on its left
  * hinge: the free edge comes toward the reader (out of the screen) and
@@ -425,7 +424,7 @@ fun EntranceCover(
             ) {
                 Spacer(Modifier.weight(0.9f))
                 GeneratedMedallion(
-                    spec = CoverMonogram,
+                    spec = ornament.medallion,
                     size = medallionSize,
                     brightGold = accents.goldBright,
                     deepGold = accents.goldDeep,

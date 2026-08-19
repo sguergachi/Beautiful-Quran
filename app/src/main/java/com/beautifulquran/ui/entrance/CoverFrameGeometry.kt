@@ -74,7 +74,7 @@ fun coverFrameMarginsDp(
  *
  * For a screen corner of radius [R] and a uniform inset [D], each frame
  * corner is [R − D] — the classic concentric rounded-rect relationship —
- * so the doubled gilt rule reads as designed for that phone's silhouette
+ * so the gilt frame reads as designed for that phone's silhouette
  * rather than a fixed square-ish border floating inside it. The khatam
  * star at each corner is sized to the band it is seated in, so it reads as
  * a hub of the border rather than an ornament laid over its edge.

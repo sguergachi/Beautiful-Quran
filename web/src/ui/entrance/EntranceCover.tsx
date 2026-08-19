@@ -8,7 +8,6 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { animate, type AnimationPlaybackControls } from 'motion'
 import { washMaskImage } from '../theme/Fade'
 import { coverLayout, coverLayoutCssVars } from './coverLayout'
-import { coverMonogram } from '../theme/coverMonogram'
 import { generateCoverOrnament, type CoverOrnament, type RosetteSpec } from '../theme/ornamentGenerator'
 import {
   fieldWeaveBackground,
@@ -107,10 +106,11 @@ async function runWash(
 }
 
 /**
- * Doubled gilt rule + generated corner seals — sizes from the board layout
- * grid. The seals are the hubs the border band's channels taper onto, part
- * of the tooled binding rather than the ink wash, so they render complete
- * from the first frame (matches Android's static `GeneratedCornerSeals`).
+ * Inner gilt fillet + generated corner seals — sizes from the board layout
+ * grid. No outer hoop: a second concentric rounded-rect around the tapered
+ * band reads as a badge-ring. The seals are the hubs the border band's
+ * channels taper onto, part of the tooled binding rather than the ink wash,
+ * so they render complete from the first frame (matches Android).
  */
 function MushafCoverFrame({ seal }: { seal: RosetteSpec }) {
   const corner = (pos: string) => (
@@ -125,7 +125,6 @@ function MushafCoverFrame({ seal }: { seal: RosetteSpec }) {
   )
   return (
     <div className="entrance-frame" aria-hidden="true">
-      <div className="entrance-frame-outer" />
       <div className="entrance-frame-inner" />
       {corner('tl')}
       {corner('tr')}
@@ -365,7 +364,7 @@ export function EntranceCover({
         <div className="entrance-content">
           <div className="entrance-air entrance-air--top" />
           <GeneratedRosette
-            spec={coverMonogram}
+            spec={ornament.medallion}
             built={built}
             className="entrance-medallion"
           />

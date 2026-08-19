@@ -4499,7 +4499,7 @@ select {
   opacity: 1;
 }
 
-/* The generated border frieze between the two gilt rules — the binding's
+/* The generated border frieze against the inner gilt fillet — the binding's
    tooling, not illumination, so it is complete from the first frame, never
    animated (matches Android's static GeneratedBorderBand). Each side's band
    is a railed channel (inline left/right or top/bottom from GeneratedBorder,
@@ -4562,26 +4562,16 @@ select {
   pointer-events: none;
 }
 
-.entrance-frame-outer {
-  position: absolute;
-  inset: var(--cover-outer-inset);
-  border: 2px solid #d9b44a;
-  border-radius: var(--cover-outer-radius);
-  /* Emboss: dark toward the lower-right, light toward the upper-left —
-     the rule pressed into the leather under a top-left light. */
-  box-shadow:
-    0.8px 0.8px 0 rgba(0, 0, 0, 0.32),
-    -0.8px -0.8px 0 rgba(255, 255, 255, 0.08);
-}
-
+/* No outer hoop — a second concentric rounded-rect around the tapered
+   band reads as a badge-ring, not as the band's own outer rail. */
 .entrance-frame-inner {
   position: absolute;
   inset: var(--cover-inner-inset);
-  border: 1px solid rgba(217, 180, 74, 0.85);
+  border: 2px solid #d9b44a;
   border-radius: var(--cover-inner-radius);
   box-shadow:
-    0.6px 0.6px 0 rgba(0, 0, 0, 0.22),
-    -0.6px -0.6px 0 rgba(255, 255, 255, 0.05);
+    0.8px 0.8px 0 rgba(0, 0, 0, 0.32),
+    -0.8px -0.8px 0 rgba(255, 255, 255, 0.08);
 }
 
 .entrance-corner {
