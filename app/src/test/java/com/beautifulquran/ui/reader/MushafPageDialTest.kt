@@ -1,5 +1,6 @@
 package com.beautifulquran.ui.reader
 
+import androidx.compose.ui.unit.dp
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -101,40 +102,54 @@ class MushafPageDialTest {
         // wait. And the threshold sits far below any real steering speed, so
         // a reader creeping through the chapters is not clicked into a trough.
         assertTrue(MUSHAF_DIAL_HOLD_S in 0.18f..0.35f)
-        assertTrue(MUSHAF_DIAL_HOLD_DP_S < MUSHAF_DIAL_FLEE_DP_S / 8f)
+        assertTrue(MUSHAF_DIAL_HOLD_DP_S < 30f)
     }
 
     @Test
-    fun `the trough gives way to a hand that moves off, or leans on an end`() {
-        assertTrue(mushafDialShouldClose(MUSHAF_DIAL_FLEE_DP_S * 1.2f, 0f))
-        assertTrue(mushafDialShouldClose(-MUSHAF_DIAL_FLEE_DP_S * 1.2f, 0f))
-        assertTrue(mushafDialShouldClose(0f, MUSHAF_DIAL_EDGE_S))
-        // Ordinary aiming inside the trough keeps it open.
-        assertFalse(mushafDialShouldClose(60f, 0f))
-        assertFalse(mushafDialShouldClose(60f, MUSHAF_DIAL_EDGE_S * 0.5f))
+    fun `the trough is left by going past an end of it, and by nothing else`() {
+        // A 360 dp rule at 3x: the measure runs from the trough inset to that
+        // far from the other end, and the run-out is what lies beyond.
+        val width = 1080f
+        val troughInset = (14f + 26f) * 3f
+        assertTrue(mushafDialPastTrough(troughInset - 1f, width, troughInset))
+        assertTrue(mushafDialPastTrough(width - troughInset + 1f, width, troughInset))
+        // Both ends of the measure itself are still inside it — the last leaf
+        // is a place the reader has to be able to sit on without falling out.
+        assertFalse(mushafDialPastTrough(troughInset, width, troughInset))
+        assertFalse(mushafDialPastTrough(width - troughInset, width, troughInset))
+        assertFalse(mushafDialPastTrough(width / 2f, width, troughInset))
     }
 
     @Test
-    fun `opening and shutting cannot both be true of one hand`() {
-        // A speed that opens the trough must not be a speed that shuts it,
-        // or the dial would chatter between the tiers every frame.
-        assertTrue(MUSHAF_DIAL_HOLD_DP_S < MUSHAF_DIAL_FLEE_DP_S)
-        var speed = 0f
+    fun `the run-out is a target, and it does not eat the chapter`() {
+        // Wide enough to aim at rather than arrive at, on the narrowest phone
+        // this ships to; and both run-outs together still leave the chapter
+        // most of the rule, or picking a leaf inside it gets cramped.
+        assertTrue(MushafDialRunOut >= 20.dp)
+        val rule = 320.dp
+        val measure = rule - (MushafDialEdgeInset + MushafDialRunOut) * 2f
+        assertTrue(measure > rule * 0.6f)
+    }
+
+    @Test
+    fun `a hand that moves fast inside the trough keeps it`() {
+        // The rule this replaced: a hand moving at a pace was handed the whole
+        // book back mid-gesture. Working quickly inside a long chapter is the
+        // tier's own job. Closing now reads a place, not a speed — so however
+        // fast the finger is going, anywhere over the measure keeps the trough.
+        val width = 1080f
+        val troughInset = 120f
+        var x = troughInset
+        while (x <= width - troughInset) {
+            assertFalse("x $x drops the trough", mushafDialPastTrough(x, width, troughInset))
+            x += 5f
+        }
+        // And no speed at all opens it: the hold is the only way in.
+        var speed = MUSHAF_DIAL_HOLD_DP_S
         while (speed < 2000f) {
-            assertFalse(
-                "speed $speed both opens and shuts",
-                mushafDialShouldOpen(speed, 10f) && mushafDialShouldClose(speed, 0f),
-            )
+            assertFalse("speed $speed opens the trough", mushafDialShouldOpen(speed, 10f))
             speed += 5f
         }
-    }
-
-    @Test
-    fun `the edge has to be leaned on, not brushed`() {
-        // Passing through the end of the trough on the way to the last leaf
-        // is normal. Staying there is the reader asking to get out.
-        assertTrue(MUSHAF_DIAL_EDGE_S > 0.08f)
-        assertTrue(MUSHAF_DIAL_EDGE_DP >= 8f)
     }
 
     @Test

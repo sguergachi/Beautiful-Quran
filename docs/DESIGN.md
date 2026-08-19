@@ -144,16 +144,23 @@ moved; so the difference is captured at the click and paid off underneath the
 opening animation. The leaf under the thumb when the trough opens is the leaf
 that was under it when the hold began.
 
-**Three things close it.** Letting go — the reader has chosen. Moving off at
-pace — they are steering again, and they are answered almost at once, because a
-sweep that lags is still magnified while the hand has already left. Or leaning
-on either end of the trough for a moment: the chapter has run out and the
-reader is asking for the next one. Passing through an end on the way to the
-last leaf is normal and does nothing; staying there is the ask. In all three
-the trough collapses back into the hairline, which is how the reader sees they
-are back at chapters. After an edge pop-out the finger is still sitting at the
-end and still still, so the hold is refused until it moves away — otherwise the
-trough would spring open again on the very next frame.
+**Two things close it.** Letting go — the reader has chosen. Or carrying the
+finger off either end of the trough's measure: the chapter has run out and the
+reader is asking for the book back. So the chapter's leaves stop short of the
+rule's ends, and what stands beyond the last of them at each side is the
+**run-out** — a hand's width of bare rule that is nothing but the way out.
+Reaching the last leaf and sitting on it is normal and does nothing; crossing
+past it is the ask. Either way the trough collapses back into the hairline,
+which is how the reader sees they are back at chapters, and the same line that
+let them out keeps them out until the hand is back over the measure.
+
+**Speed does not close it**, and this is the correction to an earlier rule that
+said it did. Moving off at pace looked like "the reader is steering again", but
+working quickly inside a long chapter is exactly what the page tier is *for*,
+and a tier you fall out of by moving is a tier you have to move gingerly in.
+The way out is now a place rather than a pace — and a place can be aimed at,
+sat next to, and backed away from, which is why it is given the width of the
+run-out instead of the edge of the glass.
 
 The label above the finger says which tier is running, and says it in what it
 counts. In the comb it is the chapter's name alone: a verse number turning over

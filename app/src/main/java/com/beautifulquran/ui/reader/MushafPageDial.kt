@@ -91,11 +91,15 @@ import kotlin.math.roundToInt
  * offset carried at entry and decayed away underneath the animation buys that.
  * Coming back out is the same sentence read backwards.
  *
- * Three things close it: letting go, moving off again at a pace (the reader
- * has finished picking and is travelling), and pressing up against either end
- * of the measure, which is what running out of chapter feels like from inside
- * the trough. All three collapse the trough back into the hairline, which is
- * how the reader is told the ground has changed back.
+ * Two things close it: letting go, and carrying the finger off either end of
+ * the measure — which is what running out of chapter feels like from inside
+ * the trough, and is the way back to the whole book. So the chapter's leaves
+ * stop short of the rule's ends and leave a run-out of bare rule beyond the
+ * last of them at each side; crossing into it is leaving. Speed is not one of
+ * the two. A reader working quickly inside a long chapter is doing the tier's
+ * own job, and taking the tier away for it made the dial something you had to
+ * move gingerly in. Either way the trough collapses back into the hairline,
+ * which is how the reader is told the ground has changed back.
  *
  * Which leaves the thumb somewhere to be. In the chapter tier a gain that is
  * not 1:1 cannot both keep the thumb under the finger and keep it at the
@@ -129,20 +133,23 @@ internal const val MUSHAF_DIAL_HOLD_DP_S = 16f
 internal const val MUSHAF_DIAL_HOLD_S = 0.26f
 
 /**
- * The pace, in dp/s, at which a hand in the trough is plainly travelling
- * again, and the trough gets out of its way.
+ * How much bare rule the trough leaves standing past its own last leaf at
+ * each end: the run-out.
  *
- * Well above anything fine work produces — picking a leaf out of a chapter is
- * a few dp at a time — and below a real stroke, so the reader never has to
- * flick to escape.
+ * The trough is left by carrying a finger off the end of it, and nothing
+ * else. Speed used to do it too, which meant a reader working quickly inside
+ * a chapter — the ordinary way to cross a long one — kept being handed back
+ * the whole book they had just left. A tier you can fall out of by moving is
+ * a tier you have to move gingerly in.
+ *
+ * So the leaves stop short of the rule's ends and this is the ground beyond
+ * them. It has to be wide enough to be aimed at rather than arrived at by
+ * accident, and narrow enough that the chapter still gets most of the
+ * measure; at a phone's width it is about a thirteenth of the rule at each
+ * end. It doubles as the readout: bare rule under the thumb, with the last
+ * leaf behind it, is what running out of chapter looks like.
  */
-internal const val MUSHAF_DIAL_FLEE_DP_S = 240f
-
-/** How close to an end of the measure counts as pressed up against it, in dp. */
-internal const val MUSHAF_DIAL_EDGE_DP = 12f
-
-/** How long pressed against an end before the trough gives way, in seconds. */
-internal const val MUSHAF_DIAL_EDGE_S = 0.12f
+internal val MushafDialRunOut = 26.dp
 
 /**
  * How fast the estimate follows a hand that is speeding up, in seconds.
@@ -203,16 +210,21 @@ internal fun mushafDialShouldOpen(speedDpPerSec: Float, heldSeconds: Float): Boo
     abs(speedDpPerSec) < MUSHAF_DIAL_HOLD_DP_S && heldSeconds >= MUSHAF_DIAL_HOLD_S
 
 /**
- * Whether a hand in the trough has asked to be out of it: moving off at a
- * pace, or pressed up against an end of the measure long enough to mean it.
+ * Whether a finger at [xPx] has carried off the end of the trough's measure,
+ * which runs from [troughInsetPx] to that far from the other end of a rule
+ * [widthPx] wide.
  *
- * The second is the one that matters. The trough's ends are the chapter's
- * ends, so a finger jammed against the edge is a reader who has run out of
- * chapter — and what they want next is the book back, not more of a chapter
- * that has stopped.
+ * The whole close rule, and the whole re-open guard. The trough's ends are the
+ * chapter's ends, so a finger that has gone past them is a reader who has run
+ * out of chapter, and what they want next is the book back. Nothing about how
+ * fast they got there enters into it: crossing the last leaf is a place, and a
+ * place can be aimed at, held, and backed out of — which is the point of
+ * giving it the width of the run-out rather than the edge of the glass.
  */
-internal fun mushafDialShouldClose(speedDpPerSec: Float, edgeSeconds: Float): Boolean =
-    abs(speedDpPerSec) > MUSHAF_DIAL_FLEE_DP_S || edgeSeconds >= MUSHAF_DIAL_EDGE_S
+internal fun mushafDialPastTrough(xPx: Float, widthPx: Float, troughInsetPx: Float): Boolean {
+    val inset = troughInsetPx.coerceIn(0f, widthPx / 2f)
+    return xPx < inset || xPx > widthPx - inset
+}
 
 /**
  * Whether a haptic tick is due, given the hand has travelled [travelDp] and
@@ -355,7 +367,7 @@ private const val MushafDialRuleWeightPx = 1f
 /** The line thickens with the thumb, so the whole rule reads as taken up. */
 private const val MushafDialRuleHeldWeightPx = 2f
 /** Paper held back at each end, clear of the system's back-gesture strip. */
-private val MushafDialEdgeInset = 14.dp
+internal val MushafDialEdgeInset = 14.dp
 /** The seat mark's share of the thumb: plainly the same mark, smaller. */
 private const val MushafDialSeatWidth = 0.55f
 /** A chapter opening in the chapter tier. */
@@ -486,6 +498,12 @@ internal fun MushafPageDial(
             val lift = expand.value
             val open = zoom.value
             val inset = MushafDialEdgeInset.toPx()
+            // The trough's own measure is held further back still. What is
+            // left standing beyond its last leaf at each end is the run-out:
+            // the ground the reader crosses to hand the book back. The chapter
+            // tier's comb does not use it — the book has to reach both ends of
+            // the rule or the far left stops meaning the back of the book.
+            val troughInset = inset + MushafDialRunOut.toPx()
             // The line thickens under the hand along its whole length: the
             // reader has taken hold of the rule, not of a knob on it.
             val rule = MushafDialRuleWeightPx +
@@ -534,8 +552,8 @@ internal fun MushafPageDial(
                 val minW = MushafDialBracketMin.toPx()
                 val centre = (fromX + toX) / 2f
                 val half = maxOf(abs(fromX - toX), minW) / 2f
-                val left = lerp(centre - half, inset, open)
-                val right = lerp(centre + half, size.width - inset, open)
+                val left = lerp(centre - half, troughInset, open)
+                val right = lerp(centre + half, size.width - troughInset, open)
                 val weight = lerp(MushafDialBracket.toPx(), MushafDialTrough.toPx(), open)
                 drawRoundRect(
                     color = ink.copy(alpha = (0.13f + 0.07f * open) * lift),
@@ -586,7 +604,7 @@ internal fun MushafPageDial(
                     val troughX = mushafDialTrackX(
                         1f - (page - run.first).toFloat() / runSpan,
                         size.width,
-                        inset,
+                        troughInset,
                     )
                     val x = lerp(seat, troughX, open)
                     if (x < -rule || x > size.width + rule) continue
@@ -687,7 +705,7 @@ internal fun MushafPageDial(
                         handed = false
                         val insetPx = MushafDialEdgeInset.toPx()
                         val widthPxNow = size.width.toFloat()
-                        val edgePx = MUSHAF_DIAL_EDGE_DP * density
+                        val troughInsetPx = insetPx + MushafDialRunOut.toPx()
                         var lastX = down.position.x
                         // What the hand has travelled since the meter last
                         // looked, in dp. The pointer loop fills it; the frame
@@ -704,12 +722,6 @@ internal fun MushafPageDial(
                         // the click would move the book under a still hand.
                         var settleOffset = 0f
                         var heldS = 0f
-                        var edgeS = 0f
-                        // Set when the trough gives way at an end of the
-                        // measure. The finger is still sitting there and still
-                        // still, so without this the hold would re-open it on
-                        // the very next frame.
-                        var edgeShut = false
                         var travelDp = 0f
                         var sinceTickS = 0f
                         var lastChapter = mushafDialChapterRun(
@@ -758,7 +770,7 @@ internal fun MushafPageDial(
                                     // Absolute, inside the chapter: the finger
                                     // names a place between the two ends.
                                     val fraction =
-                                        mushafDialTrackFraction(handPx, widthPxNow, insetPx)
+                                        mushafDialTrackFraction(handPx, widthPxNow, troughInsetPx)
                                     val target = mushafDialTroughPage(fraction, troughRun)
                                     settleOffset *= exp(-dt / MUSHAF_DIAL_TROUGH_SETTLE_TAU_S)
                                     raw = (target + settleOffset).coerceIn(
@@ -766,14 +778,9 @@ internal fun MushafPageDial(
                                         troughRun.last.toFloat(),
                                     )
                                     dialPage.floatValue = raw
-                                    val atEnd = handPx <= insetPx + edgePx ||
-                                        handPx >= widthPxNow - insetPx - edgePx
-                                    edgeS = if (atEnd) edgeS + dt else 0f
-                                    if (mushafDialShouldClose(speed, edgeS)) {
+                                    if (mushafDialPastTrough(handPx, widthPxNow, troughInsetPx)) {
                                         open = false
                                         trough = false
-                                        edgeShut = edgeS >= MUSHAF_DIAL_EDGE_S
-                                        edgeS = 0f
                                         heldS = 0f
                                         view.performHapticFeedback(HapticFeedbackConstants.CONTEXT_CLICK)
                                         scope.launch { zoom.animateTo(0f, MushafDialZoomOut) }
@@ -820,17 +827,20 @@ internal fun MushafPageDial(
                                 // stillness is what the top of every stroke
                                 // looks like.
                                 heldS = if (abs(speed) < MUSHAF_DIAL_HOLD_DP_S) heldS + dt else 0f
-                                if (edgeShut) {
-                                    val atEnd = handPx <= insetPx + 2f * edgePx ||
-                                        handPx >= widthPxNow - insetPx - 2f * edgePx
-                                    if (!atEnd) edgeShut = false
-                                }
-                                if (!edgeShut && mushafDialShouldOpen(speed, heldS)) {
+                                // The same line that shut it also keeps it
+                                // shut. A finger that has just carried off an
+                                // end is sitting in the run-out and holding
+                                // perfectly still, and the trough it left has
+                                // no leaf out there to open onto; it re-opens
+                                // once the hand is back over the measure.
+                                if (!mushafDialPastTrough(handPx, widthPxNow, troughInsetPx) &&
+                                    mushafDialShouldOpen(speed, heldS)
+                                ) {
                                     // Enter on the leaf the hand is actually
                                     // on, and let the trough's absolute scale
                                     // arrive underneath it.
                                     val fraction =
-                                        mushafDialTrackFraction(handPx, widthPxNow, insetPx)
+                                        mushafDialTrackFraction(handPx, widthPxNow, troughInsetPx)
                                     settleOffset =
                                         raw - mushafDialTroughPage(fraction, chapter)
                                     open = true
