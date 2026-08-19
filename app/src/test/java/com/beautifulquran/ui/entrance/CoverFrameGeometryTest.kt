@@ -9,22 +9,38 @@ class CoverFrameGeometryTest {
     private val density = 3f // xxhdpi-ish
 
     @Test
-    fun `concentric corners equal screen radius minus inset`() {
+    fun `outer corners are a square 3 dp fillet`() {
+        val r = COVER_OUTER_CORNER_RADIUS_DP * density
+        for (screen in listOf(
+            ScreenCornerRadiiPx(180f, 180f, 180f, 180f),
+            ScreenCornerRadiiPx(120f, 80f, 80f, 120f),
+            ScreenCornerRadiiPx.Zero,
+        )) {
+            val g = coverFrameGeometry(screen, density)
+            assertEquals(r, g.outerCorners.topLeft, 0.01f)
+            assertEquals(r, g.outerCorners.topRight, 0.01f)
+            assertEquals(r, g.outerCorners.bottomRight, 0.01f)
+            assertEquals(r, g.outerCorners.bottomLeft, 0.01f)
+        }
+    }
+
+    @Test
+    fun `inner corners stay concentric with the screen`() {
         // Large enough that the full rule gap fits inside the curve.
         val screen = ScreenCornerRadiiPx(180f, 180f, 180f, 180f)
         val g = coverFrameGeometry(screen, density)
-        assertEquals(screen.topLeft - g.outerInsetPx, g.outerCorners.topLeft, 0.01f)
         assertEquals(screen.topLeft - g.innerInsetPx, g.innerCorners.topLeft, 0.01f)
         assertTrue(g.innerInsetPx > g.outerInsetPx)
     }
 
     @Test
-    fun `per-corner screen radii stay concentric independently`() {
-        val screen = ScreenCornerRadiiPx(120f, 80f, 80f, 120f)
+    fun `per-corner screen radii stay concentric on the inner rule`() {
+        // Radii large enough that the inner inset does not consume the curve.
+        val screen = ScreenCornerRadiiPx(240f, 200f, 200f, 240f)
         val g = coverFrameGeometry(screen, density)
-        assertEquals(screen.topLeft - g.outerInsetPx, g.outerCorners.topLeft, 0.01f)
-        assertEquals(screen.topRight - g.outerInsetPx, g.outerCorners.topRight, 0.01f)
-        assertEquals(screen.bottomLeft - g.outerInsetPx, g.outerCorners.bottomLeft, 0.01f)
+        assertEquals(screen.topLeft - g.innerInsetPx, g.innerCorners.topLeft, 0.01f)
+        assertEquals(screen.topRight - g.innerInsetPx, g.innerCorners.topRight, 0.01f)
+        assertEquals(screen.bottomLeft - g.innerInsetPx, g.innerCorners.bottomLeft, 0.01f)
     }
 
     @Test

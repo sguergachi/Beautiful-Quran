@@ -68,16 +68,19 @@ fun coverFrameMarginsDp(
     return (hPx / density) to (vPx / density)
 }
 
+/** Outer gilt rule is a square fillet — 3 dp, not the screen's curve. */
+const val COVER_OUTER_CORNER_RADIUS_DP = 3f
+
 /**
- * Concentric gilt-frame insets, corner radii, and corner-ornament size for
- * the entrance cover.
+ * Gilt-frame insets, corner radii, and corner-ornament size for the
+ * entrance cover.
  *
- * For a screen corner of radius [R] and a uniform inset [D], each frame
- * corner is [R − D] — the classic concentric rounded-rect relationship —
- * so the doubled gilt rule reads as designed for that phone's silhouette
- * rather than a fixed square-ish border floating inside it. The khatam
- * star at each corner is sized to the band it is seated in, so it reads as
- * a hub of the border rather than an ornament laid over its edge.
+ * The **outer** rule is a square 3 dp fillet — a tooled plate, not a
+ * hoop concentric with the phone. The **inner** rule stays concentric
+ * with the display ([R − D]) so the opening still follows the
+ * silhouette. The khatam at each corner is sized to the band it is
+ * seated in, so it reads as a hub of the border rather than an
+ * ornament laid over its edge.
  */
 data class CoverFrameGeometry(
     val outerInsetPx: Float,
@@ -99,9 +102,10 @@ data class CoverFrameGeometry(
  *
  * [density] is px-per-dp. The outer inset scales with the screen radius
  * (~48% of the largest corner) and is clamped so every phone gets a
- * generous gilt margin without flattening the concentric curve. The inner
- * rule sits a fixed gap inside the outer; corner stars span that gap so
- * they read as pressed seals set into the band, not pinpricks over it.
+ * generous gilt margin. The outer corners are a fixed 3 dp square
+ * fillet. The inner rule sits a fixed gap inside the outer and stays
+ * concentric with the display; corner stars span that gap so they read
+ * as pressed seals set into the band, not pinpricks over it.
  */
 fun coverFrameGeometry(
     screen: ScreenCornerRadiiPx,
@@ -145,10 +149,11 @@ fun coverFrameGeometry(
         bottomLeft = concentric(screen.bottomLeft, inset),
     )
 
+    val outerR = COVER_OUTER_CORNER_RADIUS_DP * density
     return CoverFrameGeometry(
         outerInsetPx = outerInset,
         innerInsetPx = innerInset,
-        outerCorners = corners(outerInset),
+        outerCorners = ScreenCornerRadiiPx(outerR, outerR, outerR, outerR),
         innerCorners = corners(innerInset),
         starRadiusPx = starRadius,
     )

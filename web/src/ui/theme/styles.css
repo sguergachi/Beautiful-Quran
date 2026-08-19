@@ -4415,7 +4415,7 @@ select {
   --cover-unit: 8px;
   --cover-outer-inset: 23px;
   --cover-inner-inset: 33px;
-  --cover-outer-radius: 26px;
+  --cover-outer-radius: 3px;
   --cover-inner-radius: 20px;
   --cover-star: 32px;
   --cover-medallion: 203px;

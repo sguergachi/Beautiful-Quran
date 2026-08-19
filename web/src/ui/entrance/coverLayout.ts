@@ -67,10 +67,12 @@ export function coverLayout(width: number, height: number): CoverLayout {
   const ruleGap = clamp(unit * 1.95, 18, outerInset * 0.85)
   const innerInset = outerInset + ruleGap
 
-  // Concentric radii from an invented design corner (~7.5% of short).
+  // Outer rule is a square 3 px fillet (mirrors Android's 3 dp). Inner
+  // stays concentric with the invented design corner so the opening
+  // still follows the board.
   const designR = short * 0.075
-  const outerRadius = Math.max(0, designR - outerInset * 0.15)
-  const innerRadius = Math.max(0, outerRadius - ruleGap * 0.55)
+  const outerRadius = 3
+  const innerRadius = Math.max(0, designR - innerInset * 0.15)
 
   // Corner seals: diameter ≈ 1.35–1.5× outer inset — pressed into the margin,
   // not pinpricks. Floor so small boards still read as seals.

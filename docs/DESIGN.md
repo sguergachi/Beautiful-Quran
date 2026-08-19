@@ -598,11 +598,10 @@ three moments:
    in the Hafs hand, leafed in gold, ink themselves onto the leather in
    real time as the ceremony arrives — the illumination, drawn before
    the reader's eyes.
-   The frame's inset and corner radii are derived from the display's
-   rounded corners (`WindowInsets.getRoundedCorner`, via
-   `coverFrameGeometry`) so the gilt rule is concentric with the phone's
-   silhouette — the cover reads as cut for that screen, not a fixed square
-   border floating inside it.
+   The outer gilt rule is a square 3 dp fillet. The inner rule's inset
+   and corner radii still come from the display (`WindowInsets.getRoundedCorner`,
+   via `coverFrameGeometry`) so the opening follows the phone's
+   silhouette.
 2. **The isti'adha.** After a brief hold, **أعوذ بالله من الشيطان الرجيم**
    fades in as text — Arabic letter-washed onto the cover, English italic
    beneath — a quiet pause before reading begins. No audio: the du'a is
