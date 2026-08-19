@@ -169,6 +169,46 @@ internal fun mushafDialTicksVisible(pitchDp: Float): Boolean =
     pitchDp >= MUSHAF_DIAL_MIN_PITCH_DP
 
 /**
+ * The pitch the comb is actually drawn at: [rulePitchDp] when it is shut and
+ * [gainPitchDp] when it is fully [open].
+ *
+ * Shut means the rule's own pitch — the whole book laid across the measure —
+ * and not zero. That is what makes the close an honest zoom rather than a
+ * fade: at the end of it every tooth stands exactly where the rule would have
+ * drawn it, so the comb collapses *into the line* instead of over it.
+ *
+ * Interpolated geometrically. The two pitches are a factor of twenty-five
+ * apart at the fine end, and a straight interpolation spends the whole first
+ * half of the motion still looking shut.
+ */
+internal fun mushafDialZoomedPitchDp(
+    rulePitchDp: Float,
+    gainPitchDp: Float,
+    open: Float,
+): Float {
+    val shut = rulePitchDp.coerceAtLeast(1e-3f)
+    val wide = gainPitchDp.coerceAtLeast(1e-3f)
+    return shut * (wide / shut).pow(open.coerceIn(0f, 1f))
+}
+
+/**
+ * How strongly the comb is drawn as its pitch closes on the line, 1 while the
+ * teeth are apart and 0 once they are not.
+ *
+ * [mushafDialTicksVisible] is a cliff, and a cliff is fine while the pitch is
+ * a consequence of the hand's speed — the reader is moving fast and the comb
+ * is meant to be gone. It is not fine while the comb is collapsing under its
+ * own animation: the teeth would blink out an instant before they met. So the
+ * last stretch before the floor is a fade, and the teeth go out exactly as
+ * they merge.
+ */
+internal fun mushafDialCombStrength(pitchDp: Float): Float {
+    val lo = MUSHAF_DIAL_MIN_PITCH_DP
+    val hi = lo * 2.4f
+    return ((pitchDp - lo) / (hi - lo)).coerceIn(0f, 1f)
+}
+
+/**
  * How far the comb stands up [distanceDp] from the thumb, 1 under it and 0 at
  * the lens edge. A cosine, so the magnified stretch dissolves into the rule
  * with no seam either side — a hard-edged window would read as a box.
@@ -267,6 +307,8 @@ private const val MushafDialRuleHeldWeightPx = 2f
 /** Paper held back at each end, clear of the system's back-gesture strip. */
 private val MushafDialEdgeInset = 14.dp
 /** How far a tick under the thumb stands off the rule. */
+/** The seat mark's share of the thumb: plainly the same mark, smaller. */
+private const val MushafDialSeatWidth = 0.55f
 private val MushafDialTick = 9.dp
 /** Half-width of the magnified stretch. */
 private val MushafDialLens = 64.dp
@@ -327,6 +369,10 @@ internal fun MushafPageDial(
     // it: the finger's own x during a drag, then the glide home afterwards.
     val handX = remember { mutableFloatStateOf(0f) }
     var handed by remember { mutableStateOf(false) }
+    // How far the lens is open, 0 at the rule's own pitch and 1 at the gain's.
+    // It is what makes the close read as a zoom out rather than a marker
+    // wandering off: the comb collapses into the line it magnified.
+    val zoom = remember { Animatable(0f) }
     var glide by remember { mutableStateOf<Job?>(null) }
     var widthPx by remember { mutableIntStateOf(0) }
     var hudWidthPx by remember { mutableIntStateOf(0) }
@@ -360,7 +406,9 @@ internal fun MushafPageDial(
     val hudPage by remember(pages) {
         derivedStateOf { dialPage.floatValue.roundToInt().coerceIn(1, pages) }
     }
-    val hud = if (scrubbing) labelOf.value(hudPage) else null
+    // Kept through the glide home: the label riding the thumb down onto the
+    // rule is half of what says the lens is closing, not the leaf changing.
+    val hud = if (scrubbing || handed) labelOf.value(hudPage) else null
 
     Box(
         modifier
@@ -392,8 +440,15 @@ internal fun MushafPageDial(
             // Standing them up is what shows the reader the granularity — and
             // when the pitch falls under a pixel there is nothing honest to
             // show, so the rule simply stands alone and reads as speed.
-            val pitchDp = dialPitchDp.floatValue
-            if (lift > 0.004f && mushafDialTicksVisible(pitchDp)) {
+            // The rule's own pitch: all 604 across the measure. The comb is
+            // interpolated between that and the gain's pitch, so an open lens
+            // and a shut one are the same drawing at two magnifications.
+            val rulePitchDp = ((size.width - 2f * inset) / density / pages)
+                .coerceAtLeast(0.01f)
+            val pitchDp =
+                mushafDialZoomedPitchDp(rulePitchDp, dialPitchDp.floatValue, zoom.value)
+            val comb = lift * mushafDialCombStrength(pitchDp)
+            if (comb > 0.004f && mushafDialTicksVisible(pitchDp)) {
                 val lensDp = MushafDialLens.value
                 val span = lensDp / pitchDp
                 val lo = ceil(at - span).toInt().coerceAtLeast(1)
@@ -407,12 +462,12 @@ internal fun MushafPageDial(
                     val env = mushafDialLensEnvelope((x - thumbX) / density, lensDp)
                     if (env <= 0.004f) continue
                     val major = page in majorPages
-                    val length = (tickMax * env * lift * if (major) 1.4f else 1f)
+                    val length = (tickMax * env * comb * if (major) 1.4f else 1f)
                         .coerceAtMost(headroom)
                     if (length <= 0.4f) continue
                     drawRoundRect(
                         color = ink.copy(
-                            alpha = ((if (major) 0.16f else 0.10f) + 0.34f * env) * lift,
+                            alpha = ((if (major) 0.16f else 0.10f) + 0.34f * env) * comb,
                         ),
                         topLeft = Offset(x - rule / 2f, ruleY - length),
                         size = Size(rule, length),
@@ -426,6 +481,28 @@ internal fun MushafPageDial(
             val thumbH = MushafDialThumbHeight.toPx() +
                 (MushafDialThumbHeldHeight - MushafDialThumbHeight).toPx() * lift
             val thumbW = thumbH * MushafDialThumbAspect
+            // The seat: this leaf's place among the 604, kept in view for the
+            // whole scrub. Without it the thumb's return has no destination
+            // and reads as the marker wandering off on its own; with it the
+            // thumb is plainly going home to a mark that was always there.
+            // It dissolves as the thumb arrives, being the same mark.
+            if (lift > 0.004f) {
+                val apart = (abs(thumbX - seatX) / thumbW).coerceIn(0f, 1f)
+                val seatAlpha = 0.22f * lift * apart
+                if (seatAlpha > 0.004f) {
+                    val seatH = MushafDialThumbHeight.toPx()
+                    val seatW = seatH * MushafDialThumbAspect * MushafDialSeatWidth
+                    drawRoundRect(
+                        color = ink.copy(alpha = seatAlpha),
+                        topLeft = Offset(
+                            (seatX - seatW / 2f).coerceIn(0f, size.width - seatW),
+                            ruleY - seatH / 2f,
+                        ),
+                        size = Size(seatW, seatH),
+                        cornerRadius = CornerRadius(seatH, seatH),
+                    )
+                }
+            }
             val left = (thumbX - thumbW / 2f).coerceIn(0f, size.width - thumbW)
             drawRoundRect(
                 color = ink.copy(alpha = thumbInk),
@@ -507,6 +584,11 @@ internal fun MushafPageDial(
                         scrubbing = true
                         reportScrub.value(true)
                         scope.launch { expand.animateTo(1f, spring(dampingRatio = 0.85f, stiffness = 340f)) }
+                        // The lens opens out of the line rather than arriving
+                        // already open: the reader watches the hairline resolve
+                        // into its own markers, which is the one moment they
+                        // learn what the comb is a magnification of.
+                        scope.launch { zoom.animateTo(1f, MushafDialZoomIn) }
                         while (true) {
                             val event = awaitPointerEvent(PointerEventPass.Initial)
                             val change = event.changes.firstOrNull { it.id == down.id } ?: break
@@ -546,8 +628,11 @@ internal fun MushafPageDial(
                         // The thumb marks a place; it is not a flywheel. A
                         // release lands where the hand left it — no decay, no
                         // overshoot to read past.
+                        // The lift relaxes more slowly than the lens closes,
+                        // so the teeth are still standing while they converge
+                        // and it is the merge that puts them out, not a fade.
                         scope.launch {
-                            expand.animateTo(0f, spring(dampingRatio = 1f, stiffness = 200f))
+                            expand.animateTo(0f, spring(dampingRatio = 1f, stiffness = 150f))
                         }
                         if (moved && landed != settledState.value) {
                             view.performHapticFeedback(HapticFeedbackConstants.CONTEXT_CLICK)
@@ -568,10 +653,15 @@ internal fun MushafPageDial(
                         reportScrub.value(false)
                         glide = scope.launch {
                             resting.snapTo(landed.toFloat())
+                            // One motion: the teeth rush together onto their
+                            // true rule positions while the thumb rides the
+                            // shrinking comb down onto the seat. Same spec on
+                            // both, so they arrive together.
+                            launch { zoom.animateTo(0f, MushafDialZoomOut) }
                             animate(
                                 initialValue = handX.floatValue,
                                 targetValue = seat,
-                                animationSpec = spring(dampingRatio = 1f, stiffness = 200f),
+                                animationSpec = MushafDialZoomOut,
                             ) { value, _ -> handX.floatValue = value }
                             handed = false
                         }
@@ -580,6 +670,12 @@ internal fun MushafPageDial(
         )
     }
 }
+
+/** The lens opening under a new hand. */
+private val MushafDialZoomIn = spring<Float>(dampingRatio = 0.9f, stiffness = 340f)
+
+/** The lens closing on release, and the thumb's ride home on the same spec. */
+private val MushafDialZoomOut = spring<Float>(dampingRatio = 1f, stiffness = 220f)
 
 /** True when the run from [from] to [to] steps over a leaf that opens a juzʾ. */
 private fun crossedMajorPage(from: Int, to: Int, majors: Set<Int>): Boolean {

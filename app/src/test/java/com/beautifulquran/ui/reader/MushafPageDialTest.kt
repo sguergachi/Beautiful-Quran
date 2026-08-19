@@ -4,6 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import kotlin.math.sqrt
 
 /**
  * The page dial's laws, away from Compose. What a dp of finger buys, how fast
@@ -264,5 +265,50 @@ class MushafPageDialTest {
     fun `the clamp survives a rule narrower than its own insets`() {
         assertEquals(20f, mushafDialClampToTrack(0f, 40f, 90f), 0.001f)
         assertEquals(20f, mushafDialClampToTrack(40f, 40f, 90f), 0.001f)
+    }
+
+    @Test
+    fun `a shut lens draws the comb at the rule's own pitch`() {
+        // Which is the whole point: at the end of the close every tooth stands
+        // where the rule itself would have put it, so the comb collapses into
+        // the line rather than fading over it.
+        assertEquals(0.55f, mushafDialZoomedPitchDp(0.55f, 14f, 0f), 0.0001f)
+    }
+
+    @Test
+    fun `a fully open lens draws the comb at the gain's pitch`() {
+        assertEquals(14f, mushafDialZoomedPitchDp(0.55f, 14f, 1f), 0.0001f)
+    }
+
+    @Test
+    fun `the lens opens geometrically, so half way is half the magnification`() {
+        val half = mushafDialZoomedPitchDp(0.55f, 14f, 0.5f)
+        assertEquals(sqrt(0.55f * 14f), half, 0.001f)
+        // Half way is half the magnification, not half the distance: the comb
+        // has opened by the same factor it has left to open. A straight
+        // interpolation would put it at 7.3 dp, thirteen of its twenty-five
+        // times already spent, and the close would look done before it began.
+        assertEquals(half / 0.55f, 14f / half, 0.001f)
+    }
+
+    @Test
+    fun `the lens is monotonic as it opens`() {
+        var last = 0f
+        for (step in 0..20) {
+            val pitch = mushafDialZoomedPitchDp(0.55f, 14f, step / 20f)
+            assertTrue("pitch fell back at $step", pitch > last)
+            last = pitch
+        }
+    }
+
+    @Test
+    fun `the comb goes out as its teeth meet, not before`() {
+        assertEquals(0f, mushafDialCombStrength(MUSHAF_DIAL_MIN_PITCH_DP), 0.0001f)
+        assertEquals(0f, mushafDialCombStrength(0.1f), 0.0001f)
+        assertEquals(1f, mushafDialCombStrength(14f), 0.0001f)
+        // The stretch just above the floor is a fade, not a cliff: teeth that
+        // blinked out an instant before merging would read as a cut.
+        val mid = mushafDialCombStrength(MUSHAF_DIAL_MIN_PITCH_DP * 1.7f)
+        assertTrue("expected a partial strength, got $mid", mid > 0.1f && mid < 0.9f)
     }
 }

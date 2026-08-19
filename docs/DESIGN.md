@@ -116,6 +116,27 @@ them, not by how far along a hairline the mark has got. On release the comb
 closes and the thumb walks back to that leaf's seat in the same motion, and the
 rule is a place-marker again.
 
+That return needs somewhere to go, or it reads as the marker wandering off on
+its own. Two things give it one. The leaf's actual place among the 604 is drawn
+throughout the scrub as a small dim twin of the thumb — plainly the same mark,
+smaller — so the destination was always on the rule; it dissolves as the thumb
+arrives, being the same mark. And the comb does not fade on release, it
+*collapses*: the tooth pitch animates from the gain's pitch down to the rule's
+own, all 604 across the measure, while the thumb rides down onto the seat. At
+the end of that motion every tooth stands exactly where the rule itself would
+have drawn it, so the lens shuts into the line rather than over it. The lift
+relaxes more slowly than the pitch closes, so it is the merge that puts the
+teeth out and not a fade — and the last stretch before they meet is a fade
+rather than the cliff the pitch floor would otherwise give.
+
+The same motion runs backwards on press: the pitch opens out of the rule's own
+into the gain's over a couple of hundred milliseconds, so the reader watches
+the hairline resolve into its own markers. That is the one moment they learn
+what the comb is a magnification of, and the close is then just the sentence
+read the other way. Both are interpolated geometrically — the two pitches are a
+factor of twenty-five apart, and a straight interpolation looks done before it
+has begun.
+
 This does not make it a bar with a handle. At rest it is the line it always
 was, byte for byte — the comb has no existence except under a hand, and it is
 that same line resolved rather than a control grown on top of it. Above the
