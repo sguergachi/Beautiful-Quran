@@ -125,6 +125,7 @@ import com.beautifulquran.data.ReadingMode
 import com.beautifulquran.data.model.Surah
 import com.beautifulquran.domain.BASMALAH_PLAYLIST_AYAH
 import com.beautifulquran.domain.MushafToken
+import com.beautifulquran.domain.buildMushafVerseIndex
 import com.beautifulquran.ui.reader.focus.FocusEngine
 import com.beautifulquran.ui.reader.focus.rememberReaderFocusController
 import com.beautifulquran.ui.theme.FloatingPaperControl
@@ -778,35 +779,27 @@ fun ReaderScreen(
     // pagerState.currentPage directly here recomposed the entire reader body on
     // every settled page, which is exactly what MushafPager takes such care to
     // avoid by handing playback down as one State.
-    val mushafLeafPage = remember(mushafCatalog) {
-        { mushafPagerState.currentPage + 1 }
+    // The book as one run of verses, walked once when the catalog arrives.
+    // This, and not the 604 leaves, is what the dial scrubs.
+    val mushafVerses = remember(mushafCatalog) {
+        mushafCatalog?.let { buildMushafVerseIndex(it) }
     }
-    // The leaves that open a juzʾ, walked once when the catalog arrives: the
-    // dial stands these taller than their neighbours so a fast scrub still has
-    // thirty landmarks to read even when single leaves have closed up.
-    val mushafJuzPages = remember(mushafCatalog) {
-        val catalog = mushafCatalog ?: return@remember emptySet<Int>()
-        buildSet {
-            var previous = 0
-            for (page in 1..catalog.pageCount) {
-                val juz = catalog.page(page)?.juz ?: continue
-                if (juz != previous) add(page)
-                previous = juz
-            }
-        }
+    val mushafVerseAt = remember(mushafVerses) {
+        { mushafVerses?.firstVerseOfPage(mushafPagerState.currentPage + 1) ?: 1 }
     }
-    // What the dial writes over its thumb. The scrubbed leaf almost never
-    // belongs to the chapter that is loaded, so this reads the leaf's own
+    // The verses that open a chapter. The dial stands these taller than their
+    // neighbours and keeps drawing them after the single verses have closed up,
+    // so a hand moving fast reads chapters and a hand moving slowly reads
+    // verses — one comb at two magnifications.
+    val mushafChapterStarts = remember(mushafVerses) { mushafVerses?.chapterStarts ?: emptySet() }
+    // What the dial writes over its thumb. The scrubbed verse almost never
+    // belongs to the chapter that is loaded, so this reads the verse's own
     // chapter rather than the reader's.
-    val mushafPageLabel = remember(mushafCatalog, mushafUi) {
-        label@{ page: Int ->
-            val catalog = mushafCatalog ?: return@label null
-            val leaf = catalog.page(page) ?: return@label null
-            val surah = mushafUi?.surahsById?.get(leaf.primarySurahId) ?: return@label null
-            val ayah = leaf.ayahKeys
-                .filter { it.first == leaf.primarySurahId }
-                .minOfOrNull { it.second } ?: 1
-            MushafDialLabel(chapter = surah.nameTransliteration, ayah = ayah)
+    val mushafVerseLabel = remember(mushafVerses, mushafUi) {
+        label@{ verse: Int ->
+            val key = mushafVerses?.keyOf(verse) ?: return@label null
+            val surah = mushafUi?.surahsById?.get(key.first) ?: return@label null
+            MushafDialLabel(chapter = surah.nameTransliteration, ayah = key.second)
         }
     }
     val mushafLeafSurahId = remember(mushafCatalog) {
@@ -2081,15 +2074,15 @@ fun ReaderScreen(
                         onFastForward = viewModel::fastForward,
                         onRepeatClick = { showRepeatDialog = true },
                         onSpeed = viewModel::cycleSpeed,
-                        // Where the reader is in the book, by leaf — so the rule
-                        // answers while pages are turned as well as while they
-                        // are recited, and the thumb has something to mark and
-                        // something to be dragged along.
-                        leafPage = mushafLeafPage,
-                        pageCount = mushafCatalog?.pageCount ?: 1,
-                        majorPages = mushafJuzPages,
-                        pageLabel = mushafPageLabel,
-                        onSeekPage = { mushafSeekPage = it },
+                        // Where the reader is in the book, by verse — so the
+                        // rule answers while pages are turned as well as while
+                        // they are recited, and the thumb has something to mark
+                        // and something to be dragged along.
+                        verseAt = mushafVerseAt,
+                        verseCount = mushafVerses?.count ?: 1,
+                        majorVerses = mushafChapterStarts,
+                        verseLabel = mushafVerseLabel,
+                        onSeekVerse = { verse -> mushafSeekPage = mushafVerses?.pageOf(verse) },
                         onScrubbing = { mushafScrubbing.value = it },
                         modifier = Modifier.weight(1f),
                     ) {

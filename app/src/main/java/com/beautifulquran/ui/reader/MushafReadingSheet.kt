@@ -129,15 +129,15 @@ internal fun MushafReadingSheet(
     onSpeed: () -> Unit,
     /** The leaf in view, 1-based. A lambda, so turning a page redraws the
      * dial rather than recomposing the reader that hosts this sheet. */
-    leafPage: () -> Int,
+    verseAt: () -> Int,
     /** Leaves in the book — 604, once the catalog is up. */
-    pageCount: Int,
+    verseCount: Int,
     /** Leaves that open a juzʾ: the dial's landmarks. */
-    majorPages: Set<Int>,
+    majorVerses: Set<Int>,
     /** What the dial writes over its thumb for a given leaf. */
-    pageLabel: (Int) -> MushafDialLabel?,
+    verseLabel: (Int) -> MushafDialLabel?,
     /** Where a scrub landed, once the hand comes off the rule. */
-    onSeekPage: (Int) -> Unit,
+    onSeekVerse: (Int) -> Unit,
     /** Raised while a hand is on the rule. */
     onScrubbing: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
@@ -168,11 +168,11 @@ internal fun MushafReadingSheet(
             content()
         }
         MushafPageDial(
-            leafPage = leafPage,
-            pageCount = pageCount,
-            majorPages = majorPages,
-            pageLabel = pageLabel,
-            onSeekPage = onSeekPage,
+            verseAt = verseAt,
+            verseCount = verseCount,
+            majorVerses = majorVerses,
+            verseLabel = verseLabel,
+            onSeekVerse = onSeekVerse,
             onScrubbing = onScrubbing,
             reciting = reciting,
             // Paper between the leaf's own tail and the rule, so the folio
