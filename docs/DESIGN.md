@@ -90,115 +90,107 @@ pages are turned as well as while they are recited. Furniture, so never gold —
 a line drawn along the paper's edge rather than a bar with a handle.
 
 That rule also drives. A leaf carries no ayah rail and no bottom bar, so
-without it the only way to page 400 is 393 swipes. What the dial hands over
-depends entirely on how the hand is moving, and there are two things a reader
-ever wants from it: *a chapter*, which is most of the book away and wants one
-stroke, and *this leaf or the one beside it*, which wants a fingertip. So the
-coarse end of the dial deals in **chapters** and the fine end in **leaves**,
-and the whole design is the passage between them.
+without it the only way to page 400 is 393 swipes. There are two things a
+reader ever wants from it: *a chapter*, which is most of the book away and
+wants one stroke, and *this leaf or the one beside it*, which wants a
+fingertip. So the dial has two tiers — chapters, and the leaves inside one
+chapter — and the whole design is how the reader moves between them.
 
-The coarse end is not a number, it is a relation between the book and the
-screen: one sweep of the rule, at an ordinary pace, has to *arrive* at the back
-of the book. A gain that stops in juzʾ 25 and asks for a second stroke has
-failed at the only thing a coarse gain is for, and it fails differently on
-every phone width — so it is derived from the measure the reader is actually
-dragging, with change in hand to pay for the frames at the start of a stroke
-that are still spent at a finer gain.
+The tier is not a reading of how fast the hand happens to be moving. It was,
+once, and the cost was plain: the reader had to keep moving fast to stay at
+chapters, and could not slow down to look at where they had got to without the
+ground changing underneath them. Speed sets nothing now. The tier is something
+the reader *does* — they hold still, and it opens.
 
-A hand laid anywhere along the line — not on the thumb; the thumb is a mark,
-not a knob to find — opens it into what it has always been a picture of: a row
-of very fine dial markers standing up under the hand and dissolving back into
-the hairline a lens-width either side. The teeth are set at the pitch the
-current pointer gain buys, so the comb is an honest readout and not an ornament
-— slow, and it opens to fourteen points of screen per leaf, wide enough to aim
-at; move at an ordinary pace and one hand-width is the whole book. Between those
-the gain is interpolated geometrically, so there is no seam to feel. Nothing is
-animated into place: every tooth's height and strength is recomputed from its
-distance to the finger, the way the ayah rail's own marks are. The line itself
-thickens and the thumb grows a little while the hand is down — the rule has
-been taken hold of, and it says so.
+**Chapters is the default, at any speed.** Whatever the hand is doing, a drag
+along the rule slides the book's own scale under it: one stroke of the measure
+is all 604 leaves, so all the way left is the back of the book and all the way
+right is al-Fātiḥah, on any phone width. That is not a number, it is a relation
+between the book and the screen — a gain that stops in juzʾ 25 and asks for a
+second stroke has failed at the only thing a coarse tier is for. The comb the
+reader steers by is the chapter openings, pinned to the thumb and travelling
+exactly as far as the finger does; a click of haptic marks each one, spaced by
+distance and by time rather than by crossings, because at the book's scale the
+openings are three points of screen apart and one tick each is a buzz.
 
-The comb has two tiers, and that is what makes the whole span usable from one
-gesture. The leaf teeth close up and go out once the gain puts a leaf under a
-pixel — the true reading of *too fast to see leaves*. Underneath them the
-chapter openings are drawn on their own pitch, and they are still standing long
-after the leaves have merged. So the comb never goes blank; it changes what it
-is a comb of. Moving fast, the reader is sliding the comb itself, chapter past
-chapter; slowing down does not switch to a different instrument but *zooms into
-the cell they are already in*, and the leaf teeth grow out of it.
+**Hold still, and the tier under your finger opens.** A quarter second at rest
+— past the stall in an ordinary rough stroke, short of a wait — and a click of
+haptic says so. The chapter's bracket, until then a short thickened span of the
+hairline on the book's scale, stretches out until it is the whole measure and
+deep enough to have leaves standing in it: a rounded trough where the line was.
+Each of the chapter's leaves flies from where it stood on the book's scale out
+to where it stands in the trough, so the opening is a magnification the eye can
+follow and not a second drawing fading in over the first.
 
-The label above the thumb says which of the two is happening, and says it in
-what it counts. At chapter granularity it is the chapter's name alone: a verse
-number turning over by hundreds between frames is noise, and worse, it invites
-the reader to aim with it. Once the teeth are leaves, the label adds the range
-of verses that leaf actually carries — the thing the reader is choosing between
-at that scale, and the only scale at which the number means anything.
+Inside the trough the mapping is **absolute to that chapter**: the right end is
+its first leaf, the left end its last, and every place between names one leaf
+and keeps naming it. This is the one thing the chapter tier cannot do —
+accumulating means the same x means nothing in particular — and it is exactly
+what aiming at a page needs. The two disagree at one instant, the click itself,
+where the trough's scale would put a different leaf under a hand that has not
+moved; so the difference is captured at the click and paid off underneath the
+opening animation. The leaf under the thumb when the trough opens is the leaf
+that was under it when the hold began.
 
-Zoomed in, the chapter you are inside is drawn back onto the rule at the rule's
-own whole-book scale: a short thickened span of the hairline, with the seat
-mark standing inside it. That is the readout the magnification would otherwise
-destroy — under a lens the reader can see the leaves beautifully and has no
-idea where in the book they are. It is a bracket around one cell and it exists
-only while the lens is open, so it is not the progress fill this rule has
-always refused: nothing runs from an end, and nothing grows with progress.
+**Three things close it.** Letting go — the reader has chosen. Moving off at
+pace — they are steering again, and they are answered almost at once, because a
+sweep that lags is still magnified while the hand has already left. Or leaning
+on either end of the trough for a moment: the chapter has run out and the
+reader is asking for the next one. Passing through an end on the way to the
+last leaf is normal and does nothing; staying there is the ask. In all three
+the trough collapses back into the hairline, which is how the reader sees they
+are back at chapters. After an edge pop-out the finger is still sitting at the
+end and still still, so the hold is refused until it moves away — otherwise the
+trough would spring open again on the very next frame.
 
-Which means the granularity is not a mode the reader picks; it is a reading of
-how they are moving, and it is measured on the **frame clock** rather than on
-pointer events. A finger that stops moving stops reporting, so an estimate fed
-only by events freezes at whatever the last motion was — a hand that swept the
-book and then held still to choose a leaf would sit at chapter granularity
-forever, waiting for a sample that is never coming. Ticked every frame,
-stillness is a real measurement of zero and the lens opens under a held thumb.
-Which also means the reader never has to hunt for a slow enough speed: coming to
-rest is the gesture, and coming to rest is something a hand does without being
-asked.
-The two directions are deliberately not symmetric: speeding up is answered
-almost at once, because a sweep that lags runs out of screen before it reaches
-the far end, while slowing down is held for a moment, because an ordinary rough
-stroke stalls for a frame or two and answering each of those would pump the
-comb open and shut under the finger. Settling has to be something the reader
-does, not something a rough stroke does by accident.
+The label above the thumb says which tier is running, and says it in what it
+counts. In the comb it is the chapter's name alone: a verse number turning over
+by hundreds between frames is noise, and worse, it invites the reader to aim
+with it. In the trough it adds the range of verses that leaf actually carries —
+the thing they are choosing between at that scale, and the only scale at which
+the number means anything.
+
+The tier machine runs on the **frame clock**, not on pointer events. A finger
+that stops moving stops reporting, so an estimate fed only by events freezes at
+whatever the last motion was — and since holding still is the entire gesture
+that opens the trough, it would never open at all. Ticked every frame,
+stillness is a real measurement of zero. Which also means the reader never has
+to hunt for a threshold: coming to rest is the gesture, and coming to rest is
+something a hand does without being asked.
 
 The thumb goes to the finger on contact and stays under it for the whole drag.
-A gain that is not one leaf to one dp cannot do both things at once — keep the
-mark under the hand, and keep it at the leaf's own seat in the book — and it
-is the hand the mark belongs to: one that lags reads as a control that is not
-listening, and being right about what it points at does not buy that back. So
-the thumb is where the finger is and the comb slides beneath it, which is what
-a magnifier does anyway; the leaf is named by the teeth, by the bracket and by
-the label above them, not by how far along a hairline the mark has got. On
-release the comb closes and the thumb walks back to that leaf's seat in the
-same motion, and the rule is a place-marker again.
+A mark that lags reads as a control that is not listening, and being right
+about what it points at does not buy that back. So the thumb is where the
+finger is and the comb slides beneath it, which is what a magnifier does
+anyway; the leaf is named by the teeth, by the trough and by the label above
+them, not by how far along a hairline the mark has got. On release the trough
+shuts and the thumb walks back to that leaf's seat in the same motion, and the
+rule is a place-marker again.
 
 That return needs somewhere to go, or it reads as the marker wandering off on
-its own. Two things give it one. The leaf's actual place in the book is drawn
-throughout the scrub as a small dim twin of the thumb — plainly the same mark,
-smaller — so the destination was always on the rule; it dissolves as the thumb
-arrives, being the same mark. And the comb does not fade on release, it
-*collapses*: the tooth pitch animates from the gain's pitch down to the rule's
-own, the whole book across the measure, while the thumb rides down onto the
-seat. At
-the end of that motion every tooth stands exactly where the rule itself would
-have drawn it, so the lens shuts into the line rather than over it. The lift
-relaxes more slowly than the pitch closes, so it is the merge that puts the
-teeth out and not a fade — and the last stretch before they meet is a fade
-rather than the cliff the pitch floor would otherwise give.
+its own. The leaf's actual place in the book is drawn throughout the scrub as a
+small dim twin of the thumb — plainly the same mark, smaller — so the
+destination was always on the rule; it dissolves as the thumb arrives, being
+the same mark. It stands down inside the trough, where the measure has stopped
+being the book and a mark at the book's scale would be a mark in the wrong one.
 
-The same motion runs backwards on press: the pitch opens out of the rule's own
-into the gain's over a couple of hundred milliseconds, so the reader watches
-the hairline resolve into its own markers. That is the one moment they learn
-what the comb is a magnification of, and the close is then just the sentence
-read the other way. Both are interpolated geometrically — the two pitches are a
-factor of twenty-five apart, and a straight interpolation looks done before it
-has begun.
+What the hand comes off on is what the tier promised. In the trough the reader
+picked a leaf and gets that leaf. In the comb they picked a chapter and get its
+opening — anything else would make chapter granularity a lie about what they
+were steering. Nothing commits until the hand comes off; the leaf turns on
+release, never under the finger.
 
 This does not make it a bar with a handle. At rest it is the line it always
-was, byte for byte — the comb has no existence except under a hand, and it is
-that same line resolved rather than a control grown on top of it. Above the
+was, byte for byte — the comb and the trough have no existence except under a
+hand, and they are that same line resolved rather than a control grown on top
+of it. Nor is the trough the progress fill this rule has always refused: it
+does not run from an end of the rule, it does not grow with progress, and it
+is not there at all until a reader holds still. It is one cell of the comb,
+and then that cell magnified — the only way to say *you are inside this
+chapter now* to a reader whose own finger is covering the line. Above the
 thumb the leaf it will land on is named in type alone — the chapter, and its
-verses once they are what the teeth are counting — with no capsule and no
-ground: ink on paper, not a float. Nothing commits until the
-hand comes off. The leaf's own folio names a page too, and the two would argue
+verses once the trough is open — with no capsule and no ground: ink on paper,
+not a float. The leaf's own folio names a page too, and the two would argue
 in the same band, so the folio stands down for as long as the scrub lasts.
 During recitation the thumb has receded almost to nothing; a press brings it
 straight back, because on a leaf this is the only wayfinding there is and a
