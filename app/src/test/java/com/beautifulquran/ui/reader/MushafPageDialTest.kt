@@ -12,19 +12,23 @@ import kotlin.math.sqrt
  */
 class MushafPageDialTest {
 
+    /** A phone's width less the rule's two 14dp insets. */
+    private val trackDp = 360f - 28f
+    private val coarse = mushafDialCoarseGain(604, trackDp)
+
     @Test
     fun `a resting finger buys the finest gain`() {
-        assertEquals(MUSHAF_DIAL_FINE_GAIN, mushafDialGain(0f), 1e-5f)
+        assertEquals(MUSHAF_DIAL_FINE_GAIN, mushafDialGain(0f, coarse), 1e-5f)
         // Anything under the slow edge is still the floor: a hand that has
         // stopped must not creep.
-        assertEquals(MUSHAF_DIAL_FINE_GAIN, mushafDialGain(MUSHAF_DIAL_SLOW_DP_S), 1e-5f)
-        assertEquals(MUSHAF_DIAL_FINE_GAIN, mushafDialGain(-10f), 1e-5f)
+        assertEquals(MUSHAF_DIAL_FINE_GAIN, mushafDialGain(MUSHAF_DIAL_SLOW_DP_S, coarse), 1e-5f)
+        assertEquals(MUSHAF_DIAL_FINE_GAIN, mushafDialGain(-10f, coarse), 1e-5f)
     }
 
     @Test
     fun `a fast finger buys the coarsest gain, and no more`() {
-        assertEquals(MUSHAF_DIAL_COARSE_GAIN, mushafDialGain(MUSHAF_DIAL_FAST_DP_S), 1e-4f)
-        assertEquals(MUSHAF_DIAL_COARSE_GAIN, mushafDialGain(9_000f), 1e-4f)
+        assertEquals(coarse, mushafDialGain(MUSHAF_DIAL_FAST_DP_S, coarse), 1e-4f)
+        assertEquals(coarse, mushafDialGain(9_000f, coarse), 1e-4f)
     }
 
     @Test
@@ -32,7 +36,7 @@ class MushafPageDialTest {
         var previous = 0f
         var speed = 0f
         while (speed <= 2_000f) {
-            val gain = mushafDialGain(speed)
+            val gain = mushafDialGain(speed, coarse)
             assertTrue("gain fell at $speed dp/s", gain >= previous - 1e-6f)
             previous = gain
             speed += 5f
@@ -43,30 +47,61 @@ class MushafPageDialTest {
     fun `the ramp is geometric, so its middle is the geometric mean`() {
         // Smoothstep is 0.5 at the midpoint of its edges; in log space that
         // puts the gain exactly halfway between the two ends. A linear ramp
-        // would sit at 15 verses per dp here — most of the travel already
+        // would already be at 1.2 leaves per dp here — most of its travel
         // spent — and the dial would read as two settings with a cliff.
         val mid = (MUSHAF_DIAL_SLOW_DP_S + MUSHAF_DIAL_FAST_DP_S) / 2f
         val geometric = Math.sqrt(
-            (MUSHAF_DIAL_FINE_GAIN * MUSHAF_DIAL_COARSE_GAIN).toDouble(),
+            (MUSHAF_DIAL_FINE_GAIN * coarse).toDouble(),
         ).toFloat()
-        assertEquals(geometric, mushafDialGain(mid), 1e-4f)
+        assertEquals(geometric, mushafDialGain(mid, coarse), 1e-4f)
     }
 
     @Test
-    fun `one stroke crosses the whole book`() {
-        // A phone's width less the leaf's two 14dp margins. At the coarse end
-        // that stroke must reach the last of the ~6236 verses from the first
-        // with room to spare. "With room to spare" is the requirement, not a
-        // nicety: a hand sweeping to the left edge and finding itself in juzʾ
-        // 25 has to sweep again, and the dial has failed at the one thing a
-        // coarse gain is for. Half as much again is the margin held here.
-        val strokeDp = 360f - 28f
-        assertTrue(MUSHAF_DIAL_COARSE_GAIN * strokeDp >= 6236f * 1.5f)
+    fun `one stroke crosses the whole book, with change`() {
+        // The coarse gain's whole reason: a hand sweeping the rule end to end
+        // must *arrive* at leaf 604, not stop in juzʾ 25 and need a second
+        // stroke. And with change, because the first frames of the stroke are
+        // spent at a finer gain while the estimate catches up.
+        assertTrue(coarse * trackDp >= 604f)
+        assertEquals(604f * MUSHAF_DIAL_COARSE_HEADROOM, coarse * trackDp, 1f)
     }
 
     @Test
-    fun `the finest gain spends fourteen dp on a verse`() {
+    fun `the coarse gain is a relation to the screen, not a number`() {
+        // A narrower rule has to buy more leaves per dp, or the same sweep
+        // stops short on a smaller phone.
+        assertTrue(mushafDialCoarseGain(604, 240f) > mushafDialCoarseGain(604, 400f))
+        assertEquals(604f * MUSHAF_DIAL_COARSE_HEADROOM / 240f, mushafDialCoarseGain(604, 240f), 1e-3f)
+        // And it never inverts: a degenerate measure falls back to the fine end.
+        assertEquals(MUSHAF_DIAL_FINE_GAIN, mushafDialCoarseGain(604, 0f), 1e-6f)
+        assertTrue(mushafDialCoarseGain(1, 9_000f) >= MUSHAF_DIAL_FINE_GAIN)
+    }
+
+    @Test
+    fun `a full sweep at the coarse gain lands on the last leaf`() {
+        // The gesture, in one line: press at the right end, drag the measure,
+        // and the dial must be at or past 604 before the rubber clamps it.
+        val landed = 1f + trackDp * coarse
+        assertTrue("landed on $landed", landed >= 604f)
+    }
+
+    @Test
+    fun `the finest gain spends fourteen dp on a leaf`() {
         assertEquals(14f, mushafDialPitchDp(MUSHAF_DIAL_FINE_GAIN), 1e-3f)
+    }
+
+    @Test
+    fun `the coarse tier stays legible after the leaf tier has closed up`() {
+        // The two tiers are what let one gesture cover the whole span: at the
+        // coarse end a single leaf is well under a pixel and its teeth are
+        // gone, but a chapter — five leaves and a bit — is still a mark the
+        // eye can separate. Lose this and the comb goes blank at speed and
+        // the reader is steering by nothing.
+        val leafPitch = mushafDialPitchDp(coarse)
+        val chapterPitch = leafPitch * (604f / 114f)
+        assertFalse(mushafDialTicksVisible(leafPitch))
+        assertTrue(mushafDialTicksVisible(chapterPitch))
+        assertEquals(1f, mushafDialCombStrength(chapterPitch), 1e-4f)
     }
 
     @Test
@@ -95,21 +130,21 @@ class MushafPageDialTest {
     fun `a finger held still decays to a stop, and so opens the lens`() {
         // The frame meter feeds this a zero every frame while the hand is
         // down and not moving. Two thirds of a second of stillness has to put
-        // the gain back at the fine end, or "stop for a bit to pick a verse"
+        // the gain back at the fine end, or "stop for a bit to pick a leaf"
         // is not a thing the dial does. Held rather than tightened: the fall
         // is gradual the whole way, so the lens is already halfway open a
         // fifth of a second in and the reader is not waiting on a threshold.
         var speed = 900f
         repeat(40) { speed = mushafDialSpeed(speed, 0f, 0.016f) }
         assertTrue("still at $speed dp/s", speed < MUSHAF_DIAL_SLOW_DP_S)
-        assertEquals(MUSHAF_DIAL_FINE_GAIN, mushafDialGain(speed), 1e-4f)
-        assertTrue(mushafDialTicksVisible(mushafDialPitchDp(mushafDialGain(speed))))
+        assertEquals(MUSHAF_DIAL_FINE_GAIN, mushafDialGain(speed, coarse), 1e-4f)
+        assertTrue(mushafDialTicksVisible(mushafDialPitchDp(mushafDialGain(speed, coarse))))
     }
 
     @Test
     fun `the rubber gives the same on screen at either end of the gain`() {
-        // Slack is held in dp and converted, not held in verses: eighteen
-        // verses of overshoot is a third of a screen at the fine gain and
+        // Slack is held in dp and converted, not held in leaves: eighteen
+        // leaves of overshoot is a whole screen at the fine gain and
         // invisible at the coarse one.
         assertEquals(
             MUSHAF_DIAL_SLACK_DP,
@@ -118,10 +153,10 @@ class MushafPageDialTest {
         )
         assertEquals(
             MUSHAF_DIAL_SLACK_DP,
-            mushafDialSlack(MUSHAF_DIAL_COARSE_GAIN) * mushafDialPitchDp(MUSHAF_DIAL_COARSE_GAIN),
+            mushafDialSlack(coarse) * mushafDialPitchDp(coarse),
             1e-3f,
         )
-        assertTrue(mushafDialSlack(MUSHAF_DIAL_COARSE_GAIN) > mushafDialSlack(MUSHAF_DIAL_FINE_GAIN))
+        assertTrue(mushafDialSlack(coarse) > mushafDialSlack(MUSHAF_DIAL_FINE_GAIN))
     }
 
     @Test
@@ -159,16 +194,16 @@ class MushafPageDialTest {
     }
 
     @Test
-    fun `the comb closes up once a verse is under a pixel`() {
+    fun `the comb closes up once a leaf is under a pixel`() {
         assertTrue(mushafDialTicksVisible(mushafDialPitchDp(MUSHAF_DIAL_FINE_GAIN)))
-        assertFalse(mushafDialTicksVisible(mushafDialPitchDp(MUSHAF_DIAL_COARSE_GAIN)))
+        assertFalse(mushafDialTicksVisible(mushafDialPitchDp(coarse)))
         assertTrue(mushafDialTicksVisible(MUSHAF_DIAL_MIN_PITCH_DP))
         assertFalse(mushafDialTicksVisible(MUSHAF_DIAL_MIN_PITCH_DP - 0.01f))
     }
 
     @Test
     fun `the haptic stride keeps one cadence whatever the gain`() {
-        // Every verse while they are far apart...
+        // Every leaf while they are far apart...
         assertEquals(1, mushafDialHapticStride(14f))
         assertEquals(1, mushafDialHapticStride(MUSHAF_DIAL_HAPTIC_PITCH_DP))
         // ...and widening as they close, so the hand feels ~4dp per tick
@@ -212,25 +247,25 @@ class MushafPageDialTest {
         // 14 dp per leaf at 2x density is 28 px per leaf on screen, whatever
         // the rule's width happens to be.
         val pitchPx = mushafDialPitchDp(MUSHAF_DIAL_FINE_GAIN) * 2f
-        val here = mushafDialTickX(thumbXPx = 500f, verse = 100, at = 100f, pitchPx = pitchPx)
-        val next = mushafDialTickX(thumbXPx = 500f, verse = 101, at = 100f, pitchPx = pitchPx)
+        val here = mushafDialTickX(thumbXPx = 500f, page = 100, at = 100f, pitchPx = pitchPx)
+        val next = mushafDialTickX(thumbXPx = 500f, page = 101, at = 100f, pitchPx = pitchPx)
         assertEquals(500f, here, 1e-3f)
         assertEquals(pitchPx, here - next, 1e-3f)
     }
 
     @Test
-    fun `later verses stand to the left, as the book runs`() {
-        val ahead = mushafDialTickX(400f, verse = 300, at = 290f, pitchPx = 10f)
-        val behind = mushafDialTickX(400f, verse = 280, at = 290f, pitchPx = 10f)
+    fun `later leaves stand to the left, as the book runs`() {
+        val ahead = mushafDialTickX(400f, page = 300, at = 290f, pitchPx = 10f)
+        val behind = mushafDialTickX(400f, page = 280, at = 290f, pitchPx = 10f)
         assertTrue("later leaf must sit left of the thumb", ahead < 400f)
         assertTrue("earlier leaf must sit right of the thumb", behind > 400f)
     }
 
     @Test
-    fun `a fractional verse slides the comb rather than jumping it`() {
+    fun `a fractional leaf slides the comb rather than jumping it`() {
         val pitchPx = 20f
-        val at = mushafDialTickX(500f, verse = 100, at = 100f, pitchPx = pitchPx)
-        val halfway = mushafDialTickX(500f, verse = 100, at = 100.5f, pitchPx = pitchPx)
+        val at = mushafDialTickX(500f, page = 100, at = 100f, pitchPx = pitchPx)
+        val halfway = mushafDialTickX(500f, page = 100, at = 100.5f, pitchPx = pitchPx)
         assertEquals(pitchPx / 2f, halfway - at, 1e-3f)
     }
 
@@ -242,7 +277,7 @@ class MushafPageDialTest {
         val fine = mushafDialPitchDp(MUSHAF_DIAL_FINE_GAIN)
         assertTrue(mushafDialTicksVisible(fine))
         assertEquals(4, (64f / fine).toInt())
-        assertTrue(!mushafDialTicksVisible(mushafDialPitchDp(MUSHAF_DIAL_COARSE_GAIN)))
+        assertTrue(!mushafDialTicksVisible(mushafDialPitchDp(coarse)))
     }
 
     @Test
@@ -294,7 +329,7 @@ class MushafPageDialTest {
     }
 
     @Test
-    fun `the hand and the verse's seat share the same two ends`() {
+    fun `the hand and the leaf's seat share the same two ends`() {
         val width = 1000f
         val inset = 40f
         assertEquals(
@@ -359,4 +394,44 @@ class MushafPageDialTest {
         val mid = mushafDialCombStrength(MUSHAF_DIAL_MIN_PITCH_DP * 1.7f)
         assertTrue("expected a partial strength, got $mid", mid > 0.1f && mid < 0.9f)
     }
+    @Test
+    fun `the bracket holds the chapter the hand is inside`() {
+        val marks = intArrayOf(1, 2, 50, 77, 604)
+        assertEquals(2..49, mushafDialChapterRun(marks, 2, 604))
+        assertEquals(2..49, mushafDialChapterRun(marks, 30, 604))
+        assertEquals(50..76, mushafDialChapterRun(marks, 50, 604))
+        assertEquals(77..603, mushafDialChapterRun(marks, 100, 604))
+        // The last chapter runs to the back of the book.
+        assertEquals(604..604, mushafDialChapterRun(marks, 604, 604))
+        // Before the first mark, the first chapter.
+        assertEquals(1..1, mushafDialChapterRun(marks, 1, 604))
+    }
+
+    @Test
+    fun `a chapter that shares its leaf still brackets something`() {
+        // The back of the book puts several chapters on one leaf, so two marks
+        // land on the same page. An empty or backwards run would draw nothing
+        // at exactly the place the reader needs the most help.
+        val marks = intArrayOf(1, 600, 600, 601)
+        val run = mushafDialChapterRun(marks, 600, 604)
+        assertTrue("run $run", !run.isEmpty())
+        assertTrue(run.first <= run.last)
+    }
+
+    @Test
+    fun `an empty book still brackets the whole rule`() {
+        assertEquals(1..604, mushafDialChapterRun(intArrayOf(), 3, 604))
+        assertEquals(1..1, mushafDialChapterRun(intArrayOf(), 3, 0))
+    }
+
+    @Test
+    fun `the label names a chapter zoomed out and a run of verses zoomed in`() {
+        val leaf = MushafDialLabel(chapter = "Al-Baqarah", fromAyah = 6, toAyah = 16)
+        assertEquals("Al-Baqarah", mushafDialLabelText(leaf, zoomed = false))
+        assertEquals("Al-Baqarah  6–16", mushafDialLabelText(leaf, zoomed = true))
+        // A leaf holding one verse says one number, not "282-282".
+        val long = MushafDialLabel(chapter = "Al-Baqarah", fromAyah = 282, toAyah = 282)
+        assertEquals("Al-Baqarah  282", mushafDialLabelText(long, zoomed = true))
+    }
+
 }

@@ -89,21 +89,29 @@ it does not colour in the pages behind it, so nothing fills. It answers while
 pages are turned as well as while they are recited. Furniture, so never gold —
 a line drawn along the paper's edge rather than a bar with a handle.
 
-That rule also drives, and what it counts is the **verse**, not the leaf. A
-leaf carries no ayah rail and no bottom bar, so without it the only way to page
-400 is 393 swipes — but a page is not a thing anyone wants to arrive *at*. The
-label over the thumb has always named a chapter and a verse and it should be
-able to mean it; counting leaves made the hand's finest possible ask a whole
-page. So the dial holds the six thousand verses in mushaf order and works out a
-leaf only at the last moment, when the finger lifts.
+That rule also drives. A leaf carries no ayah rail and no bottom bar, so
+without it the only way to page 400 is 393 swipes. What the dial hands over
+depends entirely on how the hand is moving, and there are two things a reader
+ever wants from it: *a chapter*, which is most of the book away and wants one
+stroke, and *this leaf or the one beside it*, which wants a fingertip. So the
+coarse end of the dial deals in **chapters** and the fine end in **leaves**,
+and the whole design is the passage between them.
+
+The coarse end is not a number, it is a relation between the book and the
+screen: one sweep of the rule, at an ordinary pace, has to *arrive* at the back
+of the book. A gain that stops in juzʾ 25 and asks for a second stroke has
+failed at the only thing a coarse gain is for, and it fails differently on
+every phone width — so it is derived from the measure the reader is actually
+dragging, with change in hand to pay for the frames at the start of a stroke
+that are still spent at a finer gain.
 
 A hand laid anywhere along the line — not on the thumb; the thumb is a mark,
 not a knob to find — opens it into what it has always been a picture of: a row
 of very fine dial markers standing up under the hand and dissolving back into
 the hairline a lens-width either side. The teeth are set at the pitch the
 current pointer gain buys, so the comb is an honest readout and not an ornament
-— slow, and it opens to fourteen points of screen per verse, wide enough to aim
-at; flick, and one hand-width is worth the whole book and more. Between those
+— slow, and it opens to fourteen points of screen per leaf, wide enough to aim
+at; move at an ordinary pace and one hand-width is the whole book. Between those
 the gain is interpolated geometrically, so there is no seam to feel. Nothing is
 animated into place: every tooth's height and strength is recomputed from its
 distance to the finger, the way the ayah rail's own marks are. The line itself
@@ -111,22 +119,39 @@ thickens and the thumb grows a little while the hand is down — the rule has
 been taken hold of, and it says so.
 
 The comb has two tiers, and that is what makes the whole span usable from one
-gesture. The verse teeth close up and go out once the gain puts a verse under a
-pixel — the true reading of *too fast to see verses*. Underneath them the
+gesture. The leaf teeth close up and go out once the gain puts a leaf under a
+pixel — the true reading of *too fast to see leaves*. Underneath them the
 chapter openings are drawn on their own pitch, and they are still standing long
-after the verses have merged. So the comb never goes blank; it changes what it
-is a comb of. A hand crossing the book is steering by chapters, and the label
-over the thumb drops its verse number to match — a figure turning over by
-hundreds between frames is noise, and worse, it invites the reader to aim with
-it. Slow down and the number comes back with the teeth.
+after the leaves have merged. So the comb never goes blank; it changes what it
+is a comb of. Moving fast, the reader is sliding the comb itself, chapter past
+chapter; slowing down does not switch to a different instrument but *zooms into
+the cell they are already in*, and the leaf teeth grow out of it.
+
+The label above the thumb says which of the two is happening, and says it in
+what it counts. At chapter granularity it is the chapter's name alone: a verse
+number turning over by hundreds between frames is noise, and worse, it invites
+the reader to aim with it. Once the teeth are leaves, the label adds the range
+of verses that leaf actually carries — the thing the reader is choosing between
+at that scale, and the only scale at which the number means anything.
+
+Zoomed in, the chapter you are inside is drawn back onto the rule at the rule's
+own whole-book scale: a short thickened span of the hairline, with the seat
+mark standing inside it. That is the readout the magnification would otherwise
+destroy — under a lens the reader can see the leaves beautifully and has no
+idea where in the book they are. It is a bracket around one cell and it exists
+only while the lens is open, so it is not the progress fill this rule has
+always refused: nothing runs from an end, and nothing grows with progress.
 
 Which means the granularity is not a mode the reader picks; it is a reading of
 how they are moving, and it is measured on the **frame clock** rather than on
 pointer events. A finger that stops moving stops reporting, so an estimate fed
 only by events freezes at whatever the last motion was — a hand that swept the
-book and then held still to choose a verse would sit at chapter granularity
+book and then held still to choose a leaf would sit at chapter granularity
 forever, waiting for a sample that is never coming. Ticked every frame,
 stillness is a real measurement of zero and the lens opens under a held thumb.
+Which also means the reader never has to hunt for a slow enough speed: coming to
+rest is the gesture, and coming to rest is something a hand does without being
+asked.
 The two directions are deliberately not symmetric: speeding up is answered
 almost at once, because a sweep that lags runs out of screen before it reaches
 the far end, while slowing down is held for a moment, because an ordinary rough
@@ -135,18 +160,18 @@ comb open and shut under the finger. Settling has to be something the reader
 does, not something a rough stroke does by accident.
 
 The thumb goes to the finger on contact and stays under it for the whole drag.
-A gain that is not one verse to one dp cannot do both things at once — keep the
-mark under the hand, and keep it at the verse's own seat in the book — and it
+A gain that is not one leaf to one dp cannot do both things at once — keep the
+mark under the hand, and keep it at the leaf's own seat in the book — and it
 is the hand the mark belongs to: one that lags reads as a control that is not
 listening, and being right about what it points at does not buy that back. So
 the thumb is where the finger is and the comb slides beneath it, which is what
-a magnifier does anyway; the verse is named by the teeth and by the label above
-them, not by how far along a hairline the mark has got. On release the comb
-closes and the thumb walks back to that verse's seat in the same motion, and the
-rule is a place-marker again.
+a magnifier does anyway; the leaf is named by the teeth, by the bracket and by
+the label above them, not by how far along a hairline the mark has got. On
+release the comb closes and the thumb walks back to that leaf's seat in the
+same motion, and the rule is a place-marker again.
 
 That return needs somewhere to go, or it reads as the marker wandering off on
-its own. Two things give it one. The verse's actual place in the book is drawn
+its own. Two things give it one. The leaf's actual place in the book is drawn
 throughout the scrub as a small dim twin of the thumb — plainly the same mark,
 smaller — so the destination was always on the rule; it dissolves as the thumb
 arrives, being the same mark. And the comb does not fade on release, it
@@ -170,8 +195,9 @@ has begun.
 This does not make it a bar with a handle. At rest it is the line it always
 was, byte for byte — the comb has no existence except under a hand, and it is
 that same line resolved rather than a control grown on top of it. Above the
-thumb the verse it will land on is named in type alone, chapter and verse, with
-no capsule and no ground: ink on paper, not a float. Nothing commits until the
+thumb the leaf it will land on is named in type alone — the chapter, and its
+verses once they are what the teeth are counting — with no capsule and no
+ground: ink on paper, not a float. Nothing commits until the
 hand comes off. The leaf's own folio names a page too, and the two would argue
 in the same band, so the folio stands down for as long as the scrub lasts.
 During recitation the thumb has receded almost to nothing; a press brings it
