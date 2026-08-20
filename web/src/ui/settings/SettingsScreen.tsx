@@ -2,12 +2,11 @@ import { useEffect, useRef, useState } from 'react'
 import { assetUrl } from '../../assetUrl'
 import { appStore, useAppSelector } from '../../store/appStore'
 import {
-  type AyahSelectorSide,
   type HomeBookmarkStyle,
   type BrushCircleStyle,
-  type ReadingMode,
-  type ThemeMode,
 } from '../../data/settings'
+import { customizeSummary } from '../../data/customizePolicy'
+import { CustomizeScreen } from './CustomizeScreen'
 import { settingsLayerFor, type StackLayer } from '../paper/stack'
 import {
   BRUSH_CHECK_KNOB_SLIDERS,
@@ -35,11 +34,9 @@ import { FontSizeControl } from '../kit/FontSizeControl'
 import { DisclosureChevron } from '../kit/DisclosureChevron'
 import { InkCheckMark } from '../kit/InkCheckMark'
 import { PaperChoiceList } from '../kit/PaperChoiceList'
-import { PaperSegmented } from '../kit/PaperSegmented'
 import { PaperSlider } from '../kit/PaperSlider'
 import { PaperSwitch } from '../kit/PaperSwitch'
 import { rearmEducation } from '../../data/education'
-import { ThemeSwatches } from './themeSwatches'
 
 const ATTRIBUTIONS = `Quran text (Uthmani script) and Saheeh International translation via the quran-json project, from Tanzil and Al Quran Cloud.
 
@@ -56,27 +53,6 @@ Arabic typeface: KFGQPC HAFS Uthmanic Script © King Fahd Glorious Quran Printin
 This app is free, ad-free, and collects no data.`
 
 const APP_VERSION = '0.1.0'
-
-const READING_OPTIONS = [
-  { value: 'arabic_english' as const, label: 'Arabic & English' },
-  { value: 'english_only' as const, label: 'English' },
-  { value: 'arabic_only' as const, label: 'Arabic only' },
-]
-
-const SELECTOR_OPTIONS = [
-  { value: 'left' as const, label: 'Left side' },
-  { value: 'right' as const, label: 'Right side' },
-]
-
-const THEME_OPTIONS: {
-  value: ThemeMode
-  label: string
-}[] = [
-  { value: 'system', label: 'System' },
-  { value: 'light', label: 'Paper' },
-  { value: 'dark', label: 'Nightfall' },
-  { value: 'royal_green', label: 'Royal green' },
-]
 
 const HOME_BOOKMARK_OPTIONS: { value: HomeBookmarkStyle; label: string }[] = [
   { value: 'top_bound', label: 'Top-bound ribbon' },
@@ -99,6 +75,7 @@ export function SettingsScreen({
   const layer = settingsLayerFor(hasReader)
   const isTop = stackLayer === layer
   const depth = Math.max(0, stackLayer - layer)
+  const [customizeOpen, setCustomizeOpen] = useState(false)
   const showReadingToggles = s.readingMode === 'arabic_english'
 
   // Session-only live knobs for the brush labs (not persisted).
@@ -345,6 +322,17 @@ export function SettingsScreen({
       data-active={isTop}
     >
       <div className="settings">
+        {customizeOpen ? (
+          <CustomizeScreen
+            settings={s}
+            brushParams={brushParams}
+            paintToken={paintToken}
+            checkParams={checkParams}
+            checkPaintToken={checkPaintToken}
+            onBack={() => setCustomizeOpen(false)}
+          />
+        ) : (
+          <>
         <button
           type="button"
           className="back settings-back"
@@ -371,16 +359,17 @@ export function SettingsScreen({
 
         <section className="settings-section">
           <h2>Reading</h2>
-          <PaperSegmented
-            aria-label="Reading mode"
-            value={s.readingMode}
-            brushParams={brushParams}
-            paintToken={paintToken}
-            options={READING_OPTIONS}
-            onChange={(v) =>
-              appStore.updateSettings({ readingMode: v as ReadingMode })
-            }
-          />
+          <button
+            type="button"
+            className="settings-nav"
+            onClick={() => setCustomizeOpen(true)}
+          >
+            <span className="settings-nav-copy">
+              <span className="settings-nav-label">Customize</span>
+              <span className="settings-nav-note">{customizeSummary(s)}</span>
+            </span>
+            <DisclosureChevron expanded={false} />
+          </button>
         </section>
 
         <section className="settings-section">
@@ -393,14 +382,6 @@ export function SettingsScreen({
 
         {showReadingToggles ? (
           <section className="settings-section settings-section-toggles">
-            <PaperSwitch
-              id="setting-gloss"
-              label="Word-by-word translation"
-              checked={s.showWordGloss}
-              checkParams={checkParams}
-              paintToken={checkPaintToken}
-              onChange={(checked) => appStore.updateSettings({ showWordGloss: checked })}
-            />
             <PaperSwitch
               id="setting-translit"
               label="Transliteration"
@@ -423,37 +404,6 @@ export function SettingsScreen({
             />
           </section>
         ) : null}
-
-        <section className="settings-section">
-          <h2>Ayah selector</h2>
-          <PaperSegmented
-            aria-label="Ayah selector side"
-            value={s.ayahSelectorSide}
-            brushParams={brushParams}
-            paintToken={paintToken}
-            options={SELECTOR_OPTIONS}
-            onChange={(v) =>
-              appStore.updateSettings({
-                ayahSelectorSide: v as AyahSelectorSide,
-              })
-            }
-          />
-        </section>
-
-        <section className="settings-section">
-          <h2>Theme</h2>
-          <PaperChoiceList
-            aria-label="Theme"
-            value={s.themeMode}
-            options={THEME_OPTIONS.map((opt) => ({
-              ...opt,
-              trailing: <ThemeSwatches mode={opt.value} />,
-            }))}
-            onChange={(v) =>
-              appStore.updateSettings({ themeMode: v as ThemeMode })
-            }
-          />
-        </section>
 
         {s.developerMode ? (
           <section className="settings-section settings-section-developer">
@@ -777,6 +727,8 @@ export function SettingsScreen({
         </footer>
 
         <p className="settings-attributions">{ATTRIBUTIONS}</p>
+          </>
+        )}
       </div>
     </div>
   )

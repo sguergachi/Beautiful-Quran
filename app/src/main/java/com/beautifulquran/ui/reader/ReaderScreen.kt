@@ -1103,6 +1103,9 @@ fun ReaderScreen(
     // verse rather than the already-drifted read-out.
     val layoutSignature = listOf(
         settings.readingMode,
+        settings.readingLayout,
+        settings.verseNumberScript,
+        settings.pageNumberScript,
         settings.showWordGloss,
         settings.showTransliteration,
         settings.showTranslation,
@@ -2251,6 +2254,7 @@ fun ReaderScreen(
                         onWordClick = onMushafWordClick,
                         onWordLongClick = onMushafWordLongClick,
                         onAyahClick = onMushafAyahClick,
+                        pageNumberScript = settings.pageNumberScript,
                         modifier = Modifier.fillMaxSize(),
                     )
                     }
@@ -2463,6 +2467,7 @@ fun ReaderScreen(
                                 showGloss = settings.showWordGloss,
                                 showTransliteration = settings.showTransliteration,
                                 showTranslation = settings.showTranslation,
+                                verseNumberScript = settings.verseNumberScript,
                                 hideEnglishParentheticals = settings.hideEnglishParentheticals,
                                 searchQuery = activeQuery,
                                 flashWordPosition = searchFlashWord
@@ -2643,7 +2648,7 @@ fun ReaderScreen(
                             ) {
                                 PageBreak(
                                     page = item.page,
-                                    useArabicIndicDigits = settings.readingMode != ReadingMode.ENGLISH_ONLY,
+                                    script = settings.pageNumberScript,
                                 )
                             }
                         }

@@ -438,7 +438,7 @@ private fun mushafLineTexts(line: MushafLine): List<MushafLineText> {
  */
 private class MushafLineText(val text: String, val mark: Boolean)
 
-private fun mushafLineCells(
+internal fun mushafLineCells(
     texts: List<String>,
     typeface: android.graphics.Typeface?,
     fontPx: Float,

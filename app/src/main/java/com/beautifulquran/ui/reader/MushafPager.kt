@@ -64,6 +64,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import com.beautifulquran.DevProfiling
+import com.beautifulquran.data.PageNumberScript
 import com.beautifulquran.data.model.Ayah
 import com.beautifulquran.data.model.Surah
 import com.beautifulquran.data.model.SurahContent
@@ -297,6 +298,7 @@ internal fun MushafPager(
     onWordClick: (MushafToken) -> Unit,
     onWordLongClick: (MushafToken) -> Unit,
     onAyahClick: (MushafToken) -> Unit,
+    pageNumberScript: PageNumberScript = PageNumberScript.BOTH,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -482,6 +484,7 @@ internal fun MushafPager(
                     page = page.page,
                     unit = unit,
                     glyphSize = leafGlyphSize(unit, fontScale),
+                    script = pageNumberScript,
                     modifier = Modifier
                         .padding(horizontal = MushafEdgeGutter)
                         .graphicsLayer { alpha = folioInk },

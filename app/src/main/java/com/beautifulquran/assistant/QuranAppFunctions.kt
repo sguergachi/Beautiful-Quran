@@ -228,7 +228,7 @@ abstract class BaseQuranAppFunctionService : AppFunctionService() {
     /**
      * Configure user-facing reader preferences; omitted values remain unchanged.
      *
-     * @param readingMode Optional "Arabic and English" or "English only" mode.
+     * @param readingMode Optional "Arabic and English", "English only", or "Arabic only" mode.
      * @param fontScale Optional text scale from 0.8 through 1.6, rounded to the
      * nearest reader-supported 0.1 step.
      * @param showWordGloss Optional word-by-word translation visibility.
@@ -311,8 +311,9 @@ abstract class BaseQuranAppFunctionService : AppFunctionService() {
         "arabic and english", "arabic english", "bilingual", "arabic" ->
             ReadingMode.ARABIC_ENGLISH
         "english", "english only" -> ReadingMode.ENGLISH_ONLY
+        "arabic only" -> ReadingMode.ARABIC_ONLY
         else -> throw AppFunctionInvalidArgumentException(
-            "Reading mode must be Arabic and English or English only",
+            "Reading mode must be Arabic and English, English only, or Arabic only",
         )
     }
 

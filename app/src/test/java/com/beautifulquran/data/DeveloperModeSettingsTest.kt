@@ -23,6 +23,10 @@ class DeveloperModeSettingsTest {
         val defaults = Settings()
         assertTrue(defaults.showWordGloss)
         assertFalse(defaults.showTranslation)
+        assertEquals(ReadingMode.ARABIC_ENGLISH, defaults.readingMode)
+        assertEquals(ReadingLayout.SCROLL, defaults.readingLayout)
+        assertEquals(VerseNumberScript.ARABIC, defaults.verseNumberScript)
+        assertEquals(PageNumberScript.BOTH, defaults.pageNumberScript)
     }
 
     @Test

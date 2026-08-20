@@ -31,6 +31,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredHeight
 import androidx.compose.foundation.layout.size
@@ -108,6 +109,7 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Dp
@@ -119,7 +121,9 @@ import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import com.beautifulquran.QuranApp
 import com.beautifulquran.data.AyahSelectorSide
+import com.beautifulquran.data.PageNumberScript
 import com.beautifulquran.data.ReadingMode
+import com.beautifulquran.data.VerseNumberScript
 import com.beautifulquran.data.model.Ayah
 import com.beautifulquran.data.model.Word
 import com.beautifulquran.domain.EnglishTypography
@@ -152,10 +156,16 @@ internal fun Int.toArabicIndic(): String =
     toString().map { '٠' + (it - '0') }.joinToString("")
 
 /**
- * Ornate ayah brackets follow the surrounding line's writing direction.
+ * Ornate ayah brackets. U+FD3E/U+FD3F are Bidi_Mirrored.
+ *
+ * Arabic stays `﴿N﴾` in the RTL ayah line (cups face the digits).
+ * English is isolated LTR so Western digits cannot reorder; because those
+ * glyphs mirror in LTR we emit the opposite code points `﴾N﴿`, which paint
+ * as `﴿N﴾` — like (1), not )1(. The last inversion used Arabic's `﴿N﴾` in
+ * LTR and the preview showed the reversed cups.
  *
  * Characters are glued with WORD JOINER (U+2060) so Compose never line-breaks
- * mid-mark (e.g. `﴾` on one line and `3﴿` on the next in English prose).
+ * mid-mark.
  */
 /**
  * Mushaf end-of-ayah: U+06DD plus Arabic-Indic digits. Digital Khatt and
@@ -173,11 +183,8 @@ internal fun formatMushafAyahMark(number: Int): String {
 }
 
 internal fun formatAyahNumberMark(number: Int, useArabicIndicDigits: Boolean): String {
-    val raw = if (useArabicIndicDigits) {
-        "﴿${number.toArabicIndic()}﴾"
-    } else {
-        "﴾$number﴿"
-    }
+    val digits = if (useArabicIndicDigits) number.toArabicIndic() else number.toString()
+    val raw = if (useArabicIndicDigits) "﴿$digits﴾" else "\u2066﴾$digits﴿\u2069"
     return raw.toCharArray().joinToString("\u2060")
 }
 
@@ -1748,6 +1755,7 @@ private fun ResponsiveEnglishAyah(
     onAyahClick: () -> Unit,
     onWordClick: ((Word) -> Unit)?,
     onWordLongClick: ((Word) -> Unit)?,
+    useArabicIndicDigits: Boolean = false,
 ) {
     val palette = rememberWordInkPalette()
     val gold = LocalQuranAccents.current.gold
@@ -1778,6 +1786,7 @@ private fun ResponsiveEnglishAyah(
         searchQuery,
         fontScale,
         lyricGlosses,
+        useArabicIndicDigits,
     ) {
         val ranges = ArrayList<IntRange>(ayah.words.size)
         var markRange = 0..-1
@@ -1817,7 +1826,7 @@ private fun ResponsiveEnglishAyah(
                     fontSize = 17.sp * fontScale,
                 ),
             ) {
-                append(formatAyahNumberMark(ayah.number, useArabicIndicDigits = false))
+                append(formatAyahNumberMark(ayah.number, useArabicIndicDigits))
             }
             markRange = markStart until length
         }
@@ -1942,6 +1951,7 @@ private fun ResponsiveHafsAyah(
     fontSize: TextUnit,
     flashWordPosition: Int? = null,
     searchHitWash: RepeatWash,
+    useArabicIndicDigits: Boolean = true,
     /** When the verse is taller than the viewport, keep the active word in the
      * reading band so large type does not disappear under the player bar. */
     keepActiveWordInView: Boolean = false,
@@ -1971,7 +1981,7 @@ private fun ResponsiveHafsAyah(
     // Full-ink spans only — never bake upcoming/active into the annotated
     // string. Dim, bloom, and orange are draw-phase overlays, so word and
     // ayah boundaries do not reshape or flash the run.
-    val rendered = remember(ayah, palette.fullInkColor, ayahMarkInk, fontSize) {
+    val rendered = remember(ayah, palette.fullInkColor, ayahMarkInk, fontSize, useArabicIndicDigits) {
         val ranges = ArrayList<IntRange>(ayah.words.size)
         var markRange = 0..-1
         val text = buildAnnotatedString {
@@ -1993,7 +2003,7 @@ private fun ResponsiveHafsAyah(
                     fontSize = fontSize * AYAH_MARK_SIZE_RATIO,
                 ),
             ) {
-                append(formatAyahNumberMark(ayah.number, useArabicIndicDigits = true))
+                append(formatAyahNumberMark(ayah.number, useArabicIndicDigits))
             }
             markRange = markStart until length
         }
@@ -2066,24 +2076,42 @@ fun AyahNumberMark(
     useArabicIndicDigits: Boolean = true,
 ) {
     val accents = LocalQuranAccents.current
-    Text(
-        text = formatAyahNumberMark(number, useArabicIndicDigits),
-        fontFamily = HafsFontFamily,
-        fontSize = 20.sp * fontScale,
-        color = accents.gold,
-        modifier = Modifier
-            .offset(y = verticalNudge)
-            .gilded(
-                bright = accents.goldBright.copy(alpha = 0.9f),
-                deep = accents.goldDeep.copy(alpha = 0.9f),
+    val mark = @Composable {
+        Text(
+            text = formatAyahNumberMark(number, useArabicIndicDigits),
+            fontFamily = HafsFontFamily,
+            fontSize = 20.sp * fontScale,
+            color = accents.gold,
+            style = TextStyle(
+                textDirection = if (useArabicIndicDigits) {
+                    TextDirection.Content
+                } else {
+                    TextDirection.Ltr
+                },
             ),
-    )
+            modifier = Modifier
+                .offset(y = verticalNudge)
+                .gilded(
+                    bright = accents.goldBright.copy(alpha = 0.9f),
+                    deep = accents.goldDeep.copy(alpha = 0.9f),
+                ),
+        )
+    }
+    if (useArabicIndicDigits) {
+        mark()
+    } else {
+        // LTR paragraph so FD3E/FD3F take their mirrored glyphs (﴾N﴿).
+        CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+            mark()
+        }
+    }
 }
 
 @Composable
 private fun ArabicAyahNumberUnit(
     number: Int,
     fontScale: Float,
+    useArabicIndicDigits: Boolean = true,
 ) {
     val density = LocalDensity.current
     val arabicLineHeight = with(density) {
@@ -2095,7 +2123,7 @@ private fun ArabicAyahNumberUnit(
             .requiredHeight(arabicLineHeight),
         contentAlignment = Alignment.Center,
     ) {
-        AyahNumberMark(number, fontScale)
+        AyahNumberMark(number, fontScale, useArabicIndicDigits = useArabicIndicDigits)
     }
 }
 
@@ -2394,6 +2422,7 @@ fun AyahBlock(
     showGloss: Boolean,
     showTransliteration: Boolean,
     showTranslation: Boolean,
+    verseNumberScript: VerseNumberScript = VerseNumberScript.ARABIC,
     hideEnglishParentheticals: Boolean = false,
     searchQuery: String? = null,
     /** 1-based word to orange-flash (home search hit); null = no flash. */
@@ -2654,6 +2683,7 @@ fun AyahBlock(
                     bottom = 14.dp,
                 ),
         ) {
+            val useArabicIndicDigits = verseNumberScript == VerseNumberScript.ARABIC
             if (readingMode == ReadingMode.ENGLISH_ONLY) {
                 ResponsiveEnglishAyah(
                     ayah = ayah,
@@ -2670,8 +2700,9 @@ fun AyahBlock(
                     onAyahClick = onAyahClick,
                     onWordClick = onWordClick,
                     onWordLongClick = onWordLongClick,
+                    useArabicIndicDigits = useArabicIndicDigits,
                 )
-            } else if (showGloss) {
+            } else if (readingMode == ReadingMode.ARABIC_ENGLISH && showGloss) {
                 CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
                     FlowRow(
                         modifier = Modifier.fillMaxWidth(),
@@ -2700,7 +2731,11 @@ fun AyahBlock(
                         Box(
                             modifier = Modifier.graphicsLayer { alpha = ayahMarkAlpha.value },
                         ) {
-                            ArabicAyahNumberUnit(ayah.number, fontScale)
+                            ArabicAyahNumberUnit(
+                                ayah.number,
+                                fontScale,
+                                useArabicIndicDigits = useArabicIndicDigits,
+                            )
                         }
                     }
                 }
@@ -2716,6 +2751,7 @@ fun AyahBlock(
                         fontSize = ArabicWordStyle.fontSize * fontScale * ARABIC_ONLY_HAFS_FONT_MULTIPLIER,
                         flashWordPosition = flashWordPosition,
                         searchHitWash = searchHitWash,
+                        useArabicIndicDigits = useArabicIndicDigits,
                         keepActiveWordInView = keepActiveWordInView,
                         listCoordinates = listCoordinates,
                         onKeepWordInView = onKeepWordInView,
@@ -3120,25 +3156,35 @@ fun OrnateSurahTitle(
 }
 
 /**
- * Subtle page break: Arabic modes place Western and Arabic-Indic page numbers
- * at opposite ends of a thin gold line. English-only centers one Western page
- * number between equal rules, matching the web reader.
+ * Subtle page break: [PageNumberScript.BOTH] places Western and Arabic-Indic
+ * figures at opposite ends of a thin gold line. A single script centres that
+ * figure between equal rules.
  */
 @Composable
-fun PageBreak(page: Int, useArabicIndicDigits: Boolean = true) {
+fun PageBreak(
+    page: Int,
+    script: PageNumberScript = PageNumberScript.BOTH,
+    contentPadding: PaddingValues = PaddingValues(horizontal = 28.dp, vertical = 10.dp),
+) {
     val accents = LocalQuranAccents.current
+    val folio = pageFolioLayout(page, script)
     val pageNumberSize = 12.sp
     val pageNumberColor = accents.gold.copy(alpha = 0.68f)
+    val singleStyle = if (script == PageNumberScript.ARABIC) {
+        MaterialTheme.typography.labelSmall.copy(fontFamily = FontFamily.Serif)
+    } else {
+        MaterialTheme.typography.labelSmall
+    }
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 28.dp, vertical = 10.dp),
+            .padding(contentPadding),
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            if (!useArabicIndicDigits) {
+            if (folio.centered) {
                 HorizontalDivider(
                     modifier = Modifier.weight(1f),
                     thickness = 1.dp,
@@ -3147,21 +3193,21 @@ fun PageBreak(page: Int, useArabicIndicDigits: Boolean = true) {
                 Spacer(Modifier.width(8.dp))
             }
             Text(
-                text = page.toString(),
-                style = MaterialTheme.typography.labelSmall,
+                text = folio.leading,
+                style = if (folio.centered) singleStyle else MaterialTheme.typography.labelSmall,
                 fontSize = pageNumberSize,
                 color = pageNumberColor,
             )
             Spacer(Modifier.width(8.dp))
             HorizontalDivider(
                 modifier = Modifier.weight(1f),
-                thickness = 0.5.dp,
-                color = accents.gold.copy(alpha = if (useArabicIndicDigits) 0.2f else 0.36f),
+                thickness = if (folio.centered) 1.dp else 0.5.dp,
+                color = accents.gold.copy(alpha = if (folio.centered) 0.36f else 0.2f),
             )
-            if (useArabicIndicDigits) {
+            if (folio.trailing != null) {
                 Spacer(Modifier.width(8.dp))
                 Text(
-                    text = page.toArabicIndic(),
+                    text = folio.trailing,
                     // Keep the Arabic-Indic digits at the same 12sp as the Western
                     // numeral, but ask for a serif fallback so they stay in the
                     // same family class as the EB Garamond label.

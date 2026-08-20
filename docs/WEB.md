@@ -375,8 +375,8 @@ Three sheets, hand-rolled paper stack (no router chrome):
    active search results; changing this Home treatment never changes Reader
    ribbons.
 2. **Reader** — header + ayahs + icon player bar; mushaf page breaks
-   (whisper-gold hairline with Western + Arabic-Indic page numbers, Android
-   `PageBreak` parity) between ayahs that start a new Madinah page; once the
+   (whisper-gold hairline; folio script is a Customize setting — both, Arabic,
+   or English — Android `PageBreak` parity) between ayahs that start a new Madinah page; once the
    opening surah header scrolls off, a compact ornate title (Arabic + chapter ·
    transliteration) reappears in the top bar; ayah selector rail
    (hover-magnified dashes with gold focal tick under the cursor; spring
@@ -386,8 +386,11 @@ Three sheets, hand-rolled paper stack (no router chrome):
    drag uses tick-spaced wheel scrub so the visible label is the commit target);
    return-to-ayah roundel (gilt corolla, qalam arrow painted toward the
    active verse); bookmark ribbon.
-3. **Settings** — Android paper-settings parity: reciter as ink-disc choice
-   rows, reading mode / ayah side as ink-brush segmented rows, A—track—A text
+3. **Settings** — Android paper-settings parity: reciter as ink-disc choice;
+   Customize sub-page (view, verse and page numbers, theme, ayah-selector
+   side, word-by-word gloss, pinned faded-leaf preview with a full-bleed paper
+   dissolve under the leaf and the collapsed ayah rail on the chosen edge);
+   rows, reading mode as ink-brush segmented rows, A—track—A text
    size, display toggles with calligraphic checks, theme choice list with
    gilt swatches, colophon at the foot (triple-tap unlocks developer tools).
    Speed and repeat live on the reader player bar, not here. Opens as a third
@@ -500,7 +503,7 @@ sans.
 
 **Explicitly out of v1 web (unless pulled in later):**
 - Timings Lab / timing patch export
-- QCF V2 mushaf fonts
+- Mushaf layout / QCF V2 page fonts
 - Exact Media3 preload configuration
 - Verse annotations / ḥawāshī (bookmark-note guide ships; note editor pending)
 - Sharing / accounts / analytics (never)

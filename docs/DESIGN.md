@@ -31,7 +31,9 @@ unit of paper under it, the fifteen lines of revelation, and the folio band —
 so the head stands a line clear of the text and the chrome is measured in the
 same breath as the scripture. The unit a tail margin would take goes to the
 revelation instead; the folio's figure, centred in its own band, already sits
-half a line clear of the last line.
+half a line clear of the last line. Page-number script chooses the figure:
+Arabic-Indic, Western, or both with a diamond on the spine — always centred,
+never gold.
 
 **The folio belongs to the leaf.** It is set nearer the last line of
 revelation than the rule beneath it, because proximity is what assigns it:
@@ -1148,9 +1150,40 @@ Chapters ribbon is navigation only and never retracts when tapped.
 
 ## Reading modes
 
+Settings → **Customize** is a sub-page on the Settings sheet (same paper, back
+chevron). Theme lives here with view, layout, numeral scripts, verse
+annotations, the ayah-selector side, and word-by-word English under Arabic.
+A live miniature at the top is a faded leaf with a gold hairline — Hafs,
+Garamond, gold verse marks, and the folio — so each choice shows what the
+sheet will look like. The leaf stays pinned at the top while the choices
+scroll; a paper dissolve feathers the scroll edge under the leaf, edge to
+edge across the sheet, so rising rows never clip hard. With verse annotations on, it carries a sample ḥāshiya in the
+scribe's italic under the verse. Word-by-word on paints a few interlinear
+glosses under the Arabic tiles. Scroll shows the collapsed ayah-rail dashes
+on the chosen left or right edge; Mushaf has none. The verse mark sits
+vertically centred on the Arabic line, or glued to the last English word
+in English-only — same as the reader. Arabic-only and English-only carry
+the next verse after the folio, using a real page turn (56:76 ends 536,
+56:77 opens 537). The leaf height is the max of that Both page (with gloss
+and a note) and the mushaf miniature, so no setting resizes it. Type is a ~4/5 miniature of the reader (Hafs 24, lyric 18,
+translation 13) so the leaf does not wear full-page sizes. The
+hairline is the leaf's edge, not a card.
+Mushaf hides view, verse annotations, the ayah-selector side, word-by-word,
+and the verse-number script — a printed page has no annotation margin, no
+rail, no English under the type, and its own circled QCF marks.
+
 - **Arabic & English** — Arabic flows right-to-left, the English gloss under
   each word; optional transliteration; the flowing translation below.
+- **Arabic** — the Hafs line only, with the trailing verse mark.
 - **English** — the gloss becomes the lyric line itself, flowing
   left-to-right and lighting word-by-word on the same timings.
-  Web page breaks centre one Western folio number between equal visible gold
-  rules; the mirrored Arabic-Indic number is reserved for Arabic modes.
+- **Mushaf** — a printed Madinah leaf in the QCF V2 page face. Choosing it
+  locks the view to Arabic. The Customize preview is 21:91–92 as three
+  exclusive printed lines (page 330), scaled to the measure — never by
+  stretching word gaps. The circled mark is its own cell of the line, with
+  the page's word space either side, so it never collides with the last
+  word. Page-number script still applies, and the preview paints the same
+  folio as the leaf: a single script centred as quiet ink; both scripts
+  centred either side of a diamond. Scroll page-breaks keep the gold
+  hairline (Western left, Arabic-Indic right; a single script centred
+  between equal rules).

@@ -1,37 +1,38 @@
-import { formatReaderDigits } from '../../util/digits'
+import type { PageNumberScript } from '../../data/settings'
+import { pageFolioLayout } from '../../util/digits'
 
 /**
- * Subtle mushaf page break — thin gold hairline with Western digits on the
- * left and Arabic-Indic on the right. English-only keeps the Western number
- * and rule, but omits the redundant right-hand number.
+ * Subtle mushaf page break — thin gold hairline. Both scripts sit at opposite
+ * ends; a single script centres that figure between equal rules.
  */
 export function PageBreak({
   page,
-  useArabicIndicDigits = true,
+  script = 'both',
 }: {
   page: number
-  useArabicIndicDigits?: boolean
+  script?: PageNumberScript
 }) {
-  const westernOnly = !useArabicIndicDigits
-  const right = formatReaderDigits(page, useArabicIndicDigits)
+  const folio = pageFolioLayout(page, script)
   return (
     <div
-      className={`page-break${westernOnly ? ' page-break--western-only' : ''}`}
+      className={`page-break${folio.centered ? ' page-break--western-only' : ''}`}
       role="separator"
       aria-label={`Page ${page}`}
     >
-      {westernOnly ? (
+      {folio.centered ? (
         <>
           <span className="page-break__line" aria-hidden="true" />
-          <span className="page-break__num">{page}</span>
+          <span className="page-break__num" lang={script === 'arabic' ? 'ar' : undefined}>
+            {folio.leading}
+          </span>
           <span className="page-break__line" aria-hidden="true" />
         </>
       ) : (
         <>
-          <span className="page-break__num">{page}</span>
+          <span className="page-break__num">{folio.leading}</span>
           <span className="page-break__line" aria-hidden="true" />
           <span className="page-break__num" lang="ar">
-            {right}
+            {folio.trailing}
           </span>
         </>
       )}

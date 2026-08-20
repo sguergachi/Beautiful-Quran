@@ -354,8 +354,15 @@ horizontal page turn — draggable, fling-able, with page-turn audio
   bottom. Floating Back-to / return-to-ayah ornaments share
   `FloatingPaperControl` (enter/exit + bottom inset) with the cover float. All scrolling and verse-position logic routes through the
   focus engine (`reader/focus/`, see below).
-- `settings/SettingsScreen` — reciter, reading mode, text size, display
-  toggles, theme, attributions; developer mode unlocks the Timings Lab and
+- `settings/SettingsScreen` — reciter, Customize (view, layout, verse and
+  page numbers, theme, annotations, ayah-selector side, word-by-word gloss,
+  with a pinned faded-leaf preview, a full-bleed paper dissolve under it,
+  and the collapsed ayah rail on the chosen edge;
+  mushaf hides view, annotations, the rail
+  side, word-by-word, and verse-number script — the preview is 21:91–92
+  as three printed QCF lines scaled to the measure), text size, remaining
+  display toggles, attributions;
+  developer mode unlocks the Timings Lab and
   the [Tarjīʿ Lab](TARJI_LAB.md).
 
 Ink-bleed overlays soak **the sheet they belong to**, not a full-screen

@@ -1,4 +1,10 @@
 import { describe, expect, it } from 'vitest'
+import {
+  applyReadingMode,
+  customizeSummary,
+  showsPreviewWordGloss,
+  showsWordGlossChrome,
+} from './customizePolicy'
 import { HOME_BOOKMARK_STYLES, normalizeSettings } from './settings'
 
 describe('home bookmark settings', () => {
@@ -41,5 +47,54 @@ describe('educationGuidesEnabled setting', () => {
       normalizeSettings({ educationGuidesEnabled: 1 as unknown as boolean })
         .educationGuidesEnabled,
     ).toBe(true)
+  })
+})
+
+describe('customize reading settings', () => {
+  it('defaults to bilingual reading with Arabic verse marks and both folios', () => {
+    const settings = normalizeSettings()
+    expect(settings.readingMode).toBe('arabic_english')
+    expect(settings.verseNumberScript).toBe('arabic')
+    expect(settings.pageNumberScript).toBe('both')
+  })
+
+  it('falls back when stored customize enums are unknown', () => {
+    expect(
+      normalizeSettings({ verseNumberScript: 'roman' as never }).verseNumberScript,
+    ).toBe('arabic')
+    expect(
+      normalizeSettings({ pageNumberScript: 'none' as never }).pageNumberScript,
+    ).toBe('both')
+  })
+
+  it('offers word gloss only on bilingual scroll', () => {
+    expect(showsWordGlossChrome('arabic_english')).toBe(true)
+    expect(showsWordGlossChrome('arabic_only')).toBe(false)
+    expect(showsPreviewWordGloss('arabic_english', true)).toBe(true)
+    expect(showsPreviewWordGloss('arabic_english', false)).toBe(false)
+  })
+
+  it('applies every web reading mode', () => {
+    expect(applyReadingMode('english_only')).toEqual({
+      readingMode: 'english_only',
+    })
+    expect(applyReadingMode('arabic_english')).toEqual({
+      readingMode: 'arabic_english',
+    })
+  })
+
+  it('summarises view and verse-mark script', () => {
+    expect(customizeSummary(normalizeSettings())).toBe(
+      'Arabic & English · Arabic verse marks · System',
+    )
+    expect(
+      customizeSummary(
+        normalizeSettings({
+          readingMode: 'arabic_only',
+          verseNumberScript: 'english',
+          themeMode: 'dark',
+        }),
+      ),
+    ).toBe('Arabic · English verse marks · Nightfall')
   })
 })
