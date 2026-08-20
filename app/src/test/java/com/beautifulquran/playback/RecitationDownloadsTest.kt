@@ -29,6 +29,9 @@ class RecitationDownloadsTest {
         val empty = ChapterDownload(fatiha, 0)
         val partial = ChapterDownload(fatiha, 3, bytes = 4L * 1024 * 1024)
         val done = ChapterDownload(fatiha, 7, bytes = 12L * 1024 * 1024)
+        assertEquals("80/206 verses", chapterDownloadCountLabel(completed = 80, total = 206))
+        assertEquals("0/1 verse", chapterDownloadCountLabel(completed = -1, total = 1))
+        assertEquals("7/7 verses", chapterDownloadCountLabel(completed = 9, total = 7))
         assertEquals("7 verses", chapterFactLine(empty, downloading = false, waiting = false, paused = false))
         assertEquals("Download", chapterActionLabel(empty, downloading = false, waiting = false, paused = false))
         assertEquals(

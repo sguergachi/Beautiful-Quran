@@ -36,10 +36,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -55,6 +52,7 @@ import com.beautifulquran.playback.RecitationUsage
 import com.beautifulquran.playback.ReciterDownloads
 import com.beautifulquran.playback.chapterActionIsFetch
 import com.beautifulquran.playback.chapterActionLabel
+import com.beautifulquran.playback.chapterDownloadCountLabel
 import com.beautifulquran.playback.chapterFactLine
 import com.beautifulquran.playback.chapterOffersDelete
 import com.beautifulquran.playback.chapterProgressFraction
@@ -404,6 +402,7 @@ internal fun DownloadManagerPage(
                                 downloading = downloading,
                                 waiting = waiting,
                                 paused = chapterPaused,
+                                completedAyahs = progress.ayah.takeIf { downloading },
                                 percent = chapterPercent,
                                 confirming = confirming,
                                 reconciling = chapterReconciling,
@@ -669,6 +668,7 @@ private fun ChapterRow(
     downloading: Boolean,
     waiting: Boolean,
     paused: Boolean,
+    completedAyahs: Int?,
     percent: Int?,
     confirming: Boolean,
     reconciling: Boolean,
@@ -678,12 +678,13 @@ private fun ChapterRow(
     onDelete: () -> Unit,
 ) {
     val progressInk = LocalQuranAccents.current.gold.copy(alpha = ProgressInkAlpha)
-    val facts = buildAnnotatedString {
-        append(chapterFactLine(row, downloading, waiting, paused))
-        if (downloading && percent != null) {
-            append(" · ")
-            withStyle(SpanStyle(color = progressInk)) { append("$percent%") }
+    val facts = if (downloading) {
+        buildString {
+            append(chapterDownloadCountLabel(completedAyahs ?: 0, row.ayahCount))
+            if (percent != null) append(" · $percent%")
         }
+    } else {
+        chapterFactLine(row, downloading, waiting, paused)
     }
     val action = chapterActionLabel(row, downloading, waiting, paused)
     val alsoDelete = chapterOffersDelete(row, downloading, waiting, paused)
@@ -708,7 +709,11 @@ private fun ChapterRow(
             Text(
                 text = facts,
                 style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
+                color = if (downloading) {
+                    progressInk
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f)
+                },
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )

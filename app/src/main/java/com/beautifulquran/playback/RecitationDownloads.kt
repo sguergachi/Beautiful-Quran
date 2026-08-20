@@ -360,6 +360,13 @@ internal fun reciterHeaderActionIsFetch(action: String): Boolean =
 internal fun verseCountLabel(count: Int): String =
     if (count == 1) "1 verse" else "$count verses"
 
+internal fun chapterDownloadCountLabel(completed: Int, total: Int): String {
+    val safeTotal = total.coerceAtLeast(0)
+    val safeCompleted = completed.coerceIn(0, safeTotal)
+    val unit = if (safeTotal == 1) "verse" else "verses"
+    return "$safeCompleted/$safeTotal $unit"
+}
+
 internal fun chapterFactLine(
     row: ChapterDownload,
     downloading: Boolean,
