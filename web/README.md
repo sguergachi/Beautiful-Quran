@@ -6,7 +6,7 @@ recitation audio.
 
 ## Live
 
-https://sguergachi.github.io/Beautiful-Quran-/app/
+https://sguergachi.github.io/Beautiful-Quran/app/
 
 Linked from the project homepage as **Open web reader**.
 

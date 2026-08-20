@@ -1,0 +1,19 @@
+{
+  "id": "invented-flush-restore-hani-33-69",
+  "label": "Hani 33:69 restore must not split opening ياأيها into a flush repeat",
+  "refs": ["GitHub issue #723 class", "same restore-invented flush as 66:7"],
+  "pipeline": "invented_flush_restore",
+  "notes": "Same class as 66:7 / 5:1: qdc one word 1, restore invents a flush pair on يَاأَيُّهَا.",
+  "input_segments": [
+    [1, 50, 2700],
+    [2, 2700, 3730],
+    [3, 3730, 4850]
+  ],
+  "repair_segments": [
+    [1, 50, 1970],
+    [1, 1970, 3050],
+    [2, 3050, 4510],
+    [3, 4510, 4930]
+  ],
+  "expected_positions": [1, 2, 3]
+}

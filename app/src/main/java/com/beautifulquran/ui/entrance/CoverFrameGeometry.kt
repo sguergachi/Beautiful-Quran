@@ -72,12 +72,11 @@ fun coverFrameMarginsDp(
  * Concentric gilt-frame insets, corner radii, and corner-ornament size for
  * the entrance cover.
  *
- * For a screen corner of radius [R] and a uniform inset [D], each frame
- * corner is [R − D] — the classic concentric rounded-rect relationship —
- * so the doubled gilt rule reads as designed for that phone's silhouette
- * rather than a fixed square-ish border floating inside it. The khatam
- * star at each corner is sized to the band it is seated in, so it reads as
- * a hub of the border rather than an ornament laid over its edge.
+ * Leather margin and band width are fixed (22–40 dp and 26 dp). Outer
+ * corners follow the screen ([R − outerInset]). Inner corners are the
+ * only thing that changes: **innerRadius = outerRadius − gap**, floored
+ * so a leftover of 0 does not square the opening. The khatam is sized
+ * to the (unchanged) band.
  */
 data class CoverFrameGeometry(
     val outerInsetPx: Float,
@@ -97,11 +96,9 @@ data class CoverFrameGeometry(
 /**
  * Derive a cover-frame geometry from the display's corner radii.
  *
- * [density] is px-per-dp. The outer inset scales with the screen radius
- * (~48% of the largest corner) and is clamped so every phone gets a
- * generous gilt margin without flattening the concentric curve. The inner
- * rule sits a fixed gap inside the outer; corner stars span that gap so
- * they read as pressed seals set into the band, not pinpricks over it.
+ * [density] is px-per-dp. Margin and band width do not change with the
+ * screen curve. Only the inner corner radius is derived: outer − gap,
+ * never below 20 dp so the opening stays a fillet.
  */
 fun coverFrameGeometry(
     screen: ScreenCornerRadiiPx,
@@ -109,28 +106,15 @@ fun coverFrameGeometry(
 ): CoverFrameGeometry {
     val minInset = 22f * density
     val maxInset = 40f * density
-    // The border zone between the two rules carries the generated frieze —
-    // a real mushaf border band, not a pinstripe — so the gap is generous.
     val ruleGap = 26f * density
-    // Sharp-cornered surfaces still need a designed frame; invent a modest
-    // radius so the gilt rule does not collapse to a hard rectangle.
+    val minInnerR = 20f * density
     val fallbackR = 36f * density
     val designR = if (screen.max > 0f) screen.max else fallbackR
 
-    // Leave at least ~45% of the design radius on the outer rule so the
-    // corner still reads as a curve, not a clipped square.
     val outerInset = (designR * 0.48f)
         .coerceIn(minInset, maxInset)
         .coerceAtMost(designR * 0.55f)
-    // The inner rule sits the full band gap inside; concentric() floors its
-    // corner radius at zero when the curve is used up.
     val innerInset = outerInset + ruleGap
-
-    // Corner seals are hubs of the border band, not stamps in the margin:
-    // the seal's outer extent is half the band, so its bezel tips land on
-    // the two gilt rules. Sizing it from the outer inset instead let the
-    // seal grow past the outer rule on phones whose margin is wider than
-    // the band (the ornament's bezel reaches well past its nominal box).
     val starRadius = ruleGap / 2f
 
     fun concentric(r: Float, inset: Float): Float {
@@ -138,18 +122,27 @@ fun coverFrameGeometry(
         return (base - inset).coerceAtLeast(0f)
     }
 
-    fun corners(inset: Float) = ScreenCornerRadiiPx(
-        topLeft = concentric(screen.topLeft, inset),
-        topRight = concentric(screen.topRight, inset),
-        bottomRight = concentric(screen.bottomRight, inset),
-        bottomLeft = concentric(screen.bottomLeft, inset),
+    val outerCorners = ScreenCornerRadiiPx(
+        topLeft = concentric(screen.topLeft, outerInset),
+        topRight = concentric(screen.topRight, outerInset),
+        bottomRight = concentric(screen.bottomRight, outerInset),
+        bottomLeft = concentric(screen.bottomLeft, outerInset),
+    )
+    // Only the inner radius changes: outer − gap, floored so a leftover
+    // of 0 does not square the opening. Band width stays [ruleGap].
+    fun innerOf(outer: Float) = (outer - ruleGap).coerceAtLeast(minInnerR)
+    val innerCorners = ScreenCornerRadiiPx(
+        topLeft = innerOf(outerCorners.topLeft),
+        topRight = innerOf(outerCorners.topRight),
+        bottomRight = innerOf(outerCorners.bottomRight),
+        bottomLeft = innerOf(outerCorners.bottomLeft),
     )
 
     return CoverFrameGeometry(
         outerInsetPx = outerInset,
         innerInsetPx = innerInset,
-        outerCorners = corners(outerInset),
-        innerCorners = corners(innerInset),
+        outerCorners = outerCorners,
+        innerCorners = innerCorners,
         starRadiusPx = starRadius,
     )
 }

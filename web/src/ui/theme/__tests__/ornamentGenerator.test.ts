@@ -69,6 +69,14 @@ describe('ornamentGenerator', () => {
         o.cornerSeal.tipRadius > SEAL_RING_RADIUS && o.cornerSeal.tipRadius <= 0.7,
         `${at}: seal tipRadius ${o.cornerSeal.tipRadius}`,
       )
+      for (const s of o.cornerSeal.strokes) {
+        if (!s.closed) continue
+        const ring = s.points.every((p) => {
+          const r = Math.hypot(p.x - 0.5, p.y - 0.5)
+          return Math.abs(r - SEAL_RING_RADIUS) < 0.02
+        })
+        check(!ring, `${at}: seal enclosing ring`)
+      }
       for (const s of o.medallion.strokes) {
         check(s.points.length >= 2, `${at}: short stroke`)
         check(s.birth >= 0 && s.birth + s.span <= 1.0001, `${at}: build window`)

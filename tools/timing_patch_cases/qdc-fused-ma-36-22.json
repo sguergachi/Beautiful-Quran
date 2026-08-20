@@ -1,0 +1,39 @@
+{
+  "id": "qdc-fused-ma-36-22",
+  "label": "Sudais 36:22 QAC وَمَالِيَ is qdc وَمَا + لِيَ; do not clamp 8 onto ترجعون",
+  "refs": [
+    "ear report: Sudais 36:22 skipped a word",
+    "raw qdc_3 36:22 positions 1..8"
+  ],
+  "pipeline": "adjust_qdc_segments",
+  "n_words": 7,
+  "notes": "Clamping the extra last index invents a flush pair on word 7 and shifts لا onto لي. Merge qdc 1+2 onto word 1.",
+  "words": {
+    "1": "وَمَالِيَ",
+    "2": "لَآ",
+    "3": "أَعۡبُدُ",
+    "4": "ٱلَّذِي",
+    "5": "فَطَرَنِي",
+    "6": "وَإِلَيۡهِ",
+    "7": "تُرۡجَعُونَ"
+  },
+  "input_segments": [
+    [1, 0, 910],
+    [2, 910, 1380],
+    [3, 1380, 1900],
+    [4, 1900, 2680],
+    [5, 2680, 3380],
+    [6, 3380, 4420],
+    [7, 4420, 5330],
+    [8, 5330, 7075]
+  ],
+  "expected_segments": [
+    [1, 0, 1380],
+    [2, 1380, 1900],
+    [3, 1900, 2680],
+    [4, 2680, 3380],
+    [5, 3380, 4420],
+    [6, 4420, 5330],
+    [7, 5330, 7075]
+  ]
+}

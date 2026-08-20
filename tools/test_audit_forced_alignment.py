@@ -15,8 +15,10 @@ import torch
 
 from audit_forced_alignment import (
     Occurrence,
+    blank_id_for,
     decode_waveform,
     forced_ctc_viterbi,
+    normalize_for_mms,
     normalize_for_model,
     occurrence_frame_evidence,
     target_labels,
@@ -43,6 +45,52 @@ def test_target_keeps_repeated_occurrences():
     assert transcript == "بسم|بسم"
     assert labels == [1, 2, 3, 4, 1, 2, 3]
     assert owners == [0, 0, 0, None, 1, 1, 1]
+
+
+def test_target_concatenates_when_delimiter_is_none():
+    vocabulary = {"y": 1, "a": 2}
+    occurrences = [
+        Occurrence(1, "يا", "ya", 0, 100),
+        Occurrence(2, "يا", "ya", 200, 300),
+    ]
+    labels, owners, transcript = target_labels(occurrences, vocabulary, None)
+    assert transcript == "yaya"
+    assert labels == [1, 2, 1, 2]
+    assert owners == [0, 0, 1, 1]
+
+
+def test_blank_id_prefers_named_blank_over_pad():
+    tokenizer = SimpleNamespace(
+        blank_token_id=None,
+        blank_token="<blank>",
+        pad_token_id=1,
+        get_vocab=lambda: {"<blank>": 0, "<pad>": 1, "a": 4},
+    )
+    assert blank_id_for(tokenizer) == 0
+
+
+def test_blank_id_falls_back_to_pad():
+    tokenizer = SimpleNamespace(
+        blank_token_id=None,
+        blank_token=None,
+        pad_token_id=1,
+        get_vocab=lambda: {"<pad>": 1, "ا": 2},
+    )
+    assert blank_id_for(tokenizer) == 1
+
+
+def test_mms_folds_maddah_before_romanizing():
+    seen = {}
+
+    class FakeRomanizer:
+        def romanize_string(self, text, lcode=None):
+            seen["text"] = text
+            seen["lcode"] = lcode
+            return "malaayikaa"
+
+    assert normalize_for_mms("مَلَـٰٓئِكَةٌ", FakeRomanizer()) == "malaayikaa"
+    assert seen["text"] == "ملائكة"
+    assert seen["lcode"] == "ara"
 
 
 def test_viterbi_requires_blank_between_duplicate_labels():
@@ -91,6 +139,10 @@ def test_ffmpeg_decoder_uses_complete_float_pcm():
 def main():
     test_normalization()
     test_target_keeps_repeated_occurrences()
+    test_target_concatenates_when_delimiter_is_none()
+    test_blank_id_prefers_named_blank_over_pad()
+    test_blank_id_falls_back_to_pad()
+    test_mms_folds_maddah_before_romanizing()
     test_viterbi_requires_blank_between_duplicate_labels()
     test_occurrence_evidence_does_not_merge_repeated_words()
     test_ffmpeg_decoder_uses_complete_float_pcm()

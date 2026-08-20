@@ -866,8 +866,9 @@ three moments:
    frieze running between the rules — each side is a railed channel
    fitting a whole number of pattern periods, and its mouth tapers onto
    the corner seal's petal tip (each seal wears a four-petal ogee bezel
-   whose tips aim down the band axes), so border and corner ornaments
-   are one continuous piece of geometry. The frame, border, and seals
+   whose tips aim down the band axes — no enclosing ring around the
+   star; the two gilt rules are already the band's inner and outer),
+   so border and corner ornaments are one continuous piece of geometry. The frame, border, and seals
    are the binding's tooling and render complete on the very first
    frame — no wash, no fade. Tooled *inside* that frame, this launch's
    generated Hankin field (whisper ink) and the generated medallion
@@ -877,9 +878,10 @@ three moments:
    the reader's eyes.
    The frame's inset and corner radii are derived from the display's
    rounded corners (`WindowInsets.getRoundedCorner`, via
-   `coverFrameGeometry`) so the gilt rule is concentric with the phone's
-   silhouette — the cover reads as cut for that screen, not a fixed square
-   border floating inside it.
+   `coverFrameGeometry`) so the **outer** gilt rule is concentric with
+   the phone. The band stays 26 dp; only the **inner** corner radius
+   changes (`outer − gap`, never below 20 dp so it does not square).
+   The cover reads as cut for that screen.
 2. **The isti'adha.** After a brief hold, **أعوذ بالله من الشيطان الرجيم**
    fades in as text — Arabic letter-washed onto the cover, English italic
    beneath — a quiet pause before reading begins. No audio: the du'a is

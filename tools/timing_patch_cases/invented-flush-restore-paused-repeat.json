@@ -1,0 +1,19 @@
+{
+  "id": "invented-flush-restore-paused-repeat",
+  "label": "A restore with a ≥300 ms pause is a real re-say and must land",
+  "refs": ["timing_repairs/README.md repeat-vs-split invariant (1)"],
+  "pipeline": "invented_flush_restore",
+  "notes": "Collapse only fires below 300 ms. A paused restore that qdc flattened is the legitimate restore case and must keep both halves.",
+  "input_segments": [
+    [1, 0, 1000],
+    [2, 1000, 1800],
+    [3, 1800, 2600]
+  ],
+  "repair_segments": [
+    [1, 0, 800],
+    [1, 1200, 2000],
+    [2, 2000, 2800],
+    [3, 2800, 3600]
+  ],
+  "expected_positions": [1, 1, 2, 3]
+}

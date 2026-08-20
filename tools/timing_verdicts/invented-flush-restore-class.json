@@ -1,0 +1,631 @@
+{
+  "schemaVersion": 1,
+  "baseline": {
+    "commit": "9e0dc4b45462ce593a287363e4e96224c0aea313",
+    "databaseSha256": "74cc1ed57045b3e76a6d065b85c2a764763b0601dc4d5502ce58c081fc1d3d09"
+  },
+  "verdicts": {
+    "Abdul_Basit_Murattal_64kbps:3:54": {
+      "verdict": "accept",
+      "kinds": [
+        "topology"
+      ],
+      "baselinePayloadHash": "f3964bee4e0b79f6dccd57d66977af44b42017dbdf07840f5dee3e1594108700",
+      "candidatePayloadHash": "2ec015a10224569949a4391b178109ae279c3afa35c667dd984d0db17d4d534b",
+      "evidence": {
+        "kind": "dual_model_topology",
+        "artifact": "tools/timing_verdicts/invented-flush-restore-class.json",
+        "summary": "CTC restore invented a flush same-word pair (gap < 300 ms) that qdc did not have. XLSR and MMS/uroman forced-alignment both prefer one span.",
+        "audioSha256": "ebab12b996ba3ff04ae97ffa280c7610a114b2e677c9b43b76571dc3fdc6edc2",
+        "waveformVeto": false,
+        "models": [
+          {
+            "name": "arabic-xlsr-ctc",
+            "baselineScore": -0.239,
+            "candidateScore": -0.078
+          },
+          {
+            "name": "mms-uroman-ctc",
+            "baselineScore": -0.145,
+            "candidateScore": -0.069
+          }
+        ]
+      }
+    },
+    "Abdul_Basit_Murattal_64kbps:7:22": {
+      "verdict": "accept",
+      "kinds": [
+        "topology"
+      ],
+      "baselinePayloadHash": "1b4cfe64feba86be14faf3e3b71e50d445818787f2b5bbc7c327015bd297d612",
+      "candidatePayloadHash": "a272d36292e7178c775bf64c6f11f18452920e5723ce7eacf27a26f8464ef6d7",
+      "evidence": {
+        "kind": "dual_model_topology",
+        "artifact": "tools/timing_verdicts/invented-flush-restore-class.json",
+        "summary": "CTC restore invented a flush same-word pair (gap < 300 ms) that qdc did not have. XLSR and MMS/uroman forced-alignment both prefer one span.",
+        "audioSha256": "7c875fe928fa534c1b4c50617742aa271f36461ffbe697adc1efe67880659daa",
+        "waveformVeto": false,
+        "models": [
+          {
+            "name": "arabic-xlsr-ctc",
+            "baselineScore": -0.314,
+            "candidateScore": -0.295
+          },
+          {
+            "name": "mms-uroman-ctc",
+            "baselineScore": -0.085,
+            "candidateScore": -0.069
+          }
+        ]
+      }
+    },
+    "Abdul_Basit_Murattal_64kbps:29:14": {
+      "verdict": "accept",
+      "kinds": [
+        "topology"
+      ],
+      "baselinePayloadHash": "47b6519aba79a677fcbabe6824f6e1a90e0b6befab9d5ffae20544c22c217e34",
+      "candidatePayloadHash": "3c4ca4f4db30fabf3e855dd9690ab7c87def2197a23330710424cd9bdeaa17bf",
+      "evidence": {
+        "kind": "dual_model_topology",
+        "artifact": "tools/timing_verdicts/invented-flush-restore-class.json",
+        "summary": "CTC restore invented a flush same-word pair (gap < 300 ms) that qdc did not have. XLSR and MMS/uroman forced-alignment both prefer one span.",
+        "audioSha256": "ae665c949b9028be1d7e451b22e50c3904459528f91fe6e8de0cd1fe065aec5a",
+        "waveformVeto": false,
+        "models": [
+          {
+            "name": "arabic-xlsr-ctc",
+            "baselineScore": -0.561,
+            "candidateScore": -0.46
+          },
+          {
+            "name": "mms-uroman-ctc",
+            "baselineScore": -0.121,
+            "candidateScore": -0.055
+          }
+        ]
+      }
+    },
+    "Abdurrahmaan_As-Sudais_192kbps:70:10": {
+      "verdict": "accept",
+      "kinds": [
+        "topology"
+      ],
+      "baselinePayloadHash": "f3014966be52a5838abef6200d0247f06b781a376b52171561b5eb7d9ecc12cc",
+      "candidatePayloadHash": "b13085419ff72b78d70ed64afc84c81e5914419c168958f148425172addb7633",
+      "evidence": {
+        "kind": "dual_model_topology",
+        "artifact": "tools/timing_verdicts/invented-flush-restore-class.json",
+        "summary": "CTC restore invented a flush same-word pair (gap < 300 ms) that qdc did not have. XLSR and MMS/uroman forced-alignment both prefer one span.",
+        "audioSha256": "8fa9100cb32a7137b77080cfe9973ffa6ac596957734fedbca745268fe772ab0",
+        "waveformVeto": false,
+        "models": [
+          {
+            "name": "arabic-xlsr-ctc",
+            "baselineScore": -0.401,
+            "candidateScore": -0.169
+          },
+          {
+            "name": "mms-uroman-ctc",
+            "baselineScore": -0.159,
+            "candidateScore": -0.073
+          }
+        ]
+      }
+    },
+    "Alafasy_128kbps:6:128": {
+      "verdict": "accept",
+      "kinds": [
+        "topology"
+      ],
+      "baselinePayloadHash": "0305c153620ddd1a7d9c6876748e10dc2650cad71d48e07843745501e3198e30",
+      "candidatePayloadHash": "e71ee65f2c54f0ce25d0e76405ba275ddf61f6d2698a9a38f393dc9cd3683eae",
+      "evidence": {
+        "kind": "dual_model_topology",
+        "artifact": "tools/timing_verdicts/invented-flush-restore-class.json",
+        "summary": "CTC restore invented a flush same-word pair (gap < 300 ms) that qdc did not have. MMS/uroman forced-alignment prefers one span. XLSR is within 0.01 of the invented pair.",
+        "audioSha256": "10f7c8d0dadcce44e9071bbfcd16d09664a3e879d6c32bf4a078a8538a9f0cae",
+        "waveformVeto": false,
+        "models": [
+          {
+            "name": "arabic-xlsr-ctc",
+            "baselineScore": -0.348,
+            "candidateScore": -0.349
+          },
+          {
+            "name": "mms-uroman-ctc",
+            "baselineScore": -0.046,
+            "candidateScore": -0.03
+          }
+        ]
+      }
+    },
+    "Alafasy_128kbps:60:12": {
+      "verdict": "accept",
+      "kinds": [
+        "topology"
+      ],
+      "baselinePayloadHash": "a771a7a2eaf54b12f9e0960dca89f98a6113f13b47027662800b6344993092bf",
+      "candidatePayloadHash": "7ec8bfe0e0ad15637a9ea998b14de3701bcf26adb733a2a06715304460c8d383",
+      "evidence": {
+        "kind": "dual_model_topology",
+        "artifact": "tools/timing_verdicts/invented-flush-restore-class.json",
+        "summary": "CTC restore invented a flush same-word pair (gap < 300 ms) that qdc did not have. MMS/uroman forced-alignment prefers one span. XLSR is within 0.01 of the invented pair.",
+        "audioSha256": "f2500b1ad01aa20593caecd35391b3b8a20e65ec7d8d1e1d78ac1c0a1fac2b13",
+        "waveformVeto": false,
+        "models": [
+          {
+            "name": "arabic-xlsr-ctc",
+            "baselineScore": -0.504,
+            "candidateScore": -0.507
+          },
+          {
+            "name": "mms-uroman-ctc",
+            "baselineScore": -0.052,
+            "candidateScore": -0.036
+          }
+        ]
+      }
+    },
+    "Hani_Rifai_192kbps:2:161": {
+      "verdict": "accept",
+      "kinds": [
+        "topology"
+      ],
+      "baselinePayloadHash": "0370a88b7962f6e482eedb588a28c189dbab562955a56578e7e941bae9aa11b9",
+      "candidatePayloadHash": "e25753e863e380f561cee215901779d3487d0e8db40e6a0e1edcb6de5759dedd",
+      "evidence": {
+        "kind": "dual_model_topology",
+        "artifact": "tools/timing_verdicts/invented-flush-restore-class.json",
+        "summary": "CTC restore invented a flush same-word pair (gap < 300 ms) that qdc did not have. MMS/uroman forced-alignment prefers one span. XLSR is within 0.01 of the invented pair.",
+        "audioSha256": "0e743392babbd9e16fb97a2af61ab0f5db223e660194973da065dc571675089a",
+        "waveformVeto": false,
+        "models": [
+          {
+            "name": "arabic-xlsr-ctc",
+            "baselineScore": -0.201,
+            "candidateScore": -0.211
+          },
+          {
+            "name": "mms-uroman-ctc",
+            "baselineScore": -0.089,
+            "candidateScore": -0.082
+          }
+        ]
+      }
+    },
+    "Hani_Rifai_192kbps:5:1": {
+      "verdict": "accept",
+      "kinds": [
+        "topology"
+      ],
+      "baselinePayloadHash": "7bcaeac19be67d3e18fff16d436a057710c1a8195f5c1547ed0547eda71c365b",
+      "candidatePayloadHash": "2c4b073444c0d41544629bbe4a1c3412d44bcece1433d4da736c3c917801d8b5",
+      "evidence": {
+        "kind": "dual_model_topology",
+        "artifact": "tools/timing_verdicts/invented-flush-restore-class.json",
+        "summary": "CTC restore invented a flush same-word pair (gap < 300 ms) that qdc did not have. XLSR and MMS/uroman forced-alignment both prefer one span.",
+        "audioSha256": "2d0e4c383eb5de3c54dbad092c0683273f7ef4dda34faa319c4c71564d0950d4",
+        "waveformVeto": false,
+        "models": [
+          {
+            "name": "arabic-xlsr-ctc",
+            "baselineScore": -0.294,
+            "candidateScore": -0.263
+          },
+          {
+            "name": "mms-uroman-ctc",
+            "baselineScore": -0.09,
+            "candidateScore": -0.06
+          }
+        ]
+      }
+    },
+    "Hani_Rifai_192kbps:12:21": {
+      "verdict": "accept",
+      "kinds": [
+        "topology"
+      ],
+      "baselinePayloadHash": "3e7b1a2de5edd309a4988a277b59fa4022f4a2cc56f5108e3d5897af5e409389",
+      "candidatePayloadHash": "8a4f61cd60497882618b4f2ddb44e601efecc8477c5903580c6d879915b1c6d6",
+      "evidence": {
+        "kind": "dual_model_topology",
+        "artifact": "tools/timing_verdicts/invented-flush-restore-class.json",
+        "summary": "CTC restore invented a flush same-word pair (gap < 300 ms) that qdc did not have. XLSR and MMS/uroman forced-alignment both prefer one span.",
+        "audioSha256": "013744e9be3219ff1514d7f82fc28f35f0ab4c76b6f55a20b874f08906d6b968",
+        "waveformVeto": false,
+        "models": [
+          {
+            "name": "arabic-xlsr-ctc",
+            "baselineScore": -0.442,
+            "candidateScore": -0.416
+          },
+          {
+            "name": "mms-uroman-ctc",
+            "baselineScore": -0.095,
+            "candidateScore": -0.079
+          }
+        ]
+      }
+    },
+    "Hani_Rifai_192kbps:29:32": {
+      "verdict": "accept",
+      "kinds": [
+        "topology"
+      ],
+      "baselinePayloadHash": "38ac305aa414210fdbbd7c8e4c606f14d10bffce399e7b829fea876c1664b606",
+      "candidatePayloadHash": "31b33e6df970187345e792946f4bc969421fffeee0ed7ae234690024d9ce05a6",
+      "evidence": {
+        "kind": "dual_model_topology",
+        "artifact": "tools/timing_verdicts/invented-flush-restore-class.json",
+        "summary": "CTC restore invented a flush same-word pair (gap < 300 ms) that qdc did not have. XLSR and MMS/uroman forced-alignment both prefer one span.",
+        "audioSha256": "5a8ee6b3c711378e5f46f93055468b2a4fceda33e97dfe507a416d3d874fb4cd",
+        "waveformVeto": false,
+        "models": [
+          {
+            "name": "arabic-xlsr-ctc",
+            "baselineScore": -0.538,
+            "candidateScore": -0.506
+          },
+          {
+            "name": "mms-uroman-ctc",
+            "baselineScore": -0.089,
+            "candidateScore": -0.06
+          }
+        ]
+      }
+    },
+    "Hani_Rifai_192kbps:33:69": {
+      "verdict": "accept",
+      "kinds": [
+        "topology"
+      ],
+      "baselinePayloadHash": "be915941a38df85440bc69cc4fb134f4f4bfa4c0acfe061594b256838ca23cd8",
+      "candidatePayloadHash": "a7714419a68c50894848a453d858f74a4ca87f0e2d16eaf70fb37194671cc124",
+      "evidence": {
+        "kind": "dual_model_topology",
+        "artifact": "tools/timing_verdicts/invented-flush-restore-class.json",
+        "summary": "CTC restore invented a flush same-word pair (gap < 300 ms) that qdc did not have. XLSR and MMS/uroman forced-alignment both prefer one span.",
+        "audioSha256": "a3b396724b6316c1ee68de84278a398034fab13347702de4be514e252915f040",
+        "waveformVeto": false,
+        "models": [
+          {
+            "name": "arabic-xlsr-ctc",
+            "baselineScore": -0.278,
+            "candidateScore": -0.237
+          },
+          {
+            "name": "mms-uroman-ctc",
+            "baselineScore": -0.211,
+            "candidateScore": -0.178
+          }
+        ]
+      }
+    },
+    "Hani_Rifai_192kbps:66:6": {
+      "verdict": "accept",
+      "kinds": [
+        "topology"
+      ],
+      "baselinePayloadHash": "b7b51773b2f24a5ea1218e16bdd8da99cd00a16c5240f55da4fa792e94f093c8",
+      "candidatePayloadHash": "15f5f889b6e7fe9974501360751bf4ae98a8db8fb6352b8b01df887e14ce3459",
+      "evidence": {
+        "kind": "dual_model_topology",
+        "artifact": "tools/timing_verdicts/invented-flush-restore-class.json",
+        "summary": "CTC restore invented a flush same-word pair (gap < 300 ms) that qdc did not have. XLSR and MMS/uroman forced-alignment both prefer one span.",
+        "audioSha256": "0c35e4be2e30eafe49a79a54dceda6e6c6ab696f1d33600bd26b59ad2216d2ae",
+        "waveformVeto": false,
+        "models": [
+          {
+            "name": "arabic-xlsr-ctc",
+            "baselineScore": -0.157,
+            "candidateScore": -0.133
+          },
+          {
+            "name": "mms-uroman-ctc",
+            "baselineScore": -0.084,
+            "candidateScore": -0.078
+          }
+        ]
+      }
+    },
+    "Hani_Rifai_192kbps:66:7": {
+      "verdict": "accept",
+      "kinds": [
+        "topology"
+      ],
+      "baselinePayloadHash": "ada7801bc2606f45c0149d4e741a0bce3523e2cd1f8901bb430721b7e7c06189",
+      "candidatePayloadHash": "e04d8a24c309bcb997436fc3ee8bf59f1789a2e9020f689a5e41143a55919804",
+      "evidence": {
+        "kind": "dual_model_topology",
+        "artifact": "tools/timing_verdicts/invented-flush-restore-class.json",
+        "summary": "CTC restore invented a flush same-word pair (gap < 300 ms) that qdc did not have. XLSR and MMS/uroman forced-alignment both prefer one span.",
+        "audioSha256": "7f2159753bb2d88721f431c1b6e9cb187e4981d604f3595170cf3d7e43b72344",
+        "waveformVeto": false,
+        "models": [
+          {
+            "name": "arabic-xlsr-ctc",
+            "baselineScore": -0.163,
+            "candidateScore": -0.1
+          },
+          {
+            "name": "mms-uroman-ctc",
+            "baselineScore": -0.115,
+            "candidateScore": -0.064
+          }
+        ]
+      }
+    },
+    "Husary_64kbps:9:94": {
+      "verdict": "accept",
+      "kinds": [
+        "topology"
+      ],
+      "baselinePayloadHash": "006e97ee05e4f2507494e62e20a8f297ea3b347a9a556ca96a2a01710eb844a6",
+      "candidatePayloadHash": "ccad94e6cd2aca55eca9414e83bdf16d64b35e67d3844f5d1b1688b72a569dde",
+      "evidence": {
+        "kind": "dual_model_topology",
+        "artifact": "tools/timing_verdicts/invented-flush-restore-class.json",
+        "summary": "CTC restore invented a flush same-word pair (gap < 300 ms) that qdc did not have. MMS/uroman forced-alignment prefers one span. XLSR is within 0.01 of the invented pair.",
+        "audioSha256": "4f5248644ce7f52dcb8137700ed6bc0b2421f8f7e1e8b4ebce95700784116909",
+        "waveformVeto": false,
+        "models": [
+          {
+            "name": "arabic-xlsr-ctc",
+            "baselineScore": -0.131,
+            "candidateScore": -0.133
+          },
+          {
+            "name": "mms-uroman-ctc",
+            "baselineScore": -0.044,
+            "candidateScore": -0.032
+          }
+        ]
+      }
+    },
+    "Husary_64kbps:10:96": {
+      "verdict": "accept",
+      "kinds": [
+        "topology"
+      ],
+      "baselinePayloadHash": "4ab62e7efdc022c9b4bbfcc29a4d9b3bb4e94659c1d23029a78a501ab64de5b0",
+      "candidatePayloadHash": "c7f9c596b9d711a2b8cfc36891cb2b4fb5b88b06c7ce8b5230f4ff4842a12e64",
+      "evidence": {
+        "kind": "dual_model_topology",
+        "artifact": "tools/timing_verdicts/invented-flush-restore-class.json",
+        "summary": "CTC restore invented a flush same-word pair (gap < 300 ms) that qdc did not have. XLSR and MMS/uroman forced-alignment both prefer one span.",
+        "audioSha256": "b121b40a7f2fe3c46fe197df0e6f22a3768ad5afdc3a8265e46a86e3ecefc38c",
+        "waveformVeto": false,
+        "models": [
+          {
+            "name": "arabic-xlsr-ctc",
+            "baselineScore": -0.363,
+            "candidateScore": -0.301
+          },
+          {
+            "name": "mms-uroman-ctc",
+            "baselineScore": -0.086,
+            "candidateScore": -0.041
+          }
+        ]
+      }
+    },
+    "Husary_64kbps:17:34": {
+      "verdict": "accept",
+      "kinds": [
+        "topology"
+      ],
+      "baselinePayloadHash": "606c9c6752f1974be38a8ad6707ee53d8b94c45f0d4d0a200dbf685dad35b300",
+      "candidatePayloadHash": "300706c27dd82977457d1b959047ad332ebfcdff4ab3cf2cec6f6417800f5bb5",
+      "evidence": {
+        "kind": "dual_model_topology",
+        "artifact": "tools/timing_verdicts/invented-flush-restore-class.json",
+        "summary": "CTC restore invented a flush same-word pair (gap < 300 ms) that qdc did not have. XLSR and MMS/uroman forced-alignment both prefer one span.",
+        "audioSha256": "03dd0b99bb4b18df17a4e0c5a10c355c73636ee515d05fa2491d9349fb7ba544",
+        "waveformVeto": false,
+        "models": [
+          {
+            "name": "arabic-xlsr-ctc",
+            "baselineScore": -0.356,
+            "candidateScore": -0.313
+          },
+          {
+            "name": "mms-uroman-ctc",
+            "baselineScore": -0.069,
+            "candidateScore": -0.039
+          }
+        ]
+      }
+    },
+    "Husary_64kbps:21:93": {
+      "verdict": "accept",
+      "kinds": [
+        "topology"
+      ],
+      "baselinePayloadHash": "b5e4f6eed50971abe522c6ae24b5aa30381061c734de29309bf39c42c683f4cf",
+      "candidatePayloadHash": "f5f7ae70f785c8174ae4ae16ef1f083265b59082a502b85bdbb401714aa8442c",
+      "evidence": {
+        "kind": "dual_model_topology",
+        "artifact": "tools/timing_verdicts/invented-flush-restore-class.json",
+        "summary": "CTC restore invented a flush same-word pair (gap < 300 ms) that qdc did not have. XLSR and MMS/uroman forced-alignment both prefer one span.",
+        "audioSha256": "8f3e48fb42f4bcbce04db3836a353626edc12ac7f64a63ab85ad20d2a525dc12",
+        "waveformVeto": false,
+        "models": [
+          {
+            "name": "arabic-xlsr-ctc",
+            "baselineScore": -0.316,
+            "candidateScore": -0.272
+          },
+          {
+            "name": "mms-uroman-ctc",
+            "baselineScore": -0.07,
+            "candidateScore": -0.035
+          }
+        ]
+      }
+    },
+    "Husary_64kbps:41:11": {
+      "verdict": "accept",
+      "kinds": [
+        "topology"
+      ],
+      "baselinePayloadHash": "f168836e3677b995107c86b6ed18c3285b73a9f4dfc9efa9a6946e53133b36ef",
+      "candidatePayloadHash": "2e2917e6b7201e7f5fba7f4971340b86c3b2e5d70f38a51a323a4eda008f97e2",
+      "evidence": {
+        "kind": "dual_model_topology",
+        "artifact": "tools/timing_verdicts/invented-flush-restore-class.json",
+        "summary": "CTC restore invented a flush same-word pair (gap < 300 ms) that qdc did not have. XLSR and MMS/uroman forced-alignment both prefer one span.",
+        "audioSha256": "351e97db0b318ba7b6886076644351f13480f13c642859be44207a1ab9734626",
+        "waveformVeto": false,
+        "models": [
+          {
+            "name": "arabic-xlsr-ctc",
+            "baselineScore": -0.196,
+            "candidateScore": -0.167
+          },
+          {
+            "name": "mms-uroman-ctc",
+            "baselineScore": -0.072,
+            "candidateScore": -0.05
+          }
+        ]
+      }
+    },
+    "Husary_64kbps:42:51": {
+      "verdict": "accept",
+      "kinds": [
+        "topology"
+      ],
+      "baselinePayloadHash": "381564d077c3ae238f48f0bfc03f23bbab1f6617ae47835d413d34bac6b96991",
+      "candidatePayloadHash": "ddc1350d0c43c5e19123543e1fb8b8fa2e5812e5bff11ee9910401d8e16b3bcc",
+      "evidence": {
+        "kind": "dual_model_topology",
+        "artifact": "tools/timing_verdicts/invented-flush-restore-class.json",
+        "summary": "CTC restore invented a flush same-word pair (gap < 300 ms) that qdc did not have. XLSR and MMS/uroman forced-alignment both prefer one span.",
+        "audioSha256": "cc7c7a9de95fbe7dc1bc312aa9602a439545cd46ada6fbef233120d1a091d4d7",
+        "waveformVeto": false,
+        "models": [
+          {
+            "name": "arabic-xlsr-ctc",
+            "baselineScore": -0.149,
+            "candidateScore": -0.131
+          },
+          {
+            "name": "mms-uroman-ctc",
+            "baselineScore": -0.048,
+            "candidateScore": -0.032
+          }
+        ]
+      }
+    },
+    "Husary_64kbps:56:86": {
+      "verdict": "accept",
+      "kinds": [
+        "topology"
+      ],
+      "baselinePayloadHash": "53592ba39d25b432d95179f43ce3fa32159df107016544c1286fd2d4e845a31e",
+      "candidatePayloadHash": "a51f721eda9a5bff2135072fc419136b53cb9747c3286f6b09b0a765544e4323",
+      "evidence": {
+        "kind": "dual_model_topology",
+        "artifact": "tools/timing_verdicts/invented-flush-restore-class.json",
+        "summary": "CTC restore invented a flush same-word pair (gap < 300 ms) that qdc did not have. XLSR and MMS/uroman forced-alignment both prefer one span.",
+        "audioSha256": "0fa9ea72e1cabc5db8f4cdb6ae978ce3e1b85116573024767954e4d954cb5b51",
+        "waveformVeto": false,
+        "models": [
+          {
+            "name": "arabic-xlsr-ctc",
+            "baselineScore": -0.171,
+            "candidateScore": -0.099
+          },
+          {
+            "name": "mms-uroman-ctc",
+            "baselineScore": -0.098,
+            "candidateScore": -0.038
+          }
+        ]
+      }
+    },
+    "Husary_64kbps:73:2": {
+      "verdict": "accept",
+      "kinds": [
+        "topology"
+      ],
+      "baselinePayloadHash": "ea03323f9eb82291c86c2b52c75551ea810b57f1d0235e77563911dae1f5af76",
+      "candidatePayloadHash": "0b9b78e425a58b3f9ed6118d2d7f5e94ab76e1c65dbd667b9afa476bfd3e2faf",
+      "evidence": {
+        "kind": "dual_model_topology",
+        "artifact": "tools/timing_verdicts/invented-flush-restore-class.json",
+        "summary": "CTC restore invented a flush same-word pair (gap < 300 ms) that qdc did not have. XLSR and MMS/uroman forced-alignment both prefer one span.",
+        "audioSha256": "2a5f1c429c61576a347f4c85f27a6e3f82619deabbe36d612a04209e3fe52eb3",
+        "waveformVeto": false,
+        "models": [
+          {
+            "name": "arabic-xlsr-ctc",
+            "baselineScore": -0.338,
+            "candidateScore": -0.237
+          },
+          {
+            "name": "mms-uroman-ctc",
+            "baselineScore": -0.305,
+            "candidateScore": -0.223
+          }
+        ]
+      }
+    },
+    "Minshawy_Murattal_128kbps:56:26": {
+      "verdict": "accept",
+      "kinds": [
+        "topology"
+      ],
+      "baselinePayloadHash": "c66f3162546ee697777fa2a13ff3a50abc26c10ba2081b2b600277ce0e65e306",
+      "candidatePayloadHash": "7a107a0273ebb944c9a4997f95cc002064a5de1afab814a3500d6fa9b70fe58f",
+      "evidence": {
+        "kind": "dual_model_topology",
+        "artifact": "tools/timing_verdicts/invented-flush-restore-class.json",
+        "summary": "CTC restore invented a flush same-word pair (gap < 300 ms) that qdc did not have. XLSR and MMS/uroman forced-alignment both prefer one span.",
+        "audioSha256": "e61f7b1ca45c77cbc3d443954f120a2ba9812b19feecfc657aee327c6daa2863",
+        "waveformVeto": false,
+        "models": [
+          {
+            "name": "arabic-xlsr-ctc",
+            "baselineScore": -0.422,
+            "candidateScore": -0.307
+          },
+          {
+            "name": "mms-uroman-ctc",
+            "baselineScore": -0.155,
+            "candidateScore": -0.081
+          }
+        ]
+      }
+    },
+    "Hani_Rifai_192kbps:27:13": {
+      "verdict": "accept",
+      "kinds": [
+        "topology"
+      ],
+      "baselinePayloadHash": "f31e7996d95fe5b1cf8e5637c648d78eed41bbebbd61b697f2a089dd152abf5e",
+      "candidatePayloadHash": "59720bfa738a772a28911cebf04205a16f3e8bc26d113dddbf6929bc8fce7fc3",
+      "evidence": {
+        "kind": "dual_model_topology",
+        "artifact": "tools/timing_verdicts/invented-flush-restore-class.json",
+        "summary": "CTC restore invented a flush same-word pair (gap < 300 ms) that qdc did not have. Arabic CTC is the model that invented the split, so it is not a witness. Independent MMS/uroman prefers one span.",
+        "audioSha256": "c2088f048fcea66ed680233a252f492a5b1239ae66eded71379c598c765c518b",
+        "waveformVeto": false,
+        "models": [
+          {
+            "name": "mms-uroman-ctc",
+            "baselineScore": -0.124,
+            "candidateScore": -0.109
+          },
+          {
+            "name": "ctc-repeat-vs-split-invariant",
+            "sourceOccurrences": 1,
+            "restoreGapMs": 0,
+            "requiredPauseMs": 300
+          }
+        ]
+      }
+    }
+  }
+}

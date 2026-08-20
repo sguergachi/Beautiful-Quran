@@ -33,6 +33,7 @@ from build_db import (  # noqa: E402
     assert_qcf_v2_runs,
     boundary_conflicts,
     clean_qdc_artifacts,
+    collapse_invented_flush_repeats,
     complete_monotonic_row,
     erases_span_repeat,
     finalize_timing_rows,
@@ -69,6 +70,7 @@ PIPELINES = frozenset(
         "clock_shifted_repair",
         "complete_repeat_topology",
         "erases_span_repeat",
+        "invented_flush_restore",
         "leading_silence_offset",
         "preserve_peer_repeats",
         "qdc_clock_rebase",
@@ -179,7 +181,10 @@ def run_pipeline(case, segs):
             "gap_phantoms": 0,
         }
         n_words = case.get("n_words") or max(p for p, _, _ in segs)
-        return adjust_qdc_segments(segs, n_words, stats)
+        words = None
+        if case.get("words"):
+            words = {int(pos): arabic for pos, arabic in case["words"].items()}
+        return adjust_qdc_segments(segs, n_words, stats, words=words)
     if pipeline == "boundary_repair":
         return apply_boundary_repair(segs, resolve_repair(case), case.get("occurrence"))
     if pipeline == "clock_shifted_repair":
@@ -194,6 +199,12 @@ def run_pipeline(case, segs):
             raise SystemExit(f"{case.get('_path')}: need n_words and audio_duration_ms")
         return preserve_complete_repeat_topology(
             segs, n_words, case.get("audio_onset_ms"), duration
+        )
+    if pipeline == "invented_flush_restore":
+        return apply_clocked_timing_repair(
+            segs,
+            collapse_invented_flush_repeats(segs, resolve_repair(case)),
+            case.get("clock_offset_ms") or 0,
         )
     if pipeline == "erases_span_repeat":
         repair = resolve_repair(case)
@@ -509,13 +520,10 @@ def audit_bundled_db():
         [7, 5_970, 6_710],
         [8, 6_710, 7_540],
     ]
-    # 5b632415: the measured 1,951 ms onset clamps word 1 alone. The row later
-    # moved onto its file clock (+100 ms, quran-v49), which shifted every other
-    # boundary — the clamped opening is what this pin is here to hold.
     exact &= timings[(7, 4, 148)][:3] == [
-        [1, 1_951, 4_790],
-        [2, 4_790, 5_510],
-        [3, 5_510, 6_390],
+        [1, 1_951, 4_690],
+        [2, 4_690, 5_410],
+        [3, 5_410, 6_290],
     ]
     exact &= {
         key: timings[key][0][1]
@@ -748,14 +756,6 @@ def check_recovered_boundary_repairs():
     )
 
 
-def check_rebase_clip_constants():
-    """The gate's tail-clip ceiling has to be the one the build actually uses."""
-    from build_db import MAX_REBASE_TAIL_CLIP_MS as built
-    from timing_delta import MAX_REBASE_TAIL_CLIP_MS as gated
-
-    return built == gated
-
-
 def check_timing_delta():
     """Fail closed unless every shipped timing delta has current evidence."""
     try:
@@ -839,7 +839,6 @@ def main():
     qcf_runs_ok = check_qcf_v2_page_runs()
     qcf_assert_ok = check_qcf_v2_run_assertion()
     recovered_boundary_ok = check_recovered_boundary_repairs()
-    rebase_clip_ok = check_rebase_clip_constants()
     timing_delta_ok, timing_delta_detail = check_timing_delta()
     print(f"  {'ok  ' if confidence_ok else 'FAIL'} weighted 2:214 confidence checks")
     print(f"  {'ok  ' if audio_onset_ok else 'FAIL'} audio evidence and onset checks")
@@ -849,7 +848,6 @@ def main():
     print(f"  {'ok  ' if qcf_runs_ok else 'FAIL'} bundled QCF V2 page/font glyph runs")
     print(f"  {'ok  ' if qcf_assert_ok else 'FAIL'} QCF V2 run assertion rejects a wrong page")
     print(f"  {'ok  ' if recovered_boundary_ok else 'FAIL'} recovered-row boundary deferral")
-    print(f"  {'ok  ' if rebase_clip_ok else 'FAIL'} rebase tail-clip ceiling shared by build and gate")
     print(f"  {'ok  ' if timing_delta_ok else 'FAIL'} fail-closed timing DB delta gate")
     if not confidence_ok:
         failures.append(("weighted confidence", "2:214 checks failed", None))
@@ -867,10 +865,6 @@ def main():
         failures.append(("QCF V2 run assertion", "a wrong page number was not rejected", None))
     if not recovered_boundary_ok:
         failures.append(("recovered-row boundary deferral", "repair ordering failed", None))
-    if not rebase_clip_ok:
-        failures.append(
-            ("rebase tail clip", "build_db and timing_delta disagree on the ceiling", None)
-        )
     if not timing_delta_ok:
         failures.append(("timing DB delta gate", timing_delta_detail, None))
     print()

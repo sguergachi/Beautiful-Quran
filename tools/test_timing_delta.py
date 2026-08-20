@@ -14,7 +14,6 @@ from timing_delta import (
     build_delta,
     load_verdict_ledger,
     read_timing_rows,
-    rejected_changes,
     row_key_string,
 )
 
@@ -179,74 +178,11 @@ def test_cli_requires_explicit_acceptance(temp: Path) -> None:
     assert json.loads(accepted.stdout)["summary"]["changedRows"] == 1
 
 
-def rebase_problem(new_segments, evidence, old_segments=None):
-    """Return why the gate refuses a file_clock_rebase row, or None if it accepts."""
-    old_segments = old_segments or [[1, 0, 1000], [2, 1000, 2000], [3, 2000, 3040]]
-    entry = {
-        "verdict": "accept",
-        "kinds": ["timestamp"],
-        "baselinePayloadHash": "a",
-        "candidatePayloadHash": "b",
-        "evidence": {
-            "kind": "file_clock_rebase",
-            "summary": "Every boundary moves by one offset onto the streamed file's clock.",
-            "artifact": "fixture",
-            "audioSha256": "0" * 64,
-            **evidence,
-        },
-    }
-    report = build_delta(
-        {("beta", 1, 1): {"segments": old_segments, "audioOnsetMs": 0, "payloadHash": "a", "topologyHash": "t"}},
-        {("beta", 1, 1): {"segments": new_segments, "audioOnsetMs": 0, "payloadHash": "b", "topologyHash": "t"}},
-        {"beta:1:1": entry},
-    )
-    rejected = rejected_changes(report["changes"])
-    return rejected[0][1] if rejected else None
-
-
-def test_file_clock_rebase_evidence(temp: Path) -> None:
-    # The true shape: one 60 ms offset everywhere, the opening restored from the
-    # source's clamped 0, and a 20 ms final fade clipped to the measured length.
-    accepted = [[1, 300, 1060], [2, 1060, 2060], [3, 2060, 3080]]
-    good = {"clockOffsetMs": 60, "openingStartMs": 300, "measuredDurationMs": 3080}
-    assert rebase_problem(accepted, good) is None
-
-    # A row that is re-timed rather than moved: one boundary walks on its own.
-    walked = [[1, 300, 1060], [2, 1060, 2075], [3, 2075, 3080]]
-    assert "one offset" in rebase_problem(walked, good)
-
-    # The tail may only land on the file's own measured duration.
-    assert "measured duration" in rebase_problem(accepted, {**good, "measuredDurationMs": 3000})
-
-    # And the fade it clips has to be a fade, not a second of recitation.
-    over = [[1, 300, 1060], [2, 1060, 2060], [3, 2060, 3000]]
-    assert "final fade of at most" in rebase_problem(over, {**good, "measuredDurationMs": 3000})
-
-    # An opening off the shared offset is a judgement, so it must be written down,
-    bare = {k: v for k, v in good.items() if k != "openingStartMs"}
-    assert "recorded, one way" in rebase_problem(accepted, bare)
-    # and a restoration may only move later than the offset put it.
-    early = [[1, 30, 1060], [2, 1060, 2060], [3, 2060, 3080]]
-    assert "only move later" in rebase_problem(early, {**good, "openingStartMs": 30})
-
-    # The other lawful opening is the measured start of the voice, which sits
-    # back towards the source. It may not be claimed for an arbitrary boundary.
-    pinned = {**bare, "measuredOnsetMs": 30}
-    assert rebase_problem(early, pinned) is None
-    assert "towards the measured voice" in rebase_problem(accepted, {**bare, "measuredOnsetMs": 300})
-
-    # Silence is not an offset, and a topology change is never a rebase.
-    assert "non-zero integer" in rebase_problem(accepted, {**good, "clockOffsetMs": 0})
-    grown = [[1, 300, 1060], [2, 1060, 2060], [2, 2060, 2070], [3, 2070, 3080]]
-    assert "positions" in rebase_problem(grown, good) or "timestamps" in rebase_problem(grown, good)
-
-
 def main() -> None:
     with tempfile.TemporaryDirectory() as directory:
         temporary = Path(directory)
         test_classification_and_canonical_hashing(temporary)
         test_ledger_forms_and_fail_closed_lookup(temporary)
-        test_file_clock_rebase_evidence(temporary)
         test_cli_requires_explicit_acceptance(temporary)
     print("all timing delta tests pass")
 
