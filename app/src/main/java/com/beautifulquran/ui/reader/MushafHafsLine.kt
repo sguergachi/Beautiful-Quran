@@ -341,7 +341,7 @@ private fun MushafQcfPageLine(
                     onAyahClick = onAyahClick,
                 )
                 val mark = token.word.qcfV2.takeIf { it.isNotEmpty() }
-                    ?.let(::qcfTrailingMark).orEmpty()
+                    ?.let { qcfTrailingMark(it, token.endsAyah) }.orEmpty()
                 if (mark.isNotEmpty()) {
                     // The mark is its own cell, so it sits outside the word's
                     // ink node and needs the verse's own alphas applied here:
@@ -414,11 +414,16 @@ private fun mushafLineTexts(line: MushafLine): List<MushafLineText> {
     line.tokens.forEach { token ->
         val raw = token.word.qcfV2
         out += MushafLineText(
-            text = if (raw.isNotEmpty()) qcfWordGlyphs(raw) else token.word.arabic,
+            text = if (raw.isNotEmpty()) {
+                qcfWordGlyphs(raw, token.endsAyah)
+            } else {
+                token.word.arabic
+            },
             mark = false,
         )
-        if (raw.isNotEmpty() && qcfTrailingMark(raw).isNotEmpty()) {
-            out += MushafLineText(text = qcfTrailingMark(raw), mark = true)
+        val mark = if (raw.isNotEmpty()) qcfTrailingMark(raw, token.endsAyah) else ""
+        if (mark.isNotEmpty()) {
+            out += MushafLineText(text = mark, mark = true)
         }
     }
     return out
@@ -698,7 +703,11 @@ private fun MushafQcfWord(
     onAyahClick: (MushafToken) -> Unit,
 ) {
     val raw = token.word.qcfV2
-    val word = if (raw.isNotEmpty()) qcfWordGlyphs(raw) else token.word.arabic
+    val word = if (raw.isNotEmpty()) {
+        qcfWordGlyphs(raw, token.endsAyah)
+    } else {
+        token.word.arabic
+    }
     val rendered = remember(word) {
         // The word alone. Its circled mark, if it closes a verse, is set as its
         // own cell of the line (see [MushafQcfPageLine]) so the line's spacing
@@ -885,8 +894,12 @@ private fun qcfRendered(
     val text = buildAnnotatedString {
         line.tokens.forEach { token ->
             val raw = token.word.qcfV2
-            val word = if (raw.isNotEmpty()) qcfWordGlyphs(raw) else token.word.arabic
-            val mark = if (raw.isNotEmpty()) qcfTrailingMark(raw) else ""
+            val word = if (raw.isNotEmpty()) {
+                qcfWordGlyphs(raw, token.endsAyah)
+            } else {
+                token.word.arabic
+            }
+            val mark = if (raw.isNotEmpty()) qcfTrailingMark(raw, token.endsAyah) else ""
             val start = length
             withStyle(SpanStyle(color = ink)) { append(word) }
             ranges += start until length
