@@ -142,4 +142,195 @@ class MushafPageFitTest {
         val slot = mushafLineSlotPx(pageHeightPx = 900f, slots = 15, fontPx = 56f)
         assertEquals(60f, slot, 0.01f)
     }
+
+    // The box compositor. It is not what sets a leaf once its own face has
+    // loaded — mushafInkLineFit does, by the white each join actually carries —
+    // but it is what sets every leaf on the frame before that, so the page the
+    // reader first sees is this one's work.
+    //
+    // Set at a hundred px of type throughout, so the em bounds read straight
+    // off the constants: the page's space is 18, its floor 13, its ceiling 30,
+    // and the space a full line may open to once the letters are spent, 45.
+
+    @Test
+    fun `a line with no space in it is set at the page's own and left short`() {
+        // One word, or none: there is no join to give or take, so there is
+        // nothing to compose. It stands at the page's space and centred, which
+        // is the same answer MushafQcfPageLine gives a line too short to
+        // justify at all — see mushafLineJustifies.
+        val single = mushafLineFit(
+            inkWidthPx = 500f,
+            gapCount = 0,
+            measureWidthPx = 800f,
+            fontPx = 100f,
+        )
+        assertEquals(1f, single.scale, 1e-4f)
+        assertEquals(MUSHAF_WORD_GAP_EM * 100f, single.gapPx, 1e-4f)
+        assertTrue(!single.flush)
+        // And a line with no ink cannot be measured against anything.
+        val empty = mushafLineFit(
+            inkWidthPx = 0f,
+            gapCount = 4,
+            measureWidthPx = 800f,
+            fontPx = 100f,
+        )
+        assertEquals(1f, empty.scale, 1e-4f)
+        assertTrue(!empty.flush)
+    }
+
+    @Test
+    fun `a line a little too wide closes its space and keeps its letters`() {
+        // 700 of ink and four joins wants 772 of an 760 measure. The space
+        // gives first: 15 px a join, still above the 13 floor, and no letter
+        // is touched.
+        val fit = mushafLineFit(
+            inkWidthPx = 700f,
+            gapCount = 4,
+            measureWidthPx = 760f,
+            fontPx = 100f,
+        )
+        assertEquals(1f, fit.scale, 1e-4f)
+        assertEquals(15f, fit.gapPx, 1e-4f)
+        assertTrue(fit.flush)
+    }
+
+    @Test
+    fun `a line too dense for its floor narrows its letters, not its space`() {
+        // 740 of ink in 760 leaves 5 px a join, under the floor. The space
+        // stops at 13 and the letters give the rest: a line whose words touch
+        // is not a line.
+        val fit = mushafLineFit(
+            inkWidthPx = 740f,
+            gapCount = 4,
+            measureWidthPx = 760f,
+            fontPx = 100f,
+        )
+        assertEquals(MUSHAF_FLOOR_WORD_GAP_EM * 100f, fit.gapPx, 1e-4f)
+        assertEquals((760f - 4 * 13f) / 740f, fit.scale, 1e-4f)
+        assertTrue(fit.scale < 1f)
+        assertTrue(fit.flush)
+    }
+
+    @Test
+    fun `a line with room to spare opens its space before its letters`() {
+        // 600 of ink in 700: 25 px a join, inside the 30 ceiling, letters as
+        // drawn.
+        val fit = mushafLineFit(
+            inkWidthPx = 600f,
+            gapCount = 4,
+            measureWidthPx = 700f,
+            fontPx = 100f,
+        )
+        assertEquals(1f, fit.scale, 1e-4f)
+        assertEquals(25f, fit.gapPx, 1e-4f)
+        assertTrue(fit.flush)
+    }
+
+    @Test
+    fun `a line past the space's ceiling holds it there and stretches`() {
+        // 600 of ink in 740 would want 35 a join. The space stops at 30 and
+        // the letters take the remaining 20 px: a 1.033 stretch.
+        val fit = mushafLineFit(
+            inkWidthPx = 600f,
+            gapCount = 4,
+            measureWidthPx = 740f,
+            fontPx = 100f,
+        )
+        assertEquals(MUSHAF_MAX_WORD_GAP_EM * 100f, fit.gapPx, 1e-4f)
+        assertEquals((740f - 4 * 30f) / 600f, fit.scale, 1e-4f)
+        assertTrue(fit.scale > 1f)
+        assertTrue(fit.flush)
+    }
+
+    @Test
+    fun `a full line the letters cannot reach is carried the rest by its space`() {
+        // The last move. 600 of ink in 860 needs a 1.233 stretch, past the
+        // bound. Rather than set a full line short, the letters hold at 1.15
+        // and the space opens to 42.5 — inside the 45 a full line may take.
+        // Without this step such a line was left short even though 1.15 and a
+        // wider space would have filled it.
+        val fit = mushafLineFit(
+            inkWidthPx = 600f,
+            gapCount = 4,
+            measureWidthPx = 860f,
+            fontPx = 100f,
+        )
+        assertEquals(MUSHAF_MAX_LINE_SCALE, fit.scale, 1e-4f)
+        assertEquals(42.5f, fit.gapPx, 1e-4f)
+        assertTrue(fit.flush)
+        // And exactly at the bound the line is still flush: 870 puts the
+        // space on 45 on the nose.
+        assertTrue(
+            mushafLineFit(
+                inkWidthPx = 600f,
+                gapCount = 4,
+                measureWidthPx = 870f,
+                fontPx = 100f,
+            ).flush,
+        )
+    }
+
+    @Test
+    fun `a chapter's last words stand short and centred rather than as islands`() {
+        // 600 of ink in 900 would leave 52.5 a join even with the letters at
+        // their bound — past the 45 where a line stops reading as text and
+        // starts reading as a row of islands. Four or five words closing a
+        // chapter are set at the page's own space and centred instead.
+        val fit = mushafLineFit(
+            inkWidthPx = 600f,
+            gapCount = 4,
+            measureWidthPx = 900f,
+            fontPx = 100f,
+        )
+        assertEquals(1f, fit.scale, 1e-4f)
+        assertEquals(MUSHAF_WORD_GAP_EM * 100f, fit.gapPx, 1e-4f)
+        assertTrue(!fit.flush)
+    }
+
+    @Test
+    fun `a flush line reaches both margins exactly, however it got there`() {
+        // The one thing every branch above has to agree on, and the only
+        // assertion that catches an arithmetic slip in any of them: a line
+        // called flush fills its measure to the pixel. A mushaf page's lines
+        // reach both margins, and a leaf is drawn one node per word — a line
+        // that overruns paints its words over their neighbours.
+        val fontPx = 100f
+        for (ink in listOf(300f, 500f, 600f, 700f, 740f, 800f, 900f, 1200f)) {
+            for (gaps in 1..8) {
+                for (measure in listOf(600f, 760f, 860f, 964f)) {
+                    val fit = mushafLineFit(ink, gaps, measure, fontPx)
+                    if (!fit.flush) continue
+                    assertEquals(
+                        "ink=$ink gaps=$gaps measure=$measure",
+                        measure,
+                        fit.scale * ink + gaps * fit.gapPx,
+                        0.01f,
+                    )
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `the space never opens past what a full line may take`() {
+        // The other side of the same sweep: whatever the line needed, the
+        // space it was set on is one a page can carry. Past 0.45 em the return
+        // measured almost nil and the line reads as islands.
+        val fontPx = 100f
+        for (ink in listOf(300f, 500f, 600f, 700f, 740f, 800f, 900f, 1200f)) {
+            for (gaps in 1..8) {
+                for (measure in listOf(600f, 760f, 860f, 964f)) {
+                    val fit = mushafLineFit(ink, gaps, measure, fontPx)
+                    assertTrue(
+                        "ink=$ink gaps=$gaps measure=$measure gap=${fit.gapPx}",
+                        fit.gapPx <= MUSHAF_STRETCH_WORD_GAP_EM * fontPx + 0.01f,
+                    )
+                    assertTrue(
+                        "ink=$ink gaps=$gaps measure=$measure scale=${fit.scale}",
+                        fit.scale <= MUSHAF_MAX_LINE_SCALE + 1e-4f,
+                    )
+                }
+            }
+        }
+    }
 }
