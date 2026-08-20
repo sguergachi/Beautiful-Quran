@@ -76,6 +76,7 @@ import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -255,10 +256,32 @@ fun ReaderScreen(
         if (mushafMode) viewModel.ensureMushaf()
     }
     val mushafCatalog = mushafUi?.catalog
-    val mushafPagerState = rememberPagerState(
-        initialPage = 0,
-        pageCount = { mushafCatalog?.pageCount ?: 1 },
-    )
+    // The leaf the reader asked for, as soon as there is a catalog to ask.
+    val mushafOpeningPage = remember(mushafCatalog, surahId, startAyah, startWordPosition) {
+        val catalog = mushafCatalog ?: return@remember null
+        val page = catalog.pageOf(
+            surahId,
+            startAyah?.coerceAtLeast(1) ?: 1,
+            startWordPosition ?: 1,
+        )
+        (page - 1).coerceIn(0, catalog.pageCount - 1)
+    }
+    // Keyed on whether there is a catalog at all, so the state is built once
+    // and built knowing where the book opens.
+    //
+    // `initialPage` is read exactly once, at construction. Left at 0 with a
+    // LaunchedEffect to correct it, the pager mounted al-Fatihah first and
+    // started that leaf's fade before jumping — so opening al-Kahf flashed the
+    // wrong page every time, and no amount of catalog warmth could fix it,
+    // because by then the state existed. MushafPager itself is not composed
+    // until `mushafUi` is non-null, which is the same composition this key
+    // flips on: the first leaf ever mounted is the right one.
+    val mushafPagerState = key(mushafCatalog != null) {
+        rememberPagerState(
+            initialPage = mushafOpeningPage ?: 0,
+            pageCount = { mushafCatalog?.pageCount ?: 1 },
+        )
+    }
     // Where a dial scrub landed. The reader owns the pager, so the dial hands
     // a leaf back rather than scrolling it itself; the effect is the third and
     // last writer of the pager's position.
@@ -272,14 +295,14 @@ fun ReaderScreen(
         mushafPagerState.scrollToPage((target - 1).coerceIn(0, catalog.pageCount - 1))
         mushafSeekPage = null
     }
-    LaunchedEffect(mushafCatalog, surahId, startAyah, startWordPosition) {
-        val catalog = mushafCatalog ?: return@LaunchedEffect
-        val page = catalog.pageOf(
-            surahId,
-            startAyah?.coerceAtLeast(1) ?: 1,
-            startWordPosition ?: 1,
-        )
-        mushafPagerState.scrollToPage((page - 1).coerceIn(0, catalog.pageCount - 1))
+    // Later navigation only: a chapter opened from the index while the reader
+    // is already on a leaf. The opening leaf itself arrives as `initialPage`
+    // above, so this no-ops on the way in rather than turning the page to
+    // where it already is.
+    LaunchedEffect(mushafOpeningPage) {
+        val page = mushafOpeningPage ?: return@LaunchedEffect
+        if (mushafPagerState.currentPage == page) return@LaunchedEffect
+        mushafPagerState.scrollToPage(page)
     }
     val bookmarkedAyahs by viewModel.bookmarkedAyahs.collectAsStateWithLifecycle()
     // Like bookmarkedAyahs: read per-ayah so a note change recomposes only

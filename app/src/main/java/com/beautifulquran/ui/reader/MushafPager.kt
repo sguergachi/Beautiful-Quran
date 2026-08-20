@@ -440,6 +440,24 @@ private fun MushafPageSheet(
             content.ayahs.firstOrNull { it.number == ayah }
         }
     }
+    // The other chapter on a shared leaf. Juz 30 puts three of them on one
+    // page; Fatihah and Baqarah share the second. Only the chapter the reader
+    // opened is loaded, so these verses have no text of ours to clock — but
+    // they are on the paper, and a word with no pack at all was answering at
+    // full ink, which on a leaf being recited is the one thing full ink means:
+    // already read. The neighbouring chapter sat there looking finished.
+    //
+    // They get a recess pack keyed the same way, driven by nothing but where
+    // they stand relative to the chapter the voice is in. The mushaf runs in
+    // chapter order, so a lower id on this leaf is behind the reciter and
+    // keeps its ink, and a higher one is still to come and waits with the rest
+    // of what is ahead.
+    val upcomingOnPage = remember(page.page, content.surah.id) {
+        page.ayahKeys.filter { (surahId, _) -> surahId > content.surah.id }
+    }
+    val recitedOnPage = remember(page.page, content.surah.id) {
+        page.ayahKeys.filter { (surahId, _) -> surahId < content.surah.id }
+    }
     // A snapshot map, not a state holding an immutable one: the old form
     // rebuilt the whole map once per ayah on every composition (fifteen copies
     // a page) and invalidated every reader each time. Writes are per key now,
@@ -451,13 +469,17 @@ private fun MushafPageSheet(
     // they stood. The entry left behind still answers for those words, so they
     // kept whatever dim they were last given instead of falling back to full
     // ink. Drop what the leaf no longer carries.
-    LaunchedEffect(ayahsOnPage) {
+    LaunchedEffect(ayahsOnPage, upcomingOnPage, recitedOnPage) {
         val live = ayahsOnPage.mapTo(HashSet()) { it.surahId to it.number }
+        live.addAll(upcomingOnPage)
+        live.addAll(recitedOnPage)
         packsState.keys.retainAll(live)
     }
     if (liveInk) {
         MushafPageInkClocks(
             ayahs = ayahsOnPage,
+            upcoming = upcomingOnPage,
+            recited = recitedOnPage,
             activeWordState = activeWordState,
             playback = playback,
             playbackSpeed = playbackSpeed,
@@ -660,6 +682,12 @@ private fun MushafPageSheet(
 @Composable
 private fun MushafPageInkClocks(
     ayahs: List<Ayah>,
+    /** Verses of a chapter this leaf shares but has not loaded, standing after
+     * the loaded one: they wait with everything else still to come. */
+    upcoming: List<Pair<Int, Int>>,
+    /** The same, standing before it: the reader has passed them, so they keep
+     * their ink like any verse already read. */
+    recited: List<Pair<Int, Int>>,
     activeWordState: State<ActiveWord?>,
     playback: State<MushafPlayback>,
     playbackSpeed: Float,
@@ -698,6 +726,22 @@ private fun MushafPageInkClocks(
             SideEffect {
                 packsState[ayah.surahId to ayah.number] = pack
             }
+        }
+    }
+    // No text of theirs is loaded, so there is nothing to clock word by word.
+    // A verse-wide recess is the whole of what we can honestly say about them,
+    // and it is also the whole of what the page needs said.
+    val recitingActive = playback.value.reciting
+    upcoming.forEach { key ->
+        key(key.first, key.second) {
+            val pack = rememberMushafRecessPack(dimmed = recitingActive)
+            SideEffect { packsState[key] = pack }
+        }
+    }
+    recited.forEach { key ->
+        key(key.first, key.second) {
+            val pack = rememberMushafRecessPack(dimmed = false)
+            SideEffect { packsState[key] = pack }
         }
     }
 }
