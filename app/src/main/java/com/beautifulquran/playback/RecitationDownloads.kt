@@ -203,7 +203,6 @@ internal fun retainedDownloadClock(
 internal fun reciterProgressLabel(progress: DownloadProgress, reciterId: Int): String {
     if (!progress.running && !progress.paused) return ""
     val parts = mutableListOf<String>()
-    if (progress.paused && progress.reciterId == reciterId) parts += "Paused"
     if (progress.reciterId == reciterId && progress.surahName.isNotEmpty()) {
         parts += progress.surahName
         downloadPercent(progress.ayah, progress.ayahCount)?.let { parts += "$it%" }

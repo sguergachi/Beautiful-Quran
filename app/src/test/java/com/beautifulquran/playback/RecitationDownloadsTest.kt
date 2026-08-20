@@ -208,6 +208,10 @@ class RecitationDownloadsTest {
             ayahCount = 7,
         )
         assertEquals("Al-Fatihah · 42% · 1 waiting", reciterProgressLabel(live, reciterId = 1))
+        assertEquals(
+            "Al-Fatihah · 42% · 1 waiting",
+            reciterProgressLabel(live.copy(running = false, paused = true), reciterId = 1),
+        )
         assertEquals("1 waiting", reciterProgressLabel(live, reciterId = 2))
         assertEquals("", reciterProgressLabel(DownloadProgress(), reciterId = 1))
         assertEquals(

@@ -308,8 +308,9 @@ Delete). A paused chapter shows Delete then Resume in that slot, Resume
 on the right edge. Fetch verbs are green;
 delete is quiet ink. Pause keeps ayahs
 already fetched. Download all stays on an open reciter. Collapsed Resume
-continues a pause or unfinished partials, not empty chapters. Collapsing a
-reciter does not reopen it because a download is running.
+continues a pause or unfinished partials, not empty chapters; the Resume verb
+already communicates pause, so the progress line does not repeat “Paused.”
+Collapsing a reciter does not reopen it because a download is running.
 An ayah counts as complete only when Media3 records its content length and the
 cache holds that full length; partial spans stay resumable. A chapter download
 also keeps the shared basmalah clip when its playback queue begins with one. Playback
