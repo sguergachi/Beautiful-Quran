@@ -71,6 +71,31 @@ the copy strips memory instructions from every non-Claude agent.
 It is also ~420 tokens, well under 10% of the file. Not worth the risk even if
 it were safe.
 
+## 4. `assert_qcf_v2_runs` refuses layouts that "look fine"
+
+`tools/build_db.py` walks every one of the 604 pages and fails the build unless
+that page's `qcf_v2` codepoints, read in word order, are exactly the contiguous
+run from U+FC41. It is a whole-book assertion over data that is already
+published and versioned upstream, and it will look like belt-and-braces.
+
+It is the only thing tying the layout to the fonts. A QCF V2 page font is a
+positional encoding, not a character set: `QCF2570.qcf` maps U+FC41 onward, one
+codepoint per glyph, to *page 570's* words in order. So `qcf_page` does not
+label a word — it chooses the font that draws it. Give a word the wrong page and
+the font renders whatever its own word list happens to hold at that codepoint:
+a different, perfectly well-formed Arabic word. Nothing crashes, nothing is
+blank, and the leaf is quietly wrong.
+
+That is what shipped. The layout mirror the build used to read
+(`zonetecde/mushaf-layout`) put whole verses on the wrong side of a page break,
+and broke this invariant on 31 pages. It was noticed only on page 570, where the
+codepoints ran past the end of font 570's glyph list and produced tofu — and,
+because U+FCEF was an ayah circle, one gold tofu. The 30 pages that fell inside
+their font's range showed no symptom at all.
+
+**Keep the assertion, and keep it over all 604 pages.** A spot check on the page
+someone complained about is exactly the audit that would have missed this.
+
 ## The rule this generalizes to
 
 A check whose *reason* is invisible in the diff is the most likely to be wrong

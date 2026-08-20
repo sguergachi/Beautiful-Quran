@@ -59,6 +59,7 @@ import com.beautifulquran.assistant.AssistantAction
 import com.beautifulquran.assistant.AssistantIntents
 import com.beautifulquran.assistant.ForegroundAppFunctions
 import com.beautifulquran.data.HomeBookmarkStyle
+import com.beautifulquran.data.ReadingLayout
 import com.beautifulquran.data.ThemeMode
 import com.beautifulquran.ui.AppViewModelFactory
 import com.beautifulquran.ui.PageTurnSounds
@@ -353,8 +354,11 @@ private fun PaperStackApp(
         tarjiLabVisible ||
         labRendered || rootRendered || chooserRendered || ornamentsLabRendered || tarjiLabRendered ||
         readerInkOverlayVisible || shareUi.sendOpen || shareSendRendered
+    val mushafPageTurns = settings.readingLayout == ReadingLayout.MUSHAF &&
+        selectedSurahId != 0 &&
+        settledLayer == AYAH_LAYER
     val stackGesturesBlocked = rememberUpdatedState(
-        ayahSelectorExpanded || overlayBlocking || entranceVisible,
+        ayahSelectorExpanded || overlayBlocking || entranceVisible || mushafPageTurns,
     )
     val rootReturnVisible = rootReturnTarget != null && !overlayBlocking
     val onRootReturnUserMovedLatest = rememberUpdatedState {

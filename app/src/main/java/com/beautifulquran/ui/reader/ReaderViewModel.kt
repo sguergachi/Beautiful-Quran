@@ -15,6 +15,7 @@ import com.beautifulquran.data.model.SurahContent
 import com.beautifulquran.domain.BASMALAH_PLAYLIST_AYAH
 import com.beautifulquran.domain.HighlightClock
 import com.beautifulquran.domain.HighlightEngine
+import com.beautifulquran.domain.MushafCatalog
 import com.beautifulquran.domain.OutputLatency
 import com.beautifulquran.domain.SURAH_FATIHA
 import com.beautifulquran.domain.surahOpensWithBasmalahPreface
@@ -67,6 +68,11 @@ data class ActiveWord(
      * same word stays Active (tap the current word to play it from the start).
      */
     val activation: Long = 0L,
+)
+
+data class MushafUi(
+    val catalog: MushafCatalog,
+    val surahsById: Map<Int, Surah>,
 )
 
 data class ReaderUiState(
@@ -143,6 +149,18 @@ class ReaderViewModel(
 
     private val _uiState = MutableStateFlow(ReaderUiState())
     val uiState: StateFlow<ReaderUiState> = _uiState
+
+    private val _mushaf = MutableStateFlow<MushafUi?>(null)
+    val mushaf: StateFlow<MushafUi?> = _mushaf
+
+    fun ensureMushaf() {
+        if (_mushaf.value != null) return
+        viewModelScope.launch {
+            val catalog = repository.mushafCatalog()
+            val surahs = repository.surahs().associateBy { it.id }
+            _mushaf.value = MushafUi(catalog, surahs)
+        }
+    }
 
     /**
      * Verse under the reading line (scroll / rail / follow). Used for Assistant
@@ -485,23 +503,23 @@ class ReaderViewModel(
      * Loads [surahId]. When [startPlaybackAtAyah] is set, starts recitation from
      * that ayah once content is ready (for example, "play chapter 2").
      */
-    fun load(surahId: Int, startPlaybackAtAyah: Int? = null) {
+    fun load(surahId: Int, startPlaybackAtAyah: Int? = null, startPlaybackAtWord: Int? = null) {
         if (
             this.surahId == surahId &&
             (_uiState.value.content != null || _uiState.value.isLoading)
         ) {
             if (startPlaybackAtAyah != null) {
                 if (_uiState.value.content != null) {
-                    playFromAyah(startPlaybackAtAyah)
+                    playFromAyahWord(startPlaybackAtAyah, startPlaybackAtWord)
                 } else {
                     // Same in-flight chapter: update autoplay without a new gen.
-                    sessions.setPendingPlay(startPlaybackAtAyah)
+                    sessions.setPendingPlay(startPlaybackAtAyah, startPlaybackAtWord)
                     focusedAyah = startPlaybackAtAyah.coerceAtLeast(1)
                 }
             }
             return
         }
-        val gen = sessions.begin(surahId, startPlaybackAtAyah)
+        val gen = sessions.begin(surahId, startPlaybackAtAyah, startPlaybackAtWord)
         loadedSurah.value = surahId
         focusedAyah = startPlaybackAtAyah?.coerceAtLeast(1) ?: 1
         installTimings(emptyMap())
@@ -517,7 +535,7 @@ class ReaderViewModel(
             commitPrepared(prepared)
             val playAyah = sessions.takePendingPlay(gen)
             if (playAyah != null) {
-                playFromAyah(playAyah)
+                playFromAyahWord(playAyah, sessions.takePendingPlayWord())
             }
         }
     }
@@ -742,6 +760,26 @@ class ReaderViewModel(
         if (startSurah(ayah, preserveRepeatRange = false, startWithBasmalah = ayah == 1)) {
             rememberListened(ayah)
         }
+    }
+
+    /**
+     * Starts [ayah] as close to [word] as the reciter's timings allow: the
+     * word's own segment when it has one, otherwise the last segment that
+     * begins before it (a word inside an unsplit span starts where that span
+     * starts, not back at the top of the verse). Falls back to the verse when
+     * the chapter has no timings at all.
+     */
+    fun playFromAyahWord(ayah: Int, word: Int?) {
+        val start = word?.let { startMsForWord(ayah, it) }
+        if (start != null) playFromWord(ayah, start) else playFromAyah(ayah)
+    }
+
+    /** Timing start of [word] in [ayah], or of the nearest segment before it. */
+    fun startMsForWord(ayah: Int, word: Int): Long? {
+        val segments = timings[ayah]?.takeIf { it.isNotEmpty() } ?: return null
+        val exact = segments.firstOrNull { it.position == word }
+        if (exact != null) return exact.startMs
+        return segments.filter { it.position <= word }.maxByOrNull { it.position }?.startMs
     }
 
     fun playFromWord(ayah: Int, positionMs: Long) {

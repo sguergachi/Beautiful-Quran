@@ -11,6 +11,9 @@ enum class ThemeMode { SYSTEM, LIGHT, DARK, ROYAL_GREEN }
 /** What flows on the sheet: Arabic with English under each word, or English only. */
 enum class ReadingMode { ARABIC_ENGLISH, ENGLISH_ONLY }
 
+/** How the reader lays scripture: the scrolling verse sheet, or mushaf pages. */
+enum class ReadingLayout { SCROLL, MUSHAF }
+
 /** Which screen edge the ayah selector rail lives on. */
 enum class AyahSelectorSide { LEFT, RIGHT }
 
@@ -46,6 +49,7 @@ data class Settings(
     val reciterId: Int = 1,
     val fontScale: Float = 1f,
     val readingMode: ReadingMode = ReadingMode.ARABIC_ENGLISH,
+    val readingLayout: ReadingLayout = ReadingLayout.SCROLL,
     val showWordGloss: Boolean = true,
     val showTransliteration: Boolean = false,
     val showTranslation: Boolean = false,
@@ -109,6 +113,7 @@ class SettingsRepository(context: Context) {
         reciterId = prefs.getInt("reciterId", 1),
         fontScale = prefs.getFloat("fontScale", 1f),
         readingMode = prefs.enum("readingMode", ReadingMode.ARABIC_ENGLISH),
+        readingLayout = prefs.enum("readingLayout", ReadingLayout.SCROLL),
         showWordGloss = prefs.getBoolean("showWordGloss", true),
         showTransliteration = prefs.getBoolean("showTransliteration", false),
         showTranslation = prefs.getBoolean("showTranslation", false),
@@ -163,6 +168,7 @@ class SettingsRepository(context: Context) {
             putInt("reciterId", next.reciterId)
             putFloat("fontScale", next.fontScale)
             putInt("readingMode", next.readingMode.ordinal)
+            putInt("readingLayout", next.readingLayout.ordinal)
             putBoolean("showWordGloss", next.showWordGloss)
             putBoolean("showTransliteration", next.showTransliteration)
             putBoolean("showTranslation", next.showTranslation)

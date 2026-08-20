@@ -209,4 +209,42 @@ object ReaderInteraction {
         val chosen = state.pendingJumpAyah.takeIf { it > 0 } ?: position.takeIf { it > 0 } ?: fallbackAyah
         return chosen.coerceIn(1, ayahCount.coerceAtLeast(1))
     }
+
+    /** Where pressing play on a leaf starts. */
+    data class MushafPlayTarget(val surahId: Int, val ayah: Int, val word: Int?)
+
+    /**
+     * Which words the transport should start on when play is pressed on a leaf.
+     *
+     * A leaf is a place in the book, not a place in a chapter, so the answer
+     * cannot come from the loaded chapter's scroll position the way it does on
+     * a scrolling page. The reader turned or scrubbed to *this* paper and asked
+     * for it to be recited: the target is the first word standing on it, which
+     * is often mid-verse, and often belongs to a chapter that is not loaded.
+     *
+     * The one thing that outranks the leaf is the playhead itself. If what is
+     * paused is a verse this leaf carries, play is a resume and not a seek —
+     * pressing pause and pressing play again must not throw the reader back to
+     * the top of the page they were already listening to. [heldAyah] is that
+     * verse (of [loadedSurahId]); null means the paused position is elsewhere,
+     * or nothing is loaded to be paused.
+     *
+     * Returns null when the transport should simply resume.
+     */
+    fun mushafPlayTarget(
+        pendingJumpAyah: Int,
+        loadedSurahId: Int,
+        heldAyah: Int?,
+        leafFirstWord: MushafPlayTarget?,
+        leafAyahs: Set<Pair<Int, Int>>,
+    ): MushafPlayTarget? {
+        // A chapter opened from the index has already named its verse; the leaf
+        // it lands on is that request's consequence, not a competing one.
+        if (pendingJumpAyah > 0) {
+            return MushafPlayTarget(loadedSurahId, pendingJumpAyah, null)
+        }
+        val leaf = leafFirstWord ?: return null
+        if (heldAyah != null && (loadedSurahId to heldAyah) in leafAyahs) return null
+        return leaf
+    }
 }

@@ -32,6 +32,16 @@ class OrnamentGeneratorTest {
     }
 
     @Test
+    fun `page ornament seeds are distinct from chapter seeds`() {
+        val pages = (1..604).map { pageOrnamentSeed(it) }.toSet()
+        assertEquals(604, pages.size)
+        val chapters = (1..114).flatMap { n ->
+            listOf(1, 7, 200, 286).map { chapterOrnamentSeed(n, it) }
+        }.toSet()
+        assertTrue(pages.intersect(chapters).isEmpty())
+    }
+
+    @Test
     fun `same seed grows the same ornament`() {
         for (seed in intArrayOf(1, 42, -913, 2_000_000_011.toInt())) {
             assertEquals(generateCoverOrnament(seed), generateCoverOrnament(seed))

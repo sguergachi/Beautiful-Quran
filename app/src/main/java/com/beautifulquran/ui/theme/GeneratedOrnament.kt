@@ -9,6 +9,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathMeasure
@@ -462,4 +463,42 @@ fun Modifier.generatedFieldWeave(
         }
         drawPath(weave, ink.copy(alpha = ink.alpha * a), style = stroke)
     }
+}
+
+/**
+ * A rosette drawn as line-work in one ink, with no gilt brush and no emboss —
+ * the same star the cover carries, but written rather than tooled.
+ *
+ * Gilded rosettes are for the boards and the ceremonial centre. At the small
+ * sizes a page uses them, the gold fill and its emboss close up into a solid
+ * disc; struck in a single hairline ink they stay drawings, which is what a
+ * mark on paper should be.
+ */
+@Composable
+fun GeneratedInkRosette(
+    spec: RosetteSpec,
+    size: Dp,
+    ink: Color,
+    modifier: Modifier = Modifier,
+    strokeWidth: Dp = 0.8.dp,
+) {
+    Spacer(
+        modifier
+            .size(size)
+            .drawWithCache {
+                val d = min(this.size.width, this.size.height)
+                val w = strokeWidth.toPx()
+                val paths = RosettePaths(spec, d, ruleWidth = w, hairWidth = w)
+                val center = Offset(this.size.width / 2f, this.size.height / 2f)
+                onDrawBehind {
+                    translate(center.x, center.y) {
+                        val stroke = Stroke(width = w, cap = StrokeCap.Round, join = StrokeJoin.Round)
+                        for (s in paths.strokes) drawPath(s.full, ink, style = stroke)
+                        for (dot in paths.dots) {
+                            drawCircle(ink, radius = dot.radius, center = dot.center)
+                        }
+                    }
+                }
+            },
+    )
 }

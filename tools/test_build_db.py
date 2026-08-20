@@ -24,11 +24,13 @@ ROOT = TOOLS.parent
 sys.path.insert(0, str(TOOLS))
 from build_db import (  # noqa: E402
     AUDIO_ONSETS_DIR,
+    QCF_V2_FIRST_CODEPOINT,
     adjust_qdc_segments,
     apply_boundary_repair,
     apply_clocked_timing_repair,
     apply_one_utterance,
     apply_timing_repairs,
+    assert_qcf_v2_runs,
     boundary_conflicts,
     clean_qdc_artifacts,
     collapse_invented_flush_repeats,
@@ -628,6 +630,80 @@ def check_gloss_normalize():
     )
 
 
+def check_qcf_v2_page_runs():
+    """Every page's glyphs in the bundled DB must be its font's own run.
+
+    Font QCF2{page} maps U+FC41 onward, one codepoint per glyph, to that page's
+    words in reading order. A word labelled with a page whose font does not
+    address it there is drawn by the wrong font: page 570 once carried 70:40
+    with page 569's codepoints and rendered it as tofu with a gold ayah circle
+    in the middle of the line. The check is the whole defect class, so it runs
+    over all 604 pages rather than the one that was reported."""
+    db = sqlite3.connect(ROOT / "data/quran.db")
+    pages = {}
+    for page, surah, ayah, position, glyphs in db.execute(
+        "SELECT qcf_page,surah_id,ayah_number,position,qcf_v2 FROM words "
+        "WHERE qcf_v2 <> ''"
+    ):
+        pages.setdefault(page, []).append((surah, ayah, position, glyphs))
+    db.close()
+    if sorted(pages) != list(range(1, 605)):
+        return False
+    for page in sorted(pages):
+        codes = [
+            ord(ch)
+            for _s, _a, _p, glyphs in sorted(pages[page])
+            for ch in glyphs
+            if not ch.isspace()
+        ]
+        first = QCF_V2_FIRST_CODEPOINT
+        if codes != list(range(first, first + len(codes))):
+            return False
+    return True
+
+
+def check_qcf_v2_run_assertion():
+    """assert_qcf_v2_runs must reject the shapes that shipped broken.
+
+    Two of them: page 2 wearing one of page 1's codepoints -- the exact
+    off-by-one-page defect, in miniature -- and a layout that came back empty,
+    which a run check alone would call perfect."""
+    first = QCF_V2_FIRST_CODEPOINT
+
+    def book(pages):
+        return {
+            (1, page): [("w", chr(first + i), page, 1) for i in codes]
+            for page, codes in pages.items()
+        }
+
+    good = book({page: (0, 1) for page in range(1, 605)})
+    assert_qcf_v2_runs(good)
+
+    checks = []
+    broken = book({page: (0, 1) for page in range(1, 605)})
+    broken[(1, 2)] = [("w", chr(first + 2), 2, 1), ("w", chr(first), 2, 1)]
+    try:
+        assert_qcf_v2_runs(broken)
+        checks.append(False)
+    except SystemExit as e:
+        checks.append("page 2" in str(e))
+
+    short = book({page: (0, 1) for page in range(1, 604)})
+    try:
+        assert_qcf_v2_runs(short)
+        checks.append(False)
+    except SystemExit as e:
+        checks.append("no glyphs at all" in str(e))
+
+    try:
+        assert_qcf_v2_runs({})
+        checks.append(False)
+    except SystemExit as e:
+        checks.append("no glyphs at all" in str(e))
+
+    return all(checks)
+
+
 def check_recovered_boundary_repairs():
     """A missing row defers only its boundary repair until coverage recovers."""
     edits = {
@@ -760,6 +836,8 @@ def main():
     completion_ok = check_completion_pipeline()
     gloss_ok = check_gloss_normalize()
     database_ok = audit_bundled_db()
+    qcf_runs_ok = check_qcf_v2_page_runs()
+    qcf_assert_ok = check_qcf_v2_run_assertion()
     recovered_boundary_ok = check_recovered_boundary_repairs()
     timing_delta_ok, timing_delta_detail = check_timing_delta()
     print(f"  {'ok  ' if confidence_ok else 'FAIL'} weighted 2:214 confidence checks")
@@ -767,6 +845,8 @@ def main():
     print(f"  {'ok  ' if completion_ok else 'FAIL'} complete fallback and physics checks")
     print(f"  {'ok  ' if gloss_ok else 'FAIL'} WBW gloss whitespace normalize")
     print(f"  {'ok  ' if database_ok else 'FAIL'} bundled timing database invariants")
+    print(f"  {'ok  ' if qcf_runs_ok else 'FAIL'} bundled QCF V2 page/font glyph runs")
+    print(f"  {'ok  ' if qcf_assert_ok else 'FAIL'} QCF V2 run assertion rejects a wrong page")
     print(f"  {'ok  ' if recovered_boundary_ok else 'FAIL'} recovered-row boundary deferral")
     print(f"  {'ok  ' if timing_delta_ok else 'FAIL'} fail-closed timing DB delta gate")
     if not confidence_ok:
@@ -779,6 +859,10 @@ def main():
         failures.append(("gloss normalize", "trailing-space strip failed", None))
     if not database_ok:
         failures.append(("bundled database", "timing audit failed", None))
+    if not qcf_runs_ok:
+        failures.append(("bundled QCF V2 layout", "a page carries another page's glyphs", None))
+    if not qcf_assert_ok:
+        failures.append(("QCF V2 run assertion", "a wrong page number was not rejected", None))
     if not recovered_boundary_ok:
         failures.append(("recovered-row boundary deferral", "repair ordering failed", None))
     if not timing_delta_ok:
@@ -792,7 +876,7 @@ def main():
                 for line in str(detail).splitlines():
                     print(f"    {line}")
         return 1
-    print(f"all {len(cases) + 7} cases pass ({CASES_DIR.relative_to(Path.cwd())})")
+    print(f"all {len(cases) + 9} cases pass ({CASES_DIR.relative_to(Path.cwd())})")
     return 0
 
 

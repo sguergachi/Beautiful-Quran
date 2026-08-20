@@ -148,7 +148,7 @@ import com.beautifulquran.ui.theme.verticalFadingEdges
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 
-private fun Int.toArabicIndic(): String =
+internal fun Int.toArabicIndic(): String =
     toString().map { '٠' + (it - '0') }.joinToString("")
 
 /**
@@ -157,6 +157,21 @@ private fun Int.toArabicIndic(): String =
  * Characters are glued with WORD JOINER (U+2060) so Compose never line-breaks
  * mid-mark (e.g. `﴾` on one line and `3﴿` on the next in English prose).
  */
+/**
+ * Mushaf end-of-ayah: U+06DD plus Arabic-Indic digits. Digital Khatt and
+ * Uthmani faces draw this as the circled page number, not ﴿N﴾.
+ */
+internal fun formatMushafAyahMark(number: Int): String {
+    val digits = number.toArabicIndic()
+    return buildString {
+        append('\u06DD')
+        digits.forEach { ch ->
+            append('\u2060')
+            append(ch)
+        }
+    }
+}
+
 internal fun formatAyahNumberMark(number: Int, useArabicIndicDigits: Boolean): String {
     val raw = if (useArabicIndicDigits) {
         "﴿${number.toArabicIndic()}﴾"
@@ -171,7 +186,7 @@ private fun wordFadeAlpha(progress: Float): Float {
     return resting + (InkEngine.State.Active.inkAlpha() - resting) * progress.coerceIn(0f, 1f)
 }
 
-private data class RenderedLineText(
+internal data class RenderedLineText(
     val text: AnnotatedString,
     val wordRanges: List<IntRange>,
     /** Inclusive range of the trailing ﴿N﴾ mark in [text], if present. */
@@ -183,7 +198,7 @@ private data class RenderedLineText(
  * upcoming ink; when the verse is in focus the mark fades up to full.
  */
 @Composable
-private fun rememberAyahMarkAlpha(focused: Boolean): State<Float> =
+internal fun rememberAyahMarkAlpha(focused: Boolean): State<Float> =
     animateFloatAsState(
         targetValue = if (focused) 1f else InkEngine.State.Upcoming.inkAlpha(),
         animationSpec = tween(
@@ -253,7 +268,7 @@ private const val ARABIC_ONLY_HAFS_FONT_MULTIPLIER = 1.0f
 // full word size and reads as oversized in the Arabic-only view.
 private const val AYAH_MARK_SIZE_RATIO = 20f / 30f
 
-private data class RepeatWash(
+internal data class RepeatWash(
     val progress: State<Float>,
     val alpha: State<Float>,
     val feather: State<Float?>,
@@ -454,7 +469,7 @@ private fun rememberRepeatWash(
  * flash when search moves directly from one word to another.
  */
 @Composable
-private fun rememberSearchHitWash(identity: Int?): RepeatWash {
+internal fun rememberSearchHitWash(identity: Int?): RepeatWash {
     val progress = remember { Animatable(1f) }
     val alpha = remember { Animatable(0f) }
     val feather = remember { mutableStateOf<Float?>(null) }
@@ -550,7 +565,7 @@ private fun Modifier.repeatInkLayer(
  * running, so handoff does not widen/narrow the edge mid-wash. [pacing] lets
  * the glint layer know this word carries a hold worth resonating with.
  */
-private class LetterSweep(
+internal class LetterSweep(
     val progress: State<Float>,
     val feather: State<Float?>,
     val pacing: State<TajweedPacing.Curve?>,
@@ -862,7 +877,7 @@ private fun rememberLetterSweep(
  * main-wash progress that maps onto (see [waslWashProgress]). [feather] is
  * the ordinary ink edge so the handoff is a faded continuation, not a wipe.
  */
-private data class WaslPrefix(
+internal data class WaslPrefix(
     val windowProgress: State<Float>,
     val endProgress: Float,
     val feather: Float,
@@ -870,20 +885,20 @@ private data class WaslPrefix(
     fun displayProgress(): Float = waslWashProgress(windowProgress.value, endProgress)
 }
 
-private class ActiveWordEntry(
+internal class ActiveWordEntry(
     var index: Int,
     var activation: Long,
     var outgoingHandoff: Float = 0f,
 )
 
-private data class WaslProgress(
+internal data class WaslProgress(
     val value: State<Float>,
     val atHandoff: Float,
 )
 
 /** Blooms the next opening letter over the connected tail of this word. */
 @Composable
-private fun rememberWaslProgress(
+internal fun rememberWaslProgress(
     connection: TajweedPacing.Connection?,
     sweepMs: Int?,
     identity: Int?,
@@ -1007,7 +1022,7 @@ private fun Modifier.shapedActiveWordInView(
  * one shaped ayah; they never own animation clocks, entry masks, gates, or
  * release policy.
  */
-private class InkMotion(
+internal class InkMotion(
     val ink: InkEngine.Word,
     private val lyricInk: State<Float>,
     private val sweep: LetterSweep,
@@ -1190,7 +1205,7 @@ private fun rememberTarjiGate(
 }
 
 @Composable
-private fun rememberInkMotions(
+internal fun rememberInkMotions(
     words: List<Word>,
     inks: List<InkEngine.Word>,
     activeSweepMs: Int?,
@@ -1205,6 +1220,9 @@ private fun rememberInkMotions(
     /** Layered gloss fades word ink with [animatedInkAlpha]; shaped modes dim
      * opaque glyphs with paper covers, so they never run that clock. */
     animateLyricInk: Boolean,
+    /** True while a voice is actually laying this ink. False dries the wet-ink
+     * glint where the highlight has stopped moving — see [InkEngine.glinting]. */
+    wetInk: Boolean = true,
 ): List<InkMotion> {
     require(words.size == inks.size && inks.size == waslPrefixes.size) {
         "words, inks, and wasl prefixes must align"
@@ -1220,7 +1238,7 @@ private fun rememberInkMotions(
         val entryPacing = remember(isActive, wordActivation) {
             pacing.takeIf { isActive }
         }
-        val glinting = glintInk != null && InkEngine.glinting(ink.state)
+        val glinting = glintInk != null && InkEngine.glinting(ink.state, wetInk)
         val glintIdentity = rememberGlintIdentity(glinting, ink.repeat)
         // Tarjīʿ only runs its vsync sampler on the Active strong-hold word.
         val tarjiEligible = glinting && entryPacing?.hasStrongHold == true
@@ -1512,7 +1530,7 @@ private fun WordUnit(
  * overlays so word/ayah transitions never reshape the run or flash span
  * colours.
  */
-private class WordInkPalette(
+internal class WordInkPalette(
     private val fullInk: Color,
     private val paper: Color,
     private val repeatInk: Color,
@@ -1523,7 +1541,7 @@ private class WordInkPalette(
 }
 
 @Composable
-private fun rememberWordInkPalette(): WordInkPalette {
+internal fun rememberWordInkPalette(): WordInkPalette {
     val fullInk = MaterialTheme.colorScheme.onBackground
     val paper = MaterialTheme.colorScheme.background
     val repeatInk = LocalQuranAccents.current.repeatInk
@@ -1545,10 +1563,23 @@ private fun MutableList<ShapedWordBloom>.addShapedInkMotionBlooms(
     glintInk: Color?,
     /** Arabic-only wasl pre-ink; English has no connected-letter paint. */
     waslInk: Color? = null,
+    /**
+     * Whether the base reveal is drawn here, as paper pulled back off the
+     * glyphs, or by the caller.
+     *
+     * The paper form covers a rectangle on the line box, so it can only ever
+     * be as precise as that box: ink that leaves it — an Arabic tail, a mark
+     * riding high, the circled ayah number — is not covered, and stands at full
+     * strength beside letters that are still faint. Where each word is its own
+     * node, as on the mushaf leaf, the caller washes the node's own layer
+     * instead ([Modifier.letterFadeIn]), which masks the glyph by its own
+     * coverage and cannot cut across a letterform.
+     */
+    baseReveal: Boolean = true,
 ) {
     motions.forEachIndexed { index, motion ->
         val range = ranges.getOrNull(index) ?: return@forEachIndexed
-        if (!motion.repeat && motion.sweepProgress < 1f) {
+        if (baseReveal && !motion.repeat && motion.sweepProgress < 1f) {
             add(
                 ShapedWordBloom.InkReveal(
                     range = range,
@@ -1620,7 +1651,7 @@ private fun MutableList<ShapedWordBloom>.addShapedInkMotionBlooms(
  * (Hafs); English recesses through word states alone, so it passes a
  * constant 0 and its dim covers reduce to the Upcoming floor.
  */
-private fun buildShapedBlooms(
+internal fun buildShapedBlooms(
     motions: List<InkMotion>,
     words: List<Word>,
     rendered: RenderedLineText,
@@ -1632,6 +1663,8 @@ private fun buildShapedBlooms(
     searchHitWash: RepeatWash,
     /** Arabic-only wasl pre-ink; English has no connected-letter paint. */
     waslInk: Color? = null,
+    /** See [addShapedInkMotionBlooms]. */
+    baseReveal: Boolean = true,
 ): List<ShapedWordBloom> {
     val recess = recessCover()
     val upcomingCover = 1f - InkEngine.State.Upcoming.inkAlpha()
@@ -1673,6 +1706,7 @@ private fun buildShapedBlooms(
         palette = palette,
         glintInk = glintInk,
         waslInk = waslInk,
+        baseReveal = baseReveal,
     )
     // Home search-hit flash: same ColorReveal wash as the orange repeat
     // bloom — directional mask + dissolve × 2.
@@ -1842,7 +1876,7 @@ private fun ResponsiveEnglishAyah(
  * [onMiss] (null = ignored). [inertLongPressRange] prevents the trailing ayah
  * mark from borrowing the nearby final word's hold action.
  */
-private fun Modifier.wordTapTarget(
+internal fun Modifier.wordTapTarget(
     words: List<Word>,
     ranges: List<IntRange>,
     layoutResult: TextLayoutResult?,
@@ -2404,6 +2438,10 @@ fun AyahBlock(
     /** True while recitation is running: annotations leave the page entirely, the
      * same rule the ribbon and rail marks follow. */
     annotationsHidden: Boolean = false,
+    /** True while a voice is actually reciting this reader's chapter. The
+     * wet-ink glint dries when it goes false, so a word left paused does not
+     * keep the sheen of a word laid a second ago. */
+    reciting: Boolean = true,
     /** Clears this verse's annotation from the delete mark in the editor. */
     onAnnotationDelete: (() -> Unit)? = null,
     /** True while *another* verse is being annotated: this one recedes so the
@@ -2567,6 +2605,7 @@ fun AyahBlock(
         sequentialSweeps = readingMode == ReadingMode.ENGLISH_ONLY,
         animateLyricInk =
             readingMode == ReadingMode.ARABIC_ENGLISH && showGloss,
+        wetInk = reciting,
     )
     val searchHitWash = rememberSearchHitWash(flashWordPosition)
     // Arabic-only uses this ayah-level paper cover. Owning its clock here

@@ -27,6 +27,10 @@ class EnumForOrdinalTest {
             ReadingMode.ARABIC_ENGLISH,
             enumForOrdinal(ReadingMode.entries, 99, ReadingMode.ARABIC_ENGLISH),
         )
+        assertEquals(
+            ReadingLayout.MUSHAF,
+            enumForOrdinal(ReadingLayout.entries, 99, ReadingLayout.MUSHAF),
+        )
     }
 
     @Test

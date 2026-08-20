@@ -39,6 +39,40 @@ npm --prefix web ci
 npm --prefix web run build    # Web; copies the same database into dist
 ```
 
+### Send a debug APK to your phone (KDE Connect)
+
+Paired phone + reachable KDE Connect (app open, same LAN or Bluetooth):
+
+```bash
+scripts/send_apk_to_phone.sh
+```
+
+That builds `app/build/outputs/apk/debug/app-debug.apk` and runs
+`kdeconnect-cli --share` to the first reachable device. Accept the file on
+the phone.
+
+```bash
+scripts/send_apk_to_phone.sh --skip-build --name "Pixel 10"
+scripts/send_apk_to_phone.sh --wait          # poll up to 5 minutes
+kdeconnect-cli -a                            # list reachable phones
+```
+
+If `kdeconnect-cli -l` shows the phone as paired but `-a` is empty, unlock
+the phone, open KDE Connect, and join this machine's LAN. This desktop is
+on wired `192.168.50.0/24`; the phone must be on that network (or Bluetooth
+with KDE Connect's Bluetooth backend). Then re-run the script.
+
+Over Tailscale (any network): phone adds this desktop at `100.85.148.20`
+(KDE Connect → Add devices by IP). Desktop pins the phone in
+`~/.config/kdeconnect/config`:
+
+```
+customDevices=100.99.159.46
+```
+
+Then `kdeconnect-cli --refresh`. Reachable looks like
+`Pixel 10 … on 100.99.159.46 via LAN`.
+
 `data/quran.db` is committed, so normal builds stay offline. Run
 `python3 tools/build_db.py` only when deliberately changing Quran data.
 

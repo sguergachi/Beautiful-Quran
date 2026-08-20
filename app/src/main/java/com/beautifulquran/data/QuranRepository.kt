@@ -13,9 +13,12 @@ import com.beautifulquran.data.model.SurahContent
 import com.beautifulquran.data.model.Word
 import com.beautifulquran.data.model.WordMorphology
 import com.beautifulquran.data.model.WordSearchHit
+import com.beautifulquran.domain.MushafCatalog
+import com.beautifulquran.domain.MushafSourceWord
 import com.beautifulquran.domain.WORD_SEARCH_MAX_HITS
 import com.beautifulquran.domain.WordSearchAyahContext
 import com.beautifulquran.domain.WordSearchIndexEntry
+import com.beautifulquran.domain.buildMushafCatalog
 import com.beautifulquran.domain.isWordSearchQuery
 import com.beautifulquran.domain.matchWordSearch
 import com.beautifulquran.domain.normalizeArabicForSearch
@@ -120,6 +123,10 @@ class QuranRepository(
     @Volatile
     private var wordSearchIndex: List<WordSearchIndexEntry>? = null
 
+    /** Lazily built once — 604 Madinah pages from qcf_page / qcf_line. */
+    @Volatile
+    private var mushafCatalog: MushafCatalog? = null
+
     /** Runs [sql] and maps every row with [map] — the shape of every query here. */
     private fun <T> queryList(sql: String, args: Array<String>? = null, map: (Cursor) -> T): List<T> =
         database.db.rawQuery(sql, args).use { c ->
@@ -181,6 +188,50 @@ class QuranRepository(
             Ayah(surahId, n, c.getString(1), c.getString(2), c.getInt(3), words[n].orEmpty())
         }
         SurahContent(surah, ayahs)
+    }
+
+    /**
+     * 604 Madinah pages from the dormant qcf_page / qcf_line columns.
+     * Cached for the process lifetime — the asset is immutable.
+     *
+     * Ordered by surah as well as verse: two chapters never share a line in the
+     * Madinah layout, so today this changes nothing, but ordering by verse
+     * number alone would interleave their words if one ever did. The check in
+     * tools/verify_mushaf_lines.py orders the same way.
+     */
+    suspend fun mushafCatalog(): MushafCatalog = withContext(Dispatchers.IO) {
+        mushafCatalog ?: run {
+            val sources = queryList(
+                """
+                SELECT surah_id, ayah_number, position, arabic,
+                       qcf_v2, qcf_page, qcf_line, qcf_span_end
+                FROM words
+                WHERE qcf_page BETWEEN 1 AND 604
+                ORDER BY qcf_page, qcf_line, surah_id, ayah_number, position
+                """.trimIndent(),
+            ) { c ->
+                MushafSourceWord(
+                    surahId = c.getInt(0),
+                    ayah = c.getInt(1),
+                    word = Word(
+                        position = c.getInt(2),
+                        arabic = c.getString(3),
+                        // The leaf draws the page face and nothing else. Gloss
+                        // and transliteration belong to the scrolling reader,
+                        // which loads them per chapter in surahContent() — held
+                        // here they were ~77,000 strings of each, retained for
+                        // the process lifetime, for text no leaf ever draws.
+                        translation = "",
+                        transliteration = "",
+                        qcfV2 = c.getString(4),
+                        qcfPage = c.getInt(5),
+                        qcfLine = c.getInt(6),
+                        qcfSpanEnd = c.getInt(7),
+                    ),
+                )
+            }
+            buildMushafCatalog(sources).also { mushafCatalog = it }
+        }
     }
 
     /**

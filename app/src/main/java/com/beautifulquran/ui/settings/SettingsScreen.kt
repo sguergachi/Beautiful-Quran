@@ -76,6 +76,7 @@ import com.beautifulquran.R
 import com.beautifulquran.data.AyahSelectorSide
 import com.beautifulquran.data.BrushCircleStyle
 import com.beautifulquran.data.HomeBookmarkStyle
+import com.beautifulquran.data.ReadingLayout
 import com.beautifulquran.data.ReadingMode
 import com.beautifulquran.data.Settings
 import com.beautifulquran.data.ThemeMode
@@ -243,20 +244,38 @@ fun SettingsScreen(
                 )
             }
 
-            Section("Reading")
+            Section("Reading layout")
             InkCircledChoiceRow(
-                entries = ReadingMode.entries,
-                selected = settings.readingMode,
+                entries = ReadingLayout.entries,
+                selected = settings.readingLayout,
                 params = brushParams,
                 paintToken = paintToken,
-                label = { mode ->
-                    when (mode) {
-                        ReadingMode.ARABIC_ENGLISH -> "Arabic & English"
-                        ReadingMode.ENGLISH_ONLY -> "English"
+                label = { layout ->
+                    when (layout) {
+                        ReadingLayout.SCROLL -> "Scroll"
+                        ReadingLayout.MUSHAF -> "Mushaf"
                     }
                 },
-                onSelect = { mode -> viewModel.settings.update { it.copy(readingMode = mode) } },
+                onSelect = { layout ->
+                    viewModel.settings.update { it.copy(readingLayout = layout) }
+                },
             )
+            if (settings.readingLayout == ReadingLayout.SCROLL) {
+                Spacer(Modifier.height(16.dp))
+                InkCircledChoiceRow(
+                    entries = ReadingMode.entries,
+                    selected = settings.readingMode,
+                    params = brushParams,
+                    paintToken = paintToken,
+                    label = { mode ->
+                        when (mode) {
+                            ReadingMode.ARABIC_ENGLISH -> "Arabic & English"
+                            ReadingMode.ENGLISH_ONLY -> "English"
+                        }
+                    },
+                    onSelect = { mode -> viewModel.settings.update { it.copy(readingMode = mode) } },
+                )
+            }
 
             Section("Text size")
             TextSizeControl(
@@ -264,7 +283,10 @@ fun SettingsScreen(
                 onScale = { v -> viewModel.settings.update { it.copy(fontScale = v) } },
             )
 
-            if (settings.readingMode == ReadingMode.ARABIC_ENGLISH) {
+            if (
+                settings.readingLayout == ReadingLayout.SCROLL &&
+                settings.readingMode == ReadingMode.ARABIC_ENGLISH
+            ) {
                 Spacer(Modifier.height(20.dp))
                 ToggleRow(
                     label = "Word-by-word translation",
@@ -523,7 +545,7 @@ private fun DeveloperSection(
     if (BuildConfig.DEBUG && Build.VERSION.SDK_INT >= 35) {
         Spacer(Modifier.height(20.dp))
         Text(
-            text = "Record 10-second system trace",
+            text = "Record & send performance profile",
             style = MaterialTheme.typography.bodyLarge,
             modifier = Modifier
                 .fillMaxWidth()
@@ -533,9 +555,9 @@ private fun DeveloperSection(
         )
         Caption(
             if (Build.VERSION.SDK_INT >= 37) {
-                "ProfilingManager SystemTraceRequestBuilder + cold-start triggers; path logged under BeautifulQuranProfile."
+                "Records ten seconds — use the app while it runs — then opens the share sheet. Also registers cold-start triggers."
             } else {
-                "ProfilingManager SystemTraceRequestBuilder (API 35+); path logged under BeautifulQuranProfile. Cold-start triggers need API 37."
+                "Records ten seconds — use the app while it runs — then opens the share sheet. Cold-start triggers need API 37."
             },
         )
     }

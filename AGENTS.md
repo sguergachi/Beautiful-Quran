@@ -82,6 +82,7 @@ tools/audio_onsets/     Generated leading-silence evidence from everyayah audio
 tools/detect_audio_onsets.py  Opening-range scanner that regenerates that evidence
 scripts/                Linux emulator setup / run helpers
 docs/                   Architecture, design language, performance, timings docs
+docs/QURAN_TYPOGRAPHY.md  What a mushaf page is: the rules a line is set by
                         …and the GitHub Pages product page (index.html + styles.css)
 docs/ornaments.css      Generated: the product page's ornaments (see below); do not hand-edit
 web/                    Browser port (Vite + React): Focus / Highlight / Ink + paper reader
@@ -97,6 +98,7 @@ Requires **JDK 21**. No Android device/emulator is needed for tests.
 ./gradlew testDebugUnitTest     # unit tests — run these before committing
 ./gradlew assembleDebug         # debug APK
 ./gradlew assembleRelease       # what CI ships (R8-minified; falls back to debug keystore)
+scripts/send_apk_to_phone.sh    # build debug APK and share via KDE Connect (see README)
 python3 tools/test_build_db.py  # timing pipeline regressions (~1s, no Gradle)
 ```
 
@@ -166,6 +168,12 @@ python3 tools/test_build_db.py  # timing pipeline regressions (~1s, no Gradle)
    Hierarchy comes from spacing, size, and ink strength (text alpha). Anything
    that would traditionally float becomes a line in the page, its own sheet,
    or an ink bleed. Read `docs/DESIGN.md` before touching any UI.
+   For the mushaf leaf specifically, the typography is not ours to invent:
+   `docs/QURAN_TYPOGRAPHY.md` records what a Qur'an page is — every full line
+   flush, the line filled by the letterform rather than the space, the word
+   space chosen and not left over, leading set by the ink — with the
+   measurements behind each rule. Read it before changing anything about how a
+   line is set.
 5. **Minimal dependencies, by design.** No Hilt (hand-rolled ViewModel factory
    over `QuranApp` singletons), no Room (raw SQLite wrapper in
    `QuranDatabase`), no navigation library (the three sheets are a hand-rolled
@@ -229,7 +237,13 @@ close a `Timings patch — …` GitHub issue, **do this checklist in order**:
 4. **Implement the class fix** + add the patch case (input = broken shape,
    expected = Lab/ear topology). Run `python3 tools/test_build_db.py`.
 5. **Rebuild**: `python3 tools/build_db.py`, bump `DB_FILE_NAME`, commit DB +
-   cases.
+   cases. A rebuild usually improves rows besides yours, and the fail-closed
+   delta gate withholds every one of them. Transplanting only your rows is the
+   quick way past that, and it is how the shipped database drifted away from
+   its own pipeline for eight versions (4861e0de → af9959bd). Give the rest
+   verdicts, or record them in
+   [tools/timing_verdicts/OUTSTANDING.md](tools/timing_verdicts/OUTSTANDING.md)
+   — never leave them silently unshipped.
 6. **Do not** land per-ayah overrides. Delete any local reproduction JSON
    before committing.
 

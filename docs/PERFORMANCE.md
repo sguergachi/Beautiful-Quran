@@ -181,6 +181,31 @@ ever subscribes to it.
 - Top and bottom `contentPadding` ≥ the fade height on every sheet, so
   content sits clear of the soft edges at rest and can scroll under them.
 
+### 5b. Mushaf pager — same isolation as the verse list
+
+The 604-page pager is virtualized (`beyondViewportPageCount = 1`). A word
+tick must not remasure three pages or recreate 150 `Text` nodes.
+
+- `activeWord` stays an un-delegated `State`. Follow-page turns collect it
+  from `snapshotFlow`; each ayah's ink slot reads it through
+  `derivedStateOf`. The page layout never sees the value.
+- Ink packs are published into a `State<Map>` and read only inside
+  `shapedWordBloom` draw lambdas, so a word boundary invalidates paint,
+  not layout.
+- Line width/height probes are `remember`ed against page + constraints +
+  face. QCF page fonts are cached and preloaded on `Dispatchers.Default`
+  for the settled page ± 2 so a swipe does not `Typeface.createFromAsset`
+  on the UI thread.
+- Each Madinah line is **one** shaped `Text` (inline placeholders justify
+  QCF — no U+0020). Neighbours skip `shapedWordBloom` and rasterize in an
+  offscreen layer so a fling transforms a texture, not 150 word nodes.
+  The wash still runs through `shapedWordBloom` on the settled page only.
+  Only the active ayah owns letter-sweep clocks; other ayahs on the page
+  use a single recess cover. Pager click lambdas are remembered so a
+  play/pause tick does not rebuild the page.
+- Chrome (`MushafReadingSheet`) keys the gilt seed on `settledPage`, not
+  `currentPage`, so a fling does not regenerate ornaments mid-turn.
+
 ### 6. R8 release builds are what ships
 
 CI publishes `assembleRelease`: R8-minified (full mode), resource-shrunk,

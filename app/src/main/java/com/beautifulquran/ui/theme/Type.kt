@@ -14,6 +14,54 @@ import com.beautifulquran.R
 val HafsFontFamily = FontFamily(Font(R.font.hafs_uthmanic))
 
 /**
+ * Digital Khatt New Madina — Unicode Madinah-1420 face with real joining
+ * (init/medi/fina/rlig/curs). Mushaf pages only; the scroll reader keeps
+ * [HafsFontFamily]. SIL OFL 1.1.
+ */
+val MushafFontFamily = FontFamily(Font(R.font.digital_khatt_new_madina))
+
+/**
+ * QCF2BSML — the Madinah print's own header face, in the same hand as the 604
+ * page faces.
+ *
+ * It carries one glyph per surah header and one for the basmalah, addressed by
+ * single characters rather than by Arabic text: the page fonts have no space
+ * glyph and no Unicode Arabic at all, so a basmalah written as Unicode fell
+ * back to the reading face and arrived on the leaf in a different hand from
+ * every other line on it. See [MUSHAF_BASMALAH_GLYPH].
+ */
+val MushafBasmalahFontFamily = FontFamily(Font(R.font.qcf2_bsml))
+
+/** The basmalah, as one glyph of [MushafBasmalahFontFamily]. */
+const val MUSHAF_BASMALAH_GLYPH = "\u00F3"
+
+/**
+ * What the basmalah's type size must be multiplied by to be written in the same
+ * hand as the page beneath it.
+ *
+ * The header face carries the whole phrase as a single glyph, and that glyph's
+ * ink fills only part of its em: measured, 0.673 em against the 1.161 em a page
+ * face's word glyph inks at the median. Set at the leaf's own size it therefore
+ * came out visibly smaller than the verse under it. At this multiple its
+ * letters stand as tall as the page's, and the phrase spans about two thirds of
+ * the measure — which is where the Madinah page sets it.
+ */
+const val MUSHAF_BASMALAH_HAND_SCALE = 1.73f
+
+/**
+ * Where the glyph's ink sits about its own baseline, in em — the midpoint of
+ * its bounds, 0.310 em above it.
+ *
+ * The glyph's em box is nearly two ems tall while its ink fills two thirds of
+ * one, and the ink sits high in the box. Centring the box therefore does not
+ * centre the phrase: it dropped the basmalah to the foot of its line, where its
+ * tail ran into the first verse. The line is placed by this instead.
+ */
+const val MUSHAF_BASMALAH_INK_MID_EM = 0.3101f
+
+
+
+/**
  * EB Garamond — the book face. Everything English is set in it: translations,
  * glosses, lists, labels, even the speed chip. Bundled with true italics and
  * optical weights so emphasis never falls back to a synthetic slant.

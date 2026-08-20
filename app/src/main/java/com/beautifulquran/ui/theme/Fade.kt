@@ -209,6 +209,36 @@ fun Modifier.shapedWordBloom(
     rtl: Boolean,
     /** Feather width relative to the word; see [InkWashFeather]. */
     feather: Float = InkWashFeather,
+    /**
+     * How far a word's paper mask reaches past its box, for glyph overhang.
+     *
+     * Right when the words of a line share one [Text] — the mask covers its
+     * own word's overhang and any neighbour ink it laps is redrawn by the same
+     * text pass. Wrong when each word is its own node, as on the mushaf leaf:
+     * there the mask is the last thing drawn over that word's box, so the reach
+     * paints paper across the neighbouring word's ink and its ayah mark, and
+     * the page looks chewed at every word boundary while it recites. Those
+     * callers pass zero.
+     */
+    coverPad: Dp = PaperCoverPad,
+    /**
+     * Whether a tinted wash is clipped to its own range's selection path.
+     *
+     * [TextLayoutResult.getPathForRange] encloses the *selection*, not the
+     * letterforms: it stops at the word's advance and its line box. Where a
+     * line's words share one [Text] that clip is what keeps the orange off the
+     * word beside it, and the neighbour redraws over anything it laps.
+     *
+     * On the mushaf leaf each word is its own node, and a QCF glyph inks past
+     * its advance — a tail sweeping under the word before it, a mark riding
+     * high. Clipped there, the tint stopped at that box while the letter kept
+     * going, so a repeat coloured the middle of a word and left its overhang
+     * black along a straight edge. Those callers pass false: the layer holds
+     * only this word, the tint is [BlendMode.SrcIn] against the word's own
+     * redrawn glyphs, and so it is masked by the letterform exactly as the
+     * first-pass wash is ([Modifier.letterFadeIn]).
+     */
+    clipTintToRange: Boolean = true,
 ): Modifier {
     val stops = FloatArray(InkProfileStops) { i -> i / (InkProfileStops - 1f) }
     val lineBoundsCache = LineBoundsCache()
@@ -240,7 +270,7 @@ fun Modifier.shapedWordBloom(
                     // Bleed only horizontally: vertical padding lets an
                     // unread line's paper mask climb into the preceding line
                     // and fade a read word's descender (g/j/p/q/y).
-                    val pad = PaperCoverPad.toPx()
+                    val pad = coverPad.toPx()
                     lineBounds.forEach { bounds ->
                         val cover = linePaperCoverBounds(bounds, pad)
                         clipRect(
@@ -270,7 +300,7 @@ fun Modifier.shapedWordBloom(
                             (1f - bloom.restingAlpha) * (if (rtl) s else 1f - s)
                         bloom.paper.copy(alpha = (1f - glyphAlpha).coerceIn(0f, 1f))
                     }
-                    val pad = PaperCoverPad.toPx()
+                    val pad = coverPad.toPx()
                     lineBounds.forEach { bounds ->
                         val cover = linePaperCoverBounds(bounds, pad)
                         // The clip/draw rect already includes [pad] for glyph
@@ -372,15 +402,36 @@ fun Modifier.shapedWordBloom(
                             }
                         }
                     }
-                    clipPath(path) {
+                    val tint = bloom.color.copy(
+                        alpha = bloom.layerAlpha.coerceIn(0f, 1f) *
+                            bloom.colorAlpha.coerceIn(0f, 1f),
+                    )
+                    if (clipTintToRange) {
+                        clipPath(path) {
+                            drawText(textLayoutResult = textLayout)
+                            drawRect(
+                                color = tint,
+                                topLeft = Offset(bounds.left, bounds.top),
+                                size = Size(bounds.width, bounds.height),
+                                blendMode = BlendMode.SrcIn,
+                            )
+                        }
+                    } else {
+                        // Unclipped, the tint reaches every pixel the word
+                        // actually inks: SrcIn writes only where the redrawn
+                        // glyphs are, so the letterform is the mask and the
+                        // overhang colours with the stroke it belongs to.
                         drawText(textLayoutResult = textLayout)
                         drawRect(
-                            color = bloom.color.copy(
-                                alpha = bloom.layerAlpha.coerceIn(0f, 1f) *
-                                    bloom.colorAlpha.coerceIn(0f, 1f),
+                            color = tint,
+                            topLeft = Offset(
+                                bounds.left - colorBleed,
+                                bounds.top - colorBleed,
                             ),
-                            topLeft = Offset(bounds.left, bounds.top),
-                            size = Size(bounds.width, bounds.height),
+                            size = Size(
+                                bounds.width + colorBleed * 2f,
+                                bounds.height + colorBleed * 2f,
+                            ),
                             blendMode = BlendMode.SrcIn,
                         )
                     }
@@ -398,10 +449,19 @@ fun Modifier.shapedWordBloom(
                                 endX = bounds.left + head,
                             )
                         }
+                        // The wash has to reach as far as the tint did, or
+                        // an overhang keeps ink the sweep has not arrived at.
+                        val washBleed = if (clipTintToRange) bleed else colorBleed
                         drawRect(
                             brush = brush,
-                            topLeft = Offset(bounds.left - bleed, bounds.top - bleed),
-                            size = Size(bounds.width + bleed * 2f, bounds.height + bleed * 2f),
+                            topLeft = Offset(
+                                bounds.left - washBleed,
+                                bounds.top - washBleed,
+                            ),
+                            size = Size(
+                                bounds.width + washBleed * 2f,
+                                bounds.height + washBleed * 2f,
+                            ),
                             blendMode = BlendMode.DstIn,
                         )
                     }
@@ -548,7 +608,8 @@ private val FadeLayerBleed = 14.dp
 /** Horizontal pad beyond [TextLayoutResult.getPathForRange] when painting
  * paper covers. Vertical expansion is forbidden because it masks glyphs on
  * adjacent lines. */
-private val PaperCoverPad = 4.dp
+/** How far a word's paper mask reaches past its box, for glyph overhang. */
+internal val PaperCoverPad = 4.dp
 
 /** Expands a word mask for horizontal glyph overhang without crossing its line. */
 internal fun linePaperCoverBounds(lineBounds: Rect, horizontalPad: Float): Rect =

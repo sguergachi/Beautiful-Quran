@@ -523,6 +523,14 @@ object InkEngine {
      * on. Themes opt in via a non-null `QuranAccents.glintInk` (Nightfall and
      * Royal Green); this predicate is the *word* half of the gate.
      *
+     * [wetInk] is the voice's half. A pause does not move the highlight, so
+     * the word that was being recited stays Active for as long as the reader
+     * leaves it paused — and a sheen that means "this ink was laid a moment
+     * ago" was still standing at full strength minutes later, reading as a
+     * gold word among cream ones. Ink dries when the pen stops: false here
+     * lets [Tuning.glintFadeMs] carry the sheen away, and pressing play wets
+     * the same word again.
+     *
      * Every Active entry glints, including a replay: the wash always restarts
      * on Active entry — Recited → Active when the listener taps a word again,
      * seeks backward, or a loop restarts — because skipping it made replayed
@@ -530,7 +538,8 @@ object InkEngine {
      * used to need suppressing here is filtered upstream by
      * [com.beautifulquran.domain.HighlightClock].
      */
-    fun glinting(state: State): Boolean = state == State.Active
+    fun glinting(state: State, wetInk: Boolean = true): Boolean =
+        wetInk && state == State.Active
 
     /**
      * Draw values for the tarjīʿ pulse on the wet-ink glint. Detected on the

@@ -332,6 +332,10 @@ horizontal page turn — draggable, fling-able, with page-turn audio
   from Chapters or tapping its exposed ruby ribbon; saved verses are searchable
   and sectioned by collapsible surah headings, and each result jumps directly
   back into the reader.
+- `reader/` — verse sheet (scroll) or 604-page mushaf pager (`ReadingLayout`).
+  Mushaf pages use `qcf_page` / `qcf_line` for Madinah line breaks and the
+  same Hafs + `InkEngine` wash as Arabic-only scroll. The pager virtualizes
+  to the settled page ±1; ink clocks run only on the settled page.
 - `home/HomeScreen` — surah list with search (surah names / `surah:ayah`
   references, plus Quran-wide word hits sectioned by surah with truncated
   expand-in-place lists), a continue-listening card, and a floating playback
@@ -339,9 +343,10 @@ horizontal page turn — draggable, fling-able, with page-turn audio
   opening a word hit flashes that Arabic (and English gloss) word twice with
   the orange repeat wash (directional wash in, dissolve out) on the reader. The reader's
   embedded `PlayerBar` takes over once that sheet is open.
-- `reader/ReaderScreen` — the follow-along view. Composed of
-  `SurahHeader` + one `AyahBlock` per ayah in a `LazyColumn`;
-  `AyahBlock` renders `WordUnit`s (Arabic mode, RTL flow) or one annotated
+- `reader/ReaderScreen` — the follow-along view. Scroll layout is
+  `SurahHeader` + one `AyahBlock` per ayah in a `LazyColumn`. Mushaf layout
+  is `MushafPager` (604 Madinah pages, same ink). `AyahBlock` renders
+  `WordUnit`s (Arabic mode, RTL flow) or one annotated
   `ResponsiveEnglishAyah` (English mode, LTR prose with word ranges for ink
   and taps; repeated source labels for one multi-word English phrase are
   coalesced there, while genuine repeated Arabic words remain repeated);

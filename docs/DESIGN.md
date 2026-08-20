@@ -18,6 +18,264 @@ one at a time. Navigation glides the next sheet in from the side (a
 quarter-width slide softened with a fade, 380 ms); nothing stacks, nothing
 floats, nothing casts a shadow.
 
+In **Mushaf** layout (Settings → Reading) the Reader sheet is a full-screen
+leaf with **no frame** — iBooks, not a gilt box. The paper runs to the edges
+and the text block is the only composed thing on it: a running head, the text
+well, a chapter's title band where one opens, and a folio line of type. The
+margins are a book's, not a chrome's — a single fore-edge margin plus an edge
+gutter deep enough for a circled ayah mark's medallion, which inks about half
+its own width past its advance and is sliced by anything narrower.
+
+The leaf is an eighteen-unit column of one line's pitch: running head, a whole
+unit of paper under it, the fifteen lines of revelation, and the folio band —
+so the head stands a line clear of the text and the chrome is measured in the
+same breath as the scripture. The unit a tail margin would take goes to the
+revelation instead; the folio's figure, centred in its own band, already sits
+half a line clear of the last line.
+
+**The folio belongs to the leaf.** It is set nearer the last line of
+revelation than the rule beneath it, because proximity is what assigns it:
+measured against the transport instead, it drifts every time the chrome
+changes. Its gap comes out of the leaf's own tail — shrinking the folio's band
+only feeds the weighted text block above it, which pushes the last line down
+by as much as the figure rises.
+
+**One measure.** Running head, title band and folio all hang on the text
+block's own margin. Three different edges on one leaf is the loudest
+typographic fault the page can carry.
+
+**Rank by role, not by taste.** The revelation is the darkest thing on the
+page (~15:1 against the paper). Back / play / forward carry real ink (~4.7:1)
+because they are what a listener reaches for; chapters, settings, repeat and
+speed recede (~2.1:1) because they choose what to hear rather than hear it —
+and while a chapter recites they leave the transport altogether. Running head
+and folio are quiet ink (~3–3.5:1), never gold: gold loses contrast on cream,
+and at 9 sp a gold folio disappears.
+
+**Gold is illumination, ink is furniture.** On the leaf gold means the ayah
+marks, a chapter's name in its ʿunwān panel, and that panel's rules and
+shamsas. The running head and folio are wayfinding, so they are ink in both
+themes.
+
+Gold does not carry one weight across both leaves: it gains contrast on
+Nightfall's near-black and loses it on cream, so anything drawn faintly in
+gold — the panel's tooled ground above all — is weighed against the paper it
+sits on rather than given a single alpha (`paper.luminance()`). Ink needs no
+such correction; that is the other reason furniture is ink.
+
+The running head is type alone: the chapter at the spine, the juzʾ at the
+fore-edge, each carrying its name twice — Arabic over a Latin gloss — so the
+two ends read as one mirrored pair. Transliteration, not translated meaning:
+a running head is for finding a place, and the transliterated name is how the
+book names chapters in Latin everywhere else. It stands off the block by
+about a line's pitch.
+
+A chapter opening carries the one illumination allowed on the leaf: an ʿunwān
+panel — a capsule tapering to a point at either end, doubled gilt rule, the
+chapter's own ground tooled fine inside it, a shamsa drawn (never gilded) at
+each end, and the name on a tapered paper cartouche. Rectangles and gilded
+studs both read as UI; a drawn capsule reads as a plate set into the page. The
+panel takes one line of the page's grid, as the basmalah beneath it does, so
+the fifteen-line rhythm still holds.
+
+The page fonts carry no space glyph, so the air between a verse's closing
+letter and its circled mark is let out of that letter's own advance (0.10 em).
+Printed, a mark never sits hard against the word it closes.
+
+The rule dividing the leaf from the transport carries the reader's place in
+the book: one weight end to end, with a rounded thumb a little thicker than
+the rule marking where this leaf sits among the 604. A ribbon marks a place;
+it does not colour in the pages behind it, so nothing fills. It answers while
+pages are turned as well as while they are recited. Furniture, so never gold —
+a line drawn along the paper's edge rather than a bar with a handle.
+
+That rule also drives. A leaf carries no ayah rail and no bottom bar, so
+without it the only way to page 400 is 393 swipes. There are two things a
+reader ever wants from it: *a chapter*, which is most of the book away and
+wants one stroke, and *this leaf or the one beside it*, which wants a
+fingertip. So the dial has two tiers — chapters, and the leaves inside one
+chapter — and the whole design is how the reader moves between them.
+
+The tier is not a reading of how fast the hand happens to be moving. It was,
+once, and the cost was plain: the reader had to keep moving fast to stay at
+chapters, and could not slow down to look at where they had got to without the
+ground changing underneath them. Speed sets nothing now. The tier is something
+the reader *does* — they hold still, and it opens.
+
+**Chapters is the default, at any speed.** A hand anywhere on the rule opens it
+into the comb of chapter openings, and that comb is nailed to the rule: leaf 1
+at the right end, leaf 604 at the left, the whole book laid across the measure
+and not moving. So all the way left really is the back of the book and all the
+way right is al-Fātiḥah, in one stroke, on any phone width. A comb carried
+along under the thumb instead was tried and is wrong twice over: it slides off
+its own measure, leaving the last chapter stranded mid-rule with bare line
+beyond it and no way to tell the end of the book from the end of the comb; and
+after the first stroke that ran past an end, neither end means anything any
+more.
+
+**What the reader has hold of at that tier is the comb itself, not a marker.**
+No thumb rides the line while the comb is up — the chapter their finger is in
+is drawn as a bracket, one cell of the comb, and that cell is the thing they
+are steering. It carries the seat mark's weight and ink — a rounded capsule,
+not a thickened hairline — because at that tier the bracket *is* the marker,
+and a hairline is not something a reader can believe they have hold of. A marker riding along beside all that was a second
+answer to a question the comb had already answered, and it turned the gesture
+into dragging a knob past some scenery. A click of haptic marks each opening
+crossed, spaced by distance and by time rather than by crossings, because at
+the book's scale the openings are three points of screen apart and one tick
+each is a buzz. The comb's own teeth are drawn stronger than the trough's
+leaves, which looks backwards and is not: the trough's leaves are tall and
+spread across a whole measure, while these are hairlines at a hundred and
+fourteen to a screen, and at furniture weight they read as a smudge on the rule
+rather than as marks a reader can count and aim between — which is the only
+thing they are for. Weight here buys legibility at a pitch, not emphasis.
+
+**Hold still, and the cell under your finger opens.** A quarter second at rest
+— past the stall in an ordinary rough stroke, short of a wait — and a click of
+haptic says so. The bracket stretches out until it is the whole measure and
+with leaves standing in it: a rounded trough where the line was. The mark does
+not fatten on the way; it only stretches, and recedes from the marker's ink to
+furniture's as it goes, because a measure-wide bar at a marker's weight would
+read as a fill.
+Each of the chapter's leaves flies from where it stood on the book's scale out
+to where it stands in the trough, so the opening is a magnification the eye can
+follow and not a second drawing fading in over the first. And now a seat mark
+appears inside it — the marker the chapter tier did without, because here it is
+the right answer: the chapter has become a measure of its own, and a mark
+standing in it is the thing the reader scrubs with.
+
+Inside the trough the mapping is **absolute to that chapter**: the right end is
+its first leaf, the left end its last, and every place between names one leaf
+and keeps naming it. This is the one thing the chapter tier cannot do —
+accumulating means the same x means nothing in particular — and it is exactly
+what aiming at a page needs. The two disagree at one instant, the click itself,
+where the trough's scale would put a different leaf under a hand that has not
+moved; so the difference is captured at the click and paid off underneath the
+opening animation. The leaf under the thumb when the trough opens is the leaf
+that was under it when the hold began.
+
+**Three things close it, and all three are places.** Letting go — the reader
+has chosen. Carrying the finger off either end of the trough's measure: the
+chapter's leaves stop short of the rule's ends, and what stands beyond the last
+of them at each side is the **run-out**, a hand's width of bare rule that is
+nothing but the way out. Or coming off the line the finger pressed on at all —
+up onto the leaf, down into the transport — which is the **stray**.
+
+The last two are not weighted the same, and the asymmetry is the design. The
+end of the measure is somewhere the reader legitimately aims: the chapter's
+last leaf sits right against it, and a sweep down to that leaf overshoots. So
+the run-out **resists** — crossing it starts a beat rather than firing, and
+coming back inside clears the beat, which is what makes an overshoot free.
+Across the rule there is nothing to aim at; the line *is* the instrument, so
+leaving it counts at once, and it is read as a displacement from the press so
+that a slow deliberate lift works as well as a flick. Either way the trough
+collapses back into the hairline, and the same pair that let the reader out
+keeps it shut until the hand is back on the line and over the measure.
+
+**A hand can insist.** That guard is there to stop an *accident* — a finger
+resting in the run-out is over no leaf, so it should not be handed a trough it
+did not ask for. But it also means a reader who has just walked out and wants
+straight back in gets nothing for holding, and a control whose only answer to a
+held finger is silence reads as broken. So a hold of about a dozen ordinary holds
+opens the trough from wherever the finger is, guard and all: at that length it
+cannot be the tail of a stroke, and there is nothing else a motionless finger
+out there could mean. Opening this way takes the line it finds as the line it
+was pressed on and suspends the run-out until the hand is back over the
+measure — otherwise the resistance, which is far shorter than the hold that
+beat it, would take the trough back in the same breath it was given.
+
+**Speed does not close it**, and this is the correction to an earlier rule that
+said it did. Moving off at pace looked like "the reader is steering again", but
+working quickly inside a long chapter is exactly what the page tier is *for*,
+and a tier you fall out of by moving is a tier you have to move gingerly in.
+The way out is now a place rather than a pace — and a place can be aimed at,
+sat next to, and backed away from, which is why it is given the width of the
+run-out instead of the edge of the glass.
+
+The label above the finger says which tier is running, and says it in what it
+counts. In the comb it is the chapter, by number and by name on one line, set
+the way the index sets them — a reader crossing the book at this speed is
+counting chapters, and the number is the thing they are counting. No verse
+appears there: one turning over by hundreds between frames is noise, and worse,
+it invites the reader to aim with it. In the trough the leaf itself is the
+target, so the label names it the way the leaf names itself — the chapter, then
+`pg.` and its folio — and gives the verses standing on it a second line of
+their own, in the lighter ink everything subordinate takes. The chapter stays
+at the front of that, because a folio alone would leave the reader with nothing
+to check it against.
+
+The label keeps both lines' worth of paper at either tier: at chapter tier the
+second line is empty rather than absent. Opening the trough then writes into
+the gap the first line was already sitting above, instead of shoving it upward.
+Type over a thumb must not jump when the comb does.
+
+The tier machine runs on the **frame clock**, not on pointer events. A finger
+that stops moving stops reporting, so an estimate fed only by events freezes at
+whatever the last motion was — and since holding still is the entire gesture
+that opens the trough, it would never open at all. Ticked every frame,
+stillness is a real measurement of zero. Which also means the reader never has
+to hunt for a threshold: coming to rest is the gesture, and coming to rest is
+something a hand does without being asked.
+
+Both tiers are read the same way: where the finger stands along the measure is
+where it stands in the book, or in the chapter. Nothing accumulates, so nothing
+drifts — the bracket is under the finger because the comb it is bracketing is
+under the finger, and the two ends keep meaning the two ends however long the
+reader works at it. On release the trough shuts, the seat mark fades back up
+out of it and walks to the landed leaf's own place on the rule in one motion,
+and the rule is a place-marker again.
+
+What the hand comes off on is what the tier promised. In the trough the reader
+picked a leaf and gets that leaf. In the comb they picked a chapter and get its
+opening — anything else would make chapter granularity a lie about what they
+were steering. Nothing commits until the hand comes off; the leaf turns on
+release, never under the finger.
+
+This does not make it a bar with a handle. At rest it is the line it always
+was, byte for byte — the comb and the trough have no existence except under a
+hand, and they are that same line resolved rather than a control grown on top
+of it. Nor is the trough the progress fill this rule has always refused: it
+does not run from an end of the rule, it does not grow with progress, and it
+is not there at all until a reader holds still. It is one cell of the comb,
+and then that cell magnified — the only way to say *you are inside this
+chapter now* to a reader whose own finger is covering the line. Above the
+thumb the leaf it will land on is named in type alone — the chapter, and its
+verses once the trough is open — with no capsule and no ground: ink on paper,
+not a float. The leaf's own folio names a page too, and the two would argue
+in the same band, so the folio stands down for as long as the scrub lasts.
+During recitation the thumb has receded almost to nothing; a press brings it
+straight back, because on a leaf this is the only wayfinding there is and a
+control you cannot see is not a control.
+
+The thumb's travel stops short of the paper's edge at both ends while the line
+runs the full measure. That inset is not for looks: both ends of this rule lie
+inside the system's own back-gesture strip, and a thumb parked there is a thumb
+the OS takes the press for — the first leaf and the last would be the two you
+could not grab.
+
+Both fore-edges are feathered into the paper, always — solid at the very edge
+and gone by the time the measure begins. The band is exactly the paper outside
+the text: the margin and the mark gutter, not a hair more. A leaf in a bound
+book does not end at a cut line, it turns away from the eye; but the edge of a
+page may dissolve and the revelation may not. (Tying the effect to the pager's
+offset made it appear halfway through a swipe and vanish again, which reads as
+a glitch rather than as the shape of a book.)
+
+A short page (al-Fātiḥah) sits in the middle of the well; a full Madinah page
+fills it. A swipe turns the whole leaf (running head, text, folio) the way
+iBooks turns a page. Transport is a quiet line of ink on the paper *under* the
+page. Reciting hides the status bar, as the scroll layout does; the leaf
+reserves its top inset from `statusBarsIgnoringVisibility`, so the page holds
+still as the clock goes.
+
+QCF lines are the printed Madinah lines: one size, even
+15-line leading, leftover width shared between words
+(no U+0020).
+Horizontal swipe turns the 604 Madinah pages; the outer stack no longer
+steals that gesture. The ayah rail is scroll-only. A chapter-list tap opens
+the reader on that chapter's first page. Scroll layout keeps the original
+vertical verse sheet.
+
 Hard rules:
 
 - **No borders, no dividers, no cards, no elevation.** Hierarchy comes from
@@ -557,13 +815,33 @@ image, so it is crisp at any density and nearly free to render.
   tapping the calligraphy) prepends Al-Fatihah 1:1 audio before the first ayah;
   word taps skip the lead-in.
 - **Restraint rule:** ornament appears in exactly three places on the open
-  book — the surah header (rosette + weave), ayah number marks, and the home
-  title mark. The one place allowed to be lavish is the closed book: the
-  [entrance cover](#the-entrance) is bound leather, and binding is where a
-  mushaf has always carried its gold. Nothing else on the sheet is decorated.
-  Mushaf **page breaks** are not ornament: a whisper-gold hairline with small
-  page numbers (Western left, Arabic-Indic right) marks Madinah page
-  boundaries in the continuous scroll — functional wayfinding only.
+  *scroll* reader — the surah header (rosette + weave), ayah number marks, and
+  the home title mark. Mushaf layout carries **one**: the ruled title band at a
+  chapter's opening. No frame, no corner seals, no running-head frieze — the
+  printed line and its circled ayah marks are the rest of the page, and every
+  pixel the frame used to hold is text. A compact chapter rosette still opens a
+  new surah in the scroll layout. Never lavish — the closed
+  book is still the only place allowed to carry full binding gold. Mushaf
+  **page breaks** in scroll layout are not ornament: a whisper-gold hairline
+  with small page numbers (Western left, Arabic-Indic right) marks Madinah
+  page boundaries in the continuous scroll — functional wayfinding only. The
+  mushaf text is the QCF V2 Madinah page fonts, one word-glyph per token, with
+  KFGQPC Uthmanic Hafs standing in until a page's face has loaded. The book is
+  set at **one size throughout**: measured with HarfBuzz over all ~9,000 lines
+  (`tools/measure_mushaf_lines.py`), a line's glyph run spans 14.1 em (p10)
+  through 15.6 (p50) to 16.9 (p90), so no leaf can be sized from its own
+  longest line without the hand growing and shrinking as the pages turn. The
+  size comes from the median line and the well; each line is then fitted to the
+  measure by its own scale (`mushafLineFill`) rather than by stretching the
+  word gaps, which keeps the glyphs as large as the leaf allows instead of
+  opening rivers of paper between them. Fitting the measure always wins over
+  holding that scale: ink over the fore-edge is clipped, and the circled mark
+  riding at a line's end is what gets sliced.
+
+  The recess mask that dims an unrecited word reaches past its box for glyph
+  overhang — right when a line shares one `Text`, wrong on the mushaf leaf
+  where every word is its own node and the reach paints over its neighbours.
+  Per-word callers pass `coverPad = 0`.
 
 ## The entrance
 
