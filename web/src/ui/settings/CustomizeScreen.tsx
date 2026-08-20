@@ -2,18 +2,14 @@ import { appStore } from '../../store/appStore'
 import type {
   AyahSelectorSide,
   PageNumberScript,
-  ReadingLayout,
   ReadingMode,
   Settings,
   ThemeMode,
   VerseNumberScript,
 } from '../../data/settings'
 import {
-  applyReadingLayout,
   applyReadingMode,
-  showsPreviewAyahRail,
   showsPreviewWordGloss,
-  showsScrollChrome,
   showsWordGlossChrome,
 } from '../../data/customizePolicy'
 import { formatAyahNumberMark } from '../../util/digits'
@@ -21,7 +17,6 @@ import { symbolicAyahBarCount } from '../reader/ayahRailMath'
 import { PaperChoiceList } from '../kit/PaperChoiceList'
 import { PaperSegmented } from '../kit/PaperSegmented'
 import { PaperSwitch } from '../kit/PaperSwitch'
-import { MushafFolio } from '../reader/MushafFolio'
 import { PageBreak } from '../reader/PageBreak'
 import type { BrushCheckParams } from '../kit/brushCheck'
 import type { BrushCircleParams } from '../kit/brushMark'
@@ -31,11 +26,6 @@ const VIEW_OPTIONS = [
   { value: 'arabic_only' as const, label: 'Arabic' },
   { value: 'english_only' as const, label: 'English' },
   { value: 'arabic_english' as const, label: 'Both' },
-]
-
-const LAYOUT_OPTIONS = [
-  { value: 'scroll' as const, label: 'Scroll' },
-  { value: 'mushaf' as const, label: 'Mushaf' },
 ]
 
 const VERSE_OPTIONS = [
@@ -61,11 +51,6 @@ const THEME_OPTIONS: { value: ThemeMode; label: string }[] = [
   { value: 'royal_green', label: 'Royal green' },
 ]
 
-const MUSHAF_HEAD = 'سُورَةُ الأنبياء'
-const MUSHAF_LINE_1 = 'وَٱلَّتِيٓ أَحۡصَنَتۡ فَرۡجَهَا فَنَفَخۡنَا فِيهَا مِن رُّوحِنَا'
-const MUSHAF_LINE_2 = 'وَجَعَلۡنَٰهَا وَٱبۡنَهَآ ءَايَةٗ لِّلۡعَٰلَمِينَ إِنَّ هَٰذِهِۦٓ'
-const MUSHAF_LINE_3 = 'أُمَّتُكُمۡ أُمَّةٗ وَٰحِدَةٗ وَأَنَا۠ رَبُّكُمۡ فَٱعۡبُدُونِ'
-const MUSHAF_PAGE = 330
 // 56:76 ends page 536; 56:77 opens 537 — a real printed-page turn.
 const SAMPLE_ARABIC_1 = 'وَإِنَّهُۥ لَقَسَمٞ لَّوۡ تَعۡلَمُونَ عَظِيمٌ'
 const SAMPLE_ARABIC_2 = 'إِنَّهُۥ لَقُرۡءَانٞ كَرِيمٞ'
@@ -123,7 +108,6 @@ export function CustomizeScreen({
         <h2>Preview</h2>
         <ReadingPreview
           readingMode={settings.readingMode}
-          readingLayout={settings.readingLayout}
           verseNumberScript={settings.verseNumberScript}
           pageNumberScript={settings.pageNumberScript}
           ayahSelectorSide={settings.ayahSelectorSide}
@@ -133,23 +117,6 @@ export function CustomizeScreen({
       </div>
 
       <div className="customize-scroll">
-      <section className="settings-section">
-        <h2>Layout</h2>
-        <PaperSegmented
-          aria-label="Layout"
-          value={settings.readingLayout}
-          brushParams={brushParams}
-          paintToken={paintToken}
-          options={LAYOUT_OPTIONS}
-          onChange={(v) =>
-            appStore.updateSettings(applyReadingLayout(settings, v as ReadingLayout))
-          }
-        />
-        <p className="settings-caption">Mushaf is a printed Arabic page.</p>
-      </section>
-
-      {showsScrollChrome(settings.readingLayout) ? (
-        <>
           <section className="settings-section">
             <h2>View</h2>
             <PaperSegmented
@@ -159,12 +126,12 @@ export function CustomizeScreen({
               paintToken={paintToken}
               options={VIEW_OPTIONS}
               onChange={(v) =>
-                appStore.updateSettings(applyReadingMode(settings, v as ReadingMode))
+                appStore.updateSettings(applyReadingMode(v as ReadingMode))
               }
             />
           </section>
 
-          {showsWordGlossChrome(settings.readingLayout, settings.readingMode) ? (
+          {showsWordGlossChrome(settings.readingMode) ? (
             <section className="settings-section settings-section-toggles">
               <PaperSwitch
                 id="setting-gloss"
@@ -194,10 +161,7 @@ export function CustomizeScreen({
               }
             />
           </section>
-        </>
-      ) : null}
 
-      {showsScrollChrome(settings.readingLayout) ? (
         <section className="settings-section">
           <h2>Verse numbers</h2>
           <PaperSegmented
@@ -211,7 +175,6 @@ export function CustomizeScreen({
             }
           />
         </section>
-      ) : null}
 
       <section className="settings-section">
         <h2>Page numbers</h2>
@@ -250,23 +213,20 @@ const PREVIEW_RAIL_AYAHS = 7
 
 function ReadingPreview({
   readingMode,
-  readingLayout,
   verseNumberScript,
   pageNumberScript,
   ayahSelectorSide = 'left',
   showWordGloss = false,
 }: {
   readingMode: ReadingMode
-  readingLayout: ReadingLayout
   verseNumberScript: VerseNumberScript
   pageNumberScript: PageNumberScript
   ayahSelectorSide?: AyahSelectorSide
   showWordGloss?: boolean
 }) {
-  const arabicOnly = readingLayout === 'mushaf' || readingMode === 'arabic_only'
-  const englishOnly = readingLayout === 'scroll' && readingMode === 'english_only'
-  const showGloss = showsPreviewWordGloss(readingLayout, readingMode, showWordGloss)
-  const showRail = showsPreviewAyahRail(readingLayout)
+  const arabicOnly = readingMode === 'arabic_only'
+  const englishOnly = readingMode === 'english_only'
+  const showGloss = showsPreviewWordGloss(readingMode, showWordGloss)
   const arabicMarks = verseNumberScript === 'arabic'
   const mark1 = formatAyahNumberMark(SAMPLE_AYAH_1, arabicMarks)
   const mark2 = formatAyahNumberMark(SAMPLE_AYAH_2, arabicMarks)
@@ -276,24 +236,16 @@ function ReadingPreview({
 
   return (
     <div
-      className={[
-        'reading-preview',
-        readingLayout === 'mushaf' ? 'reading-preview--mushaf' : '',
-        showRail ? `reading-preview--rail-${ayahSelectorSide}` : '',
-      ]
-        .filter(Boolean)
-        .join(' ')}
+      className={`reading-preview reading-preview--rail-${ayahSelectorSide}`}
     >
-      {showRail ? (
-        <div
-          className={`reading-preview__rail reading-preview__rail--${ayahSelectorSide}`}
-          aria-hidden="true"
-        >
-          {Array.from({ length: railBars }, (_, index) => (
-            <i key={index} data-focus={index === 0 ? 'true' : undefined} />
-          ))}
-        </div>
-      ) : null}
+      <div
+        className={`reading-preview__rail reading-preview__rail--${ayahSelectorSide}`}
+        aria-hidden="true"
+      >
+        {Array.from({ length: railBars }, (_, index) => (
+          <i key={index} data-focus={index === 0 ? 'true' : undefined} />
+        ))}
+      </div>
       <div className="reading-preview__lock">
         <div className="reading-preview__sizer" aria-hidden="true">
           <div className="reading-preview__words" dir="rtl">
@@ -308,42 +260,8 @@ function ReadingPreview({
           <p className="reading-preview__english">{SAMPLE_ENGLISH}</p>
           <PageBreak page={SAMPLE_PAGE} script="both" />
         </div>
-        <div className="reading-preview__sizer reading-preview__sizer--mushaf" aria-hidden="true">
-          <p className="reading-preview__head">{MUSHAF_HEAD}</p>
-          <p className="reading-preview__arabic reading-preview__arabic--mushaf" dir="rtl">
-            {MUSHAF_LINE_1}
-          </p>
-          <p className="reading-preview__arabic reading-preview__arabic--mushaf" dir="rtl">
-            {MUSHAF_LINE_2}
-          </p>
-          <p className="reading-preview__arabic reading-preview__arabic--mushaf" dir="rtl">
-            {MUSHAF_LINE_3}
-          </p>
-          <MushafFolio page={MUSHAF_PAGE} script="both" />
-        </div>
-        <div
-          className={[
-            'reading-preview__live',
-            readingLayout === 'mushaf' ? 'reading-preview__live--mushaf' : '',
-          ]
-            .filter(Boolean)
-            .join(' ')}
-        >
-          {readingLayout === 'mushaf' ? (
-            <>
-              <p className="reading-preview__head">{MUSHAF_HEAD}</p>
-              <p className="reading-preview__arabic reading-preview__arabic--mushaf" dir="rtl">
-                {MUSHAF_LINE_1}
-              </p>
-              <p className="reading-preview__arabic reading-preview__arabic--mushaf" dir="rtl">
-                {MUSHAF_LINE_2}
-              </p>
-              <p className="reading-preview__arabic reading-preview__arabic--mushaf" dir="rtl">
-                {MUSHAF_LINE_3}
-              </p>
-              <MushafFolio page={MUSHAF_PAGE} script={pageNumberScript} />
-            </>
-          ) : englishOnly ? (
+        <div className="reading-preview__live">
+          {englishOnly ? (
             <>
               <p className="reading-preview__english reading-preview__english--lyric" dir="ltr">
                 {SAMPLE_ENGLISH}{' '}

@@ -76,8 +76,7 @@ export function SettingsScreen({
   const isTop = stackLayer === layer
   const depth = Math.max(0, stackLayer - layer)
   const [customizeOpen, setCustomizeOpen] = useState(false)
-  const showReadingToggles =
-    s.readingLayout === 'scroll' && s.readingMode === 'arabic_english'
+  const showReadingToggles = s.readingMode === 'arabic_english'
 
   // Session-only live knobs for the brush labs (not persisted).
   const [brushParams, setBrushParams] = useState<BrushCircleParams>(() =>
@@ -383,7 +382,7 @@ export function SettingsScreen({
 
         {showReadingToggles ? (
           <section className="settings-section settings-section-toggles">
-            <PaperSwitch(
+            <PaperSwitch
               id="setting-translit"
               label="Transliteration"
               checked={s.showTransliteration}

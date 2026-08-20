@@ -2788,17 +2788,6 @@ select {
   min-width: 0;
 }
 
-.reading-preview--mushaf {
-  align-items: stretch;
-}
-
-.reading-preview__head {
-  margin: 0;
-  font-family: var(--font-arabic);
-  font-size: 0.95rem;
-  color: rgb(from var(--gold) r g b / 0.58);
-}
-
 .reading-preview__arabic {
   margin: 0;
   font-family: var(--font-arabic);
@@ -2818,11 +2807,6 @@ select {
 .reading-preview__sizer {
   visibility: hidden;
   pointer-events: none;
-}
-
-.reading-preview__sizer--mushaf,
-.reading-preview__live--mushaf {
-  text-align: center;
 }
 
 .reading-preview__live {
@@ -2866,10 +2850,6 @@ select {
   text-align: center;
 }
 
-.reading-preview--mushaf .reading-preview__arabic {
-  text-align: right;
-}
-
 .reading-preview__english {
   margin: 0;
   font-family: var(--font-body);
@@ -2896,48 +2876,6 @@ select {
 .reading-preview .page-break {
   padding: 0.4rem 0;
   max-width: none;
-}
-
-.mushaf-folio {
-  display: flex;
-  align-items: baseline;
-  justify-content: center;
-  padding: 0.4rem 0;
-}
-
-.mushaf-folio__western,
-.mushaf-folio__arabic {
-  width: 2.5rem;
-  line-height: 1;
-  flex-shrink: 0;
-}
-
-.mushaf-folio__western {
-  font-family: var(--font-body);
-  font-size: 0.7rem;
-  letter-spacing: 0.14em;
-  text-align: end;
-  color: color-mix(in srgb, var(--ink) 50%, transparent);
-}
-
-.mushaf-folio__arabic {
-  font-family: var(--font-arabic);
-  font-size: 0.85rem;
-  text-align: start;
-  color: color-mix(in srgb, var(--ink) 54%, transparent);
-}
-
-.mushaf-folio__solo {
-  width: auto;
-  text-align: center;
-}
-
-.mushaf-folio__diamond {
-  width: 1.75rem;
-  height: 0.7rem;
-  flex-shrink: 0;
-  background: color-mix(in srgb, var(--ink) 34%, transparent);
-  clip-path: polygon(50% 0%, 81% 50%, 50% 100%, 19% 50%);
 }
 
 .settings-section {

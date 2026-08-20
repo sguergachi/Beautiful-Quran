@@ -44,15 +44,16 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.text.style.TextGeometricTransform
@@ -79,14 +80,18 @@ import com.beautifulquran.domain.qcfTrailingMark
 import com.beautifulquran.domain.qcfWordGlyphs
 import com.beautifulquran.ui.reader.AyahNumberMark
 import com.beautifulquran.ui.reader.MushafFolioMarks
+import com.beautifulquran.ui.reader.MushafCell
 import com.beautifulquran.ui.reader.MushafQcfFonts
 import com.beautifulquran.ui.reader.PageBreak
 import com.beautifulquran.ui.reader.VERSE_ANNOTATION_INK_ALPHA
 import com.beautifulquran.ui.reader.collapsedStackSpanDp
 import com.beautifulquran.ui.reader.formatAyahNumberMark
+import com.beautifulquran.ui.reader.mushafCellOrigins
+import com.beautifulquran.ui.reader.mushafLineCells
 import com.beautifulquran.ui.reader.symbolicAyahBarCount
 import com.beautifulquran.ui.reader.verseAnnotationStyle
 import kotlin.math.abs
+import kotlin.math.roundToInt
 import com.beautifulquran.ui.theme.BrushCheckParams
 import com.beautifulquran.ui.theme.BrushCircleParams
 import com.beautifulquran.ui.theme.HafsFontFamily
@@ -438,6 +443,7 @@ private fun PreviewMushafLeaf(
             .page(PreviewMushafPage)
     }
     val face = remember { MushafQcfFonts.family(context, PreviewMushafPage) }
+    val typeface = remember(face) { MushafQcfFonts.cachedTypeface(PreviewMushafPage) }
     val gold = LocalQuranAccents.current.gold
     val lines = page?.lines.orEmpty().filter {
         it.number in PreviewMushafLineFirst..PreviewMushafLineLast
@@ -455,9 +461,9 @@ private fun PreviewMushafLeaf(
             modifier = Modifier.fillMaxWidth(),
         )
         Spacer(Modifier.height(8.dp))
-        if (lines.size == 3 && face != null) {
+        if (lines.size == 3 && face != null && typeface != null) {
             CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
-                PreviewQcfLines(lines = lines, face = face)
+                PreviewQcfLines(lines = lines, face = face, typeface = typeface)
             }
         } else {
             val line = with(LocalDensity.current) {
@@ -498,10 +504,13 @@ private fun previewQcfCells(line: MushafLine): List<PreviewQcfCell> = buildList 
 }
 
 @Composable
-private fun PreviewQcfLines(lines: List<MushafLine>, face: FontFamily) {
+private fun PreviewQcfLines(
+    lines: List<MushafLine>,
+    face: FontFamily,
+    typeface: android.graphics.Typeface,
+) {
     val ink = MaterialTheme.colorScheme.onSurface
     val gold = LocalQuranAccents.current.gold
-    val measurer = rememberTextMeasurer()
     val density = LocalDensity.current
     val cells = remember(lines) { lines.map { previewQcfCells(it) } }
     BoxWithConstraints(Modifier.fillMaxWidth()) {
@@ -514,11 +523,12 @@ private fun PreviewQcfLines(lines: List<MushafLine>, face: FontFamily) {
             platformStyle = PlatformTextStyle(includeFontPadding = false),
         )
         val fontPx = with(density) { PreviewQcfSize.toPx() }
-        val needed = cells.map { line ->
-            val inkWidth = line.sumOf {
-                measurer.measure(it.text, base, maxLines = 1).size.width.toDouble()
-            }.toFloat()
-            inkWidth + (line.size - 1).coerceAtLeast(0) * MUSHAF_WORD_GAP_EM * fontPx
+        val rawCells = remember(cells, typeface, fontPx) {
+            cells.map { line -> mushafLineCells(line.map { it.text }, typeface, fontPx, 1f) }
+        }
+        val needed = rawCells.map { line ->
+            line.sumOf { it.inkWidth.toDouble() }.toFloat() +
+                (line.size - 1).coerceAtLeast(0) * MUSHAF_WORD_GAP_EM * fontPx
         }
         val longest = needed.maxOrNull() ?: 0f
         val sizeScale = if (longest > measurePx && longest > 0f) measurePx / longest else 1f
@@ -526,9 +536,8 @@ private fun PreviewQcfLines(lines: List<MushafLine>, face: FontFamily) {
         val fittedPx = fontPx * sizeScale
         Column(Modifier.fillMaxWidth()) {
             cells.forEach { line ->
-                val inkWidth = line.sumOf {
-                    measurer.measure(it.text, fitted, maxLines = 1).size.width.toDouble()
-                }.toFloat()
+                val lineCells = mushafLineCells(line.map { it.text }, typeface, fittedPx, 1f)
+                val inkWidth = lineCells.sumOf { it.inkWidth.toDouble() }.toFloat()
                 val fit = mushafLineFit(
                     inkWidthPx = inkWidth,
                     gapCount = (line.size - 1).coerceAtLeast(0),
@@ -540,18 +549,13 @@ private fun PreviewQcfLines(lines: List<MushafLine>, face: FontFamily) {
                 } else {
                     fitted.copy(textGeometricTransform = TextGeometricTransform(scaleX = fit.scale))
                 }
-                val gap = with(density) { fit.gapPx.toDp() }
-                Row(
-                    Modifier.fillMaxWidth(),
-                    horizontalArrangement = if (fit.flush) {
-                        Arrangement.Start
-                    } else {
-                        Arrangement.Center
-                    },
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    line.forEachIndexed { i, cell ->
-                        if (i > 0) Spacer(Modifier.width(gap))
+                val placedCells = if (fit.scale == 1f) {
+                    lineCells
+                } else {
+                    mushafLineCells(line.map { it.text }, typeface, fittedPx, fit.scale)
+                }
+                PreviewQcfLine(metrics = placedCells, fit = fit) {
+                    line.forEach { cell ->
                         Text(
                             text = cell.text,
                             style = style.copy(color = if (cell.mark) gold else ink),
@@ -561,6 +565,32 @@ private fun PreviewQcfLines(lines: List<MushafLine>, face: FontFamily) {
                         )
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PreviewQcfLine(
+    metrics: List<MushafCell>,
+    fit: com.beautifulquran.domain.MushafLineFit,
+    content: @Composable () -> Unit,
+) {
+    Layout(modifier = Modifier.fillMaxWidth(), content = content) { measurables, constraints ->
+        val placeables = measurables.map { it.measure(Constraints()) }
+        val height = placeables.maxOfOrNull { it.height } ?: 0
+        val origins = mushafCellOrigins(
+            cells = metrics,
+            count = placeables.size,
+            width = constraints.maxWidth.toFloat(),
+            fit = fit,
+        )
+        layout(constraints.maxWidth, height) {
+            placeables.forEachIndexed { index, placeable ->
+                placeable.place(
+                    origins.getOrElse(index) { 0f }.roundToInt(),
+                    (height - placeable.height) / 2,
+                )
             }
         }
     }

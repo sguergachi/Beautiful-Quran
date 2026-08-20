@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest'
 import {
   formatAyahNumberMark,
   formatReaderDigits,
-  mushafFolioLayout,
   pageFolioLayout,
   toArabicIndic,
 } from '../digits'
@@ -73,29 +72,6 @@ describe('pageFolioLayout', () => {
       leading: '١٢',
       trailing: null,
       centered: true,
-    })
-  })
-})
-
-describe('mushafFolioLayout', () => {
-  it('centres both scripts on a diamond', () => {
-    expect(mushafFolioLayout(330, 'both')).toEqual({
-      western: '330',
-      arabic: '٣٣٠',
-      diamond: true,
-    })
-  })
-
-  it('centres a single script with no diamond', () => {
-    expect(mushafFolioLayout(330, 'english')).toEqual({
-      western: '330',
-      arabic: null,
-      diamond: false,
-    })
-    expect(mushafFolioLayout(330, 'arabic')).toEqual({
-      western: null,
-      arabic: '٣٣٠',
-      diamond: false,
     })
   })
 })

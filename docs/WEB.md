@@ -387,10 +387,9 @@ Three sheets, hand-rolled paper stack (no router chrome):
    return-to-ayah roundel (gilt corolla, qalam arrow painted toward the
    active verse); bookmark ribbon.
 3. **Settings** — Android paper-settings parity: reciter as ink-disc choice;
-   Customize sub-page (view, layout, verse and page numbers, theme, ayah-selector
+   Customize sub-page (view, verse and page numbers, theme, ayah-selector
    side, word-by-word gloss, pinned faded-leaf preview with a full-bleed paper
-   dissolve under the leaf and the collapsed ayah rail on the chosen edge;
-   mushaf hides view, the rail side, word-by-word, and verse-number script);
+   dissolve under the leaf and the collapsed ayah rail on the chosen edge);
    rows, reading mode as ink-brush segmented rows, A—track—A text
    size, display toggles with calligraphic checks, theme choice list with
    gilt swatches, colophon at the foot (triple-tap unlocks developer tools).
@@ -504,7 +503,7 @@ sans.
 
 **Explicitly out of v1 web (unless pulled in later):**
 - Timings Lab / timing patch export
-- QCF V2 mushaf fonts
+- Mushaf layout / QCF V2 page fonts
 - Exact Media3 preload configuration
 - Verse annotations / ḥawāshī (bookmark-note guide ships; note editor pending)
 - Sharing / accounts / analytics (never)

@@ -3,7 +3,6 @@ import { BRUSH_CIRCLE_STYLE_IDS } from '../ui/kit/brushMark'
 
 export type ThemeMode = 'system' | 'light' | 'dark' | 'royal_green'
 export type ReadingMode = 'arabic_english' | 'english_only' | 'arabic_only'
-export type ReadingLayout = 'scroll' | 'mushaf'
 export type VerseNumberScript = 'arabic' | 'english'
 export type PageNumberScript = 'both' | 'arabic' | 'english'
 export type AyahSelectorSide = 'left' | 'right'
@@ -13,7 +12,6 @@ export const HOME_BOOKMARK_STYLES: HomeBookmarkStyle[] = [
   'top_bound',
   'saved_passages',
 ]
-export const READING_LAYOUTS: ReadingLayout[] = ['scroll', 'mushaf']
 export const VERSE_NUMBER_SCRIPTS: VerseNumberScript[] = ['arabic', 'english']
 export const PAGE_NUMBER_SCRIPTS: PageNumberScript[] = ['both', 'arabic', 'english']
 export const READING_MODES: ReadingMode[] = [
@@ -40,7 +38,6 @@ export interface Settings {
   reciterId: number
   fontScale: number
   readingMode: ReadingMode
-  readingLayout: ReadingLayout
   verseNumberScript: VerseNumberScript
   pageNumberScript: PageNumberScript
   showWordGloss: boolean
@@ -74,7 +71,6 @@ const DEFAULTS: Settings = {
   reciterId: 1,
   fontScale: 1,
   readingMode: 'arabic_english',
-  readingLayout: 'scroll',
   verseNumberScript: 'arabic',
   pageNumberScript: 'both',
   showWordGloss: true,
@@ -129,9 +125,6 @@ export function normalizeSettings(partial: Partial<Settings> = {}): Settings {
     readingMode: READING_MODES.includes(partial.readingMode as ReadingMode)
       ? (partial.readingMode as ReadingMode)
       : DEFAULTS.readingMode,
-    readingLayout: READING_LAYOUTS.includes(partial.readingLayout as ReadingLayout)
-      ? (partial.readingLayout as ReadingLayout)
-      : DEFAULTS.readingLayout,
     verseNumberScript: VERSE_NUMBER_SCRIPTS.includes(
       partial.verseNumberScript as VerseNumberScript,
     )
