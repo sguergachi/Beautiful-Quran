@@ -643,6 +643,13 @@ not the app's.
 - **Translations**: EB Garamond, 17 sp, 26 sp leading, at 66 % ink.
 - **UI text**: the same serif at small sizes with letterspacing and reduced
   alpha; labels never compete with scripture. Nothing in the app is sans.
+  Settings rows and the Download manager share one scale: **17 / 26**
+  bodyLarge for names, **12 / 16** labelSmall for facts and every verb
+  (Download, Resume, Pause, Delete, Keep). Reciter verbs sit 16 dp
+  after the facts. Chapter verbs trail in a reserved slot; Pause flips
+  in place to Resume (right edge), Delete to its left. Fetch verbs are green;
+  settle and delete are quiet ink. Never size a destructive verb up
+  to the name.
 - Ayah markers are typographic — gold `﴿٧﴾` ornate brackets in the Hafs
   face — not drawn ornaments.
 

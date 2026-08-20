@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.beautifulquran.data.QuranRepository
 import com.beautifulquran.data.SettingsRepository
 import com.beautifulquran.data.model.Reciter
+import com.beautifulquran.data.model.Surah
 import com.beautifulquran.tarjilab.ReciterTarjiProfiles
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -18,9 +19,14 @@ class SettingsViewModel(
 
     private val _reciters = MutableStateFlow<List<Reciter>>(emptyList())
     val reciters: StateFlow<List<Reciter>> = _reciters
+    private val _surahs = MutableStateFlow<List<Surah>>(emptyList())
+    val surahs: StateFlow<List<Surah>> = _surahs
 
     init {
-        viewModelScope.launch { _reciters.value = repository.reciters() }
+        viewModelScope.launch {
+            _reciters.value = repository.reciters()
+            _surahs.value = repository.surahs()
+        }
     }
 
     fun selectReciter(reciter: Reciter) {

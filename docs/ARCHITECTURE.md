@@ -32,7 +32,8 @@ app (runtime)                                           ▼
 ## Principles
 
 1. **Offline-first, no backend.** All text, translations, and word timings ship
-   inside the APK. Only recitation audio streams (and is cached, 1 GB LRU).
+   inside the APK. Only recitation audio streams (listening cache, 1 GB LRU;
+   explicit Download keeps chapters on the phone).
    No accounts, no analytics, no API keys — the app works in airplane mode
    once audio is cached.
 2. **The data pipeline is a build step, not app code.** Everything fragile
@@ -287,7 +288,41 @@ controls, audio focus, becoming-noisy handling, wake mode for streaming, plus a
 browsable/searchable catalog of all 114 surahs for Assistant, Android Auto, and
 other media clients. Search requests are expanded into the same complete ayah
 queue used by the reader. Audio flows through a `CacheDataSource` backed by a
-1 GB LRU `SimpleCache`, so an ayah streams once and replays from disk afterwards.
+1 GB LRU `SimpleCache` for listening (`cacheDir`) plus a non-evicting keep
+tree (`filesDir`) for chapters the reader asked to download. Playback reads
+keep first, then listen, and writes only listen. A downloaded ayah is
+dropped from listen so the one storage total does not count it twice.
+Leftover `filesDir/audio` from the old listen LRU moves onto `cacheDir` once,
+before either `SimpleCache` opens; a persistent marker prevents later explicit
+downloads from ever being reclassified as cache. Delete all empties the live caches
+in place so playback keeps the same instances. Settings → Download manager
+shows one total and Delete all (keep and listen). Reciters sit
+24 dp apart. The chevron is the only trailing
+control on the name. Download all, Pause, Resume, and Delete sit
+16 dp after the subtitle facts, never under the chevron. Open catalog is flush with the reciter spine,
+gold hairlines between chapters.
+A chapter row is bodyLarge name, labelSmall verses · size · status, with
+trailing verbs in a reserved 128 dp slot (Download, Pause, Resume,
+Delete). A paused chapter shows Delete then Resume in that slot, Resume
+on the right edge. Fetch verbs are green;
+delete is quiet ink. Pause keeps ayahs
+already fetched. Download all stays on an open reciter. Collapsed Resume
+continues a pause or unfinished partials, not empty chapters. Collapsing a
+reciter does not reopen it because a download is running.
+An ayah counts as complete only when Media3 records its content length and the
+cache holds that full length; partial spans stay resumable. A chapter download
+also keeps the shared basmalah clip when its playback queue begins with one. Playback
+strips Media3's `FLAG_DONT_CACHE_IF_LENGTH_UNKNOWN` so streamed ayahs stay
+on disk the same way Download all / Wi‑Fi prefetch already did. Storage
+changes and the catalog scan form one visible transition: the affected action
+shows an ellipsis until the post-operation scan is applied. Completion tokens
+are revisioned, so an older scan cannot uncover a stale Download / Resume /
+Delete state or acknowledge a newer disk change. Delete also cancels and waits
+for the affected blocking `CacheWriter` before removing its spans, so an
+in-flight ayah cannot put bytes back after the refreshed state is shown.
+The first catalog scan likewise shows reciter names with an ellipsis instead
+of a false empty state. Chapter rows are lazy, so opening an expanded reciter
+does not compose its full 114-row catalog in one frame.
 
 ## Android voice / Assistant
 

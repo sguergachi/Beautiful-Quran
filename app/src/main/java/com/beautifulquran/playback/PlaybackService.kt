@@ -13,11 +13,7 @@ import androidx.media3.common.MediaMetadata
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.Timeline
-import androidx.media3.database.StandaloneDatabaseProvider
 import androidx.media3.datasource.DefaultHttpDataSource
-import androidx.media3.datasource.cache.CacheDataSource
-import androidx.media3.datasource.cache.LeastRecentlyUsedCacheEvictor
-import androidx.media3.datasource.cache.SimpleCache
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.audio.AudioSink
@@ -37,7 +33,6 @@ import com.beautifulquran.domain.BASMALAH_PLAYLIST_AYAH
 import com.google.common.collect.ImmutableList
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
-import java.io.File
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -51,21 +46,23 @@ class PlaybackService : MediaLibraryService() {
     private var prefetcher: AudioPrefetcher? = null
     private var assistantAudioResume: AssistantAudioResume? = null
 
+    @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
     override fun onCreate() {
         super.onCreate()
 
-        val cache = getCache(this)
+        RecitationCache.prepare(this)
         val upstream = DefaultHttpDataSource.Factory()
             .setUserAgent("BeautifulQuran/1.0")
             .setConnectTimeoutMs(15_000)
             .setReadTimeoutMs(15_000)
             .setAllowCrossProtocolRedirects(true)
-        val cacheDataSource = CacheDataSource.Factory()
-            .setCache(cache)
-            .setUpstreamDataSourceFactory(upstream)
-            .setFlags(CacheDataSource.FLAG_IGNORE_CACHE_ON_ERROR)
+        val playerDataSource = RecitationCache.playbackDataSourceFactory(this, upstream)
 
-        val prefetcher = AudioPrefetcher(cache, upstream, getSystemService()!!)
+        val prefetcher = AudioPrefetcher(
+            RecitationCache.listen(this),
+            upstream,
+            getSystemService()!!,
+        )
         this.prefetcher = prefetcher
 
         // Playlist preload covers the next ayah's join latency (Media3 1.10).
@@ -73,7 +70,7 @@ class PlaybackService : MediaLibraryService() {
         // PreloadConfiguration only looks ahead one item.
         @Suppress("UnstableApiUsage")
         val player = ExoPlayer.Builder(this, tarjiRenderersFactory(this))
-            .setMediaSourceFactory(DefaultMediaSourceFactory(cacheDataSource))
+            .setMediaSourceFactory(DefaultMediaSourceFactory(playerDataSource))
             .setAudioAttributes(
                 AudioAttributes.Builder()
                     .setUsage(C.USAGE_MEDIA)
@@ -397,26 +394,9 @@ class PlaybackService : MediaLibraryService() {
     companion object {
         private const val LIBRARY_ROOT = "quran"
         private const val CHAPTER_PREFIX = "chapter:"
-        /** Recently-heard surahs stay offline for a while: audio is small
-         * (a few MB per surah), so a 1 GB LRU budget holds hundreds of them. */
-        private const val CACHE_BYTES = 1024L * 1024 * 1024
-
         /** How much of the *next* playlist item ExoPlayer should buffer ahead
          * of the current ayah. Ayah MP3s are short; ~5 s covers a typical
          * join without racing the player's own buffer. */
         private const val PLAYLIST_PRELOAD_US = 5_000_000L
-
-        private var cache: SimpleCache? = null
-
-        @Synchronized
-        private fun getCache(service: Context): SimpleCache =
-            cache ?: SimpleCache(
-                // filesDir, not cacheDir: cacheDir is evictable by the OS at
-                // any moment, which would defeat offline playback. Here we own
-                // eviction through the LRU budget below.
-                File(service.filesDir, "audio"),
-                LeastRecentlyUsedCacheEvictor(CACHE_BYTES),
-                StandaloneDatabaseProvider(service),
-            ).also { cache = it }
     }
 }

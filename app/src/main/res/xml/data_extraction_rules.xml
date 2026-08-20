@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Android 12+ (android:dataExtractionRules). Exclude the rebuildable audio
-     cache from both cloud backup and device-to-device transfer. -->
+<!-- Android 12+ (android:dataExtractionRules). Listening audio lives in
+     cacheDir; exclude reproducible explicit downloads in filesDir/audio. -->
 <data-extraction-rules>
     <cloud-backup>
         <exclude domain="file" path="audio" />

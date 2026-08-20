@@ -180,8 +180,8 @@ python3 tools/test_build_db.py  # timing pipeline regressions (~1s, no Gradle)
    paper stack in `MainActivity`). Do not introduce a framework to solve a
    problem the existing hand-rolled piece already solves.
 6. **Offline-first, no backend.** No accounts, no analytics, no API keys. Only
-   recitation audio touches the network at runtime (streamed and cached,
-   1 GB LRU).
+   recitation audio touches the network at runtime (listening uses a 1 GB LRU
+   in cacheDir; explicit downloads are kept in filesDir).
 7. **Ink / karaoke fidelity is non-negotiable (Android + web).** The signature
    product moment is the soft directional ink wash: each word reveals with a
    **visible faded leading edge** (smootherstep `letterFadeIn` /
@@ -322,6 +322,13 @@ this document combined: `ReaderComponents.kt` (~36k tokens),
 ## Working style
 
 - Branch off `master`; keep commits focused with clear, descriptive messages.
+- Finish every requested code change by committing and pushing it. Continue an
+  open PR on its actual head branch; if that PR has merged, follow the fresh-PR
+  rule below instead.
+- Send a clearly named debug APK to the Pixel 10 after every completed code
+  change. Never send a generic `app-debug.apk` / `app-release.apk` filename,
+  and verify that the transfer actually completed rather than trusting the
+  sender's exit code. If the phone is unreachable, report that plainly.
 - Update the relevant doc in `docs/` when you change behavior it describes —
   the docs are load-bearing and kept accurate.
 

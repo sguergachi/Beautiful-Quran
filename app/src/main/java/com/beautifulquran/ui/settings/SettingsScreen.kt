@@ -51,7 +51,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -81,6 +83,9 @@ import com.beautifulquran.data.ReadingLayout
 import com.beautifulquran.data.ReadingMode
 import com.beautifulquran.data.Settings
 import com.beautifulquran.data.ThemeMode
+import com.beautifulquran.playback.RecitationCache
+import com.beautifulquran.playback.RecitationUsage
+import com.beautifulquran.playback.formatUsage
 import com.beautifulquran.ui.PageTurnSounds
 import com.beautifulquran.ui.theme.BrushCheckParams
 import com.beautifulquran.ui.theme.BrushCircleParams
@@ -148,7 +153,15 @@ fun SettingsScreen(
 ) {
     val settings by viewModel.settings.settings.collectAsStateWithLifecycle()
     val reciters by viewModel.reciters.collectAsStateWithLifecycle()
+    val surahs by viewModel.surahs.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    var managerOpen by remember { mutableStateOf(false) }
+    var usage by remember { mutableStateOf<RecitationUsage?>(null) }
+    LaunchedEffect(managerOpen) {
+        if (!managerOpen) usage = withContext(Dispatchers.IO) {
+            RecitationCache.usage(context)
+        }
+    }
 
     var customizeOpen by rememberSaveable { mutableStateOf(false) }
     var developerTapCount by remember { mutableStateOf(0) }
@@ -208,6 +221,18 @@ fun SettingsScreen(
         }
     }
 
+    if (managerOpen) {
+        DownloadManagerPage(
+            reciters = reciters,
+            surahs = surahs,
+            onBack = {
+                usage = null
+                managerOpen = false
+            },
+        )
+        return
+    }
+
     Box(
         Modifier
             .fillMaxSize()
@@ -257,6 +282,29 @@ fun SettingsScreen(
                     selected = reciter.id == settings.reciterId,
                     onClick = { viewModel.selectReciter(reciter) },
                 )
+            }
+
+            Section("Download manager")
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .quietClickable { managerOpen = true }
+                    .padding(vertical = 8.dp),
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        text = "Download manager",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    Text(
+                        text = usage?.let(::formatUsage) ?: "…",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
+                    )
+                }
+                DisclosureChevron(expanded = false)
             }
 
             Section("Reading")
