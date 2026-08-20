@@ -1187,7 +1187,7 @@ export function ReaderScreen({ stackLayer }: { stackLayer: StackLayer }) {
   const preface = prefaceState(state.activeBasmalah, false)
   const showBasmalah = surahOpensWithBasmalahPreface(content.surah.id)
   const ayahCount = content.surah.ayahCount
-  const useArabicIndicDigits = state.settings.readingMode !== 'english_only'
+  const pageNumberScript = state.settings.pageNumberScript
   // Rail tracks the recitation only while playing; otherwise the reading line.
   const railAyah =
     recitingActive && state.activeAyah != null ? state.activeAyah : focusedAyah
@@ -1434,7 +1434,7 @@ export function ReaderScreen({ stackLayer }: { stackLayer: StackLayer }) {
                     <PageBreak
                       key={`page-${item.page}`}
                       page={item.page}
-                      useArabicIndicDigits={useArabicIndicDigits}
+                      script={pageNumberScript}
                     />
                   )
                 }
@@ -1472,6 +1472,7 @@ export function ReaderScreen({ stackLayer }: { stackLayer: StackLayer }) {
                       keepActiveWordInView={keepWordInView && isFocusTarget}
                       onKeepWordInView={onKeepWordInView}
                       readingMode={state.settings.readingMode}
+                      verseNumberScript={state.settings.verseNumberScript}
                       showWordGloss={state.settings.showWordGloss}
                       showTransliteration={state.settings.showTransliteration}
                       showTranslation={state.settings.showTranslation}

@@ -8,11 +8,17 @@ import kotlinx.coroutines.flow.StateFlow
 
 enum class ThemeMode { SYSTEM, LIGHT, DARK, ROYAL_GREEN }
 
-/** What flows on the sheet: Arabic with English under each word, or English only. */
-enum class ReadingMode { ARABIC_ENGLISH, ENGLISH_ONLY }
+/** What flows on the sheet: Arabic with English under each word, English only, or Arabic only. */
+enum class ReadingMode { ARABIC_ENGLISH, ENGLISH_ONLY, ARABIC_ONLY }
 
-/** How the reader lays scripture: the scrolling verse sheet, or mushaf pages. */
+/** Continuous scroll, or a printed mushaf leaf. Mushaf is Arabic only. */
 enum class ReadingLayout { SCROLL, MUSHAF }
+
+/** Digit form of the trailing ﴿N﴾ / ﴾N﴿ verse mark. */
+enum class VerseNumberScript { ARABIC, ENGLISH }
+
+/** Folio figures on a mushaf page break: one script, or both. */
+enum class PageNumberScript { BOTH, ARABIC, ENGLISH }
 
 /** Which screen edge the ayah selector rail lives on. */
 enum class AyahSelectorSide { LEFT, RIGHT }
@@ -50,6 +56,8 @@ data class Settings(
     val fontScale: Float = 1f,
     val readingMode: ReadingMode = ReadingMode.ARABIC_ENGLISH,
     val readingLayout: ReadingLayout = ReadingLayout.SCROLL,
+    val verseNumberScript: VerseNumberScript = VerseNumberScript.ARABIC,
+    val pageNumberScript: PageNumberScript = PageNumberScript.BOTH,
     val showWordGloss: Boolean = true,
     val showTransliteration: Boolean = false,
     val showTranslation: Boolean = false,
@@ -114,6 +122,8 @@ class SettingsRepository(context: Context) {
         fontScale = prefs.getFloat("fontScale", 1f),
         readingMode = prefs.enum("readingMode", ReadingMode.ARABIC_ENGLISH),
         readingLayout = prefs.enum("readingLayout", ReadingLayout.SCROLL),
+        verseNumberScript = prefs.enum("verseNumberScript", VerseNumberScript.ARABIC),
+        pageNumberScript = prefs.enum("pageNumberScript", PageNumberScript.BOTH),
         showWordGloss = prefs.getBoolean("showWordGloss", true),
         showTransliteration = prefs.getBoolean("showTransliteration", false),
         showTranslation = prefs.getBoolean("showTranslation", false),
@@ -169,6 +179,8 @@ class SettingsRepository(context: Context) {
             putFloat("fontScale", next.fontScale)
             putInt("readingMode", next.readingMode.ordinal)
             putInt("readingLayout", next.readingLayout.ordinal)
+            putInt("verseNumberScript", next.verseNumberScript.ordinal)
+            putInt("pageNumberScript", next.pageNumberScript.ordinal)
             putBoolean("showWordGloss", next.showWordGloss)
             putBoolean("showTransliteration", next.showTransliteration)
             putBoolean("showTranslation", next.showTranslation)

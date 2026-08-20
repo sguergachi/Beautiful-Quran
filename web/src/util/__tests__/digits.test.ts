@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { formatAyahNumberMark, formatReaderDigits, toArabicIndic } from '../digits'
+import {
+  formatAyahNumberMark,
+  formatReaderDigits,
+  pageFolioLayout,
+  toArabicIndic,
+} from '../digits'
 
 describe('toArabicIndic', () => {
   it('maps Western digits to Arabic-Indic', () => {
@@ -27,14 +32,46 @@ describe('formatAyahNumberMark', () => {
     expect(formatAyahNumberMark(12, true)).toBe(`﴿${wj}١${wj}٢${wj}﴾`)
   })
 
-  it('uses LTR bracket order with Western digits', () => {
-    expect(formatAyahNumberMark(12, false)).toBe(`﴾${wj}1${wj}2${wj}﴿`)
+  it('emits the opposite code points so LTR mirroring paints cups toward the digits', () => {
+    const lri = '\u2066'
+    const pdi = '\u2069'
+    expect(formatAyahNumberMark(12, false)).toBe(
+      `${lri}${wj}﴾${wj}1${wj}2${wj}﴿${wj}${pdi}`,
+    )
+  })
+
+  it('LTR-isolates English marks so an RTL line cannot flip the brackets', () => {
+    const mark = formatAyahNumberMark(1, false)
+    expect(mark.startsWith('\u2066')).toBe(true)
+    expect(mark.endsWith('\u2069')).toBe(true)
   })
 
   it('glues mark characters so they cannot wrap mid-unit', () => {
     const mark = formatAyahNumberMark(3, false)
-    expect(mark).toBe(`﴾${wj}3${wj}﴿`)
     expect(mark.includes('﴾3')).toBe(false)
     expect(mark.includes('3﴿')).toBe(false)
+  })
+})
+
+describe('pageFolioLayout', () => {
+  it('places both scripts at opposite ends', () => {
+    expect(pageFolioLayout(12, 'both')).toEqual({
+      leading: '12',
+      trailing: '١٢',
+      centered: false,
+    })
+  })
+
+  it('centres a single script', () => {
+    expect(pageFolioLayout(12, 'english')).toEqual({
+      leading: '12',
+      trailing: null,
+      centered: true,
+    })
+    expect(pageFolioLayout(12, 'arabic')).toEqual({
+      leading: '١٢',
+      trailing: null,
+      centered: true,
+    })
   })
 })

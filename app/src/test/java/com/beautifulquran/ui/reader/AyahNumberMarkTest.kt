@@ -16,9 +16,11 @@ class AyahNumberMarkTest {
     }
 
     @Test
-    fun `English mark uses LTR bracket order and Western digits`() {
+    fun `English mark emits the opposite code points so LTR mirroring paints cups toward the digits`() {
+        val lri = "\u2066"
+        val pdi = "\u2069"
         assertEquals(
-            "﴾${wordJoiner}1${wordJoiner}2${wordJoiner}﴿",
+            "$lri${wordJoiner}﴾${wordJoiner}1${wordJoiner}2${wordJoiner}﴿${wordJoiner}$pdi",
             formatAyahNumberMark(12, useArabicIndicDigits = false),
         )
     }
@@ -33,10 +35,15 @@ class AyahNumberMarkTest {
     }
 
     @Test
+    fun `English mark is LTR-isolated so an RTL line cannot flip its brackets`() {
+        val mark = formatAyahNumberMark(1, useArabicIndicDigits = false)
+        assertEquals('\u2066', mark.first())
+        assertEquals('\u2069', mark.last())
+    }
+
+    @Test
     fun `mark characters are glued so they cannot line-break mid unit`() {
         val mark = formatAyahNumberMark(3, useArabicIndicDigits = false)
-        assertEquals("﴾${wordJoiner}3${wordJoiner}﴿", mark)
-        // No adjacent mark graphemes without a joiner between them.
         assertFalse(mark.contains("﴾3"))
         assertFalse(mark.contains("3﴿"))
     }

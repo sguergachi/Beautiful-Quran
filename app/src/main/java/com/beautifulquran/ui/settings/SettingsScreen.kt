@@ -35,6 +35,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -48,6 +49,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import kotlinx.coroutines.delay
 import androidx.compose.ui.Alignment
@@ -73,7 +75,6 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.beautifulquran.BuildConfig
 import com.beautifulquran.R
-import com.beautifulquran.data.AyahSelectorSide
 import com.beautifulquran.data.BrushCircleStyle
 import com.beautifulquran.data.HomeBookmarkStyle
 import com.beautifulquran.data.ReadingLayout
@@ -85,7 +86,6 @@ import com.beautifulquran.ui.theme.BrushCheckParams
 import com.beautifulquran.ui.theme.BrushCircleParams
 import com.beautifulquran.ui.theme.DisclosureChevron
 import com.beautifulquran.ui.theme.InkCheck
-import com.beautifulquran.ui.theme.InkCircledChoiceRow
 import com.beautifulquran.ui.theme.InkDisc
 import com.beautifulquran.ui.theme.SHIPPED_BRUSH_REVISION
 import com.beautifulquran.ui.theme.SHIPPED_CHECK_REVISION
@@ -150,6 +150,7 @@ fun SettingsScreen(
     val reciters by viewModel.reciters.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
+    var customizeOpen by rememberSaveable { mutableStateOf(false) }
     var developerTapCount by remember { mutableStateOf(0) }
     // Session-only live knobs for the brush lab (not persisted).
     // SHIPPED_BRUSH_REVISION forces reseed when the baseline design is updated.
@@ -192,6 +193,8 @@ fun SettingsScreen(
         checkPaintToken++
     }
 
+    BackHandler(enabled = customizeOpen) { customizeOpen = false }
+
     if (developerTapCount > 0) {
         LaunchedEffect(developerTapCount) {
             delay(1500L)
@@ -210,6 +213,18 @@ fun SettingsScreen(
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background),
     ) {
+        if (customizeOpen) {
+            CustomizeScreen(
+                settings = settings,
+                brushParams = brushParams,
+                paintToken = paintToken,
+                checkParams = checkParams,
+                checkPaintToken = checkPaintToken,
+                onBack = { customizeOpen = false },
+                onUpdate = { transform -> viewModel.settings.update(transform) },
+            )
+            return@Box
+        }
         Column(
             modifier = Modifier
                 .align(Alignment.TopCenter)
@@ -244,38 +259,12 @@ fun SettingsScreen(
                 )
             }
 
-            Section("Reading layout")
-            InkCircledChoiceRow(
-                entries = ReadingLayout.entries,
-                selected = settings.readingLayout,
-                params = brushParams,
-                paintToken = paintToken,
-                label = { layout ->
-                    when (layout) {
-                        ReadingLayout.SCROLL -> "Scroll"
-                        ReadingLayout.MUSHAF -> "Mushaf"
-                    }
-                },
-                onSelect = { layout ->
-                    viewModel.settings.update { it.copy(readingLayout = layout) }
-                },
+            Section("Reading")
+            NavigateRow(
+                label = "Customize",
+                note = customizeSummary(settings),
+                onClick = { customizeOpen = true },
             )
-            if (settings.readingLayout == ReadingLayout.SCROLL) {
-                Spacer(Modifier.height(16.dp))
-                InkCircledChoiceRow(
-                    entries = ReadingMode.entries,
-                    selected = settings.readingMode,
-                    params = brushParams,
-                    paintToken = paintToken,
-                    label = { mode ->
-                        when (mode) {
-                            ReadingMode.ARABIC_ENGLISH -> "Arabic & English"
-                            ReadingMode.ENGLISH_ONLY -> "English"
-                        }
-                    },
-                    onSelect = { mode -> viewModel.settings.update { it.copy(readingMode = mode) } },
-                )
-            }
 
             Section("Text size")
             TextSizeControl(
@@ -289,13 +278,6 @@ fun SettingsScreen(
             ) {
                 Spacer(Modifier.height(20.dp))
                 ToggleRow(
-                    label = "Word-by-word translation",
-                    checked = settings.showWordGloss,
-                    onChange = { v -> viewModel.settings.update { it.copy(showWordGloss = v) } },
-                    checkParams = checkParams,
-                    checkPaintToken = checkPaintToken,
-                )
-                ToggleRow(
                     label = "Transliteration",
                     checked = settings.showTransliteration,
                     onChange = { v -> viewModel.settings.update { it.copy(showTransliteration = v) } },
@@ -308,40 +290,6 @@ fun SettingsScreen(
                     onChange = { v -> viewModel.settings.update { it.copy(showTranslation = v) } },
                     checkParams = checkParams,
                     checkPaintToken = checkPaintToken,
-                )
-            }
-
-            ToggleRow(
-                label = "Verse annotations",
-                checked = settings.annotationsEnabled,
-                onChange = { v -> viewModel.settings.update { it.copy(annotationsEnabled = v) } },
-                checkParams = checkParams,
-                checkPaintToken = checkPaintToken,
-            )
-
-            Section("Ayah selector")
-            InkCircledChoiceRow(
-                entries = AyahSelectorSide.entries,
-                selected = settings.ayahSelectorSide,
-                params = brushParams,
-                paintToken = paintToken,
-                label = { side ->
-                    when (side) {
-                        AyahSelectorSide.LEFT -> "Left side"
-                        AyahSelectorSide.RIGHT -> "Right side"
-                    }
-                },
-                onSelect = { side -> viewModel.settings.update { it.copy(ayahSelectorSide = side) } },
-            )
-
-            Section("Theme")
-            Spacer(Modifier.height(2.dp))
-            ThemeMode.entries.forEach { mode ->
-                SelectRow(
-                    label = mode.label,
-                    selected = settings.themeMode == mode,
-                    onClick = { viewModel.settings.update { it.copy(themeMode = mode) } },
-                    trailing = { ThemeColorPreview(mode = mode) },
                 )
             }
 
@@ -861,7 +809,7 @@ private fun DeveloperSection(
 // ── Header / footer ────────────────────────────────────────────────────────
 
 @Composable
-private fun BackChevron(onBack: () -> Unit) {
+internal fun BackChevron(onBack: () -> Unit) {
     Box(
         modifier = Modifier
             .size(40.dp)
@@ -915,11 +863,41 @@ private fun Colophon(
 
 // ── Selection vocabulary ───────────────────────────────────────────────────
 
+/** Opens a sub-page on this same sheet — label, quiet summary, chevron. */
+@Composable
+private fun NavigateRow(
+    label: String,
+    note: String,
+    onClick: () -> Unit,
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .quietClickable(onClick = onClick)
+            .padding(vertical = 8.dp),
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            Text(
+                text = note,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+            )
+        }
+        DisclosureChevron(expanded = false)
+    }
+}
+
 /** A single-choice row: a green ink disc leads the label, ink strength carries
  * the selection, and an optional trailing ornament (theme swatches) sits at the
  * edge. No radio, no ripple. */
 @Composable
-private fun SelectRow(
+internal fun SelectRow(
     label: String,
     selected: Boolean,
     onClick: () -> Unit,
@@ -964,7 +942,7 @@ private fun SelectRow(
 /** On/off row: the label carries the weight; a green tick inks itself in at the
  * trailing edge when on, and settles to a faint empty ring when off. */
 @Composable
-private fun ToggleRow(
+internal fun ToggleRow(
     label: String,
     checked: Boolean,
     onChange: (Boolean) -> Unit,
@@ -1470,7 +1448,7 @@ private fun TextSizeControl(scale: Float, onScale: (Float) -> Unit) {
 
 /** Theme preview: main paper fill in a round rect with a gilded gold rim. */
 @Composable
-private fun ThemeColorPreview(mode: ThemeMode) {
+internal fun ThemeColorPreview(mode: ThemeMode) {
     val colors = themePreviewColors(mode)
     val fill = colors.first()
     // Paper gilt on light surfaces; warmer gilt on dark (matches Theme.kt accents).
@@ -1490,19 +1468,14 @@ private fun ThemeColorPreview(mode: ThemeMode) {
     )
 }
 
-private val ThemeMode.label: String
-    get() = when (this) {
-        ThemeMode.SYSTEM -> "System"
-        ThemeMode.LIGHT -> "Paper"
-        ThemeMode.DARK -> "Nightfall"
-        ThemeMode.ROYAL_GREEN -> "Royal green"
-    }
+internal val ThemeMode.label: String
+    get() = themeLabel(this)
 
 // ── Quiet typographic helpers ──────────────────────────────────────────────
 
 /** A section opening: generous air above, then the quiet label. */
 @Composable
-private fun Section(text: String) {
+internal fun Section(text: String) {
     Spacer(Modifier.height(32.dp))
     SectionLabel(text)
     Spacer(Modifier.height(10.dp))
@@ -1511,7 +1484,7 @@ private fun Section(text: String) {
 /** Letterspaced, low-ink label — a whisper that never competes with the
  * reading (docs/DESIGN.md). */
 @Composable
-private fun SectionLabel(text: String) {
+internal fun SectionLabel(text: String) {
     Text(
         text = text.uppercase(),
         style = MaterialTheme.typography.labelSmall,
@@ -1521,7 +1494,7 @@ private fun SectionLabel(text: String) {
 }
 
 @Composable
-private fun Caption(text: String) {
+internal fun Caption(text: String) {
     Text(
         text = text,
         style = MaterialTheme.typography.labelSmall,

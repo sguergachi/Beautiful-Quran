@@ -1542,6 +1542,11 @@ select {
   background: rgb(from var(--gold) r g b / 0.36);
 }
 
+.ayah-mark--ltr {
+  unicode-bidi: isolate;
+  direction: ltr;
+}
+
 .ayah-mark {
   font-family: var(--font-arabic);
   color: var(--gold);
@@ -2627,6 +2632,264 @@ select {
   font-size: clamp(1.65rem, 4.5vw, 1.85rem);
   margin: 0 0 2.25rem;
   color: var(--ink);
+}
+
+.settings-nav {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 0.5rem 0;
+  margin: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+.settings-nav-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.settings-nav-label {
+  font-size: 1.05rem;
+  line-height: 1.35;
+  color: var(--ink);
+}
+
+.settings-nav-note {
+  font-size: 0.8rem;
+  line-height: 1.3;
+  color: color-mix(in srgb, var(--ink-muted) 90%, transparent);
+}
+
+.settings:has(.customize) {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding-right: 0;
+  padding-left: 0;
+  padding-bottom: 0;
+}
+
+.customize {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  height: 100%;
+  position: relative;
+}
+
+.customize-sticky {
+  flex: 0 0 auto;
+  position: relative;
+  z-index: 1;
+  background: var(--paper);
+  padding: 0 var(--sheet-pad) 0.35rem;
+}
+
+.customize-sticky::after,
+.customize::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.customize-sticky::after {
+  top: 100%;
+  height: 2.25rem;
+  background: linear-gradient(to bottom, var(--paper), transparent);
+}
+
+.customize::after {
+  bottom: 0;
+  height: 2.5rem;
+  background: linear-gradient(to top, var(--paper), transparent);
+}
+
+.customize-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  padding: 0 var(--sheet-pad) calc(3rem + env(safe-area-inset-bottom, 0px));
+}
+
+.reading-preview {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  padding: 0.75rem 0.9rem;
+  overflow: hidden;
+  border-radius: 3px;
+  border: 0.5px solid rgb(from var(--gold) r g b / 0.28);
+  background: color-mix(in srgb, var(--paper-surface) 42%, transparent);
+  opacity: 0.74;
+}
+
+.reading-preview--rail-left {
+  padding-inline-start: 1.55rem;
+}
+
+.reading-preview--rail-right {
+  padding-inline-end: 1.55rem;
+}
+
+.reading-preview__rail {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.reading-preview__rail--left {
+  left: -1.5px;
+  align-items: flex-start;
+}
+
+.reading-preview__rail--right {
+  right: -1.5px;
+  align-items: flex-end;
+}
+
+.reading-preview__rail i {
+  display: block;
+  height: 1.5px;
+  width: 10px;
+  border-radius: 1.5px;
+  background: color-mix(in srgb, var(--ink) 18%, transparent);
+}
+
+.reading-preview__rail i[data-focus='true'] {
+  width: 13px;
+  background: color-mix(in srgb, var(--ink) 90%, transparent);
+}
+
+.reading-preview--mushaf {
+  align-items: stretch;
+  text-align: center;
+}
+
+.reading-preview__head {
+  margin: 0;
+  font-family: var(--font-arabic);
+  font-size: 0.95rem;
+  color: rgb(from var(--gold) r g b / 0.58);
+}
+
+.reading-preview__arabic {
+  margin: 0;
+  font-family: var(--font-arabic);
+  font-size: 1.5rem;
+  line-height: 1.9;
+  color: var(--ink);
+  text-align: start;
+}
+
+.reading-preview__stack {
+  position: relative;
+}
+
+.reading-preview__sizer,
+.reading-preview__live {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.reading-preview__sizer {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.reading-preview__live {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+
+.reading-preview__arabic .ayah-mark {
+  vertical-align: middle;
+}
+
+.reading-preview__words {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 0.35rem 0.45rem;
+}
+
+.reading-preview__words > .ayah-mark {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  height: calc(1.5rem * 1.4);
+  line-height: 1;
+}
+
+.reading-preview__word {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.reading-preview__word .reading-preview__arabic {
+  line-height: 1.4;
+}
+
+.reading-preview__gloss {
+  font-size: 0.625rem;
+  line-height: 1.3;
+  color: color-mix(in srgb, var(--ink) 62%, transparent);
+  text-align: center;
+}
+
+.reading-preview--mushaf .reading-preview__arabic {
+  text-align: right;
+}
+
+.reading-preview__english {
+  margin: 0;
+  font-family: var(--font-body);
+  font-size: 0.8125rem;
+  line-height: 1.6;
+  color: color-mix(in srgb, var(--ink) 66%, transparent);
+}
+
+.reading-preview__english--lyric {
+  font-size: 1.125rem;
+  line-height: 1.5;
+  color: color-mix(in srgb, var(--ink) 88%, transparent);
+  text-align: start;
+}
+
+.reading-preview__english--lyric .ayah-mark {
+  display: inline;
+  margin-inline-start: 0.2em;
+  font-size: 0.78em;
+  line-height: inherit;
+  vertical-align: baseline;
+}
+
+.reading-preview .page-break {
+  padding: 0.4rem 0;
+  max-width: none;
 }
 
 .settings-section {

@@ -1,6 +1,6 @@
 import { memo, useEffect, useMemo, useRef, useState } from 'react'
 import type { ActiveWord, Ayah, Word } from '../data/models'
-import type { ReadingMode } from '../data/settings'
+import type { ReadingMode, VerseNumberScript } from '../data/settings'
 import { lyricizeEnglishGlosses } from '../domain/EnglishTypography'
 import { InkEngine, InkState } from '../ui/reader/InkEngine'
 import { ayahTranslationAlpha } from '../ui/reader/WordHighlight'
@@ -20,6 +20,7 @@ interface Props {
   keepActiveWordInView?: boolean
   onKeepWordInView?: (wordEl: HTMLElement) => void
   readingMode: ReadingMode
+  verseNumberScript?: VerseNumberScript
   showWordGloss: boolean
   showTransliteration: boolean
   showTranslation: boolean
@@ -48,6 +49,7 @@ function AyahBlockInner({
   keepActiveWordInView = false,
   onKeepWordInView,
   readingMode,
+  verseNumberScript = 'arabic',
   showWordGloss,
   showTransliteration,
   showTranslation,
@@ -65,8 +67,7 @@ function AyahBlockInner({
 }: Props) {
   const englishOnly = readingMode === 'english_only'
   const arabicOnly = readingMode === 'arabic_only'
-  // English-only: Western digits (Android AyahNumberMark useArabicIndicDigits=false).
-  const ayahMark = formatAyahNumberMark(ayah.number, !englishOnly)
+  const ayahMark = formatAyahNumberMark(ayah.number, verseNumberScript === 'arabic')
   // Inactive-ayah recess is one `.ayah-recess-veil` (paint-phase) — no per-word
   // inline dim so play/pause does not thrash every verse.
   const words = useMemo(() => ayah.words, [ayah.words])
@@ -147,7 +148,12 @@ function AyahBlockInner({
               />
             )
           })}
-          <span className="ayah-mark">{ayahMark}</span>
+          <span
+            className={verseNumberScript === 'arabic' ? 'ayah-mark' : 'ayah-mark ayah-mark--ltr'}
+            dir={verseNumberScript === 'arabic' ? undefined : 'ltr'}
+          >
+            {ayahMark}
+          </span>
         </p>
       ) : (
         <div className="words" dir={englishOnly ? 'ltr' : 'rtl'} data-lyric={englishOnly ? 'english' : 'arabic'}>
@@ -182,11 +188,16 @@ function AyahBlockInner({
               </span>
             )
           })}
-          <span className="ayah-mark">{ayahMark}</span>
+          <span
+            className={verseNumberScript === 'arabic' ? 'ayah-mark' : 'ayah-mark ayah-mark--ltr'}
+            dir={verseNumberScript === 'arabic' ? undefined : 'ltr'}
+          >
+            {ayahMark}
+          </span>
         </div>
       )}
 
-      {showTranslation && !englishOnly && ayah.translation ? (
+      {showTranslation && readingMode === 'arabic_english' && ayah.translation ? (
         <p
           className="ayah-translation"
           data-search-hit={translationHit ? 'true' : undefined}
@@ -215,6 +226,7 @@ export const AyahBlock = memo(AyahBlockInner, (prev, next) => {
     prev.focused === next.focused &&
     prev.keepActiveWordInView === next.keepActiveWordInView &&
     prev.readingMode === next.readingMode &&
+    prev.verseNumberScript === next.verseNumberScript &&
     prev.showWordGloss === next.showWordGloss &&
     prev.showTransliteration === next.showTransliteration &&
     prev.showTranslation === next.showTranslation &&

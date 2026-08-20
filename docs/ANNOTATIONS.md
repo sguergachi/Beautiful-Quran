@@ -225,11 +225,12 @@ own and never a table inside the bundled asset.
 
 ## Switching it off
 
-Settings → **Verse annotations** hides every annotation and disables the entry
+Settings → Customize → **Verse annotations** hides every annotation and disables the entry
 gesture on saved ribbons. Stored writing is never deleted — switching it back
-on brings it back wherever its verse is still bookmarked. It exists because a
-reader who only wants the mushaf should be able to have exactly that, and
-because a future scholar's gloss must be refusable too.
+on brings it back wherever its verse is still bookmarked. Mushaf layout hides
+the toggle — a printed page has no annotation margin. The toggle remains for
+scroll readers who want a clean leaf, and because a future scholar's gloss
+must be refusable too.
 
 ## Export *(not yet built)*
 
