@@ -1,5 +1,7 @@
 package com.beautifulquran.ui.settings
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -52,6 +54,7 @@ import com.beautifulquran.playback.chapterActionIsFetch
 import com.beautifulquran.playback.chapterActionLabel
 import com.beautifulquran.playback.chapterFactLine
 import com.beautifulquran.playback.chapterOffersDelete
+import com.beautifulquran.playback.chapterProgressFraction
 import com.beautifulquran.playback.chapterTrailingLabels
 import com.beautifulquran.playback.downloadPercent
 import com.beautifulquran.playback.formatUsage
@@ -381,24 +384,23 @@ internal fun DownloadManagerPage(
                         val chapterReconciling = isChapterActionSettling(
                             progress, reciterId, row.surah.id,
                         ) || deleting.affectsChapter(reciterId, row.surah.id)
+                        val chapterPercent = when {
+                            downloading -> downloadPercent(progress.ayah, progress.ayahCount)
+                            chapterPaused -> progress.pausedClocks[
+                                ChapterRef(reciterId, row.surah.id)
+                            ]?.let { downloadPercent(it.ayah, it.ayahCount) }
+                            else -> null
+                        }
                         Column {
                             if (chapterIndex == 0) {
                                 Spacer(Modifier.height(16.dp))
-                            } else {
-                                ChapterHairline()
                             }
                             ChapterRow(
                                 row = row,
                                 downloading = downloading,
                                 waiting = waiting,
                                 paused = chapterPaused,
-                                percent = when {
-                                    downloading -> downloadPercent(progress.ayah, progress.ayahCount)
-                                    chapterPaused -> progress.pausedClocks[
-                                        ChapterRef(reciterId, row.surah.id)
-                                    ]?.let { downloadPercent(it.ayah, it.ayahCount) }
-                                    else -> null
-                                },
+                                percent = chapterPercent,
                                 confirming = confirming,
                                 reconciling = chapterReconciling,
                                 actionEnabled = deleting == null && !chapterReconciling,
@@ -434,6 +436,9 @@ internal fun DownloadManagerPage(
                                         )
                                     }
                                 },
+                            )
+                            ChapterHairline(
+                                progress = chapterProgressFraction(downloading, chapterPercent),
                             )
                         }
                     }
@@ -567,14 +572,28 @@ private fun FactActionRow(
 }
 
 @Composable
-private fun ChapterHairline() {
+private fun ChapterHairline(progress: Float?) {
     val gold = LocalQuranAccents.current.gold
+    val fill by animateFloatAsState(
+        targetValue = progress ?: 0f,
+        animationSpec = tween(durationMillis = 240),
+        label = "chapter download progress",
+    )
     Box(
         Modifier
             .fillMaxWidth()
             .height(0.5.dp)
             .background(gold.copy(alpha = 0.22f)),
-    )
+    ) {
+        if (progress != null && fill > 0f) {
+            Box(
+                Modifier
+                    .fillMaxWidth(fill)
+                    .fillMaxHeight()
+                    .background(gold.copy(alpha = 0.72f)),
+            )
+        }
+    }
 }
 
 @Composable

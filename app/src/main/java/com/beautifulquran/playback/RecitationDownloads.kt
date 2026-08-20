@@ -256,6 +256,9 @@ internal fun downloadPercent(ayah: Int, ayahCount: Int): Int? {
     return ((100 * ayah) / ayahCount).coerceIn(1, 100)
 }
 
+internal fun chapterProgressFraction(downloading: Boolean, percent: Int?): Float? =
+    if (downloading) (percent ?: 0).coerceIn(0, 100) / 100f else null
+
 /**
  * Queue updates must not wipe the in-flight ayah clock. Passing both [ayah]
  * and [ayahCount] is a real tick; otherwise keep the previous pair when the
@@ -712,12 +715,15 @@ internal object RecitationDownloads {
                     queue.takeNext()?.also { publishLocked() }
                 } ?: break
                 try {
+                    var completedAyahs = 0
                     for ((ayah, uri) in chapterAudioRequests(req.reciter, req.surah)) {
                         coroutineContext.ensureActive()
                         if (synchronized(lock) { queue.cancellingActive }) break
-                        synchronized(lock) { publishLocked(ayah, req.surah.ayahCount) }
                         if (isUriFullyCached(keep, uri)) {
                             RecitationCache.dropListenIfKept(app, uri)
+                            if (ayah > 0) synchronized(lock) {
+                                publishLocked(++completedAyahs, req.surah.ayahCount)
+                            }
                             continue
                         }
                         val cacheWriter = CacheWriter(
@@ -740,6 +746,11 @@ internal object RecitationDownloads {
                         try {
                             cacheWriter.cache()
                             RecitationCache.dropListenIfKept(app, uri)
+                            if (ayah > 0 && isUriFullyCached(keep, uri)) {
+                                synchronized(lock) {
+                                    publishLocked(++completedAyahs, req.surah.ayahCount)
+                                }
+                            }
                         } catch (_: IOException) {
                             // Best-effort; the player can fetch on demand.
                         } catch (_: InterruptedException) {

@@ -70,6 +70,10 @@ class RecitationDownloadsTest {
         assertEquals(100, downloadPercent(ayah = 7, ayahCount = 7))
         assertEquals(0, downloadPercent(ayah = 0, ayahCount = 7))
         assertNull(downloadPercent(ayah = 1, ayahCount = 0))
+        assertEquals(0f, chapterProgressFraction(downloading = true, percent = null))
+        assertEquals(0.42f, chapterProgressFraction(downloading = true, percent = 42))
+        assertEquals(1f, chapterProgressFraction(downloading = true, percent = 120))
+        assertNull(chapterProgressFraction(downloading = false, percent = 42))
         val live = DownloadProgress(
             running = true,
             reciterId = 1,
