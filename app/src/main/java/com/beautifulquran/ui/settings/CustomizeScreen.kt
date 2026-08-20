@@ -236,21 +236,6 @@ internal fun CustomizeScreen(
                 checkParams = checkParams,
                 checkPaintToken = checkPaintToken,
             )
-
-            Section("Ayah selector")
-            InkCircledChoiceRow(
-                entries = AyahSelectorSide.entries,
-                selected = settings.ayahSelectorSide,
-                params = brushParams,
-                paintToken = paintToken,
-                label = { side ->
-                    when (side) {
-                        AyahSelectorSide.LEFT -> "Left side"
-                        AyahSelectorSide.RIGHT -> "Right side"
-                    }
-                },
-                onSelect = { side -> onUpdate { it.copy(ayahSelectorSide = side) } },
-            )
         }
 
         if (showsScrollChrome(settings.readingLayout)) {
@@ -285,6 +270,23 @@ internal fun CustomizeScreen(
             },
             onSelect = { script -> onUpdate { it.copy(pageNumberScript = script) } },
         )
+
+        if (showsScrollChrome(settings.readingLayout)) {
+            Section("Ayah selector")
+            InkCircledChoiceRow(
+                entries = AyahSelectorSide.entries,
+                selected = settings.ayahSelectorSide,
+                params = brushParams,
+                paintToken = paintToken,
+                label = { side ->
+                    when (side) {
+                        AyahSelectorSide.LEFT -> "Left side"
+                        AyahSelectorSide.RIGHT -> "Right side"
+                    }
+                },
+                onSelect = { side -> onUpdate { it.copy(ayahSelectorSide = side) } },
+            )
+        }
 
         Section("Theme")
         Spacer(Modifier.height(2.dp))

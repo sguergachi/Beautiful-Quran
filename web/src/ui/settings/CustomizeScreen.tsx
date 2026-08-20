@@ -146,22 +146,6 @@ export function CustomizeScreen({
             </section>
           ) : null}
 
-          <section className="settings-section">
-            <h2>Ayah selector</h2>
-            <PaperSegmented
-              aria-label="Ayah selector side"
-              value={settings.ayahSelectorSide}
-              brushParams={brushParams}
-              paintToken={paintToken}
-              options={SELECTOR_OPTIONS}
-              onChange={(v) =>
-                appStore.updateSettings({
-                  ayahSelectorSide: v as AyahSelectorSide,
-                })
-              }
-            />
-          </section>
-
         <section className="settings-section">
           <h2>Verse numbers</h2>
           <PaperSegmented
@@ -186,6 +170,22 @@ export function CustomizeScreen({
           options={PAGE_OPTIONS}
           onChange={(v) =>
             appStore.updateSettings({ pageNumberScript: v as PageNumberScript })
+          }
+        />
+      </section>
+
+      <section className="settings-section">
+        <h2>Ayah selector</h2>
+        <PaperSegmented
+          aria-label="Ayah selector side"
+          value={settings.ayahSelectorSide}
+          brushParams={brushParams}
+          paintToken={paintToken}
+          options={SELECTOR_OPTIONS}
+          onChange={(v) =>
+            appStore.updateSettings({
+              ayahSelectorSide: v as AyahSelectorSide,
+            })
           }
         />
       </section>
