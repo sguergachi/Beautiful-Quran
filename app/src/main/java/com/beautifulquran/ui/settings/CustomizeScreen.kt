@@ -198,8 +198,6 @@ internal fun CustomizeScreen(
             },
             onSelect = { layout -> onUpdate { applyReadingLayout(it, layout) } },
         )
-        Caption("Mushaf is a printed Arabic page.")
-
         if (showsScrollChrome(settings.readingLayout)) {
             Section("View")
             InkCircledChoiceRow(
