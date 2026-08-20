@@ -36,7 +36,10 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -106,6 +109,7 @@ private fun Pending?.affectsChapter(reciterId: Int, surahId: Int): Boolean = whe
 private val ActionSlotWidth = 128.dp
 /** Settings SelectRow rhythm — name + note, no forced cell height. */
 private val RowPad = 8.dp
+private const val ProgressInkAlpha = 0.72f
 
 @Composable
 internal fun DownloadManagerPage(
@@ -590,7 +594,7 @@ private fun ChapterHairline(progress: Float?) {
                 Modifier
                     .fillMaxWidth(fill)
                     .fillMaxHeight()
-                    .background(gold.copy(alpha = 0.72f)),
+                    .background(gold.copy(alpha = ProgressInkAlpha)),
             )
         }
     }
@@ -673,7 +677,14 @@ private fun ChapterRow(
     onKeep: () -> Unit,
     onDelete: () -> Unit,
 ) {
-    val facts = chapterFactLine(row, downloading, waiting, paused, percent)
+    val progressInk = LocalQuranAccents.current.gold.copy(alpha = ProgressInkAlpha)
+    val facts = buildAnnotatedString {
+        append(chapterFactLine(row, downloading, waiting, paused))
+        if (downloading && percent != null) {
+            append(" · ")
+            withStyle(SpanStyle(color = progressInk)) { append("$percent%") }
+        }
+    }
     val action = chapterActionLabel(row, downloading, waiting, paused)
     val alsoDelete = chapterOffersDelete(row, downloading, waiting, paused)
     Row(

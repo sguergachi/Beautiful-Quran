@@ -304,7 +304,8 @@ initial cache scan changes the ink without moving the page. Reciters sit
 control on the name. Download all, Pause, Resume, and Delete sit
 16 dp after the subtitle facts, never under the chevron. Open catalog is flush with the reciter spine,
 gold hairlines below chapters. While a chapter downloads, its hairline becomes
-a stronger progress fill based only on ayahs already complete in permanent storage.
+a stronger progress fill based only on ayahs already complete in permanent storage;
+the percentage uses that exact same stronger-gold ink.
 A chapter row is bodyLarge name, labelSmall verses · size · status, with
 trailing verbs in a reserved 128 dp slot (Download, Pause, Resume,
 Delete). A paused chapter shows Delete then Resume in that slot, Resume
