@@ -142,6 +142,21 @@ private val MushafFitSlack = 2.dp
  * alpha, nearly all of it landed inside the first four frames and the page
  * simply appeared.
  */
+/**
+ * The page turn playback makes on the reader's behalf.
+ *
+ * A turn under a hand is the hand's: the pager's own spring answers the fling
+ * and lands as fast as the throw did. This one has no hand behind it — the
+ * voice has simply reached the foot of the leaf — so it is paced instead of
+ * flung: slower than a snap, and eased at both ends, so the paper starts and
+ * stops the way a page being turned for you does rather than arriving all at
+ * once in the middle of a word.
+ */
+private val MushafFollowTurnSpec = tween<Float>(
+    durationMillis = 620,
+    easing = FastOutSlowInEasing,
+)
+
 private const val MushafLeafFadeMs = 220
 
 /**
@@ -281,7 +296,10 @@ internal fun MushafPager(
                 val index = (page - 1).coerceIn(0, catalog.pageCount - 1)
                 if (pagerState.currentPage != index) {
                     followPage = index
-                    pagerState.animateScrollToPage(index)
+                    pagerState.animateScrollToPage(
+                        index,
+                        animationSpec = MushafFollowTurnSpec,
+                    )
                 }
             }
     }

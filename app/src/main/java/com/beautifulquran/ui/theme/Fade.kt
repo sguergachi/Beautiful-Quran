@@ -221,6 +221,24 @@ fun Modifier.shapedWordBloom(
      * callers pass zero.
      */
     coverPad: Dp = PaperCoverPad,
+    /**
+     * Whether a tinted wash is clipped to its own range's selection path.
+     *
+     * [TextLayoutResult.getPathForRange] encloses the *selection*, not the
+     * letterforms: it stops at the word's advance and its line box. Where a
+     * line's words share one [Text] that clip is what keeps the orange off the
+     * word beside it, and the neighbour redraws over anything it laps.
+     *
+     * On the mushaf leaf each word is its own node, and a QCF glyph inks past
+     * its advance — a tail sweeping under the word before it, a mark riding
+     * high. Clipped there, the tint stopped at that box while the letter kept
+     * going, so a repeat coloured the middle of a word and left its overhang
+     * black along a straight edge. Those callers pass false: the layer holds
+     * only this word, the tint is [BlendMode.SrcIn] against the word's own
+     * redrawn glyphs, and so it is masked by the letterform exactly as the
+     * first-pass wash is ([Modifier.letterFadeIn]).
+     */
+    clipTintToRange: Boolean = true,
 ): Modifier {
     val stops = FloatArray(InkProfileStops) { i -> i / (InkProfileStops - 1f) }
     val lineBoundsCache = LineBoundsCache()
@@ -384,15 +402,36 @@ fun Modifier.shapedWordBloom(
                             }
                         }
                     }
-                    clipPath(path) {
+                    val tint = bloom.color.copy(
+                        alpha = bloom.layerAlpha.coerceIn(0f, 1f) *
+                            bloom.colorAlpha.coerceIn(0f, 1f),
+                    )
+                    if (clipTintToRange) {
+                        clipPath(path) {
+                            drawText(textLayoutResult = textLayout)
+                            drawRect(
+                                color = tint,
+                                topLeft = Offset(bounds.left, bounds.top),
+                                size = Size(bounds.width, bounds.height),
+                                blendMode = BlendMode.SrcIn,
+                            )
+                        }
+                    } else {
+                        // Unclipped, the tint reaches every pixel the word
+                        // actually inks: SrcIn writes only where the redrawn
+                        // glyphs are, so the letterform is the mask and the
+                        // overhang colours with the stroke it belongs to.
                         drawText(textLayoutResult = textLayout)
                         drawRect(
-                            color = bloom.color.copy(
-                                alpha = bloom.layerAlpha.coerceIn(0f, 1f) *
-                                    bloom.colorAlpha.coerceIn(0f, 1f),
+                            color = tint,
+                            topLeft = Offset(
+                                bounds.left - colorBleed,
+                                bounds.top - colorBleed,
                             ),
-                            topLeft = Offset(bounds.left, bounds.top),
-                            size = Size(bounds.width, bounds.height),
+                            size = Size(
+                                bounds.width + colorBleed * 2f,
+                                bounds.height + colorBleed * 2f,
+                            ),
                             blendMode = BlendMode.SrcIn,
                         )
                     }
@@ -410,10 +449,19 @@ fun Modifier.shapedWordBloom(
                                 endX = bounds.left + head,
                             )
                         }
+                        // The wash has to reach as far as the tint did, or
+                        // an overhang keeps ink the sweep has not arrived at.
+                        val washBleed = if (clipTintToRange) bleed else colorBleed
                         drawRect(
                             brush = brush,
-                            topLeft = Offset(bounds.left - bleed, bounds.top - bleed),
-                            size = Size(bounds.width + bleed * 2f, bounds.height + bleed * 2f),
+                            topLeft = Offset(
+                                bounds.left - washBleed,
+                                bounds.top - washBleed,
+                            ),
+                            size = Size(
+                                bounds.width + washBleed * 2f,
+                                bounds.height + washBleed * 2f,
+                            ),
                             blendMode = BlendMode.DstIn,
                         )
                     }

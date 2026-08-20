@@ -833,6 +833,13 @@ private fun MushafQcfWord(
                 blooms = blooms,
                 layout = { layoutResult },
                 coverPad = 0.dp,
+                // The repeat and glint washes are tints of this word's own
+                // glyphs on this word's own layer, so the letterform is their
+                // mask — the same contour the first-pass wash follows. The
+                // selection-path clip belongs to a shared line, and here it
+                // squared the orange off at the advance and left every tail
+                // and high mark standing in black.
+                clipTintToRange = false,
             )
             .wordTapTarget(
                 words = listOf(token.word),
@@ -853,6 +860,8 @@ private fun Modifier.mushafLineInk(
     layout: () -> TextLayoutResult?,
     /** Zero for a per-word node, whose neighbours are other nodes to paint over. */
     coverPad: Dp = PaperCoverPad,
+    /** False for a per-word node: see [Modifier.shapedWordBloom]. */
+    clipTintToRange: Boolean = true,
 ): Modifier = if (!liveInk) {
     this
 } else {
@@ -862,6 +871,7 @@ private fun Modifier.mushafLineInk(
         rtl = true,
         feather = InkEngine.tuning.washFeather,
         coverPad = coverPad,
+        clipTintToRange = clipTintToRange,
     )
 }
 
