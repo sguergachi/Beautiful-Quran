@@ -93,17 +93,17 @@ class MushafPageDialTest {
         assertFalse(mushafDialShouldOpen(0f, MUSHAF_DIAL_HOLD_S * 0.5f))
         assertFalse(mushafDialShouldOpen(MUSHAF_DIAL_HOLD_DP_S * 3f, 2f))
         // Direction is irrelevant: stillness is stillness either way.
-        assertTrue(mushafDialShouldOpen(-1f, 1f))
+        assertTrue(mushafDialShouldOpen(-1f, MUSHAF_DIAL_HOLD_S))
     }
 
     @Test
-    fun `the hold is short enough to feel like a gesture and long enough to be one`() {
-        // An eighth of a second: past the turn at the top of a stroke, short
-        // of anything a finger on glass would call a wait. What keeps it
-        // honest at that length is the speed gate, not the clock — the gate
-        // sits far below any real steering speed, so a reader creeping through
-        // the chapters is not clicked into a trough.
-        assertTrue(MUSHAF_DIAL_HOLD_S in 0.08f..0.18f)
+    fun `the hold is long enough that only a deliberate one reaches it`() {
+        // Around a second: past every slowing inside a scrub, which is what an
+        // eighth of a second was answering, and still one gesture rather than
+        // a wait. The speed gate is the other half of the test — it sits far
+        // below any real steering speed, so a reader creeping through the
+        // chapters is not clicked into a trough however long they take.
+        assertTrue(MUSHAF_DIAL_HOLD_S in 0.9f..1.4f)
         assertTrue(MUSHAF_DIAL_HOLD_DP_S < 30f)
     }
 
@@ -116,7 +116,12 @@ class MushafPageDialTest {
         assertTrue(mushafDialInsists(0f, MUSHAF_DIAL_INSIST_S))
         assertFalse(mushafDialInsists(0f, MUSHAF_DIAL_INSIST_S * 0.9f))
         assertFalse(mushafDialInsists(MUSHAF_DIAL_HOLD_DP_S * 3f, 10f))
-        assertTrue(MUSHAF_DIAL_INSIST_S > MUSHAF_DIAL_HOLD_S * 4f)
+        // The two clocks have converged, now that the ordinary hold is itself
+        // deliberate: what the insistent one still buys is not a longer wait
+        // but a hold that is answered *wherever* the finger is. It must stay
+        // the later of the two, so a hold on the line is never the slower way
+        // in — the reader who is somewhere legitimate is never punished for it.
+        assertTrue(MUSHAF_DIAL_INSIST_S > MUSHAF_DIAL_HOLD_S)
         assertTrue(MUSHAF_DIAL_INSIST_S in 1f..2.5f)
     }
 
@@ -288,13 +293,14 @@ class MushafPageDialTest {
     }
 
     @Test
-    fun `a swept hand opens the trough inside half a second`() {
+    fun `a swept hand still opens the trough before the insistent clock`() {
         // The worst case: a full sweep of the book, then stop and hold. The
         // whole latency the reader feels is the estimate catching up plus the
-        // dwell, and past about half a second a hold stops reading as a
-        // gesture and starts reading as the dial being slow.
+        // dwell, and the estimate's share of it has to stay small — otherwise
+        // the hold on the line lands after the hold that works anywhere, and
+        // the ordinary way in would be the slow one.
         val total = settleSeconds(from = 900f) + MUSHAF_DIAL_HOLD_S
-        assertTrue("trough opened after ${total}s", total < 0.55f)
+        assertTrue("trough opened after ${total}s", total < MUSHAF_DIAL_INSIST_S)
     }
 
     /** How long the estimate takes to fall under the hold threshold. */

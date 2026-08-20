@@ -34,6 +34,7 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.runtime.snapshotFlow
@@ -157,6 +158,30 @@ private val MushafFollowTurnSpec = tween<Float>(
     easing = FastOutSlowInEasing,
 )
 
+/**
+ * How far ahead of the voice the leaf turns, in milliseconds.
+ *
+ * A page turned exactly when the first word of the next leaf is spoken is
+ * always late: the reader is looking at the word being recited, the paper
+ * starts moving only once the voice has already left the leaf, and the first
+ * word of the new page is half-said by the time it arrives. A person turning
+ * a page for someone else starts before the line runs out. So the turn is
+ * begun inside the last word of the leaf instead, while there is still voice
+ * on the page it is leaving.
+ */
+private const val MushafTurnLeadMs = 500L
+
+/**
+ * How long to wait, from the moment the leaf's last word begins, before
+ * starting the turn: that word's own dwell at [speed], less the lead.
+ *
+ * Clamped at zero — a short final word simply turns at once, which is the
+ * same thing the lead is asking for.
+ */
+internal fun mushafTurnLeadDelayMs(durationMs: Long, speed: Float): Long =
+    ((durationMs / speed.coerceAtLeast(0.1f)).toLong() - MushafTurnLeadMs)
+        .coerceAtLeast(0L)
+
 private const val MushafLeafFadeMs = 220
 
 /**
@@ -278,6 +303,9 @@ internal fun MushafPager(
     var followPage by remember {
         mutableIntStateOf(pagerState.currentPage)
     }
+    // Read inside the follow effect, which must not restart when the reader
+    // changes speed mid-recitation.
+    val speedNow = rememberUpdatedState(playbackSpeed)
     LaunchedEffect(followEnabled, loadedSurahId, catalog, pagerState, heldPage) {
         snapshotFlow { activeWordState.value to playback.value.playingHere }
             .collect { (word, playingHere) ->
@@ -300,7 +328,38 @@ internal fun MushafPager(
                         index,
                         animationSpec = MushafFollowTurnSpec,
                     )
+                    return@collect
                 }
+                // The voice is still on this leaf. If it is on the last word
+                // of it, the turn is started inside that word rather than
+                // after it (see [MushafTurnLeadMs]); the next leaf's own word
+                // then arrives to a page that is already there, and this
+                // collector finds nothing left to do.
+                val next = index + 1
+                if (next > catalog.pageCount - 1) return@collect
+                val tail = catalog.page(page)
+                    ?.lines?.lastOrNull { it.tokens.isNotEmpty() }
+                    ?.tokens?.lastOrNull()
+                    ?: return@collect
+                if (tail.surahId != loadedSurahId ||
+                    tail.ayah != word.ayah ||
+                    tail.word.position != word.wordPosition
+                ) {
+                    return@collect
+                }
+                delay(mushafTurnLeadDelayMs(word.durationMs, speedNow.value))
+                // Paused, seeked, or turned by hand while the word was still
+                // being said: the leaf under the reader is no longer this
+                // collector's to move.
+                if (!playback.value.playingHere || !playback.value.reciting) {
+                    return@collect
+                }
+                if (pagerState.currentPage != index) return@collect
+                followPage = next
+                pagerState.animateScrollToPage(
+                    next,
+                    animationSpec = MushafFollowTurnSpec,
+                )
             }
     }
     // The reader is opened at a chapter's own page by a scroll issued from

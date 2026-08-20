@@ -157,23 +157,23 @@ internal const val MUSHAF_DIAL_HOLD_DP_S = 16f
 /**
  * How long it has to stay that still, in seconds, before the trough opens.
  *
- * Long enough that the pause at the end of an ordinary stroke does not open
- * it by accident, short enough that "hold on the chapter you want" is one
- * gesture rather than a wait. It sits at the floor of that range and has been
- * walked down to it twice: a quarter second on a stopwatch is nothing, but a
- * quarter second with a finger pressed to glass waiting for a control to
- * answer is a control thinking about it, and the same is true at a fifth. The
- * reader is not being asked to prove patience here — the run-out and the stray
- * are what make an accidental open cheap to undo, and they take almost all the
- * pressure off this number.
+ * This number has been walked in both directions on the glass. It came down
+ * from a quarter second to an eighth, on the reasoning that a finger waiting
+ * for a control to answer reads as a control thinking about it — and at an
+ * eighth the dial answered the *pause* rather than the hold. A scrub is not
+ * one continuous motion: a hand slows to read what it is passing, and every
+ * one of those slowings arrived as an instruction. So it goes back up by a
+ * full second, past a quarter and well past a stopwatch's idea of nothing.
  *
- * What is left holding the floor up is the speed gate above, not this: an
- * eighth of a second of true stillness is longer than the pause at the top of
- * a stroke, where the hand is turning rather than stopped and is still moving
- * far faster than [MUSHAF_DIAL_HOLD_DP_S]. Going much below this would start
- * opening the trough on the turn.
+ * What that buys is that opening the trough is a thing the reader does on
+ * purpose. Coming in is deliberate and cheap to leave — the run-out and the
+ * stray are still what make an accidental open cost nothing — and the hand
+ * that never meant to zoom in simply never does.
+ *
+ * The speed gate above still holds the other end: a hold is stillness *and*
+ * time, so a slow drift never accumulates one no matter how long it lasts.
  */
-internal const val MUSHAF_DIAL_HOLD_S = 0.12f
+internal const val MUSHAF_DIAL_HOLD_S = 1.12f
 
 /**
  * How long a hand has to stay still, in seconds, to open the trough from
