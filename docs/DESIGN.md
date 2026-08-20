@@ -1164,8 +1164,8 @@ on the chosen left or right edge; Mushaf has none. The verse mark sits
 vertically centred on the Arabic line, or glued to the last English word
 in English-only — same as the reader. Arabic-only and English-only carry
 the next verse after the folio, using a real page turn (56:76 ends 536,
-56:77 opens 537). The leaf height is always the Both page, so View never
-resizes it. Type is a ~4/5 miniature of the reader (Hafs 24, lyric 18,
+56:77 opens 537). The leaf height is the max of that Both page (with gloss
+and a note) and the mushaf miniature, so no setting resizes it. Type is a ~4/5 miniature of the reader (Hafs 24, lyric 18,
 translation 13) so the leaf does not wear full-page sizes. The
 hairline is the leaf's edge, not a card.
 Mushaf hides view, verse annotations, the ayah-selector side, word-by-word,

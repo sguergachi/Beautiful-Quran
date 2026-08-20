@@ -294,8 +294,21 @@ function ReadingPreview({
           ))}
         </div>
       ) : null}
-      {readingLayout === 'mushaf' ? (
-        <>
+      <div className="reading-preview__lock">
+        <div className="reading-preview__sizer" aria-hidden="true">
+          <div className="reading-preview__words" dir="rtl">
+            {SAMPLE_WORDS.map((word) => (
+              <span key={word.arabic} className="reading-preview__word">
+                <span className="reading-preview__arabic">{word.arabic}</span>
+                <span className="reading-preview__gloss">{word.gloss}</span>
+              </span>
+            ))}
+            <span className="ayah-mark">{formatAyahNumberMark(SAMPLE_AYAH_1, true)}</span>
+          </div>
+          <p className="reading-preview__english">{SAMPLE_ENGLISH}</p>
+          <PageBreak page={SAMPLE_PAGE} script="both" />
+        </div>
+        <div className="reading-preview__sizer reading-preview__sizer--mushaf" aria-hidden="true">
           <p className="reading-preview__head">{MUSHAF_HEAD}</p>
           <p className="reading-preview__arabic reading-preview__arabic--mushaf" dir="rtl">
             {MUSHAF_LINE_1}
@@ -306,85 +319,84 @@ function ReadingPreview({
           <p className="reading-preview__arabic reading-preview__arabic--mushaf" dir="rtl">
             {MUSHAF_LINE_3}
           </p>
-          <MushafFolio page={MUSHAF_PAGE} script={pageNumberScript} />
-        </>
-      ) : (
-        <div className="reading-preview__stack">
-          <div className="reading-preview__sizer" aria-hidden="true">
-            {showWordGloss ? (
-              <div className="reading-preview__words" dir="rtl">
-                {SAMPLE_WORDS.map((word) => (
-                  <span key={word.arabic} className="reading-preview__word">
-                    <span className="reading-preview__arabic">{word.arabic}</span>
-                    <span className="reading-preview__gloss">{word.gloss}</span>
-                  </span>
-                ))}
-                <span className={markClass}>{mark1}</span>
-              </div>
-            ) : (
-              <p className="reading-preview__arabic" dir="rtl">
-                {SAMPLE_ARABIC_1}{' '}
-                <span className={markClass}>{mark1}</span>
+          <MushafFolio page={MUSHAF_PAGE} script="both" />
+        </div>
+        <div
+          className={[
+            'reading-preview__live',
+            readingLayout === 'mushaf' ? 'reading-preview__live--mushaf' : '',
+          ]
+            .filter(Boolean)
+            .join(' ')}
+        >
+          {readingLayout === 'mushaf' ? (
+            <>
+              <p className="reading-preview__head">{MUSHAF_HEAD}</p>
+              <p className="reading-preview__arabic reading-preview__arabic--mushaf" dir="rtl">
+                {MUSHAF_LINE_1}
               </p>
-            )}
-            <p className="reading-preview__english">{SAMPLE_ENGLISH}</p>
-            <PageBreak page={SAMPLE_PAGE} script={pageNumberScript} />
-          </div>
-          <div className="reading-preview__live">
-            {englishOnly ? (
+              <p className="reading-preview__arabic reading-preview__arabic--mushaf" dir="rtl">
+                {MUSHAF_LINE_2}
+              </p>
+              <p className="reading-preview__arabic reading-preview__arabic--mushaf" dir="rtl">
+                {MUSHAF_LINE_3}
+              </p>
+              <MushafFolio page={MUSHAF_PAGE} script={pageNumberScript} />
+            </>
+          ) : englishOnly ? (
+            <>
               <p className="reading-preview__english reading-preview__english--lyric" dir="ltr">
                 {SAMPLE_ENGLISH}{' '}
                 <span className={markClass} dir={markDir}>
                   {mark1}
                 </span>
               </p>
-            ) : (
-              <>
-                {showGloss ? (
-                  <div className="reading-preview__words" dir="rtl">
-                    {SAMPLE_WORDS.map((word) => (
-                      <span key={word.arabic} className="reading-preview__word">
-                        <span className="reading-preview__arabic">{word.arabic}</span>
-                        <span className="reading-preview__gloss">{word.gloss}</span>
-                      </span>
-                    ))}
-                    <span className={markClass} dir={markDir}>
-                      {mark1}
-                    </span>
-                  </div>
-                ) : (
-                  <p className="reading-preview__arabic" dir="rtl">
-                    {SAMPLE_ARABIC_1}{' '}
-                    <span className={markClass} dir={markDir}>
-                      {mark1}
-                    </span>
-                  </p>
-                )}
-                {!arabicOnly ? (
-                  <p className="reading-preview__english">{SAMPLE_ENGLISH}</p>
-                ) : null}
-              </>
-            )}
-            <PageBreak page={SAMPLE_PAGE} script={pageNumberScript} />
-            {englishOnly ? (
+              <PageBreak page={SAMPLE_PAGE} script={pageNumberScript} />
               <p className="reading-preview__english reading-preview__english--lyric" dir="ltr">
                 {SAMPLE_ENGLISH_2}{' '}
                 <span className={markClass} dir={markDir}>
                   {mark2}
                 </span>
               </p>
-            ) : null}
-            {arabicOnly ? (
-              <p className="reading-preview__arabic" dir="rtl">
-                {SAMPLE_ARABIC_2}{' '}
-                <span className={markClass} dir={markDir}>
-                  {mark2}
-                </span>
-              </p>
-            ) : null}
-          </div>
+            </>
+          ) : (
+            <>
+              {showGloss ? (
+                <div className="reading-preview__words" dir="rtl">
+                  {SAMPLE_WORDS.map((word) => (
+                    <span key={word.arabic} className="reading-preview__word">
+                      <span className="reading-preview__arabic">{word.arabic}</span>
+                      <span className="reading-preview__gloss">{word.gloss}</span>
+                    </span>
+                  ))}
+                  <span className={markClass} dir={markDir}>
+                    {mark1}
+                  </span>
+                </div>
+              ) : (
+                <p className="reading-preview__arabic" dir="rtl">
+                  {SAMPLE_ARABIC_1}{' '}
+                  <span className={markClass} dir={markDir}>
+                    {mark1}
+                  </span>
+                </p>
+              )}
+              {!arabicOnly ? (
+                <p className="reading-preview__english">{SAMPLE_ENGLISH}</p>
+              ) : null}
+              <PageBreak page={SAMPLE_PAGE} script={pageNumberScript} />
+              {arabicOnly ? (
+                <p className="reading-preview__arabic" dir="rtl">
+                  {SAMPLE_ARABIC_2}{' '}
+                  <span className={markClass} dir={markDir}>
+                    {mark2}
+                  </span>
+                </p>
+              ) : null}
+            </>
+          )}
         </div>
-      )}
+      </div>
     </div>
   )
 }

@@ -108,8 +108,6 @@ private val PAGE_SCRIPTS = listOf(
     PageNumberScript.BOTH,
 )
 
-private const val MUSHAF_LINE_1 = "بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ"
-private const val MUSHAF_LINE_2 = "ٱلْحَمْدُ لِلَّهِ رَبِّ ٱلْعَٰلَمِينَ"
 // 56:76 ends page 536; 56:77 opens 537 — a real printed-page turn.
 private const val SAMPLE_ARABIC_1 = "وَإِنَّهُۥ لَقَسَمٞ لَّوۡ تَعۡلَمُونَ عَظِيمٌ"
 private const val SAMPLE_ARABIC_2 = "إِنَّهُۥ لَقُرۡءَانٞ كَرِيمٞ"
@@ -349,39 +347,40 @@ internal fun ReadingPreview(
             .border(0.5.dp, gold.copy(alpha = 0.28f), PreviewLeaf)
             .graphicsLayer { alpha = 0.74f },
     ) {
-        if (readingLayout == ReadingLayout.MUSHAF) {
-            PreviewMushafLeaf(
-                pageNumberScript = pageNumberScript,
-                modifier = contentPad,
-            )
-        } else {
-            // Both sets the leaf height. Other views fill that box and clip.
-            Column(Modifier.alpha(0f).then(contentPad)) {
-                PreviewBothBody(
-                    arabicMarks = arabicMarks,
-                    showWordGloss = showWordGloss,
-                    showNote = showNote,
+        // Height is the max leaf, always. Settings only change what is painted.
+        PreviewHeightLock(contentPad)
+        Column(Modifier.matchParentSize().clipToBounds().then(contentPad)) {
+            if (readingLayout == ReadingLayout.MUSHAF) {
+                PreviewMushafLeaf(
                     pageNumberScript = pageNumberScript,
+                    modifier = Modifier.fillMaxWidth(),
                 )
-            }
-            Column(Modifier.matchParentSize().clipToBounds().then(contentPad)) {
-                if (englishOnly) {
-                    PreviewEnglishLyric(
-                        SAMPLE_ENGLISH,
-                        number = SAMPLE_AYAH_1,
-                        arabicMarks = arabicMarks,
-                    )
-                } else {
-                    PreviewArabicLine(
-                        SAMPLE_ARABIC_1,
-                        number = SAMPLE_AYAH_1,
-                        arabicMarks = arabicMarks,
-                        showGloss = showGloss,
-                    )
-                    if (!arabicOnly) {
-                        Spacer(Modifier.height(12.dp))
-                        PreviewTranslation()
-                    }
+            } else if (englishOnly) {
+                PreviewEnglishLyric(
+                    SAMPLE_ENGLISH,
+                    number = SAMPLE_AYAH_1,
+                    arabicMarks = arabicMarks,
+                )
+                PageBreak(
+                    page = SAMPLE_PAGE,
+                    script = pageNumberScript,
+                    contentPadding = PreviewFolioPad,
+                )
+                PreviewEnglishLyric(
+                    SAMPLE_ENGLISH_2,
+                    number = SAMPLE_AYAH_2,
+                    arabicMarks = arabicMarks,
+                )
+            } else {
+                PreviewArabicLine(
+                    SAMPLE_ARABIC_1,
+                    number = SAMPLE_AYAH_1,
+                    arabicMarks = arabicMarks,
+                    showGloss = showGloss,
+                )
+                if (!arabicOnly) {
+                    Spacer(Modifier.height(12.dp))
+                    PreviewTranslation()
                 }
                 if (showNote) {
                     Spacer(Modifier.height(12.dp))
@@ -392,13 +391,7 @@ internal fun ReadingPreview(
                     script = pageNumberScript,
                     contentPadding = PreviewFolioPad,
                 )
-                if (englishOnly) {
-                    PreviewEnglishLyric(
-                        SAMPLE_ENGLISH_2,
-                        number = SAMPLE_AYAH_2,
-                        arabicMarks = arabicMarks,
-                    )
-                } else if (arabicOnly) {
+                if (arabicOnly) {
                     PreviewArabicLine(
                         SAMPLE_ARABIC_2,
                         number = SAMPLE_AYAH_2,
@@ -467,9 +460,10 @@ private fun PreviewMushafLeaf(
                 PreviewQcfLines(lines = lines, face = face)
             }
         } else {
-            PreviewArabicLine(MUSHAF_LINE_1, number = 1, arabicMarks = true)
-            Spacer(Modifier.height(8.dp))
-            PreviewArabicLine(MUSHAF_LINE_2, number = 2, arabicMarks = true)
+            val line = with(LocalDensity.current) {
+                (PreviewQcfSize * MUSHAF_LINE_PITCH_EM).toDp()
+            }
+            Spacer(Modifier.height(line * 3))
         }
         MushafFolioMarks(
             page = PreviewMushafPage,
@@ -677,6 +671,29 @@ private fun PreviewEnglishLyric(
             fontSize = PreviewLyricSize,
             lineHeight = 1.5.em,
             style = TextStyle(textDirection = TextDirection.Ltr),
+        )
+    }
+}
+
+/**
+ * Invisible copies of the tallest scroll leaf and the mushaf miniature.
+ * The preview Box sizes to whichever is taller, so Layout / View / gloss /
+ * notes / folio script never resize it.
+ */
+@Composable
+private fun PreviewHeightLock(contentPad: Modifier) {
+    Column(Modifier.alpha(0f).then(contentPad)) {
+        PreviewBothBody(
+            arabicMarks = true,
+            showWordGloss = true,
+            showNote = true,
+            pageNumberScript = PageNumberScript.BOTH,
+        )
+    }
+    Column(Modifier.alpha(0f).then(contentPad)) {
+        PreviewMushafLeaf(
+            pageNumberScript = PageNumberScript.BOTH,
+            modifier = Modifier.fillMaxWidth(),
         )
     }
 }
