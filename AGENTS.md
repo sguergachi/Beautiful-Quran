@@ -241,9 +241,10 @@ close a `Timings patch — …` GitHub issue, **do this checklist in order**:
 | Missing positions, unsafe clock, or marks outside the MP3 | fix the source/class; `finalize_timing_rows` completes, falls back, or withholds | completion/physics checks in `tools/test_build_db.py` |
 4. **Implement the class fix** + add the patch case (input = broken shape,
    expected = Lab/ear topology). Run `python3 tools/test_build_db.py`.
-5. **Verify the runtime normalizer** and deploy the timing backend. Rebuild and
-   bump `DB_FILE_NAME` only when the bundled quran-align fallback itself changed;
-   QDC-derived repeat rows must never be committed to `data/quran.db`.
+5. **Verify the runtime normalizer** and deploy the timing backend. Until a
+   non-empty release endpoint is configured and full-corpus parity is proven,
+   preserve the bundled repeat-aware compatibility rows byte-for-byte. Remove
+   them only in the same release that makes the verified cache path available.
 6. **Do not** land per-ayah overrides. Delete any local reproduction JSON
    before committing.
 

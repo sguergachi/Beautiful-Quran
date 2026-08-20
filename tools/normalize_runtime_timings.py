@@ -4,8 +4,8 @@
 The backend feeds this script raw chapter-timing responses.  It deliberately
 reuses the build pipeline's cleaner, clock rebase, repairs and physical gates:
 the runtime cache must produce the same rows the karaoke engine historically
-read from quran.db.  The committed database supplies only the independently
-licensed quran-align reference clock and never receives the normalized output.
+read from quran.db. Until the runtime endpoint proves full timing parity, that
+database retains the shipped repeat-aware compatibility baseline.
 """
 
 from __future__ import annotations
@@ -78,8 +78,11 @@ def parse_source_chapters(chapters):
 def load_reference(database_path, reciter_id):
     db = sqlite3.connect(f"file:{database_path}?mode=ro", uri=True)
     provenance = dict(db.execute("SELECT key,value FROM data_provenance"))
-    if provenance.get("qdc_delivery") != "runtime cache only":
-        raise ValueError("reference database is not the QDC-free runtime baseline")
+    if provenance.get("qdc_delivery") not in {
+        "runtime cache only",
+        "bundled compatibility baseline; runtime cache may replace",
+    }:
+        raise ValueError("reference database is not an approved runtime baseline")
     word_counts = {
         (surah, ayah): count
         for surah, ayah, count in db.execute(

@@ -70,7 +70,7 @@ persistent host before publishing its URL. QF's authenticated snapshot should
 remove that transitional fan-out.
 
 Build the production image from the **repository root**, because the runtime
-normalizer needs the QDC-free quran-align reference database and timing rules:
+normalizer needs the canonical timing reference database and timing rules:
 
 ```bash
 docker build -f backend/Dockerfile -t beautiful-quran-timing .
@@ -93,11 +93,16 @@ docker run --read-only --tmpfs /tmp \
 | `CACHE_REVALIDATE_MS` | six days | Must remain below `CACHE_MAX_AGE_MS`. |
 | `CACHE_MAX_AGE_MS` | seven days | Hard maximum enforced by the cache. |
 | `PYTHON` | `python3` | Canonical normalizer interpreter. |
-| `TIMING_REFERENCE_DB` | `data/quran.db` | QDC-free quran-align clock/reference database. |
+| `TIMING_REFERENCE_DB` | `data/quran.db` | Canonical clock/reference database; temporarily includes the verified compatibility timing baseline. |
 
 The public clients are enabled with the non-secret GitHub repository variable
 `TIMING_CONTENT_BASE_URL`. Keep it unset until the HTTPS service is deployed,
 prewarmed, monitored, and named in `docs/privacy.html`.
+
+`quran-v55.db` restores the verified bundled timing contract. The existing
+runtime parity result predates that baseline, so the endpoint must also remain
+unset until a fresh six-reciter comparison passes without unreviewed timing
+deltas. A green cache test suite alone is not timing-parity evidence.
 
 ## Production deployment gate
 

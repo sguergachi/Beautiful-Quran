@@ -20,7 +20,7 @@ tools/build_db.py  (offline generation; committed asset verified in CI)
 app (runtime)                                           ▼
    QuranDatabase ── copies asset once, opens read-only SQLite
    QfContentCacheDatabase ── atomic, replaceable runtime timing rows + sync token
-   QuranRepository ── fresh runtime timings → quran-align fallback → typed rows
+   QuranRepository ── fresh runtime timings → verified bundled fallback → typed rows
    SettingsRepository ── SharedPreferences behind a StateFlow
    PlayerController ─┬─ MediaController → PlaybackService (ExoPlayer + cache)
                      └─ PlayerUiState StateFlow (what's playing, where)
@@ -113,7 +113,7 @@ Sources (all fetched over HTTPS, cached in `tools/.cache/`):
 | `quran-json` (npm) | Uthmani Unicode text, Saheeh International translation, surah metadata | Tanzil-derived, verse-keyed, no auth |
 | `@kmaslesa/holy-quran-word-by-word-full-data` (npm) | Per-word English gloss + transliteration (Quran.com data) | Only per-word English dataset on an open registry |
 | `cpfair/quran-align` release zip | Word-level timestamps per reciter, CC-BY 4.0 | The canonical open word-alignment dataset, matched to everyayah.com audio |
-| quran.com `qdc` audio API (runtime only) | **Repeat-aware** word timestamps for reciters in `QDC_REPEAT_RECITERS` | The backend normalizes this transitional source into its device-cache contract; QDC rows are never written to the committed database. See [REPEAT_HIGHLIGHTING.md](REPEAT_HIGHLIGHTING.md) |
+| quran.com `qdc` audio API | **Repeat-aware** word timestamps for reciters in `QDC_REPEAT_RECITERS` | The last verified rows remain as a temporary bundled compatibility baseline; the backend normalizes future snapshots into the separate device cache. See [REPEAT_HIGHLIGHTING.md](REPEAT_HIGHLIGHTING.md) |
 | everyayah MP3 ranges | Leading-silence and duration measurements in `tools/audio_onsets/` | Some individual ayah files begin with silence. The offline scanner holds the first wash until sustained voice without moving valid later word boundaries, and records each file's length as the ceiling no timing row may cross. |
 | Quranic Arabic Corpus (QAC) v0.4 | Per-word root, lemma, POS, morphology; root concordance | Standard open Quranic morphology / root dictionary. Powers the [Root Word Viewer](ROOT_VIEWER.md) |
 
@@ -176,7 +176,7 @@ ayahs    (surah_id, ayah_number, text_uthmani, translation_en)
 words    (surah_id, ayah_number, position, arabic, translation_en, transliteration)
 reciters (id, slug, name, style, has_timings)
 timings  (reciter_id, surah_id, ayah_number, segments)   -- segments = "[[pos,startMs,endMs],…]"
-data_provenance (key, value) -- explicitly records quran-align-only timings / runtime QDC
+data_provenance (key, value) -- explicitly records the timing baseline and replacement path
 word_morphology (surah_id, ayah_number, position, root, lemma, pos, features)
 roots (root, occurrence_count)
 root_occurrences (root, surah_id, ayah_number, position)
@@ -187,7 +187,7 @@ Corpus). Concordance counts and jump lists come from `roots` /
 `root_occurrences`.
 
 Timing segments are stored as one compact JSON array per (reciter, ayah)
-rather than one row per word: 43,646 quran-align fallback rows instead of
+rather than one row per word: 43,641 verified compatibility rows instead of
 hundreds of thousands of word rows. Runtime snapshots use the same segment
 shape in a separate Android SQLite / browser IndexedDB cache.
 

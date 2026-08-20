@@ -10,20 +10,22 @@ data comes from, and the traps we hit making it ship.
 
 ## Current state
 
-As of `quran-v54.db`, QDC-derived rows are **not shipped in the repository or
-database**. The committed database contains 43,646 one-pass quran-align rows
-and an explicit provenance marker. It is the complete first-install/offline
-fallback apart from six unsafe ayahs (one Alafasy and five Shuraym) that are
-honestly withheld and use whole-ayah highlighting.
+As of `quran-v55.db`, the committed database temporarily retains the 43,641
+timing rows from the last verified repeat-aware release. Its timing payloads
+are byte-for-byte identical to `quran-v53.db`; only provenance metadata and the
+extraction version changed. This is deliberate: the release currently has no
+configured timing endpoint, so removing the rows changed audible repeats into
+long held words.
 
-Repeat-aware timing is now a runtime resource. When the timing facade is
-configured, Android SQLite or browser IndexedDB restores a fresh snapshot
-immediately and refreshes it in the background. The backend applies this exact
-TimingEngine pipeline before returning any row. After six days it revalidates;
-after seven days the client rejects the runtime snapshot and falls back to
-quran-align. A sync that lands during playback is installed only while quiet.
+The runtime resource path remains layered above that baseline. When the timing
+facade is configured, Android SQLite or browser IndexedDB restores a fresh
+snapshot immediately and refreshes it in the background. The backend applies
+this exact TimingEngine pipeline before returning any row. After six days it
+revalidates; after seven days the client rejects the runtime snapshot and falls
+back to the verified bundled rows. A sync that lands during playback is
+installed only while quiet.
 
-The last historical QDC-bearing database (`quran-v53.db`) had:
+The compatibility timing table (unchanged from `quran-v53.db`) has:
 
 | Fact | Value |
 |---|---|
@@ -124,7 +126,7 @@ ear-verified (Mishary 2:14, Hani 2:16); **verify the rest before enabling.**
 | AbdulBaset (murattal) | 2 | ✅ enabled (not ear-verified) |
 | Minshawi (murattal) | 9 | ✅ enabled (not ear-verified) |
 | Minshawi (mujawwad) | 8 | yes (very dense) |
-| As-Sudais | 3 | ✅ enabled at runtime (not ear-verified; quran-align fallback is complete) |
+| As-Sudais | 3 | ✅ enabled (not ear-verified) |
 | Ash-Shuraym | 10 | no (one-pass) |
 | AbdulBaset (mujawwad) | 1 | no (one-pass) |
 
@@ -174,8 +176,9 @@ cache, then `normalize_runtime_timings.py` produces the device snapshot:
 - `parse_source_chapters()` accepts today's legacy `verse_timings` and QF's
   documented authenticated `audio_file.timestamps` shape. It rebases each
   verse's gapless-file offsets to ayah-relative ms (`start − timestamp_from`)
-  and preserves repeats. `load_qdc_timings()` remains only for explicit
-  `--include-qdc-timings` parity audits; such a database must never be committed.
+  and preserves repeats. `load_qdc_timings()` remains available for explicit
+  `--include-qdc-timings` migration audits; every candidate must pass the
+  full-corpus timing delta gate before it can replace the pinned baseline.
 - `adjust_qdc_segments()` clamps word positions to our canonical word count,
   drops zero-length spans, keeps repeats, and counts the repeat spans.
 - `rebase_qdc_clock()` translates the complete repeat-aware row by the upper
@@ -490,9 +493,10 @@ read ink together while 12 fades in white as a new word.
 
 ## Traps we hit (read before touching this)
 
-- **Repeat rows never go into `quran.db`.** Change the canonical pipeline and
-  runtime normalizer tests, deploy the backend, and let Content Sync replace
-  device snapshots. The bundled quran-align rows stay unchanged.
+- **Do not remove the pinned repeat rows before runtime parity is live.** Change
+  the canonical pipeline and runtime normalizer tests, deploy the backend, set
+  the release endpoint, and prove all six reciters match before removing them.
+  The full-corpus timing delta gate must stay fail-closed.
 - **Bump the DB version when bundled fallback content changes.** `QuranDatabase.DB_FILE_NAME`
   (`quran-vN.db`) is the extraction key: the bundled asset is copied to internal
   storage only if that file doesn't already exist. Changing the DB's *content*

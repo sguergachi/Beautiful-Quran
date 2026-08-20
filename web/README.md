@@ -31,8 +31,8 @@ npm run build:pages  # → ../_site/app (CI does this on master)
 
 Requires Node 22+. `npm run dev` and `npm run build` copy the canonical
 `../data/quran.db` into the generated web assets. The database is committed
-once and shared with Android; it contains the quran-align offline timing
-fallback, not QDC-derived rows. When `VITE_TIMING_CONTENT_BASE_URL` is set, the
+once and shared with Android; it temporarily retains the last verified
+repeat-aware compatibility rows. When `VITE_TIMING_CONTENT_BASE_URL` is set, the
 browser restores fresh repeat-aware snapshots from separate IndexedDB storage
 and refreshes them through the timing facade in the background.
 

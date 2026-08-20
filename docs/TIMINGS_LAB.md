@@ -108,7 +108,7 @@ when you change ayah, and when you leave the Lab. The override store is tiny
 and atomic, so there is nothing to lose and nothing to remember. `Reset ayah
 to bundled` (the historical UI label in the overflow menu) reverts to the
 current clean source row: a fresh runtime snapshot when available, otherwise
-the bundled quran-align fallback. `Clear all corrections` empties the store.
+the verified bundled fallback. `Clear all corrections` empties the store.
 
 ## Where it lives
 
@@ -304,8 +304,8 @@ tools/timing_overrides/     local reproduction scratch; empty in commits
 * Editing is fully offline; Submit just opens a GitHub URL. Independent
   background timing refresh may still occur elsewhere in the reader.
 * The bundled `quran.db` stays read-only on device; corrections live in the
-  override store until a systematic fix reaches the runtime normalizer (or a
-  quran-align fallback fix reaches the next DB).
+  override store until a systematic fix reaches the runtime normalizer (or the
+  verified bundled baseline reaches the next DB).
 
 ## Non-goals (intentionally)
 

@@ -464,14 +464,10 @@ def audit_bundled_db():
     ):
         segs = json.loads(raw)
         timings[(rid, s, a)] = segs
-        positions = order(segs)
         starts = [x[1] for x in segs]
         if (
             not segs
-            # The committed fallback is quran-align's one-pass topology. Any
-            # backward/repeated position here would mean QDC-derived rows
-            # accidentally returned to the repository asset.
-            or positions != list(range(1, counts[(s, a)] + 1))
+            or {x[0] for x in segs} != set(range(1, counts[(s, a)] + 1))
             or starts != sorted(set(starts))
             or any(segs[i][2] > segs[i + 1][1] for i in range(len(segs) - 1))
             or any(
@@ -481,21 +477,125 @@ def audit_bundled_db():
             )
         ):
             bad.append((rid, s, a))
-    exact = dict(db.execute("SELECT key,value FROM data_provenance")) == {
+    row = db.execute(
+        "SELECT segments FROM timings WHERE reciter_id=1 "
+        "AND surah_id=2 AND ayah_number=214"
+    ).fetchone()
+    starts = {x[0]: x[1] for x in json.loads(row[0])}
+    exact = [starts[p] for p in (25, 26, 27, 28)] == [
+        24_940, 27_160, 29_190, 30_270
+    ]
+    row = db.execute(
+        "SELECT segments FROM timings WHERE reciter_id=1 "
+        "AND surah_id=5 AND ayah_number=52"
+    ).fetchone()
+    starts = {x[0]: x[1] for x in json.loads(row[0])}
+    exact &= [starts[p] for p in (11, 12)] == [14_360, 15_600]
+    repaired = {}
+    for s, a in ((2, 229), (2, 235), (4, 19), (5, 66), (6, 145)):
+        row = db.execute(
+            "SELECT segments FROM timings WHERE reciter_id=1 "
+            "AND surah_id=? AND ayah_number=?",
+            (s, a),
+        ).fetchone()
+        repaired[(s, a)] = json.loads(row[0])
+    exact &= order(repaired[(2, 229)]) == list(range(1, 47))
+    exact &= [s for s in repaired[(2, 229)] if s[0] in (16, 17)] == [
+        [16, 20_310, 21_140], [17, 22_715, 23_740]
+    ]
+    exact &= order(repaired[(2, 235)]) == list(range(1, 48))
+    exact &= [s for s in repaired[(2, 235)] if s[0] in (22, 23)] == [
+        [22, 23_230, 24_001], [23, 26_235, 27_010]
+    ]
+    exact &= [s for s in repaired[(5, 66)] if s[0] == 13] == [
+        [13, 14_791, 15_870]
+    ]
+    exact &= not any(
+        order(repaired[(4, 19)])[i : i + 4] == [17, 18, 17, 18]
+        for i in range(len(repaired[(4, 19)]) - 3)
+    )
+    exact &= order(repaired[(6, 145)]) == list(range(1, 40))
+    exact &= timings[(1, 2, 253)][:8] == [
+        [1, 1_179, 1_650],
+        [2, 1_650, 2_370],
+        [3, 2_370, 3_500],
+        [4, 3_500, 4_400],
+        [5, 4_400, 4_970],
+        [6, 4_970, 5_970],
+        [7, 5_970, 6_710],
+        [8, 6_710, 7_540],
+    ]
+    exact &= timings[(7, 4, 148)][:3] == [
+        [1, 1_951, 4_690],
+        [2, 4_690, 5_410],
+        [3, 5_410, 6_290],
+    ]
+    exact &= {
+        key: timings[key][0][1]
+        for key in ((4, 3, 113), (4, 4, 88), (7, 5, 109))
+    } == {
+        (4, 3, 113): 6_009,
+        (4, 4, 88): 5_968,
+        (7, 5, 109): 6_636,
+    }
+    # This is the phrase from Hani 5:2 that regressed to one long held word in
+    # quran-v54. Pin both passes so a one-pass fallback can never ship again.
+    exact &= [segment for segment in timings[(7, 5, 2)] if 19 <= segment[0] <= 23] == [
+        [19, 19_670, 20_970],
+        [20, 20_970, 21_600],
+        [21, 21_600, 22_100],
+        [22, 22_100, 23_570],
+        [19, 23_590, 25_300],
+        [20, 25_300, 25_980],
+        [21, 25_980, 26_620],
+        [22, 26_620, 27_890],
+        [23, 27_890, 29_810],
+    ]
+    exact &= dict(db.execute("SELECT key,value FROM data_provenance")) == {
         "timings": (
-            "cpfair/quran-align CC-BY-4.0; QDC excluded from bundled database"
+            "QDC-derived repeat timings over everyayah recordings; "
+            "transitional compatibility baseline"
         ),
-        "qdc_delivery": "runtime cache only",
+        "qdc_delivery": (
+            "bundled compatibility baseline; runtime cache may replace"
+        ),
     }
-    coverage = {
-        rid: {(s, a) for row_rid, s, a in timings if row_rid == rid}
-        for rid in range(1, 8)
+    # A withheld row is an intentional whole-ayah fallback only when neither
+    # source can describe the streamed recording safely. Pin every reciter's
+    # known exceptions so an accidental coverage loss cannot hide in the
+    # broad per-reciter coverage threshold.
+    expected_withheld = {
+        1: {(37, 152)},
+        2: set(),
+        3: set(),
+        4: set(),
+        5: {
+            (2, 25), (2, 198), (2, 223), (7, 5),
+            (13, 37), (73, 4),
+        },
+        6: {(12, 50), (12, 75), (12, 76), (91, 15)},
+        7: set(),
     }
-    exact &= set(counts) - coverage[1] == {(37, 152)}
-    exact &= all(coverage[rid] == set(counts) for rid in (2, 3, 4, 5, 7))
-    exact &= set(counts) - coverage[6] == {
-        (12, 50), (12, 75), (12, 76), (40, 64), (91, 15)
-    }
+    exact &= all(
+        set(counts) - {(s, a) for rid_, s, a in timings if rid_ == rid}
+        == withheld
+        for rid, withheld in expected_withheld.items()
+    )
+    for key, subsequence in {
+        (7, 9, 33): [13, 9, 10, 14],
+        (7, 22, 55): [15, 7, 8, 16],
+        (7, 44, 22): [6, 1, 2, 3],
+        (7, 74, 52): [7, 4, 8],
+        (7, 4, 4): [12, 12],
+        # This incomplete QDC row omits canonical word 23. Interpolating it
+        # would alter the repeat order, so the monotonic witness must remain.
+        (3, 7, 155): list(range(1, 42)),
+    }.items():
+        positions = order(timings[key])
+        exact &= any(
+            positions[i : i + len(subsequence)] == subsequence
+            for i in range(len(positions) - len(subsequence) + 1)
+        )
     for path in AUDIO_ONSETS_DIR.glob("*.json"):
         payload = json.loads(path.read_text(encoding="utf-8"))
         exact &= payload["detector"] == {
@@ -693,29 +793,6 @@ def check_timing_delta():
             capture_output=True,
             check=True,
         ).stdout.strip()
-        with sqlite3.connect(ROOT / "data/quran.db") as connection:
-            current = dict(connection.execute("SELECT key,value FROM data_provenance"))
-        result = subprocess.run(
-            ["git", "show", f"{base}:data/quran.db"],
-            cwd=ROOT,
-            capture_output=True,
-            check=True,
-        )
-        with tempfile.TemporaryDirectory() as directory:
-            base_db = Path(directory) / "quran.db"
-            base_db.write_bytes(result.stdout)
-            connection = sqlite3.connect(base_db)
-            try:
-                previous = dict(connection.execute("SELECT key,value FROM data_provenance"))
-            except sqlite3.OperationalError:
-                previous = {}
-            finally:
-                connection.close()
-        # This is the one deliberate provider migration. Once it lands, every
-        # future merge base has the marker and ordinary row deltas fail closed
-        # exactly as before.
-        if current.get("qdc_delivery") == "runtime cache only" and not previous:
-            return True, "QDC rows moved from the repository to the runtime cache"
         ledger = {}
         for path in sorted(VERDICTS_DIR.glob("*.json")):
             entries = load_verdict_ledger(path)

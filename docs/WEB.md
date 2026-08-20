@@ -207,10 +207,10 @@ Renderers consume these; they do not re-derive curves.
   This keeps the main-thread sql.js work from freezing the cover or paper
   peel. Timings remain lazy and hydrate after the reader's first frame.
 - **Do not** add data-repair logic in the web app (Android invariant #2).
-- The shared DB contains only quran-align timing fallback. Fresh normalized
-  repeat rows come from `runtimeTimings.ts`, are committed atomically with an
+- The shared DB temporarily retains the verified repeat-aware compatibility
+  rows. Fresh normalized rows come from `runtimeTimings.ts`, are committed atomically with an
   opaque token in IndexedDB, refresh after six days, and expire after seven.
-  Missing/expired/network-failed runtime data always returns to quran-align.
+  Missing/expired/network-failed runtime data always returns to that baseline.
 
 Optional later optimization (not required for v1): export per-surah JSON
 shards for faster first paint. Only if 27 MB WASM open proves too slow on

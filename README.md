@@ -91,16 +91,18 @@ In a linked Git worktree it also checks the primary checkout for
 
 `tools/build_db.py` downloads the Quran text, word-by-word data, and open
 quran-align timings, validates them against each other, and packs them into a
-single SQLite asset. QDC-derived repeat timings are not committed: Android and
-web fetch normalized snapshots from the project timing facade into a separate
-device cache, with quran-align as the immediate offline fallback. CI (GitHub
-Actions) runs unit tests on every push; on `master`
+single SQLite asset. Until the timing facade is deployed and proves full
+parity, the asset retains the last verified QDC-derived repeat timings so an
+unset endpoint cannot change playback. Android and web can replace them with
+normalized snapshots in a separate device cache. CI (GitHub Actions) runs unit
+tests on every push; on `master`
 it also assembles the release APK and publishes it to the rolling latest release.
 
 Released builds read the facade URL from the non-secret repository variable
 `TIMING_CONTENT_BASE_URL` (Android) / its Vite equivalent. Leave it unset until
 the HTTPS backend host is deployed and named in the Privacy Policy. The clients
-then continue on bundled quran-align without a broken or blocking network path.
+then continue on the verified bundled compatibility timings without a broken
+or blocking network path.
 
 ## Run in an Android emulator on Linux
 
@@ -199,6 +201,6 @@ If host Vulkan is broken on your machine, you can still fall back with
 | Word-by-word gloss + transliteration | Quran.com dataset via npm | free with attribution |
 | Root / lemma / morphology | [Quranic Arabic Corpus](http://corpus.quran.com) v0.4 | free with attribution + link |
 | Word timing segments | [cpfair/quran-align](https://github.com/cpfair/quran-align) | CC-BY 4.0 |
-| Repeat-aware timing segments (runtime cache only) | [quran.com](https://quran.com) legacy `qdc` audio API | no QDC-specific use terms located; transitional permission and QF migration pending |
+| Repeat-aware timing segments (temporary bundled compatibility baseline; runtime replacement planned) | [quran.com](https://quran.com) legacy `qdc` audio API | no QDC-specific use terms located; transitional permission and QF migration pending |
 | Recitation audio | [everyayah.com](https://everyayah.com) | free; rights remain with reciters |
 | Arabic typeface | KFGQPC HAFS Uthmanic Script, King Fahd Complex | free redistribution |

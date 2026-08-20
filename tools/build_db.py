@@ -17,9 +17,11 @@ Sources (all fetched over HTTPS, cached in tools/.cache):
                         (only the compact committed measurements are consumed).
 
 Output: data/quran.db (the canonical asset consumed by Android and web builds).
-The committed database contains only quran-align timing rows. Repeat-aware QDC
-rows are normalized and cached at runtime; --include-qdc-timings exists only
-for parity audits and must never be used for the committed asset.
+Until a release endpoint is configured and proves timing parity, the committed
+database retains the previously shipped repeat-aware QDC timing rows as its
+offline compatibility baseline. Runtime snapshots replace those rows when
+available. A normal rebuild produces the future quran-align-only baseline;
+--include-qdc-timings creates a migration audit candidate.
 
 The word segmentation canon is the space-split of the Uthmani text; the WBW
 gloss and the timing data are mapped onto it by position and clamped when a
@@ -2403,7 +2405,7 @@ def main():
     ap.add_argument(
         "--include-qdc-timings",
         action="store_true",
-        help="parity audit only; never use for the committed quran.db",
+        help="build a QDC migration candidate; the timing delta audit must pass",
     )
     args = ap.parse_args()
 
@@ -2692,8 +2694,15 @@ def main():
         "INSERT INTO data_provenance VALUES (?,?)",
         (
             [
-                ("timings", "audit build containing QDC-derived rows"),
-                ("qdc_delivery", "bundled audit only; never commit"),
+                (
+                    "timings",
+                    "QDC-derived repeat timings over everyayah recordings; "
+                    "transitional compatibility baseline",
+                ),
+                (
+                    "qdc_delivery",
+                    "bundled compatibility baseline; runtime cache may replace",
+                ),
             ]
             if args.include_qdc_timings
             else [
