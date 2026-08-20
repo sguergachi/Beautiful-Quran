@@ -53,7 +53,7 @@ import com.beautifulquran.playback.chapterFactLine
 import com.beautifulquran.playback.chapterOffersDelete
 import com.beautifulquran.playback.chapterTrailingLabels
 import com.beautifulquran.playback.downloadPercent
-import com.beautifulquran.playback.formatDownloadedBytes
+import com.beautifulquran.playback.formatUsage
 import com.beautifulquran.playback.isChapterActionSettling
 import com.beautifulquran.playback.isChapterDownloading
 import com.beautifulquran.playback.isChapterPaused
@@ -243,20 +243,20 @@ internal fun DownloadManagerPage(
                             )
                         }
                         deleting == Pending.DeleteAll -> FactActionRow(
-                            fact = formatDownloadedBytes(usage.total),
+                            fact = formatUsage(usage),
                             action = "…",
                             fetch = false,
                             enabled = false,
                             onAction = {},
                         )
                         usage.total <= 0L -> Text(
-                            text = "None downloaded",
+                            text = formatUsage(usage),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
                             modifier = Modifier.padding(vertical = RowPad),
                         )
                         else -> FactActionRow(
-                            fact = formatDownloadedBytes(usage.total),
+                            fact = formatUsage(usage),
                             action = "Delete all",
                             fetch = false,
                             enabled = deleting == null,
@@ -554,6 +554,7 @@ private fun FactActionRow(
             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f, fill = false),
         )
         if (action != null) {
             ActionWord(

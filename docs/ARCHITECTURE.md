@@ -296,7 +296,8 @@ Leftover `filesDir/audio` from the old listen LRU moves onto `cacheDir` once,
 before either `SimpleCache` opens; a persistent marker prevents later explicit
 downloads from ever being reclassified as cache. Delete all empties the live caches
 in place so playback keeps the same instances. Settings → Download manager
-shows one total and Delete all (keep and listen). Reciters sit
+shows total audio storage plus the listening-cache share, and Delete all clears
+both keep and listen. Reciters sit
 24 dp apart. The chevron is the only trailing
 control on the name. Download all, Pause, Resume, and Delete sit
 16 dp after the subtitle facts, never under the chevron. Open catalog is flush with the reciter spine,

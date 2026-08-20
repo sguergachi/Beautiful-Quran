@@ -66,18 +66,18 @@ class RecitationCacheTest {
     }
 
     @Test
-    fun formatUsageIsOneTotal() {
-        assertEquals("None downloaded", formatUsage(RecitationUsage()))
+    fun formatUsageShowsTotalStorageAndCacheShare() {
+        assertEquals("0 MB stored · 0 MB cached", formatUsage(RecitationUsage()))
         assertEquals(
-            "12 MB downloaded",
+            "12 MB stored · 12 MB cached",
             formatUsage(RecitationUsage(listenBytes = 12L * 1024 * 1024)),
         )
         assertEquals(
-            "3 MB downloaded",
+            "3 MB stored · 0 MB cached",
             formatUsage(RecitationUsage(keepBytes = 3L * 1024 * 1024)),
         )
         assertEquals(
-            "4 MB downloaded",
+            "4 MB stored · < 1 MB cached",
             formatUsage(RecitationUsage(listenBytes = 800_000, keepBytes = 4L * 1024 * 1024)),
         )
     }

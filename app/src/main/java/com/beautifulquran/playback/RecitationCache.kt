@@ -272,7 +272,7 @@ internal fun formatDownloadedBytes(bytes: Long): String = when {
 }
 
 internal fun formatUsage(usage: RecitationUsage): String =
-    formatDownloadedBytes(usage.total)
+    "${formatBytesAmount(usage.total)} stored · ${formatBytesAmount(usage.listenBytes)} cached"
 
 /** Keep wins: a downloaded ayah must not count twice in listen + keep. */
 internal fun cachedBytesForKey(listenBytes: Long, keepBytes: Long): Long =
