@@ -21,6 +21,7 @@ import { symbolicAyahBarCount } from '../reader/ayahRailMath'
 import { PaperChoiceList } from '../kit/PaperChoiceList'
 import { PaperSegmented } from '../kit/PaperSegmented'
 import { PaperSwitch } from '../kit/PaperSwitch'
+import { MushafFolio } from '../reader/MushafFolio'
 import { PageBreak } from '../reader/PageBreak'
 import type { BrushCheckParams } from '../kit/brushCheck'
 import type { BrushCircleParams } from '../kit/brushMark'
@@ -305,7 +306,7 @@ function ReadingPreview({
           <p className="reading-preview__arabic reading-preview__arabic--mushaf" dir="rtl">
             {MUSHAF_LINE_3}
           </p>
-          <PageBreak page={MUSHAF_PAGE} script={pageNumberScript} />
+          <MushafFolio page={MUSHAF_PAGE} script={pageNumberScript} />
         </>
       ) : (
         <div className="reading-preview__stack">

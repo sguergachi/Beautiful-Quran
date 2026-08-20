@@ -6,6 +6,7 @@ import com.beautifulquran.data.ReadingMode
 import com.beautifulquran.data.Settings
 import com.beautifulquran.data.ThemeMode
 import com.beautifulquran.data.VerseNumberScript
+import com.beautifulquran.ui.reader.mushafFolioLayout
 import com.beautifulquran.ui.reader.pageFolioLayout
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -150,5 +151,23 @@ class CustomizePolicyTest {
         assertEquals("١٢", arabic.leading)
         assertNull(arabic.trailing)
         assertTrue(arabic.centered)
+    }
+
+    @Test
+    fun `mushaf folio is centred, with a diamond only for both scripts`() {
+        val both = mushafFolioLayout(330, PageNumberScript.BOTH)
+        assertEquals("330", both.western)
+        assertEquals("٣٣٠", both.arabic)
+        assertTrue(both.diamond)
+
+        val english = mushafFolioLayout(330, PageNumberScript.ENGLISH)
+        assertEquals("330", english.western)
+        assertNull(english.arabic)
+        assertFalse(english.diamond)
+
+        val arabic = mushafFolioLayout(330, PageNumberScript.ARABIC)
+        assertNull(arabic.western)
+        assertEquals("٣٣٠", arabic.arabic)
+        assertFalse(arabic.diamond)
     }
 }

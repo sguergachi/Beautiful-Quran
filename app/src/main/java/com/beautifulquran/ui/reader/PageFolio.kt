@@ -21,3 +21,23 @@ fun pageFolioLayout(page: Int, script: PageNumberScript): PageFolioLayout {
         PageNumberScript.ARABIC -> PageFolioLayout(arabic, null, centered = true)
     }
 }
+
+/**
+ * Folio figures on a mushaf leaf. Always centred: a single script is the
+ * number itself, both scripts sit either side of a diamond on the spine.
+ */
+data class MushafFolioLayout(
+    val western: String?,
+    val arabic: String?,
+    val diamond: Boolean,
+)
+
+fun mushafFolioLayout(page: Int, script: PageNumberScript): MushafFolioLayout {
+    val western = page.toString()
+    val arabic = page.toArabicIndicDigits()
+    return when (script) {
+        PageNumberScript.BOTH -> MushafFolioLayout(western, arabic, diamond = true)
+        PageNumberScript.ENGLISH -> MushafFolioLayout(western, null, diamond = false)
+        PageNumberScript.ARABIC -> MushafFolioLayout(null, arabic, diamond = false)
+    }
+}

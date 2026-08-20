@@ -71,13 +71,14 @@ import com.beautifulquran.data.Settings
 import com.beautifulquran.data.ThemeMode
 import com.beautifulquran.data.VerseNumberScript
 import com.beautifulquran.domain.MUSHAF_LINE_PITCH_EM
-import com.beautifulquran.domain.MUSHAF_MAX_LINE_SCALE
+import com.beautifulquran.domain.MUSHAF_WORD_GAP_EM
 import com.beautifulquran.domain.MushafLine
 import com.beautifulquran.domain.MushafPage
-import com.beautifulquran.domain.mushafLineCondense
+import com.beautifulquran.domain.mushafLineFit
 import com.beautifulquran.domain.qcfTrailingMark
 import com.beautifulquran.domain.qcfWordGlyphs
 import com.beautifulquran.ui.reader.AyahNumberMark
+import com.beautifulquran.ui.reader.MushafFolioMarks
 import com.beautifulquran.ui.reader.MushafQcfFonts
 import com.beautifulquran.ui.reader.PageBreak
 import com.beautifulquran.ui.reader.VERSE_ANNOTATION_INK_ALPHA
@@ -422,6 +423,8 @@ internal fun ReadingPreview(
 }
 
 private val PreviewQcfSize = 13.sp
+/** Page hand for the miniature folio, so the figures read at ~10 sp. */
+private val PreviewFolioGlyph = 22.sp
 /** 21:91–92 occupy three exclusive Madinah lines (page 330, lines 1–3). */
 private const val PreviewMushafPage = 330
 private const val PreviewMushafLineFirst = 1
@@ -468,11 +471,35 @@ private fun PreviewMushafLeaf(
             Spacer(Modifier.height(8.dp))
             PreviewArabicLine(MUSHAF_LINE_2, number = 2, arabicMarks = true)
         }
-        PageBreak(
+        MushafFolioMarks(
             page = PreviewMushafPage,
+            glyphSize = PreviewFolioGlyph,
             script = pageNumberScript,
-            contentPadding = PreviewFolioPad,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(PreviewFolioPad),
         )
+    }
+}
+
+/** One drawn cell of a preview line — a word, or the circled mark after it. */
+private data class PreviewQcfCell(val text: String, val mark: Boolean)
+
+private fun previewQcfCells(line: MushafLine): List<PreviewQcfCell> = buildList {
+    line.tokens.forEach { token ->
+        val raw = token.word.qcfV2
+        add(
+            PreviewQcfCell(
+                text = if (raw.isNotEmpty()) {
+                    qcfWordGlyphs(raw, token.endsAyah)
+                } else {
+                    token.word.arabic
+                },
+                mark = false,
+            ),
+        )
+        val mark = if (raw.isNotEmpty()) qcfTrailingMark(raw, token.endsAyah) else ""
+        if (mark.isNotEmpty()) add(PreviewQcfCell(text = mark, mark = true))
     }
 }
 
@@ -481,29 +508,8 @@ private fun PreviewQcfLines(lines: List<MushafLine>, face: FontFamily) {
     val ink = MaterialTheme.colorScheme.onSurface
     val gold = LocalQuranAccents.current.gold
     val measurer = rememberTextMeasurer()
-    val annotated = remember(lines, ink, gold) {
-        lines.map { line ->
-            buildAnnotatedString {
-                line.tokens.forEach { token ->
-                    val raw = token.word.qcfV2
-                    val word = if (raw.isNotEmpty()) {
-                        qcfWordGlyphs(raw, token.endsAyah)
-                    } else {
-                        token.word.arabic
-                    }
-                    val mark = if (raw.isNotEmpty()) {
-                        qcfTrailingMark(raw, token.endsAyah)
-                    } else {
-                        ""
-                    }
-                    withStyle(SpanStyle(color = ink)) { append(word) }
-                    if (mark.isNotEmpty()) {
-                        withStyle(SpanStyle(color = gold)) { append(mark) }
-                    }
-                }
-            }
-        }
-    }
+    val density = LocalDensity.current
+    val cells = remember(lines) { lines.map { previewQcfCells(it) } }
     BoxWithConstraints(Modifier.fillMaxWidth()) {
         val measurePx = constraints.maxWidth.toFloat()
         val base = TextStyle(
@@ -513,32 +519,54 @@ private fun PreviewQcfLines(lines: List<MushafLine>, face: FontFamily) {
             textDirection = TextDirection.Rtl,
             platformStyle = PlatformTextStyle(includeFontPadding = false),
         )
-        val trial = annotated.map {
-            measurer.measure(it, base, maxLines = 1).size.width.toFloat()
+        val fontPx = with(density) { PreviewQcfSize.toPx() }
+        val needed = cells.map { line ->
+            val inkWidth = line.sumOf {
+                measurer.measure(it.text, base, maxLines = 1).size.width.toDouble()
+            }.toFloat()
+            inkWidth + (line.size - 1).coerceAtLeast(0) * MUSHAF_WORD_GAP_EM * fontPx
         }
-        val longest = trial.maxOrNull() ?: 0f
-        val fitted = if (longest > 0f) {
-            base.copy(fontSize = PreviewQcfSize * (measurePx / longest))
-        } else {
-            base
-        }
+        val longest = needed.maxOrNull() ?: 0f
+        val sizeScale = if (longest > measurePx && longest > 0f) measurePx / longest else 1f
+        val fitted = base.copy(fontSize = PreviewQcfSize * sizeScale)
+        val fittedPx = fontPx * sizeScale
         Column(Modifier.fillMaxWidth()) {
-            annotated.forEach { text ->
-                val natural = measurer.measure(text, fitted, maxLines = 1).size.width.toFloat()
-                val scale = when {
-                    natural <= 0f -> 1f
-                    natural > measurePx -> mushafLineCondense(natural, measurePx)
-                    else -> (measurePx / natural).coerceAtMost(MUSHAF_MAX_LINE_SCALE)
-                }
-                Text(
-                    text = text,
-                    style = fitted.copy(
-                        textGeometricTransform = TextGeometricTransform(scaleX = scale),
-                    ),
-                    maxLines = 1,
-                    overflow = TextOverflow.Visible,
-                    modifier = Modifier.fillMaxWidth(),
+            cells.forEach { line ->
+                val inkWidth = line.sumOf {
+                    measurer.measure(it.text, fitted, maxLines = 1).size.width.toDouble()
+                }.toFloat()
+                val fit = mushafLineFit(
+                    inkWidthPx = inkWidth,
+                    gapCount = (line.size - 1).coerceAtLeast(0),
+                    measureWidthPx = measurePx,
+                    fontPx = fittedPx,
                 )
+                val style = if (fit.scale == 1f) {
+                    fitted
+                } else {
+                    fitted.copy(textGeometricTransform = TextGeometricTransform(scaleX = fit.scale))
+                }
+                val gap = with(density) { fit.gapPx.toDp() }
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = if (fit.flush) {
+                        Arrangement.Start
+                    } else {
+                        Arrangement.Center
+                    },
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    line.forEachIndexed { i, cell ->
+                        if (i > 0) Spacer(Modifier.width(gap))
+                        Text(
+                            text = cell.text,
+                            style = style.copy(color = if (cell.mark) gold else ink),
+                            maxLines = 1,
+                            softWrap = false,
+                            overflow = TextOverflow.Visible,
+                        )
+                    }
+                }
             }
         }
     }

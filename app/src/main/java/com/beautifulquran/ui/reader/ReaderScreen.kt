@@ -2254,6 +2254,7 @@ fun ReaderScreen(
                         onWordClick = onMushafWordClick,
                         onWordLongClick = onMushafWordLongClick,
                         onAyahClick = onMushafAyahClick,
+                        pageNumberScript = settings.pageNumberScript,
                         modifier = Modifier.fillMaxSize(),
                     )
                     }

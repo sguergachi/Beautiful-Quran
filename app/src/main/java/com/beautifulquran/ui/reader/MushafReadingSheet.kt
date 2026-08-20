@@ -52,6 +52,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import androidx.media3.common.Player
+import com.beautifulquran.data.PageNumberScript
 import com.beautifulquran.domain.MushafGrid
 import com.beautifulquran.domain.MushafType
 import kotlin.math.pow
@@ -396,56 +397,79 @@ private fun MushafHeadLabel(
 }
 
 /**
- * Folio: the mushaf's own Arabic-Indic figure, with the Western numeral
- * as a faint letterspaced gloss beside it — the same pairing the scroll
- * layout's page-break hairline uses, minus the dot that made it a label.
+ * Folio: quiet ink on the leaf's centre line. A single script is the
+ * number itself; both scripts sit either side of a diamond. Never gold —
+ * at 9 sp a gold folio vanishes on cream.
  */
 @Composable
 internal fun MushafPageFolio(
     page: Int,
     unit: Dp,
     glyphSize: TextUnit,
+    script: PageNumberScript = PageNumberScript.BOTH,
     modifier: Modifier = Modifier,
 ) {
-    // In ink, like the running head: at gold-on-cream the figure measured
-    // 1.5:1 against the paper and simply vanished.
-    //
-    // The two figures are set well apart and hung on the leaf's centre line —
-    // which is the play button's line too — so the folio reads as a pair of
-    // marks either side of the spine rather than one clump of digits.
-    //
-    // The pair sits on one baseline, not on one centre line. Two scripts at
-    // two sizes have boxes of very different depth — Hafs carries an ascent
-    // half again as tall as the Latin face's — so centring the boxes stood
-    // the numerals a few pixels apart and the folio read as a typo. The
-    // figures align by baseline instead, and the band centres the pair as a
-    // whole; the row is left unbounded so the deeper Arabic box, which is
-    // taller than the 0.4-unit band by design, is not clipped to it.
-    val ink = MaterialTheme.colorScheme.onBackground
     Box(
         modifier = modifier
             .fillMaxWidth()
             .height(unit * MushafGrid.FOLIO),
         contentAlignment = Alignment.Center,
     ) {
-        Row(
+        MushafFolioMarks(
+            page = page,
+            glyphSize = glyphSize,
+            script = script,
             modifier = Modifier
                 .fillMaxWidth()
                 .wrapContentHeight(align = Alignment.CenterVertically, unbounded = true),
-            horizontalArrangement = Arrangement.Center,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
+        )
+    }
+}
+
+/**
+ * The folio figures, without the leaf's band. Customize's miniature uses
+ * this so the preview and the pager share one layout.
+ */
+@Composable
+internal fun MushafFolioMarks(
+    page: Int,
+    glyphSize: TextUnit,
+    script: PageNumberScript = PageNumberScript.BOTH,
+    modifier: Modifier = Modifier,
+) {
+    // The pair sits on one baseline, not on one centre line. Two scripts at
+    // two sizes have boxes of very different depth — Hafs carries an ascent
+    // half again as tall as the Latin face's — so centring the boxes stood
+    // the numerals a few pixels apart and the folio read as a typo.
+    val ink = MaterialTheme.colorScheme.onBackground
+    val folio = mushafFolioLayout(page, script)
+    val westernStyle = MaterialTheme.typography.labelSmall.copy(
+        fontSize = glyphSize * MushafType.RATIO.pow(MushafType.HEAD),
+        letterSpacing = 0.14.em,
+    )
+    val westernColor = ink.copy(alpha = 0.50f)
+    val arabicSize = glyphSize * MushafType.RATIO.pow(MushafType.FOLIO_FIGURE)
+    val arabicColor = ink.copy(alpha = 0.54f)
+    Row(
+        modifier = modifier,
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (folio.western != null) {
             Text(
-                text = "$page",
-                style = MaterialTheme.typography.labelSmall.copy(
-                    fontSize = glyphSize * MushafType.RATIO.pow(MushafType.HEAD),
-                    letterSpacing = 0.14.em,
-                ),
-                color = ink.copy(alpha = 0.50f),
-                textAlign = TextAlign.End,
+                text = folio.western,
+                style = westernStyle,
+                color = westernColor,
+                textAlign = if (folio.diamond) TextAlign.End else TextAlign.Center,
                 maxLines = 1,
-                modifier = Modifier.width(MushafFolioColumn).alignByBaseline(),
+                modifier = if (folio.diamond) {
+                    Modifier.width(MushafFolioColumn).alignByBaseline()
+                } else {
+                    Modifier.alignByBaseline()
+                },
             )
+        }
+        if (folio.diamond) {
             Box(
                 Modifier.width(MushafFolioSpread),
                 contentAlignment = Alignment.Center,
@@ -468,14 +492,20 @@ internal fun MushafPageFolio(
                     )
                 }
             }
+        }
+        if (folio.arabic != null) {
             Text(
-                text = page.toArabicIndic(),
+                text = folio.arabic,
                 fontFamily = HafsFontFamily,
-                fontSize = glyphSize * MushafType.RATIO.pow(MushafType.FOLIO_FIGURE),
-                color = ink.copy(alpha = 0.54f),
-                textAlign = TextAlign.Start,
+                fontSize = arabicSize,
+                color = arabicColor,
+                textAlign = if (folio.diamond) TextAlign.Start else TextAlign.Center,
                 maxLines = 1,
-                modifier = Modifier.width(MushafFolioColumn).alignByBaseline(),
+                modifier = if (folio.diamond) {
+                    Modifier.width(MushafFolioColumn).alignByBaseline()
+                } else {
+                    Modifier.alignByBaseline()
+                },
             )
         }
     }

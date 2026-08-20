@@ -31,7 +31,9 @@ unit of paper under it, the fifteen lines of revelation, and the folio band —
 so the head stands a line clear of the text and the chrome is measured in the
 same breath as the scripture. The unit a tail margin would take goes to the
 revelation instead; the folio's figure, centred in its own band, already sits
-half a line clear of the last line.
+half a line clear of the last line. Page-number script chooses the figure:
+Arabic-Indic, Western, or both with a diamond on the spine — always centred,
+never gold.
 
 **The folio belongs to the leaf.** It is set nearer the last line of
 revelation than the rule beneath it, because proximity is what assigns it:
@@ -1178,6 +1180,10 @@ rail, no English under the type, and its own circled QCF marks.
 - **Mushaf** — a printed Madinah leaf in the QCF V2 page face. Choosing it
   locks the view to Arabic. The Customize preview is 21:91–92 as three
   exclusive printed lines (page 330), scaled to the measure — never by
-  stretching word gaps. Page-number script (Arabic, English, or both on
-  the folio) still applies. A single-script folio centres that figure
-  between equal gold rules; both scripts sit at opposite ends.
+  stretching word gaps. The circled mark is its own cell of the line, with
+  the page's word space either side, so it never collides with the last
+  word. Page-number script still applies, and the preview paints the same
+  folio as the leaf: a single script centred as quiet ink; both scripts
+  centred either side of a diamond. Scroll page-breaks keep the gold
+  hairline (Western left, Arabic-Indic right; a single script centred
+  between equal rules).

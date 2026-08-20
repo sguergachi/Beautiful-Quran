@@ -41,3 +41,21 @@ export function pageFolioLayout(
   if (script === 'english') return { leading: western, trailing: null, centered: true }
   return { leading: arabic, trailing: null, centered: true }
 }
+
+export type MushafFolioLayout = {
+  western: string | null
+  arabic: string | null
+  diamond: boolean
+}
+
+/** Mushaf leaf folio, matching Android `mushafFolioLayout`. Always centred. */
+export function mushafFolioLayout(
+  page: number,
+  script: 'both' | 'arabic' | 'english',
+): MushafFolioLayout {
+  const western = String(page)
+  const arabic = toArabicIndic(page)
+  if (script === 'both') return { western, arabic, diamond: true }
+  if (script === 'english') return { western, arabic: null, diamond: false }
+  return { western: null, arabic, diamond: false }
+}
