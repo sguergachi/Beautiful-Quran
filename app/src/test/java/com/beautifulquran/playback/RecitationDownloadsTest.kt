@@ -93,6 +93,8 @@ class RecitationDownloadsTest {
     fun parkedChapterIsPickedBeforeTheRestOfTheQueue() {
         val baqarah = DownloadRequest(alafasy, Surah(2, "البقرة", "Al-Baqarah", "The Cow", "Madinah", 286))
         val imran = DownloadRequest(alafasy, Surah(3, "آل عمران", "Ali 'Imran", "Family of Imran", "Madinah", 200))
+        assertEquals(baqarah, visibleDownloadRequest(active = null, parked = baqarah))
+        assertEquals(imran, visibleDownloadRequest(active = imran, parked = baqarah))
         val (next, rest) = nextDownloadRequest(parked = baqarah, pending = listOf(imran))
         assertEquals(baqarah, next)
         assertEquals(listOf(imran), rest)
@@ -164,6 +166,13 @@ class RecitationDownloadsTest {
         assertTrue(isReciterReconciling(reconciling, 1))
         assertTrue(isReciterReconciling(reconciling, 2))
         assertFalse(isReciterReconciling(reconciling, 3))
+        assertFalse(isChapterActionSettling(reconciling, 1, 112))
+        assertFalse(isReciterActionSettling(reconciling, 1))
+        val settled = DownloadProgress(
+            reconciling = mapOf(ChapterRef(1, 112) to 4L),
+        )
+        assertTrue(isChapterActionSettling(settled, 1, 112))
+        assertTrue(isReciterActionSettling(settled, 1))
         assertEquals(
             "Resume",
             chapterActionLabel(

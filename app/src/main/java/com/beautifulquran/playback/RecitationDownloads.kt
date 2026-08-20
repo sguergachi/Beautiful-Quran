@@ -76,6 +76,19 @@ internal fun isChapterReconciling(
 internal fun isReciterReconciling(progress: DownloadProgress, reciterId: Int): Boolean =
     progress.reconciling.keys.any { it.reciterId == reciterId }
 
+/** Live controls stay authoritative while a background disk scan catches up. */
+internal fun isChapterActionSettling(
+    progress: DownloadProgress,
+    reciterId: Int,
+    surahId: Int,
+): Boolean = isChapterReconciling(progress, reciterId, surahId) &&
+    !isChapterDownloading(progress, reciterId, surahId) &&
+    !isChapterWaiting(progress, reciterId, surahId) &&
+    !isChapterPaused(progress, reciterId, surahId)
+
+internal fun isReciterActionSettling(progress: DownloadProgress, reciterId: Int): Boolean =
+    isReciterReconciling(progress, reciterId) && !isReciterBusy(progress, reciterId)
+
 /** An older scan may acknowledge only the exact revisions it actually read. */
 internal fun remainingReconciliations(
     current: Map<ChapterRef, Long>,
@@ -108,6 +121,12 @@ internal fun nextDownloadRequest(
     if (pending.isEmpty()) return null to pending
     return pending.first() to pending.drop(1)
 }
+
+/** A resumed parked chapter remains visible while the worker claims it. */
+internal fun visibleDownloadRequest(
+    active: DownloadRequest?,
+    parked: DownloadRequest?,
+): DownloadRequest? = active ?: parked
 
 internal fun parkedAfterDelete(
     parked: DownloadRequest?,
@@ -708,7 +727,7 @@ internal object RecitationDownloads {
     }
 
     private fun publishLocked(ayah: Int? = null, ayahCount: Int? = null) {
-        val a = active ?: parked.takeIf { paused }
+        val a = visibleDownloadRequest(active, parked)
         val q = pending.map { it.ref }
         if (paused && a != null) {
             val clock = retainedDownloadClock(

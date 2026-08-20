@@ -318,8 +318,12 @@ changes and the catalog scan form one visible transition: the affected action
 shows an ellipsis until the post-operation scan is applied. Completion tokens
 are revisioned, so an older scan cannot uncover a stale Download / Resume /
 Delete state or acknowledge a newer disk change. Delete also cancels and waits
-for the affected blocking `CacheWriter` before removing its spans, so an
-in-flight ayah cannot put bytes back after the refreshed state is shown.
+for the affected blocking `CacheWriter` before removing its spans. Pause and
+Resume are already authoritative live state, so they remain visible while the
+catalog scan catches up; a parked chapter also stays visible through the
+resume-to-worker handoff instead of flashing its older catalog action.
+An in-flight ayah therefore cannot put bytes back after the refreshed state is
+shown.
 The first catalog scan likewise shows reciter names with an ellipsis instead
 of a false empty state. Chapter rows are lazy, so opening an expanded reciter
 does not compose its full 114-row catalog in one frame.

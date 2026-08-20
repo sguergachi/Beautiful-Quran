@@ -54,12 +54,13 @@ import com.beautifulquran.playback.chapterOffersDelete
 import com.beautifulquran.playback.chapterTrailingLabels
 import com.beautifulquran.playback.downloadPercent
 import com.beautifulquran.playback.formatDownloadedBytes
+import com.beautifulquran.playback.isChapterActionSettling
 import com.beautifulquran.playback.isChapterDownloading
 import com.beautifulquran.playback.isChapterPaused
 import com.beautifulquran.playback.isChapterReconciling
 import com.beautifulquran.playback.isChapterWaiting
+import com.beautifulquran.playback.isReciterActionSettling
 import com.beautifulquran.playback.isReciterBusy
-import com.beautifulquran.playback.isReciterReconciling
 import com.beautifulquran.playback.reciterDownloadLabel
 import com.beautifulquran.playback.reciterHeaderAction
 import com.beautifulquran.playback.reciterHeaderActionIsFetch
@@ -275,7 +276,7 @@ internal fun DownloadManagerPage(
             visibleRows.forEachIndexed { index, reciterRow ->
                 val reciterId = reciterRow.reciter.id
                 val expanded = catalogLoaded && reciterId in expandedReciterIds
-                val reconciling = isReciterReconciling(progress, reciterId) ||
+                val reconciling = isReciterActionSettling(progress, reciterId) ||
                     deleting.affectsReciter(reciterId)
                 val downloadable = reciterRow.chapters.filter { ch ->
                     !ch.complete &&
@@ -378,7 +379,7 @@ internal fun DownloadManagerPage(
                         val chapterPaused = isChapterPaused(
                             progress, reciterId, row.surah.id,
                         )
-                        val chapterReconciling = isChapterReconciling(
+                        val chapterReconciling = isChapterActionSettling(
                             progress, reciterId, row.surah.id,
                         ) || deleting.affectsChapter(reciterId, row.surah.id)
                         Column {
