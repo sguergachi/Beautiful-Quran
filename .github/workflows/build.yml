@@ -23,6 +23,13 @@ jobs:
           distribution: temurin
           java-version: "21"
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Transitional cache service tests
+        run: npm --prefix backend test
+
       - name: Verify bundled Quran database asset
         run: test -s data/quran.db && test -s data/lexicon.db && test -s data/dictionary.db
 
@@ -59,6 +66,7 @@ jobs:
       - name: Assemble APK
         if: github.ref == 'refs/heads/master'
         env:
+          TIMING_CONTENT_BASE_URL: ${{ vars.TIMING_CONTENT_BASE_URL }}
           RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
           RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
           RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}

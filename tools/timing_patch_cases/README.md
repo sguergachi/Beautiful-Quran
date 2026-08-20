@@ -18,7 +18,8 @@ Agents landing a GitHub `Timings patch` issue must follow the full checklist in
 1. **Classify** the defect (forward spike, non-contiguous / gap phantom, false
    split, repair that flattens a span, boundary misalign, clock/coverage
    failure, …). Diff Lab expected
-   vs raw qdc vs post-clean vs post-repair — not only vs shipped DB.
+   vs raw qdc vs post-clean vs post-repair — not only vs the bundled fallback
+   or an already-normalized runtime snapshot.
 2. **Prefer a pipeline fix** that covers the *class*:
    - structural qdc noise → `clean_qdc_artifacts` in `tools/build_db.py`
    - drop repair erasing a multi-word re-say → `erases_span_repeat` / span-protect

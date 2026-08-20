@@ -43,6 +43,7 @@ from build_db import (  # noqa: E402
     normalize_text,
     offset_for_audio_onset,
     preserve_complete_repeat_topology,
+    parse_alignment_payload,
     preserve_peer_repeats,
     recover_negative_opening,
     refit_displaced_rows,
@@ -58,6 +59,10 @@ from timing_delta import (  # noqa: E402
     read_git_timing_rows,
     read_timing_rows,
     rejected_changes,
+)
+from normalize_runtime_timings import (  # noqa: E402
+    normalize_snapshot,
+    parse_source_chapters,
 )
 
 CASES_DIR = TOOLS / "timing_patch_cases"
@@ -533,6 +538,28 @@ def audit_bundled_db():
         (4, 4, 88): 5_968,
         (7, 5, 109): 6_636,
     }
+    # This is the phrase from Hani 5:2 that regressed to one long held word in
+    # quran-v54. Pin both passes so a one-pass fallback can never ship again.
+    exact &= [segment for segment in timings[(7, 5, 2)] if 19 <= segment[0] <= 23] == [
+        [19, 19_670, 20_970],
+        [20, 20_970, 21_600],
+        [21, 21_600, 22_100],
+        [22, 22_100, 23_570],
+        [19, 23_590, 25_300],
+        [20, 25_300, 25_980],
+        [21, 25_980, 26_620],
+        [22, 26_620, 27_890],
+        [23, 27_890, 29_810],
+    ]
+    exact &= dict(db.execute("SELECT key,value FROM data_provenance")) == {
+        "timings": (
+            "QDC-derived repeat timings over everyayah recordings; "
+            "transitional compatibility baseline"
+        ),
+        "qdc_delivery": (
+            "bundled compatibility baseline; runtime cache may replace"
+        ),
+    }
     # A withheld row is an intentional whole-ayah fallback only when neither
     # source can describe the streamed recording safely. Pin every reciter's
     # known exceptions so an accidental coverage loss cannot hide in the
@@ -784,6 +811,51 @@ def check_timing_delta():
     return True, f"{report['summary']['changedRows']} accepted timing DB delta(s)"
 
 
+def check_alignment_payload_parse():
+    rows = [{"surah": 1, "ayah": 1, "segments": [[0, 1, 2, 3]]}]
+    encoded = json.dumps(rows)
+    valid = (
+        parse_alignment_payload(encoded) == rows
+        and parse_alignment_payload(f"Crashed Command ['align']\n{encoded}") == rows
+    )
+    try:
+        parse_alignment_payload(f"unrecognized diagnostic\n{encoded}")
+        return False
+    except json.JSONDecodeError:
+        return valid
+
+
+def check_runtime_source_parse():
+    legacy = [{
+        "audio_files": [{
+            "verse_timings": [{
+                "verse_key": "2:1",
+                "timestamp_from": 100,
+                "segments": [[1, 120, 160]],
+            }],
+        }],
+    }]
+    authenticated = [{
+        "audio_file": {
+            "timestamps": [{
+                "verse_key": "2:1",
+                "timestamp_from": 100,
+                "segments": [[1, 120, 160]],
+            }],
+        },
+    }]
+    expected = {(2, 1): [[1, 20, 60]]}
+    parsed = (
+        parse_source_chapters(legacy) == expected
+        and parse_source_chapters(authenticated) == expected
+    )
+    try:
+        normalize_snapshot(1, legacy)
+        return False
+    except ValueError as error:
+        return parsed and "timed ayahs" in str(error)
+
+
 def main():
     cases = load_cases()
     failures = []
@@ -835,6 +907,8 @@ def main():
     audio_onset_ok = check_audio_onset_pipeline()
     completion_ok = check_completion_pipeline()
     gloss_ok = check_gloss_normalize()
+    alignment_payload_ok = check_alignment_payload_parse()
+    runtime_source_ok = check_runtime_source_parse()
     database_ok = audit_bundled_db()
     qcf_runs_ok = check_qcf_v2_page_runs()
     qcf_assert_ok = check_qcf_v2_run_assertion()
@@ -844,6 +918,11 @@ def main():
     print(f"  {'ok  ' if audio_onset_ok else 'FAIL'} audio evidence and onset checks")
     print(f"  {'ok  ' if completion_ok else 'FAIL'} complete fallback and physics checks")
     print(f"  {'ok  ' if gloss_ok else 'FAIL'} WBW gloss whitespace normalize")
+    print(
+        f"  {'ok  ' if alignment_payload_ok else 'FAIL'} "
+        "quran-align release payload parse"
+    )
+    print(f"  {'ok  ' if runtime_source_ok else 'FAIL'} runtime provider response parse")
     print(f"  {'ok  ' if database_ok else 'FAIL'} bundled timing database invariants")
     print(f"  {'ok  ' if qcf_runs_ok else 'FAIL'} bundled QCF V2 page/font glyph runs")
     print(f"  {'ok  ' if qcf_assert_ok else 'FAIL'} QCF V2 run assertion rejects a wrong page")
@@ -857,6 +936,10 @@ def main():
         failures.append(("timing finalizer", "completion/fallback checks failed", None))
     if not gloss_ok:
         failures.append(("gloss normalize", "trailing-space strip failed", None))
+    if not alignment_payload_ok:
+        failures.append(("quran-align payload", "release artifact parse failed", None))
+    if not runtime_source_ok:
+        failures.append(("runtime provider", "response parse failed", None))
     if not database_ok:
         failures.append(("bundled database", "timing audit failed", None))
     if not qcf_runs_ok:
@@ -876,7 +959,7 @@ def main():
                 for line in str(detail).splitlines():
                     print(f"    {line}")
         return 1
-    print(f"all {len(cases) + 9} cases pass ({CASES_DIR.relative_to(Path.cwd())})")
+    print(f"all {len(cases) + 11} cases pass ({CASES_DIR.relative_to(Path.cwd())})")
     return 0
 
 

@@ -45,13 +45,11 @@ jobs:
           test -s ../data/lexicon.db && test -s dist/lexicon.db
           test -s ../data/dictionary.db && test -s dist/dictionary.db
 
-  # Soft-fail when the repo has no Pages site yet (private repos often don't).
-  # Vitest + web build above remain the hard gate.
+  # The public project has an active Pages site, so deployment is a hard gate.
   build-pages:
     if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/master'
     needs: test
     runs-on: ubuntu-latest
-    continue-on-error: true
     permissions:
       contents: read
       pages: write
@@ -72,7 +70,19 @@ jobs:
           cp -R docs/. _site/
       - name: Build reader into Pages site
         working-directory: web
+        env:
+          VITE_TIMING_CONTENT_BASE_URL: ${{ vars.TIMING_CONTENT_BASE_URL }}
         run: npm run build:pages
+      - name: Verify Pages routes
+        run: |
+          test -s _site/index.html
+          test -s _site/app/index.html
+          test -s _site/app/fonts.css
+          grep -Fq '/Beautiful-Quran/app/' _site/app/index.html
+          if grep -Fq '/Beautiful-Quran-/app/' _site/app/index.html; then
+            echo 'Reader still targets the former trailing-dash repository path.'
+            exit 1
+          fi
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v4
@@ -83,7 +93,6 @@ jobs:
     if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/master'
     needs: build-pages
     runs-on: ubuntu-latest
-    continue-on-error: true
     permissions:
       pages: write
       id-token: write

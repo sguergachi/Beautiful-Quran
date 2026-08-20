@@ -234,8 +234,8 @@ because a future scholar's gloss must be refusable too.
 ## Export *(not yet built)*
 
 Notes are the only user data with no recovery path: the app is offline-first
-with no accounts and no backend (invariant #6), so a lost device is a lost
-hand. This is the highest-priority follow-up.
+with no accounts or user-data backend (the timing facade never receives
+notes), so a lost device is a lost hand. This is the highest-priority follow-up.
 
 Settings → a quiet *Export notes* line writes a plain-text file through the
 system document picker (SAF — no storage permission, no share sheet

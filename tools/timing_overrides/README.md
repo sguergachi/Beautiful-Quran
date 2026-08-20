@@ -22,9 +22,10 @@ That was wrong: raw qdc already had the re-say, a **gap phantom** mislabeled
 word 12, and a CTC **`drop` repair** had flattened the span. The correct fix
 (#571) is pipeline rules + `timing_patch_cases`, with **no** override.
 
-If the Lab/GitHub positions differ from shipped DB by **topology** (extra /
-missing backtracks, skipped word indices, collapsed long spans), it is a class
-bug until proven otherwise — not an override.
+If the Lab/GitHub positions differ from the normalized runtime row by
+**topology** (extra / missing backtracks, skipped word indices, collapsed long
+spans), it is a class bug until proven otherwise — not an override. The bundled
+quran-align fallback intentionally has no repeat topology.
 
 | Defect class | Fix where | Verify with |
 |---|---|---|

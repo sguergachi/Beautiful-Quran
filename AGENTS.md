@@ -156,10 +156,12 @@ python3 tools/test_build_db.py  # timing pipeline regressions (~1s, no Gradle)
    regenerating a database means updating **both** lines in that file and its
    `DB_FILE_NAME` to match. A red fingerprint test is the bump you forgot, not
    a flake.
-2. **The data pipeline is a build step, not app code.** All data messiness
-   (source mismatches, basmalah offsets, truncated upstream files) is resolved
-   in `tools/build_db.py` with validation. The app assumes a clean, consistent,
-   read-only database — never add data-repair logic to the app.
+2. **The data pipeline never becomes app code.** All data messiness (source
+   mismatches, basmalah offsets, malformed upstream files) is resolved by the
+   canonical `tools/build_db.py` logic with validation. It runs at build time
+   for quran-align and through `tools/normalize_runtime_timings.py` on the
+   timing backend for repeat-aware snapshots. Never add repair logic to a
+   client.
 3. **`HighlightEngine` stays pure.** It is a pure function over immutable data
    with no Android dependencies, and it is where sync correctness lives. Keep
    it that way, and keep its unit tests passing and extended.
@@ -179,9 +181,11 @@ python3 tools/test_build_db.py  # timing pipeline regressions (~1s, no Gradle)
    `QuranDatabase`), no navigation library (the three sheets are a hand-rolled
    paper stack in `MainActivity`). Do not introduce a framework to solve a
    problem the existing hand-rolled piece already solves.
-6. **Offline-first, no backend.** No accounts, no analytics, no API keys. Only
-   recitation audio touches the network at runtime (streamed and cached,
-   1 GB LRU).
+6. **Offline-first, no client secrets.** No accounts, analytics, or API keys in
+   Android/web. Quran text and quran-align timings stay bundled; recitation
+   audio and optional repeat-aware timing snapshots touch the network and are
+   cached locally. QF credentials, once approved, live only on the narrow
+   timing backend.
 7. **Ink / karaoke fidelity is non-negotiable (Android + web).** The signature
    product moment is the soft directional ink wash: each word reveals with a
    **visible faded leading edge** (smootherstep `letterFadeIn` /
@@ -217,7 +221,8 @@ When the user asks to "fix the timing issue", "apply the timings patch", or
 close a `Timings patch — …` GitHub issue, **do this checklist in order**:
 
 1. **Extract** the Lab/issue expected segments (and positions).
-2. **Compare** against the pipeline, not only the shipped DB row:
+2. **Compare** against the runtime pipeline, not only the bundled quran-align
+   fallback or a normalized device row:
    - raw qdc: `tools/.cache/qdc_<id>.json` key `"surah:ayah"` (Alafasy = 7)
    - after `clean_qdc_artifacts` / `adjust_qdc_segments`
    - after `tools/timing_repairs/` (may *erase* a real span — check kind `drop`)
@@ -236,14 +241,10 @@ close a `Timings patch — …` GitHub issue, **do this checklist in order**:
 | Missing positions, unsafe clock, or marks outside the MP3 | fix the source/class; `finalize_timing_rows` completes, falls back, or withholds | completion/physics checks in `tools/test_build_db.py` |
 4. **Implement the class fix** + add the patch case (input = broken shape,
    expected = Lab/ear topology). Run `python3 tools/test_build_db.py`.
-5. **Rebuild**: `python3 tools/build_db.py`, bump `DB_FILE_NAME`, commit DB +
-   cases. A rebuild usually improves rows besides yours, and the fail-closed
-   delta gate withholds every one of them. Transplanting only your rows is the
-   quick way past that, and it is how the shipped database drifted away from
-   its own pipeline for eight versions (4861e0de → af9959bd). Give the rest
-   verdicts, or record them in
-   [tools/timing_verdicts/OUTSTANDING.md](tools/timing_verdicts/OUTSTANDING.md)
-   — never leave them silently unshipped.
+5. **Verify the runtime normalizer** and deploy the timing backend. Until a
+   non-empty release endpoint is configured and full-corpus parity is proven,
+   preserve the bundled repeat-aware compatibility rows byte-for-byte. Remove
+   them only in the same release that makes the verified cache path available.
 6. **Do not** land per-ayah overrides. Delete any local reproduction JSON
    before committing.
 

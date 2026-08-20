@@ -106,8 +106,9 @@ elsewhere to scrub.
 Edits persist automatically — on finishing a re-sync, after a slide settles,
 when you change ayah, and when you leave the Lab. The override store is tiny
 and atomic, so there is nothing to lose and nothing to remember. `Reset ayah
-to bundled` (overflow menu) reverts to the shipped DB row; `Clear all
-corrections` empties the store.
+to bundled` (the historical UI label in the overflow menu) reverts to the
+current clean source row: a fresh runtime snapshot when available, otherwise
+the verified bundled fallback. `Clear all corrections` empties the store.
 
 ## Where it lives
 
@@ -216,8 +217,9 @@ Free, no backend, no auth beyond the GitHub account:
 
    Before classifying, **diff the Lab positions against raw qdc**
    (`tools/.cache/qdc_<id>.json`) and against the row **after**
-   `clean_qdc_artifacts` and **after** `timing_repairs` — the shipped DB may
-   already be wrong because a `drop` repair flattened a real re-say (#570).
+   `clean_qdc_artifacts` and **after** `timing_repairs` — the normalized runtime
+   snapshot may already be wrong because a `drop` repair flattened a real
+   re-say (#570). QDC rows are no longer present in the bundled database.
 
    | Class | Where to fix | Unit test |
    |---|---|---|
@@ -299,10 +301,11 @@ tools/timing_overrides/     local reproduction scratch; empty in commits
 
 * No ripple / Material ink — `quietClickable`, content answers with motion.
 * No new dependencies.
-* Editing is fully offline; only Submit touches the network (it just opens a
-  URL).
+* Editing is fully offline; Submit just opens a GitHub URL. Independent
+  background timing refresh may still occur elsewhere in the reader.
 * The bundled `quran.db` stays read-only on device; corrections live in the
-  override store until they come back bundled in the next DB.
+  override store until a systematic fix reaches the runtime normalizer (or the
+  verified bundled baseline reaches the next DB).
 
 ## Non-goals (intentionally)
 
@@ -311,5 +314,6 @@ tools/timing_overrides/     local reproduction scratch; empty in commits
 * No editing of ayah text / gloss / reciter metadata — build-time data.
 * No multi-ayah batch view — corrections are per-ayah by nature; ‹ › steps
   between neighbours quickly.
-* No automatic round-trip — corrections return to devices inside the next
-  bundled DB, not via sync.
+* No automatic upload/round-trip — a maintainer first classifies and lands the
+  patch. Runtime-source fixes then reach devices through timing sync; bundled
+  fallback fixes still require a database release.

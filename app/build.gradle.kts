@@ -10,6 +10,9 @@ plugins {
 fun env(name: String): String? = System.getenv(name)?.takeIf { it.isNotBlank() }
 
 val releaseKeystore = rootProject.file(env("RELEASE_KEYSTORE_FILE") ?: "release.keystore")
+val timingContentBaseUrl = (env("TIMING_CONTENT_BASE_URL") ?: "")
+    .replace("\\", "\\\\")
+    .replace("\"", "\\\"")
 
 android {
     namespace = "com.beautifulquran"
@@ -26,6 +29,7 @@ android {
         targetSdk = 37
         versionCode = 8
         versionName = "0.7"
+        buildConfigField("String", "TIMING_CONTENT_BASE_URL", "\"$timingContentBaseUrl\"")
     }
 
     signingConfigs {

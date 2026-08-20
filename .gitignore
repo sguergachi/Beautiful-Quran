@@ -13,6 +13,7 @@ web/dist/
 web/public/quran.db
 web/public/lexicon.db
 web/public/dictionary.db
+backend/.cache/
 _site/
 
 # Source data cache for tools/build_db.py. The built database is committed

@@ -12,6 +12,7 @@ import type { ActiveWord, Reciter, Surah, SurahContent, Segment, Word } from '..
 import { dictionaryEntry, type DictionaryEntry } from '../data/dictionary'
 import { lexiconEntry, type LexiconEntry } from '../data/lexicon'
 import { QuranRepository } from '../data/repository'
+import { runtimeTimingCache } from '../data/runtimeTimings'
 import {
   loadBookmarks,
   loadSettings,
@@ -226,6 +227,18 @@ class AppStore {
   }
 
   constructor() {
+    runtimeTimingCache?.subscribe((reciterId) => {
+      const content = this.state.content
+      if (
+        !content ||
+        this.state.player.isPlaying ||
+        this.state.settings.reciterId !== reciterId
+      ) return
+      const reciter = this.state.reciters.find((item) => item.id === reciterId)
+      if (!reciter) return
+      const ayah = this.state.player.nowPlaying?.ayah ?? this.state.openAyah
+      this.installTimings(reciter, content.surah.id, ayah, true)
+    })
     player.subscribe((ps) => {
       const prev = this.state.player
       this.state = { ...this.state, player: ps }
@@ -328,6 +341,7 @@ class AppStore {
 
   async init() {
     try {
+      void runtimeTimingCache?.restore(this.state.settings.reciterId)
       await QuranRepository.ensureReady((p) => {
         if (p.phase === 'wasm') {
           this.set({ loadLabel: 'Preparing the reader…', loadProgress: null })
@@ -400,11 +414,24 @@ class AppStore {
       const reciter = this.state.reciters.find((r) => r.id === patch.reciterId)
       if (reciter) this.reloadTimingsAndReciter(reciter)
     }
+    if (patch.reciterId != null) void runtimeTimingCache?.restore(patch.reciterId)
   }
 
   private reloadTimingsAndReciter(reciter: Reciter) {
     if (!this.state.content) return
     const surahId = this.state.content.surah.id
+    const ayah = this.state.player.nowPlaying?.ayah ?? this.state.settings.lastAyah
+    const start = ayah > 0 ? ayah : 1
+    this.installTimings(reciter, surahId, start)
+    player.loadSurah(this.state.content, reciter, start, { warm: false })
+  }
+
+  private installTimings(
+    reciter: Reciter,
+    surahId: number,
+    ayah: number,
+    recompute = false,
+  ) {
     const map = withBasmalahLeadIn(
       QuranRepository.timings(reciter.id, surahId),
       reciter.id,
@@ -412,11 +439,9 @@ class AppStore {
     )
     this.timingSegments = map
     this.prepared = new Map()
-    const ayah = this.state.player.nowPlaying?.ayah ?? this.state.settings.lastAyah
-    const start = ayah > 0 ? ayah : 1
-    this.ensurePrepared(start)
-    this.ensurePrepared(start + 1)
-    player.loadSurah(this.state.content, reciter, start, { warm: false })
+    this.ensurePrepared(ayah)
+    this.ensurePrepared(ayah + 1)
+    if (recompute) this.recomputeActive(this.state.player)
     this.set({ hasTimings: reciter.hasTimings && map.size > 0 })
   }
 
@@ -522,17 +547,7 @@ class AppStore {
       // idle task and refresh the current highlight if Play was tapped first.
       const loadTimings = () => {
         if (token !== this.openToken) return
-        const map = withBasmalahLeadIn(
-          QuranRepository.timings(reciter.id, surahId),
-          reciter.id,
-          surahId,
-        )
-        if (token !== this.openToken) return
-        this.timingSegments = map
-        this.ensurePrepared(ayah)
-        this.ensurePrepared(ayah + 1)
-        this.recomputeActive(this.state.player)
-        this.set({ hasTimings: reciter.hasTimings && map.size > 0 })
+        this.installTimings(reciter, surahId, ayah, true)
       }
       const ric = (
         globalThis as unknown as {

@@ -551,7 +551,12 @@ export function WordUnit({
       role="button"
       tabIndex={0}
     >
-      <span className="word-stack" dir={rtl ? 'rtl' : 'ltr'}>
+      <span
+        className="word-stack"
+        dir={rtl ? 'rtl' : 'ltr'}
+        lang={rtl ? 'ar' : undefined}
+        translate={rtl ? 'no' : undefined}
+      >
         {/* Base + orange overlays share one tight slot so abspos ink sits on
             the same border box as the glyphs (top:0 on the stack was half-
             leading above the inline baseline). */}

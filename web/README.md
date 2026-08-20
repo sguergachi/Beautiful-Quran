@@ -14,6 +14,10 @@ GitHub Actions stages the marketing content from `docs/` and builds the reader
 under `/app/`, then deploys the combined tree as a GitHub Pages artifact. Build
 output is never committed back to `master`.
 
+Repository **Settings → Pages → Build and deployment → Source** must be
+**GitHub Actions**. Selecting the legacy `master /docs` source deploys only the
+marketing files and overwrites `/app/` with a 404.
+
 ## Quick start
 
 ```bash
@@ -25,15 +29,18 @@ npm run build    # static site → dist/
 npm run build:pages  # → ../_site/app (CI does this on master)
 ```
 
-Requires Node 20+. `npm run dev` and `npm run build` copy the canonical
+Requires Node 22+. `npm run dev` and `npm run build` copy the canonical
 `../data/quran.db` into the generated web assets. The database is committed
-once and shared with Android; there is no second data pipeline.
+once and shared with Android; it temporarily retains the last verified
+repeat-aware compatibility rows. When `VITE_TIMING_CONTENT_BASE_URL` is set, the
+browser restores fresh repeat-aware snapshots from separate IndexedDB storage
+and refreshes them through the timing facade in the background.
 
 ## Architecture
 
 ```
 src/domain/     HighlightEngine, HighlightClock, basmalah and search policy
-src/data/       WASM SQLite (sql.js) over quran.db + settings/bookmarks
+src/data/       WASM SQLite + separate IndexedDB Content Sync timing cache
 src/playback/   Dual HTMLAudioElement + Cache API prefetch + Media Session + rAF clock
 src/render/     WordUnit / HafsWord / AyahBlock (directional ink + paper-cover bloom)
 src/ui/         paper stack plus Android-mirrored reader/focus/Ink/Fade policy
@@ -74,6 +81,10 @@ Engines are DOM-free and unit-tested against the Android JVM suites. See
   hard abut — no crossfade). Word highlight still uses the same per-ayah
   `positionMs` clock. Developer mode can disable it to A/B the legacy
   dual-`<audio>` transport.
+- Runtime timing sync never blocks a chapter open. Fresh IndexedDB rows win;
+  otherwise the bundled quran-align rows render immediately. Revalidation
+  starts after six days, and runtime rows are not used past seven days. The
+  backend's snapshot age is retained locally, so those windows do not stack.
 - Click a word to play from there; right-click / long-press opens the Root Word Viewer.
 - Themes: Paper / Nightfall / Royal green (Settings).
 - Form controls use [Base UI](https://base-ui.com) primitives (`Select`,

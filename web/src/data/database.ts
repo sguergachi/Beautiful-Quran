@@ -7,8 +7,7 @@
  *
  * Load order:
  *   1. Local WASM (wasmBinary + locateFile under the app base path)
- *   2. sql.js CDN WASM (locateFile)
- *   3. sql.js asm.js build (no WASM — last resort when wasm is blocked)
+ *   2. Bundled sql.js asm.js build (no WASM — fallback when wasm is blocked)
  */
 import initSqlJsWasm, { type Database, type SqlJsStatic } from 'sql.js'
 import { assetUrl } from '../assetUrl'
@@ -19,8 +18,6 @@ let loadPromise: Promise<Database> | null = null
 
 export type LoadPhase = 'wasm' | 'asm' | 'db'
 export type LoadProgress = { loaded: number; total: number; phase: LoadPhase }
-
-const CDN_SQLJS = 'https://sql.js.org/dist/'
 
 /** Filenames the browser sql.js build may request via locateFile. */
 export const LOCAL_WASM_CANDIDATES = [
@@ -141,12 +138,6 @@ async function initWasmLocal(
   })
 }
 
-async function initWasmCdn(): Promise<SqlJsStatic> {
-  return initSqlJsWasm({
-    locateFile: (file) => `${CDN_SQLJS}${file}`,
-  })
-}
-
 async function initAsm(
   onProgress?: (p: LoadProgress) => void,
 ): Promise<SqlJsStatic> {
@@ -158,7 +149,7 @@ async function initAsm(
 }
 
 /**
- * Resolve a working sql.js runtime: local WASM → CDN WASM → asm.js.
+ * Resolve a working sql.js runtime without contacting a third-party CDN.
  */
 export async function loadSqlJs(
   onProgress?: (p: LoadProgress) => void,
@@ -172,14 +163,6 @@ export async function loadSqlJs(
     return SQL
   } catch (e) {
     errors.push(`local-wasm: ${e instanceof Error ? e.message : String(e)}`)
-  }
-
-  try {
-    onProgress?.({ loaded: 0, total: 0, phase: 'wasm' })
-    SQL = await initWasmCdn()
-    return SQL
-  } catch (e) {
-    errors.push(`cdn-wasm: ${e instanceof Error ? e.message : String(e)}`)
   }
 
   try {
