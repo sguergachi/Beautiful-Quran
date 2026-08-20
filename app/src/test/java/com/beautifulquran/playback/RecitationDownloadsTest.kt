@@ -11,6 +11,8 @@ import org.junit.Test
 class RecitationDownloadsTest {
 
     private val fatiha = Surah(1, "الفاتحة", "Al-Fatihah", "The Opening", "Makkah", 7)
+    private val baqarah = Surah(2, "البقرة", "Al-Baqarah", "The Cow", "Madinah", 286)
+    private val imran = Surah(3, "آل عمران", "Ali 'Imran", "Family of Imran", "Madinah", 200)
     private val ikhlas = Surah(112, "الإخلاص", "Al-Ikhlas", "Sincerity", "Makkah", 4)
     private val alafasy = Reciter(1, "Alafasy_128kbps", "Mishary Alafasy", "murattal", true)
     private val husary = Reciter(2, "Husary_128kbps", "Mahmoud Khalil Al-Husary", "murattal", true)
@@ -90,26 +92,212 @@ class RecitationDownloadsTest {
     }
 
     @Test
-    fun parkedChapterIsPickedBeforeTheRestOfTheQueue() {
-        val baqarah = DownloadRequest(alafasy, Surah(2, "البقرة", "Al-Baqarah", "The Cow", "Madinah", 286))
-        val imran = DownloadRequest(alafasy, Surah(3, "آل عمران", "Ali 'Imran", "Family of Imran", "Madinah", 200))
-        assertEquals(baqarah, visibleDownloadRequest(active = null, parked = baqarah))
-        assertEquals(imran, visibleDownloadRequest(active = imran, parked = baqarah))
-        val (next, rest) = nextDownloadRequest(parked = baqarah, pending = listOf(imran))
-        assertEquals(baqarah, next)
-        assertEquals(listOf(imran), rest)
-        val (only, empty) = nextDownloadRequest(parked = baqarah, pending = listOf(baqarah, imran))
-        assertEquals(baqarah, only)
-        assertEquals(listOf(imran), empty)
+    fun pausingActiveChapterLeavesEveryWaitingChapterRunnable() {
+        val first = DownloadRequest(alafasy, baqarah)
+        val second = DownloadRequest(alafasy, imran)
+        val otherReciter = DownloadRequest(husary, fatiha)
+        val queue = DownloadQueue().apply { enqueue(listOf(first, second, otherReciter)) }
+
+        assertEquals(first, queue.takeNext())
+        assertTrue(queue.pauseChapter(first.ref, DownloadClock(12, 286)))
+        assertTrue(queue.cancellingActive)
+        assertEquals(listOf(first.ref), queue.pausedDownloads.map { it.request.ref })
+        assertEquals(listOf(second, otherReciter), queue.waitingRequests)
+        val pausedProgress = downloadProgress(queue)
+        assertTrue(pausedProgress.running)
+        assertNull(pausedProgress.active)
+        assertEquals(setOf(first.ref), pausedProgress.pausedChapters)
+        assertEquals(DownloadClock(12, 286), pausedProgress.pausedClocks[first.ref])
+        assertTrue(isChapterPaused(pausedProgress, first.reciter.id, first.surah.id))
+        assertTrue(isChapterWaiting(pausedProgress, second.reciter.id, second.surah.id))
+
+        queue.finish(first)
+        assertEquals(second, queue.takeNext())
+        val continued = downloadProgress(queue, ayah = 4, ayahCount = 200)
+        assertEquals(second.ref, continued.active)
+        assertEquals(setOf(first.ref), continued.pausedChapters)
+        assertEquals(listOf(otherReciter.ref), continued.queued)
     }
 
     @Test
-    fun deletingTheParkedChapterClearsIt() {
-        val parked = DownloadRequest(alafasy, fatiha)
-        assertEquals(null, parkedAfterDelete(parked, reciterId = 1, surahId = 1))
-        assertEquals(parked, parkedAfterDelete(parked, reciterId = 1, surahId = 112))
-        assertEquals(null, parkedAfterDelete(parked, reciterId = 1))
-        assertEquals(parked, parkedAfterDelete(parked, reciterId = 2))
+    fun pausingWaitingChapterDoesNotTouchActiveOrNeighbors() {
+        val first = DownloadRequest(alafasy, fatiha)
+        val paused = DownloadRequest(alafasy, baqarah)
+        val last = DownloadRequest(husary, ikhlas)
+        val queue = DownloadQueue().apply {
+            enqueue(listOf(first, paused, last))
+            takeNext()
+        }
+
+        assertFalse(queue.pauseChapter(paused.ref))
+        assertEquals(first, queue.active)
+        assertFalse(queue.cancellingActive)
+        assertEquals(listOf(last), queue.waitingRequests)
+        assertEquals(listOf(paused.ref), queue.pausedDownloads.map { it.request.ref })
+        assertFalse(queue.pauseChapter(ChapterRef(7, 7)))
+    }
+
+    @Test
+    fun pausingReciterMovesOnlyThatRecitersWorkOutOfTheQueue() {
+        val active = DownloadRequest(alafasy, fatiha)
+        val sameReciter = DownloadRequest(alafasy, baqarah)
+        val otherReciter = DownloadRequest(husary, ikhlas)
+        val queue = DownloadQueue().apply {
+            enqueue(listOf(active, sameReciter, otherReciter))
+            takeNext()
+        }
+
+        assertTrue(queue.pauseReciter(alafasy.id, DownloadClock(3, 7)))
+        assertEquals(listOf(active, sameReciter), queue.pausedDownloads.map { it.request })
+        assertEquals(listOf(otherReciter), queue.waitingRequests)
+        queue.finish(active)
+        assertEquals(otherReciter, queue.takeNext())
+    }
+
+    @Test
+    fun pausingQueuedReciterDoesNotInterruptAnotherRecitersActiveDownload() {
+        val active = DownloadRequest(husary, fatiha)
+        val alafasyFirst = DownloadRequest(alafasy, baqarah)
+        val alafasySecond = DownloadRequest(alafasy, imran)
+        val queue = DownloadQueue().apply {
+            enqueue(listOf(active, alafasyFirst, alafasySecond))
+            takeNext()
+        }
+
+        assertFalse(queue.pauseReciter(alafasy.id))
+        assertEquals(active, queue.active)
+        assertFalse(queue.cancellingActive)
+        assertTrue(queue.waitingRequests.isEmpty())
+        assertEquals(
+            listOf(alafasyFirst, alafasySecond),
+            queue.pausedDownloads.map { it.request },
+        )
+    }
+
+    @Test
+    fun resumingOneReciterLeavesOtherPausedWorkAlone() {
+        val alafasyFirst = DownloadRequest(alafasy, fatiha)
+        val alafasySecond = DownloadRequest(alafasy, baqarah)
+        val husaryRequest = DownloadRequest(husary, ikhlas)
+        val queue = DownloadQueue().apply {
+            enqueue(listOf(alafasyFirst, alafasySecond, husaryRequest))
+            pauseReciter(alafasy.id)
+            pauseReciter(husary.id)
+        }
+
+        queue.resumeReciter(alafasy.id)
+        assertEquals(listOf(alafasyFirst, alafasySecond), queue.waitingRequests)
+        assertEquals(listOf(husaryRequest), queue.pausedDownloads.map { it.request })
+    }
+
+    @Test
+    fun resumingOneChapterLeavesOtherPausedChaptersAlone() {
+        val first = DownloadRequest(alafasy, fatiha)
+        val second = DownloadRequest(husary, ikhlas)
+        val queue = DownloadQueue().apply {
+            enqueue(listOf(first, second))
+            pauseChapter(first.ref)
+            pauseChapter(second.ref)
+        }
+
+        queue.enqueue(listOf(first))
+        assertEquals(listOf(first), queue.waitingRequests)
+        assertEquals(listOf(second), queue.pausedDownloads.map { it.request })
+    }
+
+    @Test
+    fun rapidResumeQueuesCancelledActiveForAFullRetry() {
+        val first = DownloadRequest(alafasy, fatiha)
+        val second = DownloadRequest(husary, ikhlas)
+        val queue = DownloadQueue().apply {
+            enqueue(listOf(first, second))
+            takeNext()
+            pauseChapter(first.ref, DownloadClock(3, 7))
+        }
+
+        queue.enqueue(listOf(first))
+        assertTrue(queue.cancellingActive)
+        assertEquals(listOf(second, first), queue.waitingRequests)
+        assertTrue(queue.pausedDownloads.isEmpty())
+        queue.finish(first)
+        assertEquals(second, queue.takeNext())
+        queue.finish(second)
+        assertEquals(first, queue.takeNext())
+    }
+
+    @Test
+    fun deletionRemovesPausedAndWaitingWorkWithoutStoppingNeighbors() {
+        val active = DownloadRequest(alafasy, fatiha)
+        val paused = DownloadRequest(alafasy, baqarah)
+        val waiting = DownloadRequest(husary, ikhlas)
+        val queue = DownloadQueue().apply {
+            enqueue(listOf(active, paused, waiting))
+            takeNext()
+            pauseChapter(paused.ref)
+        }
+
+        assertFalse(queue.removeChapter(paused.ref))
+        assertTrue(queue.pausedDownloads.isEmpty())
+        assertEquals(listOf(waiting), queue.waitingRequests)
+        assertTrue(queue.removeChapter(active.ref))
+        assertTrue(queue.cancellingActive)
+        assertEquals(listOf(waiting), queue.waitingRequests)
+    }
+
+    @Test
+    fun deletingReciterPreservesOtherRecitersActiveAndWaitingWork() {
+        val active = DownloadRequest(husary, fatiha)
+        val alafasyFirst = DownloadRequest(alafasy, baqarah)
+        val alafasySecond = DownloadRequest(alafasy, imran)
+        val queue = DownloadQueue().apply {
+            enqueue(listOf(active, alafasyFirst, alafasySecond))
+            takeNext()
+            pauseChapter(alafasyFirst.ref)
+        }
+
+        assertFalse(queue.removeReciter(alafasy.id))
+        assertEquals(active, queue.active)
+        assertFalse(queue.cancellingActive)
+        assertTrue(queue.waitingRequests.isEmpty())
+        assertTrue(queue.pausedDownloads.isEmpty())
+    }
+
+    @Test
+    fun staleWorkerFinishCannotClearNewSameChapterRequest() {
+        val old = DownloadRequest(alafasy, fatiha)
+        val fresh = DownloadRequest(alafasy, fatiha)
+        val queue = DownloadQueue().apply {
+            enqueue(listOf(old))
+            takeNext()
+            clear()
+            enqueue(listOf(fresh))
+            takeNext()
+        }
+
+        queue.finish(old)
+        assertTrue(queue.active === fresh)
+        assertNull(queue.takeNext())
+        queue.finish(fresh)
+        assertNull(queue.active)
+    }
+
+    @Test
+    fun clearingQueueDropsWaitingAndPausedWork() {
+        val active = DownloadRequest(alafasy, fatiha)
+        val paused = DownloadRequest(alafasy, baqarah)
+        val waiting = DownloadRequest(husary, ikhlas)
+        val queue = DownloadQueue().apply {
+            enqueue(listOf(active, paused, waiting))
+            takeNext()
+            pauseChapter(paused.ref)
+        }
+
+        queue.clear()
+        queue.clear()
+        assertNull(queue.active)
+        assertTrue(queue.waitingRequests.isEmpty())
+        assertTrue(queue.pausedDownloads.isEmpty())
+        assertTrue(queue.cancellingActive)
     }
 
     @Test
@@ -140,9 +328,30 @@ class RecitationDownloadsTest {
     }
 
     @Test
+    fun queueProcessesUniqueRequestsOnceInFifoOrder() {
+        val first = DownloadRequest(alafasy, fatiha)
+        val second = DownloadRequest(alafasy, baqarah)
+        val third = DownloadRequest(husary, ikhlas)
+        val queue = DownloadQueue().apply {
+            enqueue(listOf(first, first, second))
+        }
+
+        assertEquals(first, queue.takeNext())
+        queue.enqueue(listOf(first, second, third, third))
+        assertEquals(listOf(second, third), queue.waitingRequests)
+        queue.finish(first)
+        assertEquals(second, queue.takeNext())
+        queue.finish(second)
+        assertEquals(third, queue.takeNext())
+        queue.finish(third)
+        assertNull(queue.takeNext())
+    }
+
+    @Test
     fun chapterBusyFlagsFollowActiveAndQueue() {
         val progress = DownloadProgress(
             running = true,
+            active = ChapterRef(1, 1),
             reciterId = 1,
             surahId = 1,
             queued = listOf(ChapterRef(1, 112), ChapterRef(2, 1)),
@@ -152,12 +361,22 @@ class RecitationDownloadsTest {
         assertTrue(isChapterWaiting(progress, 1, 112))
         assertTrue(isChapterWaiting(progress, 2, 1))
         assertFalse(isChapterWaiting(progress, 1, 1))
-        val paused = progress.copy(paused = true)
+        val paused = DownloadProgress(
+            running = true,
+            active = ChapterRef(2, 1),
+            pausedChapters = setOf(ChapterRef(1, 1)),
+            pausedClocks = mapOf(ChapterRef(1, 1) to DownloadClock(3, 7)),
+            reciterName = husary.name,
+            surahName = fatiha.nameTransliteration,
+            reciterId = 2,
+            surahId = 1,
+            queued = listOf(ChapterRef(1, 112)),
+        )
         assertTrue(isChapterPaused(paused, 1, 1))
-        assertTrue(isChapterPaused(paused, 1, 112))
+        assertFalse(isChapterPaused(paused, 1, 112))
         assertFalse(isChapterPaused(paused, 2, 1))
-        assertFalse(isChapterWaiting(paused, 1, 112))
-        assertTrue(isChapterWaiting(paused, 2, 1))
+        assertTrue(isChapterWaiting(paused, 1, 112))
+        assertFalse(isChapterWaiting(paused, 2, 1))
         val reconciling = paused.copy(
             reconciling = mapOf(ChapterRef(1, 112) to 4L, ChapterRef(2, 1) to 5L),
         )
@@ -167,6 +386,7 @@ class RecitationDownloadsTest {
         assertTrue(isReciterReconciling(reconciling, 2))
         assertFalse(isReciterReconciling(reconciling, 3))
         assertFalse(isChapterActionSettling(reconciling, 1, 112))
+        assertFalse(isChapterActionSettling(reconciling, 1, 1))
         assertFalse(isReciterActionSettling(reconciling, 1))
         val settled = DownloadProgress(
             reconciling = mapOf(ChapterRef(1, 112) to 4L),
@@ -210,7 +430,20 @@ class RecitationDownloadsTest {
         assertEquals("Al-Fatihah · 42% · 1 waiting", reciterProgressLabel(live, reciterId = 1))
         assertEquals(
             "Al-Fatihah · 42% · 1 waiting",
-            reciterProgressLabel(live.copy(running = false, paused = true), reciterId = 1),
+            reciterProgressLabel(
+                DownloadProgress(
+                    pausedChapters = setOf(ChapterRef(1, 1)),
+                    pausedClocks = mapOf(ChapterRef(1, 1) to DownloadClock(3, 7)),
+                    reciterName = alafasy.name,
+                    surahName = fatiha.nameTransliteration,
+                    reciterId = 1,
+                    surahId = 1,
+                    ayah = 3,
+                    ayahCount = 7,
+                    queued = listOf(ChapterRef(1, 112)),
+                ),
+                reciterId = 1,
+            ),
         )
         assertEquals("1 waiting", reciterProgressLabel(live, reciterId = 2))
         assertEquals("", reciterProgressLabel(DownloadProgress(), reciterId = 1))
@@ -242,10 +475,21 @@ class RecitationDownloadsTest {
             ),
         )
         assertEquals(
-            "Resume",
+            "Pause",
             reciterHeaderAction(
                 expanded = false,
                 busy = true,
+                paused = true,
+                hasDownloadable = true,
+                hasBytes = true,
+                confirming = false,
+            ),
+        )
+        assertEquals(
+            "Resume",
+            reciterHeaderAction(
+                expanded = false,
+                busy = false,
                 paused = true,
                 hasDownloadable = true,
                 hasBytes = true,

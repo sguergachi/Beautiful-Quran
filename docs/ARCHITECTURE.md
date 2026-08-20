@@ -307,7 +307,12 @@ trailing verbs in a reserved 128 dp slot (Download, Pause, Resume,
 Delete). A paused chapter shows Delete then Resume in that slot, Resume
 on the right edge. Fetch verbs are green;
 delete is quiet ink. Pause keeps ayahs
-already fetched. Download all stays on an open reciter. Collapsed Resume
+already fetched. Chapter Pause parks only that chapter and the worker continues
+with the next waiting chapter. Reciter Pause parks only that reciter’s active
+and waiting chapters; queued work for other reciters continues. Each paused
+chapter keeps its own progress clock. A Resume that races the cancelled writer
+queues a full retry of that chapter, so the interrupted ayah cannot be skipped.
+Download all stays on an open reciter. Collapsed Resume
 continues a pause or unfinished partials, not empty chapters; the Resume verb
 already communicates pause, so the progress line does not repeat “Paused.”
 Collapsing a reciter does not reopen it because a download is running.

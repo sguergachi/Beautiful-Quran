@@ -53,9 +53,18 @@ internal data class DownloadRequest(val reciter: Reciter, val surah: Surah) {
     val ref: ChapterRef get() = ChapterRef(reciter.id, surah.id)
 }
 
+internal data class DownloadClock(val ayah: Int = 0, val ayahCount: Int = 0)
+
+internal data class PausedDownload(
+    val request: DownloadRequest,
+    val clock: DownloadClock = DownloadClock(),
+)
+
 internal data class DownloadProgress(
     val running: Boolean = false,
-    val paused: Boolean = false,
+    val active: ChapterRef? = null,
+    val pausedChapters: Set<ChapterRef> = emptySet(),
+    val pausedClocks: Map<ChapterRef, DownloadClock> = emptyMap(),
     val reciterName: String = "",
     val surahName: String = "",
     val reciterId: Int = 0,
@@ -87,7 +96,9 @@ internal fun isChapterActionSettling(
     !isChapterPaused(progress, reciterId, surahId)
 
 internal fun isReciterActionSettling(progress: DownloadProgress, reciterId: Int): Boolean =
-    isReciterReconciling(progress, reciterId) && !isReciterBusy(progress, reciterId)
+    isReciterReconciling(progress, reciterId) &&
+        !isReciterBusy(progress, reciterId) &&
+        !isReciterPaused(progress, reciterId)
 
 /** An older scan may acknowledge only the exact revisions it actually read. */
 internal fun remainingReconciliations(
@@ -112,31 +123,102 @@ internal fun mergeDownloadQueue(
     return out
 }
 
-/** Parked chapter stays first. Active is already in flight and is not queued. */
-internal fun nextDownloadRequest(
-    parked: DownloadRequest?,
-    pending: List<DownloadRequest>,
-): Pair<DownloadRequest?, List<DownloadRequest>> {
-    if (parked != null) return parked to pending.filter { it.ref != parked.ref }
-    if (pending.isEmpty()) return null to pending
-    return pending.first() to pending.drop(1)
-}
+/**
+ * One worker with independent waiting and paused buckets. A cancelled active
+ * request may also be waiting when Resume arrives before its writer yields.
+ */
+internal class DownloadQueue {
+    private val waiting = ArrayDeque<DownloadRequest>()
+    private val paused = LinkedHashMap<ChapterRef, PausedDownload>()
 
-/** A resumed parked chapter remains visible while the worker claims it. */
-internal fun visibleDownloadRequest(
-    active: DownloadRequest?,
-    parked: DownloadRequest?,
-): DownloadRequest? = active ?: parked
+    var active: DownloadRequest? = null
+        private set
+    var cancellingActive: Boolean = false
+        private set
 
-internal fun parkedAfterDelete(
-    parked: DownloadRequest?,
-    reciterId: Int,
-    surahId: Int? = null,
-): DownloadRequest? {
-    val p = parked ?: return null
-    if (p.reciter.id != reciterId) return p
-    if (surahId != null && p.surah.id != surahId) return p
-    return null
+    val waitingRequests: List<DownloadRequest> get() = waiting.toList()
+    val pausedDownloads: List<PausedDownload> get() = paused.values.toList()
+
+    fun enqueue(incoming: List<DownloadRequest>) {
+        incoming.forEach { paused.remove(it.ref) }
+        val merged = mergeDownloadQueue(
+            pending = waiting.toList(),
+            incoming = incoming,
+            active = active.takeUnless { cancellingActive },
+        )
+        waiting.clear()
+        waiting.addAll(merged)
+    }
+
+    fun takeNext(): DownloadRequest? {
+        if (active != null || waiting.isEmpty()) return null
+        cancellingActive = false
+        return waiting.removeFirst().also { active = it }
+    }
+
+    fun finish(request: DownloadRequest) {
+        if (active !== request) return
+        active = null
+        cancellingActive = false
+    }
+
+    fun pauseChapter(ref: ChapterRef, clock: DownloadClock = DownloadClock()): Boolean {
+        active?.takeIf { it.ref == ref }?.let {
+            paused[ref] = PausedDownload(it, clock)
+            cancellingActive = true
+            return true
+        }
+        val request = waiting.firstOrNull { it.ref == ref } ?: return false
+        waiting.removeAll { it.ref == ref }
+        paused[ref] = PausedDownload(request)
+        return false
+    }
+
+    fun pauseReciter(reciterId: Int, clock: DownloadClock = DownloadClock()): Boolean {
+        var cancelled = false
+        active?.takeIf { it.reciter.id == reciterId }?.let {
+            paused[it.ref] = PausedDownload(it, clock)
+            cancellingActive = true
+            cancelled = true
+        }
+        val requests = waiting.filter { it.reciter.id == reciterId }
+        waiting.removeAll { it.reciter.id == reciterId }
+        requests.forEach { paused[it.ref] = PausedDownload(it) }
+        return cancelled
+    }
+
+    fun resumeReciter(reciterId: Int) {
+        val requests = paused.values
+            .filter { it.request.reciter.id == reciterId }
+            .map { it.request }
+        requests.forEach { paused.remove(it.ref) }
+        enqueue(requests)
+    }
+
+    fun removeChapter(ref: ChapterRef): Boolean {
+        waiting.removeAll { it.ref == ref }
+        paused.remove(ref)
+        return cancelActiveIf { it.ref == ref }
+    }
+
+    fun removeReciter(reciterId: Int): Boolean {
+        waiting.removeAll { it.reciter.id == reciterId }
+        paused.entries.removeAll { it.value.request.reciter.id == reciterId }
+        return cancelActiveIf { it.reciter.id == reciterId }
+    }
+
+    fun clear() {
+        waiting.clear()
+        paused.clear()
+        cancellingActive = cancellingActive || active != null
+        active = null
+    }
+
+    private fun cancelActiveIf(predicate: (DownloadRequest) -> Boolean): Boolean {
+        if (active?.let(predicate) != true) return false
+        cancellingActive = true
+        return true
+    }
 }
 
 /** Collapsed Resume continues partials; empty chapters stay off Download all. */
@@ -150,31 +232,23 @@ internal fun reciterResumeSurahs(
 }
 
 internal fun isChapterDownloading(progress: DownloadProgress, reciterId: Int, surahId: Int): Boolean =
-    progress.running && !progress.paused &&
-        progress.reciterId == reciterId && progress.surahId == surahId
+    progress.active == ChapterRef(reciterId, surahId)
 
-internal fun isChapterWaiting(progress: DownloadProgress, reciterId: Int, surahId: Int): Boolean {
-    if (!progress.queued.any { it.reciterId == reciterId && it.surahId == surahId }) return false
-    // This reciter is paused: queued chapters are paused, not waiting.
-    if (progress.paused && progress.reciterId == reciterId) return false
-    return true
-}
+internal fun isChapterWaiting(progress: DownloadProgress, reciterId: Int, surahId: Int): Boolean =
+    ChapterRef(reciterId, surahId) in progress.queued
 
-internal fun isChapterPaused(progress: DownloadProgress, reciterId: Int, surahId: Int): Boolean {
-    if (!progress.paused) return false
-    if (progress.reciterId == reciterId && progress.surahId == surahId) return true
-    return progress.reciterId == reciterId &&
-        progress.queued.any { it.reciterId == reciterId && it.surahId == surahId }
-}
+internal fun isChapterPaused(progress: DownloadProgress, reciterId: Int, surahId: Int): Boolean =
+    ChapterRef(reciterId, surahId) in progress.pausedChapters
 
 internal fun isReciterDownloading(progress: DownloadProgress, reciterId: Int): Boolean =
-    progress.running && !progress.paused && progress.reciterId == reciterId
+    progress.active?.reciterId == reciterId
 
 internal fun isReciterBusy(progress: DownloadProgress, reciterId: Int): Boolean =
-    (progress.running || progress.paused) && (
-        progress.reciterId == reciterId ||
-            progress.queued.any { it.reciterId == reciterId }
-        )
+    isReciterDownloading(progress, reciterId) ||
+        progress.queued.any { it.reciterId == reciterId }
+
+internal fun isReciterPaused(progress: DownloadProgress, reciterId: Int): Boolean =
+    progress.pausedChapters.any { it.reciterId == reciterId }
 
 internal fun downloadPercent(ayah: Int, ayahCount: Int): Int? {
     if (ayahCount <= 0) return null
@@ -199,9 +273,49 @@ internal fun retainedDownloadClock(
     return if (same) prev.ayah to prev.ayahCount else 0 to 0
 }
 
+/** Immutable UI truth derived from the queue while its lock is held. */
+internal fun downloadProgress(
+    queue: DownloadQueue,
+    previous: DownloadProgress = DownloadProgress(),
+    reconciling: Map<ChapterRef, Long> = emptyMap(),
+    ayah: Int? = null,
+    ayahCount: Int? = null,
+): DownloadProgress {
+    val active = queue.active.takeUnless { queue.cancellingActive }
+    val waiting = queue.waitingRequests
+    val paused = queue.pausedDownloads
+    val representative = active ?: paused.firstOrNull()?.request
+    val activeClock = active?.let {
+        retainedDownloadClock(
+            it.reciter.id,
+            it.surah.id,
+            previous,
+            ayah,
+            ayahCount,
+        )
+    }
+    val clock = activeClock?.let { DownloadClock(it.first, it.second) }
+        ?: paused.firstOrNull()?.clock
+        ?: DownloadClock()
+    return DownloadProgress(
+        running = active != null || waiting.isNotEmpty(),
+        active = active?.ref,
+        pausedChapters = paused.mapTo(LinkedHashSet()) { it.request.ref },
+        pausedClocks = paused.associate { it.request.ref to it.clock },
+        reciterName = representative?.reciter?.name.orEmpty(),
+        surahName = representative?.surah?.nameTransliteration.orEmpty(),
+        reciterId = representative?.reciter?.id ?: 0,
+        surahId = representative?.surah?.id ?: 0,
+        ayah = clock.ayah,
+        ayahCount = clock.ayahCount,
+        queued = waiting.map { it.ref },
+        reconciling = reconciling,
+    )
+}
+
 /** Reciter-subtitle progress. No reciter name — that line already names them. */
 internal fun reciterProgressLabel(progress: DownloadProgress, reciterId: Int): String {
-    if (!progress.running && !progress.paused) return ""
+    if (!isReciterBusy(progress, reciterId) && !isReciterPaused(progress, reciterId)) return ""
     val parts = mutableListOf<String>()
     if (progress.reciterId == reciterId && progress.surahName.isNotEmpty()) {
         parts += progress.surahName
@@ -229,8 +343,8 @@ internal fun reciterHeaderAction(
     hasResumable: Boolean = false,
 ): String? = when {
     confirming -> null
-    paused && !expanded -> "Resume"
     busy && !expanded -> "Pause"
+    paused && !expanded -> "Resume"
     !expanded && hasResumable -> "Resume"
     !expanded && hasBytes -> "Delete"
     expanded && hasDownloadable -> "Download all"
@@ -447,12 +561,8 @@ internal object RecitationDownloads {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val lock = Any()
-    private val pending = ArrayDeque<DownloadRequest>()
-    private var active: DownloadRequest? = null
-    private var skipActive = false
+    private val queue = DownloadQueue()
     private var stopped = false
-    private var paused = false
-    private var parked: DownloadRequest? = null
     private var job: Job? = null
     private var activeWriter: CacheWriter? = null
     private var activeWriterFinished: CountDownLatch? = null
@@ -500,59 +610,39 @@ internal object RecitationDownloads {
         val writerFinished: CountDownLatch?
         synchronized(lock) {
             stopped = true
-            paused = false
-            parked = null
-            pending.clear()
-            active = null
-            skipActive = true
+            queue.clear()
             running = job
-            job = null
             writerFinished = cancelWriterLocked()
+            _progress.value = DownloadProgress()
         }
         running?.cancel()
-        _progress.value = DownloadProgress()
         return writerFinished
     }
 
     fun pauseChapter(reciterId: Int, surahId: Int) {
         synchronized(lock) {
-            if (active?.reciter?.id == reciterId && active?.surah?.id == surahId) {
-                paused = true
-                skipActive = true
-                parked = active
-                cancelWriterLocked()
-            } else {
-                pending.removeAll { it.reciter.id == reciterId && it.surah.id == surahId }
-            }
+            val ref = ChapterRef(reciterId, surahId)
+            val clock = _progress.value.let { DownloadClock(it.ayah, it.ayahCount) }
+            if (queue.pauseChapter(ref, clock)) cancelWriterLocked()
             publishLocked()
         }
     }
 
     fun pauseReciter(reciterId: Int) {
         synchronized(lock) {
-            if (active?.reciter?.id == reciterId) {
-                paused = true
-                skipActive = true
-                parked = active
-                cancelWriterLocked()
-            } else {
-                pending.removeAll { it.reciter.id == reciterId }
-            }
+            val clock = _progress.value.let { DownloadClock(it.ayah, it.ayahCount) }
+            if (queue.pauseReciter(reciterId, clock)) cancelWriterLocked()
             publishLocked()
         }
     }
 
-    fun resume(context: android.content.Context) {
+    fun resumeReciter(context: android.content.Context, reciterId: Int) {
         val app = context.applicationContext
         synchronized(lock) {
-            paused = false
             stopped = false
-            skipActive = false
-            if (active?.ref == parked?.ref) parked = null
+            queue.resumeReciter(reciterId)
             publishLocked()
-            if (job?.isActive != true) {
-                job = scope.launch { runQueue(app) }
-            }
+            startWorkerLocked(app)
         }
     }
 
@@ -569,19 +659,10 @@ internal object RecitationDownloads {
         val app = context.applicationContext
         val writerFinished: CountDownLatch?
         synchronized(lock) {
-            pending.removeAll { it.reciter.id == reciter.id && it.surah.id == surah.id }
-            if (active?.reciter?.id == reciter.id && active?.surah?.id == surah.id) {
-                skipActive = true
-                writerFinished = cancelWriterLocked()
-            } else {
-                writerFinished = null
-            }
-            parked = parkedAfterDelete(parked, reciter.id, surah.id)
-            if (parked == null) paused = false
+            val cancelled = queue.removeChapter(ChapterRef(reciter.id, surah.id))
+            writerFinished = if (cancelled) cancelWriterLocked() else null
             publishLocked()
-            if (!paused && job?.isActive != true && pending.isNotEmpty()) {
-                job = scope.launch { runQueue(app) }
-            }
+            startWorkerLocked(app)
         }
         writerFinished?.await()
         for (key in cacheKeysForChapter(RecitationCache.allKeys(app), reciter, surah.id)) {
@@ -593,19 +674,10 @@ internal object RecitationDownloads {
         val app = context.applicationContext
         val writerFinished: CountDownLatch?
         synchronized(lock) {
-            pending.removeAll { it.reciter.id == reciter.id }
-            if (active?.reciter?.id == reciter.id) {
-                skipActive = true
-                writerFinished = cancelWriterLocked()
-            } else {
-                writerFinished = null
-            }
-            parked = parkedAfterDelete(parked, reciter.id)
-            if (parked == null) paused = false
+            val cancelled = queue.removeReciter(reciter.id)
+            writerFinished = if (cancelled) cancelWriterLocked() else null
             publishLocked()
-            if (!paused && job?.isActive != true && pending.isNotEmpty()) {
-                job = scope.launch { runQueue(app) }
-            }
+            startWorkerLocked(app)
         }
         writerFinished?.await()
         for (key in cacheKeysForReciter(RecitationCache.allKeys(app), reciter)) {
@@ -615,47 +687,34 @@ internal object RecitationDownloads {
 
     private fun enqueue(context: android.content.Context, incoming: List<DownloadRequest>) {
         val app = context.applicationContext
-        val startWorker: Boolean
         synchronized(lock) {
             stopped = false
-            paused = false
-            skipActive = false
-            if (active?.ref == parked?.ref) parked = null
-            val merged = mergeDownloadQueue(
-                pending.toList(),
-                incoming,
-                active ?: parked,
-            )
-            pending.clear()
-            pending.addAll(merged)
+            queue.enqueue(incoming)
             publishLocked()
-            startWorker = job?.isActive != true
-            if (startWorker) {
-                job = scope.launch { runQueue(app) }
-            }
+            startWorkerLocked(app)
+        }
+    }
+
+    private fun startWorkerLocked(app: android.content.Context) {
+        if (job?.isCompleted != false && queue.waitingRequests.isNotEmpty()) {
+            job = scope.launch { runQueue(app) }
         }
     }
 
     private suspend fun runQueue(app: android.content.Context) {
+        val worker = coroutineContext[Job]
         val keep = RecitationCache.keep(app)
         val writer = RecitationCache.downloadDataSourceFactory(app, httpFactory())
         try {
             while (true) {
                 val req = synchronized(lock) {
-                    if (paused || stopped) return@synchronized null
-                    skipActive = false
-                    val (next, rest) = nextDownloadRequest(parked, pending.toList())
-                    parked = if (next != null && parked?.ref == next.ref) null else parked
-                    pending.clear()
-                    pending.addAll(rest)
-                    active = next
-                    if (next != null) publishLocked()
-                    next
+                    if (stopped) return@synchronized null
+                    queue.takeNext()?.also { publishLocked() }
                 } ?: break
                 try {
                     for ((ayah, uri) in chapterAudioRequests(req.reciter, req.surah)) {
                         coroutineContext.ensureActive()
-                        if (synchronized(lock) { skipActive || paused }) break
+                        if (synchronized(lock) { queue.cancellingActive }) break
                         synchronized(lock) { publishLocked(ayah, req.surah.ayahCount) }
                         if (isUriFullyCached(keep, uri)) {
                             RecitationCache.dropListenIfKept(app, uri)
@@ -669,7 +728,7 @@ internal object RecitationDownloads {
                         )
                         val writerFinished = CountDownLatch(1)
                         val shouldCache = synchronized(lock) {
-                            if (skipActive || paused || stopped) {
+                            if (queue.cancellingActive || stopped) {
                                 false
                             } else {
                                 activeWriter = cacheWriter
@@ -698,8 +757,7 @@ internal object RecitationDownloads {
                 } finally {
                     synchronized(lock) {
                         reconciling[req.ref] = ++reconciliationRevision
-                        if (paused && parked == null && active == req) parked = req
-                        if (active == req) active = null
+                        queue.finish(req)
                         publishLocked()
                     }
                 }
@@ -707,75 +765,22 @@ internal object RecitationDownloads {
         } finally {
             val leftover: List<DownloadRequest>
             synchronized(lock) {
-                job = null
-                leftover = when {
-                    stopped -> emptyList()
-                    paused -> {
-                        publishLocked()
-                        emptyList()
-                    }
-                    else -> pending.toList()
-                }
-                if (!paused) {
-                    active = null
-                    publishLocked()
-                }
+                if (job === worker) job = null
+                leftover = if (stopped) emptyList() else queue.waitingRequests
+                publishLocked()
             }
             if (leftover.isNotEmpty()) enqueue(app, emptyList())
         }
     }
 
     private fun publishLocked(ayah: Int? = null, ayahCount: Int? = null) {
-        val a = visibleDownloadRequest(active, parked)
-        val q = pending.map { it.ref }
-        if (paused && a != null) {
-            val clock = retainedDownloadClock(
-                a.reciter.id,
-                a.surah.id,
-                _progress.value,
-                ayah,
-                ayahCount,
-            )
-            _progress.value = DownloadProgress(
-                running = false,
-                paused = true,
-                reciterName = a.reciter.name,
-                surahName = a.surah.nameTransliteration,
-                reciterId = a.reciter.id,
-                surahId = a.surah.id,
-                ayah = clock.first,
-                ayahCount = clock.second,
-                queued = q,
-                reconciling = reconciling.toMap(),
-            )
-            return
-        }
-        _progress.value = if (a == null && q.isEmpty()) {
-            DownloadProgress(reconciling = reconciling.toMap())
-        } else {
-            val clock = if (a != null) {
-                retainedDownloadClock(
-                    a.reciter.id,
-                    a.surah.id,
-                    _progress.value,
-                    ayah,
-                    ayahCount,
-                )
-            } else {
-                0 to 0
-            }
-            DownloadProgress(
-                running = true,
-                reciterName = a?.reciter?.name.orEmpty(),
-                surahName = a?.surah?.nameTransliteration.orEmpty(),
-                reciterId = a?.reciter?.id ?: 0,
-                surahId = a?.surah?.id ?: 0,
-                ayah = clock.first,
-                ayahCount = clock.second,
-                queued = q,
-                reconciling = reconciling.toMap(),
-            )
-        }
+        _progress.value = downloadProgress(
+            queue = queue,
+            previous = _progress.value,
+            reconciling = reconciling.toMap(),
+            ayah = ayah,
+            ayahCount = ayahCount,
+        )
     }
 
     /** CacheWriter is blocking; deletion waits for this exact write to yield. */

@@ -43,6 +43,7 @@ import com.beautifulquran.QuranApp
 import com.beautifulquran.data.model.Reciter
 import com.beautifulquran.data.model.Surah
 import com.beautifulquran.playback.ChapterDownload
+import com.beautifulquran.playback.ChapterRef
 import com.beautifulquran.playback.RecitationCache
 import com.beautifulquran.playback.RecitationDownloads
 import com.beautifulquran.playback.RecitationUsage
@@ -61,6 +62,7 @@ import com.beautifulquran.playback.isChapterReconciling
 import com.beautifulquran.playback.isChapterWaiting
 import com.beautifulquran.playback.isReciterActionSettling
 import com.beautifulquran.playback.isReciterBusy
+import com.beautifulquran.playback.isReciterPaused
 import com.beautifulquran.playback.reciterDownloadLabel
 import com.beautifulquran.playback.reciterHeaderAction
 import com.beautifulquran.playback.reciterHeaderActionIsFetch
@@ -162,7 +164,7 @@ internal fun DownloadManagerPage(
             delay(2_000)
         }
     }
-    LaunchedEffect(progress.running, progress.paused) {
+    LaunchedEffect(progress.running, progress.pausedChapters) {
         if (!progress.running && progress.reconciling.isEmpty()) refresh()
     }
     LaunchedEffect(progress.reconciling) {
@@ -286,9 +288,10 @@ internal fun DownloadManagerPage(
                         !isChapterPaused(progress, reciterId, ch.surah.id)
                 }
                 val busy = isReciterBusy(progress, reciterId)
-                val paused = progress.paused && progress.reciterId == reciterId
+                val hasPaused = isReciterPaused(progress, reciterId)
+                val paused = hasPaused && !busy
                 val confirmingDelete = pending == Pending.DeleteReciter(reciterId)
-                val hasResumable = paused || reciterRow.chapters.any { !it.complete && !it.empty }
+                val hasResumable = hasPaused || reciterRow.chapters.any { !it.complete && !it.empty }
                 val headerAction = if (!catalogLoaded) {
                     null
                 } else if (reconciling) {
@@ -336,13 +339,16 @@ internal fun DownloadManagerPage(
                                 when (headerAction) {
                                     "Pause" -> RecitationDownloads.pauseReciter(reciterId)
                                     "Resume" -> {
-                                        RecitationDownloads.resume(context)
-                                        val surahs = reciterResumeSurahs(reciterRow.chapters, paused)
-                                        if (surahs.isNotEmpty()) {
+                                        if (hasPaused) {
+                                            RecitationDownloads.resumeReciter(context, reciterId)
+                                        } else {
                                             RecitationDownloads.downloadAll(
                                                 context,
                                                 reciterRow.reciter,
-                                                surahs,
+                                                reciterResumeSurahs(
+                                                    reciterRow.chapters,
+                                                    paused = false,
+                                                ),
                                             )
                                         }
                                     }
@@ -393,10 +399,12 @@ internal fun DownloadManagerPage(
                                 downloading = downloading,
                                 waiting = waiting,
                                 paused = chapterPaused,
-                                percent = if (downloading || chapterPaused) {
-                                    downloadPercent(progress.ayah, progress.ayahCount)
-                                } else {
-                                    null
+                                percent = when {
+                                    downloading -> downloadPercent(progress.ayah, progress.ayahCount)
+                                    chapterPaused -> progress.pausedClocks[
+                                        ChapterRef(reciterId, row.surah.id)
+                                    ]?.let { downloadPercent(it.ayah, it.ayahCount) }
+                                    else -> null
                                 },
                                 confirming = confirming,
                                 reconciling = chapterReconciling,
@@ -408,14 +416,11 @@ internal fun DownloadManagerPage(
                                             reciterRow.reciter,
                                             row.surah,
                                         )
-                                        "Resume" -> {
-                                            RecitationDownloads.resume(context)
-                                            RecitationDownloads.downloadChapter(
-                                                context,
-                                                reciterRow.reciter,
-                                                row.surah,
-                                            )
-                                        }
+                                        "Resume" -> RecitationDownloads.downloadChapter(
+                                            context,
+                                            reciterRow.reciter,
+                                            row.surah,
+                                        )
                                         "Pause" -> RecitationDownloads.pauseChapter(
                                             reciterId,
                                             row.surah.id,
