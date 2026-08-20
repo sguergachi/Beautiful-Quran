@@ -117,7 +117,6 @@ internal fun DownloadManagerPage(
     var reciterRows by remember { mutableStateOf<List<ReciterDownloads>>(emptyList()) }
     var catalogLoaded by remember { mutableStateOf(false) }
     var expandedReciterIds by remember { mutableStateOf<Set<Int>>(emptySet()) }
-    var didAutoExpand by remember { mutableStateOf(false) }
     var pending by remember { mutableStateOf<Pending?>(null) }
     var deleting by remember { mutableStateOf<Pending?>(null) }
 
@@ -129,13 +128,6 @@ internal fun DownloadManagerPage(
         reciterRows = snap.first
         usage = snap.second
         catalogLoaded = true
-        if (!didAutoExpand) {
-            val open = snap.first.filter { it.cachedAyahs > 0 }.map { it.reciter.id }.toSet()
-            if (open.isNotEmpty()) {
-                expandedReciterIds = open
-                didAutoExpand = true
-            }
-        }
     }
 
     fun delete(target: Pending, remove: () -> Unit) {
@@ -251,11 +243,12 @@ internal fun DownloadManagerPage(
                             enabled = false,
                             onAction = {},
                         )
-                        usage.total <= 0L -> Text(
-                            text = formatUsage(usage),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
-                            modifier = Modifier.padding(vertical = RowPad),
+                        usage.total <= 0L -> FactActionRow(
+                            fact = formatUsage(usage),
+                            action = null,
+                            fetch = false,
+                            enabled = false,
+                            onAction = {},
                         )
                         else -> FactActionRow(
                             fact = formatUsage(usage),
@@ -526,12 +519,12 @@ private fun ReciterHeader(
                 modifier = Modifier.padding(top = 2.dp),
             )
         } else {
-            Text(
-                text = subtitle,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
+            FactActionRow(
+                fact = subtitle,
+                action = null,
+                fetch = false,
+                enabled = false,
+                onAction = {},
                 modifier = Modifier.padding(top = 2.dp),
             )
         }

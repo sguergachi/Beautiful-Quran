@@ -297,7 +297,9 @@ before either `SimpleCache` opens; a persistent marker prevents later explicit
 downloads from ever being reclassified as cache. Delete all empties the live caches
 in place so playback keeps the same instances. Settings → Download manager
 shows total audio storage plus the listening-cache share, and Delete all clears
-both keep and listen. Reciters sit
+both keep and listen. Every reciter starts collapsed; only an explicit tap opens
+one. Loading and loaded facts reserve the same row heights, so applying the
+initial cache scan changes the ink without moving the page. Reciters sit
 24 dp apart. The chevron is the only trailing
 control on the name. Download all, Pause, Resume, and Delete sit
 16 dp after the subtitle facts, never under the chevron. Open catalog is flush with the reciter spine,
