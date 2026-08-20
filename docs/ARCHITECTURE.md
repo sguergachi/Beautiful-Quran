@@ -359,8 +359,9 @@ horizontal page turn — draggable, fling-able, with page-turn audio
   with a pinned faded-leaf preview, a full-bleed paper dissolve under it,
   and the collapsed ayah rail on the chosen edge;
   mushaf hides view, annotations, the rail
-  side, word-by-word, and verse-number script — the preview is Madinah
-  page 1 in the QCF V2 face), text size, remaining display toggles, attributions;
+  side, word-by-word, and verse-number script — the preview is 21:91–92
+  as three printed QCF lines scaled to the measure), text size, remaining
+  display toggles, attributions;
   developer mode unlocks the Timings Lab and
   the [Tarjīʿ Lab](TARJI_LAB.md).
 

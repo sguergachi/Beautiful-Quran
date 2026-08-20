@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
@@ -51,8 +52,11 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDirection
+import androidx.compose.ui.text.style.TextGeometricTransform
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
@@ -66,10 +70,11 @@ import com.beautifulquran.data.ReadingMode
 import com.beautifulquran.data.Settings
 import com.beautifulquran.data.ThemeMode
 import com.beautifulquran.data.VerseNumberScript
+import com.beautifulquran.domain.MUSHAF_LINE_PITCH_EM
+import com.beautifulquran.domain.MUSHAF_MAX_LINE_SCALE
 import com.beautifulquran.domain.MushafLine
 import com.beautifulquran.domain.MushafPage
-import com.beautifulquran.domain.MUSHAF_LINE_EM
-import com.beautifulquran.domain.mushafLineJustifies
+import com.beautifulquran.domain.mushafLineCondense
 import com.beautifulquran.domain.qcfTrailingMark
 import com.beautifulquran.domain.qcfWordGlyphs
 import com.beautifulquran.ui.reader.AyahNumberMark
@@ -417,9 +422,13 @@ internal fun ReadingPreview(
 }
 
 private val PreviewQcfSize = 13.sp
-private const val PreviewMushafLineCap = 7
+/** 21:91–92 occupy three exclusive Madinah lines (page 330, lines 1–3). */
+private const val PreviewMushafPage = 330
+private const val PreviewMushafLineFirst = 1
+private const val PreviewMushafLineLast = 3
+private const val PreviewMushafSurahName = "سُورَةُ الأنبياء"
 
-/** A miniature of page 1 in the printed QCF hand — not a Hafs scroll. */
+/** Two short verses as three printed lines, scaled to the measure — never gap-stretched. */
 @Composable
 private fun PreviewMushafLeaf(
     pageNumberScript: PageNumberScript,
@@ -428,16 +437,21 @@ private fun PreviewMushafLeaf(
     val context = LocalContext.current
     var page by remember { mutableStateOf<MushafPage?>(null) }
     LaunchedEffect(Unit) {
-        page = (context.applicationContext as QuranApp).repository.mushafCatalog().page(1)
+        page = (context.applicationContext as QuranApp).repository
+            .mushafCatalog()
+            .page(PreviewMushafPage)
     }
-    val face = remember { MushafQcfFonts.family(context, 1) }
+    val face = remember { MushafQcfFonts.family(context, PreviewMushafPage) }
     val gold = LocalQuranAccents.current.gold
+    val lines = page?.lines.orEmpty().filter {
+        it.number in PreviewMushafLineFirst..PreviewMushafLineLast
+    }
     Column(
         modifier = modifier,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Text(
-            text = "سُورَةُ الفَاتِحَةِ",
+            text = PreviewMushafSurahName,
             fontFamily = HafsFontFamily,
             fontSize = 13.sp,
             color = gold.copy(alpha = 0.58f),
@@ -445,59 +459,84 @@ private fun PreviewMushafLeaf(
             modifier = Modifier.fillMaxWidth(),
         )
         Spacer(Modifier.height(8.dp))
-        val leaf = page
-        if (leaf != null && face != null) {
+        if (lines.size == 3 && face != null) {
             CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
-                leaf.lines.take(PreviewMushafLineCap).forEach { line ->
-                    PreviewQcfLine(line = line, face = face)
-                }
+                PreviewQcfLines(lines = lines, face = face)
             }
         } else {
             PreviewArabicLine(MUSHAF_LINE_1, number = 1, arabicMarks = true)
             Spacer(Modifier.height(8.dp))
             PreviewArabicLine(MUSHAF_LINE_2, number = 2, arabicMarks = true)
         }
-        PageBreak(page = 1, script = pageNumberScript, contentPadding = PreviewFolioPad)
+        PageBreak(
+            page = PreviewMushafPage,
+            script = pageNumberScript,
+            contentPadding = PreviewFolioPad,
+        )
     }
 }
 
 @Composable
-private fun PreviewQcfLine(line: MushafLine, face: FontFamily) {
+private fun PreviewQcfLines(lines: List<MushafLine>, face: FontFamily) {
     val ink = MaterialTheme.colorScheme.onSurface
     val gold = LocalQuranAccents.current.gold
-    val style = remember(face) {
-        TextStyle(
-            fontFamily = face,
-            fontSize = PreviewQcfSize,
-            lineHeight = MUSHAF_LINE_EM.em,
-            textDirection = TextDirection.Rtl,
-            platformStyle = PlatformTextStyle(includeFontPadding = false),
-        )
-    }
-    val justify = mushafLineJustifies(line.tokens.size)
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.Start,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        line.tokens.forEachIndexed { index, token ->
-            if (justify && index > 0) Spacer(Modifier.weight(1f))
-            val raw = token.word.qcfV2
-            val word = if (raw.isNotEmpty()) {
-                qcfWordGlyphs(raw, token.endsAyah)
-            } else {
-                token.word.arabic
-            }
-            val mark = if (raw.isNotEmpty()) qcfTrailingMark(raw, token.endsAyah) else ""
-            Text(
-                text = buildAnnotatedString {
+    val measurer = rememberTextMeasurer()
+    val annotated = remember(lines, ink, gold) {
+        lines.map { line ->
+            buildAnnotatedString {
+                line.tokens.forEach { token ->
+                    val raw = token.word.qcfV2
+                    val word = if (raw.isNotEmpty()) {
+                        qcfWordGlyphs(raw, token.endsAyah)
+                    } else {
+                        token.word.arabic
+                    }
+                    val mark = if (raw.isNotEmpty()) {
+                        qcfTrailingMark(raw, token.endsAyah)
+                    } else {
+                        ""
+                    }
                     withStyle(SpanStyle(color = ink)) { append(word) }
                     if (mark.isNotEmpty()) {
                         withStyle(SpanStyle(color = gold)) { append(mark) }
                     }
-                },
-                style = style,
+                }
+            }
+        }
+    }
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        val measurePx = constraints.maxWidth.toFloat()
+        val base = TextStyle(
+            fontFamily = face,
+            fontSize = PreviewQcfSize,
+            lineHeight = MUSHAF_LINE_PITCH_EM.em,
+            textDirection = TextDirection.Rtl,
+            platformStyle = PlatformTextStyle(includeFontPadding = false),
+        )
+        val trial = annotated.map {
+            measurer.measure(it, base, maxLines = 1).size.width.toFloat()
+        }
+        val longest = trial.maxOrNull() ?: 0f
+        val fitted = if (longest > 0f) {
+            base.copy(fontSize = PreviewQcfSize * (measurePx / longest))
+        } else {
+            base
+        }
+        annotated.forEach { text ->
+            val natural = measurer.measure(text, fitted, maxLines = 1).size.width.toFloat()
+            val scale = when {
+                natural <= 0f -> 1f
+                natural > measurePx -> mushafLineCondense(natural, measurePx)
+                else -> (measurePx / natural).coerceAtMost(MUSHAF_MAX_LINE_SCALE)
+            }
+            Text(
+                text = text,
+                style = fitted.copy(
+                    textGeometricTransform = TextGeometricTransform(scaleX = scale),
+                ),
                 maxLines = 1,
+                overflow = TextOverflow.Visible,
+                modifier = Modifier.fillMaxWidth(),
             )
         }
     }

@@ -60,8 +60,11 @@ const THEME_OPTIONS: { value: ThemeMode; label: string }[] = [
   { value: 'royal_green', label: 'Royal green' },
 ]
 
-const MUSHAF_LINE_1 = 'بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ'
-const MUSHAF_LINE_2 = 'ٱلْحَمْدُ لِلَّهِ رَبِّ ٱلْعَٰلَمِينَ'
+const MUSHAF_HEAD = 'سُورَةُ الأنبياء'
+const MUSHAF_LINE_1 = 'وَٱلَّتِيٓ أَحۡصَنَتۡ فَرۡجَهَا فَنَفَخۡنَا فِيهَا مِن رُّوحِنَا'
+const MUSHAF_LINE_2 = 'وَجَعَلۡنَٰهَا وَٱبۡنَهَآ ءَايَةٗ لِّلۡعَٰلَمِينَ إِنَّ هَٰذِهِۦٓ'
+const MUSHAF_LINE_3 = 'أُمَّتُكُمۡ أُمَّةٗ وَٰحِدَةٗ وَأَنَا۠ رَبُّكُمۡ فَٱعۡبُدُونِ'
+const MUSHAF_PAGE = 330
 // 56:76 ends page 536; 56:77 opens 537 — a real printed-page turn.
 const SAMPLE_ARABIC_1 = 'وَإِنَّهُۥ لَقَسَمٞ لَّوۡ تَعۡلَمُونَ عَظِيمٌ'
 const SAMPLE_ARABIC_2 = 'إِنَّهُۥ لَقُرۡءَانٞ كَرِيمٞ'
@@ -292,14 +295,17 @@ function ReadingPreview({
       ) : null}
       {readingLayout === 'mushaf' ? (
         <>
-          <p className="reading-preview__head">سُورَةُ الفَاتِحَةِ</p>
+          <p className="reading-preview__head">{MUSHAF_HEAD}</p>
           <p className="reading-preview__arabic reading-preview__arabic--mushaf" dir="rtl">
             {MUSHAF_LINE_1}
           </p>
           <p className="reading-preview__arabic reading-preview__arabic--mushaf" dir="rtl">
             {MUSHAF_LINE_2}
           </p>
-          <PageBreak page={1} script={pageNumberScript} />
+          <p className="reading-preview__arabic reading-preview__arabic--mushaf" dir="rtl">
+            {MUSHAF_LINE_3}
+          </p>
+          <PageBreak page={MUSHAF_PAGE} script={pageNumberScript} />
         </>
       ) : (
         <div className="reading-preview__stack">

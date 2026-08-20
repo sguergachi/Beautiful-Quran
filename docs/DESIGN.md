@@ -1176,7 +1176,8 @@ rail, no English under the type, and its own circled QCF marks.
 - **English** — the gloss becomes the lyric line itself, flowing
   left-to-right and lighting word-by-word on the same timings.
 - **Mushaf** — a printed Madinah leaf in the QCF V2 page face. Choosing it
-  locks the view to Arabic. The Customize preview is page 1 (al-Fātiḥah)
-  in that hand, not a Hafs scroll. Page-number script (Arabic, English, or
-  both on the folio) still applies. A single-script folio centres that
-  figure between equal gold rules; both scripts sit at opposite ends.
+  locks the view to Arabic. The Customize preview is 21:91–92 as three
+  exclusive printed lines (page 330), scaled to the measure — never by
+  stretching word gaps. Page-number script (Arabic, English, or both on
+  the folio) still applies. A single-script folio centres that figure
+  between equal gold rules; both scripts sit at opposite ends.
