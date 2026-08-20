@@ -233,9 +233,13 @@ internal val MushafDialRunOut = 26.dp
  * would be a speed test again, and a slow deliberate lift away is exactly the
  * gesture that has to work. It sits outside the grab strip's own half-height,
  * so ordinary drift along a scrub — a thumb rolling as the arm extends — is
- * still on the line.
+ * still on the line. It sat at 28 dp and was widened by half again: at that
+ * width a long sweep was ending itself under a hand that was still working
+ * the rule, and the cost of the two errors is not symmetric — a stray that
+ * fires late costs one more frame of scrubbing, a stray that fires early
+ * takes the instrument away mid-stroke.
  */
-internal val MushafDialStray = 28.dp
+internal val MushafDialStray = 42.dp
 
 /**
  * How long the finger has to stay out in the run-out, in seconds, before the
