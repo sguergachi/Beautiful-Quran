@@ -2621,6 +2621,7 @@ fun ReaderScreen(
                                     }
                                 },
                                 annotationsHidden = recitingActive,
+                                reciting = recitingActive,
                                 onAnnotationDelete = {
                                     editingAnnotationText = ""
                                     commitOpenAnnotation()

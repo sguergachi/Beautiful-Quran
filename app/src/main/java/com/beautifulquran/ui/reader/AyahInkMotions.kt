@@ -31,6 +31,8 @@ internal fun rememberAyahInkPack(
     isActiveAyah: Boolean,
     dimmed: Boolean,
     flashWordPosition: Int? = null,
+    /** True while the voice is running: the wet-ink glint dries on a pause. */
+    wetInk: Boolean = true,
 ): AyahInkPack {
     val sweepMs = InkEngine.sweepMs(activeWord, playbackSpeed)
     val repeatDwellMs = InkEngine.repeatDwellMs(activeWord, playbackSpeed)
@@ -138,6 +140,7 @@ internal fun rememberAyahInkPack(
         activeWordStartMs = activeWordStartMs,
         sequentialSweeps = false,
         animateLyricInk = false,
+        wetInk = wetInk,
     )
     val recessCover = animateFloatAsState(
         targetValue = if (dimmed) {

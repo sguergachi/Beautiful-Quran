@@ -575,6 +575,20 @@ class InkEngineTest {
     }
 
     @Test
+    fun `ink stops being wet when the voice stops`() {
+        // A pause leaves the word Active — the highlight has nowhere else to
+        // go — so without the voice's half of the gate the sheen of ink laid
+        // "a moment ago" stood on a paused page indefinitely, one gold word
+        // among cream ones.
+        assertFalse(InkEngine.glinting(State.Active, wetInk = false))
+        // And it comes back wet when the pen does.
+        assertTrue(InkEngine.glinting(State.Active, wetInk = true))
+        // A silent page cannot make a resting word glint either.
+        assertFalse(InkEngine.glinting(State.Recited, wetInk = false))
+        assertFalse(InkEngine.glinting(State.Upcoming, wetInk = false))
+    }
+
+    @Test
     fun `glint resonance is idle when not holding or disabled`() {
         assertEquals(InkEngine.GlintResonance.Idle, InkEngine.glintResonance(holding = false))
         assertEquals(

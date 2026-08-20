@@ -1220,6 +1220,9 @@ internal fun rememberInkMotions(
     /** Layered gloss fades word ink with [animatedInkAlpha]; shaped modes dim
      * opaque glyphs with paper covers, so they never run that clock. */
     animateLyricInk: Boolean,
+    /** True while a voice is actually laying this ink. False dries the wet-ink
+     * glint where the highlight has stopped moving — see [InkEngine.glinting]. */
+    wetInk: Boolean = true,
 ): List<InkMotion> {
     require(words.size == inks.size && inks.size == waslPrefixes.size) {
         "words, inks, and wasl prefixes must align"
@@ -1235,7 +1238,7 @@ internal fun rememberInkMotions(
         val entryPacing = remember(isActive, wordActivation) {
             pacing.takeIf { isActive }
         }
-        val glinting = glintInk != null && InkEngine.glinting(ink.state)
+        val glinting = glintInk != null && InkEngine.glinting(ink.state, wetInk)
         val glintIdentity = rememberGlintIdentity(glinting, ink.repeat)
         // Tarjīʿ only runs its vsync sampler on the Active strong-hold word.
         val tarjiEligible = glinting && entryPacing?.hasStrongHold == true
@@ -2435,6 +2438,10 @@ fun AyahBlock(
     /** True while recitation is running: annotations leave the page entirely, the
      * same rule the ribbon and rail marks follow. */
     annotationsHidden: Boolean = false,
+    /** True while a voice is actually reciting this reader's chapter. The
+     * wet-ink glint dries when it goes false, so a word left paused does not
+     * keep the sheen of a word laid a second ago. */
+    reciting: Boolean = true,
     /** Clears this verse's annotation from the delete mark in the editor. */
     onAnnotationDelete: (() -> Unit)? = null,
     /** True while *another* verse is being annotated: this one recedes so the
@@ -2598,6 +2605,7 @@ fun AyahBlock(
         sequentialSweeps = readingMode == ReadingMode.ENGLISH_ONLY,
         animateLyricInk =
             readingMode == ReadingMode.ARABIC_ENGLISH && showGloss,
+        wetInk = reciting,
     )
     val searchHitWash = rememberSearchHitWash(flashWordPosition)
     // Arabic-only uses this ayah-level paper cover. Owning its clock here

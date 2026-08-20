@@ -789,6 +789,10 @@ private fun MushafPageInkClocks(
                     isActiveAyah = true,
                     dimmed = false,
                     flashWordPosition = flashWordPosition?.takeIf { ayah.number == activeWord?.ayah },
+                    // Debounced on purpose: a repeat range looping back dips
+                    // out of "playing" for a frame, and the ink is not dry
+                    // between two laps of the same verse.
+                    wetInk = recitingActive,
                 )
             } else {
                 // A leaf is read once and filled in. A verse already recited
