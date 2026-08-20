@@ -123,7 +123,6 @@ import androidx.core.view.WindowInsetsCompat
 import com.beautifulquran.data.AyahSelectorSide
 import com.beautifulquran.data.ReadingLayout
 import com.beautifulquran.data.ReadingMode
-import com.beautifulquran.data.VerseNumberScript
 import com.beautifulquran.data.model.Surah
 import com.beautifulquran.domain.BASMALAH_PLAYLIST_AYAH
 import com.beautifulquran.domain.MushafToken
@@ -2256,7 +2255,6 @@ fun ReaderScreen(
                         onWordLongClick = onMushafWordLongClick,
                         onAyahClick = onMushafAyahClick,
                         pageNumberScript = settings.pageNumberScript,
-                        arabicMarks = settings.verseNumberScript == VerseNumberScript.ARABIC,
                         modifier = Modifier.fillMaxSize(),
                     )
                     }

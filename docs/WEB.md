@@ -390,7 +390,7 @@ Three sheets, hand-rolled paper stack (no router chrome):
    Customize sub-page (view, layout, verse and page numbers, theme, ayah-selector
    side, word-by-word gloss, pinned faded-leaf preview with a full-bleed paper
    dissolve under the leaf and the collapsed ayah rail on the chosen edge;
-   mushaf hides view, the rail side, and word-by-word; verse and page numbers still apply);
+   mushaf hides view, the rail side, word-by-word, and verse-number script);
    rows, reading mode as ink-brush segmented rows, A—track—A text
    size, display toggles with calligraphic checks, theme choice list with
    gilt swatches, colophon at the foot (triple-tap unlocks developer tools).

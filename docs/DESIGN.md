@@ -1168,11 +1168,9 @@ the next verse after the folio, using a real page turn (56:76 ends 536,
 and a note) and the mushaf miniature, so no setting resizes it. Type is a ~4/5 miniature of the reader (Hafs 24, lyric 18,
 translation 13) so the leaf does not wear full-page sizes. The
 hairline is the leaf's edge, not a card.
-Mushaf hides view, verse annotations, the ayah-selector side, and
-word-by-word — a printed page has no annotation margin, no rail, and no
-English under the type. Verse-number script still applies: Arabic keeps
-the page's own QCF roundels; English substitutes the end-of-ayah circle
-(U+06DD) with Western digits.
+Mushaf hides view, verse annotations, the ayah-selector side, word-by-word,
+and the verse-number script — a printed page has no annotation margin, no
+rail, no English under the type, and its own circled QCF marks.
 
 - **Arabic & English** — Arabic flows right-to-left, the English gloss under
   each word; optional transliteration; the flowing translation below.

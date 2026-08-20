@@ -16,7 +16,7 @@ import {
   showsScrollChrome,
   showsWordGlossChrome,
 } from '../../data/customizePolicy'
-import { formatAyahNumberMark, formatMushafAyahMark } from '../../util/digits'
+import { formatAyahNumberMark } from '../../util/digits'
 import { symbolicAyahBarCount } from '../reader/ayahRailMath'
 import { PaperChoiceList } from '../kit/PaperChoiceList'
 import { PaperSegmented } from '../kit/PaperSegmented'
@@ -66,8 +66,6 @@ const MUSHAF_LINE_1 = 'وَٱلَّتِيٓ أَحۡصَنَتۡ فَرۡجَه�
 const MUSHAF_LINE_2 = 'وَجَعَلۡنَٰهَا وَٱبۡنَهَآ ءَايَةٗ لِّلۡعَٰلَمِينَ إِنَّ هَٰذِهِۦٓ'
 const MUSHAF_LINE_3 = 'أُمَّتُكُمۡ أُمَّةٗ وَٰحِدَةٗ وَأَنَا۠ رَبُّكُمۡ فَٱعۡبُدُونِ'
 const MUSHAF_PAGE = 330
-const MUSHAF_AYAH_1 = 91
-const MUSHAF_AYAH_2 = 92
 // 56:76 ends page 536; 56:77 opens 537 — a real printed-page turn.
 const SAMPLE_ARABIC_1 = 'وَإِنَّهُۥ لَقَسَمٞ لَّوۡ تَعۡلَمُونَ عَظِيمٌ'
 const SAMPLE_ARABIC_2 = 'إِنَّهُۥ لَقُرۡءَانٞ كَرِيمٞ'
@@ -199,19 +197,21 @@ export function CustomizeScreen({
         </>
       ) : null}
 
-      <section className="settings-section">
-        <h2>Verse numbers</h2>
-        <PaperSegmented
-          aria-label="Verse numbers"
-          value={settings.verseNumberScript}
-          brushParams={brushParams}
-          paintToken={paintToken}
-          options={VERSE_OPTIONS}
-          onChange={(v) =>
-            appStore.updateSettings({ verseNumberScript: v as VerseNumberScript })
-          }
-        />
-      </section>
+      {showsScrollChrome(settings.readingLayout) ? (
+        <section className="settings-section">
+          <h2>Verse numbers</h2>
+          <PaperSegmented
+            aria-label="Verse numbers"
+            value={settings.verseNumberScript}
+            brushParams={brushParams}
+            paintToken={paintToken}
+            options={VERSE_OPTIONS}
+            onChange={(v) =>
+              appStore.updateSettings({ verseNumberScript: v as VerseNumberScript })
+            }
+          />
+        </section>
+      ) : null}
 
       <section className="settings-section">
         <h2>Page numbers</h2>
@@ -272,11 +272,6 @@ function ReadingPreview({
   const mark2 = formatAyahNumberMark(SAMPLE_AYAH_2, arabicMarks)
   const markClass = arabicMarks ? 'ayah-mark' : 'ayah-mark ayah-mark--ltr'
   const markDir = arabicMarks ? undefined : ('ltr' as const)
-  const mushafMark91 = formatMushafAyahMark(MUSHAF_AYAH_1, arabicMarks)
-  const mushafMark92 = formatMushafAyahMark(MUSHAF_AYAH_2, arabicMarks)
-  const mushafSizerMark91 = formatMushafAyahMark(MUSHAF_AYAH_1, true)
-  const mushafSizerMark92 = formatMushafAyahMark(MUSHAF_AYAH_2, true)
-  const mushafMarkClass = arabicMarks ? 'ayah-mark' : 'ayah-mark ayah-mark--ltr'
   const railBars = symbolicAyahBarCount(PREVIEW_RAIL_AYAHS)
 
   return (
@@ -316,15 +311,13 @@ function ReadingPreview({
         <div className="reading-preview__sizer reading-preview__sizer--mushaf" aria-hidden="true">
           <p className="reading-preview__head">{MUSHAF_HEAD}</p>
           <p className="reading-preview__arabic reading-preview__arabic--mushaf" dir="rtl">
-            {MUSHAF_LINE_1}{' '}
-            <span className="ayah-mark">{mushafSizerMark91}</span>
+            {MUSHAF_LINE_1}
           </p>
           <p className="reading-preview__arabic reading-preview__arabic--mushaf" dir="rtl">
             {MUSHAF_LINE_2}
           </p>
           <p className="reading-preview__arabic reading-preview__arabic--mushaf" dir="rtl">
-            {MUSHAF_LINE_3}{' '}
-            <span className="ayah-mark">{mushafSizerMark92}</span>
+            {MUSHAF_LINE_3}
           </p>
           <MushafFolio page={MUSHAF_PAGE} script="both" />
         </div>
@@ -340,19 +333,13 @@ function ReadingPreview({
             <>
               <p className="reading-preview__head">{MUSHAF_HEAD}</p>
               <p className="reading-preview__arabic reading-preview__arabic--mushaf" dir="rtl">
-                {MUSHAF_LINE_1}{' '}
-                <span className={mushafMarkClass} dir={markDir}>
-                  {mushafMark91}
-                </span>
+                {MUSHAF_LINE_1}
               </p>
               <p className="reading-preview__arabic reading-preview__arabic--mushaf" dir="rtl">
                 {MUSHAF_LINE_2}
               </p>
               <p className="reading-preview__arabic reading-preview__arabic--mushaf" dir="rtl">
-                {MUSHAF_LINE_3}{' '}
-                <span className={mushafMarkClass} dir={markDir}>
-                  {mushafMark92}
-                </span>
+                {MUSHAF_LINE_3}
               </p>
               <MushafFolio page={MUSHAF_PAGE} script={pageNumberScript} />
             </>
