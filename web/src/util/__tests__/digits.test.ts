@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   formatAyahNumberMark,
+  formatMushafAyahMark,
   formatReaderDigits,
   mushafFolioLayout,
   pageFolioLayout,
@@ -51,6 +52,18 @@ describe('formatAyahNumberMark', () => {
     const mark = formatAyahNumberMark(3, false)
     expect(mark.includes('﴾3')).toBe(false)
     expect(mark.includes('3﴿')).toBe(false)
+  })
+})
+
+describe('formatMushafAyahMark', () => {
+  const wj = '\u2060'
+
+  it('is end-of-ayah plus Arabic-Indic digits', () => {
+    expect(formatMushafAyahMark(12, true)).toBe(`\u06DD${wj}١${wj}٢`)
+  })
+
+  it('uses Western digits and LTR isolation for English', () => {
+    expect(formatMushafAyahMark(12, false)).toBe(`\u2066\u06DD${wj}1${wj}2\u2069`)
   })
 })
 

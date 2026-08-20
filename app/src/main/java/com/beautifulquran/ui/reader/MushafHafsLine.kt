@@ -54,6 +54,7 @@ import com.beautifulquran.domain.mushafLineFit
 import com.beautifulquran.domain.mushafLineCondense
 import com.beautifulquran.domain.qcfTrailingMark
 import com.beautifulquran.domain.qcfWordGlyphs
+import com.beautifulquran.ui.theme.HafsFontFamily
 import com.beautifulquran.ui.theme.LocalQuranAccents
 import com.beautifulquran.ui.theme.MushafFontFamily
 import com.beautifulquran.ui.theme.PaperCoverPad
@@ -90,6 +91,7 @@ internal fun MushafHafsLine(
     onWordLongClick: (MushafToken) -> Unit,
     onAyahClick: (MushafToken) -> Unit,
     pageFont: FontFamily? = null,
+    arabicMarks: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
     val palette = rememberWordInkPalette()
@@ -111,6 +113,7 @@ internal fun MushafHafsLine(
             onWordClick = onWordClick,
             onWordLongClick = onWordLongClick,
             onAyahClick = onAyahClick,
+            arabicMarks = arabicMarks,
             modifier = modifier,
         )
         return
@@ -132,11 +135,18 @@ internal fun MushafHafsLine(
     val measurer = rememberTextMeasurer()
 
     Box(modifier.fillMaxWidth()) {
-        val natural = remember(line, palette.fullInkColor, ayahMarkInk, fontSize, useQcf) {
+        val natural = remember(line, palette.fullInkColor, ayahMarkInk, fontSize, useQcf, arabicMarks) {
             if (useQcf) {
                 qcfRendered(line, palette.fullInkColor, ayahMarkInk)
             } else {
-                buildMushafLine(line, palette.fullInkColor, ayahMarkInk, fontSize, gapSpacing = 0.sp)
+                buildMushafLine(
+                    line,
+                    palette.fullInkColor,
+                    ayahMarkInk,
+                    fontSize,
+                    gapSpacing = 0.sp,
+                    arabicMarks = arabicMarks,
+                )
             }
         }
         val naturalWidth = remember(natural.text, style, measureWidthPx) {
@@ -159,11 +169,18 @@ internal fun MushafHafsLine(
             )
         }
         val gapSp = with(density) { gapPx.toSp() }
-        val rendered = remember(line, palette.fullInkColor, ayahMarkInk, fontSize, gapSp, useQcf) {
+        val rendered = remember(line, palette.fullInkColor, ayahMarkInk, fontSize, gapSp, useQcf, arabicMarks) {
             when {
                 gapPx <= 0f -> natural
                 useQcf -> qcfRendered(line, palette.fullInkColor, ayahMarkInk, gapSp)
-                else -> buildMushafLine(line, palette.fullInkColor, ayahMarkInk, fontSize, gapSp)
+                else -> buildMushafLine(
+                    line,
+                    palette.fullInkColor,
+                    ayahMarkInk,
+                    fontSize,
+                    gapSp,
+                    arabicMarks,
+                )
             }
         }
         val blooms = {
@@ -225,6 +242,7 @@ private fun MushafQcfPageLine(
     onWordClick: (MushafToken) -> Unit,
     onWordLongClick: (MushafToken) -> Unit,
     onAyahClick: (MushafToken) -> Unit,
+    arabicMarks: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
     val density = LocalDensity.current
@@ -301,6 +319,12 @@ private fun MushafQcfPageLine(
     // foundation's BasicText, which does none of that work.
     val wordStyle = remember(style, palette.fullInkColor) { style.copy(color = palette.fullInkColor) }
     val markStyle = remember(style, ayahMarkInk) { style.copy(color = ayahMarkInk) }
+    val englishMarkStyle = remember(markStyle) {
+        markStyle.copy(
+            fontFamily = HafsFontFamily,
+            textDirection = TextDirection.Ltr,
+        )
+    }
     // Where each cell's ink actually falls, not where its advance box does.
     //
     // The page faces carry the print's own side bearings, and they differ
@@ -355,8 +379,12 @@ private fun MushafQcfPageLine(
                             .coerceIn(0f, 1f)
                     }
                     BasicText(
-                        text = mark,
-                        style = markStyle,
+                        text = if (arabicMarks) {
+                            mark
+                        } else {
+                            formatMushafAyahMark(token.ayah, useArabicIndicDigits = false)
+                        },
+                        style = if (arabicMarks) markStyle else englishMarkStyle,
                         maxLines = 1,
                         softWrap = false,
                         overflow = TextOverflow.Visible,
@@ -917,6 +945,7 @@ private fun buildMushafLine(
     markInk: androidx.compose.ui.graphics.Color,
     fontSize: TextUnit,
     gapSpacing: TextUnit,
+    arabicMarks: Boolean = true,
 ): RenderedLineText {
     val ranges = ArrayList<IntRange>(line.tokens.size)
     val text = buildAnnotatedString {
@@ -933,7 +962,7 @@ private fun buildMushafLine(
                         fontSize = fontSize * MARK_SIZE_RATIO,
                     ),
                 ) {
-                    append(formatMushafAyahMark(token.ayah))
+                    append(formatMushafAyahMark(token.ayah, arabicMarks))
                 }
             }
             if (index < line.tokens.lastIndex) {

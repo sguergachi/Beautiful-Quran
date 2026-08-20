@@ -84,6 +84,7 @@ import com.beautifulquran.ui.reader.PageBreak
 import com.beautifulquran.ui.reader.VERSE_ANNOTATION_INK_ALPHA
 import com.beautifulquran.ui.reader.collapsedStackSpanDp
 import com.beautifulquran.ui.reader.formatAyahNumberMark
+import com.beautifulquran.ui.reader.formatMushafAyahMark
 import com.beautifulquran.ui.reader.symbolicAyahBarCount
 import com.beautifulquran.ui.reader.verseAnnotationStyle
 import kotlin.math.abs
@@ -248,22 +249,20 @@ internal fun CustomizeScreen(
             )
         }
 
-        if (showsScrollChrome(settings.readingLayout)) {
-            Section("Verse numbers")
-            InkCircledChoiceRow(
-                entries = VerseNumberScript.entries,
-                selected = settings.verseNumberScript,
-                params = brushParams,
-                paintToken = paintToken,
-                label = { script ->
-                    when (script) {
-                        VerseNumberScript.ARABIC -> "Arabic"
-                        VerseNumberScript.ENGLISH -> "English"
-                    }
-                },
-                onSelect = { script -> onUpdate { it.copy(verseNumberScript = script) } },
-            )
-        }
+        Section("Verse numbers")
+        InkCircledChoiceRow(
+            entries = VerseNumberScript.entries,
+            selected = settings.verseNumberScript,
+            params = brushParams,
+            paintToken = paintToken,
+            label = { script ->
+                when (script) {
+                    VerseNumberScript.ARABIC -> "Arabic"
+                    VerseNumberScript.ENGLISH -> "English"
+                }
+            },
+            onSelect = { script -> onUpdate { it.copy(verseNumberScript = script) } },
+        )
 
         Section("Page numbers")
         InkCircledChoiceRow(
@@ -353,6 +352,7 @@ internal fun ReadingPreview(
             if (readingLayout == ReadingLayout.MUSHAF) {
                 PreviewMushafLeaf(
                     pageNumberScript = pageNumberScript,
+                    arabicMarks = arabicMarks,
                     modifier = Modifier.fillMaxWidth(),
                 )
             } else if (englishOnly) {
@@ -415,7 +415,7 @@ internal fun ReadingPreview(
     }
 }
 
-private val PreviewQcfSize = 13.sp
+private val PreviewQcfSize = 20.sp
 /** Page hand for the miniature folio, so the figures read at ~10 sp. */
 private val PreviewFolioGlyph = 22.sp
 /** 21:91–92 occupy three exclusive Madinah lines (page 330, lines 1–3). */
@@ -428,6 +428,7 @@ private const val PreviewMushafSurahName = "سُورَةُ الأنبياء"
 @Composable
 private fun PreviewMushafLeaf(
     pageNumberScript: PageNumberScript,
+    arabicMarks: Boolean,
     modifier: Modifier,
 ) {
     val context = LocalContext.current
@@ -457,7 +458,7 @@ private fun PreviewMushafLeaf(
         Spacer(Modifier.height(8.dp))
         if (lines.size == 3 && face != null) {
             CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
-                PreviewQcfLines(lines = lines, face = face)
+                PreviewQcfLines(lines = lines, face = face, arabicMarks = arabicMarks)
             }
         } else {
             val line = with(LocalDensity.current) {
@@ -477,9 +478,9 @@ private fun PreviewMushafLeaf(
 }
 
 /** One drawn cell of a preview line — a word, or the circled mark after it. */
-private data class PreviewQcfCell(val text: String, val mark: Boolean)
+private data class PreviewQcfCell(val text: String, val mark: Boolean, val qcf: Boolean = true)
 
-private fun previewQcfCells(line: MushafLine): List<PreviewQcfCell> = buildList {
+private fun previewQcfCells(line: MushafLine, arabicMarks: Boolean): List<PreviewQcfCell> = buildList {
     line.tokens.forEach { token ->
         val raw = token.word.qcfV2
         add(
@@ -492,42 +493,63 @@ private fun previewQcfCells(line: MushafLine): List<PreviewQcfCell> = buildList 
                 mark = false,
             ),
         )
-        val mark = if (raw.isNotEmpty()) qcfTrailingMark(raw, token.endsAyah) else ""
-        if (mark.isNotEmpty()) add(PreviewQcfCell(text = mark, mark = true))
+        if (!token.endsAyah) return@forEach
+        if (arabicMarks) {
+            val mark = if (raw.isNotEmpty()) qcfTrailingMark(raw, true) else ""
+            if (mark.isNotEmpty()) add(PreviewQcfCell(text = mark, mark = true))
+        } else {
+            add(
+                PreviewQcfCell(
+                    text = formatMushafAyahMark(token.ayah, useArabicIndicDigits = false),
+                    mark = true,
+                    qcf = false,
+                ),
+            )
+        }
     }
 }
 
 @Composable
-private fun PreviewQcfLines(lines: List<MushafLine>, face: FontFamily) {
+private fun PreviewQcfLines(
+    lines: List<MushafLine>,
+    face: FontFamily,
+    arabicMarks: Boolean,
+) {
     val ink = MaterialTheme.colorScheme.onSurface
     val gold = LocalQuranAccents.current.gold
     val measurer = rememberTextMeasurer()
     val density = LocalDensity.current
-    val cells = remember(lines) { lines.map { previewQcfCells(it) } }
+    val cells = remember(lines, arabicMarks) { lines.map { previewQcfCells(it, arabicMarks) } }
     BoxWithConstraints(Modifier.fillMaxWidth()) {
         val measurePx = constraints.maxWidth.toFloat()
-        val base = TextStyle(
+        val qcfBase = TextStyle(
             fontFamily = face,
             fontSize = PreviewQcfSize,
             lineHeight = MUSHAF_LINE_PITCH_EM.em,
             textDirection = TextDirection.Rtl,
             platformStyle = PlatformTextStyle(includeFontPadding = false),
         )
+        val hafsBase = qcfBase.copy(fontFamily = HafsFontFamily)
+        fun styleOf(cell: PreviewQcfCell, baseQcf: TextStyle, baseHafs: TextStyle) =
+            if (cell.qcf) baseQcf else baseHafs
         val fontPx = with(density) { PreviewQcfSize.toPx() }
         val needed = cells.map { line ->
             val inkWidth = line.sumOf {
-                measurer.measure(it.text, base, maxLines = 1).size.width.toDouble()
+                measurer.measure(it.text, styleOf(it, qcfBase, hafsBase), maxLines = 1)
+                    .size.width.toDouble()
             }.toFloat()
             inkWidth + (line.size - 1).coerceAtLeast(0) * MUSHAF_WORD_GAP_EM * fontPx
         }
         val longest = needed.maxOrNull() ?: 0f
         val sizeScale = if (longest > measurePx && longest > 0f) measurePx / longest else 1f
-        val fitted = base.copy(fontSize = PreviewQcfSize * sizeScale)
+        val fittedQcf = qcfBase.copy(fontSize = PreviewQcfSize * sizeScale)
+        val fittedHafs = hafsBase.copy(fontSize = PreviewQcfSize * sizeScale)
         val fittedPx = fontPx * sizeScale
         Column(Modifier.fillMaxWidth()) {
             cells.forEach { line ->
                 val inkWidth = line.sumOf {
-                    measurer.measure(it.text, fitted, maxLines = 1).size.width.toDouble()
+                    measurer.measure(it.text, styleOf(it, fittedQcf, fittedHafs), maxLines = 1)
+                        .size.width.toDouble()
                 }.toFloat()
                 val fit = mushafLineFit(
                     inkWidthPx = inkWidth,
@@ -535,10 +557,15 @@ private fun PreviewQcfLines(lines: List<MushafLine>, face: FontFamily) {
                     measureWidthPx = measurePx,
                     fontPx = fittedPx,
                 )
-                val style = if (fit.scale == 1f) {
-                    fitted
+                val qcfStyle = if (fit.scale == 1f) {
+                    fittedQcf
                 } else {
-                    fitted.copy(textGeometricTransform = TextGeometricTransform(scaleX = fit.scale))
+                    fittedQcf.copy(textGeometricTransform = TextGeometricTransform(scaleX = fit.scale))
+                }
+                val hafsStyle = if (fit.scale == 1f) {
+                    fittedHafs
+                } else {
+                    fittedHafs.copy(textGeometricTransform = TextGeometricTransform(scaleX = fit.scale))
                 }
                 val gap = with(density) { fit.gapPx.toDp() }
                 Row(
@@ -554,7 +581,8 @@ private fun PreviewQcfLines(lines: List<MushafLine>, face: FontFamily) {
                         if (i > 0) Spacer(Modifier.width(gap))
                         Text(
                             text = cell.text,
-                            style = style.copy(color = if (cell.mark) gold else ink),
+                            style = styleOf(cell, qcfStyle, hafsStyle)
+                                .copy(color = if (cell.mark) gold else ink),
                             maxLines = 1,
                             softWrap = false,
                             overflow = TextOverflow.Visible,
@@ -693,6 +721,7 @@ private fun PreviewHeightLock(contentPad: Modifier) {
     Column(Modifier.alpha(0f).then(contentPad)) {
         PreviewMushafLeaf(
             pageNumberScript = PageNumberScript.BOTH,
+            arabicMarks = true,
             modifier = Modifier.fillMaxWidth(),
         )
     }

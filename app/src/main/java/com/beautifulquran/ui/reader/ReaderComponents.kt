@@ -171,15 +171,19 @@ internal fun Int.toArabicIndic(): String =
  * Mushaf end-of-ayah: U+06DD plus Arabic-Indic digits. Digital Khatt and
  * Uthmani faces draw this as the circled page number, not ﴿N﴾.
  */
-internal fun formatMushafAyahMark(number: Int): String {
-    val digits = number.toArabicIndic()
-    return buildString {
+internal fun formatMushafAyahMark(
+    number: Int,
+    useArabicIndicDigits: Boolean = true,
+): String {
+    val digits = if (useArabicIndicDigits) number.toArabicIndic() else number.toString()
+    val body = buildString {
         append('\u06DD')
         digits.forEach { ch ->
             append('\u2060')
             append(ch)
         }
     }
+    return if (useArabicIndicDigits) body else "\u2066$body\u2069"
 }
 
 internal fun formatAyahNumberMark(number: Int, useArabicIndicDigits: Boolean): String {

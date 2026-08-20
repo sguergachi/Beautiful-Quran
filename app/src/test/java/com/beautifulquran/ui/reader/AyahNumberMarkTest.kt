@@ -35,6 +35,17 @@ class AyahNumberMarkTest {
     }
 
     @Test
+    fun `English mushaf mark is end-of-ayah plus Western digits, LTR isolated`() {
+        val lri = "\u2066"
+        val pdi = "\u2069"
+        assertEquals(
+            "$lri\u06DD${wordJoiner}1${wordJoiner}2$pdi",
+            formatMushafAyahMark(12, useArabicIndicDigits = false),
+        )
+        assertFalse(formatMushafAyahMark(91, useArabicIndicDigits = false).contains('﴿'))
+    }
+
+    @Test
     fun `English mark is LTR-isolated so an RTL line cannot flip its brackets`() {
         val mark = formatAyahNumberMark(1, useArabicIndicDigits = false)
         assertEquals('\u2066', mark.first())

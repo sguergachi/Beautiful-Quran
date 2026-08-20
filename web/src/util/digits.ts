@@ -18,6 +18,16 @@ export function formatReaderDigits(n: number, useArabicIndicDigits: boolean): st
  * Characters are glued with WORD JOINER so the mark never wraps mid-unit
  * (mirrors Android `formatAyahNumberMark`).
  */
+/** Mushaf end-of-ayah: U+06DD plus digits. Matches Android `formatMushafAyahMark`. */
+export function formatMushafAyahMark(
+  n: number,
+  useArabicIndicDigits: boolean = true,
+): string {
+  const digits = formatReaderDigits(n, useArabicIndicDigits)
+  const body = ['\u06DD', ...digits].join('\u2060')
+  return useArabicIndicDigits ? body : `\u2066${body}\u2069`
+}
+
 export function formatAyahNumberMark(n: number, useArabicIndicDigits: boolean): string {
   const digits = formatReaderDigits(n, useArabicIndicDigits)
   const raw = useArabicIndicDigits ? `﴿${digits}﴾` : `\u2066﴾${digits}﴿\u2069`

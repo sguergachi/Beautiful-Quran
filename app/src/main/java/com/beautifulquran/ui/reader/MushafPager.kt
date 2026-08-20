@@ -299,6 +299,7 @@ internal fun MushafPager(
     onWordLongClick: (MushafToken) -> Unit,
     onAyahClick: (MushafToken) -> Unit,
     pageNumberScript: PageNumberScript = PageNumberScript.BOTH,
+    arabicMarks: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -469,6 +470,7 @@ internal fun MushafPager(
                     onWordClick = onWordClick,
                     onWordLongClick = onWordLongClick,
                     onAyahClick = onAyahClick,
+                    arabicMarks = arabicMarks,
                     unit = unit,
                     modifier = Modifier
                         .height(unit * MushafGrid.TEXT_LINES)
@@ -511,6 +513,7 @@ private fun MushafPageSheet(
     onWordClick: (MushafToken) -> Unit,
     onWordLongClick: (MushafToken) -> Unit,
     onAyahClick: (MushafToken) -> Unit,
+    arabicMarks: Boolean = true,
     unit: Dp,
     modifier: Modifier = Modifier,
 ) {
@@ -751,6 +754,7 @@ private fun MushafPageSheet(
                                 onWordLongClick = onWordLongClick,
                                 onAyahClick = onAyahClick,
                                 pageFont = pageFont,
+                                arabicMarks = arabicMarks,
                             )
                         }
                     }
