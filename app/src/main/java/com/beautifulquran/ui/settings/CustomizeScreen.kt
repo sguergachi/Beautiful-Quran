@@ -522,22 +522,24 @@ private fun PreviewQcfLines(lines: List<MushafLine>, face: FontFamily) {
         } else {
             base
         }
-        annotated.forEach { text ->
-            val natural = measurer.measure(text, fitted, maxLines = 1).size.width.toFloat()
-            val scale = when {
-                natural <= 0f -> 1f
-                natural > measurePx -> mushafLineCondense(natural, measurePx)
-                else -> (measurePx / natural).coerceAtMost(MUSHAF_MAX_LINE_SCALE)
+        Column(Modifier.fillMaxWidth()) {
+            annotated.forEach { text ->
+                val natural = measurer.measure(text, fitted, maxLines = 1).size.width.toFloat()
+                val scale = when {
+                    natural <= 0f -> 1f
+                    natural > measurePx -> mushafLineCondense(natural, measurePx)
+                    else -> (measurePx / natural).coerceAtMost(MUSHAF_MAX_LINE_SCALE)
+                }
+                Text(
+                    text = text,
+                    style = fitted.copy(
+                        textGeometricTransform = TextGeometricTransform(scaleX = scale),
+                    ),
+                    maxLines = 1,
+                    overflow = TextOverflow.Visible,
+                    modifier = Modifier.fillMaxWidth(),
+                )
             }
-            Text(
-                text = text,
-                style = fitted.copy(
-                    textGeometricTransform = TextGeometricTransform(scaleX = scale),
-                ),
-                maxLines = 1,
-                overflow = TextOverflow.Visible,
-                modifier = Modifier.fillMaxWidth(),
-            )
         }
     }
 }
