@@ -845,6 +845,27 @@ fun ReaderScreen(
             .minOfOrNull { it.second }
     }
 
+    /**
+     * Where play should start for the leaf on screen, or null to resume.
+     * The playhead is offered as the held verse only while this chapter is the
+     * one loaded, since that is the only chapter whose verse numbers the leaf's
+     * keys can be compared against.
+     */
+    fun mushafPlayTarget(): ReaderInteraction.MushafPlayTarget? {
+        val catalog = mushafCatalog ?: return null
+        val leaf = catalog.page(mushafPagerState.currentPage + 1) ?: return null
+        val first = leaf.lines.firstOrNull { it.tokens.isNotEmpty() }?.tokens?.firstOrNull()
+        return ReaderInteraction.mushafPlayTarget(
+            pendingJumpAyah = requestedJumpAyah,
+            loadedSurahId = renderedSurahId,
+            heldAyah = activeAyah.takeIf { isThisSurahPlaying },
+            leafFirstWord = first?.let {
+                ReaderInteraction.MushafPlayTarget(it.surahId, it.ayah, it.word.position)
+            },
+            leafAyahs = leaf.ayahKeys,
+        )
+    }
+
     fun selectedPlaybackAyah(): Int {
         val ayahCount = uiState.content?.surah?.ayahCount ?: return startAyah ?: 1
         return ReaderInteraction.selectedPlaybackAyah(
@@ -2083,21 +2104,33 @@ fun ReaderScreen(
                         enabled = !contextualGuideOpen,
                         onOpenChapters = onBack,
                         onOpenSettings = onOpenSettings,
+                        // The leaf on screen is the request. Pressing play on a
+                        // page recites that page, from the first word standing
+                        // on it — including when the page belongs to a chapter
+                        // the reader only scrubbed past and never loaded, which
+                        // used to resume the old chapter and turn the leaf away
+                        // underneath them. A paused verse the leaf itself
+                        // carries still resumes, so pause and play in place
+                        // stay a pair.
                         onPlayPause = {
-                            if (isThisSurahPlaying) {
-                                if (playerState.isPlaying) {
-                                    viewModel.player.togglePlayPause()
-                                } else {
-                                    dispatch(ReaderInteractionEvent.EnableFollow)
-                                    if (requestedJumpAyah > 0) {
-                                        viewModel.playLoadedFromAyah(selectedPlaybackAyah())
-                                    } else {
-                                        viewModel.player.togglePlayPause()
-                                    }
-                                }
+                            if (playerState.isPlaying) {
+                                viewModel.player.togglePlayPause()
                             } else {
                                 dispatch(ReaderInteractionEvent.EnableFollow)
-                                viewModel.playFromAyah(selectedPlaybackAyah())
+                                val target = mushafPlayTarget()
+                                when {
+                                    target == null -> if (isThisSurahPlaying) {
+                                        viewModel.player.togglePlayPause()
+                                    } else {
+                                        viewModel.playFromAyah(selectedPlaybackAyah())
+                                    }
+                                    target.surahId != renderedSurahId -> viewModel.load(
+                                        surahId = target.surahId,
+                                        startPlaybackAtAyah = target.ayah,
+                                        startPlaybackAtWord = target.word,
+                                    )
+                                    else -> viewModel.playFromAyahWord(target.ayah, target.word)
+                                }
                             }
                         },
                         onFastBackward = viewModel::fastBackward,

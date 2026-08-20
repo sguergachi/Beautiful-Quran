@@ -386,4 +386,104 @@ class ReaderInteractionTest {
             ),
         )
     }
+
+    // --- Pressing play on a leaf ---
+
+    private val leafFirst = ReaderInteraction.MushafPlayTarget(18, 17, 4)
+
+    // Page 293 as the pager sees it: al-Isra ends on it and al-Kahf opens.
+    private val leaf293 = setOf(
+        17 to 105, 17 to 106, 17 to 107, 17 to 108, 17 to 109, 17 to 110, 17 to 111,
+        18 to 1, 18 to 2, 18 to 3, 18 to 4, 18 to 5,
+    )
+
+    @Test
+    fun `a leaf of another chapter recites that chapter, not the loaded one`() {
+        // Scrubbed from al-Baqarah to a leaf of al-Kahf: the target is the
+        // leaf's own first word, so the caller loads surah 18 rather than
+        // resuming surah 2 and turning the page away.
+        val target = ReaderInteraction.mushafPlayTarget(
+            pendingJumpAyah = 0,
+            loadedSurahId = 2,
+            heldAyah = 40,
+            leafFirstWord = leafFirst,
+            leafAyahs = leaf293,
+        )
+        assertEquals(ReaderInteraction.MushafPlayTarget(18, 17, 4), target)
+    }
+
+    @Test
+    fun `a leaf deep in the loaded chapter starts on the leaf, not the chapter`() {
+        // Nothing is playing, so nothing is held: page forty of al-Baqarah
+        // begins at page forty and not at verse one.
+        val target = ReaderInteraction.mushafPlayTarget(
+            pendingJumpAyah = 0,
+            loadedSurahId = 2,
+            heldAyah = null,
+            leafFirstWord = ReaderInteraction.MushafPlayTarget(2, 253, 3),
+            leafAyahs = setOf(2 to 253, 2 to 254, 2 to 255),
+        )
+        assertEquals(ReaderInteraction.MushafPlayTarget(2, 253, 3), target)
+    }
+
+    @Test
+    fun `pause and play in place resumes rather than restarting the page`() {
+        // The held verse stands on this very leaf: play is the other half of
+        // the pause, and must not seek back to the top of the page.
+        assertEquals(
+            null,
+            ReaderInteraction.mushafPlayTarget(
+                pendingJumpAyah = 0,
+                loadedSurahId = 17,
+                heldAyah = 108,
+                leafFirstWord = leafFirst,
+                leafAyahs = leaf293,
+            ),
+        )
+    }
+
+    @Test
+    fun `a playhead left behind on another leaf does not hold the transport`() {
+        // Same chapter, but the reader has turned away from where they paused.
+        assertEquals(
+            leafFirst,
+            ReaderInteraction.mushafPlayTarget(
+                pendingJumpAyah = 0,
+                loadedSurahId = 17,
+                heldAyah = 3,
+                leafFirstWord = leafFirst,
+                leafAyahs = leaf293,
+            ),
+        )
+    }
+
+    @Test
+    fun `a verse asked for by the index outranks the leaf it lands on`() {
+        // The leaf is that request's consequence; answering with its first word
+        // would round the asked-for verse down to the top of its page.
+        assertEquals(
+            ReaderInteraction.MushafPlayTarget(18, 60, null),
+            ReaderInteraction.mushafPlayTarget(
+                pendingJumpAyah = 60,
+                loadedSurahId = 18,
+                heldAyah = null,
+                leafFirstWord = leafFirst,
+                leafAyahs = leaf293,
+            ),
+        )
+    }
+
+    @Test
+    fun `a leaf with no words of its own leaves the transport alone`() {
+        assertEquals(
+            null,
+            ReaderInteraction.mushafPlayTarget(
+                pendingJumpAyah = 0,
+                loadedSurahId = 2,
+                heldAyah = 40,
+                leafFirstWord = null,
+                leafAyahs = emptySet(),
+            ),
+        )
+    }
 }
