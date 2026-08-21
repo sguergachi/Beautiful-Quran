@@ -770,7 +770,9 @@ private fun PaperStackApp(
                 layer = PaperLayer.Customize,
                 stackPosition = stackPositionProvider,
                 settingsLayer = settingsLayer,
-                modifier = Modifier.zIndex(0.5f),
+                // Beneath Settings: the detail page is what the settings
+                // sheet turns away to reveal, so it must draw under it.
+                modifier = Modifier.zIndex(-0.5f),
             ) {
                 when (settingsDetail) {
                     SettingsDetail.CUSTOMIZE -> CustomizeSheet(
@@ -1165,22 +1167,24 @@ private fun Modifier.paperLayerTransform(
             shadowElevation = 18f * (1f - turn)
         }
         PaperLayer.Settings -> {
-            // Stay fully under the sheets above — no lateral shift that would
-            // let the reader rail read as a gutter beside Settings.
+            // Under the sheets above, no lateral shift — until a detail sheet
+            // (Customize, Downloads) is asked for: then Settings itself turns
+            // away like the Cover does, revealing the detail page beneath it.
             val reveal = (position / settingsLayer.toFloat()).coerceIn(0f, 1f)
+            val turn = (position - settingsLayer.toFloat()).coerceIn(0f, 1f)
+            translationX = -(width + STACK_OFFSCREEN_OVERSCAN_DP * density) * turn
+            rotationY = -4f * turn
+            shadowElevation = 18f * (1f - turn)
             scaleX = 0.985f + 0.015f * reveal
             scaleY = 0.985f + 0.015f * reveal
         }
         PaperLayer.Customize -> {
-            // The detail sheet slides over Settings like Ayah over Cover:
-            // enters from the right as position rises past settingsLayer,
-            // turns away again past settingsLayer+1.
-            val reveal = (position - settingsLayer).coerceIn(0f, 1f)
-            val turn = (position - (settingsLayer + 1f)).coerceIn(0f, 1f)
-            translationX = (width + STACK_OFFSCREEN_OVERSCAN_DP * density) * (1f - reveal) -
-                (width + STACK_OFFSCREEN_OVERSCAN_DP * density) * turn
-            rotationY = -4f * turn
-            shadowElevation = 18f * (1f - turn)
+            // The detail sheet is revealed from under Settings as Settings
+            // turns away — the same underneath-page the reader is to the
+            // cover. It sits a touch small and shifted right at rest-past,
+            // settling up into place as the turn completes.
+            val reveal = (position - settingsLayer.toFloat()).coerceIn(0f, 1f)
+            translationX = width * 0.055f * (1f - reveal)
             scaleX = 0.985f + 0.015f * reveal
             scaleY = 0.985f + 0.015f * reveal
         }
@@ -1201,8 +1205,9 @@ private fun Modifier.paperDropShadow(
         PaperLayer.Bookmarks -> (-position).coerceIn(0f, 1f)
         PaperLayer.Cover -> position.coerceIn(0f, 1f)
         PaperLayer.Ayah -> (position - 1f).coerceIn(0f, 1f)
-        PaperLayer.Settings -> 0f
-        PaperLayer.Customize -> (position - (settingsLayer + 1f)).coerceIn(0f, 1f)
+        // Settings casts onto the detail sheet while it turns away to it.
+        PaperLayer.Settings -> (position - settingsLayer.toFloat()).coerceIn(0f, 1f)
+        PaperLayer.Customize -> 0f
     }
     val depth = (4f * turning * (1f - turning)).coerceIn(0f, 1f)
     if (depth > 0.01f) {
