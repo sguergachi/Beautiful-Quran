@@ -646,11 +646,11 @@ internal fun MushafPageDial(
     var hudHeightPx by remember { mutableIntStateOf(0) }
 
     // A ribbon is for finding your place, not for watching. While the page is
-    // being recited it fades almost out, and comes back when the reading does —
-    // but a hand on the rule brings it straight back, because on a leaf this is
-    // the only wayfinding there is and a control you cannot see is no control.
+    // being recited it steps back rather than vanishing — still findable under
+    // a thumb, because this is the only wayfinding the leaf has and a control
+    // you cannot see is no control. A hand on the rule brings it fully back.
     val thumbInk by animateFloatAsState(
-        targetValue = if (reciting && !scrubbing) 0.06f else 0.62f,
+        targetValue = if (reciting && !scrubbing) 0.22f else 0.62f,
         animationSpec = tween(InkEngine.tuning.recessMs, easing = FastOutSlowInEasing),
         label = "mushafThumb",
     )
