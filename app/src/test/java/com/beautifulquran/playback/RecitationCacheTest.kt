@@ -113,14 +113,13 @@ class RecitationCacheTest {
     }
 
     @Test
-    fun keepsOtherDirWhenDestAlreadyHasAudio() {
+    fun discardsLegacyCacheWhenDestinationAlreadyHasAudio() {
         val from = tmp.newFolder("files-audio")
         File(from, "old.bin").writeText("stale")
         val to = tmp.newFolder("cache-audio")
         File(to, "kept.bin").writeText("live")
-        relocateAudioDir(from, to)
-        assertTrue(from.exists())
-        assertEquals("stale", File(from, "old.bin").readText())
+        assertTrue(relocateAudioDir(from, to))
+        assertFalse(from.exists())
         assertEquals("live", File(to, "kept.bin").readText())
     }
 
@@ -155,17 +154,29 @@ class RecitationCacheTest {
         File(from, "old.bin").writeText("old-listen")
         val to = File(tmp.root, "cache-audio")
 
-        relocateLegacyAudioOnce(marker, from, to)
+        assertTrue(relocateLegacyAudioOnce(marker, from, to))
         assertFalse(from.exists())
         assertEquals("old-listen", File(to, "old.bin").readText())
 
         from.mkdirs()
         File(from, "download.bin").writeText("permanent")
         to.deleteRecursively()
-        relocateLegacyAudioOnce(marker, from, to)
+        assertTrue(relocateLegacyAudioOnce(marker, from, to))
 
         assertEquals("permanent", File(from, "download.bin").readText())
         assertFalse(to.exists())
+    }
+
+    @Test
+    fun failedLegacyRelocationDoesNotWriteCompletionMarker() {
+        val marker = File(tmp.root, "legacy-moved")
+        val audio = tmp.newFolder("same-audio")
+        File(audio, "old.bin").writeText("old-listen")
+
+        assertFalse(relocateLegacyAudioOnce(marker, audio, audio))
+
+        assertFalse(marker.exists())
+        assertEquals("old-listen", File(audio, "old.bin").readText())
     }
 
     private fun span(key: String, length: Long, touched: Long): CacheSpan =

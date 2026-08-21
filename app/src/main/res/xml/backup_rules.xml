@@ -4,4 +4,5 @@
      reproducible from the network, so neither belongs in cloud backup. -->
 <full-backup-content>
     <exclude domain="file" path="audio" />
+    <exclude domain="file" path="recitation-downloads" />
 </full-backup-content>

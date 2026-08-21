@@ -293,11 +293,16 @@ tree (`filesDir`) for chapters the reader asked to download. Playback reads
 keep first, then listen, and writes only listen. A downloaded ayah is
 dropped from listen so the one storage total does not count it twice.
 Leftover `filesDir/audio` from the old listen LRU moves onto `cacheDir` once,
-before either `SimpleCache` opens; a persistent marker prevents later explicit
-downloads from ever being reclassified as cache. Delete all empties the live caches
-in place so playback keeps the same instances. Settings → Download manager
-shows total audio storage plus the listening-cache share, and Delete all clears
-both keep and listen. Every reciter starts collapsed; only an explicit tap opens
+before either `SimpleCache` opens; if both trees already contain audio, the
+current listening cache wins and the legacy evictable copy is discarded. The
+completion marker is written only after relocation succeeds, preventing later
+explicit downloads from ever being reclassified as cache. Delete all empties
+the live caches in place so playback keeps the same instances. Settings →
+Download manager shows total audio storage plus the listening-cache share, but
+its chapter catalog reads permanent keep storage only—ordinary listening never
+appears as a download. Chapter and reciter Delete preserve the evictable
+listening cache; Delete all intentionally clears both trees. Every reciter
+starts collapsed; only an explicit tap opens
 one. Loading and loaded facts reserve the same row heights, so applying the
 initial cache scan changes the ink without moving the page. Reciters sit
 24 dp apart. The chevron is the only trailing
@@ -319,7 +324,11 @@ already fetched. Chapter Pause parks only that chapter and the worker continues
 with the next waiting chapter. Reciter Pause parks only that reciter’s active
 and waiting chapters; queued work for other reciters continues. Each paused
 chapter keeps its own progress clock. A Resume that races the cancelled writer
-queues a full retry of that chapter, so the interrupted ayah cannot be skipped.
+prepends a full retry of that chapter, so the interrupted ayah cannot be skipped
+or stranded behind the queue. Disk scans use one serialized refresh path, so
+an older concurrent scan can never restore stale controls. Explicit chapter
+ownership keeps the shared basmalah while any downloaded chapter still needs it
+and removes it after the last owner is deleted.
 Download all stays on an open reciter. Collapsed Resume
 continues a pause or unfinished partials, not empty chapters; the Resume verb
 already communicates pause, so the progress line does not repeat “Paused.”
@@ -408,14 +417,16 @@ horizontal page turn — draggable, fling-able, with page-turn audio
   bottom. Floating Back-to / return-to-ayah ornaments share
   `FloatingPaperControl` (enter/exit + bottom inset) with the cover float. All scrolling and verse-position logic routes through the
   focus engine (`reader/focus/`, see below).
-- `settings/SettingsScreen` — reciter, Customize (view, layout, verse and
+- `settings/SettingsScreen` — reciter plus two sibling detail sheets,
+  Customize and Download manager, reached by tap or horizontal page swipe.
+  Customize owns text size, translation visibility, view, layout, verse and
   page numbers, theme, annotations, ayah-selector side, word-by-word gloss,
   with a pinned faded-leaf preview, a full-bleed paper dissolve under it,
   and the collapsed ayah rail on the chosen edge;
   mushaf hides view, annotations, the rail
   side, word-by-word, and verse-number script — the preview is 21:91–92
-  as three printed QCF lines scaled to the measure), text size, remaining
-  display toggles, attributions;
+  as three printed QCF lines scaled to the measure). The main Settings page
+  keeps only navigation rows and attributions;
   developer mode unlocks the Timings Lab and
   the [Tarjīʿ Lab](TARJI_LAB.md).
 

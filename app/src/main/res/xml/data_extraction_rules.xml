@@ -4,8 +4,10 @@
 <data-extraction-rules>
     <cloud-backup>
         <exclude domain="file" path="audio" />
+        <exclude domain="file" path="recitation-downloads" />
     </cloud-backup>
     <device-transfer>
         <exclude domain="file" path="audio" />
+        <exclude domain="file" path="recitation-downloads" />
     </device-transfer>
 </data-extraction-rules>

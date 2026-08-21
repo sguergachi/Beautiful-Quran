@@ -45,6 +45,8 @@ internal object RecitationCache {
 
     fun keepDir(context: Context) = File(context.filesDir, "audio")
 
+    private fun keepIndexDir(context: Context) = File(context.filesDir, "recitation-downloads")
+
     fun usage(context: Context) = RecitationUsage(
         listenBytes = directorySize(listenDir(context)),
         keepBytes = directorySize(keepDir(context)),
@@ -132,6 +134,7 @@ internal object RecitationCache {
         synchronized(lock) {
             val cache = keepCache
             if (cache != null) empty(cache) else keepDir(context).deleteRecursively()
+            keepIndexDir(context).deleteRecursively()
         }
     }
 
@@ -139,26 +142,45 @@ internal object RecitationCache {
         synchronized(lock) {
             listenCache?.let { empty(it) } ?: listenDir(context).deleteRecursively()
             keepCache?.let { empty(it) } ?: keepDir(context).deleteRecursively()
+            keepIndexDir(context).deleteRecursively()
         }
     }
 
-    fun removeKey(context: Context, key: String) {
-        listen(context).removeResource(key)
+    fun removeKeptKey(context: Context, key: String) {
         keep(context).removeResource(key)
     }
 
-    fun allKeys(context: Context): Set<String> = LinkedHashSet<String>().apply {
-        addAll(listen(context).keys)
-        addAll(keep(context).keys)
+    fun keepKeys(context: Context): Set<String> = keep(context).keys.toSet()
+
+    fun keptBytes(context: Context, key: String): Long =
+        keep(context).getCachedBytes(key, /* position = */ 0, Long.MAX_VALUE)
+
+    fun isFullyKept(context: Context, key: String): Boolean = isFullyCached(keep(context), key)
+
+    fun markKeptChapter(context: Context, ref: ChapterRef) {
+        keepIndexDir(context).also { it.mkdirs() }
+            .resolve("${ref.reciterId}-${ref.surahId}")
+            .createNewFile()
     }
 
-    fun cachedBytes(context: Context, key: String): Long = cachedBytesForKey(
-        listen(context).getCachedBytes(key, /* position = */ 0, Long.MAX_VALUE),
-        keep(context).getCachedBytes(key, /* position = */ 0, Long.MAX_VALUE),
-    )
+    fun unmarkKeptChapter(context: Context, ref: ChapterRef) {
+        keepIndexDir(context).resolve("${ref.reciterId}-${ref.surahId}").delete()
+    }
 
-    fun isFullyCached(context: Context, key: String): Boolean =
-        isFullyCached(keep(context), key) || isFullyCached(listen(context), key)
+    fun unmarkKeptReciter(context: Context, reciterId: Int) {
+        keepIndexDir(context).listFiles()
+            ?.filter { it.name.startsWith("$reciterId-") }
+            ?.forEach { it.delete() }
+    }
+
+    fun keptChapters(context: Context): Set<ChapterRef> =
+        keepIndexDir(context).listFiles().orEmpty().mapNotNullTo(LinkedHashSet()) { file ->
+            val parts = file.name.split('-')
+            if (parts.size != 2) return@mapNotNullTo null
+            val reciterId = parts[0].toIntOrNull() ?: return@mapNotNullTo null
+            val surahId = parts[1].toIntOrNull() ?: return@mapNotNullTo null
+            ChapterRef(reciterId, surahId)
+        }
 
     /** Drop the listen copy once keep fully holds this ayah. */
     fun dropListenIfKept(context: Context, key: String) {
@@ -204,11 +226,15 @@ internal object RecitationCache {
 
     private fun maybeRelocateLocked(context: Context) {
         if (!relocated.compareAndSet(false, true)) return
-        relocateLegacyAudioOnce(
+        val complete = relocateLegacyAudioOnce(
             marker = File(context.noBackupFilesDir, "legacy-recitation-cache-moved-v1"),
             from = keepDir(context),
             to = listenDir(context),
         )
+        if (!complete) {
+            relocated.set(false)
+            error("Could not safely classify the legacy recitation cache")
+        }
     }
 
     private fun empty(cache: SimpleCache) {
@@ -291,30 +317,39 @@ internal fun hasCachedAudio(dir: File): Boolean {
 
 /**
  * Move [from] onto [to] when [to] is missing, empty, or a uid/lock stub.
- * If both already hold ayah files, leave [from] so the trees can report
- * separately.
+ * If both already hold ayah files, keep the current destination and discard
+ * the legacy evictable source instead of misclassifying it as a download.
  */
-internal fun relocateAudioDir(from: File, to: File) {
-    if (!from.exists() || from == to) return
+internal fun relocateAudioDir(from: File, to: File): Boolean {
+    if (!from.exists()) return true
+    if (from == to) return false
     if (!hasCachedAudio(from)) {
         from.deleteRecursively()
-        return
+        return !from.exists()
     }
     if (to.exists() && (to.list().isNullOrEmpty() || !hasCachedAudio(to))) {
         to.deleteRecursively()
     }
     if (!to.exists()) {
         to.parentFile?.mkdirs()
-        if (from.renameTo(to)) return
-        from.copyRecursively(to)
-        from.deleteRecursively()
-        return
+        if (from.renameTo(to)) return true
+        return runCatching {
+            from.copyRecursively(to)
+            from.deleteRecursively()
+            !from.exists()
+        }.getOrDefault(false)
     }
+    // Both trees contain old evictable listening data. The destination already
+    // owns a valid cache, so discard the legacy duplicate instead of silently
+    // reclassifying it as a permanent user download.
+    from.deleteRecursively()
+    return !from.exists()
 }
 
 /** The old filesDir LRU is moved at most once; later filesDir audio is permanent. */
-internal fun relocateLegacyAudioOnce(marker: File, from: File, to: File) {
+internal fun relocateLegacyAudioOnce(marker: File, from: File, to: File): Boolean {
     marker.parentFile?.mkdirs()
-    if (!marker.createNewFile()) return
-    relocateAudioDir(from, to)
+    if (marker.exists()) return true
+    if (!relocateAudioDir(from, to)) return false
+    return marker.createNewFile() || marker.exists()
 }

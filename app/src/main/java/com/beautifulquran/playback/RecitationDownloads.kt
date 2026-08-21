@@ -150,6 +150,12 @@ internal class DownloadQueue {
         waiting.addAll(merged)
     }
 
+    fun resumeChapter(ref: ChapterRef): Boolean {
+        val request = paused.remove(ref)?.request ?: return false
+        prepend(listOf(request))
+        return true
+    }
+
     fun takeNext(): DownloadRequest? {
         if (active != null || waiting.isEmpty()) return null
         cancellingActive = false
@@ -192,7 +198,18 @@ internal class DownloadQueue {
             .filter { it.request.reciter.id == reciterId }
             .map { it.request }
         requests.forEach { paused.remove(it.ref) }
-        enqueue(requests)
+        prepend(requests)
+    }
+
+    private fun prepend(requests: List<DownloadRequest>) {
+        val seen = LinkedHashSet<ChapterRef>()
+        active?.takeUnless { cancellingActive }?.let { seen += it.ref }
+        val next = ArrayDeque<DownloadRequest>()
+        for (request in requests + waiting) {
+            if (seen.add(request.ref)) next += request
+        }
+        waiting.clear()
+        waiting.addAll(next)
     }
 
     fun removeChapter(ref: ChapterRef): Boolean {
@@ -550,10 +567,55 @@ internal fun cacheKeysForReciter(
     id.third == reciter.id
 }
 
+internal fun inferredKeptChapters(
+    keys: Iterable<String>,
+    reciters: List<Reciter>,
+): Set<ChapterRef> {
+    val idsBySlug = reciters.associate { it.slug to it.id }
+    return keys.mapNotNullTo(LinkedHashSet()) { key ->
+        val ref = parseEveryayahUri(key)?.let { uri ->
+            idsBySlug[uri.slug]?.let { ChapterRef(it, uri.surah) to uri.ayah }
+        } ?: parseMediaCacheKey(key)?.let { id ->
+            ChapterRef(id.third, id.first) to id.second
+        } ?: return@mapNotNullTo null
+        // 1:1 is also the shared basmalah lead-in. Another Fatiha ayah or an
+        // explicit ownership marker must prove that chapter 1 itself was kept.
+        ref.first.takeUnless { it.surahId == 1 && ref.second == 1 }
+    }
+}
+
+internal fun isSharedBasmalahKey(key: String, reciter: Reciter): Boolean {
+    val uri = parseEveryayahUri(key)
+    if (uri != null) return uri.slug == reciter.slug && uri.surah == 1 && uri.ayah == 1
+    val id = parseMediaCacheKey(key) ?: return false
+    return id.third == reciter.id && id.first == 1 && id.second == 1
+}
+
+internal fun needsSharedBasmalah(owned: Set<ChapterRef>, reciterId: Int): Boolean =
+    owned.any { ref ->
+        ref.reciterId == reciterId && ref.surahId != 1 &&
+            surahOpensWithBasmalahPreface(ref.surahId)
+    }
+
+internal fun shouldKeepSharedBasmalahAfterDeleting(
+    owned: Set<ChapterRef>,
+    deleted: ChapterRef,
+): Boolean {
+    val remaining = owned - deleted
+    return ChapterRef(deleted.reciterId, 1) in remaining ||
+        needsSharedBasmalah(remaining, deleted.reciterId)
+}
+
 internal fun reciterDownloads(
     reciters: List<Reciter>,
     surahs: List<Surah>,
     ayahs: Map<EveryayahRef, CachedAyah>,
+    ownedChapters: Set<ChapterRef> = reciters.flatMapTo(LinkedHashSet()) { reciter ->
+        ayahs.keys.mapNotNull { ref ->
+            if (ref.slug != reciter.slug || (ref.surah == 1 && ref.ayah == 1)) null
+            else ChapterRef(reciter.id, ref.surah)
+        }
+    },
 ): List<ReciterDownloads> = reciters.map { reciter ->
     ReciterDownloads(
         reciter = reciter,
@@ -561,9 +623,15 @@ internal fun reciterDownloads(
             ChapterDownload(
                 surah = surah,
                 cached = countCachedAyahs(surah.ayahCount) { ayah ->
+                    if (surah.id == 1 && ayah == 1 &&
+                        ChapterRef(reciter.id, 1) !in ownedChapters
+                    ) return@countCachedAyahs false
                     ayahs[EveryayahRef(reciter.slug, surah.id, ayah)]?.complete == true
                 },
                 bytes = (1..surah.ayahCount).sumOf { ayah ->
+                    if (surah.id == 1 && ayah == 1 &&
+                        ChapterRef(reciter.id, 1) !in ownedChapters
+                    ) return@sumOf 0L
                     ayahs[EveryayahRef(reciter.slug, surah.id, ayah)]?.bytes ?: 0L
                 },
             )
@@ -599,13 +667,15 @@ internal object RecitationDownloads {
         surahs: List<Surah>,
     ): List<ReciterDownloads> {
         val app = context.applicationContext
+        val keys = RecitationCache.keepKeys(app)
         val ayahs = hitsFromCacheKeys(
-            keys = RecitationCache.allKeys(app),
+            keys = keys,
             reciters = reciters,
-            cachedBytes = { key -> RecitationCache.cachedBytes(app, key) },
-            fullyCached = { key -> RecitationCache.isFullyCached(app, key) },
+            cachedBytes = { key -> RecitationCache.keptBytes(app, key) },
+            fullyCached = { key -> RecitationCache.isFullyKept(app, key) },
         )
-        return reciterDownloads(reciters, surahs, ayahs)
+        val owned = RecitationCache.keptChapters(app) + inferredKeptChapters(keys, reciters)
+        return reciterDownloads(reciters, surahs, ayahs, owned)
     }
 
     /** Release only transitions represented by the scan the UI just applied. */
@@ -624,6 +694,17 @@ internal object RecitationDownloads {
 
     fun downloadChapter(context: android.content.Context, reciter: Reciter, surah: Surah) {
         enqueue(context, listOf(DownloadRequest(reciter, surah)))
+    }
+
+    fun resumeChapter(context: android.content.Context, reciter: Reciter, surah: Surah) {
+        val app = context.applicationContext
+        synchronized(lock) {
+            stopped = false
+            val request = DownloadRequest(reciter, surah)
+            if (!queue.resumeChapter(request.ref)) queue.enqueue(listOf(request))
+            publishLocked()
+            startWorkerLocked(app)
+        }
     }
 
     private fun cancel(): CountDownLatch? {
@@ -686,8 +767,18 @@ internal object RecitationDownloads {
             startWorkerLocked(app)
         }
         writerFinished?.await()
-        for (key in cacheKeysForChapter(RecitationCache.allKeys(app), reciter, surah.id)) {
-            RecitationCache.removeKey(app, key)
+        val keys = RecitationCache.keepKeys(app)
+        val owned = RecitationCache.keptChapters(app) + inferredKeptChapters(keys, listOf(reciter))
+        val deleted = ChapterRef(reciter.id, surah.id)
+        val keepSharedBasmalah = shouldKeepSharedBasmalahAfterDeleting(owned, deleted)
+        RecitationCache.unmarkKeptChapter(app, deleted)
+        for (key in cacheKeysForChapter(keys, reciter, surah.id)) {
+            if (keepSharedBasmalah && isSharedBasmalahKey(key, reciter)) continue
+            RecitationCache.removeKeptKey(app, key)
+        }
+        if (!keepSharedBasmalah && surah.id != 1) {
+            keys.filter { isSharedBasmalahKey(it, reciter) }
+                .forEach { RecitationCache.removeKeptKey(app, it) }
         }
     }
 
@@ -701,8 +792,9 @@ internal object RecitationDownloads {
             startWorkerLocked(app)
         }
         writerFinished?.await()
-        for (key in cacheKeysForReciter(RecitationCache.allKeys(app), reciter)) {
-            RecitationCache.removeKey(app, key)
+        RecitationCache.unmarkKeptReciter(app, reciter.id)
+        for (key in cacheKeysForReciter(RecitationCache.keepKeys(app), reciter)) {
+            RecitationCache.removeKeptKey(app, key)
         }
     }
 
@@ -738,6 +830,7 @@ internal object RecitationDownloads {
                         coroutineContext.ensureActive()
                         if (synchronized(lock) { queue.cancellingActive }) break
                         if (isUriFullyCached(keep, uri)) {
+                            RecitationCache.markKeptChapter(app, req.ref)
                             RecitationCache.dropListenIfKept(app, uri)
                             if (ayah > 0) synchronized(lock) {
                                 publishLocked(++completedAyahs, req.surah.ayahCount)
@@ -763,15 +856,26 @@ internal object RecitationDownloads {
                         if (!shouldCache) break
                         try {
                             cacheWriter.cache()
-                            RecitationCache.dropListenIfKept(app, uri)
-                            if (ayah > 0 && isUriFullyCached(keep, uri)) {
-                                synchronized(lock) {
-                                    publishLocked(++completedAyahs, req.surah.ayahCount)
+                            if (isUriFullyCached(keep, uri)) {
+                                RecitationCache.markKeptChapter(app, req.ref)
+                                RecitationCache.dropListenIfKept(app, uri)
+                                if (ayah > 0) {
+                                    synchronized(lock) {
+                                        publishLocked(++completedAyahs, req.surah.ayahCount)
+                                    }
                                 }
+                            } else if (RecitationCache.keptBytes(app, uri) > 0L) {
+                                RecitationCache.markKeptChapter(app, req.ref)
                             }
                         } catch (_: IOException) {
                             // Best-effort; the player can fetch on demand.
+                            if (RecitationCache.keptBytes(app, uri) > 0L) {
+                                RecitationCache.markKeptChapter(app, req.ref)
+                            }
                         } catch (_: InterruptedException) {
+                            if (RecitationCache.keptBytes(app, uri) > 0L) {
+                                RecitationCache.markKeptChapter(app, req.ref)
+                            }
                             return
                         } finally {
                             synchronized(lock) {

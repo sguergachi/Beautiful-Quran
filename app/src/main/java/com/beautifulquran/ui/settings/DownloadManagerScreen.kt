@@ -81,6 +81,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
 private sealed class Pending {
@@ -124,15 +126,22 @@ internal fun DownloadManagerPage(
     var expandedReciterIds by remember { mutableStateOf<Set<Int>>(emptySet()) }
     var pending by remember { mutableStateOf<Pending?>(null) }
     var deleting by remember { mutableStateOf<Pending?>(null) }
+    val refreshLock = remember { Mutex() }
 
     suspend fun refresh() {
-        val snap = withContext(Dispatchers.IO) {
-            RecitationDownloads.scan(context, reciters, surahs) to
-                RecitationCache.indexedUsage(context)
+        refreshLock.withLock {
+            val reconciliations = RecitationDownloads.progress.value.reconciling
+            val snap = withContext(Dispatchers.IO) {
+                RecitationDownloads.scan(context, reciters, surahs) to
+                    RecitationCache.indexedUsage(context)
+            }
+            reciterRows = snap.first
+            usage = snap.second
+            catalogLoaded = true
+            if (reconciliations.isNotEmpty()) {
+                RecitationDownloads.acknowledgeReconciled(reconciliations)
+            }
         }
-        reciterRows = snap.first
-        usage = snap.second
-        catalogLoaded = true
     }
 
     fun delete(target: Pending, remove: () -> Unit) {
@@ -162,14 +171,10 @@ internal fun DownloadManagerPage(
         }
     }
     LaunchedEffect(progress.running, progress.pausedChapters) {
-        if (!progress.running && progress.reconciling.isEmpty()) refresh()
+        if (catalogLoaded && !progress.running && progress.reconciling.isEmpty()) refresh()
     }
     LaunchedEffect(progress.reconciling) {
-        val snapshot = progress.reconciling
-        if (snapshot.isNotEmpty()) {
-            refresh()
-            RecitationDownloads.acknowledgeReconciled(snapshot)
-        }
+        if (progress.reconciling.isNotEmpty()) refresh()
     }
 
     Box(
@@ -424,7 +429,7 @@ internal fun DownloadManagerPage(
                                             reciterRow.reciter,
                                             row.surah,
                                         )
-                                        "Resume" -> RecitationDownloads.downloadChapter(
+                                        "Resume" -> RecitationDownloads.resumeChapter(
                                             context,
                                             reciterRow.reciter,
                                             row.surah,

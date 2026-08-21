@@ -240,7 +240,7 @@ class RecitationDownloadsTest {
             pauseChapter(second.ref)
         }
 
-        queue.enqueue(listOf(first))
+        assertTrue(queue.resumeChapter(first.ref))
         assertEquals(listOf(first), queue.waitingRequests)
         assertEquals(listOf(second), queue.pausedDownloads.map { it.request })
     }
@@ -255,14 +255,14 @@ class RecitationDownloadsTest {
             pauseChapter(first.ref, DownloadClock(3, 7))
         }
 
-        queue.enqueue(listOf(first))
+        assertTrue(queue.resumeChapter(first.ref))
         assertTrue(queue.cancellingActive)
-        assertEquals(listOf(second, first), queue.waitingRequests)
+        assertEquals(listOf(first, second), queue.waitingRequests)
         assertTrue(queue.pausedDownloads.isEmpty())
         queue.finish(first)
-        assertEquals(second, queue.takeNext())
-        queue.finish(second)
         assertEquals(first, queue.takeNext())
+        queue.finish(first)
+        assertEquals(second, queue.takeNext())
     }
 
     @Test
@@ -735,6 +735,67 @@ class RecitationDownloadsTest {
         assertEquals(fatiha.ayahCount, chapterAudioRequests(alafasy, fatiha).size)
         val tawbah = Surah(9, "التوبة", "At-Tawbah", "Repentance", "Madinah", 129)
         assertEquals(tawbah.ayahCount, chapterAudioRequests(alafasy, tawbah).size)
+    }
+
+    @Test
+    fun sharedBasmalahDoesNotPretendFatihaWasDownloaded() {
+        val basmalah = EveryayahRef(alafasy.slug, 1, 1)
+        val rows = reciterDownloads(
+            reciters = listOf(alafasy),
+            surahs = listOf(fatiha, ikhlas),
+            ayahs = mapOf(basmalah to CachedAyah(bytes = 1_024L, complete = true)),
+            ownedChapters = setOf(ChapterRef(alafasy.id, ikhlas.id)),
+        )
+
+        assertTrue(rows.single().chapters[0].empty)
+        assertEquals(0L, rows.single().chapters[0].bytes)
+    }
+
+    @Test
+    fun explicitFatihaOwnershipClaimsItsFirstAyah() {
+        val basmalah = EveryayahRef(alafasy.slug, 1, 1)
+        val chapter = reciterDownloads(
+            reciters = listOf(alafasy),
+            surahs = listOf(fatiha),
+            ayahs = mapOf(basmalah to CachedAyah(bytes = 1_024L, complete = true)),
+            ownedChapters = setOf(ChapterRef(alafasy.id, fatiha.id)),
+        ).single().chapters.single()
+
+        assertEquals(1, chapter.cached)
+        assertEquals(1_024L, chapter.bytes)
+    }
+
+    @Test
+    fun keptOwnershipAndSharedBasmalahPolicyAreUnambiguous() {
+        val basmalahKey = alafasy.basmalahAudioUrl()
+        val ikhlasKey = alafasy.audioUrl(ikhlas.id, 1)
+        val inferred = inferredKeptChapters(
+            keys = listOf(basmalahKey, ikhlasKey),
+            reciters = listOf(alafasy),
+        )
+
+        assertEquals(setOf(ChapterRef(alafasy.id, ikhlas.id)), inferred)
+        assertTrue(isSharedBasmalahKey(basmalahKey, alafasy))
+        assertTrue(needsSharedBasmalah(inferred, alafasy.id))
+        assertFalse(needsSharedBasmalah(setOf(ChapterRef(alafasy.id, 9)), alafasy.id))
+        assertTrue(
+            shouldKeepSharedBasmalahAfterDeleting(
+                inferred + ChapterRef(alafasy.id, fatiha.id),
+                ChapterRef(alafasy.id, fatiha.id),
+            ),
+        )
+        assertTrue(
+            shouldKeepSharedBasmalahAfterDeleting(
+                inferred + ChapterRef(alafasy.id, fatiha.id),
+                ChapterRef(alafasy.id, ikhlas.id),
+            ),
+        )
+        assertFalse(
+            shouldKeepSharedBasmalahAfterDeleting(
+                inferred,
+                ChapterRef(alafasy.id, ikhlas.id),
+            ),
+        )
     }
 
     @Test

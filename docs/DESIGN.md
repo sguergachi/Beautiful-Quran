@@ -1157,9 +1157,13 @@ Chapters ribbon is navigation only and never retracts when tapped.
 
 ## Reading modes
 
-Settings → **Customize** is a sub-page on the Settings sheet (same paper, back
-chevron). Theme lives here with view, layout, numeral scripts, verse
-annotations, the ayah-selector side, and word-by-word English under Arabic.
+Settings, **Customize**, and **Download manager** are horizontally swipeable
+sibling pages on the same paper. Their rows animate to the requested page, and
+the back chevron or a rightward swipe returns to main Settings. Main Settings
+does not repeat section labels above those two navigation rows. Text size,
+transliteration, and ayah translation live in Customize with theme, view,
+layout, numeral scripts, verse annotations, the ayah-selector side, and
+word-by-word English under Arabic.
 A live miniature at the top is a faded leaf with a gold hairline — Hafs,
 Garamond, gold verse marks, and the folio — so each choice shows what the
 sheet will look like. The leaf stays pinned at the top while the choices

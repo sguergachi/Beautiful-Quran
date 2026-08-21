@@ -29,6 +29,8 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -49,10 +51,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -79,8 +83,6 @@ import com.beautifulquran.BuildConfig
 import com.beautifulquran.R
 import com.beautifulquran.data.BrushCircleStyle
 import com.beautifulquran.data.HomeBookmarkStyle
-import com.beautifulquran.data.ReadingLayout
-import com.beautifulquran.data.ReadingMode
 import com.beautifulquran.data.Settings
 import com.beautifulquran.data.ThemeMode
 import com.beautifulquran.playback.RecitationCache
@@ -128,6 +130,8 @@ private const val FONT_SCALE_MAX = 1.6f
 private const val FONT_SCALE_STOPS = 8 // intervals; nine tappable stops
 private val FONT_SCALE_STEP = (FONT_SCALE_MAX - FONT_SCALE_MIN) / FONT_SCALE_STOPS
 
+private enum class SettingsDetail { CUSTOMIZE, DOWNLOADS }
+
 /**
  * Snap [scale] to the nearest stop, then move [deltaStops] (±1 for the A glyphs).
  * Clamped to [FONT_SCALE_MIN]…[FONT_SCALE_MAX].
@@ -155,15 +159,25 @@ fun SettingsScreen(
     val reciters by viewModel.reciters.collectAsStateWithLifecycle()
     val surahs by viewModel.surahs.collectAsStateWithLifecycle()
     val context = LocalContext.current
-    var managerOpen by remember { mutableStateOf(false) }
+    var detail by rememberSaveable { mutableStateOf(SettingsDetail.CUSTOMIZE) }
+    val pager = rememberPagerState { 2 }
+    val scope = rememberCoroutineScope()
     var usage by remember { mutableStateOf<RecitationUsage?>(null) }
-    LaunchedEffect(managerOpen) {
-        if (!managerOpen) usage = withContext(Dispatchers.IO) {
+    LaunchedEffect(pager.settledPage) {
+        if (pager.settledPage == 0) usage = withContext(Dispatchers.IO) {
             RecitationCache.usage(context)
         }
     }
 
-    var customizeOpen by rememberSaveable { mutableStateOf(false) }
+    fun openDetail(next: SettingsDetail) {
+        detail = next
+        scope.launch { pager.animateScrollToPage(1) }
+    }
+
+    fun closeDetail() {
+        scope.launch { pager.animateScrollToPage(0) }
+    }
+
     var developerTapCount by remember { mutableStateOf(0) }
     // Session-only live knobs for the brush lab (not persisted).
     // SHIPPED_BRUSH_REVISION forces reseed when the baseline design is updated.
@@ -206,7 +220,7 @@ fun SettingsScreen(
         checkPaintToken++
     }
 
-    BackHandler(enabled = customizeOpen) { customizeOpen = false }
+    BackHandler(enabled = pager.currentPage == 1) { closeDetail() }
 
     if (developerTapCount > 0) {
         LaunchedEffect(developerTapCount) {
@@ -221,240 +235,218 @@ fun SettingsScreen(
         }
     }
 
-    if (managerOpen) {
-        DownloadManagerPage(
-            reciters = reciters,
-            surahs = surahs,
-            onBack = {
-                usage = null
-                managerOpen = false
-            },
-        )
-        return
-    }
-
-    Box(
-        Modifier
+    HorizontalPager(
+        state = pager,
+        modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background),
-    ) {
-        if (customizeOpen) {
-            CustomizeScreen(
-                settings = settings,
-                brushParams = brushParams,
-                paintToken = paintToken,
-                checkParams = checkParams,
-                checkPaintToken = checkPaintToken,
-                onBack = { customizeOpen = false },
-                onUpdate = { transform -> viewModel.settings.update(transform) },
-            )
-            return@Box
-        }
-        Column(
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .fillMaxHeight()
-                .widthIn(max = 640.dp)
-                .fillMaxWidth()
-                .windowInsetsPadding(WindowInsets.systemBars)
-                .verticalFadingEdges(color = MaterialTheme.colorScheme.background, top = 20.dp, bottom = 40.dp)
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 28.dp),
-        ) {
-            // Match the top dissolve so the chevron/title sit clear at rest.
-            Spacer(Modifier.height(20.dp))
-            BackChevron(onBack)
-            Spacer(Modifier.height(6.dp))
-            Text(
-                text = "Settings",
-                style = MaterialTheme.typography.headlineMedium,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
-
-            Spacer(Modifier.height(36.dp))
-
-            SectionLabel("Reciter")
-            Spacer(Modifier.height(4.dp))
-            reciters.forEach { reciter ->
-                SelectRow(
-                    label = reciter.name,
-                    note = if (!reciter.hasTimings) "No word highlighting" else null,
-                    selected = reciter.id == settings.reciterId,
-                    onClick = { viewModel.selectReciter(reciter) },
-                )
-            }
-
-            Section("Download manager")
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .quietClickable { managerOpen = true }
-                    .padding(vertical = 8.dp),
-            ) {
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        text = "Download manager",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
-                    Text(
-                        text = usage?.let(::formatUsage) ?: "…",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
-                    )
-                }
-                DisclosureChevron(expanded = false)
-            }
-
-            Section("Reading")
-            NavigateRow(
-                label = "Customize",
-                note = customizeSummary(settings),
-                onClick = { customizeOpen = true },
-            )
-
-            Section("Text size")
-            TextSizeControl(
-                scale = settings.fontScale,
-                onScale = { v -> viewModel.settings.update { it.copy(fontScale = v) } },
-            )
-
-            if (
-                settings.readingLayout == ReadingLayout.SCROLL &&
-                settings.readingMode == ReadingMode.ARABIC_ENGLISH
-            ) {
-                Spacer(Modifier.height(20.dp))
-                ToggleRow(
-                    label = "Transliteration",
-                    checked = settings.showTransliteration,
-                    onChange = { v -> viewModel.settings.update { it.copy(showTransliteration = v) } },
-                    checkParams = checkParams,
-                    checkPaintToken = checkPaintToken,
-                )
-                ToggleRow(
-                    label = "Ayah translation",
-                    checked = settings.showTranslation,
-                    onChange = { v -> viewModel.settings.update { it.copy(showTranslation = v) } },
-                    checkParams = checkParams,
-                    checkPaintToken = checkPaintToken,
-                )
-            }
-
-            if (settings.developerModeEnabled) {
-                Spacer(Modifier.height(44.dp))
-                DeveloperSection(
-                    viewModel = viewModel,
+    ) { page ->
+        if (page == 1) {
+            when (detail) {
+                SettingsDetail.CUSTOMIZE -> CustomizeScreen(
                     settings = settings,
                     brushParams = brushParams,
-                    onBrushParams = { brushParams = it; paintToken++ },
+                    paintToken = paintToken,
                     checkParams = checkParams,
                     checkPaintToken = checkPaintToken,
-                    onCheckParams = { checkParams = it; checkPaintToken++ },
-                    onReplayPaint = { paintToken++ },
-                    onReplayCheckPaint = { checkPaintToken++ },
-                    copyNote = copyNote,
-                    onCopyValues = {
-                        val text = formatBrushParamsCopy(brushParams)
-                        val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                        cm.setPrimaryClip(ClipData.newPlainText("brush circle params", text))
-                        Log.d("BrushLab", text)
-                        copyNote = "Copied TS + Kotlin params"
+                    onBack = ::closeDetail,
+                    onUpdate = { transform -> viewModel.settings.update(transform) },
+                )
+                SettingsDetail.DOWNLOADS -> DownloadManagerPage(
+                    reciters = reciters,
+                    surahs = surahs,
+                    onBack = {
+                        usage = null
+                        closeDetail()
                     },
-                    onPasteValues = { raw ->
-                        val parsed = parseBrushParamsFromText(raw, brushParams)
-                        if (parsed == null) {
-                            copyNote = "No brush knobs found in paste"
-                        } else {
-                            brushParams = parsed
-                            paintToken++
-                            copyNote = "Applied pasted params"
-                        }
-                    },
-                    onPasteFromClipboard = {
-                        val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                        val raw = cm.primaryClip
-                            ?.takeIf { it.itemCount > 0 }
-                            ?.getItemAt(0)
-                            ?.coerceToText(context)
-                            ?.toString()
-                            .orEmpty()
-                        val parsed = parseBrushParamsFromText(raw, brushParams)
-                        if (parsed == null) {
-                            copyNote = "No brush knobs found in clipboard"
-                        } else {
-                            brushParams = parsed
-                            paintToken++
-                            copyNote = "Applied pasted params"
-                        }
-                    },
-                    onCopyCheckValues = {
-                        val text = formatBrushCheckCopy(checkParams)
-                        val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                        cm.setPrimaryClip(ClipData.newPlainText("brush check params", text))
-                        Log.d("BrushLab", text)
-                        copyNote = "Copied check params"
-                    },
-                    onPasteCheckValues = { raw ->
-                        val parsed = parseBrushCheckFromText(raw, checkParams)
-                        if (parsed == null) {
-                            copyNote = "No check knobs found in paste"
-                        } else {
-                            checkParams = parsed
-                            checkPaintToken++
-                            copyNote = "Applied check params"
-                        }
-                    },
-                    onPasteCheckFromClipboard = {
-                        val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                        val raw = cm.primaryClip
-                            ?.takeIf { it.itemCount > 0 }
-                            ?.getItemAt(0)
-                            ?.coerceToText(context)
-                            ?.toString()
-                            .orEmpty()
-                        val parsed = parseBrushCheckFromText(raw, checkParams)
-                        if (parsed == null) {
-                            copyNote = "No check knobs found in clipboard"
-                        } else {
-                            checkParams = parsed
-                            checkPaintToken++
-                            copyNote = "Applied check params"
-                        }
-                    },
-                    onOpenTimingsLab = onOpenTimingsLab,
-                    onOpenTarjiLab = onOpenTarjiLab,
-                    onOpenOrnamentsLab = onOpenOrnamentsLab,
-                    onRecordSystemTrace = onRecordSystemTrace,
                 )
             }
+            return@HorizontalPager
+        }
+        Box(Modifier.fillMaxSize()) {
+            Column(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .fillMaxHeight()
+                    .widthIn(max = 640.dp)
+                    .fillMaxWidth()
+                    .windowInsetsPadding(WindowInsets.systemBars)
+                    .verticalFadingEdges(
+                        color = MaterialTheme.colorScheme.background,
+                        top = 20.dp,
+                        bottom = 40.dp,
+                    )
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 28.dp),
+            ) {
+                // Match the top dissolve so the chevron/title sit clear at rest.
+                Spacer(Modifier.height(20.dp))
+                BackChevron(onBack)
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    text = "Settings",
+                    style = MaterialTheme.typography.headlineMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
 
-            Spacer(Modifier.height(56.dp))
-            Colophon(
-                developerModeEnabled = settings.developerModeEnabled,
-                onLogoClick = {
-                    developerTapCount++
-                    if (developerTapCount >= 3) {
-                        viewModel.settings.update {
-                            it.copy(developerModeEnabled = !it.developerModeEnabled)
-                        }
-                        developerTapCount = 0
+                Spacer(Modifier.height(36.dp))
+
+                SectionLabel("Reciter")
+                Spacer(Modifier.height(4.dp))
+                reciters.forEach { reciter ->
+                    SelectRow(
+                        label = reciter.name,
+                        note = if (!reciter.hasTimings) "No word highlighting" else null,
+                        selected = reciter.id == settings.reciterId,
+                        onClick = { viewModel.selectReciter(reciter) },
+                    )
+                }
+
+                Spacer(Modifier.height(28.dp))
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .quietClickable { openDetail(SettingsDetail.DOWNLOADS) }
+                        .padding(vertical = 8.dp),
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            text = "Download manager",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                        Text(
+                            text = usage?.let(::formatUsage) ?: "…",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
+                        )
                     }
-                },
-                onLogoLongClick = {
-                    if (settings.developerModeEnabled) onOpenTimingsLab()
-                },
-            )
+                    DisclosureChevron(expanded = false)
+                }
 
-            Spacer(Modifier.height(18.dp))
-            Text(
-                text = ATTRIBUTIONS,
-                style = MaterialTheme.typography.bodyMedium,
-                textAlign = TextAlign.Center,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
-                modifier = Modifier.fillMaxWidth(),
-            )
-            Spacer(Modifier.height(48.dp))
+                Spacer(Modifier.height(20.dp))
+                NavigateRow(
+                    label = "Customize",
+                    note = customizeSummary(settings),
+                    onClick = { openDetail(SettingsDetail.CUSTOMIZE) },
+                )
+
+                if (settings.developerModeEnabled) {
+                    Spacer(Modifier.height(44.dp))
+                    DeveloperSection(
+                        viewModel = viewModel,
+                        settings = settings,
+                        brushParams = brushParams,
+                        onBrushParams = { brushParams = it; paintToken++ },
+                        checkParams = checkParams,
+                        checkPaintToken = checkPaintToken,
+                        onCheckParams = { checkParams = it; checkPaintToken++ },
+                        onReplayPaint = { paintToken++ },
+                        onReplayCheckPaint = { checkPaintToken++ },
+                        copyNote = copyNote,
+                        onCopyValues = {
+                            val text = formatBrushParamsCopy(brushParams)
+                            val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                            cm.setPrimaryClip(ClipData.newPlainText("brush circle params", text))
+                            Log.d("BrushLab", text)
+                            copyNote = "Copied TS + Kotlin params"
+                        },
+                        onPasteValues = { raw ->
+                            val parsed = parseBrushParamsFromText(raw, brushParams)
+                            if (parsed == null) {
+                                copyNote = "No brush knobs found in paste"
+                            } else {
+                                brushParams = parsed
+                                paintToken++
+                                copyNote = "Applied pasted params"
+                            }
+                        },
+                        onPasteFromClipboard = {
+                            val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                            val raw = cm.primaryClip
+                                ?.takeIf { it.itemCount > 0 }
+                                ?.getItemAt(0)
+                                ?.coerceToText(context)
+                                ?.toString()
+                                .orEmpty()
+                            val parsed = parseBrushParamsFromText(raw, brushParams)
+                            if (parsed == null) {
+                                copyNote = "No brush knobs found in clipboard"
+                            } else {
+                                brushParams = parsed
+                                paintToken++
+                                copyNote = "Applied pasted params"
+                            }
+                        },
+                        onCopyCheckValues = {
+                            val text = formatBrushCheckCopy(checkParams)
+                            val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                            cm.setPrimaryClip(ClipData.newPlainText("brush check params", text))
+                            Log.d("BrushLab", text)
+                            copyNote = "Copied check params"
+                        },
+                        onPasteCheckValues = { raw ->
+                            val parsed = parseBrushCheckFromText(raw, checkParams)
+                            if (parsed == null) {
+                                copyNote = "No check knobs found in paste"
+                            } else {
+                                checkParams = parsed
+                                checkPaintToken++
+                                copyNote = "Applied check params"
+                            }
+                        },
+                        onPasteCheckFromClipboard = {
+                            val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                            val raw = cm.primaryClip
+                                ?.takeIf { it.itemCount > 0 }
+                                ?.getItemAt(0)
+                                ?.coerceToText(context)
+                                ?.toString()
+                                .orEmpty()
+                            val parsed = parseBrushCheckFromText(raw, checkParams)
+                            if (parsed == null) {
+                                copyNote = "No check knobs found in clipboard"
+                            } else {
+                                checkParams = parsed
+                                checkPaintToken++
+                                copyNote = "Applied check params"
+                            }
+                        },
+                        onOpenTimingsLab = onOpenTimingsLab,
+                        onOpenTarjiLab = onOpenTarjiLab,
+                        onOpenOrnamentsLab = onOpenOrnamentsLab,
+                        onRecordSystemTrace = onRecordSystemTrace,
+                    )
+                }
+
+                Spacer(Modifier.height(56.dp))
+                Colophon(
+                    developerModeEnabled = settings.developerModeEnabled,
+                    onLogoClick = {
+                        developerTapCount++
+                        if (developerTapCount >= 3) {
+                            viewModel.settings.update {
+                                it.copy(developerModeEnabled = !it.developerModeEnabled)
+                            }
+                            developerTapCount = 0
+                        }
+                    },
+                    onLogoLongClick = {
+                        if (settings.developerModeEnabled) onOpenTimingsLab()
+                    },
+                )
+
+                Spacer(Modifier.height(18.dp))
+                Text(
+                    text = ATTRIBUTIONS,
+                    style = MaterialTheme.typography.bodyMedium,
+                    textAlign = TextAlign.Center,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(Modifier.height(48.dp))
+            }
         }
     }
 }
@@ -1432,7 +1424,7 @@ private fun parseBrushParamsFromText(text: String, base: BrushCircleParams): Bru
  * small/large "A" to nudge one stop. The letters show the effect the setting
  * has. */
 @Composable
-private fun TextSizeControl(scale: Float, onScale: (Float) -> Unit) {
+internal fun TextSizeControl(scale: Float, onScale: (Float) -> Unit) {
     var widthPx by remember { mutableStateOf(1) }
     val fraction = ((scale - FONT_SCALE_MIN) / (FONT_SCALE_MAX - FONT_SCALE_MIN)).coerceIn(0f, 1f)
     val animFraction by animateFloatAsState(fraction, label = "sizeDot")
