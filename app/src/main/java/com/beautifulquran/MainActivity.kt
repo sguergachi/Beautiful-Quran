@@ -299,7 +299,7 @@ private fun PaperStackApp(
     var selectedStartPlayback by rememberSaveable { mutableStateOf(false) }
     /** 1-based word position from a home word-search hit; 0 means no flash. */
     var selectedStartWord by rememberSaveable { mutableIntStateOf(0) }
-    var settingsDetail by rememberSaveable { mutableStateOf<com.beautifulquran.ui.settings.SettingsDetail?>(null) }
+    var settingsDetail by remember { mutableStateOf<com.beautifulquran.ui.settings.SettingsDetail?>(null) }
     /**
      * Remount key for the reader. Bumped on home/bookmarks/concordance/voice
      * opens so scroll state resets; **not** bumped on next-chapter advance so
@@ -356,11 +356,7 @@ private fun PaperStackApp(
     }
     val scope = rememberCoroutineScope()
     val settingsLayer = if (selectedSurahId == 0) AYAH_LAYER else SETTINGS_LAYER
-    val detailLayer = when (settingsDetail) {
-        com.beautifulquran.ui.settings.SettingsDetail.CUSTOMIZE -> CUSTOMIZE_LAYER
-        com.beautifulquran.ui.settings.SettingsDetail.DOWNLOADS -> DOWNLOADS_LAYER
-        null -> settingsLayer
-    }
+    val detailLayer = if (settingsDetail != null) settingsLayer + 1 else settingsLayer
     val effectiveMaxLayer = maxOf(settingsLayer, detailLayer)
     val overlayBlocking = labVisible || rootVisible || chooserVisible || ornamentsLabVisible ||
         tarjiLabVisible ||
@@ -389,6 +385,7 @@ private fun PaperStackApp(
     }
 
     suspend fun settleTo(layer: Int) {
+        android.util.Log.d("PaperStack", "settleTo req $layer effectiveMax $effectiveMaxLayer current ${stackPosition.value} detail $settingsDetail")
         val minimumLayer = if (bookmarkCount > 0) BOOKMARKS_LAYER else COVER_LAYER
         val boundedLayer = layer.coerceIn(minimumLayer, effectiveMaxLayer)
         val distance = abs(boundedLayer - stackPosition.value)
@@ -646,7 +643,7 @@ private fun PaperStackApp(
     }
     BackHandler(enabled = settingsDetail != null) {
         settingsDetail = null
-        animateTo(if (selectedSurahId == 0) COVER_LAYER else SETTINGS_LAYER)
+        animateTo(settingsLayer)
     }
     LaunchedEffect(settledLayer, settingsLayer) {
         if (settledLayer <= settingsLayer) {
@@ -754,12 +751,14 @@ private fun PaperStackApp(
                     animateTo(if (selectedSurahId == 0) COVER_LAYER else AYAH_LAYER)
                 },
                 onOpenCustomize = {
+                    android.util.Log.d("PaperStack", "openCustomize detail=$settingsDetail layer=${settingsLayer+1}")
                     settingsDetail = SettingsDetail.CUSTOMIZE
-                    animateTo(CUSTOMIZE_LAYER)
+                    animateTo(settingsLayer + 1)
                 },
                 onOpenDownloads = {
+                    android.util.Log.d("PaperStack", "openDownloads detail=$settingsDetail layer=${settingsLayer+1}")
                     settingsDetail = SettingsDetail.DOWNLOADS
-                    animateTo(DOWNLOADS_LAYER)
+                    animateTo(settingsLayer + 1)
                 },
                 onOpenTimingsLab = { openTimingsLab() },
                 onOpenTarjiLab = { openTarjiLab() },
@@ -768,34 +767,31 @@ private fun PaperStackApp(
             )
         }
 
-        PaperPage(
-            layer = PaperLayer.Customize,
-            stackPosition = stackPositionProvider,
-            settingsLayer = settingsLayer,
-            modifier = Modifier.zIndex(0.5f),
-        ) {
-            CustomizeSheet(
-                viewModel = settingsViewModel,
-                onBack = {
-                    settingsDetail = null
-                    animateTo(SETTINGS_LAYER)
-                },
-            )
-        }
-
-        PaperPage(
-            layer = PaperLayer.Downloads,
-            stackPosition = stackPositionProvider,
-            settingsLayer = settingsLayer,
-            modifier = Modifier.zIndex(0.6f),
-        ) {
-            DownloadsSheet(
-                viewModel = settingsViewModel,
-                onBack = {
-                    settingsDetail = null
-                    animateTo(SETTINGS_LAYER)
-                },
-            )
+        if (settingsDetail != null) {
+            PaperPage(
+                layer = PaperLayer.Customize,
+                stackPosition = stackPositionProvider,
+                settingsLayer = settingsLayer,
+                modifier = Modifier.zIndex(0.5f),
+            ) {
+                when (settingsDetail) {
+                    SettingsDetail.CUSTOMIZE -> CustomizeSheet(
+                        viewModel = settingsViewModel,
+                        onBack = {
+                            settingsDetail = null
+                            animateTo(settingsLayer)
+                        },
+                    )
+                    SettingsDetail.DOWNLOADS -> DownloadsSheet(
+                        viewModel = settingsViewModel,
+                        onBack = {
+                            settingsDetail = null
+                            animateTo(settingsLayer)
+                        },
+                    )
+                    null -> {}
+                }
+            }
         }
 
         if (selectedSurahId != 0) {

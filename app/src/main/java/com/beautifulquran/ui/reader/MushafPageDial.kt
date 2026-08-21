@@ -550,14 +550,14 @@ private val MushafDialChapterTick = 5.dp
 private val MushafDialPageTick = 7.dp
 /** The grab strip: a generous target hung around the rule, so taking hold of
  *  the book is never a precise-finger job. */
-internal val MushafDialTouch = 56.dp
+internal val MushafDialTouch = 48.dp
 /**
  * How far that strip reaches up into the leaf's tail. Nearly all of the growth
  * goes upward: below the rule lies the transport after a hand's-width of air,
  * so its presses must stay clear, while the tail gutter and the folio band
- * above are paper nothing else wants to touch.
+ * above are paper nothing else touches — paper nothing else wants to touch.
  */
-private val MushafDialTouchLift = 30.dp
+private val MushafDialTouchLift = 20.dp
 /** Paper between the top of the comb and the foot of the label. */
 private val MushafDialHudAir = 2.dp
 /**
