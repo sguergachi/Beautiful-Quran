@@ -441,7 +441,11 @@ internal fun DownloadManagerPage(
                                 },
                             )
                             ChapterHairline(
-                                progress = chapterProgressFraction(downloading, chapterPercent),
+                                progress = chapterProgressFraction(
+                                    downloading = downloading,
+                                    percent = chapterPercent,
+                                    complete = row.complete,
+                                ),
                             )
                         }
                     }
@@ -710,7 +714,7 @@ private fun ChapterRow(
             Text(
                 text = facts,
                 style = MaterialTheme.typography.labelSmall,
-                color = if (downloading) {
+                color = if (downloading || row.complete) {
                     progressInk
                 } else {
                     MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f)

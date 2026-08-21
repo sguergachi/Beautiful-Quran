@@ -306,7 +306,8 @@ control on the name. Download all, Pause, Resume, and Delete sit
 gold hairlines below chapters. While a chapter downloads, its hairline becomes
 a dark page-ink progress fill based only on ayahs already complete in permanent
 storage; the whole completed/total verses and percentage line uses that exact
-same dark ink as one active progress state.
+same dark ink as one active progress state. Completed chapters keep the full
+divider and their downloaded facts in that dark ink, so completion remains active.
 A chapter row is bodyLarge name, labelSmall verses · size · status, with
 trailing verbs in a reserved 128 dp slot (Download, Pause, Resume,
 Delete). A paused chapter shows Delete then Resume in that slot, Resume

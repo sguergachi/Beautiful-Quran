@@ -256,8 +256,15 @@ internal fun downloadPercent(ayah: Int, ayahCount: Int): Int? {
     return ((100 * ayah) / ayahCount).coerceIn(1, 100)
 }
 
-internal fun chapterProgressFraction(downloading: Boolean, percent: Int?): Float? =
-    if (downloading) (percent ?: 0).coerceIn(0, 100) / 100f else null
+internal fun chapterProgressFraction(
+    downloading: Boolean,
+    percent: Int?,
+    complete: Boolean,
+): Float? = when {
+    complete -> 1f
+    downloading -> (percent ?: 0).coerceIn(0, 100) / 100f
+    else -> null
+}
 
 /**
  * Queue updates must not wipe the in-flight ayah clock. Passing both [ayah]
