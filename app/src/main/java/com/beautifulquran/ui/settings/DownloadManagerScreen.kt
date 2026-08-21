@@ -52,9 +52,9 @@ import com.beautifulquran.playback.RecitationUsage
 import com.beautifulquran.playback.ReciterDownloads
 import com.beautifulquran.playback.chapterActionIsFetch
 import com.beautifulquran.playback.chapterActionLabel
-import com.beautifulquran.playback.chapterDownloadCountLabel
 import com.beautifulquran.playback.chapterFactLine
 import com.beautifulquran.playback.chapterOffersDelete
+import com.beautifulquran.playback.chapterProgressFactLine
 import com.beautifulquran.playback.chapterProgressFraction
 import com.beautifulquran.playback.chapterTrailingLabels
 import com.beautifulquran.playback.downloadPercent
@@ -386,11 +386,21 @@ internal fun DownloadManagerPage(
                         val chapterReconciling = isChapterActionSettling(
                             progress, reciterId, row.surah.id,
                         ) || deleting.affectsChapter(reciterId, row.surah.id)
+                        val pausedClock = progress.pausedClocks[
+                            ChapterRef(reciterId, row.surah.id)
+                        ]?.takeIf { it.ayahCount > 0 }
+                        val pausedAyahs = pausedClock?.ayah ?: row.cached
                         val chapterPercent = when {
                             downloading -> downloadPercent(progress.ayah, progress.ayahCount)
-                            chapterPaused -> progress.pausedClocks[
-                                ChapterRef(reciterId, row.surah.id)
-                            ]?.let { downloadPercent(it.ayah, it.ayahCount) }
+                            chapterPaused -> downloadPercent(
+                                pausedAyahs,
+                                pausedClock?.ayahCount ?: row.ayahCount,
+                            )
+                            else -> null
+                        }
+                        val completedAyahs = when {
+                            downloading -> progress.ayah
+                            chapterPaused -> pausedAyahs
                             else -> null
                         }
                         Column {
@@ -402,7 +412,7 @@ internal fun DownloadManagerPage(
                                 downloading = downloading,
                                 waiting = waiting,
                                 paused = chapterPaused,
-                                completedAyahs = progress.ayah.takeIf { downloading },
+                                completedAyahs = completedAyahs,
                                 percent = chapterPercent,
                                 confirming = confirming,
                                 reconciling = chapterReconciling,
@@ -443,6 +453,7 @@ internal fun DownloadManagerPage(
                             ChapterHairline(
                                 progress = chapterProgressFraction(
                                     downloading = downloading,
+                                    paused = chapterPaused,
                                     percent = chapterPercent,
                                     complete = row.complete,
                                 ),
@@ -683,11 +694,12 @@ private fun ChapterRow(
     onDelete: () -> Unit,
 ) {
     val progressInk = MaterialTheme.colorScheme.onSurface.copy(alpha = ProgressInkAlpha)
-    val facts = if (downloading) {
-        buildString {
-            append(chapterDownloadCountLabel(completedAyahs ?: 0, row.ayahCount))
-            if (percent != null) append(" · $percent%")
-        }
+    val facts = if (downloading || paused) {
+        chapterProgressFactLine(
+            completed = completedAyahs ?: 0,
+            total = row.ayahCount,
+            percent = percent.takeIf { downloading },
+        )
     } else {
         chapterFactLine(row, downloading, waiting, paused)
     }
@@ -714,7 +726,7 @@ private fun ChapterRow(
             Text(
                 text = facts,
                 style = MaterialTheme.typography.labelSmall,
-                color = if (downloading || row.complete) {
+                color = if (downloading || paused || row.complete) {
                     progressInk
                 } else {
                     MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f)

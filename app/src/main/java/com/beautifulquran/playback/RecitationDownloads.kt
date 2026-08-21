@@ -258,11 +258,12 @@ internal fun downloadPercent(ayah: Int, ayahCount: Int): Int? {
 
 internal fun chapterProgressFraction(
     downloading: Boolean,
+    paused: Boolean,
     percent: Int?,
     complete: Boolean,
 ): Float? = when {
     complete -> 1f
-    downloading -> (percent ?: 0).coerceIn(0, 100) / 100f
+    downloading || paused -> (percent ?: 0).coerceIn(0, 100) / 100f
     else -> null
 }
 
@@ -373,6 +374,9 @@ internal fun chapterDownloadCountLabel(completed: Int, total: Int): String {
     val unit = if (safeTotal == 1) "verse" else "verses"
     return "$safeCompleted/$safeTotal $unit"
 }
+
+internal fun chapterProgressFactLine(completed: Int, total: Int, percent: Int?): String =
+    chapterDownloadCountLabel(completed, total) + percent?.let { " · $it%" }.orEmpty()
 
 internal fun chapterFactLine(
     row: ChapterDownload,

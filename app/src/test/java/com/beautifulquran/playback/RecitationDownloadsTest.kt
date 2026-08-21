@@ -32,6 +32,8 @@ class RecitationDownloadsTest {
         assertEquals("80/206 verses", chapterDownloadCountLabel(completed = 80, total = 206))
         assertEquals("0/1 verse", chapterDownloadCountLabel(completed = -1, total = 1))
         assertEquals("7/7 verses", chapterDownloadCountLabel(completed = 9, total = 7))
+        assertEquals("80/206 verses · 38%", chapterProgressFactLine(80, 206, percent = 38))
+        assertEquals("80/206 verses", chapterProgressFactLine(80, 206, percent = null))
         assertEquals("7 verses", chapterFactLine(empty, downloading = false, waiting = false, paused = false))
         assertEquals("Download", chapterActionLabel(empty, downloading = false, waiting = false, paused = false))
         assertEquals(
@@ -75,22 +77,38 @@ class RecitationDownloadsTest {
         assertNull(downloadPercent(ayah = 1, ayahCount = 0))
         assertEquals(
             0f,
-            chapterProgressFraction(downloading = true, percent = null, complete = false),
+            chapterProgressFraction(
+                downloading = true, paused = false, percent = null, complete = false,
+            ),
         )
         assertEquals(
             0.42f,
-            chapterProgressFraction(downloading = true, percent = 42, complete = false),
+            chapterProgressFraction(
+                downloading = true, paused = false, percent = 42, complete = false,
+            ),
         )
         assertEquals(
             1f,
-            chapterProgressFraction(downloading = true, percent = 120, complete = false),
+            chapterProgressFraction(
+                downloading = true, paused = false, percent = 120, complete = false,
+            ),
         )
         assertEquals(
             1f,
-            chapterProgressFraction(downloading = false, percent = null, complete = true),
+            chapterProgressFraction(
+                downloading = false, paused = false, percent = null, complete = true,
+            ),
+        )
+        assertEquals(
+            0.42f,
+            chapterProgressFraction(
+                downloading = false, paused = true, percent = 42, complete = false,
+            ),
         )
         assertNull(
-            chapterProgressFraction(downloading = false, percent = 42, complete = false),
+            chapterProgressFraction(
+                downloading = false, paused = false, percent = 42, complete = false,
+            ),
         )
         val live = DownloadProgress(
             running = true,
