@@ -142,7 +142,7 @@ class SettingsRepository(context: Context) {
 
     /**
      * Continue Listening only — the one setting written during playback, on
-     * every ayah advance. [update] queues all sixteen keys per call, which is
+     * every ayah advance. [update] rewrites every settings key per call, which is
      * needless write amplification for two integers that change every few
      * seconds. No-ops when the position is unchanged.
      */

@@ -214,7 +214,36 @@ internal fun CustomizeScreen(
                 },
                 onSelect = { mode -> onUpdate { applyReadingMode(it, mode) } },
             )
+        }
 
+        Section("Text size")
+        TextSizeControl(
+            scale = settings.fontScale,
+            onScale = { value -> onUpdate { it.copy(fontScale = value) } },
+        )
+
+        if (
+            settings.readingLayout == ReadingLayout.SCROLL &&
+            settings.readingMode == ReadingMode.ARABIC_ENGLISH
+        ) {
+            Spacer(Modifier.height(20.dp))
+            ToggleRow(
+                label = "Transliteration",
+                checked = settings.showTransliteration,
+                onChange = { value -> onUpdate { it.copy(showTransliteration = value) } },
+                checkParams = checkParams,
+                checkPaintToken = checkPaintToken,
+            )
+            ToggleRow(
+                label = "Ayah translation",
+                checked = settings.showTranslation,
+                onChange = { value -> onUpdate { it.copy(showTranslation = value) } },
+                checkParams = checkParams,
+                checkPaintToken = checkPaintToken,
+            )
+        }
+
+        if (showsScrollChrome(settings.readingLayout)) {
             if (showsWordGlossChrome(settings.readingLayout, settings.readingMode)) {
                 Spacer(Modifier.height(20.dp))
                 ToggleRow(

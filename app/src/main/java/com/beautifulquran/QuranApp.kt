@@ -15,6 +15,7 @@ import com.beautifulquran.data.SettingsRepository
 import com.beautifulquran.ornamentslab.OrnamentSeedStore
 import com.beautifulquran.playback.AudioOutputLatency
 import com.beautifulquran.playback.PlayerController
+import com.beautifulquran.playback.RecitationCache
 import com.beautifulquran.timingslab.TimingOverrides
 import com.beautifulquran.tarjilab.ReciterTarjiProfiles
 import com.beautifulquran.ui.reader.InkEngine
@@ -77,5 +78,6 @@ class QuranApp : Application() {
         tarjiProfiles.applyToEngine(settings.settings.value.reciterId)
         // Long-press app icon → Continue / Bookmarks (works without App Actions review).
         VoiceShortcuts.publishDynamic(this)
+        RecitationCache.prepare(this)
     }
 }

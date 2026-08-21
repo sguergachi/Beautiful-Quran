@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Android 11 and below (android:fullBackupContent). The audio cache is
-     rebuildable from the network and can reach ~1 GB, so keep it out of
-     cloud backups. -->
+<!-- Android 11 and below (android:fullBackupContent). Listening audio lives
+     in cacheDir; explicit downloads live in filesDir/audio. Both are
+     reproducible from the network, so neither belongs in cloud backup. -->
 <full-backup-content>
     <exclude domain="file" path="audio" />
+    <exclude domain="file" path="recitation-downloads" />
 </full-backup-content>

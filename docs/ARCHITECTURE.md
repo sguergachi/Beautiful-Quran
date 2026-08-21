@@ -32,7 +32,8 @@ app (runtime)                                           ▼
 ## Principles
 
 1. **Offline-first, no backend.** All text, translations, and word timings ship
-   inside the APK. Only recitation audio streams (and is cached, 1 GB LRU).
+   inside the APK. Only recitation audio streams (listening cache, 1 GB LRU;
+   explicit Download keeps chapters on the phone).
    No accounts, no analytics, no API keys — the app works in airplane mode
    once audio is cached.
 2. **The data pipeline is a build step, not app code.** Everything fragile
@@ -287,7 +288,69 @@ controls, audio focus, becoming-noisy handling, wake mode for streaming, plus a
 browsable/searchable catalog of all 114 surahs for Assistant, Android Auto, and
 other media clients. Search requests are expanded into the same complete ayah
 queue used by the reader. Audio flows through a `CacheDataSource` backed by a
-1 GB LRU `SimpleCache`, so an ayah streams once and replays from disk afterwards.
+1 GB LRU `SimpleCache` for listening (`cacheDir`) plus a non-evicting keep
+tree (`filesDir`) for chapters the reader asked to download. Playback reads
+keep first, then listen, and writes only listen. A downloaded ayah is
+dropped from listen so the one storage total does not count it twice.
+Leftover `filesDir/audio` from the old listen LRU moves onto `cacheDir` once,
+before either `SimpleCache` opens; if both trees already contain audio, the
+current listening cache wins and the legacy evictable copy is discarded. The
+completion marker is written only after relocation succeeds, preventing later
+explicit downloads from ever being reclassified as cache. Delete all empties
+the live caches in place so playback keeps the same instances. Settings →
+Download manager shows total audio storage plus the listening-cache share, but
+its chapter catalog reads permanent keep storage only—ordinary listening never
+appears as a download. Chapter and reciter Delete preserve the evictable
+listening cache; Delete all intentionally clears both trees. Every reciter
+starts collapsed; only an explicit tap opens
+one. Loading and loaded facts reserve the same row heights, so applying the
+initial cache scan changes the ink without moving the page. Reciters sit
+24 dp apart. The chevron is the only trailing
+control on the name. Download all, Pause, Resume, and Delete sit
+16 dp after the subtitle facts, never under the chevron. Open catalog is flush with the reciter spine,
+gold hairlines below chapters. While a chapter downloads, its hairline becomes
+a dark page-ink progress fill based only on ayahs already complete in permanent
+storage; the whole completed/total verses and percentage line uses that exact
+same dark ink as one active progress state. Completed chapters keep the full
+divider and their downloaded facts in that dark ink, so completion remains active;
+pausing freezes the same partial divider at its last fully stored ayah and shows
+only the matching completed/total verse fraction in dark ink.
+A chapter row is bodyLarge name, labelSmall verses · size · status, with
+trailing verbs in a reserved 128 dp slot (Download, Pause, Resume,
+Delete). A paused chapter shows Delete then Resume in that slot, Resume
+on the right edge. Fetch verbs are green;
+delete is quiet ink. Pause keeps ayahs
+already fetched. Chapter Pause parks only that chapter and the worker continues
+with the next waiting chapter. Reciter Pause parks only that reciter’s active
+and waiting chapters; queued work for other reciters continues. Each paused
+chapter keeps its own progress clock. A Resume that races the cancelled writer
+prepends a full retry of that chapter, so the interrupted ayah cannot be skipped
+or stranded behind the queue. Disk scans use one serialized refresh path, so
+an older concurrent scan can never restore stale controls. Explicit chapter
+ownership keeps the shared basmalah while any downloaded chapter still needs it
+and removes it after the last owner is deleted.
+Download all stays on an open reciter. Collapsed Resume
+continues a pause or unfinished partials, not empty chapters; the Resume verb
+already communicates pause, so the progress line does not repeat “Paused.”
+Collapsing a reciter does not reopen it because a download is running.
+An ayah counts as complete only when Media3 records its content length and the
+cache holds that full length; partial spans stay resumable. A chapter download
+also keeps the shared basmalah clip when its playback queue begins with one. Playback
+strips Media3's `FLAG_DONT_CACHE_IF_LENGTH_UNKNOWN` so streamed ayahs stay
+on disk the same way Download all / Wi‑Fi prefetch already did. Storage
+changes and the catalog scan form one visible transition: the affected action
+shows an ellipsis until the post-operation scan is applied. Completion tokens
+are revisioned, so an older scan cannot uncover a stale Download / Resume /
+Delete state or acknowledge a newer disk change. Delete also cancels and waits
+for the affected blocking `CacheWriter` before removing its spans. Pause and
+Resume are already authoritative live state, so they remain visible while the
+catalog scan catches up; a parked chapter also stays visible through the
+resume-to-worker handoff instead of flashing its older catalog action.
+An in-flight ayah therefore cannot put bytes back after the refreshed state is
+shown.
+The first catalog scan likewise shows reciter names with an ellipsis instead
+of a false empty state. Chapter rows are lazy, so opening an expanded reciter
+does not compose its full 114-row catalog in one frame.
 
 ## Android voice / Assistant
 
@@ -354,14 +417,16 @@ horizontal page turn — draggable, fling-able, with page-turn audio
   bottom. Floating Back-to / return-to-ayah ornaments share
   `FloatingPaperControl` (enter/exit + bottom inset) with the cover float. All scrolling and verse-position logic routes through the
   focus engine (`reader/focus/`, see below).
-- `settings/SettingsScreen` — reciter, Customize (view, layout, verse and
+- `settings/SettingsScreen` — reciter plus two sibling detail sheets,
+  Customize and Download manager, reached by tap or horizontal page swipe.
+  Customize owns text size, translation visibility, view, layout, verse and
   page numbers, theme, annotations, ayah-selector side, word-by-word gloss,
   with a pinned faded-leaf preview, a full-bleed paper dissolve under it,
   and the collapsed ayah rail on the chosen edge;
   mushaf hides view, annotations, the rail
   side, word-by-word, and verse-number script — the preview is 21:91–92
-  as three printed QCF lines scaled to the measure), text size, remaining
-  display toggles, attributions;
+  as three printed QCF lines scaled to the measure). The main Settings page
+  keeps only navigation rows and attributions;
   developer mode unlocks the Timings Lab and
   the [Tarjīʿ Lab](TARJI_LAB.md).
 
