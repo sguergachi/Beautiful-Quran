@@ -577,6 +577,7 @@ private fun FactActionRow(
 @Composable
 private fun ChapterHairline(progress: Float?) {
     val gold = LocalQuranAccents.current.gold
+    val progressInk = MaterialTheme.colorScheme.onSurface.copy(alpha = ProgressInkAlpha)
     val fill by animateFloatAsState(
         targetValue = progress ?: 0f,
         animationSpec = tween(durationMillis = 240),
@@ -593,7 +594,7 @@ private fun ChapterHairline(progress: Float?) {
                 Modifier
                     .fillMaxWidth(fill)
                     .fillMaxHeight()
-                    .background(gold.copy(alpha = ProgressInkAlpha)),
+                    .background(progressInk),
             )
         }
     }
@@ -677,7 +678,7 @@ private fun ChapterRow(
     onKeep: () -> Unit,
     onDelete: () -> Unit,
 ) {
-    val progressInk = LocalQuranAccents.current.gold.copy(alpha = ProgressInkAlpha)
+    val progressInk = MaterialTheme.colorScheme.onSurface.copy(alpha = ProgressInkAlpha)
     val facts = if (downloading) {
         buildString {
             append(chapterDownloadCountLabel(completedAyahs ?: 0, row.ayahCount))
