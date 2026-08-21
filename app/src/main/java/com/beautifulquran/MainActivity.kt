@@ -261,8 +261,6 @@ private const val BOOKMARKS_LAYER = -1
 private const val COVER_LAYER = 0
 private const val AYAH_LAYER = 1
 private const val SETTINGS_LAYER = 2
-private const val CUSTOMIZE_LAYER = 3
-private const val DOWNLOADS_LAYER = 4
 private const val STACK_PAGE_DURATION_MS = 460
 private const val STACK_PAGE_TURN_THRESHOLD = 0.15f
 private const val STACK_PAGE_FLING_THRESHOLD = 0.30f
@@ -700,7 +698,7 @@ private fun PaperStackApp(
                         COVER_LAYER
                     }
                     val lower = (startLayer - 1).coerceAtLeast(minimumLayer).toFloat()
-                    val upper = (startLayer + 1).coerceAtMost(settingsLayer).toFloat()
+                    val upper = (startLayer + 1).coerceAtMost(effectiveMaxLayer).toFloat()
                     dragSnapJob?.cancel()
                     dragSnapJob = scope.launch {
                         stackPosition.snapTo(
@@ -1109,7 +1107,6 @@ private enum class PaperLayer {
     Ayah,
     Cover,
     Customize,
-    Downloads,
 }
 
 @Composable
@@ -1175,20 +1172,15 @@ private fun Modifier.paperLayerTransform(
             scaleY = 0.985f + 0.015f * reveal
         }
         PaperLayer.Customize -> {
+            // The detail sheet slides over Settings like Ayah over Cover:
+            // enters from the right as position rises past settingsLayer,
+            // turns away again past settingsLayer+1.
             val reveal = (position - settingsLayer).coerceIn(0f, 1f)
             val turn = (position - (settingsLayer + 1f)).coerceIn(0f, 1f)
             translationX = (width + STACK_OFFSCREEN_OVERSCAN_DP * density) * (1f - reveal) -
                 (width + STACK_OFFSCREEN_OVERSCAN_DP * density) * turn
             rotationY = -4f * turn
             shadowElevation = 18f * (1f - turn)
-            scaleX = 0.985f + 0.015f * reveal
-            scaleY = 0.985f + 0.015f * reveal
-        }
-        PaperLayer.Downloads -> {
-            val reveal = (position - (settingsLayer + 1f)).coerceIn(0f, 1f)
-            translationX = (width + STACK_OFFSCREEN_OVERSCAN_DP * density) * (1f - reveal)
-            rotationY = -4f * (1f - reveal)
-            shadowElevation = 18f * reveal
             scaleX = 0.985f + 0.015f * reveal
             scaleY = 0.985f + 0.015f * reveal
         }
@@ -1211,7 +1203,6 @@ private fun Modifier.paperDropShadow(
         PaperLayer.Ayah -> (position - 1f).coerceIn(0f, 1f)
         PaperLayer.Settings -> 0f
         PaperLayer.Customize -> (position - (settingsLayer + 1f)).coerceIn(0f, 1f)
-        PaperLayer.Downloads -> 0f
     }
     val depth = (4f * turning * (1f - turning)).coerceIn(0f, 1f)
     if (depth > 0.01f) {
