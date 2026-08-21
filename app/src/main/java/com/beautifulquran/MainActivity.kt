@@ -641,14 +641,12 @@ private fun PaperStackApp(
     BackHandler(enabled = settledLayer < COVER_LAYER || stackPosition.value < -0.01f) {
         animateTo(COVER_LAYER)
     }
-    BackHandler(enabled = settingsDetail != null) {
-        settingsDetail = null
+    BackHandler(enabled = settingsDetail != null && settledLayer > settingsLayer) {
+        // Back from a detail page lands on Settings, but the page itself
+        // stays where it is — the leaf you turned back from is still the
+        // one under your thumb, so swiping forward from Settings re-opens
+        // exactly that sheet.
         animateTo(settingsLayer)
-    }
-    LaunchedEffect(settledLayer, settingsLayer) {
-        if (settledLayer <= settingsLayer) {
-            settingsDetail = null
-        }
     }
     // Composed after the stack handler so overlay backs dismiss the bleed
     // instead of turning the page beneath it.
@@ -777,17 +775,14 @@ private fun PaperStackApp(
                 when (settingsDetail) {
                     SettingsDetail.CUSTOMIZE -> CustomizeSheet(
                         viewModel = settingsViewModel,
-                        onBack = {
-                            settingsDetail = null
-                            animateTo(settingsLayer)
-                        },
+                        // Back keeps the page where it is: the leaf you turned
+                        // back from stays under your thumb, so swiping forward
+                        // from Settings re-opens exactly that sheet.
+                        onBack = { animateTo(settingsLayer) },
                     )
                     SettingsDetail.DOWNLOADS -> DownloadsSheet(
                         viewModel = settingsViewModel,
-                        onBack = {
-                            settingsDetail = null
-                            animateTo(settingsLayer)
-                        },
+                        onBack = { animateTo(settingsLayer) },
                     )
                     null -> {}
                 }
