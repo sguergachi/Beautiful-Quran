@@ -354,8 +354,11 @@ private fun PaperStackApp(
     }
     val scope = rememberCoroutineScope()
     val settingsLayer = if (selectedSurahId == 0) AYAH_LAYER else SETTINGS_LAYER
-    val detailLayer = if (settingsDetail != null) settingsLayer + 1 else settingsLayer
-    val effectiveMaxLayer = maxOf(settingsLayer, detailLayer)
+    // The stack's top sheet, read live: a detail page (Customize, Downloads)
+    // raises the ceiling the moment it is asked for — a captured value would
+    // still hold the old bound when settleTo runs, clamping the turn to
+    // Settings and the new sheet would never arrive.
+    fun maxStackLayer(): Int = if (settingsDetail != null) settingsLayer + 1 else settingsLayer
     val overlayBlocking = labVisible || rootVisible || chooserVisible || ornamentsLabVisible ||
         tarjiLabVisible ||
         labRendered || rootRendered || chooserRendered || ornamentsLabRendered || tarjiLabRendered ||
@@ -383,9 +386,8 @@ private fun PaperStackApp(
     }
 
     suspend fun settleTo(layer: Int) {
-        android.util.Log.d("PaperStack", "settleTo req $layer effectiveMax $effectiveMaxLayer current ${stackPosition.value} detail $settingsDetail")
         val minimumLayer = if (bookmarkCount > 0) BOOKMARKS_LAYER else COVER_LAYER
-        val boundedLayer = layer.coerceIn(minimumLayer, effectiveMaxLayer)
+        val boundedLayer = layer.coerceIn(minimumLayer, maxStackLayer())
         val distance = abs(boundedLayer - stackPosition.value)
         settledLayer = boundedLayer
         stackPosition.animateTo(
@@ -680,7 +682,7 @@ private fun PaperStackApp(
                 // reachable by swiping from Chapters. With a reader open,
                 // Settings sits at layer 2 (Cover → Reader → Settings).
                 // Detail sheets (Customize, Downloads) sit one layer beyond.
-                maxLayer = { effectiveMaxLayer },
+                maxLayer = { maxStackLayer() },
                 // The pointerInput coroutine is intentionally keyed only by
                 // navigation identity. Read a stable state holder here so the
                 // long-lived detector sees overlays that open after it starts.
@@ -698,7 +700,7 @@ private fun PaperStackApp(
                         COVER_LAYER
                     }
                     val lower = (startLayer - 1).coerceAtLeast(minimumLayer).toFloat()
-                    val upper = (startLayer + 1).coerceAtMost(effectiveMaxLayer).toFloat()
+                    val upper = (startLayer + 1).coerceAtMost(maxStackLayer()).toFloat()
                     dragSnapJob?.cancel()
                     dragSnapJob = scope.launch {
                         stackPosition.snapTo(
@@ -749,12 +751,10 @@ private fun PaperStackApp(
                     animateTo(if (selectedSurahId == 0) COVER_LAYER else AYAH_LAYER)
                 },
                 onOpenCustomize = {
-                    android.util.Log.d("PaperStack", "openCustomize detail=$settingsDetail layer=${settingsLayer+1}")
                     settingsDetail = SettingsDetail.CUSTOMIZE
                     animateTo(settingsLayer + 1)
                 },
                 onOpenDownloads = {
-                    android.util.Log.d("PaperStack", "openDownloads detail=$settingsDetail layer=${settingsLayer+1}")
                     settingsDetail = SettingsDetail.DOWNLOADS
                     animateTo(settingsLayer + 1)
                 },

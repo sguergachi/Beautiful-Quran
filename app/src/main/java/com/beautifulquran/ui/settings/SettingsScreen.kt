@@ -270,10 +270,7 @@ fun SettingsScreen(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .quietClickable {
-                            android.util.Log.d("SettingsRow", "Downloads tapped")
-                            onOpenDownloads()
-                        }
+                        .quietClickable { onOpenDownloads() }
                         .padding(vertical = 8.dp),
                 ) {
                     Column(Modifier.weight(1f)) {
@@ -295,10 +292,7 @@ fun SettingsScreen(
                 NavigateRow(
                     label = "Customize",
                     note = customizeSummary(settings),
-                    onClick = {
-                        android.util.Log.d("SettingsRow", "Customize tapped")
-                        onOpenCustomize()
-                    },
+                    onClick = { onOpenCustomize() },
                 )
 
                 if (settings.developerModeEnabled) {
