@@ -573,18 +573,41 @@ internal fun mushafDialLensedX(trueX: Float, centerX: Float, sigmaPx: Float, max
     return centerX + d * mushafDialLensFactor(d, sigmaPx, maxMag)
 }
 
+/** Tail-aware warp: 25+ gets room before the edge so every short surah is selectable with precision, especially when slowing down. */
+private const val TAIL_START_IDX = 24
+private const val TAIL_HEAD_FRACTION = 0.5f
+
+private fun tailStartFrac(marks: IntArray, pageCount: Int): Float {
+    if (marks.size <= TAIL_START_IDX) return 1f
+    return mushafDialFraction(marks[TAIL_START_IDX].toFloat(), pageCount)
+}
+
 /** Where a page sits on the chapter tier, 0 at leaf 1 and 1 at the far end. */
 internal fun mushafDialChapterFraction(page: Float, marks: IntArray, pageCount: Int): Float {
-    // True place in the book: leaf 1 at 0, 604 at 1. Magnification is a
-    // lens at draw time, not a warped distribution.
-    return mushafDialFraction(page, pageCount)
+    if (marks.size <= TAIL_START_IDX) return mushafDialFraction(page, pageCount)
+    val tailFrac = tailStartFrac(marks, pageCount)
+    val f = mushafDialFraction(page, pageCount)
+    return if (f < tailFrac) {
+        f / tailFrac * TAIL_HEAD_FRACTION
+    } else {
+        TAIL_HEAD_FRACTION + (f - tailFrac) / (1f - tailFrac).coerceAtLeast(1e-3f) * (1f - TAIL_HEAD_FRACTION)
+    }
 }
 
 /** The inverse: the leaf under a finger at fraction [f] of the chapter tier. */
 internal fun mushafDialChapterPage(f: Float, marks: IntArray, pageCount: Int): Float {
-    // Inverse of the true distribution above; lens is visual.
+    if (marks.size <= TAIL_START_IDX) {
+        val clamped = f.coerceIn(0f, 1f)
+        return 1f + clamped * (pageCount - 1f).coerceAtLeast(0f)
+    }
+    val tailFrac = tailStartFrac(marks, pageCount)
     val clamped = f.coerceIn(0f, 1f)
-    return 1f + clamped * (pageCount - 1f).coerceAtLeast(0f)
+    val trueF = if (clamped < TAIL_HEAD_FRACTION) {
+        clamped / TAIL_HEAD_FRACTION * tailFrac
+    } else {
+        tailFrac + (clamped - TAIL_HEAD_FRACTION) / (1f - TAIL_HEAD_FRACTION).coerceAtLeast(1e-3f) * (1f - tailFrac)
+    }
+    return 1f + trueF * (pageCount - 1f).coerceAtLeast(0f)
 }
 
 /** The rule's own band. Ticks stand up inside it; the rule sits near its foot. */
@@ -799,8 +822,10 @@ internal fun MushafPageDial(
             // which is the only way to say "you are inside this chapter now" to
             // a reader whose own finger is covering the line.
             if (lift > 0.004f && chapterMarks.isNotEmpty()) {
-                val fromX = bookX(run.first.toFloat())
-                val toX = bookX(run.last.toFloat())
+                fun tailX(page: Float) =
+                    mushafDialTrackX(1f - mushafDialChapterFraction(page, chapterMarks, pages), size.width, inset)
+                val fromX = tailX(run.first.toFloat())
+                val toX = tailX(run.last.toFloat())
                 val minW = MushafDialBracketMin.toPx()
                 val centre = (fromX + toX) / 2f
                 val half = maxOf(abs(fromX - toX), minW) / 2f
@@ -830,8 +855,8 @@ internal fun MushafPageDial(
                 val baseSigmaPx = MUSHAF_DIAL_LENS_SIGMA_DP.dp.toPx()
                 val isLensed = scrubbing || handed
                 val centerX = if (isLensed) handX.floatValue else seatX
-                fun bookX(page: Float) =
-                    mushafDialTrackX(1f - mushafDialFraction(page, pages), size.width, inset)
+                fun tailX(page: Float) =
+                    mushafDialTrackX(1f - mushafDialChapterFraction(page, chapterMarks, pages), size.width, inset)
                 val centreProgress = if (isLensed) {
                     val centreFrac = mushafDialTrackFraction(centerX, size.width, inset)
                     (1f - centreFrac).coerceIn(0f, 1f)
@@ -845,7 +870,7 @@ internal fun MushafPageDial(
                 val epsilonPx = 1.8.dp.toPx()
                 var previousX = Float.MAX_VALUE
                 for ((idx, mark) in chapterMarks.withIndex()) {
-                    var trueX = bookX(mark.toFloat())
+                    var trueX = tailX(mark.toFloat())
                     // Spread co-located marks (gap 0) around their page.
                     var gStart = idx
                     while (gStart > 0 && chapterMarks[gStart - 1] == mark) gStart--
