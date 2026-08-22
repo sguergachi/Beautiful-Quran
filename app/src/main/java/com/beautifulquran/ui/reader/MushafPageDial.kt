@@ -953,30 +953,36 @@ internal fun MushafPageDial(
                 }
             }
 
-            // The trough's own comb: the chapter's leaves. Each one flies from
-            // where it stands on the book's scale out to where it stands in the
-            // trough, so the opening is a magnification the eye can follow and
-            // not a second drawing fading in over the first.
+            // The trough's own comb: gaps between leaves, not the leaves
+            // themselves — so a 1-page chapter shows no middle tick, a
+            // 2-page chapter shows one in the middle, etc. Each flies from
+            // where it stands on the book's scale out to where it stands in
+            // the trough.
             if (open > 0.004f && lift > 0.004f) {
                 val tick = MushafDialPageTick.toPx()
                 val strength = lift * open
-                for (page in run.first..run.last) {
-                    val seat = bookX(page.toFloat())
-                    val troughX = mushafDialTrackX(
-                        1f - (page - run.first).toFloat() / runSpan,
-                        size.width,
-                        troughInset,
-                    )
-                    val x = lerp(seat, troughX, open)
-                    if (x < -rule || x > size.width + rule) continue
-                    val length = (tick * strength).coerceAtMost(headroom)
-                    if (length <= 0.4f) continue
-                    drawRoundRect(
-                        color = ink.copy(alpha = 0.30f * strength),
-                        topLeft = Offset(x - rule / 2f, ruleY - length),
-                        size = Size(rule, length),
-                        cornerRadius = CornerRadius(rule, rule),
-                    )
+                val n = run.last - run.first + 1
+                if (n > 1) {
+                    for (i in 1 until n) {
+                        val gapFraction = (i - 0.5f) / (n - 1).toFloat()
+                        val page = run.first + i - 0.5f
+                        val seat = bookX(page)
+                        val troughX = mushafDialTrackX(
+                            1f - gapFraction,
+                            size.width,
+                            troughInset,
+                        )
+                        val x = lerp(seat, troughX, open)
+                        if (x < -rule || x > size.width + rule) continue
+                        val length = (tick * strength).coerceAtMost(headroom)
+                        if (length <= 0.4f) continue
+                        drawRoundRect(
+                            color = ink.copy(alpha = 0.30f * strength),
+                            topLeft = Offset(x - rule / 2f, ruleY - length),
+                            size = Size(rule, length),
+                            cornerRadius = CornerRadius(rule, rule),
+                        )
+                    }
                 }
             }
 
