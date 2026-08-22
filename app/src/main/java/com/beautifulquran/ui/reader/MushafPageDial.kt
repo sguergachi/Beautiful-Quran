@@ -1263,12 +1263,14 @@ internal fun MushafPageDial(
                                 // looks like.
                                 heldS = if (abs(speed) < MUSHAF_DIAL_HOLD_DP_S) heldS + dt else 0f
                                 if (heldS == 0f) hasPulsed = false
-                                // 500ms before pop: 300ms orange pulse + 200ms breather.
+                                // 500ms before pop: double 300ms orange pulse (2×150ms) + 200ms breather.
                                 if (!hasPulsed && !open && heldS >= MUSHAF_DIAL_HOLD_S - 0.5f && heldS < MUSHAF_DIAL_HOLD_S) {
                                     hasPulsed = true
                                     scope.launch {
-                                        pulse.animateTo(1f, tween(150, easing = FastOutSlowInEasing))
-                                        pulse.animateTo(0f, tween(150, easing = FastOutSlowInEasing))
+                                        pulse.animateTo(1f, tween(75, easing = FastOutSlowInEasing))
+                                        pulse.animateTo(0f, tween(75, easing = FastOutSlowInEasing))
+                                        pulse.animateTo(1f, tween(75, easing = FastOutSlowInEasing))
+                                        pulse.animateTo(0f, tween(75, easing = FastOutSlowInEasing))
                                     }
                                 }
                                 // Travel lifts the closing. A hold that has
