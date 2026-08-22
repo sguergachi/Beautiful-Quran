@@ -812,56 +812,32 @@ internal fun MushafPageDial(
                 )
             }
 
-            // The chapter tier's comb: true hairline at rest, but the 70+ tail
-            // is given its own track share so it is reachable before the far
-            // left edge. When under the finger the neighbourhood is lensed —
-            // far right 1×, growing to max by ~ch 70 then plateau — with extra
-            // tail boost and left push. Epsilon spreads co-located pages.
+            // The chapter tier's comb: true hairline at rest. When under the
+            // finger the neighbourhood is lensed — far right 1×, growing to
+            // max by ~ch 25 then plateau — with extra tail boost. Syncs with
+            // the thumb's true seat.
             val combInk = lift * (1f - open)
             if (combInk > 0.004f) {
                 val tick = MushafDialChapterTick.toPx()
                 val baseSigmaPx = MUSHAF_DIAL_LENS_SIGMA_DP.dp.toPx()
                 val isLensed = scrubbing || handed
                 val centerX = if (isLensed) handX.floatValue else seatX
-                // Tail track share: head (1..24) gets 52% of rule, tail (25..114)
-                // gets 48% — bunching starts around surah 25, so tail needs
-                // room well before the far left edge.
-                val tailStartPage = if (chapterMarks.size > 24) chapterMarks[24] else pages
-                val tailStartFrac = mushafDialFraction(tailStartPage.toFloat(), pages)
-                val leftMarginExtraPx = 22.dp.toPx()
-                fun tailAwareX(page: Float): Float {
-                    val f = mushafDialFraction(page, pages)
-                    val mappedF = if (f < tailStartFrac) {
-                        f / tailStartFrac * 0.52f
-                    } else {
-                        0.52f + (f - tailStartFrac) / (1f - tailStartFrac).coerceAtLeast(1e-3f) * 0.48f
-                    }
-                    val base = mushafDialTrackX(1f - mappedF, size.width, inset)
-                    // Tail gets extra right push so its far end is inset from edge.
-                    return if (f >= tailStartFrac) {
-                        val tailProgress = (f - tailStartFrac) / (1f - tailStartFrac).coerceAtLeast(1e-3f)
-                        base + leftMarginExtraPx * tailProgress
-                    } else base
-                }
-                // Progressive left push and sigma: 0 at far right, full by
-                // slightly before chapter 70, then plateau.
+                fun bookX(page: Float) =
+                    mushafDialTrackX(1f - mushafDialFraction(page, pages), size.width, inset)
                 val centreProgress = if (isLensed) {
                     val centreFrac = mushafDialTrackFraction(centerX, size.width, inset)
                     (1f - centreFrac).coerceIn(0f, 1f)
                 } else 0f
-                val plateauAt = 0.88f
+                val plateauAt = 0.78f
                 val effProgress = (centreProgress / plateauAt).coerceIn(0f, 1f)
-                val leftPushPx = if (isLensed) 18.dp.toPx() * combInk * effProgress else 0f
-                val sigmaPx = baseSigmaPx * (1f + 0.85f * effProgress)
-                // Base lens mag progressive: 1× at far right → max at plateau.
+                val leftPushPx = if (isLensed) 10.dp.toPx() * combInk * effProgress else 0f
+                val sigmaPx = baseSigmaPx * (1f + 0.6f * effProgress)
                 val progBaseMag = 1f + (MUSHAF_DIAL_LENS_MAG - 1f) * effProgress
                 val progHeightMag = 1f + (MUSHAF_DIAL_LENS_HEIGHT_GAIN - 1f) * effProgress
-                // Epsilon for co-located tail marks (same page): spread them
-                // so the lens has distinct centres to magnify.
-                val epsilonPx = 2.8.dp.toPx()
+                val epsilonPx = 1.8.dp.toPx()
                 var previousX = Float.MAX_VALUE
                 for ((idx, mark) in chapterMarks.withIndex()) {
-                    var trueX = tailAwareX(mark.toFloat())
+                    var trueX = bookX(mark.toFloat())
                     // Spread co-located marks (gap 0) around their page.
                     var gStart = idx
                     while (gStart > 0 && chapterMarks[gStart - 1] == mark) gStart--
