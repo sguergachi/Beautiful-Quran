@@ -151,9 +151,12 @@ import kotlin.math.roundToInt
  *
  * Not zero: a thumb resting on glass drifts a point or two a second, and a
  * dial that demanded a dead stop would be a dial that never opened for the
- * people whose hands shake.
+ * people whose hands shake. The pop timer itself now requires a dead stop
+ * (see hold tick below) — this gate stays lenient so a shaky hold still
+ * counts as a hold once the timer has started.
  */
 internal const val MUSHAF_DIAL_HOLD_DP_S = 16f
+internal const val MUSHAF_DIAL_HOLD_START_DP_S = 2f
 
 /**
  * How long it has to stay that still, in seconds, before the trough opens.
@@ -1261,7 +1264,8 @@ internal fun MushafPageDial(
                                 // hand banks no stillness, and an instant of
                                 // stillness is what the top of every stroke
                                 // looks like.
-                                heldS = if (abs(speed) < MUSHAF_DIAL_HOLD_DP_S) heldS + dt else 0f
+                                // Dead stop to start the timer — slow drift does not bank time.
+                                heldS = if (abs(speed) < MUSHAF_DIAL_HOLD_START_DP_S) heldS + dt else 0f
                                 if (heldS == 0f) hasPulsed = false
                                 // 500ms before pop: double 300ms orange pulse (2×150ms) + 200ms breather.
                                 if (!hasPulsed && !open && heldS >= MUSHAF_DIAL_HOLD_S - 0.5f && heldS < MUSHAF_DIAL_HOLD_S) {
