@@ -1180,11 +1180,17 @@ internal fun MushafPageDial(
                         var shut = false
                         var travelDp = 0f
                         var sinceTickS = 0f
-                        var lastChapter = mushafDialChapterRun(
-                            chapterMarks,
-                            raw.roundToInt().coerceIn(1, pages),
-                            pages,
-                        ).first
+                        val initialFracForLast = mushafDialChapterFraction(raw, chapterMarks, pages)
+                        val initialIdxForLast = if (initialFracForLast >= TAIL_HEAD_FRACTION && chapterMarks.size > TAIL_START_IDX) {
+                            val tailCount = (chapterMarks.size - TAIL_START_IDX).coerceAtLeast(1)
+                            val posInTail = (initialFracForLast - TAIL_HEAD_FRACTION) / (1f - TAIL_HEAD_FRACTION).coerceAtLeast(1e-3f) * tailCount
+                            (posInTail.toInt().coerceIn(0, tailCount - 1)) + TAIL_START_IDX
+                        } else {
+                            mushafDialChapterIndex(chapterMarks, raw.roundToInt().coerceIn(1, pages), pages)
+                        }
+                        var lastChapter = chapterMarks.getOrElse(initialIdxForLast) {
+                            mushafDialChapterRun(chapterMarks, raw.roundToInt().coerceIn(1, pages), pages).first
+                        }
                         var lastPage = raw.roundToInt().coerceIn(1, pages)
                         dialPage.floatValue = raw
                         // The thumb goes to the finger on contact, before any
@@ -1192,7 +1198,9 @@ internal fun MushafPageDial(
                         // here, and the mark belongs where the hand is.
                         handX.floatValue =
                             mushafDialClampToTrack(down.position.x, widthPxNow, insetPx)
-                        troughRun = mushafDialChapterRun(chapterMarks, lastPage, pages)
+                        val initialRunStart = chapterMarks[initialIdxForLast]
+                        val initialRunEnd = if (initialIdxForLast + 1 < chapterMarks.size) chapterMarks[initialIdxForLast + 1] - 1 else pages
+                        troughRun = initialRunStart..maxOf(initialRunStart, initialRunEnd)
                         scrubbing = true
                         reportScrub.value(true)
                         hasPulsed = false
@@ -1277,29 +1285,35 @@ internal fun MushafPageDial(
                                 // own finger is not — and both ends would stop
                                 // meaning the ends of the book after the first
                                 // stroke that ran past one.
-                                raw = mushafDialChapterPage(
-                                    // The tier's fractions run 0 at leaf 1
-                                    // (the rule's right end); the track runs
-                                    // 0 at its left edge. One flip joins them.
-                                    1f - mushafDialTrackFraction(handPx, widthPxNow, insetPx),
-                                    chapterMarks,
-                                    pages,
-                                )
+                                val chapterFrac = 1f - mushafDialTrackFraction(handPx, widthPxNow, insetPx)
+                                raw = mushafDialChapterPage(chapterFrac, chapterMarks, pages)
                                 dialPage.floatValue = raw
                                 val landed = raw.roundToInt().coerceIn(1, pages)
                                 val chapter = mushafDialChapterRun(chapterMarks, landed, pages)
-                                if (chapter.first != lastChapter) {
-                                    val isTailChapter = mushafDialChapterIndex(chapterMarks, chapter.first, pages) >= TAIL_START_IDX
+                                // For tail, ChapterRun collapses co-located pages (93/94 both 596) — use
+                                // the fraction's chapter index directly so every short surah ticks.
+                                val curIdx = if (chapterFrac >= TAIL_HEAD_FRACTION && chapterMarks.size > TAIL_START_IDX) {
+                                    val tailCount = (chapterMarks.size - TAIL_START_IDX).coerceAtLeast(1)
+                                    val posInTail = (chapterFrac - TAIL_HEAD_FRACTION) / (1f - TAIL_HEAD_FRACTION).coerceAtLeast(1e-3f) * tailCount
+                                    (posInTail.toInt().coerceIn(0, tailCount - 1)) + TAIL_START_IDX
+                                } else {
+                                    mushafDialChapterIndex(chapterMarks, chapter.first, pages)
+                                }
+                                val lastIdx = mushafDialChapterIndex(chapterMarks, lastChapter, pages)
+                                if (curIdx != lastIdx) {
+                                    val isTailChapter = curIdx >= TAIL_START_IDX
                                     val pitch = if (isTailChapter) MUSHAF_DIAL_TAIL_HAPTIC_PITCH_DP else MUSHAF_DIAL_HAPTIC_PITCH_DP
                                     if (abs(travelDp) >= pitch && sinceTickS >= MUSHAF_DIAL_HAPTIC_MIN_S) {
                                         view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
                                         travelDp = 0f
                                         sinceTickS = 0f
                                     }
-                                    lastChapter = chapter.first
+                                    lastChapter = chapterMarks[curIdx]
                                 }
                                 lastPage = landed
-                                troughRun = chapter
+                                val curRunStart = chapterMarks[curIdx]
+                                val curRunEnd = if (curIdx + 1 < chapterMarks.size) chapterMarks[curIdx + 1] - 1 else pages
+                                troughRun = curRunStart..maxOf(curRunStart, curRunEnd)
                                 // The hold. Both halves are needed: a fast
                                 // hand banks no stillness, and an instant of
                                 // stillness is what the top of every stroke
