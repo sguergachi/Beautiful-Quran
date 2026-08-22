@@ -98,12 +98,10 @@ class MushafPageDialTest {
 
     @Test
     fun `the hold is long enough that only a deliberate one reaches it`() {
-        // Around a second: past every slowing inside a scrub, which is what an
-        // eighth of a second was answering, and still one gesture rather than
-        // a wait. The speed gate is the other half of the test — it sits far
-        // below any real steering speed, so a reader creeping through the
-        // chapters is not clicked into a trough however long they take.
-        assertTrue(MUSHAF_DIAL_HOLD_S in 0.9f..1.4f)
+        // Around two seconds: past every slowing inside a scrub, plus the
+        // extra second the user asked for — still one gesture rather than a
+        // wait. The speed gate is the other half of the test.
+        assertTrue(MUSHAF_DIAL_HOLD_S in 1.4f..1.8f)
         assertTrue(MUSHAF_DIAL_HOLD_DP_S < 30f)
     }
 
@@ -122,7 +120,7 @@ class MushafPageDialTest {
         // the later of the two, so a hold on the line is never the slower way
         // in — the reader who is somewhere legitimate is never punished for it.
         assertTrue(MUSHAF_DIAL_INSIST_S > MUSHAF_DIAL_HOLD_S)
-        assertTrue(MUSHAF_DIAL_INSIST_S in 1f..2.5f)
+        assertTrue(MUSHAF_DIAL_INSIST_S in 1.8f..2.2f)
     }
 
     @Test
@@ -230,7 +228,7 @@ class MushafPageDialTest {
         // Inside the strip the finger is still on the rule it took hold of.
         // If the band were narrower than the paper the reader is allowed to
         // press, a scrub could end itself without the hand leaving the target.
-        assertTrue(MushafDialStray > MushafDialTouch / 2f)
+        assertTrue(MushafDialStray > MushafDialBelowGrab / 2f)
     }
 
     @Test
@@ -502,5 +500,78 @@ class MushafPageDialTest {
         // either way.
         val leaf = MushafDialLabel(number = 2, chapter = "Al-Baqarah", fromAyah = 6, toAyah = 16)
         assertEquals("", mushafDialLabelFoot(leaf, zoomed = false))
+    }
+    @Test
+    fun `the comb stays on the hairline at rest`() {
+        // True place in the book: leaf 1 at the right, 604 at the left.
+        // Magnification is a lens under the finger, not a warped book.
+        val marks = intArrayOf(1, 2, 50, 51, 604)
+        for (mark in marks) {
+            val f = mushafDialChapterFraction(mark.toFloat(), marks, 604)
+            val prop = mushafDialFraction(mark.toFloat(), 604)
+            assertEquals(prop, f, 1e-4f)
+        }
+        // Ordering still preserved.
+        for (i in 1 until marks.size) {
+            val prev = mushafDialChapterFraction(marks[i - 1].toFloat(), marks, 604)
+            val cur = mushafDialChapterFraction(marks[i].toFloat(), marks, 604)
+            assertTrue(prev < cur)
+        }
+    }
+
+    @Test
+    fun `the lens magnifies closer marks more than farther ones`() {
+        // Fisheye: closer to the centre is taller and pushed farther out.
+        val sigma = 120f
+        val mag = MUSHAF_DIAL_LENS_MAG
+        val heightMag = MUSHAF_DIAL_LENS_HEIGHT_GAIN
+        val centre = 540f
+        val near = centre + 10f
+        val far = centre + 90f
+        val nearFactor = mushafDialLensFactor(10f, sigma, mag)
+        val farFactor = mushafDialLensFactor(90f, sigma, mag)
+        assertTrue(nearFactor > farFactor)
+        assertTrue(nearFactor > 1f && farFactor >= 1f)
+        val nearLensed = mushafDialLensedX(near, centre, sigma, mag)
+        val farLensed = mushafDialLensedX(far, centre, sigma, mag)
+        assertTrue(nearLensed - centre > 10f)
+        assertTrue(farLensed - centre > 90f)
+        // But near is magnified more: ratio of lensed distance to true distance
+        assertTrue((nearLensed - centre) / 10f > (farLensed - centre) / 90f)
+        // Height follows the same falloff.
+        val nearH = mushafDialLensFactor(10f, sigma, heightMag)
+        val farH = mushafDialLensFactor(90f, sigma, heightMag)
+        assertTrue(nearH > farH)
+    }
+
+    @Test
+    fun `steering inside a long chapter still moves through its leaves`() {
+        // True distribution: within a chapter the finger walks leaves right to left.
+        val marks = intArrayOf(1, 2, 50, 51, 604)
+        val fNear = mushafDialChapterFraction(5f, marks, 604)
+        val fDeep = mushafDialChapterFraction(30f, marks, 604)
+        assertTrue(fDeep > fNear)
+        val mid = (fNear + fDeep) / 2f
+        val page = mushafDialChapterPage(mid, marks, 604)
+        assertTrue(page > 2f && page < 49f)
+    }
+
+    @Test
+    fun `the comb reads back the page under the finger`() {
+        val marks = intArrayOf(1, 2, 50, 51, 286, 604)
+        for (mark in marks) {
+            val x = mushafDialTrackX(
+                1f - mushafDialChapterFraction(mark.toFloat(), marks, 604),
+                widthPx,
+                insetPx,
+            )
+            val read = mushafDialChapterPage(
+                1f - mushafDialTrackFraction(x, widthPx, insetPx),
+                marks,
+                604,
+            )
+            val run = mushafDialChapterRun(marks, mark, 604)
+            assertTrue("mark $mark read $read run $run", read >= run.first - 1.01f && read <= run.last + 1.01f)
+        }
     }
 }

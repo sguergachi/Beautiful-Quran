@@ -130,7 +130,7 @@ private const val FONT_SCALE_MAX = 1.6f
 private const val FONT_SCALE_STOPS = 8 // intervals; nine tappable stops
 private val FONT_SCALE_STEP = (FONT_SCALE_MAX - FONT_SCALE_MIN) / FONT_SCALE_STOPS
 
-private enum class SettingsDetail { CUSTOMIZE, DOWNLOADS }
+internal enum class SettingsDetail { CUSTOMIZE, DOWNLOADS }
 
 /**
  * Snap [scale] to the nearest stop, then move [deltaStops] (±1 for the A glyphs).
@@ -150,6 +150,8 @@ internal fun nudgeFontScale(scale: Float, deltaStops: Int): Float {
 fun SettingsScreen(
     viewModel: SettingsViewModel,
     onBack: () -> Unit,
+    onOpenCustomize: () -> Unit = {},
+    onOpenDownloads: () -> Unit = {},
     onOpenTimingsLab: () -> Unit = {},
     onOpenTarjiLab: () -> Unit = {},
     onOpenOrnamentsLab: () -> Unit = {},
@@ -157,25 +159,12 @@ fun SettingsScreen(
 ) {
     val settings by viewModel.settings.settings.collectAsStateWithLifecycle()
     val reciters by viewModel.reciters.collectAsStateWithLifecycle()
-    val surahs by viewModel.surahs.collectAsStateWithLifecycle()
     val context = LocalContext.current
-    var detail by rememberSaveable { mutableStateOf(SettingsDetail.CUSTOMIZE) }
-    val pager = rememberPagerState { 2 }
-    val scope = rememberCoroutineScope()
     var usage by remember { mutableStateOf<RecitationUsage?>(null) }
-    LaunchedEffect(pager.settledPage) {
-        if (pager.settledPage == 0) usage = withContext(Dispatchers.IO) {
+    LaunchedEffect(Unit) {
+        usage = withContext(Dispatchers.IO) {
             RecitationCache.usage(context)
         }
-    }
-
-    fun openDetail(next: SettingsDetail) {
-        detail = next
-        scope.launch { pager.animateScrollToPage(1) }
-    }
-
-    fun closeDetail() {
-        scope.launch { pager.animateScrollToPage(0) }
     }
 
     var developerTapCount by remember { mutableStateOf(0) }
@@ -220,8 +209,6 @@ fun SettingsScreen(
         checkPaintToken++
     }
 
-    BackHandler(enabled = pager.currentPage == 1) { closeDetail() }
-
     if (developerTapCount > 0) {
         LaunchedEffect(developerTapCount) {
             delay(1500L)
@@ -235,35 +222,11 @@ fun SettingsScreen(
         }
     }
 
-    HorizontalPager(
-        state = pager,
+    Box(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background),
-    ) { page ->
-        if (page == 1) {
-            when (detail) {
-                SettingsDetail.CUSTOMIZE -> CustomizeScreen(
-                    settings = settings,
-                    brushParams = brushParams,
-                    paintToken = paintToken,
-                    checkParams = checkParams,
-                    checkPaintToken = checkPaintToken,
-                    onBack = ::closeDetail,
-                    onUpdate = { transform -> viewModel.settings.update(transform) },
-                )
-                SettingsDetail.DOWNLOADS -> DownloadManagerPage(
-                    reciters = reciters,
-                    surahs = surahs,
-                    onBack = {
-                        usage = null
-                        closeDetail()
-                    },
-                )
-            }
-            return@HorizontalPager
-        }
-        Box(Modifier.fillMaxSize()) {
+    ) {
             Column(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
@@ -307,7 +270,7 @@ fun SettingsScreen(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .quietClickable { openDetail(SettingsDetail.DOWNLOADS) }
+                        .quietClickable { onOpenDownloads() }
                         .padding(vertical = 8.dp),
                 ) {
                     Column(Modifier.weight(1f)) {
@@ -329,7 +292,7 @@ fun SettingsScreen(
                 NavigateRow(
                     label = "Customize",
                     note = customizeSummary(settings),
-                    onClick = { openDetail(SettingsDetail.CUSTOMIZE) },
+                    onClick = { onOpenCustomize() },
                 )
 
                 if (settings.developerModeEnabled) {
@@ -447,7 +410,6 @@ fun SettingsScreen(
                 )
                 Spacer(Modifier.height(48.dp))
             }
-        }
     }
 }
 

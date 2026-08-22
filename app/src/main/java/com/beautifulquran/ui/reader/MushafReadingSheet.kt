@@ -137,6 +137,7 @@ internal fun MushafReadingSheet(
     chapterPages: Set<Int>,
     /** What the dial writes over its thumb for a given leaf. */
     pageLabel: (Int) -> MushafDialLabel?,
+    chapterLabel: (Int) -> MushafDialLabel? = { null },
     /** Where a scrub landed, once the hand comes off the rule. */
     onSeekPage: (Int) -> Unit,
     /** Raised while a hand is on the rule. */
@@ -173,6 +174,7 @@ internal fun MushafReadingSheet(
             pageCount = pageCount,
             chapterPages = chapterPages,
             pageLabel = pageLabel,
+            chapterLabel = chapterLabel,
             onSeekPage = onSeekPage,
             onScrubbing = onScrubbing,
             reciting = reciting,

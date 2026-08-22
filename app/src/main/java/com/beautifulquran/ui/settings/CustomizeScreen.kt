@@ -116,6 +116,7 @@ private val PAGE_SCRIPTS = listOf(
 // 56:76 ends page 536; 56:77 opens 537 — a real printed-page turn.
 private const val SAMPLE_ARABIC_1 = "وَإِنَّهُۥ لَقَسَمٞ لَّوۡ تَعۡلَمُونَ عَظِيمٌ"
 private const val SAMPLE_ARABIC_2 = "إِنَّهُۥ لَقُرۡءَانٞ كَرِيمٞ"
+private const val SAMPLE_TRANSLIT = "Wa-innahu la-qasam law taʿlamūna ʿaẓīm"
 private const val SAMPLE_ENGLISH =
     "And indeed, it is an oath - if you could know - [most] great."
 private const val SAMPLE_ENGLISH_2 = "Indeed, it is a noble Qur'an."
@@ -165,6 +166,9 @@ internal fun CustomizeScreen(
                 ayahSelectorSide = settings.ayahSelectorSide,
                 annotationsEnabled = settings.annotationsEnabled,
                 showWordGloss = settings.showWordGloss,
+                fontScale = settings.fontScale,
+                showTranslation = settings.showTranslation,
+                showTransliteration = settings.showTransliteration,
             )
         }
 
@@ -353,6 +357,12 @@ internal fun ReadingPreview(
     ayahSelectorSide: AyahSelectorSide = AyahSelectorSide.LEFT,
     annotationsEnabled: Boolean = false,
     showWordGloss: Boolean = false,
+    /** The reader's text-size stop, so the miniature grows and shrinks with
+     *  the same dial — every sp inside, marks and folio included. */
+    fontScale: Float = 1f,
+    /** Scroll-layout toggles, mirrored live like every other choice. */
+    showTranslation: Boolean = true,
+    showTransliteration: Boolean = false,
 ) {
     val arabicOnly = readingLayout == ReadingLayout.MUSHAF ||
         readingMode == ReadingMode.ARABIC_ONLY
@@ -413,8 +423,20 @@ internal fun ReadingPreview(
                     showGloss = showGloss,
                 )
                 if (!arabicOnly) {
-                    Spacer(Modifier.height(12.dp))
-                    PreviewTranslation()
+                    if (showTransliteration) {
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            text = SAMPLE_TRANSLIT,
+                            fontFamily = TranslationFontFamily,
+                            fontSize = PreviewLyricSize * 13f / 18f,
+                            lineHeight = 1.4.em,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                        )
+                    }
+                    if (showTranslation) {
+                        Spacer(Modifier.height(12.dp))
+                        PreviewTranslation()
+                    }
                 }
                 if (showNote) {
                     Spacer(Modifier.height(12.dp))
