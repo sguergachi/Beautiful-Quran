@@ -224,6 +224,29 @@ class MushafPageDialTest {
     }
 
     @Test
+    fun `the hud leans with the pull and clamps where the stray fires`() {
+        // The lean is the countdown to the pop: proportional to the pull, so
+        // half the stray spent is half the lean shown, and clamped exactly at
+        // the stray — past it the tier is already gone and a lean would lie.
+        val stray = 74f
+        val lean = 20f
+        assertEquals(0f, mushafDialHudLean(0f, stray, lean), 1e-4f)
+        assertEquals(lean * 0.5f, mushafDialHudLean(stray * 0.5f, stray, lean), 1e-4f)
+        assertEquals(-lean * 0.25f, mushafDialHudLean(-stray * 0.25f, stray, lean), 1e-4f)
+        assertEquals(lean, mushafDialHudLean(stray, stray, lean), 1e-4f)
+        assertEquals(lean, mushafDialHudLean(stray * 3f, stray, lean), 1e-4f)
+        assertEquals(-lean, mushafDialHudLean(-stray * 3f, stray, lean), 1e-4f)
+    }
+
+    @Test
+    fun `the hud's full lean stays short of the stray band itself`() {
+        // The label warns; it does not leave. If the lean could carry the HUD
+        // as far as the hand has come off the line, the warning and the event
+        // it warns of would be the same distance, and the first said nothing.
+        assertTrue(MushafDialHudLean < MushafDialStray)
+    }
+
+    @Test
     fun `the stray band clears the grab strip's own half-height`() {
         // Inside the strip the finger is still on the rule it took hold of.
         // If the band were narrower than the paper the reader is allowed to

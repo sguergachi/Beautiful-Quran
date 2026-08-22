@@ -53,6 +53,7 @@ import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.exp
 import kotlin.math.roundToInt
+import kotlin.math.sign
 
 /*
  * The page dial: the hairline under the leaf, made drivable.
@@ -246,6 +247,13 @@ internal val MushafDialRunOut = 26.dp
 internal val MushafDialStray = 42.dp
 
 /**
+ * How far the HUD itself leans at a full stray-width pull, in the pull's own
+ * direction. It is the warning shot: the label moves with the hand so the
+ * reader feels the pop coming before the stray fires and takes the tier away.
+ */
+internal val MushafDialHudLean = 20.dp
+
+/**
  * How long the finger has to stay out in the run-out, in seconds, before the
  * trough actually gives way.
  *
@@ -374,6 +382,17 @@ internal fun mushafDialPastTrough(xPx: Float, widthPx: Float, troughInsetPx: Flo
  */
 internal fun mushafDialStrayed(yPx: Float, pressYPx: Float, strayPx: Float): Boolean =
     abs(yPx - pressYPx) > strayPx
+
+/**
+ * How far the HUD leans off its seat for a hand [dyPx] off the line, when the
+ * stray fires at [strayPx] and a full pull leans the label [leanPx].
+ *
+ * Proportional on purpose: the lean is the countdown to the pop, so it spends
+ * itself in the reader's own measure — half the stray crossed, half the lean
+ * shown — and clamps exactly where the stray fires and the tier gives way.
+ */
+internal fun mushafDialHudLean(dyPx: Float, strayPx: Float, leanPx: Float): Float =
+    (dyPx / strayPx).coerceIn(-1f, 1f) * leanPx
 
 /**
  * The whole close law: whether a hand that has been in the run-out for
@@ -808,6 +827,14 @@ internal fun MushafPageDial(
     // a short bracket on the book's scale, and 1 is that bracket stretched
     // across the whole measure with its leaves standing in it.
     val zoom = remember { Animatable(0f) }
+    // How far the HUD has been pulled off its seat, in px, signed with the
+    // pull: the proportional warning that the stray — and so the pop — is
+    // coming. The meter writes it while the trough stands; the pop's spring
+    // owns it afterwards.
+    val hudPull = remember { mutableFloatStateOf(0f) }
+    // The pull's direction at the moment the pop happened, so the two label
+    // readings slide apart along it as they swap. Zero on every other swap.
+    val hudPopDir = remember { mutableFloatStateOf(0f) }
     // Which chapter the trough is holding. Read in the draw phase, so it is
     // written before the animation starts and left alone until the next entry.
     var troughRun by remember { mutableStateOf(1..1) }
@@ -1138,7 +1165,9 @@ internal fun MushafPageDial(
                         val foot = MushafDialRuleY.toPx() -
                             MushafDialPageTick.toPx() -
                             MushafDialHudAir.toPx()
-                        IntOffset(left.roundToInt(), (foot - hudHeightPx).roundToInt())
+                        // Leaning with the hand: the pulled HUD rides its proportional
+                        // offset for exactly as long as the pop is imminent.
+                        IntOffset(left.roundToInt(), (foot - hudHeightPx + hudPull.floatValue).roundToInt())
                     }
                     .graphicsLayer { alpha = expand.value },
             ) {
@@ -1163,7 +1192,10 @@ internal fun MushafPageDial(
                             color = androidx.compose.ui.graphics.lerp(ink, accents.repeatInk, hudPulse).copy(alpha = 0.72f + 0.18f * hudPulse),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.graphicsLayer { alpha = maxOf(1f - zoom.value, zoom.value * 1f) },
+                            modifier = Modifier.graphicsLayer {
+                                alpha = maxOf(1f - zoom.value, zoom.value * 1f)
+                                translationY = -hudPopDir.floatValue * MushafDialHudSwap.toPx() * zoom.value
+                            },
                         )
                         // Chapter number as a grey subtitle under the name.
                         Text(
@@ -1172,7 +1204,10 @@ internal fun MushafPageDial(
                             color = androidx.compose.ui.graphics.lerp(ink.copy(alpha = 0.48f), accents.repeatInk, hudPulse).copy(alpha = 0.48f + 0.22f * hudPulse),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.graphicsLayer { alpha = 1f - zoom.value },
+                            modifier = Modifier.graphicsLayer {
+                                alpha = 1f - zoom.value
+                                translationY = -hudPopDir.floatValue * MushafDialHudSwap.toPx() * zoom.value
+                            },
                         )
                     }
                     Text(
@@ -1181,7 +1216,10 @@ internal fun MushafPageDial(
                         color = androidx.compose.ui.graphics.lerp(ink, accents.repeatInk, hudPulse).copy(alpha = 0.72f + 0.18f * hudPulse),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.graphicsLayer { alpha = zoom.value },
+                        modifier = Modifier.graphicsLayer {
+                            alpha = zoom.value
+                            translationY = hudPopDir.floatValue * MushafDialHudSwap.toPx() * (1f - zoom.value)
+                        },
                     )
                 }
             }
@@ -1212,7 +1250,8 @@ internal fun MushafPageDial(
                         val insetPx = MushafDialEdgeInset.toPx()
                         val widthPxNow = size.width.toFloat()
                         val troughInsetPx = insetPx + MushafDialRunOut.toPx()
-                        val strayPx = MushafDialStray.toPx()
+val strayPx = MushafDialStray.toPx()
+                        val leanPx = MushafDialHudLean.toPx()
                         // The line the reader took hold of. It does not creep
                         // along with the finger — the question the stray test
                         // asks is whether they have left it, and a reference
@@ -1265,6 +1304,8 @@ internal fun MushafPageDial(
                         // hold to most long strokes and to al-Fatiha, leaving
                         // the insistent hold to do it — which is why holding
                         // still took a second and a half instead of an eighth.
+var troughPopped = false
+                        var leanPop: Job? = null
                         var shut = false
                         var travelDp = 0f
                         var sinceTickS = 0f
@@ -1290,9 +1331,11 @@ internal fun MushafPageDial(
                         val initialRunStart = chapterMarks[initialIdxForLast]
                         val initialRunEnd = if (initialIdxForLast + 1 < chapterMarks.size) chapterMarks[initialIdxForLast + 1] - 1 else pages
                         troughRun = initialRunStart..maxOf(initialRunStart, initialRunEnd)
-                        scrubbing = true
+scrubbing = true
                         reportScrub.value(true)
                         hasPulsed = false
+                        hudPull.floatValue = 0f
+                        hudPopDir.floatValue = 0f
                         scope.launch { pulse.snapTo(0f) }
                         scope.launch { expand.animateTo(1f, spring(dampingRatio = 0.85f, stiffness = 340f)) }
                         // The meter runs on the frame clock, not on pointer
@@ -1332,7 +1375,14 @@ internal fun MushafPageDial(
                                 // has been for a moment or a second.
                                 val past =
                                     mushafDialPastTrough(handPx, widthPxNow, troughInsetPx)
-                                val strayed = mushafDialStrayed(handY, pressY, strayPx)
+val strayed = mushafDialStrayed(handY, pressY, strayPx)
+                                // The HUD leans into a pull off the line, in
+                                // proportion, for exactly as long as the
+                                // trough still stands under the hand.
+                                if (open && !troughPopped) {
+                                    hudPull.floatValue =
+                                        mushafDialHudLean(handY - pressY, strayPx, leanPx)
+                                }
                                 if (!past) spared = false
                                 runOutS = if (past && !spared) runOutS + dt else 0f
                                 if (open) {
@@ -1347,10 +1397,24 @@ internal fun MushafPageDial(
                                         troughRun.last.toFloat(),
                                     )
                                     dialPage.floatValue = raw
-                                    if (mushafDialShouldLeaveTrough(runOutS, strayed)) {
+if (mushafDialShouldLeaveTrough(runOutS, strayed)) {
                                         open = false
                                         heldS = 0f
                                         shut = true
+                                        // The pop: the leaned HUD springs back
+                                        // to its seat while the readings swap,
+                                        // sliding apart along the pull that
+                                        // caused it.
+                                        troughPopped = true
+                                        hudPopDir.floatValue = sign(hudPull.floatValue)
+                                        leanPop?.cancel()
+                                        leanPop = scope.launch {
+                                            animate(
+                                                initialValue = hudPull.floatValue,
+                                                targetValue = 0f,
+                                                animationSpec = MushafDialHudPop,
+                                            ) { value, _ -> hudPull.floatValue = value }
+                                        }
                                         view.performHapticFeedback(HapticFeedbackConstants.CONTEXT_CLICK)
                                         scope.launch { zoom.animateTo(0f, MushafDialZoomOut) }
                                     }
@@ -1454,6 +1518,10 @@ internal fun MushafPageDial(
                                         raw - mushafDialTroughPage(fraction, chapter)
                                     open = true
                                     heldS = 0f
+                                    troughPopped = false
+                                    leanPop?.cancel()
+                                    hudPull.floatValue = 0f
+                                    hudPopDir.floatValue = 0f
                                     view.performHapticFeedback(HapticFeedbackConstants.CONTEXT_CLICK)
                                     scope.launch { zoom.animateTo(1f, MushafDialZoomIn) }
                                 }
@@ -1589,3 +1657,13 @@ private val MushafDialZoomIn = spring<Float>(dampingRatio = 0.9f, stiffness = 34
 
 /** The trough shutting, and the thumb's ride home on the same spec. */
 private val MushafDialZoomOut = spring<Float>(dampingRatio = 1f, stiffness = 220f)
+
+/**
+ * The leaned HUD springing back to its seat when the tier gives way: one
+ * visible overshoot, which is what makes the swap read as a pop and not a
+ * slide home.
+ */
+private val MushafDialHudPop = spring<Float>(dampingRatio = 0.5f, stiffness = 380f)
+
+/** How far the two HUD readings slide apart along the pull as the pop swaps them. */
+private val MushafDialHudSwap = 10.dp
