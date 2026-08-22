@@ -823,19 +823,25 @@ internal fun MushafPageDial(
                 val baseSigmaPx = MUSHAF_DIAL_LENS_SIGMA_DP.dp.toPx()
                 val isLensed = scrubbing || handed
                 val centerX = if (isLensed) handX.floatValue else seatX
-                // Tail track share: head (1..69) gets 68% of rule, tail (70..114)
-                // gets 32% even though it is only ~6% of pages. This is the
-                // static room before the edge; lens adds dynamic spread on top.
+                // Tail track share: head (1..69) gets 64% of rule, tail (70..114)
+                // gets 36% even though it is only ~6% of pages, plus an extra
+                // left margin so the tail is not pinned to the glass edge.
                 val tailStartPage = if (chapterMarks.size > 69) chapterMarks[69] else pages
                 val tailStartFrac = mushafDialFraction(tailStartPage.toFloat(), pages)
+                val leftMarginExtraPx = 22.dp.toPx()
                 fun tailAwareX(page: Float): Float {
                     val f = mushafDialFraction(page, pages)
                     val mappedF = if (f < tailStartFrac) {
-                        f / tailStartFrac * 0.68f
+                        f / tailStartFrac * 0.64f
                     } else {
-                        0.68f + (f - tailStartFrac) / (1f - tailStartFrac).coerceAtLeast(1e-3f) * 0.32f
+                        0.64f + (f - tailStartFrac) / (1f - tailStartFrac).coerceAtLeast(1e-3f) * 0.36f
                     }
-                    return mushafDialTrackX(1f - mappedF, size.width, inset)
+                    val base = mushafDialTrackX(1f - mappedF, size.width, inset)
+                    // Tail gets extra right push so its far end is inset from edge.
+                    return if (f >= tailStartFrac) {
+                        val tailProgress = (f - tailStartFrac) / (1f - tailStartFrac).coerceAtLeast(1e-3f)
+                        base + leftMarginExtraPx * tailProgress
+                    } else base
                 }
                 // Progressive left push and sigma: 0 at far right, full by
                 // slightly before chapter 70, then plateau.
@@ -845,7 +851,7 @@ internal fun MushafPageDial(
                 } else 0f
                 val plateauAt = 0.88f
                 val effProgress = (centreProgress / plateauAt).coerceIn(0f, 1f)
-                val leftPushPx = if (isLensed) 12.dp.toPx() * combInk * effProgress else 0f
+                val leftPushPx = if (isLensed) 18.dp.toPx() * combInk * effProgress else 0f
                 val sigmaPx = baseSigmaPx * (1f + 0.85f * effProgress)
                 // Base lens mag progressive: 1× at far right → max at plateau.
                 val progBaseMag = 1f + (MUSHAF_DIAL_LENS_MAG - 1f) * effProgress
