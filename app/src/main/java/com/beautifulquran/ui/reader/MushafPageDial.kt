@@ -548,16 +548,14 @@ private const val MushafDialSeatWidth = 0.55f
 private val MushafDialChapterTick = 5.dp
 /** A leaf in the open trough: taller, because now it is the thing being aimed at. */
 private val MushafDialPageTick = 7.dp
-/** The grab strip: a generous target hung around the rule, so taking hold of
- *  the book is never a precise-finger job. */
-internal val MushafDialTouch = 64.dp
 /**
- * How far that strip reaches up into the leaf's tail. Nearly all of the growth
- * goes upward: below the rule lies the transport after a hand's-width of air,
- * so its presses must stay clear, while the tail gutter and the folio band
- * above are paper nothing else touches — paper nothing else wants to touch.
+ * Grab paper below the rule. The strip lives inside the dial's own bounds:
+ * hung off them with requiredHeight+offset it was never hit-tested at all —
+ * Compose reaches a child only through its parent's geometry — so the comb
+ * has had no hold in it since the frameless rebuild. The rule keeps its
+ * 13dp band above; the hand grabs from beneath it, where it already is.
  */
-private val MushafDialTouchLift = 38.dp
+private val MushafDialBelowGrab = 44.dp
 /** Paper between the top of the comb and the foot of the label. */
 private val MushafDialHudAir = 2.dp
 /**
@@ -680,7 +678,7 @@ internal fun MushafPageDial(
     Box(
         modifier
             .fillMaxWidth()
-            .height(MushafDialSlot)
+            .height(MushafDialSlot + MushafDialBelowGrab)
             .onSizeChanged { widthPx = it.width },
     ) {
         Canvas(Modifier.fillMaxWidth().height(MushafDialSlot)) {
@@ -961,9 +959,7 @@ internal fun MushafPageDial(
             Modifier
                 .align(Alignment.TopStart)
                 .fillMaxWidth()
-                .requiredHeight(MushafDialTouch)
-                .offset(y = -MushafDialTouchLift)
-                .systemGestureExclusion()
+                .height(MushafDialSlot + MushafDialBelowGrab)
                 .pointerInput(pages) {
                     awaitEachGesture {
                         val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
