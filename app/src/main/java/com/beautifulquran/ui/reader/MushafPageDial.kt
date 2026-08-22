@@ -623,6 +623,81 @@ internal fun mushafDialChapterPage(f: Float, marks: IntArray, pageCount: Int): F
     }
 }
 
+/**
+ * Where each chapter mark is DRAWN on the chapter tier, in px, under the
+ * fisheye the finger applies: lens around [centerX], progressive tail boost,
+ * tail push, and the same crowding skip the canvas uses. Marks skipped as
+ * invisible come back as NaN.
+ *
+ * Release reads this so letting go lands on the tick the reader sees — the
+ * lens moves marks away from their true seats, and mapping the finger
+ * through the true scale let go a chapter or three from what was under it.
+ */
+internal fun mushafDialCombDrawnXs(
+    marks: IntArray,
+    pageCount: Int,
+    centerX: Float,
+    isLensed: Boolean,
+    combInk: Float,
+    insetPx: Float,
+    widthPx: Float,
+    rulePx: Float,
+    lensSigmaPx: Float,
+    tailPushPx: Float,
+    epsilonPx: Float,
+): FloatArray {
+    val result = FloatArray(marks.size) { Float.NaN }
+    if (!isLensed || combInk <= 0.004f) {
+        for ((idx, mark) in marks.withIndex()) {
+            result[idx] = mushafDialTrackX(
+                1f - mushafDialChapterFraction(mark.toFloat(), marks, pageCount),
+                widthPx,
+                insetPx,
+            )
+        }
+        return result
+    }
+    val rule = rulePx
+    val baseSigmaPx = lensSigmaPx
+    val centreFrac = mushafDialTrackFraction(centerX, widthPx, insetPx)
+    val centreProgress = (1f - centreFrac).coerceIn(0f, 1f)
+    val plateauAt = 0.78f
+    val effProgress = (centreProgress / plateauAt).coerceIn(0f, 1f)
+    val leftPushPx = tailPushPx * combInk * effProgress
+    val sigmaPx = baseSigmaPx * (1f + 0.6f * effProgress)
+    val progBaseMag = 1f + (MUSHAF_DIAL_LENS_MAG - 1f) * effProgress
+    var previousX = Float.MAX_VALUE
+    for ((idx, mark) in marks.withIndex()) {
+        var trueX = mushafDialTrackX(
+            1f - mushafDialChapterFraction(mark.toFloat(), marks, pageCount),
+            widthPx,
+            insetPx,
+        )
+        var gStart = idx
+        while (gStart > 0 && marks[gStart - 1] == mark) gStart--
+        var gEnd = idx
+        while (gEnd + 1 < marks.size && marks[gEnd + 1] == mark) gEnd++
+        val gSize = gEnd - gStart + 1
+        if (gSize > 1) {
+            val posInGroup = idx - gStart
+            trueX += (posInGroup - (gSize - 1) / 2f) * epsilonPx
+        }
+        val isTailMark = idx >= 24
+        val gap = if (idx < marks.lastIndex) (marks[idx + 1] - mark).coerceIn(0, 20) else 1
+        val extra = if (isTailMark) (1f - gap / 10f).coerceIn(0f, 1f) * 2.2f * effProgress else 0f
+        val densityMag = progBaseMag + extra
+        val x0 = mushafDialLensedX(trueX, centerX, sigmaPx, densityMag)
+        val x = x0 + leftPushPx * (if (isTailMark) {
+            mushafDialFraction(mark.toFloat(), pageCount).coerceIn(0f, 1f)
+        } else 0f)
+        if (x < -rule || x > widthPx + rule) continue
+        if (previousX - x < rule * 1.5f) continue
+        previousX = x
+        result[idx] = x
+    }
+    return result
+}
+
 /** The rule's own band. Ticks stand up inside it; the rule sits near its foot. */
 private val MushafDialSlot = 13.dp
 /** The rule's line, measured from the top of the band — where it has always sat. */
@@ -887,8 +962,7 @@ internal fun MushafPageDial(
                 val sigmaPx = baseSigmaPx * (1f + 0.6f * effProgress)
                 val progBaseMag = 1f + (MUSHAF_DIAL_LENS_MAG - 1f) * effProgress
                 val progHeightMag = 1f + (MUSHAF_DIAL_LENS_HEIGHT_GAIN - 1f) * effProgress
-                val epsilonPx = 1.8.dp.toPx()
-                var previousX = Float.MAX_VALUE
+                            var previousX = Float.MAX_VALUE
                 for ((idx, mark) in chapterMarks.withIndex()) {
                     var trueX = tailX(mark.toFloat())
                     // Spread co-located marks (gap 0) around their page.
@@ -898,6 +972,7 @@ internal fun MushafPageDial(
                     while (gEnd + 1 < chapterMarks.size && chapterMarks[gEnd + 1] == mark) gEnd++
                     val gSize = gEnd - gStart + 1
                     if (gSize > 1) {
+                        val epsilonPx = 1.8.dp.toPx()
                         val posInGroup = idx - gStart
                         val offset = (posInGroup - (gSize - 1) / 2f) * epsilonPx
                         trueX += offset
@@ -1411,7 +1486,53 @@ internal fun MushafPageDial(
                         val here = dialPage.floatValue.roundToInt().coerceIn(1, pages)
                         val landed =
                             if (open) here
-                            else mushafDialChapterRun(chapterMarks, here, pages).first
+                            else {
+                                // Land on the tick the reader SEES: the lens
+                                // moves marks away from their true seats, so
+                                // snapping the finger's true scale let go a
+                                // chapter or three from what was under it.
+                                val drawn = mushafDialCombDrawnXs(
+                                    chapterMarks,
+                                    pages,
+                                    handX.floatValue,
+                                    isLensed = true,
+                                    combInk = expand.value,
+                                    insetPx = insetPx,
+                                    widthPx = widthPxNow,
+                                    rulePx = MushafDialRuleWeightPx * density,
+                                    lensSigmaPx = run {
+                                        // Same progressive sigma the draw
+                                        // block derives from the hand's side.
+                                        val c = mushafDialTrackFraction(
+                                            handX.floatValue, widthPxNow, insetPx,
+                                        )
+                                        val eff = ((1f - c) / 0.78f).coerceIn(0f, 1f)
+                                        MUSHAF_DIAL_LENS_SIGMA_DP.dp.toPx() *
+                                            (1f + 0.6f * eff)
+                                    },
+                                    tailPushPx = 10.dp.toPx(),
+                                    epsilonPx = 1.8.dp.toPx(),
+                                )
+                                var bestIdx = -1
+                                var bestDist = Float.MAX_VALUE
+                                for ((idx, x) in drawn.withIndex()) {
+                                    if (x.isNaN()) continue
+                                    val d = abs(x - handX.floatValue)
+                                    if (d < bestDist) {
+                                        bestDist = d
+                                        bestIdx = idx
+                                    }
+                                }
+                                if (bestIdx >= 0) {
+                                    mushafDialChapterRun(
+                                        chapterMarks,
+                                        chapterMarks[bestIdx],
+                                        pages,
+                                    ).first
+                                } else {
+                                    mushafDialChapterRun(chapterMarks, here, pages).first
+                                }
+                            }
                         // The thumb marks a place; it is not a flywheel. A
                         // release lands where the hand left it — no decay, no
                         // overshoot to read past.
