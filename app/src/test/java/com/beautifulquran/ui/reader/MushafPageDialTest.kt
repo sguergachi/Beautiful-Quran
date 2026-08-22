@@ -98,12 +98,10 @@ class MushafPageDialTest {
 
     @Test
     fun `the hold is long enough that only a deliberate one reaches it`() {
-        // Around a second: past every slowing inside a scrub, which is what an
-        // eighth of a second was answering, and still one gesture rather than
-        // a wait. The speed gate is the other half of the test — it sits far
-        // below any real steering speed, so a reader creeping through the
-        // chapters is not clicked into a trough however long they take.
-        assertTrue(MUSHAF_DIAL_HOLD_S in 0.9f..1.4f)
+        // Around two seconds: past every slowing inside a scrub, plus the
+        // extra second the user asked for — still one gesture rather than a
+        // wait. The speed gate is the other half of the test.
+        assertTrue(MUSHAF_DIAL_HOLD_S in 1.9f..2.4f)
         assertTrue(MUSHAF_DIAL_HOLD_DP_S < 30f)
     }
 
@@ -122,7 +120,7 @@ class MushafPageDialTest {
         // the later of the two, so a hold on the line is never the slower way
         // in — the reader who is somewhere legitimate is never punished for it.
         assertTrue(MUSHAF_DIAL_INSIST_S > MUSHAF_DIAL_HOLD_S)
-        assertTrue(MUSHAF_DIAL_INSIST_S in 1f..2.5f)
+        assertTrue(MUSHAF_DIAL_INSIST_S in 2f..3.5f)
     }
 
     @Test
