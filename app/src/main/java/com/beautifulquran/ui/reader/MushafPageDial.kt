@@ -817,25 +817,58 @@ internal fun MushafPageDial(
             // True positions on the hairline; when the comb is under the finger
             // the neighbourhood is magnified so the bunched marks at the back
             // can be picked between. Closer marks are taller, farther shorter —
-            // the magnification is in the lens, not in the book.
+            // the magnification is in the lens, not in the book. An extra left
+            // margin and per-mark density scaling give the short surahs room
+            // without forcing the thumb to the glass edge.
             val combInk = lift * (1f - open)
             if (combInk > 0.004f) {
                 val tick = MushafDialChapterTick.toPx()
-                val sigmaPx = MUSHAF_DIAL_LENS_SIGMA_DP.dp.toPx()
+                val baseSigmaPx = MUSHAF_DIAL_LENS_SIGMA_DP.dp.toPx()
                 val isLensed = scrubbing || handed
                 val centerX = if (isLensed) handX.floatValue else seatX
+                // Left margin when lensed: push the tail right so the last
+                // chapters are not pinned to the edge. Scales with combInk so
+                // it fades in with the comb rather than jumping.
+                val leftPushPx = if (isLensed) 18.dp.toPx() * combInk else 0f
+                // Wider lens when the centre is in the dense tail.
+                val tailCentre = if (isLensed) {
+                    // 0 at leaf 1 (right), 1 at leaf 604 (left)
+                    val centreFrac = mushafDialTrackFraction(centerX, size.width, inset)
+                    // left half is the tail (pages ~300..604)
+                    (1f - centreFrac).coerceIn(0f, 1f)
+                } else 0f
+                val sigmaPx = baseSigmaPx * (1f + 0.35f * tailCentre)
                 var previousX = Float.MAX_VALUE
-                for (mark in chapterMarks) {
+                for ((idx, mark) in chapterMarks.withIndex()) {
                     val trueX = bookX(mark.toFloat())
-                    val x = if (isLensed) {
-                        mushafDialLensedX(trueX, centerX, sigmaPx, MUSHAF_DIAL_LENS_MAG)
+                    // Per-mark density: short chapters (gap 0..2) get more mag.
+                    val gap = if (idx < chapterMarks.lastIndex) {
+                        (chapterMarks[idx + 1] - mark).coerceIn(0, 20)
+                    } else 1
+                    val densityMag = if (isLensed) {
+                        // gap 0 => 1.35x, gap 10 => 1.0x of base
+                        val extra = (1f - gap / 10f).coerceIn(0f, 1f) * 0.9f
+                        MUSHAF_DIAL_LENS_MAG + extra
+                    } else MUSHAF_DIAL_LENS_MAG
+                    val heightMagForMark = if (isLensed) {
+                        val extraH = (1f - gap / 10f).coerceIn(0f, 1f) * 0.5f
+                        MUSHAF_DIAL_LENS_HEIGHT_GAIN + extraH
+                    } else MUSHAF_DIAL_LENS_HEIGHT_GAIN
+                    val x0 = if (isLensed) {
+                        mushafDialLensedX(trueX, centerX, sigmaPx, densityMag)
                     } else trueX
+                    val x = x0 + leftPushPx * (if (isLensed) {
+                        // Tail marks get more of the push; head marks almost none.
+                        // Use true position's tail-ness.
+                        val markFrac = mushafDialFraction(mark.toFloat(), pages)
+                        (markFrac).coerceIn(0f, 1f)
+                    } else 0f)
                     if (x < -rule || x > size.width + rule) continue
                     if (previousX - x < rule * 1.5f) continue
                     previousX = x
                     val dist = if (isLensed) abs(trueX - centerX) else 0f
                     val heightGain = if (isLensed) {
-                        mushafDialLensFactor(dist, sigmaPx, MUSHAF_DIAL_LENS_HEIGHT_GAIN)
+                        mushafDialLensFactor(dist, sigmaPx, heightMagForMark)
                     } else 1f
                     val length = (tick * combInk * heightGain).coerceAtMost(headroom)
                     if (length <= 0.4f) continue
@@ -847,7 +880,7 @@ internal fun MushafPageDial(
                         // weight the comb read as a smudge on the rule rather
                         // than as marks a reader could count and aim between,
                         // which is the only thing it is for. Height shows the
-                        // lens: closer is taller.
+                        // lens: closer is taller, denser tail is taller still.
                         color = ink.copy(alpha = 0.54f * combInk),
                         topLeft = Offset(x - rule / 2f, ruleY - length),
                         size = Size(rule, length),
