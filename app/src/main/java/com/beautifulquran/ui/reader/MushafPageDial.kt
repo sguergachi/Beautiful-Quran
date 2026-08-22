@@ -529,15 +529,20 @@ internal fun mushafDialChapterRun(marks: IntArray, at: Int, pageCount: Int): Int
     return start..end.coerceAtLeast(start)
 }
 
+/** How much the chapter tier magnifies the bunched tail. */
+internal const val MUSHAF_DIAL_MAGNIFY = 0.42f
+
 /**
- * The chapter tier's own scale: every chapter owns an EQUAL cell of the
- * measure, whatever its length in leaves. Al-Baqarah gets one cell and
- * an-Nas gets one, so a hundred marks stand countable along the rule
- * instead of piling into the first few pixels — the comb is read by
- * counting cells, not by measuring pages.
+ * The chapter tier's own scale: accurately spaced by leaves, magnified where
+ * chapters bunch up. A page's place is its true place in the book
+ * ([mushafDialFraction]) blended toward an equal-cell share, so Al-Baqarah
+ * still reads long and the short surahs at the back — many to a leaf — each
+ * keep their own ground on the rule. The finger can still pick between them
+ * because that ground is magnified, not because the whole book was flattened
+ * into equal cells.
  *
- * [mushafDialChapterIndex] finds which cell a page stands in; the fraction
- * returned carries the place inside the cell too, so steering within a
+ * [mushafDialChapterIndex] finds which chapter a page stands in; the fraction
+ * returned carries the place inside the chapter too, so steering within a
  * long chapter still moves.
  */
 internal fun mushafDialChapterIndex(marks: IntArray, at: Int, pageCount: Int): Int {
@@ -559,22 +564,67 @@ internal fun mushafDialChapterIndex(marks: IntArray, at: Int, pageCount: Int): I
 
 /** Where a page sits on the chapter tier, 0 at leaf 1 and 1 at the far end. */
 internal fun mushafDialChapterFraction(page: Float, marks: IntArray, pageCount: Int): Float {
-    val n = marks.size.coerceAtLeast(1)
-    val index = mushafDialChapterIndex(marks, page.toInt().coerceIn(1, pageCount), pageCount)
-    val run = mushafDialChapterRun(marks, page.toInt().coerceIn(1, pageCount), pageCount)
-    val span = (run.last - run.first).coerceAtLeast(1)
-    val within = (page - run.first) / span
-    return ((index + within) / n).coerceIn(0f, 1f)
+    if (marks.isEmpty()) return mushafDialFraction(page, pageCount)
+    val n = marks.size
+    val at = page.toInt().coerceIn(1, pageCount)
+    val index = mushafDialChapterIndex(marks, at, pageCount)
+    // Each chapter's share: true gap to the next opening blended toward an
+    // equal cell, so the tail's many one-leaf chapters each keep ground.
+    // Gap, not run length: chapters sharing a leaf have gap 0, otherwise
+    // double-counting would push the far end past 1.
+    fun gapAt(i: Int): Int = if (i < n - 1) {
+        (marks[i + 1] - marks[i]).coerceAtLeast(0)
+    } else {
+        (pageCount - marks[i] + 1).coerceAtLeast(1)
+    }
+    fun spanAt(i: Int): Int {
+        val run = mushafDialChapterRun(marks, marks[i], pageCount)
+        return (run.last - run.first + 1).coerceAtLeast(1)
+    }
+    val m = MUSHAF_DIAL_MAGNIFY.coerceIn(0f, 1f)
+    var prefix = 0f
+    for (i in 0 until index) {
+        val p = gapAt(i).toFloat() / pageCount
+        prefix += (1f - m) * p + m * (1f / n)
+    }
+    val span = spanAt(index).toFloat()
+    val run = mushafDialChapterRun(marks, at, pageCount)
+    val within = (page - run.first) / span.coerceAtLeast(1f)
+    val p = gapAt(index).toFloat() / pageCount
+    val w = (1f - m) * p + m * (1f / n)
+    return (prefix + within * w).coerceIn(0f, 1f)
 }
 
 /** The inverse: the leaf under a finger at fraction [f] of the chapter tier. */
 internal fun mushafDialChapterPage(f: Float, marks: IntArray, pageCount: Int): Float {
-    val n = marks.size.coerceAtLeast(1)
-    val cell = (f.coerceIn(0f, 1f) * n).toInt().coerceIn(0, n - 1)
-    val run = mushafDialChapterRun(marks, marks[cell], pageCount)
-    val span = (run.last - run.first).coerceAtLeast(1)
-    val within = f.coerceIn(0f, 1f) * n - cell
-    return run.first + within * span
+    if (marks.isEmpty()) return 1f + f.coerceIn(0f, 1f) * (pageCount - 1f).coerceAtLeast(0f)
+    val n = marks.size
+    val m = MUSHAF_DIAL_MAGNIFY.coerceIn(0f, 1f)
+    fun gapAt(i: Int): Int = if (i < n - 1) {
+        (marks[i + 1] - marks[i]).coerceAtLeast(0)
+    } else {
+        (pageCount - marks[i] + 1).coerceAtLeast(1)
+    }
+    fun spanAt(i: Int): Int {
+        val run = mushafDialChapterRun(marks, marks[i], pageCount)
+        return (run.last - run.first + 1).coerceAtLeast(1)
+    }
+    val clamped = f.coerceIn(0f, 1f)
+    var prefix = 0f
+    for (i in 0 until n) {
+        val gap = gapAt(i).toFloat()
+        val span = spanAt(i).toFloat()
+        val p = gap / pageCount
+        val w = (1f - m) * p + m * (1f / n)
+        val next = prefix + w
+        if (clamped < next || i == n - 1) {
+            val within = if (w > 1e-6f) (clamped - prefix) / w else 0f
+            val run = mushafDialChapterRun(marks, marks[i], pageCount)
+            return run.first + within.coerceIn(0f, 1f) * span
+        }
+        prefix = next
+    }
+    return pageCount.toFloat()
 }
 
 /** The rule's own band. Ticks stand up inside it; the rule sits near its foot. */
@@ -768,9 +818,10 @@ internal fun MushafPageDial(
             // The book does not move. The reader moves along it.
             fun bookX(page: Float) =
                 mushafDialTrackX(1f - mushafDialFraction(page, pages), size.width, inset)
-            // The chapter tier's own hand: every chapter an equal cell of the
-            // measure, so the comb is countable. The trough keeps the book's
-            // absolute scale — it is a magnification of real paper.
+            // The chapter tier's own hand: accurately spaced by leaves, but the
+            // bunched tail is magnified so each short chapter keeps its own
+            // ground. The trough keeps the book's absolute scale — it is a
+            // magnification of real paper.
             fun cellX(page: Float) = mushafDialTrackX(
                 1f - mushafDialChapterFraction(page, chapterMarks, pages),
                 size.width,
@@ -827,8 +878,8 @@ internal fun MushafPageDial(
                 for (mark in chapterMarks) {
                     val x = cellX(mark.toFloat())
                     if (x < -rule || x > size.width + rule) continue
-                    // Equal cells keep every mark its own ground, so none
-                    // needs dropping for crowding a neighbour.
+                    // Magnified spacing keeps every mark its own ground, so
+                    // none needs dropping for crowding a neighbour.
                     if (previousX - x < rule * 1.5f) continue
                     previousX = x
                     val length = (tick * combInk).coerceAtMost(headroom)

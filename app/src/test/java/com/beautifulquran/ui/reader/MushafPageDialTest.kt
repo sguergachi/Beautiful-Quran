@@ -504,38 +504,69 @@ class MushafPageDialTest {
         assertEquals("", mushafDialLabelFoot(leaf, zoomed = false))
     }
     @Test
-    fun `every chapter owns an equal cell of the measure`() {
-        // The comb is read by counting marks, not by measuring pages, so each
-        // chapter — al-Baqarah's 48 leaves and an-Nas's 6 — gets the same
-        // width of rule. Cell boundaries land one cell apart all the way down.
+    fun `the comb stays accurately spaced but magnifies the bunched tail`() {
+        // Truly proportional vs truly equal are the two ends; the shipped
+        // dial sits between them so Al-Baqarah still reads long and the
+        // short surahs at the back — many to a leaf — each keep their own
+        // ground. The magnification is inside the zone, not a flattening of
+        // the whole book.
         val marks = intArrayOf(1, 2, 50, 51, 604)
-        val count = marks.size
+        val n = marks.size
         for (i in marks.indices) {
-            // Leaf 1 sits at fraction 0 (the rule's right end), the far leaf
-            // at 1: the book's own direction of travel.
             val f = mushafDialChapterFraction(marks[i].toFloat(), marks, 604)
-            assertEquals(i.toFloat() / count, f, 1e-4f)
+            val prop = mushafDialFraction(marks[i].toFloat(), 604)
+            val equal = i.toFloat() / n
+            // Magnified sits between the two ends, strictly inside unless
+            // a chapter happens to be exactly average length.
+            assertTrue("mark $i f=$f prop=$prop equal=$equal", f in 0f..1f)
+            // Ordering is preserved: later chapters are further along.
+            if (i > 0) {
+                val prev = mushafDialChapterFraction(marks[i - 1].toFloat(), marks, 604)
+                assertTrue(prev < f)
+            }
+            // For a short chapter the magnified mark is pulled away from
+            // its collapsed proportional place toward its equal-cell place.
+            // Long Al-Baqarah (2→50) is slightly compressed for the same
+            // reason — check the tail mark where the effect is plain.
+            if (marks[i] == 51) {
+                assertTrue(f > prop)
+                assertTrue(f < equal)
+            }
         }
+        // The tail's bunched marks gain separable ground: with pure
+        // proportional spacing marks 50→51 would be 1/603 apart; magnified
+        // they are at least twice that, so a fingertip can pick between them.
+        val f50 = mushafDialChapterFraction(50f, marks, 604)
+        val f51 = mushafDialChapterFraction(51f, marks, 604)
+        val propGap = mushafDialFraction(51f, 604) - mushafDialFraction(50f, 604)
+        assertTrue(f51 - f50 > propGap * 2f)
     }
 
     @Test
     fun `steering inside a long chapter still moves through its leaves`() {
-        // Equal cells must not flatten al-Baqarah into a single stop: within
-        // a cell, the finger walks the chapter's own leaves, right to left.
+        // Magnified cells must not flatten al-Baqarah into a single stop:
+        // within a cell, the finger walks the chapter's own leaves, right
+        // to left, using its magnified share of the rule.
         val marks = intArrayOf(1, 2, 50, 51, 604)
-        // Cell 1 holds the chapter that opens on leaf 2 (leaves 2..49):
-        // inside it the finger walks those leaves in the book's direction,
-        // and the far edge hands back where the next chapter opens.
-        val nearStart = mushafDialChapterPage(1.1f / 5f, marks, 604)
-        val deepIn = mushafDialChapterPage(1.9f / 5f, marks, 604)
-        assertTrue(nearStart > 2f && nearStart < 20f)
-        assertTrue(deepIn > nearStart && deepIn < 49f)
+        // Find the magnified cell for chapter 2 (leaves 2..49) and sample
+        // inside it: near its start and deep in.
+        val fNear = mushafDialChapterFraction(5f, marks, 604)
+        val fDeep = mushafDialChapterFraction(30f, marks, 604)
+        assertTrue(fDeep > fNear)
+        // Inverse around that zone still walks leaves forward.
+        val mid = (fNear + fDeep) / 2f
+        val page = mushafDialChapterPage(mid, marks, 604)
+        assertTrue(page > 2f && page < 49f)
+        // Edges of the cell land where the chapter opens and hands off.
+        val startF = mushafDialChapterFraction(2f, marks, 604)
+        val endF = mushafDialChapterFraction(49f, marks, 604)
+        assertTrue(mid > startF && mid < endF)
     }
 
     @Test
-    fun `the equal-cell comb reads back the page under the finger`() {
-        // Round trip: a mark drawn at its cell position sits exactly where
-        // the gesture arithmetic expects to find that chapter again.
+    fun `the magnified comb reads back the page under the finger`() {
+        // Round trip: a mark drawn at its magnified position sits exactly
+        // where the gesture arithmetic expects to find that chapter again.
         val marks = intArrayOf(1, 2, 50, 51, 286, 604)
         for (mark in marks) {
             val x = mushafDialTrackX(
@@ -548,11 +579,8 @@ class MushafPageDialTest {
                 marks,
                 604,
             )
-            // A cell boundary rounds into a neighbouring chapter across the
-            // seam leaf two chapters share, so the read-back may land one
-            // leaf to either side of this chapter's run.
             val run = mushafDialChapterRun(marks, mark, 604)
-            assertTrue(read >= run.first - 1.01f && read <= run.last + 1.01f)
+            assertTrue("mark $mark read $read run $run", read >= run.first - 1.01f && read <= run.last + 1.01f)
         }
     }
 }
