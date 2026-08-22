@@ -788,8 +788,10 @@ internal fun MushafPageDial(
      * recompose the reader that hosts this. */
     pageAt: () -> Int,
     pageCount: Int,
-    /** Leaves that open a chapter: the chapter tier's comb, and the trough's ends. */
-    chapterPages: Set<Int>,
+    /** One cell per surah, in surah order 1..114: equal on the comb even when
+     *  two tiny surahs share a leaf, so every chapter remains independently
+     *  selectable (Chapter 93 is not collapsed into 92). */
+    chapterPages: IntArray,
     pageLabel: (Int) -> MushafDialLabel?,
     chapterLabel: (Int) -> MushafDialLabel? = { null },
     onSeekPage: (Int) -> Unit,
@@ -828,10 +830,10 @@ internal fun MushafPageDial(
     // across the whole measure with its leaves standing in it.
     val zoom = remember { Animatable(0f) }
     // How far the HUD has been pulled off its seat, in px, signed with the
-    // pull: the proportional warning that the stray — and so the pop — is
-    // coming. The meter writes it while the trough stands; the pop's spring
-    // owns it afterwards.
-    val hudPull = remember { mutableFloatStateOf(0f) }
+    // pull: the warning that the stray — and so the pop — is coming. The
+    // meter only names the target; a soft spring chases it, so the lean is
+    // elastic — it lags the hand and settles, never glued to the finger.
+    val hudPull = remember { Animatable(0f) }
     // The pull's direction at the moment the pop happened, so the two label
     // readings slide apart along it as they swap. Zero on every other swap.
     val hudPopDir = remember { mutableFloatStateOf(0f) }
@@ -1165,9 +1167,9 @@ internal fun MushafPageDial(
                         val foot = MushafDialRuleY.toPx() -
                             MushafDialPageTick.toPx() -
                             MushafDialHudAir.toPx()
-                        // Leaning with the hand: the pulled HUD rides its proportional
-                        // offset for exactly as long as the pop is imminent.
-                        IntOffset(left.roundToInt(), (foot - hudHeightPx + hudPull.floatValue).roundToInt())
+                        // Leaning with the hand: the pulled HUD rides its elastic
+                        // lean for exactly as long as the pop is imminent.
+                        IntOffset(left.roundToInt(), (foot - hudHeightPx + hudPull.value).roundToInt())
                     }
                     .graphicsLayer { alpha = expand.value },
             ) {
@@ -1334,7 +1336,7 @@ var troughPopped = false
 scrubbing = true
                         reportScrub.value(true)
                         hasPulsed = false
-                        hudPull.floatValue = 0f
+                        scope.launch { hudPull.snapTo(0f) }
                         hudPopDir.floatValue = 0f
                         scope.launch { pulse.snapTo(0f) }
                         scope.launch { expand.animateTo(1f, spring(dampingRatio = 0.85f, stiffness = 340f)) }
@@ -1376,12 +1378,26 @@ scrubbing = true
                                 val past =
                                     mushafDialPastTrough(handPx, widthPxNow, troughInsetPx)
 val strayed = mushafDialStrayed(handY, pressY, strayPx)
-                                // The HUD leans into a pull off the line, in
-                                // proportion, for exactly as long as the
-                                // trough still stands under the hand.
+                                // The HUD leans into a pull off the line for
+                                // exactly as long as the trough stands under
+                                // the hand — but the lean is elastic: the
+                                // meter names the proportional target and a
+                                // soft spring chases it, so the label lags
+                                // the hand and settles instead of riding it.
                                 if (open && !troughPopped) {
-                                    hudPull.floatValue =
-                                        mushafDialHudLean(handY - pressY, strayPx, leanPx)
+                                    val lean = mushafDialHudLean(
+                                        handY - pressY,
+                                        strayPx,
+                                        leanPx,
+                                    )
+                                    scope.launch {
+                                        // Re-checked on resume: a pop later in
+                                        // this very frame must win over a stale
+                                        // chase.
+                                        if (open && !troughPopped) {
+                                            hudPull.animateTo(lean, MushafDialHudElastic)
+                                        }
+                                    }
                                 }
                                 if (!past) spared = false
                                 runOutS = if (past && !spared) runOutS + dt else 0f
@@ -1406,14 +1422,10 @@ if (mushafDialShouldLeaveTrough(runOutS, strayed)) {
                                         // sliding apart along the pull that
                                         // caused it.
                                         troughPopped = true
-                                        hudPopDir.floatValue = sign(hudPull.floatValue)
+                                        hudPopDir.floatValue = sign(hudPull.value)
                                         leanPop?.cancel()
                                         leanPop = scope.launch {
-                                            animate(
-                                                initialValue = hudPull.floatValue,
-                                                targetValue = 0f,
-                                                animationSpec = MushafDialHudPop,
-                                            ) { value, _ -> hudPull.floatValue = value }
+                                            hudPull.animateTo(0f, MushafDialHudPop)
                                         }
                                         view.performHapticFeedback(HapticFeedbackConstants.CONTEXT_CLICK)
                                         scope.launch { zoom.animateTo(0f, MushafDialZoomOut) }
@@ -1520,7 +1532,7 @@ if (mushafDialShouldLeaveTrough(runOutS, strayed)) {
                                     heldS = 0f
                                     troughPopped = false
                                     leanPop?.cancel()
-                                    hudPull.floatValue = 0f
+                                    scope.launch { hudPull.snapTo(0f) }
                                     hudPopDir.floatValue = 0f
                                     view.performHapticFeedback(HapticFeedbackConstants.CONTEXT_CLICK)
                                     scope.launch { zoom.animateTo(1f, MushafDialZoomIn) }
@@ -1657,6 +1669,13 @@ private val MushafDialZoomIn = spring<Float>(dampingRatio = 0.9f, stiffness = 34
 
 /** The trough shutting, and the thumb's ride home on the same spec. */
 private val MushafDialZoomOut = spring<Float>(dampingRatio = 1f, stiffness = 220f)
+
+/**
+ * How the HUD chases a pull off the line: soft and underdamped, so the lean
+ * lags the hand, catches up with a slight wobble, and never rides the finger
+ * exactly — an elastic band stretched off its seat, not a knob.
+ */
+private val MushafDialHudElastic = spring<Float>(dampingRatio = 0.6f, stiffness = 300f)
 
 /**
  * The leaned HUD springing back to its seat when the tier gives way: one
