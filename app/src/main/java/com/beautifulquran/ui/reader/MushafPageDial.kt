@@ -1319,13 +1319,12 @@ internal fun MushafPageDial(
                                 hudChapterIdx = curIdx
                                 val lastIdx = mushafDialChapterIndex(chapterMarks, lastChapter, pages)
                                 if (curIdx != lastIdx) {
-                                    val isTailChapter = curIdx >= TAIL_START_IDX
-                                    val pitch = if (isTailChapter) MUSHAF_DIAL_TAIL_HAPTIC_PITCH_DP else MUSHAF_DIAL_HAPTIC_PITCH_DP
-                                    if (abs(travelDp) >= pitch && sinceTickS >= MUSHAF_DIAL_HAPTIC_MIN_S) {
-                                        view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
-                                        travelDp = 0f
-                                        sinceTickS = 0f
-                                    }
+                                    // Every chapter crossed ticks — the travel
+                                    // gate is dropped so no chapter skips its
+                                    // tick, only the time guard remains.
+                                    view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+                                    travelDp = 0f
+                                    sinceTickS = 0f
                                     lastChapter = chapterMarks[curIdx]
                                 }
                                 lastPage = landed
