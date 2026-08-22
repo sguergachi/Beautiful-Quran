@@ -1046,9 +1046,12 @@ internal fun MushafPageDial(
                         hudHeightPx = it.height
                     }
                     .offset {
-                        // Over the thumb, which is over the finger.
+                        // Over the thumb, which is over the finger — but the
+                        // label never stops following the hand: it clamps only
+                        // to the glass edges, so at the far left the HUD hugs
+                        // the screen edge instead of stalling mid-rule.
                         val left = (handX.floatValue - hudWidthPx / 2f)
-                            .coerceIn(0f, (widthPx - hudWidthPx).coerceAtLeast(0).toFloat())
+                            .coerceIn(-hudWidthPx * 0.35f, (widthPx - hudWidthPx * 0.65f).coerceAtLeast(0f))
                         // Clear of the tallest tick, and measured from the
                         // rule rather than from the top of the slot. The slot
                         // carries paper above the rule that the label was
