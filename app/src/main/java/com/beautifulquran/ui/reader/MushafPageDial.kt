@@ -47,6 +47,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.util.lerp
 import android.view.HapticFeedbackConstants
+import com.beautifulquran.ui.theme.LocalQuranAccents
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlin.math.abs
@@ -666,6 +667,7 @@ internal fun MushafPageDial(
     modifier: Modifier = Modifier,
 ) {
     val ink = MaterialTheme.colorScheme.onBackground
+    val accents = LocalQuranAccents.current
     val view = LocalView.current
     val scope = rememberCoroutineScope()
     val pages = pageCount.coerceAtLeast(1)
@@ -678,6 +680,9 @@ internal fun MushafPageDial(
     var scrubbing by remember { mutableStateOf(false) }
     val dialPage = remember { mutableFloatStateOf(settled.toFloat()) }
     val expand = remember { Animatable(0f) }
+    // Orange pulse 500ms before the trough pops — 300ms flash + 200ms breather.
+    val pulse = remember { Animatable(0f) }
+    var hasPulsed by remember { mutableStateOf(false) }
     // Where the thumb is drawn, in px along the rule, whenever the hand owns
     // it: the finger's own x during a drag, then the glide home afterwards.
     val handX = remember { mutableFloatStateOf(0f) }
@@ -1013,11 +1018,12 @@ internal fun MushafPageDial(
                 // does not slide out from under the type as the words change.
                 // Both alphas are read in the draw phase, so the whole
                 // transition costs no recomposition at all.
+                val hudPulse = pulse.value
                 Box(contentAlignment = Alignment.Center) {
                     Text(
                         text = mushafDialLabelHead(hud, zoomed = false, page = hudPage),
                         style = hudType,
-                        color = ink.copy(alpha = 0.72f),
+                        color = androidx.compose.ui.graphics.lerp(ink, accents.repeatInk, hudPulse).copy(alpha = 0.72f + 0.18f * hudPulse),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.graphicsLayer { alpha = 1f - zoom.value },
@@ -1025,7 +1031,7 @@ internal fun MushafPageDial(
                     Text(
                         text = mushafDialLabelHead(hud, zoomed = true, page = hudPage),
                         style = hudType,
-                        color = ink.copy(alpha = 0.72f),
+                        color = androidx.compose.ui.graphics.lerp(ink, accents.repeatInk, hudPulse).copy(alpha = 0.72f + 0.18f * hudPulse),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.graphicsLayer { alpha = zoom.value },
@@ -1044,7 +1050,7 @@ internal fun MushafPageDial(
                 Text(
                     text = mushafDialLabelFoot(hud, zoomed = true).ifEmpty { " " },
                     style = hudType,
-                    color = ink.copy(alpha = 0.48f),
+                    color = androidx.compose.ui.graphics.lerp(ink, accents.repeatInk, hudPulse).copy(alpha = 0.48f + 0.22f * hudPulse),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.graphicsLayer { alpha = zoom.value },
@@ -1148,6 +1154,8 @@ internal fun MushafPageDial(
                         troughRun = mushafDialChapterRun(chapterMarks, lastPage, pages)
                         scrubbing = true
                         reportScrub.value(true)
+                        hasPulsed = false
+                        scope.launch { pulse.snapTo(0f) }
                         scope.launch { expand.animateTo(1f, spring(dampingRatio = 0.85f, stiffness = 340f)) }
                         // The meter runs on the frame clock, not on pointer
                         // events.
@@ -1254,6 +1262,15 @@ internal fun MushafPageDial(
                                 // stillness is what the top of every stroke
                                 // looks like.
                                 heldS = if (abs(speed) < MUSHAF_DIAL_HOLD_DP_S) heldS + dt else 0f
+                                if (heldS == 0f) hasPulsed = false
+                                // 500ms before pop: 300ms orange pulse + 200ms breather.
+                                if (!hasPulsed && !open && heldS >= MUSHAF_DIAL_HOLD_S - 0.5f && heldS < MUSHAF_DIAL_HOLD_S) {
+                                    hasPulsed = true
+                                    scope.launch {
+                                        pulse.animateTo(1f, tween(150, easing = FastOutSlowInEasing))
+                                        pulse.animateTo(0f, tween(150, easing = FastOutSlowInEasing))
+                                    }
+                                }
                                 // Travel lifts the closing. A hold that has
                                 // not moved since the trough was taken away is
                                 // the same gesture still going; a hold that
@@ -1344,6 +1361,8 @@ internal fun MushafPageDial(
                         handed = true
                         scrubbing = false
                         reportScrub.value(false)
+                        hasPulsed = false
+                        scope.launch { pulse.snapTo(0f) }
                         // One motion: the trough shuts back into the line
                         // while the thumb rides down onto the seat. Same spec
                         // on both, so they still arrive together — but the
