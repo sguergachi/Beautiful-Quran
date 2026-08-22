@@ -529,22 +529,6 @@ internal fun mushafDialChapterRun(marks: IntArray, at: Int, pageCount: Int): Int
     return start..end.coerceAtLeast(start)
 }
 
-/** How much the chapter tier magnifies the bunched tail. */
-internal const val MUSHAF_DIAL_MAGNIFY = 0.42f
-
-/**
- * The chapter tier's own scale: accurately spaced by leaves, magnified where
- * chapters bunch up. A page's place is its true place in the book
- * ([mushafDialFraction]) blended toward an equal-cell share, so Al-Baqarah
- * still reads long and the short surahs at the back — many to a leaf — each
- * keep their own ground on the rule. The finger can still pick between them
- * because that ground is magnified, not because the whole book was flattened
- * into equal cells.
- *
- * [mushafDialChapterIndex] finds which chapter a page stands in; the fraction
- * returned carries the place inside the chapter too, so steering within a
- * long chapter still moves.
- */
 internal fun mushafDialChapterIndex(marks: IntArray, at: Int, pageCount: Int): Int {
     if (marks.isEmpty()) return 0
     var lo = 0
@@ -562,69 +546,41 @@ internal fun mushafDialChapterIndex(marks: IntArray, at: Int, pageCount: Int): I
     return found
 }
 
+/**
+ * Fisheye for the chapter comb. True positions stay on the hairline; when
+ * the comb is under the finger the neighbourhood is magnified so the
+ * bunched marks at the back can be picked between. Farther marks stay
+ * shorter and closer to their true place — the magnification is in the
+ * lens, not in the book.
+ */
+internal const val MUSHAF_DIAL_LENS_SIGMA_DP = 52f
+internal const val MUSHAF_DIAL_LENS_MAG = 2.4f
+internal const val MUSHAF_DIAL_LENS_HEIGHT_GAIN = 1.9f
+
+internal fun mushafDialLensFactor(distPx: Float, sigmaPx: Float, maxMag: Float): Float {
+    if (sigmaPx <= 1f) return 1f
+    // Gaussian falloff: 1 at infinity, maxMag at the centre.
+    val x = distPx / sigmaPx
+    return 1f + (maxMag - 1f) * exp(-0.5f * x * x)
+}
+
+internal fun mushafDialLensedX(trueX: Float, centerX: Float, sigmaPx: Float, maxMag: Float): Float {
+    val d = trueX - centerX
+    return centerX + d * mushafDialLensFactor(d, sigmaPx, maxMag)
+}
+
 /** Where a page sits on the chapter tier, 0 at leaf 1 and 1 at the far end. */
 internal fun mushafDialChapterFraction(page: Float, marks: IntArray, pageCount: Int): Float {
-    if (marks.isEmpty()) return mushafDialFraction(page, pageCount)
-    val n = marks.size
-    val at = page.toInt().coerceIn(1, pageCount)
-    val index = mushafDialChapterIndex(marks, at, pageCount)
-    // Each chapter's share: true gap to the next opening blended toward an
-    // equal cell, so the tail's many one-leaf chapters each keep ground.
-    // Gap, not run length: chapters sharing a leaf have gap 0, otherwise
-    // double-counting would push the far end past 1.
-    fun gapAt(i: Int): Int = if (i < n - 1) {
-        (marks[i + 1] - marks[i]).coerceAtLeast(0)
-    } else {
-        (pageCount - marks[i] + 1).coerceAtLeast(1)
-    }
-    fun spanAt(i: Int): Int {
-        val run = mushafDialChapterRun(marks, marks[i], pageCount)
-        return (run.last - run.first + 1).coerceAtLeast(1)
-    }
-    val m = MUSHAF_DIAL_MAGNIFY.coerceIn(0f, 1f)
-    var prefix = 0f
-    for (i in 0 until index) {
-        val p = gapAt(i).toFloat() / pageCount
-        prefix += (1f - m) * p + m * (1f / n)
-    }
-    val span = spanAt(index).toFloat()
-    val run = mushafDialChapterRun(marks, at, pageCount)
-    val within = (page - run.first) / span.coerceAtLeast(1f)
-    val p = gapAt(index).toFloat() / pageCount
-    val w = (1f - m) * p + m * (1f / n)
-    return (prefix + within * w).coerceIn(0f, 1f)
+    // True place in the book: leaf 1 at 0, 604 at 1. Magnification is a
+    // lens at draw time, not a warped distribution.
+    return mushafDialFraction(page, pageCount)
 }
 
 /** The inverse: the leaf under a finger at fraction [f] of the chapter tier. */
 internal fun mushafDialChapterPage(f: Float, marks: IntArray, pageCount: Int): Float {
-    if (marks.isEmpty()) return 1f + f.coerceIn(0f, 1f) * (pageCount - 1f).coerceAtLeast(0f)
-    val n = marks.size
-    val m = MUSHAF_DIAL_MAGNIFY.coerceIn(0f, 1f)
-    fun gapAt(i: Int): Int = if (i < n - 1) {
-        (marks[i + 1] - marks[i]).coerceAtLeast(0)
-    } else {
-        (pageCount - marks[i] + 1).coerceAtLeast(1)
-    }
-    fun spanAt(i: Int): Int {
-        val run = mushafDialChapterRun(marks, marks[i], pageCount)
-        return (run.last - run.first + 1).coerceAtLeast(1)
-    }
+    // Inverse of the true distribution above; lens is visual.
     val clamped = f.coerceIn(0f, 1f)
-    var prefix = 0f
-    for (i in 0 until n) {
-        val gap = gapAt(i).toFloat()
-        val span = spanAt(i).toFloat()
-        val p = gap / pageCount
-        val w = (1f - m) * p + m * (1f / n)
-        val next = prefix + w
-        if (clamped < next || i == n - 1) {
-            val within = if (w > 1e-6f) (clamped - prefix) / w else 0f
-            val run = mushafDialChapterRun(marks, marks[i], pageCount)
-            return run.first + within.coerceIn(0f, 1f) * span
-        }
-        prefix = next
-    }
-    return pageCount.toFloat()
+    return 1f + clamped * (pageCount - 1f).coerceAtLeast(0f)
 }
 
 /** The rule's own band. Ticks stand up inside it; the rule sits near its foot. */
@@ -818,35 +774,25 @@ internal fun MushafPageDial(
             // The book does not move. The reader moves along it.
             fun bookX(page: Float) =
                 mushafDialTrackX(1f - mushafDialFraction(page, pages), size.width, inset)
-            // The chapter tier's own hand: accurately spaced by leaves, but the
-            // bunched tail is magnified so each short chapter keeps its own
-            // ground. The trough keeps the book's absolute scale — it is a
-            // magnification of real paper.
-            fun cellX(page: Float) = mushafDialTrackX(
-                1f - mushafDialChapterFraction(page, chapterMarks, pages),
-                size.width,
-                inset,
-            )
             val run = troughRun
             val runSpan = (run.last - run.first).coerceAtLeast(1)
             val headroom = ruleY - 1.5.dp.toPx()
 
             // The bracket, and what it becomes. In the chapter tier it is a
             // short capsule of the seat mark's own weight and ink, sitting over
-            // the chapter the finger is in, drawn on the book's scale like
-            // everything else in that tier — the marker the reader has hold of,
-            // which is why it is not a hairline. Hold still and it stretches
-            // out until it is the whole measure with leaves standing in it, and
-            // recedes to furniture ink as it goes: the trough.
+            // the chapter the finger is in, drawn on the book's true scale.
+            // Hold still and it stretches out until it is the whole measure
+            // with leaves standing in it, and recedes to furniture ink as it
+            // goes: the trough.
             //
             // It is not a fill. It does not run from an end of the rule and it
             // does not grow with progress — at rest it is not there at all. It
-            // is one cell of the comb, and then that cell magnified, which is
-            // the only way to say "you are inside this chapter now" to a reader
-            // whose own finger is covering the line.
+            // is one chapter's run, and then that run magnified into the trough,
+            // which is the only way to say "you are inside this chapter now" to
+            // a reader whose own finger is covering the line.
             if (lift > 0.004f && chapterMarks.isNotEmpty()) {
-                val fromX = lerp(cellX(run.first.toFloat()), bookX(run.first.toFloat()), open)
-                val toX = lerp(cellX(run.last.toFloat()), bookX(run.last.toFloat()), open)
+                val fromX = bookX(run.first.toFloat())
+                val toX = bookX(run.last.toFloat())
                 val minW = MushafDialBracketMin.toPx()
                 val centre = (fromX + toX) / 2f
                 val half = maxOf(abs(fromX - toX), minW) / 2f
@@ -857,7 +803,7 @@ internal fun MushafPageDial(
                     // The seat mark's ink while it is a marker, falling back to
                     // furniture as it becomes a channel. Reversed from how it
                     // was, and the reversal is the point: the reader's hand is
-                    // on the cell, not on the measure, and the whole measure
+                    // on the chapter, not on the measure, and the whole measure
                     // carrying a marker's weight would read as a fill.
                     color = ink.copy(alpha = lerp(thumbInk, 0.20f, open) * lift),
                     topLeft = Offset(left, ruleY - weight / 2f),
@@ -868,21 +814,30 @@ internal fun MushafPageDial(
 
             // The chapter tier's comb: one mark per chapter opening, standing
             // where that chapter stands in the book, end to end of the rule.
-            // This is what the reader steers by by default, at any speed — it
-            // is not taken away for going fast or for going slow, and it does
-            // not move, so the far left really is the back of the book.
+            // True positions on the hairline; when the comb is under the finger
+            // the neighbourhood is magnified so the bunched marks at the back
+            // can be picked between. Closer marks are taller, farther shorter —
+            // the magnification is in the lens, not in the book.
             val combInk = lift * (1f - open)
             if (combInk > 0.004f) {
                 val tick = MushafDialChapterTick.toPx()
+                val sigmaPx = MUSHAF_DIAL_LENS_SIGMA_DP.dp.toPx()
+                val isLensed = scrubbing || handed
+                val centerX = if (isLensed) handX.floatValue else seatX
                 var previousX = Float.MAX_VALUE
                 for (mark in chapterMarks) {
-                    val x = cellX(mark.toFloat())
+                    val trueX = bookX(mark.toFloat())
+                    val x = if (isLensed) {
+                        mushafDialLensedX(trueX, centerX, sigmaPx, MUSHAF_DIAL_LENS_MAG)
+                    } else trueX
                     if (x < -rule || x > size.width + rule) continue
-                    // Magnified spacing keeps every mark its own ground, so
-                    // none needs dropping for crowding a neighbour.
                     if (previousX - x < rule * 1.5f) continue
                     previousX = x
-                    val length = (tick * combInk).coerceAtMost(headroom)
+                    val dist = if (isLensed) abs(trueX - centerX) else 0f
+                    val heightGain = if (isLensed) {
+                        mushafDialLensFactor(dist, sigmaPx, MUSHAF_DIAL_LENS_HEIGHT_GAIN)
+                    } else 1f
+                    val length = (tick * combInk * heightGain).coerceAtMost(headroom)
                     if (length <= 0.4f) continue
                     drawRoundRect(
                         // Stronger than the trough's own leaves, which is the
@@ -891,7 +846,8 @@ internal fun MushafPageDial(
                         // hundred and fourteen to a screen. At furniture
                         // weight the comb read as a smudge on the rule rather
                         // than as marks a reader could count and aim between,
-                        // which is the only thing it is for.
+                        // which is the only thing it is for. Height shows the
+                        // lens: closer is taller.
                         color = ink.copy(alpha = 0.54f * combInk),
                         topLeft = Offset(x - rule / 2f, ruleY - length),
                         size = Size(rule, length),
