@@ -553,9 +553,9 @@ internal fun mushafDialChapterIndex(marks: IntArray, at: Int, pageCount: Int): I
  * shorter and closer to their true place — the magnification is in the
  * lens, not in the book.
  */
-internal const val MUSHAF_DIAL_LENS_SIGMA_DP = 52f
-internal const val MUSHAF_DIAL_LENS_MAG = 2.4f
-internal const val MUSHAF_DIAL_LENS_HEIGHT_GAIN = 1.9f
+internal const val MUSHAF_DIAL_LENS_SIGMA_DP = 36f
+internal const val MUSHAF_DIAL_LENS_MAG = 3.2f
+internal const val MUSHAF_DIAL_LENS_HEIGHT_GAIN = 2.4f
 
 internal fun mushafDialLensFactor(distPx: Float, sigmaPx: Float, maxMag: Float): Float {
     if (sigmaPx <= 1f) return 1f
