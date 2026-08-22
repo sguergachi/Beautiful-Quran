@@ -286,6 +286,7 @@ fun ReaderScreen(
     // a leaf back rather than scrolling it itself; the effect is the third and
     // last writer of the pager's position.
     var mushafSeekPage by remember { mutableStateOf<Int?>(null) }
+    var mushafSeekSurahId by remember { mutableStateOf<Int?>(null) }
     // Read as a lambda by the pager, so a hand landing on the rule fades the
     // folio without recomposing 604 leaves' worth of reader around it.
     val mushafScrubbing = remember { mutableStateOf(false) }
@@ -809,9 +810,16 @@ fun ReaderScreen(
     // leaves have closed up, so a hand moving at a normal pace is steering by
     // chapters and a hand that slows down is steering by leaves — one comb at
     // two magnifications.
-    val mushafChapterPages = remember(mushafCatalog) {
-        val catalog = mushafCatalog ?: return@remember emptySet<Int>()
-        buildSet { for (surahId in 1..114) add(catalog.firstPageOf(surahId)) }
+    val mushafChapterFirstPages = remember(mushafCatalog) {
+        val catalog = mushafCatalog ?: return@remember IntArray(0)
+        IntArray(114) { idx -> catalog.firstPageOf(idx + 1) }
+    }
+    // Keep the distinct set for any legacy filter that only cares about page
+    // existence; the dial itself needs the full 114 (duplicates kept) so two
+    // tiny surahs sharing one leaf still own two equal cells and remain
+    // independently selectable.
+    val mushafChapterPages = remember(mushafChapterFirstPages) {
+        mushafChapterFirstPages.toSet()
     }
     // What the dial writes over its thumb. The scrubbed leaf almost never
     // belongs to the chapter that is loaded, so this reads the leaf's own
@@ -865,6 +873,22 @@ fun ReaderScreen(
     fun mushafPlayTarget(): ReaderInteraction.MushafPlayTarget? {
         val catalog = mushafCatalog ?: return null
         val leaf = catalog.page(mushafPagerState.currentPage + 1) ?: return null
+        val scrubbedSurah = mushafSeekSurahId?.takeIf { sid ->
+            leaf.surahStarts.any { it.surahId == sid } || leaf.ayahKeys.any { it.first == sid }
+        }
+        if (scrubbedSurah != null) {
+            val firstOfScrubbed = leaf.lines
+                .flatMap { it.tokens }
+                .firstOrNull { it.surahId == scrubbedSurah }
+            if (firstOfScrubbed != null) {
+                // A scrub explicitly chose a surah whose opening leaf this is;
+                // honour that choice instead of the page's overall first word,
+                // which may belong to the previous surah on a shared leaf.
+                return ReaderInteraction.MushafPlayTarget(
+                    scrubbedSurah, firstOfScrubbed.ayah, firstOfScrubbed.word.position,
+                )
+            }
+        }
         val first = leaf.lines.firstOrNull { it.tokens.isNotEmpty() }?.tokens?.firstOrNull()
         return ReaderInteraction.mushafPlayTarget(
             pendingJumpAyah = requestedJumpAyah,
@@ -2157,10 +2181,11 @@ fun ReaderScreen(
                         // and something to be dragged along.
                         pageAt = mushafLeafPage,
                         pageCount = mushafCatalog?.pageCount ?: 1,
-                        chapterPages = mushafChapterPages,
+                        chapterPages = mushafChapterFirstPages,
                         pageLabel = mushafPageLabel,
                         chapterLabel = mushafChapterLabel,
                         onSeekPage = { mushafSeekPage = it },
+                        onSeekSurah = { mushafSeekSurahId = it },
                         onScrubbing = { mushafScrubbing.value = it },
                         modifier = Modifier.weight(1f),
                     ) {

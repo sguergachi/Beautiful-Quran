@@ -133,13 +133,16 @@ internal fun MushafReadingSheet(
     pageAt: () -> Int,
     /** Leaves in the book — 604, once the catalog is up. */
     pageCount: Int,
-    /** Leaves that open a chapter: the dial's coarse tier. */
-    chapterPages: Set<Int>,
+    /** One cell per surah, in order 1..114: equal on the comb even when two
+     *  tiny surahs share a leaf, so Chapter 93's mark is not lost because it
+     *  shares paper with 92. */
+    chapterPages: IntArray,
     /** What the dial writes over its thumb for a given leaf. */
     pageLabel: (Int) -> MushafDialLabel?,
     chapterLabel: (Int) -> MushafDialLabel? = { null },
     /** Where a scrub landed, once the hand comes off the rule. */
     onSeekPage: (Int) -> Unit,
+    onSeekSurah: ((Int) -> Unit)? = null,
     /** Raised while a hand is on the rule. */
     onScrubbing: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
@@ -176,6 +179,7 @@ internal fun MushafReadingSheet(
             pageLabel = pageLabel,
             chapterLabel = chapterLabel,
             onSeekPage = onSeekPage,
+            onSeekSurah = onSeekSurah,
             onScrubbing = onScrubbing,
             reciting = reciting,
             // Paper between the leaf's own tail and the rule, so the folio

@@ -795,6 +795,7 @@ internal fun MushafPageDial(
     pageLabel: (Int) -> MushafDialLabel?,
     chapterLabel: (Int) -> MushafDialLabel? = { null },
     onSeekPage: (Int) -> Unit,
+    onSeekSurah: ((Int) -> Unit)? = null,
     /** Raised while a hand is on the rule. The leaf's folio steps aside for
      * the label, which is naming a page the folio has not reached yet. */
     onScrubbing: (Boolean) -> Unit,
@@ -812,6 +813,7 @@ internal fun MushafPageDial(
     val labelOf = rememberUpdatedState(pageLabel)
     val chapterLabelOf = rememberUpdatedState(chapterLabel)
     val seek = rememberUpdatedState(onSeekPage)
+    val seekSurah = rememberUpdatedState(onSeekSurah)
     val reportScrub = rememberUpdatedState(onScrubbing)
 
     var scrubbing by remember { mutableStateOf(false) }
@@ -843,9 +845,10 @@ internal fun MushafPageDial(
     var glide by remember { mutableStateOf<Job?>(null) }
     var widthPx by remember { mutableIntStateOf(0) }
     var hudWidthPx by remember { mutableIntStateOf(0) }
-    // The chapter openings in order, so the comb is drawn by walking a
-    // hundred-odd marks rather than by asking a set about every leaf on screen.
-    val chapterMarks = remember(chapterPages) { chapterPages.toIntArray().sortedArray() }
+    // One mark per surah, surah order 1..114 — duplicates kept when a leaf
+    // opens two tiny surahs, so each owns its own equal cell on the chapter
+    // tier and none is uncountable. Short sorts keep the visual honest.
+    val chapterMarks = remember(chapterPages) { chapterPages.copyOf() }
     var hudHeightPx by remember { mutableIntStateOf(0) }
 
     // A ribbon is for finding your place, not for watching. While the page is
@@ -1563,6 +1566,7 @@ if (mushafDialShouldLeaveTrough(runOutS, strayed)) {
                         // so the leaf is the one it opens on — that is what
                         // chapter granularity has to mean when the hand comes
                         // off, or the tier was a lie.
+                        var landedSurahId: Int? = null
                         val here = dialPage.floatValue.roundToInt().coerceIn(1, pages)
                         val landed =
                             if (open) here
@@ -1604,6 +1608,7 @@ if (mushafDialShouldLeaveTrough(runOutS, strayed)) {
                                     }
                                 }
                                 if (bestIdx >= 0) {
+                                    landedSurahId = bestIdx + 1
                                     mushafDialChapterRun(
                                         chapterMarks,
                                         chapterMarks[bestIdx],
@@ -1621,6 +1626,7 @@ if (mushafDialShouldLeaveTrough(runOutS, strayed)) {
                         }
                         if (moved && landed != settledState.value) {
                             view.performHapticFeedback(HapticFeedbackConstants.CONTEXT_CLICK)
+                            landedSurahId?.let { seekSurah.value?.invoke(it) }
                             seek.value(landed)
                         }
                         dialPage.floatValue = landed.toFloat()
