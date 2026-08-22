@@ -224,15 +224,19 @@ class MushafPageDialTest {
     }
 
     @Test
-    fun `the hud leans with the pull and clamps where the stray fires`() {
-        // The lean is the countdown to the pop: proportional to the pull, so
-        // half the stray spent is half the lean shown, and clamped exactly at
-        // the stray — past it the tier is already gone and a lean would lie.
+    fun `the hud holds steady until the band is nearly spent`() {
+        // Elastic-band tension: ordinary drift inside the band barely moves
+        // the label, and the lean arrives steeply only as the hand nears the
+        // edge — where the pop is actually imminent. Clamped at the stray:
+        // past it the tier is already gone and a lean would lie.
         val stray = 74f
         val lean = 20f
         assertEquals(0f, mushafDialHudLean(0f, stray, lean), 1e-4f)
-        assertEquals(lean * 0.5f, mushafDialHudLean(stray * 0.5f, stray, lean), 1e-4f)
-        assertEquals(-lean * 0.25f, mushafDialHudLean(-stray * 0.25f, stray, lean), 1e-4f)
+        // Half the band: an eighth of the lean — a quarter: almost nothing.
+        assertEquals(lean * 0.125f, mushafDialHudLean(stray * 0.5f, stray, lean), 1e-4f)
+        assertEquals(-lean * 0.125f, mushafDialHudLean(-stray * 0.5f, stray, lean), 1e-4f)
+        assertEquals(lean * 0.015625f, mushafDialHudLean(stray * 0.25f, stray, lean), 1e-6f)
+        // Full tension stands exactly at the break, and never lies past it.
         assertEquals(lean, mushafDialHudLean(stray, stray, lean), 1e-4f)
         assertEquals(lean, mushafDialHudLean(stray * 3f, stray, lean), 1e-4f)
         assertEquals(-lean, mushafDialHudLean(-stray * 3f, stray, lean), 1e-4f)

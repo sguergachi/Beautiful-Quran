@@ -387,12 +387,17 @@ internal fun mushafDialStrayed(yPx: Float, pressYPx: Float, strayPx: Float): Boo
  * How far the HUD leans off its seat for a hand [dyPx] off the line, when the
  * stray fires at [strayPx] and a full pull leans the label [leanPx].
  *
- * Proportional on purpose: the lean is the countdown to the pop, so it spends
- * itself in the reader's own measure — half the stray crossed, half the lean
- * shown — and clamps exactly where the stray fires and the tier gives way.
+ * Elastic-band tension, not a knob. Ordinary travel along the rule — and the
+ * ordinary drift that comes with it — keeps the label almost seated, and the
+ * lean arrives only as the hand nears the edge of the band, where the pop is
+ * actually imminent. The cube is the tension curve: half the stray spent
+ * shows an eighth of the lean, and the whole of it stands at the exact
+ * threshold where the tier breaks.
  */
-internal fun mushafDialHudLean(dyPx: Float, strayPx: Float, leanPx: Float): Float =
-    (dyPx / strayPx).coerceIn(-1f, 1f) * leanPx
+internal fun mushafDialHudLean(dyPx: Float, strayPx: Float, leanPx: Float): Float {
+    val pull = (dyPx / strayPx).coerceIn(-1f, 1f)
+    return pull * pull * pull * leanPx
+}
 
 /**
  * The whole close law: whether a hand that has been in the run-out for
