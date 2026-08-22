@@ -529,6 +529,54 @@ internal fun mushafDialChapterRun(marks: IntArray, at: Int, pageCount: Int): Int
     return start..end.coerceAtLeast(start)
 }
 
+/**
+ * The chapter tier's own scale: every chapter owns an EQUAL cell of the
+ * measure, whatever its length in leaves. Al-Baqarah gets one cell and
+ * an-Nas gets one, so a hundred marks stand countable along the rule
+ * instead of piling into the first few pixels — the comb is read by
+ * counting cells, not by measuring pages.
+ *
+ * [mushafDialChapterIndex] finds which cell a page stands in; the fraction
+ * returned carries the place inside the cell too, so steering within a
+ * long chapter still moves.
+ */
+internal fun mushafDialChapterIndex(marks: IntArray, at: Int, pageCount: Int): Int {
+    if (marks.isEmpty()) return 0
+    var lo = 0
+    var hi = marks.lastIndex
+    var found = 0
+    while (lo <= hi) {
+        val mid = (lo + hi) / 2
+        if (marks[mid] <= at) {
+            found = mid
+            lo = mid + 1
+        } else {
+            hi = mid - 1
+        }
+    }
+    return found
+}
+
+/** Where a page sits on the chapter tier, 0 at leaf 1 and 1 at the far end. */
+internal fun mushafDialChapterFraction(page: Float, marks: IntArray, pageCount: Int): Float {
+    val n = marks.size.coerceAtLeast(1)
+    val index = mushafDialChapterIndex(marks, page.toInt().coerceIn(1, pageCount), pageCount)
+    val run = mushafDialChapterRun(marks, page.toInt().coerceIn(1, pageCount), pageCount)
+    val span = (run.last - run.first).coerceAtLeast(1)
+    val within = (page - run.first) / span
+    return ((index + within) / n).coerceIn(0f, 1f)
+}
+
+/** The inverse: the leaf under a finger at fraction [f] of the chapter tier. */
+internal fun mushafDialChapterPage(f: Float, marks: IntArray, pageCount: Int): Float {
+    val n = marks.size.coerceAtLeast(1)
+    val cell = (f.coerceIn(0f, 1f) * n).toInt().coerceIn(0, n - 1)
+    val run = mushafDialChapterRun(marks, marks[cell], pageCount)
+    val span = (run.last - run.first).coerceAtLeast(1)
+    val within = f.coerceIn(0f, 1f) * n - cell
+    return run.first + within * span
+}
+
 /** The rule's own band. Ticks stand up inside it; the rule sits near its foot. */
 private val MushafDialSlot = 13.dp
 /** The rule's line, measured from the top of the band — where it has always sat. */
@@ -555,7 +603,7 @@ private val MushafDialPageTick = 7.dp
  * has had no hold in it since the frameless rebuild. The rule keeps its
  * 13dp band above; the hand grabs from beneath it, where it already is.
  */
-private val MushafDialBelowGrab = 44.dp
+internal val MushafDialBelowGrab = 44.dp
 /** Paper between the top of the comb and the foot of the label. */
 private val MushafDialHudAir = 2.dp
 /**
@@ -720,6 +768,14 @@ internal fun MushafPageDial(
             // The book does not move. The reader moves along it.
             fun bookX(page: Float) =
                 mushafDialTrackX(1f - mushafDialFraction(page, pages), size.width, inset)
+            // The chapter tier's own hand: every chapter an equal cell of the
+            // measure, so the comb is countable. The trough keeps the book's
+            // absolute scale — it is a magnification of real paper.
+            fun cellX(page: Float) = mushafDialTrackX(
+                1f - mushafDialChapterFraction(page, chapterMarks, pages),
+                size.width,
+                inset,
+            )
             val run = troughRun
             val runSpan = (run.last - run.first).coerceAtLeast(1)
             val headroom = ruleY - 1.5.dp.toPx()
@@ -738,8 +794,8 @@ internal fun MushafPageDial(
             // the only way to say "you are inside this chapter now" to a reader
             // whose own finger is covering the line.
             if (lift > 0.004f && chapterMarks.isNotEmpty()) {
-                val fromX = bookX(run.first.toFloat())
-                val toX = bookX(run.last.toFloat())
+                val fromX = lerp(cellX(run.first.toFloat()), bookX(run.first.toFloat()), open)
+                val toX = lerp(cellX(run.last.toFloat()), bookX(run.last.toFloat()), open)
                 val minW = MushafDialBracketMin.toPx()
                 val centre = (fromX + toX) / 2f
                 val half = maxOf(abs(fromX - toX), minW) / 2f
@@ -769,12 +825,10 @@ internal fun MushafPageDial(
                 val tick = MushafDialChapterTick.toPx()
                 var previousX = Float.MAX_VALUE
                 for (mark in chapterMarks) {
-                    val x = bookX(mark.toFloat())
+                    val x = cellX(mark.toFloat())
                     if (x < -rule || x > size.width + rule) continue
-                    // Marks run leftward as the number grows. The short
-                    // chapters at the back of the book share leaves, so
-                    // several of these land on one pixel; drop the ones that
-                    // would only thicken their neighbour.
+                    // Equal cells keep every mark its own ground, so none
+                    // needs dropping for crowding a neighbour.
                     if (previousX - x < rule * 1.5f) continue
                     previousX = x
                     val length = (tick * combInk).coerceAtMost(headroom)
@@ -1123,9 +1177,13 @@ internal fun MushafPageDial(
                                 // own finger is not — and both ends would stop
                                 // meaning the ends of the book after the first
                                 // stroke that ran past one.
-                                raw = mushafDialTroughPage(
-                                    mushafDialTrackFraction(handPx, widthPxNow, insetPx),
-                                    1..pages,
+                                raw = mushafDialChapterPage(
+                                    // The tier's fractions run 0 at leaf 1
+                                    // (the rule's right end); the track runs
+                                    // 0 at its left edge. One flip joins them.
+                                    1f - mushafDialTrackFraction(handPx, widthPxNow, insetPx),
+                                    chapterMarks,
+                                    pages,
                                 )
                                 dialPage.floatValue = raw
                                 val landed = raw.roundToInt().coerceIn(1, pages)

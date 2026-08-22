@@ -230,7 +230,7 @@ class MushafPageDialTest {
         // Inside the strip the finger is still on the rule it took hold of.
         // If the band were narrower than the paper the reader is allowed to
         // press, a scrub could end itself without the hand leaving the target.
-        assertTrue(MushafDialStray > MushafDialTouch / 2f)
+        assertTrue(MushafDialStray > MushafDialBelowGrab / 2f)
     }
 
     @Test
@@ -502,5 +502,57 @@ class MushafPageDialTest {
         // either way.
         val leaf = MushafDialLabel(number = 2, chapter = "Al-Baqarah", fromAyah = 6, toAyah = 16)
         assertEquals("", mushafDialLabelFoot(leaf, zoomed = false))
+    }
+    @Test
+    fun `every chapter owns an equal cell of the measure`() {
+        // The comb is read by counting marks, not by measuring pages, so each
+        // chapter — al-Baqarah's 48 leaves and an-Nas's 6 — gets the same
+        // width of rule. Cell boundaries land one cell apart all the way down.
+        val marks = intArrayOf(1, 2, 50, 51, 604)
+        val count = marks.size
+        for (i in marks.indices) {
+            // Leaf 1 sits at fraction 0 (the rule's right end), the far leaf
+            // at 1: the book's own direction of travel.
+            val f = mushafDialChapterFraction(marks[i].toFloat(), marks, 604)
+            assertEquals(i.toFloat() / count, f, 1e-4f)
+        }
+    }
+
+    @Test
+    fun `steering inside a long chapter still moves through its leaves`() {
+        // Equal cells must not flatten al-Baqarah into a single stop: within
+        // a cell, the finger walks the chapter's own leaves, right to left.
+        val marks = intArrayOf(1, 2, 50, 51, 604)
+        // Cell 1 holds the chapter that opens on leaf 2 (leaves 2..49):
+        // inside it the finger walks those leaves in the book's direction,
+        // and the far edge hands back where the next chapter opens.
+        val nearStart = mushafDialChapterPage(1.1f / 5f, marks, 604)
+        val deepIn = mushafDialChapterPage(1.9f / 5f, marks, 604)
+        assertTrue(nearStart > 2f && nearStart < 20f)
+        assertTrue(deepIn > nearStart && deepIn < 49f)
+    }
+
+    @Test
+    fun `the equal-cell comb reads back the page under the finger`() {
+        // Round trip: a mark drawn at its cell position sits exactly where
+        // the gesture arithmetic expects to find that chapter again.
+        val marks = intArrayOf(1, 2, 50, 51, 286, 604)
+        for (mark in marks) {
+            val x = mushafDialTrackX(
+                1f - mushafDialChapterFraction(mark.toFloat(), marks, 604),
+                widthPx,
+                insetPx,
+            )
+            val read = mushafDialChapterPage(
+                1f - mushafDialTrackFraction(x, widthPx, insetPx),
+                marks,
+                604,
+            )
+            // A cell boundary rounds into a neighbouring chapter across the
+            // seam leaf two chapters share, so the read-back may land one
+            // leaf to either side of this chapter's run.
+            val run = mushafDialChapterRun(marks, mark, 604)
+            assertTrue(read >= run.first - 1.01f && read <= run.last + 1.01f)
+        }
     }
 }
