@@ -975,8 +975,9 @@ internal fun MushafPageDial(
                         cornerRadius = CornerRadius(rule, rule),
                     )
                 }
-                // Edges always with buffer; inner markers equal-spaced between.
-                val edgeBuf = if (n >= 3) 0.06f else 0f
+                // Edges always with a bigger buffer so the last tick is not
+                // on the run-out edge where a nudge pops out.
+                val edgeBuf = 0.09f
                 drawTroughTick(edgeBuf, run.last.toFloat())
                 drawTroughTick(1f - edgeBuf, run.first.toFloat())
                 if (n > 1) {
@@ -1077,14 +1078,25 @@ internal fun MushafPageDial(
                 // transition costs no recomposition at all.
                 val hudPulse = pulse.value
                 Box(contentAlignment = Alignment.Center) {
-                    Text(
-                        text = mushafDialLabelHead(hud, zoomed = false, page = hudPage),
-                        style = hudType,
-                        color = androidx.compose.ui.graphics.lerp(ink, accents.repeatInk, hudPulse).copy(alpha = 0.72f + 0.18f * hudPulse),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.graphicsLayer { alpha = 1f - zoom.value },
-                    )
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            text = hud.chapter,
+                            style = hudType,
+                            color = androidx.compose.ui.graphics.lerp(ink, accents.repeatInk, hudPulse).copy(alpha = 0.72f + 0.18f * hudPulse),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.graphicsLayer { alpha = maxOf(1f - zoom.value, zoom.value * 1f) },
+                        )
+                        // Chapter number as a grey subtitle under the name.
+                        Text(
+                            text = "${hud.number}",
+                            style = hudType,
+                            color = androidx.compose.ui.graphics.lerp(ink.copy(alpha = 0.48f), accents.repeatInk, hudPulse).copy(alpha = 0.48f + 0.22f * hudPulse),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.graphicsLayer { alpha = 1f - zoom.value },
+                        )
+                    }
                     Text(
                         text = mushafDialLabelHead(hud, zoomed = true, page = hudPage),
                         style = hudType,
@@ -1094,24 +1106,6 @@ internal fun MushafPageDial(
                         modifier = Modifier.graphicsLayer { alpha = zoom.value },
                     )
                 }
-                // The verses sit under the leaf's own name and are read after
-                // it, so they are set below it in the lighter ink the running
-                // head uses for everything subordinate.
-                //
-                // Only one tier writes this line at all, so its cross-fade is
-                // the line against nothing — which is the fade itself, and
-                // wants no second setting to fade against. What the comb
-                // writes here is the hard space: an empty string measures to
-                // no line, and the paper the verses arrive on has to be
-                // already theirs, or the head would step down as they came in.
-                Text(
-                    text = mushafDialLabelFoot(hud, zoomed = true).ifEmpty { " " },
-                    style = hudType,
-                    color = androidx.compose.ui.graphics.lerp(ink, accents.repeatInk, hudPulse).copy(alpha = 0.48f + 0.22f * hudPulse),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.graphicsLayer { alpha = zoom.value },
-                )
             }
         }
         // The grab strip. It hangs around the rule rather than replacing it:
