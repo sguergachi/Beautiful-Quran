@@ -826,18 +826,20 @@ internal fun MushafPageDial(
                 val baseSigmaPx = MUSHAF_DIAL_LENS_SIGMA_DP.dp.toPx()
                 val isLensed = scrubbing || handed
                 val centerX = if (isLensed) handX.floatValue else seatX
-                // Progressive left push and sigma: 0 at far right, full at far
-                // left. Far right starts with zero magnification so the hairline
-                // stays true; moving left progressively magnifies.
+                // Progressive left push and sigma: 0 at far right, full by
+                // slightly before chapter 70, then plateau — so far left does
+                // not keep peaking and bunching. Hairline stays true at right.
                 val centreProgress = if (isLensed) {
                     val centreFrac = mushafDialTrackFraction(centerX, size.width, inset)
                     (1f - centreFrac).coerceIn(0f, 1f)
                 } else 0f
-                val leftPushPx = if (isLensed) 32.dp.toPx() * combInk * centreProgress else 0f
-                val sigmaPx = baseSigmaPx * (1f + 0.85f * centreProgress)
-                // Base lens mag progressive: 1× at far right → max at far left.
-                val progBaseMag = 1f + (MUSHAF_DIAL_LENS_MAG - 1f) * centreProgress
-                val progHeightMag = 1f + (MUSHAF_DIAL_LENS_HEIGHT_GAIN - 1f) * centreProgress
+                val plateauAt = 0.88f
+                val effProgress = (centreProgress / plateauAt).coerceIn(0f, 1f)
+                val leftPushPx = if (isLensed) 32.dp.toPx() * combInk * effProgress else 0f
+                val sigmaPx = baseSigmaPx * (1f + 0.85f * effProgress)
+                // Base lens mag progressive: 1× at far right → max at plateau.
+                val progBaseMag = 1f + (MUSHAF_DIAL_LENS_MAG - 1f) * effProgress
+                val progHeightMag = 1f + (MUSHAF_DIAL_LENS_HEIGHT_GAIN - 1f) * effProgress
                 var previousX = Float.MAX_VALUE
                 for ((idx, mark) in chapterMarks.withIndex()) {
                     val trueX = bookX(mark.toFloat())
@@ -850,13 +852,13 @@ internal fun MushafPageDial(
                     } else 1
                     val densityMag = if (isLensed) {
                         val extra = if (isTailMark) {
-                            (1f - gap / 10f).coerceIn(0f, 1f) * 1.4f * centreProgress
+                            (1f - gap / 10f).coerceIn(0f, 1f) * 1.4f * effProgress
                         } else 0f
                         progBaseMag + extra
                     } else progBaseMag
                     val heightMagForMark = if (isLensed) {
                         val extraH = if (isTailMark) {
-                            (1f - gap / 10f).coerceIn(0f, 1f) * 0.75f * centreProgress
+                            (1f - gap / 10f).coerceIn(0f, 1f) * 0.75f * effProgress
                         } else 0f
                         progHeightMag + extraH
                     } else progHeightMag
