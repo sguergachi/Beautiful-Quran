@@ -975,14 +975,13 @@ internal fun MushafPageDial(
                         cornerRadius = CornerRadius(rule, rule),
                     )
                 }
-                // Edges always; for >4 pages give them buffer so the last leaf
-                // isn't on the run-out edge where a nudge pops out.
-                val edgeBuf = if (n > 4) 0.06f else 0f
+                // Edges always with buffer; inner markers equal-spaced between.
+                val edgeBuf = if (n >= 3) 0.06f else 0f
                 drawTroughTick(edgeBuf, run.last.toFloat())
                 drawTroughTick(1f - edgeBuf, run.first.toFloat())
                 if (n > 1) {
                     for (i in 1 until n) {
-                        val rawGap = (i - 0.5f) / (n - 1).toFloat()
+                        val rawGap = i / n.toFloat()
                         val gapFraction = edgeBuf + rawGap * (1f - 2f * edgeBuf)
                         val page = run.first + i - 0.5f
                         drawTroughTick(gapFraction, page)
