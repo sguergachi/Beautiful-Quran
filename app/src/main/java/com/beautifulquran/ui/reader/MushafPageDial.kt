@@ -841,25 +841,25 @@ internal fun MushafPageDial(
                 var previousX = Float.MAX_VALUE
                 for ((idx, mark) in chapterMarks.withIndex()) {
                     val trueX = bookX(mark.toFloat())
-                    // Per-mark density: short chapters (gap 0..2) get more mag.
+                    // Extra magnification from chapter 70 onward — the short
+                    // tail where gaps collapse. Earlier chapters keep base mag.
+                    val isTailMark = idx >= 69
                     val gap = if (idx < chapterMarks.lastIndex) {
                         (chapterMarks[idx + 1] - mark).coerceIn(0, 20)
                     } else 1
-                    val densityMag = if (isLensed) {
-                        // gap 0 => 1.35x, gap 10 => 1.0x of base
+                    val densityMag = if (isLensed && isTailMark) {
+                        // gap 0 => +0.9, gap 10 => +0
                         val extra = (1f - gap / 10f).coerceIn(0f, 1f) * 0.9f
                         MUSHAF_DIAL_LENS_MAG + extra
                     } else MUSHAF_DIAL_LENS_MAG
-                    val heightMagForMark = if (isLensed) {
+                    val heightMagForMark = if (isLensed && isTailMark) {
                         val extraH = (1f - gap / 10f).coerceIn(0f, 1f) * 0.5f
                         MUSHAF_DIAL_LENS_HEIGHT_GAIN + extraH
                     } else MUSHAF_DIAL_LENS_HEIGHT_GAIN
                     val x0 = if (isLensed) {
                         mushafDialLensedX(trueX, centerX, sigmaPx, densityMag)
                     } else trueX
-                    val x = x0 + leftPushPx * (if (isLensed) {
-                        // Tail marks get more of the push; head marks almost none.
-                        // Use true position's tail-ness.
+                    val x = x0 + leftPushPx * (if (isLensed && isTailMark) {
                         val markFrac = mushafDialFraction(mark.toFloat(), pages)
                         (markFrac).coerceIn(0f, 1f)
                     } else 0f)
