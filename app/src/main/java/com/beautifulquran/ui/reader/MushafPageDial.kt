@@ -553,7 +553,7 @@ internal fun mushafDialChapterIndex(marks: IntArray, at: Int, pageCount: Int): I
  * shorter and closer to their true place — the magnification is in the
  * lens, not in the book.
  */
-internal const val MUSHAF_DIAL_LENS_SIGMA_DP = 36f
+internal const val MUSHAF_DIAL_LENS_SIGMA_DP = 24f
 internal const val MUSHAF_DIAL_LENS_MAG = 3.2f
 internal const val MUSHAF_DIAL_LENS_HEIGHT_GAIN = 2.4f
 
@@ -840,25 +840,38 @@ internal fun MushafPageDial(
                 // Base lens mag progressive: 1× at far right → max at plateau.
                 val progBaseMag = 1f + (MUSHAF_DIAL_LENS_MAG - 1f) * effProgress
                 val progHeightMag = 1f + (MUSHAF_DIAL_LENS_HEIGHT_GAIN - 1f) * effProgress
+                // Epsilon for co-located tail marks (same page): spread them
+                // so the lens has distinct centres to magnify.
+                val epsilonPx = 2.8.dp.toPx()
                 var previousX = Float.MAX_VALUE
                 for ((idx, mark) in chapterMarks.withIndex()) {
-                    val trueX = bookX(mark.toFloat())
+                    var trueX = bookX(mark.toFloat())
+                    // Spread co-located marks (gap 0) around their page.
+                    var gStart = idx
+                    while (gStart > 0 && chapterMarks[gStart - 1] == mark) gStart--
+                    var gEnd = idx
+                    while (gEnd + 1 < chapterMarks.size && chapterMarks[gEnd + 1] == mark) gEnd++
+                    val gSize = gEnd - gStart + 1
+                    if (gSize > 1) {
+                        val posInGroup = idx - gStart
+                        val offset = (posInGroup - (gSize - 1) / 2f) * epsilonPx
+                        trueX += offset
+                    }
                     // Extra tail boost from chapter 70, also progressive with
-                    // centreProgress so it fades in leftward. Stronger gap
-                    // scaling so 70+ gets real room before the edge.
+                    // effProgress so it fades in leftward. Tighter stronger for tail.
                     val isTailMark = idx >= 69
                     val gap = if (idx < chapterMarks.lastIndex) {
                         (chapterMarks[idx + 1] - mark).coerceIn(0, 20)
                     } else 1
                     val densityMag = if (isLensed) {
                         val extra = if (isTailMark) {
-                            (1f - gap / 10f).coerceIn(0f, 1f) * 1.4f * effProgress
+                            (1f - gap / 10f).coerceIn(0f, 1f) * 2.2f * effProgress
                         } else 0f
                         progBaseMag + extra
                     } else progBaseMag
                     val heightMagForMark = if (isLensed) {
                         val extraH = if (isTailMark) {
-                            (1f - gap / 10f).coerceIn(0f, 1f) * 0.75f * effProgress
+                            (1f - gap / 10f).coerceIn(0f, 1f) * 1.1f * effProgress
                         } else 0f
                         progHeightMag + extraH
                     } else progHeightMag
