@@ -833,8 +833,8 @@ internal fun MushafPageDial(
                     val centreFrac = mushafDialTrackFraction(centerX, size.width, inset)
                     (1f - centreFrac).coerceIn(0f, 1f)
                 } else 0f
-                val leftPushPx = if (isLensed) 18.dp.toPx() * combInk * centreProgress else 0f
-                val sigmaPx = baseSigmaPx * (1f + 0.35f * centreProgress)
+                val leftPushPx = if (isLensed) 32.dp.toPx() * combInk * centreProgress else 0f
+                val sigmaPx = baseSigmaPx * (1f + 0.85f * centreProgress)
                 // Base lens mag progressive: 1× at far right → max at far left.
                 val progBaseMag = 1f + (MUSHAF_DIAL_LENS_MAG - 1f) * centreProgress
                 val progHeightMag = 1f + (MUSHAF_DIAL_LENS_HEIGHT_GAIN - 1f) * centreProgress
@@ -842,20 +842,21 @@ internal fun MushafPageDial(
                 for ((idx, mark) in chapterMarks.withIndex()) {
                     val trueX = bookX(mark.toFloat())
                     // Extra tail boost from chapter 70, also progressive with
-                    // centreProgress so it fades in leftward.
+                    // centreProgress so it fades in leftward. Stronger gap
+                    // scaling so 70+ gets real room before the edge.
                     val isTailMark = idx >= 69
                     val gap = if (idx < chapterMarks.lastIndex) {
                         (chapterMarks[idx + 1] - mark).coerceIn(0, 20)
                     } else 1
                     val densityMag = if (isLensed) {
                         val extra = if (isTailMark) {
-                            (1f - gap / 10f).coerceIn(0f, 1f) * 0.9f * centreProgress
+                            (1f - gap / 10f).coerceIn(0f, 1f) * 1.4f * centreProgress
                         } else 0f
                         progBaseMag + extra
                     } else progBaseMag
                     val heightMagForMark = if (isLensed) {
                         val extraH = if (isTailMark) {
-                            (1f - gap / 10f).coerceIn(0f, 1f) * 0.5f * centreProgress
+                            (1f - gap / 10f).coerceIn(0f, 1f) * 0.75f * centreProgress
                         } else 0f
                         progHeightMag + extraH
                     } else progHeightMag
