@@ -832,6 +832,17 @@ fun ReaderScreen(
             )
         }
     }
+    val mushafChapterLabel = remember(mushafUi) {
+        label@{ idx: Int ->
+            val surah = mushafUi?.surahsById?.get(idx + 1) ?: return@label null
+            MushafDialLabel(
+                number = idx + 1,
+                chapter = surah.nameTransliteration,
+                fromAyah = 1,
+                toAyah = surah.ayahCount,
+            )
+        }
+    }
     val mushafLeafSurahId = remember(mushafCatalog) {
         derivedStateOf { mushafCatalog?.page(mushafPagerState.currentPage + 1)?.primarySurahId }
     }
@@ -2148,6 +2159,7 @@ fun ReaderScreen(
                         pageCount = mushafCatalog?.pageCount ?: 1,
                         chapterPages = mushafChapterPages,
                         pageLabel = mushafPageLabel,
+                        chapterLabel = mushafChapterLabel,
                         onSeekPage = { mushafSeekPage = it },
                         onScrubbing = { mushafScrubbing.value = it },
                         modifier = Modifier.weight(1f),

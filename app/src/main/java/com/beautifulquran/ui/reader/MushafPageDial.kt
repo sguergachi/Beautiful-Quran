@@ -697,6 +697,7 @@ internal fun MushafPageDial(
     /** Leaves that open a chapter: the chapter tier's comb, and the trough's ends. */
     chapterPages: Set<Int>,
     pageLabel: (Int) -> MushafDialLabel?,
+    chapterLabel: (Int) -> MushafDialLabel? = { null },
     onSeekPage: (Int) -> Unit,
     /** Raised while a hand is on the rule. The leaf's folio steps aside for
      * the label, which is naming a page the folio has not reached yet. */
@@ -713,11 +714,13 @@ internal fun MushafPageDial(
     val settled = pageAt().coerceIn(1, pages)
     val settledState = rememberUpdatedState(settled)
     val labelOf = rememberUpdatedState(pageLabel)
+    val chapterLabelOf = rememberUpdatedState(chapterLabel)
     val seek = rememberUpdatedState(onSeekPage)
     val reportScrub = rememberUpdatedState(onScrubbing)
 
     var scrubbing by remember { mutableStateOf(false) }
     val dialPage = remember { mutableFloatStateOf(settled.toFloat()) }
+    var hudChapterIdx by remember { mutableIntStateOf(-1) }
     val expand = remember { Animatable(0f) }
     // Orange pulse 500ms before the trough pops — 300ms flash + 200ms breather.
     val pulse = remember { Animatable(0f) }
@@ -771,7 +774,11 @@ internal fun MushafPageDial(
     }
     // Kept through the glide home: the label riding the thumb down onto the
     // rule is half of what says the trough is closing, not the leaf changing.
-    val hud = if (scrubbing || handed) labelOf.value(hudPage) else null
+    val hud = if (scrubbing || handed) {
+        if (hudChapterIdx >= TAIL_START_IDX) {
+            chapterLabelOf.value(hudChapterIdx) ?: labelOf.value(hudPage)
+        } else labelOf.value(hudPage)
+    } else null
 
     Box(
         modifier
@@ -1193,6 +1200,7 @@ internal fun MushafPageDial(
                         }
                         var lastPage = raw.roundToInt().coerceIn(1, pages)
                         dialPage.floatValue = raw
+                        hudChapterIdx = initialIdxForLast
                         // The thumb goes to the finger on contact, before any
                         // movement: the reader has taken hold of the rule
                         // here, and the mark belongs where the hand is.
@@ -1299,6 +1307,7 @@ internal fun MushafPageDial(
                                 } else {
                                     mushafDialChapterIndex(chapterMarks, chapter.first, pages)
                                 }
+                                hudChapterIdx = curIdx
                                 val lastIdx = mushafDialChapterIndex(chapterMarks, lastChapter, pages)
                                 if (curIdx != lastIdx) {
                                     val isTailChapter = curIdx >= TAIL_START_IDX
