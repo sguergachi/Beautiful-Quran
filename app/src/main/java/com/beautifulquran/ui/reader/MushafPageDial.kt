@@ -812,30 +812,40 @@ internal fun MushafPageDial(
                 )
             }
 
-            // The chapter tier's comb: one mark per chapter opening, standing
-            // where that chapter stands in the book, end to end of the rule.
-            // True positions on the hairline at rest; when the comb is under
-            // the finger the neighbourhood is magnified. Far right (Al-Fatiha)
-            // starts at 1× (no lens) and magnification grows progressively left
-            // toward the tail, with an extra boost from chapter 70 where gaps
-            // collapse. Closer marks are taller, farther shorter — the lens is
-            // progressive, not flat.
+            // The chapter tier's comb: true hairline at rest, but the 70+ tail
+            // is given its own track share so it is reachable before the far
+            // left edge. When under the finger the neighbourhood is lensed —
+            // far right 1×, growing to max by ~ch 70 then plateau — with extra
+            // tail boost and left push. Epsilon spreads co-located pages.
             val combInk = lift * (1f - open)
             if (combInk > 0.004f) {
                 val tick = MushafDialChapterTick.toPx()
                 val baseSigmaPx = MUSHAF_DIAL_LENS_SIGMA_DP.dp.toPx()
                 val isLensed = scrubbing || handed
                 val centerX = if (isLensed) handX.floatValue else seatX
+                // Tail track share: head (1..69) gets 68% of rule, tail (70..114)
+                // gets 32% even though it is only ~6% of pages. This is the
+                // static room before the edge; lens adds dynamic spread on top.
+                val tailStartPage = if (chapterMarks.size > 69) chapterMarks[69] else pages
+                val tailStartFrac = mushafDialFraction(tailStartPage.toFloat(), pages)
+                fun tailAwareX(page: Float): Float {
+                    val f = mushafDialFraction(page, pages)
+                    val mappedF = if (f < tailStartFrac) {
+                        f / tailStartFrac * 0.68f
+                    } else {
+                        0.68f + (f - tailStartFrac) / (1f - tailStartFrac).coerceAtLeast(1e-3f) * 0.32f
+                    }
+                    return mushafDialTrackX(1f - mappedF, size.width, inset)
+                }
                 // Progressive left push and sigma: 0 at far right, full by
-                // slightly before chapter 70, then plateau — so far left does
-                // not keep peaking and bunching. Hairline stays true at right.
+                // slightly before chapter 70, then plateau.
                 val centreProgress = if (isLensed) {
                     val centreFrac = mushafDialTrackFraction(centerX, size.width, inset)
                     (1f - centreFrac).coerceIn(0f, 1f)
                 } else 0f
                 val plateauAt = 0.88f
                 val effProgress = (centreProgress / plateauAt).coerceIn(0f, 1f)
-                val leftPushPx = if (isLensed) 32.dp.toPx() * combInk * effProgress else 0f
+                val leftPushPx = if (isLensed) 12.dp.toPx() * combInk * effProgress else 0f
                 val sigmaPx = baseSigmaPx * (1f + 0.85f * effProgress)
                 // Base lens mag progressive: 1× at far right → max at plateau.
                 val progBaseMag = 1f + (MUSHAF_DIAL_LENS_MAG - 1f) * effProgress
@@ -845,7 +855,7 @@ internal fun MushafPageDial(
                 val epsilonPx = 2.8.dp.toPx()
                 var previousX = Float.MAX_VALUE
                 for ((idx, mark) in chapterMarks.withIndex()) {
-                    var trueX = bookX(mark.toFloat())
+                    var trueX = tailAwareX(mark.toFloat())
                     // Spread co-located marks (gap 0) around their page.
                     var gStart = idx
                     while (gStart > 0 && chapterMarks[gStart - 1] == mark) gStart--
