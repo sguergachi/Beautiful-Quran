@@ -177,7 +177,7 @@ internal const val MUSHAF_DIAL_HOLD_START_DP_S = 2f
  * The speed gate above still holds the other end: a hold is stillness *and*
  * time, so a slow drift never accumulates one no matter how long it lasts.
  */
-internal const val MUSHAF_DIAL_HOLD_S = 2.12f
+internal const val MUSHAF_DIAL_HOLD_S = 1.62f
 
 /**
  * How long a hand has to stay still, in seconds, to open the trough from
@@ -200,7 +200,7 @@ internal const val MUSHAF_DIAL_HOLD_S = 2.12f
  * over the measure. Otherwise the reader would be handed the trough and have
  * it taken away again in the same fifth of a second, over and over.
  */
-internal const val MUSHAF_DIAL_INSIST_S = 2.5f
+internal const val MUSHAF_DIAL_INSIST_S = 2.0f
 
 /**
  * How much bare rule the trough leaves standing past its own last leaf at
