@@ -293,7 +293,7 @@ internal const val MUSHAF_DIAL_SPEED_FALL_TAU_S = 0.06f
 
 /** The tactile rhythm the dial keeps: no tick closer than this to the last. */
 internal const val MUSHAF_DIAL_HAPTIC_PITCH_DP = 4f
-internal const val MUSHAF_DIAL_TAIL_HAPTIC_PITCH_DP = 2f
+internal const val MUSHAF_DIAL_TAIL_HAPTIC_PITCH_DP = 1.2f
 
 /** Nor closer in time than this, in seconds — under it a tick is a buzz. */
 internal const val MUSHAF_DIAL_HAPTIC_MIN_S = 0.045f
@@ -576,7 +576,7 @@ internal fun mushafDialLensedX(trueX: Float, centerX: Float, sigmaPx: Float, max
 
 /** Tail-aware warp: 25+ gets room and per-chapter equal cells so every short surah is selectable with precision, especially when slowing. */
 private const val TAIL_START_IDX = 24
-private const val TAIL_HEAD_FRACTION = 0.5f
+private const val TAIL_HEAD_FRACTION = 0.3f
 
 private fun tailStartFrac(marks: IntArray, pageCount: Int): Float {
     if (marks.size <= TAIL_START_IDX) return 1f
