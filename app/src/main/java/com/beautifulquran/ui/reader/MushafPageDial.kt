@@ -293,6 +293,7 @@ internal const val MUSHAF_DIAL_SPEED_FALL_TAU_S = 0.06f
 
 /** The tactile rhythm the dial keeps: no tick closer than this to the last. */
 internal const val MUSHAF_DIAL_HAPTIC_PITCH_DP = 4f
+internal const val MUSHAF_DIAL_TAIL_HAPTIC_PITCH_DP = 2f
 
 /** Nor closer in time than this, in seconds — under it a tick is a buzz. */
 internal const val MUSHAF_DIAL_HAPTIC_MIN_S = 0.045f
@@ -573,7 +574,7 @@ internal fun mushafDialLensedX(trueX: Float, centerX: Float, sigmaPx: Float, max
     return centerX + d * mushafDialLensFactor(d, sigmaPx, maxMag)
 }
 
-/** Tail-aware warp: 25+ gets room before the edge so every short surah is selectable with precision, especially when slowing down. */
+/** Tail-aware warp: 25+ gets room and per-chapter equal cells so every short surah is selectable with precision, especially when slowing. */
 private const val TAIL_START_IDX = 24
 private const val TAIL_HEAD_FRACTION = 0.5f
 
@@ -585,12 +586,18 @@ private fun tailStartFrac(marks: IntArray, pageCount: Int): Float {
 /** Where a page sits on the chapter tier, 0 at leaf 1 and 1 at the far end. */
 internal fun mushafDialChapterFraction(page: Float, marks: IntArray, pageCount: Int): Float {
     if (marks.size <= TAIL_START_IDX) return mushafDialFraction(page, pageCount)
-    val tailFrac = tailStartFrac(marks, pageCount)
-    val f = mushafDialFraction(page, pageCount)
-    return if (f < tailFrac) {
-        f / tailFrac * TAIL_HEAD_FRACTION
+    val idx = mushafDialChapterIndex(marks, page.toInt().coerceIn(1, pageCount), pageCount)
+    if (idx < TAIL_START_IDX) {
+        val tailFrac = tailStartFrac(marks, pageCount)
+        val f = mushafDialFraction(page, pageCount)
+        return f / tailFrac * TAIL_HEAD_FRACTION
     } else {
-        TAIL_HEAD_FRACTION + (f - tailFrac) / (1f - tailFrac).coerceAtLeast(1e-3f) * (1f - TAIL_HEAD_FRACTION)
+        val tailCount = (marks.size - TAIL_START_IDX).coerceAtLeast(1)
+        val run = mushafDialChapterRun(marks, page.toInt().coerceIn(1, pageCount), pageCount)
+        val span = (run.last - run.first + 1).coerceAtLeast(1)
+        val within = (page - run.first) / span
+        val posInTail = (idx - TAIL_START_IDX + within) / tailCount
+        return TAIL_HEAD_FRACTION + posInTail * (1f - TAIL_HEAD_FRACTION)
     }
 }
 
@@ -602,12 +609,18 @@ internal fun mushafDialChapterPage(f: Float, marks: IntArray, pageCount: Int): F
     }
     val tailFrac = tailStartFrac(marks, pageCount)
     val clamped = f.coerceIn(0f, 1f)
-    val trueF = if (clamped < TAIL_HEAD_FRACTION) {
-        clamped / TAIL_HEAD_FRACTION * tailFrac
+    if (clamped < TAIL_HEAD_FRACTION) {
+        val trueF = clamped / TAIL_HEAD_FRACTION * tailFrac
+        return 1f + trueF * (pageCount - 1f).coerceAtLeast(0f)
     } else {
-        tailFrac + (clamped - TAIL_HEAD_FRACTION) / (1f - TAIL_HEAD_FRACTION).coerceAtLeast(1e-3f) * (1f - tailFrac)
+        val tailCount = (marks.size - TAIL_START_IDX).coerceAtLeast(1)
+        val posInTail = (clamped - TAIL_HEAD_FRACTION) / (1f - TAIL_HEAD_FRACTION).coerceAtLeast(1e-3f) * tailCount
+        val idx = (posInTail.toInt().coerceIn(0, tailCount - 1)) + TAIL_START_IDX
+        val within = posInTail - (idx - TAIL_START_IDX)
+        val run = mushafDialChapterRun(marks, marks[idx], pageCount)
+        val span = (run.last - run.first + 1).coerceAtLeast(1)
+        return run.first + within.coerceIn(0f, 1f) * span
     }
-    return 1f + trueF * (pageCount - 1f).coerceAtLeast(0f)
 }
 
 /** The rule's own band. Ticks stand up inside it; the rule sits near its foot. */
@@ -1276,7 +1289,9 @@ internal fun MushafPageDial(
                                 val landed = raw.roundToInt().coerceIn(1, pages)
                                 val chapter = mushafDialChapterRun(chapterMarks, landed, pages)
                                 if (chapter.first != lastChapter) {
-                                    if (mushafDialHapticDue(travelDp, sinceTickS)) {
+                                    val isTailChapter = mushafDialChapterIndex(chapterMarks, chapter.first, pages) >= TAIL_START_IDX
+                                    val pitch = if (isTailChapter) MUSHAF_DIAL_TAIL_HAPTIC_PITCH_DP else MUSHAF_DIAL_HAPTIC_PITCH_DP
+                                    if (abs(travelDp) >= pitch && sinceTickS >= MUSHAF_DIAL_HAPTIC_MIN_S) {
                                         view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
                                         travelDp = 0f
                                         sinceTickS = 0f
