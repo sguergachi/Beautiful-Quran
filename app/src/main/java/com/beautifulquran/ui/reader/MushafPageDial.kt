@@ -1317,27 +1317,20 @@ internal fun MushafPageDial(
             // flush to the near edge and the wash runs solid into the glass
             // on that side — no feather showing between edge and words.
             val density = LocalDensity.current
-            // HUD stays centred on the hand until the hand itself hits
-            // the glass; at the edge we keep the plate centred on the hand
-            // (so it stays above the comb) and only the *text* goes flush
-            // — left edge at the plate centre for -1, right edge at centre
-            // for 1. No plate jump to -slack.
+            // Text leads, plate follows: when the centred text would run
+            // off the glass we dock the type — left edge at the comb for -1,
+            // right edge at the comb for 1 — and the plate shifts to sit
+            // under it.
             val hudDock by remember {
                 derivedStateOf {
                     if (widthPx <= 0 || hudWidthPx <= 0) return@derivedStateOf 0
-                    val track = widthPx.toFloat()
-                    val plate = hudWidthPx.toFloat()
                     val hand = handX.floatValue
-                    val rawLeft = hand - plate / 2f
-                    val slack = with(density) { MushafDialHudPad.toPx() } -
-                        MUSHAF_DIAL_HUD_EDGE_MARGIN_PX
-                    val maxLeft = track - plate + slack
-                    // Dock when the *plate* would need to park to keep text
-                    // inside 8px, but we do not park the plate — only the
-                    // text alignment changes, so the plate keeps following.
+                    val contentW = hudContentWidthPx.toFloat()
+                    if (contentW <= 1f) return@derivedStateOf 0
+                    val track = widthPx.toFloat()
                     when {
-                        rawLeft <= -slack -> -1
-                        rawLeft >= maxLeft -> 1
+                        hand - contentW / 2f < 0f -> -1
+                        hand + contentW / 2f > track -> 1
                         else -> 0
                     }
                 }
@@ -1355,18 +1348,25 @@ internal fun MushafPageDial(
                     // bounds at the band's top corner while the type moves
                     // without it.
                     .offset {
-                        // The plate stays centred above the hand — which is
-                        // above the comb tick — and parks only when the glass
-                        // itself stops it: mushafDialHudX clamps at -slack /
-                        // maxLeft. It never jumps aside at the walls; only the
-                        // *text* alignment changes (hudDock), its near edge
-                        // set on the plate's centre vertical axis, which is
-                        // the comb's own line.
-                        val left = mushafDialHudX(
-                            handX.floatValue,
-                            hudWidthPx.toFloat(),
-                            widthPx.toFloat(),
-                            MushafDialHudPad.toPx(),
+                        // Text leads, plate follows: text edge sits at the comb
+                        // (hand) when docked, centred on it otherwise; plate is
+                        // textLeft - pad, clamped to -slack so the wash never
+                        // leaves the glass. No jump to -slack/maxLeft.
+                        val hand = handX.floatValue
+                        val contentW = hudContentWidthPx.toFloat().coerceAtLeast(1f)
+                        val plateW = hudWidthPx.toFloat()
+                        val pad = with(density) { MushafDialHudPad.toPx() }
+                        val slack = pad - MUSHAF_DIAL_HUD_EDGE_MARGIN_PX
+                        val track = widthPx.toFloat()
+                        val textLeft = when (hudDock) {
+                            -1 -> hand
+                            1 -> hand - contentW
+                            else -> hand - contentW / 2f
+                        }
+                        val rawPlateLeft = textLeft - pad
+                        val left = rawPlateLeft.coerceIn(
+                            -slack,
+                            (track - plateW + slack).coerceAtLeast(-slack),
                         )
                         // Clear of the tallest tick, and measured from the
                         // rule rather than from the top of the slot. The slot
@@ -1400,6 +1400,10 @@ internal fun MushafPageDial(
                         hudWidthPx = it.width
                         hudHeightPx = it.height
                     }
+                    // Plate and text vanish together the frame the hand lifts
+                    // — text was already instant via the inner expand gate, but
+                    // drawBehind sits outside that layer so the wash lingered.
+                    .graphicsLayer { alpha = if (hudShown) 1f else 0f }
                     .drawBehind {
                         // The ground is one long progressive wash across
                         // its own width: transparent at each end, easing
@@ -1444,7 +1448,7 @@ internal fun MushafPageDial(
                         )
                     }
                     .padding(horizontal = MushafDialHudPad, vertical = 6.dp)
-                    .graphicsLayer { alpha = if (hudShown) expand.value else 0f },
+                    .graphicsLayer { alpha = expand.value },
             ) {
                 // The head is set twice, once as each tier reads the leaf, and
                 // the two are cross-faded on the trough's own opening. The
@@ -1472,22 +1476,8 @@ internal fun MushafPageDial(
                     1 -> Alignment.End
                     else -> Alignment.CenterHorizontally
                 }
-                // Docked, the type's near edge is set on the plate's centre
-                // vertical axis — the comb's own line — not on the plate's
-                // far edge: the Box shifts half its measured width toward
-                // the centre so left-aligned type starts at the comb and
-                // right-aligned type ends at it. Undocked, centred as usual.
                 Box(
-                    modifier = Modifier
-                        .onSizeChanged { hudContentWidthPx = it.width }
-                        .offset {
-                            val w = hudContentWidthPx
-                            when (hudDock) {
-                                -1 -> IntOffset(w / 2, 0)
-                                1 -> IntOffset(-w / 2, 0)
-                                else -> IntOffset.Zero
-                            }
-                        },
+                    modifier = Modifier.onSizeChanged { hudContentWidthPx = it.width },
                     contentAlignment = when (hudDock) {
                         -1 -> Alignment.TopStart
                         1 -> Alignment.TopEnd
