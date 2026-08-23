@@ -731,9 +731,9 @@ internal fun mushafDialChapterAt(seats: FloatArray, xPx: Float): Int {
  * decisively beyond the midpoint to the new one. Without this a hand
  * parked exactly on a boundary between two tiny tail chapters (70+,
  * ~7.8px cells) jitters 1-2px from sensor noise and flips HUD every
- * frame — constant vibration even when still. The window is small
- * (hysteresisPx) so a deliberate 3-4px move still crosses, but noise
- * does not.
+ * frame — constant vibration even when still. Adaptive to the actual
+ * gap so a 37px head gap needs ~14px to cross but a 7.8px tail gap
+ * needs ~3px; fast jumps >1 are always immediate.
  */
 internal fun mushafDialChapterAtHysteresis(
     seats: FloatArray,
@@ -743,13 +743,15 @@ internal fun mushafDialChapterAtHysteresis(
 ): Int {
     val cur = mushafDialChapterAt(seats, xPx)
     if (cur == lastIdx || lastIdx !in seats.indices || cur !in seats.indices) return cur
-    // Only hysteresis for adjacent neighbours; a fast swipe that jumps
-    // 2+ chapters is deliberate and should land immediately.
     if (abs(cur - lastIdx) != 1) return cur
+    val gap = abs(seats[lastIdx] - seats[cur])
+    // ~60% of the gap — hand must move decisively past the midpoint.
+    // For 70+ (~7.8px) that's ~4.7px total hysteresis, so 1-2px sensor
+    // jitter stays inside, but a 4px deliberate nudge still crosses.
+    val adaptive = (gap * 0.60f).coerceAtLeast(hysteresisPx * 0.85f)
     val mid = (seats[lastIdx] + seats[cur]) / 2f
-    val h = hysteresisPx / 2f
+    val h = adaptive / 2f
     return if (cur > lastIdx) {
-        // moving left (seats decrease with idx)
         if (xPx < mid - h) cur else lastIdx
     } else {
         if (xPx > mid + h) cur else lastIdx
@@ -1786,9 +1788,9 @@ if (mushafDialShouldLeaveTrough(runOutS, strayed)) {
                                 if (effectiveIdx != lastIdx) {
                                     hudChapterIdx = effectiveIdx
                                     // One tick per HUD chapter change, with a
-                                    // 28ms floor so a jitter that somehow still
+                                    // 70ms floor so a jitter that somehow still
                                     // crosses does not buzz at frame rate.
-                                    if (now - lastHapticNs >= 28_000_000L) {
+                                    if (now - lastHapticNs >= 70_000_000L) {
                                         view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
                                         lastHapticNs = now
                                     }
