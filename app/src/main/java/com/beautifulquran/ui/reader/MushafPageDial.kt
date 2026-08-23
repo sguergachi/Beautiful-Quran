@@ -757,10 +757,10 @@ private val MushafDialHudAir = 2.dp
 
 /**
  * How far the label stands clear of the tick line, over and above the air.
- * It reads as a small plate floating above the thumb rather than type sitting
- * on the ticks, so it is lifted a thumb-height clear of them.
+ * It reads as a small plate floating well above the thumb rather than type
+ * sitting on the ticks, so it is lifted clear into the margin.
  */
-private val MushafDialHudLift = 6.dp
+private val MushafDialHudLift = 14.dp
 /**
  * The bracket's weight, closed and open alike — the held thumb's own.
  *
@@ -1156,9 +1156,9 @@ internal fun MushafPageDial(
                     .align(Alignment.TopStart)
                     .background(
                         MaterialTheme.colorScheme.surface,
-                        RoundedCornerShape(3.dp),
+                        RoundedCornerShape(4.dp),
                     )
-                    .padding(horizontal = 8.dp, vertical = 3.dp)
+                    .padding(horizontal = 10.dp, vertical = 4.dp)
                     // Measured out of the slot's reach. The dial's own band is
                     // 13 dp — a hairline's worth — and the label does not live
                     // in it; it stands on the leaf's bottom margin above. Left
