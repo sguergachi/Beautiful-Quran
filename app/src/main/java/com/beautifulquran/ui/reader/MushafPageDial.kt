@@ -404,39 +404,21 @@ internal fun mushafDialHudLean(dyPx: Float, strayPx: Float, leanPx: Float): Floa
 }
 
 /**
- * How much of the HUD plate may hang past the glass at either end, as a
- * fraction of the plate's own width.
- *
- * Full containment read as timid: the plate's own ends are transparent
- * shoulder and its type carries 21 dp of padding, so a plate flush with
- * the glass still showed its words well in from the edge. A small
- * measured overhang lets the reading sit close without ever losing the
- * words themselves — and because it is a fraction of the measured width,
- * a larger font still collides sooner.
- */
-internal const val MUSHAF_DIAL_HUD_OVERHANG = 0.1f
-
-/**
  * Where the HUD plate's left edge sits so its centre follows a hand at
- * [handXPx], colliding with both edges of a rule [trackWidthPx] wide but
- * allowed [MUSHAF_DIAL_HUD_OVERHANG] of itself past either one.
+ * [handXPx] and the plate touches the glass as its max extent: at the far
+ * left it goes left-aligned, at the far right right-aligned, and between
+ * them it centres on the hand.
  *
  * Collision against both edges, from the plate's own *measured* width —
  * the width already carries whatever the type set it to, so a larger font
  * (or a user font scale) collides sooner without this law knowing a thing
- * about type. A plate wider than the rule itself parks at the overhang
- * rather than oscillating between the two clamps.
+ * about type. A plate wider than the rule itself parks flush left rather
+ * than oscillating between the two clamps.
  */
-internal fun mushafDialHudX(
-    handXPx: Float,
-    hudWidthPx: Float,
-    trackWidthPx: Float,
-    overhangFraction: Float = MUSHAF_DIAL_HUD_OVERHANG,
-): Float {
+internal fun mushafDialHudX(handXPx: Float, hudWidthPx: Float, trackWidthPx: Float): Float {
     val halfPlate = hudWidthPx / 2f
-    val overhang = hudWidthPx * overhangFraction
-    val maxLeft = (trackWidthPx - hudWidthPx + overhang).coerceAtLeast(-overhang)
-    return (handXPx - halfPlate).coerceIn(-overhang, maxLeft)
+    val maxLeft = (trackWidthPx - hudWidthPx).coerceAtLeast(0f)
+    return (handXPx - halfPlate).coerceIn(0f, maxLeft)
 }
 
 /**
@@ -1206,10 +1188,10 @@ internal fun MushafPageDial(
                     .offset {
                         // Over the thumb, which is over the finger — but the
                         // label never stops following the hand: it collides
-                        // with the glass edges on its own measured width,
-                        // keeping only a small measured overhang past them,
-                        // so a larger font buys an earlier wall while the
-                        // words still ride close to the edge.
+                        // with the glass edges on its own measured width and
+                        // touches them as its max extent — left-aligned at
+                        // the left, right-aligned at the right — so a larger
+                        // font buys an earlier wall.
                         val left = mushafDialHudX(handX.floatValue, hudWidthPx.toFloat(), widthPx.toFloat())
                         // Clear of the tallest tick, and measured from the
                         // rule rather than from the top of the slot. The slot
