@@ -1333,7 +1333,44 @@ val strayPx = MushafDialStray.toPx()
                         // hold to most long strokes and to al-Fatiha, leaving
                         // the insistent hold to do it — which is why holding
                         // still took a second and a half instead of an eighth.
-var troughPopped = false
+                        // The comb as it is DRAWN under the fisheye, and
+                        // the tick nearest the finger. Shared by the tier's
+                        // read and by release, so the bracket, the label,
+                        // and the landing all answer to the same ticks.
+                        fun nearestDrawnTick(fingerX: Float): Int {
+                            val drawn = mushafDialCombDrawnXs(
+                                chapterMarks,
+                                pages,
+                                fingerX,
+                                isLensed = true,
+                                combInk = expand.value,
+                                insetPx = insetPx,
+                                widthPx = widthPxNow,
+                                rulePx = MushafDialRuleWeightPx * density,
+                                lensSigmaPx = run {
+                                    val c = mushafDialTrackFraction(
+                                        fingerX, widthPxNow, insetPx,
+                                    )
+                                    val eff = ((1f - c) / 0.78f).coerceIn(0f, 1f)
+                                    MUSHAF_DIAL_LENS_SIGMA_DP.dp.toPx() *
+                                        (1f + 0.6f * eff)
+                                },
+                                tailPushPx = 10.dp.toPx(),
+                                epsilonPx = 1.8.dp.toPx(),
+                            )
+                            var best = -1
+                            var bestDist = Float.MAX_VALUE
+                            for ((idx, x) in drawn.withIndex()) {
+                                if (x.isNaN()) continue
+                                val d = abs(x - fingerX)
+                                if (d < bestDist) {
+                                    bestDist = d
+                                    best = idx
+                                }
+                            }
+                            return best
+                        }
+                        var troughPopped = false
                         var leanPop: Job? = null
                         var shut = false
                         var travelDp = 0f
@@ -1477,20 +1514,24 @@ if (mushafDialShouldLeaveTrough(runOutS, strayed)) {
                                 // own finger is not — and both ends would stop
                                 // meaning the ends of the book after the first
                                 // stroke that ran past one.
-                                val chapterFrac = 1f - mushafDialTrackFraction(handPx, widthPxNow, insetPx)
-                                raw = mushafDialChapterPage(chapterFrac, chapterMarks, pages)
+                                // Read off the drawn comb, not through the
+                                // true scale: the lens and the tail's equal
+                                // cells draw each tick away from its true
+                                // seat — at a cell's very edge, not its
+                                // middle — so a true-scale read named a
+                                // chapter one away from the tick the finger
+                                // was aiming at, and al-Munafiqun let go as
+                                // at-Taghabun. Reading what is drawn makes
+                                // bracket, label, and landing agree.
+                                val curIdx = nearestDrawnTick(handPx).takeIf { it >= 0 }
+                                    ?: mushafDialChapterIndex(
+                                        chapterMarks,
+                                        dialPage.floatValue.roundToInt().coerceIn(1, pages),
+                                        pages,
+                                    )
+                                raw = chapterMarks[curIdx].toFloat()
                                 dialPage.floatValue = raw
-                                val landed = raw.roundToInt().coerceIn(1, pages)
-                                val chapter = mushafDialChapterRun(chapterMarks, landed, pages)
-                                // For tail, ChapterRun collapses co-located pages (93/94 both 596) — use
-                                // the fraction's chapter index directly so every short surah ticks.
-                                val curIdx = if (chapterFrac >= TAIL_HEAD_FRACTION && chapterMarks.size > TAIL_START_IDX) {
-                                    val tailCount = (chapterMarks.size - TAIL_START_IDX).coerceAtLeast(1)
-                                    val posInTail = (chapterFrac - TAIL_HEAD_FRACTION) / (1f - TAIL_HEAD_FRACTION).coerceAtLeast(1e-3f) * tailCount
-                                    (posInTail.toInt().coerceIn(0, tailCount - 1)) + TAIL_START_IDX
-                                } else {
-                                    mushafDialChapterIndex(chapterMarks, chapter.first, pages)
-                                }
+                                lastPage = raw.roundToInt().coerceIn(1, pages)
                                 hudChapterIdx = curIdx
                                 val lastIdx = mushafDialChapterIndex(chapterMarks, lastChapter, pages)
                                 if (curIdx != lastIdx) {
@@ -1502,7 +1543,6 @@ if (mushafDialShouldLeaveTrough(runOutS, strayed)) {
                                     sinceTickS = 0f
                                     lastChapter = chapterMarks[curIdx]
                                 }
-                                lastPage = landed
                                 val curRunStart = chapterMarks[curIdx]
                                 val curRunEnd = if (curIdx + 1 < chapterMarks.size) chapterMarks[curIdx + 1] - 1 else pages
                                 troughRun = curRunStart..maxOf(curRunStart, curRunEnd)
@@ -1554,7 +1594,7 @@ if (mushafDialShouldLeaveTrough(runOutS, strayed)) {
                                     val fraction =
                                         mushafDialTrackFraction(handPx, widthPxNow, troughInsetPx)
                                     settleOffset =
-                                        raw - mushafDialTroughPage(fraction, chapter)
+                                        raw - mushafDialTroughPage(fraction, troughRun)
                                     open = true
                                     heldS = 0f
                                     troughPopped = false
@@ -1595,42 +1635,11 @@ if (mushafDialShouldLeaveTrough(runOutS, strayed)) {
                         val landed =
                             if (open) here
                             else {
-                                // Land on the tick the reader SEES: the lens
-                                // moves marks away from their true seats, so
-                                // snapping the finger's true scale let go a
-                                // chapter or three from what was under it.
-                                val drawn = mushafDialCombDrawnXs(
-                                    chapterMarks,
-                                    pages,
-                                    handX.floatValue,
-                                    isLensed = true,
-                                    combInk = expand.value,
-                                    insetPx = insetPx,
-                                    widthPx = widthPxNow,
-                                    rulePx = MushafDialRuleWeightPx * density,
-                                    lensSigmaPx = run {
-                                        // Same progressive sigma the draw
-                                        // block derives from the hand's side.
-                                        val c = mushafDialTrackFraction(
-                                            handX.floatValue, widthPxNow, insetPx,
-                                        )
-                                        val eff = ((1f - c) / 0.78f).coerceIn(0f, 1f)
-                                        MUSHAF_DIAL_LENS_SIGMA_DP.dp.toPx() *
-                                            (1f + 0.6f * eff)
-                                    },
-                                    tailPushPx = 10.dp.toPx(),
-                                    epsilonPx = 1.8.dp.toPx(),
-                                )
-                                var bestIdx = -1
-                                var bestDist = Float.MAX_VALUE
-                                for ((idx, x) in drawn.withIndex()) {
-                                    if (x.isNaN()) continue
-                                    val d = abs(x - handX.floatValue)
-                                    if (d < bestDist) {
-                                        bestDist = d
-                                        bestIdx = idx
-                                    }
-                                }
+                                // Land on the tick the reader SEES — the
+                                // same drawn tick the tier has been reading
+                                // all along, so letting go lands the stroke
+                                // where the bracket says it sat.
+                                val bestIdx = nearestDrawnTick(handX.floatValue)
                                 if (bestIdx >= 0) {
                                     landedSurahId = bestIdx + 1
                                     mushafDialChapterRun(
