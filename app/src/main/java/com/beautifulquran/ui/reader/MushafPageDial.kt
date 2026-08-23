@@ -35,6 +35,7 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -1192,8 +1193,37 @@ internal fun MushafPageDial(
                 letterSpacing = 0.08.em,
             )
             val paper = MaterialTheme.colorScheme.background
+            // Which wall the plate is parked against, if either: -1 left,
+            // +1 right, 0 riding free with the hand. Docked, the type goes
+            // flush to the near edge and the wash runs solid into the glass
+            // on that side — no feather showing between edge and words.
+            val density = LocalDensity.current
+            val hudDock by remember {
+                derivedStateOf {
+                    if (widthPx <= 0 || hudWidthPx <= 0) return@derivedStateOf 0
+                    val slack = with(density) { MushafDialHudPad.toPx() } -
+                        MUSHAF_DIAL_HUD_EDGE_MARGIN_PX
+                    val track = widthPx.toFloat()
+                    val plate = hudWidthPx.toFloat()
+                    val left = mushafDialHudX(
+                        handX.floatValue,
+                        plate,
+                        track,
+                        with(density) { MushafDialHudPad.toPx() },
+                    )
+                    when {
+                        left <= -slack + 0.5f -> -1
+                        left >= track - plate + slack - 0.5f -> 1
+                        else -> 0
+                    }
+                }
+            }
             Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
+                horizontalAlignment = when (hudDock) {
+                    -1 -> Alignment.Start
+                    1 -> Alignment.End
+                    else -> Alignment.CenterHorizontally
+                },
                 modifier = Modifier
                     .align(Alignment.TopStart)
                     // Order is load-bearing: offset and fade must WRAP the
@@ -1256,16 +1286,36 @@ internal fun MushafPageDial(
                         // longer — chapter, page, verses — so the plateau
                         // stretches with it and the line's ends never sit
                         // on ground that is still arriving.
+                        //
+                        // Docked at a wall, the docked side loses its
+                        // feather entirely: paper runs solid off the glass,
+                        // and only the open side fades away.
                         val rise = lerp(0.25f, 0.14f, zoom.value)
-                        drawRoundRect(
-                            brush = Brush.horizontalGradient(
+                        val shoulder = paper.copy(alpha = 0.35f)
+                        val brush = when (hudDock) {
+                            -1 -> Brush.horizontalGradient(
+                                0f to paper,
+                                1f - rise to paper,
+                                1f - rise * 0.5f to shoulder,
+                                1f to paper.copy(alpha = 0f),
+                            )
+                            1 -> Brush.horizontalGradient(
                                 0f to paper.copy(alpha = 0f),
-                                rise * 0.5f to paper.copy(alpha = 0.35f),
+                                rise * 0.5f to shoulder,
+                                rise to paper,
+                                1f to paper,
+                            )
+                            else -> Brush.horizontalGradient(
+                                0f to paper.copy(alpha = 0f),
+                                rise * 0.5f to shoulder,
                                 rise to paper,
                                 1f - rise to paper,
-                                1f - rise * 0.5f to paper.copy(alpha = 0.35f),
+                                1f - rise * 0.5f to shoulder,
                                 1f to paper.copy(alpha = 0f),
-                            ),
+                            )
+                        }
+                        drawRoundRect(
+                            brush = brush,
                             cornerRadius = CornerRadius(6.dp.toPx()),
                         )
                     }
@@ -1293,8 +1343,19 @@ internal fun MushafPageDial(
                 // the pulse before the trough opens, and the ripening band
                 // as the hand pulls toward the pop.
                 val orange = maxOf(hudPulse, hudRipe.floatValue)
-                Box(contentAlignment = Alignment.TopCenter) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                val hudDockAlignment = when (hudDock) {
+                    -1 -> Alignment.Start
+                    1 -> Alignment.End
+                    else -> Alignment.CenterHorizontally
+                }
+                Box(
+                    contentAlignment = when (hudDock) {
+                        -1 -> Alignment.TopStart
+                        1 -> Alignment.TopEnd
+                        else -> Alignment.TopCenter
+                    },
+                ) {
+                    Column(horizontalAlignment = hudDockAlignment) {
                         Text(
                             text = hud.chapter,
                             style = hudType,
@@ -1322,7 +1383,7 @@ internal fun MushafPageDial(
                             },
                         )
                     }
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Column(horizontalAlignment = hudDockAlignment) {
                         Text(
                             text = mushafDialLabelHead(hud, zoomed = true, page = hudPage),
                             style = hudType,
