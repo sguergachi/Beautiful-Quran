@@ -1009,10 +1009,11 @@ internal fun MushafPageDial(
     }
     // Kept through the glide home: the label riding the thumb down onto the
     // rule is half of what says the trough is closing, not the leaf changing.
+    // Chapter tier always reads the chapter's own label — the page's primary
+    // is the previous surah on every shared leaf (e.g. 293 holds 17+18, 106
+    // holds 4+5), so a page label would show 17 for both 17 and 18.
     val hud = if (scrubbing || handed) {
-        if (hudChapterIdx >= TAIL_START_IDX) {
-            chapterLabelOf.value(hudChapterIdx) ?: labelOf.value(hudPage)
-        } else labelOf.value(hudPage)
+        chapterLabelOf.value(hudChapterIdx) ?: labelOf.value(hudPage)
     } else null
 
     Box(
