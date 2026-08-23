@@ -7,6 +7,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Box
@@ -14,8 +15,10 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredHeight
 import androidx.compose.foundation.layout.wrapContentHeight
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.systemGestureExclusion
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -751,6 +754,13 @@ private val MushafDialPageTick = 7.dp
 internal val MushafDialBelowGrab = 44.dp
 /** Paper between the top of the comb and the foot of the label. */
 private val MushafDialHudAir = 2.dp
+
+/**
+ * How far the label stands clear of the tick line, over and above the air.
+ * It reads as a small plate floating above the thumb rather than type sitting
+ * on the ticks, so it is lifted a thumb-height clear of them.
+ */
+private val MushafDialHudLift = 6.dp
 /**
  * The bracket's weight, closed and open alike — the held thumb's own.
  *
@@ -1132,15 +1142,23 @@ internal fun MushafPageDial(
             }
         }
         if (hud != null) {
-            // Type alone, no capsule: on this paper anything with a ground
-            // behind it is a card, and the leaf does not carry cards. It takes
-            // the transport's own small hand, because it stands on the
+            // A quiet plate under the type: the leaf's own script runs right
+            // up to the margin here, and unreadable ink under the label helps
+            // nobody. The ground is the page's own surface colour — flat, no
+            // border, no shadow — so it reads as a clean patch of paper laid
+            // over the margin, not a card floating on it. It takes the
+            // transport's own small hand, because it stands on the
             // transport's paper rather than on the leaf.
             val hudType = MaterialTheme.typography.labelSmall.copy(letterSpacing = 0.08.em)
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier
                     .align(Alignment.TopStart)
+                    .background(
+                        MaterialTheme.colorScheme.surface,
+                        RoundedCornerShape(3.dp),
+                    )
+                    .padding(horizontal = 8.dp, vertical = 3.dp)
                     // Measured out of the slot's reach. The dial's own band is
                     // 13 dp — a hairline's worth — and the label does not live
                     // in it; it stands on the leaf's bottom margin above. Left
@@ -1174,7 +1192,8 @@ internal fun MushafPageDial(
                         // on the leaf the label is already saying.
                         val foot = MushafDialRuleY.toPx() -
                             MushafDialPageTick.toPx() -
-                            MushafDialHudAir.toPx()
+                            MushafDialHudAir.toPx() -
+                            MushafDialHudLift.toPx()
                         // Leaning with the hand: the pulled HUD rides its elastic
                         // lean for exactly as long as the pop is imminent.
                         IntOffset(left.roundToInt(), (foot - hudHeightPx + hudPull.value).roundToInt())
