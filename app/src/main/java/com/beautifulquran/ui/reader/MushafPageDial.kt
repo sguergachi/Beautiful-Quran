@@ -1351,13 +1351,19 @@ internal fun MushafPageDial(
                     // bounds at the band's top corner while the type moves
                     // without it.
                     .offset {
-                        // Plate stays centred on the hand (=> above the comb)
-                        // all the way to the glass; no jump to -slack. When
-                        // docked the Column goes Start/End so the text's
-                        // edge sits at the plate centre vertical axis — left
-                        // edge at centre for -1, right edge at centre for 1.
-                        val rawLeft = handX.floatValue - hudWidthPx.toFloat() / 2f
-                        val left = rawLeft
+                        // Plate stays centred on the hand until it would go
+                        // beyond the glass; when docked the plate edge sits
+                        // at the hand (=> above the comb) so the text edge
+                        // is at the comb — left edge at hand for -1, right
+                        // edge at hand for 1, centred otherwise.
+                        val hand = handX.floatValue
+                        val plate = hudWidthPx.toFloat()
+                        val rawLeft = hand - plate / 2f
+                        val left = when (hudDock) {
+                            -1 -> hand
+                            1 -> hand - plate
+                            else -> rawLeft
+                        }
                         // Clear of the tallest tick, and measured from the
                         // rule rather than from the top of the slot. The slot
                         // carries paper above the rule that the label was
@@ -1462,22 +1468,7 @@ internal fun MushafPageDial(
                     1 -> Alignment.End
                     else -> Alignment.CenterHorizontally
                 }
-                // Left/right dock keeps the plate centred on the hand
-                // (above the comb) but the *text* edge sits at the plate
-                // centre vertical axis — left edge at centre for -1, right
-                // edge at centre for 1 — so the plate does not jump to the
-                // wall and the text stays above the tick.
                 Box(
-                    modifier = Modifier
-                        .onSizeChanged { hudContentWidthPx = it.width }
-                        .offset {
-                            val w = hudContentWidthPx
-                            when (hudDock) {
-                                -1 -> IntOffset(w / 2, 0)
-                                1 -> IntOffset(-w / 2, 0)
-                                else -> IntOffset.Zero
-                            }
-                        },
                     contentAlignment = when (hudDock) {
                         -1 -> Alignment.TopStart
                         1 -> Alignment.TopEnd
