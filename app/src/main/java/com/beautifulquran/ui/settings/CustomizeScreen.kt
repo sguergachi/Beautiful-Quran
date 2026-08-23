@@ -47,6 +47,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.text.SpanStyle
@@ -364,6 +365,12 @@ internal fun ReadingPreview(
     showTranslation: Boolean = true,
     showTransliteration: Boolean = false,
 ) {
+    // Every sp inside the preview, marks and folio included, rides the
+    // reader's text-size dial — the miniature is the reader at one glance.
+    val previewDensity = Density(
+        density = LocalDensity.current.density,
+        fontScale = LocalDensity.current.fontScale * fontScale,
+    )
     val arabicOnly = readingLayout == ReadingLayout.MUSHAF ||
         readingMode == ReadingMode.ARABIC_ONLY
     val englishOnly = readingLayout == ReadingLayout.SCROLL &&
@@ -393,7 +400,8 @@ internal fun ReadingPreview(
     ) {
         // Height is the max leaf, always. Settings only change what is painted.
         PreviewHeightLock(contentPad)
-        Column(Modifier.matchParentSize().clipToBounds().then(contentPad)) {
+        CompositionLocalProvider(LocalDensity provides previewDensity) {
+            Column(Modifier.matchParentSize().clipToBounds().then(contentPad)) {
             if (readingLayout == ReadingLayout.MUSHAF) {
                 PreviewMushafLeaf(
                     pageNumberScript = pageNumberScript,
