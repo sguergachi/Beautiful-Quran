@@ -1005,6 +1005,7 @@ internal fun MushafPageDial(
     var glide by remember { mutableStateOf<Job?>(null) }
     var widthPx by remember { mutableIntStateOf(0) }
     var hudWidthPx by remember { mutableIntStateOf(0) }
+    var hudContentWidthPx by remember { mutableIntStateOf(0) }
     // One mark per surah, surah order 1..114 — duplicates kept when a leaf
     // opens two tiny surahs, so each owns its own equal cell on the chapter
     // tier and none is uncountable. Short sorts keep the visual honest.
@@ -1306,22 +1307,27 @@ internal fun MushafPageDial(
             // flush to the near edge and the wash runs solid into the glass
             // on that side — no feather showing between edge and words.
             val density = LocalDensity.current
+            // HUD stays centred on the hand until the hand itself hits
+            // the glass; at the edge we keep the plate centred on the hand
+            // (so it stays above the comb) and only the *text* goes flush
+            // — left edge at the plate centre for -1, right edge at centre
+            // for 1. No plate jump to -slack.
             val hudDock by remember {
                 derivedStateOf {
                     if (widthPx <= 0 || hudWidthPx <= 0) return@derivedStateOf 0
-                    val slack = with(density) { MushafDialHudPad.toPx() } -
-                        MUSHAF_DIAL_HUD_EDGE_MARGIN_PX
                     val track = widthPx.toFloat()
                     val plate = hudWidthPx.toFloat()
-                    val left = mushafDialHudX(
-                        handX.floatValue,
-                        plate,
-                        track,
-                        with(density) { MushafDialHudPad.toPx() },
-                    )
+                    val hand = handX.floatValue
+                    val rawLeft = hand - plate / 2f
+                    val slack = with(density) { MushafDialHudPad.toPx() } -
+                        MUSHAF_DIAL_HUD_EDGE_MARGIN_PX
+                    val maxLeft = track - plate + slack
+                    // Dock when the *plate* would need to park to keep text
+                    // inside 8px, but we do not park the plate — only the
+                    // text alignment changes, so the plate keeps following.
                     when {
-                        left <= -slack + 0.5f -> -1
-                        left >= track - plate + slack - 0.5f -> 1
+                        rawLeft <= -slack -> -1
+                        rawLeft >= maxLeft -> 1
                         else -> 0
                     }
                 }
@@ -1339,16 +1345,13 @@ internal fun MushafPageDial(
                     // bounds at the band's top corner while the type moves
                     // without it.
                     .offset {
-                        // Over the thumb, which is over the finger — label
-                        // follows the hand to max extent, parks at -slack/
-                        // maxLeft only when the hand hits the glass. Text
-                        // goes flush at the wall.
-                        val left = mushafDialHudX(
-                            handX.floatValue,
-                            hudWidthPx.toFloat(),
-                            widthPx.toFloat(),
-                            MushafDialHudPad.toPx(),
-                        )
+                        // Plate stays centred on the hand (=> above the comb)
+                        // all the way to the glass; no jump to -slack. When
+                        // docked the Column goes Start/End so the text's
+                        // edge sits at the plate centre vertical axis — left
+                        // edge at centre for -1, right edge at centre for 1.
+                        val rawLeft = handX.floatValue - hudWidthPx.toFloat() / 2f
+                        val left = rawLeft
                         // Clear of the tallest tick, and measured from the
                         // rule rather than from the top of the slot. The slot
                         // carries paper above the rule that the label was
@@ -1453,7 +1456,22 @@ internal fun MushafPageDial(
                     1 -> Alignment.End
                     else -> Alignment.CenterHorizontally
                 }
+                // Left/right dock keeps the plate centred on the hand
+                // (above the comb) but the *text* edge sits at the plate
+                // centre vertical axis — left edge at centre for -1, right
+                // edge at centre for 1 — so the plate does not jump to the
+                // wall and the text stays above the tick.
                 Box(
+                    modifier = Modifier
+                        .onSizeChanged { hudContentWidthPx = it.width }
+                        .offset {
+                            val w = hudContentWidthPx
+                            when (hudDock) {
+                                -1 -> IntOffset(w / 2, 0)
+                                1 -> IntOffset(-w / 2, 0)
+                                else -> IntOffset.Zero
+                            }
+                        },
                     contentAlignment = when (hudDock) {
                         -1 -> Alignment.TopStart
                         1 -> Alignment.TopEnd
