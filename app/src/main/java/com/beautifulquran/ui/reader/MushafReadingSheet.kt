@@ -55,6 +55,7 @@ import androidx.media3.common.Player
 import com.beautifulquran.data.PageNumberScript
 import com.beautifulquran.domain.MushafGrid
 import com.beautifulquran.domain.MushafType
+import com.beautifulquran.ui.reader.MushafDialEdgeInset
 import kotlin.math.pow
 import com.beautifulquran.playback.PlayerUiState
 import com.beautifulquran.ui.theme.HafsFontFamily
@@ -100,6 +101,17 @@ private val MushafFolioDiamond = 5.dp
  * the fore-edge fade can be drawn over without reaching the mark gutter.
  */
 internal val MushafPageMargin = 4.dp
+
+/**
+ * The transport row's fore-edge: where the hairline itself now ends. The rule
+ * is drawn only as wide as the comb (the dial's own edge inset inside the
+ * sheet's page gutter), and Back/Settings read as flush with it when their
+ * *ink* starts at the line's end — a 20dp icon inside a 40dp touch target
+ * carries 10dp of bearing each side, so the row pads to the line minus that.
+ */
+private val MushafTransportEdge =
+    MushafPageMargin + MushafEdgeGutter + MushafDialEdgeInset - 10.dp
+
 /**
  * Running head to first line of revelation. A head that sits closer than
  * about a line's pitch reads as part of the block instead of standing off it;
@@ -195,7 +207,7 @@ internal fun MushafReadingSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = MushafPageMargin, vertical = 2.dp),
+                .padding(horizontal = MushafTransportEdge, vertical = 2.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Box(

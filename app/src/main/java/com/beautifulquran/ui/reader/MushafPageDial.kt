@@ -1062,8 +1062,11 @@ internal fun MushafPageDial(
                 (MushafDialRuleHeldWeightPx - MushafDialRuleWeightPx) * lift
             drawRoundRect(
                 color = ink.copy(alpha = 0.10f + 0.06f * lift),
-                topLeft = Offset(0f, ruleY - rule / 2f),
-                size = Size(size.width, rule),
+                // The rule ends where the comb ends: the first and last
+                // chapter ticks stand at the edge inset, and a line running
+                // past them read as a rule wider than the book it measures.
+                topLeft = Offset(inset, ruleY - rule / 2f),
+                size = Size((size.width - inset * 2f).coerceAtLeast(rule), rule),
                 cornerRadius = CornerRadius(rule, rule),
             )
             val seatX = mushafDialTrackX(1f - mushafDialFraction(at, pages), size.width, inset)
