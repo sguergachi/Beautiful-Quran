@@ -1346,9 +1346,13 @@ internal fun MushafPageDial(
                             else -> hand - contentW / 2f
                         }
                         val rawPlateLeft = textLeft - pad
+                        // The plate never hangs off the glass: clamped to
+                        // 0..track-plateW so both of its edge feathers stay
+                        // fully on-glass — a wall-side feather cut by the
+                        // glass read as a hard, unfaded edge.
                         val left = rawPlateLeft.coerceIn(
-                            -slack,
-                            (track - plateW + slack).coerceAtLeast(-slack),
+                            0f,
+                            (track - plateW).coerceAtLeast(0f),
                         )
                         // Clear of the tallest tick, and measured from the
                         // rule rather than from the top of the slot. The slot
@@ -1402,31 +1406,20 @@ internal fun MushafPageDial(
                         // and only the open side fades away.
                         val rise = lerp(0.25f, 0.14f, zoom.value)
                         val shoulder = paper.copy(alpha = 0.35f)
-                        val brush = when (hudDock) {
-                            // Flush at a wall: paper runs solid into the
-                            // glass, then a long clean fall to transparent
-                            // across the far half — the transparent-to-opaque
-                            // read has to survive at the edge, where the old
-                            // shallow shoulder hid it.
-                            -1 -> Brush.horizontalGradient(
-                                0f to paper,
-                                0.5f to paper,
-                                1f to paper.copy(alpha = 0f),
-                            )
-                            1 -> Brush.horizontalGradient(
-                                0f to paper.copy(alpha = 0f),
-                                0.5f to paper,
-                                1f to paper,
-                            )
-                            else -> Brush.horizontalGradient(
-                                0f to paper.copy(alpha = 0f),
-                                rise * 0.5f to shoulder,
-                                rise to paper,
-                                1f - rise to paper,
-                                1f - rise * 0.5f to shoulder,
-                                1f to paper.copy(alpha = 0f),
-                            )
-                        }
+                        // One wash for every position, docked or not: both
+                        // ends feather — transparent at each tip, full paper
+                        // across the middle. The plate is clamped fully
+                        // on-glass, so the wall-side feather is always
+                        // visible; a solid run into the glass read as a hard
+                        // unfaded edge.
+                        val brush = Brush.horizontalGradient(
+                            0f to paper.copy(alpha = 0f),
+                            rise * 0.5f to shoulder,
+                            rise to paper,
+                            1f - rise to paper,
+                            1f - rise * 0.5f to shoulder,
+                            1f to paper.copy(alpha = 0f),
+                        )
                         drawRoundRect(
                             brush = brush,
                             cornerRadius = CornerRadius(6.dp.toPx()),

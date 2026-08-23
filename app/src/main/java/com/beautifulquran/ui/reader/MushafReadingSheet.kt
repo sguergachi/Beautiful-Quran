@@ -82,8 +82,8 @@ internal const val MushafTapPageHoldMs = 1_500L
  * the text and 64px over the rule, reading as part of the controls.
  */
 internal val MushafFolioBand = 30.dp
-/** Paper above and below the rule that divides the leaf from the transport. */
-private val MushafRuleTailAir = 10.dp
+/** Paper between the rule and the transport it divides the leaf from. */
+private val MushafRuleTailAir = 6.dp
 
 /**
  * Paper between the leaf's last line and the hairline. The rule sat at the
@@ -91,7 +91,7 @@ private val MushafRuleTailAir = 10.dp
  * read as shifted up. This sets it off the leaf so the line sits between
  * the page and the transport instead of hanging off the page.
  */
-private val MushafDialHeadAir = 8.dp
+private val MushafDialHeadAir = 16.dp
 
 /** Each folio figure's column, equal either side of the centre line. */
 private val MushafFolioColumn = 40.dp
