@@ -1648,7 +1648,6 @@ val strayPx = MushafDialStray.toPx()
                             mushafDialChapterRun(chapterMarks, raw.roundToInt().coerceIn(1, pages), pages).first
                         }
                         var lastHapticIdx = initialIdxForLast
-                        var leanChase: Job? = null
                         dialPage.floatValue = chapterMarks[initialIdxForLast].toFloat()
                         hudChapterIdx = initialIdxForLast
                         // The thumb goes to the finger on contact, before any
@@ -1663,7 +1662,9 @@ scrubbing = true
                         hudShown = true
                         reportScrub.value(true)
                         hasPulsed = false
-                        leanChase?.cancel()
+                        // awaitEachGesture is a restricted scope — it cannot
+                        // call snapTo directly; a launch here is once per
+                        // gesture, not per frame, so nothing starves.
                         scope.launch { hudPull.snapTo(0f) }
                         hudPopDir.floatValue = 0f
                         hudRipe.floatValue = 0f
@@ -1723,15 +1724,19 @@ val strayed = mushafDialStrayed(handY, pressY, strayPx)
                                     // not one per frame.
                                     hudRipe.floatValue =
                                         (abs(lean) / leanPx * 12f).roundToInt() / 12f
-                                    leanChase?.cancel()
-                                    leanChase = scope.launch {
-                                        // Re-checked on resume: a pop later in
-                                        // this very frame must win over a stale
-                                        // chase.
-                                        if (open && !troughPopped) {
-                                            hudPull.animateTo(lean, MushafDialHudElastic)
-                                        }
-                                    }
+                                    // Chase the lean right here in the meter —
+                                    // a per-frame exponential step, not a
+                                    // launched spring. The launched chase
+                                    // starved: the meter's own frame callback
+                                    // ran first every frame and cancelled the
+                                    // chase before its animation frame ever
+                                    // ran, so hudPull never advanced and the
+                                    // elastic band was dead on the glass. The
+                                    // meter owns hudPull outright; the pop
+                                    // still springs it home once, outside
+                                    // this block.
+                                    val chase = 1f - exp(-dt / MUSHAF_DIAL_HUD_CHASE_TAU_S)
+                                    hudPull.snapTo(hudPull.value + (lean - hudPull.value) * chase)
                                 }
                                 if (!past) spared = false
                                 runOutS = if (past && !spared) runOutS + dt else 0f
@@ -1874,7 +1879,10 @@ if (mushafDialShouldLeaveTrough(runOutS, strayed)) {
                                     heldS = 0f
                                     troughPopped = false
                                     leanPop?.cancel()
-                                    scope.launch { hudPull.snapTo(0f) }
+                        // awaitEachGesture is a restricted scope — it cannot
+                        // call snapTo directly; a launch here is once per
+                        // gesture, not per frame, so nothing starves.
+                        scope.launch { hudPull.snapTo(0f) }
                                     hudPopDir.floatValue = 0f
                                     hudRipe.floatValue = 0f
                                     scope.launch { zoom.animateTo(1f, MushafDialZoomIn) }
@@ -1983,11 +1991,12 @@ private val MushafDialZoomIn = spring<Float>(dampingRatio = 0.9f, stiffness = 34
 private val MushafDialZoomOut = spring<Float>(dampingRatio = 1f, stiffness = 220f)
 
 /**
- * How the HUD chases a pull off the line: soft and underdamped, so the lean
- * lags the hand, catches up with a slight wobble, and never rides the finger
- * exactly — an elastic band stretched off its seat, not a knob.
+ * How fast the HUD's lean follows the hand, in seconds — the meter's own
+ * per-frame exponential step toward the pull target. Short enough to feel
+ * attached to the hand, long enough that the lean visibly lags and settles
+ * rather than riding the finger exactly: an elastic band, not a knob.
  */
-private val MushafDialHudElastic = spring<Float>(dampingRatio = 0.6f, stiffness = 300f)
+internal const val MUSHAF_DIAL_HUD_CHASE_TAU_S = 0.05f
 
 /**
  * The leaned HUD springing back to its seat when the tier gives way: one
