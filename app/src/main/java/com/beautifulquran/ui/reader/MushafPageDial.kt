@@ -43,9 +43,11 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
@@ -869,11 +871,11 @@ private val MushafDialPageTick = 7.dp
  * Grab paper below the rule. The strip lives inside the dial's own bounds:
  * hung off them with requiredHeight+offset it was never hit-tested at all —
  * Compose reaches a child only through its parent's geometry — so the comb
- * has had no hold in it since the frameless rebuild. The rule keeps its
- * 13dp band above; the hand grabs from beneath it, where it already is.
- * 32dp: a generous finger target that still leaves the leaf the paper.
+ * has had no hold in it since the frameless rebuild. Kept shallow: the rule
+ * belongs just above the transport, and every dp below it is dp the leaf
+ * loses.
  */
-internal val MushafDialBelowGrab = 32.dp
+internal val MushafDialBelowGrab = 8.dp
 /** Paper between the top of the comb and the foot of the label. */
 private val MushafDialHudAir = 2.dp
 
@@ -1444,7 +1446,34 @@ internal fun MushafPageDial(
                     else -> Alignment.CenterHorizontally
                 }
                 Box(
-                    modifier = Modifier.onSizeChanged { hudContentWidthPx = it.width },
+                    modifier = Modifier
+                        // Docked, the label lives between the comb and the
+                        // glass: clamp its measure so the type ellipsises and
+                        // the plate hugs what is left, instead of running its
+                        // full intrinsic width across the leaf.
+                        .layout { measurable, constraints ->
+                            val track = widthPx.toFloat()
+                            val padPx = MushafDialHudPad.toPx()
+                            val maxW = when (hudDock) {
+                                -1 -> (track - handX.floatValue - padPx -
+                                    MUSHAF_DIAL_HUD_EDGE_MARGIN_PX).roundToInt()
+                                1 -> (handX.floatValue - padPx -
+                                    MUSHAF_DIAL_HUD_EDGE_MARGIN_PX).roundToInt()
+                                else -> constraints.maxWidth
+                            }.coerceAtLeast(0)
+                            val placeable = measurable.measure(
+                                Constraints(
+                                    minWidth = 0,
+                                    maxWidth = maxW.coerceAtMost(constraints.maxWidth),
+                                    minHeight = 0,
+                                    maxHeight = constraints.maxHeight,
+                                ),
+                            )
+                            layout(placeable.width, placeable.height) {
+                                placeable.place(0, 0)
+                            }
+                        }
+                        .onSizeChanged { hudContentWidthPx = it.width },
                     contentAlignment = when (hudDock) {
                         -1 -> Alignment.TopStart
                         1 -> Alignment.TopEnd

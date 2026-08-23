@@ -83,7 +83,7 @@ internal const val MushafTapPageHoldMs = 1_500L
  */
 internal val MushafFolioBand = 30.dp
 /** Paper between the rule and the transport it divides the leaf from. */
-private val MushafRuleTailAir = 2.dp
+private val MushafRuleTailAir = 0.dp
 
 /**
  * Paper between the leaf's last line and the hairline. The rule sat at the
