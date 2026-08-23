@@ -1048,6 +1048,12 @@ internal fun MushafPageDial(
     val hud = if (scrubbing || handed) {
         chapterLabelOf.value(hudChapterIdx) ?: labelOf.value(hudPage)
     } else null
+    // Trough HUD is always page-scoped so the ayah range updates per leaf
+    // while scrubbing inside a chapter — chapterLabel would stay 1..286 for
+    // the whole trough.
+    val troughHud = if (scrubbing || handed) {
+        labelOf.value(hudPage)
+    } else null
 
     Box(
         modifier
@@ -1507,8 +1513,12 @@ internal fun MushafPageDial(
                         )
                     }
                     Column(horizontalAlignment = hudDockAlignment) {
+                        // Page-scoped so Ayah range ticks per leaf inside the
+                        // trough; chapterLabel would stay 1..286 for the whole
+                        // chapter.
+                        val th = troughHud ?: hud
                         Text(
-                            text = mushafDialLabelHead(hud, zoomed = true, page = hudPage),
+                            text = if (th != null) mushafDialLabelHead(th, zoomed = true, page = hudPage) else "",
                             style = hudType,
                             color = androidx.compose.ui.graphics.lerp(ink, accents.repeatInk, orange).copy(alpha = 0.72f + 0.18f * hudPulse),
                             maxLines = 1,
@@ -1528,7 +1538,7 @@ internal fun MushafPageDial(
                         // this row must hold its height whether or not words
                         // arrive, or the head would step as they came in.
                         Text(
-                            text = mushafDialLabelFoot(hud, zoomed = true).ifEmpty { " " },
+                            text = if (th != null) mushafDialLabelFoot(th, zoomed = true).ifEmpty { " " } else " ",
                             style = hudType,
                             color = androidx.compose.ui.graphics.lerp(ink.copy(alpha = 0.48f), accents.repeatInk, orange).copy(alpha = 0.48f + 0.22f * orange),
                             maxLines = 1,
@@ -1639,6 +1649,8 @@ val strayPx = MushafDialStray.toPx()
                         // noise — still a 3-4px deliberate move crosses.
                         val hysteresisPx = MushafDialRuleWeightPx * density * 1.8f
                         var lastHapticNs = 0L
+                        var lastTroughHapticPage = -1
+                        var lastTroughHapticNs = 0L
                         var troughPopped = false
                         var leanPop: Job? = null
                         var shut = false
@@ -1749,6 +1761,18 @@ val strayed = mushafDialStrayed(handY, pressY, strayPx)
                                         troughRun.last.toFloat(),
                                     )
                                     dialPage.floatValue = raw
+                                    // Page ticks inside the trough — one per leaf
+                                    // crossed, so the hand feels each page.
+                                    val curTroughPage = raw.roundToInt().coerceIn(1, pages)
+                                    if (lastTroughHapticPage == -1) {
+                                        lastTroughHapticPage = curTroughPage
+                                    } else if (curTroughPage != lastTroughHapticPage) {
+                                        if (now - lastTroughHapticNs >= 45_000_000L) {
+                                            view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+                                            lastTroughHapticNs = now
+                                        }
+                                        lastTroughHapticPage = curTroughPage
+                                    }
 if (mushafDialShouldLeaveTrough(runOutS, strayed)) {
                                         open = false
                                         heldS = 0f
@@ -1765,10 +1789,10 @@ if (mushafDialShouldLeaveTrough(runOutS, strayed)) {
                                             hudPull.animateTo(0f, MushafDialHudPop)
                                         }
                                         scope.launch { zoom.animateTo(0f, MushafDialZoomOut) }
+                                        // Reset trough haptics so next open does
+                                        // not tick the entry page.
+                                        lastTroughHapticPage = -1
                                     }
-                                    // Deliberately silent: inside the trough the
-                                    // reader is choosing a leaf within one chapter,
-                                    // and the dial's only haptic is the chapter tick.
                                     continue
                                 }
                                 // The chapter tier, read against the stable
