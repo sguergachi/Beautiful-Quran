@@ -727,6 +727,36 @@ internal fun mushafDialChapterAt(seats: FloatArray, xPx: Float): Int {
 }
 
 /**
+ * Hysteretic read: keeps the last chapter until the hand has moved
+ * decisively beyond the midpoint to the new one. Without this a hand
+ * parked exactly on a boundary between two tiny tail chapters (70+,
+ * ~7.8px cells) jitters 1-2px from sensor noise and flips HUD every
+ * frame — constant vibration even when still. The window is small
+ * (hysteresisPx) so a deliberate 3-4px move still crosses, but noise
+ * does not.
+ */
+internal fun mushafDialChapterAtHysteresis(
+    seats: FloatArray,
+    xPx: Float,
+    lastIdx: Int,
+    hysteresisPx: Float,
+): Int {
+    val cur = mushafDialChapterAt(seats, xPx)
+    if (cur == lastIdx || lastIdx !in seats.indices || cur !in seats.indices) return cur
+    // Only hysteresis for adjacent neighbours; a fast swipe that jumps
+    // 2+ chapters is deliberate and should land immediately.
+    if (abs(cur - lastIdx) != 1) return cur
+    val mid = (seats[lastIdx] + seats[cur]) / 2f
+    val h = hysteresisPx / 2f
+    return if (cur > lastIdx) {
+        // moving left (seats decrease with idx)
+        if (xPx < mid - h) cur else lastIdx
+    } else {
+        if (xPx > mid + h) cur else lastIdx
+    }
+}
+
+/**
  * Where each chapter mark is DRAWN on the chapter tier, in px, under the
  * fisheye the finger applies: lens around [centerX], progressive tail boost,
  * tail push. Every mark comes back placed — never NaN — because what the
@@ -1274,6 +1304,11 @@ internal fun MushafPageDial(
             // flush to the near edge and the wash runs solid into the glass
             // on that side — no feather showing between edge and words.
             val density = LocalDensity.current
+            // Dock alignment goes edge-flush a little before the plate
+            // actually hits the glass — the plate still follows the comb
+            // (mushafDialHudX parks at -slack / maxLeft) so the type rides
+            // above the tick until the max extent, but the text is already
+            // left/right aligned when the hand is close to the edge.
             val hudDock by remember {
                 derivedStateOf {
                     if (widthPx <= 0 || hudWidthPx <= 0) return@derivedStateOf 0
@@ -1281,15 +1316,16 @@ internal fun MushafPageDial(
                         MUSHAF_DIAL_HUD_EDGE_MARGIN_PX
                     val track = widthPx.toFloat()
                     val plate = hudWidthPx.toFloat()
-                    val left = mushafDialHudX(
-                        handX.floatValue,
-                        plate,
-                        track,
-                        with(density) { MushafDialHudPad.toPx() },
-                    )
+                    val hand = handX.floatValue
+                    // Sooner than the hard wall: hand within plate/2 + 28dp
+                    // of the edge already docks the type. Plate still parks
+                    // only at the wall via mushafDialHudX.
+                    val ahead = with(density) { 28.dp.toPx() }
+                    val leftWallHand = plate / 2f - slack
+                    val rightWallHand = track - plate / 2f + slack
                     when {
-                        left <= -slack + 0.5f -> -1
-                        left >= track - plate + slack - 0.5f -> 1
+                        hand <= leftWallHand + ahead -> -1
+                        hand >= rightWallHand - ahead -> 1
                         else -> 0
                     }
                 }
@@ -1587,6 +1623,11 @@ val strayPx = MushafDialStray.toPx()
                             widthPxNow,
                             MushafDialRuleWeightPx * density,
                         )
+                        // Hysteresis so a hand parked on a 70+ boundary (~7.8px
+                        // cells) does not flip HUD every frame from 1-2px sensor
+                        // noise — still a 3-4px deliberate move crosses.
+                        val hysteresisPx = MushafDialRuleWeightPx * density * 1.8f
+                        var lastHapticNs = 0L
                         var troughPopped = false
                         var leanPop: Job? = null
                         var shut = false
@@ -1726,20 +1767,37 @@ if (mushafDialShouldLeaveTrough(runOutS, strayed)) {
                                 // HUD text, and the landing all answer to the
                                 // same cell, and a boundary cannot be jumped
                                 // over by the lens breathing.
-                                val curIdx = mushafDialChapterAt(cellSeats, handPx)
-                                raw = chapterMarks[curIdx].toFloat()
+                                // Hysteretic read + one tick per HUD chapter
+                                // change: a hand parked on a 70+ boundary
+                                // jitters 1-2px and would otherwise flip every
+                                // frame — constant vibration while still.
+                                val rawIdx = mushafDialChapterAt(cellSeats, handPx)
+                                val curIdx = mushafDialChapterAtHysteresis(
+                                    cellSeats, handPx, hudChapterIdx, hysteresisPx,
+                                )
+                                // HUD tracks the hysteretic chapter, so text
+                                // does not flicker; rawIdx still drives the
+                                // page so a fast swipe that jumps 2+ cells
+                                // lands immediately.
+                                val effectiveIdx = if (abs(rawIdx - hudChapterIdx) > 1) rawIdx else curIdx
+                                raw = chapterMarks[effectiveIdx].toFloat()
                                 dialPage.floatValue = raw
-                                hudChapterIdx = curIdx
                                 val lastIdx = mushafDialChapterIndex(chapterMarks, lastChapter, pages)
-                                if (curIdx != lastIdx) {
-                                    // The one haptic the dial speaks: the HUD's
-                                    // chapter text is about to change, and the
-                                    // hand hears it. Every crossing, no exceptions.
-                                    view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
-                                    lastChapter = chapterMarks[curIdx]
+                                if (effectiveIdx != lastIdx) {
+                                    hudChapterIdx = effectiveIdx
+                                    // One tick per HUD chapter change, with a
+                                    // 28ms floor so a jitter that somehow still
+                                    // crosses does not buzz at frame rate.
+                                    if (now - lastHapticNs >= 28_000_000L) {
+                                        view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+                                        lastHapticNs = now
+                                    }
+                                    lastChapter = chapterMarks[effectiveIdx]
+                                } else if (effectiveIdx != hudChapterIdx) {
+                                    hudChapterIdx = effectiveIdx
                                 }
-                                val curRunStart = chapterMarks[curIdx]
-                                val curRunEnd = if (curIdx + 1 < chapterMarks.size) chapterMarks[curIdx + 1] - 1 else pages
+                                val curRunStart = chapterMarks[effectiveIdx]
+                                val curRunEnd = if (effectiveIdx + 1 < chapterMarks.size) chapterMarks[effectiveIdx + 1] - 1 else pages
                                 troughRun = curRunStart..maxOf(curRunStart, curRunEnd)
                                 // The hold. Both halves are needed: a fast
                                 // hand banks no stillness, and an instant of
