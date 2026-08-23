@@ -243,19 +243,29 @@ class MushafPageDialTest {
     }
 
     @Test
-    fun `the hud plate touches the glass as its max extent`() {
-        // Collision on the plate's own measured width: centred on the hand
-        // while there is room; at the walls it goes edge-aligned — left-
-        // aligned at the left glass, right-aligned at the right.
+    fun `the hud text stops a margin short of the glass, flush aligned`() {
+        // The collision is the *text's*, not the plate's: parked at either
+        // wall, the words sit edgeMargin from the glass and the plate hangs
+        // past it by exactly the padding that is not wanted. With an inset
+        // of 21 and a margin of 8, the plate parks 13 out on either side.
         val track = 1000f
         val plate = 300f
-        assertEquals(350f, mushafDialHudX(500f, plate, track), 1e-4f)
-        // Left wall: left-aligned, the plate's own edge on the glass.
-        assertEquals(0f, mushafDialHudX(0f, plate, track), 1e-4f)
-        assertEquals(0f, mushafDialHudX(-200f, plate, track), 1e-4f)
-        // Right wall: right-aligned, mirrored.
-        assertEquals(track - plate, mushafDialHudX(track, plate, track), 1e-4f)
-        assertEquals(track - plate, mushafDialHudX(track + 400f, plate, track), 1e-4f)
+        val inset = 21f
+        val margin = 8f
+        val slack = inset - margin
+        assertEquals(350f, mushafDialHudX(500f, plate, track, inset, margin), 1e-4f)
+        // Left wall: text left edge at +8, plate hanging 13 past the glass.
+        assertEquals(-slack, mushafDialHudX(0f, plate, track, inset, margin), 1e-4f)
+        assertEquals(-slack, mushafDialHudX(-200f, plate, track, inset, margin), 1e-4f)
+        assertEquals(margin, mushafDialHudX(0f, plate, track, inset, margin) + inset, 1e-4f)
+        // Right wall: mirrored — text right edge at track−8.
+        assertEquals(track - plate + slack, mushafDialHudX(track, plate, track, inset, margin), 1e-4f)
+        assertEquals(track - plate + slack, mushafDialHudX(track + 400f, plate, track, inset, margin), 1e-4f)
+        assertEquals(
+            margin,
+            track - (mushafDialHudX(track, plate, track, inset, margin) + plate - inset),
+            1e-4f,
+        )
     }
 
     @Test
@@ -265,11 +275,14 @@ class MushafPageDialTest {
         // rule: the wider plate sits further left.
         val track = 1000f
         val hand = 700f
-        assertTrue(mushafDialHudX(hand, 500f, track) > mushafDialHudX(hand, 800f, track))
+        val inset = 21f
+        assertTrue(
+            mushafDialHudX(hand, 500f, track, inset) > mushafDialHudX(hand, 800f, track, inset)
+        )
         // The wider plate has already met its wall at this hand.
-        assertEquals(200f, mushafDialHudX(hand, 800f, track), 1e-4f)
-        // A plate wider than the rule itself parks flush left and stays put.
-        assertEquals(0f, mushafDialHudX(track * 0.9f, track * 2f, track), 1e-4f)
+        assertEquals(track - 800f + inset - MUSHAF_DIAL_HUD_EDGE_MARGIN_PX, mushafDialHudX(hand, 800f, track, inset), 1e-4f)
+        // A plate wider than the rule itself parks at the left margin and stays put.
+        assertEquals(-(inset - MUSHAF_DIAL_HUD_EDGE_MARGIN_PX), mushafDialHudX(track * 0.9f, track * 2f, track, inset), 1e-4f)
     }
 
     @Test

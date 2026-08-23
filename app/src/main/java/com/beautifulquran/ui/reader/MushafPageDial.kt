@@ -403,22 +403,37 @@ internal fun mushafDialHudLean(dyPx: Float, strayPx: Float, leanPx: Float): Floa
     return pull * pull * pull * leanPx
 }
 
+/** The plate's own side padding: the air between plate edge and type. */
+private val MushafDialHudPad = 21.dp
+
+/** How close the HUD *text* may come to the glass, in px. */
+internal const val MUSHAF_DIAL_HUD_EDGE_MARGIN_PX = 8f
+
 /**
  * Where the HUD plate's left edge sits so its centre follows a hand at
- * [handXPx] and the plate touches the glass as its max extent: at the far
- * left it goes left-aligned, at the far right right-aligned, and between
- * them it centres on the hand.
+ * [handXPx] while the *type* collides with the glass, never the plate: the
+ * words stop [MUSHAF_DIAL_HUD_EDGE_MARGIN_PX] short of either edge — flush
+ * left-aligned at the left, flush right-aligned at the right — and the
+ * plate, whose ends are only transparent shoulder and [MushafDialHudPad]
+ * of padding, runs as far under the edge as that takes it.
  *
- * Collision against both edges, from the plate's own *measured* width —
- * the width already carries whatever the type set it to, so a larger font
- * (or a user font scale) collides sooner without this law knowing a thing
- * about type. A plate wider than the rule itself parks flush left rather
- * than oscillating between the two clamps.
+ * Collision is computed from the plate's *measured* width, so whatever set
+ * that width — a larger font, a user font scale — buys an earlier wall
+ * without this law knowing a thing about type. A plate wider than the rule
+ * itself parks at the left margin and stays there.
  */
-internal fun mushafDialHudX(handXPx: Float, hudWidthPx: Float, trackWidthPx: Float): Float {
-    val halfPlate = hudWidthPx / 2f
-    val maxLeft = (trackWidthPx - hudWidthPx).coerceAtLeast(0f)
-    return (handXPx - halfPlate).coerceIn(0f, maxLeft)
+internal fun mushafDialHudX(
+    handXPx: Float,
+    hudWidthPx: Float,
+    trackWidthPx: Float,
+    textInsetPx: Float,
+    edgeMarginPx: Float = MUSHAF_DIAL_HUD_EDGE_MARGIN_PX,
+): Float {
+    // The plate may hang past the glass by exactly the padding that is not
+    // wanted: the text sits [edgeMarginPx] in when the plate is parked.
+    val slack = (textInsetPx - edgeMarginPx).coerceAtLeast(0f)
+    val maxLeft = (trackWidthPx - hudWidthPx + slack).coerceAtLeast(-slack)
+    return (handXPx - hudWidthPx / 2f).coerceIn(-slack, maxLeft)
 }
 
 /**
@@ -1187,12 +1202,18 @@ internal fun MushafPageDial(
                     // without it.
                     .offset {
                         // Over the thumb, which is over the finger — but the
-                        // label never stops following the hand: it collides
-                        // with the glass edges on its own measured width and
-                        // touches them as its max extent — left-aligned at
-                        // the left, right-aligned at the right — so a larger
-                        // font buys an earlier wall.
-                        val left = mushafDialHudX(handX.floatValue, hudWidthPx.toFloat(), widthPx.toFloat())
+                        // label never stops following the hand. The collision
+                        // is the *text's*, not the plate's: the words stop a
+                        // few pixels short of the glass — flush left-aligned
+                        // at the left, flush right-aligned at the right — and
+                        // the plate runs under the edge as far as that takes
+                        // it. A larger font buys an earlier wall for free.
+                        val left = mushafDialHudX(
+                            handX.floatValue,
+                            hudWidthPx.toFloat(),
+                            widthPx.toFloat(),
+                            MushafDialHudPad.toPx(),
+                        )
                         // Clear of the tallest tick, and measured from the
                         // rule rather than from the top of the slot. The slot
                         // carries paper above the rule that the label was
@@ -1248,7 +1269,7 @@ internal fun MushafPageDial(
                             cornerRadius = CornerRadius(6.dp.toPx()),
                         )
                     }
-                    .padding(horizontal = 21.dp, vertical = 6.dp)
+                    .padding(horizontal = MushafDialHudPad, vertical = 6.dp)
                     .graphicsLayer { alpha = expand.value },
             ) {
                 // The head is set twice, once as each tier reads the leaf, and
