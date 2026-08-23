@@ -871,8 +871,9 @@ private val MushafDialPageTick = 7.dp
  * Compose reaches a child only through its parent's geometry — so the comb
  * has had no hold in it since the frameless rebuild. The rule keeps its
  * 13dp band above; the hand grabs from beneath it, where it already is.
+ * 32dp: a generous finger target that still leaves the leaf the paper.
  */
-internal val MushafDialBelowGrab = 44.dp
+internal val MushafDialBelowGrab = 32.dp
 /** Paper between the top of the comb and the foot of the label. */
 private val MushafDialHudAir = 2.dp
 
@@ -1391,33 +1392,21 @@ internal fun MushafPageDial(
                     // drawBehind sits outside that layer so the wash lingered.
                     .graphicsLayer { alpha = if (hudShown) 1f else 0f }
                     .drawBehind {
-                        // The ground is one long progressive wash across
-                        // its own width: transparent at each end, easing
-                        // up to full paper over a short shoulder so half
-                        // the plate stands fully opaque under the words,
-                        // then back down — part of the magnification, not
-                        // a card laid on the leaf. The zoomed tier reads
-                        // longer — chapter, page, verses — so the plateau
-                        // stretches with it and the line's ends never sit
-                        // on ground that is still arriving.
-                        //
-                        // Docked at a wall, the docked side loses its
-                        // feather entirely: paper runs solid off the glass,
-                        // and only the open side fades away.
-                        val rise = lerp(0.25f, 0.14f, zoom.value)
-                        val shoulder = paper.copy(alpha = 0.35f)
-                        // One wash for every position, docked or not: both
-                        // ends feather — transparent at each tip, full paper
-                        // across the middle. The plate is clamped fully
-                        // on-glass, so the wall-side feather is always
-                        // visible; a solid run into the glass read as a hard
-                        // unfaded edge.
+                        // The ground is opaque exactly under the words and
+                        // transparent outside them: the gradient's stops are
+                        // the text's own bounds, so the fade lives in the
+                        // padding and no word ever sits on thinning ground —
+                        // part of the magnification, not a card laid on the
+                        // leaf.
+                        val pad = MushafDialHudPad.toPx()
+                        val textStart = (pad / size.width).coerceIn(0f, 0.5f)
+                        val textEnd =
+                            ((pad + hudContentWidthPx) / size.width)
+                                .coerceIn(textStart + 0.01f, 1f)
                         val brush = Brush.horizontalGradient(
                             0f to paper.copy(alpha = 0f),
-                            rise * 0.5f to shoulder,
-                            rise to paper,
-                            1f - rise to paper,
-                            1f - rise * 0.5f to shoulder,
+                            textStart to paper,
+                            textEnd to paper,
                             1f to paper.copy(alpha = 0f),
                         )
                         drawRoundRect(
