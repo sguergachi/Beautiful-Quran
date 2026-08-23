@@ -243,18 +243,20 @@ class MushafPageDialTest {
     }
 
     @Test
-    fun `the hud plate never leaves the glass at either edge`() {
+    fun `the hud plate rides close to the glass but never loses its words`() {
         // Collision on the plate's own measured width: centred on the hand
-        // while there is room, clamped flush to the wall when there is not.
+        // while there is room, and at the walls allowed a small measured
+        // overhang past the glass — its own ends are transparent shoulder,
+        // so hanging a sliver keeps the words close without losing them.
         val track = 1000f
         val plate = 300f
         assertEquals(350f, mushafDialHudX(500f, plate, track), 1e-4f)
-        // Left wall: a hand past the edge parks the plate at zero, not off it.
-        assertEquals(0f, mushafDialHudX(0f, plate, track), 1e-4f)
-        assertEquals(0f, mushafDialHudX(-200f, plate, track), 1e-4f)
-        // Right wall: fully visible, right edge on the glass.
-        assertEquals(track - plate, mushafDialHudX(track, plate, track), 1e-4f)
-        assertEquals(track - plate, mushafDialHudX(track + 400f, plate, track), 1e-4f)
+        // Left wall: the hand past the edge parks the plate an overhang out.
+        assertEquals(-plate * MUSHAF_DIAL_HUD_OVERHANG, mushafDialHudX(0f, plate, track), 1e-4f)
+        assertEquals(-plate * MUSHAF_DIAL_HUD_OVERHANG, mushafDialHudX(-200f, plate, track), 1e-4f)
+        // Right wall: same overhang, mirrored.
+        assertEquals(track - plate + plate * MUSHAF_DIAL_HUD_OVERHANG, mushafDialHudX(track, plate, track), 1e-4f)
+        assertEquals(track - plate + plate * MUSHAF_DIAL_HUD_OVERHANG, mushafDialHudX(track + 400f, plate, track), 1e-4f)
     }
 
     @Test
@@ -266,9 +268,9 @@ class MushafPageDialTest {
         val hand = 700f
         assertTrue(mushafDialHudX(hand, 500f, track) > mushafDialHudX(hand, 800f, track))
         // The wider plate has already met its wall at this hand.
-        assertEquals(200f, mushafDialHudX(hand, 800f, track), 1e-4f)
-        // A plate wider than the rule itself parks flush left and stays put.
-        assertEquals(0f, mushafDialHudX(track * 0.9f, track * 2f, track), 1e-4f)
+        assertEquals(track - 800f + 800f * MUSHAF_DIAL_HUD_OVERHANG, mushafDialHudX(hand, 800f, track), 1e-4f)
+        // A plate wider than the rule itself parks at its overhang and stays put.
+        assertEquals(-track * 2f * MUSHAF_DIAL_HUD_OVERHANG, mushafDialHudX(track * 0.9f, track * 2f, track), 1e-4f)
     }
 
     @Test
