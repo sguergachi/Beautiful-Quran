@@ -694,7 +694,7 @@ internal fun mushafDialCombCellSeats(
         while (gStart > 0 && marks[gStart - 1] == mark) gStart--
         var gEnd = idx
         while (gEnd + 1 < marks.size && marks[gEnd + 1] == mark) gEnd++
-        if (gEnd > gStart) x += (idx - gStart - (gEnd - gStart) / 2f) * rulePx * 3f
+        if (gEnd > gStart) x += ((gEnd - gStart) / 2f - (idx - gStart)) * rulePx * 3f
         result[idx] = x.coerceIn(insetPx, widthPx - insetPx)
     }
     val span = (widthPx - 2f * insetPx).coerceAtLeast(0f)
@@ -769,7 +769,7 @@ internal fun mushafDialCombDrawnXs(
             while (gEnd + 1 < marks.size && marks[gEnd + 1] == mark) gEnd++
             val gSize = gEnd - gStart + 1
             if (gSize > 1) {
-                x += (idx - gStart - (gSize - 1) / 2f) * epsilonPx
+                x += ((gSize - 1) / 2f - (idx - gStart)) * epsilonPx
             }
             result[idx] = x
         }
@@ -800,7 +800,7 @@ internal fun mushafDialCombDrawnXs(
         val gSize = gEnd - gStart + 1
         if (gSize > 1) {
             val posInGroup = idx - gStart
-            trueX += (posInGroup - (gSize - 1) / 2f) * epsilonPx
+            trueX += ((gSize - 1) / 2f - posInGroup) * epsilonPx
         }
         val isTailMark = idx >= 24
         val gap = if (idx < marks.lastIndex) (marks[idx + 1] - mark).coerceIn(0, 20) else 1
@@ -1150,7 +1150,7 @@ internal fun MushafPageDial(
                     if (gSize > 1) {
                         val epsilonPx = 1.8.dp.toPx()
                         val posInGroup = idx - gStart
-                        val offset = (posInGroup - (gSize - 1) / 2f) * epsilonPx
+                        val offset = ((gSize - 1) / 2f - posInGroup) * epsilonPx
                         trueX += offset
                     }
                     // Extra tail boost from chapter 25, also progressive with
