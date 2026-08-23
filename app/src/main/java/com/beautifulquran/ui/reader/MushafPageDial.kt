@@ -1228,8 +1228,11 @@ internal fun MushafPageDial(
                         // up to full paper over a short shoulder so half
                         // the plate stands fully opaque under the words,
                         // then back down — part of the magnification, not
-                        // a card laid on the leaf.
-                        val rise = 0.25f
+                        // a card laid on the leaf. The zoomed tier reads
+                        // longer — chapter, page, verses — so the plateau
+                        // stretches with it and the line's ends never sit
+                        // on ground that is still arriving.
+                        val rise = lerp(0.25f, 0.14f, zoom.value)
                         drawRoundRect(
                             brush = Brush.horizontalGradient(
                                 0f to paper.copy(alpha = 0f),
