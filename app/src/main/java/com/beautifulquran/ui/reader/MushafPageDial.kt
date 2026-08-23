@@ -749,11 +749,15 @@ internal fun mushafDialCombDrawnXs(
         val extra = if (isTailMark) (1f - gap / 10f).coerceIn(0f, 1f) * 2.2f * effProgress else 0f
         val densityMag = progBaseMag + extra
         val x0 = mushafDialLensedX(trueX, centerX, sigmaPx, densityMag)
-        val x = x0 + leftPushPx * (if (isTailMark) {
+        var x = x0 + leftPushPx * (if (isTailMark) {
             mushafDialFraction(mark.toFloat(), pageCount).coerceIn(0f, 1f)
         } else 0f)
         if (x < -rule || x > widthPx + rule) continue
-        if (previousX - x < rule * 1.5f) continue
+        // Crowding nudges, it never erases. A tick the comb does not draw
+        // can never be nearest under the finger — and al-Baqarah opens a
+        // single page after al-Fatihah, within a pixel of it on the
+        // compressed head.
+        if (previousX - x < rule * 1.5f) x = previousX - rule * 1.5f
         previousX = x
         result[idx] = x
     }
@@ -1083,12 +1087,15 @@ internal fun MushafPageDial(
                     val x0 = if (isLensed) {
                         mushafDialLensedX(trueX, centerX, sigmaPx, densityMag)
                     } else trueX
-                    val x = x0 + leftPushPx * (if (isLensed && isTailMark) {
+                    var x = x0 + leftPushPx * (if (isLensed && isTailMark) {
                         val markFrac = mushafDialFraction(mark.toFloat(), pages)
                         (markFrac).coerceIn(0f, 1f)
                     } else 0f)
                     if (x < -rule || x > size.width + rule) continue
-                    if (previousX - x < rule * 1.5f) continue
+                    // Crowding nudges, it never erases — the same law the
+                    // hit-read follows, so a tick the finger can select is
+                    // always one the eye can see.
+                    if (previousX - x < rule * 1.5f) x = previousX - rule * 1.5f
                     previousX = x
                     val dist = if (isLensed) abs(trueX - centerX) else 0f
                     val heightGain = if (isLensed) {
@@ -1665,18 +1672,11 @@ if (mushafDialShouldLeaveTrough(runOutS, strayed)) {
                                         leanPop = scope.launch {
                                             hudPull.animateTo(0f, MushafDialHudPop)
                                         }
-                                        view.performHapticFeedback(HapticFeedbackConstants.CONTEXT_CLICK)
                                         scope.launch { zoom.animateTo(0f, MushafDialZoomOut) }
                                     }
-                                    val landed = raw.roundToInt().coerceIn(1, pages)
-                                    if (landed != lastPage &&
-                                        mushafDialHapticDue(travelDp, sinceTickS)
-                                    ) {
-                                        view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
-                                        lastPage = landed
-                                        travelDp = 0f
-                                        sinceTickS = 0f
-                                    }
+                                    // Deliberately silent: inside the trough the
+                                    // reader is choosing a leaf within one chapter,
+                                    // and the dial's only haptic is the chapter tick.
                                     continue
                                 }
                                 // The chapter tier, read the same way the
@@ -1709,10 +1709,13 @@ if (mushafDialShouldLeaveTrough(runOutS, strayed)) {
                                 hudChapterIdx = curIdx
                                 val lastIdx = mushafDialChapterIndex(chapterMarks, lastChapter, pages)
                                 if (curIdx != lastIdx) {
-                                    // Every chapter crossed ticks — the travel
-                                    // gate is dropped so no chapter skips its
-                                    // tick, only the time guard remains.
-                                    view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+                                    // One haptic per chapter crossed — the only
+                                    // one the dial speaks. The time guard keeps a
+                                    // hand hovering on a cell boundary from
+                                    // machine-gunning the tick as the lens breathes.
+                                    if (sinceTickS >= MUSHAF_DIAL_HAPTIC_MIN_S) {
+                                        view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+                                    }
                                     travelDp = 0f
                                     sinceTickS = 0f
                                     lastChapter = chapterMarks[curIdx]
@@ -1776,7 +1779,6 @@ if (mushafDialShouldLeaveTrough(runOutS, strayed)) {
                                     scope.launch { hudPull.snapTo(0f) }
                                     hudPopDir.floatValue = 0f
                                     hudRipe.floatValue = 0f
-                                    view.performHapticFeedback(HapticFeedbackConstants.CONTEXT_CLICK)
                                     scope.launch { zoom.animateTo(1f, MushafDialZoomIn) }
                                 }
                             }
@@ -1833,7 +1835,9 @@ if (mushafDialShouldLeaveTrough(runOutS, strayed)) {
                             expand.animateTo(0f, spring(dampingRatio = 1f, stiffness = 150f))
                         }
                         if (moved && landed != settledState.value) {
-                            view.performHapticFeedback(HapticFeedbackConstants.CONTEXT_CLICK)
+                            // No haptic here: the chapter tick already spoke
+                            // on the crossing, and the landing is that same
+                            // chapter's name arriving under the hand.
                             landedSurahId?.let { seekSurah.value?.invoke(it) }
                             seek.value(landed)
                         }

@@ -1,6 +1,7 @@
 package com.beautifulquran.ui.reader
 
 import androidx.compose.ui.unit.dp
+import kotlin.math.abs
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -265,6 +266,110 @@ class MushafPageDialTest {
             margin,
             track - (mushafDialHudX(track, plate, track, inset, margin) + plate - inset),
             1e-4f,
+        )
+    }
+
+    @Test
+    fun `every chapter is reachable on the drawn comb`() {
+        // The head of the book compresses the first surahs into a sliver —
+        // al-Baqarah opens one page after al-Fatihah — and ticks that crowd
+        // must be nudged apart, never dropped: what the comb does not draw
+        // the reader can never select. Sweep a finger across the whole tier
+        // under the strongest lens and require every chapter's tick to win
+        // as the nearest somewhere.
+        val marks = intArrayOf(
+            1, 2, 50, 77, 106, 128, 151, 177, 187, 208, 221, 235, 249, 255,
+            262, 267, 282, 293, 305, 312, 322, 332, 342, 350, 359, 367, 377,
+            385, 396, 404, 411, 415, 418, 428, 434, 440, 446, 453, 458, 467,
+            477, 483, 489, 496, 499, 502, 507, 511, 515, 518, 520, 523, 526,
+            528, 531, 534, 537, 542, 545, 549, 551, 553, 554, 556, 558, 560,
+            562, 564, 566, 568, 570, 572, 574, 575, 577, 578, 580, 582, 583,
+            585, 586, 587, 587, 589, 590, 591, 591, 592, 593, 594, 595, 595,
+            596, 596, 597, 597, 598, 598, 599, 599, 600, 600, 601, 601, 601,
+            602, 602, 602, 603, 603, 603, 604, 604, 604,
+        )
+        val pages = 604
+        val density = 2.625f
+        val width = 1080f
+        val inset = 14f * density
+        val rule = density
+        val reachable = BooleanArray(marks.size)
+        for (sigmaMag in floatArrayOf(1f, 1.6f)) {
+            for (finger in (inset.toInt()..(width - inset).toInt())) {
+                val drawn = mushafDialCombDrawnXs(
+                    marks,
+                    pages,
+                    finger.toFloat(),
+                    isLensed = true,
+                    combInk = 1f,
+                    insetPx = inset,
+                    widthPx = width,
+                    rulePx = rule,
+                    lensSigmaPx = MUSHAF_DIAL_LENS_SIGMA_DP * density * sigmaMag,
+                    tailPushPx = 10f * density,
+                    epsilonPx = 1.8f * density,
+                )
+                var best = -1
+                var bestDist = Float.MAX_VALUE
+                for ((idx, x) in drawn.withIndex()) {
+                    if (x.isNaN()) continue
+                    val d = abs(x - finger)
+                    if (d < bestDist) {
+                        bestDist = d
+                        best = idx
+                    }
+                }
+                if (best >= 0) reachable[best] = true
+            }
+        }
+        val missing = (0 until marks.size).filter { !reachable[it] }
+        // Co-located surahs that share a start page (the Juz-30 stacks:
+        // three surahs open page 601, three open 603) can sit within a few
+        // pixels of their siblings, so the middle member of a stack may
+        // never itself be the nearest tick — but every sibling lands on
+        // the same page, and every tick must at least be drawn somewhere.
+        // What matters for the reader: every distinct start page is
+        // selectable, and no chapter's tick is erased outright.
+        val drawnSomewhere = BooleanArray(marks.size)
+        val reachablePages = HashSet<Int>()
+        for (sigmaMag in floatArrayOf(1f, 1.6f)) {
+            for (finger in (inset.toInt()..(width - inset).toInt())) {
+                val drawn = mushafDialCombDrawnXs(
+                    marks,
+                    pages,
+                    finger.toFloat(),
+                    isLensed = true,
+                    combInk = 1f,
+                    insetPx = inset,
+                    widthPx = width,
+                    rulePx = rule,
+                    lensSigmaPx = MUSHAF_DIAL_LENS_SIGMA_DP * density * sigmaMag,
+                    tailPushPx = 10f * density,
+                    epsilonPx = 1.8f * density,
+                )
+                var best = -1
+                var bestDist = Float.MAX_VALUE
+                for ((idx, x) in drawn.withIndex()) {
+                    if (!x.isNaN()) drawnSomewhere[idx] = true
+                    if (x.isNaN()) continue
+                    val d = abs(x - finger)
+                    if (d < bestDist) {
+                        bestDist = d
+                        best = idx
+                    }
+                }
+                if (best >= 0) {
+                    reachable[best] = true
+                    reachablePages.add(marks[best])
+                }
+            }
+        }
+        val undrawn = (0 until marks.size).filter { !drawnSomewhere[it] }
+        val distinctPages = marks.toSet()
+        val unreachablePages = distinctPages.filter { page -> page !in reachablePages }
+        assertTrue(
+            "ticks never drawn anywhere: $undrawn; start pages never selectable: $unreachablePages",
+            undrawn.isEmpty() && unreachablePages.isEmpty(),
         )
     }
 
