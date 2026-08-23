@@ -33,6 +33,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -297,7 +298,10 @@ private fun PaperStackApp(
     var selectedStartPlayback by rememberSaveable { mutableStateOf(false) }
     /** 1-based word position from a home word-search hit; 0 means no flash. */
     var selectedStartWord by rememberSaveable { mutableIntStateOf(0) }
-    var settingsDetail by remember { mutableStateOf<com.beautifulquran.ui.settings.SettingsDetail?>(null) }
+    var settingsDetail by rememberSaveable(stateSaver = Saver(
+        save = { it?.name },
+        restore = { name -> name?.let { com.beautifulquran.ui.settings.SettingsDetail.valueOf(it) } },
+    )) { mutableStateOf<com.beautifulquran.ui.settings.SettingsDetail?>(null) }
     /**
      * Remount key for the reader. Bumped on home/bookmarks/concordance/voice
      * opens so scroll state resets; **not** bumped on next-chapter advance so

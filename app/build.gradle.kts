@@ -183,7 +183,11 @@ val syncQcfFonts by tasks.registering {
         val dest = outDir.get().asFile
         dest.mkdirs()
         dest.listFiles()?.filter { it.extension == "ttf" }?.forEach { it.delete() }
-        if (dest.resolve("QCF2001.qcf").isFile) return@doLast
+        // Idempotence gate is the count, not a single sentinel — a partial
+        // extract (build killed mid-extract) leaves QCF2001.qcf plus <604
+        // files and would otherwise pass forever via the old sentinel.
+        val existing = dest.listFiles { _, name -> name.endsWith(".qcf") }.orEmpty()
+        if (existing.size == QcfFontCount && dest.resolve("QCF2001.qcf").isFile) return@doLast
         val parts = partsDir.asFile.listFiles { _, name ->
             name.startsWith("qcf-v2-fonts.tar.xz.part")
         }?.sortedBy { it.name }.orEmpty()

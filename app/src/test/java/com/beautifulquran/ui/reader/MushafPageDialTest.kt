@@ -690,34 +690,4 @@ class MushafPageDialTest {
         assertTrue(nearH > farH)
     }
 
-    @Test
-    fun `steering inside a long chapter still moves through its leaves`() {
-        // True distribution: within a chapter the finger walks leaves right to left.
-        val marks = intArrayOf(1, 2, 50, 51, 604)
-        val fNear = mushafDialChapterFraction(5f, marks, 604)
-        val fDeep = mushafDialChapterFraction(30f, marks, 604)
-        assertTrue(fDeep > fNear)
-        val mid = (fNear + fDeep) / 2f
-        val page = mushafDialChapterPage(mid, marks, 604)
-        assertTrue(page > 2f && page < 49f)
-    }
-
-    @Test
-    fun `the comb reads back the page under the finger`() {
-        val marks = intArrayOf(1, 2, 50, 51, 286, 604)
-        for (mark in marks) {
-            val x = mushafDialTrackX(
-                1f - mushafDialChapterFraction(mark.toFloat(), marks, 604),
-                widthPx,
-                insetPx,
-            )
-            val read = mushafDialChapterPage(
-                1f - mushafDialTrackFraction(x, widthPx, insetPx),
-                marks,
-                604,
-            )
-            val run = mushafDialChapterRun(marks, mark, 604)
-            assertTrue("mark $mark read $read run $run", read >= run.first - 1.01f && read <= run.last + 1.01f)
-        }
-    }
 }

@@ -814,13 +814,6 @@ fun ReaderScreen(
         val catalog = mushafCatalog ?: return@remember IntArray(0)
         IntArray(114) { idx -> catalog.firstPageOf(idx + 1) }
     }
-    // Keep the distinct set for any legacy filter that only cares about page
-    // existence; the dial itself needs the full 114 (duplicates kept) so two
-    // tiny surahs sharing one leaf still own two equal cells and remain
-    // independently selectable.
-    val mushafChapterPages = remember(mushafChapterFirstPages) {
-        mushafChapterFirstPages.toSet()
-    }
     // What the dial writes over its thumb. The scrubbed leaf almost never
     // belongs to the chapter that is loaded, so this reads the leaf's own
     // chapter rather than the reader's — and it carries the run of verses the

@@ -644,28 +644,6 @@ internal fun mushafDialChapterFraction(page: Float, marks: IntArray, pageCount: 
     }
 }
 
-/** The inverse: the leaf under a finger at fraction [f] of the chapter tier. */
-internal fun mushafDialChapterPage(f: Float, marks: IntArray, pageCount: Int): Float {
-    if (marks.size <= TAIL_START_IDX) {
-        val clamped = f.coerceIn(0f, 1f)
-        return 1f + clamped * (pageCount - 1f).coerceAtLeast(0f)
-    }
-    val tailFrac = tailStartFrac(marks, pageCount)
-    val clamped = f.coerceIn(0f, 1f)
-    if (clamped < TAIL_HEAD_FRACTION) {
-        val trueF = clamped / TAIL_HEAD_FRACTION * tailFrac
-        return 1f + trueF * (pageCount - 1f).coerceAtLeast(0f)
-    } else {
-        val tailCount = (marks.size - TAIL_START_IDX).coerceAtLeast(1)
-        val posInTail = (clamped - TAIL_HEAD_FRACTION) / (1f - TAIL_HEAD_FRACTION).coerceAtLeast(1e-3f) * tailCount
-        val idx = (posInTail.toInt().coerceIn(0, tailCount - 1)) + TAIL_START_IDX
-        val within = posInTail - (idx - TAIL_START_IDX)
-        val run = mushafDialChapterRun(marks, marks[idx], pageCount)
-        val span = (run.last - run.first + 1).coerceAtLeast(1)
-        return run.first + within.coerceIn(0f, 1f) * span
-    }
-}
-
 /**
  * The chapter tier's stable selection seats: each chapter's true seat on the
  * rule — co-located stacks spread apart — relaxed to a minimum gap and clamped
@@ -770,9 +748,10 @@ internal fun mushafDialChapterAtHysteresis(
  * compressed head; three surahs open page 601 and three open 603. A tick
  * erased as a duplicate took its chapter's selection with it.
  *
- * Release reads this so letting go lands on the tick the reader sees — the
- * lens moves marks away from their true seats, and mapping the finger
- * through the true scale let go a chapter or three from what was under it.
+ * Selection does not read this — it reads the stable cellSeats; this is
+ * decoration. The lens moves marks away from their true seats, but the
+ * finger's chapter is decided by the nearest cell, not the nearest drawn
+ * tick.
  */
 internal fun mushafDialCombDrawnXs(
     marks: IntArray,
@@ -1164,10 +1143,10 @@ internal fun MushafPageDial(
                 val effProgress = (centreProgress / plateauAt).coerceIn(0f, 1f)
                 val sigmaPx = baseSigmaPx * (1f + 0.6f * effProgress)
                 val progHeightMag = 1f + (MUSHAF_DIAL_LENS_HEIGHT_GAIN - 1f) * effProgress
-                // One layout, three readers: the drawn comb, the hit-read
-                // under the finger, and the release landing all answer to the
-                // same array, so a tick that can be touched is always one the
-                // eye can see.
+                // One layout for the eyes: the drawn comb is decoration; the
+                // hit-read under the finger and the release landing read the
+                // stable cellSeats, so a tick that can be touched is always
+                // one the eye can see, but the selection does not breathe.
                 val drawnXs = mushafDialCombDrawnXs(
                     chapterMarks,
                     pages,
@@ -1566,6 +1545,7 @@ internal fun MushafPageDial(
                 .align(Alignment.TopStart)
                 .fillMaxWidth()
                 .height(MushafDialSlot + MushafDialBelowGrab)
+                .systemGestureExclusion()
                 .pointerInput(pages) {
                     awaitEachGesture {
                         val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
@@ -1654,19 +1634,19 @@ val strayPx = MushafDialStray.toPx()
                         var troughPopped = false
                         var leanPop: Job? = null
                         var shut = false
-                        val initialFracForLast = mushafDialChapterFraction(raw, chapterMarks, pages)
-                        val initialIdxForLast = if (initialFracForLast >= TAIL_HEAD_FRACTION && chapterMarks.size > TAIL_START_IDX) {
-                            val tailCount = (chapterMarks.size - TAIL_START_IDX).coerceAtLeast(1)
-                            val posInTail = (initialFracForLast - TAIL_HEAD_FRACTION) / (1f - TAIL_HEAD_FRACTION).coerceAtLeast(1e-3f) * tailCount
-                            (posInTail.toInt().coerceIn(0, tailCount - 1)) + TAIL_START_IDX
-                        } else {
-                            mushafDialChapterIndex(chapterMarks, raw.roundToInt().coerceIn(1, pages), pages)
-                        }
+                        // Press x, not settled page — pressing one cell over
+                        // should not show HUD for the old chapter and then
+                        // release to the neighbour it never named.
+                        val initialIdxForLast = mushafDialChapterAt(
+                            cellSeats,
+                            mushafDialClampToTrack(down.position.x, widthPxNow, insetPx),
+                        )
                         var lastChapter = chapterMarks.getOrElse(initialIdxForLast) {
                             mushafDialChapterRun(chapterMarks, raw.roundToInt().coerceIn(1, pages), pages).first
                         }
                         var lastHapticIdx = initialIdxForLast
-                        dialPage.floatValue = raw
+                        var leanChase: Job? = null
+                        dialPage.floatValue = chapterMarks[initialIdxForLast].toFloat()
                         hudChapterIdx = initialIdxForLast
                         // The thumb goes to the finger on contact, before any
                         // movement: the reader has taken hold of the rule
@@ -1680,6 +1660,7 @@ scrubbing = true
                         hudShown = true
                         reportScrub.value(true)
                         hasPulsed = false
+                        leanChase?.cancel()
                         scope.launch { hudPull.snapTo(0f) }
                         hudPopDir.floatValue = 0f
                         hudRipe.floatValue = 0f
@@ -1739,7 +1720,8 @@ val strayed = mushafDialStrayed(handY, pressY, strayPx)
                                     // not one per frame.
                                     hudRipe.floatValue =
                                         (abs(lean) / leanPx * 12f).roundToInt() / 12f
-                                    scope.launch {
+                                    leanChase?.cancel()
+                                    leanChase = scope.launch {
                                         // Re-checked on resume: a pop later in
                                         // this very frame must win over a stale
                                         // chase.
