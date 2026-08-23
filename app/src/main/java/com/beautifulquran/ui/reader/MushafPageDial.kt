@@ -38,9 +38,7 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.nativeCanvas
-import androidx.compose.ui.graphics.toArgb
-import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
@@ -1204,31 +1202,20 @@ internal fun MushafPageDial(
                         hudHeightPx = it.height
                     }
                     .drawBehind {
-                        // A feathered sheet of paper, not a cut card: the
-                        // ground dissolves into the leaf instead of ending at
-                        // a hard rim. The rect is inset by the feather so the
-                        // blur's soft falloff lands inside these bounds.
-                        val feather = 5.dp.toPx()
-                        val blur = android.graphics.BlurMaskFilter(
-                            feather,
-                            android.graphics.BlurMaskFilter.Blur.NORMAL,
+                        // The ground cross-fades into the leaf across its own
+                        // width: solid paper under the words, dissolving to
+                        // nothing at each end — part of the magnification,
+                        // not a card cut out and laid on top of it.
+                        val edge = (16.dp.toPx()).coerceAtMost(size.width / 3f)
+                        drawRoundRect(
+                            brush = Brush.horizontalGradient(
+                                0f to paper.copy(alpha = 0f),
+                                edge / size.width to paper,
+                                1f - edge / size.width to paper,
+                                1f to paper.copy(alpha = 0f),
+                            ),
+                            cornerRadius = CornerRadius(6.dp.toPx()),
                         )
-                        drawIntoCanvas { canvas ->
-                            val paint = android.graphics.Paint().apply {
-                                isAntiAlias = true
-                                color = paper.toArgb()
-                                maskFilter = blur
-                            }
-                            canvas.nativeCanvas.drawRoundRect(
-                                feather,
-                                feather,
-                                size.width - feather,
-                                size.height - feather,
-                                6.dp.toPx(),
-                                6.dp.toPx(),
-                                paint,
-                            )
-                        }
                     }
                     .padding(horizontal = 14.dp, vertical = 6.dp)
                     .graphicsLayer { alpha = expand.value },
@@ -1291,6 +1278,27 @@ internal fun MushafPageDial(
                         },
                     )
                 }
+                // The verses sit under the leaf's own name and are read after
+                // it, so they are set below it in the lighter ink the running
+                // head uses for everything subordinate.
+                //
+                // Only one tier writes this line at all, so its cross-fade is
+                // the line against nothing — which is the fade itself, and
+                // wants no second setting to fade against. What the comb
+                // writes here is the hard space: an empty string measures to
+                // no line, and the paper the verses arrive on has to be
+                // already theirs, or the head would step down as they came in.
+                Text(
+                    text = mushafDialLabelFoot(hud, zoomed = true).ifEmpty { " " },
+                    style = hudType,
+                    color = androidx.compose.ui.graphics.lerp(ink.copy(alpha = 0.48f), accents.repeatInk, orange).copy(alpha = 0.48f + 0.22f * orange),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.graphicsLayer {
+                        alpha = zoom.value
+                        translationY = hudPopDir.floatValue * MushafDialHudSwap.toPx() * (1f - zoom.value)
+                    },
+                )
             }
         }
         // The grab strip. It hangs around the rule rather than replacing it:
