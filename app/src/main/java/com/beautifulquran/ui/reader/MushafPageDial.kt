@@ -1171,7 +1171,7 @@ internal fun MushafPageDial(
             // transport's paper rather than on the leaf.
             val hudType = MaterialTheme.typography.labelSmall.copy(
                 fontSize = 14.sp,
-                lineHeight = 18.sp,
+                lineHeight = 16.sp,
                 letterSpacing = 0.08.em,
             )
             val paper = MaterialTheme.colorScheme.background
@@ -1258,14 +1258,18 @@ internal fun MushafPageDial(
                 // Stacked rather than sequenced, so the block stays as wide as
                 // the wider of the two readings throughout and the centring
                 // does not slide out from under the type as the words change.
-                // Both alphas are read in the draw phase, so the whole
+                // Each tier is its own two-line column and the columns are
+                // top-aligned, so the tiers' first lines share one baseline —
+                // the zoomed head reads exactly where the leaf's name stood —
+                // and the second lines likewise, with no blank row between
+                // them. Both alphas are read in the draw phase, so the whole
                 // transition costs no recomposition at all.
                 val hudPulse = pulse.value
                 // One orange for both warnings, whichever speaks louder:
                 // the pulse before the trough opens, and the ripening band
                 // as the hand pulls toward the pop.
                 val orange = maxOf(hudPulse, hudRipe.floatValue)
-                Box(contentAlignment = Alignment.Center) {
+                Box(contentAlignment = Alignment.TopCenter) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(
                             text = hud.chapter,
@@ -1294,39 +1298,40 @@ internal fun MushafPageDial(
                             },
                         )
                     }
-                    Text(
-                        text = mushafDialLabelHead(hud, zoomed = true, page = hudPage),
-                        style = hudType,
-                        color = androidx.compose.ui.graphics.lerp(ink, accents.repeatInk, orange).copy(alpha = 0.72f + 0.18f * hudPulse),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.graphicsLayer {
-                            alpha = zoom.value
-                            translationY = hudPopDir.floatValue * MushafDialHudSwap.toPx() * (1f - zoom.value)
-                        },
-                    )
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            text = mushafDialLabelHead(hud, zoomed = true, page = hudPage),
+                            style = hudType,
+                            color = androidx.compose.ui.graphics.lerp(ink, accents.repeatInk, orange).copy(alpha = 0.72f + 0.18f * hudPulse),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.graphicsLayer {
+                                alpha = zoom.value
+                                translationY = hudPopDir.floatValue * MushafDialHudSwap.toPx() * (1f - zoom.value)
+                            },
+                        )
+                        // The verses sit under the leaf's own page line and are
+                        // read after it, so they take the subtitle's seat in the
+                        // lighter ink the running head uses for everything
+                        // subordinate.
+                        //
+                        // What the comb writes here when it has no verses is the
+                        // hard space: an empty string measures to no line, and
+                        // this row must hold its height whether or not words
+                        // arrive, or the head would step as they came in.
+                        Text(
+                            text = mushafDialLabelFoot(hud, zoomed = true).ifEmpty { " " },
+                            style = hudType,
+                            color = androidx.compose.ui.graphics.lerp(ink.copy(alpha = 0.48f), accents.repeatInk, orange).copy(alpha = 0.48f + 0.22f * orange),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.graphicsLayer {
+                                alpha = zoom.value
+                                translationY = hudPopDir.floatValue * MushafDialHudSwap.toPx() * (1f - zoom.value)
+                            },
+                        )
+                    }
                 }
-                // The verses sit under the leaf's own name and are read after
-                // it, so they are set below it in the lighter ink the running
-                // head uses for everything subordinate.
-                //
-                // Only one tier writes this line at all, so its cross-fade is
-                // the line against nothing — which is the fade itself, and
-                // wants no second setting to fade against. What the comb
-                // writes here is the hard space: an empty string measures to
-                // no line, and the paper the verses arrive on has to be
-                // already theirs, or the head would step down as they came in.
-                Text(
-                    text = mushafDialLabelFoot(hud, zoomed = true).ifEmpty { " " },
-                    style = hudType,
-                    color = androidx.compose.ui.graphics.lerp(ink.copy(alpha = 0.48f), accents.repeatInk, orange).copy(alpha = 0.48f + 0.22f * orange),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.graphicsLayer {
-                        alpha = zoom.value
-                        translationY = hudPopDir.floatValue * MushafDialHudSwap.toPx() * (1f - zoom.value)
-                    },
-                )
             }
         }
         // The grab strip. It hangs around the rule rather than replacing it:
