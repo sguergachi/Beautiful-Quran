@@ -300,7 +300,7 @@ class MushafPageDialTest {
             for (i in 0 until marks.size - 1) {
                 assertTrue(
                     "cell gap collapsed [$i] on ${width}px: ${seats[i] - seats[i + 1]}",
-                    seats[i] - seats[i + 1] >= minGap / 2f && seats[i] in inset..width - inset,
+                    seats[i] - seats[i + 1] >= minGap - 0.01f && seats[i] in inset..width - inset,
                 )
             }
             assertTrue(seats[marks.size - 1] in inset..width - inset)
@@ -688,6 +688,24 @@ class MushafPageDialTest {
         val nearH = mushafDialLensFactor(10f, sigma, heightMag)
         val farH = mushafDialLensFactor(90f, sigma, heightMag)
         assertTrue(nearH > farH)
+    }
+
+    @Test
+    fun `hysteresis keeps a boundary from jittering`() {
+        val seats = floatArrayOf(100f, 0f) // gap 100, decreasing x
+        val hyst = 4f // gap*0.6=60 dominates
+        // Gap 100 -> adaptive 60, half 30, mid 50 -> need <20 to flip 0->1
+        assertEquals(0, mushafDialChapterAtHysteresis(seats, 50f, 0, hyst))
+        assertEquals(0, mushafDialChapterAtHysteresis(seats, 25f, 0, hyst))
+        assertEquals(1, mushafDialChapterAtHysteresis(seats, 19f, 0, hyst))
+        // Symmetric: mid 50 -> need >80 to flip 1->0 (1 is at 0, 0 at 100)
+        // For lastIdx=1 (at 0), cur for 75 is 0, need >80 to flip to 0
+        assertEquals(1, mushafDialChapterAtHysteresis(seats, 50f, 1, hyst))
+        assertEquals(1, mushafDialChapterAtHysteresis(seats, 75f, 1, hyst))
+        assertEquals(0, mushafDialChapterAtHysteresis(seats, 81f, 1, hyst))
+        // Fast jump >1 is immediate (with 3 seats, gap 50 each, tested elsewhere)
+        val seats3 = floatArrayOf(100f, 50f, 0f)
+        assertEquals(2, mushafDialChapterAtHysteresis(seats3, 0f, 0, hyst))
     }
 
 }

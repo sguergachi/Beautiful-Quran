@@ -302,6 +302,7 @@ private fun PaperStackApp(
         save = { it?.name },
         restore = { name -> name?.let { com.beautifulquran.ui.settings.SettingsDetail.valueOf(it) } },
     )) { mutableStateOf<com.beautifulquran.ui.settings.SettingsDetail?>(null) }
+    var downloadsRefreshKey by remember { mutableIntStateOf(0) }
     /**
      * Remount key for the reader. Bumped on home/bookmarks/concordance/voice
      * opens so scroll state resets; **not** bumped on next-chapter advance so
@@ -749,6 +750,7 @@ private fun PaperStackApp(
         ) {
             SettingsScreen(
                 viewModel = settingsViewModel,
+                downloadsRefreshKey = downloadsRefreshKey,
                 onBack = {
                     animateTo(if (selectedSurahId == 0) COVER_LAYER else AYAH_LAYER)
                 },
@@ -786,7 +788,10 @@ private fun PaperStackApp(
                     )
                     SettingsDetail.DOWNLOADS -> DownloadsSheet(
                         viewModel = settingsViewModel,
-                        onBack = { animateTo(settingsLayer) },
+                        onBack = {
+                            downloadsRefreshKey++
+                            animateTo(settingsLayer)
+                        },
                     )
                     null -> {}
                 }
