@@ -38,7 +38,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
@@ -1154,27 +1156,10 @@ internal fun MushafPageDial(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier
                     .align(Alignment.TopStart)
-                    .background(
-                        MaterialTheme.colorScheme.surface,
-                        RoundedCornerShape(4.dp),
-                    )
-                    .padding(horizontal = 10.dp, vertical = 4.dp)
-                    // Measured out of the slot's reach. The dial's own band is
-                    // 13 dp — a hairline's worth — and the label does not live
-                    // in it; it stands on the leaf's bottom margin above. Left
-                    // to the slot's constraints the second line has nowhere to
-                    // be measured into and silently collapses to nothing.
-                    //
-                    // Height only. Freeing the width as well would take the
-                    // rule's own width off the label, and a line that is never
-                    // told how much paper it has cannot ellipsise: at a large
-                    // font scale the head would run off the glass instead of
-                    // ending in a full stop.
-                    .wrapContentHeight(Alignment.Top, unbounded = true)
-                    .onSizeChanged {
-                        hudWidthPx = it.width
-                        hudHeightPx = it.height
-                    }
+                    // Order is load-bearing: offset and fade must WRAP the
+                    // background, or the plate paints the column's un-shifted
+                    // bounds at the band's top corner while the type moves
+                    // without it.
                     .offset {
                         // Over the thumb, which is over the finger — but the
                         // label never stops following the hand: it clamps only
@@ -1198,6 +1183,27 @@ internal fun MushafPageDial(
                         // lean for exactly as long as the pop is imminent.
                         IntOffset(left.roundToInt(), (foot - hudHeightPx + hudPull.value).roundToInt())
                     }
+                    // Measured out of the slot's reach. The dial's own band is
+                    // 13 dp — a hairline's worth — and the label does not live
+                    // in it; it stands on the leaf's bottom margin above. Left
+                    // to the slot's constraints the second line has nowhere to
+                    // be measured into and silently collapses to nothing.
+                    //
+                    // Height only. Freeing the width as well would take the
+                    // rule's own width off the label, and a line that is never
+                    // told how much paper it has cannot ellipsise: at a large
+                    // font scale the head would run off the glass instead of
+                    // ending in a full stop.
+                    .wrapContentHeight(Alignment.Top, unbounded = true)
+                    .onSizeChanged {
+                        hudWidthPx = it.width
+                        hudHeightPx = it.height
+                    }
+                    .background(
+                        MaterialTheme.colorScheme.surface,
+                        RoundedCornerShape(4.dp),
+                    )
+                    .padding(horizontal = 10.dp, vertical = 4.dp)
                     .graphicsLayer { alpha = expand.value },
             ) {
                 // The head is set twice, once as each tier reads the leaf, and
@@ -1213,7 +1219,24 @@ internal fun MushafPageDial(
                 // Both alphas are read in the draw phase, so the whole
                 // transition costs no recomposition at all.
                 val hudPulse = pulse.value
-                Box(contentAlignment = Alignment.Center) {
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier.drawWithContent {
+                        drawContent()
+                        // Ripening toward the pop: the closer the band is to
+                        // breaking, the more the type takes the orange. Read
+                        // off the leaned HUD itself, in the draw phase, so
+                        // the whole warning costs no recomposition.
+                        val ripe = (abs(hudPull.value) /
+                            MushafDialHudLean.toPx()).coerceIn(0f, 1f)
+                        if (ripe > 0.004f) {
+                            drawRect(
+                                accents.repeatInk.copy(alpha = ripe),
+                                blendMode = BlendMode.SrcAtop,
+                            )
+                        }
+                    },
+                ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(
                             text = hud.chapter,
