@@ -1365,12 +1365,27 @@ internal fun MushafPageDial(
                             )
                         } else null
                         val hudSeatX = seats?.getOrNull(hudChapterIdx) ?: handX.floatValue
-                        val left = mushafDialHudX(
+                        val baseLeft = mushafDialHudX(
                             hudSeatX,
                             hudWidthPx.toFloat(),
                             widthPx.toFloat(),
                             MushafDialHudPad.toPx(),
                         )
+                        // When docked left/right the plate is parked at the wall
+                        // (-slack/maxLeft) while the text is flush. Nudge the
+                        // plate a touch toward the comb so the flush edge does
+                        // not feel off-balance: left docks shift right, right
+                        // docks shift left.
+                        val nudge = with(density) { 10.dp.toPx() }
+                        val slack = with(density) { MushafDialHudPad.toPx() } -
+                            MUSHAF_DIAL_HUD_EDGE_MARGIN_PX
+                        val maxLeft = (widthPx.toFloat() - hudWidthPx.toFloat() + slack)
+                            .coerceAtLeast(-slack)
+                        val left = when (hudDock) {
+                            -1 -> (baseLeft + nudge).coerceIn(-slack, maxLeft)
+                            1 -> (baseLeft - nudge).coerceIn(-slack, maxLeft)
+                            else -> baseLeft
+                        }
                         // Clear of the tallest tick, and measured from the
                         // rule rather than from the top of the slot. The slot
                         // carries paper above the rule that the label was
