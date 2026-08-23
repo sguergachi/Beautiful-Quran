@@ -304,13 +304,6 @@ internal const val MUSHAF_DIAL_SPEED_RISE_TAU_S = 0.05f
  */
 internal const val MUSHAF_DIAL_SPEED_FALL_TAU_S = 0.06f
 
-/** The tactile rhythm the dial keeps: no tick closer than this to the last. */
-internal const val MUSHAF_DIAL_HAPTIC_PITCH_DP = 4f
-internal const val MUSHAF_DIAL_TAIL_HAPTIC_PITCH_DP = 1.2f
-
-/** Nor closer in time than this, in seconds — under it a tick is a buzz. */
-internal const val MUSHAF_DIAL_HAPTIC_MIN_S = 0.045f
-
 /** How fast the entry offset is paid off, in seconds. See [mushafDialTroughPage]. */
 internal const val MUSHAF_DIAL_TROUGH_SETTLE_TAU_S = 0.11f
 
@@ -450,18 +443,6 @@ internal fun mushafDialHudX(
  */
 internal fun mushafDialShouldLeaveTrough(runOutSeconds: Float, strayed: Boolean): Boolean =
     strayed || runOutSeconds >= MUSHAF_DIAL_RUNOUT_S
-
-/**
- * Whether a haptic tick is due, given the hand has travelled [travelDp] and
- * [sinceSeconds] have passed since the last one.
- *
- * A crossing is not enough on its own. In the chapter tier the openings are
- * about three dp apart on the book's scale, so a real stroke crosses a
- * hundred of them in a third of a second; ticking each would be a buzz, and a
- * buzz carries no information about anything.
- */
-internal fun mushafDialHapticDue(travelDp: Float, sinceSeconds: Float): Boolean =
-    abs(travelDp) >= MUSHAF_DIAL_HAPTIC_PITCH_DP && sinceSeconds >= MUSHAF_DIAL_HAPTIC_MIN_S
 
 /**
  * Where a page sits along the rule, 0 at the left edge and 1 at the right.
@@ -686,6 +667,66 @@ internal fun mushafDialChapterPage(f: Float, marks: IntArray, pageCount: Int): F
 }
 
 /**
+ * The chapter tier's stable selection seats: each chapter's true seat on the
+ * rule — co-located stacks spread apart — relaxed to a minimum gap and clamped
+ * into the track. Unlike the drawn comb this does not depend on where the
+ * finger is, so it partitions the measure into cells that never move: every
+ * chapter owns a slice of the rule it alone answers to, on every screen,
+ * under every lens state.
+ *
+ * The lensed comb the reader sees is decoration; THIS is what the tier means.
+ */
+internal fun mushafDialCombCellSeats(
+    marks: IntArray,
+    pageCount: Int,
+    insetPx: Float,
+    widthPx: Float,
+    rulePx: Float,
+): FloatArray {
+    val result = FloatArray(marks.size)
+    for ((idx, mark) in marks.withIndex()) {
+        var x = mushafDialTrackX(
+            1f - mushafDialChapterFraction(mark.toFloat(), marks, pageCount),
+            widthPx,
+            insetPx,
+        )
+        var gStart = idx
+        while (gStart > 0 && marks[gStart - 1] == mark) gStart--
+        var gEnd = idx
+        while (gEnd + 1 < marks.size && marks[gEnd + 1] == mark) gEnd++
+        if (gEnd > gStart) x += (idx - gStart - (gEnd - gStart) / 2f) * rulePx * 3f
+        result[idx] = x.coerceIn(insetPx, widthPx - insetPx)
+    }
+    val span = (widthPx - 2f * insetPx).coerceAtLeast(0f)
+    val minGap = minOf(rulePx * 1.5f, span / (marks.size - 1).coerceAtLeast(1))
+    var prev = widthPx - insetPx + minGap
+    for (i in marks.indices) {
+        result[i] = minOf(result[i], prev - minGap)
+        prev = result[i]
+    }
+    var floor = insetPx
+    for (i in marks.indices.reversed()) {
+        result[i] = maxOf(result[i], floor)
+        floor = result[i] + minGap
+    }
+    return result
+}
+
+/** Which chapter's stable cell [xPx] falls in. */
+internal fun mushafDialChapterAt(seats: FloatArray, xPx: Float): Int {
+    var best = 0
+    var bestDist = Float.MAX_VALUE
+    for ((idx, x) in seats.withIndex()) {
+        val d = abs(x - xPx)
+        if (d < bestDist) {
+            bestDist = d
+            best = idx
+        }
+    }
+    return best
+}
+
+/**
  * Where each chapter mark is DRAWN on the chapter tier, in px, under the
  * fisheye the finger applies: lens around [centerX], progressive tail boost,
  * tail push. Every mark comes back placed — never NaN — because what the
@@ -774,8 +815,11 @@ internal fun mushafDialCombDrawnXs(
     // the track, then relaxed to the minimum gap — forward so no tick crowds
     // the one before it, backward so the chain never spills off the far end.
     // Where the raw seats crowd (the book's head, the Juz-30 stacks) the
-    // spread pushes outward; where they breathe, nothing moves.
-    val minGap = rulePx * 1.5f
+    // spread pushes outward; where they breathe, nothing moves. On a screen
+    // too narrow for the full gap the spacing yields before the guarantee
+    // does: order and separation survive, sized to what the glass allows.
+    val span = (widthPx - 2f * insetPx).coerceAtLeast(0f)
+    val minGap = minOf(rulePx * 1.5f, span / (marks.size - 1).coerceAtLeast(1))
     val lo = insetPx
     val hi = widthPx - insetPx
     var prev = hi + minGap
@@ -1074,7 +1118,6 @@ internal fun MushafPageDial(
                 } else 0f
                 val plateauAt = 0.78f
                 val effProgress = (centreProgress / plateauAt).coerceIn(0f, 1f)
-                val leftPushPx = if (isLensed) 10.dp.toPx() * combInk * effProgress else 0f
                 val sigmaPx = baseSigmaPx * (1f + 0.6f * effProgress)
                 val progHeightMag = 1f + (MUSHAF_DIAL_LENS_HEIGHT_GAIN - 1f) * effProgress
                 // One layout, three readers: the drawn comb, the hit-read
@@ -1531,48 +1574,21 @@ val strayPx = MushafDialStray.toPx()
                         // hold to most long strokes and to al-Fatiha, leaving
                         // the insistent hold to do it — which is why holding
                         // still took a second and a half instead of an eighth.
-                        // The comb as it is DRAWN under the fisheye, and
-                        // the tick nearest the finger. Shared by the tier's
-                        // read and by release, so the bracket, the label,
-                        // and the landing all answer to the same ticks.
-                        fun nearestDrawnTick(fingerX: Float): Int {
-                            val drawn = mushafDialCombDrawnXs(
-                                chapterMarks,
-                                pages,
-                                fingerX,
-                                isLensed = true,
-                                combInk = expand.value,
-                                insetPx = insetPx,
-                                widthPx = widthPxNow,
-                                rulePx = MushafDialRuleWeightPx * density,
-                                lensSigmaPx = run {
-                                    val c = mushafDialTrackFraction(
-                                        fingerX, widthPxNow, insetPx,
-                                    )
-                                    val eff = ((1f - c) / 0.78f).coerceIn(0f, 1f)
-                                    MUSHAF_DIAL_LENS_SIGMA_DP.dp.toPx() *
-                                        (1f + 0.6f * eff)
-                                },
-                                tailPushPx = 10.dp.toPx(),
-                                epsilonPx = 1.8.dp.toPx(),
-                            )
-                            var best = -1
-                            var bestDist = Float.MAX_VALUE
-                            for ((idx, x) in drawn.withIndex()) {
-                                if (x.isNaN()) continue
-                                val d = abs(x - fingerX)
-                                if (d < bestDist) {
-                                    bestDist = d
-                                    best = idx
-                                }
-                            }
-                            return best
-                        }
+                        // The chapter tier's cells: stable, finger-independent
+                        // seats the hand selects between. The lensed comb above
+                        // is what the eye enjoys; THESE are what the finger
+                        // means. Computed once per gesture — the cells cannot
+                        // move under a moving hand.
+                        val cellSeats = mushafDialCombCellSeats(
+                            chapterMarks,
+                            pages,
+                            insetPx,
+                            widthPxNow,
+                            MushafDialRuleWeightPx * density,
+                        )
                         var troughPopped = false
                         var leanPop: Job? = null
                         var shut = false
-                        var travelDp = 0f
-                        var sinceTickS = 0f
                         val initialFracForLast = mushafDialChapterFraction(raw, chapterMarks, pages)
                         val initialIdxForLast = if (initialFracForLast >= TAIL_HEAD_FRACTION && chapterMarks.size > TAIL_START_IDX) {
                             val tailCount = (chapterMarks.size - TAIL_START_IDX).coerceAtLeast(1)
@@ -1584,7 +1600,6 @@ val strayPx = MushafDialStray.toPx()
                         var lastChapter = chapterMarks.getOrElse(initialIdxForLast) {
                             mushafDialChapterRun(chapterMarks, raw.roundToInt().coerceIn(1, pages), pages).first
                         }
-                        var lastPage = raw.roundToInt().coerceIn(1, pages)
                         dialPage.floatValue = raw
                         hudChapterIdx = initialIdxForLast
                         // The thumb goes to the finger on contact, before any
@@ -1626,8 +1641,6 @@ scrubbing = true
                                 val dxDp = pendingDp
                                 pendingDp = 0f
                                 speed = mushafDialSpeed(speed, dxDp / dt, dt)
-                                travelDp += abs(dxDp)
-                                sinceTickS += dt
                                 val handPx = handX.floatValue
                                 // Out along the rule, or off across it. The
                                 // trough is a place; both of these say the
@@ -1704,33 +1717,17 @@ if (mushafDialShouldLeaveTrough(runOutS, strayed)) {
                                     // and the dial's only haptic is the chapter tick.
                                     continue
                                 }
-                                // The chapter tier, read the same way the
-                                // trough is: the finger's place along the
-                                // measure names a place in the book, right end
-                                // to left end. The comb it is reading is
-                                // nailed to the rule, so any other mapping
-                                // would put the bracket somewhere the reader's
-                                // own finger is not — and both ends would stop
-                                // meaning the ends of the book after the first
-                                // stroke that ran past one.
-                                // Read off the drawn comb, not through the
-                                // true scale: the lens and the tail's equal
-                                // cells draw each tick away from its true
-                                // seat — at a cell's very edge, not its
-                                // middle — so a true-scale read named a
-                                // chapter one away from the tick the finger
-                                // was aiming at, and al-Munafiqun let go as
-                                // at-Taghabun. Reading what is drawn makes
-                                // bracket, label, and landing agree.
-                                val curIdx = nearestDrawnTick(handPx).takeIf { it >= 0 }
-                                    ?: mushafDialChapterIndex(
-                                        chapterMarks,
-                                        dialPage.floatValue.roundToInt().coerceIn(1, pages),
-                                        pages,
-                                    )
+                                // The chapter tier, read against the stable
+                                // cells: the finger's place along the measure
+                                // falls in exactly one chapter's cell, and the
+                                // cells never move under a moving hand — so
+                                // every chapter is aimable, the bracket, the
+                                // HUD text, and the landing all answer to the
+                                // same cell, and a boundary cannot be jumped
+                                // over by the lens breathing.
+                                val curIdx = mushafDialChapterAt(cellSeats, handPx)
                                 raw = chapterMarks[curIdx].toFloat()
                                 dialPage.floatValue = raw
-                                lastPage = raw.roundToInt().coerceIn(1, pages)
                                 hudChapterIdx = curIdx
                                 val lastIdx = mushafDialChapterIndex(chapterMarks, lastChapter, pages)
                                 if (curIdx != lastIdx) {
@@ -1738,8 +1735,6 @@ if (mushafDialShouldLeaveTrough(runOutS, strayed)) {
                                     // chapter text is about to change, and the
                                     // hand hears it. Every crossing, no exceptions.
                                     view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
-                                    travelDp = 0f
-                                    sinceTickS = 0f
                                     lastChapter = chapterMarks[curIdx]
                                 }
                                 val curRunStart = chapterMarks[curIdx]
@@ -1834,21 +1829,16 @@ if (mushafDialShouldLeaveTrough(runOutS, strayed)) {
                         val landed =
                             if (open) here
                             else {
-                                // Land on the tick the reader SEES — the
-                                // same drawn tick the tier has been reading
+                                // Land in the cell the tier has been reading
                                 // all along, so letting go lands the stroke
-                                // where the bracket says it sat.
-                                val bestIdx = nearestDrawnTick(handX.floatValue)
-                                if (bestIdx >= 0) {
-                                    landedSurahId = bestIdx + 1
-                                    mushafDialChapterRun(
-                                        chapterMarks,
-                                        chapterMarks[bestIdx],
-                                        pages,
-                                    ).first
-                                } else {
-                                    mushafDialChapterRun(chapterMarks, here, pages).first
-                                }
+                                // where the HUD says it sat.
+                                val bestIdx = mushafDialChapterAt(cellSeats, handX.floatValue)
+                                landedSurahId = bestIdx + 1
+                                mushafDialChapterRun(
+                                    chapterMarks,
+                                    chapterMarks[bestIdx],
+                                    pages,
+                                ).first
                             }
                         // The thumb marks a place; it is not a flywheel. A
                         // release lands where the hand left it — no decay, no

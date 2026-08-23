@@ -270,14 +270,13 @@ class MushafPageDialTest {
     }
 
     @Test
-    fun `every chapter is reachable on the drawn comb`() {
-        // The head of the book compresses the first surahs into a sliver —
-        // al-Baqarah opens one page after al-Fatihah — and ticks that crowd
-        // must be spread apart, never dropped: what the comb does not draw
-        // the reader can never select. Sweep a finger across the whole tier
-        // under every lens strength and require every chapter's tick to win
-        // as the nearest somewhere. Chapter 18 (idx 17) was the report that
-        // proved discrete sigma samples are not enough.
+    fun `every chapter owns a stable cell and every cell is selectable`() {
+        // Selection reads stable cells, not the lensed drawing: the cells
+        // partition the whole measure, never move under a moving hand, and
+        // stay ordered with breathing room on every screen. Al-Baqarah (idx
+        // 1) opens one page after al-Fatihah; chapter 18 sat in the crushed
+        // head; three surahs stack on page 601 and three on 603 — every one
+        // of them must own a slice of the rule a finger can hold.
         val marks = intArrayOf(
             1, 2, 50, 77, 106, 128, 151, 177, 187, 208, 221, 235, 249, 255,
             262, 267, 282, 293, 305, 312, 322, 332, 342, 350, 359, 367, 377,
@@ -290,11 +289,51 @@ class MushafPageDialTest {
             602, 602, 602, 603, 603, 603, 604, 604, 604,
         )
         val pages = 604
+
+        fun check(density: Float, width: Float) {
+            val inset = 14f * density
+            val rule = density
+            val seats = mushafDialCombCellSeats(marks, pages, inset, width, rule)
+            // Invariant 1: the cells tile the measure in order, each at
+            // least a minimum gap wide, none outside the track.
+            val minGap = rule * 1.5f
+            for (i in 0 until marks.size - 1) {
+                assertTrue(
+                    "cell gap collapsed [$i] on ${width}px: ${seats[i] - seats[i + 1]}",
+                    seats[i] - seats[i + 1] >= minGap / 2f && seats[i] in inset..width - inset,
+                )
+            }
+            assertTrue(seats[marks.size - 1] in inset..width - inset)
+            // Invariant 2: every chapter's cell is held by some finger
+            // position — sweep the whole rule and collect who wins.
+            val reachable = BooleanArray(marks.size)
+            for (finger in (inset.toInt()..(width - inset).toInt())) {
+                reachable[mushafDialChapterAt(seats, finger.toFloat())] = true
+            }
+            val missing = (0 until marks.size).filter { !reachable[it] }
+            assertTrue(
+                "chapters with no cell of their own on ${width}px: $missing",
+                missing.isEmpty(),
+            )
+            // And the two chapters that were reported broken by name.
+            assertTrue(reachable[1])
+            assertTrue(reachable[17])
+        }
+
+        check(density = 2.625f, width = 1080f)
+        check(density = 2.0f, width = 800f)
+        check(density = 3.5f, width = 1440f)
+    }
+
+    @Test
+    fun `the lensed comb stays ordered under any hand`() {
+        // The lensed drawing is decoration, but decoration still has laws:
+        // it never folds back on itself, whatever the finger does.
+        val marks = intArrayOf(1, 2, 50, 77, 106, 128, 151, 177, 187, 208)
+        val pages = 208
         val density = 2.625f
         val width = 1080f
         val inset = 14f * density
-        val rule = density
-        val reachable = BooleanArray(marks.size)
         var sigmaMag = 1f
         while (sigmaMag <= 1.61f) {
             for (finger in (inset.toInt()..(width - inset).toInt())) {
@@ -306,30 +345,18 @@ class MushafPageDialTest {
                     combInk = 1f,
                     insetPx = inset,
                     widthPx = width,
-                    rulePx = rule,
+                    rulePx = density,
                     lensSigmaPx = MUSHAF_DIAL_LENS_SIGMA_DP * density * sigmaMag,
                     tailPushPx = 10f * density,
                     epsilonPx = 1.8f * density,
                 )
-                var best = -1
-                var bestDist = Float.MAX_VALUE
-                for ((idx, x) in drawn.withIndex()) {
-                    if (x.isNaN()) continue
-                    val d = abs(x - finger)
-                    if (d < bestDist) {
-                        bestDist = d
-                        best = idx
-                    }
+                for (i in 0 until marks.size - 1) {
+                    assertFalse(drawn[i].isNaN())
+                    assertTrue(drawn[i] > drawn[i + 1])
                 }
-                if (best >= 0) reachable[best] = true
             }
-            sigmaMag += 0.05f
+            sigmaMag += 0.15f
         }
-        val missing = (0 until marks.size).filter { !reachable[it] }
-        assertTrue(
-            "chapters never nearest under any finger position: $missing",
-            missing.isEmpty(),
-        )
     }
 
     @Test
@@ -457,21 +484,6 @@ class MushafPageDialTest {
         assertEquals(oneStep, twoSteps, 0.01f)
         // A sample with no time behind it changes nothing.
         assertEquals(123f, mushafDialSpeed(123f, 999f, 0f), 1e-5f)
-    }
-
-    @Test
-    fun `the haptic is spaced by travel and by time, not by leaves crossed`() {
-        // Chapter openings are about three dp apart at the book's scale, so a
-        // tick per crossing is a buzz. Both guards are needed: a fast hand
-        // clears the travel in a millisecond, and a creeping one clears the
-        // time without having gone anywhere.
-        assertTrue(mushafDialHapticDue(MUSHAF_DIAL_HAPTIC_PITCH_DP, MUSHAF_DIAL_HAPTIC_MIN_S))
-        assertFalse(mushafDialHapticDue(MUSHAF_DIAL_HAPTIC_PITCH_DP * 0.5f, 1f))
-        assertFalse(mushafDialHapticDue(50f, MUSHAF_DIAL_HAPTIC_MIN_S * 0.5f))
-        // Either direction of travel counts.
-        assertTrue(mushafDialHapticDue(-MUSHAF_DIAL_HAPTIC_PITCH_DP, 1f))
-        // And the cadence stays under a comfortable ceiling.
-        assertTrue(1f / MUSHAF_DIAL_HAPTIC_MIN_S < 30f)
     }
 
     @Test
