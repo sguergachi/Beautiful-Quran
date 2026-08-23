@@ -688,8 +688,14 @@ internal fun mushafDialChapterPage(f: Float, marks: IntArray, pageCount: Int): F
 /**
  * Where each chapter mark is DRAWN on the chapter tier, in px, under the
  * fisheye the finger applies: lens around [centerX], progressive tail boost,
- * tail push, and the same crowding skip the canvas uses. Marks skipped as
- * invisible come back as NaN.
+ * tail push. Every mark comes back placed — never NaN — because what the
+ * comb does not draw the reader can never select.
+ *
+ * The laid-out ticks keep a minimum gap of [rulePx] × 1.5 between neighbours:
+ * crowding is resolved by spreading, not by erasing. Al-Baqarah opens a
+ * single page after al-Fatihah and sits within a pixel of it on the
+ * compressed head; three surahs open page 601 and three open 603. A tick
+ * erased as a duplicate took its chapter's selection with it.
  *
  * Release reads this so letting go lands on the tick the reader sees — the
  * lens moves marks away from their true seats, and mapping the finger
@@ -708,19 +714,31 @@ internal fun mushafDialCombDrawnXs(
     tailPushPx: Float,
     epsilonPx: Float,
 ): FloatArray {
-    val result = FloatArray(marks.size) { Float.NaN }
+    val result = FloatArray(marks.size)
     if (!isLensed || combInk <= 0.004f) {
         for ((idx, mark) in marks.withIndex()) {
-            result[idx] = mushafDialTrackX(
+            var x = mushafDialTrackX(
                 1f - mushafDialChapterFraction(mark.toFloat(), marks, pageCount),
                 widthPx,
                 insetPx,
             )
+            var gStart = idx
+            while (gStart > 0 && marks[gStart - 1] == mark) gStart--
+            var gEnd = idx
+            while (gEnd + 1 < marks.size && marks[gEnd + 1] == mark) gEnd++
+            val gSize = gEnd - gStart + 1
+            if (gSize > 1) {
+                x += (idx - gStart - (gSize - 1) / 2f) * epsilonPx
+            }
+            result[idx] = x
         }
         return result
     }
-    val rule = rulePx
     val baseSigmaPx = lensSigmaPx
+    // Co-located surah stacks (three surahs open one page in Juz 30) need
+    // more than the minimum gap between members, or the middle member's
+    // capture window collapses to nothing as the lens breathes.
+    val epsilonPx = maxOf(epsilonPx, 3f * rulePx)
     val centreFrac = mushafDialTrackFraction(centerX, widthPx, insetPx)
     val centreProgress = (1f - centreFrac).coerceIn(0f, 1f)
     val plateauAt = 0.78f
@@ -728,7 +746,6 @@ internal fun mushafDialCombDrawnXs(
     val leftPushPx = tailPushPx * combInk * effProgress
     val sigmaPx = baseSigmaPx * (1f + 0.6f * effProgress)
     val progBaseMag = 1f + (MUSHAF_DIAL_LENS_MAG - 1f) * effProgress
-    var previousX = Float.MAX_VALUE
     for ((idx, mark) in marks.withIndex()) {
         var trueX = mushafDialTrackX(
             1f - mushafDialChapterFraction(mark.toFloat(), marks, pageCount),
@@ -749,17 +766,27 @@ internal fun mushafDialCombDrawnXs(
         val extra = if (isTailMark) (1f - gap / 10f).coerceIn(0f, 1f) * 2.2f * effProgress else 0f
         val densityMag = progBaseMag + extra
         val x0 = mushafDialLensedX(trueX, centerX, sigmaPx, densityMag)
-        var x = x0 + leftPushPx * (if (isTailMark) {
+        result[idx] = x0 + leftPushPx * (if (isTailMark) {
             mushafDialFraction(mark.toFloat(), pageCount).coerceIn(0f, 1f)
         } else 0f)
-        if (x < -rule || x > widthPx + rule) continue
-        // Crowding nudges, it never erases. A tick the comb does not draw
-        // can never be nearest under the finger — and al-Baqarah opens a
-        // single page after al-Fatihah, within a pixel of it on the
-        // compressed head.
-        if (previousX - x < rule * 1.5f) x = previousX - rule * 1.5f
-        previousX = x
-        result[idx] = x
+    }
+    // Layout law: every tick owns its own slice of the measure. Clamped into
+    // the track, then relaxed to the minimum gap — forward so no tick crowds
+    // the one before it, backward so the chain never spills off the far end.
+    // Where the raw seats crowd (the book's head, the Juz-30 stacks) the
+    // spread pushes outward; where they breathe, nothing moves.
+    val minGap = rulePx * 1.5f
+    val lo = insetPx
+    val hi = widthPx - insetPx
+    var prev = hi + minGap
+    for (i in marks.indices) {
+        result[i] = minOf(result[i].coerceIn(lo, hi), prev - minGap)
+        prev = result[i]
+    }
+    var floor = lo
+    for (i in marks.indices.reversed()) {
+        result[i] = maxOf(result[i], floor)
+        floor = result[i] + minGap
     }
     return result
 }
@@ -1049,10 +1076,27 @@ internal fun MushafPageDial(
                 val effProgress = (centreProgress / plateauAt).coerceIn(0f, 1f)
                 val leftPushPx = if (isLensed) 10.dp.toPx() * combInk * effProgress else 0f
                 val sigmaPx = baseSigmaPx * (1f + 0.6f * effProgress)
-                val progBaseMag = 1f + (MUSHAF_DIAL_LENS_MAG - 1f) * effProgress
                 val progHeightMag = 1f + (MUSHAF_DIAL_LENS_HEIGHT_GAIN - 1f) * effProgress
-                            var previousX = Float.MAX_VALUE
+                // One layout, three readers: the drawn comb, the hit-read
+                // under the finger, and the release landing all answer to the
+                // same array, so a tick that can be touched is always one the
+                // eye can see.
+                val drawnXs = mushafDialCombDrawnXs(
+                    chapterMarks,
+                    pages,
+                    centerX,
+                    isLensed = isLensed,
+                    combInk = combInk,
+                    insetPx = inset,
+                    widthPx = size.width,
+                    rulePx = MushafDialRuleWeightPx * density,
+                    lensSigmaPx = baseSigmaPx,
+                    tailPushPx = 10.dp.toPx(),
+                    epsilonPx = 1.8.dp.toPx(),
+                )
                 for ((idx, mark) in chapterMarks.withIndex()) {
+                    val x = drawnXs[idx]
+                    if (x.isNaN()) continue
                     var trueX = tailX(mark.toFloat())
                     // Spread co-located marks (gap 0) around their page.
                     var gStart = idx
@@ -1072,31 +1116,12 @@ internal fun MushafPageDial(
                     val gap = if (idx < chapterMarks.lastIndex) {
                         (chapterMarks[idx + 1] - mark).coerceIn(0, 20)
                     } else 1
-                    val densityMag = if (isLensed) {
-                        val extra = if (isTailMark) {
-                            (1f - gap / 10f).coerceIn(0f, 1f) * 2.2f * effProgress
-                        } else 0f
-                        progBaseMag + extra
-                    } else progBaseMag
                     val heightMagForMark = if (isLensed) {
                         val extraH = if (isTailMark) {
                             (1f - gap / 10f).coerceIn(0f, 1f) * 1.1f * effProgress
                         } else 0f
                         progHeightMag + extraH
                     } else progHeightMag
-                    val x0 = if (isLensed) {
-                        mushafDialLensedX(trueX, centerX, sigmaPx, densityMag)
-                    } else trueX
-                    var x = x0 + leftPushPx * (if (isLensed && isTailMark) {
-                        val markFrac = mushafDialFraction(mark.toFloat(), pages)
-                        (markFrac).coerceIn(0f, 1f)
-                    } else 0f)
-                    if (x < -rule || x > size.width + rule) continue
-                    // Crowding nudges, it never erases — the same law the
-                    // hit-read follows, so a tick the finger can select is
-                    // always one the eye can see.
-                    if (previousX - x < rule * 1.5f) x = previousX - rule * 1.5f
-                    previousX = x
                     val dist = if (isLensed) abs(trueX - centerX) else 0f
                     val heightGain = if (isLensed) {
                         mushafDialLensFactor(dist, sigmaPx, heightMagForMark)
@@ -1709,13 +1734,10 @@ if (mushafDialShouldLeaveTrough(runOutS, strayed)) {
                                 hudChapterIdx = curIdx
                                 val lastIdx = mushafDialChapterIndex(chapterMarks, lastChapter, pages)
                                 if (curIdx != lastIdx) {
-                                    // One haptic per chapter crossed — the only
-                                    // one the dial speaks. The time guard keeps a
-                                    // hand hovering on a cell boundary from
-                                    // machine-gunning the tick as the lens breathes.
-                                    if (sinceTickS >= MUSHAF_DIAL_HAPTIC_MIN_S) {
-                                        view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
-                                    }
+                                    // The one haptic the dial speaks: the HUD's
+                                    // chapter text is about to change, and the
+                                    // hand hears it. Every crossing, no exceptions.
+                                    view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
                                     travelDp = 0f
                                     sinceTickS = 0f
                                     lastChapter = chapterMarks[curIdx]

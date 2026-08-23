@@ -273,10 +273,11 @@ class MushafPageDialTest {
     fun `every chapter is reachable on the drawn comb`() {
         // The head of the book compresses the first surahs into a sliver —
         // al-Baqarah opens one page after al-Fatihah — and ticks that crowd
-        // must be nudged apart, never dropped: what the comb does not draw
+        // must be spread apart, never dropped: what the comb does not draw
         // the reader can never select. Sweep a finger across the whole tier
-        // under the strongest lens and require every chapter's tick to win
-        // as the nearest somewhere.
+        // under every lens strength and require every chapter's tick to win
+        // as the nearest somewhere. Chapter 18 (idx 17) was the report that
+        // proved discrete sigma samples are not enough.
         val marks = intArrayOf(
             1, 2, 50, 77, 106, 128, 151, 177, 187, 208, 221, 235, 249, 255,
             262, 267, 282, 293, 305, 312, 322, 332, 342, 350, 359, 367, 377,
@@ -294,7 +295,8 @@ class MushafPageDialTest {
         val inset = 14f * density
         val rule = density
         val reachable = BooleanArray(marks.size)
-        for (sigmaMag in floatArrayOf(1f, 1.6f)) {
+        var sigmaMag = 1f
+        while (sigmaMag <= 1.61f) {
             for (finger in (inset.toInt()..(width - inset).toInt())) {
                 val drawn = mushafDialCombDrawnXs(
                     marks,
@@ -321,55 +323,12 @@ class MushafPageDialTest {
                 }
                 if (best >= 0) reachable[best] = true
             }
+            sigmaMag += 0.05f
         }
         val missing = (0 until marks.size).filter { !reachable[it] }
-        // Co-located surahs that share a start page (the Juz-30 stacks:
-        // three surahs open page 601, three open 603) can sit within a few
-        // pixels of their siblings, so the middle member of a stack may
-        // never itself be the nearest tick — but every sibling lands on
-        // the same page, and every tick must at least be drawn somewhere.
-        // What matters for the reader: every distinct start page is
-        // selectable, and no chapter's tick is erased outright.
-        val drawnSomewhere = BooleanArray(marks.size)
-        val reachablePages = HashSet<Int>()
-        for (sigmaMag in floatArrayOf(1f, 1.6f)) {
-            for (finger in (inset.toInt()..(width - inset).toInt())) {
-                val drawn = mushafDialCombDrawnXs(
-                    marks,
-                    pages,
-                    finger.toFloat(),
-                    isLensed = true,
-                    combInk = 1f,
-                    insetPx = inset,
-                    widthPx = width,
-                    rulePx = rule,
-                    lensSigmaPx = MUSHAF_DIAL_LENS_SIGMA_DP * density * sigmaMag,
-                    tailPushPx = 10f * density,
-                    epsilonPx = 1.8f * density,
-                )
-                var best = -1
-                var bestDist = Float.MAX_VALUE
-                for ((idx, x) in drawn.withIndex()) {
-                    if (!x.isNaN()) drawnSomewhere[idx] = true
-                    if (x.isNaN()) continue
-                    val d = abs(x - finger)
-                    if (d < bestDist) {
-                        bestDist = d
-                        best = idx
-                    }
-                }
-                if (best >= 0) {
-                    reachable[best] = true
-                    reachablePages.add(marks[best])
-                }
-            }
-        }
-        val undrawn = (0 until marks.size).filter { !drawnSomewhere[it] }
-        val distinctPages = marks.toSet()
-        val unreachablePages = distinctPages.filter { page -> page !in reachablePages }
         assertTrue(
-            "ticks never drawn anywhere: $undrawn; start pages never selectable: $unreachablePages",
-            undrawn.isEmpty() && unreachablePages.isEmpty(),
+            "chapters never nearest under any finger position: $missing",
+            missing.isEmpty(),
         )
     }
 
