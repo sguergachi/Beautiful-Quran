@@ -1306,11 +1306,6 @@ internal fun MushafPageDial(
             // flush to the near edge and the wash runs solid into the glass
             // on that side — no feather showing between edge and words.
             val density = LocalDensity.current
-            // Dock alignment goes edge-flush a little before the plate
-            // actually hits the glass — the plate still follows the comb
-            // (mushafDialHudX parks at -slack / maxLeft) so the type rides
-            // above the tick until the max extent, but the text is already
-            // left/right aligned when the hand is close to the edge.
             val hudDock by remember {
                 derivedStateOf {
                     if (widthPx <= 0 || hudWidthPx <= 0) return@derivedStateOf 0
@@ -1318,16 +1313,15 @@ internal fun MushafPageDial(
                         MUSHAF_DIAL_HUD_EDGE_MARGIN_PX
                     val track = widthPx.toFloat()
                     val plate = hudWidthPx.toFloat()
-                    val hand = handX.floatValue
-                    // Sooner than the hard wall: hand within plate/2 + 28dp
-                    // of the edge already docks the type. Plate still parks
-                    // only at the wall via mushafDialHudX.
-                    val ahead = with(density) { 28.dp.toPx() }
-                    val leftWallHand = plate / 2f - slack
-                    val rightWallHand = track - plate / 2f + slack
+                    val left = mushafDialHudX(
+                        handX.floatValue,
+                        plate,
+                        track,
+                        with(density) { MushafDialHudPad.toPx() },
+                    )
                     when {
-                        hand <= leftWallHand + ahead -> -1
-                        hand >= rightWallHand - ahead -> 1
+                        left <= -slack + 0.5f -> -1
+                        left >= track - plate + slack - 0.5f -> 1
                         else -> 0
                     }
                 }
@@ -1644,6 +1638,7 @@ val strayPx = MushafDialStray.toPx()
                         var lastChapter = chapterMarks.getOrElse(initialIdxForLast) {
                             mushafDialChapterRun(chapterMarks, raw.roundToInt().coerceIn(1, pages), pages).first
                         }
+                        var lastHapticIdx = initialIdxForLast
                         dialPage.floatValue = raw
                         hudChapterIdx = initialIdxForLast
                         // The thumb goes to the finger on contact, before any
@@ -1784,16 +1779,16 @@ if (mushafDialShouldLeaveTrough(runOutS, strayed)) {
                                 val effectiveIdx = if (abs(rawIdx - hudChapterIdx) > 1) rawIdx else curIdx
                                 raw = chapterMarks[effectiveIdx].toFloat()
                                 dialPage.floatValue = raw
-                                val lastIdx = mushafDialChapterIndex(chapterMarks, lastChapter, pages)
-                                if (effectiveIdx != lastIdx) {
+                                // haptics + HUD track the idx directly — using the
+                                // page would collapse co-located 591×2 (86/87) to
+                                // the same page and make 86 think 87 is still 86.
+                                if (effectiveIdx != lastHapticIdx) {
                                     hudChapterIdx = effectiveIdx
-                                    // One tick per HUD chapter change, with a
-                                    // 70ms floor so a jitter that somehow still
-                                    // crosses does not buzz at frame rate.
                                     if (now - lastHapticNs >= 70_000_000L) {
                                         view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
                                         lastHapticNs = now
                                     }
+                                    lastHapticIdx = effectiveIdx
                                     lastChapter = chapterMarks[effectiveIdx]
                                 } else if (effectiveIdx != hudChapterIdx) {
                                     hudChapterIdx = effectiveIdx
