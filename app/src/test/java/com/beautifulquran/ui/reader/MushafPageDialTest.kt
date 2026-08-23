@@ -243,6 +243,35 @@ class MushafPageDialTest {
     }
 
     @Test
+    fun `the hud plate never leaves the glass at either edge`() {
+        // Collision on the plate's own measured width: centred on the hand
+        // while there is room, clamped flush to the wall when there is not.
+        val track = 1000f
+        val plate = 300f
+        assertEquals(350f, mushafDialHudX(500f, plate, track), 1e-4f)
+        // Left wall: a hand past the edge parks the plate at zero, not off it.
+        assertEquals(0f, mushafDialHudX(0f, plate, track), 1e-4f)
+        assertEquals(0f, mushafDialHudX(-200f, plate, track), 1e-4f)
+        // Right wall: fully visible, right edge on the glass.
+        assertEquals(track - plate, mushafDialHudX(track, plate, track), 1e-4f)
+        assertEquals(track - plate, mushafDialHudX(track + 400f, plate, track), 1e-4f)
+    }
+
+    @Test
+    fun `a wider hud collides sooner without any font knowledge`() {
+        // The width arrives measured, so whatever set it — a bigger HUD type,
+        // a user font scale — buys an earlier wall for free. Same hand, same
+        // rule: the wider plate sits further left.
+        val track = 1000f
+        val hand = 700f
+        assertTrue(mushafDialHudX(hand, 500f, track) > mushafDialHudX(hand, 800f, track))
+        // The wider plate has already met its wall at this hand.
+        assertEquals(200f, mushafDialHudX(hand, 800f, track), 1e-4f)
+        // A plate wider than the rule itself parks flush left and stays put.
+        assertEquals(0f, mushafDialHudX(track * 0.9f, track * 2f, track), 1e-4f)
+    }
+
+    @Test
     fun `the hud's full lean stays short of the stray band itself`() {
         // The label warns; it does not leave. If the lean could carry the HUD
         // as far as the hand has come off the line, the warning and the event

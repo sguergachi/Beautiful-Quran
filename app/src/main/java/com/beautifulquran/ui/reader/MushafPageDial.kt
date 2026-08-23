@@ -48,6 +48,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.util.lerp
 import android.view.HapticFeedbackConstants
 import com.beautifulquran.ui.theme.LocalQuranAccents
@@ -400,6 +401,22 @@ internal fun mushafDialStrayed(yPx: Float, pressYPx: Float, strayPx: Float): Boo
 internal fun mushafDialHudLean(dyPx: Float, strayPx: Float, leanPx: Float): Float {
     val pull = (dyPx / strayPx).coerceIn(-1f, 1f)
     return pull * pull * pull * leanPx
+}
+
+/**
+ * Where the HUD plate's left edge sits so its centre follows a hand at
+ * [handXPx] without the plate ever leaving the glass.
+ *
+ * Collision against both edges, from the plate's own *measured* width —
+ * the width already carries whatever the type set it to, so a larger font
+ * (or a user font scale) collides sooner without this law knowing a thing
+ * about type. A plate wider than the rule itself parks flush left rather
+ * than oscillating between the two clamps.
+ */
+internal fun mushafDialHudX(handXPx: Float, hudWidthPx: Float, trackWidthPx: Float): Float {
+    val halfPlate = hudWidthPx / 2f
+    val maxLeft = (trackWidthPx - hudWidthPx).coerceAtLeast(0f)
+    return (handXPx - halfPlate).coerceIn(0f, maxLeft)
 }
 
 /**
@@ -1152,7 +1169,11 @@ internal fun MushafPageDial(
             // over the margin, not a card floating on it. It takes the
             // transport's own small hand, because it stands on the
             // transport's paper rather than on the leaf.
-            val hudType = MaterialTheme.typography.labelSmall.copy(letterSpacing = 0.08.em)
+            val hudType = MaterialTheme.typography.labelSmall.copy(
+                fontSize = 14.sp,
+                lineHeight = 18.sp,
+                letterSpacing = 0.08.em,
+            )
             val paper = MaterialTheme.colorScheme.background
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -1164,11 +1185,11 @@ internal fun MushafPageDial(
                     // without it.
                     .offset {
                         // Over the thumb, which is over the finger — but the
-                        // label never stops following the hand: it clamps only
-                        // to the glass edges, so at the far left the HUD hugs
-                        // the screen edge instead of stalling mid-rule.
-                        val left = (handX.floatValue - hudWidthPx / 2f)
-                            .coerceIn(-hudWidthPx * 0.35f, (widthPx - hudWidthPx * 0.65f).coerceAtLeast(0f))
+                        // label never stops following the hand: it collides
+                        // with the glass edges on its own measured width, so
+                        // a larger font buys an earlier wall and the plate is
+                        // always fully on the glass.
+                        val left = mushafDialHudX(handX.floatValue, hudWidthPx.toFloat(), widthPx.toFloat())
                         // Clear of the tallest tick, and measured from the
                         // rule rather than from the top of the slot. The slot
                         // carries paper above the rule that the label was
@@ -1204,10 +1225,11 @@ internal fun MushafPageDial(
                     .drawBehind {
                         // The ground is one long progressive wash across
                         // its own width: transparent at each end, easing
-                        // through the first two fifths up to full paper
-                        // under the words, then back down — part of the
-                        // magnification, not a card laid on the leaf.
-                        val rise = 0.4f
+                        // up to full paper over a short shoulder so half
+                        // the plate stands fully opaque under the words,
+                        // then back down — part of the magnification, not
+                        // a card laid on the leaf.
+                        val rise = 0.25f
                         drawRoundRect(
                             brush = Brush.horizontalGradient(
                                 0f to paper.copy(alpha = 0f),
