@@ -1202,22 +1202,25 @@ internal fun MushafPageDial(
                         hudHeightPx = it.height
                     }
                     .drawBehind {
-                        // The ground cross-fades into the leaf across its own
-                        // width: solid paper under the words, dissolving to
-                        // nothing at each end — part of the magnification,
-                        // not a card cut out and laid on top of it.
-                        val edge = (16.dp.toPx()).coerceAtMost(size.width / 3f)
+                        // The ground is one long progressive wash across
+                        // its own width: transparent at each end, easing
+                        // through the first two fifths up to full paper
+                        // under the words, then back down — part of the
+                        // magnification, not a card laid on the leaf.
+                        val rise = 0.4f
                         drawRoundRect(
                             brush = Brush.horizontalGradient(
                                 0f to paper.copy(alpha = 0f),
-                                edge / size.width to paper,
-                                1f - edge / size.width to paper,
+                                rise * 0.5f to paper.copy(alpha = 0.35f),
+                                rise to paper,
+                                1f - rise to paper,
+                                1f - rise * 0.5f to paper.copy(alpha = 0.35f),
                                 1f to paper.copy(alpha = 0f),
                             ),
                             cornerRadius = CornerRadius(6.dp.toPx()),
                         )
                     }
-                    .padding(horizontal = 14.dp, vertical = 6.dp)
+                    .padding(horizontal = 21.dp, vertical = 6.dp)
                     .graphicsLayer { alpha = expand.value },
             ) {
                 // The head is set twice, once as each tier reads the leaf, and
