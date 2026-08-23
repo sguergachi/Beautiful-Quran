@@ -984,6 +984,10 @@ internal fun MushafPageDial(
     // it: the finger's own x during a drag, then the glide home afterwards.
     val handX = remember { mutableFloatStateOf(0f) }
     var handed by remember { mutableStateOf(false) }
+    // The plate lives only while a hand is on the rule. Letting go ends it
+    // the same frame — a label that lingers over the glide home reads as a
+    // control that did not hear the release.
+    var hudShown by remember { mutableStateOf(false) }
     // How far the trough is open: 0 is the chapter tier, where the chapter is
     // a short bracket on the book's scale, and 1 is that bracket stretched
     // across the whole measure with its leaves standing in it.
@@ -1351,19 +1355,19 @@ internal fun MushafPageDial(
                     // bounds at the band's top corner while the type moves
                     // without it.
                     .offset {
-                        // Plate stays centred on the hand until it would go
-                        // beyond the glass; when docked the plate edge sits
-                        // at the hand (=> above the comb) so the text edge
-                        // is at the comb — left edge at hand for -1, right
-                        // edge at hand for 1, centred otherwise.
-                        val hand = handX.floatValue
-                        val plate = hudWidthPx.toFloat()
-                        val rawLeft = hand - plate / 2f
-                        val left = when (hudDock) {
-                            -1 -> hand
-                            1 -> hand - plate
-                            else -> rawLeft
-                        }
+                        // The plate stays centred above the hand — which is
+                        // above the comb tick — and parks only when the glass
+                        // itself stops it: mushafDialHudX clamps at -slack /
+                        // maxLeft. It never jumps aside at the walls; only the
+                        // *text* alignment changes (hudDock), its near edge
+                        // set on the plate's centre vertical axis, which is
+                        // the comb's own line.
+                        val left = mushafDialHudX(
+                            handX.floatValue,
+                            hudWidthPx.toFloat(),
+                            widthPx.toFloat(),
+                            MushafDialHudPad.toPx(),
+                        )
                         // Clear of the tallest tick, and measured from the
                         // rule rather than from the top of the slot. The slot
                         // carries paper above the rule that the label was
@@ -1440,7 +1444,7 @@ internal fun MushafPageDial(
                         )
                     }
                     .padding(horizontal = MushafDialHudPad, vertical = 6.dp)
-                    .graphicsLayer { alpha = expand.value },
+                    .graphicsLayer { alpha = if (hudShown) expand.value else 0f },
             ) {
                 // The head is set twice, once as each tier reads the leaf, and
                 // the two are cross-faded on the trough's own opening. The
@@ -1468,7 +1472,22 @@ internal fun MushafPageDial(
                     1 -> Alignment.End
                     else -> Alignment.CenterHorizontally
                 }
+                // Docked, the type's near edge is set on the plate's centre
+                // vertical axis — the comb's own line — not on the plate's
+                // far edge: the Box shifts half its measured width toward
+                // the centre so left-aligned type starts at the comb and
+                // right-aligned type ends at it. Undocked, centred as usual.
                 Box(
+                    modifier = Modifier
+                        .onSizeChanged { hudContentWidthPx = it.width }
+                        .offset {
+                            val w = hudContentWidthPx
+                            when (hudDock) {
+                                -1 -> IntOffset(w / 2, 0)
+                                1 -> IntOffset(-w / 2, 0)
+                                else -> IntOffset.Zero
+                            }
+                        },
                     contentAlignment = when (hudDock) {
                         -1 -> Alignment.TopStart
                         1 -> Alignment.TopEnd
@@ -1668,6 +1687,7 @@ val strayPx = MushafDialStray.toPx()
                         val initialRunEnd = if (initialIdxForLast + 1 < chapterMarks.size) chapterMarks[initialIdxForLast + 1] - 1 else pages
                         troughRun = initialRunStart..maxOf(initialRunStart, initialRunEnd)
 scrubbing = true
+                        hudShown = true
                         reportScrub.value(true)
                         hasPulsed = false
                         scope.launch { hudPull.snapTo(0f) }
@@ -1950,6 +1970,7 @@ if (mushafDialShouldLeaveTrough(runOutS, strayed)) {
                             insetPx,
                         )
                         handed = true
+                        hudShown = false
                         scrubbing = false
                         reportScrub.value(false)
                         hasPulsed = false
