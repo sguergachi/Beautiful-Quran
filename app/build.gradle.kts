@@ -11,6 +11,19 @@ fun env(name: String): String? = System.getenv(name)?.takeIf { it.isNotBlank() }
 
 val releaseKeystore = rootProject.file(env("RELEASE_KEYSTORE_FILE") ?: "release.keystore")
 
+// The mushaf is the QCF V2 page faces or it is nothing: a build that ships
+// without all 604 renders every leaf in the fallback Hafs face, which is the
+// "misaligned mushaf" failure this pipeline once produced silently. So the
+// sync task below fails the build rather than warning — the parts are
+// git-tracked, so every clone and CI checkout has them. The output tree is
+// deliberately NOT inside generated/quranAssets: syncQuranDbAsset is a Sync
+// task, and a Sync deletes destination entries its source does not carry — it
+// once wiped the whole qcf-v2-fonts/ subtree that syncQcfFonts had just
+// extracted there, and the APK silently shipped a 110MB Hafs fallback with
+// every mushaf page mis-set. Separate trees cannot race.
+val QcfFontCount = 604
+val qcfAssetsDir = layout.buildDirectory.dir("generated/qcfAssets/qcf-v2-fonts")
+
 android {
     namespace = "com.beautifulquran"
     // API 37 ships as platforms/android-37.0; pin the minor so AGP resolves it.
@@ -87,6 +100,18 @@ android {
         assets.directories.add(
             layout.buildDirectory.dir("generated/quranAssets").get().asFile.absolutePath,
         )
+        // The QCF page faces live in their own tree, deliberately NOT inside
+        // generated/quranAssets: syncQuranDbAsset is a Sync task, and a Sync
+        // deletes destination entries its source does not carry — it once
+        // wiped the whole qcf-v2-fonts/ subtree that syncQcfFonts had just
+        // extracted there, and the APK silently shipped a 110MB Hafs fallback
+        // with every mushaf page mis-set. Separate trees cannot race. The
+        // *parent* is the assets root so the files keep their
+        // qcf-v2-fonts/ prefix — MushafQcfFonts looks the faces up by that
+        // path.
+        assets.directories.add(
+            qcfAssetsDir.get().asFile.parentFile.absolutePath,
+        )
     }
     lint {
         // Media3's @UnstableApi opt-in trips lintVital on release builds; the
@@ -144,9 +169,14 @@ val syncQuranDbAsset by tasks.registering(Sync::class) {
     }
 }
 
+// The mushaf is the QCF V2 page faces or it is nothing: a build that ships
+// without all 604 renders every leaf in the fallback Hafs face, which is the
+// "misaligned mushaf" failure this task once produced silently. So the task
+// fails the build rather than warning — the parts are git-tracked, so every
+// clone and CI checkout has them.
 val syncQcfFonts by tasks.registering {
     val partsDir = layout.projectDirectory.dir("qcf-v2-fonts")
-    val outDir = layout.buildDirectory.dir("generated/quranAssets/qcf-v2-fonts")
+    val outDir = qcfAssetsDir
     inputs.dir(partsDir)
     outputs.dir(outDir)
     doLast {
@@ -158,8 +188,11 @@ val syncQcfFonts by tasks.registering {
             name.startsWith("qcf-v2-fonts.tar.xz.part")
         }?.sortedBy { it.name }.orEmpty()
         if (parts.isEmpty()) {
-            logger.warn("No QCF V2 font archive parts in ${partsDir.asFile}; mushaf pages fall back to Hafs.")
-            return@doLast
+            throw GradleException(
+                "No QCF V2 font archive parts in ${partsDir.asFile}. The mushaf " +
+                    "would ship without its page faces; restore the parts " +
+                    "(scripts/fetch_qcf_v2_fonts.sh) before building.",
+            )
         }
         val archive = temporaryDir.resolve("qcf-v2-fonts.tar.xz")
         archive.outputStream().use { out ->
@@ -179,6 +212,12 @@ val syncQcfFonts by tasks.registering {
             check(ttf.renameTo(ttf.resolveSibling(ttf.nameWithoutExtension + ".qcf"))) {
                 "Failed to rename ${ttf.name} for APK deflate"
             }
+        }
+        // Partial extracts ship a half-dressed mushaf that is miserable to
+        // diagnose from the glass. Count here, fail here.
+        val fonts = dest.listFiles { _, name -> name.endsWith(".qcf") }.orEmpty()
+        check(fonts.size == QcfFontCount) {
+            "QCF extract produced ${fonts.size}/$QcfFontCount page fonts in $dest"
         }
     }
 }
