@@ -1306,6 +1306,9 @@ internal fun MushafPageDial(
             // flush to the near edge and the wash runs solid into the glass
             // on that side — no feather showing between edge and words.
             val density = LocalDensity.current
+            // Plate follows the comb's seat (not the raw finger) to max
+            // extent; alignment flips 28dp before the wall so text is already
+            // flush while the plate still rides above the tick.
             val hudDock by remember {
                 derivedStateOf {
                     if (widthPx <= 0 || hudWidthPx <= 0) return@derivedStateOf 0
@@ -1313,15 +1316,23 @@ internal fun MushafPageDial(
                         MUSHAF_DIAL_HUD_EDGE_MARGIN_PX
                     val track = widthPx.toFloat()
                     val plate = hudWidthPx.toFloat()
-                    val left = mushafDialHudX(
-                        handX.floatValue,
-                        plate,
-                        track,
-                        with(density) { MushafDialHudPad.toPx() },
-                    )
+                    val ahead = with(density) { 28.dp.toPx() }
+                    // Seat of the chapter the HUD is showing, not the raw
+                    // finger — keeps HUD above the tick until the tick itself
+                    // hits the glass.
+                    val pagesVal = pages
+                    val marksVal = chapterMarks
+                    val insetPx = with(density) { MushafDialEdgeInset.toPx() }
+                    val rulePx = MushafDialRuleWeightPx * density.density
+                    val seats = if (marksVal.isNotEmpty() && pagesVal > 0) {
+                        mushafDialCombCellSeats(marksVal, pagesVal, insetPx, track, rulePx)
+                    } else null
+                    val seatX = seats?.getOrNull(hudChapterIdx) ?: handX.floatValue
+                    val leftWallSeat = plate / 2f - slack
+                    val rightWallSeat = track - plate / 2f + slack
                     when {
-                        left <= -slack + 0.5f -> -1
-                        left >= track - plate + slack - 0.5f -> 1
+                        seatX <= leftWallSeat + ahead -> -1
+                        seatX >= rightWallSeat - ahead -> 1
                         else -> 0
                     }
                 }
@@ -1339,15 +1350,23 @@ internal fun MushafPageDial(
                     // bounds at the band's top corner while the type moves
                     // without it.
                     .offset {
-                        // Over the thumb, which is over the finger — but the
-                        // label never stops following the hand. The collision
-                        // is the *text's*, not the plate's: the words stop a
-                        // few pixels short of the glass — flush left-aligned
-                        // at the left, flush right-aligned at the right — and
-                        // the plate runs under the edge as far as that takes
-                        // it. A larger font buys an earlier wall for free.
+                        // Above the comb's tick, not the raw finger — plate
+                        // centres on the seat of the chapter the HUD shows
+                        // and parks at -slack/maxLeft only when that tick
+                        // hits the glass. Text goes flush 28dp before the
+                        // wall (hudDock) while the plate still follows.
+                        val pagesVal = pages
+                        val marksVal = chapterMarks
+                        val insetPx = with(density) { MushafDialEdgeInset.toPx() }
+                        val rulePx = MushafDialRuleWeightPx * density.density
+                        val seats = if (marksVal.isNotEmpty() && pagesVal > 0) {
+                            mushafDialCombCellSeats(
+                                marksVal, pagesVal, insetPx, widthPx.toFloat(), rulePx,
+                            )
+                        } else null
+                        val hudSeatX = seats?.getOrNull(hudChapterIdx) ?: handX.floatValue
                         val left = mushafDialHudX(
-                            handX.floatValue,
+                            hudSeatX,
                             hudWidthPx.toFloat(),
                             widthPx.toFloat(),
                             MushafDialHudPad.toPx(),
