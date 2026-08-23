@@ -85,6 +85,14 @@ internal val MushafFolioBand = 30.dp
 /** Paper above and below the rule that divides the leaf from the transport. */
 private val MushafRuleTailAir = 10.dp
 
+/**
+ * Paper between the leaf's last line and the hairline. The rule sat at the
+ * top of its own band — flush under the leaf, with all its air below — and
+ * read as shifted up. This sets it off the leaf so the line sits between
+ * the page and the transport instead of hanging off the page.
+ */
+private val MushafDialHeadAir = 8.dp
+
 /** Each folio figure's column, equal either side of the centre line. */
 private val MushafFolioColumn = 40.dp
 /** Paper between the two figures. */
@@ -201,6 +209,7 @@ internal fun MushafReadingSheet(
             modifier = Modifier.padding(
                 start = MushafPageMargin + MushafEdgeGutter,
                 end = MushafPageMargin + MushafEdgeGutter,
+                top = MushafDialHeadAir,
                 bottom = MushafRuleTailAir,
             ),
         )

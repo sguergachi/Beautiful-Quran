@@ -1403,16 +1403,19 @@ internal fun MushafPageDial(
                         val rise = lerp(0.25f, 0.14f, zoom.value)
                         val shoulder = paper.copy(alpha = 0.35f)
                         val brush = when (hudDock) {
+                            // Flush at a wall: paper runs solid into the
+                            // glass, then a long clean fall to transparent
+                            // across the far half — the transparent-to-opaque
+                            // read has to survive at the edge, where the old
+                            // shallow shoulder hid it.
                             -1 -> Brush.horizontalGradient(
                                 0f to paper,
-                                1f - rise to paper,
-                                1f - rise * 0.5f to shoulder,
+                                0.5f to paper,
                                 1f to paper.copy(alpha = 0f),
                             )
                             1 -> Brush.horizontalGradient(
                                 0f to paper.copy(alpha = 0f),
-                                rise * 0.5f to shoulder,
-                                rise to paper,
+                                0.5f to paper,
                                 1f to paper,
                             )
                             else -> Brush.horizontalGradient(
