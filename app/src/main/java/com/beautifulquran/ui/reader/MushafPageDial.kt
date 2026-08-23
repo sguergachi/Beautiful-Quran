@@ -38,9 +38,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
@@ -856,6 +854,9 @@ internal fun MushafPageDial(
     // The pull's direction at the moment the pop happened, so the two label
     // readings slide apart along it as they swap. Zero on every other swap.
     val hudPopDir = remember { mutableFloatStateOf(0f) }
+    // How close the elastic band is to breaking, in a dozen steps: the
+    // measure by which the HUD's own type turns orange as the pop nears.
+    val hudRipe = remember { mutableFloatStateOf(0f) }
     // Which chapter the trough is holding. Read in the draw phase, so it is
     // written before the animation starts and left alone until the next entry.
     var troughRun by remember { mutableStateOf(1..1) }
@@ -1200,7 +1201,7 @@ internal fun MushafPageDial(
                         hudHeightPx = it.height
                     }
                     .background(
-                        MaterialTheme.colorScheme.surface,
+                        MaterialTheme.colorScheme.background,
                         RoundedCornerShape(4.dp),
                     )
                     .padding(horizontal = 10.dp, vertical = 4.dp)
@@ -1219,29 +1220,16 @@ internal fun MushafPageDial(
                 // Both alphas are read in the draw phase, so the whole
                 // transition costs no recomposition at all.
                 val hudPulse = pulse.value
-                Box(
-                    contentAlignment = Alignment.Center,
-                    modifier = Modifier.drawWithContent {
-                        drawContent()
-                        // Ripening toward the pop: the closer the band is to
-                        // breaking, the more the type takes the orange. Read
-                        // off the leaned HUD itself, in the draw phase, so
-                        // the whole warning costs no recomposition.
-                        val ripe = (abs(hudPull.value) /
-                            MushafDialHudLean.toPx()).coerceIn(0f, 1f)
-                        if (ripe > 0.004f) {
-                            drawRect(
-                                accents.repeatInk.copy(alpha = ripe),
-                                blendMode = BlendMode.SrcAtop,
-                            )
-                        }
-                    },
-                ) {
+                // One orange for both warnings, whichever speaks louder:
+                // the pulse before the trough opens, and the ripening band
+                // as the hand pulls toward the pop.
+                val orange = maxOf(hudPulse, hudRipe.floatValue)
+                Box(contentAlignment = Alignment.Center) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(
                             text = hud.chapter,
                             style = hudType,
-                            color = androidx.compose.ui.graphics.lerp(ink, accents.repeatInk, hudPulse).copy(alpha = 0.72f + 0.18f * hudPulse),
+                            color = androidx.compose.ui.graphics.lerp(ink, accents.repeatInk, orange).copy(alpha = 0.72f + 0.18f * hudPulse),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.graphicsLayer {
@@ -1253,7 +1241,7 @@ internal fun MushafPageDial(
                         Text(
                             text = "${hud.number}",
                             style = hudType,
-                            color = androidx.compose.ui.graphics.lerp(ink.copy(alpha = 0.48f), accents.repeatInk, hudPulse).copy(alpha = 0.48f + 0.22f * hudPulse),
+                            color = androidx.compose.ui.graphics.lerp(ink.copy(alpha = 0.48f), accents.repeatInk, orange).copy(alpha = 0.48f + 0.22f * hudPulse),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.graphicsLayer {
@@ -1265,7 +1253,7 @@ internal fun MushafPageDial(
                     Text(
                         text = mushafDialLabelHead(hud, zoomed = true, page = hudPage),
                         style = hudType,
-                        color = androidx.compose.ui.graphics.lerp(ink, accents.repeatInk, hudPulse).copy(alpha = 0.72f + 0.18f * hudPulse),
+                        color = androidx.compose.ui.graphics.lerp(ink, accents.repeatInk, orange).copy(alpha = 0.72f + 0.18f * hudPulse),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.graphicsLayer {
@@ -1425,6 +1413,7 @@ scrubbing = true
                         hasPulsed = false
                         scope.launch { hudPull.snapTo(0f) }
                         hudPopDir.floatValue = 0f
+                        hudRipe.floatValue = 0f
                         scope.launch { pulse.snapTo(0f) }
                         scope.launch { expand.animateTo(1f, spring(dampingRatio = 0.85f, stiffness = 340f)) }
                         // The meter runs on the frame clock, not on pointer
@@ -1477,6 +1466,12 @@ val strayed = mushafDialStrayed(handY, pressY, strayPx)
                                         strayPx,
                                         leanPx,
                                     )
+                                    // Full tension is a pop on this frame's
+                                    // edge. Quantized, so the type's colour
+                                    // change costs one recomposition per step,
+                                    // not one per frame.
+                                    hudRipe.floatValue =
+                                        (abs(lean) / leanPx * 12f).roundToInt() / 12f
                                     scope.launch {
                                         // Re-checked on resume: a pop later in
                                         // this very frame must win over a stale
@@ -1510,6 +1505,7 @@ if (mushafDialShouldLeaveTrough(runOutS, strayed)) {
                                         // caused it.
                                         troughPopped = true
                                         hudPopDir.floatValue = sign(hudPull.value)
+                                        hudRipe.floatValue = 0f
                                         leanPop?.cancel()
                                         leanPop = scope.launch {
                                             hudPull.animateTo(0f, MushafDialHudPop)
@@ -1624,6 +1620,7 @@ if (mushafDialShouldLeaveTrough(runOutS, strayed)) {
                                     leanPop?.cancel()
                                     scope.launch { hudPull.snapTo(0f) }
                                     hudPopDir.floatValue = 0f
+                                    hudRipe.floatValue = 0f
                                     view.performHapticFeedback(HapticFeedbackConstants.CONTEXT_CLICK)
                                     scope.launch { zoom.animateTo(1f, MushafDialZoomIn) }
                                 }
