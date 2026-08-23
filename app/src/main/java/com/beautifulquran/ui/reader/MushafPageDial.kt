@@ -7,7 +7,6 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Box
@@ -18,7 +17,6 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredHeight
 import androidx.compose.foundation.layout.wrapContentHeight
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.systemGestureExclusion
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -36,9 +34,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
@@ -1153,6 +1155,7 @@ internal fun MushafPageDial(
             // transport's own small hand, because it stands on the
             // transport's paper rather than on the leaf.
             val hudType = MaterialTheme.typography.labelSmall.copy(letterSpacing = 0.08.em)
+            val paper = MaterialTheme.colorScheme.background
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier
@@ -1200,11 +1203,34 @@ internal fun MushafPageDial(
                         hudWidthPx = it.width
                         hudHeightPx = it.height
                     }
-                    .background(
-                        MaterialTheme.colorScheme.background,
-                        RoundedCornerShape(4.dp),
-                    )
-                    .padding(horizontal = 10.dp, vertical = 4.dp)
+                    .drawBehind {
+                        // A feathered sheet of paper, not a cut card: the
+                        // ground dissolves into the leaf instead of ending at
+                        // a hard rim. The rect is inset by the feather so the
+                        // blur's soft falloff lands inside these bounds.
+                        val feather = 5.dp.toPx()
+                        val blur = android.graphics.BlurMaskFilter(
+                            feather,
+                            android.graphics.BlurMaskFilter.Blur.NORMAL,
+                        )
+                        drawIntoCanvas { canvas ->
+                            val paint = android.graphics.Paint().apply {
+                                isAntiAlias = true
+                                color = paper.toArgb()
+                                maskFilter = blur
+                            }
+                            canvas.nativeCanvas.drawRoundRect(
+                                feather,
+                                feather,
+                                size.width - feather,
+                                size.height - feather,
+                                6.dp.toPx(),
+                                6.dp.toPx(),
+                                paint,
+                            )
+                        }
+                    }
+                    .padding(horizontal = 14.dp, vertical = 6.dp)
                     .graphicsLayer { alpha = expand.value },
             ) {
                 // The head is set twice, once as each tier reads the leaf, and
@@ -1233,7 +1259,10 @@ internal fun MushafPageDial(
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.graphicsLayer {
-                                alpha = maxOf(1f - zoom.value, zoom.value * 1f)
+                                // Fully yielded when the trough owns the head:
+                                // anything left standing prints under the page
+                                // line, and the two readings read as one smear.
+                                alpha = 1f - zoom.value
                                 translationY = -hudPopDir.floatValue * MushafDialHudSwap.toPx() * zoom.value
                             },
                         )
