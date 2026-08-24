@@ -1,5 +1,6 @@
 package com.beautifulquran.ui.reader
 
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -17,6 +18,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.PlatformTextStyle
@@ -323,8 +325,60 @@ private fun MushafQcfPageLine(
     // either side of it, so the em measurement holds at any width and only the
     // size of the em changes.
     val emPx = linePx * condense
+    // Which token each cell belongs to — words and verse marks both live in
+    // the cells, and a tap on a mark is a tap on its verse's last word.
+    val cellToken = remember(texts) {
+        IntArray(texts.size).also { map ->
+            var cell = 0
+            line.tokens.forEachIndexed { ti, token ->
+                map[cell++] = ti
+                val mark = token.word.qcfV2.takeIf { it.isNotEmpty() }
+                    ?.let { qcfTrailingMark(it, token.endsAyah) }.orEmpty()
+                if (mark.isNotEmpty()) map[cell++] = ti
+            }
+        }
+    }
+    // The placed origins, captured by the measure below and read by the
+    // line's tap handler: one gesture handler per line, not one per word —
+    // a leaf carrying a pointer-input node per word handed the input system
+    // four hundred and fifty hit-test targets per leaf, and swiping paid
+    // for every one of them.
+    val placedOrigins = remember(line) { arrayOfNulls<FloatArray>(1) }
+    fun tokenAt(x: Float): MushafToken? {
+        val origins = placedOrigins[0] ?: return null
+        var best = -1
+        var bestDist = Float.MAX_VALUE
+        for (i in cells.indices) {
+            val left = origins.getOrElse(i) { 0f }
+            val right = left + cells[i].advance
+            val d = when {
+                x in left..right -> 0f
+                x < left -> left - x
+                else -> x - right
+            }
+            if (d < bestDist) {
+                bestDist = d
+                best = i
+            }
+        }
+        if (best < 0 || bestDist > hitSlopPx) return null
+        val ti = cellToken.getOrElse(best) { -1 }
+        return line.tokens.getOrNull(ti)
+    }
     Layout(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier
+            .fillMaxWidth()
+            .pointerInput(line, onWordClick, onWordLongClick, onAyahClick, hitSlopPx) {
+                detectTapGestures(
+                    onTap = { pos ->
+                        val token = tokenAt(pos.x)
+                        if (token != null) onWordClick(token) else onAyahClick(line.tokens.first())
+                    },
+                    onLongPress = { pos ->
+                        tokenAt(pos.x)?.let(onWordLongClick)
+                    },
+                )
+            },
         content = {
             line.tokens.forEach { token ->
                 MushafQcfWord(
@@ -335,10 +389,6 @@ private fun MushafQcfPageLine(
                     palette = palette,
                     ayahMarkInk = ayahMarkInk,
                     glintInk = glintInk,
-                    hitSlopPx = hitSlopPx,
-                    onWordClick = onWordClick,
-                    onWordLongClick = onWordLongClick,
-                    onAyahClick = onAyahClick,
                 )
                 val mark = token.word.qcfV2.takeIf { it.isNotEmpty() }
                     ?.let { qcfTrailingMark(it, token.endsAyah) }.orEmpty()
@@ -384,6 +434,7 @@ private fun MushafQcfPageLine(
             joins = joinsEm,
             emPx = emPx,
         )
+        placedOrigins[0] = origins
         layout(width, height) {
             placeables.forEachIndexed { i, p ->
                 p.place(origins.getOrElse(i) { 0f }.roundToInt(), (height - p.height) / 2)
@@ -697,10 +748,6 @@ private fun MushafQcfWord(
     palette: WordInkPalette,
     ayahMarkInk: androidx.compose.ui.graphics.Color,
     glintInk: androidx.compose.ui.graphics.Color?,
-    hitSlopPx: Float,
-    onWordClick: (MushafToken) -> Unit,
-    onWordLongClick: (MushafToken) -> Unit,
-    onAyahClick: (MushafToken) -> Unit,
 ) {
     val raw = token.word.qcfV2
     val word = if (raw.isNotEmpty()) {
@@ -849,15 +896,6 @@ private fun MushafQcfWord(
                 // squared the orange off at the advance and left every tail
                 // and high mark standing in black.
                 clipTintToRange = false,
-            )
-            .wordTapTarget(
-                words = listOf(token.word),
-                ranges = rendered.wordRanges,
-                layoutResult = layoutResult,
-                hitSlopPx = hitSlopPx,
-                onWordClick = { onWordClick(token) },
-                onWordLongClick = { onWordLongClick(token) },
-                onMiss = { onAyahClick(token) },
             ),
         onTextLayout = { layoutResult = it },
     )
