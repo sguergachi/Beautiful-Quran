@@ -105,6 +105,7 @@ import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -126,8 +127,10 @@ import com.beautifulquran.data.ReadingMode
 import com.beautifulquran.data.model.Surah
 import com.beautifulquran.domain.BASMALAH_PLAYLIST_AYAH
 import com.beautifulquran.domain.MushafToken
+import com.beautifulquran.domain.mushafFontPreloadPages
 import com.beautifulquran.ui.reader.focus.FocusEngine
 import com.beautifulquran.ui.reader.focus.rememberReaderFocusController
+import com.beautifulquran.ui.reader.MushafQcfFonts
 import com.beautifulquran.ui.theme.FloatingPaperControl
 import com.beautifulquran.ui.theme.IslamicReturnToAyahButton
 import com.beautifulquran.ui.theme.InkRevealOverlay
@@ -135,9 +138,11 @@ import com.beautifulquran.ui.theme.absorbPointerEvents
 import com.beautifulquran.ui.theme.contrastingOverlayColorScheme
 import com.beautifulquran.ui.theme.contextualGuideProgressiveBlur
 import com.beautifulquran.ui.theme.verticalFadingEdges
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlin.math.abs
 
 /** Paused highlight polling is 250 ms; leave one scheduling beat for a fresh sample. */
@@ -299,10 +304,21 @@ fun ReaderScreen(
     // Later navigation only: a chapter opened from the index while the reader
     // is already on a leaf. The opening leaf itself arrives as `initialPage`
     // above, so this no-ops on the way in rather than turning the page to
-    // where it already is.
+    // where it already is. The target's face is warmed before the jump: a
+    // leaf composing without a resident face holds blank for its face wait
+    // and then fades in, which read as the whole screen flashing out and
+    // back when play loaded another chapter.
+    val activityContext = LocalContext.current
     LaunchedEffect(mushafOpeningPage) {
         val page = mushafOpeningPage ?: return@LaunchedEffect
         if (mushafPagerState.currentPage == page) return@LaunchedEffect
+        val catalog = mushafCatalog ?: return@LaunchedEffect
+        withContext(Dispatchers.Default) {
+            MushafQcfFonts.preload(
+                activityContext,
+                mushafFontPreloadPages(page, catalog.pageCount),
+            )
+        }
         mushafPagerState.scrollToPage(page)
     }
     val bookmarkedAyahs by viewModel.bookmarkedAyahs.collectAsStateWithLifecycle()

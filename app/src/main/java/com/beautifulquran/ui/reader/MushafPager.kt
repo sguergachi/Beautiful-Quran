@@ -325,6 +325,16 @@ internal fun MushafPager(
                 if (heldPage != null && page != heldPage) return@collect
                 val index = (page - 1).coerceIn(0, catalog.pageCount - 1)
                 if (pagerState.currentPage != index) {
+                    // Warm the target leaf's face before the turn. A leaf
+                    // composing without a resident face holds blank for its
+                    // face wait and then fades in — on a playback turn that
+                    // read as the whole screen flashing out and back.
+                    withContext(Dispatchers.Default) {
+                        MushafQcfFonts.preload(
+                            context,
+                            mushafFontPreloadPages(index, catalog.pageCount),
+                        )
+                    }
                     followPage = index
                     pagerState.animateScrollToPage(
                         index,

@@ -39,6 +39,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerEventPass
@@ -1411,9 +1412,26 @@ internal fun MushafPageDial(
                             textEnd to paper,
                             1f to paper.copy(alpha = 0f),
                         )
+                        // The top edge feathers too: the plate is a patch of
+                        // paper dissolving into the leaf, and a hard top line
+                        // read as a card's border. DstOut erases the ground
+                        // proportionally to the eraser's alpha — full at the
+                        // very top, gone by the feather's foot — and the text
+                        // is drawn after, so it never thins.
+                        val feather = 6.dp.toPx()
                         drawRoundRect(
                             brush = brush,
                             cornerRadius = CornerRadius(6.dp.toPx()),
+                        )
+                        drawRect(
+                            brush = Brush.verticalGradient(
+                                0f to paper,
+                                1f to paper.copy(alpha = 0f),
+                                startY = 0f,
+                                endY = feather,
+                            ),
+                            size = Size(size.width, feather),
+                            blendMode = BlendMode.DstOut,
                         )
                     }
                     .padding(horizontal = MushafDialHudPad, vertical = 6.dp)
