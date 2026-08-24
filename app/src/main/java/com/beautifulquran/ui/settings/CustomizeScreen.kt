@@ -227,47 +227,49 @@ internal fun CustomizeScreen(
             onScale = { value -> onUpdate { it.copy(fontScale = value) } },
         )
 
-        if (
-            settings.readingLayout == ReadingLayout.SCROLL &&
-            settings.readingMode == ReadingMode.ARABIC_ENGLISH
-        ) {
-            Spacer(Modifier.height(20.dp))
-            ToggleRow(
-                label = "Transliteration",
-                checked = settings.showTransliteration,
-                onChange = { value -> onUpdate { it.copy(showTransliteration = value) } },
-                checkParams = checkParams,
-                checkPaintToken = checkPaintToken,
-            )
-            ToggleRow(
-                label = "Ayah translation",
-                checked = settings.showTranslation,
-                onChange = { value -> onUpdate { it.copy(showTranslation = value) } },
-                checkParams = checkParams,
-                checkPaintToken = checkPaintToken,
-            )
-        }
-
+        // The scroll layout's toggles share one vertical rhythm: a single
+        // 20dp stand-off before the group, then even 12dp between rows —
+        // the old layout gapped 20dp before some rows and nothing between
+        // Transliteration and Ayah translation.
         if (showsScrollChrome(settings.readingLayout)) {
-            if (showsWordGlossChrome(settings.readingLayout, settings.readingMode)) {
-                Spacer(Modifier.height(20.dp))
+            Spacer(Modifier.height(20.dp))
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                if (
+                    settings.readingLayout == ReadingLayout.SCROLL &&
+                    settings.readingMode == ReadingMode.ARABIC_ENGLISH
+                ) {
+                    ToggleRow(
+                        label = "Transliteration",
+                        checked = settings.showTransliteration,
+                        onChange = { value -> onUpdate { it.copy(showTransliteration = value) } },
+                        checkParams = checkParams,
+                        checkPaintToken = checkPaintToken,
+                    )
+                    ToggleRow(
+                        label = "Ayah translation",
+                        checked = settings.showTranslation,
+                        onChange = { value -> onUpdate { it.copy(showTranslation = value) } },
+                        checkParams = checkParams,
+                        checkPaintToken = checkPaintToken,
+                    )
+                }
+                if (showsWordGlossChrome(settings.readingLayout, settings.readingMode)) {
+                    ToggleRow(
+                        label = "Word-by-word translation",
+                        checked = settings.showWordGloss,
+                        onChange = { v -> onUpdate { it.copy(showWordGloss = v) } },
+                        checkParams = checkParams,
+                        checkPaintToken = checkPaintToken,
+                    )
+                }
                 ToggleRow(
-                    label = "Word-by-word translation",
-                    checked = settings.showWordGloss,
-                    onChange = { v -> onUpdate { it.copy(showWordGloss = v) } },
+                    label = "Verse annotations",
+                    checked = settings.annotationsEnabled,
+                    onChange = { v -> onUpdate { it.copy(annotationsEnabled = v) } },
                     checkParams = checkParams,
                     checkPaintToken = checkPaintToken,
                 )
             }
-
-            Spacer(Modifier.height(20.dp))
-            ToggleRow(
-                label = "Verse annotations",
-                checked = settings.annotationsEnabled,
-                onChange = { v -> onUpdate { it.copy(annotationsEnabled = v) } },
-                checkParams = checkParams,
-                checkPaintToken = checkPaintToken,
-            )
         }
 
         if (showsScrollChrome(settings.readingLayout)) {
@@ -398,9 +400,13 @@ internal fun ReadingPreview(
             .border(0.5.dp, gold.copy(alpha = 0.28f), PreviewLeaf)
             .graphicsLayer { alpha = 0.74f },
     ) {
-        // Height is the max leaf, always. Settings only change what is painted.
-        PreviewHeightLock(contentPad)
+        // The height lock lives inside the scaled density: it measures the
+        // max leaf at the preview's own text size, so the size dial grows
+        // and shrinks the leaf instead of clipping bigger type at a height
+        // measured for the old size.
         CompositionLocalProvider(LocalDensity provides previewDensity) {
+            // Height is the max leaf, always. Settings only change what is painted.
+            PreviewHeightLock(contentPad)
             Column(Modifier.matchParentSize().clipToBounds().then(contentPad)) {
             if (readingLayout == ReadingLayout.MUSHAF) {
                 PreviewMushafLeaf(
@@ -476,6 +482,7 @@ internal fun ReadingPreview(
                 ),
             )
         }
+    }
     }
 }
 
