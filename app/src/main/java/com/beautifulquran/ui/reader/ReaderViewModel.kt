@@ -792,6 +792,14 @@ class ReaderViewModel(
      * the chapter has no timings at all.
      */
     fun playFromAyahWord(ayah: Int, word: Int?) {
+        // A chapter's opening — ayah 1 at its first word — starts with the
+        // basmalah lead-in, exactly as play-from-ayah-1 does. The mushaf's
+        // play target is a word, and the word path used to seek straight
+        // into ayah 1 and skip the bismillah.
+        if (ayah == 1 && (word == null || word <= 1) && surahOpensWithBasmalahPreface(surahId)) {
+            playFromAyah(ayah)
+            return
+        }
         val start = word?.let { startMsForWord(ayah, it) }
         if (start != null) playFromWord(ayah, start) else playFromAyah(ayah)
     }
