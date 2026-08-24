@@ -1474,17 +1474,21 @@ internal fun MushafPageDial(
                         // Docked, the label lives between the comb and the
                         // glass: clamp its measure so the type ellipsises and
                         // the plate hugs what is left, instead of running its
-                        // full intrinsic width across the leaf.
+                        // full intrinsic width across the leaf. The clamp is
+                        // quantized to 16px steps — a per-pixel max would
+                        // re-measure the label on every frame the hand moves
+                        // along the wall.
                         .layout { measurable, constraints ->
                             val track = widthPx.toFloat()
                             val padPx = MushafDialHudPad.toPx()
-                            val maxW = when (hudDock) {
-                                -1 -> (track - handX.floatValue - padPx -
-                                    MUSHAF_DIAL_HUD_EDGE_MARGIN_PX).roundToInt()
-                                1 -> (handX.floatValue - padPx -
-                                    MUSHAF_DIAL_HUD_EDGE_MARGIN_PX).roundToInt()
-                                else -> constraints.maxWidth
-                            }.coerceAtLeast(0)
+                            val raw = when (hudDock) {
+                                -1 -> track - handX.floatValue - padPx -
+                                    MUSHAF_DIAL_HUD_EDGE_MARGIN_PX
+                                1 -> handX.floatValue - padPx -
+                                    MUSHAF_DIAL_HUD_EDGE_MARGIN_PX
+                                else -> constraints.maxWidth.toFloat()
+                            }.coerceAtLeast(0f)
+                            val maxW = (raw / 16f).toInt().coerceAtLeast(0) * 16
                             val placeable = measurable.measure(
                                 Constraints(
                                     minWidth = 0,

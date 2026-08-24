@@ -548,7 +548,16 @@ class ReaderViewModel(
         )
         loadJob?.cancel()
         loadJob = viewModelScope.launch {
-            val prepared = materialize(surahId) ?: return@launch
+            val prepared = materialize(surahId)
+            if (prepared == null) {
+                // The swap failed with nothing to commit: release the
+                // entrance-fade hold or it would suppress the fade of the
+                // next real navigation.
+                if (sessions.isCurrent(gen, surahId)) {
+                    _uiState.value = _uiState.value.copy(keepsContentThroughLoad = false)
+                }
+                return@launch
+            }
             if (!sessions.isCurrent(gen, surahId)) return@launch
             commitPrepared(prepared)
             val playAyah = sessions.takePendingPlay(gen)
