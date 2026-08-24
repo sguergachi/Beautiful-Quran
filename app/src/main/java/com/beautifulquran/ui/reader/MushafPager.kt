@@ -325,6 +325,13 @@ internal fun MushafPager(
                 // the reader is looking at rather than turning to wherever that
                 // word lives and straight back.
                 if (heldPage != null && page != heldPage) return@collect
+                // A hand on the pager owns the turn: while a scroll is in
+                // progress — the user's swipe or a turn this collector just
+                // started — do not pull. Pulling mid-swipe yanked the page
+                // back under the finger, a 100-350ms hitch on every word
+                // tick; the next tick after the scroll settles re-aims if
+                // the voice is still elsewhere.
+                if (pagerState.isScrollInProgress) return@collect
                 val index = (page - 1).coerceIn(0, catalog.pageCount - 1)
                 if (pagerState.currentPage != index) {
                     // Warm the target leaf's face before the turn. A leaf
