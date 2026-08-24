@@ -75,6 +75,8 @@ private const val MARK_SIZE_RATIO = 20f / 30f
 @Composable
 internal fun MushafHafsLine(
     line: MushafLine,
+    /** The leaf this line sits on — the line geometry cache's key. */
+    page: Int,
     packs: SnapshotStateMap<Pair<Int, Int>, AyahInkPack>,
     fontSize: TextUnit,
     /**
@@ -101,6 +103,7 @@ internal fun MushafHafsLine(
     if (useQcf && pageFont != null) {
         MushafQcfPageLine(
             line = line,
+            page = page,
             pageFont = pageFont,
             fontSize = fontSize,
             measureWidthPx = measureWidthPx,
@@ -212,9 +215,83 @@ internal fun MushafHafsLine(
     }
 }
 
+/**
+ * Measured geometry for one mushaf line, cacheable across leaf compositions.
+ *
+ * Swiping back to a visited leaf re-composes its lines, and the measure is
+ * not cheap: ink profiles render each word to a bitmap, the joins derive
+ * from them, and the fit runs a bisection per line — all on the UI thread,
+ * mid-swipe. The face LRU evicts typefaces (and with them the profile
+ * cache), so this cache holds the geometry strongly, keyed by what the
+ * geometry actually depends on: the page's own face, the line, the size,
+ * and the measure.
+ */
+internal class MushafLineGeometry(
+    val cells: List<MushafCell>,
+    val joinsEm: List<MushafInkJoin>,
+    val fit: MushafLineFit,
+)
+
+private val lineGeometryCache = object : LinkedHashMap<Long, MushafLineGeometry>(64, 0.75f, true) {
+    override fun removeEldestEntry(eldest: MutableMap.MutableEntry<Long, MushafLineGeometry>) =
+        size > 512
+}
+
+private fun lineGeometryKey(
+    page: Int,
+    line: Int,
+    fontPx: Float,
+    measureWidthPx: Float,
+): Long = ((page.toLong() * 1000 + line) * 8192 + fontPx.rawBits()) * 8192 + measureWidthPx.rawBits()
+
+private fun Float.rawBits(): Long = java.lang.Float.floatToIntBits(this).toLong() and 0xFFFFFFFFL
+
+@Composable
+private fun lineGeometry(
+    page: Int,
+    line: MushafLine,
+    pageTypeface: android.graphics.Typeface?,
+    linePx: Float,
+    measureWidthPx: Float,
+    justify: Boolean,
+): MushafLineGeometry {
+    val key = lineGeometryKey(page, line.number, linePx, measureWidthPx)
+    return remember(key) {
+        lineGeometryCache.getOrPut(key) {
+            val texts = mushafLineTexts(line)
+            val glyphs = texts.map { it.text }
+            val rawCells = mushafLineCells(glyphs, pageTypeface, linePx, condense = 1f)
+            val joinsEm = mushafLineJoins(texts, pageTypeface)
+            val fit = if (!justify) {
+                MushafLineFit(
+                    scale = 1f,
+                    gapPx = MUSHAF_WORD_GAP_EM * linePx,
+                    flush = false,
+                )
+            } else if (joinsEm.size == (rawCells.size - 1).coerceAtLeast(0) && joinsEm.isNotEmpty()) {
+                mushafInkLineFit(
+                    inkWidthPx = rawCells.sumOf { it.inkWidth.toDouble() }.toFloat(),
+                    joins = joinsEm,
+                    measureWidthPx = measureWidthPx,
+                    fontPx = linePx,
+                )
+            } else {
+                mushafLineFit(
+                    inkWidthPx = rawCells.sumOf { it.inkWidth.toDouble() }.toFloat(),
+                    gapCount = (rawCells.size - 1).coerceAtLeast(0),
+                    measureWidthPx = measureWidthPx,
+                    fontPx = linePx,
+                )
+            }
+            MushafLineGeometry(rawCells, joinsEm, fit)
+        }
+    }
+}
+
 @Composable
 private fun MushafQcfPageLine(
     line: MushafLine,
+    page: Int,
     pageFont: FontFamily,
     fontSize: TextUnit,
     measureWidthPx: Float,
@@ -240,48 +317,17 @@ private fun MushafQcfPageLine(
     val linePx = with(density) { fontSize.toPx() }
     // What the words actually mark, measured from the page's own face and
     // unscaled. Everything about the line's fit follows from this.
+    // Cells, joins and fit come from the process-wide geometry cache: a leaf
+    // re-composing mid-swipe (returning to a visited page) re-measures on
+    // the UI thread otherwise — ink profiles render each word to a bitmap,
+    // and the fit runs a bisection per line. See [lineGeometry].
+    val geometry = lineGeometry(page, line, pageTypeface, linePx, measureWidthPx, justify)
+    val rawCells = geometry.cells
+    val joinsEm = geometry.joinsEm
+    val fit = geometry.fit
+    val condense = fit.scale
     val texts = remember(line) { mushafLineTexts(line) }
     val glyphs = remember(texts) { texts.map { it.text } }
-    val rawCells = remember(glyphs, pageTypeface, linePx) {
-        mushafLineCells(glyphs, pageTypeface, linePx, condense = 1f)
-    }
-    // What each join already carries. Spacing by ink *box* set every join the
-    // same distance apart and so no two of them the same paper apart — a word
-    // closing on an open ن leaves a pocket its neighbour belongs in, and the
-    // box does not know it is there.
-    val joinsEm = remember(texts, pageTypeface) { mushafLineJoins(texts, pageTypeface) }
-    // A word space is guaranteed first and the letters give way to it, which is
-    // the order a compositor works in. Fitting the advance run to the measure
-    // instead left the spacing to be whatever paper happened to remain: over
-    // 738 lines that put a third of them under 0.10 em and the tightest tenth
-    // into overlap. See MUSHAF_MIN_WORD_GAP_EM.
-    val fit = remember(rawCells, joinsEm, measureWidthPx, linePx, justify) {
-        if (!justify) {
-            // Too few words to justify: the page's own space, centred.
-            MushafLineFit(
-                scale = 1f,
-                gapPx = MUSHAF_WORD_GAP_EM * linePx,
-                flush = false,
-            )
-        } else if (joinsEm.size == (rawCells.size - 1).coerceAtLeast(0) && joinsEm.isNotEmpty()) {
-            mushafInkLineFit(
-                inkWidthPx = rawCells.sumOf { it.inkWidth.toDouble() }.toFloat(),
-                joins = joinsEm,
-                measureWidthPx = measureWidthPx,
-                fontPx = linePx,
-            )
-        } else {
-            // No page face yet, so no profiles: fall back to fitting by box,
-            // which is what this did before the ink was measured.
-            mushafLineFit(
-                inkWidthPx = rawCells.sumOf { it.inkWidth.toDouble() }.toFloat(),
-                gapCount = (rawCells.size - 1).coerceAtLeast(0),
-                measureWidthPx = measureWidthPx,
-                fontPx = linePx,
-            )
-        }
-    }
-    val condense = fit.scale
     // Condensed, never resized. A line brought inside the measure keeps its
     // height, weight and colour — the page still reads as one hand — where a
     // line set at a different size reads as a fault.

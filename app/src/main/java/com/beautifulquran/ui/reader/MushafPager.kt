@@ -772,6 +772,7 @@ private fun MushafPageSheet(
                         ) {
                             MushafHafsLine(
                                 line = line,
+                                page = page.page,
                                 packs = packsState,
                                 fontSize = fontSp,
                                 measureWidthPx = lineMeasurePx,
