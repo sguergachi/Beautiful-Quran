@@ -729,9 +729,13 @@ internal fun mushafDialChapterAtHysteresis(
     // ~60% of the gap — hand must move decisively past the midpoint.
     // For 70+ (~7.8px) that's ~4.7px total hysteresis, so 1-2px sensor
     // jitter stays inside, but a 4px deliberate nudge still crosses.
+    // Capped so each seat keeps a live approach: al-Fatihah and al-Baqarah
+    // sit only minGap apart at the compressed head, and an uncapped window
+    // left al-Fatihah a fraction of a pixel at the track's clamp — the HUD
+    // never reached chapter one.
     val adaptive = (gap * 0.60f).coerceAtLeast(hysteresisPx * 0.85f)
     val mid = (seats[lastIdx] + seats[cur]) / 2f
-    val h = adaptive / 2f
+    val h = minOf(adaptive / 2f, gap / 2f - 1.2f).coerceAtLeast(0f)
     return if (cur > lastIdx) {
         if (xPx < mid - h) cur else lastIdx
     } else {
@@ -1833,9 +1837,21 @@ if (mushafDialShouldLeaveTrough(runOutS, strayed)) {
                                 // jitters 1-2px and would otherwise flip every
                                 // frame — constant vibration while still.
                                 val rawIdx = mushafDialChapterAt(cellSeats, handPx)
-                                val curIdx = mushafDialChapterAtHysteresis(
-                                    cellSeats, handPx, hudChapterIdx, hysteresisPx,
-                                )
+                                // At either wall the hand has run out of
+                                // track — it cannot go further, so there is
+                                // no jitter for hysteresis to absorb, and an
+                                // end chapter (al-Fatihah, an-Nas) whose seat
+                                // is the clamp itself would otherwise stay
+                                // behind its neighbour forever.
+                                val atWall = handPx <= insetPx + 0.5f ||
+                                    handPx >= widthPxNow - insetPx - 0.5f
+                                val curIdx = if (atWall) {
+                                    rawIdx
+                                } else {
+                                    mushafDialChapterAtHysteresis(
+                                        cellSeats, handPx, hudChapterIdx, hysteresisPx,
+                                    )
+                                }
                                 // HUD tracks the hysteretic chapter, so text
                                 // does not flicker; rawIdx still drives the
                                 // page so a fast swipe that jumps 2+ cells

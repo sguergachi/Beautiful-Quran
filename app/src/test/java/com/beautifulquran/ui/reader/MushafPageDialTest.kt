@@ -708,4 +708,30 @@ class MushafPageDialTest {
         assertEquals(2, mushafDialChapterAtHysteresis(seats3, 0f, 0, hyst))
     }
 
+    @Test
+    fun `a seat at the track's clamp stays reachable through hysteresis`() {
+        // Al-Fatihah and al-Baqarah sit minGap apart at the compressed head,
+        // and al-Fatihah's seat is the track's own clamp — an uncapped
+        // hysteresis window left it a fraction of a pixel, and the HUD never
+        // reached chapter one. The window toward a seat must leave the seat
+        // a live approach.
+        val gap = 3.9375f
+        val seats = floatArrayOf(1043.25f, 1039.3125f) // ch1, ch2 — decreasing
+        val hyst = 4.725f
+        val mid = (seats[0] + seats[1]) / 2f
+        // From ch2, the hand must reach ch1 before the clamp runs out:
+        // the window is capped at gap/2 - 1.2, leaving the seat a live
+        // approach exactly as the production law caps it.
+        val h = minOf(
+            minOf(gap * 0.6f, hyst * 0.85f) / 2f,
+            gap / 2f - 1.2f,
+        )
+        val flip = mid + h
+        assertTrue(
+            "flip $flip left ch1 less than 1.2px of approach",
+            seats[0] - flip >= 1.2f - 0.01f,
+        )
+        assertEquals(0, mushafDialChapterAtHysteresis(seats, seats[0], 1, hyst))
+    }
+
 }
