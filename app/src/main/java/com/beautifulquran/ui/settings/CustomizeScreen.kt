@@ -400,13 +400,12 @@ internal fun ReadingPreview(
             .border(0.5.dp, gold.copy(alpha = 0.28f), PreviewLeaf)
             .graphicsLayer { alpha = 0.74f },
     ) {
-        // The height lock lives inside the scaled density: it measures the
-        // max leaf at the preview's own text size, so the size dial grows
-        // and shrinks the leaf instead of clipping bigger type at a height
-        // measured for the old size.
+        // The height lock lives OUTSIDE the scaled density: the preview box
+        // keeps one fixed height (measured at the base text size), and the
+        // size dial grows the type inside it — clipping at the leaf's foot —
+        // instead of resizing the preview and pushing the settings below.
+        PreviewHeightLock(contentPad)
         CompositionLocalProvider(LocalDensity provides previewDensity) {
-            // Height is the max leaf, always. Settings only change what is painted.
-            PreviewHeightLock(contentPad)
             Column(Modifier.matchParentSize().clipToBounds().then(contentPad)) {
             if (readingLayout == ReadingLayout.MUSHAF) {
                 PreviewMushafLeaf(
