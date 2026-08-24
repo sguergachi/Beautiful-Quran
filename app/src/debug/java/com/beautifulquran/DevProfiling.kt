@@ -161,6 +161,7 @@ object DevProfiling {
             try {
                 file.writeText(summary)
                 Log.i(Tag, "Frame watch -> ${file.absolutePath}: ${summary.lineSequence().first()}")
+                shareFile(file, "frame-watch")
             } catch (error: java.io.IOException) {
                 Log.e(Tag, "Unable to write frame watch", error)
             }
