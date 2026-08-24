@@ -156,13 +156,13 @@ fun SettingsScreen(
     onOpenTarjiLab: () -> Unit = {},
     onOpenOrnamentsLab: () -> Unit = {},
     onRecordSystemTrace: () -> Unit = {},
+    downloadsRefreshKey: Int = 0,
 ) {
     val settings by viewModel.settings.settings.collectAsStateWithLifecycle()
     val reciters by viewModel.reciters.collectAsStateWithLifecycle()
     val context = LocalContext.current
-    var usageRefreshKey by remember { mutableIntStateOf(0) }
     var usage by remember { mutableStateOf<RecitationUsage?>(null) }
-    LaunchedEffect(usageRefreshKey) {
+    LaunchedEffect(downloadsRefreshKey) {
         usage = withContext(Dispatchers.IO) {
             RecitationCache.usage(context)
         }
