@@ -51,6 +51,8 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.rememberTextMeasurer
@@ -435,9 +437,27 @@ internal fun MushafPager(
             val settled by remember {
                 derivedStateOf { pageIndex == pagerState.settledPage }
             }
+            // One description for the leaf, not ~450 word nodes: the QCF
+            // glyphs are private-use artwork — meaningless to a screen reader
+            // — and an active accessibility service re-sorted and re-geometried
+            // every one of them per frame of a swipe, which was the mushaf's
+            // swipe lag. Taps are pointer-based and unaffected.
+            val leafSurah = surahsById[page.primarySurahId]?.nameTransliteration
             BoxWithConstraints(
                 Modifier
                     .fillMaxSize()
+                    .clearAndSetSemantics {
+                        contentDescription = buildString {
+                            append("Mushaf page ")
+                            append(page.page)
+                            if (leafSurah != null) {
+                                append(", ")
+                                append(leafSurah)
+                            }
+                            append(", Juz ")
+                            append(page.juz)
+                        }
+                    }
                     // Each leaf gets a surface of its own, so turning the page
                     // moves something already recorded instead of drawing it
                     // again. Without this the pager's offset dirtied the leaf's
