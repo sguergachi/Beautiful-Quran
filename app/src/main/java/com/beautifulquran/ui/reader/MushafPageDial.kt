@@ -39,8 +39,8 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
@@ -1414,25 +1414,27 @@ internal fun MushafPageDial(
                         )
                         // The top edge feathers too: the plate is a patch of
                         // paper dissolving into the leaf, and a hard top line
-                        // read as a card's border. DstOut erases the ground
-                        // proportionally to the eraser's alpha — full at the
-                        // very top, gone by the feather's foot — and the text
-                        // is drawn after, so it never thins.
-                        val feather = 6.dp.toPx()
+                        // read as a card's border. Two passes, no blend
+                        // modes: the top strip is a vertical paper ramp from
+                        // zero at its tip, and the horizontal wash below it
+                        // is clipped to start where the ramp ends — so the
+                        // edge fades clean to nothing on every renderer.
+                        val feather = 10.dp.toPx()
                         drawRoundRect(
-                            brush = brush,
-                            cornerRadius = CornerRadius(6.dp.toPx()),
-                        )
-                        drawRect(
                             brush = Brush.verticalGradient(
-                                0f to paper,
-                                1f to paper.copy(alpha = 0f),
+                                0f to paper.copy(alpha = 0f),
+                                1f to paper,
                                 startY = 0f,
                                 endY = feather,
                             ),
-                            size = Size(size.width, feather),
-                            blendMode = BlendMode.DstOut,
+                            cornerRadius = CornerRadius(6.dp.toPx()),
                         )
+                        clipRect(top = feather) {
+                            drawRoundRect(
+                                brush = brush,
+                                cornerRadius = CornerRadius(6.dp.toPx()),
+                            )
+                        }
                     }
                     .padding(horizontal = MushafDialHudPad, vertical = 6.dp)
                     .graphicsLayer { alpha = expand.value },

@@ -808,27 +808,23 @@ private fun MushafPageInkClocks(
                     wetInk = recitingActive,
                 )
             } else {
-                // A leaf is read once and filled in. A verse already recited
-                // keeps its ink, so the page darkens line by line and the
-                // reader can see how much of it is done; only what is still
-                // to come waits in the recess. (The scroll layout recesses
-                // both sides of the active verse, because there is no page
-                // there to complete — just a river of text going by.)
-                val recited = activeAyah != null && ayah.number < activeAyah
-                rememberMushafRecessPack(dimmed = recitingActive && !recited)
+                // Full ink, always. The leaf is scripture on paper: hitting
+                // play must never fade it — the old ahead-of-voice recess
+                // dimmed every verse still to come to a quarter of its ink
+                // the moment playback started, and the whole page vanished
+                // at once. The wash alone marks where the voice is.
+                rememberMushafRecessPack(dimmed = false)
             }
             SideEffect {
                 packsState[ayah.surahId to ayah.number] = pack
             }
         }
     }
-    // No text of theirs is loaded, so there is nothing to clock word by word.
-    // A verse-wide recess is the whole of what we can honestly say about them,
-    // and it is also the whole of what the page needs said.
-    val recitingActive = playback.value.reciting
+    // No text of theirs is loaded, so there is nothing to clock word by word —
+    // and nothing to dim either: full ink, for the same law as above.
     upcoming.forEach { key ->
         key(key.first, key.second) {
-            val pack = rememberMushafRecessPack(dimmed = recitingActive)
+            val pack = rememberMushafRecessPack(dimmed = false)
             SideEffect { packsState[key] = pack }
         }
     }
