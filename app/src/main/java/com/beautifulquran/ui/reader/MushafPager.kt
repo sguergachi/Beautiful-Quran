@@ -836,7 +836,13 @@ private fun MushafPageInkClocks(
                 rememberMushafRecessPack(dimmed = false)
             }
             SideEffect {
-                packsState[ayah.surahId to ayah.number] = pack
+                // Write only on real change: a same-value write to the
+                // snapshot map still notifies every word reading its pack,
+                // and each of those recompositions re-diffed the word's wash
+                // modifiers - profiled as setDetachedListener churn on every
+                // page settle.
+                val key = ayah.surahId to ayah.number
+                if (packsState[key] !== pack) packsState[key] = pack
             }
         }
     }
@@ -845,13 +851,17 @@ private fun MushafPageInkClocks(
     upcoming.forEach { key ->
         key(key.first, key.second) {
             val pack = rememberMushafRecessPack(dimmed = false)
-            SideEffect { packsState[key] = pack }
+            SideEffect {
+                if (packsState[key] !== pack) packsState[key] = pack
+            }
         }
     }
     recited.forEach { key ->
         key(key.first, key.second) {
             val pack = rememberMushafRecessPack(dimmed = false)
-            SideEffect { packsState[key] = pack }
+            SideEffect {
+                if (packsState[key] !== pack) packsState[key] = pack
+            }
         }
     }
 }
