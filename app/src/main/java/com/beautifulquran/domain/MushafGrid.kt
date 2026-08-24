@@ -46,13 +46,14 @@ object MushafGrid {
     const val RUNNING_HEAD = 0.30f
 
     /**
-     * Paper between the head and the first line of revelation. A running head
-     * that sits closer reads as part of the text block rather than as a head
-     * standing over it — but it does not need a whole line of the revelation's
-     * pitch to do that. Just under half a unit still clears the head band by
-     * more than the head's own type is tall, and the rest goes to the text.
+     * Paper between the head and the first line of revelation. A head that
+     * sits closer than about a line's pitch reads as part of the block
+     * instead of standing off it — and the first line's ink reaches high
+     * into its own slot (the faces ink 1.37 em above the baseline), so the
+     * visible gap is the gutter less that reach. Set to most of a line's
+     * pitch so the head reads as a head, with air under it.
      */
-    const val HEAD_GUTTER = 0.32f
+    const val HEAD_GUTTER = 0.70f
     const val TEXT_LINES = MUSHAF_LINES_PER_PAGE
     /**
      * Paper between the last line and the folio. The folio belongs to the
