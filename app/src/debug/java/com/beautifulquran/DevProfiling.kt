@@ -11,6 +11,7 @@ import android.os.ProfilingResult
 import android.os.ProfilingTrigger
 import android.os.Handler
 import android.os.Looper
+import android.view.Choreographer
 import android.os.Trace
 import android.util.Log
 import android.widget.Toast
@@ -51,6 +52,7 @@ object DevProfiling {
     private val methodTraceRunning = AtomicBoolean(false)
     private val callbackExecutor: Executor = Executors.newSingleThreadExecutor()
     private val ceremonyStop = AtomicReference<CancellationSignal?>(null)
+    private val frameWatch = AtomicReference<FrameWatch?>(null)
 
     /**
      * Application context for the share step. The profiling callback arrives
@@ -84,12 +86,85 @@ object DevProfiling {
         // Ten seconds of recording with nothing on screen reads as a dead
         // button, and the whole point is to use the app while it records.
         toast(context, "Recording ${ManualTraceDurationMs / 1000}s — use the app now")
+        startFrameWatch(context)
         if (Build.VERSION.SDK_INT < 35) {
             Log.w(Tag, "SystemTraceRequestBuilder requires API 35+ — sampling instead")
             recordMethodTrace()
             return
         }
         Api35.recordSystemTrace(context.applicationContext, ManualTag, ManualTraceDurationMs)
+        Handler(Looper.getMainLooper()).postDelayed({
+            stopFrameWatch()
+        }, ManualTraceDurationMs.toLong())
+    }
+
+    /**
+     * Frame-time watch over the capture window: the sampling trace shows
+     * where CPU went but not *when frames dropped*, and the reported lag is
+     * a hitch at the start of a swipe — exactly what a per-frame delta log
+     * catches that a sampler cannot. Written and shared next to the trace.
+     */
+    private fun startFrameWatch(context: Context) {
+        if (frameWatch.get() != null) return
+        val file = File(
+            File(context.cacheDir, "share").apply { mkdirs() },
+            "bq-frames-${System.currentTimeMillis()}.txt",
+        )
+        val watch = FrameWatch(file)
+        frameWatch.set(watch)
+        watch.start()
+    }
+
+    private fun stopFrameWatch() {
+        frameWatch.getAndSet(null)?.stop()
+    }
+
+    private class FrameWatch(private val file: File) : Choreographer.FrameCallback {
+        private val choreographer = Choreographer.getInstance()
+        private val lines = ArrayList<String>(720)
+        private var lastNanos = 0L
+        private var startNanos = 0L
+        private var worst = 0f
+        private var over16 = 0
+        private var counted = 0
+
+        fun start() {
+            startNanos = System.nanoTime()
+            choreographer.postFrameCallback(this)
+        }
+
+        override fun doFrame(frameTimeNanos: Long) {
+            if (lastNanos != 0L) {
+                val deltaMs = (frameTimeNanos - lastNanos) / 1_000_000f
+                val at = (frameTimeNanos - startNanos) / 1_000_000f
+                lines += String.format("%.1f@%.0f", deltaMs, at)
+                counted++
+                if (deltaMs > worst) worst = deltaMs
+                if (deltaMs > 16.7f) over16++
+            }
+            lastNanos = frameTimeNanos
+            choreographer.postFrameCallback(this)
+        }
+
+        fun stop() {
+            choreographer.removeFrameCallback(this)
+            val summary = buildString {
+                append("frames=")
+                append(counted)
+                append(" over16ms=")
+                append(over16)
+                append(" worstMs=")
+                append(String.format("%.1f", worst))
+                append('\n')
+                append(lines.joinToString(" "))
+            }
+            try {
+                file.writeText(summary)
+                Log.i(Tag, "Frame watch -> ${file.absolutePath}: ${summary.lineSequence().first()}")
+            } catch (error: java.io.IOException) {
+                Log.e(Tag, "Unable to write frame watch", error)
+            }
+        }
     }
 
     /**

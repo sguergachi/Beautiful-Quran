@@ -258,32 +258,34 @@ private fun lineGeometry(
     val key = lineGeometryKey(page, line.number, linePx, measureWidthPx)
     return remember(key) {
         lineGeometryCache.getOrPut(key) {
-            val texts = mushafLineTexts(line)
-            val glyphs = texts.map { it.text }
-            val rawCells = mushafLineCells(glyphs, pageTypeface, linePx, condense = 1f)
-            val joinsEm = mushafLineJoins(texts, pageTypeface)
-            val fit = if (!justify) {
-                MushafLineFit(
-                    scale = 1f,
-                    gapPx = MUSHAF_WORD_GAP_EM * linePx,
-                    flush = false,
-                )
-            } else if (joinsEm.size == (rawCells.size - 1).coerceAtLeast(0) && joinsEm.isNotEmpty()) {
-                mushafInkLineFit(
-                    inkWidthPx = rawCells.sumOf { it.inkWidth.toDouble() }.toFloat(),
-                    joins = joinsEm,
-                    measureWidthPx = measureWidthPx,
-                    fontPx = linePx,
-                )
-            } else {
-                mushafLineFit(
-                    inkWidthPx = rawCells.sumOf { it.inkWidth.toDouble() }.toFloat(),
-                    gapCount = (rawCells.size - 1).coerceAtLeast(0),
-                    measureWidthPx = measureWidthPx,
-                    fontPx = linePx,
-                )
+            com.beautifulquran.DevProfiling.trace("lineGeometryMiss") {
+                val texts = mushafLineTexts(line)
+                val glyphs = texts.map { it.text }
+                val rawCells = mushafLineCells(glyphs, pageTypeface, linePx, condense = 1f)
+                val joinsEm = mushafLineJoins(texts, pageTypeface)
+                val fit = if (!justify) {
+                    MushafLineFit(
+                        scale = 1f,
+                        gapPx = MUSHAF_WORD_GAP_EM * linePx,
+                        flush = false,
+                    )
+                } else if (joinsEm.size == (rawCells.size - 1).coerceAtLeast(0) && joinsEm.isNotEmpty()) {
+                    mushafInkLineFit(
+                        inkWidthPx = rawCells.sumOf { it.inkWidth.toDouble() }.toFloat(),
+                        joins = joinsEm,
+                        measureWidthPx = measureWidthPx,
+                        fontPx = linePx,
+                    )
+                } else {
+                    mushafLineFit(
+                        inkWidthPx = rawCells.sumOf { it.inkWidth.toDouble() }.toFloat(),
+                        gapCount = (rawCells.size - 1).coerceAtLeast(0),
+                        measureWidthPx = measureWidthPx,
+                        fontPx = linePx,
+                    )
+                }
+                MushafLineGeometry(rawCells, joinsEm, fit)
             }
-            MushafLineGeometry(rawCells, joinsEm, fit)
         }
     }
 }

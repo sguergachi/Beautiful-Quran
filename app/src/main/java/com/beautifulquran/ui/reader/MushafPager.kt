@@ -331,17 +331,19 @@ internal fun MushafPager(
                     // composing without a resident face holds blank for its
                     // face wait and then fades in — on a playback turn that
                     // read as the whole screen flashing out and back.
-                    withContext(Dispatchers.Default) {
-                        MushafQcfFonts.preload(
-                            context,
-                            mushafFontPreloadPages(index, catalog.pageCount),
+                    com.beautifulquran.DevProfiling.trace("followTurn p${index + 1}") {
+                        withContext(Dispatchers.Default) {
+                            MushafQcfFonts.preload(
+                                context,
+                                mushafFontPreloadPages(index, catalog.pageCount),
+                            )
+                        }
+                        followPage = index
+                        pagerState.animateScrollToPage(
+                            index,
+                            animationSpec = MushafFollowTurnSpec,
                         )
                     }
-                    followPage = index
-                    pagerState.animateScrollToPage(
-                        index,
-                        animationSpec = MushafFollowTurnSpec,
-                    )
                     return@collect
                 }
                 // The voice is still on this leaf. If it is on the last word
@@ -384,9 +386,19 @@ internal fun MushafPager(
     // one. The first settled page is therefore where following starts, not a
     // turn away from it.
     var followSeeded by remember { mutableStateOf(false) }
+    var wasScrolling by remember { mutableStateOf(false) }
     LaunchedEffect(pagerState) {
         snapshotFlow { pagerState.currentPage to pagerState.isScrollInProgress }
             .collect { (page, scrolling) ->
+                // Swipe boundaries as named marks: they land in logcat and in
+                // the system trace, so a captured frame log can be read
+                // against them.
+                if (scrolling && !wasScrolling) {
+                    DevProfiling.mark("swipeBegin p${page + 1}")
+                } else if (!scrolling && wasScrolling) {
+                    DevProfiling.mark("swipeEnd p${page + 1}")
+                }
+                wasScrolling = scrolling
                 if (scrolling) return@collect
                 if (!followSeeded) {
                     followSeeded = true
