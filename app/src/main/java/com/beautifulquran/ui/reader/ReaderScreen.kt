@@ -1508,9 +1508,12 @@ fun ReaderScreen(
         // whole page (including the flyer) for a frame.
         val readerContentAlpha = remember { Animatable(0f) }
         // Only fade in on cold open / external nav — never when finishing a
-        // next-chapter handoff (that used to snap the settled header).
+        // next-chapter handoff (that used to snap the settled header), and
+        // never across a playback-driven chapter swap (hitting play on
+        // another chapter's leaf swapped the ink under a composed page; a
+        // fade there read as the whole screen flashing out and back).
         LaunchedEffect(content?.surah?.id, startAyah) {
-            if (chapterAdvancing || verseRevealForSurah != 0) {
+            if (chapterAdvancing || verseRevealForSurah != 0 || uiState.keepsContentThroughLoad) {
                 readerContentAlpha.snapTo(1f)
                 return@LaunchedEffect
             }
@@ -2175,6 +2178,7 @@ fun ReaderScreen(
                                         surahId = target.surahId,
                                         startPlaybackAtAyah = target.ayah,
                                         startPlaybackAtWord = target.word,
+                                        keepContent = true,
                                     )
                                     else -> viewModel.playFromAyahWord(target.ayah, target.word)
                                 }
