@@ -221,11 +221,15 @@ internal fun CustomizeScreen(
             )
         }
 
-        Section("Text size")
-        TextSizeControl(
-            scale = settings.fontScale,
-            onScale = { value -> onUpdate { it.copy(fontScale = value) } },
-        )
+        // The mushaf leaf sets its own hand from the page grid — the text
+        // dial is a scroll-layout control and has nothing to turn there.
+        if (showsScrollChrome(settings.readingLayout)) {
+            Section("Text size")
+            TextSizeControl(
+                scale = settings.fontScale,
+                onScale = { value -> onUpdate { it.copy(fontScale = value) } },
+            )
+        }
 
         // The scroll layout's toggles share one vertical rhythm: a single
         // 20dp stand-off before the group, then even 12dp between rows —
