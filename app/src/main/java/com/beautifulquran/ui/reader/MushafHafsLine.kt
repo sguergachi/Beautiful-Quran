@@ -769,6 +769,12 @@ private fun MushafQcfWord(
         )
     }
     var layoutResult by remember { mutableStateOf<TextLayoutResult?>(null) }
+    // Only the verse under the voice carries wash layers. A static word's
+    // alpha is always 1 — the recess is gone — so its layers were pure
+    // overhead, and a leaf hands the transformed-rect walk ~150 of them:
+    // profiled on device, the walk ran on every frame of a swipe.
+    val hasInk = liveInk &&
+        packs[token.surahId to token.ayah]?.motions?.isNotEmpty() == true
     // A word waiting its turn is dimmed by its own alpha, not by paper laid
     // over it. A paper mask is a rectangle on a word's box, and a QCF glyph
     // inks past that box — so the mask left the overhang at full strength,
@@ -857,15 +863,16 @@ private fun MushafQcfWord(
         // which is exactly what the line end showed.
         overflow = TextOverflow.Visible,
         modifier = Modifier
-            // Only while there is ink to animate. A graphicsLayer marks its
-            // node transformed, and Compose then keeps that node's rect index
-            // up to date by walking its whole subhierarchy — profiled on
-            // device, insertOrUpdateTransformedNodeSubhierarchy is the single
-            // hottest method in the reader, and a leaf hands it ~150 nodes.
-            // Reading and turning pages need none of it: the alpha is 1 and
-            // the wash is already gated the same way (see [mushafLineInk]).
+            // Only while there is ink to animate — the verse under the voice.
+            // A graphicsLayer marks its node transformed, and Compose then
+            // keeps that node's rect index up to date by walking its whole
+            // subhierarchy — profiled on device,
+            // insertOrUpdateTransformedNodeSubhierarchy is the single hottest
+            // method in the reader, and a leaf handed it ~150 nodes on every
+            // frame of a swipe. A static word's ink is always full, so it
+            // carries no layers at all.
             .then(
-                if (!liveInk) {
+                if (!hasInk) {
                     Modifier
                 } else {
                     // Both washes work on the word's own drawing, so the ink is
@@ -884,18 +891,25 @@ private fun MushafQcfWord(
                         )
                 },
             )
-            .mushafLineInk(
-                liveInk = liveInk,
-                blooms = blooms,
-                layout = { layoutResult },
-                coverPad = 0.dp,
-                // The repeat and glint washes are tints of this word's own
-                // glyphs on this word's own layer, so the letterform is their
-                // mask — the same contour the first-pass wash follows. The
-                // selection-path clip belongs to a shared line, and here it
-                // squared the orange off at the advance and left every tail
-                // and high mark standing in black.
-                clipTintToRange = false,
+            .then(
+                if (!hasInk) {
+                    Modifier
+                } else {
+                    Modifier.mushafLineInk(
+                        liveInk = true,
+                        blooms = blooms,
+                        layout = { layoutResult },
+                        coverPad = 0.dp,
+                        // The repeat and glint washes are tints of this word's
+                        // own glyphs on this word's own layer, so the
+                        // letterform is their mask — the same contour the
+                        // first-pass wash follows. The selection-path clip
+                        // belongs to a shared line, and here it squared the
+                        // orange off at the advance and left every tail and
+                        // high mark standing in black.
+                        clipTintToRange = false,
+                    )
+                },
             ),
         onTextLayout = { layoutResult = it },
     )
