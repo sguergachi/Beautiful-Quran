@@ -55,14 +55,12 @@ object MushafGrid {
     const val HEAD_GUTTER = 0.32f
     const val TEXT_LINES = MUSHAF_LINES_PER_PAGE
     /**
-     * Nothing between the last line and the folio band. The folio's figure is
-     * centred in its own band, which already sets it clear of the text — and
-     * the unit this used to take is worth more to the revelation, where it
-     * keeps the type about 6% larger than an eighteen-unit leaf that spends it
-     * here. The folio band itself is two thirds of a unit: the figure is set
-     * two steps down the scale, so a whole unit was mostly paper around it.
+     * Paper between the last line and the folio. The folio belongs to the
+     * gap between the leaf's text and the dial's hairline — centred in it,
+     * not glued to the text — so the band carries the air that sets it
+     * there.
      */
-    const val TAIL = 0f
+    const val TAIL = 0.35f
     const val FOLIO = 0.40f
 
     /** The whole leaf, in units. */
