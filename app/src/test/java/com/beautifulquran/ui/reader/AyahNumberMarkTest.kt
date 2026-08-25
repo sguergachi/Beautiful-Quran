@@ -1,5 +1,8 @@
 package com.beautifulquran.ui.reader
 
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import com.beautifulquran.ui.theme.TranslationFontFamily
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Test
@@ -46,5 +49,19 @@ class AyahNumberMarkTest {
         val mark = formatAyahNumberMark(3, useArabicIndicDigits = false)
         assertFalse(mark.contains("﴾3"))
         assertFalse(mark.contains("3﴿"))
+    }
+
+    @Test
+    fun `English mark gives Western digits an explicit Garamond span`() {
+        val mark = buildAnnotatedString {
+            appendAyahNumberMark(12, useArabicIndicDigits = false, style = SpanStyle())
+        }
+
+        assertEquals(
+            listOf(4 to 5, 6 to 7),
+            mark.spanStyles
+                .filter { it.item.fontFamily == TranslationFontFamily }
+                .map { it.start to it.end },
+        )
     }
 }
