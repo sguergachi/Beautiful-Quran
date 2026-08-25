@@ -1515,13 +1515,15 @@ fun ReaderScreen(
         LaunchedEffect(content?.surah?.id, startAyah) {
             if (chapterAdvancing || verseRevealForSurah != 0 || uiState.keepsContentThroughLoad) {
                 readerContentAlpha.snapTo(1f)
+                DevProfiling.mark("entranceHold s${content?.surah?.id}")
                 return@LaunchedEffect
             }
             if (content == null) {
-                DevProfiling.mark("readerContentNull")
+                DevProfiling.mark("contentNull")
+                DevProfiling.mark("readerContentAlpha0")
                 readerContentAlpha.snapTo(0f)
             } else {
-                DevProfiling.mark("readerContentReady s${content.surah.id}")
+                DevProfiling.mark("entranceFade s${content.surah.id} a$startAyah")
                 readerContentAlpha.snapTo(0f)
                 readerContentAlpha.animateTo(
                     targetValue = 1f,
@@ -1543,6 +1545,7 @@ fun ReaderScreen(
             // page seem to appear out of nowhere, because the eye was fixed on
             // a moving thing that vanished the instant the text arrived. Empty
             // paper waits quietly, and the text settles onto it.
+            DevProfiling.mark("blankPaper s$surahId")
             Box(Modifier.fillMaxSize())
             return@Scaffold
         }
