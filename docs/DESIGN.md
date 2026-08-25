@@ -636,8 +636,9 @@ not the app's.
   0.78 em. Web uses a calibrated paint lift for its browser font metrics;
   Compose shares the English prose baseline because Android reports different
   metrics for the verse ornament.
-- **English verse marks**: EB Garamond, including the number inside its
-  ornamental brackets. Arabic verse marks remain in Hafs.
+- **English verse marks**: the Western digits are explicitly EB Garamond; the
+  ornamental brackets remain Hafs, which supplies their correct cups. Arabic
+  verse marks remain entirely in Hafs.
 - **English gloss punctuation**: a display-only period closes each ayah.
   Existing source punctuation is preserved, but capitalization never creates
   an inferred sentence boundary. This policy never mutates the database text

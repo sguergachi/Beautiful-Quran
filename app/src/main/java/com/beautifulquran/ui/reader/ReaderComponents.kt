@@ -188,6 +188,25 @@ internal fun formatAyahNumberMark(number: Int, useArabicIndicDigits: Boolean): S
     return raw.toCharArray().joinToString("\u2060")
 }
 
+/** Appends a mark with Hafs cups and, for English, explicitly Garamond digits. */
+internal fun AnnotatedString.Builder.appendAyahNumberMark(
+    number: Int,
+    useArabicIndicDigits: Boolean,
+    style: SpanStyle,
+) {
+    val start = length
+    withStyle(style.copy(fontFamily = HafsFontFamily)) {
+        append(formatAyahNumberMark(number, useArabicIndicDigits))
+    }
+    if (!useArabicIndicDigits) {
+        val digitStyle = style.copy(fontFamily = TranslationFontFamily)
+        number.toString().indices.forEach { index ->
+            val digitStart = start + 4 + index * 2
+            addStyle(digitStyle, digitStart, digitStart + 1)
+        }
+    }
+}
+
 private fun wordFadeAlpha(progress: Float): Float {
     val resting = InkEngine.State.Upcoming.inkAlpha()
     return resting + (InkEngine.State.Active.inkAlpha() - resting) * progress.coerceIn(0f, 1f)
@@ -1817,17 +1836,13 @@ private fun ResponsiveEnglishAyah(
             }
             if (length > 0) append(" ")
             val markStart = length
-            withStyle(
-                SpanStyle(
-                    color = gold,
-                    fontFamily = if (useArabicIndicDigits) HafsFontFamily else TranslationFontFamily,
-                    // 17/22 keeps the ornament proportional. Sharing the prose
-                    // baseline avoids a font-metric paint lift on Android.
-                    fontSize = 17.sp * fontScale,
-                ),
-            ) {
-                append(formatAyahNumberMark(ayah.number, useArabicIndicDigits))
-            }
+            // 17/22 keeps the ornament proportional. Sharing the prose
+            // baseline avoids a font-metric paint lift on Android.
+            appendAyahNumberMark(
+                number = ayah.number,
+                useArabicIndicDigits = useArabicIndicDigits,
+                style = SpanStyle(color = gold, fontSize = 17.sp * fontScale),
+            )
             markRange = markStart until length
         }
         RenderedLineText(text = text, wordRanges = ranges, markRange = markRange)
@@ -1997,14 +2012,14 @@ private fun ResponsiveHafsAyah(
                 append(" ")
             }
             val markStart = length
-            withStyle(
-                SpanStyle(
+            appendAyahNumberMark(
+                number = ayah.number,
+                useArabicIndicDigits = useArabicIndicDigits,
+                style = SpanStyle(
                     color = ayahMarkInk,
                     fontSize = fontSize * AYAH_MARK_SIZE_RATIO,
                 ),
-            ) {
-                append(formatAyahNumberMark(ayah.number, useArabicIndicDigits))
-            }
+            )
             markRange = markStart until length
         }
         RenderedLineText(text = text, wordRanges = ranges, markRange = markRange)
@@ -2076,11 +2091,18 @@ fun AyahNumberMark(
     useArabicIndicDigits: Boolean = true,
 ) {
     val accents = LocalQuranAccents.current
+    val text = remember(number, fontScale, useArabicIndicDigits, accents.gold) {
+        buildAnnotatedString {
+            appendAyahNumberMark(
+                number = number,
+                useArabicIndicDigits = useArabicIndicDigits,
+                style = SpanStyle(color = accents.gold, fontSize = 20.sp * fontScale),
+            )
+        }
+    }
     val mark = @Composable {
         Text(
-            text = formatAyahNumberMark(number, useArabicIndicDigits),
-            fontFamily = if (useArabicIndicDigits) HafsFontFamily else TranslationFontFamily,
-            fontSize = 20.sp * fontScale,
+            text = text,
             color = accents.gold,
             style = TextStyle(
                 textDirection = if (useArabicIndicDigits) {

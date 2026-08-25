@@ -87,6 +87,7 @@ import com.beautifulquran.ui.reader.PageBreak
 import com.beautifulquran.ui.reader.VERSE_ANNOTATION_INK_ALPHA
 import com.beautifulquran.ui.reader.collapsedStackSpanDp
 import com.beautifulquran.ui.reader.formatAyahNumberMark
+import com.beautifulquran.ui.reader.appendAyahNumberMark
 import com.beautifulquran.ui.reader.mushafCellOrigins
 import com.beautifulquran.ui.reader.mushafLineCells
 import com.beautifulquran.ui.reader.symbolicAyahBarCount
@@ -735,14 +736,14 @@ private fun PreviewArabicLine(
     val run = buildAnnotatedString {
         withStyle(SpanStyle(color = ink)) { append(text) }
         append("\u00a0")
-        withStyle(
-            SpanStyle(
+        appendAyahNumberMark(
+            number = number,
+            useArabicIndicDigits = arabicMarks,
+            style = SpanStyle(
                 color = gold,
                 fontSize = PreviewArabicSize * 20f / 30f,
             ),
-        ) {
-            append(formatAyahNumberMark(number, arabicMarks))
-        }
+        )
     }
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
         Text(
@@ -768,15 +769,14 @@ private fun PreviewEnglishLyric(
     val text = buildAnnotatedString {
         withStyle(SpanStyle(color = ink)) { append(verse) }
         append(" ")
-        withStyle(
-            SpanStyle(
+        appendAyahNumberMark(
+            number = number,
+            useArabicIndicDigits = arabicMarks,
+            style = SpanStyle(
                 color = gold,
-                fontFamily = if (arabicMarks) HafsFontFamily else TranslationFontFamily,
                 fontSize = PreviewLyricSize * 17f / 22f,
             ),
-        ) {
-            append(formatAyahNumberMark(number, arabicMarks))
-        }
+        )
     }
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
         Text(
