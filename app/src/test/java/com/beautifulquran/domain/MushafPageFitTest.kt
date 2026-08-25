@@ -25,11 +25,15 @@ class MushafPageFitTest {
     }
 
     @Test
-    fun `only lines with enough words take full justify`() {
+    fun `every full line takes justify - the name-list lines included`() {
+        // The Quran's rule: every full line of the page is flush end to end.
+        // The name-list lines (Al-Ahzab 62-65) carry few, long words and were
+        // left short by the old five-word gate.
         assertTrue(mushafLineJustifies(5))
         assertTrue(mushafLineJustifies(9))
-        assertTrue(!mushafLineJustifies(2))
-        assertTrue(!mushafLineJustifies(4))
+        assertTrue(mushafLineJustifies(2))
+        assertTrue(mushafLineJustifies(4))
+        assertTrue(!mushafLineJustifies(1))
     }
 
     @Test

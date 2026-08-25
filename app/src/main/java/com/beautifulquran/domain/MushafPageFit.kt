@@ -332,8 +332,15 @@ fun mushafLineFit(
 /** Never stretch a word gap past this fraction of the page font. */
 const val MUSHAF_MAX_GAP_EM = 0.55f
 
-/** Short lines stay naturally spaced; full justify needs enough words. */
-const val MUSHAF_JUSTIFY_MIN_WORDS = 5
+/**
+ * The Quran's own rule: every full line of the page is justified end to end —
+ * the printed page stretches the name-list lines (few, long words) the same
+ * as any other. Two words is the floor: one gap is all a two-word line has
+ * to give, and the fit's own stretch caps keep it inside the page's taste.
+ * A line that genuinely cannot fill falls back to short-and-centred inside
+ * the fit.
+ */
+const val MUSHAF_JUSTIFY_MIN_WORDS = 2
 
 fun mushafLineJustifies(tokenCount: Int): Boolean = tokenCount >= MUSHAF_JUSTIFY_MIN_WORDS
 
