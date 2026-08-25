@@ -746,7 +746,10 @@ private fun MushafPageSheet(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(horizontal = MushafEdgeGutter),
-                    verticalArrangement = Arrangement.Center,
+                    // A short page keeps the grid's line size and hangs from
+                    // the top — the printed page starts at the head, it does
+                    // not float to the middle of the leaf.
+                    verticalArrangement = Arrangement.Top,
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     page.lines.forEachIndexed { index, line ->
