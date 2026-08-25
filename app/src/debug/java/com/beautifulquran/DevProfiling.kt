@@ -55,6 +55,53 @@ object DevProfiling {
     private val frameWatch = AtomicReference<FrameWatch?>(null)
 
     /**
+     * Named marks collected during a capture window: every path that can
+     * blank or fade the screen emits one, and the file is shared with the
+     * trace - the mark sequence around a reported flash reads as a sentence
+     * naming the path that caused it.
+     */
+    private val markLock = Any()
+    private val markLines = ArrayList<String>(256)
+    private val captureStart = AtomicReference<Long?>(null)
+
+    private fun recordMark(label: String) {
+        val at = System.currentTimeMillis()
+        synchronized(markLock) {
+            val start = captureStart.get()
+            if (start != null) {
+                markLines += String.format("%+.3fs  %s", (at - start) / 1000.0, label)
+                if (markLines.size > 2000) markLines.removeAt(0)
+            }
+        }
+    }
+
+    private fun startMarkCapture() {
+        synchronized(markLock) {
+            markLines.clear()
+            captureStart.set(System.currentTimeMillis())
+        }
+    }
+
+    private fun stopMarkCapture(context: Context) {
+        val start = captureStart.getAndSet(null) ?: return
+        val file = File(
+            File(context.cacheDir, "share").apply { mkdirs() },
+            "bq-marks-${System.currentTimeMillis()}.txt",
+        )
+        try {
+            synchronized(markLock) {
+                file.writeText(
+                    (markLines.size.toString() + " marks\n") +
+                        markLines.joinToString("\n"),
+                )
+            }
+            shareFile(file, "marks")
+        } catch (error: java.io.IOException) {
+            Log.e(Tag, "Unable to write marks", error)
+        }
+    }
+
+    /**
      * Application context for the share step. The profiling callback arrives
      * on a pool thread long after the tap, with no activity in hand, so the
      * one thing it needs is kept here rather than plumbed through the request.
@@ -86,6 +133,7 @@ object DevProfiling {
         // Ten seconds of recording with nothing on screen reads as a dead
         // button, and the whole point is to use the app while it records.
         toast(context, "Recording ${ManualTraceDurationMs / 1000}s — use the app now")
+        startMarkCapture()
         startFrameWatch(context)
         if (Build.VERSION.SDK_INT < 35) {
             Log.w(Tag, "SystemTraceRequestBuilder requires API 35+ — sampling instead")
@@ -95,6 +143,7 @@ object DevProfiling {
         Api35.recordSystemTrace(context.applicationContext, ManualTag, ManualTraceDurationMs)
         Handler(Looper.getMainLooper()).postDelayed({
             stopFrameWatch()
+            stopMarkCapture(context)
         }, ManualTraceDurationMs.toLong())
     }
 
@@ -211,6 +260,7 @@ object DevProfiling {
                     Log.e(Tag, "Unable to stop method trace", error)
                 }
                 methodTraceRunning.set(false)
+                stopMarkCapture(context)
                 shareFile(file, "method-trace")
             },
             ManualTraceDurationMs.toLong(),
@@ -271,9 +321,11 @@ object DevProfiling {
         }
     }
 
-    /** Wall-clock milestone for logcat; also emits an instant atrace counter. */
+    /** Wall-clock milestone for logcat, the system trace, and the capture's
+     * own marks file (shared with the trace when a window is open). */
     fun mark(label: String) {
         Log.i(Tag, label)
+        recordMark(label)
         Trace.setCounter("BQ:$label", 1)
         Trace.setCounter("BQ:$label", 0)
     }
