@@ -771,7 +771,7 @@ private fun PreviewEnglishLyric(
         withStyle(
             SpanStyle(
                 color = gold,
-                fontFamily = HafsFontFamily,
+                fontFamily = if (arabicMarks) HafsFontFamily else TranslationFontFamily,
                 fontSize = PreviewLyricSize * 17f / 22f,
             ),
         ) {

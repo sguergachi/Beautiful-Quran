@@ -1820,7 +1820,7 @@ private fun ResponsiveEnglishAyah(
             withStyle(
                 SpanStyle(
                     color = gold,
-                    fontFamily = HafsFontFamily,
+                    fontFamily = if (useArabicIndicDigits) HafsFontFamily else TranslationFontFamily,
                     // 17/22 keeps the ornament proportional. Sharing the prose
                     // baseline avoids a font-metric paint lift on Android.
                     fontSize = 17.sp * fontScale,
@@ -2079,7 +2079,7 @@ fun AyahNumberMark(
     val mark = @Composable {
         Text(
             text = formatAyahNumberMark(number, useArabicIndicDigits),
-            fontFamily = HafsFontFamily,
+            fontFamily = if (useArabicIndicDigits) HafsFontFamily else TranslationFontFamily,
             fontSize = 20.sp * fontScale,
             color = accents.gold,
             style = TextStyle(

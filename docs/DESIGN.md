@@ -635,7 +635,9 @@ not the app's.
   hyphenates this word-addressable text. Its trailing Hafs verse mark is about
   0.78 em. Web uses a calibrated paint lift for its browser font metrics;
   Compose shares the English prose baseline because Android reports different
-  metrics for the same Hafs ornament.
+  metrics for the verse ornament.
+- **English verse marks**: EB Garamond, including the number inside its
+  ornamental brackets. Arabic verse marks remain in Hafs.
 - **English gloss punctuation**: a display-only period closes each ayah.
   Existing source punctuation is preserved, but capitalization never creates
   an inferred sentence boundary. This policy never mutates the database text
