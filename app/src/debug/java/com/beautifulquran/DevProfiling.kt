@@ -53,6 +53,7 @@ object DevProfiling {
     private val callbackExecutor: Executor = Executors.newSingleThreadExecutor()
     private val ceremonyStop = AtomicReference<CancellationSignal?>(null)
     private val frameWatch = AtomicReference<FrameWatch?>(null)
+    private val stackWatch = AtomicReference<StackSampler?>(null)
 
     /**
      * Named marks collected during a capture window: every path that can
@@ -135,6 +136,7 @@ object DevProfiling {
         toast(context, "Recording ${ManualTraceDurationMs / 1000}s — use the app now")
         startMarkCapture()
         startFrameWatch(context)
+        startStackWatch()
         if (Build.VERSION.SDK_INT < 35) {
             Log.w(Tag, "SystemTraceRequestBuilder requires API 35+ — sampling instead")
             recordMethodTrace()
@@ -143,8 +145,70 @@ object DevProfiling {
         Api35.recordSystemTrace(context.applicationContext, ManualTag, ManualTraceDurationMs)
         Handler(Looper.getMainLooper()).postDelayed({
             stopFrameWatch()
+            stopStackWatch()
             stopMarkCapture(context)
         }, ManualTraceDurationMs.toLong())
+    }
+
+    /**
+     * Samples the main thread's stack every 10ms during the capture window
+     * and writes the timeline as bq-stacks-*.txt: whatever blocks a swipe
+     * appears as a run of identical stacks at the hitch's timestamp — the
+     * one thing a sampling profile of methods cannot name.
+     */
+    private fun startStackWatch() {
+        if (stackWatch.get() != null) return
+        val main = Looper.getMainLooper().thread
+        val file = File(
+            File(appContext.get()?.cacheDir ?: return, "share").apply { mkdirs() },
+            "bq-stacks-${System.currentTimeMillis()}.txt",
+        )
+        val sampler = StackSampler(main, file)
+        stackWatch.set(sampler)
+        Thread(sampler, "BQStackWatch").apply {
+            isDaemon = true
+            priority = Thread.MIN_PRIORITY
+        }.start()
+    }
+
+    private fun stopStackWatch() {
+        stackWatch.getAndSet(null)?.stop()
+    }
+
+    private class StackSampler(
+        private val mainThread: Thread,
+        private val file: File,
+    ) : Runnable {
+        @Volatile private var running = true
+        private val samples = ArrayList<String>(1200)
+        private val startNanos = System.nanoTime()
+
+        override fun run() {
+            while (running) {
+                try {
+                    val at = (System.nanoTime() - startNanos) / 1_000_000L
+                    val stack = mainThread.stackTrace
+                    val top = stack.take(5)
+                        .joinToString(" <- ") { frame ->
+                            frame.className.substringAfterLast('.') + "::" + frame.methodName
+                        }
+                    synchronized(samples) { samples += "$at ms: $top" }
+                } catch (_: Throwable) {
+                }
+                Thread.sleep(10)
+            }
+        }
+
+        fun stop() {
+            running = false
+            val summary = synchronized(samples) { samples.toList() }
+            try {
+                file.writeText(summary.size.toString() + " samples\n" + summary.joinToString("\n"))
+                Log.i(Tag, "Stack watch -> ${file.absolutePath} (${summary.size} samples)")
+            } catch (error: java.io.IOException) {
+                Log.e(Tag, "Unable to write stack watch", error)
+            }
+        }
     }
 
     /**
