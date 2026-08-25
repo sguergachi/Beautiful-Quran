@@ -139,22 +139,16 @@ const val MUSHAF_DESIGN_LINE_EM = 16.4f
 
 /**
  * The one type size for every leaf: the measure divided by the design line,
- * never taller than the well can carry fifteen lines of. [fontScale] is the
- * reader's nudge around it, not a free resize.
+ * never taller than the well can carry fifteen lines of. The printed page owns
+ * this size; reader text-scale preferences apply only to the scroll layout.
  */
 fun mushafUniformFontPx(
     measureWidthPx: Float,
     wellHeightPx: Float,
     slots: Int,
-    fontScale: Float = 1f,
 ): Float {
     if (measureWidthPx <= 0f || wellHeightPx <= 0f || slots <= 0) return MUSHAF_MIN_FONT_PX
-    val scale = fontScale.coerceIn(0.88f, 1.12f)
-    val fromMeasure = measureWidthPx / MUSHAF_DESIGN_LINE_EM * scale
-    // The reader's own size nudge is inside this, not outside it: applied after
-    // the well had spoken, a larger text size grew the ink by a tenth while the
-    // slot it sits in stayed exactly as tall, and the descenders went into the
-    // line below. The type stops growing where its ink would stop fitting.
+    val fromMeasure = measureWidthPx / MUSHAF_DESIGN_LINE_EM
     val fromWell = wellHeightPx / (slots * MUSHAF_LINE_INK_EM)
     return minOf(fromMeasure, fromWell)
         .coerceIn(MUSHAF_MIN_FONT_PX, MUSHAF_MAX_FONT_PX)
@@ -332,8 +326,15 @@ fun mushafLineFit(
 /** Never stretch a word gap past this fraction of the page font. */
 const val MUSHAF_MAX_GAP_EM = 0.55f
 
-/** Short lines stay naturally spaced; full justify needs enough words. */
-const val MUSHAF_JUSTIFY_MIN_WORDS = 5
+/**
+ * The Quran's own rule: every full line of the page is justified end to end —
+ * the printed page stretches the name-list lines (few, long words) the same
+ * as any other. Two words is the floor: one gap is all a two-word line has
+ * to give, and the fit's own stretch caps keep it inside the page's taste.
+ * A line that genuinely cannot fill falls back to short-and-centred inside
+ * the fit.
+ */
+const val MUSHAF_JUSTIFY_MIN_WORDS = 2
 
 fun mushafLineJustifies(tokenCount: Int): Boolean = tokenCount >= MUSHAF_JUSTIFY_MIN_WORDS
 

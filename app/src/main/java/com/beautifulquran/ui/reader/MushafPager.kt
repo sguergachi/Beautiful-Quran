@@ -51,6 +51,8 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.rememberTextMeasurer
@@ -211,8 +213,8 @@ private const val MushafNeighbourHoldDelayMs = 520L
  * be sized before a page font has even loaded.
  */
 @Composable
-private fun leafGlyphSize(unit: Dp, fontScale: Float): TextUnit = with(LocalDensity.current) {
-    (unit.toPx() / MUSHAF_LINE_PITCH_EM * fontScale.coerceIn(0.88f, 1.12f)).toSp()
+private fun leafGlyphSize(unit: Dp): TextUnit = with(LocalDensity.current) {
+    (unit.toPx() / MUSHAF_LINE_PITCH_EM).toSp()
 }
 
 /**
@@ -276,7 +278,6 @@ internal fun MushafPager(
      */
     playback: State<MushafPlayback>,
     playbackSpeed: Float,
-    fontScale: Float,
     followEnabled: Boolean,
     loadedSurahId: Int,
     /**
@@ -323,13 +324,29 @@ internal fun MushafPager(
                 // the reader is looking at rather than turning to wherever that
                 // word lives and straight back.
                 if (heldPage != null && page != heldPage) return@collect
+                // A hand on the pager owns the turn: while a scroll is in
+                // progress — the user's swipe or a turn this collector just
+                // started — do not pull. Pulling mid-swipe yanked the page
+                // back under the finger, a 100-350ms hitch on every word
+                // tick; the next tick after the scroll settles re-aims if
+                // the voice is still elsewhere.
+                if (pagerState.isScrollInProgress) return@collect
                 val index = (page - 1).coerceIn(0, catalog.pageCount - 1)
                 if (pagerState.currentPage != index) {
+                    // Warm the target leaf's face before the turn. A leaf
+                    // composing without a resident face holds blank for its
+                    // face wait and then fades in — on a playback turn that
+                    // read as the whole screen flashing out and back.
+                    DevProfiling.mark("followTurnStart p${index + 1}")
+                    withContext(Dispatchers.Default) {
+                        MushafQcfFonts.face(context, index + 1)
+                    }
                     followPage = index
                     pagerState.animateScrollToPage(
                         index,
                         animationSpec = MushafFollowTurnSpec,
                     )
+                    DevProfiling.mark("followTurnEnd p${index + 1}")
                     return@collect
                 }
                 // The voice is still on this leaf. If it is on the last word
@@ -373,8 +390,18 @@ internal fun MushafPager(
     // turn away from it.
     var followSeeded by remember { mutableStateOf(false) }
     LaunchedEffect(pagerState) {
+        var wasScrolling = false
         snapshotFlow { pagerState.currentPage to pagerState.isScrollInProgress }
             .collect { (page, scrolling) ->
+                // Swipe boundaries as named marks: they land in logcat and in
+                // the system trace, so a captured frame log can be read
+                // against them.
+                if (scrolling && !wasScrolling) {
+                    DevProfiling.mark("swipeBegin p${page + 1}")
+                } else if (!scrolling && wasScrolling) {
+                    DevProfiling.mark("swipeEnd p${page + 1}")
+                }
+                wasScrolling = scrolling
                 if (scrolling) return@collect
                 if (!followSeeded) {
                     followSeeded = true
@@ -425,9 +452,37 @@ internal fun MushafPager(
             val settled by remember {
                 derivedStateOf { pageIndex == pagerState.settledPage }
             }
+            // One description for the leaf, not ~450 word nodes: the QCF
+            // glyphs are private-use artwork — meaningless to a screen reader
+            // — and an active accessibility service re-sorted and re-geometried
+            // every one of them per frame of a swipe, which was the mushaf's
+            // swipe lag. Taps are pointer-based and unaffected.
+            val leafSurah = surahsById[page.primarySurahId]?.nameTransliteration
+            val leafDescription = remember(page, leafSurah) {
+                buildString {
+                    append("Mushaf page ")
+                    append(page.page)
+                    if (leafSurah != null) {
+                        append(", ")
+                        append(leafSurah)
+                    }
+                    append(", Juz ")
+                    append(page.juz)
+                    page.lines.forEach { line ->
+                        if (line.tokens.isNotEmpty()) append(". ")
+                        line.tokens.forEach { token ->
+                            append(token.word.arabic)
+                            append(' ')
+                        }
+                    }
+                }.trimEnd()
+            }
             BoxWithConstraints(
                 Modifier
                     .fillMaxSize()
+                    .clearAndSetSemantics {
+                        contentDescription = leafDescription
+                    }
                     // Each leaf gets a surface of its own, so turning the page
                     // moves something already recorded instead of drawing it
                     // again. Without this the pager's offset dirtied the leaf's
@@ -438,58 +493,60 @@ internal fun MushafPager(
                     .graphicsLayer { }
                     .padding(horizontal = MushafPageMargin),
             ) {
-            val density = LocalDensity.current
-            // One unit for the whole leaf — see MushafGrid. Every band below is
-            // a whole number of them, so the head, the well, the tail and the
-            // folio all sit on the same rhythm as the lines of revelation.
-            val unit = with(density) {
-                MushafGrid.unitPx(constraints.maxHeight.toFloat()).toDp()
-            }
-            Column(Modifier.fillMaxSize()) {
-                MushafPageHeader(
-                    surahNameArabic = surahsById[page.primarySurahId]?.nameArabic,
-                    surahNameLatin = surahsById[page.primarySurahId]?.nameTransliteration,
-                    juz = page.juz,
-                    unit = unit,
-                    glyphSize = leafGlyphSize(unit, fontScale),
-                )
-                Spacer(Modifier.height(unit * MushafGrid.HEAD_GUTTER))
-                MushafPageSheet(
-                    basmalahWash = basmalahWash,
-                    page = page,
-                    content = content,
-                    surahsById = surahsById,
-                    liveInk = settled,
-                    activeWordState = activeWordState,
-                    playback = playback,
-                    playbackSpeed = playbackSpeed,
-                    fontScale = fontScale,
-                    loadedSurahId = loadedSurahId,
-                    flashWordPosition = flashWordPosition.takeIf { settled },
-                    onWordClick = onWordClick,
-                    onWordLongClick = onWordLongClick,
-                    onAyahClick = onAyahClick,
-                    unit = unit,
-                    modifier = Modifier
-                        .height(unit * MushafGrid.TEXT_LINES)
-                        .fillMaxWidth(),
-                )
-                Spacer(Modifier.height(unit * MushafGrid.TAIL))
-                val folioInk by animateFloatAsState(
-                    targetValue = if (scrubbing()) 0f else 1f,
-                    animationSpec = tween(InkEngine.tuning.recessMs, easing = FastOutSlowInEasing),
-                    label = "mushafFolioStandDown",
-                )
-                MushafPageFolio(
-                    page = page.page,
-                    unit = unit,
-                    glyphSize = leafGlyphSize(unit, fontScale),
-                    script = pageNumberScript,
-                    modifier = Modifier
-                        .padding(horizontal = MushafEdgeGutter)
-                        .graphicsLayer { alpha = folioInk },
-                )
-            }
+                val density = LocalDensity.current
+                // One unit for the whole leaf — see MushafGrid. Every band below is
+                // a whole number of them, so the head, the well, the tail and the
+                // folio all sit on the same rhythm as the lines of revelation.
+                val unit = with(density) {
+                    MushafGrid.unitPx(constraints.maxHeight.toFloat()).toDp()
+                }
+                Column(Modifier.fillMaxSize()) {
+                    MushafPageHeader(
+                        surahNameArabic = surahsById[page.primarySurahId]?.nameArabic,
+                        surahNameLatin = surahsById[page.primarySurahId]?.nameTransliteration,
+                        juz = page.juz,
+                        unit = unit,
+                        glyphSize = leafGlyphSize(unit),
+                    )
+                    Spacer(Modifier.height(unit * MushafGrid.HEAD_GUTTER))
+                    MushafPageSheet(
+                        basmalahWash = basmalahWash,
+                        page = page,
+                        content = content,
+                        surahsById = surahsById,
+                        liveInk = settled,
+                        activeWordState = activeWordState,
+                        playback = playback,
+                        playbackSpeed = playbackSpeed,
+                        loadedSurahId = loadedSurahId,
+                        flashWordPosition = flashWordPosition.takeIf { settled },
+                        onWordClick = onWordClick,
+                        onWordLongClick = onWordLongClick,
+                        onAyahClick = onAyahClick,
+                        unit = unit,
+                        modifier = Modifier
+                            .height(unit * MushafGrid.TEXT_LINES)
+                            .fillMaxWidth(),
+                    )
+                    Spacer(Modifier.height(unit * MushafGrid.TAIL))
+                    val folioInk by animateFloatAsState(
+                        targetValue = if (scrubbing()) 0f else 1f,
+                        animationSpec = tween(
+                            InkEngine.tuning.recessMs,
+                            easing = FastOutSlowInEasing,
+                        ),
+                        label = "mushafFolioStandDown",
+                    )
+                    MushafPageFolio(
+                        page = page.page,
+                        unit = unit,
+                        glyphSize = leafGlyphSize(unit),
+                        script = pageNumberScript,
+                        modifier = Modifier
+                            .padding(horizontal = MushafEdgeGutter)
+                            .graphicsLayer { alpha = folioInk },
+                    )
+                }
             }
         }
     }
@@ -505,7 +562,6 @@ private fun MushafPageSheet(
     activeWordState: State<ActiveWord?>,
     playback: State<MushafPlayback>,
     playbackSpeed: Float,
-    fontScale: Float,
     loadedSurahId: Int,
     flashWordPosition: Int?,
     onWordClick: (MushafToken) -> Unit,
@@ -576,15 +632,15 @@ private fun MushafPageSheet(
     // first time a leaf was opened, and every time after the cache window had
     // moved on from it.)
     val residentFace = remember(page.page) { MushafQcfFonts.cached(page.page) }
-    var pageFont by remember(page.page) { mutableStateOf(residentFace) }
+    var pageFace by remember(page.page) { mutableStateOf(residentFace) }
     LaunchedEffect(page.page, context) {
-        if (pageFont != null) {
+        if (pageFace != null) {
             DevProfiling.mark("leafFaceCached p${page.page}")
             return@LaunchedEffect
         }
         DevProfiling.mark("leafFaceLoadStart p${page.page}")
-        pageFont = withContext(Dispatchers.Default) {
-            MushafQcfFonts.family(context, page.page)
+        pageFace = withContext(Dispatchers.Default) {
+            MushafQcfFonts.face(context, page.page)
         }
         DevProfiling.mark("leafFaceLoaded p${page.page}")
     }
@@ -604,8 +660,9 @@ private fun MushafPageSheet(
         delay(MushafLeafFaceWaitMs)
         faceOverdue = true
     }
-    val pageTypeface = remember(pageFont) { MushafQcfFonts.cachedTypeface(page.page) }
-    val leafReady = pageFont != null || faceOverdue
+    val pageFont = pageFace?.family
+    val pageTypeface = pageFace?.typeface
+    val leafReady = pageFace != null || faceOverdue
     // A face already resident cannot reflow, so there is nothing for this fade
     // to hide and the leaf starts fully inked. The chapter's own entrance is
     // the reader's (see ReaderEntranceFadeMs); running a second fade inside it
@@ -665,7 +722,7 @@ private fun MushafPageSheet(
             // longest line. Fitting each leaf to itself made the hand grow and
             // shrink as the pages turned.
             val unitPx = with(density) { unit.toPx() }
-            val fontPx = remember(unitPx, availableW, fontScale, slotCount) {
+            val fontPx = remember(unitPx, availableW, slotCount) {
                 mushafUniformFontPx(
                     measureWidthPx = availableW,
                     // The well is the grid's fifteen units, whatever the page
@@ -677,7 +734,6 @@ private fun MushafPageSheet(
                     // shrunk to about 0.88 of one.
                     wellHeightPx = unitPx * MushafGrid.TEXT_LINES,
                     slots = mushafGridSlots(slotCount),
-                    fontScale = fontScale,
                 )
             }
             val fontSp = with(density) { fontPx.toSp() }
@@ -697,7 +753,10 @@ private fun MushafPageSheet(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(horizontal = MushafEdgeGutter),
-                    verticalArrangement = Arrangement.Center,
+                    // A short page keeps the grid's line size and hangs from
+                    // the top — the printed page starts at the head, it does
+                    // not float to the middle of the leaf.
+                    verticalArrangement = Arrangement.Top,
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     page.lines.forEachIndexed { index, line ->
@@ -742,6 +801,7 @@ private fun MushafPageSheet(
                         ) {
                             MushafHafsLine(
                                 line = line,
+                                page = page.page,
                                 packs = packsState,
                                 fontSize = fontSp,
                                 measureWidthPx = lineMeasurePx,
@@ -798,34 +858,40 @@ private fun MushafPageInkClocks(
                     wetInk = recitingActive,
                 )
             } else {
-                // A leaf is read once and filled in. A verse already recited
-                // keeps its ink, so the page darkens line by line and the
-                // reader can see how much of it is done; only what is still
-                // to come waits in the recess. (The scroll layout recesses
-                // both sides of the active verse, because there is no page
-                // there to complete — just a river of text going by.)
-                val recited = activeAyah != null && ayah.number < activeAyah
-                rememberMushafRecessPack(dimmed = recitingActive && !recited)
+                // Full ink, always. The leaf is scripture on paper: hitting
+                // play must never fade it — the old ahead-of-voice recess
+                // dimmed every verse still to come to a quarter of its ink
+                // the moment playback started, and the whole page vanished
+                // at once. The wash alone marks where the voice is.
+                rememberMushafRecessPack(dimmed = false)
             }
             SideEffect {
-                packsState[ayah.surahId to ayah.number] = pack
+                // Write only on real change: a same-value write to the
+                // snapshot map still notifies every word reading its pack,
+                // and each of those recompositions re-diffed the word's wash
+                // modifiers - profiled as setDetachedListener churn on every
+                // page settle.
+                val key = ayah.surahId to ayah.number
+                if (packsState[key] !== pack) packsState[key] = pack
             }
         }
     }
-    // No text of theirs is loaded, so there is nothing to clock word by word.
-    // A verse-wide recess is the whole of what we can honestly say about them,
-    // and it is also the whole of what the page needs said.
-    val recitingActive = playback.value.reciting
+    // No text of theirs is loaded, so there is nothing to clock word by word —
+    // and nothing to dim either: full ink, for the same law as above.
     upcoming.forEach { key ->
         key(key.first, key.second) {
-            val pack = rememberMushafRecessPack(dimmed = recitingActive)
-            SideEffect { packsState[key] = pack }
+            val pack = rememberMushafRecessPack(dimmed = false)
+            SideEffect {
+                if (packsState[key] !== pack) packsState[key] = pack
+            }
         }
     }
     recited.forEach { key ->
         key(key.first, key.second) {
             val pack = rememberMushafRecessPack(dimmed = false)
-            SideEffect { packsState[key] = pack }
+            SideEffect {
+                if (packsState[key] !== pack) packsState[key] = pack
+            }
         }
     }
 }
@@ -925,5 +991,3 @@ private fun MushafBasmalahLine(
         }
     }
 }
-
-

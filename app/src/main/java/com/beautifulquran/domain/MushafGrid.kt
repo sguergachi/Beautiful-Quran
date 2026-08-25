@@ -15,11 +15,12 @@ import kotlin.math.pow
  *
  * ```
  *  0.3  running head — the smallest hand on the leaf
- * 0.32  head gutter — enough paper to stand the head off the text
+ *  0.7  head gutter — enough paper to stand the head off the text
  *  15   the revelation — the Madinah page's own grid
+ * 0.35  tail — paper between revelation and folio
  *  0.4  folio, its figure centred in the band
  *  ---
- * 16.02
+ * 16.75
  * ```
  *
  * The furniture is trimmed to what it actually needs to read as furniture,
@@ -46,23 +47,22 @@ object MushafGrid {
     const val RUNNING_HEAD = 0.30f
 
     /**
-     * Paper between the head and the first line of revelation. A running head
-     * that sits closer reads as part of the text block rather than as a head
-     * standing over it — but it does not need a whole line of the revelation's
-     * pitch to do that. Just under half a unit still clears the head band by
-     * more than the head's own type is tall, and the rest goes to the text.
+     * Paper between the head and the first line of revelation. A head that
+     * sits closer than about a line's pitch reads as part of the block
+     * instead of standing off it — and the first line's ink reaches high
+     * into its own slot (the faces ink 1.37 em above the baseline), so the
+     * visible gap is the gutter less that reach. Set to most of a line's
+     * pitch so the head reads as a head, with air under it.
      */
-    const val HEAD_GUTTER = 0.32f
+    const val HEAD_GUTTER = 0.70f
     const val TEXT_LINES = MUSHAF_LINES_PER_PAGE
     /**
-     * Nothing between the last line and the folio band. The folio's figure is
-     * centred in its own band, which already sets it clear of the text — and
-     * the unit this used to take is worth more to the revelation, where it
-     * keeps the type about 6% larger than an eighteen-unit leaf that spends it
-     * here. The folio band itself is two thirds of a unit: the figure is set
-     * two steps down the scale, so a whole unit was mostly paper around it.
+     * Paper between the last line and the folio. The folio belongs to the
+     * gap between the leaf's text and the dial's hairline — centred in it,
+     * not glued to the text — so the band carries the air that sets it
+     * there.
      */
-    const val TAIL = 0f
+    const val TAIL = 0.35f
     const val FOLIO = 0.40f
 
     /** The whole leaf, in units. */

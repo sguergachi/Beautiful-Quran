@@ -8,9 +8,9 @@ class MushafGridTest {
 
     @Test
     fun `fifteen of the leaf's units are revelation and the chrome takes the rest`() {
-        assertEquals(16.02f, MushafGrid.SLOTS, 0.001f)
+        assertEquals(16.75f, MushafGrid.SLOTS, 0.001f)
         assertEquals(15, MushafGrid.TEXT_LINES)
-        // The head asks for half a line now that it carries one, not two.
+        // The head and its gutter stand clear without spending a second line.
         assertEquals(
             MushafGrid.SLOTS - MushafGrid.TEXT_LINES,
             MushafGrid.RUNNING_HEAD + MushafGrid.HEAD_GUTTER + MushafGrid.TAIL + MushafGrid.FOLIO,

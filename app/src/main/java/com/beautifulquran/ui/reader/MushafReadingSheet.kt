@@ -81,8 +81,16 @@ internal const val MushafTapPageHoldMs = 1_500L
  * the text and 64px over the rule, reading as part of the controls.
  */
 internal val MushafFolioBand = 30.dp
-/** Paper above and below the rule that divides the leaf from the transport. */
-private val MushafRuleTailAir = 10.dp
+/** Paper between the rule and the transport it divides the leaf from. */
+private val MushafRuleTailAir = 0.dp
+
+/**
+ * Paper between the leaf's last line and the hairline. The rule sat at the
+ * top of its own band — flush under the leaf, with all its air below — and
+ * read as shifted up. This sets it off the leaf so the line sits between
+ * the page and the transport instead of hanging off the page.
+ */
+private val MushafDialHeadAir = 24.dp
 
 /** Each folio figure's column, equal either side of the centre line. */
 private val MushafFolioColumn = 40.dp
@@ -91,7 +99,6 @@ private val MushafFolioSpread = 28.dp
 /** The lozenge set between them. */
 private val MushafFolioDiamond = 5.dp
 
-/** Fore-edge margin. The page has no frame, so this is the whole margin. */
 /**
  * Paper outside the mark gutter.
  *
@@ -100,6 +107,17 @@ private val MushafFolioDiamond = 5.dp
  * the fore-edge fade can be drawn over without reaching the mark gutter.
  */
 internal val MushafPageMargin = 4.dp
+
+/**
+ * The transport row's fore-edge: where the hairline itself now ends. The rule
+ * is drawn only as wide as the comb (the dial's own edge inset inside the
+ * sheet's page gutter), and Back/Settings read as flush with it when their
+ * *ink* starts at the line's end — a 20dp icon inside a 40dp touch target
+ * carries 10dp of bearing each side, so the row pads to the line minus that.
+ */
+private val MushafTransportEdge =
+    MushafPageMargin + MushafEdgeGutter + MushafDialEdgeInset - 10.dp
+
 /**
  * Running head to first line of revelation. A head that sits closer than
  * about a line's pitch reads as part of the block instead of standing off it;
@@ -133,12 +151,16 @@ internal fun MushafReadingSheet(
     pageAt: () -> Int,
     /** Leaves in the book — 604, once the catalog is up. */
     pageCount: Int,
-    /** Leaves that open a chapter: the dial's coarse tier. */
-    chapterPages: Set<Int>,
-    /** What the dial writes over its thumb for a given leaf. */
-    pageLabel: (Int) -> MushafDialLabel?,
+    /** One cell per surah, in order 1..114: equal on the comb even when two
+     *  tiny surahs share a leaf, so Chapter 93's mark is not lost because it
+     *  shares paper with 92. */
+    chapterPages: IntArray,
+    /** What the dial writes over its thumb for a leaf and selected chapter. */
+    pageLabel: (page: Int, surahId: Int?) -> MushafDialLabel?,
+    chapterLabel: (Int) -> MushafDialLabel? = { null },
     /** Where a scrub landed, once the hand comes off the rule. */
     onSeekPage: (Int) -> Unit,
+    onSeekSurah: ((Int) -> Unit)? = null,
     /** Raised while a hand is on the rule. */
     onScrubbing: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
@@ -173,7 +195,9 @@ internal fun MushafReadingSheet(
             pageCount = pageCount,
             chapterPages = chapterPages,
             pageLabel = pageLabel,
+            chapterLabel = chapterLabel,
             onSeekPage = onSeekPage,
+            onSeekSurah = onSeekSurah,
             onScrubbing = onScrubbing,
             reciting = reciting,
             // Paper between the leaf's own tail and the rule, so the folio
@@ -183,13 +207,14 @@ internal fun MushafReadingSheet(
             modifier = Modifier.padding(
                 start = MushafPageMargin + MushafEdgeGutter,
                 end = MushafPageMargin + MushafEdgeGutter,
+                top = MushafDialHeadAir,
                 bottom = MushafRuleTailAir,
             ),
         )
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = MushafPageMargin, vertical = 2.dp),
+                .padding(horizontal = MushafTransportEdge, vertical = 2.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Box(

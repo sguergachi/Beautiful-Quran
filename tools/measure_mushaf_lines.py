@@ -8,7 +8,7 @@ constant comes from — rerun it if the page fonts or the qcf_v2 column change:
     python3 -m venv .venv && .venv/bin/pip install uharfbuzz fonttools
     .venv/bin/python tools/measure_mushaf_lines.py
 
-Reads data/quran.db and app/build/generated/quranAssets/qcf-v2-fonts (run a
+Reads data/quran.db and app/build/generated/qcfAssets/qcf-v2-fonts (run a
 Gradle build first so the fonts are unpacked).
 """
 
@@ -30,7 +30,7 @@ def shape_width(font, text):
 per_page_max = {}
 per_line = []
 for p in sorted(pages):
-    path = f'app/build/generated/quranAssets/qcf-v2-fonts/QCF2{p:03d}.qcf'
+    path = f'app/build/generated/qcfAssets/qcf-v2-fonts/QCF2{p:03d}.qcf'
     blob = hb.Blob.from_file_path(path); face = hb.Face(blob); font = hb.Font(face)
     upem = face.upem
     best = 0.0

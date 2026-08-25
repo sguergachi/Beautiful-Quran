@@ -85,6 +85,13 @@ data class ReaderUiState(
     val currentReciter: Reciter? = null,
     val hasTimings: Boolean = false,
     val isLoading: Boolean = true,
+    /**
+     * True while a playback-driven chapter swap is in flight: the outgoing
+     * content stays on the glass and the reader's entrance fade holds full,
+     * so hitting play on another chapter's leaf swaps the ink without a
+     * whole-screen flash.
+     */
+    val keepsContentThroughLoad: Boolean = false,
 )
 
 /** Off-screen chapter payload for continuous chapter advance. */
@@ -503,7 +510,12 @@ class ReaderViewModel(
      * Loads [surahId]. When [startPlaybackAtAyah] is set, starts recitation from
      * that ayah once content is ready (for example, "play chapter 2").
      */
-    fun load(surahId: Int, startPlaybackAtAyah: Int? = null, startPlaybackAtWord: Int? = null) {
+    fun load(
+        surahId: Int,
+        startPlaybackAtAyah: Int? = null,
+        startPlaybackAtWord: Int? = null,
+        keepContent: Boolean = false,
+    ) {
         if (
             this.surahId == surahId &&
             (_uiState.value.content != null || _uiState.value.isLoading)
@@ -523,14 +535,29 @@ class ReaderViewModel(
         loadedSurah.value = surahId
         focusedAyah = startPlaybackAtAyah?.coerceAtLeast(1) ?: 1
         installTimings(emptyMap())
+        // keepContent: a playback-driven swap keeps the outgoing chapter on
+        // the glass until the new one commits — the leaf is already showing
+        // its own glyphs, and blanking read as the whole screen flashing.
+        val outgoing = _uiState.value.content
         _uiState.value = ReaderUiState(
             reciters = _uiState.value.reciters,
             currentReciter = _uiState.value.currentReciter,
             isLoading = true,
+            content = if (keepContent) outgoing else null,
+            keepsContentThroughLoad = keepContent && outgoing != null,
         )
         loadJob?.cancel()
         loadJob = viewModelScope.launch {
-            val prepared = materialize(surahId) ?: return@launch
+            val prepared = materialize(surahId)
+            if (prepared == null) {
+                // The swap failed with nothing to commit: release the
+                // entrance-fade hold or it would suppress the fade of the
+                // next real navigation.
+                if (sessions.isCurrent(gen, surahId)) {
+                    _uiState.value = _uiState.value.copy(keepsContentThroughLoad = false)
+                }
+                return@launch
+            }
             if (!sessions.isCurrent(gen, surahId)) return@launch
             commitPrepared(prepared)
             val playAyah = sessions.takePendingPlay(gen)
@@ -596,7 +623,18 @@ class ReaderViewModel(
             currentReciter = prepared.reciter,
             hasTimings = prepared.timings.isNotEmpty(),
             isLoading = false,
+            // The swap happened under a composed leaf: hold the reader at
+            // full ink through the content change (the screen's entrance
+            // effect reads this and skips its fade for exactly one swap).
+            keepsContentThroughLoad = _uiState.value.keepsContentThroughLoad,
         )
+    }
+
+    /** Consumes the one-shot entrance hold after the kept chapter is on glass. */
+    fun onKeptContentCommitted() {
+        if (_uiState.value.keepsContentThroughLoad) {
+            _uiState.value = _uiState.value.copy(keepsContentThroughLoad = false)
+        }
     }
 
     private suspend fun onReciterChanged() {
@@ -770,6 +808,14 @@ class ReaderViewModel(
      * the chapter has no timings at all.
      */
     fun playFromAyahWord(ayah: Int, word: Int?) {
+        // A chapter's opening — ayah 1 at its first word — starts with the
+        // basmalah lead-in, exactly as play-from-ayah-1 does. The mushaf's
+        // play target is a word, and the word path used to seek straight
+        // into ayah 1 and skip the bismillah.
+        if (ayah == 1 && (word == null || word <= 1) && surahOpensWithBasmalahPreface(surahId)) {
+            playFromAyah(ayah)
+            return
+        }
         val start = word?.let { startMsForWord(ayah, it) }
         if (start != null) playFromWord(ayah, start) else playFromAyah(ayah)
     }

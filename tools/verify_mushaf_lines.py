@@ -16,7 +16,7 @@ plainly: one line short, the next long, the pair averaging out.
     .venv/bin/python tools/verify_mushaf_lines.py 281 3      # named pages
 
 Needs `uharfbuzz`, `data/quran.db`, and the page fonts unpacked by a Gradle
-build (app/build/generated/quranAssets/qcf-v2-fonts).
+build (app/build/generated/qcfAssets/qcf-v2-fonts).
 """
 
 from __future__ import annotations
@@ -29,7 +29,7 @@ from pathlib import Path
 import uharfbuzz as hb
 
 DB = Path("data/quran.db")
-FONTS = Path("app/build/generated/quranAssets/qcf-v2-fonts")
+FONTS = Path("app/build/generated/qcfAssets/qcf-v2-fonts")
 PAGES = 604
 
 # A line more than this off its page's median is not a line the print would set.

@@ -47,6 +47,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.text.SpanStyle
@@ -98,6 +99,8 @@ import com.beautifulquran.ui.theme.HafsFontFamily
 import com.beautifulquran.ui.theme.InkCircledChoiceRow
 import com.beautifulquran.ui.theme.LocalQuranAccents
 import com.beautifulquran.ui.theme.TranslationFontFamily
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import com.beautifulquran.ui.theme.shippedCheckParams
 import com.beautifulquran.ui.theme.verticalFadingEdges
 
@@ -116,6 +119,7 @@ private val PAGE_SCRIPTS = listOf(
 // 56:76 ends page 536; 56:77 opens 537 — a real printed-page turn.
 private const val SAMPLE_ARABIC_1 = "وَإِنَّهُۥ لَقَسَمٞ لَّوۡ تَعۡلَمُونَ عَظِيمٌ"
 private const val SAMPLE_ARABIC_2 = "إِنَّهُۥ لَقُرۡءَانٞ كَرِيمٞ"
+private const val SAMPLE_TRANSLIT = "Wa-innahu la-qasam law taʿlamūna ʿaẓīm"
 private const val SAMPLE_ENGLISH =
     "And indeed, it is an oath - if you could know - [most] great."
 private const val SAMPLE_ENGLISH_2 = "Indeed, it is a noble Qur'an."
@@ -165,6 +169,9 @@ internal fun CustomizeScreen(
                 ayahSelectorSide = settings.ayahSelectorSide,
                 annotationsEnabled = settings.annotationsEnabled,
                 showWordGloss = settings.showWordGloss,
+                fontScale = settings.fontScale,
+                showTranslation = settings.showTranslation,
+                showTransliteration = settings.showTransliteration,
             )
         }
 
@@ -216,53 +223,59 @@ internal fun CustomizeScreen(
             )
         }
 
-        Section("Text size")
-        TextSizeControl(
-            scale = settings.fontScale,
-            onScale = { value -> onUpdate { it.copy(fontScale = value) } },
-        )
-
-        if (
-            settings.readingLayout == ReadingLayout.SCROLL &&
-            settings.readingMode == ReadingMode.ARABIC_ENGLISH
-        ) {
-            Spacer(Modifier.height(20.dp))
-            ToggleRow(
-                label = "Transliteration",
-                checked = settings.showTransliteration,
-                onChange = { value -> onUpdate { it.copy(showTransliteration = value) } },
-                checkParams = checkParams,
-                checkPaintToken = checkPaintToken,
-            )
-            ToggleRow(
-                label = "Ayah translation",
-                checked = settings.showTranslation,
-                onChange = { value -> onUpdate { it.copy(showTranslation = value) } },
-                checkParams = checkParams,
-                checkPaintToken = checkPaintToken,
+        // The mushaf leaf sets its own hand from the page grid — the text
+        // dial is a scroll-layout control and has nothing to turn there.
+        if (showsScrollChrome(settings.readingLayout)) {
+            Section("Text size")
+            TextSizeControl(
+                scale = settings.fontScale,
+                onScale = { value -> onUpdate { it.copy(fontScale = value) } },
             )
         }
 
+        // The scroll layout's toggles share one vertical rhythm: a single
+        // 20dp stand-off before the group, then even 12dp between rows —
+        // the old layout gapped 20dp before some rows and nothing between
+        // Transliteration and Ayah translation.
         if (showsScrollChrome(settings.readingLayout)) {
-            if (showsWordGlossChrome(settings.readingLayout, settings.readingMode)) {
-                Spacer(Modifier.height(20.dp))
+            Spacer(Modifier.height(20.dp))
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                if (
+                    settings.readingLayout == ReadingLayout.SCROLL &&
+                    settings.readingMode == ReadingMode.ARABIC_ENGLISH
+                ) {
+                    ToggleRow(
+                        label = "Transliteration",
+                        checked = settings.showTransliteration,
+                        onChange = { value -> onUpdate { it.copy(showTransliteration = value) } },
+                        checkParams = checkParams,
+                        checkPaintToken = checkPaintToken,
+                    )
+                    ToggleRow(
+                        label = "Ayah translation",
+                        checked = settings.showTranslation,
+                        onChange = { value -> onUpdate { it.copy(showTranslation = value) } },
+                        checkParams = checkParams,
+                        checkPaintToken = checkPaintToken,
+                    )
+                }
+                if (showsWordGlossChrome(settings.readingLayout, settings.readingMode)) {
+                    ToggleRow(
+                        label = "Word-by-word translation",
+                        checked = settings.showWordGloss,
+                        onChange = { v -> onUpdate { it.copy(showWordGloss = v) } },
+                        checkParams = checkParams,
+                        checkPaintToken = checkPaintToken,
+                    )
+                }
                 ToggleRow(
-                    label = "Word-by-word translation",
-                    checked = settings.showWordGloss,
-                    onChange = { v -> onUpdate { it.copy(showWordGloss = v) } },
+                    label = "Verse annotations",
+                    checked = settings.annotationsEnabled,
+                    onChange = { v -> onUpdate { it.copy(annotationsEnabled = v) } },
                     checkParams = checkParams,
                     checkPaintToken = checkPaintToken,
                 )
             }
-
-            Spacer(Modifier.height(20.dp))
-            ToggleRow(
-                label = "Verse annotations",
-                checked = settings.annotationsEnabled,
-                onChange = { v -> onUpdate { it.copy(annotationsEnabled = v) } },
-                checkParams = checkParams,
-                checkPaintToken = checkPaintToken,
-            )
         }
 
         if (showsScrollChrome(settings.readingLayout)) {
@@ -353,7 +366,24 @@ internal fun ReadingPreview(
     ayahSelectorSide: AyahSelectorSide = AyahSelectorSide.LEFT,
     annotationsEnabled: Boolean = false,
     showWordGloss: Boolean = false,
+    /** The reader's text-size stop, so the miniature grows and shrinks with
+     *  the same dial — every sp inside, marks and folio included. */
+    fontScale: Float = 1f,
+    /** Scroll-layout toggles, mirrored live like every other choice. */
+    showTranslation: Boolean = true,
+    showTransliteration: Boolean = false,
 ) {
+    // Every sp inside the preview, marks and folio included, rides the
+    // reader's text-size dial — the miniature is the reader at one glance.
+    val previewFontScale = if (readingLayout == ReadingLayout.MUSHAF) {
+        1f
+    } else {
+        LocalDensity.current.fontScale * fontScale
+    }
+    val previewDensity = Density(
+        density = LocalDensity.current.density,
+        fontScale = previewFontScale,
+    )
     val arabicOnly = readingLayout == ReadingLayout.MUSHAF ||
         readingMode == ReadingMode.ARABIC_ONLY
     val englishOnly = readingLayout == ReadingLayout.SCROLL &&
@@ -381,70 +411,87 @@ internal fun ReadingPreview(
             .border(0.5.dp, gold.copy(alpha = 0.28f), PreviewLeaf)
             .graphicsLayer { alpha = 0.74f },
     ) {
-        // Height is the max leaf, always. Settings only change what is painted.
+        // The height lock lives OUTSIDE the scaled density: the preview box
+        // keeps one fixed height (measured at the base text size), and the
+        // size dial grows the type inside it — clipping at the leaf's foot —
+        // instead of resizing the preview and pushing the settings below.
         PreviewHeightLock(contentPad)
-        Column(Modifier.matchParentSize().clipToBounds().then(contentPad)) {
-            if (readingLayout == ReadingLayout.MUSHAF) {
-                PreviewMushafLeaf(
-                    pageNumberScript = pageNumberScript,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            } else if (englishOnly) {
-                PreviewEnglishLyric(
-                    SAMPLE_ENGLISH,
-                    number = SAMPLE_AYAH_1,
-                    arabicMarks = arabicMarks,
-                )
-                PageBreak(
-                    page = SAMPLE_PAGE,
-                    script = pageNumberScript,
-                    contentPadding = PreviewFolioPad,
-                )
-                PreviewEnglishLyric(
-                    SAMPLE_ENGLISH_2,
-                    number = SAMPLE_AYAH_2,
-                    arabicMarks = arabicMarks,
-                )
-            } else {
-                PreviewArabicLine(
-                    SAMPLE_ARABIC_1,
-                    number = SAMPLE_AYAH_1,
-                    arabicMarks = arabicMarks,
-                    showGloss = showGloss,
-                )
-                if (!arabicOnly) {
-                    Spacer(Modifier.height(12.dp))
-                    PreviewTranslation()
-                }
-                if (showNote) {
-                    Spacer(Modifier.height(12.dp))
-                    PreviewAnnotation()
-                }
-                PageBreak(
-                    page = SAMPLE_PAGE,
-                    script = pageNumberScript,
-                    contentPadding = PreviewFolioPad,
-                )
-                if (arabicOnly) {
-                    PreviewArabicLine(
-                        SAMPLE_ARABIC_2,
+        CompositionLocalProvider(LocalDensity provides previewDensity) {
+            Column(Modifier.matchParentSize().clipToBounds().then(contentPad)) {
+                if (readingLayout == ReadingLayout.MUSHAF) {
+                    PreviewMushafLeaf(
+                        pageNumberScript = pageNumberScript,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                } else if (englishOnly) {
+                    PreviewEnglishLyric(
+                        SAMPLE_ENGLISH,
+                        number = SAMPLE_AYAH_1,
+                        arabicMarks = arabicMarks,
+                    )
+                    PageBreak(
+                        page = SAMPLE_PAGE,
+                        script = pageNumberScript,
+                        contentPadding = PreviewFolioPad,
+                    )
+                    PreviewEnglishLyric(
+                        SAMPLE_ENGLISH_2,
                         number = SAMPLE_AYAH_2,
                         arabicMarks = arabicMarks,
                     )
+                } else {
+                    PreviewArabicLine(
+                        SAMPLE_ARABIC_1,
+                        number = SAMPLE_AYAH_1,
+                        arabicMarks = arabicMarks,
+                        showGloss = showGloss,
+                    )
+                    if (!arabicOnly) {
+                        if (showTransliteration) {
+                            Spacer(Modifier.height(8.dp))
+                            Text(
+                                text = SAMPLE_TRANSLIT,
+                                fontFamily = TranslationFontFamily,
+                                fontSize = PreviewLyricSize * 13f / 18f,
+                                lineHeight = 1.4.em,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                            )
+                        }
+                        if (showTranslation) {
+                            Spacer(Modifier.height(12.dp))
+                            PreviewTranslation()
+                        }
+                    }
+                    if (showNote) {
+                        Spacer(Modifier.height(12.dp))
+                        PreviewAnnotation()
+                    }
+                    PageBreak(
+                        page = SAMPLE_PAGE,
+                        script = pageNumberScript,
+                        contentPadding = PreviewFolioPad,
+                    )
+                    if (arabicOnly) {
+                        PreviewArabicLine(
+                            SAMPLE_ARABIC_2,
+                            number = SAMPLE_AYAH_2,
+                            arabicMarks = arabicMarks,
+                        )
+                    }
                 }
             }
-        }
-        if (showRail) {
-            PreviewAyahRail(
-                side = ayahSelectorSide,
-                modifier = Modifier.align(
-                    if (ayahSelectorSide == AyahSelectorSide.RIGHT) {
-                        Alignment.CenterEnd
-                    } else {
-                        Alignment.CenterStart
-                    },
-                ),
-            )
+            if (showRail) {
+                PreviewAyahRail(
+                    side = ayahSelectorSide,
+                    modifier = Modifier.align(
+                        if (ayahSelectorSide == AyahSelectorSide.RIGHT) {
+                            Alignment.CenterEnd
+                        } else {
+                            Alignment.CenterStart
+                        },
+                    ),
+                )
+            }
         }
     }
 }
@@ -466,16 +513,24 @@ private fun PreviewMushafLeaf(
 ) {
     val context = LocalContext.current
     var page by remember { mutableStateOf<MushafPage?>(null) }
-    LaunchedEffect(Unit) {
-        page = (context.applicationContext as QuranApp).repository
-            .mushafCatalog()
-            .page(PreviewMushafPage)
+    val residentFace = remember { MushafQcfFonts.cached(PreviewMushafPage) }
+    var qcfFace by remember { mutableStateOf(residentFace) }
+    LaunchedEffect(context) {
+        val (loadedPage, loadedFace) = withContext(Dispatchers.Default) {
+            val catalog = (context.applicationContext as QuranApp).repository.mushafCatalog()
+            catalog.page(PreviewMushafPage) to
+                (residentFace ?: MushafQcfFonts.face(context, PreviewMushafPage))
+        }
+        page = loadedPage
+        qcfFace = loadedFace
     }
-    val face = remember { MushafQcfFonts.family(context, PreviewMushafPage) }
-    val typeface = remember(face) { MushafQcfFonts.cachedTypeface(PreviewMushafPage) }
+    val face = qcfFace?.family
+    val typeface = qcfFace?.typeface
     val gold = LocalQuranAccents.current.gold
-    val lines = page?.lines.orEmpty().filter {
-        it.number in PreviewMushafLineFirst..PreviewMushafLineLast
+    val lines = remember(page) {
+        page?.lines.orEmpty().filter {
+            it.number in PreviewMushafLineFirst..PreviewMushafLineLast
+        }
     }
     Column(
         modifier = modifier,

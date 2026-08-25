@@ -1,6 +1,7 @@
 package com.beautifulquran.ui.reader
 
 import androidx.compose.ui.unit.dp
+import kotlin.math.abs
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -12,6 +13,28 @@ import org.junit.Test
  * therefore allowed to show.
  */
 class MushafPageDialTest {
+
+    @Test
+    fun `release ignores a press but preserves a chapter on a shared leaf`() {
+        assertEquals(
+            MushafDialRelease(page = 590, surahId = null),
+            mushafDialRelease(
+                moved = false,
+                settledPage = 590,
+                selectedPage = 591,
+                selectedSurahId = 87,
+            ),
+        )
+        assertEquals(
+            MushafDialRelease(page = 591, surahId = 87),
+            mushafDialRelease(
+                moved = true,
+                settledPage = 591,
+                selectedPage = 591,
+                selectedSurahId = 87,
+            ),
+        )
+    }
 
     /** A phone's rule, in px, and the inset each end is held back by. */
     private val widthPx = 1080f
@@ -98,12 +121,10 @@ class MushafPageDialTest {
 
     @Test
     fun `the hold is long enough that only a deliberate one reaches it`() {
-        // Around a second: past every slowing inside a scrub, which is what an
-        // eighth of a second was answering, and still one gesture rather than
-        // a wait. The speed gate is the other half of the test — it sits far
-        // below any real steering speed, so a reader creeping through the
-        // chapters is not clicked into a trough however long they take.
-        assertTrue(MUSHAF_DIAL_HOLD_S in 0.9f..1.4f)
+        // Around two seconds: past every slowing inside a scrub, plus the
+        // extra second the user asked for — still one gesture rather than a
+        // wait. The speed gate is the other half of the test.
+        assertTrue(MUSHAF_DIAL_HOLD_S in 1.4f..1.8f)
         assertTrue(MUSHAF_DIAL_HOLD_DP_S < 30f)
     }
 
@@ -122,7 +143,7 @@ class MushafPageDialTest {
         // the later of the two, so a hold on the line is never the slower way
         // in — the reader who is somewhere legitimate is never punished for it.
         assertTrue(MUSHAF_DIAL_INSIST_S > MUSHAF_DIAL_HOLD_S)
-        assertTrue(MUSHAF_DIAL_INSIST_S in 1f..2.5f)
+        assertTrue(MUSHAF_DIAL_INSIST_S in 1.8f..2.2f)
     }
 
     @Test
@@ -226,11 +247,128 @@ class MushafPageDialTest {
     }
 
     @Test
+    fun `the hud holds steady until the band is nearly spent`() {
+        // Elastic-band tension: ordinary drift inside the band barely moves
+        // the label, and the lean arrives steeply only as the hand nears the
+        // edge — where the pop is actually imminent. Clamped at the stray:
+        // past it the tier is already gone and a lean would lie.
+        val stray = 74f
+        val lean = 20f
+        assertEquals(0f, mushafDialHudLean(0f, stray, lean), 1e-4f)
+        // Half the band: an eighth of the lean — a quarter: almost nothing.
+        assertEquals(lean * 0.125f, mushafDialHudLean(stray * 0.5f, stray, lean), 1e-4f)
+        assertEquals(-lean * 0.125f, mushafDialHudLean(-stray * 0.5f, stray, lean), 1e-4f)
+        assertEquals(lean * 0.015625f, mushafDialHudLean(stray * 0.25f, stray, lean), 1e-6f)
+        // Full tension stands exactly at the break, and never lies past it.
+        assertEquals(lean, mushafDialHudLean(stray, stray, lean), 1e-4f)
+        assertEquals(lean, mushafDialHudLean(stray * 3f, stray, lean), 1e-4f)
+        assertEquals(-lean, mushafDialHudLean(-stray * 3f, stray, lean), 1e-4f)
+    }
+
+    @Test
+    fun `every chapter owns a stable cell and every cell is selectable`() {
+        // Selection reads stable cells, not the lensed drawing: the cells
+        // partition the whole measure, never move under a moving hand, and
+        // stay ordered with breathing room on every screen. Al-Baqarah (idx
+        // 1) opens one page after al-Fatihah; chapter 18 sat in the crushed
+        // head; three surahs stack on page 601 and three on 603 — every one
+        // of them must own a slice of the rule a finger can hold.
+        val marks = intArrayOf(
+            1, 2, 50, 77, 106, 128, 151, 177, 187, 208, 221, 235, 249, 255,
+            262, 267, 282, 293, 305, 312, 322, 332, 342, 350, 359, 367, 377,
+            385, 396, 404, 411, 415, 418, 428, 434, 440, 446, 453, 458, 467,
+            477, 483, 489, 496, 499, 502, 507, 511, 515, 518, 520, 523, 526,
+            528, 531, 534, 537, 542, 545, 549, 551, 553, 554, 556, 558, 560,
+            562, 564, 566, 568, 570, 572, 574, 575, 577, 578, 580, 582, 583,
+            585, 586, 587, 587, 589, 590, 591, 591, 592, 593, 594, 595, 595,
+            596, 596, 597, 597, 598, 598, 599, 599, 600, 600, 601, 601, 601,
+            602, 602, 602, 603, 603, 603, 604, 604, 604,
+        )
+        val pages = 604
+
+        fun check(density: Float, width: Float) {
+            val inset = 14f * density
+            val rule = density
+            val seats = mushafDialCombCellSeats(marks, pages, inset, width, rule)
+            // Invariant 1: the cells tile the measure in order, each at
+            // least a minimum gap wide, none outside the track.
+            val minGap = rule * 1.5f
+            for (i in 0 until marks.size - 1) {
+                assertTrue(
+                    "cell gap collapsed [$i] on ${width}px: ${seats[i] - seats[i + 1]}",
+                    seats[i] - seats[i + 1] >= minGap - 0.01f && seats[i] in inset..width - inset,
+                )
+            }
+            assertTrue(seats[marks.size - 1] in inset..width - inset)
+            // Invariant 2: every chapter's cell is held by some finger
+            // position — sweep the whole rule and collect who wins.
+            val reachable = BooleanArray(marks.size)
+            for (finger in (inset.toInt()..(width - inset).toInt())) {
+                reachable[mushafDialChapterAt(seats, finger.toFloat())] = true
+            }
+            val missing = (0 until marks.size).filter { !reachable[it] }
+            assertTrue(
+                "chapters with no cell of their own on ${width}px: $missing",
+                missing.isEmpty(),
+            )
+            // And the two chapters that were reported broken by name.
+            assertTrue(reachable[1])
+            assertTrue(reachable[17])
+        }
+
+        check(density = 2.625f, width = 1080f)
+        check(density = 2.0f, width = 800f)
+        check(density = 3.5f, width = 1440f)
+    }
+
+    @Test
+    fun `the lensed comb stays ordered under any hand`() {
+        // The lensed drawing is decoration, but decoration still has laws:
+        // it never folds back on itself, whatever the finger does.
+        val marks = intArrayOf(1, 2, 50, 77, 106, 128, 151, 177, 187, 208)
+        val pages = 208
+        val density = 2.625f
+        val width = 1080f
+        val inset = 14f * density
+        var sigmaMag = 1f
+        while (sigmaMag <= 1.61f) {
+            for (finger in (inset.toInt()..(width - inset).toInt())) {
+                val drawn = mushafDialCombDrawnXs(
+                    marks,
+                    pages,
+                    finger.toFloat(),
+                    isLensed = true,
+                    combInk = 1f,
+                    insetPx = inset,
+                    widthPx = width,
+                    rulePx = density,
+                    lensSigmaPx = MUSHAF_DIAL_LENS_SIGMA_DP * density * sigmaMag,
+                    tailPushPx = 10f * density,
+                    epsilonPx = 1.8f * density,
+                )
+                for (i in 0 until marks.size - 1) {
+                    assertFalse(drawn[i].isNaN())
+                    assertTrue(drawn[i] > drawn[i + 1])
+                }
+            }
+            sigmaMag += 0.15f
+        }
+    }
+
+    @Test
+    fun `the hud's full lean stays short of the stray band itself`() {
+        // The label warns; it does not leave. If the lean could carry the HUD
+        // as far as the hand has come off the line, the warning and the event
+        // it warns of would be the same distance, and the first said nothing.
+        assertTrue(MushafDialHudLean < MushafDialStray)
+    }
+
+    @Test
     fun `the stray band clears the grab strip's own half-height`() {
         // Inside the strip the finger is still on the rule it took hold of.
         // If the band were narrower than the paper the reader is allowed to
         // press, a scrub could end itself without the hand leaving the target.
-        assertTrue(MushafDialStray > MushafDialTouch / 2f)
+        assertTrue(MushafDialStray > MushafDialBelowGrab / 2f)
     }
 
     @Test
@@ -325,21 +463,6 @@ class MushafPageDialTest {
         assertEquals(oneStep, twoSteps, 0.01f)
         // A sample with no time behind it changes nothing.
         assertEquals(123f, mushafDialSpeed(123f, 999f, 0f), 1e-5f)
-    }
-
-    @Test
-    fun `the haptic is spaced by travel and by time, not by leaves crossed`() {
-        // Chapter openings are about three dp apart at the book's scale, so a
-        // tick per crossing is a buzz. Both guards are needed: a fast hand
-        // clears the travel in a millisecond, and a creeping one clears the
-        // time without having gone anywhere.
-        assertTrue(mushafDialHapticDue(MUSHAF_DIAL_HAPTIC_PITCH_DP, MUSHAF_DIAL_HAPTIC_MIN_S))
-        assertFalse(mushafDialHapticDue(MUSHAF_DIAL_HAPTIC_PITCH_DP * 0.5f, 1f))
-        assertFalse(mushafDialHapticDue(50f, MUSHAF_DIAL_HAPTIC_MIN_S * 0.5f))
-        // Either direction of travel counts.
-        assertTrue(mushafDialHapticDue(-MUSHAF_DIAL_HAPTIC_PITCH_DP, 1f))
-        // And the cadence stays under a comfortable ceiling.
-        assertTrue(1f / MUSHAF_DIAL_HAPTIC_MIN_S < 30f)
     }
 
     @Test
@@ -503,4 +626,91 @@ class MushafPageDialTest {
         val leaf = MushafDialLabel(number = 2, chapter = "Al-Baqarah", fromAyah = 6, toAyah = 16)
         assertEquals("", mushafDialLabelFoot(leaf, zoomed = false))
     }
+    @Test
+    fun `the comb stays on the hairline at rest`() {
+        // True place in the book: leaf 1 at the right, 604 at the left.
+        // Magnification is a lens under the finger, not a warped book.
+        val marks = intArrayOf(1, 2, 50, 51, 604)
+        for (mark in marks) {
+            val f = mushafDialChapterFraction(mark.toFloat(), marks, 604)
+            val prop = mushafDialFraction(mark.toFloat(), 604)
+            assertEquals(prop, f, 1e-4f)
+        }
+        // Ordering still preserved.
+        for (i in 1 until marks.size) {
+            val prev = mushafDialChapterFraction(marks[i - 1].toFloat(), marks, 604)
+            val cur = mushafDialChapterFraction(marks[i].toFloat(), marks, 604)
+            assertTrue(prev < cur)
+        }
+    }
+
+    @Test
+    fun `the lens magnifies closer marks more than farther ones`() {
+        // Fisheye: closer to the centre is taller and pushed farther out.
+        val sigma = 120f
+        val mag = MUSHAF_DIAL_LENS_MAG
+        val heightMag = MUSHAF_DIAL_LENS_HEIGHT_GAIN
+        val centre = 540f
+        val near = centre + 10f
+        val far = centre + 90f
+        val nearFactor = mushafDialLensFactor(10f, sigma, mag)
+        val farFactor = mushafDialLensFactor(90f, sigma, mag)
+        assertTrue(nearFactor > farFactor)
+        assertTrue(nearFactor > 1f && farFactor >= 1f)
+        val nearLensed = mushafDialLensedX(near, centre, sigma, mag)
+        val farLensed = mushafDialLensedX(far, centre, sigma, mag)
+        assertTrue(nearLensed - centre > 10f)
+        assertTrue(farLensed - centre > 90f)
+        // But near is magnified more: ratio of lensed distance to true distance
+        assertTrue((nearLensed - centre) / 10f > (farLensed - centre) / 90f)
+        // Height follows the same falloff.
+        val nearH = mushafDialLensFactor(10f, sigma, heightMag)
+        val farH = mushafDialLensFactor(90f, sigma, heightMag)
+        assertTrue(nearH > farH)
+    }
+
+    @Test
+    fun `hysteresis keeps a boundary from jittering`() {
+        val seats = floatArrayOf(100f, 0f) // gap 100, decreasing x
+        val hyst = 4f // gap*0.6=60 dominates
+        // Gap 100 -> adaptive 60, half 30, mid 50 -> need <20 to flip 0->1
+        assertEquals(0, mushafDialChapterAtHysteresis(seats, 50f, 0, hyst))
+        assertEquals(0, mushafDialChapterAtHysteresis(seats, 25f, 0, hyst))
+        assertEquals(1, mushafDialChapterAtHysteresis(seats, 19f, 0, hyst))
+        // Symmetric: mid 50 -> need >80 to flip 1->0 (1 is at 0, 0 at 100)
+        // For lastIdx=1 (at 0), cur for 75 is 0, need >80 to flip to 0
+        assertEquals(1, mushafDialChapterAtHysteresis(seats, 50f, 1, hyst))
+        assertEquals(1, mushafDialChapterAtHysteresis(seats, 75f, 1, hyst))
+        assertEquals(0, mushafDialChapterAtHysteresis(seats, 81f, 1, hyst))
+        // Fast jump >1 is immediate (with 3 seats, gap 50 each, tested elsewhere)
+        val seats3 = floatArrayOf(100f, 50f, 0f)
+        assertEquals(2, mushafDialChapterAtHysteresis(seats3, 0f, 0, hyst))
+    }
+
+    @Test
+    fun `a seat at the track's clamp stays reachable through hysteresis`() {
+        // Al-Fatihah and al-Baqarah sit minGap apart at the compressed head,
+        // and al-Fatihah's seat is the track's own clamp — an uncapped
+        // hysteresis window left it a fraction of a pixel, and the HUD never
+        // reached chapter one. The window toward a seat must leave the seat
+        // a live approach.
+        val gap = 3.9375f
+        val seats = floatArrayOf(1043.25f, 1039.3125f) // ch1, ch2 — decreasing
+        val hyst = 4.725f
+        val mid = (seats[0] + seats[1]) / 2f
+        // From ch2, the hand must reach ch1 before the clamp runs out:
+        // the window is capped at gap/2 - 1.2, leaving the seat a live
+        // approach exactly as the production law caps it.
+        val h = minOf(
+            minOf(gap * 0.6f, hyst * 0.85f) / 2f,
+            gap / 2f - 1.2f,
+        )
+        val flip = mid + h
+        assertTrue(
+            "flip $flip left ch1 less than 1.2px of approach",
+            seats[0] - flip >= 1.2f - 0.01f,
+        )
+        assertEquals(0, mushafDialChapterAtHysteresis(seats, seats[0], 1, hyst))
+    }
+
 }

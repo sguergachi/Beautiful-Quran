@@ -1,5 +1,6 @@
 package com.beautifulquran.ui.reader
 
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -17,6 +18,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.PlatformTextStyle
@@ -73,6 +75,8 @@ private const val MARK_SIZE_RATIO = 20f / 30f
 @Composable
 internal fun MushafHafsLine(
     line: MushafLine,
+    /** The leaf this line sits on — the line geometry cache's key. */
+    page: Int,
     packs: SnapshotStateMap<Pair<Int, Int>, AyahInkPack>,
     fontSize: TextUnit,
     /**
@@ -96,9 +100,10 @@ internal fun MushafHafsLine(
     val ayahMarkInk = LocalQuranAccents.current.gold
     val glintInk = LocalQuranAccents.current.glintInk
     val useQcf = pageFont != null && line.tokens.any { it.word.qcfV2.isNotEmpty() }
-    if (useQcf && pageFont != null) {
+    if (useQcf) {
         MushafQcfPageLine(
             line = line,
+            page = page,
             pageFont = pageFont,
             fontSize = fontSize,
             measureWidthPx = measureWidthPx,
@@ -210,9 +215,98 @@ internal fun MushafHafsLine(
     }
 }
 
+/**
+ * Measured geometry for one mushaf line, cacheable across leaf compositions.
+ *
+ * Swiping back to a visited leaf re-composes its lines, and the measure is
+ * not cheap: ink profiles render each word to a bitmap, the joins derive
+ * from them, and the fit runs a bisection per line — all on the UI thread,
+ * mid-swipe. The face LRU evicts typefaces (and with them the profile
+ * cache), so this cache holds the geometry strongly, keyed by what the
+ * geometry actually depends on: the page's own face, the line, the size,
+ * and the measure.
+ */
+internal class MushafLineGeometry(
+    val cells: List<MushafCell>,
+    val joinsEm: List<MushafInkJoin>,
+    val fit: MushafLineFit,
+)
+
+private data class MushafLineGeometryKey(
+    val page: Int,
+    val line: Int,
+    val fontPxBits: Int,
+    val measureWidthPxBits: Int,
+)
+
+private val lineGeometryCache =
+    object : LinkedHashMap<MushafLineGeometryKey, MushafLineGeometry>(64, 0.75f, true) {
+    override fun removeEldestEntry(
+        eldest: MutableMap.MutableEntry<MushafLineGeometryKey, MushafLineGeometry>,
+    ) =
+        size > 512
+}
+
+private fun lineGeometryKey(
+    page: Int,
+    line: Int,
+    fontPx: Float,
+    measureWidthPx: Float,
+): MushafLineGeometryKey = MushafLineGeometryKey(
+    page = page,
+    line = line,
+    fontPxBits = fontPx.toRawBits(),
+    measureWidthPxBits = measureWidthPx.toRawBits(),
+)
+
+@Composable
+private fun lineGeometry(
+    page: Int,
+    line: MushafLine,
+    pageTypeface: android.graphics.Typeface?,
+    linePx: Float,
+    measureWidthPx: Float,
+    justify: Boolean,
+): MushafLineGeometry {
+    val key = lineGeometryKey(page, line.number, linePx, measureWidthPx)
+    return remember(key) {
+        lineGeometryCache.getOrPut(key) {
+            com.beautifulquran.DevProfiling.trace("lineGeometryMiss") {
+                val texts = mushafLineTexts(line)
+                val glyphs = texts.map { it.text }
+                val rawCells = mushafLineCells(glyphs, pageTypeface, linePx, condense = 1f)
+                val joinsEm = mushafLineJoins(texts, pageTypeface)
+                val fit = if (!justify) {
+                    MushafLineFit(
+                        scale = 1f,
+                        gapPx = MUSHAF_WORD_GAP_EM * linePx,
+                        flush = false,
+                    )
+                } else if (joinsEm.size == (rawCells.size - 1).coerceAtLeast(0) && joinsEm.isNotEmpty()) {
+                    mushafInkLineFit(
+                        inkWidthPx = rawCells.sumOf { it.inkWidth.toDouble() }.toFloat(),
+                        joins = joinsEm,
+                        measureWidthPx = measureWidthPx,
+                        fontPx = linePx,
+                    )
+                } else {
+                    mushafLineFit(
+                        inkWidthPx = rawCells.sumOf { it.inkWidth.toDouble() }.toFloat(),
+                        gapCount = (rawCells.size - 1).coerceAtLeast(0),
+                        measureWidthPx = measureWidthPx,
+                        fontPx = linePx,
+                    )
+                }
+                MushafLineGeometry(rawCells, joinsEm, fit)
+            }
+        }
+    }
+}
+
 @Composable
 private fun MushafQcfPageLine(
     line: MushafLine,
+    page: Int,
     pageFont: FontFamily,
     fontSize: TextUnit,
     measureWidthPx: Float,
@@ -238,48 +332,17 @@ private fun MushafQcfPageLine(
     val linePx = with(density) { fontSize.toPx() }
     // What the words actually mark, measured from the page's own face and
     // unscaled. Everything about the line's fit follows from this.
+    // Cells, joins and fit come from the process-wide geometry cache: a leaf
+    // re-composing mid-swipe (returning to a visited page) re-measures on
+    // the UI thread otherwise — ink profiles render each word to a bitmap,
+    // and the fit runs a bisection per line. See [lineGeometry].
+    val geometry = lineGeometry(page, line, pageTypeface, linePx, measureWidthPx, justify)
+    val rawCells = geometry.cells
+    val joinsEm = geometry.joinsEm
+    val fit = geometry.fit
+    val condense = fit.scale
     val texts = remember(line) { mushafLineTexts(line) }
     val glyphs = remember(texts) { texts.map { it.text } }
-    val rawCells = remember(glyphs, pageTypeface, linePx) {
-        mushafLineCells(glyphs, pageTypeface, linePx, condense = 1f)
-    }
-    // What each join already carries. Spacing by ink *box* set every join the
-    // same distance apart and so no two of them the same paper apart — a word
-    // closing on an open ن leaves a pocket its neighbour belongs in, and the
-    // box does not know it is there.
-    val joinsEm = remember(texts, pageTypeface) { mushafLineJoins(texts, pageTypeface) }
-    // A word space is guaranteed first and the letters give way to it, which is
-    // the order a compositor works in. Fitting the advance run to the measure
-    // instead left the spacing to be whatever paper happened to remain: over
-    // 738 lines that put a third of them under 0.10 em and the tightest tenth
-    // into overlap. See MUSHAF_MIN_WORD_GAP_EM.
-    val fit = remember(rawCells, joinsEm, measureWidthPx, linePx, justify) {
-        if (!justify) {
-            // Too few words to justify: the page's own space, centred.
-            MushafLineFit(
-                scale = 1f,
-                gapPx = MUSHAF_WORD_GAP_EM * linePx,
-                flush = false,
-            )
-        } else if (joinsEm.size == (rawCells.size - 1).coerceAtLeast(0) && joinsEm.isNotEmpty()) {
-            mushafInkLineFit(
-                inkWidthPx = rawCells.sumOf { it.inkWidth.toDouble() }.toFloat(),
-                joins = joinsEm,
-                measureWidthPx = measureWidthPx,
-                fontPx = linePx,
-            )
-        } else {
-            // No page face yet, so no profiles: fall back to fitting by box,
-            // which is what this did before the ink was measured.
-            mushafLineFit(
-                inkWidthPx = rawCells.sumOf { it.inkWidth.toDouble() }.toFloat(),
-                gapCount = (rawCells.size - 1).coerceAtLeast(0),
-                measureWidthPx = measureWidthPx,
-                fontPx = linePx,
-            )
-        }
-    }
-    val condense = fit.scale
     // Condensed, never resized. A line brought inside the measure keeps its
     // height, weight and colour — the page still reads as one hand — where a
     // line set at a different size reads as a fault.
@@ -323,8 +386,62 @@ private fun MushafQcfPageLine(
     // either side of it, so the em measurement holds at any width and only the
     // size of the em changes.
     val emPx = linePx * condense
+    // Which token each cell belongs to — words and verse marks both live in
+    // the cells, and a tap on a mark is a tap on its verse's last word.
+    val cellToken = remember(texts) {
+        IntArray(texts.size).also { map ->
+            var cell = 0
+            line.tokens.forEachIndexed { ti, token ->
+                map[cell++] = ti
+                val mark = token.word.qcfV2.takeIf { it.isNotEmpty() }
+                    ?.let { qcfTrailingMark(it, token.endsAyah) }.orEmpty()
+                if (mark.isNotEmpty()) map[cell++] = ti
+            }
+        }
+    }
+    // The placed origins, captured by the measure below and read by the
+    // line's tap handler: one gesture handler per line, not one per word —
+    // a leaf carrying a pointer-input node per word handed the input system
+    // four hundred and fifty hit-test targets per leaf, and swiping paid
+    // for every one of them.
+    val placedOrigins = remember(line) { arrayOfNulls<FloatArray>(1) }
+    fun tokenAt(x: Float): MushafToken? {
+        val origins = placedOrigins[0] ?: return null
+        var best = -1
+        var bestDist = Float.MAX_VALUE
+        for (i in cells.indices) {
+            val cell = cells[i]
+            val origin = origins.getOrElse(i) { 0f }
+            val left = origin + minOf(cell.inkLeft, cell.inkRight)
+            val right = origin + maxOf(cell.inkLeft, cell.inkRight)
+            val d = when {
+                x in left..right -> 0f
+                x < left -> left - x
+                else -> x - right
+            }
+            if (d < bestDist) {
+                bestDist = d
+                best = i
+            }
+        }
+        if (best < 0 || bestDist > hitSlopPx) return null
+        val ti = cellToken.getOrElse(best) { -1 }
+        return line.tokens.getOrNull(ti)
+    }
     Layout(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier
+            .fillMaxWidth()
+            .pointerInput(line, cells, onWordClick, onWordLongClick, onAyahClick, hitSlopPx) {
+                detectTapGestures(
+                    onTap = { pos ->
+                        val token = tokenAt(pos.x)
+                        if (token != null) onWordClick(token) else onAyahClick(line.tokens.first())
+                    },
+                    onLongPress = { pos ->
+                        tokenAt(pos.x)?.let(onWordLongClick)
+                    },
+                )
+            },
         content = {
             line.tokens.forEach { token ->
                 MushafQcfWord(
@@ -335,10 +452,6 @@ private fun MushafQcfPageLine(
                     palette = palette,
                     ayahMarkInk = ayahMarkInk,
                     glintInk = glintInk,
-                    hitSlopPx = hitSlopPx,
-                    onWordClick = onWordClick,
-                    onWordLongClick = onWordLongClick,
-                    onAyahClick = onAyahClick,
                 )
                 val mark = token.word.qcfV2.takeIf { it.isNotEmpty() }
                     ?.let { qcfTrailingMark(it, token.endsAyah) }.orEmpty()
@@ -384,6 +497,7 @@ private fun MushafQcfPageLine(
             joins = joinsEm,
             emPx = emPx,
         )
+        placedOrigins[0] = origins
         layout(width, height) {
             placeables.forEachIndexed { i, p ->
                 p.place(origins.getOrElse(i) { 0f }.roundToInt(), (height - p.height) / 2)
@@ -697,10 +811,6 @@ private fun MushafQcfWord(
     palette: WordInkPalette,
     ayahMarkInk: androidx.compose.ui.graphics.Color,
     glintInk: androidx.compose.ui.graphics.Color?,
-    hitSlopPx: Float,
-    onWordClick: (MushafToken) -> Unit,
-    onWordLongClick: (MushafToken) -> Unit,
-    onAyahClick: (MushafToken) -> Unit,
 ) {
     val raw = token.word.qcfV2
     val word = if (raw.isNotEmpty()) {
@@ -722,6 +832,12 @@ private fun MushafQcfWord(
         )
     }
     var layoutResult by remember { mutableStateOf<TextLayoutResult?>(null) }
+    // Only the verse under the voice carries wash layers. A static word's
+    // alpha is always 1 — the recess is gone — so its layers were pure
+    // overhead, and a leaf hands the transformed-rect walk ~150 of them:
+    // profiled on device, the walk ran on every frame of a swipe.
+    val hasInk = liveInk &&
+        packs[token.surahId to token.ayah]?.motions?.isNotEmpty() == true
     // A word waiting its turn is dimmed by its own alpha, not by paper laid
     // over it. A paper mask is a rectangle on a word's box, and a QCF glyph
     // inks past that box — so the mask left the overhang at full strength,
@@ -810,15 +926,16 @@ private fun MushafQcfWord(
         // which is exactly what the line end showed.
         overflow = TextOverflow.Visible,
         modifier = Modifier
-            // Only while there is ink to animate. A graphicsLayer marks its
-            // node transformed, and Compose then keeps that node's rect index
-            // up to date by walking its whole subhierarchy — profiled on
-            // device, insertOrUpdateTransformedNodeSubhierarchy is the single
-            // hottest method in the reader, and a leaf hands it ~150 nodes.
-            // Reading and turning pages need none of it: the alpha is 1 and
-            // the wash is already gated the same way (see [mushafLineInk]).
+            // Only while there is ink to animate — the verse under the voice.
+            // A graphicsLayer marks its node transformed, and Compose then
+            // keeps that node's rect index up to date by walking its whole
+            // subhierarchy — profiled on device,
+            // insertOrUpdateTransformedNodeSubhierarchy is the single hottest
+            // method in the reader, and a leaf handed it ~150 nodes on every
+            // frame of a swipe. A static word's ink is always full, so it
+            // carries no layers at all.
             .then(
-                if (!liveInk) {
+                if (!hasInk) {
                     Modifier
                 } else {
                     // Both washes work on the word's own drawing, so the ink is
@@ -837,27 +954,25 @@ private fun MushafQcfWord(
                         )
                 },
             )
-            .mushafLineInk(
-                liveInk = liveInk,
-                blooms = blooms,
-                layout = { layoutResult },
-                coverPad = 0.dp,
-                // The repeat and glint washes are tints of this word's own
-                // glyphs on this word's own layer, so the letterform is their
-                // mask — the same contour the first-pass wash follows. The
-                // selection-path clip belongs to a shared line, and here it
-                // squared the orange off at the advance and left every tail
-                // and high mark standing in black.
-                clipTintToRange = false,
-            )
-            .wordTapTarget(
-                words = listOf(token.word),
-                ranges = rendered.wordRanges,
-                layoutResult = layoutResult,
-                hitSlopPx = hitSlopPx,
-                onWordClick = { onWordClick(token) },
-                onWordLongClick = { onWordLongClick(token) },
-                onMiss = { onAyahClick(token) },
+            .then(
+                if (!hasInk) {
+                    Modifier
+                } else {
+                    Modifier.mushafLineInk(
+                        liveInk = true,
+                        blooms = blooms,
+                        layout = { layoutResult },
+                        coverPad = 0.dp,
+                        // The repeat and glint washes are tints of this word's
+                        // own glyphs on this word's own layer, so the
+                        // letterform is their mask — the same contour the
+                        // first-pass wash follows. The selection-path clip
+                        // belongs to a shared line, and here it squared the
+                        // orange off at the advance and left every tail and
+                        // high mark standing in black.
+                        clipTintToRange = false,
+                    )
+                },
             ),
         onTextLayout = { layoutResult = it },
     )

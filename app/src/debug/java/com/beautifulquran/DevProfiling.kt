@@ -11,6 +11,7 @@ import android.os.ProfilingResult
 import android.os.ProfilingTrigger
 import android.os.Handler
 import android.os.Looper
+import android.view.Choreographer
 import android.os.Trace
 import android.util.Log
 import android.widget.Toast
@@ -49,8 +50,58 @@ object DevProfiling {
     private const val MethodTraceIntervalUs = 1_000
 
     private val methodTraceRunning = AtomicBoolean(false)
+    private val manualCaptureRunning = AtomicBoolean(false)
     private val callbackExecutor: Executor = Executors.newSingleThreadExecutor()
     private val ceremonyStop = AtomicReference<CancellationSignal?>(null)
+    private val frameWatch = AtomicReference<FrameWatch?>(null)
+    private val stackWatch = AtomicReference<StackSampler?>(null)
+
+    /**
+     * Named marks collected during a capture window: every path that can
+     * blank or fade the screen emits one, and the file is shared with the
+     * trace - the mark sequence around a reported flash reads as a sentence
+     * naming the path that caused it.
+     */
+    private val markLock = Any()
+    private val markLines = ArrayList<String>(256)
+    private val captureStart = AtomicReference<Long?>(null)
+
+    private fun recordMark(label: String) {
+        val at = System.currentTimeMillis()
+        synchronized(markLock) {
+            val start = captureStart.get()
+            if (start != null) {
+                markLines += String.format("%+.3fs  %s", (at - start) / 1000.0, label)
+                if (markLines.size > 2000) markLines.removeAt(0)
+            }
+        }
+    }
+
+    private fun startMarkCapture() {
+        synchronized(markLock) {
+            markLines.clear()
+            captureStart.set(System.currentTimeMillis())
+        }
+    }
+
+    private fun stopMarkCapture(context: Context) {
+        if (captureStart.getAndSet(null) == null) return
+        val lines = synchronized(markLock) { markLines.toList() }
+        val file = File(
+            File(context.cacheDir, "share").apply { mkdirs() },
+            "bq-marks-${System.currentTimeMillis()}.txt",
+        )
+        callbackExecutor.execute {
+            try {
+                file.writeText(
+                    (lines.size.toString() + " marks\n") + lines.joinToString("\n"),
+                )
+                shareFile(file, "marks")
+            } catch (error: java.io.IOException) {
+                Log.e(Tag, "Unable to write marks", error)
+            }
+        }
+    }
 
     /**
      * Application context for the share step. The profiling callback arrives
@@ -81,15 +132,185 @@ object DevProfiling {
 
     fun recordSystemTrace(context: Context) {
         appContext.compareAndSet(null, context.applicationContext)
+        if (!manualCaptureRunning.compareAndSet(false, true)) {
+            toast(context, "A performance profile is already recording")
+            return
+        }
         // Ten seconds of recording with nothing on screen reads as a dead
         // button, and the whole point is to use the app while it records.
         toast(context, "Recording ${ManualTraceDurationMs / 1000}s — use the app now")
+        startMarkCapture()
+        startFrameWatch(context)
+        startStackWatch()
+        Handler(Looper.getMainLooper()).postDelayed({
+            stopFrameWatch()
+            stopStackWatch()
+            stopMarkCapture(context)
+            manualCaptureRunning.set(false)
+        }, ManualTraceDurationMs.toLong())
         if (Build.VERSION.SDK_INT < 35) {
             Log.w(Tag, "SystemTraceRequestBuilder requires API 35+ — sampling instead")
             recordMethodTrace()
             return
         }
         Api35.recordSystemTrace(context.applicationContext, ManualTag, ManualTraceDurationMs)
+    }
+
+    /**
+     * Samples the main thread's stack every 10ms during the capture window
+     * and writes the timeline as bq-stacks-*.txt: whatever blocks a swipe
+     * appears as a run of identical stacks at the hitch's timestamp — the
+     * one thing a sampling profile of methods cannot name.
+     */
+    private fun startStackWatch() {
+        if (stackWatch.get() != null) return
+        val main = Looper.getMainLooper().thread
+        val file = File(
+            File(appContext.get()?.cacheDir ?: return, "share").apply { mkdirs() },
+            "bq-stacks-${System.currentTimeMillis()}.txt",
+        )
+        val sampler = StackSampler(main, file)
+        stackWatch.set(sampler)
+        Thread(sampler, "BQStackWatch").apply {
+            isDaemon = true
+            priority = Thread.MIN_PRIORITY
+        }.start()
+    }
+
+    private fun stopStackWatch() {
+        stackWatch.getAndSet(null)?.stop()
+    }
+
+    private class StackSampler(
+        private val mainThread: Thread,
+        private val file: File,
+    ) : Runnable {
+        @Volatile private var running = true
+        private val samples = ArrayList<String>(1200)
+        private val startNanos = System.nanoTime()
+
+        override fun run() {
+            while (running) {
+                try {
+                    val at = (System.nanoTime() - startNanos) / 1_000_000L
+                    val stack = mainThread.stackTrace
+                    val top = stack.take(5)
+                        .joinToString(" <- ") { frame ->
+                            frame.className.substringAfterLast('.') + "::" + frame.methodName
+                        }
+                    synchronized(samples) { samples += "$at ms: $top" }
+                } catch (_: Throwable) {
+                }
+                Thread.sleep(10)
+            }
+        }
+
+        fun stop() {
+            running = false
+            val summary = synchronized(samples) { samples.toList() }
+            callbackExecutor.execute {
+                try {
+                    file.writeText(
+                        summary.size.toString() + " samples\n" + summary.joinToString("\n"),
+                    )
+                    Log.i(Tag, "Stack watch -> ${file.absolutePath} (${summary.size} samples)")
+                } catch (error: java.io.IOException) {
+                    Log.e(Tag, "Unable to write stack watch", error)
+                }
+            }
+        }
+    }
+
+    /**
+     * Frame-time watch over the capture window: the sampling trace shows
+     * where CPU went but not *when frames dropped*, and the reported lag is
+     * a hitch at the start of a swipe — exactly what a per-frame delta log
+     * catches that a sampler cannot. Written and shared next to the trace.
+     */
+    private fun startFrameWatch(context: Context) {
+        if (frameWatch.get() != null) return
+        val file = File(
+            File(context.cacheDir, "share").apply { mkdirs() },
+            "bq-frames-${System.currentTimeMillis()}.txt",
+        )
+        val watch = FrameWatch(file)
+        frameWatch.set(watch)
+        watch.start()
+    }
+
+    private fun stopFrameWatch() {
+        frameWatch.getAndSet(null)?.stop()
+    }
+
+    private class FrameWatch(private val file: File) : Choreographer.FrameCallback {
+        private val choreographer = Choreographer.getInstance()
+        private val deltasMicros = LongArray(2400)
+        private val offsetsMicros = LongArray(deltasMicros.size)
+        private var lastNanos = 0L
+        private var startNanos = 0L
+        private var worstMicros = 0L
+        private var over16 = 0
+        private var counted = 0
+
+        fun start() {
+            startNanos = System.nanoTime()
+            choreographer.postFrameCallback(this)
+        }
+
+        override fun doFrame(frameTimeNanos: Long) {
+            if (lastNanos != 0L) {
+                val deltaMicros = (frameTimeNanos - lastNanos) / 1_000L
+                if (counted < deltasMicros.size) {
+                    deltasMicros[counted] = deltaMicros
+                    offsetsMicros[counted] = (frameTimeNanos - startNanos) / 1_000L
+                    counted++
+                }
+                if (deltaMicros > worstMicros) worstMicros = deltaMicros
+                if (deltaMicros > 16_700L) over16++
+            }
+            lastNanos = frameTimeNanos
+            choreographer.postFrameCallback(this)
+        }
+
+        fun stop() {
+            choreographer.removeFrameCallback(this)
+            val frameCount = counted
+            val deltas = deltasMicros.copyOf(frameCount)
+            val offsets = offsetsMicros.copyOf(frameCount)
+            val slowFrames = over16
+            val worst = worstMicros
+            callbackExecutor.execute {
+                val summary = buildString {
+                    append("frames=")
+                    append(frameCount)
+                    append(" over16ms=")
+                    append(slowFrames)
+                    append(" worstMs=")
+                    append(String.format("%.1f", worst / 1000.0))
+                    append('\n')
+                    repeat(frameCount) { index ->
+                        if (index > 0) append(' ')
+                        append(
+                            String.format(
+                                "%.1f@%.0f",
+                                deltas[index] / 1000.0,
+                                offsets[index] / 1000.0,
+                            ),
+                        )
+                    }
+                }
+                try {
+                    file.writeText(summary)
+                    Log.i(
+                        Tag,
+                        "Frame watch -> ${file.absolutePath}: ${summary.lineSequence().first()}",
+                    )
+                    shareFile(file, "frame-watch")
+                } catch (error: java.io.IOException) {
+                    Log.e(Tag, "Unable to write frame watch", error)
+                }
+            }
+        }
     }
 
     /**
@@ -195,9 +416,11 @@ object DevProfiling {
         }
     }
 
-    /** Wall-clock milestone for logcat; also emits an instant atrace counter. */
+    /** Wall-clock milestone for logcat, the system trace, and the capture's
+     * own marks file (shared with the trace when a window is open). */
     fun mark(label: String) {
         Log.i(Tag, label)
+        recordMark(label)
         Trace.setCounter("BQ:$label", 1)
         Trace.setCounter("BQ:$label", 0)
     }
@@ -241,6 +464,7 @@ object DevProfiling {
             } catch (error: RuntimeException) {
                 Log.e(Tag, "Unable to start system trace ($tag)", error)
                 if (ceremonyStop.get() === stopSignal) ceremonyStop.set(null)
+                if (tag == ManualTag) recordMethodTrace()
                 return
             }
             Log.i(Tag, "Recording ${durationMs}ms system trace tag=$tag")

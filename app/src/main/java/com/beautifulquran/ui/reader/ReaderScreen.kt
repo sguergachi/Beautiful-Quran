@@ -105,6 +105,7 @@ import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -126,8 +127,10 @@ import com.beautifulquran.data.ReadingMode
 import com.beautifulquran.data.model.Surah
 import com.beautifulquran.domain.BASMALAH_PLAYLIST_AYAH
 import com.beautifulquran.domain.MushafToken
+import com.beautifulquran.domain.mushafFontPreloadPages
 import com.beautifulquran.ui.reader.focus.FocusEngine
 import com.beautifulquran.ui.reader.focus.rememberReaderFocusController
+import com.beautifulquran.ui.reader.MushafQcfFonts
 import com.beautifulquran.ui.theme.FloatingPaperControl
 import com.beautifulquran.ui.theme.IslamicReturnToAyahButton
 import com.beautifulquran.ui.theme.InkRevealOverlay
@@ -135,9 +138,11 @@ import com.beautifulquran.ui.theme.absorbPointerEvents
 import com.beautifulquran.ui.theme.contrastingOverlayColorScheme
 import com.beautifulquran.ui.theme.contextualGuideProgressiveBlur
 import com.beautifulquran.ui.theme.verticalFadingEdges
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlin.math.abs
 
 /** Paused highlight polling is 250 ms; leave one scheduling beat for a fresh sample. */
@@ -286,6 +291,7 @@ fun ReaderScreen(
     // a leaf back rather than scrolling it itself; the effect is the third and
     // last writer of the pager's position.
     var mushafSeekPage by remember { mutableStateOf<Int?>(null) }
+    var mushafSeekSurahId by remember { mutableStateOf<Int?>(null) }
     // Read as a lambda by the pager, so a hand landing on the rule fades the
     // folio without recomposing 604 leaves' worth of reader around it.
     val mushafScrubbing = remember { mutableStateOf(false) }
@@ -298,10 +304,21 @@ fun ReaderScreen(
     // Later navigation only: a chapter opened from the index while the reader
     // is already on a leaf. The opening leaf itself arrives as `initialPage`
     // above, so this no-ops on the way in rather than turning the page to
-    // where it already is.
+    // where it already is. The target's face is warmed before the jump: a
+    // leaf composing without a resident face holds blank for its face wait
+    // and then fades in, which read as the whole screen flashing out and
+    // back when play loaded another chapter.
+    val activityContext = LocalContext.current
     LaunchedEffect(mushafOpeningPage) {
         val page = mushafOpeningPage ?: return@LaunchedEffect
         if (mushafPagerState.currentPage == page) return@LaunchedEffect
+        val catalog = mushafCatalog ?: return@LaunchedEffect
+        withContext(Dispatchers.Default) {
+            MushafQcfFonts.preload(
+                activityContext,
+                mushafFontPreloadPages(page, catalog.pageCount),
+            )
+        }
         mushafPagerState.scrollToPage(page)
     }
     val bookmarkedAyahs by viewModel.bookmarkedAyahs.collectAsStateWithLifecycle()
@@ -809,9 +826,9 @@ fun ReaderScreen(
     // leaves have closed up, so a hand moving at a normal pace is steering by
     // chapters and a hand that slows down is steering by leaves — one comb at
     // two magnifications.
-    val mushafChapterPages = remember(mushafCatalog) {
-        val catalog = mushafCatalog ?: return@remember emptySet<Int>()
-        buildSet { for (surahId in 1..114) add(catalog.firstPageOf(surahId)) }
+    val mushafChapterFirstPages = remember(mushafCatalog) {
+        val catalog = mushafCatalog ?: return@remember IntArray(0)
+        IntArray(114) { idx -> catalog.firstPageOf(idx + 1) }
     }
     // What the dial writes over its thumb. The scrubbed leaf almost never
     // belongs to the chapter that is loaded, so this reads the leaf's own
@@ -819,16 +836,37 @@ fun ReaderScreen(
     // leaf holds, which is what the label says once the dial has zoomed in far
     // enough for a single leaf to be a thing you can aim at.
     val mushafPageLabel = remember(mushafCatalog, mushafUi) {
-        label@{ page: Int ->
+        label@{ page: Int, requestedSurahId: Int? ->
             val catalog = mushafCatalog ?: return@label null
             val leaf = catalog.page(page) ?: return@label null
-            val surah = mushafUi?.surahsById?.get(leaf.primarySurahId) ?: return@label null
-            val ayahs = leaf.ayahKeys.filter { it.first == leaf.primarySurahId }.map { it.second }
+            val surahId = requestedSurahId?.takeIf { requested ->
+                leaf.ayahKeys.any { it.first == requested }
+            } ?: leaf.primarySurahId
+            val surah = mushafUi?.surahsById?.get(surahId) ?: return@label null
+            var fromAyah = Int.MAX_VALUE
+            var toAyah = Int.MIN_VALUE
+            leaf.ayahKeys.forEach { (id, ayah) ->
+                if (id == surahId) {
+                    fromAyah = minOf(fromAyah, ayah)
+                    toAyah = maxOf(toAyah, ayah)
+                }
+            }
             MushafDialLabel(
-                number = leaf.primarySurahId,
+                number = surahId,
                 chapter = surah.nameTransliteration,
-                fromAyah = ayahs.minOrNull() ?: 1,
-                toAyah = ayahs.maxOrNull() ?: 1,
+                fromAyah = fromAyah.takeUnless { it == Int.MAX_VALUE } ?: 1,
+                toAyah = toAyah.takeUnless { it == Int.MIN_VALUE } ?: 1,
+            )
+        }
+    }
+    val mushafChapterLabel = remember(mushafUi) {
+        label@{ idx: Int ->
+            val surah = mushafUi?.surahsById?.get(idx + 1) ?: return@label null
+            MushafDialLabel(
+                number = idx + 1,
+                chapter = surah.nameTransliteration,
+                fromAyah = 1,
+                toAyah = surah.ayahCount,
             )
         }
     }
@@ -854,6 +892,22 @@ fun ReaderScreen(
     fun mushafPlayTarget(): ReaderInteraction.MushafPlayTarget? {
         val catalog = mushafCatalog ?: return null
         val leaf = catalog.page(mushafPagerState.currentPage + 1) ?: return null
+        val scrubbedSurah = mushafSeekSurahId?.takeIf { sid ->
+            leaf.surahStarts.any { it.surahId == sid } || leaf.ayahKeys.any { it.first == sid }
+        }
+        if (scrubbedSurah != null) {
+            val firstOfScrubbed = leaf.lines
+                .flatMap { it.tokens }
+                .firstOrNull { it.surahId == scrubbedSurah }
+            if (firstOfScrubbed != null) {
+                // A scrub explicitly chose a surah whose opening leaf this is;
+                // honour that choice instead of the page's overall first word,
+                // which may belong to the previous surah on a shared leaf.
+                return ReaderInteraction.MushafPlayTarget(
+                    scrubbedSurah, firstOfScrubbed.ayah, firstOfScrubbed.word.position,
+                )
+            }
+        }
         val first = leaf.lines.firstOrNull { it.tokens.isNotEmpty() }?.tokens?.firstOrNull()
         return ReaderInteraction.mushafPlayTarget(
             pendingJumpAyah = requestedJumpAyah,
@@ -1464,17 +1518,28 @@ fun ReaderScreen(
         // whole page (including the flyer) for a frame.
         val readerContentAlpha = remember { Animatable(0f) }
         // Only fade in on cold open / external nav — never when finishing a
-        // next-chapter handoff (that used to snap the settled header).
+        // next-chapter handoff (that used to snap the settled header), and
+        // never across a playback-driven chapter swap (hitting play on
+        // another chapter's leaf swapped the ink under a composed page; a
+        // fade there read as the whole screen flashing out and back).
         LaunchedEffect(content?.surah?.id, startAyah) {
             if (chapterAdvancing || verseRevealForSurah != 0) {
                 readerContentAlpha.snapTo(1f)
+                DevProfiling.mark("entranceHold s${content?.surah?.id}")
+                return@LaunchedEffect
+            }
+            if (uiState.keepsContentThroughLoad) {
+                readerContentAlpha.snapTo(1f)
+                viewModel.onKeptContentCommitted()
+                DevProfiling.mark("entranceHold s${content?.surah?.id}")
                 return@LaunchedEffect
             }
             if (content == null) {
-                DevProfiling.mark("readerContentNull")
+                DevProfiling.mark("contentNull")
+                DevProfiling.mark("readerContentAlpha0")
                 readerContentAlpha.snapTo(0f)
             } else {
-                DevProfiling.mark("readerContentReady s${content.surah.id}")
+                DevProfiling.mark("entranceFade s${content.surah.id} a$startAyah")
                 readerContentAlpha.snapTo(0f)
                 readerContentAlpha.animateTo(
                     targetValue = 1f,
@@ -1496,6 +1561,7 @@ fun ReaderScreen(
             // page seem to appear out of nowhere, because the eye was fixed on
             // a moving thing that vanished the instant the text arrived. Empty
             // paper waits quietly, and the text settles onto it.
+            DevProfiling.mark("blankPaper s$surahId")
             Box(Modifier.fillMaxSize())
             return@Scaffold
         }
@@ -2131,6 +2197,7 @@ fun ReaderScreen(
                                         surahId = target.surahId,
                                         startPlaybackAtAyah = target.ayah,
                                         startPlaybackAtWord = target.word,
+                                        keepContent = true,
                                     )
                                     else -> viewModel.playFromAyahWord(target.ayah, target.word)
                                 }
@@ -2146,9 +2213,11 @@ fun ReaderScreen(
                         // and something to be dragged along.
                         pageAt = mushafLeafPage,
                         pageCount = mushafCatalog?.pageCount ?: 1,
-                        chapterPages = mushafChapterPages,
+                        chapterPages = mushafChapterFirstPages,
                         pageLabel = mushafPageLabel,
+                        chapterLabel = mushafChapterLabel,
                         onSeekPage = { mushafSeekPage = it },
+                        onSeekSurah = { mushafSeekSurahId = it },
                         onScrubbing = { mushafScrubbing.value = it },
                         modifier = Modifier.weight(1f),
                     ) {
@@ -2210,6 +2279,7 @@ fun ReaderScreen(
                                     surahId = token.surahId,
                                     startPlaybackAtAyah = token.ayah,
                                     startPlaybackAtWord = token.word.position,
+                                    keepContent = true,
                                 )
                             }
                         }
@@ -2231,7 +2301,11 @@ fun ReaderScreen(
                         if (token.surahId == mushafSurahId) {
                             viewModel.playFromAyah(token.ayah)
                         } else {
-                            viewModel.load(token.surahId, startPlaybackAtAyah = token.ayah)
+                            viewModel.load(
+                                surahId = token.surahId,
+                                startPlaybackAtAyah = token.ayah,
+                                keepContent = true,
+                            )
                         }
                         }
                     }
@@ -2244,7 +2318,6 @@ fun ReaderScreen(
                         activeWordState = activeWordState,
                         playback = mushafPlayback,
                         playbackSpeed = playerState.speed,
-                        fontScale = settings.fontScale,
                         followEnabled = followEnabled,
                         loadedSurahId = mushafSurahId,
                         flashWordPosition = startWordPosition,
