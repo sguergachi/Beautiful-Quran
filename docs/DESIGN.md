@@ -132,9 +132,9 @@ fourteen to a screen, and at furniture weight they read as a smudge on the rule
 rather than as marks a reader can count and aim between — which is the only
 thing they are for. Weight here buys legibility at a pitch, not emphasis.
 
-**Hold still, and the cell under your finger opens.** A quarter second at rest
-— past the stall in an ordinary rough stroke, short of a wait — and a click of
-haptic says so. The bracket stretches out until it is the whole measure and
+**Hold still, and the cell under your finger opens.** About 1.6 seconds at rest
+— long enough to distinguish a deliberate hold from the pauses in an ordinary
+scrub — and a click of haptic says so. The bracket stretches into the whole measure and
 with leaves standing in it: a rounded trough where the line was. The mark does
 not fatten on the way; it only stretches, and recedes from the marker's ink to
 furniture's as it goes, because a measure-wide bar at a marker's weight would
@@ -178,7 +178,7 @@ keeps it shut until the hand is back on the line and over the measure.
 resting in the run-out is over no leaf, so it should not be handed a trough it
 did not ask for. But it also means a reader who has just walked out and wants
 straight back in gets nothing for holding, and a control whose only answer to a
-held finger is silence reads as broken. So a hold of about a dozen ordinary holds
+held finger is silence reads as broken. So a two-second insistent hold
 opens the trough from wherever the finger is, guard and all: at that length it
 cannot be the tail of a stroke, and there is nothing else a motionless finger
 out there could mean. Opening this way takes the line it finds as the line it
@@ -1157,9 +1157,10 @@ Chapters ribbon is navigation only and never retracts when tapped.
 
 ## Reading modes
 
-Settings, **Customize**, and **Download manager** are horizontally swipeable
-sibling pages on the same paper. Their rows animate to the requested page, and
-the back chevron or a rightward swipe returns to main Settings. Main Settings
+Settings, **Customize**, and **Download manager** are consecutive leaves in
+the physical paper stack. Their rows turn to the requested detail leaf, and
+the back chevron or a rightward swipe returns to main Settings while leaving
+that detail underneath for a forward swipe to reopen. Main Settings
 does not repeat section labels above those two navigation rows. Text size,
 transliteration, and ayah translation live in Customize with theme, view,
 layout, numeral scripts, verse annotations, the ayah-selector side, and

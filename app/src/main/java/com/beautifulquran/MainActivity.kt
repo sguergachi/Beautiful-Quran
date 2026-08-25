@@ -87,6 +87,7 @@ import com.beautifulquran.ui.rootviewer.WordHoldChooser
 import com.beautifulquran.ui.settings.CustomizeScreen
 import com.beautifulquran.ui.settings.DownloadManagerPage
 import com.beautifulquran.ui.settings.SettingsDetail
+import com.beautifulquran.ui.settings.SettingsInkPreviewState
 import com.beautifulquran.ui.settings.SettingsScreen
 import com.beautifulquran.ui.settings.SettingsViewModel
 import com.beautifulquran.ui.share.ShareHost
@@ -290,6 +291,9 @@ private fun PaperStackApp(
     val rootViewerViewModel: RootViewerViewModel = viewModel(factory = AppViewModelFactory)
     val shareViewModel: ShareViewModel = viewModel(factory = AppViewModelFactory)
     val settings by app.settings.settings.collectAsStateWithLifecycle()
+    val settingsInkPreview = remember {
+        SettingsInkPreviewState(settings.brushCircleStyle)
+    }
     val bookmarkCount by bookmarksViewModel.bookmarkCount.collectAsStateWithLifecycle()
     val shareUi by shareViewModel.ui.collectAsStateWithLifecycle()
 
@@ -298,10 +302,12 @@ private fun PaperStackApp(
     var selectedStartPlayback by rememberSaveable { mutableStateOf(false) }
     /** 1-based word position from a home word-search hit; 0 means no flash. */
     var selectedStartWord by rememberSaveable { mutableIntStateOf(0) }
-    var settingsDetail by rememberSaveable(stateSaver = Saver(
-        save = { it?.name },
-        restore = { name -> name?.let { com.beautifulquran.ui.settings.SettingsDetail.valueOf(it) } },
-    )) { mutableStateOf<com.beautifulquran.ui.settings.SettingsDetail?>(null) }
+    var settingsDetail by rememberSaveable(
+        stateSaver = Saver<SettingsDetail?, String>(
+            save = { it?.name },
+            restore = SettingsDetail::valueOf,
+        ),
+    ) { mutableStateOf<SettingsDetail?>(null) }
     var downloadsRefreshKey by remember { mutableIntStateOf(0) }
     /**
      * Remount key for the reader. Bumped on home/bookmarks/concordance/voice
@@ -394,6 +400,12 @@ private fun PaperStackApp(
         val minimumLayer = if (bookmarkCount > 0) BOOKMARKS_LAYER else COVER_LAYER
         val boundedLayer = layer.coerceIn(minimumLayer, maxStackLayer())
         val distance = abs(boundedLayer - stackPosition.value)
+        if (settingsDetail == SettingsDetail.DOWNLOADS &&
+            boundedLayer == settingsLayer &&
+            stackPosition.value > settingsLayer + 0.01f
+        ) {
+            downloadsRefreshKey++
+        }
         settledLayer = boundedLayer
         stackPosition.animateTo(
             targetValue = boundedLayer.toFloat(),
@@ -750,6 +762,7 @@ private fun PaperStackApp(
         ) {
             SettingsScreen(
                 viewModel = settingsViewModel,
+                inkPreview = settingsInkPreview,
                 downloadsRefreshKey = downloadsRefreshKey,
                 onBack = {
                     animateTo(if (selectedSurahId == 0) COVER_LAYER else AYAH_LAYER)
@@ -771,7 +784,7 @@ private fun PaperStackApp(
 
         if (settingsDetail != null) {
             PaperPage(
-                layer = PaperLayer.Customize,
+                layer = PaperLayer.Detail,
                 stackPosition = stackPositionProvider,
                 settingsLayer = settingsLayer,
                 // Beneath Settings: the detail page is what the settings
@@ -781,6 +794,7 @@ private fun PaperStackApp(
                 when (settingsDetail) {
                     SettingsDetail.CUSTOMIZE -> CustomizeSheet(
                         viewModel = settingsViewModel,
+                        inkPreview = settingsInkPreview,
                         // Back keeps the page where it is: the leaf you turned
                         // back from stays under your thumb, so swiping forward
                         // from Settings re-opens exactly that sheet.
@@ -788,10 +802,7 @@ private fun PaperStackApp(
                     )
                     SettingsDetail.DOWNLOADS -> DownloadsSheet(
                         viewModel = settingsViewModel,
-                        onBack = {
-                            downloadsRefreshKey++
-                            animateTo(settingsLayer)
-                        },
+                        onBack = { animateTo(settingsLayer) },
                     )
                     null -> {}
                 }
@@ -1047,47 +1058,16 @@ private fun PaperStackApp(
 @Composable
 private fun CustomizeSheet(
     viewModel: com.beautifulquran.ui.settings.SettingsViewModel,
+    inkPreview: SettingsInkPreviewState,
     onBack: () -> Unit,
 ) {
     val settings by viewModel.settings.settings.collectAsStateWithLifecycle()
-    var brushParams by androidx.compose.runtime.remember {
-        androidx.compose.runtime.mutableStateOf(com.beautifulquran.ui.theme.brushCircleParams(settings.brushCircleStyle))
-    }
-    var checkParams by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(com.beautifulquran.ui.theme.shippedCheckParams()) }
-    var paintToken by androidx.compose.runtime.remember { androidx.compose.runtime.mutableIntStateOf(0) }
-    var checkPaintToken by androidx.compose.runtime.remember { androidx.compose.runtime.mutableIntStateOf(0) }
-    var lastBrushStyle by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(settings.brushCircleStyle) }
-    var lastShipRev by androidx.compose.runtime.remember { androidx.compose.runtime.mutableIntStateOf(com.beautifulquran.ui.theme.SHIPPED_BRUSH_REVISION) }
-    var lastCheckShipRev by androidx.compose.runtime.remember { androidx.compose.runtime.mutableIntStateOf(com.beautifulquran.ui.theme.SHIPPED_CHECK_REVISION) }
-    androidx.compose.runtime.LaunchedEffect(settings.brushCircleStyle, com.beautifulquran.ui.theme.SHIPPED_BRUSH_REVISION) {
-        val styleChanged = lastBrushStyle != settings.brushCircleStyle
-        val shipChanged = lastShipRev != com.beautifulquran.ui.theme.SHIPPED_BRUSH_REVISION
-        lastBrushStyle = settings.brushCircleStyle
-        lastShipRev = com.beautifulquran.ui.theme.SHIPPED_BRUSH_REVISION
-        if (shipChanged) {
-            if (settings.brushCircleStyle != com.beautifulquran.data.BrushCircleStyle.BASELINE) {
-                viewModel.settings.update { it.copy(brushCircleStyle = com.beautifulquran.data.BrushCircleStyle.BASELINE) }
-            }
-            lastBrushStyle = com.beautifulquran.data.BrushCircleStyle.BASELINE
-            brushParams = com.beautifulquran.ui.theme.brushCircleParams(com.beautifulquran.data.BrushCircleStyle.BASELINE)
-            paintToken++
-        } else if (styleChanged) {
-            brushParams = com.beautifulquran.ui.theme.brushCircleParams(settings.brushCircleStyle)
-            paintToken++
-        }
-    }
-    androidx.compose.runtime.LaunchedEffect(com.beautifulquran.ui.theme.SHIPPED_CHECK_REVISION) {
-        if (lastCheckShipRev == com.beautifulquran.ui.theme.SHIPPED_CHECK_REVISION) return@LaunchedEffect
-        lastCheckShipRev = com.beautifulquran.ui.theme.SHIPPED_CHECK_REVISION
-        checkParams = com.beautifulquran.ui.theme.shippedCheckParams()
-        checkPaintToken++
-    }
     CustomizeScreen(
         settings = settings,
-        brushParams = brushParams,
-        paintToken = paintToken,
-        checkParams = checkParams,
-        checkPaintToken = checkPaintToken,
+        brushParams = inkPreview.brushParams,
+        paintToken = inkPreview.paintToken,
+        checkParams = inkPreview.checkParams,
+        checkPaintToken = inkPreview.checkPaintToken,
         onBack = onBack,
         onUpdate = { transform -> viewModel.settings.update(transform) },
     )
@@ -1112,7 +1092,7 @@ private enum class PaperLayer {
     Settings,
     Ayah,
     Cover,
-    Customize,
+    Detail,
 }
 
 @Composable
@@ -1182,7 +1162,7 @@ private fun Modifier.paperLayerTransform(
             scaleX = 0.985f + 0.015f * reveal
             scaleY = 0.985f + 0.015f * reveal
         }
-        PaperLayer.Customize -> {
+        PaperLayer.Detail -> {
             // The detail sheet is revealed from under Settings as Settings
             // turns away — the same underneath-page the reader is to the
             // cover. It sits a touch small and shifted right at rest-past,
@@ -1211,7 +1191,7 @@ private fun Modifier.paperDropShadow(
         PaperLayer.Ayah -> (position - 1f).coerceIn(0f, 1f)
         // Settings casts onto the detail sheet while it turns away to it.
         PaperLayer.Settings -> (position - settingsLayer.toFloat()).coerceIn(0f, 1f)
-        PaperLayer.Customize -> 0f
+        PaperLayer.Detail -> 0f
     }
     val depth = (4f * turning * (1f - turning)).coerceIn(0f, 1f)
     if (depth > 0.01f) {

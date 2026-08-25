@@ -50,6 +50,7 @@ object DevProfiling {
     private const val MethodTraceIntervalUs = 1_000
 
     private val methodTraceRunning = AtomicBoolean(false)
+    private val manualCaptureRunning = AtomicBoolean(false)
     private val callbackExecutor: Executor = Executors.newSingleThreadExecutor()
     private val ceremonyStop = AtomicReference<CancellationSignal?>(null)
     private val frameWatch = AtomicReference<FrameWatch?>(null)
@@ -84,21 +85,21 @@ object DevProfiling {
     }
 
     private fun stopMarkCapture(context: Context) {
-        val start = captureStart.getAndSet(null) ?: return
+        if (captureStart.getAndSet(null) == null) return
+        val lines = synchronized(markLock) { markLines.toList() }
         val file = File(
             File(context.cacheDir, "share").apply { mkdirs() },
             "bq-marks-${System.currentTimeMillis()}.txt",
         )
-        try {
-            synchronized(markLock) {
+        callbackExecutor.execute {
+            try {
                 file.writeText(
-                    (markLines.size.toString() + " marks\n") +
-                        markLines.joinToString("\n"),
+                    (lines.size.toString() + " marks\n") + lines.joinToString("\n"),
                 )
+                shareFile(file, "marks")
+            } catch (error: java.io.IOException) {
+                Log.e(Tag, "Unable to write marks", error)
             }
-            shareFile(file, "marks")
-        } catch (error: java.io.IOException) {
-            Log.e(Tag, "Unable to write marks", error)
         }
     }
 
@@ -131,23 +132,28 @@ object DevProfiling {
 
     fun recordSystemTrace(context: Context) {
         appContext.compareAndSet(null, context.applicationContext)
+        if (!manualCaptureRunning.compareAndSet(false, true)) {
+            toast(context, "A performance profile is already recording")
+            return
+        }
         // Ten seconds of recording with nothing on screen reads as a dead
         // button, and the whole point is to use the app while it records.
         toast(context, "Recording ${ManualTraceDurationMs / 1000}s — use the app now")
         startMarkCapture()
         startFrameWatch(context)
         startStackWatch()
+        Handler(Looper.getMainLooper()).postDelayed({
+            stopFrameWatch()
+            stopStackWatch()
+            stopMarkCapture(context)
+            manualCaptureRunning.set(false)
+        }, ManualTraceDurationMs.toLong())
         if (Build.VERSION.SDK_INT < 35) {
             Log.w(Tag, "SystemTraceRequestBuilder requires API 35+ — sampling instead")
             recordMethodTrace()
             return
         }
         Api35.recordSystemTrace(context.applicationContext, ManualTag, ManualTraceDurationMs)
-        Handler(Looper.getMainLooper()).postDelayed({
-            stopFrameWatch()
-            stopStackWatch()
-            stopMarkCapture(context)
-        }, ManualTraceDurationMs.toLong())
     }
 
     /**
@@ -202,11 +208,15 @@ object DevProfiling {
         fun stop() {
             running = false
             val summary = synchronized(samples) { samples.toList() }
-            try {
-                file.writeText(summary.size.toString() + " samples\n" + summary.joinToString("\n"))
-                Log.i(Tag, "Stack watch -> ${file.absolutePath} (${summary.size} samples)")
-            } catch (error: java.io.IOException) {
-                Log.e(Tag, "Unable to write stack watch", error)
+            callbackExecutor.execute {
+                try {
+                    file.writeText(
+                        summary.size.toString() + " samples\n" + summary.joinToString("\n"),
+                    )
+                    Log.i(Tag, "Stack watch -> ${file.absolutePath} (${summary.size} samples)")
+                } catch (error: java.io.IOException) {
+                    Log.e(Tag, "Unable to write stack watch", error)
+                }
             }
         }
     }
@@ -234,10 +244,11 @@ object DevProfiling {
 
     private class FrameWatch(private val file: File) : Choreographer.FrameCallback {
         private val choreographer = Choreographer.getInstance()
-        private val lines = ArrayList<String>(720)
+        private val deltasMicros = LongArray(2400)
+        private val offsetsMicros = LongArray(deltasMicros.size)
         private var lastNanos = 0L
         private var startNanos = 0L
-        private var worst = 0f
+        private var worstMicros = 0L
         private var over16 = 0
         private var counted = 0
 
@@ -248,12 +259,14 @@ object DevProfiling {
 
         override fun doFrame(frameTimeNanos: Long) {
             if (lastNanos != 0L) {
-                val deltaMs = (frameTimeNanos - lastNanos) / 1_000_000f
-                val at = (frameTimeNanos - startNanos) / 1_000_000f
-                lines += String.format("%.1f@%.0f", deltaMs, at)
-                counted++
-                if (deltaMs > worst) worst = deltaMs
-                if (deltaMs > 16.7f) over16++
+                val deltaMicros = (frameTimeNanos - lastNanos) / 1_000L
+                if (counted < deltasMicros.size) {
+                    deltasMicros[counted] = deltaMicros
+                    offsetsMicros[counted] = (frameTimeNanos - startNanos) / 1_000L
+                    counted++
+                }
+                if (deltaMicros > worstMicros) worstMicros = deltaMicros
+                if (deltaMicros > 16_700L) over16++
             }
             lastNanos = frameTimeNanos
             choreographer.postFrameCallback(this)
@@ -261,22 +274,41 @@ object DevProfiling {
 
         fun stop() {
             choreographer.removeFrameCallback(this)
-            val summary = buildString {
-                append("frames=")
-                append(counted)
-                append(" over16ms=")
-                append(over16)
-                append(" worstMs=")
-                append(String.format("%.1f", worst))
-                append('\n')
-                append(lines.joinToString(" "))
-            }
-            try {
-                file.writeText(summary)
-                Log.i(Tag, "Frame watch -> ${file.absolutePath}: ${summary.lineSequence().first()}")
-                shareFile(file, "frame-watch")
-            } catch (error: java.io.IOException) {
-                Log.e(Tag, "Unable to write frame watch", error)
+            val frameCount = counted
+            val deltas = deltasMicros.copyOf(frameCount)
+            val offsets = offsetsMicros.copyOf(frameCount)
+            val slowFrames = over16
+            val worst = worstMicros
+            callbackExecutor.execute {
+                val summary = buildString {
+                    append("frames=")
+                    append(frameCount)
+                    append(" over16ms=")
+                    append(slowFrames)
+                    append(" worstMs=")
+                    append(String.format("%.1f", worst / 1000.0))
+                    append('\n')
+                    repeat(frameCount) { index ->
+                        if (index > 0) append(' ')
+                        append(
+                            String.format(
+                                "%.1f@%.0f",
+                                deltas[index] / 1000.0,
+                                offsets[index] / 1000.0,
+                            ),
+                        )
+                    }
+                }
+                try {
+                    file.writeText(summary)
+                    Log.i(
+                        Tag,
+                        "Frame watch -> ${file.absolutePath}: ${summary.lineSequence().first()}",
+                    )
+                    shareFile(file, "frame-watch")
+                } catch (error: java.io.IOException) {
+                    Log.e(Tag, "Unable to write frame watch", error)
+                }
             }
         }
     }
@@ -324,7 +356,6 @@ object DevProfiling {
                     Log.e(Tag, "Unable to stop method trace", error)
                 }
                 methodTraceRunning.set(false)
-                stopMarkCapture(context)
                 shareFile(file, "method-trace")
             },
             ManualTraceDurationMs.toLong(),
@@ -433,6 +464,7 @@ object DevProfiling {
             } catch (error: RuntimeException) {
                 Log.e(Tag, "Unable to start system trace ($tag)", error)
                 if (ceremonyStop.get() === stopSignal) ceremonyStop.set(null)
+                if (tag == ManualTag) recordMethodTrace()
                 return
             }
             Log.i(Tag, "Recording ${durationMs}ms system trace tag=$tag")

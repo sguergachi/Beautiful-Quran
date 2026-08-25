@@ -192,17 +192,15 @@ tick must not remasure three pages or recreate 150 `Text` nodes.
 - Ink packs are published into a `State<Map>` and read only inside
   `shapedWordBloom` draw lambdas, so a word boundary invalidates paint,
   not layout.
-- Line width/height probes are `remember`ed against page + constraints +
-  face. QCF page fonts are cached and preloaded on `Dispatchers.Default`
-  for the settled page ± 2 so a swipe does not `Typeface.createFromAsset`
-  on the UI thread.
-- Each Madinah line is **one** shaped `Text` (inline placeholders justify
-  QCF — no U+0020). Neighbours skip `shapedWordBloom` and rasterize in an
-  offscreen layer so a fling transforms a texture, not 150 word nodes.
-  The wash still runs through `shapedWordBloom` on the settled page only.
-  Only the active ayah owns letter-sweep clocks; other ayahs on the page
-  use a single recess cover. Pager click lambdas are remembered so a
-  play/pause tick does not rebuild the page.
+- QCF page fonts are held as one atomic family/typeface pair in a bounded LRU
+  and preloaded on `Dispatchers.Default` for the settled page ± 2, so a swipe
+  does not `Typeface.createFromAsset` on the UI thread. Line geometry is keyed
+  by page, line, size, and measure in a bounded process cache.
+- Each Madinah line owns one pointer-input node, not one per word. Its QCF word
+  nodes retain the directional `shapedWordBloom`, while the leaf itself owns an
+  offscreen layer so a fling transforms a recorded page. Only the settled page
+  runs live ink; neighbours keep static ink, and one page-level accessibility
+  node exposes the canonical Arabic instead of hundreds of private-use glyphs.
 - Chrome (`MushafReadingSheet`) keys the gilt seed on `settledPage`, not
   `currentPage`, so a fling does not regenerate ornaments mid-turn.
 

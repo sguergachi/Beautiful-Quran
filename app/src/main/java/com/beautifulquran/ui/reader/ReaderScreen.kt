@@ -836,16 +836,26 @@ fun ReaderScreen(
     // leaf holds, which is what the label says once the dial has zoomed in far
     // enough for a single leaf to be a thing you can aim at.
     val mushafPageLabel = remember(mushafCatalog, mushafUi) {
-        label@{ page: Int ->
+        label@{ page: Int, requestedSurahId: Int? ->
             val catalog = mushafCatalog ?: return@label null
             val leaf = catalog.page(page) ?: return@label null
-            val surah = mushafUi?.surahsById?.get(leaf.primarySurahId) ?: return@label null
-            val ayahs = leaf.ayahKeys.filter { it.first == leaf.primarySurahId }.map { it.second }
+            val surahId = requestedSurahId?.takeIf { requested ->
+                leaf.ayahKeys.any { it.first == requested }
+            } ?: leaf.primarySurahId
+            val surah = mushafUi?.surahsById?.get(surahId) ?: return@label null
+            var fromAyah = Int.MAX_VALUE
+            var toAyah = Int.MIN_VALUE
+            leaf.ayahKeys.forEach { (id, ayah) ->
+                if (id == surahId) {
+                    fromAyah = minOf(fromAyah, ayah)
+                    toAyah = maxOf(toAyah, ayah)
+                }
+            }
             MushafDialLabel(
-                number = leaf.primarySurahId,
+                number = surahId,
                 chapter = surah.nameTransliteration,
-                fromAyah = ayahs.minOrNull() ?: 1,
-                toAyah = ayahs.maxOrNull() ?: 1,
+                fromAyah = fromAyah.takeUnless { it == Int.MAX_VALUE } ?: 1,
+                toAyah = toAyah.takeUnless { it == Int.MIN_VALUE } ?: 1,
             )
         }
     }
@@ -1513,8 +1523,14 @@ fun ReaderScreen(
         // another chapter's leaf swapped the ink under a composed page; a
         // fade there read as the whole screen flashing out and back).
         LaunchedEffect(content?.surah?.id, startAyah) {
-            if (chapterAdvancing || verseRevealForSurah != 0 || uiState.keepsContentThroughLoad) {
+            if (chapterAdvancing || verseRevealForSurah != 0) {
                 readerContentAlpha.snapTo(1f)
+                DevProfiling.mark("entranceHold s${content?.surah?.id}")
+                return@LaunchedEffect
+            }
+            if (uiState.keepsContentThroughLoad) {
+                readerContentAlpha.snapTo(1f)
+                viewModel.onKeptContentCommitted()
                 DevProfiling.mark("entranceHold s${content?.surah?.id}")
                 return@LaunchedEffect
             }
@@ -2263,6 +2279,7 @@ fun ReaderScreen(
                                     surahId = token.surahId,
                                     startPlaybackAtAyah = token.ayah,
                                     startPlaybackAtWord = token.word.position,
+                                    keepContent = true,
                                 )
                             }
                         }
@@ -2284,7 +2301,11 @@ fun ReaderScreen(
                         if (token.surahId == mushafSurahId) {
                             viewModel.playFromAyah(token.ayah)
                         } else {
-                            viewModel.load(token.surahId, startPlaybackAtAyah = token.ayah)
+                            viewModel.load(
+                                surahId = token.surahId,
+                                startPlaybackAtAyah = token.ayah,
+                                keepContent = true,
+                            )
                         }
                         }
                     }
@@ -2297,7 +2318,6 @@ fun ReaderScreen(
                         activeWordState = activeWordState,
                         playback = mushafPlayback,
                         playbackSpeed = playerState.speed,
-                        fontScale = settings.fontScale,
                         followEnabled = followEnabled,
                         loadedSurahId = mushafSurahId,
                         flashWordPosition = startWordPosition,

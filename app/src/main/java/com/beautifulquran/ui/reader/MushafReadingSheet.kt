@@ -55,7 +55,6 @@ import androidx.media3.common.Player
 import com.beautifulquran.data.PageNumberScript
 import com.beautifulquran.domain.MushafGrid
 import com.beautifulquran.domain.MushafType
-import com.beautifulquran.ui.reader.MushafDialEdgeInset
 import kotlin.math.pow
 import com.beautifulquran.playback.PlayerUiState
 import com.beautifulquran.ui.theme.HafsFontFamily
@@ -100,7 +99,6 @@ private val MushafFolioSpread = 28.dp
 /** The lozenge set between them. */
 private val MushafFolioDiamond = 5.dp
 
-/** Fore-edge margin. The page has no frame, so this is the whole margin. */
 /**
  * Paper outside the mark gutter.
  *
@@ -157,8 +155,8 @@ internal fun MushafReadingSheet(
      *  tiny surahs share a leaf, so Chapter 93's mark is not lost because it
      *  shares paper with 92. */
     chapterPages: IntArray,
-    /** What the dial writes over its thumb for a given leaf. */
-    pageLabel: (Int) -> MushafDialLabel?,
+    /** What the dial writes over its thumb for a leaf and selected chapter. */
+    pageLabel: (page: Int, surahId: Int?) -> MushafDialLabel?,
     chapterLabel: (Int) -> MushafDialLabel? = { null },
     /** Where a scrub landed, once the hand comes off the rule. */
     onSeekPage: (Int) -> Unit,

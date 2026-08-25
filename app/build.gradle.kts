@@ -21,7 +21,7 @@ val releaseKeystore = rootProject.file(env("RELEASE_KEYSTORE_FILE") ?: "release.
 // once wiped the whole qcf-v2-fonts/ subtree that syncQcfFonts had just
 // extracted there, and the APK silently shipped a 110MB Hafs fallback with
 // every mushaf page mis-set. Separate trees cannot race.
-val QcfFontCount = 604
+val qcfFontCount = 604
 val qcfAssetsDir = layout.buildDirectory.dir("generated/qcfAssets/qcf-v2-fonts")
 
 android {
@@ -169,11 +169,6 @@ val syncQuranDbAsset by tasks.registering(Sync::class) {
     }
 }
 
-// The mushaf is the QCF V2 page faces or it is nothing: a build that ships
-// without all 604 renders every leaf in the fallback Hafs face, which is the
-// "misaligned mushaf" failure this task once produced silently. So the task
-// fails the build rather than warning — the parts are git-tracked, so every
-// clone and CI checkout has them.
 val syncQcfFonts by tasks.registering {
     val partsDir = layout.projectDirectory.dir("qcf-v2-fonts")
     val outDir = qcfAssetsDir
@@ -187,7 +182,8 @@ val syncQcfFonts by tasks.registering {
         // extract (build killed mid-extract) leaves QCF2001.qcf plus <604
         // files and would otherwise pass forever via the old sentinel.
         val existing = dest.listFiles { _, name -> name.endsWith(".qcf") }.orEmpty()
-        if (existing.size == QcfFontCount && dest.resolve("QCF2001.qcf").isFile) return@doLast
+        if (existing.size == qcfFontCount && dest.resolve("QCF2001.qcf").isFile) return@doLast
+        existing.forEach { check(it.delete()) { "Failed to remove stale QCF face $it" } }
         val parts = partsDir.asFile.listFiles { _, name ->
             name.startsWith("qcf-v2-fonts.tar.xz.part")
         }?.sortedBy { it.name }.orEmpty()
@@ -202,11 +198,13 @@ val syncQcfFonts by tasks.registering {
         archive.outputStream().use { out ->
             parts.forEach { part -> part.inputStream().use { it.copyTo(out) } }
         }
-        val extract = ProcessBuilder(
-            "bash", "-lc",
-            "xz -dc '${archive.absolutePath}' | tar -x -C '${dest.parentFile.absolutePath}'",
-        ).inheritIO().start()
-        check(extract.waitFor() == 0) { "Failed to extract QCF V2 fonts" }
+        val extractors = ProcessBuilder.startPipeline(
+            listOf(
+                ProcessBuilder("xz", "-dc", archive.absolutePath),
+                ProcessBuilder("tar", "-x", "-C", dest.parentFile.absolutePath),
+            ),
+        )
+        check(extractors.all { it.waitFor() == 0 }) { "Failed to extract QCF V2 fonts" }
         check(dest.resolve("QCF2001.ttf").isFile) {
             "QCF extract did not produce ${dest.resolve("QCF2001.ttf")}"
         }
@@ -220,8 +218,8 @@ val syncQcfFonts by tasks.registering {
         // Partial extracts ship a half-dressed mushaf that is miserable to
         // diagnose from the glass. Count here, fail here.
         val fonts = dest.listFiles { _, name -> name.endsWith(".qcf") }.orEmpty()
-        check(fonts.size == QcfFontCount) {
-            "QCF extract produced ${fonts.size}/$QcfFontCount page fonts in $dest"
+        check(fonts.size == qcfFontCount) {
+            "QCF extract produced ${fonts.size}/$qcfFontCount page fonts in $dest"
         }
     }
 }

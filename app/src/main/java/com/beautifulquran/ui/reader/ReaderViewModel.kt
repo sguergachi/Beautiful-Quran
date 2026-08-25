@@ -630,6 +630,13 @@ class ReaderViewModel(
         )
     }
 
+    /** Consumes the one-shot entrance hold after the kept chapter is on glass. */
+    fun onKeptContentCommitted() {
+        if (_uiState.value.keepsContentThroughLoad) {
+            _uiState.value = _uiState.value.copy(keepsContentThroughLoad = false)
+        }
+    }
+
     private suspend fun onReciterChanged() {
         val gen = sessions.generation
         val id = sessions.surahId

@@ -417,8 +417,9 @@ horizontal page turn — draggable, fling-able, with page-turn audio
   bottom. Floating Back-to / return-to-ayah ornaments share
   `FloatingPaperControl` (enter/exit + bottom inset) with the cover float. All scrolling and verse-position logic routes through the
   focus engine (`reader/focus/`, see below).
-- `settings/SettingsScreen` — reciter plus two sibling detail sheets,
-  Customize and Download manager, reached by tap or horizontal page swipe.
+- `settings/SettingsScreen` — reciter plus two detail leaves in the app's
+  physical paper stack, Customize and Download manager, reached by tap or
+  horizontal page turn.
   Customize owns text size, translation visibility, view, layout, verse and
   page numbers, theme, annotations, ayah-selector side, word-by-word gloss,
   with a pinned faded-leaf preview, a full-bleed paper dissolve under it,

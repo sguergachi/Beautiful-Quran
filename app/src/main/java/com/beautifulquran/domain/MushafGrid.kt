@@ -15,11 +15,12 @@ import kotlin.math.pow
  *
  * ```
  *  0.3  running head — the smallest hand on the leaf
- * 0.32  head gutter — enough paper to stand the head off the text
+ *  0.7  head gutter — enough paper to stand the head off the text
  *  15   the revelation — the Madinah page's own grid
+ * 0.35  tail — paper between revelation and folio
  *  0.4  folio, its figure centred in the band
  *  ---
- * 16.02
+ * 16.75
  * ```
  *
  * The furniture is trimmed to what it actually needs to read as furniture,

@@ -99,6 +99,8 @@ import com.beautifulquran.ui.theme.HafsFontFamily
 import com.beautifulquran.ui.theme.InkCircledChoiceRow
 import com.beautifulquran.ui.theme.LocalQuranAccents
 import com.beautifulquran.ui.theme.TranslationFontFamily
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import com.beautifulquran.ui.theme.shippedCheckParams
 import com.beautifulquran.ui.theme.verticalFadingEdges
 
@@ -373,9 +375,14 @@ internal fun ReadingPreview(
 ) {
     // Every sp inside the preview, marks and folio included, rides the
     // reader's text-size dial — the miniature is the reader at one glance.
+    val previewFontScale = if (readingLayout == ReadingLayout.MUSHAF) {
+        1f
+    } else {
+        LocalDensity.current.fontScale * fontScale
+    }
     val previewDensity = Density(
         density = LocalDensity.current.density,
-        fontScale = LocalDensity.current.fontScale * fontScale,
+        fontScale = previewFontScale,
     )
     val arabicOnly = readingLayout == ReadingLayout.MUSHAF ||
         readingMode == ReadingMode.ARABIC_ONLY
@@ -411,81 +418,81 @@ internal fun ReadingPreview(
         PreviewHeightLock(contentPad)
         CompositionLocalProvider(LocalDensity provides previewDensity) {
             Column(Modifier.matchParentSize().clipToBounds().then(contentPad)) {
-            if (readingLayout == ReadingLayout.MUSHAF) {
-                PreviewMushafLeaf(
-                    pageNumberScript = pageNumberScript,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            } else if (englishOnly) {
-                PreviewEnglishLyric(
-                    SAMPLE_ENGLISH,
-                    number = SAMPLE_AYAH_1,
-                    arabicMarks = arabicMarks,
-                )
-                PageBreak(
-                    page = SAMPLE_PAGE,
-                    script = pageNumberScript,
-                    contentPadding = PreviewFolioPad,
-                )
-                PreviewEnglishLyric(
-                    SAMPLE_ENGLISH_2,
-                    number = SAMPLE_AYAH_2,
-                    arabicMarks = arabicMarks,
-                )
-            } else {
-                PreviewArabicLine(
-                    SAMPLE_ARABIC_1,
-                    number = SAMPLE_AYAH_1,
-                    arabicMarks = arabicMarks,
-                    showGloss = showGloss,
-                )
-                if (!arabicOnly) {
-                    if (showTransliteration) {
-                        Spacer(Modifier.height(8.dp))
-                        Text(
-                            text = SAMPLE_TRANSLIT,
-                            fontFamily = TranslationFontFamily,
-                            fontSize = PreviewLyricSize * 13f / 18f,
-                            lineHeight = 1.4.em,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-                        )
-                    }
-                    if (showTranslation) {
-                        Spacer(Modifier.height(12.dp))
-                        PreviewTranslation()
-                    }
-                }
-                if (showNote) {
-                    Spacer(Modifier.height(12.dp))
-                    PreviewAnnotation()
-                }
-                PageBreak(
-                    page = SAMPLE_PAGE,
-                    script = pageNumberScript,
-                    contentPadding = PreviewFolioPad,
-                )
-                if (arabicOnly) {
-                    PreviewArabicLine(
-                        SAMPLE_ARABIC_2,
+                if (readingLayout == ReadingLayout.MUSHAF) {
+                    PreviewMushafLeaf(
+                        pageNumberScript = pageNumberScript,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                } else if (englishOnly) {
+                    PreviewEnglishLyric(
+                        SAMPLE_ENGLISH,
+                        number = SAMPLE_AYAH_1,
+                        arabicMarks = arabicMarks,
+                    )
+                    PageBreak(
+                        page = SAMPLE_PAGE,
+                        script = pageNumberScript,
+                        contentPadding = PreviewFolioPad,
+                    )
+                    PreviewEnglishLyric(
+                        SAMPLE_ENGLISH_2,
                         number = SAMPLE_AYAH_2,
                         arabicMarks = arabicMarks,
                     )
+                } else {
+                    PreviewArabicLine(
+                        SAMPLE_ARABIC_1,
+                        number = SAMPLE_AYAH_1,
+                        arabicMarks = arabicMarks,
+                        showGloss = showGloss,
+                    )
+                    if (!arabicOnly) {
+                        if (showTransliteration) {
+                            Spacer(Modifier.height(8.dp))
+                            Text(
+                                text = SAMPLE_TRANSLIT,
+                                fontFamily = TranslationFontFamily,
+                                fontSize = PreviewLyricSize * 13f / 18f,
+                                lineHeight = 1.4.em,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                            )
+                        }
+                        if (showTranslation) {
+                            Spacer(Modifier.height(12.dp))
+                            PreviewTranslation()
+                        }
+                    }
+                    if (showNote) {
+                        Spacer(Modifier.height(12.dp))
+                        PreviewAnnotation()
+                    }
+                    PageBreak(
+                        page = SAMPLE_PAGE,
+                        script = pageNumberScript,
+                        contentPadding = PreviewFolioPad,
+                    )
+                    if (arabicOnly) {
+                        PreviewArabicLine(
+                            SAMPLE_ARABIC_2,
+                            number = SAMPLE_AYAH_2,
+                            arabicMarks = arabicMarks,
+                        )
+                    }
                 }
             }
+            if (showRail) {
+                PreviewAyahRail(
+                    side = ayahSelectorSide,
+                    modifier = Modifier.align(
+                        if (ayahSelectorSide == AyahSelectorSide.RIGHT) {
+                            Alignment.CenterEnd
+                        } else {
+                            Alignment.CenterStart
+                        },
+                    ),
+                )
+            }
         }
-        if (showRail) {
-            PreviewAyahRail(
-                side = ayahSelectorSide,
-                modifier = Modifier.align(
-                    if (ayahSelectorSide == AyahSelectorSide.RIGHT) {
-                        Alignment.CenterEnd
-                    } else {
-                        Alignment.CenterStart
-                    },
-                ),
-            )
-        }
-    }
     }
 }
 
@@ -506,16 +513,24 @@ private fun PreviewMushafLeaf(
 ) {
     val context = LocalContext.current
     var page by remember { mutableStateOf<MushafPage?>(null) }
-    LaunchedEffect(Unit) {
-        page = (context.applicationContext as QuranApp).repository
-            .mushafCatalog()
-            .page(PreviewMushafPage)
+    val residentFace = remember { MushafQcfFonts.cached(PreviewMushafPage) }
+    var qcfFace by remember { mutableStateOf(residentFace) }
+    LaunchedEffect(context) {
+        val (loadedPage, loadedFace) = withContext(Dispatchers.Default) {
+            val catalog = (context.applicationContext as QuranApp).repository.mushafCatalog()
+            catalog.page(PreviewMushafPage) to
+                (residentFace ?: MushafQcfFonts.face(context, PreviewMushafPage))
+        }
+        page = loadedPage
+        qcfFace = loadedFace
     }
-    val face = remember { MushafQcfFonts.family(context, PreviewMushafPage) }
-    val typeface = remember(face) { MushafQcfFonts.cachedTypeface(PreviewMushafPage) }
+    val face = qcfFace?.family
+    val typeface = qcfFace?.typeface
     val gold = LocalQuranAccents.current.gold
-    val lines = page?.lines.orEmpty().filter {
-        it.number in PreviewMushafLineFirst..PreviewMushafLineLast
+    val lines = remember(page) {
+        page?.lines.orEmpty().filter {
+            it.number in PreviewMushafLineFirst..PreviewMushafLineLast
+        }
     }
     Column(
         modifier = modifier,

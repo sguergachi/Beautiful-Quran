@@ -100,7 +100,7 @@ internal fun MushafHafsLine(
     val ayahMarkInk = LocalQuranAccents.current.gold
     val glintInk = LocalQuranAccents.current.glintInk
     val useQcf = pageFont != null && line.tokens.any { it.word.qcfV2.isNotEmpty() }
-    if (useQcf && pageFont != null) {
+    if (useQcf) {
         MushafQcfPageLine(
             line = line,
             page = page,
@@ -232,8 +232,18 @@ internal class MushafLineGeometry(
     val fit: MushafLineFit,
 )
 
-private val lineGeometryCache = object : LinkedHashMap<Long, MushafLineGeometry>(64, 0.75f, true) {
-    override fun removeEldestEntry(eldest: MutableMap.MutableEntry<Long, MushafLineGeometry>) =
+private data class MushafLineGeometryKey(
+    val page: Int,
+    val line: Int,
+    val fontPxBits: Int,
+    val measureWidthPxBits: Int,
+)
+
+private val lineGeometryCache =
+    object : LinkedHashMap<MushafLineGeometryKey, MushafLineGeometry>(64, 0.75f, true) {
+    override fun removeEldestEntry(
+        eldest: MutableMap.MutableEntry<MushafLineGeometryKey, MushafLineGeometry>,
+    ) =
         size > 512
 }
 
@@ -242,9 +252,12 @@ private fun lineGeometryKey(
     line: Int,
     fontPx: Float,
     measureWidthPx: Float,
-): Long = ((page.toLong() * 1000 + line) * 8192 + fontPx.rawBits()) * 8192 + measureWidthPx.rawBits()
-
-private fun Float.rawBits(): Long = java.lang.Float.floatToIntBits(this).toLong() and 0xFFFFFFFFL
+): MushafLineGeometryKey = MushafLineGeometryKey(
+    page = page,
+    line = line,
+    fontPxBits = fontPx.toRawBits(),
+    measureWidthPxBits = measureWidthPx.toRawBits(),
+)
 
 @Composable
 private fun lineGeometry(
@@ -397,8 +410,10 @@ private fun MushafQcfPageLine(
         var best = -1
         var bestDist = Float.MAX_VALUE
         for (i in cells.indices) {
-            val left = origins.getOrElse(i) { 0f }
-            val right = left + cells[i].advance
+            val cell = cells[i]
+            val origin = origins.getOrElse(i) { 0f }
+            val left = origin + minOf(cell.inkLeft, cell.inkRight)
+            val right = origin + maxOf(cell.inkLeft, cell.inkRight)
             val d = when {
                 x in left..right -> 0f
                 x < left -> left - x
@@ -416,7 +431,7 @@ private fun MushafQcfPageLine(
     Layout(
         modifier = modifier
             .fillMaxWidth()
-            .pointerInput(line, onWordClick, onWordLongClick, onAyahClick, hitSlopPx) {
+            .pointerInput(line, cells, onWordClick, onWordLongClick, onAyahClick, hitSlopPx) {
                 detectTapGestures(
                     onTap = { pos ->
                         val token = tokenAt(pos.x)

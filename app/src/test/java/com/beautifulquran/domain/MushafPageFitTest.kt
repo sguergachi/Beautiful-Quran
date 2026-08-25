@@ -51,7 +51,7 @@ class MushafPageFitTest {
     @Test
     fun `a full page fills the well and a short page keeps its leading`() {
         // 15 lines divide the whole well; 8 lines take 8 of the same slots
-        // and centre, rather than stretching one page's leading to fit.
+        // from the head, rather than stretching one page's leading to fit.
         assertEquals(15, mushafGridSlots(15))
         assertEquals(15, mushafGridSlots(8))
         assertEquals(15, mushafGridSlots(1))
@@ -87,21 +87,6 @@ class MushafPageFitTest {
         val font = mushafUniformFontPx(measureWidthPx = 2000f, wellHeightPx = 1400f, slots = 15)
         // The size a line's own ink will fit in the paper the well gives it.
         assertEquals(1400f / (15f * MUSHAF_LINE_INK_EM), font, 0.01f)
-    }
-
-    @Test
-    fun `the reader's size nudge cannot push a line's ink out of its slot`() {
-        // Applied after the well had spoken, a larger text size grew the ink
-        // while its slot stayed as tall, and descenders went into the line
-        // below. The largest nudge must still fit the paper the well gives.
-        val well = 1400f
-        val big = mushafUniformFontPx(
-            measureWidthPx = 2000f,
-            wellHeightPx = well,
-            slots = 15,
-            fontScale = 1.12f,
-        )
-        assertTrue("ink overflows its slot", big * MUSHAF_LINE_INK_EM <= well / 15f + 0.01f)
     }
 
     @Test

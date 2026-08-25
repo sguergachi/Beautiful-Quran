@@ -139,22 +139,16 @@ const val MUSHAF_DESIGN_LINE_EM = 16.4f
 
 /**
  * The one type size for every leaf: the measure divided by the design line,
- * never taller than the well can carry fifteen lines of. [fontScale] is the
- * reader's nudge around it, not a free resize.
+ * never taller than the well can carry fifteen lines of. The printed page owns
+ * this size; reader text-scale preferences apply only to the scroll layout.
  */
 fun mushafUniformFontPx(
     measureWidthPx: Float,
     wellHeightPx: Float,
     slots: Int,
-    fontScale: Float = 1f,
 ): Float {
     if (measureWidthPx <= 0f || wellHeightPx <= 0f || slots <= 0) return MUSHAF_MIN_FONT_PX
-    val scale = fontScale.coerceIn(0.88f, 1.12f)
-    val fromMeasure = measureWidthPx / MUSHAF_DESIGN_LINE_EM * scale
-    // The reader's own size nudge is inside this, not outside it: applied after
-    // the well had spoken, a larger text size grew the ink by a tenth while the
-    // slot it sits in stayed exactly as tall, and the descenders went into the
-    // line below. The type stops growing where its ink would stop fitting.
+    val fromMeasure = measureWidthPx / MUSHAF_DESIGN_LINE_EM
     val fromWell = wellHeightPx / (slots * MUSHAF_LINE_INK_EM)
     return minOf(fromMeasure, fromWell)
         .coerceIn(MUSHAF_MIN_FONT_PX, MUSHAF_MAX_FONT_PX)
