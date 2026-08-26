@@ -773,9 +773,12 @@ fun ReaderScreen(
     // whether it is taller than the screen — the return-to-verse control reads
     // the former, the word-level follow gate reads the latter. Both watch
     // layoutInfo, so they recompute only when their answer actually changes.
-    // During the basmalah lead-in the target is ayah 0 (the basmalah list item).
+    // The camera follows the media item, not the fade-led ink target: lifting
+    // the next ayah's recess early must not move the page before its audio.
+    // During the basmalah lead-in the target is ayah 0 (its dedicated item).
+    val listeningAyah = playerState.nowPlaying?.ayah
     val playbackFocusTarget = FocusEngine.playbackFocusTarget(
-        activeAyah = activeAyah,
+        playingAyah = listeningAyah?.takeIf { it >= 1 && isThisSurahPlaying },
         activeBasmalah = isThisSurahPlaying && activeBasmalah == true,
     )
     val activeAyahPlacement = remember(playbackFocusTarget) {
@@ -1038,7 +1041,6 @@ fun ReaderScreen(
     // recorded a verse the listener never reached — breaking the repository's
     // "only verses actually recited" contract. Ayah 0 is the basmalah lead-in
     // and is filtered by the >= 1 guard.
-    val listeningAyah = playerState.nowPlaying?.ayah
     LaunchedEffect(listeningAyah, isThisSurahPlaying, playerState.isPlaying) {
         if (listeningAyah != null && listeningAyah >= 1 &&
             isThisSurahPlaying && playerState.isPlaying
@@ -2399,6 +2401,25 @@ fun ReaderScreen(
                         }
                         }
                     }
+                    val onMushafBasmalahClick = remember(
+                        mushafSurahId,
+                        viewModel,
+                        mushafReady.catalog,
+                    ) {
+                        { surahId: Int ->
+                            mushafTappedPage = mushafReady.catalog.firstPageOf(surahId)
+                            mushafDispatch.value(ReaderInteractionEvent.EnableFollow)
+                            if (surahId == mushafSurahId) {
+                                viewModel.playFromAyah(1)
+                            } else {
+                                viewModel.load(
+                                    surahId = surahId,
+                                    startPlaybackAtAyah = 1,
+                                    keepContent = true,
+                                )
+                            }
+                        }
+                    }
                     MushafPager(
                         catalog = mushafReady.catalog,
                         content = content,
@@ -2418,6 +2439,7 @@ fun ReaderScreen(
                         onWordClick = onMushafWordClick,
                         onWordLongClick = onMushafWordLongClick,
                         onAyahClick = onMushafAyahClick,
+                        onBasmalahClick = onMushafBasmalahClick,
                         pageNumberScript = settings.pageNumberScript,
                         modifier = Modifier.fillMaxSize(),
                     )

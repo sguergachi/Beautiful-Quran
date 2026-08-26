@@ -201,7 +201,9 @@ tick must not remasure three pages or recreate 150 `Text` nodes.
   offscreen layer so a fling transforms a recorded page. The settled page runs
   live ink; during an automatic turn the voice's page may join it so a short
   opening word does not restart its wash when the leaf lands. Other neighbours
-  keep static ink, and one page-level accessibility node exposes the canonical
+  keep static ink. On the voice's page, only the active ayah owns word motions:
+  completed ayahs use a static full-ink pack and later ayahs share a motionless
+  recess pack. One page-level accessibility node exposes the canonical
   Arabic instead of hundreds of private-use glyphs.
 - Chrome (`MushafReadingSheet`) keys the gilt seed on `settledPage`, not
   `currentPage`, so a fling does not regenerate ornaments mid-turn.

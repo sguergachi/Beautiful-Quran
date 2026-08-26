@@ -16,6 +16,8 @@ internal data class AyahInkPack(
     val recessCover: State<Float>,
     val markAlpha: State<Float>,
     val searchHitWash: RepeatWash,
+    /** A motionless mushaf ayah that still waits beneath the page recess. */
+    val wholeAyahRecess: Boolean = false,
 )
 
 /**

@@ -832,12 +832,13 @@ private fun MushafQcfWord(
         )
     }
     var layoutResult by remember { mutableStateOf<TextLayoutResult?>(null) }
-    // Only the verse under the voice carries wash layers. A static word's
-    // alpha is always 1 — the recess is gone — so its layers were pure
-    // overhead, and a leaf hands the transformed-rect walk ~150 of them:
-    // profiled on device, the walk ran on every frame of a swipe.
-    val hasInk = liveInk &&
-        packs[token.surahId to token.ayah]?.motions?.isNotEmpty() == true
+    val pack = packs[token.surahId to token.ayah]
+    // Only the verse under the voice carries wash layers. A waiting ayah needs
+    // the cheaper glyph-alpha draw modifier, but never the wash/tint layers;
+    // completed and manually browsed words carry neither. This keeps the page
+    // progression without restoring ~150 transformed nodes to every leaf.
+    val hasMotionInk = liveInk && pack?.motions?.isNotEmpty() == true
+    val hasWholeAyahRecess = liveInk && pack?.wholeAyahRecess == true
     // A word waiting its turn is dimmed by its own alpha, not by paper laid
     // over it. A paper mask is a rectangle on a word's box, and a QCF glyph
     // inks past that box — so the mask left the overhang at full strength,
@@ -882,12 +883,11 @@ private fun MushafQcfWord(
             ?.washFeather ?: InkEngine.tuning.washFeather
     }
     val blooms = {
-        if (!liveInk) {
+        if (!hasMotionInk) {
             emptyList()
         } else {
-            val pack = packs[token.surahId to token.ayah]
-            val motion = pack?.motions?.getOrNull(token.word.position - 1)
-            if (pack == null || motion == null ||
+            val motion = pack.motions.getOrNull(token.word.position - 1)
+            if (motion == null ||
                 (!motion.isActive && motion.ink.state == InkEngine.State.Upcoming)
             ) {
                 // Waiting words carry no bloom at all now: their dim is the
@@ -935,27 +935,26 @@ private fun MushafQcfWord(
             // frame of a swipe. A static word's ink is always full, so it
             // carries no layers at all.
             .then(
-                if (!hasInk) {
-                    Modifier
-                } else {
-                    // Both washes work on the word's own drawing, so the ink is
-                    // masked by its own coverage — a tail, a mark, the circled
-                    // number all fade with the letter they belong to, and no
-                    // edge can fall across a stroke. This is the same pair the
-                    // scrolling reader uses; the leaf used to lay paper over a
-                    // rectangle instead, which is what showed as clipping.
-                    Modifier
-                        .glyphLayerAlpha { recessAlpha() }
-                        .letterFadeIn(
-                            progress = { wordSweep() },
-                            rtl = true,
-                            restingAlpha = InkEngine.State.Upcoming.inkAlpha(),
-                            feather = wordFeather(),
-                        )
+                when {
+                    hasMotionInk -> {
+                        // Both washes work on the word's own drawing, so the
+                        // ink is masked by its own coverage and no edge can
+                        // fall across a tail, high mark, or circled number.
+                        Modifier
+                            .glyphLayerAlpha { recessAlpha() }
+                            .letterFadeIn(
+                                progress = { wordSweep() },
+                                rtl = true,
+                                restingAlpha = InkEngine.State.Upcoming.inkAlpha(),
+                                feather = wordFeather(),
+                            )
+                    }
+                    hasWholeAyahRecess -> Modifier.glyphLayerAlpha { recessAlpha() }
+                    else -> Modifier
                 },
             )
             .then(
-                if (!hasInk) {
+                if (!hasMotionInk) {
                     Modifier
                 } else {
                     Modifier.mushafLineInk(

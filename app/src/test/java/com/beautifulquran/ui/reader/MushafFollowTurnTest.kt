@@ -48,14 +48,47 @@ class MushafFollowTurnTest {
     }
 
     @Test
-    fun `fade-led ayah without a word leaves the mushaf fully inked`() {
+    fun `basmalah starts a voice page with every ayah waiting under paper`() {
         assertEquals(
-            MushafInkPackKind.STATIC,
+            MushafInkPackKind.UPCOMING,
             mushafInkPackKind(
-                playingHere = true,
-                hasActiveWord = false,
+                pageOwnsVoice = true,
+                ayah = 1,
+                activeWordAyah = null,
+                frontierAyah = null,
+                basmalahActive = true,
                 hasSearchFlash = false,
             ),
+        )
+        // A word retained from the outgoing playlist cannot steal the first
+        // ayah's pack while the basmalah is the real timing owner.
+        assertEquals(
+            MushafInkPackKind.UPCOMING,
+            mushafInkPackKind(true, 1, 1, 1, true, false),
+        )
+    }
+
+    @Test
+    fun `voice page retains read ayahs and covers those beyond the active word`() {
+        assertEquals(
+            MushafInkPackKind.STATIC,
+            mushafInkPackKind(true, 4, 5, 5, false, false),
+        )
+        assertEquals(
+            MushafInkPackKind.ACTIVE_WORD,
+            mushafInkPackKind(true, 5, 5, 5, false, false),
+        )
+        assertEquals(
+            MushafInkPackKind.UPCOMING,
+            mushafInkPackKind(true, 6, 5, 5, false, false),
+        )
+    }
+
+    @Test
+    fun `a manually browsed page remains fully readable`() {
+        assertEquals(
+            MushafInkPackKind.STATIC,
+            mushafInkPackKind(false, 6, 5, 5, false, false),
         )
     }
 
@@ -64,8 +97,11 @@ class MushafFollowTurnTest {
         assertEquals(
             MushafInkPackKind.SEARCH_FLASH,
             mushafInkPackKind(
-                playingHere = false,
-                hasActiveWord = false,
+                pageOwnsVoice = false,
+                ayah = 8,
+                activeWordAyah = null,
+                frontierAyah = null,
+                basmalahActive = false,
                 hasSearchFlash = true,
             ),
         )

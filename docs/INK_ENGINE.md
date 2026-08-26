@@ -448,8 +448,10 @@ tween-vs-snap rules, sweep entry and residual rules, repeat wash timing, the
   from the same latency-corrected heard position, a contract enforced in
   `ReaderViewModel`; the highlight lead is suppressed during encoded silence
   before the first word — see
-  [OUTPUT_LATENCY.md](OUTPUT_LATENCY.md). `focusEngineEnabled` is a session-only
-  lab freeze and is never persisted.
+  [OUTPUT_LATENCY.md](OUTPUT_LATENCY.md). The lead prepares ink only: scrolling
+  follows the actual Media3 ayah boundary, so the next verse does not move into
+  focus before it is heard. `focusEngineEnabled` is a session-only lab freeze
+  and is never persisted.
 - **One motion lifecycle, two paint adapters.** `AyahBlock` derives the ayah's
   `InkEngine.Word` list once (the single `InkEngine.word(...)` call site), then
   builds one aligned `InkMotion` per word. `InkMotion` exclusively owns base
@@ -462,6 +464,12 @@ tween-vs-snap rules, sweep entry and residual rules, repeat wash timing, the
   creates an `Animatable`, `SideEffect`, ordered gate, or word-motion lifecycle.
   The two shaped modes still keep independent text construction because their
   typography differs; only their motion-to-bloom adapter is shared.
+- **Mushaf progression is page-local.** The leaf carrying the voice begins
+  beneath the Upcoming paper cover; its active word uses the same motion pack
+  as the scrolling reader, completed ayahs retain full ink, and later ayahs use
+  a motionless recess pack. A leaf reached by hand stays fully readable, even
+  while playback continues elsewhere. The chapter-opening basmalah is part of
+  that sequence: tapping it starts its own wash before the first ayah.
 - Every **highlight** duration, alpha and easing still comes from
   `InkEngine.tuning` — no literal ink-tuning values remain. Motion outside the
   word highlight stays local (for example the block fade while the ayah-selector
