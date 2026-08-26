@@ -1,6 +1,7 @@
 package com.beautifulquran.ui.reader
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -44,5 +45,82 @@ class MushafFollowTurnTest {
         // Zero would divide the dwell into an eternity and strand the reader
         // on a leaf the voice has left.
         assertTrue(mushafTurnLeadDelayMs(1_000L, 0f) < 60_000L)
+    }
+
+    @Test
+    fun `fade-led ayah without a word leaves the mushaf fully inked`() {
+        assertEquals(
+            MushafInkPackKind.STATIC,
+            mushafInkPackKind(
+                playingHere = true,
+                hasActiveWord = false,
+                hasSearchFlash = false,
+            ),
+        )
+    }
+
+    @Test
+    fun `an idle search hit owns a flash pack without becoming playback`() {
+        assertEquals(
+            MushafInkPackKind.SEARCH_FLASH,
+            mushafInkPackKind(
+                playingHere = false,
+                hasActiveWord = false,
+                hasSearchFlash = true,
+            ),
+        )
+    }
+
+    @Test
+    fun `voice page keeps live clocks while the old page settles out`() {
+        assertTrue(mushafUsesLiveInk(isSettled = false, isVoicePage = true))
+        assertTrue(mushafUsesLiveInk(isSettled = true, isVoicePage = false))
+        assertFalse(mushafUsesLiveInk(isSettled = false, isVoicePage = false))
+    }
+
+    @Test
+    fun `a repeat at the page tail does not turn forward`() {
+        assertFalse(
+            mushafTailTurnAllowed(
+                nextTimingPage = 58,
+                followingPage = 59,
+                isFinalAyah = false,
+            ),
+        )
+        assertTrue(
+            mushafTailTurnAllowed(
+                nextTimingPage = 59,
+                followingPage = 59,
+                isFinalAyah = false,
+            ),
+        )
+        assertFalse(
+            mushafTailTurnAllowed(
+                nextTimingPage = null,
+                followingPage = 59,
+                isFinalAyah = true,
+            ),
+        )
+    }
+
+    @Test
+    fun `a delayed turn cannot be inherited by another word or seek`() {
+        val expected = ActiveWord(
+            ayah = 77,
+            wordPosition = 27,
+            startMs = 1_000,
+            durationMs = 800,
+            activation = 4,
+        )
+        assertTrue(mushafSameActivation(expected, expected.copy()))
+        assertFalse(mushafSameActivation(expected, expected.copy(wordPosition = 25)))
+        assertFalse(mushafSameActivation(expected, expected.copy(activation = 5)))
+        assertFalse(mushafSameActivation(expected, null))
+    }
+
+    @Test
+    fun `mushaf return direction compares leaves rather than hidden list rows`() {
+        assertTrue(mushafReturnPointsUp(currentPage = 120, playbackPage = 118))
+        assertFalse(mushafReturnPointsUp(currentPage = 120, playbackPage = 122))
     }
 }

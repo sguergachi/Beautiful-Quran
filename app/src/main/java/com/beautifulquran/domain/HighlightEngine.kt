@@ -33,6 +33,9 @@ object HighlightEngine {
          * running into the next word (Arabic-only paper-cover flicker).
          */
         val holdEndMs: Long,
+        /** Position owned by the next timing segment, including a repeat
+         * backtrack, or null when this is the final segment in the ayah. */
+        val nextPosition: Int?,
         val isRepeat: Boolean,
         val highWater: Int,
         /** First word of the current repeat chain: while the reciter is
@@ -66,6 +69,7 @@ object HighlightEngine {
                 startMs = seg.startMs,
                 endMs = seg.endMs,
                 holdEndMs = holdEndMs.coerceAtLeast(seg.startMs),
+                nextPosition = segments.getOrNull(idx + 1)?.position,
                 isRepeat = seg.position <= maxBefore,
                 highWater = maxOf(maxBefore, seg.position),
                 repeatStart = repeatStartByIndex[idx],

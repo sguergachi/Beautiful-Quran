@@ -57,6 +57,8 @@ data class ActiveWord(
      * hold across the gap to the next word. Tajweed pacing distributes the
      * letters over this share of [durationMs] and rests for the remainder. */
     val spokenMs: Long = durationMs,
+    /** Next timing owner, including a repeat backtrack; null at ayah end. */
+    val nextWordPosition: Int? = null,
     val isRepeat: Boolean = false,
     val highWater: Int = wordPosition,
     /** First word of the active repeat chain: while repeating, words
@@ -401,6 +403,7 @@ class ReaderViewModel(
                     durationMs = (it.holdEndMs - it.startMs).coerceAtLeast(0L),
                     spokenMs = (it.endMs - it.startMs)
                         .coerceIn(0L, (it.holdEndMs - it.startMs).coerceAtLeast(0L)),
+                    nextWordPosition = it.nextPosition,
                     isRepeat = it.isRepeat,
                     highWater = it.highWater,
                     repeatStart = it.repeatStart,

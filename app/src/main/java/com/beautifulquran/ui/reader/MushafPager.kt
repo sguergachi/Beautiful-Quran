@@ -117,6 +117,17 @@ internal data class MushafPlayback(
     val playingHere: Boolean,
     /** The chapter's opening basmalah is the thing being recited. */
     val basmalahActive: Boolean = false,
+    /** Undebounced player truth; page turns must stop on the first pause. */
+    val isPlaying: Boolean = false,
+)
+
+/** Stable equality key for the small set of voice changes follow reacts to. */
+private data class MushafFollowMoment(
+    val word: ActiveWord?,
+    val activeAyah: Int?,
+    val basmalahActive: Boolean,
+    val playingHere: Boolean,
+    val isPlaying: Boolean,
 )
 
 /**
@@ -184,6 +195,43 @@ private const val MushafTurnLeadMs = 500L
 internal fun mushafTurnLeadDelayMs(durationMs: Long, speed: Float): Long =
     ((durationMs / speed.coerceAtLeast(0.1f)).toLong() - MushafTurnLeadMs)
         .coerceAtLeast(0L)
+
+/** A second page owns clocks only while the voice is crossing onto it. */
+internal fun mushafUsesLiveInk(isSettled: Boolean, isVoicePage: Boolean): Boolean =
+    isSettled || isVoicePage
+
+internal enum class MushafInkPackKind { ACTIVE_WORD, SEARCH_FLASH, STATIC }
+
+/** Which clock pack an ayah owns on the full-ink mushaf leaf. */
+internal fun mushafInkPackKind(
+    playingHere: Boolean,
+    hasActiveWord: Boolean,
+    hasSearchFlash: Boolean,
+): MushafInkPackKind = when {
+    playingHere && hasActiveWord -> MushafInkPackKind.ACTIVE_WORD
+    hasSearchFlash -> MushafInkPackKind.SEARCH_FLASH
+    else -> MushafInkPackKind.STATIC
+}
+
+/** A timing backtrack at a physical page tail must not turn the leaf forward. */
+internal fun mushafTailTurnAllowed(
+    nextTimingPage: Int?,
+    followingPage: Int,
+    isFinalAyah: Boolean,
+): Boolean = !isFinalAyah &&
+    (nextTimingPage == null || nextTimingPage == followingPage)
+
+/** Delayed turns retain ownership only while the exact activation survives. */
+internal fun mushafSameActivation(expected: ActiveWord, current: ActiveWord?): Boolean =
+    current != null &&
+        expected.ayah == current.ayah &&
+        expected.wordPosition == current.wordPosition &&
+        expected.startMs == current.startMs &&
+        expected.activation == current.activation
+
+/** The return ornament points toward the playback leaf in book order. */
+internal fun mushafReturnPointsUp(currentPage: Int, playbackPage: Int): Boolean =
+    playbackPage < currentPage
 
 private const val MushafLeafFadeMs = 220
 
@@ -259,8 +307,9 @@ private fun Modifier.mushafForeEdgeFade(paper: Color, band: Dp): Modifier = draw
 }
 
 /**
- * Virtualized 604-page mushaf. Only the settled page runs ink clocks;
- * neighbours paint static Hafs so a fling never starts 30+ wash loops.
+ * Virtualized 604-page mushaf. The settled page runs ink clocks, joined only
+ * by the voice's page during a turn; other neighbours paint static Hafs so a
+ * fling never starts 30+ wash loops.
  */
 @Composable
 internal fun MushafPager(
@@ -287,6 +336,7 @@ internal fun MushafPager(
      * finger.
      */
     heldPage: Int?,
+    flashAyah: Int?,
     flashWordPosition: Int?,
     /**
      * True while the page dial is under a hand. The folio and the dial's label
@@ -310,16 +360,35 @@ internal fun MushafPager(
     // changes speed mid-recitation.
     val speedNow = rememberUpdatedState(playbackSpeed)
     LaunchedEffect(followEnabled, loadedSurahId, catalog, pagerState, heldPage) {
-        snapshotFlow { activeWordState.value to playback.value.playingHere }
-            .collect { (word, playingHere) ->
-                if (!followEnabled || word == null) return@collect
+        snapshotFlow {
+            val voice = playback.value
+            MushafFollowMoment(
+                word = activeWordState.value,
+                activeAyah = voice.activeAyah,
+                basmalahActive = voice.basmalahActive,
+                playingHere = voice.playingHere,
+                isPlaying = voice.isPlaying,
+            )
+        }
+            .collect { moment ->
+                if (!followEnabled || !moment.playingHere || !moment.isPlaying) return@collect
+                val word = moment.word
                 // The active word carries no surah of its own. Right after a
                 // tap that loaded another chapter, the word still belongs to
                 // the outgoing one — following it would turn the leaf out from
                 // under the reader, to whatever page that verse number happens
                 // to fall on in the new surah. Wait for the player to arrive.
-                if (!playingHere) return@collect
-                val page = catalog.pageOf(loadedSurahId, word.ayah, word.wordPosition)
+                val focusAyah = word?.ayah ?: moment.activeAyah
+                val page = when {
+                    word != null -> catalog.pageOf(
+                        loadedSurahId,
+                        word.ayah,
+                        word.wordPosition,
+                    )
+                    moment.basmalahActive -> catalog.firstPageOf(loadedSurahId)
+                    focusAyah != null -> catalog.pageOf(loadedSurahId, focusAyah, 1)
+                    else -> return@collect
+                }
                 // Still hearing the word from before the tap: stay on the leaf
                 // the reader is looking at rather than turning to wherever that
                 // word lives and straight back.
@@ -341,6 +410,22 @@ internal fun MushafPager(
                     withContext(Dispatchers.Default) {
                         MushafQcfFonts.face(context, index + 1)
                     }
+                    val currentVoice = playback.value
+                    if (!currentVoice.playingHere || !currentVoice.isPlaying) return@collect
+                    if (word != null && !mushafSameActivation(word, activeWordState.value)) {
+                        return@collect
+                    }
+                    if (word == null) {
+                        if (currentVoice.basmalahActive != moment.basmalahActive) {
+                            return@collect
+                        }
+                        if (!moment.basmalahActive &&
+                            currentVoice.activeAyah != moment.activeAyah
+                        ) {
+                            return@collect
+                        }
+                    }
+                    if (pagerState.isScrollInProgress) return@collect
                     followPage = index
                     pagerState.animateScrollToPage(
                         index,
@@ -354,6 +439,7 @@ internal fun MushafPager(
                 // after it (see [MushafTurnLeadMs]); the next leaf's own word
                 // then arrives to a page that is already there, and this
                 // collector finds nothing left to do.
+                if (word == null) return@collect
                 val next = index + 1
                 if (next > catalog.pageCount - 1) return@collect
                 val tail = catalog.page(page)
@@ -366,14 +452,30 @@ internal fun MushafPager(
                 ) {
                     return@collect
                 }
+                val nextTimingPage = word.nextWordPosition?.let { nextPosition ->
+                    catalog.pageOf(loadedSurahId, word.ayah, nextPosition) - 1
+                }
+                if (!mushafTailTurnAllowed(
+                        nextTimingPage = nextTimingPage,
+                        followingPage = next,
+                        isFinalAyah = word.ayah >= content.surah.ayahCount,
+                    )
+                ) {
+                    return@collect
+                }
                 delay(mushafTurnLeadDelayMs(word.durationMs, speedNow.value))
                 // Paused, seeked, or turned by hand while the word was still
                 // being said: the leaf under the reader is no longer this
                 // collector's to move.
-                if (!playback.value.playingHere || !playback.value.reciting) {
+                val currentVoice = playback.value
+                if (!currentVoice.playingHere || !currentVoice.isPlaying ||
+                    !mushafSameActivation(word, activeWordState.value)
+                ) {
                     return@collect
                 }
-                if (pagerState.currentPage != index) return@collect
+                if (pagerState.currentPage != index || pagerState.isScrollInProgress) {
+                    return@collect
+                }
                 followPage = next
                 pagerState.animateScrollToPage(
                     next,
@@ -452,6 +554,15 @@ internal fun MushafPager(
             val settled by remember {
                 derivedStateOf { pageIndex == pagerState.settledPage }
             }
+            val liveInk by remember(pageIndex, catalog, loadedSurahId) {
+                derivedStateOf {
+                    val voice = playback.value
+                    val word = activeWordState.value
+                    val isVoicePage = voice.playingHere && word != null &&
+                        catalog.pageOf(loadedSurahId, word.ayah, word.wordPosition) == pageIndex + 1
+                    mushafUsesLiveInk(settled, isVoicePage)
+                }
+            }
             // One description for the leaf, not ~450 word nodes: the QCF
             // glyphs are private-use artwork — meaningless to a screen reader
             // — and an active accessibility service re-sorted and re-geometried
@@ -514,11 +625,11 @@ internal fun MushafPager(
                         page = page,
                         content = content,
                         surahsById = surahsById,
-                        liveInk = settled,
+                        liveInk = liveInk,
                         activeWordState = activeWordState,
                         playback = playback,
                         playbackSpeed = playbackSpeed,
-                        loadedSurahId = loadedSurahId,
+                        flashAyah = flashAyah.takeIf { settled },
                         flashWordPosition = flashWordPosition.takeIf { settled },
                         onWordClick = onWordClick,
                         onWordLongClick = onWordLongClick,
@@ -562,7 +673,7 @@ private fun MushafPageSheet(
     activeWordState: State<ActiveWord?>,
     playback: State<MushafPlayback>,
     playbackSpeed: Float,
-    loadedSurahId: Int,
+    flashAyah: Int?,
     flashWordPosition: Int?,
     onWordClick: (MushafToken) -> Unit,
     onWordLongClick: (MushafToken) -> Unit,
@@ -619,6 +730,7 @@ private fun MushafPageSheet(
             activeWordState = activeWordState,
             playback = playback,
             playbackSpeed = playbackSpeed,
+            flashAyah = flashAyah,
             flashWordPosition = flashWordPosition,
             packsState = packsState,
         )
@@ -831,6 +943,7 @@ private fun MushafPageInkClocks(
     activeWordState: State<ActiveWord?>,
     playback: State<MushafPlayback>,
     playbackSpeed: Float,
+    flashAyah: Int?,
     flashWordPosition: Int?,
     packsState: SnapshotStateMap<Pair<Int, Int>, AyahInkPack>,
 ) {
@@ -839,31 +952,43 @@ private fun MushafPageInkClocks(
             val activeWord by remember(ayah.number) {
                 derivedStateOf { activeWordState.value?.takeIf { it.ayah == ayah.number } }
             }
-            val activeAyah = playback.value.activeAyah
             val recitingActive = playback.value.reciting
             val isThisSurahPlaying = playback.value.playingHere
-            val policyActive = isThisSurahPlaying &&
-                (activeWord != null || ayah.number == activeAyah)
-            val pack = if (policyActive) {
-                rememberAyahInkPack(
+            val flashHere = flashAyah == ayah.number && flashWordPosition != null
+            val pack = when (mushafInkPackKind(
+                playingHere = isThisSurahPlaying,
+                hasActiveWord = activeWord != null,
+                hasSearchFlash = flashHere,
+            )) {
+                MushafInkPackKind.ACTIVE_WORD -> rememberAyahInkPack(
                     ayah = ayah,
                     activeWord = activeWord,
                     playbackSpeed = playbackSpeed,
                     isActiveAyah = true,
                     dimmed = false,
-                    flashWordPosition = flashWordPosition?.takeIf { ayah.number == activeWord?.ayah },
+                    flashWordPosition = flashWordPosition?.takeIf { flashHere },
                     // Debounced on purpose: a repeat range looping back dips
                     // out of "playing" for a frame, and the ink is not dry
                     // between two laps of the same verse.
                     wetInk = recitingActive,
                 )
-            } else {
-                // Full ink, always. The leaf is scripture on paper: hitting
-                // play must never fade it — the old ahead-of-voice recess
-                // dimmed every verse still to come to a quarter of its ink
-                // the moment playback started, and the whole page vanished
-                // at once. The wash alone marks where the voice is.
-                rememberMushafRecessPack(dimmed = false)
+                MushafInkPackKind.SEARCH_FLASH -> rememberAyahInkPack(
+                    ayah = ayah,
+                    activeWord = null,
+                    playbackSpeed = playbackSpeed,
+                    isActiveAyah = false,
+                    dimmed = false,
+                    flashWordPosition = flashWordPosition,
+                    wetInk = false,
+                )
+                MushafInkPackKind.STATIC -> {
+                    // Full ink, always. The leaf is scripture on paper: hitting
+                    // play must never fade it — the old ahead-of-voice recess
+                    // dimmed every verse still to come to a quarter of its ink
+                    // the moment playback started, and the whole page vanished
+                    // at once. The wash alone marks where the voice is.
+                    rememberMushafRecessPack(dimmed = false)
+                }
             }
             SideEffect {
                 // Write only on real change: a same-value write to the
