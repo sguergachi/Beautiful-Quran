@@ -38,6 +38,12 @@ class AyahNumberMarkTest {
     }
 
     @Test
+    fun `upcoming mushaf mark receives one focus fade rather than two`() {
+        assertEquals(0.22f, mushafAyahMarkInkAlpha(liveInk = true, markAlpha = 0.22f))
+        assertEquals(1f, mushafAyahMarkInkAlpha(liveInk = false, markAlpha = 0.22f))
+    }
+
+    @Test
     fun `English mark is LTR-isolated so an RTL line cannot flip its brackets`() {
         val mark = formatAyahNumberMark(1, useArabicIndicDigits = false)
         assertEquals('\u2066', mark.first())

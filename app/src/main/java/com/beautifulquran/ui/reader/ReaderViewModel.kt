@@ -72,6 +72,48 @@ data class ActiveWord(
     val activation: Long = 0L,
 )
 
+/** Reuses the immutable UI snapshot while the 33 ms poll stays in one word. */
+internal class ActiveWordPollCache {
+    private var info: HighlightEngine.ActiveInfo? = null
+    private var ayah = 0
+    private var activation = 0L
+    private var word: ActiveWord? = null
+
+    fun activeWord(
+        ayah: Int,
+        info: HighlightEngine.ActiveInfo?,
+        activation: Long,
+    ): ActiveWord? {
+        if (info == null) {
+            this.info = null
+            word = null
+            return null
+        }
+        val cached = word
+        if (info === this.info && ayah == this.ayah && activation == this.activation && cached != null) {
+            return cached
+        }
+        val durationMs = (info.holdEndMs - info.startMs).coerceAtLeast(0L)
+        return ActiveWord(
+            ayah = ayah,
+            wordPosition = info.position,
+            startMs = info.startMs,
+            durationMs = durationMs,
+            spokenMs = (info.endMs - info.startMs).coerceIn(0L, durationMs),
+            nextWordPosition = info.nextPosition,
+            isRepeat = info.isRepeat,
+            highWater = info.highWater,
+            repeatStart = info.repeatStart,
+            activation = activation,
+        ).also {
+            this.info = info
+            this.ayah = ayah
+            this.activation = activation
+            word = it
+        }
+    }
+}
+
 data class MushafUi(
     val catalog: MushafCatalog,
     val surahsById: Map<Int, Surah>,
@@ -276,6 +318,7 @@ class ReaderViewModel(
     /** Never lets sampling jitter bounce the highlight backward across a word
      * boundary — the source of the random full → faint → wash word flicker. */
     private val highlightClock = HighlightClock()
+    private val activeWordPollCache = ActiveWordPollCache()
 
     private var lastClockEventId = player.state.value.positionEvents.clockId
     /** Last applied lag/lead so a lab or route change can reset the clock. */
@@ -391,25 +434,11 @@ class ReaderViewModel(
             ?: 0L
         val rawMs = highlightPositionMs(firstWordStartMs)
         val clockMs = highlightClock.sample(np, rawMs)
-        preparedTimings[np.ayah]
-            ?.activeInfo(clockMs)
-            ?.let {
-                ActiveWord(
-                    ayah = np.ayah,
-                    wordPosition = it.position,
-                    startMs = it.startMs,
-                    // Karaoke hold lifetime — sweep finishes as the next word
-                    // lights, not merely when this segment's endMs elapses.
-                    durationMs = (it.holdEndMs - it.startMs).coerceAtLeast(0L),
-                    spokenMs = (it.endMs - it.startMs)
-                        .coerceIn(0L, (it.holdEndMs - it.startMs).coerceAtLeast(0L)),
-                    nextWordPosition = it.nextPosition,
-                    isRepeat = it.isRepeat,
-                    highWater = it.highWater,
-                    repeatStart = it.repeatStart,
-                    activation = events.inkId,
-                )
-            }
+        activeWordPollCache.activeWord(
+            ayah = np.ayah,
+            info = preparedTimings[np.ayah]?.activeInfo(clockMs),
+            activation = events.inkId,
+        )
     }
 
     /** The ayah focus/prepare target on the sheet. Normally the playing ayah,

@@ -3,6 +3,7 @@ package com.beautifulquran.domain
 import com.beautifulquran.data.model.Segment
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertSame
 import org.junit.Test
 
 class HighlightEngineTest {
@@ -191,5 +192,6 @@ class HighlightEngineTest {
         }
         // Same instance answers every tick — no per-call IntArray rebuild.
         assertEquals(withRepeat, prepared.segments)
+        assertSame(prepared.activeInfo(3100), prepared.activeInfo(3900))
     }
 }

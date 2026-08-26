@@ -1,11 +1,15 @@
 package com.beautifulquran.ui.reader
 
+import com.beautifulquran.data.model.Segment
+import com.beautifulquran.domain.HighlightEngine
 import com.beautifulquran.playback.NowPlaying
 import com.beautifulquran.playback.PlaybackPositionEvents
 import com.beautifulquran.playback.PlayerUiState
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertNotSame
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertSame
 import org.junit.Test
 
 class ReaderPollingTest {
@@ -64,5 +68,21 @@ class ReaderPollingTest {
         )
 
         assertNull(pollingIdentity(state, loadedSurahId = 2) { it })
+    }
+
+    @Test
+    fun `active word poll reuses its snapshot until a real ink boundary`() {
+        val timings = HighlightEngine.PreparedTimings.prepare(
+            listOf(
+                Segment(position = 1, startMs = 0, endMs = 1_000),
+                Segment(position = 2, startMs = 1_000, endMs = 2_000),
+            ),
+        )
+        val cache = ActiveWordPollCache()
+
+        val first = cache.activeWord(ayah = 5, timings.activeInfo(100), activation = 7)
+        assertSame(first, cache.activeWord(ayah = 5, timings.activeInfo(900), activation = 7))
+        assertNotSame(first, cache.activeWord(ayah = 5, timings.activeInfo(1_100), activation = 7))
+        assertNotSame(first, cache.activeWord(ayah = 5, timings.activeInfo(100), activation = 8))
     }
 }

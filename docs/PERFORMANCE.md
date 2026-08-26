@@ -123,14 +123,12 @@ counter are part of the `flatMapLatest` identity, so resuming or receiving any
 seek/loop/adjustment cancels a paused sleep and samples immediately; a word tap
 cannot start audio up to 250 ms before its ink restart. Repeat / high-water
 tables are built once when timings load (`HighlightEngine.PreparedTimings`);
-the lookup itself is a binary search + O(1) table read that allocates nothing.
-
-The *poll* is not allocation-free, though: every tick builds an
-`ActiveInfo` and an `ActiveWord`, and `distinctUntilChanged` discards them
-only afterwards — two short-lived objects per tick per polling flow, which
-the young generation absorbs. Only the **emission** is boundary-rate
-(~2–3×/second); the sampling and its garbage are 30 Hz. Do not cite this
-loop as allocation-free.
+each immutable `ActiveInfo` is prepared beside those tables. The poll's binary
+search returns that same object throughout a segment, and `ActiveWordPollCache`
+reuses the matching UI snapshot until the word, ayah, or genuine ink activation
+changes. The steady 30 Hz word poll therefore allocates no per-word objects;
+both allocation and downstream emission happen only at real ink boundaries
+(~2–3×/second).
 
 ### 3b. Playlist preload + cache warm
 

@@ -457,15 +457,13 @@ private fun MushafQcfPageLine(
                     ?.let { qcfTrailingMark(it, token.endsAyah) }.orEmpty()
                 if (mark.isNotEmpty()) {
                     // The mark is its own cell, so it sits outside the word's
-                    // ink node and needs the verse's own alphas applied here:
-                    // the focus alpha the scrolling reader gives every mark, and
-                    // the recess that dims a verse waiting its turn. Read in the
-                    // layer block so both animate without recomposing the leaf.
+                    // ink node. markAlpha already expresses the verse's focus
+                    // state; multiplying it by the matching recess would dim an
+                    // upcoming mark twice (22% → 5%). Read it in the layer block
+                    // so the animation does not recompose the leaf.
                     val markInkAlpha = {
                         val pack = packs[token.surahId to token.ayah]
-                        if (!liveInk || pack == null) 1f
-                        else (pack.markAlpha.value * (1f - pack.recessCover.value))
-                            .coerceIn(0f, 1f)
+                        mushafAyahMarkInkAlpha(liveInk, pack?.markAlpha?.value)
                     }
                     BasicText(
                         text = mark,
@@ -505,6 +503,9 @@ private fun MushafQcfPageLine(
         }
     }
 }
+
+internal fun mushafAyahMarkInkAlpha(liveInk: Boolean, markAlpha: Float?): Float =
+    if (liveInk && markAlpha != null) markAlpha.coerceIn(0f, 1f) else 1f
 
 /** A cell's advance and where its ink sits inside it, in px. */
 internal class MushafCell(val advance: Float, val inkLeft: Float, val inkRight: Float) {
