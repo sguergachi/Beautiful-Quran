@@ -4,7 +4,7 @@
 Sources (all fetched over HTTPS, cached in tools/.cache):
   * quran-json (npm)  — Uthmani Unicode text + Saheeh International translation
                         + surah metadata.  https://github.com/risan/quran-json
-  * @kmaslesa/holy-quran-word-by-word-full-data (npm)
+  * @kmaslesa/holy-quran-word-by-word-full-data (npm, local parity builds only)
                       — per-word English gloss + transliteration (quran.com data).
   * Quranic Arabic Corpus morphology 0.4
                       — per-word root / lemma / POS (mirrored for unattended fetch).
@@ -16,7 +16,11 @@ Sources (all fetched over HTTPS, cached in tools/.cache):
   * tools/audio_onsets — generated voice onsets from the streamed everyayah MP3s
                         (only the compact committed measurements are consumed).
 
-Output: data/quran.db (the canonical asset consumed by Android and web builds)
+Output: data/quran.db (the canonical asset consumed by Android and web builds).
+A normal rebuild excludes Quran.com-derived word/QCF/QDC fields and uses the
+independent quran-align timing fallback. ``--include-quran-com-content`` and
+``--include-qdc-timings`` create local parity/audit candidates; neither mode is
+used for the committed public database.
 
 The word segmentation canon is the space-split of the Uthmani text; the WBW
 gloss and the timing data are mapped onto it by position and clamped when a
@@ -28,7 +32,6 @@ from difflib import SequenceMatcher
 import hashlib
 import io
 import json
-import os
 import re
 import sqlite3
 import sys
@@ -115,23 +118,20 @@ BASMALAH_WORDS = 4  # words in bismillah, prefixed to audio of every first ayah
 # quran.com's `qdc` audio API serves segment data that PRESERVES repeats: when a
 # reciter re-recites a phrase, later segments point back at an earlier word index
 # (the reader renders these as a second, orange fade). quran-align cannot express
-# this (one monotonic span per word), so for the reciters below we take timings
-# from quran.com instead. The audio is the same everyayah recording we stream, so
+# this (one monotonic span per word), so local QDC audit candidates may take
+# timings from quran.com instead. The audio is the same everyayah recording we stream, so
 # the per-verse windows line up; we rebase each verse's gapless-file offsets to
 # ayah-relative ms. Map: our reciter id -> quran.com recitation id.
-QDC_CACHE_BASE_URL = os.environ.get("BQ_QDC_CACHE_BASE_URL", "").rstrip("/")
 QDC_URL = (
-    f"{QDC_CACHE_BASE_URL}/v1/legacy-qdc/recitations/{{rid}}/chapters/{{ch}}/audio-files"
-    if QDC_CACHE_BASE_URL
-    else "https://api.quran.com/api/qdc/audio/reciters/{rid}"
-         "/audio_files?chapter_number={ch}&segments=true"
+    "https://api.quran.com/api/qdc/audio/reciters/{rid}"
+    "/audio_files?chapter_number={ch}&segments=true"
 )
 QDC_REPEAT_RECITERS = {
     1: 7,  # Mishary Alafasy (murattal)
     2: 6,  # Mahmoud Khalil Al-Husary (murattal)
     3: 2,  # AbdulBaset AbdulSamad (murattal)
     4: 9,  # Mohamed Siddiq El-Minshawi (murattal)
-    5: 3,  # Abdurrahman As-Sudais (also fills the missing quran-align timings)
+    5: 3,  # Abdurrahman As-Sudais
     7: 5,  # Hani ar-Rifai (murattal)
     # Saud Ash-Shuraym (qdc 10) is one-pass on quran.com too — no repeats to add,
     # so he stays on quran-align.
@@ -402,6 +402,28 @@ def align_qcf_words(arabic_words, qcf_words, surah, ayah):
     return aligned
 
 
+def parse_alignment_payload(payload: str):
+    """Decode quran-align JSON, including its known Sudais release artifact.
+
+    That locked release prepends one ``Crashed Command ...`` diagnostic line
+    to Sudais' otherwise complete JSON array.  Accept only that narrow shape;
+    every other malformed payload remains a hard parse failure for the file.
+    """
+    try:
+        return json.loads(payload)
+    except json.JSONDecodeError:
+        marker = "\n[{"
+        start = payload.find(marker)
+        prefix = payload[:start].strip() if start >= 0 else ""
+        if (
+            start < 0
+            or not prefix.startswith("Crashed Command ")
+            or "\n" in prefix
+        ):
+            raise
+        return json.loads(payload[start + 1:])
+
+
 def load_timings(zip_path: Path, slug: str):
     """Return {(surah, ayah): [[word_idx0, start_ms, end_ms], ...]} for a reciter,
     or None if no parseable timing file exists (the reciter then ships without
@@ -424,7 +446,7 @@ def load_timings(zip_path: Path, slug: str):
         for name in cand:
             payload = zf.read(name).decode("utf-8-sig", errors="replace")
             try:
-                raw = json.loads(payload)
+                raw = parse_alignment_payload(payload)
                 break
             except json.JSONDecodeError as e:
                 info = zf.getinfo(name)
@@ -1515,7 +1537,11 @@ def discard_false_same_position_lead(segs, position, requires_audio_verdict=Fals
     ]
 
 
-def apply_timing_corrections(timing_rows, corrections_dir=CORRECTIONS_DIR):
+def apply_timing_corrections(
+    timing_rows,
+    corrections_dir=CORRECTIONS_DIR,
+    only_reciter_ids=None,
+):
     """Apply narrow typed verdicts that cannot be inferred from row topology."""
     by_key = {
         (rid, sid, ay): json.loads(segs) if isinstance(segs, str) else segs
@@ -1535,6 +1561,8 @@ def apply_timing_corrections(timing_rows, corrections_dir=CORRECTIONS_DIR):
                 int(edit["surahId"]),
                 int(edit["ayah"]),
             )
+            if only_reciter_ids is not None and key[0] not in only_reciter_ids:
+                continue
             if key not in by_key:
                 print(
                     f"  !! correction {path.name}: source row "
@@ -1579,6 +1607,7 @@ def apply_timing_repairs(
     only_kinds=None,
     skip_missing_boundary_keys=None,
     word_text=None,
+    only_reciter_ids=None,
 ):
     """Apply auto-generated CTC-arbitrated repairs (tools/timing_repairs/*.json)
     on top of the current source rows. Structural differences and their
@@ -1613,6 +1642,8 @@ def apply_timing_repairs(
             sys.exit(1)
         for edit in payload.get("edits") or []:
             rid, sid, ay = int(edit["reciterId"]), int(edit["surahId"]), int(edit["ayah"])
+            if only_reciter_ids is not None and rid not in only_reciter_ids:
+                continue
             if rid not in slug_by_id:
                 print(f"  !! repair {path.name}: unknown reciterId {rid}", file=sys.stderr)
                 sys.exit(1)
@@ -2188,6 +2219,10 @@ CREATE TABLE root_occurrences (
   position INTEGER NOT NULL,
   PRIMARY KEY (root, surah_id, ayah_number, position)
 );
+CREATE TABLE data_provenance (
+  key TEXT PRIMARY KEY NOT NULL,
+  value TEXT NOT NULL
+);
 """
 
 
@@ -2366,6 +2401,16 @@ def write_morphology(db: sqlite3.Connection, morph_rows, roots_rows, occ_rows):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--skip-timings", action="store_true")
+    ap.add_argument(
+        "--include-qdc-timings",
+        action="store_true",
+        help="build a QDC migration candidate; the timing delta audit must pass",
+    )
+    ap.add_argument(
+        "--include-quran-com-content",
+        action="store_true",
+        help="build a local parity candidate with Quran.com word/QCF fields",
+    )
     args = ap.parse_args()
 
     print("[1/6] fetching text + metadata (quran-json)")
@@ -2373,14 +2418,19 @@ def main():
     surahs, ayahs = load_text_and_meta(qj)
     assert len(surahs) == 114 and len(ayahs) == 6236, "unexpected corpus shape"
 
-    print("[2/6] fetching word-by-word gloss")
-    wbw_tgz = fetch(WBW_TGZ, "wbw.tgz")
-    wbw, page_of = load_wbw(wbw_tgz)
+    if args.include_quran_com_content:
+        print("[2/6] fetching word-by-word gloss")
+        wbw_tgz = fetch(WBW_TGZ, "wbw.tgz")
+        wbw, page_of = load_wbw(wbw_tgz)
 
-    print("[3/6] fetching QCF V2 mushaf layout")
-    qcf_v2 = load_qcf_v2_layout()
-    assert_qcf_v2_runs(qcf_v2)
-    print(f"  qcf v2 ayahs: {len(qcf_v2)}")
+        print("[3/6] fetching QCF V2 mushaf layout")
+        qcf_v2 = load_qcf_v2_layout()
+        assert_qcf_v2_runs(qcf_v2)
+        print(f"  qcf v2 ayahs: {len(qcf_v2)}")
+    else:
+        print("[2/6] Quran.com word data excluded (runtime cache only)")
+        print("[3/6] Quran.com QCF layout excluded (runtime cache only)")
+        wbw, page_of, qcf_v2 = {}, {}, {}
 
     print("[4/6] building words table")
     words = []
@@ -2388,10 +2438,14 @@ def main():
     for (s, a), (text, _tr) in sorted(ayahs.items()):
         arabic_words = text.split()
         glosses = wbw.get((s, a), [])
-        if len(glosses) != len(arabic_words):
+        if args.include_quran_com_content and len(glosses) != len(arabic_words):
             gloss_mismatch.append((s, a, len(arabic_words), len(glosses)))
         try:
-            qcf_aligned = align_qcf_words(arabic_words, qcf_v2.get((s, a), []), s, a)
+            qcf_aligned = (
+                align_qcf_words(arabic_words, qcf_v2.get((s, a), []), s, a)
+                if args.include_quran_com_content
+                else {}
+            )
         except ValueError as e:
             print(f"  !! {e}", file=sys.stderr)
             sys.exit(1)
@@ -2436,7 +2490,7 @@ def main():
             )
             alignment_references.update(reciter_alignment)
             qdc_id = QDC_REPEAT_RECITERS.get(rid)
-            if qdc_id is not None:
+            if qdc_id is not None and args.include_qdc_timings:
                 # Repeat-aware timings from quran.com instead of quran-align.
                 print(f"  {slug}: repeat-aware timings from quran.com (qdc {qdc_id})")
                 data = load_qdc_timings(qdc_id)
@@ -2544,8 +2598,13 @@ def main():
                     rid, word_counts, timing_rows, stats,
                     adjust_aligned,
                 )
+                source_label = (
+                    "quran-align offline fallback"
+                    if qdc_id is not None
+                    else "quran-align"
+                )
                 print(
-                    f"  {slug}: ayahs covered {covered}/6236, "
+                    f"  {slug} ({source_label}): ayahs covered {covered}/6236, "
                     f"basmalah-shifted {stats['basmalah_shift']}, "
                     f"clamped segs {stats['clamped']}, missing {stats['missing']}"
                 )
@@ -2554,23 +2613,23 @@ def main():
                 sys.exit(1)
             reciter_rows.append((rid, slug, name, style, 1))
 
-        print("[typed corrections] applying irreducible timing verdicts")
-        timing_rows = apply_timing_corrections(timing_rows)
+        if args.include_qdc_timings:
+            print("[typed corrections] applying irreducible timing verdicts")
+            timing_rows = apply_timing_corrections(timing_rows)
 
-        # A boundary repair cannot create the singleton gap itself.  Hold all
-        # of this candidate row's boundary edits until its coverage fallback is
-        # chosen; non-boundary repairs still get the first chance to complete
-        # the source row without using the fallback.
-        deferred_boundary_keys = set(singleton_gap_candidates)
-        print("[repairs] applying tools/timing_repairs/*.json")
-        timing_rows = apply_timing_repairs(
-            timing_rows,
-            word_counts,
-            timing_clock_offsets,
-            audio_durations,
-            skip_missing_boundary_keys=deferred_boundary_keys,
-            word_text=word_text,
-        )
+            # A boundary repair cannot create the singleton gap itself. Hold
+            # this candidate row's boundary edits until its coverage fallback
+            # is chosen; other repairs can still complete the source row.
+            deferred_boundary_keys = set(singleton_gap_candidates)
+            print("[repairs] applying tools/timing_repairs/*.json")
+            timing_rows = apply_timing_repairs(
+                timing_rows,
+                word_counts,
+                timing_clock_offsets,
+                audio_durations,
+                skip_missing_boundary_keys=deferred_boundary_keys,
+                word_text=word_text,
+            )
 
         print("[overrides] applying tools/timing_overrides/*.json")
         timing_rows, reciter_rows = apply_timing_overrides(
@@ -2642,6 +2701,39 @@ def main():
         [
             (rid, sid, ay, segments, audio_onsets.get((rid, sid, ay), 0))
             for rid, sid, ay, segments in timing_rows
+        ],
+    )
+    db.executemany(
+        "INSERT INTO data_provenance VALUES (?,?)",
+        [
+            (
+                "quran_com_content",
+                "local parity candidate"
+                if args.include_quran_com_content
+                else "excluded from committed database; runtime cache only",
+            ),
+            *(
+                [
+                    (
+                        "timings",
+                        "QDC-derived repeat timings over everyayah recordings; "
+                        "transitional compatibility baseline",
+                    ),
+                    (
+                        "qdc_delivery",
+                        "bundled compatibility baseline; runtime cache may replace",
+                    ),
+                ]
+                if args.include_qdc_timings
+                else [
+                    (
+                        "timings",
+                        "cpfair/quran-align CC-BY-4.0; "
+                        "QDC excluded from bundled database",
+                    ),
+                    ("qdc_delivery", "runtime cache only"),
+                ]
+            ),
         ],
     )
     write_morphology(db, morph_rows, roots_rows, occ_rows)
