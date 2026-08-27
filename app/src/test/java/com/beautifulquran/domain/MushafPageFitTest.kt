@@ -83,6 +83,15 @@ class MushafPageFitTest {
     }
 
     @Test
+    fun `only the two framed opening leaves are centred medallions`() {
+        assertTrue(mushafIsOpeningLeaf(1))
+        assertTrue(mushafIsOpeningLeaf(2))
+        assertTrue(!mushafIsOpeningLeaf(3))
+        assertTrue(!mushafIsOpeningLeaf(46))
+        assertTrue(!mushafIsOpeningLeaf(604))
+    }
+
+    @Test
     fun `display hand grows by one fifteenth on every page`() {
         assertEquals(16, MUSHAF_DISPLAY_LINES_PER_PAGE)
         assertEquals(60f * MUSHAF_TYPE_SCALE, mushafDisplayFontPx(60f), 0.01f)

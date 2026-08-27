@@ -263,8 +263,9 @@ page may dissolve and the revelation may not. (Tying the effect to the pager's
 offset made it appear halfway through a swipe and vanish again, which reads as
 a glitch rather than as the shape of a book.)
 
-A short page (al-Fātiḥah) sits in the middle of the well; a full Madinah page
-fills it. A swipe turns the whole leaf (running head, text, folio) the way
+Pages 1–2 (al-Fātiḥah and the opening of al-Baqarah) sit in the middle of
+the well as a framed medallion; a full Madinah page fills it, and any other
+short leaf still hangs from the head. A swipe turns the whole leaf (running head, text, folio) the way
 iBooks turns a page. Transport is a quiet line of ink on the paper *under* the
 page. Reciting hides the status bar, as the scroll layout does; the leaf
 reserves its top inset from `statusBarsIgnoringVisibility`, so the page holds

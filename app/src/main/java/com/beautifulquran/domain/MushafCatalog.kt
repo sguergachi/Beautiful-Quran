@@ -54,7 +54,7 @@ fun reflowMushafPage(
     page: MushafPage,
     tokenWeight: (MushafToken) -> Float,
 ): MushafPage {
-    if (page.lines.isEmpty()) return page
+    if (mushafIsOpeningLeaf(page.page) || page.lines.isEmpty()) return page
     val boundaries = (listOf(0) + page.surahStarts.map { it.beforeLineIndex } + page.lines.size)
         .distinct().sorted()
     val sections = boundaries.zipWithNext().filter { (start, end) -> start < end }

@@ -82,6 +82,15 @@ const val MUSHAF_LINES_PER_PAGE = 15
 const val MUSHAF_DISPLAY_LINES_PER_PAGE = MUSHAF_LINES_PER_PAGE + 1
 
 /**
+ * Al-Fātiḥah and the opening of al-Baqarah: the two framed leaves. The print
+ * sets them as a centred medallion — shorter lines at the crown and foot,
+ * the block sitting in the middle of the page — not as a 15-line grid
+ * hanging from the head. Reflow would pull those lines into even rows and
+ * destroy the circle.
+ */
+fun mushafIsOpeningLeaf(page: Int): Boolean = page in 1..2
+
+/**
  * Slots to divide the text well by. A full page fills it; a short page
  * (al-Fātiḥah, a surah's last lines) keeps the *same* leading as a full
  * page and sits in the middle of the well rather than stretching across

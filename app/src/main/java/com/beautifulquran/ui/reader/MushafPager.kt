@@ -87,6 +87,7 @@ import com.beautifulquran.domain.mushafFontPreloadPages
 import com.beautifulquran.domain.MushafGrid
 import com.beautifulquran.domain.MushafType
 import com.beautifulquran.domain.mushafGridSlots
+import com.beautifulquran.domain.mushafIsOpeningLeaf
 import com.beautifulquran.domain.mushafUniformFontPx
 import com.beautifulquran.domain.mushafLineSlotPx
 import com.beautifulquran.domain.qcfTrailingMark
@@ -997,10 +998,15 @@ private fun MushafPageSheet(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(horizontal = MushafEdgeGutter),
-                    // A short page keeps the grid's line size and hangs from
-                    // the top — the printed page starts at the head, it does
-                    // not float to the middle of the leaf.
-                    verticalArrangement = Arrangement.Top,
+                    // Ordinary leaves start at the head, even when the last
+                    // lines of a chapter leave the foot empty. The two framed
+                    // opening pages are a medallion: the block sits in the
+                    // middle of the well, the way the print centres them.
+                    verticalArrangement = if (mushafIsOpeningLeaf(page.page)) {
+                        Arrangement.Center
+                    } else {
+                        Arrangement.Top
+                    },
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     displayPage.lines.forEachIndexed { index, line ->

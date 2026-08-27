@@ -19,16 +19,19 @@ authority; `qcf_line` remains the source composition from which the larger
 reader hand is reflowed within that boundary.
 
 *Pages 1–2 are the exception: al-Fātiḥah and the opening of al-Baqarah are set
-in decorated frames with fewer lines.*
+in decorated frames with fewer lines, as a centred medallion — shorter lines
+at the crown and foot, the block in the middle of the page.*
 
 **We follow the page boundary.** `MushafCatalog` builds the same 604 leaves
 straight from those columns, and `tools/fetch_mushaf_lines.py` cross-checks the
 words on every page against quran.com's published layout. For the reader's
 larger hand, `reflowMushafPage` balances those same words over one additional
 visual line inside each leaf; it never moves a word to another page and keeps
-every chapter opening as a hard boundary. Line geometry is cached by those
-reflowed words and the page face, not by row number — the same slot is a
-different token list after the face lands.
+every chapter opening as a hard boundary. Pages 1–2 are not reflowed: the
+print's own line breaks *are* the circle, and stretching them into even rows
+destroys it. Line geometry is cached by those reflowed words and the page
+face, not by row number — the same slot is a different token list after the
+face lands.
 
 ## 2. One hand for the whole book
 
