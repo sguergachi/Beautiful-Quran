@@ -195,9 +195,12 @@ sat next to, and backed away from, which is why it is given the width of the
 run-out instead of the edge of the glass.
 
 The label above the finger says which tier is running, and says it in what it
-counts. In the comb it is the chapter, by number then name on one line, joined
-by the same middle dot the trough uses — a reader crossing the book at this
-speed is counting chapters, and the number is the thing they are counting. The
+counts. Its plate is a full-width band of the page's own paper, dissolving
+only at the top, so the last lines of script stay covered while the words
+follow the comb. In the comb it is the chapter, by number then name on one
+line, joined by the same middle dot the trough uses — a reader crossing the
+book at this speed is counting chapters, and the number is the thing they are
+counting. The
 second line is the leaf that chapter opens on, `pg.` and its folio, in the
 lighter ink everything subordinate takes. No verse appears there: one turning
 over by hundreds between frames is noise, and worse, it invites the reader to
