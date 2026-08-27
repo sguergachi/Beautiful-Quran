@@ -278,6 +278,24 @@ class MushafFollowTurnTest {
     }
 
     @Test
+    fun `a tapped leaf waits under paper until the voice arrives`() {
+        // Dialed or hand-turned: full ink. A tap must cover it the way a
+        // follow turn covers the next leaf, or the wash has nothing to fill.
+        assertTrue(
+            mushafLeafWaitingForVoice(pageNumber = 50, waitingPage = 0, heldPage = 50),
+        )
+        assertTrue(
+            mushafLeafWaitingForVoice(pageNumber = 50, waitingPage = 50, heldPage = null),
+        )
+        assertFalse(
+            mushafLeafWaitingForVoice(pageNumber = 50, waitingPage = 0, heldPage = null),
+        )
+        assertFalse(
+            mushafLeafWaitingForVoice(pageNumber = 49, waitingPage = 50, heldPage = 50),
+        )
+    }
+
+    @Test
     fun `a tapped leaf holds against follow until the seek names it`() {
         assertTrue(mushafHoldBlocksFollow(heldPage = 12, voicePage = 11))
         assertTrue(mushafHoldBlocksFollow(heldPage = 12, voicePage = null))
