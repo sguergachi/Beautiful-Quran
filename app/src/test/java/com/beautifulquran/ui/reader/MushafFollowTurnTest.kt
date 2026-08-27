@@ -173,6 +173,13 @@ class MushafFollowTurnTest {
         assertTrue(mushafUsesLiveInk(isSettled = false, isVoicePage = true))
         assertTrue(mushafUsesLiveInk(isSettled = true, isVoicePage = false))
         assertFalse(mushafUsesLiveInk(isSettled = false, isVoicePage = false))
+        assertTrue(
+            mushafUsesLiveInk(
+                isSettled = false,
+                isVoicePage = false,
+                pageHasActiveWord = true,
+            ),
+        )
     }
 
     @Test
@@ -224,6 +231,49 @@ class MushafFollowTurnTest {
                 basmalahActive = false,
                 hasSearchFlash = false,
                 waitingForVoice = true,
+            ),
+        )
+        // Play-start used to drop waitingForVoice before pageOwnsVoice.
+        // The leaf still has the word — keep Active so the wash is not
+        // disposed, and keep later ayahs recessed.
+        assertEquals(
+            MushafInkPackKind.ACTIVE_WORD,
+            mushafInkPackKind(
+                pageOwnsVoice = false,
+                ayah = 12,
+                activeWordAyah = 12,
+                frontierAyah = 12,
+                basmalahActive = false,
+                hasSearchFlash = false,
+                waitingForVoice = false,
+                pageHasActiveWord = true,
+            ),
+        )
+        assertEquals(
+            MushafInkPackKind.UPCOMING,
+            mushafInkPackKind(
+                pageOwnsVoice = false,
+                ayah = 13,
+                activeWordAyah = 12,
+                frontierAyah = 12,
+                basmalahActive = false,
+                hasSearchFlash = false,
+                waitingForVoice = false,
+                pageHasActiveWord = true,
+            ),
+        )
+        // A settled leaf the reader is only browsing must stay full ink.
+        assertEquals(
+            MushafInkPackKind.STATIC,
+            mushafInkPackKind(
+                pageOwnsVoice = false,
+                ayah = 80,
+                activeWordAyah = 12,
+                frontierAyah = 12,
+                basmalahActive = false,
+                hasSearchFlash = false,
+                waitingForVoice = false,
+                pageHasActiveWord = false,
             ),
         )
     }

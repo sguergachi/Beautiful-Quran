@@ -487,6 +487,10 @@ tween-vs-snap rules, sweep entry and residual rules, repeat wash timing, the
   treated as voice arrival — that dropped the cover and swapped the pack off
   Active, disposing the wash Animatable — and the poll must not restamp
   `activation` for that same word, or `rememberLetterSweep` rearms from zero.
+  The Active pack belongs to the leaf that has the word, not to
+  `pageOwnsVoice` / `waitingForVoice`: those both drop at play-start and
+  the `when` that swaps packs disposes the Animatable, which read as the
+  wash running for a beat then vanishing.
   The chapter-opening
   basmalah is part of
   that sequence: tapping it starts its own wash before the first ayah. At the

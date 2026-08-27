@@ -220,7 +220,8 @@ internal fun mushafUsesLiveInk(
     isSettled: Boolean,
     isVoicePage: Boolean,
     waitingForVoice: Boolean = false,
-): Boolean = isSettled || isVoicePage || waitingForVoice
+    pageHasActiveWord: Boolean = false,
+): Boolean = isSettled || isVoicePage || waitingForVoice || pageHasActiveWord
 
 internal enum class MushafInkPackKind { ACTIVE_WORD, UPCOMING, SEARCH_FLASH, STATIC }
 
@@ -240,15 +241,24 @@ internal fun mushafInkPackKind(
      * wash can fill it; a hand-browsed leaf stays [STATIC].
      */
     waitingForVoice: Boolean = false,
+    /**
+     * This leaf is where [activeWordAyah] lives, even if Media3 has not
+     * set [pageOwnsVoice] yet. A dial-then-tap seed puts the word here
+     * while `playingHere` is still false; dropping Active at play-start
+     * disposes the wash Animatable.
+     */
+    pageHasActiveWord: Boolean = false,
 ): MushafInkPackKind = when {
     pageOwnsVoice && basmalahActive -> MushafInkPackKind.UPCOMING
-    // A tap covers the leaf before Media3 names it. The tapped ayah still
-    // has to wash — a blanket Upcoming here left the audio running with
-    // no letter fade, because pageOwnsVoice lags the seek.
-    (pageOwnsVoice || waitingForVoice) && activeWordAyah == ayah ->
+    // Own the wash wherever the word is, not only once Media3 or the
+    // waiting cover says so. pageOwnsVoice lags the seek; waitingForVoice
+    // is released when play starts — both used to swap this pack to
+    // STATIC and kill the letter fade mid-run.
+    (pageOwnsVoice || waitingForVoice || pageHasActiveWord) &&
+        activeWordAyah == ayah ->
         MushafInkPackKind.ACTIVE_WORD
     hasSearchFlash -> MushafInkPackKind.SEARCH_FLASH
-    pageOwnsVoice &&
+    (pageOwnsVoice || pageHasActiveWord) &&
         (frontierAyah == null || ayah > frontierAyah ||
             ayah == frontierAyah && frontierWaitingForFirstWord) ->
         MushafInkPackKind.UPCOMING
@@ -741,6 +751,16 @@ internal fun MushafPager(
             val pageOwnsVoice by remember(pageIndex) {
                 derivedStateOf { voicePage.value == pageIndex + 1 }
             }
+            val pageHasActiveWord by remember(pageIndex, catalog, loadedSurahId) {
+                derivedStateOf {
+                    val word = activeWordState.value ?: return@derivedStateOf false
+                    catalog.pageOf(
+                        loadedSurahId,
+                        word.ayah,
+                        word.wordPosition,
+                    ) == pageIndex + 1
+                }
+            }
             val waitingForVoice by remember(pageIndex, heldPage) {
                 derivedStateOf {
                     mushafLeafWaitingForVoice(
@@ -752,7 +772,12 @@ internal fun MushafPager(
             }
             val liveInk by remember(pageIndex) {
                 derivedStateOf {
-                    mushafUsesLiveInk(settled, pageOwnsVoice, waitingForVoice)
+                    mushafUsesLiveInk(
+                        settled,
+                        pageOwnsVoice,
+                        waitingForVoice,
+                        pageHasActiveWord,
+                    )
                 }
             }
             val leafWordClick = remember(pageIndex, page.page) {
@@ -855,6 +880,7 @@ internal fun MushafPager(
                         liveInk = liveInk,
                         pageOwnsVoice = pageOwnsVoice,
                         waitingForVoice = waitingForVoice,
+                        pageHasActiveWord = pageHasActiveWord,
                         activeWordState = activeWordState,
                         playback = playback,
                         playbackSpeed = playbackSpeed,
@@ -903,6 +929,7 @@ private fun MushafPageSheet(
     liveInk: Boolean,
     pageOwnsVoice: Boolean,
     waitingForVoice: Boolean,
+    pageHasActiveWord: Boolean,
     activeWordState: State<ActiveWord?>,
     playback: State<MushafPlayback>,
     playbackSpeed: Float,
@@ -965,6 +992,7 @@ private fun MushafPageSheet(
             playback = playback,
             pageOwnsVoice = pageOwnsVoice,
             waitingForVoice = waitingForVoice,
+            pageHasActiveWord = pageHasActiveWord,
             playbackSpeed = playbackSpeed,
             flashAyah = flashAyah,
             flashWordPosition = flashWordPosition,
@@ -1207,6 +1235,7 @@ private fun MushafPageInkClocks(
     playback: State<MushafPlayback>,
     pageOwnsVoice: Boolean,
     waitingForVoice: Boolean,
+    pageHasActiveWord: Boolean,
     playbackSpeed: Float,
     flashAyah: Int?,
     flashWordPosition: Int?,
@@ -1243,6 +1272,7 @@ private fun MushafPageInkClocks(
                 hasSearchFlash = flashHere,
                 frontierWaitingForFirstWord = frontierWaitingForFirstWord,
                 waitingForVoice = waitingForVoice,
+                pageHasActiveWord = pageHasActiveWord,
             )) {
                 MushafInkPackKind.ACTIVE_WORD -> rememberAyahInkPack(
                     ayah = ayah,
@@ -1285,7 +1315,9 @@ private fun MushafPageInkClocks(
     // already passed and every manually browsed leaf remain full scripture.
     upcoming.forEach { key ->
         key(key.first, key.second) {
-            val pack = rememberMushafRecessPack(dimmed = pageOwnsVoice || waitingForVoice)
+            val pack = rememberMushafRecessPack(
+                dimmed = pageOwnsVoice || waitingForVoice || pageHasActiveWord,
+            )
             SideEffect {
                 if (packsState[key] !== pack) packsState[key] = pack
             }
