@@ -83,7 +83,8 @@ class MushafPageFitTest {
     }
 
     @Test
-    fun `display hand carries one uniform optical size nudge`() {
+    fun `display hand grows by one fifteenth on every page`() {
+        assertEquals(16, MUSHAF_DISPLAY_LINES_PER_PAGE)
         assertEquals(60f * MUSHAF_TYPE_SCALE, mushafDisplayFontPx(60f), 0.01f)
         assertEquals(MUSHAF_MAX_FONT_PX, mushafDisplayFontPx(MUSHAF_MAX_FONT_PX), 0f)
     }

@@ -14,15 +14,19 @@ depending on the cost. They are reproducible with the tools in `tools/`.
 
 The Madinah mushaf is 604 pages of 15 lines, and every copy breaks at the same
 word. A reader who has memorised by page expects the page to end where it has
-always ended. The line data in `data/quran.db` (`qcf_page`, `qcf_line`) is that
-layout, and it is authority, not suggestion.
+always ended. The page assignment in `data/quran.db` (`qcf_page`) is therefore
+authority; `qcf_line` remains the source composition from which the larger
+reader hand is reflowed within that boundary.
 
 *Pages 1–2 are the exception: al-Fātiḥah and the opening of al-Baqarah are set
 in decorated frames with fewer lines.*
 
-**We follow it.** `MushafCatalog` builds pages straight from those columns, and
-`tools/fetch_mushaf_lines.py` cross-checks our line breaks word-for-word
-against quran.com's published layout.
+**We follow the page boundary.** `MushafCatalog` builds the same 604 leaves
+straight from those columns, and `tools/fetch_mushaf_lines.py` cross-checks the
+words on every page against quran.com's published layout. For the reader's
+larger hand, `reflowMushafPage` balances those same words over one additional
+visual line inside each leaf; it never moves a word to another page and keeps
+every chapter opening as a hard boundary.
 
 ## 2. One hand for the whole book
 
@@ -32,8 +36,11 @@ is set on its own.
 
 **We follow it.** `MUSHAF_DESIGN_LINE_EM` fixes one size for all 604 pages;
 nothing sizes type per page or per line. `MUSHAF_TYPE_SCALE` applies the same
-1.06 optical nudge to that fitted hand on every leaf, using about one
-fifteenth more of the page vertically without changing a word or line break.
+16/15 enlargement to that fitted hand on every leaf. Each page's unchanged
+content is then balanced over one more visual line, so the larger type wraps
+instead of being narrowed back into the original fifteen rows. The
+sixteenth row takes the paper formerly reserved by the wide head and tail
+gutters; it is not squeezed into the old fifteen-row well.
 
 ## 3. Every full line is flush
 

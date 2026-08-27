@@ -82,6 +82,32 @@ class MushafCatalogTest {
         assertEquals(604, catalog.firstPageOf(114))
         assertEquals(1, catalog.firstPageOf(50))
     }
+
+    @Test
+    fun `display reflow adds one line without moving words between pages or chapters`() {
+        val page = buildMushafCatalog(
+            listOf(
+                source(1, 7, 8, "one", page = 1, line = 1),
+                source(1, 7, 9, "two", page = 1, line = 1),
+                source(2, 1, 1, "three", page = 1, line = 2),
+                source(2, 1, 2, "four", page = 1, line = 2),
+                source(2, 1, 3, "five", page = 1, line = 2),
+                source(2, 2, 1, "six", page = 1, line = 3),
+                source(2, 2, 2, "seven", page = 1, line = 3),
+                source(2, 2, 3, "eight", page = 1, line = 3),
+            ),
+        ).page(1)!!
+
+        val reflowed = reflowMushafPage(page) { if (it.surahId == 1) 10f else 1f }
+
+        assertEquals(4, reflowed.lines.size)
+        assertEquals(
+            page.lines.flatMap { it.tokens }.map { it.word.arabic },
+            reflowed.lines.flatMap { it.tokens }.map { it.word.arabic },
+        )
+        assertEquals(2, reflowed.surahStarts.single().beforeLineIndex)
+        assertEquals(2, reflowed.surahStarts.single().surahId)
+    }
 }
 
 private fun source(

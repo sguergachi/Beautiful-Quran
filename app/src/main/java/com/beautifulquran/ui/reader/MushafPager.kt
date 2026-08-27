@@ -1,5 +1,6 @@
 package com.beautifulquran.ui.reader
 
+import android.graphics.Paint
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -72,6 +73,8 @@ import com.beautifulquran.data.model.Surah
 import com.beautifulquran.data.model.SurahContent
 import com.beautifulquran.domain.MUSHAF_LINE_EM
 import com.beautifulquran.domain.MUSHAF_LINE_PITCH_EM
+import com.beautifulquran.domain.MUSHAF_DISPLAY_LINES_PER_PAGE
+import com.beautifulquran.domain.MUSHAF_WORD_GAP_EM
 import com.beautifulquran.domain.mushafDisplayFontPx
 import com.beautifulquran.domain.MushafCatalog
 import com.beautifulquran.domain.MushafLine
@@ -85,6 +88,9 @@ import com.beautifulquran.domain.MushafType
 import com.beautifulquran.domain.mushafGridSlots
 import com.beautifulquran.domain.mushafUniformFontPx
 import com.beautifulquran.domain.mushafLineSlotPx
+import com.beautifulquran.domain.qcfTrailingMark
+import com.beautifulquran.domain.qcfWordGlyphs
+import com.beautifulquran.domain.reflowMushafPage
 import com.beautifulquran.domain.surahOpensWithBasmalahPreface
 import kotlin.math.abs
 import com.beautifulquran.ui.theme.MushafBasmalahFontFamily
@@ -151,6 +157,13 @@ internal val MushafEdgeGutter = 10.dp
  * instead of exactly on it.
  */
 private val MushafFitSlack = 2.dp
+
+// The extra text row is bought from the leaf's furniture, not by squeezing
+// sixteen rows into the old fifteen-row well. Together these still total the
+// original 16.75-unit leaf: .30 head + .20 gutter + 16 text + .05 tail + .20 folio.
+private const val MushafDisplayHeadGutter = 0.20f
+private const val MushafDisplayTail = 0.05f
+private const val MushafDisplayFolio = 0.20f
 
 
 /**
@@ -654,7 +667,7 @@ internal fun MushafPager(
                         unit = unit,
                         glyphSize = leafGlyphSize(unit),
                     )
-                    Spacer(Modifier.height(unit * MushafGrid.HEAD_GUTTER))
+                    Spacer(Modifier.height(unit * MushafDisplayHeadGutter))
                     MushafPageSheet(
                         basmalahWash = basmalahWash,
                         page = page,
@@ -673,10 +686,10 @@ internal fun MushafPager(
                         onBasmalahClick = onBasmalahClick,
                         unit = unit,
                         modifier = Modifier
-                            .height(unit * MushafGrid.TEXT_LINES)
+                            .height(unit * MUSHAF_DISPLAY_LINES_PER_PAGE)
                             .fillMaxWidth(),
                     )
-                    Spacer(Modifier.height(unit * MushafGrid.TAIL))
+                    Spacer(Modifier.height(unit * MushafDisplayTail))
                     val folioInk by animateFloatAsState(
                         targetValue = if (scrubbing()) 0f else 1f,
                         animationSpec = tween(
@@ -691,6 +704,7 @@ internal fun MushafPager(
                         glyphSize = leafGlyphSize(unit),
                         script = pageNumberScript,
                         modifier = Modifier
+                            .height(unit * MushafDisplayFolio)
                             .padding(horizontal = MushafEdgeGutter)
                             .graphicsLayer { alpha = folioInk },
                     )
@@ -814,6 +828,22 @@ private fun MushafPageSheet(
     }
     val pageFont = pageFace?.family
     val pageTypeface = pageFace?.typeface
+    val displayPage = remember(page, pageTypeface) {
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            typeface = pageTypeface
+            textSize = 100f
+        }
+        reflowMushafPage(page) { token ->
+            val qcf = token.word.qcfV2
+            val word = if (qcf.isEmpty()) {
+                token.word.arabic
+            } else {
+                qcfWordGlyphs(qcf, token.endsAyah)
+            }
+            val mark = if (qcf.isEmpty()) "" else qcfTrailingMark(qcf, token.endsAyah)
+            paint.measureText(word) + paint.measureText(mark) + MUSHAF_WORD_GAP_EM * paint.textSize
+        }
+    }
     val leafReady = pageFace != null || faceOverdue
     // A face already resident cannot reflow, so there is nothing for this fade
     // to hide and the leaf starts fully inked. The chapter's own entrance is
@@ -867,14 +897,17 @@ private fun MushafPageSheet(
                 .coerceAtLeast(1f)
             // Every chapter opening costs the grid a line for its title band,
             // and another for the basmalah under it where the chapter takes one.
-            val slotCount = (page.lines.size + page.surahStarts.size +
+            val fitSlotCount = (page.lines.size + page.surahStarts.size +
                 page.surahStarts.count { surahOpensWithBasmalahPreface(it.surahId) })
+                .coerceAtLeast(1)
+            val displaySlotCount = (displayPage.lines.size + displayPage.surahStarts.size +
+                displayPage.surahStarts.count { surahOpensWithBasmalahPreface(it.surahId) })
                 .coerceAtLeast(1)
             // One size for the whole book: the measure, not this page's own
             // longest line. Fitting each leaf to itself made the hand grow and
             // shrink as the pages turned.
             val unitPx = with(density) { unit.toPx() }
-            val fontPx = remember(unitPx, availableW, slotCount) {
+            val fontPx = remember(unitPx, availableW, fitSlotCount) {
                 mushafDisplayFontPx(
                     mushafUniformFontPx(
                         measureWidthPx = availableW,
@@ -886,7 +919,7 @@ private fun MushafPageSheet(
                         // opening kept type cut for a full slot while its slot had
                         // shrunk to about 0.88 of one.
                         wellHeightPx = unitPx * MushafGrid.TEXT_LINES,
-                        slots = mushafGridSlots(slotCount),
+                        slots = mushafGridSlots(fitSlotCount),
                     ),
                 )
             }
@@ -898,7 +931,7 @@ private fun MushafPageSheet(
                 .coerceAtLeast(1f)
             // One slot is one unit of the leaf's grid, whatever the page holds.
             val lineSlot = with(density) {
-                (availableH / mushafGridSlots(slotCount)).toDp()
+                (availableH / mushafGridSlots(displaySlotCount)).toDp()
             }
             CompositionLocalProvider(
                 LocalLayoutDirection provides LayoutDirection.Rtl,
@@ -913,8 +946,8 @@ private fun MushafPageSheet(
                     verticalArrangement = Arrangement.Top,
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    page.lines.forEachIndexed { index, line ->
-                        page.surahStarts.firstOrNull { it.beforeLineIndex == index }?.let { start ->
+                    displayPage.lines.forEachIndexed { index, line ->
+                        displayPage.surahStarts.firstOrNull { it.beforeLineIndex == index }?.let { start ->
                             Box(
                                 Modifier
                                     .fillMaxWidth()

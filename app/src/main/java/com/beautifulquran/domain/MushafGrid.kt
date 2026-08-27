@@ -30,9 +30,10 @@ import kotlin.math.pow
  * a bare 10dp; fourteen percent of the leaf on vertical chrome was the odd one
  * out.
  *
- * The type well is exactly fifteen units whatever the leaf's height, so the
- * mushaf's own grid is the page's grid, and the chrome is measured in the same
- * breath as the scripture rather than against it.
+ * These constants remain the canonical fifteen-row fit and the total 16.75
+ * unit budget. The pager's larger display hand reassigns one unit of that same
+ * budget from head/tail furniture to a sixteenth visual row; the leaf itself
+ * does not grow and its 604 page boundaries do not move.
  */
 object MushafGrid {
     /**

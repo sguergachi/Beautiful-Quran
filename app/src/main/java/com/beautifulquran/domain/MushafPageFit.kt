@@ -78,6 +78,9 @@ fun mushafLineSlotPx(pageHeightPx: Float, slots: Int, fontPx: Float): Float {
 /** Every Madinah page is set on the same 15-line grid. */
 const val MUSHAF_LINES_PER_PAGE = 15
 
+/** The reader's larger hand wraps each fixed page over one additional row. */
+const val MUSHAF_DISPLAY_LINES_PER_PAGE = MUSHAF_LINES_PER_PAGE + 1
+
 /**
  * Slots to divide the text well by. A full page fills it; a short page
  * (al-Fātiḥah, a surah's last lines) keeps the *same* leading as a full
@@ -137,8 +140,8 @@ const val MUSHAF_MAX_FONT_PX = 128f
  */
 const val MUSHAF_DESIGN_LINE_EM = 16.4f
 
-/** Book-wide optical nudge: roughly one fifteenth more ink down the leaf. */
-const val MUSHAF_TYPE_SCALE = 1.06f
+/** Book-wide enlargement that gives a canonical leaf one additional visual line. */
+const val MUSHAF_TYPE_SCALE = 16f / 15f
 
 /** Applies the reader's uniform optical size without introducing page sizing. */
 fun mushafDisplayFontPx(fittedFontPx: Float): Float =

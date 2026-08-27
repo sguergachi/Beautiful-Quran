@@ -396,8 +396,10 @@ horizontal page turn — draggable, fling-able, with page-turn audio
   and sectioned by collapsible surah headings, and each result jumps directly
   back into the reader.
 - `reader/` — verse sheet (scroll) or 604-page mushaf pager (`ReadingLayout`).
-  Mushaf pages use `qcf_page` / `qcf_line` for Madinah line breaks and the
-  same Hafs + `InkEngine` wash as Arabic-only scroll. The pager virtualizes
+  Mushaf pages keep the 604 `qcf_page` boundaries, then balance each page's
+  words from `qcf_line` over one additional visual line for the larger hand;
+  chapter openings remain hard boundaries. They use the same Hafs +
+  `InkEngine` wash as Arabic-only scroll. The pager virtualizes
   to the settled page ±1; ink clocks run on the settled page and, only during
   an automatic turn, the page that owns the voice. Scroll and mushaf hand one
   another their visible ayah/leaf when the reading layout changes.

@@ -45,6 +45,69 @@ data class MushafPage(
     }
 }
 
+/**
+ * Keeps a leaf's words and page boundary, but balances them over one more
+ * visual line. Chapter openings remain hard boundaries so their title and
+ * basmalah never drift into the preceding chapter's tail.
+ */
+fun reflowMushafPage(
+    page: MushafPage,
+    tokenWeight: (MushafToken) -> Float,
+): MushafPage {
+    if (page.lines.isEmpty()) return page
+    val boundaries = (listOf(0) + page.surahStarts.map { it.beforeLineIndex } + page.lines.size)
+        .distinct().sorted()
+    val sections = boundaries.zipWithNext().filter { (start, end) -> start < end }
+    val expanded = sections.indices.maxByOrNull { index ->
+        val (start, end) = sections[index]
+        page.lines.subList(start, end).flatMap { it.tokens }
+            .sumOf { tokenWeight(it).coerceAtLeast(0.001f).toDouble() } / (end - start)
+    } ?: return page
+    val rows = ArrayList<MushafLine>(page.lines.size + 1)
+    val starts = ArrayList<MushafSurahStart>(page.surahStarts.size)
+    sections.forEachIndexed { index, (start, end) ->
+        page.surahStarts.filter { it.beforeLineIndex == start }.forEach {
+            starts += it.copy(beforeLineIndex = rows.size)
+        }
+        val tokens = page.lines.subList(start, end).flatMap { it.tokens }
+        val count = ((end - start) + if (index == expanded) 1 else 0).coerceAtMost(tokens.size)
+        balancedMushafRows(tokens, count, tokenWeight).forEach { row ->
+            rows += MushafLine(number = rows.size + 1, tokens = row)
+        }
+    }
+    return page.copy(lines = rows, surahStarts = starts)
+}
+
+private fun balancedMushafRows(
+    tokens: List<MushafToken>,
+    count: Int,
+    tokenWeight: (MushafToken) -> Float,
+): List<List<MushafToken>> {
+    val weights = tokens.map { tokenWeight(it).coerceAtLeast(0.001f) }
+    val rows = ArrayList<List<MushafToken>>(count)
+    var start = 0
+    repeat(count) { row ->
+        if (row == count - 1) {
+            rows += tokens.subList(start, tokens.size)
+        } else {
+            val remaining = count - row
+            val target = weights.subList(start, weights.size).sum() / remaining
+            val maxEnd = tokens.size - remaining + 1
+            var end = start + 1
+            var width = weights[start]
+            while (end < maxEnd) {
+                val next = width + weights[end]
+                if (kotlin.math.abs(target - next) >= kotlin.math.abs(target - width)) break
+                width = next
+                end++
+            }
+            rows += tokens.subList(start, end)
+            start = end
+        }
+    }
+    return rows
+}
+
 data class MushafSourceWord(
     val surahId: Int,
     val ayah: Int,
