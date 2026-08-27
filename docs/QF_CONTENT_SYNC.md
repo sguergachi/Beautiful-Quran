@@ -43,30 +43,28 @@ changes at least every seven days, and applies corrections atomically.
 Android / web reader
   ├─ committed quran.db
   │    └─ independent Quran text/morphology + quran-align timing fallback
-  ├─ separate atomic device cache (SQLite on Android; IndexedDB on web)
-  └─ Beautiful Quran's QF-shaped Content Sync facade
-       ├─ recitations:* today: legacy unauthenticated QDC endpoint
-       ├─ mushafs:1 today: legacy unauthenticated Quran.com by-page endpoint
-       └─ provider adapter after approval: QF OAuth + authenticated Content API
+  ├─ mushafs:1 device cache
+  │    └─ direct unauthenticated Quran.com chapter API today
+  └─ recitations:* device cache
+       └─ Content Sync facade → canonical timing normalizer
+            └─ legacy QDC today / QF OAuth provider after approval
 ```
 
-The Android and web clients do not know which upstream provider is active and
-never receive a QF client secret. They read fresh local rows first, start a
-background refresh after six days, reject runtime rows after seven days, and
-fall back to independently licensed timing rows whenever the timing cache is
-unavailable. Quran.com-derived gloss/QCF fields are withheld when absent or
-older than seven days; they are not present in the public database.
+The current word/QCF clients make fixed-corpus unauthenticated requests directly
+to Quran.com and never send a QF secret or any user state. Their transport is
+replaceable with the QF-shaped Content Sync path after approval. Both caches
+read local rows first, refresh after six days, reject runtime rows after seven
+days, and retry when connectivity returns. Quran.com-derived gloss/QCF fields
+are withheld when absent or stale; they are not present in the public database.
 The backend runs the same cleaner, clock rebase, corrections, repairs, and
 physical finalizer that historically produced the reader rows. Its earlier
 Alafasy audit predates the restored `quran-v55` baseline and is no longer
 sufficient release evidence. The facade URL must remain unset until all six
 reciters pass a new full-corpus comparison against that baseline.
 
-The transitional provider is still only an engineering control—not permission
-to use the legacy endpoint and not an authenticated QF integration. Its use
-must be disclosed to QF rather than represented as already approved. Production
-clients must not be pointed at it until a host is selected and named in the
-Privacy Policy.
+The transitional direct API and timing provider are engineering controls—not
+permission to use a legacy endpoint and not an authenticated QF integration.
+Their use must be disclosed to QF rather than represented as already approved.
 
 ## Already implemented
 
@@ -110,7 +108,8 @@ Privacy Policy.
   values. Its identity `qcf_span_end = position` defaults carry no provider data.
   CI checks every field, provenance, version, and fingerprint.
 - [x] `mushafs:1` supplies exactly 77,429 normalized word records to Android
-  and web through the same atomic six-day/seven-day cache contract.
+  and web through the same atomic six-day/seven-day cache contract. The direct
+  adapters verify the 604 QCF page-font codepoint runs before installation.
 - [x] CI tests the backend, Python timing pipeline, Android cache, web cache,
   and database provenance/freshness gates.
 
@@ -190,9 +189,9 @@ Include these in the application or follow-up email. Code cannot resolve them:
 - [ ] Run and retain a new full-corpus parity report for all six runtime
   reciters against `quran-v55.db` before production deployment. The earlier
   Alafasy result used the superseded baseline and does not satisfy this gate.
-- [ ] Remove the direct legacy importer and transitional endpoint after the QF
-  migration is accepted. Keep the purge path long enough to delete legacy and
-  QF caches safely.
+- [ ] Replace the direct legacy word/QCF transport and the transitional timing
+  provider after QF migration is accepted. Keep the cache schema and purge path
+  so legacy and QF rows can be deleted safely.
 - [ ] Do not rewrite Git history merely to hide old data; do so only if QF
   requires it and after a separate, explicit migration plan.
 
@@ -255,6 +254,7 @@ processor disclosure, network-restored scheduling/monitoring, full six-reciter
 parity evidence, and the notes consent/deletion flow.
 
 It is also not a legal conclusion that transitional legacy access is allowed.
-That permission question remains explicit for QF. If QF asks for the legacy
-provider to stop, disable the backend and purge its cache. The clients would
-then keep quran-align timing fallback and withhold Quran.com word/QCF fields.
+That permission question remains explicit for QF. If QF asks for legacy access
+to stop, disable both direct word/QCF traffic and the timing provider, then
+purge their caches. The clients would keep quran-align timing fallback and
+withhold Quran.com word/QCF fields.

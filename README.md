@@ -117,16 +117,18 @@ In a linked Git worktree it also checks the primary checkout for
 `tools/build_db.py` downloads independently sourced Quran text, morphology,
 and open quran-align timings and packs them into SQLite. The committed asset
 contains no Quran.com-derived word, QCF, page-layout, or QDC timing values.
-Android and web obtain those fields through normalized seven-day snapshots in
-a separate device cache. CI (GitHub Actions) runs unit
+Android and web fetch word/QCF fields from the unauthenticated Quran.com API
+and normalize them into a separate seven-day device cache. Repeat timings use
+the normalized timing service only when configured. CI (GitHub Actions) runs unit
 tests on every push; on `master`
 it also assembles the release APK and publishes it to the rolling latest release.
 
-Released builds read the facade URL from the non-secret repository variable
-`TIMING_CONTENT_BASE_URL` (Android) / its Vite equivalent. Leave it unset until
-the HTTPS backend host is deployed and named in the Privacy Policy. The clients
-then continue on quran-align timings without a blocking network path;
-runtime-only gloss/QCF fields appear after the first successful cache fill.
+Word/QCF download needs no build variable: released clients call
+`https://api.quran.com` automatically, refresh after six days, and withhold the
+cache after seven. `TIMING_CONTENT_BASE_URL` (Android) / its Vite equivalent is
+only for the normalized repeat-timing service; leave it unset until that HTTPS
+host passes the deployment and parity gates. quran-align remains the timing
+fallback without a blocking network path.
 
 ## Run in an Android emulator on Linux
 

@@ -2,6 +2,7 @@ package com.beautifulquran.data
 
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -10,7 +11,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.int
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
@@ -40,13 +43,24 @@ class RuntimeMushafCache(
     val diagnostics: StateFlow<RuntimeCacheDiagnostics> = _diagnostics
     private val syncer = QfContentSyncer(counted(api), store, nowMs)
     private var syncing = false
-    private var parsedToken: String? = null
+    @Volatile private var cachedState: QfSyncState? = null
+    @Volatile private var parsedToken: String? = null
+    @Volatile private var unreadableToken: String? = null
+    @Volatile private var scheduledToken: String? = null
+    @Volatile private var blockReadRefresh = false
     private var parsedWords = emptyMap<String, RuntimeMushafWord>()
     private var parsedBySurah = emptyMap<Int, Map<Pair<Int, Int>, RuntimeMushafWord>>()
     private var refreshJob: Job? = null
     private var expiryJob: Job? = null
-    private val _changes = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+    private val _changes = MutableSharedFlow<Unit>(
+        extraBufferCapacity = 1,
+        onBufferOverflow = BufferOverflow.DROP_OLDEST,
+    )
     val changes: SharedFlow<Unit> = _changes
+
+    init {
+        (api as? QfNetworkCallReporter)?.setNetworkCallReporter(::countApiCall)
+    }
 
     fun status(now: Long = nowMs()): RuntimeCacheStatus {
         val diagnostics = _diagnostics.value
@@ -75,9 +89,11 @@ class RuntimeMushafCache(
     fun allWords(): Collection<RuntimeMushafWord>? = currentWords()?.values
     internal fun snapshotWords(): Map<String, RuntimeMushafWord>? = currentWords()
 
+    /** Launch / connectivity hook. Never retries a failed refresh from a reader lookup. */
     fun refreshIfNeeded() {
-        val state = store.state(FILTER)
-        updateResource { it.copy(updatedAtMs = state?.updatedAtMs) }
+        blockReadRefresh = false
+        val state = rememberedState()
+        rememberUpdatedAt(state)
         scheduleChecks(state)
         val age = state?.let { nowMs() - it.updatedAtMs }
         if (age == null || age !in 0..QF_REVALIDATE_AFTER_MS) refresh()
@@ -88,18 +104,22 @@ class RuntimeMushafCache(
             if (syncing) return
             syncing = true
         }
+        blockReadRefresh = false
         updateResource {
-            it.copy(updatedAtMs = store.state(FILTER)?.updatedAtMs, refreshing = true, lastError = null)
+            it.copy(updatedAtMs = rememberedState()?.updatedAtMs, refreshing = true, lastError = null)
         }
         scope.launch {
             try {
                 syncer.sync(FILTER)
-                parsedToken = null
                 val state = store.state(FILTER)
-                updateResource { it.copy(updatedAtMs = state?.updatedAtMs) }
+                cachedState = state
+                parsedToken = null
+                unreadableToken = null
+                rememberUpdatedAt(state)
                 scheduleChecks(state)
-                _changes.emit(Unit)
+                _changes.tryEmit(Unit)
             } catch (error: Exception) {
+                blockReadRefresh = true
                 updateResource { it.copy(lastError = error.message ?: error::class.simpleName) }
             } finally {
                 synchronized(this@RuntimeMushafCache) { syncing = false }
@@ -109,57 +129,86 @@ class RuntimeMushafCache(
     }
 
     private fun currentWords(): Map<String, RuntimeMushafWord>? {
-        val state = store.state(FILTER)
-        updateResource { it.copy(updatedAtMs = state?.updatedAtMs) }
-        if (state == null || nowMs() - state.updatedAtMs !in 0..QF_REVALIDATE_AFTER_MS) refreshIfNeeded()
-        if (!isQfContentFresh(state?.updatedAtMs, nowMs())) return null
+        val state = rememberedState()
+        rememberUpdatedAt(state)
+        val now = nowMs()
+        if (!blockReadRefresh && (state == null || now - state.updatedAtMs !in 0..QF_REVALIDATE_AFTER_MS)) {
+            refresh()
+        }
+        if (!isQfContentFresh(state?.updatedAtMs, now)) return null
         val current = state ?: return null
         if (parsedToken == current.token) return parsedWords
-        return runCatching {
+        if (unreadableToken == current.token) return null
+        return install(current)
+    }
+
+    private fun install(expected: QfSyncState): Map<String, RuntimeMushafWord>? {
+        val parsed = runCatching {
             store.rows(RESOURCE, RECORD_TYPE).associate { row ->
-                val record = json.parseToJsonElement(row.payload).jsonObject
-                val word = RuntimeMushafWord(
-                    surahId = record.requiredInt("surah_id"),
-                    ayahNumber = record.requiredInt("ayah_number"),
-                    position = record.requiredInt("position"),
-                    translation = record.requiredString("translation_en"),
-                    transliteration = record.requiredString("transliteration"),
-                    qcfV2 = record.requiredString("qcf_v2"),
-                    qcfPage = record.requiredInt("qcf_page"),
-                    qcfLine = record.requiredInt("qcf_line"),
-                    qcfSpanEnd = record.requiredInt("qcf_span_end"),
-                    ayahPage = record.requiredInt("ayah_page"),
-                )
+                val word = parseMushafWord(json.parseToJsonElement(row.payload).jsonObject)
                 check(row.recordKey == key(word.surahId, word.ayahNumber, word.position))
                 row.recordKey to word
-            }.also {
-                check(it.size >= minimumWords)
-                parsedWords = it
-                parsedBySurah = it.values.groupBy { word -> word.surahId }.mapValues { (_, words) ->
-                    words.associateBy { word -> word.ayahNumber to word.position }
-                }
-                parsedToken = current.token
+            }.also { check(it.size >= minimumWords) }
+        }.getOrElse { error ->
+            unreadableToken = expected.token
+            updateResource { it.copy(lastError = error.message ?: error::class.simpleName) }
+            return null
+        }
+        val bySurah = parsed.values.groupBy { it.surahId }.mapValues { (_, words) ->
+            words.associateBy { word -> word.ayahNumber to word.position }
+        }
+        synchronized(this) {
+            if (cachedState?.token != expected.token) {
+                return if (parsedToken == cachedState?.token) parsedWords else null
             }
-        }.getOrNull()
+            parsedWords = parsed
+            parsedBySurah = bySurah
+            parsedToken = expected.token
+            unreadableToken = null
+            return parsed
+        }
+    }
+
+    private fun rememberedState(): QfSyncState? {
+        cachedState?.let { return it }
+        return store.state(FILTER).also { cachedState = it }
+    }
+
+    private fun rememberUpdatedAt(state: QfSyncState?) {
+        val updated = state?.updatedAtMs
+        if (_diagnostics.value.resources[MUSHAF_ID]?.updatedAtMs != updated) {
+            updateResource { it.copy(updatedAtMs = updated) }
+        }
     }
 
     private fun counted(api: QfContentSyncApi) = object : QfContentSyncApi {
         override suspend fun sync(request: QfSyncRequest): QfSyncPage {
-            _diagnostics.update { RuntimeCacheDiagnostics(it.apiCalls + 1, it.resources) }
+            if (api !is QfNetworkCallReporter) countApiCall()
             return api.sync(request)
         }
 
         override suspend fun snapshot(relativePath: String): QfSnapshot {
-            _diagnostics.update { RuntimeCacheDiagnostics(it.apiCalls + 1, it.resources) }
+            if (api !is QfNetworkCallReporter) countApiCall()
             return api.snapshot(relativePath)
         }
     }
 
+    private fun countApiCall() {
+        _diagnostics.update { RuntimeCacheDiagnostics(it.apiCalls + 1, it.resources) }
+    }
+
     /** Refresh while current, then notify readers exactly when retained data expires. */
     private fun scheduleChecks(state: QfSyncState?) {
+        if (state == null) {
+            refreshJob?.cancel()
+            expiryJob?.cancel()
+            scheduledToken = null
+            return
+        }
+        if (scheduledToken == state.token) return
         refreshJob?.cancel()
         expiryJob?.cancel()
-        if (state == null) return
+        scheduledToken = state.token
         val token = state.token
         val now = nowMs()
         val refreshDelay = state.updatedAtMs + QF_REVALIDATE_AFTER_MS - now
@@ -171,10 +220,10 @@ class RuntimeMushafCache(
         }
         expiryJob = scope.launch {
             delay((state.updatedAtMs + QF_MAX_CACHE_AGE_MS - now).coerceAtLeast(0) + 1)
-            val current = store.state(FILTER)
+            val current = cachedState ?: store.state(FILTER)
             if (current?.token == token && !isQfContentFresh(current.updatedAtMs, nowMs())) {
                 parsedToken = null
-                _changes.emit(Unit)
+                _changes.tryEmit(Unit)
                 refreshIfNeeded()
             }
         }
@@ -191,12 +240,6 @@ class RuntimeMushafCache(
         }
     }
 
-    private fun kotlinx.serialization.json.JsonObject.requiredInt(name: String) =
-        get(name)?.jsonPrimitive?.int ?: error("Mushaf field $name is missing")
-
-    private fun kotlinx.serialization.json.JsonObject.requiredString(name: String) =
-        get(name)?.jsonPrimitive?.content ?: error("Mushaf field $name is missing")
-
     private companion object {
         const val MUSHAF_ID = 1
         const val RECORD_TYPE = "mushaf_word"
@@ -205,3 +248,41 @@ class RuntimeMushafCache(
         fun key(surahId: Int, ayah: Int, position: Int) = "$surahId:$ayah:$position"
     }
 }
+
+internal fun parseMushafWord(record: JsonObject): RuntimeMushafWord {
+    val surah = record.int("surah_id")
+    val ayah = record.int("ayah_number")
+    val position = record.int("position")
+    val qcf = record.string("qcf_v2")
+    val qcfPage = record.int("qcf_page")
+    val qcfLine = record.int("qcf_line")
+    val spanEnd = record.int("qcf_span_end")
+    val ayahPage = record.int("ayah_page")
+    check(record.string("record_type") == "mushaf_word") { "Unexpected mushaf record type" }
+    check(surah in 1..114 && ayah > 0 && position > 0) { "Invalid mushaf word identity" }
+    check(record.string("record_key") == "$surah:$ayah:$position") { "Mushaf record_key mismatch" }
+    check(
+        if (qcf.isEmpty()) qcfPage == 0 && qcfLine == 0
+        else qcfPage in 1..604 && qcfLine > 0,
+    ) { "Invalid mushaf QCF coordinates" }
+    check(spanEnd >= position) { "Invalid mushaf qcf_span_end" }
+    check(ayahPage in 1..604) { "Invalid mushaf ayah_page" }
+    return RuntimeMushafWord(
+        surahId = surah,
+        ayahNumber = ayah,
+        position = position,
+        translation = record.string("translation_en"),
+        transliteration = record.string("transliteration"),
+        qcfV2 = qcf,
+        qcfPage = qcfPage,
+        qcfLine = qcfLine,
+        qcfSpanEnd = spanEnd,
+        ayahPage = ayahPage,
+    )
+}
+
+private fun JsonObject.int(name: String) =
+    get(name)?.jsonPrimitive?.intOrNull ?: error("Mushaf field $name is missing")
+
+private fun JsonObject.string(name: String) =
+    get(name)?.jsonPrimitive?.contentOrNull ?: error("Mushaf field $name is missing")

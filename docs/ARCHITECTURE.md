@@ -58,23 +58,28 @@ app (runtime)                                           ▼
 > credentials remain a backend-only post-approval step. The remaining approval
 > and deployment gates live in [QF_CONTENT_SYNC.md](QF_CONTENT_SYNC.md).
 
-### Transitional backend boundary
+### Transitional provider boundaries
 
 ```text
-Android / web
-       │ QF-shaped sync/snapshot calls; no account, secret, or user data
-       ▼
-Beautiful Quran content facade ── normalize ── private 6-day/7-day cache
-       │ provider boundary; fixed allowlisted calls only
-       ▼
-legacy Quran.com APIs today │ authenticated QF after approval
+word/QCF today: Android / web ── direct fixed-corpus GETs ── api.quran.com
+                                      │
+                                      └─ atomic 6-day/7-day device cache
+
+repeat timing: Android / web ── Content Sync facade ── Python normalizer
+                                      │
+                                      └─ legacy QDC today / authenticated QF later
 ```
 
-The service accepts no arbitrary upstream URL, stores no client identifier,
-serializes bounded upstream requests, writes cache files atomically, and
-exposes a secret-protected purge operation. Its public facade uses stable app
-reciter IDs and normalized records, so the future QF ID map and OAuth flow stay
-server-side. See
+The unauthenticated legacy word/QCF adapter fetches the same fixed 114-chapter
+corpus for every user; it sends no account, secret, reading position, search,
+bookmark, or note data. It validates all 77,429 records and each QCF page-font
+codepoint run before one atomic client-cache replacement. The future QF-shaped
+Content Sync transport remains available behind the same cache interface.
+
+Repeat timing never consumes raw QDC in a client: the service runs the canonical
+cleaner, clock rebase, corrections, repairs, and physical finalizer first. It
+accepts no arbitrary upstream URL, stores no client identifier, and keeps the
+future QF ID map and OAuth flow server-side. See
 [`backend/README.md`](../backend/README.md). This is a transitional engineering
 control, not evidence of QF permission for the legacy endpoint.
 
@@ -103,12 +108,12 @@ For each selected reciter and chapter, both clients use the same order:
    object for that session. The new rows take effect only while quiet or on the
    next load, preventing an in-flight word from jumping.
 
-The same path also syncs `mushafs:1`: all 77,429 word gloss, transliteration,
-QCF glyph/layout, and ayah-page records are normalized server-side and applied
-atomically. Android stores rows in `qf-content-cache.db`; the browser uses
-separate QF IndexedDB stores. Neither cache is part of Git, the
-APK, or the Pages artifact. The stable public resource key is
-`recitations:<app-reciter-id>` or `mushafs:1`; only the backend owns provider IDs.
+The word/QCF cache uses the same freshness and atomicity contract. Today the
+clients normalize direct legacy `by_chapter` responses into `mushafs:1`; after
+approval the replaceable transport can consume QF Content Sync without changing
+the repositories or cache schema. Android stores rows in `qf-content-cache.db`;
+the browser uses IndexedDB. Neither cache is part of Git, the APK, or the Pages
+artifact.
 Developer Mode shows the selected resource's state, next refresh, seven-day
 limit, last failure, and the exact number of API requests made in that process
 or browser session.
@@ -120,7 +125,7 @@ Sources (all fetched over HTTPS, cached in `tools/.cache/`):
 | Source | Provides | Why this one |
 |---|---|---|
 | `quran-json` (npm) | Uthmani Unicode text, Saheeh International translation, surah metadata | Tanzil-derived, verse-keyed, no auth |
-| Quran.com by-page API (runtime only) | Per-word English gloss, transliteration, QCF V2 layout, page | Normalized behind `mushafs:1`; never committed to `quran.db` |
+| Quran.com chapter API (runtime only) | Per-word English gloss, transliteration, QCF V2 layout, page | Normalized and validated directly into the client `mushafs:1` cache; never committed to `quran.db` |
 | `cpfair/quran-align` release zip | Word-level timestamps per reciter, CC-BY 4.0 | The canonical open word-alignment dataset, matched to everyayah.com audio |
 | quran.com `qdc` audio API (runtime only) | **Repeat-aware** word timestamps for reciters in `QDC_REPEAT_RECITERS` | Normalized behind `recitations:*`; never committed to `quran.db`. See [REPEAT_HIGHLIGHTING.md](REPEAT_HIGHLIGHTING.md) |
 | everyayah MP3 ranges | Leading-silence and duration measurements in `tools/audio_onsets/` | Some individual ayah files begin with silence. The offline scanner holds the first wash until sustained voice without moving valid later word boundaries, and records each file's length as the ceiling no timing row may cross. |

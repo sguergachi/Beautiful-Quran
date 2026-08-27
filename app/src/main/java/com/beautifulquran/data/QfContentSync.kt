@@ -51,6 +51,11 @@ interface QfContentSyncApi {
     suspend fun snapshot(relativePath: String): QfSnapshot
 }
 
+/** Lets a direct provider adapter report physical HTTP calls to Developer Mode. */
+internal interface QfNetworkCallReporter {
+    fun setNetworkCallReporter(reporter: () -> Unit)
+}
+
 /** Separate from the reader database: QF's cache can be replaced without mixing rows. */
 interface QfContentSyncStore {
     fun state(filter: QfResourceFilter): QfSyncState?
