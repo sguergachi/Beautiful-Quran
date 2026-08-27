@@ -185,13 +185,22 @@ class MainActivity : ComponentActivity() {
             val mushafDiagnostics by app.runtimeMushaf!!.diagnostics.collectAsStateWithLifecycle()
             val mushafStatus = remember(mushafDiagnostics) { app.runtimeMushaf!!.status() }
             val mushafReady = runtimeMushafEntranceReady(mushafStatus, System.currentTimeMillis())
+            var mushafMemoryReady by remember { mutableStateOf(false) }
+            LaunchedEffect(mushafReady, mushafStatus.updatedAtMs) {
+                mushafMemoryReady = false
+                if (mushafReady) {
+                    app.repository.warmRuntimeMushaf()
+                    mushafMemoryReady = true
+                }
+            }
             var databaseReady by remember { mutableStateOf(false) }
             LaunchedEffect(Unit) {
                 app.repository.warmDatabase()
                 databaseReady = true
             }
-            val contentReady = mushafReady && databaseReady
+            val contentReady = mushafReady && mushafMemoryReady && databaseReady
             val contentLoadLabel = when {
+                mushafReady && !mushafMemoryReady -> "Caching Quran pages"
                 mushafReady && !databaseReady -> "Caching Quran database"
                 else -> when (mushafStatus.phase) {
                     RuntimeCachePhase.REFRESHING -> when {
@@ -219,9 +228,9 @@ class MainActivity : ComponentActivity() {
             LaunchedEffect(assistantAction) {
                 if (assistantAction != null) entranceDone = true
             }
-            // Deep links skip the cover, but the OS splash still owns the
-            // launch until the complete bundled database is warm.
-            if (entranceDone && databaseReady) {
+            // Deep links skip the cover, but the OS splash still owns launch
+            // until both the bundled DB and runtime QF lookup maps are warm.
+            if (entranceDone && contentReady) {
                 SideEffect { splashPending = false }
             }
 

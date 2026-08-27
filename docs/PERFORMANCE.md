@@ -246,8 +246,10 @@ janky", first ask: is this the release APK?
 - During the closed-cover load, Android sizes SQLite's native page-cache ceiling
   to the database file plus 1 MiB and runs `quick_check`, touching the complete
   file before opening. The singleton connection retains that cache for the
-  process. Web's sql.js database already retains the complete fetched buffer.
-  Do not duplicate all 77,429 rows into Kotlin/JS view objects at startup.
+  process. It also reads and parses the separate 77,429-row QF cache once into
+  process-lifetime word and per-surah lookup maps, so no chapter pays that cost.
+  Web's sql.js database already retains the complete fetched buffer. Do not
+  create additional per-screen copies of either cache.
 - A surah loads with exactly three queries (ayahs, words, timings) — no
   per-ayah round trips. Timings for one reciter+surah arrive as one query of
   compact JSON rows.

@@ -96,6 +96,22 @@ class RuntimeMushafCacheTest {
     }
 
     @Test
+    fun `launch warm parses and retains every fresh row without an API call`() = runTest {
+        val store = Store(QfSyncState(filter, "cached", 90L, 190L), listOf(row))
+        val api = CountingApi { error("should not fetch") }
+        val cache = RuntimeMushafCache(api, store, backgroundScope, nowMs = { 100L }, minimumWords = 1)
+
+        assertTrue(cache.warm())
+        assertEquals(1, cache.cachedWordCount())
+        assertEquals(1, store.rowReads)
+        assertEquals(0, api.syncs)
+        assertEquals(190L, cache.status().lastRefreshApiCalls)
+
+        assertTrue(cache.warm())
+        assertEquals(1, store.rowReads)
+    }
+
+    @Test
     fun `direct adapter reports physical HTTP calls instead of wrapper hops`() = runTest {
         val store = Store()
         val api = ReportingApi(httpCalls = 3)
@@ -106,6 +122,7 @@ class RuntimeMushafCacheTest {
 
         assertEquals("seeking", cache.word(5, 2, 19)?.translation)
         assertEquals(3L, cache.status().apiCalls)
+        assertEquals(3L, cache.status().lastRefreshApiCalls)
         assertEquals(1, api.syncs)
     }
 
@@ -290,9 +307,10 @@ class RuntimeMushafCacheTest {
             snapshots: List<QfSnapshot>,
             nextToken: String,
             nowMs: Long,
+            lastRefreshApiCalls: Long?,
         ) {
             rows = snapshots.single().rows
-            state = QfSyncState(filter, nextToken, nowMs)
+            state = QfSyncState(filter, nextToken, nowMs, lastRefreshApiCalls)
         }
     }
 }

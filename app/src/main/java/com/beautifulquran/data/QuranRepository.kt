@@ -181,6 +181,11 @@ class QuranRepository(
         database.warmEntireDatabase()
     }
 
+    /** Parse and retain every fresh QF word row before the cover opens. */
+    suspend fun warmRuntimeMushaf() = withContext(Dispatchers.IO) {
+        runtimeMushaf?.warm()
+    }
+
     suspend fun surahs(): List<Surah> = withContext(Dispatchers.IO) {
         surahsCache ?: queryList(
             "SELECT id, name_arabic, name_transliteration, name_translation, revelation_place, ayah_count FROM surahs ORDER BY id",

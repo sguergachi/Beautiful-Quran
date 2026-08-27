@@ -19,7 +19,12 @@ data class QfCacheRow(
     val updatedAt: String,
 )
 
-data class QfSyncState(val filter: QfResourceFilter, val token: String, val updatedAtMs: Long)
+data class QfSyncState(
+    val filter: QfResourceFilter,
+    val token: String,
+    val updatedAtMs: Long,
+    val lastRefreshApiCalls: Long? = null,
+)
 
 sealed interface QfSyncRequest {
     data class Bootstrap(val filter: QfResourceFilter) : QfSyncRequest
@@ -77,6 +82,7 @@ interface QfContentSyncStore {
         snapshots: List<QfSnapshot>,
         nextToken: String,
         nowMs: Long,
+        lastRefreshApiCalls: Long?,
     )
 }
 
@@ -90,7 +96,8 @@ class QfContentSyncer(
     private val beforeApply: () -> Unit = {},
     private val nowMs: () -> Long = System::currentTimeMillis,
 ) {
-    suspend fun sync(filter: QfResourceFilter) {
+    suspend fun sync(filter: QfResourceFilter, apiCalls: (() -> Long)? = null) {
+        val callsBefore = apiCalls?.invoke()
         var request: QfSyncRequest = store.state(filter)?.let {
             QfSyncRequest.Incremental(filter, it.token)
         } ?: QfSyncRequest.Bootstrap(filter)
@@ -127,6 +134,7 @@ class QfContentSyncer(
             snapshots,
             requireNotNull(finalToken),
             nowMs() - requireNotNull(finalContentAgeMs),
+            callsBefore?.let { apiCalls() - it },
         )
     }
 }

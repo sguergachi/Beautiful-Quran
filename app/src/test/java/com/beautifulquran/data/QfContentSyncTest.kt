@@ -57,6 +57,31 @@ class QfContentSyncTest {
     }
 
     @Test
+    fun `successful checkpoint records exact API usage for that refresh`() = runBlocking {
+        var calls = 0L
+        val store = FakeStore()
+        val api = object : QfContentSyncApi {
+            override suspend fun sync(request: QfSyncRequest): QfSyncPage {
+                calls++
+                return QfSyncPage(
+                    listOf(QfContentChange.Snapshot(resource, "/api/v4/resources/snapshots/recitations/7")),
+                    null,
+                    "new-token",
+                )
+            }
+
+            override suspend fun snapshot(relativePath: String): QfSnapshot {
+                calls++
+                return QfSnapshot(resource, listOf(row))
+            }
+        }
+
+        QfContentSyncer(api, store).sync(filter) { calls }
+
+        assertEquals(2L, store.savedState?.lastRefreshApiCalls)
+    }
+
+    @Test
     fun `freshness expires after exactly seven days`() {
         assertTrue(isQfContentFresh(0L, QF_MAX_CACHE_AGE_MS))
         assertFalse(isQfContentFresh(0L, QF_MAX_CACHE_AGE_MS + 1))
@@ -96,6 +121,7 @@ class QfContentSyncTest {
             snapshots: List<QfSnapshot>,
             nextToken: String,
             nowMs: Long,
+            lastRefreshApiCalls: Long?,
         ) {
             val result = rows.toMutableList()
             val fetched = snapshots.iterator()
@@ -120,7 +146,7 @@ class QfContentSyncTest {
                 }
             }
             rows = result
-            savedState = QfSyncState(filter, nextToken, nowMs)
+            savedState = QfSyncState(filter, nextToken, nowMs, lastRefreshApiCalls)
         }
     }
 }

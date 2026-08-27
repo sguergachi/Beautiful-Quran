@@ -15,9 +15,18 @@ class QfContentCacheDatabase(context: Context) : QfContentSyncStore {
             CREATE TABLE IF NOT EXISTS sync_state (
                 resource_filter TEXT PRIMARY KEY NOT NULL,
                 sync_token TEXT NOT NULL,
-                updated_at_ms INTEGER NOT NULL
+                updated_at_ms INTEGER NOT NULL,
+                last_refresh_api_calls INTEGER
             )
         """.trimIndent())
+        if (!hasColumn("sync_state", "last_refresh_api_calls")) {
+            execSQL("ALTER TABLE sync_state ADD COLUMN last_refresh_api_calls INTEGER")
+            // Every successful legacy snapshot reads the same 190 chapter pages.
+            execSQL(
+                "UPDATE sync_state SET last_refresh_api_calls = 190 " +
+                    "WHERE sync_token LIKE 'legacy-%'",
+            )
+        }
         execSQL("""
             CREATE TABLE IF NOT EXISTS cached_rows (
                 resource_group TEXT NOT NULL,
@@ -33,13 +42,15 @@ class QfContentCacheDatabase(context: Context) : QfContentSyncStore {
 
     override fun state(filter: QfResourceFilter): QfSyncState? =
         db.rawQuery(
-            "SELECT sync_token, updated_at_ms FROM sync_state WHERE resource_filter = ?",
+            "SELECT sync_token, updated_at_ms, last_refresh_api_calls " +
+                "FROM sync_state WHERE resource_filter = ?",
             arrayOf(filter.value),
         ).use { cursor ->
             if (!cursor.moveToFirst()) null else QfSyncState(
                 filter,
                 cursor.getString(0),
                 cursor.getLong(1),
+                cursor.getLong(2).takeUnless { cursor.isNull(2) },
             )
         }
 
@@ -55,6 +66,7 @@ class QfContentCacheDatabase(context: Context) : QfContentSyncStore {
         snapshots: List<QfSnapshot>,
         nextToken: String,
         nowMs: Long,
+        lastRefreshApiCalls: Long?,
     ) = db.transaction {
         val fetchedSnapshots = snapshots.iterator()
         changes.forEach { change ->
@@ -81,6 +93,8 @@ class QfContentCacheDatabase(context: Context) : QfContentSyncStore {
             put("resource_filter", filter.value)
             put("sync_token", nextToken)
             put("updated_at_ms", nowMs)
+            if (lastRefreshApiCalls == null) putNull("last_refresh_api_calls")
+            else put("last_refresh_api_calls", lastRefreshApiCalls)
         })
         Unit
     }
@@ -104,6 +118,12 @@ class QfContentCacheDatabase(context: Context) : QfContentSyncStore {
         })
     }
 }
+
+private fun SQLiteDatabase.hasColumn(table: String, column: String): Boolean =
+    rawQuery("PRAGMA table_info($table)", null).use { cursor ->
+        generateSequence { if (cursor.moveToNext()) cursor.getString(1) else null }
+            .any { it == column }
+    }
 
 private inline fun <T> SQLiteDatabase.transaction(block: SQLiteDatabase.() -> T): T {
     beginTransaction()

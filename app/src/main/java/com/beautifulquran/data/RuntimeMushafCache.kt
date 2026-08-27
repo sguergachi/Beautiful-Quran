@@ -79,8 +79,16 @@ class RuntimeMushafCache(
         return RuntimeCacheStatus(
             phase, updated, updated?.plus(QF_REVALIDATE_AFTER_MS),
             updated?.plus(QF_MAX_CACHE_AGE_MS), diagnostics.apiCalls, resource?.lastError,
+            resource?.lastRefreshApiCalls,
         )
     }
+
+    /** Parse and retain the complete fresh snapshot before the reader opens. */
+    fun warm(): Boolean = currentWords() != null
+
+    /** Number of QF word rows retained in memory for immediate chapter reads. */
+    fun cachedWordCount(): Int =
+        if (parsedToken != null && parsedToken == cachedState?.token) parsedWords.size else 0
 
     fun words(surahId: Int): Map<Pair<Int, Int>, RuntimeMushafWord>? =
         currentWords()?.let { parsedBySurah[surahId].orEmpty() }
@@ -115,7 +123,7 @@ class RuntimeMushafCache(
         }
         scope.launch {
             try {
-                syncer.sync(FILTER)
+                syncer.sync(FILTER) { _diagnostics.value.apiCalls }
                 val state = store.state(FILTER)
                 cachedState = state
                 parsedToken = null
@@ -181,8 +189,15 @@ class RuntimeMushafCache(
 
     private fun rememberUpdatedAt(state: QfSyncState?) {
         val updated = state?.updatedAtMs
-        if (_diagnostics.value.resources[MUSHAF_ID]?.updatedAtMs != updated) {
-            updateResource { it.copy(updatedAtMs = updated) }
+        val lastRefreshApiCalls = state?.lastRefreshApiCalls
+        val resource = _diagnostics.value.resources[MUSHAF_ID]
+        if (resource?.updatedAtMs != updated || resource?.lastRefreshApiCalls != lastRefreshApiCalls) {
+            updateResource {
+                it.copy(
+                    updatedAtMs = updated,
+                    lastRefreshApiCalls = lastRefreshApiCalls,
+                )
+            }
         }
     }
 
