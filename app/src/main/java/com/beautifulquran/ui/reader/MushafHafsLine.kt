@@ -10,6 +10,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -65,6 +66,17 @@ import com.beautifulquran.ui.theme.letterFadeIn
 import com.beautifulquran.ui.theme.shapedWordBloom
 
 private const val MARK_SIZE_RATIO = 20f / 30f
+
+/** Keeps a newly active pack recessed until composition attaches its wash. */
+internal fun mushafLayerTransitionAlpha(
+    hasWashLayer: Boolean,
+    currentPackHasMotions: Boolean,
+    resolvedAlpha: Float,
+): Float = if (!hasWashLayer && currentPackHasMotions) {
+    InkEngine.State.Upcoming.inkAlpha()
+} else {
+    resolvedAlpha
+}
 
 /**
  * One Madinah line. QCF V2 is one handwritten word-glyph per token
@@ -833,12 +845,14 @@ private fun MushafQcfWord(
         )
     }
     var layoutResult by remember { mutableStateOf<TextLayoutResult?>(null) }
-    val pack = packs[token.surahId to token.ayah]
+    val packKey = remember(token.surahId, token.ayah) { token.surahId to token.ayah }
+    val packState = remember(packs, packKey) { derivedStateOf { packs[packKey] } }
+    val pack = packState.value
     // Pack identity is a composition decision: it determines whether this
-    // word owns only the cheap recess layer or the full wash chain. Draw
-    // lambdas must capture that same pack. Looking up a newer map entry before
-    // recomposition lets the old recess-only chain see an Active motion and
-    // expose full ink for one frame, before letterFadeIn has been attached.
+    // word owns only the cheap recess layer or the full wash chain. Animated
+    // values still come from the latest pack during draw. Capturing a stale
+    // pack here leaves the previous word's completed sweep visible for one
+    // frame at every handoff before the new wash begins.
     // Only the verse under the voice carries wash layers. A waiting ayah needs
     // the cheaper glyph-alpha draw modifier, but never the wash/tint layers;
     // completed and manually browsed words carry neither. This keeps the page
@@ -853,11 +867,12 @@ private fun MushafQcfWord(
     // the word beside it. Read in the layer block, so the dim animates in the
     // draw phase without recomposing the leaf.
     val recessAlpha = {
-        val motion = pack?.motions?.getOrNull(token.word.position - 1)
-        when {
-            !liveInk || pack == null -> 1f
+        val currentPack = packState.value
+        val motion = currentPack?.motions?.getOrNull(token.word.position - 1)
+        val resolved = when {
+            !liveInk || currentPack == null -> 1f
             // No motion: a whole verse waiting its turn, dimmed as a block.
-            motion == null -> (1f - pack.recessCover.value).coerceIn(0f, 1f)
+            motion == null -> (1f - currentPack.recessCover.value).coerceIn(0f, 1f)
             // The wash owns ink strength while a word is revealing; the lyric
             // alpha applies once settled, and before the word has begun — which
             // is what dims the words still ahead of the voice inside the verse
@@ -866,6 +881,11 @@ private fun MushafQcfWord(
             motion.isActive || (motion.sweepProgress > 0f && motion.sweepProgress < 1f) -> 1f
             else -> motion.lyricAlpha
         }
+        mushafLayerTransitionAlpha(
+            hasWashLayer = hasMotionInk,
+            currentPackHasMotions = currentPack?.motions?.isNotEmpty() == true,
+            resolvedAlpha = resolved,
+        )
     }
     // The reveal of the one word being recited, read in the draw phase.
     //
@@ -874,7 +894,7 @@ private fun MushafQcfWord(
     // ~150 words. Their waiting dim is a flat alpha instead (see recessAlpha),
     // so only the word actually under the voice pays for a layer.
     val wordSweep = {
-        val motion = pack?.motions?.getOrNull(token.word.position - 1)
+        val motion = packState.value?.motions?.getOrNull(token.word.position - 1)
         when {
             motion == null || motion.repeat -> 1f
             motion.isActive || motion.sweepProgress > 0f -> motion.sweepProgress
@@ -882,7 +902,7 @@ private fun MushafQcfWord(
         }
     }
     val wordFeather = {
-        pack?.motions?.getOrNull(token.word.position - 1)
+        packState.value?.motions?.getOrNull(token.word.position - 1)
             ?.washFeather ?: InkEngine.tuning.washFeather
     }
     val blooms = {

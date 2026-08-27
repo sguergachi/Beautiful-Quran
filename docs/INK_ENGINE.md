@@ -472,9 +472,11 @@ tween-vs-snap rules, sweep entry and residual rules, repeat wash timing, the
   that sequence: tapping it starts its own wash before the first ayah. At the
   playlist handoff, the first ayah stays Upcoming until its first word timing
   arrives; Media3 advancing the item a poll tick earlier must never flash the
-  whole ayah full before its wash. Each QCF word's draw lambdas also capture
-  the pack that selected its modifier chain, so a newly published Active pack
-  cannot reach an older recess-only chain one frame before the wash layer.
+  whole ayah full before its wash. QCF words read the current pack through one
+  cached state so every word sees its entry mask immediately. If a newly
+  published Active pack reaches an older recess-only modifier before
+  recomposition attaches the wash, that modifier holds Upcoming alpha for the
+  topology-transition frame.
 - Every **highlight** duration, alpha and easing still comes from
   `InkEngine.tuning` — no literal ink-tuning values remain. Motion outside the
   word highlight stays local (for example the block fade while the ayah-selector

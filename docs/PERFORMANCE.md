@@ -191,11 +191,12 @@ tick must not remasure three pages or recreate 150 `Text` nodes.
   read in composition so only that ayah can swap between its cheap recess and
   live wash modifier chains; the pack's animated values are read during draw,
   so wash frames invalidate paint rather than layout.
-- A QCF word captures the pack identity that selected its modifier chain;
-  only that pack's animated values are read during draw. Re-reading the map
-  from a draw lambda is both a hot hash lookup and a correctness race: a new
-  Active pack can otherwise reach an old recess-only chain one frame before
-  recomposition attaches the wash layer.
+- Each QCF word wraps its ayah-map lookup in `derivedStateOf`: a pack publish
+  performs one keyed lookup, while every wash frame reads only the cached
+  pack. Draw must see the latest pack so a completed sweep from the previous
+  word cannot flash before the next entry mask. A recess-only chain that sees
+  Active before recomposition is held at Upcoming alpha until its wash layer
+  is attached.
 - QCF page fonts are held as one atomic family/typeface pair in a bounded LRU
   and preloaded on `Dispatchers.Default` for the settled page ± 2, so a swipe
   does not `Typeface.createFromAsset` on the UI thread. Line geometry is keyed

@@ -105,6 +105,21 @@ class MushafFollowTurnTest {
     }
 
     @Test
+    fun `active pack cannot flash through an old recess-only layer`() {
+        assertEquals(
+            InkEngine.State.Upcoming.inkAlpha(),
+            mushafLayerTransitionAlpha(
+                hasWashLayer = false,
+                currentPackHasMotions = true,
+                resolvedAlpha = 1f,
+            ),
+            0f,
+        )
+        assertEquals(1f, mushafLayerTransitionAlpha(true, true, 1f), 0f)
+        assertEquals(0.4f, mushafLayerTransitionAlpha(false, false, 0.4f), 0f)
+    }
+
+    @Test
     fun `voice page retains read ayahs and covers those beyond the active word`() {
         assertEquals(
             MushafInkPackKind.STATIC,
