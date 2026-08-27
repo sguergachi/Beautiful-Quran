@@ -65,13 +65,6 @@ internal val MushafGutterSlot = 44.dp
 /** Running head band — a tap target tall, nothing more. */
 internal val MushafRunningHead = 36.dp
 /**
- * How long a tapped leaf is held against playback follow. Long enough for a
- * seek to land and the position poll to report a word from where the reader
- * actually tapped, short enough that a verse crossing onto the next page still
- * turns it.
- */
-internal const val MushafTapPageHoldMs = 1_500L
-/**
  * Folio band, with the figure centred in it.
  *
  * The page number belongs to the leaf, so it must sit nearer the last line of

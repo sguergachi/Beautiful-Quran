@@ -265,15 +265,21 @@ internal fun mushafTailTurnAllowed(
  * tap. A hit that leaks onto the previous or next page plays that page's
  * verse with no wash on the leaf the reader is looking at.
  */
-internal fun mushafLeafAcceptsTap(pageIndex: Int, currentPage: Int): Boolean =
-    pageIndex == currentPage
+internal fun mushafLeafAcceptsTap(
+    pageIndex: Int,
+    currentPage: Int,
+    settledPage: Int = currentPage,
+): Boolean = pageIndex == currentPage && pageIndex == settledPage
 
 /**
- * A tap pins the leaf until the seek's word arrives. Auto-follow — including
- * the last-word lead turn — must not steal that leaf in the meantime, or the
- * wash runs on a page the reader is no longer watching.
+ * A tap pins the leaf until the seek's word arrives on it. Auto-follow —
+ * including the last-word lead turn — must not steal that leaf while the
+ * poll still names the word from before the seek.
+ *
+ * [heldPage] and [voicePage] are 1-based. A null voice has not arrived.
  */
-internal fun mushafHoldBlocksFollow(heldPage: Int?): Boolean = heldPage != null
+internal fun mushafHoldBlocksFollow(heldPage: Int?, voicePage: Int?): Boolean =
+    heldPage != null && voicePage != heldPage
 
 /** Delayed turns retain ownership only while the exact activation survives. */
 internal fun mushafSameActivation(expected: ActiveWord, current: ActiveWord?): Boolean =
@@ -490,7 +496,7 @@ internal fun MushafPager(
                 // land and the wash can run where the reader tapped — following
                 // the stale clock, or leading the next leaf, both leave it.
                 if (waitingPage != 0 && page == waitingPage) waitingPage = 0
-                if (mushafHoldBlocksFollow(heldPage)) return@collect
+                if (mushafHoldBlocksFollow(heldPage, page)) return@collect
                 // A hand on the pager owns the turn: while a scroll is in
                 // progress — the user's swipe or a turn this collector just
                 // started — do not pull. Pulling mid-swipe yanked the page
@@ -647,6 +653,7 @@ internal fun MushafPager(
         if (!followEnabled) waitingPage = 0
     }
     val currentPageNow = rememberUpdatedState(pagerState.currentPage)
+    val settledPageNow = rememberUpdatedState(pagerState.settledPage)
     val onWordClickNow = rememberUpdatedState(onWordClick)
     val onWordLongClickNow = rememberUpdatedState(onWordLongClick)
     val onAyahClickNow = rememberUpdatedState(onAyahClick)
@@ -715,7 +722,12 @@ internal fun MushafPager(
             }
             val leafWordClick = remember(pageIndex, page.page) {
                 { token: MushafToken ->
-                    if (mushafLeafAcceptsTap(pageIndex, currentPageNow.value)) {
+                    if (mushafLeafAcceptsTap(
+                            pageIndex,
+                            currentPageNow.value,
+                            settledPageNow.value,
+                        )
+                    ) {
                         onTappedLeafNow.value(page.page)
                         onWordClickNow.value(token)
                     }
@@ -723,14 +735,24 @@ internal fun MushafPager(
             }
             val leafWordLongClick = remember(pageIndex) {
                 { token: MushafToken ->
-                    if (mushafLeafAcceptsTap(pageIndex, currentPageNow.value)) {
+                    if (mushafLeafAcceptsTap(
+                            pageIndex,
+                            currentPageNow.value,
+                            settledPageNow.value,
+                        )
+                    ) {
                         onWordLongClickNow.value(token)
                     }
                 }
             }
             val leafAyahClick = remember(pageIndex, page.page) {
                 { token: MushafToken ->
-                    if (mushafLeafAcceptsTap(pageIndex, currentPageNow.value)) {
+                    if (mushafLeafAcceptsTap(
+                            pageIndex,
+                            currentPageNow.value,
+                            settledPageNow.value,
+                        )
+                    ) {
                         onTappedLeafNow.value(page.page)
                         onAyahClickNow.value(token)
                     }
@@ -738,7 +760,12 @@ internal fun MushafPager(
             }
             val leafBasmalahClick = remember(pageIndex, page.page) {
                 { surahId: Int ->
-                    if (mushafLeafAcceptsTap(pageIndex, currentPageNow.value)) {
+                    if (mushafLeafAcceptsTap(
+                            pageIndex,
+                            currentPageNow.value,
+                            settledPageNow.value,
+                        )
+                    ) {
                         onTappedLeafNow.value(page.page)
                         onBasmalahClickNow.value(surahId)
                     }

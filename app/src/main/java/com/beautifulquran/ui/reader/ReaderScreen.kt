@@ -2395,12 +2395,22 @@ fun ReaderScreen(
                     // page of its own and the position poll can still be
                     // reporting the word from before the seek, which used to
                     // turn the page back and then forward again under the
-                    // finger. Hold the pager here until the clock catches up.
+                    // finger. Hold the pager here until the clock names this
+                    // leaf — a timer let a slow seek yank it away.
                     var mushafTappedPage by remember { mutableStateOf<Int?>(null) }
-                    LaunchedEffect(mushafTappedPage) {
-                        if (mushafTappedPage != null) {
-                            delay(MushafTapPageHoldMs)
-                            mushafTappedPage = null
+                    LaunchedEffect(mushafTappedPage, mushafReady.catalog, mushafSurahId) {
+                        val held = mushafTappedPage ?: return@LaunchedEffect
+                        val catalog = mushafReady.catalog
+                        snapshotFlow { activeWordState.value }.collect { word ->
+                            if (word != null &&
+                                catalog.pageOf(
+                                    mushafSurahId,
+                                    word.ayah,
+                                    word.wordPosition,
+                                ) == held
+                            ) {
+                                mushafTappedPage = null
+                            }
                         }
                     }
                     val onMushafTurnedPage = remember {

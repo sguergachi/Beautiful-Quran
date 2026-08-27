@@ -275,12 +275,18 @@ class MushafFollowTurnTest {
         assertTrue(mushafLeafAcceptsTap(pageIndex = 11, currentPage = 11))
         assertFalse(mushafLeafAcceptsTap(pageIndex = 10, currentPage = 11))
         assertFalse(mushafLeafAcceptsTap(pageIndex = 12, currentPage = 11))
+        // Mid-turn the closest page is not yet the leaf under the reader.
+        assertFalse(
+            mushafLeafAcceptsTap(pageIndex = 12, currentPage = 12, settledPage = 11),
+        )
     }
 
     @Test
-    fun `a tapped leaf holds against follow and the last-word lead turn`() {
-        assertTrue(mushafHoldBlocksFollow(heldPage = 12))
-        assertFalse(mushafHoldBlocksFollow(heldPage = null))
+    fun `a tapped leaf holds against follow until the seek names it`() {
+        assertTrue(mushafHoldBlocksFollow(heldPage = 12, voicePage = 11))
+        assertTrue(mushafHoldBlocksFollow(heldPage = 12, voicePage = null))
+        assertFalse(mushafHoldBlocksFollow(heldPage = 12, voicePage = 12))
+        assertFalse(mushafHoldBlocksFollow(heldPage = null, voicePage = 12))
     }
 
     @Test
