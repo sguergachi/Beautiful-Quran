@@ -235,8 +235,11 @@ internal fun MushafHafsLine(
  * from them, and the fit runs a bisection per line — all on the UI thread,
  * mid-swipe. The face LRU evicts typefaces (and with them the profile
  * cache), so this cache holds the geometry strongly, keyed by what the
- * geometry actually depends on: the page's own face, the line, the size,
- * and the measure.
+ * geometry actually depends on: the page's own face, the line's words,
+ * the size, and the measure. Line number alone is not the line — display
+ * reflow rebuilds row N from a different token list once the face lands,
+ * and reusing the previous row's flush fit stretched three words across
+ * the measure (a river down the leaf).
  */
 internal class MushafLineGeometry(
     val cells: List<MushafCell>,
@@ -249,6 +252,8 @@ private data class MushafLineGeometryKey(
     val line: Int,
     val fontPxBits: Int,
     val measureWidthPxBits: Int,
+    val typefaceId: Int,
+    val contentKey: Int,
 )
 
 private val lineGeometryCache =
@@ -259,16 +264,30 @@ private val lineGeometryCache =
         size > 512
 }
 
+/** Identity of the words a display row is actually setting. */
+internal fun mushafLineContentKey(line: MushafLine): Int {
+    var h = line.tokens.size
+    line.tokens.forEach { token ->
+        h = 31 * h + token.surahId
+        h = 31 * h + token.ayah
+        h = 31 * h + token.word.position
+    }
+    return h
+}
+
 private fun lineGeometryKey(
     page: Int,
-    line: Int,
+    line: MushafLine,
+    pageTypeface: android.graphics.Typeface?,
     fontPx: Float,
     measureWidthPx: Float,
 ): MushafLineGeometryKey = MushafLineGeometryKey(
     page = page,
-    line = line,
+    line = line.number,
     fontPxBits = fontPx.toRawBits(),
     measureWidthPxBits = measureWidthPx.toRawBits(),
+    typefaceId = System.identityHashCode(pageTypeface),
+    contentKey = mushafLineContentKey(line),
 )
 
 @Composable
@@ -280,7 +299,7 @@ private fun lineGeometry(
     measureWidthPx: Float,
     justify: Boolean,
 ): MushafLineGeometry {
-    val key = lineGeometryKey(page, line.number, linePx, measureWidthPx)
+    val key = lineGeometryKey(page, line, pageTypeface, linePx, measureWidthPx)
     return remember(key) {
         lineGeometryCache.getOrPut(key) {
             com.beautifulquran.DevProfiling.trace("lineGeometryMiss") {

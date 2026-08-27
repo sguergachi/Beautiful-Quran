@@ -26,7 +26,9 @@ straight from those columns, and `tools/fetch_mushaf_lines.py` cross-checks the
 words on every page against quran.com's published layout. For the reader's
 larger hand, `reflowMushafPage` balances those same words over one additional
 visual line inside each leaf; it never moves a word to another page and keeps
-every chapter opening as a hard boundary.
+every chapter opening as a hard boundary. Line geometry is cached by those
+reflowed words and the page face, not by row number — the same slot is a
+different token list after the face lands.
 
 ## 2. One hand for the whole book
 
