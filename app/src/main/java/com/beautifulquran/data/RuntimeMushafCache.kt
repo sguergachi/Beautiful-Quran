@@ -59,6 +59,9 @@ class RuntimeMushafCache(
         onBufferOverflow = BufferOverflow.DROP_OLDEST,
     )
     val changes: SharedFlow<Unit> = _changes
+    private val _refreshes = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+    /** Successful cache commits, distinct from expiry-driven reader changes. */
+    val refreshes: SharedFlow<Unit> = _refreshes
 
     init {
         (api as? QfNetworkCallReporter)?.setNetworkCallReporter(::countApiCall)
@@ -131,6 +134,7 @@ class RuntimeMushafCache(
                 rememberUpdatedAt(state)
                 scheduleChecks(state)
                 _changes.tryEmit(Unit)
+                _refreshes.tryEmit(Unit)
             } catch (error: Exception) {
                 blockReadRefresh = true
                 updateResource { it.copy(lastError = error.message ?: error::class.simpleName) }

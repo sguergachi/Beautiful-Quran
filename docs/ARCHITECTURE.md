@@ -112,7 +112,8 @@ For each selected reciter and chapter, both clients use the same order:
    still releases the independent reader.
 4. Validate full-corpus coverage, then commit snapshot rows, source age, and the
    new opaque token atomically. A failed page, partial snapshot, parse, or write
-   preserves the prior token and rows.
+   preserves the prior token and rows. Android's short “Quran cache refreshed”
+   system toast is emitted only after that successful atomic commit.
 5. If playback is active when a snapshot arrives, retain the current timing
    object for that session. The new rows take effect only while quiet or on the
    next load, preventing an in-flight word from jumping.

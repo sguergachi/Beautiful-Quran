@@ -88,7 +88,8 @@ Their use must be disclosed to QF rather than represented as already approved.
   revalidation, network-restored retry, single-flight refresh, and verified
   bundled fallback on first use, offline use, upstream failure, or expiry.
 - [x] Developer Mode reports cache state, next refresh, seven-day expiry,
-  last failure, and exact API calls made during the current app/browser session.
+  last failure, API calls made by the last successful refresh, and exact calls
+  made during the current app/browser session.
 - [x] A shared freshness clock: the facade reports the normalized snapshot's
   actual age and clients preserve it, so backend and device TTLs cannot stack
   into a 14-day window. Partial nonempty snapshots below 6,000 ayahs fail
@@ -169,6 +170,10 @@ Include these in the application or follow-up email. Code cannot resolve them:
 - [x] Retry a due or missing resource when connectivity is restored. Current
   checkpoints make zero network calls, and single-flight prevents duplicate
   launch/resource/network triggers.
+- [ ] Handle authenticated Content Sync recovery codes explicitly:
+  `resync_required` must discard the affected token and bootstrap again;
+  filter/cursor mismatch errors must restart only with the canonical filter and
+  returned cursor contract. The legacy adapter cannot exercise these responses.
 - [ ] Add bounded retry/backoff only if production operations require retries
   beyond launch, resource-open, and network-restored events. Clients currently
   avoid a background failure loop and wait for one of those concrete triggers.

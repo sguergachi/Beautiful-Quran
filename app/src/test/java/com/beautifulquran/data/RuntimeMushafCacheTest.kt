@@ -151,10 +151,13 @@ class RuntimeMushafCacheTest {
         val store = Store()
         val api = SnapshotApi()
         val cache = RuntimeMushafCache(api, store, backgroundScope, { 100L }, minimumWords = 1)
+        val committed = async { cache.refreshes.first() }
+        runCurrent()
 
         cache.refresh()
         cache.refresh()
         runCurrent()
+        committed.await()
 
         assertEquals(1, api.syncs)
         assertEquals("seeking", cache.word(5, 2, 19)?.translation)

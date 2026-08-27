@@ -2,6 +2,7 @@ package com.beautifulquran
 
 import android.content.Intent
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -180,6 +181,15 @@ class MainActivity : ComponentActivity() {
         setContent {
             LaunchedEffect(Unit) {
                 app.assistantActions.collect { pendingAssistantAction.value = it }
+            }
+            LaunchedEffect(Unit) {
+                app.runtimeMushaf!!.refreshes.collect {
+                    Toast.makeText(
+                        this@MainActivity,
+                        "Quran cache refreshed",
+                        Toast.LENGTH_SHORT,
+                    ).show()
+                }
             }
             val settings by app.settings.settings.collectAsStateWithLifecycle()
             val mushafDiagnostics by app.runtimeMushaf!!.diagnostics.collectAsStateWithLifecycle()
