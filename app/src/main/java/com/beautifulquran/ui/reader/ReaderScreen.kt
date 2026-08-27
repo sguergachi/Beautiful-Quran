@@ -133,6 +133,7 @@ import com.beautifulquran.ui.reader.focus.rememberReaderFocusController
 import com.beautifulquran.ui.reader.MushafQcfFonts
 import com.beautifulquran.ui.theme.FloatingPaperControl
 import com.beautifulquran.ui.theme.IslamicReturnToAyahButton
+import com.beautifulquran.ui.theme.ReturnArrowHeading
 import com.beautifulquran.ui.theme.InkRevealOverlay
 import com.beautifulquran.ui.theme.absorbPointerEvents
 import com.beautifulquran.ui.theme.contrastingOverlayColorScheme
@@ -2232,6 +2233,16 @@ fun ReaderScreen(
             }
             val revealDp = with(density) { revealPx.toDp() }
             val pullT = previousChapterPull.coerceIn(0f, 1f)
+            // Ornamented return-to-ayah. Yields while MainActivity's concordance
+            // Back-to capsule is showing so the two never compete. Lab freeze
+            // already parks the page; suppress the return capsule so it does
+            // not fight the deliberate "leave me alone" state.
+            val showReturnToAyah =
+                playerState.error == null &&
+                    !rootReturnVisible &&
+                    !followEnabled &&
+                    labFocusEnabled &&
+                    recitingActive
             Column(
                 Modifier
                     .align(Alignment.TopCenter)
@@ -2324,6 +2335,38 @@ fun ReaderScreen(
                         onSeekSurah = { mushafSeekSurahId = it },
                         onScrubbing = { mushafScrubbing.value = it },
                         modifier = Modifier.weight(1f),
+                        leafFooter = {
+                            val catalog = mushafCatalog
+                            val word = activeWordState.value
+                            val playbackPage = when {
+                                catalog == null -> null
+                                word != null && isThisSurahPlaying -> catalog.pageOf(
+                                    renderedSurahId,
+                                    word.ayah,
+                                    word.wordPosition,
+                                ) - 1
+                                activeBasmalah == true && isThisSurahPlaying ->
+                                    catalog.firstPageOf(renderedSurahId) - 1
+                                activeAyah != null && isThisSurahPlaying ->
+                                    catalog.pageOf(renderedSurahId, activeAyah, 1) - 1
+                                else -> null
+                            }
+                            val way = playbackPage?.let {
+                                mushafReturnWay(mushafPagerState.currentPage, it)
+                            }
+                            FloatingPaperControl(visible = showReturnToAyah && way != null) {
+                                IslamicReturnToAyahButton(
+                                    heading = when (way) {
+                                        MushafReturnWay.Left -> ReturnArrowHeading.Left
+                                        MushafReturnWay.Right -> ReturnArrowHeading.Right
+                                        null -> ReturnArrowHeading.Down
+                                    },
+                                    onClick = {
+                                        dispatch(ReaderInteractionEvent.EnableFollow)
+                                    },
+                                )
+                            }
+                        },
                     ) {
                     if (mushafReady == null) {
                         Box(Modifier.fillMaxSize())
@@ -2978,49 +3021,27 @@ fun ReaderScreen(
                 )
             }
 
-            // Ornamented return-to-ayah — floats above the player bar via the
-            // shared FloatingPaperControl host. Yields while MainActivity's
-            // concordance Back-to capsule is showing so the two never compete.
-            // Lab freeze already parks the page; suppress the return capsule
-            // so it does not fight the deliberate "leave me alone" state.
-            val showReturnToAyah =
-                playerState.error == null &&
-                    !rootReturnVisible &&
-                    !followEnabled &&
-                    labFocusEnabled &&
-                    recitingActive
-            Box(
-                contentAlignment = Alignment.BottomCenter,
-                modifier = Modifier
-                    .matchParentSize()
-                    .zIndex(1.2f),
-            ) {
-                FloatingPaperControl(visible = showReturnToAyah) {
-                    IslamicReturnToAyahButton(
-                        pointUp = if (mushafMode) {
-                            val catalog = mushafCatalog
-                            val word = activeWordState.value
-                            val playbackPage = when {
-                                catalog == null -> null
-                                word != null && isThisSurahPlaying -> catalog.pageOf(
-                                    renderedSurahId,
-                                    word.ayah,
-                                    word.wordPosition,
-                                ) - 1
-                                activeBasmalah == true && isThisSurahPlaying ->
-                                    catalog.firstPageOf(renderedSurahId) - 1
-                                activeAyah != null && isThisSurahPlaying ->
-                                    catalog.pageOf(renderedSurahId, activeAyah, 1) - 1
-                                else -> null
-                            }
-                            playbackPage?.let {
-                                mushafReturnPointsUp(mushafPagerState.currentPage, it)
-                            } ?: false
-                        } else {
-                            activeAyahPlacement.value.pointUp
-                        },
-                        onClick = { dispatch(ReaderInteractionEvent.EnableFollow) },
-                    )
+            // Scroll layout: above the scaffold PlayerBar. Mushaf hosts its
+            // own roundel on the leaf's foot, above the dial and play row.
+            if (!mushafMode) {
+                Box(
+                    contentAlignment = Alignment.BottomCenter,
+                    modifier = Modifier
+                        .matchParentSize()
+                        .zIndex(1.2f),
+                ) {
+                    FloatingPaperControl(visible = showReturnToAyah) {
+                        IslamicReturnToAyahButton(
+                            heading = if (activeAyahPlacement.value.pointUp) {
+                                ReturnArrowHeading.Up
+                            } else {
+                                ReturnArrowHeading.Down
+                            },
+                            onClick = {
+                                dispatch(ReaderInteractionEvent.EnableFollow)
+                            },
+                        )
+                    }
                 }
             }
 

@@ -945,7 +945,9 @@ weight.
   motion allowed a touch of whimsy.
 - Auto-scroll keeps the active ayah in the upper third and yields instantly
   to the reader's hand; the return-to-ayah roundel (gilt corolla + painted
-  qalam arrow) offers the way back, pointing up or down toward the verse.
+  qalam arrow) offers the way back. In the scrolling reader it points up or
+  down toward the verse; on a mushaf leaf it sits above the play bar and
+  points left or right toward the playing page.
 - On the chapter list, when a verse is loaded (playing or paused mid-session),
   the floating playback control slides up with the same fade + vertical
   motion as the reader's return-to-ayah / Back-to ornaments

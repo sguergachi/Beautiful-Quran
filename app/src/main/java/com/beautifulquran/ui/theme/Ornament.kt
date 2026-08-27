@@ -305,9 +305,19 @@ fun Modifier.gilded(bright: Color, deep: Color): Modifier =
  * three thick calligraphic strokes: the shaft, then each barb of the head,
  * each wiped in with a soft ink edge in the order a hand would draw them.
  */
+/** Where the return-to-ayah qalam points. Down is the drawn rest pose. */
+enum class ReturnArrowHeading { Up, Down, Left, Right }
+
+internal fun ReturnArrowHeading.rotationDeg(): Float = when (this) {
+    ReturnArrowHeading.Down -> 0f
+    ReturnArrowHeading.Left -> 90f
+    ReturnArrowHeading.Up -> 180f
+    ReturnArrowHeading.Right -> 270f
+}
+
 @Composable
 fun IslamicReturnToAyahButton(
-    pointUp: Boolean,
+    heading: ReturnArrowHeading,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     size: Dp = 44.dp,
@@ -316,7 +326,7 @@ fun IslamicReturnToAyahButton(
     val colors = MaterialTheme.colorScheme
     val ink = remember { Animatable(0f) }
     val rotation by animateFloatAsState(
-        targetValue = if (pointUp) 180f else 0f,
+        targetValue = heading.rotationDeg(),
         animationSpec = tween(
             durationMillis = 300,
             easing = FastOutSlowInEasing,
@@ -325,7 +335,7 @@ fun IslamicReturnToAyahButton(
     )
 
     // Re-draw the arrow from a dry page whenever the direction flips.
-    LaunchedEffect(pointUp) {
+    LaunchedEffect(heading) {
         ink.snapTo(0f)
         ink.animateTo(
             targetValue = 1f,

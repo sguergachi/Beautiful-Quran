@@ -1,5 +1,7 @@
 package com.beautifulquran.ui.reader
 
+import com.beautifulquran.ui.theme.ReturnArrowHeading
+import com.beautifulquran.ui.theme.rotationDeg
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -214,9 +216,19 @@ class MushafFollowTurnTest {
     }
 
     @Test
-    fun `mushaf return direction compares leaves rather than hidden list rows`() {
-        assertTrue(mushafReturnPointsUp(currentPage = 120, playbackPage = 118))
-        assertFalse(mushafReturnPointsUp(currentPage = 120, playbackPage = 122))
+    fun `mushaf return points toward the playing leaf, left or right`() {
+        // reverseLayout: later pages sit to the left of the leaf in view.
+        assertEquals(MushafReturnWay.Left, mushafReturnWay(currentPage = 45, playbackPage = 46))
+        assertEquals(MushafReturnWay.Right, mushafReturnWay(currentPage = 45, playbackPage = 44))
+        assertEquals(null, mushafReturnWay(currentPage = 45, playbackPage = 45))
+    }
+
+    @Test
+    fun `qalam rest pose is down so a quarter turn faces a neighbour leaf`() {
+        assertEquals(0f, ReturnArrowHeading.Down.rotationDeg())
+        assertEquals(90f, ReturnArrowHeading.Left.rotationDeg())
+        assertEquals(180f, ReturnArrowHeading.Up.rotationDeg())
+        assertEquals(270f, ReturnArrowHeading.Right.rotationDeg())
     }
 
     @Test

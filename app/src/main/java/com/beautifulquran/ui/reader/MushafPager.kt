@@ -273,9 +273,19 @@ internal fun mushafSameActivation(expected: ActiveWord, current: ActiveWord?): B
         expected.startMs == current.startMs &&
         expected.activation == current.activation
 
-/** The return ornament points toward the playback leaf in book order. */
-internal fun mushafReturnPointsUp(currentPage: Int, playbackPage: Int): Boolean =
-    playbackPage < currentPage
+/**
+ * The playing leaf sits to the left (later pages) or the right (earlier
+ * pages) of the leaf under the reader. The mushaf pager is reversed: page
+ * one is on the right, so a higher page number is a turn to the left.
+ */
+internal enum class MushafReturnWay { Left, Right }
+
+internal fun mushafReturnWay(currentPage: Int, playbackPage: Int): MushafReturnWay? =
+    when {
+        playbackPage > currentPage -> MushafReturnWay.Left
+        playbackPage < currentPage -> MushafReturnWay.Right
+        else -> null
+    }
 
 private const val MushafLeafFadeMs = 220
 

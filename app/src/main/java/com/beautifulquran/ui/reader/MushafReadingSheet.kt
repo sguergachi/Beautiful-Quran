@@ -164,6 +164,8 @@ internal fun MushafReadingSheet(
     /** Raised while a hand is on the rule. */
     onScrubbing: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
+    /** Sits on the leaf's foot, above the dial and the play bar. */
+    leafFooter: @Composable () -> Unit = {},
     content: @Composable () -> Unit,
 ) {
     // Rank by role, not by taste. Back / play / forward are what a listener
@@ -189,6 +191,13 @@ internal fun MushafReadingSheet(
     Column(modifier.fillMaxSize()) {
         Box(Modifier.weight(1f).fillMaxWidth()) {
             content()
+            Box(
+                Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 8.dp),
+            ) {
+                leafFooter()
+            }
         }
         MushafPageDial(
             pageAt = pageAt,
