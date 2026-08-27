@@ -470,7 +470,10 @@ tween-vs-snap rules, sweep entry and residual rules, repeat wash timing, the
   beneath the Upcoming paper cover; its active word uses the same motion pack
   as the scrolling reader, completed ayahs retain full ink, and later ayahs use
   a motionless recess pack. A leaf reached by hand stays fully readable, even
-  while playback continues elsewhere. Only the current pager leaf owns a tap;
+  while playback continues elsewhere. A leaf follow is about to turn onto
+  waits under Upcoming paper *before* the paper moves, so the turn never
+  reveals a finished page; once the voice arrives the usual wash fills it.
+  Only the current pager leaf owns a tap;
   a hold then blocks auto-follow (including the last-word lead turn) until the
   seek's word arrives, so the wash cannot run on a neighbour the reader is
   not watching. The chapter-opening basmalah is part of

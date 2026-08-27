@@ -176,6 +176,45 @@ class MushafFollowTurnTest {
     }
 
     @Test
+    fun `a follow-turn leaf waits under paper until the voice arrives`() {
+        assertTrue(
+            mushafUsesLiveInk(
+                isSettled = false,
+                isVoicePage = false,
+                waitingForVoice = true,
+            ),
+        )
+        assertEquals(
+            MushafInkPackKind.UPCOMING,
+            mushafInkPackKind(
+                pageOwnsVoice = false,
+                ayah = 12,
+                activeWordAyah = 11,
+                frontierAyah = 11,
+                basmalahActive = false,
+                hasSearchFlash = false,
+                waitingForVoice = true,
+            ),
+        )
+        assertEquals(
+            MushafInkPackKind.STATIC,
+            mushafInkPackKind(false, 12, 11, 11, false, false),
+        )
+        assertEquals(
+            MushafInkPackKind.ACTIVE_WORD,
+            mushafInkPackKind(
+                pageOwnsVoice = true,
+                ayah = 12,
+                activeWordAyah = 12,
+                frontierAyah = 12,
+                basmalahActive = false,
+                hasSearchFlash = false,
+                waitingForVoice = true,
+            ),
+        )
+    }
+
+    @Test
     fun `a repeat at the page tail does not turn forward`() {
         assertFalse(
             mushafTailTurnAllowed(
