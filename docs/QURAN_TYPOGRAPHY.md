@@ -114,11 +114,18 @@ page from sd 5.7px to sd 1.8px.
 
 ## 7. Words are never broken, and never reordered
 
-No hyphenation, no reflow, no wrapping. A line holds the words the print gives
-it, in order, and if they do not fit, rule 4 applies.
+No hyphenation. Words stay in the print's order, on the print's page. A word
+is never split across a line end, and the sequence is never shuffled. If a
+display row still will not fit, rule 4 applies.
 
-**We follow it.** A line's tokens come from the page data and are only ever
-scaled or spaced.
+What *does* move is the display row. `reflowMushafPage` regroups those same
+tokens inside the leaf so the larger hand fits one extra visual line. It never
+moves a word to another page. Pages 1–2 are not regrouped: their printed
+breaks *are* the medallion.
+
+**We follow it.** A token is never cut or reordered. Page boundaries stay put.
+Display rows may regroup the print's tokens inside a leaf (except pages 1–2);
+those rows are then only scaled or spaced.
 
 ## 8. The verse mark belongs to the line
 
