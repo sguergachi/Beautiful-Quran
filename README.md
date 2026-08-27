@@ -125,7 +125,9 @@ it also assembles the release APK and publishes it to the rolling latest release
 
 Word/QCF download needs no build variable: released clients call
 `https://api.quran.com` automatically, refresh after six days, and withhold the
-cache after seven. `TIMING_CONTENT_BASE_URL` (Android) / its Vite equivalent is
+cache after seven. A missing/expired first fill completes on the closed-mushaf
+loading screen, with offline failure falling through to the independent reader.
+`TIMING_CONTENT_BASE_URL` (Android) / its Vite equivalent is
 only for the normalized repeat-timing service; leave it unset until that HTTPS
 host passes the deployment and parity gates. quran-align remains the timing
 fallback without a blocking network path.

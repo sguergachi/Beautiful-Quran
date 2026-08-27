@@ -8,6 +8,7 @@ import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -21,6 +22,18 @@ class RuntimeMushafCacheTest {
         """{"record_type":"mushaf_word","record_key":"5:2:19","surah_id":5,"ayah_number":2,"position":19,"translation_en":"seeking","transliteration":"yabtaghūna","qcf_v2":"x","qcf_page":106,"qcf_line":12,"qcf_span_end":19,"ayah_page":106}""",
         "1",
     )
+
+    @Test
+    fun `entrance waits only for a missing or expired initial cache`() {
+        fun status(phase: RuntimeCachePhase, updated: Long? = null) =
+            RuntimeCacheStatus(phase, updated, null, null, 0, null)
+
+        assertFalse(runtimeMushafEntranceReady(status(RuntimeCachePhase.EMPTY), 100L))
+        assertFalse(runtimeMushafEntranceReady(status(RuntimeCachePhase.REFRESHING), 100L))
+        assertFalse(runtimeMushafEntranceReady(status(RuntimeCachePhase.REFRESHING, 0L), QF_MAX_CACHE_AGE_MS + 1))
+        assertTrue(runtimeMushafEntranceReady(status(RuntimeCachePhase.REFRESHING, 90L), 100L))
+        assertTrue(runtimeMushafEntranceReady(status(RuntimeCachePhase.ERROR), 100L))
+    }
 
     @Test
     fun `missing cache withholds fields then atomically publishes snapshot`() = runTest {

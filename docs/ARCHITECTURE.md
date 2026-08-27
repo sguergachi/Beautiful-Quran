@@ -101,6 +101,9 @@ For each selected reciter and chapter, both clients use the same order:
    launch and network-restored hooks first inspect the local checkpoint, so a
    current cache makes zero API calls. If a due refresh fails offline, both
    clients retry automatically when connectivity returns.
+   A missing or expired word/QCF cache keeps the cold-start mushaf cover up
+   until that first refresh succeeds or fails; a fresh/still-readable cache
+   never delays opening, and offline failure releases the independent reader.
 4. Validate full-corpus coverage, then commit snapshot rows, source age, and the
    new opaque token atomically. A failed page, partial snapshot, parse, or write
    preserves the prior token and rows.

@@ -228,8 +228,31 @@ describe('RuntimeMushafCache', () => {
     expect(loaded).toBe(0)
     await restored
     expect(loaded).toBe(1)
-    await cache.refresh()
-    expect(loaded).toBe(1)
+    expect(cache.word(5, 1, 1)?.translation_en).toBe('O')
+  })
+
+  it('keeps initial restore pending until a missing cache is installed', async () => {
+    let markStarted!: () => void
+    const started = new Promise<void>((resolve) => { markStarted = resolve })
+    let release!: () => void
+    const fetcher = () => new Promise<Response>((resolve) => {
+      markStarted()
+      release = () => resolve(jsonResponse({ verses: [legacyVerse], pagination: { next_page: null } }))
+    })
+    const cache = new RuntimeMushafCache(
+      'https://api.quran.com', new Store(), fetcher as typeof fetch,
+      () => 100, 1, () => canonical, [106],
+    )
+    let settled = false
+
+    const restoring = cache.restore().then(() => { settled = true })
+    await started
+    expect(settled).toBe(false)
+    expect(cache.status().phase).toBe('refreshing')
+
+    release()
+    await restoring
+    expect(settled).toBe(true)
     expect(cache.word(5, 1, 1)?.translation_en).toBe('O')
   })
 

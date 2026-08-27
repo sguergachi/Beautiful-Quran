@@ -65,7 +65,9 @@ import com.beautifulquran.assistant.AssistantIntents
 import com.beautifulquran.assistant.ForegroundAppFunctions
 import com.beautifulquran.data.HomeBookmarkStyle
 import com.beautifulquran.data.ReadingLayout
+import com.beautifulquran.data.RuntimeCachePhase
 import com.beautifulquran.data.ThemeMode
+import com.beautifulquran.data.runtimeMushafEntranceReady
 import com.beautifulquran.ui.AppViewModelFactory
 import com.beautifulquran.ui.PageTurnSounds
 import com.beautifulquran.ornamentslab.OrnamentsLabScreen
@@ -180,6 +182,14 @@ class MainActivity : ComponentActivity() {
                 app.assistantActions.collect { pendingAssistantAction.value = it }
             }
             val settings by app.settings.settings.collectAsStateWithLifecycle()
+            val mushafDiagnostics by app.runtimeMushaf!!.diagnostics.collectAsStateWithLifecycle()
+            val mushafStatus = remember(mushafDiagnostics) { app.runtimeMushaf!!.status() }
+            val mushafReady = runtimeMushafEntranceReady(mushafStatus, System.currentTimeMillis())
+            val mushafLoadLabel = when (mushafStatus.phase) {
+                RuntimeCachePhase.REFRESHING ->
+                    "Preparing Quran pages · ${mushafStatus.apiCalls} API requests"
+                else -> "Preparing Quran pages"
+            }
             val assistantAction by pendingAssistantAction.collectAsStateWithLifecycle()
             val systemDark = isSystemInDarkTheme()
             val usesNightfall = settings.themeMode == ThemeMode.DARK ||
@@ -236,6 +246,8 @@ class MainActivity : ComponentActivity() {
                         EntranceCover(
                             chrome = coverChrome,
                             ornament = coverOrnament,
+                            contentReady = mushafReady,
+                            loadLabel = mushafLoadLabel,
                             onOpenBegan = {
                                 val sounds = coverSounds
                                     ?: PageTurnSounds(this@MainActivity).also { coverSounds = it }

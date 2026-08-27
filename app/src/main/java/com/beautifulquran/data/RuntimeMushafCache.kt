@@ -281,6 +281,11 @@ internal fun parseMushafWord(record: JsonObject): RuntimeMushafWord {
     )
 }
 
+/** Hold the cold-start cover only for a missing/expired cache that can still refresh. */
+internal fun runtimeMushafEntranceReady(status: RuntimeCacheStatus, nowMs: Long): Boolean =
+    status.phase == RuntimeCachePhase.ERROR ||
+        status.updatedAtMs?.let { isQfContentFresh(it, nowMs) } == true
+
 private fun JsonObject.int(name: String) =
     get(name)?.jsonPrimitive?.intOrNull ?: error("Mushaf field $name is missing")
 

@@ -135,7 +135,11 @@ export class RuntimeMushafCache {
       }
     } catch { /* A corrupt local cache is a miss. */ }
     this.notifyDiagnostics()
-    if (!this.state || refreshDue(this.state.updatedAtMs, this.now())) void this.refresh()
+    if (!this.state || !fresh(this.state.updatedAtMs, this.now())) {
+      await this.refresh()
+    } else if (refreshDue(this.state.updatedAtMs, this.now())) {
+      void this.refresh()
+    }
   }
 
   refreshIfNeeded(): Promise<boolean> {
@@ -232,8 +236,7 @@ export class RuntimeMushafCache {
       }
       surahs.add(surah)
     }
-    for (let surah = 1; surah <= 114; surah += 1) {
-      if (!surahs.has(surah)) continue
+    await mapConcurrent([...surahs].sort((a, b) => a - b), 4, async (surah) => {
       const verses: unknown[] = []
       let page = 1
       do {
@@ -245,7 +248,7 @@ export class RuntimeMushafCache {
         page = Number.isInteger(next) && next > 0 ? next : 0
       } while (page > 0)
       chapters.set(surah, verses)
-    }
+    })
     const records = normalizeLegacyMushaf(canonical, chapters)
     assertQcfV2Runs(records, this.expectedQcfPages)
     return validateStored({
@@ -307,6 +310,16 @@ export class RuntimeMushafCache {
   private notifyDiagnostics() {
     for (const listener of this.diagnosticListeners) listener()
   }
+}
+
+async function mapConcurrent<T>(values: readonly T[], limit: number, run: (value: T) => Promise<void>) {
+  let next = 0
+  await Promise.all(Array.from({ length: Math.min(limit, values.length) }, async () => {
+    while (next < values.length) {
+      const value = values[next++]!
+      await run(value)
+    }
+  }))
 }
 
 type LegacySourceWord = {
