@@ -473,6 +473,9 @@ tween-vs-snap rules, sweep entry and residual rules, repeat wash timing, the
   while playback continues elsewhere. A leaf follow is about to turn onto
   waits under Upcoming paper *before* the paper moves, so the turn never
   reveals a finished page; once the voice arrives the usual wash fills it.
+  Catch-up must not rewind onto the spoken leaf during that wait — the last
+  word is still being said, and pulling back is the bounce of next, previous,
+  next again.
   Only the current pager leaf owns a tap;
   a hold then blocks auto-follow (including the last-word lead turn) until the
   seek's word arrives, so the wash cannot run on a neighbour the reader is

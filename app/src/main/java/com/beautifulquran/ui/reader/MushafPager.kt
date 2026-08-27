@@ -284,6 +284,32 @@ internal fun mushafSameActivation(expected: ActiveWord, current: ActiveWord?): B
         expected.activation == current.activation
 
 /**
+ * A last-word lead turn puts the paper on [waitingPage] while the voice is
+ * still on the previous leaf. Catch-up that rewinds to the spoken leaf is the
+ * bounce: next, previous, next again. Hold until the voice arrives.
+ *
+ * [voicePage], [visiblePage] and [waitingPage] are 1-based leaf numbers;
+ * [waitingPage] is 0 when no lead turn is in flight.
+ */
+internal fun mushafLeadTurnHoldsPager(
+    voicePage: Int,
+    visiblePage: Int,
+    waitingPage: Int,
+): Boolean = waitingPage != 0 &&
+    visiblePage == waitingPage &&
+    voicePage == waitingPage - 1
+
+/**
+ * Follow may pull the paper only while the leaf in view is the one it last
+ * aimed at. A swipe lands on a different leaf; catching up to the voice from
+ * there rewinds the turn the hand just made.
+ */
+internal fun mushafFollowOwnsVisiblePage(
+    currentPageIndex: Int,
+    followPage: Int,
+): Boolean = currentPageIndex == followPage
+
+/**
  * The playing leaf sits to the left (later pages) or the right (earlier
  * pages) of the leaf under the reader. The mushaf pager is reversed: page
  * one is on the right, so a higher page number is a turn to the left.
@@ -472,8 +498,22 @@ internal fun MushafPager(
                 // tick; the next tick after the scroll settles re-aims if
                 // the voice is still elsewhere.
                 if (pagerState.isScrollInProgress) return@collect
+                // Lead-turn already put this leaf on the paper. The voice is
+                // still on the last word of the previous one — that is the
+                // point of the lead — so catching up to it would rewind.
+                if (mushafLeadTurnHoldsPager(
+                        voicePage = page,
+                        visiblePage = pagerState.currentPage + 1,
+                        waitingPage = waitingPage,
+                    )
+                ) {
+                    return@collect
+                }
                 val index = (page - 1).coerceIn(0, catalog.pageCount - 1)
                 if (pagerState.currentPage != index) {
+                    if (!mushafFollowOwnsVisiblePage(pagerState.currentPage, followPage)) {
+                        return@collect
+                    }
                     // Warm the target leaf's face before the turn. A leaf
                     // composing without a resident face holds blank for its
                     // face wait and then fades in — on a playback turn that

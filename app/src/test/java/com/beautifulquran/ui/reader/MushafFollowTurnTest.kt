@@ -282,4 +282,31 @@ class MushafFollowTurnTest {
         assertTrue(mushafHoldBlocksFollow(heldPage = 12))
         assertFalse(mushafHoldBlocksFollow(heldPage = null))
     }
+
+    @Test
+    fun `catch-up does not rewind a lead turn while the last word is still being said`() {
+        // Paper is already on 12 because we turned inside page 11's last
+        // word. The voice is still on 11. Rewinding would bounce: 12, 11, 12.
+        assertTrue(
+            mushafLeadTurnHoldsPager(voicePage = 11, visiblePage = 12, waitingPage = 12),
+        )
+        // Voice arrived: the wait is over, ordinary follow applies.
+        assertFalse(
+            mushafLeadTurnHoldsPager(voicePage = 12, visiblePage = 12, waitingPage = 12),
+        )
+        // Still on the spoken leaf — the turn has not happened yet.
+        assertFalse(
+            mushafLeadTurnHoldsPager(voicePage = 11, visiblePage = 11, waitingPage = 12),
+        )
+        // No lead in flight: a real seek behind the reader must catch up.
+        assertFalse(
+            mushafLeadTurnHoldsPager(voicePage = 11, visiblePage = 12, waitingPage = 0),
+        )
+    }
+
+    @Test
+    fun `follow does not steal a leaf it did not put on the paper`() {
+        assertTrue(mushafFollowOwnsVisiblePage(currentPageIndex = 11, followPage = 11))
+        assertFalse(mushafFollowOwnsVisiblePage(currentPageIndex = 12, followPage = 11))
+    }
 }
