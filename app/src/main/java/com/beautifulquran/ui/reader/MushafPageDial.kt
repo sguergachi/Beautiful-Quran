@@ -401,6 +401,14 @@ internal fun mushafDialHudLean(dyPx: Float, strayPx: Float, leanPx: Float): Floa
 
 /** The plate's own side padding: the air between plate edge and type. */
 private val MushafDialHudPad = 21.dp
+/**
+ * Paper above the HUD type. Must clear [MushafDialHudFeather] or the first
+ * line sits in the fade and the leaf's last script shows through the words.
+ */
+private val MushafDialHudPadTop = 16.dp
+private val MushafDialHudPadBottom = 8.dp
+/** Top dissolve of the plate into the leaf. */
+private val MushafDialHudFeather = 14.dp
 
 /** How close the HUD *text* may come to the glass, in px. */
 internal const val MUSHAF_DIAL_HUD_EDGE_MARGIN_PX = 8f
@@ -1436,7 +1444,7 @@ internal fun MushafPageDial(
                         // zero at its tip, and the horizontal wash below it
                         // is clipped to start where the ramp ends — so the
                         // edge fades clean to nothing on every renderer.
-                        val feather = 10.dp.toPx()
+                        val feather = MushafDialHudFeather.toPx()
                         val verticalBrush = Brush.verticalGradient(
                             0f to paper.copy(alpha = 0f),
                             1f to paper,
@@ -1457,7 +1465,12 @@ internal fun MushafPageDial(
                             }
                         }
                     }
-                    .padding(horizontal = MushafDialHudPad, vertical = 6.dp)
+                    .padding(
+                        start = MushafDialHudPad,
+                        top = MushafDialHudPadTop,
+                        end = MushafDialHudPad,
+                        bottom = MushafDialHudPadBottom,
+                    )
                     .graphicsLayer { alpha = expand.value },
             ) {
                 // The head is set twice, once as each tier reads the leaf, and
