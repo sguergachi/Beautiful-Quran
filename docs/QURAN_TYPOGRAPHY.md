@@ -31,7 +31,9 @@ grew or shrank against its neighbour reads as a fault, however well each leaf
 is set on its own.
 
 **We follow it.** `MUSHAF_DESIGN_LINE_EM` fixes one size for all 604 pages;
-nothing sizes type per page or per line.
+nothing sizes type per page or per line. `MUSHAF_TYPE_SCALE` applies the same
+1.06 optical nudge to that fitted hand on every leaf, using about one
+fifteenth more of the page vertically without changing a word or line break.
 
 ## 3. Every full line is flush
 

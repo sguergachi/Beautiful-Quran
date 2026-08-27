@@ -196,7 +196,8 @@ tick must not remasure three pages or recreate 150 `Text` nodes.
   pack. Draw must see the latest pack so a completed sweep from the previous
   word cannot flash before the next entry mask. A recess-only chain that sees
   Active before recomposition is held at Upcoming alpha until its wash layer
-  is attached.
+  is attached. Ayah selection reuses that pack's draw-phase recess-cover
+  `State`; its fade does not recompose or relayout the leaf per frame.
 - QCF page fonts are held as one atomic family/typeface pair in a bounded LRU
   and preloaded on `Dispatchers.Default` for the settled page ± 2, so a swipe
   does not `Typeface.createFromAsset` on the UI thread. Line geometry is keyed

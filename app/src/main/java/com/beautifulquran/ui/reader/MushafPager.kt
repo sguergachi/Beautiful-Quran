@@ -72,6 +72,7 @@ import com.beautifulquran.data.model.Surah
 import com.beautifulquran.data.model.SurahContent
 import com.beautifulquran.domain.MUSHAF_LINE_EM
 import com.beautifulquran.domain.MUSHAF_LINE_PITCH_EM
+import com.beautifulquran.domain.mushafDisplayFontPx
 import com.beautifulquran.domain.MushafCatalog
 import com.beautifulquran.domain.MushafLine
 import com.beautifulquran.domain.MushafPage
@@ -874,17 +875,19 @@ private fun MushafPageSheet(
             // shrink as the pages turned.
             val unitPx = with(density) { unit.toPx() }
             val fontPx = remember(unitPx, availableW, slotCount) {
-                mushafUniformFontPx(
-                    measureWidthPx = availableW,
-                    // The well is the grid's fifteen units, whatever the page
-                    // holds: a leaf carrying a chapter's opening asks for more
-                    // slots than that and packs them into the same paper. Both
-                    // arguments used to be scaled by the slot count, which
-                    // cancelled and left the guard unable to bite — a chapter
-                    // opening kept type cut for a full slot while its slot had
-                    // shrunk to about 0.88 of one.
-                    wellHeightPx = unitPx * MushafGrid.TEXT_LINES,
-                    slots = mushafGridSlots(slotCount),
+                mushafDisplayFontPx(
+                    mushafUniformFontPx(
+                        measureWidthPx = availableW,
+                        // The well is the grid's fifteen units, whatever the page
+                        // holds: a leaf carrying a chapter's opening asks for more
+                        // slots than that and packs them into the same paper. Both
+                        // arguments used to be scaled by the slot count, which
+                        // cancelled and left the guard unable to bite — a chapter
+                        // opening kept type cut for a full slot while its slot had
+                        // shrunk to about 0.88 of one.
+                        wellHeightPx = unitPx * MushafGrid.TEXT_LINES,
+                        slots = mushafGridSlots(slotCount),
+                    ),
                 )
             }
             val fontSp = with(density) { fontPx.toSp() }
@@ -1030,6 +1033,7 @@ private fun MushafPageInkClocks(
                     // out of "playing" for a frame, and the ink is not dry
                     // between two laps of the same verse.
                     wetInk = recitingActive,
+                    initiallyRecessed = true,
                 )
                 MushafInkPackKind.UPCOMING -> rememberMushafRecessPack(dimmed = true)
                 MushafInkPackKind.SEARCH_FLASH -> rememberAyahInkPack(

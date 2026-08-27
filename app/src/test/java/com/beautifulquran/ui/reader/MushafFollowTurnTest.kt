@@ -120,6 +120,14 @@ class MushafFollowTurnTest {
     }
 
     @Test
+    fun `selected ayah enters from its existing paper cover`() {
+        val waitingCover = 1f - InkEngine.State.Upcoming.inkAlpha()
+        assertEquals(waitingCover, ayahRecessCoverTarget(false, true), 0f)
+        assertEquals(waitingCover, ayahRecessCoverTarget(true, false), 0f)
+        assertEquals(0f, ayahRecessCoverTarget(false, false), 0f)
+    }
+
+    @Test
     fun `voice page retains read ayahs and covers those beyond the active word`() {
         assertEquals(
             MushafInkPackKind.STATIC,

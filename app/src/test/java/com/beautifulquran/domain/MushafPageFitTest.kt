@@ -83,6 +83,12 @@ class MushafPageFitTest {
     }
 
     @Test
+    fun `display hand carries one uniform optical size nudge`() {
+        assertEquals(60f * MUSHAF_TYPE_SCALE, mushafDisplayFontPx(60f), 0.01f)
+        assertEquals(MUSHAF_MAX_FONT_PX, mushafDisplayFontPx(MUSHAF_MAX_FONT_PX), 0f)
+    }
+
+    @Test
     fun `a short well caps the size so fifteen lines still fit`() {
         val font = mushafUniformFontPx(measureWidthPx = 2000f, wellHeightPx = 1400f, slots = 15)
         // The size a line's own ink will fit in the paper the well gives it.

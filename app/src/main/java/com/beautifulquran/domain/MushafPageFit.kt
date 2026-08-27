@@ -137,6 +137,14 @@ const val MUSHAF_MAX_FONT_PX = 128f
  */
 const val MUSHAF_DESIGN_LINE_EM = 16.4f
 
+/** Book-wide optical nudge: roughly one fifteenth more ink down the leaf. */
+const val MUSHAF_TYPE_SCALE = 1.06f
+
+/** Applies the reader's uniform optical size without introducing page sizing. */
+fun mushafDisplayFontPx(fittedFontPx: Float): Float =
+    (fittedFontPx * MUSHAF_TYPE_SCALE)
+        .coerceIn(MUSHAF_MIN_FONT_PX, MUSHAF_MAX_FONT_PX)
+
 /**
  * The one type size for every leaf: the measure divided by the design line,
  * never taller than the well can carry fifteen lines of. The printed page owns
