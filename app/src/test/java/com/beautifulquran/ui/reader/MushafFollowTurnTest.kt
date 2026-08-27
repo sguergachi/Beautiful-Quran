@@ -212,6 +212,20 @@ class MushafFollowTurnTest {
                 waitingForVoice = true,
             ),
         )
+        // Tap on a dialed leaf: the word is already known, the voice page
+        // is not. That ayah must wash, not sit under Upcoming paper.
+        assertEquals(
+            MushafInkPackKind.ACTIVE_WORD,
+            mushafInkPackKind(
+                pageOwnsVoice = false,
+                ayah = 12,
+                activeWordAyah = 12,
+                frontierAyah = 12,
+                basmalahActive = false,
+                hasSearchFlash = false,
+                waitingForVoice = true,
+            ),
+        )
     }
 
     @Test

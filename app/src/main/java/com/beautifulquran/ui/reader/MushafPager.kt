@@ -241,13 +241,18 @@ internal fun mushafInkPackKind(
      */
     waitingForVoice: Boolean = false,
 ): MushafInkPackKind = when {
-    waitingForVoice && !pageOwnsVoice -> MushafInkPackKind.UPCOMING
     pageOwnsVoice && basmalahActive -> MushafInkPackKind.UPCOMING
-    pageOwnsVoice && activeWordAyah == ayah -> MushafInkPackKind.ACTIVE_WORD
+    // A tap covers the leaf before Media3 names it. The tapped ayah still
+    // has to wash — a blanket Upcoming here left the audio running with
+    // no letter fade, because pageOwnsVoice lags the seek.
+    (pageOwnsVoice || waitingForVoice) && activeWordAyah == ayah ->
+        MushafInkPackKind.ACTIVE_WORD
     hasSearchFlash -> MushafInkPackKind.SEARCH_FLASH
     pageOwnsVoice &&
         (frontierAyah == null || ayah > frontierAyah ||
             ayah == frontierAyah && frontierWaitingForFirstWord) ->
+        MushafInkPackKind.UPCOMING
+    waitingForVoice && (activeWordAyah == null || ayah > activeWordAyah) ->
         MushafInkPackKind.UPCOMING
     else -> MushafInkPackKind.STATIC
 }

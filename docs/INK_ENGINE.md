@@ -481,7 +481,10 @@ tween-vs-snap rules, sweep entry and residual rules, repeat wash timing, the
   seek's word is on that leaf, so a slow seek cannot yank the paper to the
   verse that was playing before the tap. The tapped leaf itself waits under
   Upcoming paper until that word arrives — a dialed page is fully inked, and
-  without the cover the wash has nothing to fill. The chapter-opening basmalah is part of
+  without the cover the wash has nothing to fill. The tapped ayah is Active as
+  soon as the word is known, even before the pager names the leaf, so the
+  letter wash is not stuck under a blanket Upcoming cover. The chapter-opening
+  basmalah is part of
   that sequence: tapping it starts its own wash before the first ayah. At the
   playlist handoff, the first ayah stays Upcoming until its first word timing
   arrives; Media3 advancing the item a poll tick earlier must never flash the

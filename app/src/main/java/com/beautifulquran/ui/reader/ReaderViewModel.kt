@@ -421,25 +421,33 @@ class ReaderViewModel(
      * publishes on change, so the UI recomposes once per word. The highlight
      * holds while paused (like a lyrics player); it only clears when this
      * surah stops being the loaded one. */
-    val activeWord: StateFlow<ActiveWord?> = pollingWhileLoaded(key = { it }) { np ->
-        val events = player.state.value.positionEvents
-        if (events.clockId != lastClockEventId) {
-            highlightClock.acceptNextSample()
-            lastClockEventId = events.clockId
+    private val polledActiveWord: StateFlow<ActiveWord?> =
+        pollingWhileLoaded(key = { it }) { np ->
+            val events = player.state.value.positionEvents
+            if (events.clockId != lastClockEventId) {
+                highlightClock.acceptNextSample()
+                lastClockEventId = events.clockId
+            }
+            val firstWordStartMs = preparedTimings[np.ayah]
+                ?.segments
+                ?.firstOrNull()
+                ?.startMs
+                ?: 0L
+            val rawMs = highlightPositionMs(firstWordStartMs)
+            val clockMs = highlightClock.sample(np, rawMs)
+            activeWordPollCache.activeWord(
+                ayah = np.ayah,
+                info = preparedTimings[np.ayah]?.activeInfo(clockMs),
+                activation = events.inkId,
+            )
         }
-        val firstWordStartMs = preparedTimings[np.ayah]
-            ?.segments
-            ?.firstOrNull()
-            ?.startMs
-            ?: 0L
-        val rawMs = highlightPositionMs(firstWordStartMs)
-        val clockMs = highlightClock.sample(np, rawMs)
-        activeWordPollCache.activeWord(
-            ayah = np.ayah,
-            info = preparedTimings[np.ayah]?.activeInfo(clockMs),
-            activation = events.inkId,
-        )
-    }
+
+    /** Word-tap ink, held until the 33 ms poll names the same word. */
+    private val tapInk = MutableStateFlow<ActiveWord?>(null)
+
+    val activeWord: StateFlow<ActiveWord?> = combine(polledActiveWord, tapInk) { polled, tap ->
+        tap ?: polled
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(1_000), null)
 
     /** The ayah focus/prepare target on the sheet. Normally the playing ayah,
      * but advances to the next ayah [InkEngine.fadeLeadMs] before the current
@@ -512,6 +520,17 @@ class ReaderViewModel(
     }
 
     init {
+        viewModelScope.launch {
+            polledActiveWord.collect { polled ->
+                val tap = tapInk.value ?: return@collect
+                if (polled != null &&
+                    polled.ayah == tap.ayah &&
+                    polled.wordPosition == tap.wordPosition
+                ) {
+                    tapInk.value = null
+                }
+            }
+        }
         // React when the reciter is changed on the settings sheet: reload the
         // timing data and, if this surah is playing, continue with the new voice.
         viewModelScope.launch {
@@ -848,8 +867,43 @@ class ReaderViewModel(
             playFromAyah(ayah)
             return
         }
-        val start = word?.let { startMsForWord(ayah, it) }
-        if (start != null) playFromWord(ayah, start) else playFromAyah(ayah)
+        if (word != null) {
+            val start = startMsForWord(ayah, word)
+            if (start != null) {
+                seedTapInk(ayah, word)
+                playFromWord(ayah, start)
+                return
+            }
+        }
+        playFromAyah(ayah)
+    }
+
+    /**
+     * Lights the tapped word this frame. The 33 ms poll + highlight clock
+     * settle can lag the seek by a beat, and mushaf wash only attaches to
+     * an Active pack — so without this the audio starts and the ink does not.
+     */
+    private fun seedTapInk(ayah: Int, word: Int) {
+        val segs = timings[ayah]?.takeIf { it.isNotEmpty() } ?: return
+        val seg = segs.firstOrNull { it.position == word }
+            ?: segs.filter { it.position <= word }.maxByOrNull { it.position }
+            ?: return
+        val next = segs.firstOrNull { it.startMs > seg.startMs }?.position
+        val duration = (seg.endMs - seg.startMs).coerceAtLeast(0L)
+        val seed = ActiveWord(
+            ayah = ayah,
+            wordPosition = word,
+            startMs = seg.startMs,
+            durationMs = duration,
+            spokenMs = duration,
+            nextWordPosition = next,
+            activation = player.state.value.positionEvents.inkId + 1L,
+        )
+        tapInk.value = seed
+        viewModelScope.launch {
+            delay(2_000)
+            if (tapInk.value === seed) tapInk.value = null
+        }
     }
 
     /** Timing start of [word] in [ayah], or of the nearest segment before it. */
@@ -869,6 +923,7 @@ class ReaderViewModel(
         // Always restart ink: tap-to-play must re-run the wash even when the
         // same word stays Active or the seek is shorter than the jitter hold.
         val seekMs = positionMs.coerceAtLeast(0L)
+        highlightClock.acceptNextSample()
         if (np != null && np.surahId == surahId && np.reciterId == reciter.id) {
             if (!keepRepeat) player.clearRepeatRange()
             player.seekToWordAndPlay(ayah, seekMs)
