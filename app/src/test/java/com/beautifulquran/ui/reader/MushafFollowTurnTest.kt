@@ -310,6 +310,19 @@ class MushafFollowTurnTest {
     }
 
     @Test
+    fun `a tap seed must not release the waiting leaf`() {
+        assertFalse(
+            mushafWaitingLeafReleased(waitingPage = 50, voicePage = 50, fromTap = true),
+        )
+        assertTrue(
+            mushafWaitingLeafReleased(waitingPage = 50, voicePage = 50, fromTap = false),
+        )
+        assertFalse(
+            mushafWaitingLeafReleased(waitingPage = 50, voicePage = 49, fromTap = false),
+        )
+    }
+
+    @Test
     fun `a tapped leaf holds against follow until the seek names it`() {
         assertTrue(mushafHoldBlocksFollow(heldPage = 12, voicePage = 11))
         assertTrue(mushafHoldBlocksFollow(heldPage = 12, voicePage = null))

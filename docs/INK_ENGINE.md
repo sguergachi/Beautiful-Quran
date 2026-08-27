@@ -483,7 +483,11 @@ tween-vs-snap rules, sweep entry and residual rules, repeat wash timing, the
   Upcoming paper until that word arrives — a dialed page is fully inked, and
   without the cover the wash has nothing to fill. The tapped ayah is Active as
   soon as the word is known, even before the pager names the leaf, so the
-  letter wash is not stuck under a blanket Upcoming cover. The chapter-opening
+  letter wash is not stuck under a blanket Upcoming cover. The seed is not
+  treated as voice arrival — that dropped the cover and swapped the pack off
+  Active, disposing the wash Animatable — and the poll must not restamp
+  `activation` for that same word, or `rememberLetterSweep` rearms from zero.
+  The chapter-opening
   basmalah is part of
   that sequence: tapping it starts its own wash before the first ayah. At the
   playlist handoff, the first ayah stays Upcoming until its first word timing

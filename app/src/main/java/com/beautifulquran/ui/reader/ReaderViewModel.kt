@@ -70,7 +70,46 @@ data class ActiveWord(
      * same word stays Active (tap the current word to play it from the start).
      */
     val activation: Long = 0L,
+    /**
+     * True while this is the optimistic word-tap seed, not the 33 ms poll.
+     * Releasing a mushaf tap-hold on this value drops the waiting cover
+     * before Media3 owns the leaf and disposes the wash Animatable.
+     */
+    val fromTap: Boolean = false,
 )
+
+/**
+ * Word the reader sees after a tap. The seed lights the wash this frame;
+ * the 33 ms poll replaces it. That poll often carries a new [ActiveWord.activation]
+ * (seek inkId), and [rememberLetterSweep] rearms on a generation change —
+ * keep the seed's activation while that word is still the one being said.
+ */
+internal fun resolveActiveWord(
+    polled: ActiveWord?,
+    tap: ActiveWord?,
+    seed: ActiveWord?,
+): ActiveWord? {
+    val shown = if (
+        tap != null &&
+        (polled == null ||
+            polled.ayah != tap.ayah ||
+            polled.wordPosition != tap.wordPosition)
+    ) {
+        tap
+    } else {
+        polled
+    } ?: return null
+    return if (
+        seed != null &&
+        shown.ayah == seed.ayah &&
+        shown.wordPosition == seed.wordPosition &&
+        shown.activation != seed.activation
+    ) {
+        shown.copy(activation = seed.activation)
+    } else {
+        shown
+    }
+}
 
 /** Reuses the immutable UI snapshot while the 33 ms poll stays in one word. */
 internal class ActiveWordPollCache {
@@ -445,8 +484,12 @@ class ReaderViewModel(
     /** Word-tap ink, held until the 33 ms poll names the same word. */
     private val tapInk = MutableStateFlow<ActiveWord?>(null)
 
+    /** The seed [tapInk] last published, kept after the poll takes over so
+     * [resolveActiveWord] can pin the wash generation for that word. */
+    private var tapSeed: ActiveWord? = null
+
     val activeWord: StateFlow<ActiveWord?> = combine(polledActiveWord, tapInk) { polled, tap ->
-        tap ?: polled
+        resolveActiveWord(polled, tap, tapSeed)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(1_000), null)
 
     /** The ayah focus/prepare target on the sheet. Normally the playing ayah,
@@ -522,12 +565,24 @@ class ReaderViewModel(
     init {
         viewModelScope.launch {
             polledActiveWord.collect { polled ->
-                val tap = tapInk.value ?: return@collect
-                if (polled != null &&
+                val tap = tapInk.value
+                if (tap != null &&
+                    polled != null &&
                     polled.ayah == tap.ayah &&
                     polled.wordPosition == tap.wordPosition
                 ) {
                     tapInk.value = null
+                }
+                // Drop the pin once playback has left the tapped word. Not
+                // on the stale pre-seek poll: tap is still held then, and
+                // clearing here lets the matching poll re-arm the wash.
+                val seed = tapSeed
+                if (tapInk.value == null &&
+                    seed != null &&
+                    polled != null &&
+                    (polled.ayah != seed.ayah || polled.wordPosition != seed.wordPosition)
+                ) {
+                    tapSeed = null
                 }
             }
         }
@@ -898,7 +953,9 @@ class ReaderViewModel(
             spokenMs = duration,
             nextWordPosition = next,
             activation = player.state.value.positionEvents.inkId + 1L,
+            fromTap = true,
         )
+        tapSeed = seed
         tapInk.value = seed
         viewModelScope.launch {
             delay(2_000)

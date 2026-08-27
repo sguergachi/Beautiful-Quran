@@ -296,6 +296,16 @@ internal fun mushafLeafWaitingForVoice(
     heldPage: Int?,
 ): Boolean = pageNumber == waitingPage || heldPage == pageNumber
 
+/**
+ * The 33 ms poll has named the waiting leaf. A tap seed must not count:
+ * treating it as arrival drops the cover and disposes the wash mid-run.
+ */
+internal fun mushafWaitingLeafReleased(
+    waitingPage: Int,
+    voicePage: Int,
+    fromTap: Boolean,
+): Boolean = waitingPage != 0 && voicePage == waitingPage && !fromTap
+
 /** Delayed turns retain ownership only while the exact activation survives. */
 internal fun mushafSameActivation(expected: ActiveWord, current: ActiveWord?): Boolean =
     current != null &&
@@ -476,7 +486,10 @@ internal fun MushafPager(
     // Read inside the follow effect, which must not restart when the reader
     // changes speed mid-recitation.
     val speedNow = rememberUpdatedState(playbackSpeed)
-    LaunchedEffect(followEnabled, loadedSurahId, catalog, pagerState, heldPage) {
+    val heldPageNow = rememberUpdatedState(heldPage)
+    // heldPage is read, not keyed: keying it restarted this collector on
+    // every tap and cancelled in-flight work. The hold is checked per tick.
+    LaunchedEffect(followEnabled, loadedSurahId, catalog, pagerState) {
         snapshotFlow {
             val voice = playback.value
             MushafFollowMoment(
@@ -510,8 +523,10 @@ internal fun MushafPager(
                 // leaf's last word: stay put. The hold exists so the seek can
                 // land and the wash can run where the reader tapped — following
                 // the stale clock, or leading the next leaf, both leave it.
-                if (waitingPage != 0 && page == waitingPage) waitingPage = 0
-                if (mushafHoldBlocksFollow(heldPage, page)) return@collect
+                if (mushafWaitingLeafReleased(waitingPage, page, word?.fromTap == true)) {
+                    waitingPage = 0
+                }
+                if (mushafHoldBlocksFollow(heldPageNow.value, page)) return@collect
                 // A hand on the pager owns the turn: while a scroll is in
                 // progress — the user's swipe or a turn this collector just
                 // started — do not pull. Pulling mid-swipe yanked the page

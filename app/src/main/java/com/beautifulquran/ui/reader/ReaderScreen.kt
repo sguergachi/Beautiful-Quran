@@ -2402,8 +2402,8 @@ fun ReaderScreen(
                         val held = mushafTappedPage ?: return@LaunchedEffect
                         val catalog = mushafReady.catalog
                         snapshotFlow { activeWordState.value }.collect { word ->
-                            if (word != null &&
-                                catalog.pageOf(
+                            if (word == null || word.fromTap) return@collect
+                            if (catalog.pageOf(
                                     mushafSurahId,
                                     word.ayah,
                                     word.wordPosition,
