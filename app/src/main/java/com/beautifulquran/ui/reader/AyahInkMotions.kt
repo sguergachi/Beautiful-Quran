@@ -4,6 +4,7 @@ import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableStateOf
@@ -16,7 +17,12 @@ internal data class AyahInkPack(
     val recessCover: State<Float>,
     val markAlpha: State<Float>,
     val searchHitWash: RepeatWash,
+    /** A motionless mushaf ayah that still waits beneath the page recess. */
+    val wholeAyahRecess: Boolean = false,
 )
+
+internal fun ayahRecessCoverTarget(dimmed: Boolean, enteringFromRecess: Boolean): Float =
+    if (dimmed || enteringFromRecess) 1f - InkEngine.State.Upcoming.inkAlpha() else 0f
 
 /**
  * The motion owner [AyahBlock] already uses: tajweed pacing, wasl handoff,
@@ -33,6 +39,8 @@ internal fun rememberAyahInkPack(
     flashWordPosition: Int? = null,
     /** True while the voice is running: the wet-ink glint dries on a pause. */
     wetInk: Boolean = true,
+    /** Mushaf selection enters from the paper cover already on the ayah. */
+    initiallyRecessed: Boolean = false,
 ): AyahInkPack {
     val sweepMs = InkEngine.sweepMs(activeWord, playbackSpeed)
     val repeatDwellMs = InkEngine.repeatDwellMs(activeWord, playbackSpeed)
@@ -142,19 +150,21 @@ internal fun rememberAyahInkPack(
         animateLyricInk = false,
         wetInk = wetInk,
     )
+    val enteringFromRecess = remember(initiallyRecessed) {
+        mutableStateOf(initiallyRecessed)
+    }
+    LaunchedEffect(initiallyRecessed) {
+        enteringFromRecess.value = false
+    }
     val recessCover = animateFloatAsState(
-        targetValue = if (dimmed) {
-            1f - InkEngine.State.Upcoming.inkAlpha()
-        } else {
-            0f
-        },
+        targetValue = ayahRecessCoverTarget(dimmed, enteringFromRecess.value),
         animationSpec = tween(InkEngine.tuning.recessMs, easing = FastOutSlowInEasing),
         label = "mushafRecessCover",
     )
     return AyahInkPack(
         motions = motions,
         recessCover = recessCover,
-        markAlpha = rememberAyahMarkAlpha(focused = !dimmed),
+        markAlpha = rememberAyahMarkAlpha(focused = !dimmed && !enteringFromRecess.value),
         searchHitWash = rememberSearchHitWash(flashWordPosition),
     )
 }

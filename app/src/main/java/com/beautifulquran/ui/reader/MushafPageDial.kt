@@ -35,7 +35,6 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithCache
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -399,8 +398,14 @@ internal fun mushafDialHudLean(dyPx: Float, strayPx: Float, leanPx: Float): Floa
     return pull * pull * pull * leanPx
 }
 
-/** The plate's own side padding: the air between plate edge and type. */
-private val MushafDialHudPad = 21.dp
+/**
+ * Paper above the HUD type. Must clear [MushafDialHudFeather] or the first
+ * line sits in the fade and the leaf's last script shows through the words.
+ */
+private val MushafDialHudPadTop = 16.dp
+private val MushafDialHudPadBottom = 8.dp
+/** Top dissolve of the plate into the leaf. */
+private val MushafDialHudFeather = 14.dp
 
 /** How close the HUD *text* may come to the glass, in px. */
 internal const val MUSHAF_DIAL_HUD_EDGE_MARGIN_PX = 8f
@@ -514,9 +519,9 @@ internal fun mushafDialRelease(
 /**
  * The line the label always writes, at the granularity the dial is working at.
  *
- * Chapter tier, the chapter and nothing else — but by its number as well as its
- * name, set the way the index sets them, because a reader crossing the book at
- * this speed is counting chapters and the number is the thing they are counting.
+ * Chapter tier, the chapter by its number then its name, with the same middle
+ * dot the trough uses — a reader crossing the book at this speed is counting
+ * chapters and the number is the thing they are counting, so it leads.
  *
  * In the trough the leaf is the target, so the head names the leaf: the chapter
  * it stands in, then its folio. The chapter stays at the front because the
@@ -524,18 +529,21 @@ internal fun mushafDialRelease(
  * with nothing to check it against.
  */
 internal fun mushafDialLabelHead(label: MushafDialLabel, zoomed: Boolean, page: Int): String =
-    if (zoomed) "${label.chapter}  ·  pg. $page" else "${label.number}  ${label.chapter}"
+    if (zoomed) "${label.chapter}  ·  pg. $page" else "${label.number}  ·  ${label.chapter}"
 
 /**
- * The line only the trough writes: the verses standing on the leaf.
+ * The line under the head: at chapter tier, the leaf the chapter opens on;
+ * in the trough, the verses standing on the leaf in view.
  *
- * At chapter tier it is empty rather than absent. The label keeps both lines'
- * worth of paper at either tier, so opening the trough writes into the gap the
- * head was already sitting above instead of shoving the head upward — the type
- * over a thumb should not jump when the comb does.
+ * Both tiers write this line, so the Column's two-line paper is occupied
+ * either way and opening the trough does not shove the head upward.
  */
-internal fun mushafDialLabelFoot(label: MushafDialLabel, zoomed: Boolean): String {
-    if (!zoomed) return ""
+internal fun mushafDialLabelFoot(
+    label: MushafDialLabel,
+    zoomed: Boolean,
+    startPage: Int = 0,
+): String {
+    if (!zoomed) return if (startPage > 0) "pg. $startPage" else ""
     val verses =
         if (label.toAyah <= label.fromAyah) "${label.fromAyah}"
         else "${label.fromAyah}–${label.toAyah}"
@@ -989,7 +997,6 @@ internal fun MushafPageDial(
     var troughRun by remember { mutableStateOf(1..1) }
     var glide by remember { mutableStateOf<Job?>(null) }
     var widthPx by remember { mutableIntStateOf(0) }
-    var hudWidthPx by remember { mutableIntStateOf(0) }
     var hudContentWidthPx by remember { mutableIntStateOf(0) }
     // One mark per surah, surah order 1..114 — duplicates kept when a leaf
     // opens two tiny surahs, so each owns its own equal cell on the chapter
@@ -1285,14 +1292,16 @@ internal fun MushafPageDial(
                 )
             }
         }
-        if (hud != null) {
+        // Unmount when hidden: a full-width plate at alpha 0 still eats
+        // taps on the last lines of the leaf, and the thumb's ride home
+        // used to leave it sitting there invisible.
+        if (hud != null && hudShown) {
+            val chapterStartPage = chapterPages.getOrElse(hud.number - 1) { 0 }
             // A quiet plate under the type: the leaf's own script runs right
             // up to the margin here, and unreadable ink under the label helps
             // nobody. The ground is the page's own surface colour — flat, no
-            // border, no shadow — so it reads as a clean patch of paper laid
-            // over the margin, not a card floating on it. It takes the
-            // transport's own small hand, because it stands on the
-            // transport's paper rather than on the leaf.
+            // border, no shadow — a full-width band of paper dissolving into
+            // the leaf at the top, not a card floating on it.
             val labelSmall = MaterialTheme.typography.labelSmall
             val hudType = remember(labelSmall) {
                 labelSmall.copy(
@@ -1302,18 +1311,13 @@ internal fun MushafPageDial(
                 )
             }
             val paper = MaterialTheme.colorScheme.background
-            // Which wall the plate is parked against, if either: -1 left,
-            // +1 right, 0 riding free with the hand. Docked, the type goes
-            // flush to the near edge and the wash runs solid into the glass
-            // on that side — no feather showing between edge and words.
-            val density = LocalDensity.current
-            // Text leads, plate follows: when the centred text would run
-            // off the glass we dock the type — left edge at the comb for -1,
-            // right edge at the comb for 1 — and the plate shifts to sit
-            // under it.
+            // Which wall the type is parked against, if either: -1 left,
+            // +1 right, 0 riding free with the hand. The plate itself is the
+            // whole measure — a band of the page's own paper — so only the
+            // words follow the comb.
             val hudDock by remember {
                 derivedStateOf {
-                    if (widthPx <= 0 || hudWidthPx <= 0) return@derivedStateOf 0
+                    if (widthPx <= 0 || hudContentWidthPx <= 0) return@derivedStateOf 0
                     val hand = handX.floatValue
                     val contentW = hudContentWidthPx.toFloat()
                     if (contentW <= 1f) return@derivedStateOf 0
@@ -1325,55 +1329,27 @@ internal fun MushafPageDial(
                     }
                 }
             }
-            val hudMaxWidthPx by remember(density) {
+            val hudMaxWidthPx by remember {
                 derivedStateOf {
                     val track = widthPx.toFloat()
-                    val padPx = with(density) { MushafDialHudPad.toPx() }
                     val raw = when (hudDock) {
-                        -1 -> track - handX.floatValue - padPx -
-                            MUSHAF_DIAL_HUD_EDGE_MARGIN_PX
-                        1 -> handX.floatValue - padPx - MUSHAF_DIAL_HUD_EDGE_MARGIN_PX
+                        -1 -> track - handX.floatValue - MUSHAF_DIAL_HUD_EDGE_MARGIN_PX
+                        1 -> handX.floatValue - MUSHAF_DIAL_HUD_EDGE_MARGIN_PX
                         else -> track
                     }.coerceAtLeast(0f)
                     ((raw / 16f).toInt() * 16).coerceIn(0, widthPx)
                 }
             }
             Column(
-                horizontalAlignment = when (hudDock) {
-                    -1 -> Alignment.Start
-                    1 -> Alignment.End
-                    else -> Alignment.CenterHorizontally
-                },
+                horizontalAlignment = Alignment.Start,
                 modifier = Modifier
                     .align(Alignment.TopStart)
+                    .fillMaxWidth()
                     // Order is load-bearing: offset and fade must WRAP the
                     // background, or the plate paints the column's un-shifted
                     // bounds at the band's top corner while the type moves
                     // without it.
                     .offset {
-                        // Text leads, plate follows: text edge sits at the comb
-                        // (hand) when docked, centred on it otherwise; plate is
-                        // textLeft - pad, clamped to -slack so the wash never
-                        // leaves the glass. No jump to -slack/maxLeft.
-                        val hand = handX.floatValue
-                        val contentW = hudContentWidthPx.toFloat().coerceAtLeast(1f)
-                        val plateW = hudWidthPx.toFloat()
-                        val pad = with(density) { MushafDialHudPad.toPx() }
-                        val track = widthPx.toFloat()
-                        val textLeft = when (hudDock) {
-                            -1 -> hand
-                            1 -> hand - contentW
-                            else -> hand - contentW / 2f
-                        }
-                        val rawPlateLeft = textLeft - pad
-                        // The plate never hangs off the glass: clamped to
-                        // 0..track-plateW so both of its edge feathers stay
-                        // fully on-glass — a wall-side feather cut by the
-                        // glass read as a hard, unfaded edge.
-                        val left = rawPlateLeft.coerceIn(
-                            0f,
-                            (track - plateW).coerceAtLeast(0f),
-                        )
                         // Clear of the tallest tick, and measured from the
                         // rule rather than from the top of the slot. The slot
                         // carries paper above the rule that the label was
@@ -1388,76 +1364,45 @@ internal fun MushafPageDial(
                             MushafDialHudLift.toPx()
                         // Leaning with the hand: the pulled HUD rides its elastic
                         // lean for exactly as long as the pop is imminent.
-                        IntOffset(left.roundToInt(), (foot - hudHeightPx + hudPull.value).roundToInt())
+                        IntOffset(0, (foot - hudHeightPx + hudPull.value).roundToInt())
                     }
                     // Measured out of the slot's reach. The dial's own band is
                     // 13 dp — a hairline's worth — and the label does not live
                     // in it; it stands on the leaf's bottom margin above. Left
                     // to the slot's constraints the second line has nowhere to
                     // be measured into and silently collapses to nothing.
-                    //
-                    // Height only. Freeing the width as well would take the
-                    // rule's own width off the label, and a line that is never
-                    // told how much paper it has cannot ellipsise: at a large
-                    // font scale the head would run off the glass instead of
-                    // ending in a full stop.
                     .wrapContentHeight(Alignment.Top, unbounded = true)
-                    .onSizeChanged {
-                        hudWidthPx = it.width
-                        hudHeightPx = it.height
-                    }
+                    .onSizeChanged { hudHeightPx = it.height }
                     // Plate and text vanish together the frame the hand lifts
                     // — text was already instant via the inner expand gate, but
                     // the cached draw sits outside that layer so the wash lingered.
                     .graphicsLayer { alpha = if (hudShown) 1f else 0f }
                     .drawWithCache {
-                        // The ground is opaque exactly under the words and
-                        // transparent outside them: the gradient's stops are
-                        // the text's own bounds, so the fade lives in the
-                        // padding and no word ever sits on thinning ground —
-                        // part of the magnification, not a card laid on the
-                        // leaf.
-                        val plateWidth = size.width.coerceAtLeast(1f)
-                        val pad = MushafDialHudPad.toPx()
-                        val textStart = (pad / plateWidth).coerceIn(0f, 0.5f)
-                        val textEnd =
-                            ((pad + hudContentWidthPx) / plateWidth)
-                                .coerceIn(textStart + 0.01f, 1f)
-                        val horizontalBrush = Brush.horizontalGradient(
-                            0f to paper.copy(alpha = 0f),
-                            textStart to paper,
-                            textEnd to paper,
-                            1f to paper.copy(alpha = 0f),
-                        )
-                        // The top edge feathers too: the plate is a patch of
-                        // paper dissolving into the leaf, and a hard top line
-                        // read as a card's border. Two passes, no blend
-                        // modes: the top strip is a vertical paper ramp from
-                        // zero at its tip, and the horizontal wash below it
-                        // is clipped to start where the ramp ends — so the
-                        // edge fades clean to nothing on every renderer.
-                        val feather = 10.dp.toPx()
+                        // Full-width paper, dissolving only at the top: a hard
+                        // top line would read as a card's border, and a side
+                        // fade would let the leaf's last script show through
+                        // at the glass. Two passes, no blend modes: the top
+                        // strip is a vertical paper ramp from zero at its tip,
+                        // and the solid wash below it is clipped to start
+                        // where the ramp ends.
+                        val feather = MushafDialHudFeather.toPx()
                         val verticalBrush = Brush.verticalGradient(
                             0f to paper.copy(alpha = 0f),
                             1f to paper,
                             startY = 0f,
                             endY = feather,
                         )
-                        val corner = CornerRadius(6.dp.toPx())
                         onDrawBehind {
-                            drawRoundRect(
-                                brush = verticalBrush,
-                                cornerRadius = corner,
-                            )
+                            drawRect(brush = verticalBrush)
                             clipRect(top = feather) {
-                                drawRoundRect(
-                                    brush = horizontalBrush,
-                                    cornerRadius = corner,
-                                )
+                                drawRect(color = paper)
                             }
                         }
                     }
-                    .padding(horizontal = MushafDialHudPad, vertical = 6.dp)
+                    .padding(
+                        top = MushafDialHudPadTop,
+                        bottom = MushafDialHudPadBottom,
+                    )
                     .graphicsLayer { alpha = expand.value },
             ) {
                 // The head is set twice, once as each tier reads the leaf, and
@@ -1489,9 +1434,8 @@ internal fun MushafPageDial(
                 Box(
                     modifier = Modifier
                         // Docked, the label lives between the comb and the
-                        // glass: clamp its measure so the type ellipsises and
-                        // the plate hugs what is left, instead of running its
-                        // full intrinsic width across the leaf. The clamp is
+                        // glass: clamp its measure so the type ellipsises
+                        // instead of running off the leaf. The clamp is
                         // quantized to 16px steps — a per-pixel max would
                         // re-measure the label on every frame the hand moves
                         // along the wall.
@@ -1508,7 +1452,17 @@ internal fun MushafPageDial(
                                 placeable.place(0, 0)
                             }
                         }
-                        .onSizeChanged { hudContentWidthPx = it.width },
+                        .onSizeChanged { hudContentWidthPx = it.width }
+                        .offset {
+                            val hand = handX.floatValue
+                            val contentW = hudContentWidthPx.toFloat().coerceAtLeast(1f)
+                            val left = when (hudDock) {
+                                -1 -> hand
+                                1 -> hand - contentW
+                                else -> hand - contentW / 2f
+                            }
+                            IntOffset(left.roundToInt(), 0)
+                        },
                     contentAlignment = when (hudDock) {
                         -1 -> Alignment.TopStart
                         1 -> Alignment.TopEnd
@@ -1517,7 +1471,7 @@ internal fun MushafPageDial(
                 ) {
                     Column(horizontalAlignment = hudDockAlignment) {
                         Text(
-                            text = hud.chapter,
+                            text = mushafDialLabelHead(hud, zoomed = false, page = hudPage),
                             style = hudType,
                             color = androidx.compose.ui.graphics
                                 .lerp(ink, accents.repeatInk, orange)
@@ -1533,13 +1487,19 @@ internal fun MushafPageDial(
                                     MushafDialHudSwap.toPx() * zoom.value
                             },
                         )
-                        // Chapter number as a grey subtitle under the name.
+                        // Opening leaf, in the same grey the trough's ayah
+                        // range takes — subordinate to the chapter, the thing
+                        // a reader aiming by chapters still needs to land.
                         Text(
-                            text = "${hud.number}",
+                            text = mushafDialLabelFoot(
+                                hud,
+                                zoomed = false,
+                                startPage = chapterStartPage,
+                            ).ifEmpty { " " },
                             style = hudType,
                             color = androidx.compose.ui.graphics
                                 .lerp(ink.copy(alpha = 0.48f), accents.repeatInk, orange)
-                                .copy(alpha = 0.48f + 0.22f * hudPulse),
+                                .copy(alpha = 0.48f + 0.22f * orange),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.graphicsLayer {
@@ -2075,13 +2035,16 @@ internal fun MushafPageDial(
                         // again until that stroke opened the trough itself.
                         scope.launch { zoom.animateTo(0f, MushafDialZoomOut) }
                         glide = scope.launch {
-                            resting.snapTo(landed.toFloat())
-                            animate(
-                                initialValue = handX.floatValue,
-                                targetValue = seat,
-                                animationSpec = MushafDialZoomOut,
-                            ) { value, _ -> handX.floatValue = value }
-                            handed = false
+                            try {
+                                resting.snapTo(landed.toFloat())
+                                animate(
+                                    initialValue = handX.floatValue,
+                                    targetValue = seat,
+                                    animationSpec = MushafDialZoomOut,
+                                ) { value, _ -> handX.floatValue = value }
+                            } finally {
+                                handed = false
+                            }
                         }
                     }
                 },

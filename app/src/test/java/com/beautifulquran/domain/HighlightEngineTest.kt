@@ -3,6 +3,7 @@ package com.beautifulquran.domain
 import com.beautifulquran.data.model.Segment
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertSame
 import org.junit.Test
 
 class HighlightEngineTest {
@@ -160,11 +161,24 @@ class HighlightEngineTest {
         assertEquals(1, info.position)
         assertEquals(960, info.endMs)
         assertEquals(970, info.holdEndMs)
+        assertEquals(2, info.nextPosition)
 
         val last = HighlightEngine.activeInfo(segments, 3000)!!
         assertEquals(4, last.position)
         assertEquals(6210, last.endMs)
         assertEquals(6210, last.holdEndMs)
+        assertEquals(null, last.nextPosition)
+    }
+
+    @Test
+    fun `next position preserves a repeat backtrack`() {
+        val beforeRepeat = HighlightEngine.activeInfo(withRepeat, 2500)!!
+        assertEquals(3, beforeRepeat.position)
+        assertEquals(2, beforeRepeat.nextPosition)
+
+        val repeatTail = HighlightEngine.activeInfo(withRepeat, 4500)!!
+        assertEquals(3, repeatTail.position)
+        assertEquals(4, repeatTail.nextPosition)
     }
 
     @Test
@@ -178,5 +192,6 @@ class HighlightEngineTest {
         }
         // Same instance answers every tick — no per-call IntArray rebuild.
         assertEquals(withRepeat, prepared.segments)
+        assertSame(prepared.activeInfo(3100), prepared.activeInfo(3900))
     }
 }

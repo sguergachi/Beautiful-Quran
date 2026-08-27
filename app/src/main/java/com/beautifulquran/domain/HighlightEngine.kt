@@ -33,6 +33,9 @@ object HighlightEngine {
          * running into the next word (Arabic-only paper-cover flicker).
          */
         val holdEndMs: Long,
+        /** Position owned by the next timing segment, including a repeat
+         * backtrack, or null when this is the final segment in the ayah. */
+        val nextPosition: Int?,
         val isRepeat: Boolean,
         val highWater: Int,
         /** First word of the current repeat chain: while the reciter is
@@ -49,27 +52,11 @@ object HighlightEngine {
      */
     class PreparedTimings private constructor(
         val segments: List<Segment>,
-        private val maxBeforeByIndex: IntArray,
-        private val repeatStartByIndex: IntArray,
+        private val infoByIndex: Array<ActiveInfo>,
     ) {
         fun activeInfo(positionMs: Long): ActiveInfo? {
             val idx = activeIndex(segments, positionMs) ?: return null
-            val seg = segments[idx]
-            val maxBefore = maxBeforeByIndex[idx]
-            val holdEndMs = if (idx + 1 < segments.size) {
-                segments[idx + 1].startMs
-            } else {
-                seg.endMs
-            }
-            return ActiveInfo(
-                position = seg.position,
-                startMs = seg.startMs,
-                endMs = seg.endMs,
-                holdEndMs = holdEndMs.coerceAtLeast(seg.startMs),
-                isRepeat = seg.position <= maxBefore,
-                highWater = maxOf(maxBefore, seg.position),
-                repeatStart = repeatStartByIndex[idx],
-            )
+            return infoByIndex[idx]
         }
 
         companion object {
@@ -100,7 +87,21 @@ object HighlightEngine {
                     }
                     runningMax = maxOf(runningMax, pos)
                 }
-                return PreparedTimings(segments, maxBefore, repeatStart)
+                val info = Array(n) { i ->
+                    val seg = segments[i]
+                    val holdEndMs = segments.getOrNull(i + 1)?.startMs ?: seg.endMs
+                    ActiveInfo(
+                        position = seg.position,
+                        startMs = seg.startMs,
+                        endMs = seg.endMs,
+                        holdEndMs = holdEndMs.coerceAtLeast(seg.startMs),
+                        nextPosition = segments.getOrNull(i + 1)?.position,
+                        isRepeat = seg.position <= maxBefore[i],
+                        highWater = maxOf(maxBefore[i], seg.position),
+                        repeatStart = repeatStart[i],
+                    )
+                }
+                return PreparedTimings(segments, info)
             }
         }
     }

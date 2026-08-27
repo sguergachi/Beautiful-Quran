@@ -133,6 +133,7 @@ import com.beautifulquran.ui.reader.focus.rememberReaderFocusController
 import com.beautifulquran.ui.reader.MushafQcfFonts
 import com.beautifulquran.ui.theme.FloatingPaperControl
 import com.beautifulquran.ui.theme.IslamicReturnToAyahButton
+import com.beautifulquran.ui.theme.ReturnArrowHeading
 import com.beautifulquran.ui.theme.InkRevealOverlay
 import com.beautifulquran.ui.theme.absorbPointerEvents
 import com.beautifulquran.ui.theme.contrastingOverlayColorScheme
@@ -773,9 +774,12 @@ fun ReaderScreen(
     // whether it is taller than the screen — the return-to-verse control reads
     // the former, the word-level follow gate reads the latter. Both watch
     // layoutInfo, so they recompute only when their answer actually changes.
-    // During the basmalah lead-in the target is ayah 0 (the basmalah list item).
+    // The camera follows the media item, not the fade-led ink target: lifting
+    // the next ayah's recess early must not move the page before its audio.
+    // During the basmalah lead-in the target is ayah 0 (its dedicated item).
+    val listeningAyah = playerState.nowPlaying?.ayah
     val playbackFocusTarget = FocusEngine.playbackFocusTarget(
-        activeAyah = activeAyah,
+        playingAyah = listeningAyah?.takeIf { it >= 1 && isThisSurahPlaying },
         activeBasmalah = isThisSurahPlaying && activeBasmalah == true,
     )
     val activeAyahPlacement = remember(playbackFocusTarget) {
@@ -785,10 +789,23 @@ fun ReaderScreen(
     // A fresh query restarts from its first match…
     LaunchedEffect(activeQuery) { search.index = 0 }
     // …and the sheet glides to whichever match is current.
-    LaunchedEffect(searchMatches, currentMatch) {
+    LaunchedEffect(searchMatches, currentMatch, mushafMode, mushafCatalog) {
         val target = searchMatches.getOrNull(currentMatch) ?: return@LaunchedEffect
         dispatch(ReaderInteractionEvent.SearchNavigated)
-        focusController.focus(target, animate = true, preRoll = true)
+        val catalog = mushafCatalog
+        if (mushafMode && catalog != null) {
+            val page = (catalog.pageOf(renderedSurahId, target, 1) - 1)
+                .coerceIn(0, catalog.pageCount - 1)
+            withContext(Dispatchers.Default) {
+                MushafQcfFonts.preload(
+                    activityContext,
+                    mushafFontPreloadPages(page, catalog.pageCount),
+                )
+            }
+            mushafPagerState.animateScrollToPage(page)
+        } else if (!mushafMode) {
+            focusController.focus(target, animate = true, preRoll = true)
+        }
     }
 
     LaunchedEffect(requestedJumpAyah) {
@@ -955,10 +972,69 @@ fun ReaderScreen(
     val labFocusEnabled = InkEngine.focusEngineEnabled
     val followPlayback =
         ReaderInteraction.shouldFollowPlayback(interaction) && labFocusEnabled
+    // Each layout hands the other the location under the reader. Without this,
+    // switching to the mushaf reopened the route's original leaf, while
+    // switching back exposed the hidden list's stale position.
+    var lastScrollAyah by remember(renderedSurahId) {
+        mutableIntStateOf(
+            startAyah?.coerceAtLeast(1) ?: scrolledAyah.value.coerceAtLeast(1),
+        )
+    }
+    LaunchedEffect(mushafMode, renderedSurahId) {
+        if (!mushafMode) {
+            snapshotFlow { scrolledAyah.value }
+                .collect { ayah -> if (ayah >= 1) lastScrollAyah = ayah }
+        }
+    }
+    var previousMushafMode by remember { mutableStateOf(mushafMode) }
+    LaunchedEffect(mushafMode, mushafCatalog, renderedSurahId) {
+        if (previousMushafMode == mushafMode) return@LaunchedEffect
+        val catalog = mushafCatalog
+        if (mushafMode && catalog == null) return@LaunchedEffect
+        previousMushafMode = mushafMode
+        if (mushafMode) {
+            catalog ?: return@LaunchedEffect
+            val word = activeWordState.value.takeIf {
+                followPlayback && isThisSurahPlaying
+            }
+            val targetPage = when {
+                word != null -> catalog.pageOf(
+                    renderedSurahId,
+                    word.ayah,
+                    word.wordPosition,
+                )
+                followPlayback && isThisSurahPlaying && activeBasmalah == true ->
+                    catalog.firstPageOf(renderedSurahId)
+                followPlayback && isThisSurahPlaying && activeAyah != null ->
+                    catalog.pageOf(renderedSurahId, activeAyah, 1)
+                else -> catalog.pageOf(renderedSurahId, lastScrollAyah, 1)
+            }
+            val page = (targetPage - 1).coerceIn(0, catalog.pageCount - 1)
+            withContext(Dispatchers.Default) {
+                MushafQcfFonts.preload(
+                    activityContext,
+                    mushafFontPreloadPages(page, catalog.pageCount),
+                )
+            }
+            mushafPagerState.scrollToPage(page)
+        } else {
+            val target = if (followPlayback && isThisSurahPlaying) {
+                playbackFocusTarget
+            } else {
+                catalog?.page(mushafPagerState.currentPage + 1)
+                    ?.ayahKeys
+                    ?.filter { it.first == renderedSurahId }
+                    ?.minOfOrNull { it.second }
+            }
+            target?.let { focusController.focus(it, animate = false) }
+        }
+    }
     var followWasEnabled by remember { mutableStateOf(followEnabled) }
     /** Last target we already homed onto while follow stayed on. Skips
      * re-focus when activeAyah flickers null→same during seeks. */
     var lastFollowFocusTarget by remember { mutableStateOf<Int?>(null) }
+    /** Word tap whose Media3 seek has not yet named this ayah. */
+    var pendingWordTapAyah by remember { mutableStateOf<Int?>(null) }
 
     // Continue Listening tracks recited ayahs without driving scroll.
     //
@@ -968,7 +1044,6 @@ fun ReaderScreen(
     // recorded a verse the listener never reached — breaking the repository's
     // "only verses actually recited" contract. Ayah 0 is the basmalah lead-in
     // and is filtered by the >= 1 guard.
-    val listeningAyah = playerState.nowPlaying?.ayah
     LaunchedEffect(listeningAyah, isThisSurahPlaying, playerState.isPlaying) {
         if (listeningAyah != null && listeningAyah >= 1 &&
             isThisSurahPlaying && playerState.isPlaying
@@ -977,10 +1052,18 @@ fun ReaderScreen(
         }
     }
 
-    LaunchedEffect(playbackFocusTarget, followPlayback, isThisSurahPlaying) {
+    LaunchedEffect(
+        playbackFocusTarget,
+        followPlayback,
+        isThisSurahPlaying,
+        mushafMode,
+        pendingWordTapAyah,
+    ) {
+        if (mushafMode) return@LaunchedEffect
         if (!followPlayback) {
             followWasEnabled = false
             lastFollowFocusTarget = null
+            pendingWordTapAyah = null
             return@LaunchedEffect
         }
         // Playlist finished (nowPlaying cleared at STATE_ENDED): leave the page
@@ -988,6 +1071,15 @@ fun ReaderScreen(
         // like a random scroll-up at the end of the surah.
         if (!isThisSurahPlaying) return@LaunchedEffect
         val target = playbackFocusTarget ?: return@LaunchedEffect
+        if (ReaderInteraction.wordTapAwaitingSeek(target, pendingWordTapAyah)) {
+            return@LaunchedEffect
+        }
+        if (pendingWordTapAyah == target) {
+            pendingWordTapAyah = null
+            lastFollowFocusTarget = target
+            followWasEnabled = true
+            return@LaunchedEffect
+        }
         val justEnabled = !followWasEnabled
         followWasEnabled = true
         if (ReaderInteraction.shouldRestoreWordBeforeVerseHome(
@@ -1091,9 +1183,12 @@ fun ReaderScreen(
         uiState.content?.surah?.id,
         isThisSurahPlaying,
         followPlayback,
+        mushafMode,
     ) {
         val content = uiState.content
-        if (!initialFocusSettled || content == null || !isThisSurahPlaying || !followPlayback) {
+        if (mushafMode || !initialFocusSettled || content == null ||
+            !isThisSurahPlaying || !followPlayback
+        ) {
             return@LaunchedEffect
         }
         val playlistAyah = playerState.nowPlaying?.ayah?.takeIf { it >= 1 }
@@ -1167,6 +1262,7 @@ fun ReaderScreen(
         settings.fontScale,
     )
     var lastLayoutSignature by remember { mutableStateOf(layoutSignature) }
+    var lastReadingLayout by remember { mutableStateOf(settings.readingLayout) }
     var stickyAyah by remember { mutableIntStateOf(1) }
     var layoutFocusSeeded by remember { mutableStateOf(false) }
     val playbackOwnsReflow = followPlayback && isThisSurahPlaying
@@ -1184,6 +1280,15 @@ fun ReaderScreen(
         if (!layoutFocusSeeded) {
             // First composition matches the initial settle above; don't fight it.
             layoutFocusSeeded = true
+            lastLayoutSignature = layoutSignature
+            lastReadingLayout = settings.readingLayout
+            return@LaunchedEffect
+        }
+        // Layout-to-layout location transfer above owns this change. Running
+        // the LazyList reflow recovery as well would restore its hidden stale
+        // ayah a beat later and undo the leaf-to-scroll handoff.
+        if (lastReadingLayout != settings.readingLayout) {
+            lastReadingLayout = settings.readingLayout
             lastLayoutSignature = layoutSignature
             return@LaunchedEffect
         }
@@ -2128,6 +2233,16 @@ fun ReaderScreen(
             }
             val revealDp = with(density) { revealPx.toDp() }
             val pullT = previousChapterPull.coerceIn(0f, 1f)
+            // Ornamented return-to-ayah. Yields while MainActivity's concordance
+            // Back-to capsule is showing so the two never compete. Lab freeze
+            // already parks the page; suppress the return capsule so it does
+            // not fight the deliberate "leave me alone" state.
+            val showReturnToAyah =
+                playerState.error == null &&
+                    !rootReturnVisible &&
+                    !followEnabled &&
+                    labFocusEnabled &&
+                    recitingActive
             Column(
                 Modifier
                     .align(Alignment.TopCenter)
@@ -2220,6 +2335,38 @@ fun ReaderScreen(
                         onSeekSurah = { mushafSeekSurahId = it },
                         onScrubbing = { mushafScrubbing.value = it },
                         modifier = Modifier.weight(1f),
+                        leafFooter = {
+                            val catalog = mushafCatalog
+                            val word = activeWordState.value
+                            val playbackPage = when {
+                                catalog == null -> null
+                                word != null && isThisSurahPlaying -> catalog.pageOf(
+                                    renderedSurahId,
+                                    word.ayah,
+                                    word.wordPosition,
+                                ) - 1
+                                activeBasmalah == true && isThisSurahPlaying ->
+                                    catalog.firstPageOf(renderedSurahId) - 1
+                                activeAyah != null && isThisSurahPlaying ->
+                                    catalog.pageOf(renderedSurahId, activeAyah, 1) - 1
+                                else -> null
+                            }
+                            val way = playbackPage?.let {
+                                mushafReturnWay(mushafPagerState.currentPage, it)
+                            }
+                            FloatingPaperControl(visible = showReturnToAyah && way != null) {
+                                IslamicReturnToAyahButton(
+                                    heading = when (way) {
+                                        MushafReturnWay.Left -> ReturnArrowHeading.Left
+                                        MushafReturnWay.Right -> ReturnArrowHeading.Right
+                                        null -> ReturnArrowHeading.Down
+                                    },
+                                    onClick = {
+                                        dispatch(ReaderInteractionEvent.EnableFollow)
+                                    },
+                                )
+                            }
+                        },
                     ) {
                     if (mushafReady == null) {
                         Box(Modifier.fillMaxSize())
@@ -2234,6 +2381,9 @@ fun ReaderScreen(
                             reciting = recitingActive,
                             playingHere = isThisSurahPlaying,
                             basmalahActive = isThisSurahPlaying && activeBasmalah == true,
+                            isPlaying = isThisSurahPlaying && playerState.isPlaying,
+                            playingAyah = playerState.nowPlaying?.ayah
+                                ?.takeIf { isThisSurahPlaying },
                         )
                     }
                     val mushafDispatch = rememberUpdatedState(
@@ -2245,12 +2395,22 @@ fun ReaderScreen(
                     // page of its own and the position poll can still be
                     // reporting the word from before the seek, which used to
                     // turn the page back and then forward again under the
-                    // finger. Hold the pager here until the clock catches up.
+                    // finger. Hold the pager here until the clock names this
+                    // leaf — a timer let a slow seek yank it away.
                     var mushafTappedPage by remember { mutableStateOf<Int?>(null) }
-                    LaunchedEffect(mushafTappedPage) {
-                        if (mushafTappedPage != null) {
-                            delay(MushafTapPageHoldMs)
-                            mushafTappedPage = null
+                    LaunchedEffect(mushafTappedPage, mushafReady.catalog, mushafSurahId) {
+                        val held = mushafTappedPage ?: return@LaunchedEffect
+                        val catalog = mushafReady.catalog
+                        snapshotFlow { activeWordState.value }.collect { word ->
+                            if (word == null || word.fromTap) return@collect
+                            if (catalog.pageOf(
+                                    mushafSurahId,
+                                    word.ayah,
+                                    word.wordPosition,
+                                ) == held
+                            ) {
+                                mushafTappedPage = null
+                            }
                         }
                     }
                     val onMushafTurnedPage = remember {
@@ -2260,13 +2420,8 @@ fun ReaderScreen(
                             mushafRootMoved.value()
                         }
                     }
-                    val onMushafWordClick = remember(mushafSurahId, viewModel, mushafReady.catalog) {
+                    val onMushafWordClick = remember(mushafSurahId, viewModel) {
                         { token: MushafToken ->
-                            mushafTappedPage = mushafReady.catalog.pageOf(
-                                token.surahId,
-                                token.ayah,
-                                token.word.position,
-                            )
                             mushafDispatch.value(ReaderInteractionEvent.EnableFollow)
                             if (token.surahId == mushafSurahId) {
                                 viewModel.playFromAyahWord(token.ayah, token.word.position)
@@ -2290,13 +2445,8 @@ fun ReaderScreen(
                             mushafOpenRoot.value(token.surahId, token.ayah, token.word.position)
                         }
                     }
-                    val onMushafAyahClick = remember(mushafSurahId, viewModel, mushafReady.catalog) {
+                    val onMushafAyahClick = remember(mushafSurahId, viewModel) {
                         { token: MushafToken ->
-                        mushafTappedPage = mushafReady.catalog.pageOf(
-                            token.surahId,
-                            token.ayah,
-                            token.word.position,
-                        )
                         mushafDispatch.value(ReaderInteractionEvent.EnableFollow)
                         if (token.surahId == mushafSurahId) {
                             viewModel.playFromAyah(token.ayah)
@@ -2309,6 +2459,20 @@ fun ReaderScreen(
                         }
                         }
                     }
+                    val onMushafBasmalahClick = remember(mushafSurahId, viewModel) {
+                        { surahId: Int ->
+                            mushafDispatch.value(ReaderInteractionEvent.EnableFollow)
+                            if (surahId == mushafSurahId) {
+                                viewModel.playFromAyah(1)
+                            } else {
+                                viewModel.load(
+                                    surahId = surahId,
+                                    startPlaybackAtAyah = 1,
+                                    keepContent = true,
+                                )
+                            }
+                        }
+                    }
                     MushafPager(
                         catalog = mushafReady.catalog,
                         content = content,
@@ -2318,15 +2482,18 @@ fun ReaderScreen(
                         activeWordState = activeWordState,
                         playback = mushafPlayback,
                         playbackSpeed = playerState.speed,
-                        followEnabled = followEnabled,
+                        followEnabled = followPlayback,
                         loadedSurahId = mushafSurahId,
-                        flashWordPosition = startWordPosition,
+                        flashAyah = searchFlashAyah,
+                        flashWordPosition = searchFlashWord,
                         heldPage = mushafTappedPage,
+                        onTappedLeaf = { mushafTappedPage = it },
                         scrubbing = { mushafScrubbing.value },
                         onUserTurnedPage = onMushafTurnedPage,
                         onWordClick = onMushafWordClick,
                         onWordLongClick = onMushafWordLongClick,
                         onAyahClick = onMushafAyahClick,
+                        onBasmalahClick = onMushafBasmalahClick,
                         pageNumberScript = settings.pageNumberScript,
                         modifier = Modifier.fillMaxSize(),
                     )
@@ -2626,9 +2793,12 @@ fun ReaderScreen(
                                         // ayahs that pins the top, un-lays-out the bottom
                                         // line the reader tapped, and word-band follow cannot
                                         // measure it — so the page jumps up. Seed follow as
-                                        // already on this ayah so shouldHomeOnto skips.
+                                        // already on this ayah so shouldHomeOnto skips once
+                                        // the seek lands. Until then the playback target is
+                                        // still the previous item — do not home onto it.
                                         lastFollowFocusTarget = ayah.number
                                         followWasEnabled = true
+                                        pendingWordTapAyah = ayah.number
                                         dispatch(ReaderInteractionEvent.EnableFollow)
                                         if (segment != null) {
                                             viewModel.playFromWord(ayah.number, segment.startMs)
@@ -2861,28 +3031,27 @@ fun ReaderScreen(
                 )
             }
 
-            // Ornamented return-to-ayah — floats above the player bar via the
-            // shared FloatingPaperControl host. Yields while MainActivity's
-            // concordance Back-to capsule is showing so the two never compete.
-            // Lab freeze already parks the page; suppress the return capsule
-            // so it does not fight the deliberate "leave me alone" state.
-            val showReturnToAyah =
-                playerState.error == null &&
-                    !rootReturnVisible &&
-                    !followEnabled &&
-                    labFocusEnabled &&
-                    recitingActive
-            Box(
-                contentAlignment = Alignment.BottomCenter,
-                modifier = Modifier
-                    .matchParentSize()
-                    .zIndex(1.2f),
-            ) {
-                FloatingPaperControl(visible = showReturnToAyah) {
-                    IslamicReturnToAyahButton(
-                        pointUp = activeAyahPlacement.value.pointUp,
-                        onClick = { dispatch(ReaderInteractionEvent.EnableFollow) },
-                    )
+            // Scroll layout: above the scaffold PlayerBar. Mushaf hosts its
+            // own roundel on the leaf's foot, above the dial and play row.
+            if (!mushafMode) {
+                Box(
+                    contentAlignment = Alignment.BottomCenter,
+                    modifier = Modifier
+                        .matchParentSize()
+                        .zIndex(1.2f),
+                ) {
+                    FloatingPaperControl(visible = showReturnToAyah) {
+                        IslamicReturnToAyahButton(
+                            heading = if (activeAyahPlacement.value.pointUp) {
+                                ReturnArrowHeading.Up
+                            } else {
+                                ReturnArrowHeading.Down
+                            },
+                            onClick = {
+                                dispatch(ReaderInteractionEvent.EnableFollow)
+                            },
+                        )
+                    }
                 }
             }
 

@@ -1,6 +1,9 @@
 package com.beautifulquran.ui.reader
 
+import com.beautifulquran.ui.theme.ReturnArrowHeading
+import com.beautifulquran.ui.theme.rotationDeg
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -44,5 +47,363 @@ class MushafFollowTurnTest {
         // Zero would divide the dwell into an eternity and strand the reader
         // on a leaf the voice has left.
         assertTrue(mushafTurnLeadDelayMs(1_000L, 0f) < 60_000L)
+    }
+
+    @Test
+    fun `basmalah starts a voice page with every ayah waiting under paper`() {
+        assertEquals(
+            MushafInkPackKind.UPCOMING,
+            mushafInkPackKind(
+                pageOwnsVoice = true,
+                ayah = 1,
+                activeWordAyah = null,
+                frontierAyah = null,
+                basmalahActive = true,
+                hasSearchFlash = false,
+            ),
+        )
+        // A word retained from the outgoing playlist cannot steal the first
+        // ayah's pack while the basmalah is the real timing owner.
+        assertEquals(
+            MushafInkPackKind.UPCOMING,
+            mushafInkPackKind(true, 1, 1, 1, true, false),
+        )
+    }
+
+    @Test
+    fun `first ayah stays recessed between basmalah and its first word`() {
+        assertEquals(
+            MushafInkPackKind.UPCOMING,
+            mushafInkPackKind(
+                pageOwnsVoice = true,
+                ayah = 1,
+                activeWordAyah = null,
+                frontierAyah = 1,
+                basmalahActive = false,
+                hasSearchFlash = false,
+                frontierWaitingForFirstWord = true,
+            ),
+        )
+        assertEquals(
+            MushafInkPackKind.ACTIVE_WORD,
+            mushafInkPackKind(true, 1, 1, 1, false, false),
+        )
+    }
+
+    @Test
+    fun `completed ayah stays full through its audio tail`() {
+        assertEquals(
+            MushafInkPackKind.STATIC,
+            mushafInkPackKind(
+                pageOwnsVoice = true,
+                ayah = 1,
+                activeWordAyah = null,
+                frontierAyah = 1,
+                basmalahActive = false,
+                hasSearchFlash = false,
+                frontierWaitingForFirstWord = false,
+            ),
+        )
+    }
+
+    @Test
+    fun `active pack cannot flash through an old recess-only layer`() {
+        assertEquals(
+            InkEngine.State.Upcoming.inkAlpha(),
+            mushafLayerTransitionAlpha(
+                hasWashLayer = false,
+                currentPackHasMotions = true,
+                resolvedAlpha = 1f,
+            ),
+            0f,
+        )
+        assertEquals(1f, mushafLayerTransitionAlpha(true, true, 1f), 0f)
+        assertEquals(0.4f, mushafLayerTransitionAlpha(false, false, 0.4f), 0f)
+    }
+
+    @Test
+    fun `selected ayah enters from its existing paper cover`() {
+        val waitingCover = 1f - InkEngine.State.Upcoming.inkAlpha()
+        assertEquals(waitingCover, ayahRecessCoverTarget(false, true), 0f)
+        assertEquals(waitingCover, ayahRecessCoverTarget(true, false), 0f)
+        assertEquals(0f, ayahRecessCoverTarget(false, false), 0f)
+    }
+
+    @Test
+    fun `voice page retains read ayahs and covers those beyond the active word`() {
+        assertEquals(
+            MushafInkPackKind.STATIC,
+            mushafInkPackKind(true, 4, 5, 5, false, false),
+        )
+        assertEquals(
+            MushafInkPackKind.ACTIVE_WORD,
+            mushafInkPackKind(true, 5, 5, 5, false, false),
+        )
+        assertEquals(
+            MushafInkPackKind.UPCOMING,
+            mushafInkPackKind(true, 6, 5, 5, false, false),
+        )
+    }
+
+    @Test
+    fun `a manually browsed page remains fully readable`() {
+        assertEquals(
+            MushafInkPackKind.STATIC,
+            mushafInkPackKind(false, 6, 5, 5, false, false),
+        )
+    }
+
+    @Test
+    fun `an idle search hit owns a flash pack without becoming playback`() {
+        assertEquals(
+            MushafInkPackKind.SEARCH_FLASH,
+            mushafInkPackKind(
+                pageOwnsVoice = false,
+                ayah = 8,
+                activeWordAyah = null,
+                frontierAyah = null,
+                basmalahActive = false,
+                hasSearchFlash = true,
+            ),
+        )
+    }
+
+    @Test
+    fun `voice page keeps live clocks while the old page settles out`() {
+        assertTrue(mushafUsesLiveInk(isSettled = false, isVoicePage = true))
+        assertTrue(mushafUsesLiveInk(isSettled = true, isVoicePage = false))
+        assertFalse(mushafUsesLiveInk(isSettled = false, isVoicePage = false))
+        assertTrue(
+            mushafUsesLiveInk(
+                isSettled = false,
+                isVoicePage = false,
+                pageHasActiveWord = true,
+            ),
+        )
+    }
+
+    @Test
+    fun `a follow-turn leaf waits under paper until the voice arrives`() {
+        assertTrue(
+            mushafUsesLiveInk(
+                isSettled = false,
+                isVoicePage = false,
+                waitingForVoice = true,
+            ),
+        )
+        assertEquals(
+            MushafInkPackKind.UPCOMING,
+            mushafInkPackKind(
+                pageOwnsVoice = false,
+                ayah = 12,
+                activeWordAyah = 11,
+                frontierAyah = 11,
+                basmalahActive = false,
+                hasSearchFlash = false,
+                waitingForVoice = true,
+            ),
+        )
+        assertEquals(
+            MushafInkPackKind.STATIC,
+            mushafInkPackKind(false, 12, 11, 11, false, false),
+        )
+        assertEquals(
+            MushafInkPackKind.ACTIVE_WORD,
+            mushafInkPackKind(
+                pageOwnsVoice = true,
+                ayah = 12,
+                activeWordAyah = 12,
+                frontierAyah = 12,
+                basmalahActive = false,
+                hasSearchFlash = false,
+                waitingForVoice = true,
+            ),
+        )
+        // Tap on a dialed leaf: the word is already known, the voice page
+        // is not. That ayah must wash, not sit under Upcoming paper.
+        assertEquals(
+            MushafInkPackKind.ACTIVE_WORD,
+            mushafInkPackKind(
+                pageOwnsVoice = false,
+                ayah = 12,
+                activeWordAyah = 12,
+                frontierAyah = 12,
+                basmalahActive = false,
+                hasSearchFlash = false,
+                waitingForVoice = true,
+            ),
+        )
+        // Play-start used to drop waitingForVoice before pageOwnsVoice.
+        // The leaf still has the word — keep Active so the wash is not
+        // disposed, and keep later ayahs recessed.
+        assertEquals(
+            MushafInkPackKind.ACTIVE_WORD,
+            mushafInkPackKind(
+                pageOwnsVoice = false,
+                ayah = 12,
+                activeWordAyah = 12,
+                frontierAyah = 12,
+                basmalahActive = false,
+                hasSearchFlash = false,
+                waitingForVoice = false,
+                pageHasActiveWord = true,
+            ),
+        )
+        assertEquals(
+            MushafInkPackKind.UPCOMING,
+            mushafInkPackKind(
+                pageOwnsVoice = false,
+                ayah = 13,
+                activeWordAyah = 12,
+                frontierAyah = 12,
+                basmalahActive = false,
+                hasSearchFlash = false,
+                waitingForVoice = false,
+                pageHasActiveWord = true,
+            ),
+        )
+        // A settled leaf the reader is only browsing must stay full ink.
+        assertEquals(
+            MushafInkPackKind.STATIC,
+            mushafInkPackKind(
+                pageOwnsVoice = false,
+                ayah = 80,
+                activeWordAyah = 12,
+                frontierAyah = 12,
+                basmalahActive = false,
+                hasSearchFlash = false,
+                waitingForVoice = false,
+                pageHasActiveWord = false,
+            ),
+        )
+    }
+
+    @Test
+    fun `a repeat at the page tail does not turn forward`() {
+        assertFalse(
+            mushafTailTurnAllowed(
+                nextTimingPage = 58,
+                followingPage = 59,
+                isFinalAyah = false,
+            ),
+        )
+        assertTrue(
+            mushafTailTurnAllowed(
+                nextTimingPage = 59,
+                followingPage = 59,
+                isFinalAyah = false,
+            ),
+        )
+        assertFalse(
+            mushafTailTurnAllowed(
+                nextTimingPage = null,
+                followingPage = 59,
+                isFinalAyah = true,
+            ),
+        )
+    }
+
+    @Test
+    fun `a delayed turn cannot be inherited by another word or seek`() {
+        val expected = ActiveWord(
+            ayah = 77,
+            wordPosition = 27,
+            startMs = 1_000,
+            durationMs = 800,
+            activation = 4,
+        )
+        assertTrue(mushafSameActivation(expected, expected.copy()))
+        assertFalse(mushafSameActivation(expected, expected.copy(wordPosition = 25)))
+        assertFalse(mushafSameActivation(expected, expected.copy(activation = 5)))
+        assertFalse(mushafSameActivation(expected, null))
+    }
+
+    @Test
+    fun `mushaf return points toward the playing leaf, left or right`() {
+        // reverseLayout: later pages sit to the left of the leaf in view.
+        assertEquals(MushafReturnWay.Left, mushafReturnWay(currentPage = 45, playbackPage = 46))
+        assertEquals(MushafReturnWay.Right, mushafReturnWay(currentPage = 45, playbackPage = 44))
+        assertEquals(null, mushafReturnWay(currentPage = 45, playbackPage = 45))
+    }
+
+    @Test
+    fun `qalam rest pose is down so a quarter turn faces a neighbour leaf`() {
+        assertEquals(0f, ReturnArrowHeading.Down.rotationDeg())
+        assertEquals(90f, ReturnArrowHeading.Left.rotationDeg())
+        assertEquals(180f, ReturnArrowHeading.Up.rotationDeg())
+        assertEquals(270f, ReturnArrowHeading.Right.rotationDeg())
+    }
+
+    @Test
+    fun `only the current leaf owns a tap`() {
+        assertTrue(mushafLeafAcceptsTap(pageIndex = 11, currentPage = 11))
+        assertFalse(mushafLeafAcceptsTap(pageIndex = 10, currentPage = 11))
+        assertFalse(mushafLeafAcceptsTap(pageIndex = 12, currentPage = 11))
+    }
+
+    @Test
+    fun `a tapped leaf waits under paper until the voice arrives`() {
+        // Dialed or hand-turned: full ink. A tap must cover it the way a
+        // follow turn covers the next leaf, or the wash has nothing to fill.
+        assertTrue(
+            mushafLeafWaitingForVoice(pageNumber = 50, waitingPage = 0, heldPage = 50),
+        )
+        assertTrue(
+            mushafLeafWaitingForVoice(pageNumber = 50, waitingPage = 50, heldPage = null),
+        )
+        assertFalse(
+            mushafLeafWaitingForVoice(pageNumber = 50, waitingPage = 0, heldPage = null),
+        )
+        assertFalse(
+            mushafLeafWaitingForVoice(pageNumber = 49, waitingPage = 50, heldPage = 50),
+        )
+    }
+
+    @Test
+    fun `a tap seed must not release the waiting leaf`() {
+        assertFalse(
+            mushafWaitingLeafReleased(waitingPage = 50, voicePage = 50, fromTap = true),
+        )
+        assertTrue(
+            mushafWaitingLeafReleased(waitingPage = 50, voicePage = 50, fromTap = false),
+        )
+        assertFalse(
+            mushafWaitingLeafReleased(waitingPage = 50, voicePage = 49, fromTap = false),
+        )
+    }
+
+    @Test
+    fun `a tapped leaf holds against follow until the seek names it`() {
+        assertTrue(mushafHoldBlocksFollow(heldPage = 12, voicePage = 11))
+        assertTrue(mushafHoldBlocksFollow(heldPage = 12, voicePage = null))
+        assertFalse(mushafHoldBlocksFollow(heldPage = 12, voicePage = 12))
+        assertFalse(mushafHoldBlocksFollow(heldPage = null, voicePage = 12))
+    }
+
+    @Test
+    fun `catch-up does not rewind a lead turn while the last word is still being said`() {
+        // Paper is already on 12 because we turned inside page 11's last
+        // word. The voice is still on 11. Rewinding would bounce: 12, 11, 12.
+        assertTrue(
+            mushafLeadTurnHoldsPager(voicePage = 11, visiblePage = 12, waitingPage = 12),
+        )
+        // Voice arrived: the wait is over, ordinary follow applies.
+        assertFalse(
+            mushafLeadTurnHoldsPager(voicePage = 12, visiblePage = 12, waitingPage = 12),
+        )
+        // Still on the spoken leaf — the turn has not happened yet.
+        assertFalse(
+            mushafLeadTurnHoldsPager(voicePage = 11, visiblePage = 11, waitingPage = 12),
+        )
+        // No lead in flight: a real seek behind the reader must catch up.
+        assertFalse(
+            mushafLeadTurnHoldsPager(voicePage = 11, visiblePage = 12, waitingPage = 0),
+        )
+    }
+
+    @Test
+    fun `follow does not steal a leaf it did not put on the paper`() {
+        assertTrue(mushafFollowOwnsVisiblePage(currentPageIndex = 11, followPage = 11))
+        assertFalse(mushafFollowOwnsVisiblePage(currentPageIndex = 12, followPage = 11))
     }
 }

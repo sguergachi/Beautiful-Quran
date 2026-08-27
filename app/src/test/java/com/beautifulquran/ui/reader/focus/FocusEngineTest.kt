@@ -17,14 +17,20 @@ class FocusEngineTest {
     fun `playback focus target is basmalah while the lead-in is active`() {
         assertEquals(
             FocusEngine.CHAPTER_TOP_FOCUS_AYAH,
-            FocusEngine.playbackFocusTarget(activeAyah = null, activeBasmalah = true),
+            FocusEngine.playbackFocusTarget(playingAyah = null, activeBasmalah = true),
         )
         assertEquals(
             FocusEngine.CHAPTER_TOP_FOCUS_AYAH,
-            FocusEngine.playbackFocusTarget(activeAyah = 3, activeBasmalah = true),
+            FocusEngine.playbackFocusTarget(playingAyah = 3, activeBasmalah = true),
         )
-        assertEquals(5, FocusEngine.playbackFocusTarget(activeAyah = 5, activeBasmalah = false))
-        assertEquals(null, FocusEngine.playbackFocusTarget(activeAyah = null, activeBasmalah = false))
+        assertEquals(
+            5,
+            FocusEngine.playbackFocusTarget(playingAyah = 5, activeBasmalah = false),
+        )
+        assertEquals(
+            null,
+            FocusEngine.playbackFocusTarget(playingAyah = null, activeBasmalah = false),
+        )
     }
 
     @Test

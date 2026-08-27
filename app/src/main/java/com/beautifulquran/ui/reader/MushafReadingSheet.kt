@@ -66,13 +66,6 @@ internal val MushafGutterSlot = 44.dp
 /** Running head band — a tap target tall, nothing more. */
 internal val MushafRunningHead = 36.dp
 /**
- * How long a tapped leaf is held against playback follow. Long enough for a
- * seek to land and the position poll to report a word from where the reader
- * actually tapped, short enough that a verse crossing onto the next page still
- * turns it.
- */
-internal const val MushafTapPageHoldMs = 1_500L
-/**
  * Folio band, with the figure centred in it.
  *
  * The page number belongs to the leaf, so it must sit nearer the last line of
@@ -165,6 +158,8 @@ internal fun MushafReadingSheet(
     /** Raised while a hand is on the rule. */
     onScrubbing: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
+    /** Sits on the leaf's foot, above the dial and the play bar. */
+    leafFooter: @Composable () -> Unit = {},
     content: @Composable () -> Unit,
 ) {
     // Rank by role, not by taste. Back / play / forward are what a listener
@@ -190,6 +185,13 @@ internal fun MushafReadingSheet(
     Column(modifier.fillMaxSize()) {
         Box(Modifier.weight(1f).fillMaxWidth()) {
             content()
+            Box(
+                Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 8.dp),
+            ) {
+                leafFooter()
+            }
         }
         MushafPageDial(
             pageAt = pageAt,

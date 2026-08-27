@@ -14,15 +14,24 @@ depending on the cost. They are reproducible with the tools in `tools/`.
 
 The Madinah mushaf is 604 pages of 15 lines, and every copy breaks at the same
 word. A reader who has memorised by page expects the page to end where it has
-always ended. The line data in `data/quran.db` (`qcf_page`, `qcf_line`) is that
-layout, and it is authority, not suggestion.
+always ended. The page assignment in `data/quran.db` (`qcf_page`) is therefore
+authority; `qcf_line` remains the source composition from which the larger
+reader hand is reflowed within that boundary.
 
 *Pages 1–2 are the exception: al-Fātiḥah and the opening of al-Baqarah are set
-in decorated frames with fewer lines.*
+in decorated frames with fewer lines, as a centred medallion — shorter lines
+at the crown and foot, the block in the middle of the page.*
 
-**We follow it.** `MushafCatalog` builds pages straight from those columns, and
-`tools/fetch_mushaf_lines.py` cross-checks our line breaks word-for-word
-against quran.com's published layout.
+**We follow the page boundary.** `MushafCatalog` builds the same 604 leaves
+straight from those columns, and `tools/fetch_mushaf_lines.py` cross-checks the
+words on every page against quran.com's published layout. For the reader's
+larger hand, `reflowMushafPage` balances those same words over one additional
+visual line inside each leaf; it never moves a word to another page and keeps
+every chapter opening as a hard boundary. Pages 1–2 are not reflowed: the
+print's own line breaks *are* the circle, and stretching them into even rows
+destroys it. Line geometry is cached by those reflowed words and the page
+face, not by row number — the same slot is a different token list after the
+face lands.
 
 ## 2. One hand for the whole book
 
@@ -31,7 +40,12 @@ grew or shrank against its neighbour reads as a fault, however well each leaf
 is set on its own.
 
 **We follow it.** `MUSHAF_DESIGN_LINE_EM` fixes one size for all 604 pages;
-nothing sizes type per page or per line.
+nothing sizes type per page or per line. `MUSHAF_TYPE_SCALE` applies the same
+16/15 enlargement to that fitted hand on every leaf. Each page's unchanged
+content is then balanced over one more visual line, so the larger type wraps
+instead of being narrowed back into the original fifteen rows. The
+sixteenth row takes the paper formerly reserved by the wide head and tail
+gutters; it is not squeezed into the old fifteen-row well.
 
 ## 3. Every full line is flush
 
@@ -100,11 +114,18 @@ page from sd 5.7px to sd 1.8px.
 
 ## 7. Words are never broken, and never reordered
 
-No hyphenation, no reflow, no wrapping. A line holds the words the print gives
-it, in order, and if they do not fit, rule 4 applies.
+No hyphenation. Words stay in the print's order, on the print's page. A word
+is never split across a line end, and the sequence is never shuffled. If a
+display row still will not fit, rule 4 applies.
 
-**We follow it.** A line's tokens come from the page data and are only ever
-scaled or spaced.
+What *does* move is the display row. `reflowMushafPage` regroups those same
+tokens inside the leaf so the larger hand fits one extra visual line. It never
+moves a word to another page. Pages 1–2 are not regrouped: their printed
+breaks *are* the medallion.
+
+**We follow it.** A token is never cut or reordered. Page boundaries stay put.
+Display rows may regroup the print's tokens inside a leaf (except pages 1–2);
+those rows are then only scaled or spaced.
 
 ## 8. The verse mark belongs to the line
 

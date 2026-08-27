@@ -57,6 +57,8 @@ data class ActiveWord(
      * hold across the gap to the next word. Tajweed pacing distributes the
      * letters over this share of [durationMs] and rests for the remainder. */
     val spokenMs: Long = durationMs,
+    /** Next timing owner, including a repeat backtrack; null at ayah end. */
+    val nextWordPosition: Int? = null,
     val isRepeat: Boolean = false,
     val highWater: Int = wordPosition,
     /** First word of the active repeat chain: while repeating, words
@@ -68,7 +70,88 @@ data class ActiveWord(
      * same word stays Active (tap the current word to play it from the start).
      */
     val activation: Long = 0L,
+    /**
+     * True while this is the optimistic word-tap seed, not the 33 ms poll.
+     * Releasing a mushaf tap-hold on this value drops the waiting cover
+     * before Media3 owns the leaf and disposes the wash Animatable.
+     */
+    val fromTap: Boolean = false,
 )
+
+/**
+ * Word the reader sees after a tap. The seed lights the wash this frame;
+ * the 33 ms poll replaces it. That poll often carries a new [ActiveWord.activation]
+ * (seek inkId), and [rememberLetterSweep] rearms on a generation change —
+ * keep the seed's activation while that word is still the one being said.
+ */
+internal fun resolveActiveWord(
+    polled: ActiveWord?,
+    tap: ActiveWord?,
+    seed: ActiveWord?,
+): ActiveWord? {
+    val shown = if (
+        tap != null &&
+        (polled == null ||
+            polled.ayah != tap.ayah ||
+            polled.wordPosition != tap.wordPosition)
+    ) {
+        tap
+    } else {
+        polled
+    } ?: return null
+    return if (
+        seed != null &&
+        shown.ayah == seed.ayah &&
+        shown.wordPosition == seed.wordPosition &&
+        shown.activation != seed.activation
+    ) {
+        shown.copy(activation = seed.activation)
+    } else {
+        shown
+    }
+}
+
+/** Reuses the immutable UI snapshot while the 33 ms poll stays in one word. */
+internal class ActiveWordPollCache {
+    private var info: HighlightEngine.ActiveInfo? = null
+    private var ayah = 0
+    private var activation = 0L
+    private var word: ActiveWord? = null
+
+    fun activeWord(
+        ayah: Int,
+        info: HighlightEngine.ActiveInfo?,
+        activation: Long,
+    ): ActiveWord? {
+        if (info == null) {
+            this.info = null
+            word = null
+            return null
+        }
+        val cached = word
+        if (info === this.info && ayah == this.ayah && activation == this.activation && cached != null) {
+            return cached
+        }
+        val durationMs = (info.holdEndMs - info.startMs).coerceAtLeast(0L)
+        return ActiveWord(
+            ayah = ayah,
+            wordPosition = info.position,
+            startMs = info.startMs,
+            durationMs = durationMs,
+            spokenMs = (info.endMs - info.startMs).coerceIn(0L, durationMs),
+            nextWordPosition = info.nextPosition,
+            isRepeat = info.isRepeat,
+            highWater = info.highWater,
+            repeatStart = info.repeatStart,
+            activation = activation,
+        ).also {
+            this.info = info
+            this.ayah = ayah
+            this.activation = activation
+            word = it
+        }
+    }
+}
 
 data class MushafUi(
     val catalog: MushafCatalog,
@@ -274,6 +357,7 @@ class ReaderViewModel(
     /** Never lets sampling jitter bounce the highlight backward across a word
      * boundary — the source of the random full → faint → wash word flicker. */
     private val highlightClock = HighlightClock()
+    private val activeWordPollCache = ActiveWordPollCache()
 
     private var lastClockEventId = player.state.value.positionEvents.clockId
     /** Last applied lag/lead so a lab or route change can reset the clock. */
@@ -376,38 +460,37 @@ class ReaderViewModel(
      * publishes on change, so the UI recomposes once per word. The highlight
      * holds while paused (like a lyrics player); it only clears when this
      * surah stops being the loaded one. */
-    val activeWord: StateFlow<ActiveWord?> = pollingWhileLoaded(key = { it }) { np ->
-        val events = player.state.value.positionEvents
-        if (events.clockId != lastClockEventId) {
-            highlightClock.acceptNextSample()
-            lastClockEventId = events.clockId
-        }
-        val firstWordStartMs = preparedTimings[np.ayah]
-            ?.segments
-            ?.firstOrNull()
-            ?.startMs
-            ?: 0L
-        val rawMs = highlightPositionMs(firstWordStartMs)
-        val clockMs = highlightClock.sample(np, rawMs)
-        preparedTimings[np.ayah]
-            ?.activeInfo(clockMs)
-            ?.let {
-                ActiveWord(
-                    ayah = np.ayah,
-                    wordPosition = it.position,
-                    startMs = it.startMs,
-                    // Karaoke hold lifetime — sweep finishes as the next word
-                    // lights, not merely when this segment's endMs elapses.
-                    durationMs = (it.holdEndMs - it.startMs).coerceAtLeast(0L),
-                    spokenMs = (it.endMs - it.startMs)
-                        .coerceIn(0L, (it.holdEndMs - it.startMs).coerceAtLeast(0L)),
-                    isRepeat = it.isRepeat,
-                    highWater = it.highWater,
-                    repeatStart = it.repeatStart,
-                    activation = events.inkId,
-                )
+    private val polledActiveWord: StateFlow<ActiveWord?> =
+        pollingWhileLoaded(key = { it }) { np ->
+            val events = player.state.value.positionEvents
+            if (events.clockId != lastClockEventId) {
+                highlightClock.acceptNextSample()
+                lastClockEventId = events.clockId
             }
-    }
+            val firstWordStartMs = preparedTimings[np.ayah]
+                ?.segments
+                ?.firstOrNull()
+                ?.startMs
+                ?: 0L
+            val rawMs = highlightPositionMs(firstWordStartMs)
+            val clockMs = highlightClock.sample(np, rawMs)
+            activeWordPollCache.activeWord(
+                ayah = np.ayah,
+                info = preparedTimings[np.ayah]?.activeInfo(clockMs),
+                activation = events.inkId,
+            )
+        }
+
+    /** Word-tap ink, held until the 33 ms poll names the same word. */
+    private val tapInk = MutableStateFlow<ActiveWord?>(null)
+
+    /** The seed [tapInk] last published, kept after the poll takes over so
+     * [resolveActiveWord] can pin the wash generation for that word. */
+    private var tapSeed: ActiveWord? = null
+
+    val activeWord: StateFlow<ActiveWord?> = combine(polledActiveWord, tapInk) { polled, tap ->
+        resolveActiveWord(polled, tap, tapSeed)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(1_000), null)
 
     /** The ayah focus/prepare target on the sheet. Normally the playing ayah,
      * but advances to the next ayah [InkEngine.fadeLeadMs] before the current
@@ -480,6 +563,29 @@ class ReaderViewModel(
     }
 
     init {
+        viewModelScope.launch {
+            polledActiveWord.collect { polled ->
+                val tap = tapInk.value
+                if (tap != null &&
+                    polled != null &&
+                    polled.ayah == tap.ayah &&
+                    polled.wordPosition == tap.wordPosition
+                ) {
+                    tapInk.value = null
+                }
+                // Drop the pin once playback has left the tapped word. Not
+                // on the stale pre-seek poll: tap is still held then, and
+                // clearing here lets the matching poll re-arm the wash.
+                val seed = tapSeed
+                if (tapInk.value == null &&
+                    seed != null &&
+                    polled != null &&
+                    (polled.ayah != seed.ayah || polled.wordPosition != seed.wordPosition)
+                ) {
+                    tapSeed = null
+                }
+            }
+        }
         // React when the reciter is changed on the settings sheet: reload the
         // timing data and, if this surah is playing, continue with the new voice.
         viewModelScope.launch {
@@ -816,8 +922,45 @@ class ReaderViewModel(
             playFromAyah(ayah)
             return
         }
-        val start = word?.let { startMsForWord(ayah, it) }
-        if (start != null) playFromWord(ayah, start) else playFromAyah(ayah)
+        if (word != null) {
+            val start = startMsForWord(ayah, word)
+            if (start != null) {
+                seedTapInk(ayah, word)
+                playFromWord(ayah, start)
+                return
+            }
+        }
+        playFromAyah(ayah)
+    }
+
+    /**
+     * Lights the tapped word this frame. The 33 ms poll + highlight clock
+     * settle can lag the seek by a beat, and mushaf wash only attaches to
+     * an Active pack — so without this the audio starts and the ink does not.
+     */
+    private fun seedTapInk(ayah: Int, word: Int) {
+        val segs = timings[ayah]?.takeIf { it.isNotEmpty() } ?: return
+        val seg = segs.firstOrNull { it.position == word }
+            ?: segs.filter { it.position <= word }.maxByOrNull { it.position }
+            ?: return
+        val next = segs.firstOrNull { it.startMs > seg.startMs }?.position
+        val duration = (seg.endMs - seg.startMs).coerceAtLeast(0L)
+        val seed = ActiveWord(
+            ayah = ayah,
+            wordPosition = word,
+            startMs = seg.startMs,
+            durationMs = duration,
+            spokenMs = duration,
+            nextWordPosition = next,
+            activation = player.state.value.positionEvents.inkId + 1L,
+            fromTap = true,
+        )
+        tapSeed = seed
+        tapInk.value = seed
+        viewModelScope.launch {
+            delay(2_000)
+            if (tapInk.value === seed) tapInk.value = null
+        }
     }
 
     /** Timing start of [word] in [ayah], or of the nearest segment before it. */
@@ -837,6 +980,7 @@ class ReaderViewModel(
         // Always restart ink: tap-to-play must re-run the wash even when the
         // same word stays Active or the seek is shorter than the jitter hold.
         val seekMs = positionMs.coerceAtLeast(0L)
+        highlightClock.acceptNextSample()
         if (np != null && np.surahId == surahId && np.reciterId == reciter.id) {
             if (!keepRepeat) player.clearRepeatRange()
             player.seekToWordAndPlay(ayah, seekMs)

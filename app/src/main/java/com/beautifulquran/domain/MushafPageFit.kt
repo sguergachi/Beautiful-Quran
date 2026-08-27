@@ -78,6 +78,18 @@ fun mushafLineSlotPx(pageHeightPx: Float, slots: Int, fontPx: Float): Float {
 /** Every Madinah page is set on the same 15-line grid. */
 const val MUSHAF_LINES_PER_PAGE = 15
 
+/** The reader's larger hand wraps each fixed page over one additional row. */
+const val MUSHAF_DISPLAY_LINES_PER_PAGE = MUSHAF_LINES_PER_PAGE + 1
+
+/**
+ * Al-Fātiḥah and the opening of al-Baqarah: the two framed leaves. The print
+ * sets them as a centred medallion — shorter lines at the crown and foot,
+ * the block sitting in the middle of the page — not as a 15-line grid
+ * hanging from the head. Reflow would pull those lines into even rows and
+ * destroy the circle.
+ */
+fun mushafIsOpeningLeaf(page: Int): Boolean = page in 1..2
+
 /**
  * Slots to divide the text well by. A full page fills it; a short page
  * (al-Fātiḥah, a surah's last lines) keeps the *same* leading as a full
@@ -136,6 +148,14 @@ const val MUSHAF_MAX_FONT_PX = 128f
  * does not, which is why it reads as a fault.
  */
 const val MUSHAF_DESIGN_LINE_EM = 16.4f
+
+/** Book-wide enlargement that gives a canonical leaf one additional visual line. */
+const val MUSHAF_TYPE_SCALE = 16f / 15f
+
+/** Applies the reader's uniform optical size without introducing page sizing. */
+fun mushafDisplayFontPx(fittedFontPx: Float): Float =
+    (fittedFontPx * MUSHAF_TYPE_SCALE)
+        .coerceIn(MUSHAF_MIN_FONT_PX, MUSHAF_MAX_FONT_PX)
 
 /**
  * The one type size for every leaf: the measure divided by the design line,

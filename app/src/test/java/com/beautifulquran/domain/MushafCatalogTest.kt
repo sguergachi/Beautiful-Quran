@@ -82,6 +82,48 @@ class MushafCatalogTest {
         assertEquals(604, catalog.firstPageOf(114))
         assertEquals(1, catalog.firstPageOf(50))
     }
+
+    @Test
+    fun `display reflow adds one line without moving words between pages or chapters`() {
+        val page = buildMushafCatalog(
+            listOf(
+                source(1, 7, 8, "one", page = 5, line = 1),
+                source(1, 7, 9, "two", page = 5, line = 1),
+                source(2, 1, 1, "three", page = 5, line = 2),
+                source(2, 1, 2, "four", page = 5, line = 2),
+                source(2, 1, 3, "five", page = 5, line = 2),
+                source(2, 2, 1, "six", page = 5, line = 3),
+                source(2, 2, 2, "seven", page = 5, line = 3),
+                source(2, 2, 3, "eight", page = 5, line = 3),
+            ),
+        ).page(5)!!
+
+        val reflowed = reflowMushafPage(page) { if (it.surahId == 1) 10f else 1f }
+
+        assertEquals(4, reflowed.lines.size)
+        assertEquals(
+            page.lines.flatMap { it.tokens }.map { it.word.arabic },
+            reflowed.lines.flatMap { it.tokens }.map { it.word.arabic },
+        )
+        assertEquals(2, reflowed.surahStarts.single().beforeLineIndex)
+        assertEquals(2, reflowed.surahStarts.single().surahId)
+    }
+
+    @Test
+    fun `framed opening leaves keep the print's lines`() {
+        val page = buildMushafCatalog(
+            listOf(
+                source(1, 1, 1, "bismillah", page = 1, line = 2),
+                source(1, 1, 2, "allah", page = 1, line = 2),
+                source(1, 2, 1, "alhamdu", page = 1, line = 3),
+                source(1, 2, 2, "lillahi", page = 1, line = 3),
+            ),
+        ).page(1)!!
+        val reflowed = reflowMushafPage(page) { 10f }
+        assertEquals(page.lines.map { it.tokens.map { t -> t.word.arabic } },
+            reflowed.lines.map { it.tokens.map { t -> t.word.arabic } })
+        assertEquals(2, reflowed.lines.size)
+    }
 }
 
 private fun source(

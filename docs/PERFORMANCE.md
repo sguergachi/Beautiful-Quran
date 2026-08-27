@@ -123,14 +123,12 @@ counter are part of the `flatMapLatest` identity, so resuming or receiving any
 seek/loop/adjustment cancels a paused sleep and samples immediately; a word tap
 cannot start audio up to 250 ms before its ink restart. Repeat / high-water
 tables are built once when timings load (`HighlightEngine.PreparedTimings`);
-the lookup itself is a binary search + O(1) table read that allocates nothing.
-
-The *poll* is not allocation-free, though: every tick builds an
-`ActiveInfo` and an `ActiveWord`, and `distinctUntilChanged` discards them
-only afterwards — two short-lived objects per tick per polling flow, which
-the young generation absorbs. Only the **emission** is boundary-rate
-(~2–3×/second); the sampling and its garbage are 30 Hz. Do not cite this
-loop as allocation-free.
+each immutable `ActiveInfo` is prepared beside those tables. The poll's binary
+search returns that same object throughout a segment, and `ActiveWordPollCache`
+reuses the matching UI snapshot until the word, ayah, or genuine ink activation
+changes. The steady 30 Hz word poll therefore allocates no per-word objects;
+both allocation and downstream emission happen only at real ink boundaries
+(~2–3×/second).
 
 ### 3b. Playlist preload + cache warm
 
@@ -189,18 +187,33 @@ tick must not remasure three pages or recreate 150 `Text` nodes.
 - `activeWord` stays an un-delegated `State`. Follow-page turns collect it
   from `snapshotFlow`; each ayah's ink slot reads it through
   `derivedStateOf`. The page layout never sees the value.
-- Ink packs are published into a `State<Map>` and read only inside
-  `shapedWordBloom` draw lambdas, so a word boundary invalidates paint,
-  not layout.
+- Ink packs are published per ayah into a `SnapshotStateMap`. Pack identity is
+  read in composition so only that ayah can swap between its cheap recess and
+  live wash modifier chains; the pack's animated values are read during draw,
+  so wash frames invalidate paint rather than layout.
+- Each QCF word wraps its ayah-map lookup in `derivedStateOf`: a pack publish
+  performs one keyed lookup, while every wash frame reads only the cached
+  pack. Draw must see the latest pack so a completed sweep from the previous
+  word cannot flash before the next entry mask. A recess-only chain that sees
+  Active before recomposition is held at Upcoming alpha until its wash layer
+  is attached. Ayah selection reuses that pack's draw-phase recess-cover
+  `State`; its fade does not recompose or relayout the leaf per frame.
 - QCF page fonts are held as one atomic family/typeface pair in a bounded LRU
   and preloaded on `Dispatchers.Default` for the settled page ± 2, so a swipe
   does not `Typeface.createFromAsset` on the UI thread. Line geometry is keyed
-  by page, line, size, and measure in a bounded process cache.
+  by page, display row, size, and measure. The page's sixteen-row reflow is a
+  linear token-width pass remembered by page + typeface; playback ticks and
+  ink animation frames never repeat it. Geometry remains in the bounded
+  process cache.
 - Each Madinah line owns one pointer-input node, not one per word. Its QCF word
   nodes retain the directional `shapedWordBloom`, while the leaf itself owns an
-  offscreen layer so a fling transforms a recorded page. Only the settled page
-  runs live ink; neighbours keep static ink, and one page-level accessibility
-  node exposes the canonical Arabic instead of hundreds of private-use glyphs.
+  offscreen layer so a fling transforms a recorded page. The settled page runs
+  live ink; during an automatic turn the voice's page may join it so a short
+  opening word does not restart its wash when the leaf lands. Other neighbours
+  keep static ink. On the voice's page, only the active ayah owns word motions:
+  completed ayahs use a static full-ink pack and later ayahs share a motionless
+  recess pack. One page-level accessibility node exposes the canonical
+  Arabic instead of hundreds of private-use glyphs.
 - Chrome (`MushafReadingSheet`) keys the gilt seed on `settledPage`, not
   `currentPage`, so a fling does not regenerate ornaments mid-turn.
 

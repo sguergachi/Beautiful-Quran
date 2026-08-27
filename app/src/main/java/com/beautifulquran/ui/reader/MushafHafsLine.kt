@@ -10,6 +10,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -65,6 +66,17 @@ import com.beautifulquran.ui.theme.letterFadeIn
 import com.beautifulquran.ui.theme.shapedWordBloom
 
 private const val MARK_SIZE_RATIO = 20f / 30f
+
+/** Keeps a newly active pack recessed until composition attaches its wash. */
+internal fun mushafLayerTransitionAlpha(
+    hasWashLayer: Boolean,
+    currentPackHasMotions: Boolean,
+    resolvedAlpha: Float,
+): Float = if (!hasWashLayer && currentPackHasMotions) {
+    InkEngine.State.Upcoming.inkAlpha()
+} else {
+    resolvedAlpha
+}
 
 /**
  * One Madinah line. QCF V2 is one handwritten word-glyph per token
@@ -223,8 +235,11 @@ internal fun MushafHafsLine(
  * from them, and the fit runs a bisection per line — all on the UI thread,
  * mid-swipe. The face LRU evicts typefaces (and with them the profile
  * cache), so this cache holds the geometry strongly, keyed by what the
- * geometry actually depends on: the page's own face, the line, the size,
- * and the measure.
+ * geometry actually depends on: the page's own face, the line's words,
+ * the size, and the measure. Line number alone is not the line — display
+ * reflow rebuilds row N from a different token list once the face lands,
+ * and reusing the previous row's flush fit stretched three words across
+ * the measure (a river down the leaf).
  */
 internal class MushafLineGeometry(
     val cells: List<MushafCell>,
@@ -237,6 +252,8 @@ private data class MushafLineGeometryKey(
     val line: Int,
     val fontPxBits: Int,
     val measureWidthPxBits: Int,
+    val typefaceId: Int,
+    val contentKey: Int,
 )
 
 private val lineGeometryCache =
@@ -247,16 +264,30 @@ private val lineGeometryCache =
         size > 512
 }
 
+/** Identity of the words a display row is actually setting. */
+internal fun mushafLineContentKey(line: MushafLine): Int {
+    var h = line.tokens.size
+    line.tokens.forEach { token ->
+        h = 31 * h + token.surahId
+        h = 31 * h + token.ayah
+        h = 31 * h + token.word.position
+    }
+    return h
+}
+
 private fun lineGeometryKey(
     page: Int,
-    line: Int,
+    line: MushafLine,
+    pageTypeface: android.graphics.Typeface?,
     fontPx: Float,
     measureWidthPx: Float,
 ): MushafLineGeometryKey = MushafLineGeometryKey(
     page = page,
-    line = line,
+    line = line.number,
     fontPxBits = fontPx.toRawBits(),
     measureWidthPxBits = measureWidthPx.toRawBits(),
+    typefaceId = System.identityHashCode(pageTypeface),
+    contentKey = mushafLineContentKey(line),
 )
 
 @Composable
@@ -268,7 +299,7 @@ private fun lineGeometry(
     measureWidthPx: Float,
     justify: Boolean,
 ): MushafLineGeometry {
-    val key = lineGeometryKey(page, line.number, linePx, measureWidthPx)
+    val key = lineGeometryKey(page, line, pageTypeface, linePx, measureWidthPx)
     return remember(key) {
         lineGeometryCache.getOrPut(key) {
             com.beautifulquran.DevProfiling.trace("lineGeometryMiss") {
@@ -322,7 +353,6 @@ private fun MushafQcfPageLine(
     modifier: Modifier = Modifier,
 ) {
     val density = LocalDensity.current
-    val hitSlopPx = with(density) { 8.dp.toPx() }
     val justify = mushafLineJustifies(line.tokens.size)
     val measurer = rememberTextMeasurer()
     // The book is set at one size (see MUSHAF_DESIGN_LINE_EM). A line whose
@@ -424,14 +454,14 @@ private fun MushafQcfPageLine(
                 best = i
             }
         }
-        if (best < 0 || bestDist > hitSlopPx) return null
+        if (best < 0) return null
         val ti = cellToken.getOrElse(best) { -1 }
         return line.tokens.getOrNull(ti)
     }
     Layout(
         modifier = modifier
             .fillMaxWidth()
-            .pointerInput(line, cells, onWordClick, onWordLongClick, onAyahClick, hitSlopPx) {
+            .pointerInput(line, cells, onWordClick, onWordLongClick, onAyahClick) {
                 detectTapGestures(
                     onTap = { pos ->
                         val token = tokenAt(pos.x)
@@ -457,15 +487,13 @@ private fun MushafQcfPageLine(
                     ?.let { qcfTrailingMark(it, token.endsAyah) }.orEmpty()
                 if (mark.isNotEmpty()) {
                     // The mark is its own cell, so it sits outside the word's
-                    // ink node and needs the verse's own alphas applied here:
-                    // the focus alpha the scrolling reader gives every mark, and
-                    // the recess that dims a verse waiting its turn. Read in the
-                    // layer block so both animate without recomposing the leaf.
+                    // ink node. markAlpha already expresses the verse's focus
+                    // state; multiplying it by the matching recess would dim an
+                    // upcoming mark twice (22% → 5%). Read it in the layer block
+                    // so the animation does not recompose the leaf.
                     val markInkAlpha = {
                         val pack = packs[token.surahId to token.ayah]
-                        if (!liveInk || pack == null) 1f
-                        else (pack.markAlpha.value * (1f - pack.recessCover.value))
-                            .coerceIn(0f, 1f)
+                        mushafAyahMarkInkAlpha(liveInk, pack?.markAlpha?.value)
                     }
                     BasicText(
                         text = mark,
@@ -505,6 +533,9 @@ private fun MushafQcfPageLine(
         }
     }
 }
+
+internal fun mushafAyahMarkInkAlpha(liveInk: Boolean, markAlpha: Float?): Float =
+    if (liveInk && markAlpha != null) markAlpha.coerceIn(0f, 1f) else 1f
 
 /** A cell's advance and where its ink sits inside it, in px. */
 internal class MushafCell(val advance: Float, val inkLeft: Float, val inkRight: Float) {
@@ -832,12 +863,20 @@ private fun MushafQcfWord(
         )
     }
     var layoutResult by remember { mutableStateOf<TextLayoutResult?>(null) }
-    // Only the verse under the voice carries wash layers. A static word's
-    // alpha is always 1 — the recess is gone — so its layers were pure
-    // overhead, and a leaf hands the transformed-rect walk ~150 of them:
-    // profiled on device, the walk ran on every frame of a swipe.
-    val hasInk = liveInk &&
-        packs[token.surahId to token.ayah]?.motions?.isNotEmpty() == true
+    val packKey = remember(token.surahId, token.ayah) { token.surahId to token.ayah }
+    val packState = remember(packs, packKey) { derivedStateOf { packs[packKey] } }
+    val pack = packState.value
+    // Pack identity is a composition decision: it determines whether this
+    // word owns only the cheap recess layer or the full wash chain. Animated
+    // values still come from the latest pack during draw. Capturing a stale
+    // pack here leaves the previous word's completed sweep visible for one
+    // frame at every handoff before the new wash begins.
+    // Only the verse under the voice carries wash layers. A waiting ayah needs
+    // the cheaper glyph-alpha draw modifier, but never the wash/tint layers;
+    // completed and manually browsed words carry neither. This keeps the page
+    // progression without restoring ~150 transformed nodes to every leaf.
+    val hasMotionInk = liveInk && pack?.motions?.isNotEmpty() == true
+    val hasWholeAyahRecess = liveInk && pack?.wholeAyahRecess == true
     // A word waiting its turn is dimmed by its own alpha, not by paper laid
     // over it. A paper mask is a rectangle on a word's box, and a QCF glyph
     // inks past that box — so the mask left the overhang at full strength,
@@ -846,12 +885,12 @@ private fun MushafQcfWord(
     // the word beside it. Read in the layer block, so the dim animates in the
     // draw phase without recomposing the leaf.
     val recessAlpha = {
-        val pack = packs[token.surahId to token.ayah]
-        val motion = pack?.motions?.getOrNull(token.word.position - 1)
-        when {
-            !liveInk || pack == null -> 1f
+        val currentPack = packState.value
+        val motion = currentPack?.motions?.getOrNull(token.word.position - 1)
+        val resolved = when {
+            !liveInk || currentPack == null -> 1f
             // No motion: a whole verse waiting its turn, dimmed as a block.
-            motion == null -> (1f - pack.recessCover.value).coerceIn(0f, 1f)
+            motion == null -> (1f - currentPack.recessCover.value).coerceIn(0f, 1f)
             // The wash owns ink strength while a word is revealing; the lyric
             // alpha applies once settled, and before the word has begun — which
             // is what dims the words still ahead of the voice inside the verse
@@ -860,6 +899,11 @@ private fun MushafQcfWord(
             motion.isActive || (motion.sweepProgress > 0f && motion.sweepProgress < 1f) -> 1f
             else -> motion.lyricAlpha
         }
+        mushafLayerTransitionAlpha(
+            hasWashLayer = hasMotionInk,
+            currentPackHasMotions = currentPack?.motions?.isNotEmpty() == true,
+            resolvedAlpha = resolved,
+        )
     }
     // The reveal of the one word being recited, read in the draw phase.
     //
@@ -868,8 +912,7 @@ private fun MushafQcfWord(
     // ~150 words. Their waiting dim is a flat alpha instead (see recessAlpha),
     // so only the word actually under the voice pays for a layer.
     val wordSweep = {
-        val motion = packs[token.surahId to token.ayah]
-            ?.motions?.getOrNull(token.word.position - 1)
+        val motion = packState.value?.motions?.getOrNull(token.word.position - 1)
         when {
             motion == null || motion.repeat -> 1f
             motion.isActive || motion.sweepProgress > 0f -> motion.sweepProgress
@@ -877,17 +920,15 @@ private fun MushafQcfWord(
         }
     }
     val wordFeather = {
-        packs[token.surahId to token.ayah]
-            ?.motions?.getOrNull(token.word.position - 1)
+        packState.value?.motions?.getOrNull(token.word.position - 1)
             ?.washFeather ?: InkEngine.tuning.washFeather
     }
     val blooms = {
-        if (!liveInk) {
+        if (!hasMotionInk) {
             emptyList()
         } else {
-            val pack = packs[token.surahId to token.ayah]
-            val motion = pack?.motions?.getOrNull(token.word.position - 1)
-            if (pack == null || motion == null ||
+            val motion = pack.motions.getOrNull(token.word.position - 1)
+            if (motion == null ||
                 (!motion.isActive && motion.ink.state == InkEngine.State.Upcoming)
             ) {
                 // Waiting words carry no bloom at all now: their dim is the
@@ -935,27 +976,26 @@ private fun MushafQcfWord(
             // frame of a swipe. A static word's ink is always full, so it
             // carries no layers at all.
             .then(
-                if (!hasInk) {
-                    Modifier
-                } else {
-                    // Both washes work on the word's own drawing, so the ink is
-                    // masked by its own coverage — a tail, a mark, the circled
-                    // number all fade with the letter they belong to, and no
-                    // edge can fall across a stroke. This is the same pair the
-                    // scrolling reader uses; the leaf used to lay paper over a
-                    // rectangle instead, which is what showed as clipping.
-                    Modifier
-                        .glyphLayerAlpha { recessAlpha() }
-                        .letterFadeIn(
-                            progress = { wordSweep() },
-                            rtl = true,
-                            restingAlpha = InkEngine.State.Upcoming.inkAlpha(),
-                            feather = wordFeather(),
-                        )
+                when {
+                    hasMotionInk -> {
+                        // Both washes work on the word's own drawing, so the
+                        // ink is masked by its own coverage and no edge can
+                        // fall across a tail, high mark, or circled number.
+                        Modifier
+                            .glyphLayerAlpha { recessAlpha() }
+                            .letterFadeIn(
+                                progress = { wordSweep() },
+                                rtl = true,
+                                restingAlpha = InkEngine.State.Upcoming.inkAlpha(),
+                                feather = wordFeather(),
+                            )
+                    }
+                    hasWholeAyahRecess -> Modifier.glyphLayerAlpha { recessAlpha() }
+                    else -> Modifier
                 },
             )
             .then(
-                if (!hasInk) {
+                if (!hasMotionInk) {
                     Modifier
                 } else {
                     Modifier.mushafLineInk(

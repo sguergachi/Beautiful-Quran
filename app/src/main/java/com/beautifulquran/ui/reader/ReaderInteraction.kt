@@ -138,6 +138,14 @@ object ReaderInteraction {
     ): Boolean = justEnabledFollow || target != lastHomedTarget
 
     /**
+     * A word tap seeks after this frame. Until Media3 names [pendingWordTapAyah],
+     * the playback target is still the previous item — homing onto it jumps
+     * the page away from the tap, with no wash where the finger was.
+     */
+    fun wordTapAwaitingSeek(target: Int, pendingWordTapAyah: Int?): Boolean =
+        pendingWordTapAyah != null && target != pendingWordTapAyah
+
+    /**
      * A playback-owned recovery inside the visible, tall **playing** ayah
      * should restore its active word directly. Homing the fade-led verse target
      * first can move in the opposite direction, pin line one, and queue the

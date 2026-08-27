@@ -93,6 +93,7 @@ data class ActiveInfo(
     val startMs: Long,
     val endMs: Long,
     val holdEndMs: Long,    // karaoke hold end (next start, or endMs if last)
+    val nextPosition: Int?, // next timing owner, including a repeat backtrack
     val isRepeat: Boolean,  // this word points back at an earlier position
     val highWater: Int,     // furthest word reached so far in this ayah
     val repeatStart: Int,   // first word of the current repeat chain
@@ -112,6 +113,10 @@ data class ActiveInfo(
   > would otherwise read as false repeats are removed at build time by duration
   > and ratio, never by adjacency — see docs/REPEAT_HIGHLIGHTING.md. If a
   > specific row looks wrong, ear-check it and fix the data, not this predicate.
+- **`nextPosition`** — the following segment's word position, or null at the
+  ayah's final segment. Renderers do not need it, but mushaf follow uses it to
+  distinguish a real move onto the next leaf from a reciter repeating a page-
+  tail word or phrase backward.
 - **`highWater`** — the furthest word reached so far. During a repeat the
   active word jumps backward, but everything up to the high-water mark was
   already recited, so the reader keeps it at full ink instead of dimming it

@@ -448,8 +448,12 @@ tween-vs-snap rules, sweep entry and residual rules, repeat wash timing, the
   from the same latency-corrected heard position, a contract enforced in
   `ReaderViewModel`; the highlight lead is suppressed during encoded silence
   before the first word — see
-  [OUTPUT_LATENCY.md](OUTPUT_LATENCY.md). `focusEngineEnabled` is a session-only
-  lab freeze and is never persisted.
+  [OUTPUT_LATENCY.md](OUTPUT_LATENCY.md). The lead prepares ink only: scrolling
+  follows the actual Media3 ayah boundary, so the next verse does not move into
+  focus before it is heard. A word tap waits for that boundary to name the
+  tapped ayah before homing — the previous item must not steal the camera
+  during the seek. `focusEngineEnabled` is a session-only lab freeze
+  and is never persisted.
 - **One motion lifecycle, two paint adapters.** `AyahBlock` derives the ayah's
   `InkEngine.Word` list once (the single `InkEngine.word(...)` call site), then
   builds one aligned `InkMotion` per word. `InkMotion` exclusively owns base
@@ -462,6 +466,44 @@ tween-vs-snap rules, sweep entry and residual rules, repeat wash timing, the
   creates an `Animatable`, `SideEffect`, ordered gate, or word-motion lifecycle.
   The two shaped modes still keep independent text construction because their
   typography differs; only their motion-to-bloom adapter is shared.
+- **Mushaf progression is page-local.** The leaf carrying the voice begins
+  beneath the Upcoming paper cover; its active word uses the same motion pack
+  as the scrolling reader, completed ayahs retain full ink, and later ayahs use
+  a motionless recess pack. A leaf reached by hand stays fully readable, even
+  while playback continues elsewhere. A leaf follow is about to turn onto
+  waits under Upcoming paper *before* the paper moves, so the turn never
+  reveals a finished page; once the voice arrives the usual wash fills it.
+  Catch-up must not rewind onto the spoken leaf during that wait — the last
+  word is still being said, and pulling back is the bounce of next, previous,
+  next again.
+  Only the current pager leaf owns a tap;
+  a hold then blocks auto-follow (including the last-word lead turn) until the
+  seek's word is on that leaf, so a slow seek cannot yank the paper to the
+  verse that was playing before the tap. The tapped leaf itself waits under
+  Upcoming paper until that word arrives — a dialed page is fully inked, and
+  without the cover the wash has nothing to fill. The tapped ayah is Active as
+  soon as the word is known, even before the pager names the leaf, so the
+  letter wash is not stuck under a blanket Upcoming cover. The seed is not
+  treated as voice arrival — that dropped the cover and swapped the pack off
+  Active, disposing the wash Animatable — and the poll must not restamp
+  `activation` for that same word, or `rememberLetterSweep` rearms from zero.
+  The Active pack belongs to the leaf that has the word, not to
+  `pageOwnsVoice` / `waitingForVoice`: those both drop at play-start and
+  the `when` that swaps packs disposes the Animatable, which read as the
+  wash running for a beat then vanishing.
+  The chapter-opening
+  basmalah is part of
+  that sequence: tapping it starts its own wash before the first ayah. At the
+  playlist handoff, the first ayah stays Upcoming until its first word timing
+  arrives; Media3 advancing the item a poll tick earlier must never flash the
+  whole ayah full before its wash. QCF words read the current pack through one
+  cached state so every word sees its entry mask immediately. If a newly
+  published Active pack reaches an older recess-only modifier before
+  recomposition attaches the wash, that modifier holds Upcoming alpha for the
+  topology-transition frame. The new Active pack begins with that same recess
+  cover and eases it away, so the ayah and its number fade into selection
+  instead of popping; future words remain at Upcoming ink and the active word
+  retains its directional wash.
 - Every **highlight** duration, alpha and easing still comes from
   `InkEngine.tuning` — no literal ink-tuning values remain. Motion outside the
   word highlight stays local (for example the block fade while the ayah-selector

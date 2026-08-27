@@ -43,13 +43,13 @@ object FocusEngine {
     const val CHAPTER_TOP_FOCUS_AYAH: Int = BASMALAH_PLAYLIST_AYAH
 
     /**
-     * Resolve what the lyric-follow / return-to-verse path should home onto
-     * given the current playback highlight. Basmalah lead-in wins over a null
-     * verse so the basmalah list item stays the focus target while the preface
-     * plays.
+     * Resolve what lyric-follow / return-to-verse should home onto from the
+     * media item actually playing. This deliberately does not accept the
+     * fade-led ink target: preparing the next ayah's ink must not move the
+     * reader before its audio begins. Basmalah lead-in wins over a null verse.
      */
-    fun playbackFocusTarget(activeAyah: Int?, activeBasmalah: Boolean): Int? =
-        if (activeBasmalah) CHAPTER_TOP_FOCUS_AYAH else activeAyah
+    fun playbackFocusTarget(playingAyah: Int?, activeBasmalah: Boolean): Int? =
+        if (activeBasmalah) CHAPTER_TOP_FOCUS_AYAH else playingAyah
 
     /** True on the first word when repeat-aware timings restart a whole ayah. */
     fun startsFullAyahRepeat(wordPosition: Int, isRepeat: Boolean, repeatStart: Int): Boolean =
