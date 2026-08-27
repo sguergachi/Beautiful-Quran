@@ -103,7 +103,11 @@ For each selected reciter and chapter, both clients use the same order:
    clients retry automatically when connectivity returns.
    A missing or expired word/QCF cache keeps the cold-start mushaf cover up
    until that first refresh succeeds or fails; a fresh/still-readable cache
-   never delays opening, and offline failure releases the independent reader.
+   makes zero API calls. The same cover opens and verifies Android's complete
+   bundled SQLite file into a process-lifetime native page cache; web already
+   retains the complete sql.js database buffer. The cover opens only after
+   both local preparation and the runtime-cache decision finish. Offline
+   failure still releases the independent reader.
 4. Validate full-corpus coverage, then commit snapshot rows, source age, and the
    new opaque token atomically. A failed page, partial snapshot, parse, or write
    preserves the prior token and rows.

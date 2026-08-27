@@ -154,8 +154,8 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        // Hold the leather splash until the first Compose frame paints — either
-        // the closed mushaf (cold start) or the sheets (deep-link skip).
+        // Hold the leather splash until the closed mushaf paints, or until a
+        // deep-link launch has both drawn its sheets and warmed the Quran DB.
         var splashPending = true
         installSplashScreen().setKeepOnScreenCondition { splashPending }
         enableEdgeToEdge()
@@ -185,15 +185,24 @@ class MainActivity : ComponentActivity() {
             val mushafDiagnostics by app.runtimeMushaf!!.diagnostics.collectAsStateWithLifecycle()
             val mushafStatus = remember(mushafDiagnostics) { app.runtimeMushaf!!.status() }
             val mushafReady = runtimeMushafEntranceReady(mushafStatus, System.currentTimeMillis())
-            val mushafLoadLabel = when (mushafStatus.phase) {
-                RuntimeCachePhase.REFRESHING -> when {
-                    mushafDiagnostics.requestsSettled && mushafStatus.apiCalls > 0 ->
-                        "Saving Quran pages · ${mushafStatus.apiCalls} requests complete"
-                    mushafStatus.apiCalls > 0 ->
-                        "Downloading Quran pages · ${mushafStatus.apiCalls} API requests"
+            var databaseReady by remember { mutableStateOf(false) }
+            LaunchedEffect(Unit) {
+                app.repository.warmDatabase()
+                databaseReady = true
+            }
+            val contentReady = mushafReady && databaseReady
+            val contentLoadLabel = when {
+                mushafReady && !databaseReady -> "Caching Quran database"
+                else -> when (mushafStatus.phase) {
+                    RuntimeCachePhase.REFRESHING -> when {
+                        mushafDiagnostics.requestsSettled && mushafStatus.apiCalls > 0 ->
+                            "Saving Quran pages · ${mushafStatus.apiCalls} requests complete"
+                        mushafStatus.apiCalls > 0 ->
+                            "Downloading Quran pages · ${mushafStatus.apiCalls} API requests"
+                        else -> "Preparing Quran pages"
+                    }
                     else -> "Preparing Quran pages"
                 }
-                else -> "Preparing Quran pages"
             }
             val assistantAction by pendingAssistantAction.collectAsStateWithLifecycle()
             val systemDark = isSystemInDarkTheme()
@@ -210,8 +219,9 @@ class MainActivity : ComponentActivity() {
             LaunchedEffect(assistantAction) {
                 if (assistantAction != null) entranceDone = true
             }
-            // Deep links skip the cover: dismiss splash as soon as sheets draw.
-            if (entranceDone) {
+            // Deep links skip the cover, but the OS splash still owns the
+            // launch until the complete bundled database is warm.
+            if (entranceDone && databaseReady) {
                 SideEffect { splashPending = false }
             }
 
@@ -251,8 +261,8 @@ class MainActivity : ComponentActivity() {
                         EntranceCover(
                             chrome = coverChrome,
                             ornament = coverOrnament,
-                            contentReady = mushafReady,
-                            loadLabel = mushafLoadLabel,
+                            contentReady = contentReady,
+                            loadLabel = contentLoadLabel,
                             onOpenBegan = {
                                 val sounds = coverSounds
                                     ?: PageTurnSounds(this@MainActivity).also { coverSounds = it }

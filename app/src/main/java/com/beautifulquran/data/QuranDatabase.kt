@@ -11,12 +11,32 @@ import java.io.File
  */
 class QuranDatabase(private val context: Context) {
 
+    @Volatile
+    private var warmed = false
+
     val db: SQLiteDatabase by lazy {
         SQLiteDatabase.openDatabase(
             ensureExtracted().absolutePath,
             null,
             SQLiteDatabase.OPEN_READONLY,
         )
+    }
+
+    /** Open, verify, and retain the complete database in SQLite's native page cache. */
+    fun warmEntireDatabase() {
+        if (warmed) return
+        synchronized(this) {
+            if (warmed) return
+            val database = db
+            val cacheKiB = quranDatabaseCacheKiB(File(database.path).length())
+            database.execPerConnectionSQL("PRAGMA cache_size = -$cacheKiB", emptyArray())
+            database.rawQuery("PRAGMA quick_check", null).use { cursor ->
+                check(cursor.moveToFirst() && cursor.getString(0) == "ok") {
+                    "Bundled Quran database failed its startup check"
+                }
+            }
+            warmed = true
+        }
     }
 
     private fun ensureExtracted(): File {
@@ -49,4 +69,10 @@ class QuranDatabase(private val context: Context) {
         // DatabaseFingerprintTest fails if the two drift apart.
         internal const val DB_FILE_NAME = "quran-v56.db"
     }
+}
+
+/** Database bytes plus 1 MiB for SQLite's schema and working pages. */
+internal fun quranDatabaseCacheKiB(fileBytes: Long): Long {
+    require(fileBytes >= 0)
+    return (fileBytes + 1023L) / 1024L + 1024L
 }

@@ -176,6 +176,11 @@ class QuranRepository(
             }
         }
 
+    /** Finish the bundled database's full native-cache warm before the cover opens. */
+    suspend fun warmDatabase() = withContext(Dispatchers.IO) {
+        database.warmEntireDatabase()
+    }
+
     suspend fun surahs(): List<Surah> = withContext(Dispatchers.IO) {
         surahsCache ?: queryList(
             "SELECT id, name_arabic, name_transliteration, name_translation, revelation_place, ayah_count FROM surahs ORDER BY id",
