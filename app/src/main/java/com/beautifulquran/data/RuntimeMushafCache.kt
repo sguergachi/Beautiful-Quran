@@ -41,7 +41,9 @@ class RuntimeMushafCache(
 ) {
     private val _diagnostics = MutableStateFlow(RuntimeCacheDiagnostics())
     val diagnostics: StateFlow<RuntimeCacheDiagnostics> = _diagnostics
-    private val syncer = QfContentSyncer(counted(api), store, nowMs)
+    private val syncer = QfContentSyncer(
+        counted(api), store, beforeApply = ::markRequestsSettled, nowMs = nowMs,
+    )
     private var syncing = false
     @Volatile private var cachedState: QfSyncState? = null
     @Volatile private var parsedToken: String? = null
@@ -105,6 +107,9 @@ class RuntimeMushafCache(
             syncing = true
         }
         blockReadRefresh = false
+        _diagnostics.update {
+            RuntimeCacheDiagnostics(it.apiCalls, it.resources, false)
+        }
         updateResource {
             it.copy(updatedAtMs = rememberedState()?.updatedAtMs, refreshing = true, lastError = null)
         }
@@ -194,7 +199,15 @@ class RuntimeMushafCache(
     }
 
     private fun countApiCall() {
-        _diagnostics.update { RuntimeCacheDiagnostics(it.apiCalls + 1, it.resources) }
+        _diagnostics.update {
+            RuntimeCacheDiagnostics(it.apiCalls + 1, it.resources, false)
+        }
+    }
+
+    private fun markRequestsSettled() {
+        _diagnostics.update {
+            RuntimeCacheDiagnostics(it.apiCalls, it.resources, true)
+        }
     }
 
     /** Refresh while current, then notify readers exactly when retained data expires. */
@@ -236,6 +249,7 @@ class RuntimeMushafCache(
                 current.resources + (MUSHAF_ID to transform(
                     current.resources[MUSHAF_ID] ?: RuntimeCacheResource(),
                 )),
+                current.requestsSettled,
             )
         }
     }

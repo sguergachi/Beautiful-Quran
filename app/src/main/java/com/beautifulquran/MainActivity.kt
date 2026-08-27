@@ -186,8 +186,13 @@ class MainActivity : ComponentActivity() {
             val mushafStatus = remember(mushafDiagnostics) { app.runtimeMushaf!!.status() }
             val mushafReady = runtimeMushafEntranceReady(mushafStatus, System.currentTimeMillis())
             val mushafLoadLabel = when (mushafStatus.phase) {
-                RuntimeCachePhase.REFRESHING ->
-                    "Preparing Quran pages · ${mushafStatus.apiCalls} API requests"
+                RuntimeCachePhase.REFRESHING -> when {
+                    mushafDiagnostics.requestsSettled && mushafStatus.apiCalls > 0 ->
+                        "Saving Quran pages · ${mushafStatus.apiCalls} requests complete"
+                    mushafStatus.apiCalls > 0 ->
+                        "Downloading Quran pages · ${mushafStatus.apiCalls} API requests"
+                    else -> "Preparing Quran pages"
+                }
                 else -> "Preparing Quran pages"
             }
             val assistantAction by pendingAssistantAction.collectAsStateWithLifecycle()

@@ -41,6 +41,8 @@ data class QfSyncPage(
     val nextPagePath: String?,
     /** Present only on the final page of a successful sync. */
     val nextSyncToken: String?,
+    /** Age of the provider snapshot, so nested caches cannot extend its TTL. */
+    val contentAgeMs: Long = 0L,
 )
 
 data class QfSnapshot(val resource: QfResource, val rows: List<QfCacheRow>)
@@ -59,6 +61,11 @@ internal interface QfNetworkCallReporter {
 /** Separate from the reader database: QF's cache can be replaced without mixing rows. */
 interface QfContentSyncStore {
     fun state(filter: QfResourceFilter): QfSyncState?
+    fun rows(
+        resource: QfResource,
+        recordType: String,
+        recordKeyPrefix: String? = null,
+    ): List<QfCacheRow>
 
     /** Deletes all QF content and private sync checkpoints on termination or revocation. */
     fun clear()
@@ -80,6 +87,7 @@ interface QfContentSyncStore {
 class QfContentSyncer(
     private val api: QfContentSyncApi,
     private val store: QfContentSyncStore,
+    private val beforeApply: () -> Unit = {},
     private val nowMs: () -> Long = System::currentTimeMillis,
 ) {
     suspend fun sync(filter: QfResourceFilter) {
@@ -89,8 +97,11 @@ class QfContentSyncer(
         val changes = mutableListOf<QfContentChange>()
         val snapshots = mutableListOf<QfSnapshot>()
         var finalToken: String? = null
+        var finalContentAgeMs: Long? = null
+        var pageCount = 0
 
         while (true) {
+            check(++pageCount <= MAX_SYNC_PAGES) { "Content Sync exceeded page limit" }
             val page = api.sync(request)
             changes += page.changes
             page.changes.filterIsInstance<QfContentChange.Snapshot>().forEach { change ->
@@ -101,14 +112,26 @@ class QfContentSyncer(
             }
             val next = page.nextPagePath ?: run {
                 finalToken = requireNotNull(page.nextSyncToken) { "Final QF sync page has no token" }
+                finalContentAgeMs = page.contentAgeMs.also {
+                    require(it in 0..QF_MAX_CACHE_AGE_MS) { "Invalid QF content age" }
+                }
                 break
             }
             requireRelativeApiPath(next)
             request = QfSyncRequest.NextPage(next)
         }
-        store.apply(filter, changes, snapshots, requireNotNull(finalToken), nowMs())
+        beforeApply()
+        store.apply(
+            filter,
+            changes,
+            snapshots,
+            requireNotNull(finalToken),
+            nowMs() - requireNotNull(finalContentAgeMs),
+        )
     }
 }
+
+private const val MAX_SYNC_PAGES = 100
 
 /** QF returns relative API paths; accepting absolute URLs would enable host injection. */
 internal fun requireRelativeApiPath(path: String) {
@@ -121,3 +144,4 @@ internal fun isQfContentFresh(lastSuccessfulSyncMs: Long?, nowMs: Long): Boolean
     lastSuccessfulSyncMs != null && nowMs - lastSuccessfulSyncMs in 0..QF_MAX_CACHE_AGE_MS
 
 internal const val QF_MAX_CACHE_AGE_MS = 7L * 24 * 60 * 60 * 1000
+internal const val QF_REVALIDATE_AFTER_MS = 6L * 24 * 60 * 60 * 1000

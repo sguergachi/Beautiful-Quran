@@ -119,7 +119,9 @@ the browser uses IndexedDB. Neither cache is part of Git, the APK, or the Pages
 artifact.
 Developer Mode shows the selected resource's state, next refresh, seven-day
 limit, last failure, and the exact number of API requests made in that process
-or browser session.
+or browser session. The cold-start cover reports requests as they start, then
+switches to save status after the complete 77,429-row snapshot is validated and
+while it is committed atomically.
 
 ## The data pipeline (`tools/build_db.py`)
 

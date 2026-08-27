@@ -1,5 +1,6 @@
 package com.beautifulquran.data
 
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.first
@@ -60,6 +61,7 @@ class RuntimeMushafCacheTest {
         assertNull(cache.word(5, 2, 19))
         runCurrent()
         assertEquals(RuntimeCachePhase.ERROR, cache.status().phase)
+        assertFalse(cache.diagnostics.value.requestsSettled)
         assertNull(cache.word(5, 2, 19))
     }
 
@@ -105,6 +107,26 @@ class RuntimeMushafCacheTest {
         assertEquals("seeking", cache.word(5, 2, 19)?.translation)
         assertEquals(3L, cache.status().apiCalls)
         assertEquals(1, api.syncs)
+    }
+
+    @Test
+    fun `physical request activity remains visible until its response completes`() = runTest {
+        val started = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        val cache = RuntimeMushafCache(
+            ReportingApi(1, started, release), Store(), backgroundScope,
+            { 100L }, minimumWords = 1,
+        )
+
+        cache.refresh()
+        started.await()
+        assertEquals(1L, cache.diagnostics.value.apiCalls)
+        assertFalse(cache.diagnostics.value.requestsSettled)
+
+        release.complete(Unit)
+        runCurrent()
+        assertTrue(cache.diagnostics.value.requestsSettled)
+        assertEquals("seeking", cache.word(5, 2, 19)?.translation)
     }
 
     @Test
@@ -214,7 +236,11 @@ class RuntimeMushafCacheTest {
         override suspend fun snapshot(relativePath: String) = QfSnapshot(resource, listOf(row))
     }
 
-    private inner class ReportingApi(private val httpCalls: Int) : QfContentSyncApi, QfNetworkCallReporter {
+    private inner class ReportingApi(
+        private val httpCalls: Int,
+        private val started: CompletableDeferred<Unit>? = null,
+        private val release: CompletableDeferred<Unit>? = null,
+    ) : QfContentSyncApi, QfNetworkCallReporter {
         var syncs = 0
         private var reporter: () -> Unit = {}
         override fun setNetworkCallReporter(reporter: () -> Unit) {
@@ -229,7 +255,11 @@ class RuntimeMushafCacheTest {
             )
         }
         override suspend fun snapshot(relativePath: String): QfSnapshot {
-            repeat(httpCalls) { reporter() }
+            repeat(httpCalls) {
+                reporter()
+                started?.complete(Unit)
+                release?.await()
+            }
             return QfSnapshot(resource, listOf(row))
         }
     }

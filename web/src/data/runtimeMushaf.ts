@@ -85,6 +85,7 @@ export class RuntimeMushafCache {
   private readonly diagnosticListeners = new Set<() => void>()
   private error: string | null = null
   private apiCalls = 0
+  private requestsSettled = false
   private byKey = new Map<string, RuntimeMushafWord>()
   private refreshTimer: number | null = null
   private expiryTimer: number | null = null
@@ -126,6 +127,10 @@ export class RuntimeMushafCache {
     }
   }
 
+  haveRequestsSettled(): boolean {
+    return this.requestsSettled
+  }
+
   async restore(): Promise<void> {
     try {
       const saved = await this.store.get()
@@ -150,6 +155,7 @@ export class RuntimeMushafCache {
   refresh(): Promise<boolean> {
     if (this.inFlight) return this.inFlight
     this.error = null
+    this.requestsSettled = false
     this.inFlight = this.sync().then(() => true).catch((error: unknown) => {
       this.error = error instanceof Error ? error.message : String(error)
       return false
@@ -170,6 +176,7 @@ export class RuntimeMushafCache {
   private async sync(): Promise<void> {
     if (this.directLegacy) {
       const next = await this.fetchLegacySnapshot()
+      this.markRequestsSettled()
       await this.store.put(next)
       this.state = next
       this.error = null
@@ -219,6 +226,7 @@ export class RuntimeMushafCache {
     const next = validateStored({
       id: 1, token, updatedAtMs: this.now() - contentAge!, records,
     }, this.minimumRecords)
+    this.markRequestsSettled()
     await this.store.put(next)
     this.state = next
     this.error = null
@@ -286,6 +294,7 @@ export class RuntimeMushafCache {
 
   private async get(path: string): Promise<unknown> {
     this.apiCalls += 1
+    this.requestsSettled = false
     this.notifyDiagnostics()
     const response = await this.fetchImpl(this.requestUrl(path), {
       headers: { accept: 'application/json' },
@@ -299,6 +308,11 @@ export class RuntimeMushafCache {
     const body = await response.text()
     if (body.length > MAX_RESPONSE_CHARS) throw new Error('Content API response exceeded size limit')
     return JSON.parse(body) as unknown
+  }
+
+  private markRequestsSettled() {
+    this.requestsSettled = true
+    this.notifyDiagnostics()
   }
 
   private requestUrl(path: string): string {

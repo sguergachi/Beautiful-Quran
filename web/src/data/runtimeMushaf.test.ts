@@ -249,10 +249,13 @@ describe('RuntimeMushafCache', () => {
     await started
     expect(settled).toBe(false)
     expect(cache.status().phase).toBe('refreshing')
+    expect(cache.status().apiCalls).toBe(1)
+    expect(cache.haveRequestsSettled()).toBe(false)
 
     release()
     await restoring
     expect(settled).toBe(true)
+    expect(cache.haveRequestsSettled()).toBe(true)
     expect(cache.word(5, 1, 1)?.translation_en).toBe('O')
   })
 
