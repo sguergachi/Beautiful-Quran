@@ -218,4 +218,17 @@ class MushafFollowTurnTest {
         assertTrue(mushafReturnPointsUp(currentPage = 120, playbackPage = 118))
         assertFalse(mushafReturnPointsUp(currentPage = 120, playbackPage = 122))
     }
+
+    @Test
+    fun `only the current leaf owns a tap`() {
+        assertTrue(mushafLeafAcceptsTap(pageIndex = 11, currentPage = 11))
+        assertFalse(mushafLeafAcceptsTap(pageIndex = 10, currentPage = 11))
+        assertFalse(mushafLeafAcceptsTap(pageIndex = 12, currentPage = 11))
+    }
+
+    @Test
+    fun `a tapped leaf holds against follow and the last-word lead turn`() {
+        assertTrue(mushafHoldBlocksFollow(heldPage = 12))
+        assertFalse(mushafHoldBlocksFollow(heldPage = null))
+    }
 }

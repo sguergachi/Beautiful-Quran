@@ -43,6 +43,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -248,6 +249,21 @@ internal fun mushafTailTurnAllowed(
 ): Boolean = !isFinalAyah &&
     (nextTimingPage == null || nextTimingPage == followingPage)
 
+/**
+ * Neighbour leaves stay composed for a warm turn, but they must not own the
+ * tap. A hit that leaks onto the previous or next page plays that page's
+ * verse with no wash on the leaf the reader is looking at.
+ */
+internal fun mushafLeafAcceptsTap(pageIndex: Int, currentPage: Int): Boolean =
+    pageIndex == currentPage
+
+/**
+ * A tap pins the leaf until the seek's word arrives. Auto-follow — including
+ * the last-word lead turn — must not steal that leaf in the meantime, or the
+ * wash runs on a page the reader is no longer watching.
+ */
+internal fun mushafHoldBlocksFollow(heldPage: Int?): Boolean = heldPage != null
+
 /** Delayed turns retain ownership only while the exact activation survives. */
 internal fun mushafSameActivation(expected: ActiveWord, current: ActiveWord?): Boolean =
     current != null &&
@@ -363,6 +379,8 @@ internal fun MushafPager(
      * finger.
      */
     heldPage: Int?,
+    /** The leaf the pointer actually hit — not a word-to-page lookup. */
+    onTappedLeaf: (Int) -> Unit,
     flashAyah: Int?,
     flashWordPosition: Int?,
     /**
@@ -417,10 +435,11 @@ internal fun MushafPager(
                     focusAyah != null -> catalog.pageOf(loadedSurahId, focusAyah, 1)
                     else -> return@collect
                 }
-                // Still hearing the word from before the tap: stay on the leaf
-                // the reader is looking at rather than turning to wherever that
-                // word lives and straight back.
-                if (heldPage != null && page != heldPage) return@collect
+                // Still hearing the word from before the tap, or sitting on the
+                // leaf's last word: stay put. The hold exists so the seek can
+                // land and the wash can run where the reader tapped — following
+                // the stale clock, or leading the next leaf, both leave it.
+                if (mushafHoldBlocksFollow(heldPage)) return@collect
                 // A hand on the pager owns the turn: while a scroll is in
                 // progress — the user's swipe or a turn this collector just
                 // started — do not pull. Pulling mid-swipe yanked the page
@@ -553,6 +572,12 @@ internal fun MushafPager(
                 }
             }
     }
+    val currentPageNow = rememberUpdatedState(pagerState.currentPage)
+    val onWordClickNow = rememberUpdatedState(onWordClick)
+    val onWordLongClickNow = rememberUpdatedState(onWordLongClick)
+    val onAyahClickNow = rememberUpdatedState(onAyahClick)
+    val onBasmalahClickNow = rememberUpdatedState(onBasmalahClick)
+    val onTappedLeafNow = rememberUpdatedState(onTappedLeaf)
     val paper = MaterialTheme.colorScheme.background
     // Opening a chapter should cost one leaf, not three. Holding a neighbour
     // composed either side is what makes a page turn smooth, but doing it
@@ -611,6 +636,37 @@ internal fun MushafPager(
                     mushafUsesLiveInk(settled, pageOwnsVoice)
                 }
             }
+            val leafWordClick = remember(pageIndex, page.page) {
+                { token: MushafToken ->
+                    if (mushafLeafAcceptsTap(pageIndex, currentPageNow.value)) {
+                        onTappedLeafNow.value(page.page)
+                        onWordClickNow.value(token)
+                    }
+                }
+            }
+            val leafWordLongClick = remember(pageIndex) {
+                { token: MushafToken ->
+                    if (mushafLeafAcceptsTap(pageIndex, currentPageNow.value)) {
+                        onWordLongClickNow.value(token)
+                    }
+                }
+            }
+            val leafAyahClick = remember(pageIndex, page.page) {
+                { token: MushafToken ->
+                    if (mushafLeafAcceptsTap(pageIndex, currentPageNow.value)) {
+                        onTappedLeafNow.value(page.page)
+                        onAyahClickNow.value(token)
+                    }
+                }
+            }
+            val leafBasmalahClick = remember(pageIndex, page.page) {
+                { surahId: Int ->
+                    if (mushafLeafAcceptsTap(pageIndex, currentPageNow.value)) {
+                        onTappedLeafNow.value(page.page)
+                        onBasmalahClickNow.value(surahId)
+                    }
+                }
+            }
             // One description for the leaf, not ~450 word nodes: the QCF
             // glyphs are private-use artwork — meaningless to a screen reader
             // — and an active accessibility service re-sorted and re-geometried
@@ -650,6 +706,7 @@ internal fun MushafPager(
                     // of the hitch — 99th percentile 101ms against 38 with it,
                     // and half as many frames blamed on the UI thread.
                     .graphicsLayer { }
+                    .clipToBounds()
                     .padding(horizontal = MushafPageMargin),
             ) {
                 val density = LocalDensity.current
@@ -680,10 +737,10 @@ internal fun MushafPager(
                         playbackSpeed = playbackSpeed,
                         flashAyah = flashAyah.takeIf { settled },
                         flashWordPosition = flashWordPosition.takeIf { settled },
-                        onWordClick = onWordClick,
-                        onWordLongClick = onWordLongClick,
-                        onAyahClick = onAyahClick,
-                        onBasmalahClick = onBasmalahClick,
+                        onWordClick = leafWordClick,
+                        onWordLongClick = leafWordLongClick,
+                        onAyahClick = leafAyahClick,
+                        onBasmalahClick = leafBasmalahClick,
                         unit = unit,
                         modifier = Modifier
                             .height(unit * MUSHAF_DISPLAY_LINES_PER_PAGE)

@@ -236,6 +236,13 @@ class ReaderInteractionTest {
     }
 
     @Test
+    fun `word tap waits for the seek instead of homing onto the previous ayah`() {
+        assertTrue(ReaderInteraction.wordTapAwaitingSeek(target = 10, pendingWordTapAyah = 14))
+        assertFalse(ReaderInteraction.wordTapAwaitingSeek(target = 14, pendingWordTapAyah = 14))
+        assertFalse(ReaderInteraction.wordTapAwaitingSeek(target = 14, pendingWordTapAyah = null))
+    }
+
+    @Test
     fun `shouldHomeOntoPlaybackTarget skips same target while follow stays on`() {
         // Pause/play and seek flicker must not re-home a tall mid-verse.
         assertFalse(

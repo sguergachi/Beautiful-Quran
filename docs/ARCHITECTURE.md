@@ -401,8 +401,10 @@ horizontal page turn — draggable, fling-able, with page-turn audio
   chapter openings remain hard boundaries. They use the same Hafs +
   `InkEngine` wash as Arabic-only scroll. The pager virtualizes
   to the settled page ±1; ink clocks run on the settled page and, only during
-  an automatic turn, the page that owns the voice. Scroll and mushaf hand one
-  another their visible ayah/leaf when the reading layout changes.
+  an automatic turn, the page that owns the voice. Only the current leaf
+  accepts a word tap; the pager then holds that leaf against follow until
+  the seek lands. Scroll and mushaf hand one another their visible ayah/leaf
+  when the reading layout changes.
 - `home/HomeScreen` — surah list with search (surah names / `surah:ayah`
   references, plus Quran-wide word hits sectioned by surah with truncated
   expand-in-place lists), a continue-listening card, and a floating playback

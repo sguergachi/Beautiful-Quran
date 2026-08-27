@@ -334,7 +334,6 @@ private fun MushafQcfPageLine(
     modifier: Modifier = Modifier,
 ) {
     val density = LocalDensity.current
-    val hitSlopPx = with(density) { 8.dp.toPx() }
     val justify = mushafLineJustifies(line.tokens.size)
     val measurer = rememberTextMeasurer()
     // The book is set at one size (see MUSHAF_DESIGN_LINE_EM). A line whose
@@ -436,14 +435,14 @@ private fun MushafQcfPageLine(
                 best = i
             }
         }
-        if (best < 0 || bestDist > hitSlopPx) return null
+        if (best < 0) return null
         val ti = cellToken.getOrElse(best) { -1 }
         return line.tokens.getOrNull(ti)
     }
     Layout(
         modifier = modifier
             .fillMaxWidth()
-            .pointerInput(line, cells, onWordClick, onWordLongClick, onAyahClick, hitSlopPx) {
+            .pointerInput(line, cells, onWordClick, onWordLongClick, onAyahClick) {
                 detectTapGestures(
                     onTap = { pos ->
                         val token = tokenAt(pos.x)

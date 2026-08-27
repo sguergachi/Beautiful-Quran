@@ -450,7 +450,9 @@ tween-vs-snap rules, sweep entry and residual rules, repeat wash timing, the
   before the first word — see
   [OUTPUT_LATENCY.md](OUTPUT_LATENCY.md). The lead prepares ink only: scrolling
   follows the actual Media3 ayah boundary, so the next verse does not move into
-  focus before it is heard. `focusEngineEnabled` is a session-only lab freeze
+  focus before it is heard. A word tap waits for that boundary to name the
+  tapped ayah before homing — the previous item must not steal the camera
+  during the seek. `focusEngineEnabled` is a session-only lab freeze
   and is never persisted.
 - **One motion lifecycle, two paint adapters.** `AyahBlock` derives the ayah's
   `InkEngine.Word` list once (the single `InkEngine.word(...)` call site), then
@@ -468,7 +470,10 @@ tween-vs-snap rules, sweep entry and residual rules, repeat wash timing, the
   beneath the Upcoming paper cover; its active word uses the same motion pack
   as the scrolling reader, completed ayahs retain full ink, and later ayahs use
   a motionless recess pack. A leaf reached by hand stays fully readable, even
-  while playback continues elsewhere. The chapter-opening basmalah is part of
+  while playback continues elsewhere. Only the current pager leaf owns a tap;
+  a hold then blocks auto-follow (including the last-word lead turn) until the
+  seek's word arrives, so the wash cannot run on a neighbour the reader is
+  not watching. The chapter-opening basmalah is part of
   that sequence: tapping it starts its own wash before the first ayah. At the
   playlist handoff, the first ayah stays Upcoming until its first word timing
   arrives; Media3 advancing the item a poll tick earlier must never flash the
