@@ -476,7 +476,7 @@ tween-vs-snap rules, sweep entry and residual rules, repeat wash timing, the
   Catch-up must not rewind onto the spoken leaf during that wait — the last
   word is still being said, and pulling back is the bounce of next, previous,
   next again.
-  Only the settled pager leaf owns a tap;
+  Only the current pager leaf owns a tap;
   a hold then blocks auto-follow (including the last-word lead turn) until the
   seek's word is on that leaf, so a slow seek cannot yank the paper to the
   verse that was playing before the tap. The chapter-opening basmalah is part of

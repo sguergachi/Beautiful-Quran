@@ -275,10 +275,6 @@ class MushafFollowTurnTest {
         assertTrue(mushafLeafAcceptsTap(pageIndex = 11, currentPage = 11))
         assertFalse(mushafLeafAcceptsTap(pageIndex = 10, currentPage = 11))
         assertFalse(mushafLeafAcceptsTap(pageIndex = 12, currentPage = 11))
-        // Mid-turn the closest page is not yet the leaf under the reader.
-        assertFalse(
-            mushafLeafAcceptsTap(pageIndex = 12, currentPage = 12, settledPage = 11),
-        )
     }
 
     @Test

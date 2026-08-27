@@ -1292,7 +1292,10 @@ internal fun MushafPageDial(
                 )
             }
         }
-        if (hud != null) {
+        // Unmount when hidden: a full-width plate at alpha 0 still eats
+        // taps on the last lines of the leaf, and the thumb's ride home
+        // used to leave it sitting there invisible.
+        if (hud != null && hudShown) {
             val chapterStartPage = chapterPages.getOrElse(hud.number - 1) { 0 }
             // A quiet plate under the type: the leaf's own script runs right
             // up to the margin here, and unreadable ink under the label helps
@@ -2032,13 +2035,16 @@ internal fun MushafPageDial(
                         // again until that stroke opened the trough itself.
                         scope.launch { zoom.animateTo(0f, MushafDialZoomOut) }
                         glide = scope.launch {
-                            resting.snapTo(landed.toFloat())
-                            animate(
-                                initialValue = handX.floatValue,
-                                targetValue = seat,
-                                animationSpec = MushafDialZoomOut,
-                            ) { value, _ -> handX.floatValue = value }
-                            handed = false
+                            try {
+                                resting.snapTo(landed.toFloat())
+                                animate(
+                                    initialValue = handX.floatValue,
+                                    targetValue = seat,
+                                    animationSpec = MushafDialZoomOut,
+                                ) { value, _ -> handX.floatValue = value }
+                            } finally {
+                                handed = false
+                            }
                         }
                     }
                 },
