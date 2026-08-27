@@ -522,9 +522,9 @@ internal fun mushafDialRelease(
 /**
  * The line the label always writes, at the granularity the dial is working at.
  *
- * Chapter tier, the chapter and nothing else — but by its number as well as its
- * name, set the way the index sets them, because a reader crossing the book at
- * this speed is counting chapters and the number is the thing they are counting.
+ * Chapter tier, the chapter by its number then its name, with the same middle
+ * dot the trough uses — a reader crossing the book at this speed is counting
+ * chapters and the number is the thing they are counting, so it leads.
  *
  * In the trough the leaf is the target, so the head names the leaf: the chapter
  * it stands in, then its folio. The chapter stays at the front because the
@@ -532,18 +532,21 @@ internal fun mushafDialRelease(
  * with nothing to check it against.
  */
 internal fun mushafDialLabelHead(label: MushafDialLabel, zoomed: Boolean, page: Int): String =
-    if (zoomed) "${label.chapter}  ·  pg. $page" else "${label.number}  ${label.chapter}"
+    if (zoomed) "${label.chapter}  ·  pg. $page" else "${label.number}  ·  ${label.chapter}"
 
 /**
- * The line only the trough writes: the verses standing on the leaf.
+ * The line under the head: at chapter tier, the leaf the chapter opens on;
+ * in the trough, the verses standing on the leaf in view.
  *
- * At chapter tier it is empty rather than absent. The label keeps both lines'
- * worth of paper at either tier, so opening the trough writes into the gap the
- * head was already sitting above instead of shoving the head upward — the type
- * over a thumb should not jump when the comb does.
+ * Both tiers write this line, so the Column's two-line paper is occupied
+ * either way and opening the trough does not shove the head upward.
  */
-internal fun mushafDialLabelFoot(label: MushafDialLabel, zoomed: Boolean): String {
-    if (!zoomed) return ""
+internal fun mushafDialLabelFoot(
+    label: MushafDialLabel,
+    zoomed: Boolean,
+    startPage: Int = 0,
+): String {
+    if (!zoomed) return if (startPage > 0) "pg. $startPage" else ""
     val verses =
         if (label.toAyah <= label.fromAyah) "${label.fromAyah}"
         else "${label.fromAyah}–${label.toAyah}"
@@ -1294,6 +1297,7 @@ internal fun MushafPageDial(
             }
         }
         if (hud != null) {
+            val chapterStartPage = chapterPages.getOrElse(hud.number - 1) { 0 }
             // A quiet plate under the type: the leaf's own script runs right
             // up to the margin here, and unreadable ink under the label helps
             // nobody. The ground is the page's own surface colour — flat, no
@@ -1530,7 +1534,7 @@ internal fun MushafPageDial(
                 ) {
                     Column(horizontalAlignment = hudDockAlignment) {
                         Text(
-                            text = hud.chapter,
+                            text = mushafDialLabelHead(hud, zoomed = false, page = hudPage),
                             style = hudType,
                             color = androidx.compose.ui.graphics
                                 .lerp(ink, accents.repeatInk, orange)
@@ -1546,13 +1550,19 @@ internal fun MushafPageDial(
                                     MushafDialHudSwap.toPx() * zoom.value
                             },
                         )
-                        // Chapter number as a grey subtitle under the name.
+                        // Opening leaf, in the same grey the trough's ayah
+                        // range takes — subordinate to the chapter, the thing
+                        // a reader aiming by chapters still needs to land.
                         Text(
-                            text = "${hud.number}",
+                            text = mushafDialLabelFoot(
+                                hud,
+                                zoomed = false,
+                                startPage = chapterStartPage,
+                            ).ifEmpty { " " },
                             style = hudType,
                             color = androidx.compose.ui.graphics
                                 .lerp(ink.copy(alpha = 0.48f), accents.repeatInk, orange)
-                                .copy(alpha = 0.48f + 0.22f * hudPulse),
+                                .copy(alpha = 0.48f + 0.22f * orange),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.graphicsLayer {

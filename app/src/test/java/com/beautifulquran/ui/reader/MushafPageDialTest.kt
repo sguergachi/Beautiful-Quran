@@ -610,8 +610,9 @@ class MushafPageDialTest {
     @Test
     fun `the label names a chapter in the comb, and the leaf itself in the trough`() {
         val leaf = MushafDialLabel(number = 2, chapter = "Al-Baqarah", fromAyah = 6, toAyah = 16)
-        assertEquals("2  Al-Baqarah", mushafDialLabelHead(leaf, zoomed = false, page = 42))
+        assertEquals("2  ·  Al-Baqarah", mushafDialLabelHead(leaf, zoomed = false, page = 42))
         assertEquals("Al-Baqarah  ·  pg. 42", mushafDialLabelHead(leaf, zoomed = true, page = 42))
+        assertEquals("pg. 2", mushafDialLabelFoot(leaf, zoomed = false, startPage = 2))
         assertEquals("Ayah 6–16", mushafDialLabelFoot(leaf, zoomed = true))
         // A leaf holding one verse says one number, not "282-282".
         val one = MushafDialLabel(number = 2, chapter = "Al-Baqarah", fromAyah = 282, toAyah = 282)
@@ -619,12 +620,12 @@ class MushafPageDialTest {
     }
 
     @Test
-    fun `the comb keeps the verse line's paper without writing on it`() {
-        // The head must not move when the trough opens, so the foot is empty
-        // rather than absent at chapter tier — the Column reserves both lines
-        // either way.
+    fun `the comb writes the chapter's opening leaf under the name`() {
         val leaf = MushafDialLabel(number = 2, chapter = "Al-Baqarah", fromAyah = 6, toAyah = 16)
-        assertEquals("", mushafDialLabelFoot(leaf, zoomed = false))
+        assertEquals("pg. 2", mushafDialLabelFoot(leaf, zoomed = false, startPage = 2))
+        // Missing catalog still occupies the line via an empty string the
+        // Column replaces with a hard space — the head must not jump.
+        assertEquals("", mushafDialLabelFoot(leaf, zoomed = false, startPage = 0))
     }
     @Test
     fun `the comb stays on the hairline at rest`() {

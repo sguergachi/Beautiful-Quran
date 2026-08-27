@@ -195,21 +195,22 @@ sat next to, and backed away from, which is why it is given the width of the
 run-out instead of the edge of the glass.
 
 The label above the finger says which tier is running, and says it in what it
-counts. In the comb it is the chapter, by number and by name on one line, set
-the way the index sets them — a reader crossing the book at this speed is
-counting chapters, and the number is the thing they are counting. No verse
-appears there: one turning over by hundreds between frames is noise, and worse,
-it invites the reader to aim with it. In the trough the leaf itself is the
-target, so the label names it the way the leaf names itself — the chapter, then
-`pg.` and its folio — and gives the verses standing on it a second line of
-their own, in the lighter ink everything subordinate takes. The chapter stays
-at the front of that, because a folio alone would leave the reader with nothing
-to check it against.
+counts. In the comb it is the chapter, by number then name on one line, joined
+by the same middle dot the trough uses — a reader crossing the book at this
+speed is counting chapters, and the number is the thing they are counting. The
+second line is the leaf that chapter opens on, `pg.` and its folio, in the
+lighter ink everything subordinate takes. No verse appears there: one turning
+over by hundreds between frames is noise, and worse, it invites the reader to
+aim with it. In the trough the leaf itself is the target, so the label names it
+the way the leaf names itself — the chapter, then `pg.` and its folio — and
+gives the verses standing on it a second line of their own, in that same
+lighter ink. The chapter stays at the front of that, because a folio alone
+would leave the reader with nothing to check it against.
 
-The label keeps both lines' worth of paper at either tier: at chapter tier the
-second line is empty rather than absent. Opening the trough then writes into
-the gap the first line was already sitting above, instead of shoving it upward.
-Type over a thumb must not jump when the comb does.
+The label keeps both lines' worth of paper at either tier. Opening the trough
+then writes into the second line the first line was already sitting above,
+instead of shoving it upward. Type over a thumb must not jump when the comb
+does.
 
 The tier machine runs on the **frame clock**, not on pointer events. A finger
 that stops moving stops reporting, so an estimate fed only by events freezes at
