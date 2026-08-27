@@ -834,6 +834,11 @@ private fun MushafQcfWord(
     }
     var layoutResult by remember { mutableStateOf<TextLayoutResult?>(null) }
     val pack = packs[token.surahId to token.ayah]
+    // Pack identity is a composition decision: it determines whether this
+    // word owns only the cheap recess layer or the full wash chain. Draw
+    // lambdas must capture that same pack. Looking up a newer map entry before
+    // recomposition lets the old recess-only chain see an Active motion and
+    // expose full ink for one frame, before letterFadeIn has been attached.
     // Only the verse under the voice carries wash layers. A waiting ayah needs
     // the cheaper glyph-alpha draw modifier, but never the wash/tint layers;
     // completed and manually browsed words carry neither. This keeps the page
@@ -848,7 +853,6 @@ private fun MushafQcfWord(
     // the word beside it. Read in the layer block, so the dim animates in the
     // draw phase without recomposing the leaf.
     val recessAlpha = {
-        val pack = packs[token.surahId to token.ayah]
         val motion = pack?.motions?.getOrNull(token.word.position - 1)
         when {
             !liveInk || pack == null -> 1f
@@ -870,8 +874,7 @@ private fun MushafQcfWord(
     // ~150 words. Their waiting dim is a flat alpha instead (see recessAlpha),
     // so only the word actually under the voice pays for a layer.
     val wordSweep = {
-        val motion = packs[token.surahId to token.ayah]
-            ?.motions?.getOrNull(token.word.position - 1)
+        val motion = pack?.motions?.getOrNull(token.word.position - 1)
         when {
             motion == null || motion.repeat -> 1f
             motion.isActive || motion.sweepProgress > 0f -> motion.sweepProgress
@@ -879,8 +882,7 @@ private fun MushafQcfWord(
         }
     }
     val wordFeather = {
-        packs[token.surahId to token.ayah]
-            ?.motions?.getOrNull(token.word.position - 1)
+        pack?.motions?.getOrNull(token.word.position - 1)
             ?.washFeather ?: InkEngine.tuning.washFeather
     }
     val blooms = {

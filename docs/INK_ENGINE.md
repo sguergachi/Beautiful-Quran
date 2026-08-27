@@ -469,7 +469,12 @@ tween-vs-snap rules, sweep entry and residual rules, repeat wash timing, the
   as the scrolling reader, completed ayahs retain full ink, and later ayahs use
   a motionless recess pack. A leaf reached by hand stays fully readable, even
   while playback continues elsewhere. The chapter-opening basmalah is part of
-  that sequence: tapping it starts its own wash before the first ayah.
+  that sequence: tapping it starts its own wash before the first ayah. At the
+  playlist handoff, the first ayah stays Upcoming until its first word timing
+  arrives; Media3 advancing the item a poll tick earlier must never flash the
+  whole ayah full before its wash. Each QCF word's draw lambdas also capture
+  the pack that selected its modifier chain, so a newly published Active pack
+  cannot reach an older recess-only chain one frame before the wash layer.
 - Every **highlight** duration, alpha and easing still comes from
   `InkEngine.tuning` — no literal ink-tuning values remain. Motion outside the
   word highlight stays local (for example the block fade while the ayah-selector

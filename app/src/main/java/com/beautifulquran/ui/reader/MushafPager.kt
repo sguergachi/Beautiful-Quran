@@ -120,6 +120,8 @@ internal data class MushafPlayback(
     val basmalahActive: Boolean = false,
     /** Undebounced player truth; page turns must stop on the first pause. */
     val isPlaying: Boolean = false,
+    /** Media3's actual playlist ayah, before the fade-led ink frontier. */
+    val playingAyah: Int? = null,
 )
 
 /** Stable equality key for the small set of voice changes follow reacts to. */
@@ -211,12 +213,15 @@ internal fun mushafInkPackKind(
     frontierAyah: Int?,
     basmalahActive: Boolean,
     hasSearchFlash: Boolean,
+    /** The frontier is selected, but its first word timing has not arrived. */
+    frontierWaitingForFirstWord: Boolean = false,
 ): MushafInkPackKind = when {
     pageOwnsVoice && basmalahActive -> MushafInkPackKind.UPCOMING
     pageOwnsVoice && activeWordAyah == ayah -> MushafInkPackKind.ACTIVE_WORD
     hasSearchFlash -> MushafInkPackKind.SEARCH_FLASH
     pageOwnsVoice &&
-        (frontierAyah == null || ayah > frontierAyah) ->
+        (frontierAyah == null || ayah > frontierAyah ||
+            ayah == frontierAyah && frontierWaitingForFirstWord) ->
         MushafInkPackKind.UPCOMING
     else -> MushafInkPackKind.STATIC
 }
@@ -986,21 +991,33 @@ private fun MushafPageInkClocks(
     val activeWordAyah by remember {
         derivedStateOf { activeWordState.value?.ayah }
     }
-    val frontierAyah = activeWordAyah ?: playback.value.activeAyah
+    val voice = playback.value
+    val frontierAyah = activeWordAyah ?: voice.activeAyah
+    var playingAyahHasWord by remember(voice.playingAyah) { mutableStateOf(false) }
+    if (!playingAyahHasWord && activeWordAyah != null && activeWordAyah == voice.playingAyah) {
+        SideEffect { playingAyahHasWord = true }
+    }
+    // Media3 advances the playlist item before the 33 ms word poll reaches
+    // that item's first timing. Keep its frontier under Upcoming paper during
+    // that silence. Once a word has appeared, a later null is the audio tail
+    // and the completed ayah must retain full ink instead of dimming again.
+    val frontierWaitingForFirstWord = activeWordAyah == null &&
+        (frontierAyah != voice.playingAyah || !playingAyahHasWord)
     ayahs.forEach { ayah ->
         key(ayah.surahId, ayah.number) {
             val activeWord by remember(ayah.number) {
                 derivedStateOf { activeWordState.value?.takeIf { it.ayah == ayah.number } }
             }
-            val recitingActive = playback.value.reciting
+            val recitingActive = voice.reciting
             val flashHere = flashAyah == ayah.number && flashWordPosition != null
             val pack = when (mushafInkPackKind(
                 pageOwnsVoice = pageOwnsVoice,
                 ayah = ayah.number,
                 activeWordAyah = activeWordAyah,
                 frontierAyah = frontierAyah,
-                basmalahActive = playback.value.basmalahActive,
+                basmalahActive = voice.basmalahActive,
                 hasSearchFlash = flashHere,
+                frontierWaitingForFirstWord = frontierWaitingForFirstWord,
             )) {
                 MushafInkPackKind.ACTIVE_WORD -> rememberAyahInkPack(
                     ayah = ayah,

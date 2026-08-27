@@ -69,6 +69,42 @@ class MushafFollowTurnTest {
     }
 
     @Test
+    fun `first ayah stays recessed between basmalah and its first word`() {
+        assertEquals(
+            MushafInkPackKind.UPCOMING,
+            mushafInkPackKind(
+                pageOwnsVoice = true,
+                ayah = 1,
+                activeWordAyah = null,
+                frontierAyah = 1,
+                basmalahActive = false,
+                hasSearchFlash = false,
+                frontierWaitingForFirstWord = true,
+            ),
+        )
+        assertEquals(
+            MushafInkPackKind.ACTIVE_WORD,
+            mushafInkPackKind(true, 1, 1, 1, false, false),
+        )
+    }
+
+    @Test
+    fun `completed ayah stays full through its audio tail`() {
+        assertEquals(
+            MushafInkPackKind.STATIC,
+            mushafInkPackKind(
+                pageOwnsVoice = true,
+                ayah = 1,
+                activeWordAyah = null,
+                frontierAyah = 1,
+                basmalahActive = false,
+                hasSearchFlash = false,
+                frontierWaitingForFirstWord = false,
+            ),
+        )
+    }
+
+    @Test
     fun `voice page retains read ayahs and covers those beyond the active word`() {
         assertEquals(
             MushafInkPackKind.STATIC,

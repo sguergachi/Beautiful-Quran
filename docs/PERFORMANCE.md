@@ -187,9 +187,15 @@ tick must not remasure three pages or recreate 150 `Text` nodes.
 - `activeWord` stays an un-delegated `State`. Follow-page turns collect it
   from `snapshotFlow`; each ayah's ink slot reads it through
   `derivedStateOf`. The page layout never sees the value.
-- Ink packs are published into a `State<Map>` and read only inside
-  `shapedWordBloom` draw lambdas, so a word boundary invalidates paint,
-  not layout.
+- Ink packs are published per ayah into a `SnapshotStateMap`. Pack identity is
+  read in composition so only that ayah can swap between its cheap recess and
+  live wash modifier chains; the pack's animated values are read during draw,
+  so wash frames invalidate paint rather than layout.
+- A QCF word captures the pack identity that selected its modifier chain;
+  only that pack's animated values are read during draw. Re-reading the map
+  from a draw lambda is both a hot hash lookup and a correctness race: a new
+  Active pack can otherwise reach an old recess-only chain one frame before
+  recomposition attaches the wash layer.
 - QCF page fonts are held as one atomic family/typeface pair in a bounded LRU
   and preloaded on `Dispatchers.Default` for the settled page ± 2, so a swipe
   does not `Typeface.createFromAsset` on the UI thread. Line geometry is keyed
