@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -312,12 +313,10 @@ internal fun MushafReadingSheet(
                     label = "Next",
                     tint = primary,
                 )
-                Text(
-                    text = "${if (playerState.speed % 1f == 0f) playerState.speed.toInt() else playerState.speed}×",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = if (playerState.speed == 1f) quiet else MaterialTheme.colorScheme.onBackground,
+                Box(
                     modifier = Modifier
                         .width(MushafGutterSlot)
+                        .fillMaxHeight()
                         .graphicsLayer { alpha = secondaryFade }
                         .then(
                             // Faded out of sight, and out of reach with it.
@@ -327,8 +326,15 @@ internal fun MushafReadingSheet(
                                 Modifier
                             },
                         ),
-                    textAlign = TextAlign.Center,
-                )
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = "${if (playerState.speed % 1f == 0f) playerState.speed.toInt() else playerState.speed}×",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = if (playerState.speed == 1f) quiet else MaterialTheme.colorScheme.onBackground,
+                        textAlign = TextAlign.Center,
+                    )
+                }
             }
             }
             if (reciterName.isNotEmpty()) {
