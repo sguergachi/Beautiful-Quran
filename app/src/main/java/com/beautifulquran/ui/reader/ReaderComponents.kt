@@ -182,26 +182,40 @@ internal fun formatMushafAyahMark(number: Int): String {
     }
 }
 
-internal fun formatAyahNumberMark(number: Int, useArabicIndicDigits: Boolean): String {
+internal fun formatAyahNumberMark(
+    number: Int,
+    useArabicIndicDigits: Boolean,
+    /**
+     * Which way the *line* runs, which is not the same question as which
+     * digits it carries. An Arabic-Indic mark set in an English paragraph —
+     * the English mushaf leaf with Arabic verse numbers — still needs the
+     * LTR-isolated form, or bidi mirroring turns its cups outward.
+     */
+    ltr: Boolean = !useArabicIndicDigits,
+): String {
     val digits = if (useArabicIndicDigits) number.toArabicIndic() else number.toString()
-    val raw = if (useArabicIndicDigits) "﴿$digits﴾" else "\u2066﴾$digits﴿\u2069"
+    val raw = if (ltr) "\u2066﴾$digits﴿\u2069" else "﴿$digits﴾"
     return raw.toCharArray().joinToString("\u2060")
 }
 
-/** Appends a mark with Hafs cups and, for English, explicitly Garamond digits. */
+/** Appends a mark with Hafs cups and, for Western digits, explicitly Garamond ones. */
 internal fun AnnotatedString.Builder.appendAyahNumberMark(
     number: Int,
     useArabicIndicDigits: Boolean,
     style: SpanStyle,
+    ltr: Boolean = !useArabicIndicDigits,
 ) {
     val start = length
     withStyle(style.copy(fontFamily = HafsFontFamily)) {
-        append(formatAyahNumberMark(number, useArabicIndicDigits))
+        append(formatAyahNumberMark(number, useArabicIndicDigits, ltr))
     }
     if (!useArabicIndicDigits) {
         val digitStyle = style.copy(fontFamily = TranslationFontFamily)
+        // The isolate and the cup each take a character and a word joiner, so
+        // the LTR form opens its digits two units further in than the plain one.
+        val digitsAt = if (ltr) 4 else 2
         number.toString().indices.forEach { index ->
-            val digitStart = start + 4 + index * 2
+            val digitStart = start + digitsAt + index * 2
             addStyle(digitStyle, digitStart, digitStart + 1)
         }
     }
@@ -235,7 +249,7 @@ internal fun rememberAyahMarkAlpha(focused: Boolean): State<Float> =
     )
 
 /** True when [tap] falls inside the glyph bounds of [range], inflated by [hitSlopPx]. */
-private fun TextLayoutResult.rangeContains(
+internal fun TextLayoutResult.rangeContains(
     tap: Offset,
     range: IntRange,
     hitSlopPx: Float,
@@ -246,7 +260,7 @@ private fun TextLayoutResult.rangeContains(
         ?.inflate(hitSlopPx)
         ?.contains(tap) == true
 
-private fun TextLayoutResult.wordIndexAt(
+internal fun TextLayoutResult.wordIndexAt(
     tap: Offset,
     ranges: List<IntRange>,
     hitSlopPx: Float,

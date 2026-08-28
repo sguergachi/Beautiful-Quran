@@ -6,17 +6,31 @@ import com.beautifulquran.data.Settings
 import com.beautifulquran.data.ThemeMode
 import com.beautifulquran.data.VerseNumberScript
 
-/** Mushaf is a printed Arabic page — never English, never bilingual. */
+/**
+ * Views the mushaf leaf can be set in.
+ *
+ * A printed leaf is one book in one language — the page's own hand, or the
+ * English of it (`domain/EnglishLeaf.kt`). Bilingual is a scroll idea: it
+ * pairs each verse with its translation under it, which is a list of verses
+ * and not a page, and there is nowhere on a leaf to put the second language
+ * without ceasing to be a leaf.
+ *
+ * Until the English leaf existed this list was Arabic alone, and both
+ * functions below forced the setting back to it.
+ */
+val MUSHAF_VIEW_MODES = listOf(ReadingMode.ARABIC_ONLY, ReadingMode.ENGLISH_ONLY)
+
+/** Bilingual has no printed leaf, so entering mushaf from it lands on Arabic. */
 fun applyReadingLayout(settings: Settings, layout: ReadingLayout): Settings =
-    if (layout == ReadingLayout.MUSHAF) {
+    if (layout == ReadingLayout.MUSHAF && settings.readingMode !in MUSHAF_VIEW_MODES) {
         settings.copy(readingLayout = layout, readingMode = ReadingMode.ARABIC_ONLY)
     } else {
         settings.copy(readingLayout = layout)
     }
 
-/** View-mode changes while mushaf is on are ignored so the leaf stays Arabic. */
+/** A leaf may be set in either language, and in nothing else. */
 fun applyReadingMode(settings: Settings, mode: ReadingMode): Settings =
-    if (settings.readingLayout == ReadingLayout.MUSHAF && mode != ReadingMode.ARABIC_ONLY) {
+    if (settings.readingLayout == ReadingLayout.MUSHAF && mode !in MUSHAF_VIEW_MODES) {
         settings
     } else {
         settings.copy(readingMode = mode)
@@ -33,6 +47,15 @@ fun showsPreviewAnnotation(layout: ReadingLayout, annotationsEnabled: Boolean): 
 /** Collapsed ayah rail lives on the scroll leaf — never on a printed page. */
 fun showsPreviewAyahRail(layout: ReadingLayout): Boolean =
     showsScrollChrome(layout)
+
+/**
+ * The verse-mark script is offered wherever the reader actually sees Western
+ * digits as an option: every scroll view, and the English leaf, whose marks
+ * are set in the running prose the same way. The Arabic leaf's marks are drawn
+ * by the page face itself and cannot be restyled.
+ */
+fun showsVerseNumberChrome(layout: ReadingLayout, mode: ReadingMode): Boolean =
+    showsScrollChrome(layout) || mode == ReadingMode.ENGLISH_ONLY
 
 /** Word gloss lives under Arabic tiles — only the bilingual scroll view. */
 fun showsWordGlossChrome(layout: ReadingLayout, mode: ReadingMode): Boolean =
@@ -51,14 +74,18 @@ fun themeLabel(mode: ThemeMode): String = when (mode) {
     ThemeMode.ROYAL_GREEN -> "Royal green"
 }
 
+fun readingModeLabel(mode: ReadingMode): String = when (mode) {
+    ReadingMode.ENGLISH_ONLY -> "English"
+    ReadingMode.ARABIC_ONLY -> "Arabic"
+    ReadingMode.ARABIC_ENGLISH -> "Arabic & English"
+}
+
 fun customizeSummary(settings: Settings): String {
     val theme = themeLabel(settings.themeMode)
-    if (settings.readingLayout == ReadingLayout.MUSHAF) return "Mushaf · $theme"
-    val view = when (settings.readingMode) {
-        ReadingMode.ENGLISH_ONLY -> "English"
-        ReadingMode.ARABIC_ONLY -> "Arabic"
-        ReadingMode.ARABIC_ENGLISH -> "Arabic & English"
+    if (settings.readingLayout == ReadingLayout.MUSHAF) {
+        return "Mushaf · ${readingModeLabel(settings.readingMode)} · $theme"
     }
+    val view = readingModeLabel(settings.readingMode)
     val verse = if (settings.verseNumberScript == VerseNumberScript.ARABIC) {
         "Arabic verse marks"
     } else {

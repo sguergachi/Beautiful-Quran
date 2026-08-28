@@ -11,7 +11,11 @@ enum class ThemeMode { SYSTEM, LIGHT, DARK, ROYAL_GREEN }
 /** What flows on the sheet: Arabic with English under each word, English only, or Arabic only. */
 enum class ReadingMode { ARABIC_ENGLISH, ENGLISH_ONLY, ARABIC_ONLY }
 
-/** Continuous scroll, or a printed mushaf leaf. Mushaf is Arabic only. */
+/**
+ * Continuous scroll, or a printed leaf. A leaf may be set in the page's own
+ * hand or in English (`domain/EnglishLeaf.kt`) — never bilingual, which is a
+ * scroll idea. See `MUSHAF_VIEW_MODES`.
+ */
 enum class ReadingLayout { SCROLL, MUSHAF }
 
 /** Digit form of the trailing ﴿N﴾ / ﴾N﴿ verse mark. */

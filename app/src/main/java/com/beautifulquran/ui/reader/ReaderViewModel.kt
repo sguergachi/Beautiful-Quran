@@ -243,6 +243,12 @@ class ReaderViewModel(
     private val _mushaf = MutableStateFlow<MushafUi?>(null)
     val mushaf: StateFlow<MushafUi?> = _mushaf
 
+    /**
+     * The verses that begin on one mushaf leaf — what the English leaf is set
+     * from. A page at a time, and windowed in the repository.
+     */
+    suspend fun leafText(page: Int): Map<Long, String> = repository.mushafPageTranslations(page)
+
     fun ensureMushaf() {
         if (_mushaf.value != null) return
         viewModelScope.launch {

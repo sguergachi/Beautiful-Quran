@@ -239,9 +239,18 @@ fun Modifier.shapedWordBloom(
      * first-pass wash is ([Modifier.letterFadeIn]).
      */
     clipTintToRange: Boolean = true,
+    /**
+     * Whether the text is set `TextAlign.Justify`.
+     *
+     * It changes where the ink *is*, not merely how it looks: a justified line
+     * is stretched to the measure after it is measured, and the selection path
+     * this works from never learns of it. See [justifyShift]. Every caller that
+     * sets ragged or centred text leaves this false and is unaffected.
+     */
+    justified: Boolean = false,
 ): Modifier {
     val stops = FloatArray(InkProfileStops) { i -> i / (InkProfileStops - 1f) }
-    val lineBoundsCache = LineBoundsCache()
+    val lineBoundsCache = LineBoundsCache(justified)
     val glyphHaloCache = GlyphHaloCache()
     return drawWithContent {
         drawContent()
@@ -301,8 +310,23 @@ fun Modifier.shapedWordBloom(
                         bloom.paper.copy(alpha = (1f - glyphAlpha).coerceIn(0f, 1f))
                     }
                     val pad = coverPad.toPx()
-                    lineBounds.forEach { bounds ->
-                        val cover = linePaperCoverBounds(bounds, pad)
+                    val covers = lineBounds.map { linePaperCoverBounds(it, pad) }
+                    // One wash across the whole range, however many lines it
+                    // is set over.
+                    //
+                    // A word is one line's worth of ink, so for every caller
+                    // that draws words this is a single cover and the arithmetic
+                    // below collapses to what it always was. A range that *is*
+                    // set over several lines — a verse of English prose, which
+                    // is one reveal spanning a paragraph — must be washed in
+                    // reading order: the wash crosses line one, then line two.
+                    // Giving each line the same progress lit the whole block at
+                    // once, which is the one thing the ink is not allowed to do.
+                    val total = covers.sumOf { it.width.toDouble() }.toFloat().coerceAtLeast(1f)
+                    val edge = (total * (bloom.feather ?: feather)).coerceAtLeast(1f)
+                    val head = p * (total + edge)
+                    var travelled = 0f
+                    covers.forEach { cover ->
                         // The clip/draw rect already includes [pad] for glyph
                         // overhang, so the wash must use that same geometry.
                         // Otherwise an end glyph such as EB Garamond's “g”
@@ -311,19 +335,21 @@ fun Modifier.shapedWordBloom(
                         // progress snaps to 1.
                         val washLeft = cover.left
                         val w = cover.width
-                        val edge = (w * (bloom.feather ?: feather)).coerceAtLeast(1f)
-                        val head = p * (w + edge)
+                        // Where the head stands within this line, measured from
+                        // the line's own leading edge.
+                        val local = head - travelled
+                        travelled += w
                         val brush = if (rtl) {
                             Brush.horizontalGradient(
                                 colors = paperColors,
-                                startX = washLeft + (w - head),
-                                endX = washLeft + (w - head) + edge,
+                                startX = washLeft + (w - local),
+                                endX = washLeft + (w - local) + edge,
                             )
                         } else {
                             Brush.horizontalGradient(
                                 colors = paperColors,
-                                startX = washLeft + head - edge,
-                                endX = washLeft + head,
+                                startX = washLeft + local - edge,
+                                endX = washLeft + local,
                             )
                         }
                         clipRect(
@@ -482,7 +508,7 @@ fun Modifier.shapedWordBloom(
  * Bounded by the word count of one ayah and dropped whole when the layout
  * changes identity (font scale, width, text).
  */
-private class LineBoundsCache {
+private class LineBoundsCache(private val justified: Boolean) {
     private var layout: TextLayoutResult? = null
     private val byRange = HashMap<Long, List<Rect>>()
 
@@ -493,7 +519,8 @@ private class LineBoundsCache {
         }
         val key = (start.toLong() shl 32) or endExclusive.toLong()
         byRange[key]?.let { return it }
-        return computeLineBounds(textLayout, start, endExclusive).also { byRange[key] = it }
+        return computeLineBounds(textLayout, start, endExclusive, justified)
+            .also { byRange[key] = it }
     }
 }
 
@@ -573,29 +600,86 @@ private fun computeLineBounds(
     textLayout: TextLayoutResult,
     start: Int,
     endExclusive: Int,
+    justified: Boolean,
 ): List<Rect> = buildList {
     val firstLine = textLayout.getLineForOffset(start)
     val lastLine = textLayout.getLineForOffset((endExclusive - 1).coerceAtLeast(start))
     for (line in firstLine..lastLine) {
-        val lineStart = maxOf(start, textLayout.getLineStart(line))
-        val lineEnd = minOf(endExclusive, textLayout.getLineEnd(line, visibleEnd = true))
+        val layoutStart = textLayout.getLineStart(line)
+        val layoutEnd = textLayout.getLineEnd(line, visibleEnd = true)
+        val lineStart = maxOf(start, layoutStart)
+        val lineEnd = minOf(endExclusive, layoutEnd)
         if (lineEnd <= lineStart) continue
         val selectionBounds = textLayout.getPathForRange(lineStart, lineEnd).getBounds()
         if (!selectionBounds.isEmpty && selectionBounds.width > 0f) {
+            val shift = if (justified) {
+                justifyShift(textLayout, line, layoutStart, layoutEnd)
+            } else {
+                null
+            }
             // Selection paths can stop above a Latin descender at a wrapped
             // range edge. Keep the word-local horizontal bounds, but cover the
             // text layout's full line height so g/j/p/q/y never escape the
             // upcoming-ink mask.
             add(
                 Rect(
-                    left = selectionBounds.left,
+                    left = selectionBounds.left + (shift?.at(lineStart) ?: 0f),
                     top = textLayout.getLineTop(line),
-                    right = selectionBounds.right,
+                    right = selectionBounds.right + (shift?.at(lineEnd) ?: 0f),
                     bottom = textLayout.getLineBottom(line),
                 ),
             )
         }
     }
+}
+
+/**
+ * Where a justified line's ink actually sits, against where the selection path
+ * says it does.
+ *
+ * A selection path is measured on the run's own advances:
+ * `TextLayoutResult.getPathForRange` does not know that the line was stretched
+ * to the measure, so on a justified paragraph it stops short of the ink by the
+ * whole of that stretch. Left uncorrected the paper masks came up short at the
+ * end of every line, and an unread verse showed its last word or two at full
+ * ink — a page of English prose with a bright ragged edge down its right side.
+ *
+ * The correction is exact rather than a fudge, because the stretch is
+ * distributed evenly: Android justifies inter-word, dividing the extra width
+ * over the line's stretchable spaces. So a character sits right of where the
+ * path puts it by one share for every space before it.
+ */
+private class JustifyShift(private val perSpace: Float, private val spacesBefore: (Int) -> Int) {
+    fun at(offset: Int): Float = perSpace * spacesBefore(offset)
+}
+
+private fun justifyShift(
+    textLayout: TextLayoutResult,
+    line: Int,
+    layoutStart: Int,
+    layoutEnd: Int,
+): JustifyShift? {
+    // A paragraph's last line is set flush left and takes no stretch at all;
+    // measuring one would read the whole of its ragged edge as stretch.
+    if (line >= textLayout.lineCount - 1) return null
+    val text = textLayout.layoutInput.text
+    val spaces = countSpaces(text, layoutStart, layoutEnd)
+    if (spaces <= 0) return null
+    val natural = textLayout.getPathForRange(layoutStart, layoutEnd).getBounds()
+    if (natural.isEmpty) return null
+    val stretch = textLayout.getLineRight(line) - natural.right
+    if (stretch <= 0f) return null
+    return JustifyShift(stretch / spaces) { offset ->
+        countSpaces(text, layoutStart, offset)
+    }
+}
+
+private fun countSpaces(text: CharSequence, start: Int, endExclusive: Int): Int {
+    var spaces = 0
+    for (index in start until endExclusive.coerceAtMost(text.length)) {
+        if (text[index] == ' ') spaces++
+    }
+    return spaces
 }
 
 private const val InkProfileStops = 9

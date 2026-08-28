@@ -22,6 +22,7 @@ import com.beautifulquran.domain.buildMushafCatalog
 import com.beautifulquran.domain.isWordSearchQuery
 import com.beautifulquran.domain.matchWordSearch
 import com.beautifulquran.domain.normalizeArabicForSearch
+import com.beautifulquran.domain.quranWordKey
 import com.beautifulquran.timingslab.OverrideEntry
 import com.beautifulquran.timingslab.OverrideKey
 import com.beautifulquran.timingslab.TimingOverrides
@@ -30,6 +31,10 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlin.math.abs
+
+/** Leaves whose English text is held resident — the page and its neighbours,
+ * matching the QCF face window. */
+private const val MUSHAF_LEAF_TEXT_CACHE = 12
 
 private fun Segment.shiftBy(ms: Long) = copy(startMs = startMs + ms, endMs = endMs + ms)
 
@@ -126,6 +131,24 @@ class QuranRepository(
     /** Lazily built once — 604 Madinah pages from qcf_page / qcf_line. */
     @Volatile
     private var mushafCatalog: MushafCatalog? = null
+
+    /**
+     * Verse translations for the English leaf, a page at a time.
+     *
+     * Only the chapter the reader opened is loaded ([surahContent]), and a leaf
+     * routinely carries verses of another — juz' 30 puts three chapters on one
+     * page. Held for the whole book these are 6,236 strings retained for the
+     * process lifetime for text no Arabic leaf ever draws, so they are fetched
+     * per page and kept in a window the size of the QCF face cache.
+     */
+    private val leafTranslationCache = object : LinkedHashMap<Int, Map<Long, String>>(
+        /* initialCapacity = */ 16,
+        /* loadFactor = */ 0.75f,
+        /* accessOrder = */ true,
+    ) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<Int, Map<Long, String>>) =
+            size > MUSHAF_LEAF_TEXT_CACHE
+    }
 
     /** Runs [sql] and maps every row with [map] — the shape of every query here. */
     private fun <T> queryList(sql: String, args: Array<String>? = null, map: (Cursor) -> T): List<T> =
@@ -233,6 +256,37 @@ class QuranRepository(
             buildMushafCatalog(sources).also { mushafCatalog = it }
         }
     }
+
+    /**
+     * The translation of every verse that *begins* on one Madinah page, keyed
+     * by [quranWordKey] at position 1.
+     *
+     * This is what the English leaf is set from, and the join says the rule:
+     * a verse belongs to the leaf its first word falls on, because a sentence
+     * cannot be cut at a page break (see `domain/EnglishLeaf.kt`). At most
+     * forty rows, so the query is small; the window is what keeps a swipe from
+     * going back to SQLite for a leaf the reader has just turned away from and
+     * is about to turn back to.
+     */
+    suspend fun mushafPageTranslations(page: Int): Map<Long, String> =
+        withContext(Dispatchers.IO) {
+            synchronized(leafTranslationCache) { leafTranslationCache[page] }
+                ?.let { return@withContext it }
+            val verses = queryList(
+                """
+                SELECT a.surah_id, a.ayah_number, a.translation_en
+                FROM ayahs a
+                JOIN words w
+                  ON w.surah_id = a.surah_id AND w.ayah_number = a.ayah_number
+                WHERE w.position = 1 AND w.qcf_page = ?
+                """.trimIndent(),
+                arrayOf(page.toString()),
+            ) { c ->
+                quranWordKey(c.getInt(0), c.getInt(1), 1) to c.getString(2)
+            }.toMap()
+            synchronized(leafTranslationCache) { leafTranslationCache[page] = verses }
+            verses
+        }
 
     /**
      * Resolves user bookmark keys to their immutable Quran text and chapter

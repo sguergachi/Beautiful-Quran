@@ -83,6 +83,8 @@ tools/detect_audio_onsets.py  Opening-range scanner that regenerates that eviden
 scripts/                Linux emulator setup / run helpers
 docs/                   Architecture, design language, performance, timings docs
 docs/QURAN_TYPOGRAPHY.md  What a mushaf page is: the rules a line is set by
+                        (§13 is the English leaf — the same book in English)
+tools/measure_english_leaves.py  Where the English leaf's fit constants come from
                         …and the GitHub Pages product page (index.html + styles.css)
 docs/ornaments.css      Generated: the product page's ornaments (see below); do not hand-edit
 web/                    Browser port (Vite + React): Focus / Highlight / Ink + paper reader
@@ -173,7 +175,9 @@ python3 tools/test_build_db.py  # timing pipeline regressions (~1s, no Gradle)
    flush, the line filled by the letterform rather than the space, the word
    space chosen and not left over, leading set by the ink — with the
    measurements behind each rule. Read it before changing anything about how a
-   line is set.
+   line is set. §13 is the English leaf: the same 604 pages set as a book of
+   the meaning, where a verse belongs to the leaf it *begins* on and the ink
+   says only what it can honestly say about where the reciter is.
 5. **Minimal dependencies, by design.** No Hilt (hand-rolled ViewModel factory
    over `QuranApp` singletons), no Room (raw SQLite wrapper in
    `QuranDatabase`), no navigation library (the three sheets are a hand-rolled

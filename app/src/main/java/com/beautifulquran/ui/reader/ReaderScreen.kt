@@ -258,17 +258,28 @@ fun ReaderScreen(
     val settings by viewModel.settings.settings.collectAsStateWithLifecycle()
     val mushafUi by viewModel.mushaf.collectAsStateWithLifecycle()
     val mushafMode = settings.readingLayout == ReadingLayout.MUSHAF
+    // The English leaf sets a straddling verse whole on the page it begins on,
+    // so every "which leaf is the voice on" answer is the verse's opening leaf
+    // rather than the word's own. See MushafCatalog.readingPageOf.
+    val mushafWholeVerses = mushafMode && settings.readingMode == ReadingMode.ENGLISH_ONLY
     LaunchedEffect(mushafMode) {
         if (mushafMode) viewModel.ensureMushaf()
     }
     val mushafCatalog = mushafUi?.catalog
     // The leaf the reader asked for, as soon as there is a catalog to ask.
-    val mushafOpeningPage = remember(mushafCatalog, surahId, startAyah, startWordPosition) {
+    val mushafOpeningPage = remember(
+        mushafCatalog,
+        surahId,
+        startAyah,
+        startWordPosition,
+        mushafWholeVerses,
+    ) {
         val catalog = mushafCatalog ?: return@remember null
-        val page = catalog.pageOf(
+        val page = catalog.readingPageOf(
             surahId,
             startAyah?.coerceAtLeast(1) ?: 1,
             startWordPosition ?: 1,
+            wholeVerses = mushafWholeVerses,
         )
         (page - 1).coerceIn(0, catalog.pageCount - 1)
     }
@@ -998,10 +1009,11 @@ fun ReaderScreen(
                 followPlayback && isThisSurahPlaying
             }
             val targetPage = when {
-                word != null -> catalog.pageOf(
+                word != null -> catalog.readingPageOf(
                     renderedSurahId,
                     word.ayah,
                     word.wordPosition,
+                    wholeVerses = mushafWholeVerses,
                 )
                 followPlayback && isThisSurahPlaying && activeBasmalah == true ->
                     catalog.firstPageOf(renderedSurahId)
@@ -2340,10 +2352,11 @@ fun ReaderScreen(
                             val word = activeWordState.value
                             val playbackPage = when {
                                 catalog == null -> null
-                                word != null && isThisSurahPlaying -> catalog.pageOf(
+                                word != null && isThisSurahPlaying -> catalog.readingPageOf(
                                     renderedSurahId,
                                     word.ayah,
                                     word.wordPosition,
+                                    wholeVerses = mushafWholeVerses,
                                 ) - 1
                                 activeBasmalah == true && isThisSurahPlaying ->
                                     catalog.firstPageOf(renderedSurahId) - 1
@@ -2398,15 +2411,21 @@ fun ReaderScreen(
                     // finger. Hold the pager here until the clock names this
                     // leaf — a timer let a slow seek yank it away.
                     var mushafTappedPage by remember { mutableStateOf<Int?>(null) }
-                    LaunchedEffect(mushafTappedPage, mushafReady.catalog, mushafSurahId) {
+                    LaunchedEffect(
+                        mushafTappedPage,
+                        mushafReady.catalog,
+                        mushafSurahId,
+                        mushafWholeVerses,
+                    ) {
                         val held = mushafTappedPage ?: return@LaunchedEffect
                         val catalog = mushafReady.catalog
                         snapshotFlow { activeWordState.value }.collect { word ->
                             if (word == null || word.fromTap) return@collect
-                            if (catalog.pageOf(
+                            if (catalog.readingPageOf(
                                     mushafSurahId,
                                     word.ayah,
                                     word.wordPosition,
+                                    wholeVerses = mushafWholeVerses,
                                 ) == held
                             ) {
                                 mushafTappedPage = null
@@ -2495,6 +2514,10 @@ fun ReaderScreen(
                         onAyahClick = onMushafAyahClick,
                         onBasmalahClick = onMushafBasmalahClick,
                         pageNumberScript = settings.pageNumberScript,
+                        english = settings.readingMode == ReadingMode.ENGLISH_ONLY,
+                        verseNumberScript = settings.verseNumberScript,
+                        hideEnglishParentheticals = settings.hideEnglishParentheticals,
+                        leafText = viewModel::leafText,
                         modifier = Modifier.fillMaxSize(),
                     )
                     }

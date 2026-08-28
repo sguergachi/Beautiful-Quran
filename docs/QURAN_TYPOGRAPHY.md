@@ -201,6 +201,117 @@ has too little contrast to read.
 
 ---
 
+## 13. The English leaf
+
+The same book, in the reader's language. Rules 1–12 are about the Arabic page;
+this section is the whole of what changes when the leaf is set in English, and
+nothing here overrides them — the Arabic leaf is unaffected.
+
+*Code: `domain/EnglishLeaf.kt` (what a leaf carries), `domain/EnglishLeafFit.kt`
+(what it is set in), `ui/reader/MushafEnglishSheet.kt` (how it is drawn).
+Measurements: `tools/measure_english_leaves.py`.*
+
+### 13.1 The page boundary is borrowed, not invented
+
+The translation has no pagination of its own — no printing of it breaks where
+every other printing breaks. So an English leaf carries the verses that
+**begin** on the Arabic leaf of the same number. Page 255 in English opens
+where page 255 opens.
+
+*Begin*, not *appear*: a verse is a sentence, and a sentence cannot be cut at
+whatever word the calligrapher reached at the foot of the page. A verse that
+runs over a break is set whole on the leaf it starts on — which is how a
+parallel-text Qur'an is printed, and it makes the English run continuously with
+nothing repeated and nothing dropped. Every one of the 604 leaves has at least
+one verse beginning on it, so no leaf comes out empty.
+
+The consequence is a rule the rest of the reader has to honour: while the voice
+is inside a straddling verse, the leaf the reader is on is the verse's *opening*
+page, not the page that word is printed on. That is `MushafCatalog.readingPageOf`,
+and it is also why the English leaf does not lead-turn (rule 13.6).
+
+### 13.2 The text is the translation, not the gloss
+
+The scrolling reader's English is quran.com's word-by-word gloss, lyricized —
+an interlinear aid, and it reads as one ("Indeed this (is) your religion
+religion one"). A page of that is a crib. The leaf is a book, so it is set from
+the verse translation.
+
+### 13.3 One hand for the whole book, solved from the measure
+
+Rule 2 again, by a different route. The Arabic hand comes from the fixed 16.4 em
+line; the Latin one comes from the classical measure — a book line holds about
+fifty characters. Both the well and the measure enter it at once:
+
+```
+    H = √( well · measure / (c · ℓ · R) )
+```
+
+with `c` the face's average character advance (measured from EB Garamond at
+runtime, never assumed), `ℓ` the nominal leading and `R` the reference page mass.
+It takes no page: the type depends on the leaf's geometry and the face, and on
+nothing the page happens to carry.
+
+### 13.4 The leading gives; the type does not
+
+This is the deepest difference from the Arabic leaf, and it is the same
+difference as rule 4. Arabic fills a *line* by the letterform and keeps one
+leading for the whole book. Latin fills a line by the word space — which
+justification already does — and fills the *page* by leading, the compositor's
+classical lever.
+
+A leaf's content is fixed by the Arabic, so its mass varies: measured over the
+book, 1,055 characters at the 1st percentile, 1,469 at the median, 1,997 at the
+worst. The block is therefore brought down to the foot by opening or closing the
+leading inside 1.30–1.80 em, never by resizing the type. Anchored at R = 1,440,
+90.2% of leaves fill their well outright. Of the rest, 35 stand a little short
+at the foot — which is what every parallel translation does, and reads as the
+end of something — and 24 ask the hand to give, the worst of them by 7%.
+
+### 13.5 Justified, and deliberately not hyphenated
+
+`TextAlign.Justify` with `LineBreak.Paragraph`; the last line of a paragraph
+stands where it ends, unlike rule 3.
+
+Hyphens are off, and this is load-bearing rather than an omission. Hyphenation
+is the one thing that breaks a *word* across two lines, and
+`ShapedWordBloom.ColorReveal` takes the union bounds of a range's glyph path —
+a tinted wash over a broken word would sweep the width of the whole line.
+(`InkReveal` was taught to advance one wash across a range's line fragments in
+order, because the verse wash below needs exactly that; the tinted layers were
+not.) Anyone turning hyphens on must fix ColorReveal the same way first.
+
+### 13.6 The ink says only what is true
+
+The reciter's timings name Arabic words. This page has none, and the leaf does
+not invent an alignment: it washes the verse being recited across its own
+sentence at the fraction of that verse the voice has actually reached — words
+behind the voice, plus the letter sweep of the word on it
+(`englishVerseReadProgress`). That is a true statement about where the reciter
+is. Verses still to come wait under the same recess as the Arabic leaf's; verses
+already read hold their ink; the packs are the very same `AyahInkPack`.
+
+For the same reason the leaf carries no orange repeat and no wet-ink glint.
+Both are statements about one Arabic word — that the reciter went back over it,
+that its ink is still wet — and there is no word here to say them of. Nor does
+it lead-turn: the lead is measured from the last word *printed* on the page,
+which is routinely mid-sentence on a leaf that set that sentence whole.
+
+### 13.7 The furniture is the Arabic leaf's
+
+Running head, head gutter, well, tail, folio, the page dial, the chapter panel
+and its ornament, the fore-edge fade, and the right-to-left page turn: all
+unchanged. It is the same book — only the writing is the reader's. The chapter's
+name is set in the book's hand inside the same illuminated panel, and the
+basmalah is a centred italic display line under it.
+
+The one thing that grows is the fore-edge margin. The Arabic leaf keeps a bare
+10 dp because every unit of paper it does not spend is type size; the English
+hand is solved from the measure, so paper given to the margin comes back as a
+shorter, more readable line instead.
+
+---
+
 ## What we cannot reproduce
 
 **Kashīda.** The print fills a line by elongating strokes within words. The QCF
