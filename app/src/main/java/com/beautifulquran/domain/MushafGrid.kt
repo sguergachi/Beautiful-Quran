@@ -78,6 +78,59 @@ object MushafGrid {
 }
 
 /**
+ * How a leaf divides its height, in units of [MushafGrid].
+ *
+ * The five bands always sum to [MushafGrid.SLOTS] — that is the whole point of
+ * a grid, and the one thing a test can hold: a leaf whose bands sum to more
+ * than its height runs its folio off the paper, and one that sums to less
+ * leaves a strip of dead paper at the foot that nothing accounts for.
+ *
+ * The two settings spend the budget differently because their ink does.
+ *
+ * The Arabic leaf spends almost nothing on the gutter and the tail and buys a
+ * sixteenth row of revelation with it. It can: the QCF faces mark 1.37 em above
+ * the baseline and 0.75 below, so a nominal band of nearly nothing still leaves
+ * visible air, and every unit not spent on furniture is type size (see
+ * `MUSHAF_DESIGN_LINE_EM`).
+ *
+ * The English leaf has no sixteenth row to buy — its well is continuous prose —
+ * and its ink stops exactly at the ascent and the descender, because the block
+ * is set `Trim.Both`. A band of nothing there is nothing. So it keeps the
+ * canonical gutter and tail, which were sized for exactly this: "a head that
+ * sits closer than about a line's pitch reads as part of the block".
+ */
+data class MushafLeafBands(
+    val runningHead: Float,
+    val headGutter: Float,
+    val well: Float,
+    val tail: Float,
+    val folio: Float,
+) {
+    val slots: Float get() = runningHead + headGutter + well + tail + folio
+}
+
+/** The canonical bands: wide gutters, fifteen units of well. */
+val MUSHAF_ENGLISH_BANDS = MushafLeafBands(
+    runningHead = MushafGrid.RUNNING_HEAD,
+    headGutter = MushafGrid.HEAD_GUTTER,
+    well = MushafGrid.TEXT_LINES.toFloat(),
+    tail = MushafGrid.TAIL,
+    folio = MushafGrid.FOLIO,
+)
+
+/** The display bands: the furniture gives a unit up for a sixteenth row. */
+val MUSHAF_ARABIC_BANDS = MushafLeafBands(
+    runningHead = MushafGrid.RUNNING_HEAD,
+    headGutter = 0.20f,
+    well = MUSHAF_DISPLAY_LINES_PER_PAGE.toFloat(),
+    tail = 0.05f,
+    folio = 0.20f,
+)
+
+fun mushafLeafBands(english: Boolean): MushafLeafBands =
+    if (english) MUSHAF_ENGLISH_BANDS else MUSHAF_ARABIC_BANDS
+
+/**
  * The leaf's type scale.
  *
  * One ratio, one anchor. The anchor is the page's own hand — the fitted glyph

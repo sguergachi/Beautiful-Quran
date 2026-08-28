@@ -37,8 +37,8 @@ import kotlin.math.sqrt
  * and the first thing a reader notices, and a fit resting on a *model* of how
  * long a page will run is a fit that can be wrong — which is a page with
  * revelation cut off the bottom of it. The hand is cut once, for the worst
- * page; and `MushafEnglishSheet` then closes the leading against the leaf's
- * own measured height, so that fitting is a guarantee and not an estimate.
+ * page; and `MushafEnglishSheet` then steps the leading against the leaf's own
+ * measured height, so that fitting is a guarantee and not an estimate.
  */
 
 /**
@@ -149,15 +149,15 @@ fun englishLeafHandPx(
 }
 
 /**
- * The leading this leaf is set on: what brings [lines] down to the foot of
- * the well, held inside the band so the book keeps one colour whatever the
- * page happens to hold.
+ * The leading this leaf is set on: what brings [lines] baseline steps down to
+ * the foot of the well, held inside the band so the book keeps one colour
+ * whatever the page happens to hold.
  *
- * [lines] is fractional because a chapter's panel and its basmalah are
- * measured in line pitches too (`EnglishLeafPanelLines`,
- * `EnglishLeafBasmalahLines`) rather than in dp of their own. Everything on
- * the leaf then rides one rhythm, the way `MushafGrid` puts the Arabic leaf's
- * head, well, tail and folio on one unit.
+ * [lines] counts the *steps between baselines*, not the lines — a block of `n`
+ * lines takes `n − 1` of them plus one line's own ink — and [wellHeightPx] is
+ * what is left of the well once that ink and the leaf's chapter panels have
+ * taken their paper. Both of those are fixed by the hand and do not move with
+ * the leading, which is what makes this one division rather than a search.
  */
 fun englishLeafLeadingEm(lines: Float, fontPx: Float, wellHeightPx: Float): Float {
     if (lines <= 0f || fontPx <= 0f) return ENGLISH_LEAF_NOMINAL_LEADING_EM
@@ -168,19 +168,25 @@ fun englishLeafLeadingEm(lines: Float, fontPx: Float, wellHeightPx: Float): Floa
 /**
  * The leading a leaf is actually set on, once its block has been measured.
  *
- * [englishLeafLeadingEm] chooses from a line count, which is as good as the
- * hand that produced it; this is the guarantee. Given what the leaf really
- * stands at, it closes the leading by exactly the overflow — the block's
- * height is proportional to its leading, so one step lands it on the foot —
- * and it is allowed below [ENGLISH_LEAF_MIN_LEADING_EM] to do it. A line
- * crowded by a fortieth of an em is a page set a little tight; a line past
- * the foot is revelation the reader cannot see.
+ * [englishLeafLeadingEm] chooses from a model of the page; this is the page.
+ * The block's height moves by one pitch for every baseline step it holds
+ * ([pitchesPx] is `steps × hand`), so the leftover paper converts to leading in
+ * one step and lands the foot exactly on the foot of the well.
+ *
+ * It may close below [ENGLISH_LEAF_MIN_LEADING_EM] to do it, and it must: a
+ * line crowded by a fortieth of an em is a page set a little tight, and a line
+ * past the foot is revelation the reader cannot see. Opening, it stops at
+ * [ENGLISH_LEAF_MAX_LEADING_EM] like any other leaf — a page that will not
+ * reach its foot stands short of it.
  */
 fun englishLeafFittedLeadingEm(
     leadingEm: Float,
     measuredHeightPx: Float,
     wellHeightPx: Float,
+    pitchesPx: Float,
 ): Float {
-    if (measuredHeightPx <= wellHeightPx || measuredHeightPx <= 0f) return leadingEm
-    return leadingEm * (wellHeightPx / measuredHeightPx)
+    if (measuredHeightPx <= 0f || pitchesPx <= 0f) return leadingEm
+    val step = (wellHeightPx - measuredHeightPx) / pitchesPx
+    val fitted = leadingEm + step
+    return if (step > 0f) fitted.coerceAtMost(ENGLISH_LEAF_MAX_LEADING_EM) else fitted
 }

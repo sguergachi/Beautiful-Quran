@@ -314,18 +314,60 @@ that its ink is still wet — and there is no word here to say them of. Nor does
 it lead-turn: the lead is measured from the last word *printed* on the page,
 which is routinely mid-sentence on a leaf that set that sentence whole.
 
-### 13.7 The furniture is the Arabic leaf's
+### 13.7 The grid
 
-Running head, head gutter, well, tail, folio, the page dial, the chapter panel
-and its ornament, the fore-edge fade, and the right-to-left page turn: all
-unchanged. It is the same book — only the writing is the reader's. The chapter's
-name is set in the book's hand inside the same illuminated panel, and the
-basmalah is a centred italic display line under it.
+The leaf is one grid, and everything on it lands on the grid.
 
-The one thing that grows is the fore-edge margin. The Arabic leaf keeps a bare
-10 dp because every unit of paper it does not spend is type size; the English
-hand is solved from the measure, so paper given to the margin comes back as a
-shorter, more readable line instead.
+**Vertically**, both settings divide the same 16.75 units of `MushafGrid`, and
+`MushafLeafBands` holds them to it — the five bands must sum to `SLOTS`, or the
+folio runs off the paper at one end and a strip of nothing is unaccounted for at
+the other. They spend the budget differently because their ink does:
+
+```
+                head   gutter   well    tail   folio
+    Arabic      0.30     0.20     16     0.05   0.20
+    English     0.30     0.70     15     0.35   0.40
+```
+
+The Arabic leaf spends almost nothing on the gutter and the tail and buys a
+sixteenth row of revelation with it. It can, because the QCF faces mark 1.37 em
+above the baseline and 0.75 below, so a band of nearly nothing still leaves
+visible air — and every unit not spent on furniture is type size (§2). The
+English leaf has no sixteenth row to buy, and its ink stops *exactly* at the
+ascent and the descender, so it keeps the canonical gutters, which were sized
+for precisely this: a head that sits closer than about a line's pitch reads as
+part of the block.
+
+That last point is why the block is set `LineHeightStyle.Trim.Both`. Untrimmed,
+a line box carries half its leading above the first ascent and half below the
+last descender — and since the leading is the thing that varies from leaf to
+leaf (§13.4), so did that half. Measured on device, the first line of a leaf set
+at 2.00 em sat 7 dp lower than the first line of one set at 1.30 em: the head
+gutter the grid promised was not the paper the reader saw. Trimmed, the block's
+own edges are the ink, and the first line and the last land on the same paper on
+every leaf in the book. It also makes the block's height exactly `(n − 1)`
+pitches plus one line's ink, which is what the leading is solved from.
+
+**Horizontally**, there is one measure, and the running head and the folio are
+set to it. They are furniture *of the text block*, not of the paper: standing
+them at their own inset put the head a finger's width outside the block it
+names. The Arabic leaf's measure keeps its bare 10 dp fore-edge, because every
+unit of paper it does not spend is type size and the QCF measure is what caps
+that type. The English leaf's is 5.5% of the leaf — the hand is solved from the
+measure there, so paper given to the margin comes back as a shorter, more
+readable line rather than as smaller type, and a book with no outer margin reads
+as a printout.
+
+**The illumination is the book's, not the page's.** The chapter panel and the
+basmalah are a fixed number of ems of the hand, so a chapter opens the same size
+wherever it falls. Measured in line pitches, as they were at first, a panel came
+out a third larger on a light leaf than on a heavy one — the same fault as type
+that changes from leaf to leaf, in the one element that is supposed to be the
+most constant thing on the page.
+
+Everything else is unchanged: the page dial, the chapter ornament, the fore-edge
+fade, and the right-to-left page turn. It is the same book — only the writing is
+the reader's.
 
 ---
 

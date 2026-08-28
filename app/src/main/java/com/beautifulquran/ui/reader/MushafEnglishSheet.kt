@@ -116,6 +116,8 @@ internal fun MushafEnglishSheet(
     flashWordPosition: Int?,
     hideParentheticals: Boolean,
     verseNumberScript: VerseNumberScript,
+    /** The leaf's fore-edge, shared with the running head and the folio. */
+    foreEdge: Dp,
     onAyahClick: (MushafToken) -> Unit,
     onBasmalahClick: (Int) -> Unit,
     modifier: Modifier = Modifier,
@@ -176,15 +178,13 @@ internal fun MushafEnglishSheet(
         if (leaf == null) return@BoxWithConstraints
         val density = LocalDensity.current
         val measurer = rememberTextMeasurer()
-        val margin = englishLeafMargin(maxWidth)
-        // A hair off the well, as the Arabic leaf takes for the same reason:
-        // the block is solved to fill this exactly, and rounding must not put
-        // the last line's descenders past the foot where they are clipped.
+        // A hair off the well: the block is solved to fill this exactly, and
+        // rounding must not put the last line's descenders past the foot.
         val wellPx = with(density) {
             (constraints.maxHeight - EnglishLeafFitSlack.roundToPx()).toFloat().coerceAtLeast(1f)
         }
         val measurePx = with(density) {
-            (constraints.maxWidth - (margin * 2).roundToPx()).toFloat().coerceAtLeast(1f)
+            (constraints.maxWidth - foreEdge.roundToPx() * 2).toFloat().coerceAtLeast(1f)
         }
         val palette = rememberWordInkPalette()
         val gold = LocalQuranAccents.current.gold
@@ -195,12 +195,17 @@ internal fun MushafEnglishSheet(
             setEnglishLeaf(blocks, wellPx, measurePx, density, measurer)
         }
         val fontSize = with(density) { setting.handPx.toSp() }
-        val pitchDp = with(density) { (setting.handPx * setting.leadingEm).toDp() }
-        val pitch = with(density) { pitchDp.toSp() }
+        val handDp = with(density) { setting.handPx.toDp() }
+        val basmalahDp = remember(setting.handPx, measurePx, density, measurer) {
+            with(density) {
+                englishBasmalahPx(setting.handPx, measurePx, density, measurer).toDp()
+            }
+        }
+        val pitch = with(density) { (setting.handPx * setting.leadingEm).toSp() }
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = margin),
+                .padding(horizontal = foreEdge),
             // A leaf whose content will not reach the foot hangs from the
             // head, as a book's last page of a chapter does — the paper simply
             // runs out under it.
@@ -225,20 +230,20 @@ internal fun MushafEnglishSheet(
                         Box(
                             Modifier
                                 .fillMaxWidth()
-                                .height(pitchDp * EnglishLeafPanelLines),
+                                .height(handDp * EnglishLeafPanelEm),
                             contentAlignment = Alignment.Center,
                         ) {
                             MushafSurahTitleBand(
                                 surah = surahsById[block.surahId],
                                 fontSize = fontSize * EnglishLeafPanelType,
-                                bandHeight = pitchDp * EnglishLeafPanelLines * 0.82f,
+                                bandHeight = handDp * EnglishLeafPanelEm * 0.82f,
                                 latin = true,
                             )
                         }
                         if (block.basmalah) {
                             EnglishBasmalahLine(
                                 fontSize = fontSize,
-                                slotHeight = pitchDp * EnglishLeafBasmalahLines,
+                                slotHeight = basmalahDp,
                                 active = pageOwnsVoice &&
                                     block.surahId == content.surah.id &&
                                     playback.value.basmalahActive,
@@ -263,25 +268,30 @@ internal fun MushafEnglishSheet(
 }
 
 /**
- * The leaf's fore-edge margin.
+ * The English leaf's fore-edge margin, shared by its running head, its text
+ * block and its folio.
  *
- * The Arabic leaf keeps a bare 10 dp because every unit of paper it does not
- * spend is type size, and the QCF measure is what caps that type. The English
- * hand is solved from the measure instead ([englishLeafHandPx]), so paper given
- * to the margin comes back as a shorter, more readable line rather than as
- * smaller type — and a book with no outer margin reads as a printout. A
- * proportion, not a dp, so a tablet gets a tablet's margins.
+ * A proportion, not a dp, so a tablet gets a tablet's margins.
  */
-private fun englishLeafMargin(leafWidth: Dp): Dp =
-    (leafWidth * EnglishLeafMarginFraction).coerceAtLeast(MushafEdgeGutter)
+internal fun englishLeafForeEdge(leafWidth: Dp): Dp =
+    (leafWidth * EnglishLeafForeEdgeFraction).coerceAtLeast(MushafEdgeGutter)
 
-private const val EnglishLeafMarginFraction = 0.055f
+private const val EnglishLeafForeEdgeFraction = 0.055f
 
 private val EnglishLeafFitSlack = 2.dp
 
-/** The chapter panel and its basmalah, measured in line pitches of the page. */
-private const val EnglishLeafPanelLines = 2.4f
-private const val EnglishLeafBasmalahLines = 1.9f
+/**
+ * The chapter panel and its basmalah, in **ems of the book's hand**.
+ *
+ * Ems, not line pitches. The pitch is the one thing on this leaf that varies
+ * from page to page — it is how a leaf fills its well — so a panel measured in
+ * pitches was a third larger on a light leaf than on a heavy one. The
+ * illumination is the book's, like the hand: one size wherever a chapter opens.
+ */
+private const val EnglishLeafPanelEm = 3.5f
+
+/** Air under the basmalah, so the chapter's first verse does not run into it. */
+private const val EnglishLeafBasmalahAirEm = 0.9f
 
 /** The panel's name is set a step above the text, as the Arabic leaf sets it. */
 private const val EnglishLeafPanelType = 1.08f
@@ -294,9 +304,9 @@ private const val EnglishLeafFadeMs = 220
 /** One block of the leaf, with its text already built. */
 private sealed class EnglishLeafBlockText {
     data class Opening(val surahId: Int, val basmalah: Boolean) : EnglishLeafBlockText() {
-        /** What the panel and its basmalah take, in line pitches of the page. */
-        val pitches: Float
-            get() = EnglishLeafPanelLines + if (basmalah) EnglishLeafBasmalahLines else 0f
+        /** The paper this opening takes: a fixed panel, and a measured basmalah. */
+        fun heightPx(handPx: Float, basmalahPx: Float): Float =
+            handPx * EnglishLeafPanelEm + if (basmalah) basmalahPx else 0f
     }
 
     /**
@@ -381,15 +391,29 @@ private fun englishLeafBlockTexts(
 private data class EnglishLeafSetting(val handPx: Float, val leadingEm: Float)
 
 /**
- * Sets the leaf: takes the book's hand, counts what the page runs to at it,
- * chooses a leading — and then checks what the leaf *actually* stands at and
- * closes the leading until it fits.
+ * Sets the leaf: takes the book's hand, then solves the one leading that puts
+ * the block's foot on the foot of the well.
  *
  * The hand is never touched. It is the book's, cut for the heaviest leaf in it
  * (`EnglishLeafFit.kt`), and a leaf that set its own type would be the one
- * fault a reader turning pages cannot miss. The second pass exists because a
- * line count is a measurement of this page and the hand is a model of the
- * average one: where they disagree, the page wins and the leading absorbs it.
+ * fault a reader turning pages cannot miss.
+ *
+ * A block of `n` lines stands `(n − 1)` pitches plus one line's own ink —
+ * because the leaf is set `LineHeightStyle.Trim.Both`, so the first line begins
+ * at its ascent and the last ends at its descender rather than at half a
+ * leading beyond either. That is what puts the top of the text on the grid: the
+ * head gutter is the same paper on every leaf in the book, whatever leading the
+ * page happens to be set on. Chapter panels are a fixed number of ems and do
+ * not move with the leading at all. So the whole leaf is
+ *
+ * ```
+ *   well = Σ panels + Σ ( (nᵢ − 1) · hand · ℓ + ink )      →      solve for ℓ
+ * ```
+ *
+ * and the second pass is the guarantee rather than the arithmetic: the leaf is
+ * measured as it will actually be drawn, and the leading steps by whatever is
+ * left over. Down without a floor — a line past the foot is revelation the
+ * reader cannot see — and up no further than the band allows.
  */
 private fun setEnglishLeaf(
     blocks: List<EnglishLeafBlockText>,
@@ -403,71 +427,104 @@ private fun setEnglishLeaf(
         measureWidthPx = measurePx,
         charAdvanceEm = englishCharAdvanceEm(measurer, density),
     )
-    val lines = englishLeafLines(blocks, handPx, measurePx, density, measurer)
-    val chosen = englishLeafLeadingEm(lines = lines, fontPx = handPx, wellHeightPx = wellPx)
-    val stands = englishLeafHeightPx(blocks, handPx, chosen, measurePx, density, measurer)
+    val basmalahPx = englishBasmalahPx(handPx, measurePx, density, measurer)
+    val shape = englishLeafShape(blocks, handPx, basmalahPx, measurePx, density, measurer)
+    val chosen = englishLeafLeadingEm(
+        lines = shape.pitches,
+        fontPx = handPx,
+        wellHeightPx = (wellPx - shape.fixedPx).coerceAtLeast(1f),
+    )
+    val stands =
+        englishLeafHeightPx(blocks, handPx, basmalahPx, chosen, measurePx, density, measurer)
     return EnglishLeafSetting(
         handPx = handPx,
         leadingEm = englishLeafFittedLeadingEm(
             leadingEm = chosen,
             measuredHeightPx = stands,
             wellHeightPx = wellPx,
+            pitchesPx = (shape.pitches * handPx).coerceAtLeast(1f),
         ),
     )
 }
 
 /**
- * The leaf's height in line pitches: the lines its prose wraps to, plus what
- * its chapter panels take. Independent of the leading, which is what lets the
- * leading be solved from it.
+ * What the leaf holds that the leading cannot change: how many baseline steps
+ * its prose takes, and how much paper its panels and its lines' own ink take
+ * whatever the leading is.
  */
-private fun englishLeafLines(
+private data class EnglishLeafShape(val pitches: Float, val fixedPx: Float)
+
+private fun englishLeafShape(
     blocks: List<EnglishLeafBlockText>,
+    handPx: Float,
+    basmalahPx: Float,
+    measurePx: Float,
+    density: Density,
+    measurer: TextMeasurer,
+): EnglishLeafShape {
+    val inkPx = englishLineInkPx(handPx, measurePx, density, measurer)
+    var pitches = 0f
+    var fixed = 0f
+    blocks.forEach { block ->
+        when (block) {
+            is EnglishLeafBlockText.Opening -> fixed += block.heightPx(handPx, basmalahPx)
+            is EnglishLeafBlockText.Prose -> {
+                val lines = measurer
+                    .measure(
+                        text = block.text,
+                        style = englishProseStyle(
+                            with(density) { handPx.toSp() },
+                            TextUnit.Unspecified,
+                        ),
+                        constraints = Constraints(maxWidth = measurePx.toInt().coerceAtLeast(1)),
+                        density = density,
+                    )
+                    .lineCount
+                pitches += (lines - 1).coerceAtLeast(0).toFloat()
+                fixed += inkPx
+            }
+        }
+    }
+    return EnglishLeafShape(pitches = pitches.coerceAtLeast(0.001f), fixedPx = fixed)
+}
+
+/** One line of the book's own ink, top of ascent to foot of descender. */
+private fun englishLineInkPx(
     handPx: Float,
     measurePx: Float,
     density: Density,
     measurer: TextMeasurer,
-): Float = blocks.sumOf { block ->
-    when (block) {
-        is EnglishLeafBlockText.Opening -> block.pitches.toDouble()
-        is EnglishLeafBlockText.Prose -> measurer
-            .measure(
-                text = block.text,
-                style = englishProseStyle(with(density) { handPx.toSp() }, TextUnit.Unspecified),
-                constraints = Constraints(maxWidth = measurePx.toInt().coerceAtLeast(1)),
-                density = density,
-            )
-            .lineCount
-            .toDouble()
-    }
-}.toFloat().coerceAtLeast(1f)
+): Float = measurer.measure(
+    text = AnnotatedString(ENGLISH_LEAF_SPECIMEN),
+    style = englishProseStyle(with(density) { handPx.toSp() }, TextUnit.Unspecified),
+    constraints = Constraints(maxWidth = measurePx.toInt().coerceAtLeast(1)),
+    density = density,
+).size.height.toFloat()
 
 /**
  * What the leaf really stands at, in px, set at this hand and this leading.
  *
- * Not `lines × pitch`. That is what the leading was *chosen* from, and it
- * assumes a paragraph is exactly its line count times its line height — true
- * of Compose's own arithmetic, but the panels are laid out separately and the
- * rounding of an sp line height into device pixels is not free. A leaf that
- * came out one line over its well lost that line off the foot, which on this
- * page is revelation the reader cannot see. So the block is measured.
+ * Not the model above. That is what the leading was *chosen* from; this is the
+ * page as it will be drawn, panels and rounding and all. A leaf that came out
+ * one line over its well lost that line off the foot, which here is revelation
+ * the reader cannot see.
  */
 private fun englishLeafHeightPx(
     blocks: List<EnglishLeafBlockText>,
     handPx: Float,
+    basmalahPx: Float,
     leadingEm: Float,
     measurePx: Float,
     density: Density,
     measurer: TextMeasurer,
 ): Float {
-    val pitchPx = handPx * leadingEm
     val style = englishProseStyle(
         with(density) { handPx.toSp() },
-        with(density) { pitchPx.toSp() },
+        with(density) { (handPx * leadingEm).toSp() },
     )
     return blocks.sumOf { block ->
         when (block) {
-            is EnglishLeafBlockText.Opening -> (block.pitches * pitchPx).toDouble()
+            is EnglishLeafBlockText.Opening -> block.heightPx(handPx, basmalahPx).toDouble()
             is EnglishLeafBlockText.Prose -> measurer
                 .measure(
                     text = block.text,
@@ -533,11 +590,16 @@ private fun englishProseStyle(fontSize: TextUnit, lineHeight: TextUnit) = TextSt
     textAlign = TextAlign.Justify,
     lineBreak = LineBreak.Paragraph,
     platformStyle = PlatformTextStyle(includeFontPadding = false),
-    // Trim.None is what makes a block exactly lineCount × lineHeight tall,
-    // which is the arithmetic the whole fit rests on.
+    // Trim.Both puts the block's own edges on the grid: the first line starts
+    // at its ascent and the last stops at its descender, instead of half a
+    // leading beyond each. Untrimmed, that half-leading grew with the leading —
+    // so the first line of a light leaf sat 7 dp lower than the first line of a
+    // heavy one, and the head gutter the grid promises was not the paper the
+    // reader saw. It also makes the block's height (n − 1) pitches plus one
+    // line's ink, which is what setEnglishLeaf solves.
     lineHeightStyle = LineHeightStyle(
         alignment = LineHeightStyle.Alignment.Proportional,
-        trim = LineHeightStyle.Trim.None,
+        trim = LineHeightStyle.Trim.Both,
     ),
 )
 
@@ -742,13 +804,7 @@ private fun EnglishBasmalahLine(
     ) {
         Text(
             text = ENGLISH_BASMALAH,
-            style = TextStyle(
-                fontFamily = SerifFontFamily,
-                fontStyle = FontStyle.Italic,
-                fontSize = fontSize,
-                textAlign = TextAlign.Center,
-                platformStyle = PlatformTextStyle(includeFontPadding = false),
-            ),
+            style = englishBasmalahStyle(fontSize),
             color = MaterialTheme.colorScheme.onBackground,
             modifier = Modifier
                 .fillMaxWidth()
@@ -769,6 +825,34 @@ private fun EnglishBasmalahLine(
         )
     }
 }
+
+/**
+ * The basmalah's own hand: the book's italic, centred.
+ *
+ * A display line, but not necessarily *one* line — on a phone measure it takes
+ * two, and the leaf has to give it the paper it actually needs. Assuming a slot
+ * for it put its second line on top of the chapter's first verse.
+ */
+private fun englishBasmalahStyle(fontSize: TextUnit) = TextStyle(
+    fontFamily = SerifFontFamily,
+    fontStyle = FontStyle.Italic,
+    fontSize = fontSize,
+    textAlign = TextAlign.Center,
+    platformStyle = PlatformTextStyle(includeFontPadding = false),
+)
+
+/** What the basmalah stands at, plus the air a display line takes under it. */
+private fun englishBasmalahPx(
+    handPx: Float,
+    measurePx: Float,
+    density: Density,
+    measurer: TextMeasurer,
+): Float = measurer.measure(
+    text = AnnotatedString(ENGLISH_BASMALAH),
+    style = englishBasmalahStyle(with(density) { handPx.toSp() }),
+    constraints = Constraints(maxWidth = measurePx.toInt().coerceAtLeast(1)),
+    density = density,
+).size.height + handPx * EnglishLeafBasmalahAirEm
 
 /** Saheeh International's rendering — the translation the book is set in. */
 private const val ENGLISH_BASMALAH =

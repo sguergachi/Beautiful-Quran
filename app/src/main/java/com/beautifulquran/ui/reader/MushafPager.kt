@@ -86,6 +86,7 @@ import com.beautifulquran.domain.BASMALAH_UTHMANI
 import com.beautifulquran.domain.buildMushafQcfLine
 import com.beautifulquran.domain.mushafFontPreloadPages
 import com.beautifulquran.domain.MushafGrid
+import com.beautifulquran.domain.mushafLeafBands
 import com.beautifulquran.domain.MushafType
 import com.beautifulquran.domain.mushafGridSlots
 import com.beautifulquran.domain.mushafIsOpeningLeaf
@@ -162,13 +163,6 @@ internal val MushafEdgeGutter = 10.dp
  * instead of exactly on it.
  */
 private val MushafFitSlack = 2.dp
-
-// The extra text row is bought from the leaf's furniture, not by squeezing
-// sixteen rows into the old fifteen-row well. Together these still total the
-// original 16.75-unit leaf: .30 head + .20 gutter + 16 text + .05 tail + .20 folio.
-private const val MushafDisplayHeadGutter = 0.20f
-private const val MushafDisplayTail = 0.05f
-private const val MushafDisplayFolio = 0.20f
 
 
 /**
@@ -929,6 +923,26 @@ internal fun MushafPager(
                 val unit = with(density) {
                     MushafGrid.unitPx(constraints.maxHeight.toFloat()).toDp()
                 }
+                // One measure for the whole leaf. The running head and the
+                // folio are furniture *of the text block* — in any book they
+                // stand over and under the measure, not over and under the
+                // paper — so all three take the same fore-edge.
+                //
+                // The Arabic leaf's is 10dp because every unit of paper it does
+                // not spend is type size and the QCF measure is what caps that
+                // type (see MushafEdgeGutter). The English hand is solved from
+                // the measure instead, so paper given to the margin comes back
+                // as a shorter line rather than as smaller type — and a book
+                // with no outer margin reads as a printout.
+                val foreEdge = if (english) {
+                    englishLeafForeEdge(maxWidth)
+                } else {
+                    MushafEdgeGutter
+                }
+                // How this leaf spends its height. Both settings sum to
+                // MushafGrid.SLOTS; they divide it differently because their
+                // ink does. See MushafLeafBands.
+                val bands = mushafLeafBands(english)
                 Column(Modifier.fillMaxSize()) {
                     MushafPageHeader(
                         surahNameArabic = surahsById[page.primarySurahId]?.nameArabic,
@@ -936,10 +950,11 @@ internal fun MushafPager(
                         juz = page.juz,
                         unit = unit,
                         glyphSize = leafGlyphSize(unit),
+                        foreEdge = foreEdge,
                     )
-                    Spacer(Modifier.height(unit * MushafDisplayHeadGutter))
+                    Spacer(Modifier.height(unit * bands.headGutter))
                     val wellModifier = Modifier
-                        .height(unit * MUSHAF_DISPLAY_LINES_PER_PAGE)
+                        .height(unit * bands.well)
                         .fillMaxWidth()
                     if (english) {
                         MushafEnglishSheet(
@@ -959,6 +974,7 @@ internal fun MushafPager(
                             flashWordPosition = flashWordPosition.takeIf { settled },
                             hideParentheticals = hideEnglishParentheticals,
                             verseNumberScript = verseNumberScript,
+                            foreEdge = foreEdge,
                             onAyahClick = leafAyahClick,
                             onBasmalahClick = leafBasmalahClick,
                             modifier = wellModifier,
@@ -986,7 +1002,7 @@ internal fun MushafPager(
                             modifier = wellModifier,
                         )
                     }
-                    Spacer(Modifier.height(unit * MushafDisplayTail))
+                    Spacer(Modifier.height(unit * bands.tail))
                     val folioInk by animateFloatAsState(
                         targetValue = if (scrubbing()) 0f else 1f,
                         animationSpec = tween(
@@ -1001,8 +1017,8 @@ internal fun MushafPager(
                         glyphSize = leafGlyphSize(unit),
                         script = pageNumberScript,
                         modifier = Modifier
-                            .height(unit * MushafDisplayFolio)
-                            .padding(horizontal = MushafEdgeGutter)
+                            .height(unit * bands.folio)
+                            .padding(horizontal = foreEdge)
                             .graphicsLayer { alpha = folioInk },
                     )
                 }

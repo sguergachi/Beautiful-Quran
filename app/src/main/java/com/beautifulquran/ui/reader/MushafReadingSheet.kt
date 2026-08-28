@@ -366,6 +366,12 @@ internal fun MushafPageHeader(
     juz: Int,
     unit: Dp,
     glyphSize: TextUnit,
+    /**
+     * The leaf's fore-edge — the same one the text block is set to. A running
+     * head is furniture of the measure, not of the paper: standing it at its
+     * own inset put it a finger's width outside the block it names.
+     */
+    foreEdge: Dp = MushafEdgeGutter,
     modifier: Modifier = Modifier,
 ) {
     // Type alone up here, and in ink rather than gold: gold is illumination —
@@ -381,7 +387,7 @@ internal fun MushafPageHeader(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = MushafEdgeGutter)
+            .padding(horizontal = foreEdge)
             .height(unit * MushafGrid.RUNNING_HEAD),
         verticalAlignment = Alignment.CenterVertically,
     ) {

@@ -100,20 +100,44 @@ class EnglishLeafFitTest {
     }
 
     @Test
-    fun `a leaf that already fits is left exactly as it was set`() {
-        assertEquals(1.7f, englishLeafFittedLeadingEm(1.7f, well - 1f, well), 0f)
-        assertEquals(1.7f, englishLeafFittedLeadingEm(1.7f, well, well), 0f)
+    fun `a leaf that lands on its foot is left exactly as it was set`() {
+        assertEquals(1.7f, englishLeafFittedLeadingEm(1.7f, well, well, pitchesPx = 600f), 0f)
     }
 
     @Test
-    fun `a leaf that stands past the foot closes its leading by exactly the overflow`() {
-        // The block's height is proportional to its leading, so one step lands
-        // it on the foot — and it may close past the comfortable floor to do
-        // it, because a line past the foot is revelation the reader cannot see.
-        assertEquals(1.6f, englishLeafFittedLeadingEm(2.0f, well * 1.25f, well), 0.0001f)
+    fun `the leftover paper converts to leading in one step`() {
+        // The block moves by one pitch for every baseline step it holds, so
+        // 60 px of overflow over 600 px of steps is a tenth of an em.
+        assertEquals(
+            1.6f,
+            englishLeafFittedLeadingEm(1.7f, well + 60f, well, pitchesPx = 600f),
+            0.0001f,
+        )
+        assertEquals(
+            1.8f,
+            englishLeafFittedLeadingEm(1.7f, well - 60f, well, pitchesPx = 600f),
+            0.0001f,
+        )
+    }
+
+    @Test
+    fun `closing has no floor, because a line past the foot cannot be read`() {
         assertTrue(
-            englishLeafFittedLeadingEm(ENGLISH_LEAF_MIN_LEADING_EM, well * 1.1f, well) <
+            englishLeafFittedLeadingEm(
                 ENGLISH_LEAF_MIN_LEADING_EM,
+                well + 600f,
+                well,
+                pitchesPx = 600f,
+            ) < ENGLISH_LEAF_MIN_LEADING_EM,
+        )
+    }
+
+    @Test
+    fun `opening still stops at the band, so a light leaf stands short`() {
+        assertEquals(
+            ENGLISH_LEAF_MAX_LEADING_EM,
+            englishLeafFittedLeadingEm(1.9f, well * 0.4f, well, pitchesPx = 600f),
+            0f,
         )
     }
 
@@ -127,6 +151,7 @@ class EnglishLeafFitTest {
             englishLeafLeadingEm(0f, 20f, well),
             0f,
         )
-        assertEquals(1.5f, englishLeafFittedLeadingEm(1.5f, 0f, well), 0f)
+        assertEquals(1.5f, englishLeafFittedLeadingEm(1.5f, 0f, well, pitchesPx = 600f), 0f)
+        assertEquals(1.5f, englishLeafFittedLeadingEm(1.5f, well, well, pitchesPx = 0f), 0f)
     }
 }
