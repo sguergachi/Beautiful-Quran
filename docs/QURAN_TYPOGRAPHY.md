@@ -252,40 +252,43 @@ runtime, never assumed), `ℓ` the nominal leading and `R` the reference page ma
 It takes no page: the type depends on the leaf's geometry and the face, and on
 nothing the page happens to carry.
 
-### 13.4 The leading gives; the type never does
+### 13.4 One hand, one leading, and the foot falls where it falls
 
-This is the deepest difference from the Arabic leaf, and it is the same
-difference as rule 4. Arabic fills a *line* by the letterform and keeps one
-leading for the whole book. Latin fills a line by the word space — which
-justification already does — and fills the *page* by leading, the compositor's
-classical lever.
+The page boundary comes from the Arabic leaf, so a page's mass is fixed at
+somewhere between 1,055 and 1,997 characters. Something has to absorb a range of
+nearly two to one, and it can only be the type, the leading, or the foot.
 
-A leaf's content is fixed by the Arabic, so its mass varies: measured over the
-book, 1,055 characters at the 1st percentile, 1,469 at the median, 1,997 at the
-worst (page 579). The block is brought down to the foot by opening or closing
-the leading inside 1.30–2.00 em, and by nothing else.
+**It is the foot.** One hand and one leading for the whole book — 1.40 em on
+every leaf of the 604 — and a leaf ends where its content ends. Measured over
+the book, a leaf reaches 71% of the well at the median, 62% at the tenth
+percentile, and 97% on the heaviest. The hand is cut for that heaviest leaf,
+with 3% held back because the fit is solved from an *estimate* of how many
+characters go to a line and the worst page must not be the one the estimate is
+wrong about.
 
-**The hand is cut once, for the whole book.** The anchor is a reference page
-mass of 1,548 characters — nothing overflows and nothing resizes, whatever it
-is set to, because the leaf is measured and its leading stepped to fit
-(below). What the anchor buys is the size the book is read at.
+The other two answers were both tried, and both are worse:
 
-Cut for the *heaviest* leaf at the tightest leading it would be
-`1997 × 1.30 / 1.55 = 1675`, and then no leaf would ever ask for less than the
-floor. That is the safe reading and it sets the book a size smaller than it
-wants to be read at. At 1,548 the hand comes up about 4%, the median leaf takes
-one more line of type, and six leaves of 604 close below 1.30 em — the heaviest,
-page 579, at 1.20. Close-set there rather than crowded: the face's line box is
-1.24 em and its ink fills 0.89 of one, so a third of an em of air still stands
-between what is actually drawn. 96% of leaves now reach their foot, against 88%
-before, so there are fewer ragged feet as well as larger type.
+- **The type gave**, a few percent on the heaviest leaves. That is the one thing
+  rule 13.3 forbids and the first thing a reader notices.
+- **The leading gave**, opening and closing between 1.20 and 2.00 em to bring
+  each block down to the foot. Every leaf filled, and the price was that a page
+  set at 2.00 em turned into one set at 1.20 — the same book in two different
+  hands' worth of air. A reader turning pages sees a change of line spacing at
+  once, far sooner than they notice a page that ends early.
 
-And the fit is a guarantee, not an estimate. A line count is a measurement of
-*this* page; the hand is a model of the average one. So the leaf is measured
-at the leading it was given, and if it still stands past the foot the leading
-closes by exactly the overflow — below 1.30 em if it must. A line crowded by a
-fortieth of an em is a page set a little tight; a line past the foot is
-revelation the reader cannot see.
+The white at the foot is the only one of the three a reader reads as *meaning*
+something: a page that ends early ends something. It is also what a printed
+parallel translation looks like on its English side, for exactly this reason.
+
+`hand² × leading` is a constant of the leaf, so the two trade directly against
+each other: 1.30 em would buy 4% more type, 1.55 em would cost 5%.
+`tools/measure_english_leaves.py` prints that table.
+
+The leaf is still measured as it will be drawn, and the leading still closes if
+the block would run past the foot — but only on that leaf, only by the overflow,
+and only because an estimate can be wrong somewhere nobody looked. Being wrong
+there means revelation clipped off the bottom of a page; a leaf set a hair
+tighter than its neighbours is a leaf nobody notices.
 
 ### 13.5 Justified, and deliberately not hyphenated
 

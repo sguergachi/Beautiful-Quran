@@ -18,18 +18,16 @@ class EnglishLeafFitTest {
     private val measure = 300f * 3f
     private val advance = 0.40f
 
-    @Test
-    fun `the reference page fills the well at the nominal leading`() {
+    /** Characters to the line at the book's hand — the fit's own arithmetic. */
+    private fun charsPerLine(): Float {
         val hand = englishLeafHandPx(well, measure, advance)
-        // The whole point of the fit: a page of ENGLISH_LEAF_REFERENCE_PROSE
-        // characters comes out at exactly the nominal leading.
-        val perLine = measure / (advance * hand)
-        val lines = ENGLISH_LEAF_REFERENCE_PROSE / perLine
-        assertEquals(
-            ENGLISH_LEAF_NOMINAL_LEADING_EM,
-            englishLeafLeadingEm(lines = lines, fontPx = hand, wellHeightPx = well),
-            0.01f,
-        )
+        return measure / (advance * hand)
+    }
+
+    /** Where a leaf of [mass] characters ends, as a share of the well. */
+    private fun fill(mass: Float): Float {
+        val hand = englishLeafHandPx(well, measure, advance)
+        return mass / charsPerLine() * hand * ENGLISH_LEAF_LEADING_EM / well
     }
 
     @Test
@@ -37,9 +35,11 @@ class EnglishLeafFitTest {
         // englishLeafHandPx takes no page at all. This is the law expressed as
         // a signature, and the test that keeps it that way: the only inputs
         // are the leaf's geometry and the face.
-        val light = englishLeafHandPx(well, measure, advance)
-        val heavy = englishLeafHandPx(well, measure, advance)
-        assertEquals(light, heavy, 0f)
+        assertEquals(
+            englishLeafHandPx(well, measure, advance),
+            englishLeafHandPx(well, measure, advance),
+            0f,
+        )
     }
 
     @Test
@@ -49,116 +49,68 @@ class EnglishLeafFitTest {
         assertTrue(wide > narrow)
         // Both stay near fifty characters — the book scales, it does not
         // simply spread.
-        val narrowChars = measure / (advance * narrow)
-        val wideChars = measure * 1.7f / (advance * wide)
-        assertTrue(abs(narrowChars - 48f) < 8f)
-        assertTrue(abs(wideChars - 48f) < 12f)
+        assertTrue(abs(charsPerLine() - 48f) < 10f)
+        assertTrue(abs(measure * 1.7f / (advance * wide) - 48f) < 14f)
     }
 
     @Test
-    fun `a light page opens its leading, a heavy one closes it`() {
-        val hand = englishLeafHandPx(well, measure, advance)
-        val nominal = well / (hand * ENGLISH_LEAF_NOMINAL_LEADING_EM)
-        assertTrue(
-            englishLeafLeadingEm(nominal * 0.9f, hand, well) >
-                ENGLISH_LEAF_NOMINAL_LEADING_EM,
-        )
-        assertTrue(
-            englishLeafLeadingEm(nominal * 1.1f, hand, well) <
-                ENGLISH_LEAF_NOMINAL_LEADING_EM,
-        )
+    fun `the hand is cut so the heaviest leaf in the book fills its well`() {
+        // The whole of rule 3: with one leading for the book, the heaviest leaf
+        // is what sets the type. Page 579 carries 1,997 characters — see
+        // tools/measure_english_leaves.py — and comes out just inside the well,
+        // the margin being the 3% the anchor holds back for the estimate.
+        val heaviest = fill(1997f)
+        assertTrue("heaviest leaf overflows: $heaviest", heaviest <= 1f)
+        assertTrue("heaviest leaf wastes the page: $heaviest", heaviest > 0.94f)
     }
 
     @Test
-    fun `the leading never leaves its band, however light or heavy the page`() {
-        val hand = englishLeafHandPx(well, measure, advance)
-        assertEquals(
-            ENGLISH_LEAF_MAX_LEADING_EM,
-            englishLeafLeadingEm(lines = 1f, fontPx = hand, wellHeightPx = well),
-            0f,
-        )
-        assertEquals(
-            ENGLISH_LEAF_MIN_LEADING_EM,
-            englishLeafLeadingEm(lines = 400f, fontPx = hand, wellHeightPx = well),
-            0f,
-        )
+    fun `every other leaf ends short of the foot, by exactly how much lighter it is`() {
+        // The price of one leading, and the thing that replaces it: the foot.
+        assertEquals(0.71f, fill(1469f), 0.02f) // median
+        assertEquals(0.62f, fill(1286f), 0.02f) // tenth percentile
+        assertEquals(0.51f, fill(1055f), 0.02f) // first percentile
+        // And it is linear in the mass, because nothing else varies.
+        assertEquals(2f, fill(1400f) / fill(700f), 0.001f)
     }
 
     @Test
-    fun `the book is set larger than the floor alone would allow`() {
-        // The anchor buys the whole book a legible size at the price of a
-        // handful of close-set leaves. Cut for the heaviest page at the floor
-        // it would be 1997 x 1.30 / 1.55 = 1675; it is smaller than that, which
-        // is what makes the hand larger. See tools/measure_english_leaves.py.
-        assertTrue(ENGLISH_LEAF_REFERENCE_PROSE < 1675f)
-        val hand = englishLeafHandPx(well, measure, advance)
-        val perLine = measure / (advance * hand)
-        // Page 579, the heaviest leaf in the book, is one of those: it asks for
-        // less than the floor, and the fitted leading is what lets it.
-        val heaviest =
-            englishLeafLeadingEm(lines = 1997f / perLine, fontPx = hand, wellHeightPx = well)
-        assertEquals(ENGLISH_LEAF_MIN_LEADING_EM, heaviest, 0.0001f)
+    fun `a leaf that lands inside its well is drawn on the book's leading`() {
         assertEquals(
-            1.20f,
+            ENGLISH_LEAF_LEADING_EM,
             englishLeafFittedLeadingEm(
-                leadingEm = heaviest,
-                // What it actually stands at when the floor holds it open.
-                measuredHeightPx = well * (ENGLISH_LEAF_MIN_LEADING_EM / 1.202f),
+                ENGLISH_LEAF_LEADING_EM,
+                measuredHeightPx = well - 1f,
                 wellHeightPx = well,
-                pitchesPx = 1997f / perLine * hand,
-            ),
-            0.02f,
-        )
-    }
-
-    @Test
-    fun `the median leaf is set near the nominal leading`() {
-        // 1,469 characters — see tools/measure_english_leaves.py.
-        val hand = englishLeafHandPx(well, measure, advance)
-        val perLine = measure / (advance * hand)
-        val median =
-            englishLeafLeadingEm(lines = 1469f / perLine, fontPx = hand, wellHeightPx = well)
-        assertEquals(1.63f, median, 0.03f)
-    }
-
-    @Test
-    fun `a leaf that lands on its foot is left exactly as it was set`() {
-        assertEquals(1.7f, englishLeafFittedLeadingEm(1.7f, well, well, pitchesPx = 600f), 0f)
-    }
-
-    @Test
-    fun `the leftover paper converts to leading in one step`() {
-        // The block moves by one pitch for every baseline step it holds, so
-        // 60 px of overflow over 600 px of steps is a tenth of an em.
-        assertEquals(
-            1.6f,
-            englishLeafFittedLeadingEm(1.7f, well + 60f, well, pitchesPx = 600f),
-            0.0001f,
-        )
-        assertEquals(
-            1.8f,
-            englishLeafFittedLeadingEm(1.7f, well - 60f, well, pitchesPx = 600f),
-            0.0001f,
-        )
-    }
-
-    @Test
-    fun `closing has no floor, because a line past the foot cannot be read`() {
-        assertTrue(
-            englishLeafFittedLeadingEm(
-                ENGLISH_LEAF_MIN_LEADING_EM,
-                well + 600f,
-                well,
                 pitchesPx = 600f,
-            ) < ENGLISH_LEAF_MIN_LEADING_EM,
+            ),
+            0f,
         )
     }
 
     @Test
-    fun `opening still stops at the band, so a light leaf stands short`() {
+    fun `only an overflow moves it, and only by the overflow`() {
+        // The block moves one pitch for every baseline step it holds, so 60 px
+        // over 600 px of steps is a tenth of an em — closing, never opening.
         assertEquals(
-            ENGLISH_LEAF_MAX_LEADING_EM,
-            englishLeafFittedLeadingEm(1.9f, well * 0.4f, well, pitchesPx = 600f),
+            ENGLISH_LEAF_LEADING_EM - 0.1f,
+            englishLeafFittedLeadingEm(
+                ENGLISH_LEAF_LEADING_EM,
+                measuredHeightPx = well + 60f,
+                wellHeightPx = well,
+                pitchesPx = 600f,
+            ),
+            0.0001f,
+        )
+        // A leaf with paper to spare keeps the book's leading and its white.
+        assertEquals(
+            ENGLISH_LEAF_LEADING_EM,
+            englishLeafFittedLeadingEm(
+                ENGLISH_LEAF_LEADING_EM,
+                measuredHeightPx = well * 0.4f,
+                wellHeightPx = well,
+                pitchesPx = 600f,
+            ),
             0f,
         )
     }
@@ -169,11 +121,9 @@ class EnglishLeafFitTest {
         assertEquals(ENGLISH_LEAF_MIN_FONT_PX, englishLeafHandPx(well, 0f, advance), 0f)
         assertEquals(ENGLISH_LEAF_MIN_FONT_PX, englishLeafHandPx(well, measure, 0f), 0f)
         assertEquals(
-            ENGLISH_LEAF_NOMINAL_LEADING_EM,
-            englishLeafLeadingEm(0f, 20f, well),
+            ENGLISH_LEAF_LEADING_EM,
+            englishLeafFittedLeadingEm(ENGLISH_LEAF_LEADING_EM, well * 2f, well, pitchesPx = 0f),
             0f,
         )
-        assertEquals(1.5f, englishLeafFittedLeadingEm(1.5f, 0f, well, pitchesPx = 600f), 0f)
-        assertEquals(1.5f, englishLeafFittedLeadingEm(1.5f, well, well, pitchesPx = 0f), 0f)
     }
 }

@@ -23,89 +23,70 @@ import kotlin.math.sqrt
  *    characters; that is what makes it readable, and it is the Latin
  *    counterpart of the mushaf's fixed 16.4 em measure. The hand is solved
  *    from the well and the measure together so both come out right at once.
- * 3. **The leading gives; the type never does.** The page's content is fixed
- *    by the Arabic leaf, so the block is brought down to the foot by opening
- *    or closing the leading. A leaf lighter than the hand was cut for opens
- *    its leading and, past the top of the band, stands short at the foot —
- *    which is what a printed parallel translation does. A leaf heavier than it
- *    closes past the floor, which six of the book's 604 leaves do
- *    ([ENGLISH_LEAF_REFERENCE_PROSE]).
+ * 3. **One leading for the whole book, and the foot falls where it falls.**
+ *    A book is set on one leading. It does not respace its lines because a
+ *    page happens to be full, and a reader turning pages sees a change in line
+ *    spacing at once — far sooner than they notice a page that ends early.
  *
- * Rule 3 used to let the type give a few percent on the heaviest leaves
- * rather than set the whole book smaller. That was the wrong trade twice
- * over: type that changes from leaf to leaf is the one thing rule 1 forbids
- * and the first thing a reader notices, and a fit resting on a *model* of how
- * long a page will run is a fit that can be wrong — which is a page with
- * revelation cut off the bottom of it. The hand is cut once, for the whole
- * book; and `MushafEnglishSheet` then steps the leading against the leaf's own
- * measured height, so that fitting is a guarantee and not an estimate.
+ * Rule 3 is the third answer this setting has given to the same question, and
+ * the question is unavoidable: the page boundary comes from the Arabic leaf, so
+ * the mass of a page is fixed at somewhere between 1,055 and 1,997 characters
+ * and *something* has to absorb a range of nearly two to one. It can be the
+ * type, the leading, or the foot; it cannot be nothing.
+ *
+ * It was the type first — a few percent off the heaviest leaves. That is the
+ * one thing rule 1 forbids and the first thing a reader notices, so it went.
+ *
+ * Then it was the leading, opening and closing between 1.20 and 2.00 em to
+ * bring each block down to the foot. Every leaf filled, and the price was that
+ * a page set at 2.00 em turned into one set at 1.20: the same book in two
+ * different hands' worth of air, which reads as a fault however full the page.
+ *
+ * So it is the foot. One hand, one leading, and a leaf ends where its content
+ * ends — 71% of the well at the median, 63% at the tenth percentile, all of it
+ * on the heaviest. That is what a printed parallel translation looks like on
+ * its English side, and it is the only one of the three that a reader reads as
+ * meaning something: a page that ends early ends something.
+ *
+ * The hand is therefore cut for the heaviest leaf in the book at that one
+ * leading ([ENGLISH_LEAF_REFERENCE_PROSE]), and `MushafEnglishSheet` still
+ * measures each leaf as it will be drawn — but only as a guarantee against
+ * clipping, never as the thing that sets the page.
  */
 
 /**
  * The page the hand is cut for, in characters of set prose.
  *
- * The book's one size is fitted so that a leaf of this mass fills the well at
- * the nominal leading. Measured over all 604 leaves of `data/quran.db`
+ * With one leading for the whole book (rule 3), the heaviest leaf is what sets
+ * the type: it has to fit its well, and every leaf lighter than it then ends
+ * short of the foot by exactly as much as it is lighter.
+ *
+ * Measured over all 604 leaves of `data/quran.db`
  * (`tools/measure_english_leaves.py`, verse translations with their marks and
  * joining spaces) the book runs 1,055 characters at the 1st percentile, 1,286
  * at the 10th, 1,469 at the median, 1,663 at the 90th and 1,997 at the worst,
- * which is page 579.
+ * which is page 579. So the anchor is 1,997 and a little over — 3%, because
+ * the hand is solved from an *estimate* of how many characters go to a line
+ * and the heaviest leaf must not be the one the estimate is wrong about.
  *
- * The anchor was the worst page carried at the tightest leading —
- * `1997 × 1.30 / 1.55 = 1675` — so that no leaf in the book ever asked for a
- * leading below the floor. That is the safe reading of it, and it set the book
- * a size smaller than it wanted to be read at.
- *
- * It is now 1,548, which is the same worst page carried one line further down
- * the leaf. The hand comes up about 4%, the median leaf takes one more line of
- * type than it used to, and the whole book reads a size larger.
- *
- * What that costs is the floor, on six leaves out of 604. Above about 1,850
- * characters a leaf now asks for less than 1.30 em, and the heaviest — page
- * 579, at 1,997 — sets at 1.20. It is close-set there rather than crowded:
- * measured on device the face's line box is 1.24 em and its *ink* fills 0.89
- * of one, so a line at 1.20 em still leaves a third of an em of air between
- * what is actually drawn, and only a descender standing directly over an
- * ascender comes near. Six leaves buying the other 598 a legible size is the
- * trade, and it is the compositor's usual one.
- *
- * The rest of the distribution moves the right way with it. 96% of leaves now
- * reach their foot inside the band against 88% before — the same page mass
- * over a slightly smaller measure needs less of the leading's help — so there
- * are fewer ragged feet as well as larger type. The leading runs 1.20 em on
- * the heaviest leaf, 1.63 at the median, and holds at the 2.00 em cap for the
- * lightest twentieth.
+ * Leaves therefore fill 71% of the well at the median, 63% at the tenth
+ * percentile, and all of it at the worst. That white at the foot is the price
+ * of the other two rules, and it is the right one to pay: a reader sees a
+ * change of leading between two pages immediately and reads a short page as
+ * the end of something.
  */
-const val ENGLISH_LEAF_REFERENCE_PROSE = 1548f
-
-/** The leading the reference page is set on. */
-const val ENGLISH_LEAF_NOMINAL_LEADING_EM = 1.55f
+const val ENGLISH_LEAF_REFERENCE_PROSE = 2060f
 
 /**
- * The tightest the leading may close.
+ * The leading the whole book is set on.
  *
- * EB Garamond's ascenders and descenders reach about 0.95 em and 0.28 em from
- * the baseline, so 1.30 em still leaves a fifteenth of an em between the
- * deepest descender and the tallest ascender below it. Under that they touch.
- *
- * A floor on the *fitting*, not on the drawing. A leaf that would still
- * overflow closes past it rather than lose a line off the foot — fit outranks
- * leading, always — and since [ENGLISH_LEAF_REFERENCE_PROSE] was moved to buy
- * the book a legible size, six leaves of 604 do exactly that. The heaviest
- * sets at 1.20 em. See that constant for why the trade is worth taking.
+ * One number, for every leaf. EB Garamond runs a small x-height and would take
+ * more air on a long measure; this one is about fifty characters, which wants
+ * less. 1.40 em is where a serif book of this measure sits, and every 0.05 em
+ * added to it comes straight off the type — the heaviest leaf has to fit
+ * either way, so `hand² × leading` is a constant of the leaf.
  */
-const val ENGLISH_LEAF_MIN_LEADING_EM = 1.30f
-
-/**
- * The most it may open before the foot is simply left short.
- *
- * Past this a page stops reading as prose and starts reading as a list; short
- * of the foot it reads as the end of something, which on a leaf whose content
- * was fixed by another book is exactly true. At 2.00 em 96% of leaves reach
- * their foot; at 1.80 far fewer would, and the rest would stand short for the
- * sake of a distinction the eye does not draw at this size.
- */
-const val ENGLISH_LEAF_MAX_LEADING_EM = 2.00f
+const val ENGLISH_LEAF_LEADING_EM = 1.40f
 
 /**
  * Smallest / largest hand, in px, so an odd viewport cannot produce nonsense.
@@ -151,42 +132,26 @@ fun englishLeafHandPx(
         return ENGLISH_LEAF_MIN_FONT_PX
     }
     val denominator = charAdvanceEm *
-        ENGLISH_LEAF_NOMINAL_LEADING_EM *
+        ENGLISH_LEAF_LEADING_EM *
         ENGLISH_LEAF_REFERENCE_PROSE
     return sqrt(wellHeightPx * measureWidthPx / denominator)
         .coerceIn(ENGLISH_LEAF_MIN_FONT_PX, ENGLISH_LEAF_MAX_FONT_PX)
 }
 
 /**
- * The leading this leaf is set on: what brings [lines] baseline steps down to
- * the foot of the well, held inside the band so the book keeps one colour
- * whatever the page happens to hold.
+ * The leading a leaf is actually drawn on: the book's, unless that would put
+ * the block past the foot of the well.
  *
- * [lines] counts the *steps between baselines*, not the lines — a block of `n`
- * lines takes `n − 1` of them plus one line's own ink — and [wellHeightPx] is
- * what is left of the well once that ink and the leaf's chapter panels have
- * taken their paper. Both of those are fixed by the hand and do not move with
- * the leading, which is what makes this one division rather than a search.
- */
-fun englishLeafLeadingEm(lines: Float, fontPx: Float, wellHeightPx: Float): Float {
-    if (lines <= 0f || fontPx <= 0f) return ENGLISH_LEAF_NOMINAL_LEADING_EM
-    return (wellHeightPx / (lines * fontPx))
-        .coerceIn(ENGLISH_LEAF_MIN_LEADING_EM, ENGLISH_LEAF_MAX_LEADING_EM)
-}
-
-/**
- * The leading a leaf is actually set on, once its block has been measured.
+ * It should never have to. The hand is cut for the heaviest leaf in the book
+ * with three percent to spare ([ENGLISH_LEAF_REFERENCE_PROSE]), so every leaf
+ * fits by construction. But the hand is solved from an estimate of how many
+ * characters go to a line, and an estimate can be wrong on some page nobody
+ * looked at — and being wrong there means revelation clipped off the bottom of
+ * it. So the leaf is measured as it will be drawn, and if it still stands past
+ * the foot the leading closes by exactly the overflow.
  *
- * [englishLeafLeadingEm] chooses from a model of the page; this is the page.
- * The block's height moves by one pitch for every baseline step it holds
- * ([pitchesPx] is `steps × hand`), so the leftover paper converts to leading in
- * one step and lands the foot exactly on the foot of the well.
- *
- * It may close below [ENGLISH_LEAF_MIN_LEADING_EM] to do it, and it must: a
- * line crowded by a fortieth of an em is a page set a little tight, and a line
- * past the foot is revelation the reader cannot see. Opening, it stops at
- * [ENGLISH_LEAF_MAX_LEADING_EM] like any other leaf — a page that will not
- * reach its foot stands short of it.
+ * Only closes, and only that leaf. A page set a hair tighter than its
+ * neighbours is a page nobody notices; a page missing its last line is not.
  */
 fun englishLeafFittedLeadingEm(
     leadingEm: Float,
@@ -194,8 +159,6 @@ fun englishLeafFittedLeadingEm(
     wellHeightPx: Float,
     pitchesPx: Float,
 ): Float {
-    if (measuredHeightPx <= 0f || pitchesPx <= 0f) return leadingEm
-    val step = (wellHeightPx - measuredHeightPx) / pitchesPx
-    val fitted = leadingEm + step
-    return if (step > 0f) fitted.coerceAtMost(ENGLISH_LEAF_MAX_LEADING_EM) else fitted
+    if (measuredHeightPx <= wellHeightPx || pitchesPx <= 0f) return leadingEm
+    return leadingEm - (measuredHeightPx - wellHeightPx) / pitchesPx
 }

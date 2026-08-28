@@ -3,12 +3,11 @@
 The English leaf borrows the mushaf's 604 page boundaries and sets what falls
 on each of them as a page of a book (see docs/QURAN_TYPOGRAPHY.md §13 and
 domain/EnglishLeaf.kt). Its content is therefore fixed by the Arabic, and the
-one lever left for filling the page is the leading — which is why the book's
-hand is anchored on a *reference page mass* rather than on a line count, and
-why the anchor moves the whole book's size at once. Nothing can run past the
-foot whatever it is set to — MushafEnglishSheet steps the leading against the
-leaf's measured height — so what the anchor really buys is legible type against
-a handful of leaves set closer than the comfortable floor.
+nothing fills the page at all: the book is set on one hand and one leading, and
+a leaf simply ends where its content ends. So the hand is cut for the heaviest
+leaf in the book — that one has to fit its well — and every lighter leaf stands
+short of the foot by exactly as much as it is lighter. This is the measurement
+that says where the anchor goes and how short the rest stand.
 
 This is the measurement ENGLISH_LEAF_REFERENCE_PROSE comes from. Rerun it if
 the translation or the qcf_page column changes:
@@ -26,10 +25,8 @@ import statistics
 from collections import defaultdict
 
 # Must track EnglishLeafFit.kt.
-NOMINAL = 1.55
-LEAD_MIN = 1.30
-LEAD_MAX = 2.00
-REFERENCE = 1548.0
+LEADING = 1.40      # one figure, for every leaf in the book
+REFERENCE = 2060.0  # the heaviest leaf, plus 3% for the estimate
 MARK_CHARS = 6  # ENGLISH_LEAF_MARK_CHARS: the verse mark and its two spaces
 
 db = sqlite3.connect("data/quran.db")
@@ -66,25 +63,16 @@ for q in (0, 1, 5, 10, 25, 50, 75, 90, 95, 99, 100):
     print(f"  p{q:<3} {pct(q)}")
 print(f"  mean {statistics.mean(masses):.0f}")
 
-print(f"\nat ENGLISH_LEAF_REFERENCE_PROSE = {REFERENCE:.0f}:")
-leadings = {page: NOMINAL * REFERENCE / mass for page, mass in prose.items()}
-inside = [p for p, lead in leadings.items() if LEAD_MIN <= lead <= LEAD_MAX]
-tight = sorted(p for p, lead in leadings.items() if lead < LEAD_MIN)
-loose = sorted(p for p, lead in leadings.items() if lead > LEAD_MAX)
-print(f"  fill the well outright     {len(inside):3d}  ({100 * len(inside) / len(masses):.1f}%)")
-print(f"  would overflow the well    {len(tight):3d}  {tight[:8]}{' ...' if len(tight) > 8 else ''}")
-print(f"  foot stands short          {len(loose):3d}  {loose[:8]}{' ...' if len(loose) > 8 else ''}")
+print(f"\nat ENGLISH_LEAF_REFERENCE_PROSE = {REFERENCE:.0f}, leading {LEADING}:")
+over = sorted(p for p, m in prose.items() if m > REFERENCE)
+print(f"  would overflow the well  {len(over):3d}  {over[:8]}")
+print(f"  heaviest leaf  page {max(prose, key=prose.get)} "
+      f"({max(masses)} chars) fills {100 * max(masses) / REFERENCE:.0f}% of the well")
 
-worst = min(leadings.items(), key=lambda kv: kv[1])
-print(f"  worst leaf page {worst[0]} ({prose[worst[0]]} chars) sets at {worst[1]:.3f} em")
+print("\nhow far down the well a leaf reaches:")
+for q in (1, 10, 25, 50, 75, 90, 99, 100):
+    print(f"  p{q:<3} {100 * pct(q) / REFERENCE:5.0f}%")
 
-print("\nthe floor would put the anchor at:")
-print(f"  {max(masses)} x {LEAD_MIN} / {NOMINAL} = {max(masses) * LEAD_MIN / NOMINAL:.0f}"
-      f"   (the book is set larger than that; see ENGLISH_LEAF_REFERENCE_PROSE)")
-
-print("\nreference sweep (fill %, leaves that would overflow, leaves left short):")
-for candidate in (1450, 1500, 1548, 1600, 1675, 1750):
-    lead = [NOMINAL * candidate / m for m in masses]
-    fill = sum(1 for x in lead if LEAD_MIN <= x <= LEAD_MAX)
-    print(f"  {candidate}  {100 * fill / len(masses):5.1f}%  "
-          f"{sum(1 for x in lead if x < LEAD_MIN):3d}  {sum(1 for x in lead if x > LEAD_MAX):3d}")
+print("\nthe leading buys type, and the type buys leading (hand^2 x leading is fixed):")
+for lead in (1.30, 1.35, 1.40, 1.45, 1.50, 1.55):
+    print(f"  {lead:.2f} em -> hand x {(LEADING / lead) ** 0.5:.3f} of today's")

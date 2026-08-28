@@ -62,7 +62,7 @@ import com.beautifulquran.domain.MushafToken
 import com.beautifulquran.domain.englishLeaf
 import com.beautifulquran.domain.englishLeafFittedLeadingEm
 import com.beautifulquran.domain.englishLeafHandPx
-import com.beautifulquran.domain.englishLeafLeadingEm
+import com.beautifulquran.domain.ENGLISH_LEAF_LEADING_EM
 import com.beautifulquran.domain.mushafIsOpeningLeaf
 import com.beautifulquran.domain.quranWordKey
 import com.beautifulquran.ui.theme.LocalQuranAccents
@@ -451,29 +451,18 @@ private data class EnglishLeafSetting(
 )
 
 /**
- * Sets the leaf: takes the book's hand, then solves the one leading that puts
- * the block's foot on the foot of the well.
+ * Sets the leaf: the book's hand and the book's leading, then a measurement to
+ * make sure the block really does fit the well.
  *
- * The hand is never touched. It is the book's, cut for the heaviest leaf in it
- * (`EnglishLeafFit.kt`), and a leaf that set its own type would be the one
- * fault a reader turning pages cannot miss.
+ * Neither number is this leaf's to choose. The hand is the book's, cut for the
+ * heaviest leaf in it; the leading is the book's, one figure for all 604
+ * leaves (`EnglishLeafFit.kt`). A page that respaced its lines to fill itself
+ * would be a page a reader sees change as they turn onto it, which is a worse
+ * fault than the white this leaves at the foot.
  *
- * A block of `n` lines stands `(n − 1)` pitches plus one line's own ink —
- * because the leaf is set `LineHeightStyle.Trim.Both`, so the first line begins
- * at its ascent and the last ends at its descender rather than at half a
- * leading beyond either. That is what puts the top of the text on the grid: the
- * head gutter is the same paper on every leaf in the book, whatever leading the
- * page happens to be set on. Chapter panels are a fixed number of ems and do
- * not move with the leading at all. So the whole leaf is
- *
- * ```
- *   well = Σ panels + Σ ( (nᵢ − 1) · hand · ℓ + ink )      →      solve for ℓ
- * ```
- *
- * and the second pass is the guarantee rather than the arithmetic: the leaf is
- * measured as it will actually be drawn, and the leading steps by whatever is
- * left over. Down without a floor — a line past the foot is revelation the
- * reader cannot see — and up no further than the band allows.
+ * So the only thing solved here is the guarantee: the leaf is measured as it
+ * will be drawn, and the leading closes — on that leaf alone, and only far
+ * enough — if the estimate the hand was cut from turns out to be wrong here.
  */
 private fun setEnglishLeaf(
     blocks: List<EnglishLeafBlockText>,
@@ -489,53 +478,48 @@ private fun setEnglishLeaf(
     )
     val basmalahPx = englishBasmalahPx(handPx, measurePx, density, measurer)
     val lineInkPx = englishLineInkPx(handPx, density, measurer)
-    val shape = englishLeafShape(blocks, handPx, basmalahPx, measurePx, density, measurer)
-    val chosen = englishLeafLeadingEm(
-        lines = shape.pitches,
-        fontPx = handPx,
-        wellHeightPx = (wellPx - shape.fixedPx).coerceAtLeast(1f),
+    val pitches = englishLeafPitches(blocks, handPx, measurePx, density, measurer)
+    val stands = englishLeafHeightPx(
+        blocks,
+        handPx,
+        basmalahPx,
+        ENGLISH_LEAF_LEADING_EM,
+        measurePx,
+        density,
+        measurer,
     )
-    val stands =
-        englishLeafHeightPx(blocks, handPx, basmalahPx, chosen, measurePx, density, measurer)
     return EnglishLeafSetting(
         handPx = handPx,
         lineInkPx = lineInkPx,
         leadingEm = englishLeafFittedLeadingEm(
-            leadingEm = chosen,
+            leadingEm = ENGLISH_LEAF_LEADING_EM,
             measuredHeightPx = stands,
             wellHeightPx = wellPx,
-            pitchesPx = (shape.pitches * handPx).coerceAtLeast(1f),
+            pitchesPx = (pitches * handPx).coerceAtLeast(1f),
         ),
     )
 }
 
 /**
- * What the leaf holds that the leading cannot change: how many baseline steps
- * its prose takes, and how much paper its panels and its lines' own ink take
- * whatever the leading is.
+ * How many baseline steps the leaf's blocks hold — its prose lines less one
+ * each, plus the air its chapter panels take, which rides the leading too.
+ *
+ * This is the rate at which the block's height moves with the leading, and it
+ * is the only thing the fit guarantee needs: how far the leading must close to
+ * lose a given overflow. What does *not* move with the leading — a line's own
+ * ink, a panel's band, the basmalah — is deliberately not counted.
  */
-private data class EnglishLeafShape(val pitches: Float, val fixedPx: Float)
-
-private fun englishLeafShape(
+private fun englishLeafPitches(
     blocks: List<EnglishLeafBlockText>,
     handPx: Float,
-    basmalahPx: Float,
     measurePx: Float,
     density: Density,
     measurer: TextMeasurer,
-): EnglishLeafShape {
-    val inkPx = englishLineInkPx(handPx, density, measurer)
+): Float {
     var pitches = 0f
-    var fixed = 0f
     blocks.forEach { block ->
         when (block) {
-            is EnglishLeafBlockText.Opening -> {
-                // The band is a line's own type box and does not move with the
-                // leading; the air around it does, so it counts as pitches.
-                pitches += EnglishLeafPanelAir * 2f
-                fixed += inkPx
-                if (block.basmalah) fixed += basmalahPx
-            }
+            is EnglishLeafBlockText.Opening -> pitches += EnglishLeafPanelAir * 2f
             is EnglishLeafBlockText.Prose -> {
                 val lines = measurer
                     .measure(
@@ -549,11 +533,10 @@ private fun englishLeafShape(
                     )
                     .lineCount
                 pitches += (lines - 1).coerceAtLeast(0).toFloat()
-                fixed += inkPx
             }
         }
     }
-    return EnglishLeafShape(pitches = pitches.coerceAtLeast(0.001f), fixedPx = fixed)
+    return pitches.coerceAtLeast(0.001f)
 }
 
 /**
