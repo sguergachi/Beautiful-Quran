@@ -195,7 +195,7 @@ internal fun MushafEnglishSheet(
             setEnglishLeaf(blocks, wellPx, measurePx, density, measurer)
         }
         val fontSize = with(density) { setting.handPx.toSp() }
-        val handDp = with(density) { setting.handPx.toDp() }
+        val pitchDp = with(density) { (setting.handPx * setting.leadingEm).toDp() }
         val basmalahDp = remember(setting.handPx, measurePx, density, measurer) {
             with(density) {
                 englishBasmalahPx(setting.handPx, measurePx, density, measurer).toDp()
@@ -228,15 +228,16 @@ internal fun MushafEnglishSheet(
                 when (block) {
                     is EnglishLeafBlockText.Opening -> {
                         Box(
-                            Modifier
-                                .fillMaxWidth()
-                                .height(handDp * EnglishLeafPanelEm),
+                            Modifier.fillMaxWidth().height(pitchDp),
                             contentAlignment = Alignment.Center,
                         ) {
                             MushafSurahTitleBand(
                                 surah = surahsById[block.surahId],
                                 fontSize = fontSize * EnglishLeafPanelType,
-                                bandHeight = handDp * EnglishLeafPanelEm * 0.82f,
+                                // Air above and below: the panel is a plate set
+                                // into the line, not the line itself — the same
+                                // 0.94 the Arabic leaf gives its own band.
+                                bandHeight = pitchDp * EnglishLeafPanelBand,
                                 latin = true,
                             )
                         }
@@ -281,14 +282,21 @@ private const val EnglishLeafForeEdgeFraction = 0.055f
 private val EnglishLeafFitSlack = 2.dp
 
 /**
- * The chapter panel and its basmalah, in **ems of the book's hand**.
+ * The chapter's panel is **one line of the page** — it takes the paper a line
+ * of the revelation takes, and the prose picks up on the next one.
  *
- * Ems, not line pitches. The pitch is the one thing on this leaf that varies
- * from page to page — it is how a leaf fills its well — so a panel measured in
- * pitches was a third larger on a light leaf than on a heavy one. The
- * illumination is the book's, like the hand: one size wherever a chapter opens.
+ * Which means it rides the leading, and so is a little taller on an open leaf
+ * than on a close-set one. That is right rather than a fault: the eye reads the
+ * panel against the lines it sits *among*, not against a panel on some other
+ * leaf it saw ten minutes ago, and a band that stood a line and a half deep in
+ * a page set at one line read as a plate dropped onto the paper rather than a
+ * line of it. The Arabic leaf sets its own ʿunwān exactly this way, on the slot
+ * a line of revelation would have had.
+ *
+ * The band inside that line is 0.94 of it, as the Arabic leaf's is: air above
+ * and below, so the plate is set *into* the line rather than being it.
  */
-private const val EnglishLeafPanelEm = 3.5f
+private const val EnglishLeafPanelBand = 0.94f
 
 /** Air under the basmalah, so the chapter's first verse does not run into it. */
 private const val EnglishLeafBasmalahAirEm = 0.9f
@@ -304,9 +312,12 @@ private const val EnglishLeafFadeMs = 220
 /** One block of the leaf, with its text already built. */
 private sealed class EnglishLeafBlockText {
     data class Opening(val surahId: Int, val basmalah: Boolean) : EnglishLeafBlockText() {
-        /** The paper this opening takes: a fixed panel, and a measured basmalah. */
-        fun heightPx(handPx: Float, basmalahPx: Float): Float =
-            handPx * EnglishLeafPanelEm + if (basmalah) basmalahPx else 0f
+        /**
+         * The paper this opening takes: one line of the page for the panel,
+         * plus the basmalah's own measured height where it takes one.
+         */
+        fun heightPx(pitchPx: Float, basmalahPx: Float): Float =
+            pitchPx + if (basmalah) basmalahPx else 0f
     }
 
     /**
@@ -467,7 +478,12 @@ private fun englishLeafShape(
     var fixed = 0f
     blocks.forEach { block ->
         when (block) {
-            is EnglishLeafBlockText.Opening -> fixed += block.heightPx(handPx, basmalahPx)
+            is EnglishLeafBlockText.Opening -> {
+                // The panel is one line of the page, so it rides the leading
+                // with the prose and counts as a pitch, not as fixed paper.
+                pitches += 1f
+                if (block.basmalah) fixed += basmalahPx
+            }
             is EnglishLeafBlockText.Prose -> {
                 val lines = measurer
                     .measure(
@@ -524,7 +540,8 @@ private fun englishLeafHeightPx(
     )
     return blocks.sumOf { block ->
         when (block) {
-            is EnglishLeafBlockText.Opening -> block.heightPx(handPx, basmalahPx).toDouble()
+            is EnglishLeafBlockText.Opening ->
+                block.heightPx(handPx * leadingEm, basmalahPx).toDouble()
             is EnglishLeafBlockText.Prose -> measurer
                 .measure(
                     text = block.text,

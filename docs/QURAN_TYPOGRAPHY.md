@@ -358,12 +358,22 @@ measure there, so paper given to the margin comes back as a shorter, more
 readable line rather than as smaller type, and a book with no outer margin reads
 as a printout.
 
-**The illumination is the book's, not the page's.** The chapter panel and the
-basmalah are a fixed number of ems of the hand, so a chapter opens the same size
-wherever it falls. Measured in line pitches, as they were at first, a panel came
-out a third larger on a light leaf than on a heavy one — the same fault as type
-that changes from leaf to leaf, in the one element that is supposed to be the
-most constant thing on the page.
+**The chapter's panel is one line of the page.** It takes the paper a line of
+the revelation would have taken and the prose picks up on the next one, which is
+how the Arabic leaf sets its own ʿunwān. The band inside that line is 0.94 of
+it, again as the Arabic leaf's is: air above and below, so the plate is set
+*into* the line rather than being it.
+
+It therefore rides the leading, and is a little deeper on an open leaf than on a
+close-set one. That is right rather than a fault — the eye reads the panel
+against the lines it sits *among*, not against a panel on some other leaf it saw
+ten minutes ago. (Set to a fixed number of ems it was constant across the book
+and a line and a half deep on a page set at one line, which read as a plate
+dropped onto the paper.)
+
+The basmalah under it is not a line but a display block, and on a phone measure
+it takes two — so its slot is *measured*, not assumed. Assumed, its second line
+sat on the chapter's first verse.
 
 Everything else is unchanged: the page dial, the chapter ornament, the fore-edge
 fade, and the right-to-left page turn. It is the same book — only the writing is
