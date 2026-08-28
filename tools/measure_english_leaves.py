@@ -4,7 +4,9 @@ The English leaf borrows the mushaf's 604 page boundaries and sets what falls
 on each of them as a page of a book (see docs/QURAN_TYPOGRAPHY.md §13 and
 domain/EnglishLeaf.kt). Its content is therefore fixed by the Arabic, and the
 one lever left for filling the page is the leading — which is why the book's
-hand is anchored on a *reference page mass* rather than on a line count.
+hand is anchored on a *reference page mass* rather than on a line count, and
+why that anchor is the heaviest leaf in the book: cut for the worst page, the
+hand never has to change and nothing can run past the foot.
 
 This is the measurement ENGLISH_LEAF_REFERENCE_PROSE comes from. Rerun it if
 the translation or the qcf_page column changes:
@@ -24,8 +26,8 @@ from collections import defaultdict
 # Must track EnglishLeafFit.kt.
 NOMINAL = 1.55
 LEAD_MIN = 1.30
-LEAD_MAX = 1.80
-REFERENCE = 1440.0
+LEAD_MAX = 2.00
+REFERENCE = 1675.0
 MARK_CHARS = 6  # ENGLISH_LEAF_MARK_CHARS: the verse mark and its two spaces
 
 db = sqlite3.connect("data/quran.db")
@@ -68,17 +70,17 @@ inside = [p for p, lead in leadings.items() if LEAD_MIN <= lead <= LEAD_MAX]
 tight = sorted(p for p, lead in leadings.items() if lead < LEAD_MIN)
 loose = sorted(p for p, lead in leadings.items() if lead > LEAD_MAX)
 print(f"  fill the well outright     {len(inside):3d}  ({100 * len(inside) / len(masses):.1f}%)")
-print(f"  hand gives (leading floor) {len(tight):3d}  {tight[:8]}{' ...' if len(tight) > 8 else ''}")
+print(f"  would overflow the well    {len(tight):3d}  {tight[:8]}{' ...' if len(tight) > 8 else ''}")
 print(f"  foot stands short          {len(loose):3d}  {loose[:8]}{' ...' if len(loose) > 8 else ''}")
 
-# The hand gives by the square root of the overflow: narrowing it by g fits
-# 1/g more characters to the line *and* takes each line g shorter.
 worst = min(leadings.items(), key=lambda kv: kv[1])
-give = (worst[1] / LEAD_MIN) ** 0.5
-print(f"  worst leaf page {worst[0]} ({prose[worst[0]]} chars) asks hand {give:.3f}")
+print(f"  worst leaf page {worst[0]} ({prose[worst[0]]} chars) sets at {worst[1]:.3f} em")
 
-print("\nreference sweep (fill %, leaves needing the hand, leaves left short):")
-for candidate in (1380, 1400, 1420, 1440, 1460, 1480, 1500):
+print("\nthe anchor is the worst leaf at the tightest leading:")
+print(f"  {max(masses)} x {LEAD_MIN} / {NOMINAL} = {max(masses) * LEAD_MIN / NOMINAL:.0f}")
+
+print("\nreference sweep (fill %, leaves that would overflow, leaves left short):")
+for candidate in (1440, 1550, 1600, 1675, 1750, 1800):
     lead = [NOMINAL * candidate / m for m in masses]
     fill = sum(1 for x in lead if LEAD_MIN <= x <= LEAD_MAX)
     print(f"  {candidate}  {100 * fill / len(masses):5.1f}%  "

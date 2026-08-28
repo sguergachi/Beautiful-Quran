@@ -218,6 +218,43 @@ internal fun mushafTurnLeadDelayMs(durationMs: Long, speed: Float): Long =
     ((durationMs / speed.coerceAtLeast(0.1f)).toLong() - MushafTurnLeadMs)
         .coerceAtLeast(0L)
 
+/**
+ * The leaf the reciter is on, or null when the voice is not on this reading.
+ *
+ * This is what decides ink ownership — which verse waits under paper, which
+ * holds its ink, which is being washed — so its one hard requirement is that
+ * it must not answer "nowhere" while the voice is plainly here.
+ *
+ * It used to. Between two words there is no active word, and for a beat after
+ * a verse ends there is no ink frontier either, so both of the first two
+ * answers were null and the page fell to null with them. Every verse on the
+ * leaf was then classified as already-read for a frame or two — which is the
+ * whole page snapping to full ink and back at each verse boundary. Media3
+ * knows which verse is playing throughout, and that is the answer for those
+ * frames.
+ */
+internal fun mushafVoicePage(
+    catalog: MushafCatalog,
+    surahId: Int,
+    voice: MushafPlayback,
+    word: ActiveWord?,
+    wholeVerses: Boolean,
+): Int? {
+    if (!voice.playingHere) return null
+    return when {
+        voice.basmalahActive -> catalog.firstPageOf(surahId)
+        word != null -> catalog.readingPageOf(
+            surahId,
+            word.ayah,
+            word.wordPosition,
+            wholeVerses = wholeVerses,
+        )
+        voice.activeAyah != null -> catalog.pageOf(surahId, voice.activeAyah, 1)
+        voice.playingAyah != null -> catalog.pageOf(surahId, voice.playingAyah, 1)
+        else -> null
+    }
+}
+
 /** A second page owns clocks only while the voice is crossing onto it. */
 internal fun mushafUsesLiveInk(
     isSettled: Boolean,
@@ -735,24 +772,13 @@ internal fun MushafPager(
     }
     val voicePage = remember(catalog, loadedSurahId, english) {
         derivedStateOf {
-            val voice = playback.value
-            if (!voice.playingHere) return@derivedStateOf null
-            val word = activeWordState.value
-            when {
-                voice.basmalahActive -> catalog.firstPageOf(loadedSurahId)
-                word != null -> catalog.readingPageOf(
-                    loadedSurahId,
-                    word.ayah,
-                    word.wordPosition,
-                    wholeVerses = english,
-                )
-                voice.activeAyah != null -> catalog.pageOf(
-                    loadedSurahId,
-                    voice.activeAyah,
-                    1,
-                )
-                else -> null
-            }
+            mushafVoicePage(
+                catalog = catalog,
+                surahId = loadedSurahId,
+                voice = playback.value,
+                word = activeWordState.value,
+                wholeVerses = english,
+            )
         }
     }
     HorizontalPager(
@@ -1328,7 +1354,7 @@ internal fun MushafPageInkClocks(
             }
             val recitingActive = voice.reciting
             val flashHere = flashAyah == ayah.number && flashWordPosition != null
-            val pack = when (mushafInkPackKind(
+            val kind = mushafInkPackKind(
                 pageOwnsVoice = pageOwnsVoice,
                 ayah = ayah.number,
                 activeWordAyah = activeWordAyah,
@@ -1338,7 +1364,8 @@ internal fun MushafPageInkClocks(
                 frontierWaitingForFirstWord = frontierWaitingForFirstWord,
                 waitingForVoice = waitingForVoice,
                 pageHasActiveWord = pageHasActiveWord,
-            )) {
+            )
+            val pack = when (kind) {
                 MushafInkPackKind.ACTIVE_WORD -> rememberAyahInkPack(
                     ayah = ayah,
                     activeWord = activeWord,
@@ -1352,7 +1379,6 @@ internal fun MushafPageInkClocks(
                     wetInk = recitingActive,
                     initiallyRecessed = true,
                 )
-                MushafInkPackKind.UPCOMING -> rememberMushafRecessPack(dimmed = true)
                 MushafInkPackKind.SEARCH_FLASH -> rememberAyahInkPack(
                     ayah = ayah,
                     activeWord = null,
@@ -1362,7 +1388,21 @@ internal fun MushafPageInkClocks(
                     flashWordPosition = flashWordPosition,
                     wetInk = false,
                 )
-                MushafInkPackKind.STATIC -> rememberMushafRecessPack(dimmed = false)
+                // One branch, deliberately: waiting and settled differ only by
+                // whether the paper cover is down, and they must share a clock.
+                //
+                // Split across two `when` branches they were two composition
+                // groups, so every flip between them threw the recess
+                // Animatable away and built a new one already at its target.
+                // At a verse boundary the active word is briefly null and the
+                // voice's page is briefly unknown, which drops every verse
+                // ahead of the reciter to STATIC for a frame or two — and with
+                // a fresh Animatable that read as the whole page snapping to
+                // full ink and back. Sharing the branch keeps one clock, so a
+                // flip that lasts two frames moves the cover by two frames'
+                // worth of [InkEngine.Tuning.recessMs] and is invisible.
+                MushafInkPackKind.UPCOMING, MushafInkPackKind.STATIC ->
+                    rememberMushafRecessPack(dimmed = kind == MushafInkPackKind.UPCOMING)
             }
             SideEffect {
                 // Write only on real change: a same-value write to the

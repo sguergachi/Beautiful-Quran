@@ -252,7 +252,7 @@ runtime, never assumed), `ℓ` the nominal leading and `R` the reference page ma
 It takes no page: the type depends on the leaf's geometry and the face, and on
 nothing the page happens to carry.
 
-### 13.4 The leading gives; the type does not
+### 13.4 The leading gives; the type never does
 
 This is the deepest difference from the Arabic leaf, and it is the same
 difference as rule 4. Arabic fills a *line* by the letterform and keeps one
@@ -262,11 +262,28 @@ classical lever.
 
 A leaf's content is fixed by the Arabic, so its mass varies: measured over the
 book, 1,055 characters at the 1st percentile, 1,469 at the median, 1,997 at the
-worst. The block is therefore brought down to the foot by opening or closing the
-leading inside 1.30–1.80 em, never by resizing the type. Anchored at R = 1,440,
-90.2% of leaves fill their well outright. Of the rest, 35 stand a little short
-at the foot — which is what every parallel translation does, and reads as the
-end of something — and 24 ask the hand to give, the worst of them by 7%.
+worst (page 579). The block is brought down to the foot by opening or closing
+the leading inside 1.30–2.00 em, and by nothing else.
+
+**The hand is cut for the worst page, not the average one.** The anchor is
+`1997 × 1.30 / 1.55 = 1675` characters — the heaviest leaf in the Qur'an,
+carried at the tightest leading the book may be set on. Every other leaf is
+lighter, so it has room to spare and spends it on leading. Nothing overflows,
+and nothing resizes. 88% of leaves reach their foot; 73 stand short of it,
+which is what every parallel translation does and reads as the end of
+something.
+
+Anchoring nearer the median bought about 7% more type and cost both of those
+guarantees at once: the heaviest leaves either ran past the foot or had to be
+set smaller than their neighbours. Type that changes from leaf to leaf is the
+one thing rule 13.3 forbids and the first thing a reader notices.
+
+And the fit is a guarantee, not an estimate. A line count is a measurement of
+*this* page; the hand is a model of the average one. So the leaf is measured
+at the leading it was given, and if it still stands past the foot the leading
+closes by exactly the overflow — below 1.30 em if it must. A line crowded by a
+fortieth of an em is a page set a little tight; a line past the foot is
+revelation the reader cannot see.
 
 ### 13.5 Justified, and deliberately not hyphenated
 

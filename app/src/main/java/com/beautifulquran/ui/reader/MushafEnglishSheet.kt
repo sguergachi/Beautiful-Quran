@@ -60,7 +60,7 @@ import com.beautifulquran.domain.EnglishLeafBlock
 import com.beautifulquran.domain.MushafPage
 import com.beautifulquran.domain.MushafToken
 import com.beautifulquran.domain.englishLeaf
-import com.beautifulquran.domain.englishLeafHandGive
+import com.beautifulquran.domain.englishLeafFittedLeadingEm
 import com.beautifulquran.domain.englishLeafHandPx
 import com.beautifulquran.domain.englishLeafLeadingEm
 import com.beautifulquran.domain.mushafIsOpeningLeaf
@@ -293,7 +293,11 @@ private const val EnglishLeafFadeMs = 220
 
 /** One block of the leaf, with its text already built. */
 private sealed class EnglishLeafBlockText {
-    data class Opening(val surahId: Int, val basmalah: Boolean) : EnglishLeafBlockText()
+    data class Opening(val surahId: Int, val basmalah: Boolean) : EnglishLeafBlockText() {
+        /** What the panel and its basmalah take, in line pitches of the page. */
+        val pitches: Float
+            get() = EnglishLeafPanelLines + if (basmalah) EnglishLeafBasmalahLines else 0f
+    }
 
     /**
      * One paragraph. [text] runs its verses together as continuous prose —
@@ -377,13 +381,15 @@ private fun englishLeafBlockTexts(
 private data class EnglishLeafSetting(val handPx: Float, val leadingEm: Float)
 
 /**
- * Sets the leaf: fits the book's hand, measures what the page takes at it, then
- * brings the block down to the foot by leading.
+ * Sets the leaf: takes the book's hand, counts what the page runs to at it,
+ * chooses a leading — and then checks what the leaf *actually* stands at and
+ * closes the leading until it fits.
  *
- * A second pass runs only for the heaviest leaves in the book, where even the
- * tightest leading overflows the well and the hand has to give
- * ([englishLeafHandGive]) — measured over the corpus, 24 leaves of 604, the
- * worst of them by 7%.
+ * The hand is never touched. It is the book's, cut for the heaviest leaf in it
+ * (`EnglishLeafFit.kt`), and a leaf that set its own type would be the one
+ * fault a reader turning pages cannot miss. The second pass exists because a
+ * line count is a measurement of this page and the hand is a model of the
+ * average one: where they disagree, the page wins and the leading absorbs it.
  */
 private fun setEnglishLeaf(
     blocks: List<EnglishLeafBlockText>,
@@ -392,20 +398,21 @@ private fun setEnglishLeaf(
     density: Density,
     measurer: TextMeasurer,
 ): EnglishLeafSetting {
-    var handPx = englishLeafHandPx(
+    val handPx = englishLeafHandPx(
         wellHeightPx = wellPx,
         measureWidthPx = measurePx,
         charAdvanceEm = englishCharAdvanceEm(measurer, density),
     )
-    var lines = englishLeafLines(blocks, handPx, measurePx, density, measurer)
-    val give = englishLeafHandGive(lines = lines, fontPx = handPx, wellHeightPx = wellPx)
-    if (give < 1f) {
-        handPx *= give
-        lines = englishLeafLines(blocks, handPx, measurePx, density, measurer)
-    }
+    val lines = englishLeafLines(blocks, handPx, measurePx, density, measurer)
+    val chosen = englishLeafLeadingEm(lines = lines, fontPx = handPx, wellHeightPx = wellPx)
+    val stands = englishLeafHeightPx(blocks, handPx, chosen, measurePx, density, measurer)
     return EnglishLeafSetting(
         handPx = handPx,
-        leadingEm = englishLeafLeadingEm(lines = lines, fontPx = handPx, wellHeightPx = wellPx),
+        leadingEm = englishLeafFittedLeadingEm(
+            leadingEm = chosen,
+            measuredHeightPx = stands,
+            wellHeightPx = wellPx,
+        ),
     )
 }
 
@@ -420,22 +427,59 @@ private fun englishLeafLines(
     measurePx: Float,
     density: Density,
     measurer: TextMeasurer,
-): Float {
-    val style = englishProseStyle(with(density) { handPx.toSp() }, TextUnit.Unspecified)
-    return blocks.sumOf { block ->
-        when (block) {
-            is EnglishLeafBlockText.Opening ->
-                (EnglishLeafPanelLines + if (block.basmalah) EnglishLeafBasmalahLines else 0f)
-                    .toDouble()
-
-            is EnglishLeafBlockText.Prose -> measurer.measure(
+): Float = blocks.sumOf { block ->
+    when (block) {
+        is EnglishLeafBlockText.Opening -> block.pitches.toDouble()
+        is EnglishLeafBlockText.Prose -> measurer
+            .measure(
                 text = block.text,
-                style = style,
+                style = englishProseStyle(with(density) { handPx.toSp() }, TextUnit.Unspecified),
                 constraints = Constraints(maxWidth = measurePx.toInt().coerceAtLeast(1)),
                 density = density,
-            ).lineCount.toDouble()
+            )
+            .lineCount
+            .toDouble()
+    }
+}.toFloat().coerceAtLeast(1f)
+
+/**
+ * What the leaf really stands at, in px, set at this hand and this leading.
+ *
+ * Not `lines × pitch`. That is what the leading was *chosen* from, and it
+ * assumes a paragraph is exactly its line count times its line height — true
+ * of Compose's own arithmetic, but the panels are laid out separately and the
+ * rounding of an sp line height into device pixels is not free. A leaf that
+ * came out one line over its well lost that line off the foot, which on this
+ * page is revelation the reader cannot see. So the block is measured.
+ */
+private fun englishLeafHeightPx(
+    blocks: List<EnglishLeafBlockText>,
+    handPx: Float,
+    leadingEm: Float,
+    measurePx: Float,
+    density: Density,
+    measurer: TextMeasurer,
+): Float {
+    val pitchPx = handPx * leadingEm
+    val style = englishProseStyle(
+        with(density) { handPx.toSp() },
+        with(density) { pitchPx.toSp() },
+    )
+    return blocks.sumOf { block ->
+        when (block) {
+            is EnglishLeafBlockText.Opening -> (block.pitches * pitchPx).toDouble()
+            is EnglishLeafBlockText.Prose -> measurer
+                .measure(
+                    text = block.text,
+                    style = style,
+                    constraints = Constraints(maxWidth = measurePx.toInt().coerceAtLeast(1)),
+                    density = density,
+                )
+                .size
+                .height
+                .toDouble()
         }
-    }.toFloat().coerceAtLeast(1f)
+    }.toFloat()
 }
 
 /**

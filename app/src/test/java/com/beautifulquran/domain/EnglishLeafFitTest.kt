@@ -85,45 +85,36 @@ class EnglishLeafFitTest {
     }
 
     @Test
-    fun `the hand only gives once the leading has closed all the way`() {
+    fun `the hand is cut so the heaviest leaf in the book fits at the tightest leading`() {
+        // The anchor's defining property, and the whole reason the type never
+        // has to change: page 579 carries 1,997 characters — see
+        // tools/measure_english_leaves.py — and comes out at the floor, not
+        // past it.
         val hand = englishLeafHandPx(well, measure, advance)
-        val fitsTight = well / (hand * ENGLISH_LEAF_MIN_LEADING_EM)
-        assertEquals(1f, englishLeafHandGive(fitsTight, hand, well), 0f)
-        assertEquals(1f, englishLeafHandGive(fitsTight * 0.5f, hand, well), 0f)
-        assertTrue(englishLeafHandGive(fitsTight * 1.2f, hand, well) < 1f)
-    }
-
-    @Test
-    fun `the give is the square root of the overflow, not the overflow`() {
-        val hand = 20f
-        // A leaf that overflows the tightest leading by 21%.
-        val lines = well / (hand * ENGLISH_LEAF_MIN_LEADING_EM) * 1.21f
-        // √(1/1.21), not 1/1.21: narrowing the hand takes both the line count
-        // and the line height with it, so the block comes down by the square.
-        assertEquals(0.9091f, englishLeafHandGive(lines, hand, well), 0.001f)
-    }
-
-    @Test
-    fun `the give has a floor`() {
-        val hand = 20f
-        val absurd = well / (hand * ENGLISH_LEAF_MIN_LEADING_EM) * 100f
-        assertEquals(ENGLISH_LEAF_MIN_HAND, englishLeafHandGive(absurd, hand, well), 0f)
-    }
-
-    @Test
-    fun `the heaviest leaf in the book stays clear of that floor`() {
-        val hand = englishLeafHandPx(well, measure, advance)
-        // Page 579 carries 1,997 characters against the 1,440 the hand is
-        // fitted to, and is the heaviest in the book — see
-        // tools/measure_english_leaves.py.
-        val referenceLines = well / (hand * ENGLISH_LEAF_NOMINAL_LEADING_EM)
-        val worst = englishLeafHandGive(
-            lines = referenceLines * 1997f / ENGLISH_LEAF_REFERENCE_PROSE,
-            fontPx = hand,
-            wellHeightPx = well,
+        val perLine = measure / (advance * hand)
+        assertEquals(
+            ENGLISH_LEAF_MIN_LEADING_EM,
+            englishLeafLeadingEm(lines = 1997f / perLine, fontPx = hand, wellHeightPx = well),
+            0.01f,
         )
-        assertEquals(0.927f, worst, 0.002f)
-        assertTrue(worst > ENGLISH_LEAF_MIN_HAND)
+    }
+
+    @Test
+    fun `a leaf that already fits is left exactly as it was set`() {
+        assertEquals(1.7f, englishLeafFittedLeadingEm(1.7f, well - 1f, well), 0f)
+        assertEquals(1.7f, englishLeafFittedLeadingEm(1.7f, well, well), 0f)
+    }
+
+    @Test
+    fun `a leaf that stands past the foot closes its leading by exactly the overflow`() {
+        // The block's height is proportional to its leading, so one step lands
+        // it on the foot — and it may close past the comfortable floor to do
+        // it, because a line past the foot is revelation the reader cannot see.
+        assertEquals(1.6f, englishLeafFittedLeadingEm(2.0f, well * 1.25f, well), 0.0001f)
+        assertTrue(
+            englishLeafFittedLeadingEm(ENGLISH_LEAF_MIN_LEADING_EM, well * 1.1f, well) <
+                ENGLISH_LEAF_MIN_LEADING_EM,
+        )
     }
 
     @Test
@@ -136,6 +127,6 @@ class EnglishLeafFitTest {
             englishLeafLeadingEm(0f, 20f, well),
             0f,
         )
-        assertEquals(1f, englishLeafHandGive(0f, 20f, well), 0f)
+        assertEquals(1.5f, englishLeafFittedLeadingEm(1.5f, 0f, well), 0f)
     }
 }
