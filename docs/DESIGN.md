@@ -658,6 +658,10 @@ not the app's.
   in place to Resume (right edge), Delete to its left. Fetch verbs are green;
   settle and delete are quiet ink. Never size a destructive verb up
   to the name.
+- **Product stage** (`Alpha`): the same letterspaced labelSmall whisper as a
+  settings section label, sitting next to the product name on the home
+  masthead and the settings colophon. Never a chip, pill, or badge with a
+  fill or stroke. Gold is Quranic ornament — the stage mark is quiet ink.
 - Ayah markers are typographic — gold `﴿٧﴾` ornate brackets in the Hafs
   face — not drawn ornaments.
 

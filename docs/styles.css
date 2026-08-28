@@ -330,6 +330,24 @@ p {
   letter-spacing: -0.025em;
   color: var(--ink);
   margin-bottom: 18px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.35em 0.7rem;
+}
+
+/* Product-stage whisper — same letterspaced label as a settings section,
+ * never a chip. Gold is Quranic ornament; this is quiet ink. */
+.alpha-tag {
+  font-family: var(--body);
+  font-weight: 500;
+  font-size: var(--text-xs);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  line-height: 1;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .hero-lead {
