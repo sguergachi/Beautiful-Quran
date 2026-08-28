@@ -1,3 +1,4 @@
+export { AlphaTag } from './AlphaTag'
 export { PaperSelect } from './PaperSelect'
 export type { PaperSelectOption } from './PaperSelect'
 export { PaperSwitch } from './PaperSwitch'

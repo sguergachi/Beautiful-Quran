@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Beautiful Quran</string>
+    <string name="alpha_tag">Alpha</string>
+    <string name="alpha_tag_description">Alpha, still in development</string>
     <string name="appfunctions_description">Control Quran reading and recitation hands-free</string>
 
     <!-- Launcher / App Actions shortcuts -->

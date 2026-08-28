@@ -10,6 +10,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.waitForUpOrCancellation
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -79,6 +80,7 @@ import com.beautifulquran.data.HomeBookmarkStyle
 import com.beautifulquran.domain.WORD_SEARCH_PREVIEW_LIMIT
 import com.beautifulquran.domain.englishTranslationHighlightSpans
 import com.beautifulquran.ui.reader.VerseBookmarkRibbon
+import com.beautifulquran.ui.theme.AlphaTag
 import com.beautifulquran.ui.theme.ArabicTitleStyle
 import com.beautifulquran.ui.theme.GildedRosette
 import com.beautifulquran.ui.theme.LocalQuranAccents
@@ -461,14 +463,20 @@ private fun HomeHeader(
     ) {
         Column(Modifier.weight(1f)) {
             Spacer(Modifier.height(38.dp))
-            Text(
-                text = "Beautiful Quran",
-                style = MaterialTheme.typography.headlineMedium.copy(
-                    fontSize = 34.sp,
-                    lineHeight = 40.sp,
-                ),
-                color = MaterialTheme.colorScheme.onBackground,
-            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Text(
+                    text = "Beautiful Quran",
+                    style = MaterialTheme.typography.headlineMedium.copy(
+                        fontSize = 34.sp,
+                        lineHeight = 40.sp,
+                    ),
+                    color = MaterialTheme.colorScheme.onBackground,
+                )
+                AlphaTag()
+            }
             Spacer(Modifier.height(24.dp))
         }
         Box(
