@@ -39,23 +39,35 @@ npm --prefix web ci
 npm --prefix web run build    # Web; copies the same database into dist
 ```
 
-### Send a debug APK to your phone (KDE Connect)
+### Send an APK to your phone (KDE Connect)
 
 Paired phone + reachable KDE Connect (app open, same LAN or Bluetooth):
 
 ```bash
-scripts/send_apk_to_phone.sh
+scripts/send_apk_to_phone.sh --label "what this build is"
 ```
 
-That builds `app/build/outputs/apk/debug/app-debug.apk` and runs
-`kdeconnect-cli --share` to the first reachable device. Accept the file on
-the phone.
+That builds the APK, stages it under a name made from your label and the
+commit — `Beautiful-Quran-what-this-build-is-a1b2c3d4-debug.apk` — shares it
+to the first reachable device, and then **deletes the older staged builds**.
+Accept the file on the phone.
+
+Both halves matter. The phone never gets a generic `app-debug.apk`, because a
+phone full of identically-named builds is one you cannot test from and KDE
+Connect drops repeat sends of the same filename; and the previous builds go,
+because at a quarter of a gigabyte each they fill `/tmp` and a full `/tmp`
+truncates the next copy mid-send.
 
 ```bash
-scripts/send_apk_to_phone.sh --skip-build --name "Pixel 10"
+scripts/send_apk_to_phone.sh --release --label "chapter panel"
+scripts/send_apk_to_phone.sh --skip-build --name "Pixel 10" --label "wash fix"
 scripts/send_apk_to_phone.sh --wait          # poll up to 5 minutes
+scripts/send_apk_to_phone.sh --keep-old      # keep the previous builds
 kdeconnect-cli -a                            # list reachable phones
 ```
+
+Staged builds live in `$TMPDIR/beautiful-quran-apks` (override with
+`BQ_APK_STAGE`); cleanup only ever touches that directory.
 
 If `kdeconnect-cli -l` shows the phone as paired but `-a` is empty, unlock
 the phone, open KDE Connect, and join this machine's LAN. This desktop is
