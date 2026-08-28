@@ -30,6 +30,7 @@ import {
   type BrushCircleParams,
   type BrushKnobKey,
 } from '../kit/brushMark'
+import { AlphaTag } from '../kit/AlphaTag'
 import { FontSizeControl } from '../kit/FontSizeControl'
 import { DisclosureChevron } from '../kit/DisclosureChevron'
 import { InkCheckMark } from '../kit/InkCheckMark'
@@ -719,7 +720,10 @@ export function SettingsScreen({
           >
             <img src={assetUrl('icon-192.png')} alt="" width={48} height={48} />
           </button>
-          <p className="settings-colophon-name">Beautiful Quran</p>
+          <p className="settings-colophon-name">
+            <span>Beautiful Quran</span>
+            <AlphaTag />
+          </p>
           <p className="settings-colophon-version">
             Version {APP_VERSION}
             {s.developerMode ? ' · developer mode' : ''}

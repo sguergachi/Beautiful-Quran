@@ -83,6 +83,7 @@ import com.beautifulquran.playback.RecitationCache
 import com.beautifulquran.playback.RecitationUsage
 import com.beautifulquran.playback.formatUsage
 import com.beautifulquran.ui.PageTurnSounds
+import com.beautifulquran.ui.theme.AlphaTag
 import com.beautifulquran.ui.theme.BrushCheckParams
 import com.beautifulquran.ui.theme.BrushCircleParams
 import com.beautifulquran.ui.theme.DisclosureChevron
@@ -857,11 +858,17 @@ private fun Colophon(
                 .quietClickable(onClick = onLogoClick, onLongClick = onLogoLongClick),
         )
         Spacer(Modifier.height(4.dp))
-        Text(
-            text = stringResource(R.string.app_name),
-            style = MaterialTheme.typography.titleLarge,
-            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.85f),
-        )
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Text(
+                text = stringResource(R.string.app_name),
+                style = MaterialTheme.typography.titleLarge,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.85f),
+            )
+            AlphaTag()
+        }
         Text(
             text = buildString {
                 append("Version ${BuildConfig.VERSION_NAME}")
