@@ -358,17 +358,32 @@ measure there, so paper given to the margin comes back as a shorter, more
 readable line rather than as smaller type, and a book with no outer margin reads
 as a printout.
 
-**The chapter's panel is one line of the page.** It takes the paper a line of
-the revelation would have taken and the prose picks up on the next one, which is
-how the Arabic leaf sets its own ʿunwān. The band inside that line is 0.94 of
-it, again as the Arabic leaf's is: air above and below, so the plate is set
-*into* the line rather than being it.
+**The chapter's panel is one line of the page, with a line's air around it.**
+The band is one line's own type box, so it stands exactly as deep as a line of
+the revelation; on each side of it sits about one of the page's interlines, so
+the whole slot comes to around a line and a half.
 
-It therefore rides the leading, and is a little deeper on an open leaf than on a
-close-set one. That is right rather than a fault — the eye reads the panel
-against the lines it sits *among*, not against a panel on some other leaf it saw
-ten minutes ago. (Set to a fixed number of ems it was constant across the book
-and a line and a half deep on a page set at one line, which read as a plate
+Both halves are measured rather than chosen as a fraction, because a fraction
+was what got it wrong. The prose block is set `Trim.Both`, so its last line
+stops at the descender and contributes no trailing white of its own —
+everything separating the panel from the text has to come out of the panel's
+own slot. Sized as a share of the band, that came to 14 px above and 20 px
+below on a page whose lines sit 27 px apart: tighter than the text it divides,
+and visibly tighter on one side than the other. Built from the line's ink and
+the page's interline it measures 24 px above and 29 px below against a 23–25 px
+interline, and what is left is glyph slack — the line above may have no
+descender, the line below may open on a capital rather than an ascender.
+
+Half a pitch a side reads better still and is not worth its price: on a leaf of
+juzʾ 30 with two chapters opening on it, it took the page's own interline from
+27 px down to 20 to pay for itself, which is the rest of the page giving up its
+air so the panel can have some.
+
+The panel therefore rides the leading, and is a little deeper on an open leaf
+than on a close-set one. That is right rather than a fault — the eye reads the
+panel against the lines it sits *among*, not against a panel on some other leaf
+it saw ten minutes ago. (Set to a fixed number of ems it was constant across the
+book and a line and a half deep on a page set at one line, which read as a plate
 dropped onto the paper.)
 
 The basmalah under it is not a line but a display block, and on a phone measure

@@ -227,17 +227,17 @@ internal fun MushafEnglishSheet(
             blocks.forEach { block ->
                 when (block) {
                     is EnglishLeafBlockText.Opening -> {
+                        val bandDp = with(density) { setting.lineInkPx.toDp() }
                         Box(
-                            Modifier.fillMaxWidth().height(pitchDp),
+                            Modifier
+                                .fillMaxWidth()
+                                .height(bandDp + pitchDp * EnglishLeafPanelAir * 2f),
                             contentAlignment = Alignment.Center,
                         ) {
                             MushafSurahTitleBand(
                                 surah = surahsById[block.surahId],
                                 fontSize = fontSize * EnglishLeafPanelType,
-                                // Air above and below: the panel is a plate set
-                                // into the line, not the line itself — the same
-                                // 0.94 the Arabic leaf gives its own band.
-                                bandHeight = pitchDp * EnglishLeafPanelBand,
+                                bandHeight = bandDp,
                                 latin = true,
                             )
                         }
@@ -282,27 +282,63 @@ private const val EnglishLeafForeEdgeFraction = 0.055f
 private val EnglishLeafFitSlack = 2.dp
 
 /**
- * The chapter's panel is **one line of the page** — it takes the paper a line
- * of the revelation takes, and the prose picks up on the next one.
+ * The air on each side of the chapter's panel, in line pitches of the page.
  *
- * Which means it rides the leading, and so is a little taller on an open leaf
+ * The band itself is **one line of the page** — one line's own type box, so it
+ * stands exactly as deep as a line of the revelation. This is the paper set
+ * around it: about one of the page's own interlines on each side, which makes
+ * the panel's whole slot around a line and a half.
+ *
+ * Not more. Half a pitch a side reads beautifully on its own and costs the leaf
+ * two lines of paper for every chapter that opens on it — on a leaf of juz' 30
+ * with two openings it took the page's interline from 27 px down to 20 to pay
+ * for itself, which is the rest of the page giving up its air so the panel can
+ * have some.
+ *
+ * Equal by construction, because the two sides were not. The prose block is set
+ * `Trim.Both`, so its last line stops at the descender and contributes no
+ * trailing white of its own; everything that separates the panel from the text
+ * has to come out of the panel's own slot. Sized as a fraction of the band it
+ * came to 14 px above and 20 px below on a page whose lines sit 27 px apart —
+ * tighter than the text it divides, and visibly tighter on one side than the
+ * other.
+ *
+ * Half a pitch is generous on purpose. What is left over after the arithmetic
+ * is glyph slack — the last line above may have no descender, the first line
+ * below may open on a capital rather than an ascender — and that slack is a
+ * fixed few pixels. Against a token gap it is the whole difference; against
+ * half a line it is nothing the eye picks out.
+ *
+ * The panel therefore rides the leading, and is a little deeper on an open leaf
  * than on a close-set one. That is right rather than a fault: the eye reads the
  * panel against the lines it sits *among*, not against a panel on some other
- * leaf it saw ten minutes ago, and a band that stood a line and a half deep in
- * a page set at one line read as a plate dropped onto the paper rather than a
- * line of it. The Arabic leaf sets its own ʿunwān exactly this way, on the slot
- * a line of revelation would have had.
- *
- * The band inside that line is 0.94 of it, as the Arabic leaf's is: air above
- * and below, so the plate is set *into* the line rather than being it.
+ * leaf it saw ten minutes ago. The Arabic leaf sets its own ʿunwān the same
+ * way, on the slot a line of revelation would have had.
  */
-private const val EnglishLeafPanelBand = 0.94f
+private const val EnglishLeafPanelAir = 0.3f
 
-/** Air under the basmalah, so the chapter's first verse does not run into it. */
+/**
+ * Air under the basmalah, so the chapter's first verse does not run into it.
+ *
+ * Under it, all of it — the line sits at the head of its slot. Centred there,
+ * half of this fell *above* the basmalah instead, where it landed under the
+ * chapter's panel and made the space below the panel five times the space
+ * above it. The panel's own air is what stands it off its neighbours, on both
+ * sides and equally; this is the separation between a display line and the
+ * body text that follows it.
+ */
 private const val EnglishLeafBasmalahAirEm = 0.9f
 
-/** The panel's name is set a step above the text, as the Arabic leaf sets it. */
-private const val EnglishLeafPanelType = 1.08f
+/**
+ * The chapter's name inside the panel.
+ *
+ * Under the page's own hand rather than a step above it, as the Arabic leaf
+ * sets it: the cartouche has to sit inside a band of 0.72 of a line at the
+ * *tightest* leading in the book, and a name set larger than this stops fitting
+ * there. [MushafSurahTitleBand] takes it down again for Latin, which spells a
+ * chapter out where Hafs writes it in three or four letters.
+ */
+private const val EnglishLeafPanelType = 0.95f
 
 /** The mark rides at this share of the prose size, as the scrolling reader sets it. */
 private const val EnglishLeafMarkType = 17f / 22f
@@ -316,8 +352,9 @@ private sealed class EnglishLeafBlockText {
          * The paper this opening takes: one line of the page for the panel,
          * plus the basmalah's own measured height where it takes one.
          */
-        fun heightPx(pitchPx: Float, basmalahPx: Float): Float =
-            pitchPx + if (basmalah) basmalahPx else 0f
+        fun heightPx(pitchPx: Float, lineInkPx: Float, basmalahPx: Float): Float =
+            lineInkPx + pitchPx * EnglishLeafPanelAir * 2f +
+                if (basmalah) basmalahPx else 0f
     }
 
     /**
@@ -398,8 +435,15 @@ private fun englishLeafBlockTexts(
     }
 }
 
-/** The hand and the leading this leaf came out at. */
-private data class EnglishLeafSetting(val handPx: Float, val leadingEm: Float)
+/**
+ * The hand and the leading this leaf came out at, and how tall one line of it
+ * inks — which is what the chapter's panel is built on.
+ */
+private data class EnglishLeafSetting(
+    val handPx: Float,
+    val leadingEm: Float,
+    val lineInkPx: Float,
+)
 
 /**
  * Sets the leaf: takes the book's hand, then solves the one leading that puts
@@ -439,6 +483,7 @@ private fun setEnglishLeaf(
         charAdvanceEm = englishCharAdvanceEm(measurer, density),
     )
     val basmalahPx = englishBasmalahPx(handPx, measurePx, density, measurer)
+    val lineInkPx = englishLineInkPx(handPx, measurePx, density, measurer)
     val shape = englishLeafShape(blocks, handPx, basmalahPx, measurePx, density, measurer)
     val chosen = englishLeafLeadingEm(
         lines = shape.pitches,
@@ -449,6 +494,7 @@ private fun setEnglishLeaf(
         englishLeafHeightPx(blocks, handPx, basmalahPx, chosen, measurePx, density, measurer)
     return EnglishLeafSetting(
         handPx = handPx,
+        lineInkPx = lineInkPx,
         leadingEm = englishLeafFittedLeadingEm(
             leadingEm = chosen,
             measuredHeightPx = stands,
@@ -479,9 +525,10 @@ private fun englishLeafShape(
     blocks.forEach { block ->
         when (block) {
             is EnglishLeafBlockText.Opening -> {
-                // The panel is one line of the page, so it rides the leading
-                // with the prose and counts as a pitch, not as fixed paper.
-                pitches += 1f
+                // The band is a line's own type box and does not move with the
+                // leading; the air around it does, so it counts as pitches.
+                pitches += EnglishLeafPanelAir * 2f
+                fixed += inkPx
                 if (block.basmalah) fixed += basmalahPx
             }
             is EnglishLeafBlockText.Prose -> {
@@ -534,14 +581,16 @@ private fun englishLeafHeightPx(
     density: Density,
     measurer: TextMeasurer,
 ): Float {
+    val inkPx = englishLineInkPx(handPx, measurePx, density, measurer)
     val style = englishProseStyle(
         with(density) { handPx.toSp() },
         with(density) { (handPx * leadingEm).toSp() },
     )
     return blocks.sumOf { block ->
         when (block) {
-            is EnglishLeafBlockText.Opening ->
-                block.heightPx(handPx * leadingEm, basmalahPx).toDouble()
+            is EnglishLeafBlockText.Opening -> block
+                .heightPx(handPx * leadingEm, inkPx, basmalahPx)
+                .toDouble()
             is EnglishLeafBlockText.Prose -> measurer
                 .measure(
                     text = block.text,
@@ -817,7 +866,10 @@ private fun EnglishBasmalahLine(
             .fillMaxWidth()
             .height(slotHeight)
             .quietClickable(onClick = onClick),
-        contentAlignment = Alignment.Center,
+        // At the head of the slot: every bit of the slot's air belongs below
+        // the line, between it and the chapter's first verse. See
+        // EnglishLeafBasmalahAirEm.
+        contentAlignment = Alignment.TopCenter,
     ) {
         Text(
             text = ENGLISH_BASMALAH,
@@ -856,6 +908,13 @@ private fun englishBasmalahStyle(fontSize: TextUnit) = TextStyle(
     fontSize = fontSize,
     textAlign = TextAlign.Center,
     platformStyle = PlatformTextStyle(includeFontPadding = false),
+    // Trimmed like the prose, so the line begins at its ascent. Untrimmed, the
+    // leading above it reappeared as air under the chapter's panel and put six
+    // more pixels below the panel than above it.
+    lineHeightStyle = LineHeightStyle(
+        alignment = LineHeightStyle.Alignment.Proportional,
+        trim = LineHeightStyle.Trim.Both,
+    ),
 )
 
 /** What the basmalah stands at, plus the air a display line takes under it. */
