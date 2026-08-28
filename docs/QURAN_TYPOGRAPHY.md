@@ -265,18 +265,20 @@ book, 1,055 characters at the 1st percentile, 1,469 at the median, 1,997 at the
 worst (page 579). The block is brought down to the foot by opening or closing
 the leading inside 1.30–2.00 em, and by nothing else.
 
-**The hand is cut for the worst page, not the average one.** The anchor is
-`1997 × 1.30 / 1.55 = 1675` characters — the heaviest leaf in the Qur'an,
-carried at the tightest leading the book may be set on. Every other leaf is
-lighter, so it has room to spare and spends it on leading. Nothing overflows,
-and nothing resizes. 88% of leaves reach their foot; 73 stand short of it,
-which is what every parallel translation does and reads as the end of
-something.
+**The hand is cut once, for the whole book.** The anchor is a reference page
+mass of 1,548 characters — nothing overflows and nothing resizes, whatever it
+is set to, because the leaf is measured and its leading stepped to fit
+(below). What the anchor buys is the size the book is read at.
 
-Anchoring nearer the median bought about 7% more type and cost both of those
-guarantees at once: the heaviest leaves either ran past the foot or had to be
-set smaller than their neighbours. Type that changes from leaf to leaf is the
-one thing rule 13.3 forbids and the first thing a reader notices.
+Cut for the *heaviest* leaf at the tightest leading it would be
+`1997 × 1.30 / 1.55 = 1675`, and then no leaf would ever ask for less than the
+floor. That is the safe reading and it sets the book a size smaller than it
+wants to be read at. At 1,548 the hand comes up about 4%, the median leaf takes
+one more line of type, and six leaves of 604 close below 1.30 em — the heaviest,
+page 579, at 1.20. Close-set there rather than crowded: the face's line box is
+1.24 em and its ink fills 0.89 of one, so a third of an em of air still stands
+between what is actually drawn. 96% of leaves now reach their foot, against 88%
+before, so there are fewer ragged feet as well as larger type.
 
 And the fit is a guarantee, not an estimate. A line count is a measurement of
 *this* page; the hand is a model of the average one. So the leaf is measured
@@ -386,9 +388,16 @@ it saw ten minutes ago. (Set to a fixed number of ems it was constant across the
 book and a line and a half deep on a page set at one line, which read as a plate
 dropped onto the paper.)
 
-The basmalah under it is not a line but a display block, and on a phone measure
-it takes two — so its slot is *measured*, not assumed. Assumed, its second line
-sat on the chapter's first verse.
+**The basmalah under it is one line.** Set at the page's own hand it takes two
+on a phone measure, and a basmalah broken across a line-end is not a display
+line — it is a paragraph of one sentence sitting where a heading should be. So
+it is set to the measure: the hand comes down until the line fits, which is the
+Latin form of §4's "a line that will not fit is made to fit", by the only lever
+this script gives. It is still one size for the whole book, because the measure
+does not change from leaf to leaf, and a display line set smaller than the body
+is what a printed translation does with it anyway. Its slot is measured too, and
+all of its air falls below it — centred, half of it landed above instead, under
+the chapter's panel.
 
 Everything else is unchanged: the page dial, the chapter ornament, the fore-edge
 fade, and the right-to-left page turn. It is the same book — only the writing is

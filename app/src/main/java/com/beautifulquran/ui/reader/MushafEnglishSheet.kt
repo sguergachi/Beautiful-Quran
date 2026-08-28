@@ -201,6 +201,11 @@ internal fun MushafEnglishSheet(
                 englishBasmalahPx(setting.handPx, measurePx, density, measurer).toDp()
             }
         }
+        val basmalahFontSize = remember(setting.handPx, measurePx, density, measurer) {
+            with(density) {
+                englishBasmalahHandPx(setting.handPx, measurePx, density, measurer).toSp()
+            }
+        }
         val pitch = with(density) { (setting.handPx * setting.leadingEm).toSp() }
         Column(
             modifier = Modifier
@@ -243,7 +248,7 @@ internal fun MushafEnglishSheet(
                         }
                         if (block.basmalah) {
                             EnglishBasmalahLine(
-                                fontSize = fontSize,
+                                fontSize = basmalahFontSize,
                                 slotHeight = basmalahDp,
                                 active = pageOwnsVoice &&
                                     block.surahId == content.surah.id &&
@@ -483,7 +488,7 @@ private fun setEnglishLeaf(
         charAdvanceEm = englishCharAdvanceEm(measurer, density),
     )
     val basmalahPx = englishBasmalahPx(handPx, measurePx, density, measurer)
-    val lineInkPx = englishLineInkPx(handPx, measurePx, density, measurer)
+    val lineInkPx = englishLineInkPx(handPx, density, measurer)
     val shape = englishLeafShape(blocks, handPx, basmalahPx, measurePx, density, measurer)
     val chosen = englishLeafLeadingEm(
         lines = shape.pitches,
@@ -519,7 +524,7 @@ private fun englishLeafShape(
     density: Density,
     measurer: TextMeasurer,
 ): EnglishLeafShape {
-    val inkPx = englishLineInkPx(handPx, measurePx, density, measurer)
+    val inkPx = englishLineInkPx(handPx, density, measurer)
     var pitches = 0f
     var fixed = 0f
     blocks.forEach { block ->
@@ -551,16 +556,22 @@ private fun englishLeafShape(
     return EnglishLeafShape(pitches = pitches.coerceAtLeast(0.001f), fixedPx = fixed)
 }
 
-/** One line of the book's own ink, top of ascent to foot of descender. */
+/**
+ * One line of the book's own ink, top of ascent to foot of descender.
+ *
+ * Measured unbounded, which is the whole point: constrained to the measure the
+ * specimen wraps as soon as the hand is large enough to break it, and then this
+ * returns *two* lines' ink. It did — the chapter panel, which is built on this,
+ * came out twice as deep as a line the moment the book was set a size larger.
+ */
 private fun englishLineInkPx(
     handPx: Float,
-    measurePx: Float,
     density: Density,
     measurer: TextMeasurer,
 ): Float = measurer.measure(
     text = AnnotatedString(ENGLISH_LEAF_SPECIMEN),
     style = englishProseStyle(with(density) { handPx.toSp() }, TextUnit.Unspecified),
-    constraints = Constraints(maxWidth = measurePx.toInt().coerceAtLeast(1)),
+    constraints = Constraints(),
     density = density,
 ).size.height.toFloat()
 
@@ -581,7 +592,7 @@ private fun englishLeafHeightPx(
     density: Density,
     measurer: TextMeasurer,
 ): Float {
-    val inkPx = englishLineInkPx(handPx, measurePx, density, measurer)
+    val inkPx = englishLineInkPx(handPx, density, measurer)
     val style = englishProseStyle(
         with(density) { handPx.toSp() },
         with(density) { (handPx * leadingEm).toSp() },
@@ -875,6 +886,10 @@ private fun EnglishBasmalahLine(
             text = ENGLISH_BASMALAH,
             style = englishBasmalahStyle(fontSize),
             color = MaterialTheme.colorScheme.onBackground,
+            // Sized to the measure by englishBasmalahHandPx; held to one line
+            // here so a pixel of rounding can never break it across two.
+            maxLines = 1,
+            softWrap = false,
             modifier = Modifier
                 .fillMaxWidth()
                 .then(
@@ -917,6 +932,48 @@ private fun englishBasmalahStyle(fontSize: TextUnit) = TextStyle(
     ),
 )
 
+/**
+ * The hand the basmalah is set in: the page's, brought down until the line fits
+ * the measure.
+ *
+ * It is one line. Set at the page's own hand it took two on a phone, and a
+ * basmalah broken across a line-end is not a display line — it is a paragraph
+ * of one sentence sitting where a heading should be. This is the Latin form of
+ * what the Arabic leaf does when a line will not reach its measure
+ * (`QURAN_TYPOGRAPHY.md` §4): the line is made to fit, by the only lever the
+ * script gives, which here is the size rather than the letterform.
+ *
+ * It is still one size for the whole book — the measure does not change from
+ * leaf to leaf, so neither does this — and a display line set smaller than the
+ * body is what a printed translation does with it anyway.
+ */
+private fun englishBasmalahHandPx(
+    handPx: Float,
+    measurePx: Float,
+    density: Density,
+    measurer: TextMeasurer,
+): Float {
+    val natural = measurer.measure(
+        text = AnnotatedString(ENGLISH_BASMALAH),
+        style = englishBasmalahStyle(with(density) { handPx.toSp() }),
+        constraints = Constraints(),
+        density = density,
+    ).size.width
+    if (natural <= 0) return handPx
+    val fits = measurePx * EnglishBasmalahMeasureFill / natural
+    return handPx * fits.coerceIn(EnglishBasmalahMinHand, 1f)
+}
+
+/**
+ * How much of the measure the basmalah may fill. Short of all of it: a display
+ * line that reaches both margins reads as a line of text that happens to be
+ * centred, and the last of the fit is rounding slack the line must not spend.
+ */
+private const val EnglishBasmalahMeasureFill = 0.94f
+
+/** Never smaller than this share of the page's hand, whatever the measure. */
+private const val EnglishBasmalahMinHand = 0.62f
+
 /** What the basmalah stands at, plus the air a display line takes under it. */
 private fun englishBasmalahPx(
     handPx: Float,
@@ -925,7 +982,9 @@ private fun englishBasmalahPx(
     measurer: TextMeasurer,
 ): Float = measurer.measure(
     text = AnnotatedString(ENGLISH_BASMALAH),
-    style = englishBasmalahStyle(with(density) { handPx.toSp() }),
+    style = englishBasmalahStyle(
+        with(density) { englishBasmalahHandPx(handPx, measurePx, density, measurer).toSp() },
+    ),
     constraints = Constraints(maxWidth = measurePx.toInt().coerceAtLeast(1)),
     density = density,
 ).size.height + handPx * EnglishLeafBasmalahAirEm

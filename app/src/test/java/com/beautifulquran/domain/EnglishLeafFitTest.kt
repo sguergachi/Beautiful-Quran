@@ -85,18 +85,40 @@ class EnglishLeafFitTest {
     }
 
     @Test
-    fun `the hand is cut so the heaviest leaf in the book fits at the tightest leading`() {
-        // The anchor's defining property, and the whole reason the type never
-        // has to change: page 579 carries 1,997 characters — see
-        // tools/measure_english_leaves.py — and comes out at the floor, not
-        // past it.
+    fun `the book is set larger than the floor alone would allow`() {
+        // The anchor buys the whole book a legible size at the price of a
+        // handful of close-set leaves. Cut for the heaviest page at the floor
+        // it would be 1997 x 1.30 / 1.55 = 1675; it is smaller than that, which
+        // is what makes the hand larger. See tools/measure_english_leaves.py.
+        assertTrue(ENGLISH_LEAF_REFERENCE_PROSE < 1675f)
         val hand = englishLeafHandPx(well, measure, advance)
         val perLine = measure / (advance * hand)
+        // Page 579, the heaviest leaf in the book, is one of those: it asks for
+        // less than the floor, and the fitted leading is what lets it.
+        val heaviest =
+            englishLeafLeadingEm(lines = 1997f / perLine, fontPx = hand, wellHeightPx = well)
+        assertEquals(ENGLISH_LEAF_MIN_LEADING_EM, heaviest, 0.0001f)
         assertEquals(
-            ENGLISH_LEAF_MIN_LEADING_EM,
-            englishLeafLeadingEm(lines = 1997f / perLine, fontPx = hand, wellHeightPx = well),
-            0.01f,
+            1.20f,
+            englishLeafFittedLeadingEm(
+                leadingEm = heaviest,
+                // What it actually stands at when the floor holds it open.
+                measuredHeightPx = well * (ENGLISH_LEAF_MIN_LEADING_EM / 1.202f),
+                wellHeightPx = well,
+                pitchesPx = 1997f / perLine * hand,
+            ),
+            0.02f,
         )
+    }
+
+    @Test
+    fun `the median leaf is set near the nominal leading`() {
+        // 1,469 characters — see tools/measure_english_leaves.py.
+        val hand = englishLeafHandPx(well, measure, advance)
+        val perLine = measure / (advance * hand)
+        val median =
+            englishLeafLeadingEm(lines = 1469f / perLine, fontPx = hand, wellHeightPx = well)
+        assertEquals(1.63f, median, 0.03f)
     }
 
     @Test

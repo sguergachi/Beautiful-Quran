@@ -27,17 +27,17 @@ import kotlin.math.sqrt
  *    by the Arabic leaf, so the block is brought down to the foot by opening
  *    or closing the leading. A leaf lighter than the hand was cut for opens
  *    its leading and, past the top of the band, stands short at the foot —
- *    which is what a printed parallel translation does. A leaf *heavier* than
- *    the hand was cut for cannot exist, because the hand is cut for the
- *    heaviest leaf in the book ([ENGLISH_LEAF_REFERENCE_PROSE]).
+ *    which is what a printed parallel translation does. A leaf heavier than it
+ *    closes past the floor, which six of the book's 604 leaves do
+ *    ([ENGLISH_LEAF_REFERENCE_PROSE]).
  *
  * Rule 3 used to let the type give a few percent on the heaviest leaves
  * rather than set the whole book smaller. That was the wrong trade twice
  * over: type that changes from leaf to leaf is the one thing rule 1 forbids
  * and the first thing a reader notices, and a fit resting on a *model* of how
  * long a page will run is a fit that can be wrong — which is a page with
- * revelation cut off the bottom of it. The hand is cut once, for the worst
- * page; and `MushafEnglishSheet` then steps the leading against the leaf's own
+ * revelation cut off the bottom of it. The hand is cut once, for the whole
+ * book; and `MushafEnglishSheet` then steps the leading against the leaf's own
  * measured height, so that fitting is a guarantee and not an estimate.
  */
 
@@ -51,23 +51,32 @@ import kotlin.math.sqrt
  * at the 10th, 1,469 at the median, 1,663 at the 90th and 1,997 at the worst,
  * which is page 579.
  *
- * The anchor is that worst page, carried at the *tightest* leading the book
- * may be set on: `1997 × 1.30 / 1.55 = 1675`. Which is to say the size is
- * chosen so that the heaviest leaf in the Qur'an fits its well with the lines
- * as close together as they are allowed to come — and every other leaf, being
- * lighter, has room to spare and spends it on leading.
+ * The anchor was the worst page carried at the tightest leading —
+ * `1997 × 1.30 / 1.55 = 1675` — so that no leaf in the book ever asked for a
+ * leading below the floor. That is the safe reading of it, and it set the book
+ * a size smaller than it wanted to be read at.
  *
- * Anchoring nearer the median instead bought about 7% more type and cost the
- * two things this setting exists to guarantee: the heaviest leaves either ran
- * past the foot or had to be set smaller than their neighbours. A compositor
- * choosing one size for a book chooses it for the worst spread; so do we.
+ * It is now 1,548, which is the same worst page carried one line further down
+ * the leaf. The hand comes up about 4%, the median leaf takes one more line of
+ * type than it used to, and the whole book reads a size larger.
  *
- * What it costs is the foot. At this anchor no leaf in the book overflows,
- * 88% reach the foot inside the band, and 73 stand short of it. The leading a
- * leaf is set on runs 1.30 em on the heaviest, 1.77 at the median, and holds
- * at the 2.00 em cap for the lightest eighth.
+ * What that costs is the floor, on six leaves out of 604. Above about 1,850
+ * characters a leaf now asks for less than 1.30 em, and the heaviest — page
+ * 579, at 1,997 — sets at 1.20. It is close-set there rather than crowded:
+ * measured on device the face's line box is 1.24 em and its *ink* fills 0.89
+ * of one, so a line at 1.20 em still leaves a third of an em of air between
+ * what is actually drawn, and only a descender standing directly over an
+ * ascender comes near. Six leaves buying the other 598 a legible size is the
+ * trade, and it is the compositor's usual one.
+ *
+ * The rest of the distribution moves the right way with it. 96% of leaves now
+ * reach their foot inside the band against 88% before — the same page mass
+ * over a slightly smaller measure needs less of the leading's help — so there
+ * are fewer ragged feet as well as larger type. The leading runs 1.20 em on
+ * the heaviest leaf, 1.63 at the median, and holds at the 2.00 em cap for the
+ * lightest twentieth.
  */
-const val ENGLISH_LEAF_REFERENCE_PROSE = 1675f
+const val ENGLISH_LEAF_REFERENCE_PROSE = 1548f
 
 /** The leading the reference page is set on. */
 const val ENGLISH_LEAF_NOMINAL_LEADING_EM = 1.55f
@@ -79,11 +88,11 @@ const val ENGLISH_LEAF_NOMINAL_LEADING_EM = 1.55f
  * the baseline, so 1.30 em still leaves a fifteenth of an em between the
  * deepest descender and the tallest ascender below it. Under that they touch.
  *
- * The hand is cut so that no leaf in the book asks for less than this
- * ([ENGLISH_LEAF_REFERENCE_PROSE]). It is a floor on the *fitting*, not on
- * the drawing: a leaf that would still overflow — because a real line count
- * beat the model that chose the hand — closes past it rather than lose a
- * line off the foot. Fit outranks leading; both outrank nothing else.
+ * A floor on the *fitting*, not on the drawing. A leaf that would still
+ * overflow closes past it rather than lose a line off the foot — fit outranks
+ * leading, always — and since [ENGLISH_LEAF_REFERENCE_PROSE] was moved to buy
+ * the book a legible size, six leaves of 604 do exactly that. The heaviest
+ * sets at 1.20 em. See that constant for why the trade is worth taking.
  */
 const val ENGLISH_LEAF_MIN_LEADING_EM = 1.30f
 
@@ -92,9 +101,9 @@ const val ENGLISH_LEAF_MIN_LEADING_EM = 1.30f
  *
  * Past this a page stops reading as prose and starts reading as a list; short
  * of the foot it reads as the end of something, which on a leaf whose content
- * was fixed by another book is exactly true. At 2.00 em 88% of leaves reach
- * their foot; at 1.80 only two thirds would, and the rest would stand short
- * for the sake of a distinction the eye does not draw at this size.
+ * was fixed by another book is exactly true. At 2.00 em 96% of leaves reach
+ * their foot; at 1.80 far fewer would, and the rest would stand short for the
+ * sake of a distinction the eye does not draw at this size.
  */
 const val ENGLISH_LEAF_MAX_LEADING_EM = 2.00f
 
