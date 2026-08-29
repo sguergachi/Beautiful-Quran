@@ -125,6 +125,9 @@ import com.beautifulquran.data.AyahSelectorSide
 import com.beautifulquran.data.ReadingLayout
 import com.beautifulquran.data.ReadingMode
 import com.beautifulquran.data.model.Surah
+import com.beautifulquran.share.AyahRef
+import com.beautifulquran.share.ShareUxVariant
+import com.beautifulquran.ui.share.ShareRibbon
 import com.beautifulquran.domain.BASMALAH_PLAYLIST_AYAH
 import com.beautifulquran.domain.MushafToken
 import com.beautifulquran.domain.mushafFontPreloadPages
@@ -243,6 +246,17 @@ fun ReaderScreen(
     /** 1-based ordinal for a gathered verse, or null when not selected. */
     gatherOrdinal: (surahId: Int, ayah: Int) -> Int? = { _, _ -> null },
     onToggleGatheredAyah: (surahId: Int, ayah: Int) -> Unit = { _, _ -> },
+    shareUx: ShareUxVariant = ShareUxVariant.OFF,
+    sharePrompt: AyahRef? = null,
+    shareCount: Int = 0,
+    preparingShareText: Boolean = false,
+    preparingShareImage: Boolean = false,
+    onShareMarkTap: (surahId: Int, ayah: Int) -> Unit = { _, _ -> },
+    onShareVerb: (surahId: Int, ayah: Int) -> Unit = { _, _ -> },
+    onShareLift: (surahId: Int, ayah: Int) -> Unit = { _, _ -> },
+    onShareCancel: () -> Unit = {},
+    onShareText: () -> Unit = {},
+    onShareImage: () -> Unit = {},
 ) {
     LaunchedEffect(surahId) { viewModel.load(surahId) }
     DisposableEffect(onAyahSelectorExpandedChange) {
@@ -1584,36 +1598,54 @@ fun ReaderScreen(
                             .padding(vertical = 6.dp),
                     )
                 }
-                PlayerBar(
-                    state = playerState,
-                    isThisSurahLoaded = isThisSurahPlaying,
-                    enabled = !contextualGuideOpen,
-                    chromeAlpha = { chromeAlpha.value },
-                    reciterName = uiState.currentReciter?.name.orEmpty(),
-                    onPlayPause = {
-                        if (isThisSurahPlaying) {
-                            if (playerState.isPlaying) {
-                                viewModel.player.togglePlayPause()
+                val shareRibbon = gathering ||
+                    (shareUx == ShareUxVariant.ACTION_LINE && sharePrompt != null)
+                if (shareRibbon) {
+                    ShareRibbon(
+                        gathering = gathering,
+                        count = shareCount,
+                        preparingText = preparingShareText,
+                        preparingImage = preparingShareImage,
+                        onCancel = onShareCancel,
+                        onShare = {
+                            val prompt = sharePrompt ?: return@ShareRibbon
+                            onShareVerb(prompt.surahId, prompt.ayah)
+                        },
+                        onShareText = onShareText,
+                        onShareImage = onShareImage,
+                    )
+                } else {
+                    PlayerBar(
+                        state = playerState,
+                        isThisSurahLoaded = isThisSurahPlaying,
+                        enabled = !contextualGuideOpen,
+                        chromeAlpha = { chromeAlpha.value },
+                        reciterName = uiState.currentReciter?.name.orEmpty(),
+                        onPlayPause = {
+                            if (isThisSurahPlaying) {
+                                if (playerState.isPlaying) {
+                                    viewModel.player.togglePlayPause()
+                                } else {
+                                    dispatch(ReaderInteractionEvent.EnableFollow)
+                                    if (requestedJumpAyah > 0) {
+                                        val selectedAyah = selectedPlaybackAyah()
+                                        viewModel.playLoadedFromAyah(selectedAyah)
+                                    } else {
+                                        viewModel.player.togglePlayPause()
+                                    }
+                                }
                             } else {
                                 dispatch(ReaderInteractionEvent.EnableFollow)
-                                if (requestedJumpAyah > 0) {
-                                    val selectedAyah = selectedPlaybackAyah()
-                                    viewModel.playLoadedFromAyah(selectedAyah)
-                                } else {
-                                    viewModel.player.togglePlayPause()
-                                }
+                                viewModel.playFromAyah(selectedPlaybackAyah())
                             }
-                        } else {
-                            dispatch(ReaderInteractionEvent.EnableFollow)
-                            viewModel.playFromAyah(selectedPlaybackAyah())
-                        }
-                    },
-                    onFastBackward = viewModel::fastBackward,
-                    onFastForward = viewModel::fastForward,
-                    onRepeatClick = { showRepeatDialog = true },
-                    onSpeed = viewModel::cycleSpeed,
-                    onReciterClick = onOpenSettings,
-                )
+                        },
+                        onFastBackward = viewModel::fastBackward,
+                        onFastForward = viewModel::fastForward,
+                        onRepeatClick = { showRepeatDialog = true },
+                        onSpeed = viewModel::cycleSpeed,
+                        onReciterClick = onOpenSettings,
+                    )
+                }
             }
         },
     ) { padding ->
@@ -2782,6 +2814,21 @@ fun ReaderScreen(
                                 } else {
                                     null
                                 },
+                                shareUx = shareUx,
+                                sharePrompted = !gathering &&
+                                    sharePrompt != null &&
+                                    sharePrompt.surahId == ayah.surahId &&
+                                    sharePrompt.ayah == ayah.number,
+                                onAyahMarkClick = if (
+                                    gathering || shareUx.usesMarkTap
+                                ) {
+                                    { onShareMarkTap(ayah.surahId, ayah.number) }
+                                } else {
+                                    null
+                                },
+                                onShareVerbClick = {
+                                    onShareVerb(ayah.surahId, ayah.number)
+                                },
                                 onWordClick = if (gathering) {
                                     { onToggleGatheredAyah(ayah.surahId, ayah.number) }
                                 } else {
@@ -2816,10 +2863,21 @@ fun ReaderScreen(
                                         viewModel.playFromAyah(ayah.number)
                                     }
                                 },
-                                onWordLongClick = if (gathering) {
-                                    null
+                                onAyahLongClick = if (!gathering && shareUx.usesLift) {
+                                    {
+                                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                        onShareLift(ayah.surahId, ayah.number)
+                                    }
                                 } else {
-                                    { word ->
+                                    null
+                                },
+                                onWordLongClick = when {
+                                    gathering -> null
+                                    shareUx.usesLift -> { _ ->
+                                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                        onShareLift(ayah.surahId, ayah.number)
+                                    }
+                                    else -> { word ->
                                         // Hold opens the Root Word Viewer (or, in
                                         // developer mode, a chooser that can also
                                         // open the Timings Lab). MainActivity owns

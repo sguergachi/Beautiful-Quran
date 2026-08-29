@@ -10,6 +10,9 @@ import com.beautifulquran.share.AyahRef
 import com.beautifulquran.share.SHARE_SELECTION_MAX
 import com.beautifulquran.share.ShareFiles
 import com.beautifulquran.share.ShareImageRenderer
+import com.beautifulquran.share.ShareUx
+import com.beautifulquran.share.ShareUxAction
+import com.beautifulquran.share.ShareUxVariant
 import com.beautifulquran.share.VerseTextComposer
 import com.beautifulquran.share.gatherOrdinals
 import com.beautifulquran.share.toggleGatheredAyah
@@ -42,6 +45,11 @@ data class ShareVerseLine(
 data class ShareUiState(
     val gathering: Boolean = false,
     val sendOpen: Boolean = false,
+    /**
+     * Verse whose share prompt is open (colophon / seal / action-line current).
+     * Null while gathering or idle.
+     */
+    val prompt: AyahRef? = null,
     val selection: List<AyahRef> = emptyList(),
     /** 1-based ordinals derived from [selection] — read by ayah blocks only. */
     val ordinals: Map<AyahRef, Int> = emptyMap(),
@@ -101,11 +109,88 @@ class ShareViewModel(
         _ui.update {
             it.copy(
                 gathering = true,
+                prompt = null,
                 sendOpen = false,
                 error = null,
                 pendingShareText = null,
                 pendingShareImageUri = null,
             )
+        }
+    }
+
+    /**
+     * Verse-first enter: that ayah is already selected (`١`), playback paused,
+     * prompt dismissed. Used by every test design's Share verb / lift.
+     */
+    fun enterShare(surahId: Int, ayah: Int) {
+        if (surahId < 1 || ayah < 1) return
+        val ref = AyahRef(surahId, ayah)
+        if (_ui.value.gathering) {
+            if (ref !in _ui.value.selection) toggle(surahId, ayah)
+            hidePrompt()
+            return
+        }
+        player.pause()
+        val selection = listOf(ref)
+        _ui.update {
+            it.copy(
+                gathering = true,
+                prompt = null,
+                sendOpen = false,
+                selection = selection,
+                ordinals = gatherOrdinals(selection),
+                error = null,
+                pendingShareText = null,
+                pendingShareImageUri = null,
+            )
+        }
+    }
+
+    fun onMarkTap(variant: ShareUxVariant, surahId: Int, ayah: Int) {
+        if (surahId < 1 || ayah < 1) return
+        apply(
+            ShareUx.onMarkTap(
+                variant = variant,
+                gathering = _ui.value.gathering,
+                prompt = _ui.value.prompt,
+                ref = AyahRef(surahId, ayah),
+            ),
+        )
+    }
+
+    fun onShareVerb(surahId: Int, ayah: Int) {
+        if (surahId < 1 || ayah < 1) return
+        apply(ShareUx.onShareVerb(AyahRef(surahId, ayah)))
+    }
+
+    fun onLift(variant: ShareUxVariant, surahId: Int, ayah: Int) {
+        if (surahId < 1 || ayah < 1) return
+        apply(
+            ShareUx.onLift(
+                variant = variant,
+                gathering = _ui.value.gathering,
+                ref = AyahRef(surahId, ayah),
+            ),
+        )
+    }
+
+    fun hidePrompt() {
+        if (_ui.value.prompt == null) return
+        _ui.update { it.copy(prompt = null) }
+    }
+
+    /** Cancel on the share ribbon: leave gather, or dismiss a pre-gather prompt. */
+    fun onChromeCancel() {
+        if (_ui.value.gathering) exitGather() else hidePrompt()
+    }
+
+    private fun apply(action: ShareUxAction) {
+        when (action) {
+            is ShareUxAction.ShowPrompt -> _ui.update { it.copy(prompt = action.ref) }
+            ShareUxAction.HidePrompt -> hidePrompt()
+            is ShareUxAction.EnterShare -> enterShare(action.ref.surahId, action.ref.ayah)
+            is ShareUxAction.ToggleVerse -> toggle(action.ref.surahId, action.ref.ayah)
+            ShareUxAction.None -> Unit
         }
     }
 

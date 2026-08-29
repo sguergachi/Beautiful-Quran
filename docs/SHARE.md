@@ -1,9 +1,10 @@
 # Sharing verses
 
 **Status: PR1 + PR2 shipped (gather + text + full-ink image).** Video remains
-proposed. **Interaction rework** (verse-first share, gold wash, no dual-purpose
-bar control) is designed in [VERSE_ACTIONS.md](VERSE_ACTIONS.md) — not yet
-implemented. This file is the design record for *gather mode* and the export
+proposed. **Entry UX** is four Developer-gated designs (colophon / lift /
+seal / action line) — see [VERSE_ACTIONS.md](VERSE_ACTIONS.md). Production
+entry is still **off** (`ShareUxVariant.OFF`): nothing on the page starts
+gather. This file is the design record for *gather mode* and the export
 pipeline: **text**, **image**, and later **video that carries the ink**.
 
 ## Why it exists
@@ -27,11 +28,12 @@ The second is why selection is an ordered list and not a range.
 Gathering is a **mode of the reader sheet**, not a new sheet. The page keeps
 its layout; it grows ordinals in the margin.
 
-- **Enter** via `ShareViewModel.enterGather()` (pauses recitation — the mode
-  owns the tap). The player bar does **not** host a Gather control
-  ([#519](https://github.com/sguergachi/Beautiful-Quran-/pull/519)). Entry
-  UX is redesigned in [VERSE_ACTIONS.md](VERSE_ACTIONS.md) (not yet
-  implemented): verse-first, multi-select as an extension.
+- **Enter** via `ShareViewModel.enterShare(surah, ayah)` (verse-first: that
+  ayah is already `١`; pauses recitation — the mode owns the tap). The idle
+  player bar does **not** host a Gather control
+  ([#519](https://github.com/sguergachi/Beautiful-Quran-/pull/519)). Four
+  entry designs live behind Settings → Developer → Verse share
+  ([VERSE_ACTIONS.md](VERSE_ACTIONS.md)).
 - **Pick** by tapping a verse (word or ayah). Its ordinal is written in the
   outer margin in gold Arabic-Indic numerals (١ ٢ ٣) — the same margin the
   bookmark ribbon lives in. The ribbon is hidden while gathering. Tap again
@@ -139,13 +141,15 @@ only (no app watermark in the chat body).
 
 ```text
 share/AyahRef.kt                 AyahRef + toggle/ordinals pure helpers
+share/ShareUx.kt                 four entry designs + pure gesture policy
 share/VerseTextComposer.kt       text formatting — pure, JVM-tested
 share/ShareFiles.kt              cacheDir/share + FileProvider URI
 share/ShareImageRenderer.kt      offscreen ComposeView → Bitmap
 share/WashEdgeProbe.kt           soft-edge assertion (JVM-tested)
 ui/share/ShareImageCard.kt       fixed Paper full-ink card
-ui/share/ShareViewModel.kt       selection + text/image export state
+ui/share/ShareViewModel.kt       selection + prompt + text/image export state
 ui/share/ShareHost.kt            BackHandler + InkRevealOverlay + chooser
+ui/share/ShareRibbon.kt          replaces PlayerBar while sharing
 ui/share/ShareComposeSheet.kt    Send page (list + text + image)
 res/xml/share_paths.xml          FileProvider paths
 ```
@@ -159,7 +163,7 @@ longer hosts Gather (#519). Entry/chrome rework: [VERSE_ACTIONS.md](VERSE_ACTION
 |---|---|---|
 | 1 | Gather mode + text share | **shipped** |
 | 2 | Full-ink image export + FileProvider + wash probe | **shipped** |
-| 2b | Verse-first share UX (G1) — wash, share ribbon, no dual button | **designed** ([VERSE_ACTIONS.md](VERSE_ACTIONS.md)) |
+| 2b | Verse-first share UX — four Developer entry designs + gold wash + share ribbon | **in-app A/B** ([VERSE_ACTIONS.md](VERSE_ACTIONS.md)); production still OFF |
 | 3 | Bounded silent ink video | after 2b (or parallel once entry exists) |
 | 4 | Audio staging + mux | after silent video is stable |
 | 5 | Web parity | later |

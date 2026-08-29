@@ -93,6 +93,7 @@ import com.beautifulquran.ui.settings.SettingsViewModel
 import com.beautifulquran.ui.share.ShareHost
 import com.beautifulquran.ui.share.ShareViewModel
 import com.beautifulquran.share.AyahRef
+import com.beautifulquran.share.ShareUxVariant
 import com.beautifulquran.timingslab.TimingsLabScreen
 import com.beautifulquran.timingslab.TimingsLabViewModel
 import com.beautifulquran.tarjilab.TarjiLabScreen
@@ -281,6 +282,7 @@ private fun PaperStackApp(
     onRecordSystemTrace: () -> Unit,
 ) {
     val app = LocalContext.current.applicationContext as QuranApp
+    val activity = LocalContext.current as? android.app.Activity
     val homeViewModel: HomeViewModel = viewModel(factory = AppViewModelFactory)
     val bookmarksViewModel: BookmarksViewModel = viewModel(factory = AppViewModelFactory)
     val readerViewModel: ReaderViewModel = viewModel(factory = AppViewModelFactory)
@@ -852,6 +854,43 @@ private fun PaperStackApp(
                         gathering = shareUi.gathering,
                         gatherOrdinal = { sid, a -> shareUi.ordinals[AyahRef(sid, a)] },
                         onToggleGatheredAyah = shareViewModel::toggle,
+                        shareUx = if (settings.developerModeEnabled) {
+                            settings.shareUxVariant
+                        } else {
+                            ShareUxVariant.OFF
+                        },
+                        sharePrompt = shareUi.prompt,
+                        shareCount = shareUi.selection.size,
+                        preparingShareText = shareUi.preparingText,
+                        preparingShareImage = shareUi.preparingImage,
+                        onShareMarkTap = { sid, a ->
+                            shareViewModel.onMarkTap(
+                                variant = if (settings.developerModeEnabled) {
+                                    settings.shareUxVariant
+                                } else {
+                                    ShareUxVariant.OFF
+                                },
+                                surahId = sid,
+                                ayah = a,
+                            )
+                        },
+                        onShareVerb = shareViewModel::onShareVerb,
+                        onShareLift = { sid, a ->
+                            shareViewModel.onLift(
+                                variant = if (settings.developerModeEnabled) {
+                                    settings.shareUxVariant
+                                } else {
+                                    ShareUxVariant.OFF
+                                },
+                                surahId = sid,
+                                ayah = a,
+                            )
+                        },
+                        onShareCancel = shareViewModel::onChromeCancel,
+                        onShareText = { shareViewModel.shareAsText() },
+                        onShareImage = {
+                            if (activity != null) shareViewModel.shareAsImage(activity)
+                        },
                     )
                 }
 

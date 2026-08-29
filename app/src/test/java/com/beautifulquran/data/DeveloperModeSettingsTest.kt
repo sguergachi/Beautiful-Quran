@@ -1,5 +1,6 @@
 package com.beautifulquran.data
 
+import com.beautifulquran.share.ShareUxVariant
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -85,6 +86,21 @@ class DeveloperModeSettingsTest {
         assertEquals(
             HomeBookmarkStyle.SAVED_PASSAGES,
             alternative.copy(developerModeEnabled = false).homeBookmarkStyle,
+        )
+    }
+
+    @Test
+    fun `verse share UX defaults off and keeps four test designs`() {
+        assertEquals(ShareUxVariant.OFF, Settings().shareUxVariant)
+        assertEquals(5, ShareUxVariant.entries.size)
+        val lift = Settings().copy(
+            developerModeEnabled = true,
+            shareUxVariant = ShareUxVariant.LIFT,
+        )
+        assertEquals(ShareUxVariant.LIFT, lift.shareUxVariant)
+        assertEquals(
+            ShareUxVariant.LIFT,
+            lift.copy(developerModeEnabled = false).shareUxVariant,
         )
     }
 

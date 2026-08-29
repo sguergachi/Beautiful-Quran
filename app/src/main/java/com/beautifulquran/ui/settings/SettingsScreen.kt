@@ -79,6 +79,7 @@ import com.beautifulquran.data.BrushCircleStyle
 import com.beautifulquran.data.HomeBookmarkStyle
 import com.beautifulquran.data.Settings
 import com.beautifulquran.data.ThemeMode
+import com.beautifulquran.share.ShareUxVariant
 import com.beautifulquran.playback.RecitationCache
 import com.beautifulquran.playback.RecitationUsage
 import com.beautifulquran.playback.formatUsage
@@ -578,6 +579,30 @@ private fun DeveloperSection(
         checkPaintToken = checkPaintToken,
     )
     Caption("English-only reading hides text in parentheses or square brackets, including the brackets.")
+
+    Spacer(Modifier.height(28.dp))
+    Text(
+        "Verse share",
+        style = MaterialTheme.typography.bodyLarge,
+        color = MaterialTheme.colorScheme.onSurface,
+    )
+    Spacer(Modifier.height(2.dp))
+    Caption("Four entry designs. Turning one on turns the others off.")
+    ShareUxVariant.entries.filter { it != ShareUxVariant.OFF }.forEach { variant ->
+        Spacer(Modifier.height(8.dp))
+        ToggleRow(
+            label = variant.label,
+            checked = settings.shareUxVariant == variant,
+            onChange = { on ->
+                viewModel.settings.update {
+                    it.copy(shareUxVariant = if (on) variant else ShareUxVariant.OFF)
+                }
+            },
+            checkParams = checkParams,
+            checkPaintToken = checkPaintToken,
+        )
+        Caption(variant.note)
+    }
 
     Spacer(Modifier.height(20.dp))
     Text(

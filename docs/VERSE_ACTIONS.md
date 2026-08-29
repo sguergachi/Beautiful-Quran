@@ -1,14 +1,15 @@
 # Verse actions: bookmark · note · share
 
-**Status: design — not implemented.** Implementation deferred.
+**Status: four entry designs in Developer for in-app A/B.** Export
+(text/image) is shipped; the shipped reader still has **no** share entry
+(`ShareUxVariant.OFF`). Settings → Developer → **Verse share** toggles
+Colophon, Lift, Seal, and Action line — exclusive, paper checkmarks.
 
 This document records the product decision for how three **different**
 actions on a verse coexist without cluttering reading or violating the
 paper metaphor. It supersedes the dual-purpose player-bar Gather control
 (removed in #519) and the multi-step gather-first share flow as the
-**target UX**. Shipping code today still implements the older gather
-pipeline for text/image export — see [SHARE.md](SHARE.md) for the code
-shape; change the interaction surface to match **this** doc when building.
+**target UX**. The export pipeline is unchanged — see [SHARE.md](SHARE.md).
 
 Related: [DESIGN.md](DESIGN.md) (paper rules), [ANNOTATIONS.md](ANNOTATIONS.md)
 (notes), [SHARE.md](SHARE.md) (export pipeline).
@@ -183,19 +184,37 @@ With G1, the intermediate Send list is **optional**:
 - Forcing bookmark or note through multi-select
 - Putting Gather back on the idle player bar
 
+## In-app test designs
+
+Developer → **Verse share** (off by default; requires developer mode):
+
+| Toggle | Entry | Then |
+|---|---|---|
+| **Colophon** | Tap `﴿N﴾` → **Share** under the verse | Share selects that ayah, gold wash, ribbon |
+| **Lift** | Long-press the verse body | Immediate gather; root-viewer hold is displaced |
+| **Seal** | Tap `﴿N﴾` → **Share** beside the mark | Same gather as colophon |
+| **Action line** | Tap `﴿N﴾` → player bar becomes **Cancel · Share** | Share selects that ayah |
+
+All four then share: tap more verses to add/drop (wash + margin ordinal),
+ribbon `Cancel · N · Text · Image` (no Send page on the happy path), back
+dismisses prompt or leaves gather.
+
+Policy lives in `share/ShareUx.kt` (pure, JVM-tested). Do not invent
+entry rules in `ReaderScreen`.
+
 ## Implementation sketch (later)
 
-Order of work when we build — not started:
+Shipped for A/B, not locked as G1:
 
-1. Gold wash on `AyahBlock` when `gatherOrdinal != null` (or share-selected set)
-2. Share ribbon composable replacing `PlayerBar` when `shareUi.gathering`
-3. Enter share: `﴿N﴾` short-tap → colophon **Share** → `enterShare(surah, ayah)`
-   auto-selects that ref
-4. Wire ribbon Text / Image to existing `shareAsText` / `shareAsImage`
-5. Remove dual-purpose gather entry remnants; ensure #519 stays (no gather
-   on idle transport)
-6. Soft-delete or bypass Send page for the happy path
-7. Visual QA on Paper + Nightfall + multi-verse toggle
+1. Gold wash on `AyahBlock` when `gatherOrdinal != null` or share-prompted
+2. Share ribbon composable replacing `PlayerBar` when gathering (and on
+   action-line prompt)
+3. Four entries behind `Settings.shareUxVariant`
+4. Ribbon Text / Image → existing `shareAsText` / `shareAsImage`
+5. #519 stays: idle transport has no Gather
+6. Happy path skips Send; chooser completion leaves gather
+7. Visual QA on Paper + Nightfall + multi-verse toggle — pick a winner,
+   then delete the other three
 
 Reuse: `ShareViewModel` selection list, ordinals, text/image exporters,
 `ShareHost` / FileProvider. Change the **entry and chrome**, not the export
