@@ -127,7 +127,6 @@ import com.beautifulquran.data.ReadingMode
 import com.beautifulquran.data.model.Surah
 import com.beautifulquran.share.AyahRef
 import com.beautifulquran.share.ShareUxVariant
-import com.beautifulquran.ui.share.ShareActionPrompt
 import com.beautifulquran.ui.share.ShareRibbon
 import com.beautifulquran.domain.BASMALAH_PLAYLIST_AYAH
 import com.beautifulquran.domain.MushafToken
@@ -254,7 +253,7 @@ fun ReaderScreen(
     preparingShareImage: Boolean = false,
     onShareMarkTap: (surahId: Int, ayah: Int) -> Unit = { _, _ -> },
     onShareVerb: (surahId: Int, ayah: Int) -> Unit = { _, _ -> },
-    onShareMarkHold: (surahId: Int, ayah: Int) -> Unit = { _, _ -> },
+    onShareBodyHold: (surahId: Int, ayah: Int) -> Unit = { _, _ -> },
     onShareCancel: () -> Unit = {},
     onShareText: () -> Unit = {},
     onShareImage: () -> Unit = {},
@@ -1609,21 +1608,17 @@ fun ReaderScreen(
                         onShareImage = onShareImage,
                     )
                 } else {
-                    val actionPrompt = sharePrompt
-                    if (shareUx == ShareUxVariant.ACTION_LINE && actionPrompt != null) {
-                        ShareActionPrompt(
-                            onCancel = onShareCancel,
-                            onShare = {
-                                onShareVerb(actionPrompt.surahId, actionPrompt.ayah)
-                            },
-                        )
-                    }
                     PlayerBar(
                         state = playerState,
                         isThisSurahLoaded = isThisSurahPlaying,
                         enabled = !contextualGuideOpen,
                         chromeAlpha = { chromeAlpha.value },
                         reciterName = uiState.currentReciter?.name.orEmpty(),
+                        onShare = if (shareUx.usesBarIcon) {
+                            { onShareVerb(surahId, selectedPlaybackAyah()) }
+                        } else {
+                            null
+                        },
                         onPlayPause = {
                             if (isThisSurahPlaying) {
                                 if (playerState.isPlaying) {
@@ -2817,11 +2812,20 @@ fun ReaderScreen(
                                 } else {
                                     null
                                 },
-                                shareUx = shareUx,
-                                sharePrompted = !gathering &&
-                                    sharePrompt != null &&
-                                    sharePrompt.surahId == ayah.surahId &&
-                                    sharePrompt.ayah == ayah.number,
+                                showShareVerb = !gathering && (
+                                    (
+                                        shareUx.revealsOnCurrent &&
+                                            if (isThisSurahPlaying) {
+                                                policyActive
+                                            } else {
+                                                bookmarkFocused
+                                            }
+                                    ) || (
+                                        sharePrompt != null &&
+                                            sharePrompt.surahId == ayah.surahId &&
+                                            sharePrompt.ayah == ayah.number
+                                    )
+                                ),
                                 onAyahMarkClick = if (
                                     gathering || shareUx.usesMarkTap
                                 ) {
@@ -2829,16 +2833,24 @@ fun ReaderScreen(
                                 } else {
                                     null
                                 },
-                                onAyahMarkLongClick = if (!gathering && shareUx.usesMarkHold) {
+                                onAyahMarkLongClick = if (!gathering && shareUx.usesBodyHold) {
                                     {
                                         haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                                        onShareMarkHold(ayah.surahId, ayah.number)
+                                        onShareBodyHold(ayah.surahId, ayah.number)
                                     }
                                 } else {
                                     null
                                 },
                                 onShareVerbClick = {
                                     onShareVerb(ayah.surahId, ayah.number)
+                                },
+                                onAyahLongClick = if (!gathering && shareUx.usesBodyHold) {
+                                    {
+                                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                        onShareBodyHold(ayah.surahId, ayah.number)
+                                    }
+                                } else {
+                                    null
                                 },
                                 onWordClick = if (gathering) {
                                     { onToggleGatheredAyah(ayah.surahId, ayah.number) }

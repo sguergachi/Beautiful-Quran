@@ -1,9 +1,9 @@
 # Verse actions: bookmark · note · share
 
-**Status: four entry designs in Developer for in-app A/B.** Export
-(text/image) is shipped; the shipped reader still has **no** share entry
+**Status: four discoverable entry designs in Developer for in-app A/B.**
+Export (text/image) is shipped; production still has **no** share entry
 (`ShareUxVariant.OFF`). Settings → Developer → **Verse share** toggles
-Colophon, Lift, Seal, and Action line — exclusive, paper checkmarks.
+Icon, Reveal, Hold, and Mark — exclusive, paper checkmarks.
 
 This document records the product decision for how three **different**
 actions on a verse coexist without cluttering reading or violating the
@@ -187,14 +187,17 @@ With G1, the intermediate Send list is **optional**:
 
 ## In-app test designs
 
+The first A/B hid Share behind `﴿N﴾`. Nobody looks at a verse number and
+thinks “share.” Discoverability is the test now.
+
 Developer → **Verse share** (off by default; requires developer mode):
 
-| Toggle | Entry | Then |
+| Toggle | What you see | Why it might be the one |
 |---|---|---|
-| **Colophon** | Tap `﴿N﴾` → **Share** under the verse (ink) | Share selects that ayah |
-| **Lift** | Hold `﴿N﴾` | Immediate gather. Word hold stays Root Viewer |
-| **Seal** | Tap `﴿N﴾` | Immediate gather (one tap) |
-| **Action line** | Tap `﴿N﴾` → **Share** above play | Transport stays until Share |
+| **Icon** | Android share glyph on the play bar (current verse) | The phone-wide pattern. One meaning: share this verse |
+| **Reveal** | The word **Share** under the verse you are on | The action is on the thing it acts on. No secret tap |
+| **Hold** | Hold the verse (translation or `﴿N﴾`) → Share appears | The OS “what can I do with this” gesture. Word hold stays Root Viewer |
+| **Mark** | Tap `﴿N﴾` | Verse handle. Least obvious; kept for comparison |
 
 All four then share: tap more verses to add/drop (wash + Western margin
 ordinal), ribbon `Cancel    2    Text   Image` (no Send page on the happy
@@ -203,36 +206,24 @@ path), back dismisses prompt or leaves gather.
 Policy lives in `share/ShareUx.kt` (pure, JVM-tested). Do not invent
 entry rules in `ReaderScreen`.
 
-## Critique of the first A/B (applied)
+The play-bar Share is **not** the #519 Gather control. It shares the
+current verse. It does not enter-and-commit.
 
-The first pass had four names and one gesture. Fixes:
+## Why the first four failed
 
-1. **Arabic-Indic in chrome.** `١` on the ribbon and in the margin is
-   furniture pretending to be scripture. Chrome is Western Garamond ink.
-   `﴿N﴾` on the verse stays the reader's verse-number script.
-2. **Gold ordinals.** Gold is illumination (ayah marks). A gold
-   `headlineSmall` number in the same margin as `﴿N﴾` reads as a second
-   verse number. Ordinals are ink, `titleMedium`.
-3. **Colophon / Seal / Action line were the same two-tap.** Seal now
-   enters on the mark tap. Action line keeps play and puts Share above
-   the bar. Colophon keeps the confirm-under-verse.
-4. **Lift stole Root Viewer.** Word hold is a signature feature. Lift is
-   a hold on `﴿N﴾` only.
-5. **Prompt looked selected.** Wash is for gathered verses only. A
-   colophon/action-line prompt is the Share verb, not a wash.
-6. **Ribbon was a Material toolbar.** SpaceEvenly four gold items. Now a
-   line of type: Cancel leading, Western count, Text / Image trailing,
-   ink not gold.
-7. **Action line ate play before gather.** Transport stays until Share.
+Hidden gestures are not share. `﴿N﴾` means “this is verse N.” Hold on the
+mark is a power move. A confirm-Share that never appears until you already
+know the secret is a dead end. The action has to be visible (icon or the
+word Share) or attached to a gesture everyone already uses (hold the
+thing).
 
 ## Implementation sketch (later)
 
 Shipped for A/B, not locked as G1:
 
-1. Gold wash on `AyahBlock` when `gatherOrdinal != null` or share-prompted
-2. Share ribbon composable replacing `PlayerBar` when gathering (and on
-   action-line prompt)
-3. Four entries behind `Settings.shareUxVariant`
+1. Gold wash on `AyahBlock` when `gatherOrdinal != null`
+2. Share ribbon composable replacing `PlayerBar` when gathering
+3. Four discoverable entries behind `Settings.shareUxVariant` (Icon / Reveal / Hold / Mark)
 4. Ribbon Text / Image → existing `shareAsText` / `shareAsImage`
 5. #519 stays: idle transport has no Gather
 6. Happy path skips Send; chooser completion leaves gather

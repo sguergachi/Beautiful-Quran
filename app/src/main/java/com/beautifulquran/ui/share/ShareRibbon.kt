@@ -1,6 +1,5 @@
 package com.beautifulquran.ui.share
 
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -86,28 +85,6 @@ fun ShareRibbon(
                 )
             }
         }
-    }
-}
-
-/**
- * Action-line prompt: Share sits above the still-living player bar.
- * Transport is not replaced until the verse is actually gathered.
- */
-@Composable
-fun ShareActionPrompt(
-    onCancel: () -> Unit,
-    onShare: () -> Unit,
-) {
-    val ink = MaterialTheme.colorScheme.onSurface
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween,
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(start = 20.dp, end = 20.dp, top = 4.dp, bottom = 0.dp),
-    ) {
-        RibbonVerb("Cancel", ink.copy(alpha = 0.62f), onClick = onCancel)
-        RibbonVerb("Share", ink.copy(alpha = 0.92f), onClick = onShare)
     }
 }
 

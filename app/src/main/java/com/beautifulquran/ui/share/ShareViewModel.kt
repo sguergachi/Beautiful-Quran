@@ -163,10 +163,10 @@ class ShareViewModel(
         apply(ShareUx.onShareVerb(AyahRef(surahId, ayah)))
     }
 
-    fun onMarkHold(variant: ShareUxVariant, surahId: Int, ayah: Int) {
+    fun onBodyHold(variant: ShareUxVariant, surahId: Int, ayah: Int) {
         if (surahId < 1 || ayah < 1) return
         apply(
-            ShareUx.onMarkHold(
+            ShareUx.onBodyHold(
                 variant = variant,
                 gathering = _ui.value.gathering,
                 ref = AyahRef(surahId, ayah),

@@ -3,51 +3,59 @@ package com.beautifulquran.share
 /**
  * Four verse-share entry designs for in-app A/B (Settings → Developer).
  *
- * [OFF] is the shipped reader: gather/export exist, but nothing on the page
- * enters the mode (player-bar Gather was removed in #519). Export (text /
- * image) is shared; only entry chrome differs.
+ * Discoverability is the question. Hidden taps on `﴿N﴾` are not how anyone
+ * shares a thing on a phone. These four are the actually-findable options:
  *
- * Chrome (count, margin ordinals) is Western digits in the book face — never
- * Arabic-Indic. Those digits belong to scripture marks, not furniture.
+ * - [ICON] — the Android share glyph on the play bar (current verse)
+ * - [REVEAL] — the word Share written under the verse you are on
+ * - [HOLD] — long-press the verse (not a word) and Share appears
+ * - [MARK] — tap `﴿N﴾` (verse handle; least obvious, kept for comparison)
+ *
+ * [OFF] is production: gather/export exist, nothing on the page starts them.
+ * Chrome counts are Western digits in the book face.
  */
 enum class ShareUxVariant {
     OFF,
-    /** Tap ﴿N﴾ → quiet "Share" line under that verse. Two taps. */
-    COLOPHON,
-    /** Long-press the ayah mark → enter share. Word hold stays Root Viewer. */
-    LIFT,
-    /** Tap ﴿N﴾ → enter share with that verse already selected. One tap. */
-    SEAL,
-    /** Tap ﴿N﴾ → Share sits above the player bar; transport stays. */
-    ACTION_LINE,
+    ICON,
+    REVEAL,
+    HOLD,
+    MARK,
     ;
 
-    val usesMarkTap: Boolean
-        get() = this == COLOPHON || this == SEAL || this == ACTION_LINE
+    /** Share glyph on the player bar. */
+    val usesBarIcon: Boolean
+        get() = this == ICON
 
-    /** Long-press the ﴿N﴾ mark, not the verse body. */
-    val usesMarkHold: Boolean
-        get() = this == LIFT
+    /** Share is written under the current (playing or focused) verse. */
+    val revealsOnCurrent: Boolean
+        get() = this == REVEAL
+
+    /** Long-press the verse body (translation) reveals Share on that verse. */
+    val usesBodyHold: Boolean
+        get() = this == HOLD
+
+    val usesMarkTap: Boolean
+        get() = this == MARK
 
     val entersOnMarkTap: Boolean
-        get() = this == SEAL
+        get() = this == MARK
 
     val label: String
         get() = when (this) {
             OFF -> "Off"
-            COLOPHON -> "Colophon"
-            LIFT -> "Lift"
-            SEAL -> "Seal"
-            ACTION_LINE -> "Action line"
+            ICON -> "Icon"
+            REVEAL -> "Reveal"
+            HOLD -> "Hold"
+            MARK -> "Mark"
         }
 
     val note: String
         get() = when (this) {
             OFF -> "Shipped reader — no share entry"
-            COLOPHON -> "Tap ﴿N﴾, then Share under the verse"
-            LIFT -> "Hold ﴿N﴾; gold wash, already selected"
-            SEAL -> "Tap ﴿N﴾ to share that verse"
-            ACTION_LINE -> "Tap ﴿N﴾, Share sits above play"
+            ICON -> "Share on the play bar — this verse"
+            REVEAL -> "Share written under the verse you are on"
+            HOLD -> "Hold the verse, Share appears"
+            MARK -> "Tap ﴿N﴾ to share that verse"
         }
 }
 
@@ -62,6 +70,8 @@ sealed class ShareUxAction {
 /** Pure entry/toggle policy. Compose and the ViewModel must not invent rules. */
 object ShareUx {
 
+    fun onBarShare(ref: AyahRef): ShareUxAction = ShareUxAction.EnterShare(ref)
+
     fun onMarkTap(
         variant: ShareUxVariant,
         gathering: Boolean,
@@ -70,19 +80,21 @@ object ShareUx {
     ): ShareUxAction {
         if (gathering) return ShareUxAction.ToggleVerse(ref)
         if (variant.entersOnMarkTap) return ShareUxAction.EnterShare(ref)
-        if (!variant.usesMarkTap) return ShareUxAction.None
-        return if (prompt == ref) ShareUxAction.HidePrompt else ShareUxAction.ShowPrompt(ref)
+        if (variant == ShareUxVariant.HOLD && prompt == ref) {
+            return ShareUxAction.HidePrompt
+        }
+        return ShareUxAction.None
     }
 
     fun onShareVerb(ref: AyahRef): ShareUxAction = ShareUxAction.EnterShare(ref)
 
-    fun onMarkHold(
+    fun onBodyHold(
         variant: ShareUxVariant,
         gathering: Boolean,
         ref: AyahRef,
     ): ShareUxAction {
-        if (!variant.usesMarkHold || gathering) return ShareUxAction.None
-        return ShareUxAction.EnterShare(ref)
+        if (!variant.usesBodyHold || gathering) return ShareUxAction.None
+        return ShareUxAction.ShowPrompt(ref)
     }
 
     fun onVerseTap(gathering: Boolean, ref: AyahRef): ShareUxAction =

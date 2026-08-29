@@ -587,7 +587,7 @@ private fun DeveloperSection(
         color = MaterialTheme.colorScheme.onSurface,
     )
     Spacer(Modifier.height(2.dp))
-    Caption("Four entry designs. Turning one on turns the others off.")
+    Caption("How you find Share. Turning one on turns the others off.")
     ShareUxVariant.entries.filter { it != ShareUxVariant.OFF }.forEach { variant ->
         Spacer(Modifier.height(8.dp))
         ToggleRow(

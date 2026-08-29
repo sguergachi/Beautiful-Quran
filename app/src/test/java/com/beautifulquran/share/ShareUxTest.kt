@@ -11,41 +11,51 @@ class ShareUxTest {
     private val b = AyahRef(2, 256)
 
     @Test
-    fun `off and lift do not treat a short mark tap as share`() {
-        assertEquals(
-            ShareUxAction.None,
-            ShareUx.onMarkTap(ShareUxVariant.OFF, gathering = false, prompt = null, ref = a),
-        )
-        assertEquals(
-            ShareUxAction.None,
-            ShareUx.onMarkTap(ShareUxVariant.LIFT, gathering = false, prompt = null, ref = a),
-        )
+    fun `bar share always enters with the current verse`() {
+        assertEquals(ShareUxAction.EnterShare(a), ShareUx.onBarShare(a))
     }
 
     @Test
-    fun `colophon and action line prompt on first mark tap`() {
-        for (variant in listOf(ShareUxVariant.COLOPHON, ShareUxVariant.ACTION_LINE)) {
+    fun `only mark enters on a short tap of ﴿N﴾`() {
+        assertEquals(
+            ShareUxAction.EnterShare(a),
+            ShareUx.onMarkTap(ShareUxVariant.MARK, gathering = false, prompt = null, ref = a),
+        )
+        for (variant in listOf(
+            ShareUxVariant.OFF,
+            ShareUxVariant.ICON,
+            ShareUxVariant.REVEAL,
+            ShareUxVariant.HOLD,
+        )) {
             assertEquals(
-                ShareUxAction.ShowPrompt(a),
+                ShareUxAction.None,
                 ShareUx.onMarkTap(variant, gathering = false, prompt = null, ref = a),
             )
         }
     }
 
     @Test
-    fun `seal enters on the mark tap`() {
+    fun `hold on the verse body reveals Share, it does not fire share`() {
         assertEquals(
-            ShareUxAction.EnterShare(a),
-            ShareUx.onMarkTap(ShareUxVariant.SEAL, gathering = false, prompt = null, ref = a),
+            ShareUxAction.ShowPrompt(a),
+            ShareUx.onBodyHold(ShareUxVariant.HOLD, gathering = false, ref = a),
+        )
+        assertEquals(
+            ShareUxAction.None,
+            ShareUx.onBodyHold(ShareUxVariant.REVEAL, gathering = false, ref = a),
+        )
+        assertEquals(
+            ShareUxAction.None,
+            ShareUx.onBodyHold(ShareUxVariant.HOLD, gathering = true, ref = a),
         )
     }
 
     @Test
-    fun `second tap on the same mark hides the prompt`() {
+    fun `second tap on the held verse hides the revealed Share`() {
         assertEquals(
             ShareUxAction.HidePrompt,
             ShareUx.onMarkTap(
-                ShareUxVariant.COLOPHON,
+                ShareUxVariant.HOLD,
                 gathering = false,
                 prompt = a,
                 ref = a,
@@ -54,16 +64,8 @@ class ShareUxTest {
     }
 
     @Test
-    fun `tapping another mark moves the prompt`() {
-        assertEquals(
-            ShareUxAction.ShowPrompt(b),
-            ShareUx.onMarkTap(
-                ShareUxVariant.ACTION_LINE,
-                gathering = false,
-                prompt = a,
-                ref = b,
-            ),
-        )
+    fun `share verb always enters with that verse`() {
+        assertEquals(ShareUxAction.EnterShare(a), ShareUx.onShareVerb(a))
     }
 
     @Test
@@ -77,47 +79,23 @@ class ShareUxTest {
     }
 
     @Test
-    fun `share verb always enters with that verse`() {
-        assertEquals(ShareUxAction.EnterShare(a), ShareUx.onShareVerb(a))
-    }
-
-    @Test
-    fun `lift enters from a mark hold only for that variant`() {
-        assertEquals(
-            ShareUxAction.EnterShare(a),
-            ShareUx.onMarkHold(ShareUxVariant.LIFT, gathering = false, ref = a),
-        )
-        assertEquals(
-            ShareUxAction.None,
-            ShareUx.onMarkHold(ShareUxVariant.COLOPHON, gathering = false, ref = a),
-        )
-        assertEquals(
-            ShareUxAction.None,
-            ShareUx.onMarkHold(ShareUxVariant.LIFT, gathering = true, ref = a),
-        )
-    }
-
-    @Test
     fun `verse tap only toggles while gathering`() {
         assertEquals(ShareUxAction.None, ShareUx.onVerseTap(gathering = false, ref = a))
         assertEquals(
-            ShareUxAction.ToggleVerse(a),
-            ShareUx.onVerseTap(gathering = true, ref = a),
+            ShareUxAction.ToggleVerse(b),
+            ShareUx.onVerseTap(gathering = true, ref = b),
         )
     }
 
     @Test
-    fun `variant flags match the four entry designs`() {
-        assertFalse(ShareUxVariant.OFF.usesMarkTap)
-        assertFalse(ShareUxVariant.OFF.usesMarkHold)
-        assertTrue(ShareUxVariant.COLOPHON.usesMarkTap)
-        assertFalse(ShareUxVariant.COLOPHON.entersOnMarkTap)
-        assertTrue(ShareUxVariant.SEAL.usesMarkTap)
-        assertTrue(ShareUxVariant.SEAL.entersOnMarkTap)
-        assertTrue(ShareUxVariant.ACTION_LINE.usesMarkTap)
-        assertFalse(ShareUxVariant.ACTION_LINE.entersOnMarkTap)
-        assertTrue(ShareUxVariant.LIFT.usesMarkHold)
-        assertFalse(ShareUxVariant.LIFT.usesMarkTap)
+    fun `variant flags match the four discoverable designs`() {
+        assertTrue(ShareUxVariant.ICON.usesBarIcon)
+        assertTrue(ShareUxVariant.REVEAL.revealsOnCurrent)
+        assertTrue(ShareUxVariant.HOLD.usesBodyHold)
+        assertTrue(ShareUxVariant.MARK.usesMarkTap)
+        assertTrue(ShareUxVariant.MARK.entersOnMarkTap)
+        assertFalse(ShareUxVariant.ICON.usesMarkTap)
+        assertFalse(ShareUxVariant.REVEAL.usesBarIcon)
         assertEquals(5, ShareUxVariant.entries.size)
     }
 }

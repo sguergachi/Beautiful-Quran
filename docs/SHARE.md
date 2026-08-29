@@ -32,8 +32,8 @@ its layout; it grows ordinals in the margin.
   ayah is already `١`; pauses recitation — the mode owns the tap). The idle
   player bar does **not** host a Gather control
   ([#519](https://github.com/sguergachi/Beautiful-Quran-/pull/519)). Four
-  entry designs live behind Settings → Developer → Verse share
-  ([VERSE_ACTIONS.md](VERSE_ACTIONS.md)).
+  discoverable entry designs (Icon / Reveal / Hold / Mark) live behind
+  Settings → Developer → Verse share ([VERSE_ACTIONS.md](VERSE_ACTIONS.md)).
 - **Pick** by tapping a verse (word or ayah). Its ordinal is written in the
   outer margin in Western digits (1 2 3), Garamond ink — furniture, not
   illumination. The same margin the bookmark ribbon lives in; the ribbon is

@@ -128,7 +128,6 @@ import com.beautifulquran.data.ReadingMode
 import com.beautifulquran.data.VerseNumberScript
 import com.beautifulquran.data.model.Ayah
 import com.beautifulquran.data.model.Word
-import com.beautifulquran.share.ShareUxVariant
 import com.beautifulquran.domain.EnglishTypography
 import com.beautifulquran.domain.TajweedPacing
 import com.beautifulquran.ui.reader.focus.FocusEngine
@@ -2526,10 +2525,8 @@ fun AyahBlock(
      * Non-null only while gather mode has this verse selected.
      */
     gatherOrdinal: Int? = null,
-    /** Developer share-entry design. [ShareUxVariant.OFF] draws nothing extra. */
-    shareUx: ShareUxVariant = ShareUxVariant.OFF,
-    /** True while this verse is the open colophon/action-line prompt. */
-    sharePrompted: Boolean = false,
+    /** Write the word Share under this verse (Reveal / Hold). */
+    showShareVerb: Boolean = false,
     onAyahMarkClick: (() -> Unit)? = null,
     onAyahMarkLongClick: (() -> Unit)? = null,
     onShareVerbClick: (() -> Unit)? = null,
@@ -2897,7 +2894,7 @@ fun AyahBlock(
                         ),
                 )
             }
-            if (sharePrompted && shareUx == ShareUxVariant.COLOPHON && onShareVerbClick != null) {
+            if (showShareVerb && onShareVerbClick != null) {
                 ShareInkVerb(
                     onClick = onShareVerbClick,
                     modifier = Modifier.padding(top = 8.dp),
@@ -2991,7 +2988,7 @@ fun AyahBlock(
     }
 }
 
-/** Quiet ink "Share" under the verse (colophon). Furniture, not illumination. */
+/** Quiet ink "Share" under the verse. Furniture, not illumination. */
 @Composable
 private fun ShareInkVerb(
     onClick: () -> Unit,
