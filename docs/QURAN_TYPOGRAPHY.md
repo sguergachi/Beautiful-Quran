@@ -211,24 +211,43 @@ nothing here overrides them — the Arabic leaf is unaffected.
 (what it is set in), `ui/reader/MushafEnglishSheet.kt` (how it is drawn).
 Measurements: `tools/measure_english_leaves.py`.*
 
-### 13.1 The page boundary is borrowed, not invented
+### 13.1 The book paginates itself
 
 The translation has no pagination of its own — no printing of it breaks where
-every other printing breaks. So an English leaf carries the verses that
-**begin** on the Arabic leaf of the same number. Page 255 in English opens
-where page 255 opens.
+every other printing breaks. It borrowed the mushaf's for a while: an English
+leaf carried the verses that **began** on the Arabic leaf of the same number, so
+page 255 in English opened where page 255 opened.
 
-*Begin*, not *appear*: a verse is a sentence, and a sentence cannot be cut at
-whatever word the calligrapher reached at the foot of the page. A verse that
-runs over a break is set whole on the leaf it starts on — which is how a
-parallel-text Qur'an is printed, and it makes the English run continuously with
-nothing repeated and nothing dropped. Every one of the 604 leaves has at least
-one verse beginning on it, so no leaf comes out empty.
+**That boundary is gone, and it was the whitespace.** A borrowed boundary is
+still a boundary: every Madinah page ended on a remainder, and once the type was
+large enough that a page took two or three leaves, roughly half of every leaf in
+the book *was* a remainder. Measured, 365 of 1,254 leaves came out under 70%
+full — a reader met a third of a blank page every other turn. The verses are
+now packed continuously, straight through the Arabic page breaks, and the same
+type gives 1,145 leaves at 91% full with 77 short ones instead of 365.
 
-The consequence is a rule the rest of the reader has to honour: while the voice
-is inside a straddling verse, the leaf the reader is on is the verse's *opening*
-page, not the page that word is printed on. That is `MushafCatalog.readingPageOf`,
-and it is also why the English leaf does not lead-turn (rule 13.6).
+What is still true, and is what the leaf actually rests on: a verse is a
+sentence, and a sentence cannot be cut at whatever word the calligrapher reached
+at the foot of a page. Verses are set whole, in the mushaf's own order, so the
+English runs continuously with nothing repeated and nothing dropped.
+
+Al-Fatihah is the one break the packing keeps — it opens the book on a leaf of
+its own, as it stands on a page of its own in every mushaf. Every other chapter
+runs on, its panel set inside the leaf where it falls, which is how a printed
+translation sets them; starting all 114 on a fresh leaf would leave 39 of them
+under a third full.
+
+**The two layouts are still one book, through the verse rather than the page.**
+`EnglishBook.leafOfVerse` is exact for all 6,236 verses, so the running head,
+the juzʾ, the dial, the reciter's own place on the paper and a reader who
+changes language all land on the words they were on. Each leaf records the
+Madinah page it *opens* on, and that is what the head and the juzʾ are read
+from.
+
+One rule the rest of the reader still has to honour: while the voice is inside a
+straddling verse, the leaf the reader is on is the verse's *opening* page, not
+the page that word is printed on. That is `MushafCatalog.readingPageOf`, and it
+is also why the English leaf does not lead-turn (rule 13.6).
 
 ### 13.2 The text is the translation, not the gloss
 
@@ -260,9 +279,9 @@ nothing the page happens to carry.
 
 ### 13.4 One hand, one leading — and the leaf is not the page
 
-The page boundary comes from the Arabic leaf, so a page's mass is fixed at
-somewhere between 1,055 and 1,997 characters. Something has to absorb a range of
-nearly two to one, and there are only four candidates: the type, the leading,
+While the page boundary came from the Arabic leaf, a page's mass was fixed at
+somewhere between 1,055 and 1,997 characters. Something had to absorb a range of
+nearly two to one, and there were only four candidates: the type, the leading,
 the foot, or the number of leaves. Three of them were tried:
 
 - **The type gave**, a few percent on the heaviest leaves. That is the one thing
@@ -276,11 +295,11 @@ the foot, or the number of leaves. Three of them were tried:
   by the heaviest page in the book, which is to say every page was set for the
   worst one.
 
-**It is the leaf count.** A leaf holds `ENGLISH_LEAF_CAPACITY_CHARS` = 900
-characters, and a Madinah page takes as many leaves as that needs — two or three
-for nearly all of the 604, about 1,250 leaves in all. Every leaf still names its
-Madinah page, so the juzʾ, the running head and the reciter's own place on the
-paper go on meaning exactly what they meant; page 255 is simply two leaves long.
+**It is the leaf count**, and then §13.1 removed the boundary that made it a
+range at all. A leaf holds `ENGLISH_LEAF_CAPACITY_CHARS` = 900 characters and is
+filled to it — about 1,145 leaves for the book. Every leaf still records the
+Madinah page it opens on, so the juzʾ, the running head and the reciter's own
+place on the paper go on meaning exactly what they meant.
 
 What the leaf does take over is the **count**. The folio and the page dial
 number *leaves*, not Madinah pages, because those are what a reader turns and
@@ -296,34 +315,39 @@ prose sets at about 22 sp on a phone and 46 characters to the line, which is a
 book measure and the size the scrolling reader has always set its English at.
 Half again the type of the page-bound leaf.
 
-The cost is leaves, and the sweep is flat where it matters. Below about 850 the
-count climbs by a hundred leaves for two percent of type; above about 1,000 the
-line is longer than the hand wants and the leaves start emptying again. The
-median leaf reaches 81% of its well, against 85% at 1,650 and 68% when a leaf
-was a page. `tools/measure_english_leaves.py` prints it.
+The cost is leaves, and with the pagination continuous the capacity buys nothing
+but type: the median leaf reaches 91% of its well at any capacity in the range,
+so the choice is purely how long a line the hand wants. Below about 850 it is
+shorter than the measure wants and above about 1,000 it is longer.
+`tools/measure_english_leaves.py` prints the sweep.
 
-**Leaves are filled, not evened.** A page's verses go on the leaf until the
-next one will not fit, and then the next leaf starts — the compositor's order,
-and the reason no leaf is ever handed out over its capacity. It used to even
-the page out instead, so that a page of 1,700 became two leaves of 850 rather
-than one full leaf and a stub. That was right when a page made at most two
-leaves; it is wrong now that a page makes two or three, because evening *every*
-leaf of a page makes every leaf of that page short. Measured over the book it
-cost 137 extra leaves, ten points of median fill, and — the thing it existed to
-prevent — nearly twice as many leaves under a third full.
+**Leaves are filled, not evened.** Verses go on the leaf until the next one will
+not fit, and then the next leaf starts — the compositor's order, and the reason
+no leaf is ever handed out over its capacity.
 
-The stub is handled where stubs actually happen, at the end. When the last leaf
-of a page comes out under `ENGLISH_LEAF_STUB_FRACTION` = 55% full, the last
-verse of the leaf above is carried back into it, while that brings the two
-closer together. Over the book that turns 39 leaves under a third full into 3.
+**An opening is charged the paper it takes.** The capacity is a mass of *prose*,
+and a chapter opening sets none — it sets a panel, the air on either side of it,
+and it ends the paragraph above half a line early. Left uncounted that is paper
+the pagination believes is free, and the last leaf of the Qur'an, which opens
+four chapters, spent fifteen of its twenty-two lines before a word of
+translation was set on it; the leading closed to pay and the lines ran into one
+another. So `ENGLISH_LEAF_OPENING_CHARS` = 92 for the panel and its air, plus
+`ENGLISH_LEAF_BASMALAH_CHARS` = 78 for the preface line where a chapter takes
+one — two lines of a 46-character measure.
 
-One leaf in the Qur'an is still over its capacity — 2:282, a single sentence of
-1,333 characters, which no rule splits. That leaf, alone, is set tight.
+**One leaf is over capacity and always will be.** 2:282 is a single sentence of
+1,333 characters, half as long again as a leaf holds, and no pagination splits a
+sentence.
 
-The leaf is still measured as it will be drawn, and its leading still closes if
-the block would run past the foot — but only on that leaf, only by the overflow,
-and now only for 2:282 and for wherever a character count turns out to be wrong.
-Being wrong there means revelation clipped off the bottom of a page.
+**The rescue, in order.** The leaf is measured as it will be drawn, and if the
+block would run past the foot its leading closes — only on that leaf, only by
+the overflow. The leading stops at `ENGLISH_LEAF_MIN_LEADING_EM` = 1.15, because
+unbounded it will close as far as the arithmetic asks and a page whose ascenders
+touch the descenders above them is not a tight page but an unreadable one. What
+the floor cannot take, the hand does: `englishLeafOverflowHandPx` gives up a few
+percent of type on that leaf alone. That breaks §13.3 knowingly — on 2:282 the
+alternatives are overlapping lines or revelation clipped off the foot, and a page
+set a little small is the only one of the three a reader can still read.
 
 ### 13.5 Ragged right, and deliberately not hyphenated
 

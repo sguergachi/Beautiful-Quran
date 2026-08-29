@@ -6,9 +6,9 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * The leaf is not the page. A Madinah page takes as many leaves as its English
- * needs at a legible size — see `EnglishBook.kt` for why that is what buys the
- * type its size.
+ * The English book paginates itself. A leaf is a run of the translation of
+ * [ENGLISH_LEAF_CAPACITY_CHARS] or less — not a Madinah page, and not a slice
+ * of one either. See `EnglishBook.kt` for why the borrowed boundary went.
  */
 class EnglishBookTest {
 
@@ -27,42 +27,54 @@ class EnglishBookTest {
             ),
         ) { s, a -> mass(s, a) }
 
+    /** The leaves a page's verses land on, in order, with no repeats. */
+    private fun leavesFrom(b: EnglishBook, page: Int): List<EnglishBookLeaf> {
+        val first = b.firstLeafOf(page)
+        return b.leaves.drop(first).takeWhile { page in it.pages }
+    }
+
     @Test
     fun `a page that fits is one leaf, and that leaf is the page`() {
         val b = book(3 to listOf(2 to 1, 2 to 2, 2 to 3)) { _, _ -> cap / 6 }
         val leaf = b.leaves[b.firstLeafOf(3)]
         assertEquals(3, leaf.page)
-        assertEquals(1, leaf.parts)
+        assertEquals(3..3, leaf.pages)
         assertEquals(listOf(2 to 1, 2 to 2, 2 to 3), leaf.verses)
     }
 
     @Test
     fun `a page that will not fit takes two leaves`() {
-        // Four verses of just under half a leaf: each leaf fills with two of
-        // them, and the third and fourth start the second leaf.
-        val b = book(3 to listOf(2 to 1, 2 to 2, 2 to 3, 2 to 4)) { _, _ -> cap / 2 - 10 }
-        val first = b.firstLeafOf(3)
-        assertEquals(2, b.leaves[first].parts)
-        assertEquals(listOf(2 to 1, 2 to 2), b.leaves[first].verses)
-        assertEquals(listOf(2 to 3, 2 to 4), b.leaves[first + 1].verses)
-        assertEquals(1, b.leaves[first].part)
-        assertEquals(2, b.leaves[first + 1].part)
+        // Four verses of just under half a leaf, none of them a chapter's
+        // first: two go on, the third will not, and it opens the next leaf.
+        val b = book(3 to listOf(2 to 2, 2 to 3, 2 to 4, 2 to 5)) { _, _ -> cap / 2 - 10 }
+        val leaves = leavesFrom(b, 3)
+        assertEquals(2, leaves.size)
+        assertEquals(listOf(2 to 2, 2 to 3), leaves[0].verses)
+        assertEquals(listOf(2 to 4, 2 to 5), leaves[1].verses)
     }
 
     @Test
-    fun `both leaves of a page still name that page`() {
-        val b = book(3 to listOf(2 to 1, 2 to 2, 2 to 3, 2 to 4)) { _, _ -> cap / 2 - 10 }
-        val first = b.firstLeafOf(3)
-        assertEquals(3, b.leaves[first].page)
-        assertEquals(3, b.leaves[first + 1].page)
+    fun `a leaf runs straight through the page break`() {
+        // The change this file exists for. Two pages of a third of a leaf each
+        // used to be two leaves a third full; now they are one leaf.
+        val b = book(
+            3 to listOf(2 to 1, 2 to 2),
+            4 to listOf(2 to 3, 2 to 4),
+        ) { _, _ -> cap / 5 }
+        val leaf = b.leaves[b.firstLeafOf(3)]
+        assertEquals(listOf(2 to 1, 2 to 2, 2 to 3, 2 to 4), leaf.verses)
+        // It opens on 3 and draws from both, and either page finds it.
+        assertEquals(3, leaf.page)
+        assertEquals(3..4, leaf.pages)
+        assertEquals(b.firstLeafOf(3), b.firstLeafOf(4))
     }
 
     @Test
     fun `a verse is found on the leaf that carries it, not the page's first`() {
-        val b = book(3 to listOf(2 to 1, 2 to 2, 2 to 3, 2 to 4)) { _, _ -> cap / 2 - 10 }
+        val b = book(3 to listOf(2 to 2, 2 to 3, 2 to 4, 2 to 5)) { _, _ -> cap / 2 - 10 }
         val first = b.firstLeafOf(3)
-        assertEquals(first, b.leafOfVerse(2, 1, page = 3))
-        assertEquals(first + 1, b.leafOfVerse(2, 4, page = 3))
+        assertEquals(first, b.leafOfVerse(2, 2, page = 3))
+        assertEquals(first + 1, b.leafOfVerse(2, 5, page = 3))
     }
 
     @Test
@@ -73,75 +85,85 @@ class EnglishBookTest {
 
     @Test
     fun `a verse longer than a leaf is set whole, and set alone`() {
-        // Twice a leaf, then a short one. No number of leaves splits a
-        // sentence, so the long verse takes its own leaf and runs over it —
-        // 2:282 is the one place in the Qur'an this happens.
+        // Twice a leaf, then a short one. No pagination splits a sentence, so
+        // the long verse takes its own leaf and runs over it — 2:282 is the one
+        // place in the Qur'an this happens.
         val b = book(3 to listOf(2 to 1, 2 to 2)) { _, a -> if (a == 1) cap * 2 else cap / 4 }
-        val first = b.firstLeafOf(3)
-        assertEquals(2, b.leaves[first].parts)
-        assertEquals(listOf(2 to 1), b.leaves[first].verses)
-        assertEquals(listOf(2 to 2), b.leaves[first + 1].verses)
+        val leaves = leavesFrom(b, 3)
+        assertEquals(2, leaves.size)
+        assertEquals(listOf(2 to 1), leaves[0].verses)
+        assertEquals(listOf(2 to 2), leaves[1].verses)
     }
 
     @Test
-    fun `a verse that will not go on the leaf starts the next one`() {
-        // Three verses of two-thirds a leaf: no two of them go together, so
-        // each takes a leaf and no leaf is over its well.
-        val b = book(3 to listOf(2 to 1, 2 to 2, 2 to 3)) { _, _ -> cap * 2 / 3 }
-        val first = b.firstLeafOf(3)
-        assertEquals(3, b.leaves[first].parts)
-        (0..2).forEach { assertEquals(1, b.leaves[first + it].verses.size) }
-    }
-
-    @Test
-    fun `a stub at the end of a page has a verse carried back into it`() {
-        // Filled, this page is a full leaf and a leaf a ninth full. The last
-        // verse of the full leaf comes back, and both leaves are half pages.
-        val masses = listOf(cap * 5 / 9, cap * 4 / 9, cap / 9)
-        val b = book(3 to masses.indices.map { 2 to it + 1 }) { _, a -> masses[a - 1] }
-        val first = b.firstLeafOf(3)
-        assertEquals(2, b.leaves[first].parts)
-        assertEquals(listOf(2 to 1), b.leaves[first].verses)
-        assertEquals(listOf(2 to 2, 2 to 3), b.leaves[first + 1].verses)
-    }
-
-    @Test
-    fun `a last leaf that is not a stub is left where it fell`() {
-        // Nothing is carried back for its own sake: the last leaf here is
-        // two-thirds full, which is a page that ends, not a mistake.
-        val masses = listOf(cap / 2, cap / 2, cap * 2 / 3)
-        val b = book(3 to masses.indices.map { 2 to it + 1 }) { _, a -> masses[a - 1] }
-        val first = b.firstLeafOf(3)
-        assertEquals(2, b.leaves[first].parts)
-        assertEquals(listOf(2 to 1, 2 to 2), b.leaves[first].verses)
-        assertEquals(listOf(2 to 3), b.leaves[first + 1].verses)
-    }
-
-    @Test
-    fun `no leaf of the book is set past its capacity, but the one that cannot fit`() {
-        // The guarantee, on an awkward page: every leaf inside its well, and
-        // every verse of the page set exactly once.
+    fun `no leaf is set past its capacity, but the one that cannot fit`() {
         val masses = listOf(700, 500, 300, 800, 200, 640)
         val b = book(3 to masses.indices.map { 2 to it + 1 }) { _, a -> masses[a - 1] }
-        val first = b.firstLeafOf(3)
-        val leaves = (0 until b.leaves[first].parts).map { b.leaves[first + it] }
-        assertEquals(masses.sum(), leaves.sumOf { l -> l.verses.sumOf { masses[it.second - 1] } })
+        val leaves = leavesFrom(b, 3)
+        // Every verse of the page set exactly once, in order.
+        assertEquals(
+            masses.indices.map { 2 to it + 1 },
+            leaves.flatMap { it.verses },
+        )
         leaves.forEach { leaf ->
             assertTrue(leaf.verses.sumOf { masses[it.second - 1] } <= cap)
         }
     }
 
     @Test
-    fun `every page has a leaf, and the leaves run in page order`() {
+    fun `Al-Fatihah opens the book on a leaf of its own`() {
+        // The one break the packing keeps. Al-Fatihah is short enough that
+        // Al-Baqarah would otherwise run on behind it.
+        val b = book(
+            1 to listOf(1 to 1, 1 to 2),
+            2 to listOf(2 to 1, 2 to 2),
+        ) { _, _ -> cap / 8 }
+        assertEquals(listOf(1 to 1, 1 to 2), b.leaves[0].verses)
+        assertEquals(listOf(2 to 1, 2 to 2), b.leaves[1].verses)
+        assertEquals(1, b.firstLeafOf(2))
+    }
+
+    @Test
+    fun `every chapter after the second runs on where it falls`() {
+        // A book of translation does not start each of its 114 on a fresh page;
+        // the panel is set inside the leaf, which is what keeps the leaves full.
+        val b = book(3 to listOf(2 to 1, 3 to 1, 4 to 1)) { _, _ -> cap / 8 }
+        assertEquals(1, leavesFrom(b, 3).size)
+        assertEquals(listOf(2 to 1, 3 to 1, 4 to 1), b.leaves[b.firstLeafOf(3)].verses)
+    }
+
+    @Test
+    fun `a chapter opening is charged the paper it takes`() {
+        // The panel and its basmalah set no prose and take two lines of it.
+        // Uncounted, the last leaf of the Qur'an — four chapters open on it —
+        // spent two thirds of its well before a word was set.
+        assertEquals(
+            300 + ENGLISH_LEAF_OPENING_CHARS + ENGLISH_LEAF_BASMALAH_CHARS,
+            englishLeafVerseMass(surahId = 2, ayah = 1, prose = 300),
+        )
+        // Al-Fatihah and At-Tawbah take no basmalah, so they are not charged one.
+        assertEquals(
+            300 + ENGLISH_LEAF_OPENING_CHARS,
+            englishLeafVerseMass(surahId = 9, ayah = 1, prose = 300),
+        )
+        // Every other verse is its prose and nothing else.
+        assertEquals(300, englishLeafVerseMass(surahId = 2, ayah = 2, prose = 300))
+    }
+
+    @Test
+    fun `every page names a leaf, and the leaves run in page order`() {
         val b = book(
             1 to listOf(1 to 1),
             2 to listOf(2 to 1),
         ) { _, _ -> cap / 6 }
-        assertEquals(MushafCatalog.MUSHAF_PAGE_COUNT, b.leaves.count { it.parts == 1 })
-        assertEquals(MushafCatalog.MUSHAF_PAGE_COUNT, b.leafCount)
+        assertTrue(b.leafCount >= 2)
         assertTrue(b.leaves.zipWithNext().all { (a, z) -> z.page >= a.page })
         assertEquals(0, b.firstLeafOf(1))
         assertEquals(1, b.firstLeafOf(2))
+        // A page with no verse of its own reads as the leaf its neighbour opened.
+        (1..MushafCatalog.MUSHAF_PAGE_COUNT).forEach {
+            assertTrue(b.firstLeafOf(it) in 0 until b.leafCount)
+        }
     }
 }
 

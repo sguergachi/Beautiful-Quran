@@ -1,7 +1,5 @@
 package com.beautifulquran.domain
 
-import kotlin.math.abs
-
 /*
  * The English book's leaves.
  *
@@ -11,20 +9,35 @@ import kotlin.math.abs
  * because the worst one had to be, which is another way of saying none of them
  * was as legible as it could have been.
  *
- * So the leaf stops being the page. A leaf holds
- * [ENGLISH_LEAF_CAPACITY_CHARS] of prose and no more; a Madinah page takes as
- * many leaves as that needs, which for all but a handful of the 604 is two or
- * three, and the book runs to about 1,250 leaves. The type is then cut for the
- * leaf rather than for the worst page — half again as large, at about 46
- * characters to the line, which is a book measure.
+ * So the leaf stops being the page, in two steps, and the second one is the
+ * one that matters.
  *
- * What is *not* given up is the page. Every leaf still knows which Madinah page
- * it belongs to, so the juzʾ, the running head and the reciter’s own place
- * on the paper all go on meaning exactly what they meant; page 255 is simply
- * two leaves long. What the leaf does take over is the *count*: the folio and
- * the page dial number leaves, because those are what a reader turns and lands
- * on, and a folio that repeated itself twice a page would be a lie about where
- * they are. See `mushafLeafNumber`.
+ * **A page may take more than one leaf.** A leaf holds
+ * [ENGLISH_LEAF_CAPACITY_CHARS] of prose and no more, and a Madinah page takes
+ * as many leaves as that needs. That alone buys the type half again its size.
+ *
+ * **A leaf may take more than one page.** This is the one that fixes the
+ * whitespace. Keeping the page as a *boundary* means every page ends on a
+ * remainder — its last leaf carries whatever is left over, and since a page now
+ * makes two or three leaves, roughly half of every leaf in the book was a
+ * remainder. Measured: 365 of 1,254 leaves came out under 70% full, and a
+ * reader turning pages met a third of a blank one every other turn. Paginate
+ * the translation continuously instead — verse after verse, straight through
+ * the page breaks — and the same type gives 1,118 leaves at 91% full, with 66
+ * short ones instead of 365. The short ones left are honest: a verse too long
+ * to join the leaf it met.
+ *
+ * What that gives up is the borrowed boundary — page 255 in English no longer
+ * opens where page 255 opens — and by the time it went it was buying nothing.
+ * The folio counts leaves, the dial counts leaves, and a reader in the English
+ * book navigates it by its own pages. What every leaf still knows is which
+ * Madinah page its first verse falls on, and that is what the running head, the
+ * juzʾ and the reciter's own place on the paper are drawn from, so a reader who
+ * changes language still lands on the words they were on. That is
+ * [EnglishBook.leafOfVerse], and it is exact for all 6,236 verses.
+ *
+ * Al-Fatihah is the one break the packing keeps: it opens the book on a leaf of
+ * its own, as it stands on a page of its own in every mushaf.
  */
 
 /**
@@ -39,29 +52,60 @@ import kotlin.math.abs
  * of EB Garamond's small x-height reads easily in the hand; the scrolling
  * reader has always set its English at 22 sp, and the leaf had drifted to 16.
  *
- * It is not free, and the cost is leaves. Fill is quantised — a page takes
- * whole verses, so a page of 1,400 characters becomes a full leaf and a half
- * one — and the smaller the capacity the more often that happens: the median
- * leaf reaches 81% of its well here and the book runs to about 1,250 leaves,
- * against 675 at 1,650 and 604 when a leaf was a page. That is the
- * trade, taken deliberately: white at the foot of a page costs the reader
- * nothing, and type they have to squint at costs them the page.
+ * It is not free, and the cost is leaves: about 1,120 of them, against 675 at
+ * 1,650 and 604 when a leaf was a page. That is the trade, taken deliberately.
+ * What it is *not* paying for any more is whitespace — the leaves are packed
+ * continuously, so the median one reaches 91% of its well whatever the capacity
+ * is, and the capacity buys only type.
  *
- * Below about 850 it stops paying — the leaf count climbs by a hundred for
- * each percent of type — and above about 1,000 the line is longer than the
- * hand wants. `tools/measure_english_leaves.py` prints the sweep.
+ * Below about 850 the line is shorter than the hand wants and above about 1,000
+ * it is longer. `tools/measure_english_leaves.py` prints the sweep.
  */
 const val ENGLISH_LEAF_CAPACITY_CHARS = 900
 
-/** One leaf of the English book: a slice of one Madinah page. */
+/**
+ * What a chapter's opening costs the leaf, in the characters the capacity
+ * counts.
+ *
+ * The capacity is a mass of *prose*, and a chapter opening sets no prose at
+ * all — it sets a panel, and the air on either side of it, and it ends the
+ * paragraph above it half a line early. Paper, not words. Left uncounted it is
+ * paper the pagination believes is free, and the last leaf of the Qur'an,
+ * which opens four chapters, came out with fifteen of its twenty-two lines
+ * already spent before a word of translation was set on it. The leading closed
+ * to pay for it and the lines ran into one another.
+ *
+ * So an opening is charged what it takes. About one line for the panel, a
+ * third of one for the air on each side, and half a line for the ragged end of
+ * the paragraph above: call it two lines, and a line of this book is about 46
+ * characters. The basmalah preface is charged its own line and its air.
+ */
+const val ENGLISH_LEAF_OPENING_CHARS = 92
+const val ENGLISH_LEAF_BASMALAH_CHARS = 78
+
+/** What a verse costs the leaf: its prose, and the opening it may bring. */
+fun englishLeafVerseMass(surahId: Int, ayah: Int, prose: Int): Int = when {
+    ayah != 1 -> prose
+    surahOpensWithBasmalahPreface(surahId) ->
+        prose + ENGLISH_LEAF_OPENING_CHARS + ENGLISH_LEAF_BASMALAH_CHARS
+    else -> prose + ENGLISH_LEAF_OPENING_CHARS
+}
+
+/** One leaf of the English book: a run of the translation, set as a page. */
 data class EnglishBookLeaf(
-    /** The Madinah page this leaf belongs to. Its folio, its juzʾ, its dial. */
+    /**
+     * The Madinah page this leaf *opens* on — where its first verse begins.
+     * Not a boundary any more, but still where the leaf is in the mushaf, and
+     * so what the running head and the juzʾ are read from.
+     */
     val page: Int,
-    /** 1-based, within that page. */
-    val part: Int,
-    /** How many leaves the page takes in all. */
-    val parts: Int,
-    /** The verses set on this leaf, in the page's own order. */
+    /**
+     * Every Madinah page the leaf draws a verse from. Two or three, because a
+     * leaf is smaller than a page — the pager needs it to find the Arabic word
+     * a tap on an English sentence should play from.
+     */
+    val pages: IntRange,
+    /** The verses set on this leaf, in the book's own order. */
     val verses: List<Pair<Int, Int>>,
 )
 
@@ -93,121 +137,89 @@ class EnglishBook internal constructor(
 }
 
 /**
- * Paginates the whole book once.
+ * Paginates the whole book once, continuously.
  *
  * [prose] answers how much paper one verse takes, in the same characters
  * [ENGLISH_LEAF_CAPACITY_CHARS] counts. It is a *character* estimate rather
  * than a layout, deliberately: it is device-independent, so the book breaks in
  * the same places on every screen the way a printed book does, and it costs a
- * few hundred microseconds instead of six hundred text layouts. Where the
+ * few hundred microseconds instead of a thousand text layouts. Where the
  * estimate is off, `MushafEnglishSheet` measures the leaf as it will actually
  * be drawn and closes its leading by the difference — the same guarantee that
  * has always caught it.
+ *
+ * The verses are walked in the mushaf's own order — page by page, and within a
+ * page in the order the calligrapher set them — and a leaf is closed when the
+ * next verse will not go on it. Nothing is evened out and nothing is carried
+ * back, because with the page boundary gone there is no remainder to even: the
+ * only leaf that ends short is one that met a verse too long to take.
  */
 fun buildEnglishBook(
     catalog: MushafCatalog,
     prose: (surahId: Int, ayah: Int) -> Int,
 ): EnglishBook {
-    val leaves = ArrayList<EnglishBookLeaf>(MushafCatalog.MUSHAF_PAGE_COUNT)
-    val firstLeafByPage = IntArray(MushafCatalog.MUSHAF_PAGE_COUNT + 1)
-    val leafByVerse = HashMap<Long, Int>(6_500)
-    for (page in 1..MushafCatalog.MUSHAF_PAGE_COUNT) {
-        firstLeafByPage[page] = leaves.size
-        val verses = catalog.page(page)?.let(::englishLeafVerseKeys).orEmpty()
-        if (verses.isEmpty()) {
-            leaves += EnglishBookLeaf(page = page, part = 1, parts = 1, verses = emptyList())
-            continue
+    val leaves = ArrayList<EnglishBookLeaf>(1_300)
+    val firstLeafByPage = IntArray(MushafCatalog.MUSHAF_PAGE_COUNT + 1) { -1 }
+    val leafByVerse = HashMap<Long, Int>(8_192)
+
+    val run = ArrayList<Pair<Int, Int>>(16)
+    val runPages = ArrayList<Int>(16)
+    var mass = 0
+
+    fun close() {
+        if (run.isEmpty()) return
+        val index = leaves.size
+        run.forEach { (s, a) -> leafByVerse[quranWordKey(s, a, 1)] = index }
+        // A page's leaf is the first one that carries any of its verses.
+        runPages.forEach { page ->
+            if (firstLeafByPage[page] < 0) firstLeafByPage[page] = index
         }
-        val parts = englishPageParts(verses.map { (s, a) -> prose(s, a) })
-        parts.forEachIndexed { index, run ->
-            val slice = verses.subList(run.first, run.last + 1)
-            slice.forEach { (s, a) -> leafByVerse[quranWordKey(s, a, 1)] = leaves.size }
-            leaves += EnglishBookLeaf(
-                page = page,
-                part = index + 1,
-                parts = parts.size,
-                verses = slice,
-            )
+        leaves += EnglishBookLeaf(
+            page = runPages.first(),
+            pages = runPages.first()..runPages.last(),
+            verses = ArrayList(run),
+        )
+        run.clear()
+        runPages.clear()
+        mass = 0
+    }
+
+    for (page in 1..MushafCatalog.MUSHAF_PAGE_COUNT) {
+        val keys = catalog.page(page)?.let(::englishLeafVerseKeys).orEmpty()
+        for (key in keys) {
+            val verseMass =
+                englishLeafVerseMass(key.first, key.second, prose(key.first, key.second))
+            val full = mass + verseMass > ENGLISH_LEAF_CAPACITY_CHARS
+            if (run.isNotEmpty() && (full || englishLeafOpensHere(key))) close()
+            run += key
+            runPages += page
+            mass += verseMass
+        }
+    }
+    close()
+
+    // A page with no verse of its own reads as the leaf its neighbour opened.
+    var carried = 0
+    for (page in 1..MushafCatalog.MUSHAF_PAGE_COUNT) {
+        if (firstLeafByPage[page] < 0) {
+            firstLeafByPage[page] = carried
+        } else {
+            carried = firstLeafByPage[page]
         }
     }
     return EnglishBook(leaves, firstLeafByPage, leafByVerse)
 }
 
 /**
- * Splits one page's verses into leaves the way a compositor sets a book: fill
- * the leaf, and when the next verse will not go, start the next leaf.
+ * The one place the packing is told to break: Al-Baqarah opens a leaf, so
+ * Al-Fatihah has one to itself.
  *
- * A verse is never split, because a verse is a sentence (`EnglishLeaf.kt`), so
- * the break lands before the verse that would overrun — which is also the
- * guarantee that no leaf is handed out over its capacity. Exactly one leaf in
- * the Qur'an still is: 2:282, a single sentence of 1,333 characters, half as
- * long again as a leaf holds and unsplittable by any rule. That leaf, alone, is
- * set tight by the fitted leading.
- *
- * This used to even the page out instead — a page of 1,700 became two leaves of
- * 850 rather than one full one and a stub. That was right when a page made at
- * most two leaves. It is not right now that a page makes two or three: evening
- * *every* leaf of the page means every leaf of the page is short, and measured
- * over the book it cost 137 extra leaves, ten points of median fill, and — the
- * thing it was there to prevent — nearly twice as many leaves under a third
- * full. Filling gives the fuller page; the stub is handled where stubs
- * actually happen, at the end.
+ * Every other chapter runs on, its panel set inside the page where it falls —
+ * which is how a printed Qur'an translation sets them, and starting each of the
+ * 114 on a fresh leaf would leave 39 of them under a third full. Al-Fatihah is
+ * not one of the 114 in this respect: it is the opening of the book, it stands
+ * on a page of its own in every mushaf, and `mushafIsOpeningLeaf` already sets
+ * that page differently from all the rest.
  */
-private fun englishPageParts(masses: List<Int>): List<IntRange> {
-    val runs = ArrayList<IntRange>()
-    var start = 0
-    var run = 0
-    masses.forEachIndexed { index, mass ->
-        if (index > start && run + mass > ENGLISH_LEAF_CAPACITY_CHARS) {
-            runs += start..index - 1
-            start = index
-            run = 0
-        }
-        run += mass
-    }
-    runs += start..masses.indices.last
-    return englishCarriedBack(runs, masses)
-}
-
-/**
- * How empty the last leaf of a page may be before a verse is carried back into
- * it from the leaf above.
- *
- * Filling leaves the remainder at the end, and a remainder can be one short
- * verse — a leaf 5% full, which reads as a mistake rather than as an ending.
- * Half a leaf is where a short page still reads as a page.
- */
-private const val ENGLISH_LEAF_STUB_FRACTION = 0.55f
-
-/**
- * Evens out the last two leaves of a page when the last came out a stub.
- *
- * The compositor's move, and only at the end, where the remainder falls: take
- * the last verse off the fuller leaf and set it on the emptier one, while that
- * brings the two closer together. Over the book it turns 39 leaves under a
- * third full into 3, and costs three points of median fill.
- */
-private fun englishCarriedBack(
-    runs: List<IntRange>,
-    masses: List<Int>,
-): List<IntRange> {
-    if (runs.size < 2) return runs
-    val out = ArrayList(runs)
-    val stub = ENGLISH_LEAF_STUB_FRACTION * ENGLISH_LEAF_CAPACITY_CHARS
-    while (out.size >= 2) {
-        val above = out[out.size - 2]
-        val last = out[out.size - 1]
-        val massAbove = (above.first..above.last).sumOf { masses[it] }
-        val massLast = (last.first..last.last).sumOf { masses[it] }
-        // Nothing to carry, or nothing to carry it from.
-        if (massLast >= stub || above.last <= above.first) break
-        val carried = masses[above.last]
-        // Only while it evens them: a verse that would leave the upper leaf
-        // emptier than the lower has not been carried back, it has been moved.
-        val evened = abs((massAbove - carried) - (massLast + carried))
-        if (evened >= abs(massAbove - massLast)) break
-        out[out.size - 2] = above.first..above.last - 1
-        out[out.size - 1] = above.last..last.last
-    }
-    return out
-}
+private fun englishLeafOpensHere(verse: Pair<Int, Int>): Boolean =
+    verse.first == 2 && verse.second == 1

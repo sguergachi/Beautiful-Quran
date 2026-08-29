@@ -898,17 +898,54 @@ internal fun MushafPager(
             // neighbours the pager already holds have their text in hand
             // before they are swiped to — and so the leaf's one accessibility
             // description can be written in the language it is set in.
-            var leafText by remember(page.page) { mutableStateOf<Map<Long, String>?>(null) }
-            LaunchedEffect(page.page, english) {
-                if (english) leafText = leafTextNow.value(page.page)
+            // Every Madinah page the leaf draws from — two or three, since the
+            // English book paginates itself and its leaves do not stop where
+            // the Arabic ones do.
+            val leafPages = bookLeaf?.pages ?: page.page..page.page
+            var leafText by remember(leafPages) { mutableStateOf<Map<Long, String>?>(null) }
+            LaunchedEffect(leafPages, english) {
+                if (english) {
+                    leafText = buildMap {
+                        leafPages.forEach { putAll(leafTextNow.value(it)) }
+                    }
+                }
             }
-            val leafVerses = bookLeaf?.verses
+            val leafVerses = bookLeaf?.verses.orEmpty()
+            // The Arabic word each verse of the leaf opens with — what a tap on
+            // an English sentence plays from. Gathered here rather than in the
+            // sheet because it is the pager that holds the catalog, and a leaf
+            // spanning two pages needs both of them.
+            val leafTokens = remember(leafPages, english) {
+                if (!english) {
+                    emptyMap()
+                } else {
+                    buildMap {
+                        leafPages.forEach { number ->
+                            catalog.page(number)?.lines?.forEach { line ->
+                                line.tokens.forEach { token ->
+                                    if (token.word.position == 1) {
+                                        put(token.surahId to token.ayah, token)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
             // One description for the leaf, not ~450 word nodes: the QCF
             // glyphs are private-use artwork — meaningless to a screen reader
             // — and an active accessibility service re-sorted and re-geometried
             // every one of them per frame of a swipe, which was the mushaf's
             // swipe lag. Taps are pointer-based and unaffected.
-            val leafSurah = surahsById[page.primarySurahId]?.nameTransliteration
+            // The chapter the leaf opens in. For English that is its first
+            // verse's, not the page's — a leaf may open partway down a page
+            // whose "primary" chapter it never reaches.
+            val leafSurahId = if (english) {
+                leafVerses.firstOrNull()?.first ?: page.primarySurahId
+            } else {
+                page.primarySurahId
+            }
+            val leafSurah = surahsById[leafSurahId]?.nameTransliteration
             val leafDescription = remember(page, leafSurah, english, leafText, leafVerses) {
                 buildString {
                     append("Mushaf page ")
@@ -921,7 +958,7 @@ internal fun MushafPager(
                     append(page.juz)
                     val verses = leafText
                     if (english && verses != null) {
-                        (leafVerses ?: englishLeafVerseKeys(page)).forEach { (surahId, ayah) ->
+                        leafVerses.forEach { (surahId, ayah) ->
                             append(". ")
                             append(verses[quranWordKey(surahId, ayah, 1)].orEmpty())
                         }
@@ -982,8 +1019,8 @@ internal fun MushafPager(
                 val bands = mushafLeafBands(english)
                 Column(Modifier.fillMaxSize()) {
                     MushafPageHeader(
-                        surahNameArabic = surahsById[page.primarySurahId]?.nameArabic,
-                        surahNameLatin = surahsById[page.primarySurahId]?.nameTransliteration,
+                        surahNameArabic = surahsById[leafSurahId]?.nameArabic,
+                        surahNameLatin = surahsById[leafSurahId]?.nameTransliteration,
                         juz = page.juz,
                         unit = unit,
                         glyphSize = leafGlyphSize(unit),
@@ -1013,6 +1050,7 @@ internal fun MushafPager(
                             verseNumberScript = verseNumberScript,
                             foreEdge = foreEdge,
                             leafVerses = leafVerses,
+                            leafTokens = leafTokens,
                             onAyahClick = leafAyahClick,
                             onBasmalahClick = leafBasmalahClick,
                             modifier = wellModifier,

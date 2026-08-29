@@ -5,22 +5,23 @@ package com.beautifulquran.domain
  *
  * **The page.** The English translation has no pagination of its own — no
  * printing of it breaks where every other printing breaks, the way the Madinah
- * mushaf does. So it borrows one: an English leaf carries the verses that
- * *begin* on the Arabic leaf of the same number. Page 255 in English opens
- * where page 255 opens.
+ * mushaf does. It borrowed one for a while: a leaf carried the verses that
+ * *began* on the Arabic leaf of the same number. It no longer does, because the
+ * borrowed boundary turned out to cost a third of a blank page every other turn
+ * and to buy nothing a reader could see — `EnglishBook.kt` has the measurement.
+ * The English book paginates itself, continuously.
  *
- * "Begin", not "appear", because a verse is a sentence and a sentence cannot be
- * cut at the word the calligrapher happened to reach at the foot of a page. A
- * verse that runs over a page break is therefore set whole on the leaf it
- * starts on — which is how a parallel-text Qur'an is printed, and it means the
- * English runs continuously with nothing repeated and nothing dropped. Measured
- * over the book, every one of the 604 leaves has at least one verse beginning
- * on it, so no leaf comes out empty.
+ * What the leaf still carries is the verses that *begin* somewhere, in the
+ * mushaf's own order, whole. A verse is a sentence and a sentence cannot be cut
+ * at the word the calligrapher happened to reach at the foot of a page, so a
+ * verse that straddles an Arabic page break is set whole where it starts —
+ * which is how a parallel-text Qur'an is printed, and it means the English runs
+ * continuously with nothing repeated and nothing dropped.
  *
- * That borrowed boundary is what makes the two layouts one book: the folio, the
- * juz', the running head, the page dial, the chapter openings and the reciter's
- * own place on the paper all mean the same thing in either script, and a reader
- * who changes language does not lose their page.
+ * The two layouts are still one book, but through the *verse* rather than
+ * through the page: `EnglishBook.leafOfVerse` is exact for all 6,236 of them,
+ * so the running head, the juz', the page dial, the reciter's own place on the
+ * paper and a reader who changes language all land on the words they were on.
  *
  * **The text.** The verse translation, set as running prose — not the
  * word-by-word gloss the scrolling reader lyricizes. The gloss is an
@@ -65,12 +66,18 @@ data class EnglishLeaf(
         get() = blocks.filterIsInstance<EnglishLeafBlock.Prose>().flatMap { it.verses }
 
     /**
-     * Characters of set prose on the leaf — the mass its hand is fitted to.
-     * Counts what the page actually lays out: each verse, its mark, and the
-     * spaces that join them. See [ENGLISH_LEAF_CAPACITY_CHARS].
+     * The paper the leaf takes, in the characters [ENGLISH_LEAF_CAPACITY_CHARS]
+     * counts: each verse, its mark, the spaces that join them, and what a
+     * chapter's panel and basmalah cost even though they set no prose.
      */
     val prose: Int
-        get() = verses.sumOf { it.text.length + ENGLISH_LEAF_MARK_CHARS }
+        get() = verses.sumOf { verse ->
+            englishLeafVerseMass(
+                surahId = verse.surahId,
+                ayah = verse.ayah,
+                prose = verse.text.length + ENGLISH_LEAF_MARK_CHARS,
+            )
+        }
 }
 
 /**
@@ -95,56 +102,48 @@ fun englishLeafVerseKeys(page: MushafPage): List<Pair<Int, Int>> =
         .distinct()
 
 /**
- * Sets one Madinah page in English.
+ * Sets one leaf of the English book.
  *
- * Chapter openings stay hard boundaries, so a chapter's panel never falls
- * inside the paragraph above it. [translation] answers for one verse; a verse
- * with no text is dropped rather than set as a hole.
+ * [verses] is the run the leaf carries, in the book's order — `EnglishBook` has
+ * already decided where the leaf begins and ends, and a run may cross a Madinah
+ * page break, so nothing here reads the Arabic page's lines. What a leaf is, at
+ * this point, is a list of verses.
+ *
+ * A chapter opening is simply a verse numbered 1: its panel is set immediately
+ * before it, which is where a printed translation sets one, and which cannot
+ * put the panel inside the paragraph above it because the panel *is* a block.
+ * [translation] answers for one verse; a verse with no text is dropped rather
+ * than set as a hole.
  */
 fun englishLeaf(
-    page: MushafPage,
-    /**
-     * The verses this leaf carries. Null means the whole page — a Madinah page
-     * that fits one leaf. Where it does not, `EnglishBook` has already cut the
-     * page into leaves and hands each its own slice.
-     */
-    verses: List<Pair<Int, Int>>? = null,
+    page: Int,
+    verses: List<Pair<Int, Int>>,
     hideParentheticals: Boolean = false,
     translation: (surahId: Int, ayah: Int) -> String,
 ): EnglishLeaf {
-    val carried = verses?.toHashSet()
-    val openings = page.surahStarts.associateBy { it.beforeLineIndex }
-    val boundaries = (listOf(0) + openings.keys + page.lines.size).distinct().sorted()
-    val blocks = ArrayList<EnglishLeafBlock>(page.surahStarts.size * 2 + boundaries.size)
-    boundaries.zipWithNext().forEach { (start, end) ->
-        // A chapter's panel belongs to the leaf that carries its first verse,
-        // not to every leaf of the page it opens on.
-        openings[start]
-            ?.takeIf { carried == null || carried.contains(it.surahId to 1) }
-            ?.let { opening ->
-                blocks += EnglishLeafBlock.ChapterOpening(
-                    surahId = opening.surahId,
-                    basmalah = surahOpensWithBasmalahPreface(opening.surahId),
-                )
-            }
-        if (start >= end) return@forEach
-        val verses = page.lines.subList(start, end)
-            .flatMap { it.tokens }
-            .filter { it.word.position == 1 }
-            .map { it.surahId to it.ayah }
-            .distinct()
-            .filter { carried == null || carried.contains(it) }
-            .mapNotNull { (surahId, ayah) ->
-                val text = englishVerseProse(translation(surahId, ayah), hideParentheticals)
-                if (text.isEmpty()) {
-                    null
-                } else {
-                    EnglishLeafVerse(surahId = surahId, ayah = ayah, text = text)
-                }
-            }
-        if (verses.isNotEmpty()) blocks += EnglishLeafBlock.Prose(verses)
+    val blocks = ArrayList<EnglishLeafBlock>(4)
+    var prose = ArrayList<EnglishLeafVerse>(verses.size)
+    fun closeProse() {
+        if (prose.isNotEmpty()) {
+            blocks += EnglishLeafBlock.Prose(prose)
+            prose = ArrayList(verses.size)
+        }
     }
-    return EnglishLeaf(page = page.page, blocks = blocks)
+    verses.forEach { (surahId, ayah) ->
+        if (ayah == 1) {
+            closeProse()
+            blocks += EnglishLeafBlock.ChapterOpening(
+                surahId = surahId,
+                basmalah = surahOpensWithBasmalahPreface(surahId),
+            )
+        }
+        val text = englishVerseProse(translation(surahId, ayah), hideParentheticals)
+        if (text.isNotEmpty()) {
+            prose += EnglishLeafVerse(surahId = surahId, ayah = ayah, text = text)
+        }
+    }
+    closeProse()
+    return EnglishLeaf(page = page, blocks = blocks)
 }
 
 /**

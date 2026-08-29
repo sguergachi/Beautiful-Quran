@@ -175,9 +175,10 @@ python3 tools/test_build_db.py  # timing pipeline regressions (~1s, no Gradle)
    flush, the line filled by the letterform rather than the space, the word
    space chosen and not left over, leading set by the ink — with the
    measurements behind each rule. Read it before changing anything about how a
-   line is set. §13 is the English leaf: the same 604 pages set as a book of
-   the meaning, where a verse belongs to the leaf it *begins* on and the ink
-   says only what it can honestly say about where the reciter is.
+   line is set. §13 is the English leaf: the translation set as a book of
+   the meaning, paginated to its own leaves rather than to the mushaf's pages,
+   where a verse is set whole and the ink says only what it can honestly say
+   about where the reciter is.
 5. **Minimal dependencies, by design.** No Hilt (hand-rolled ViewModel factory
    over `QuranApp` singletons), no Room (raw SQLite wrapper in
    `QuranDatabase`), no navigation library (the three sheets are a hand-rolled

@@ -63,6 +63,7 @@ import com.beautifulquran.domain.MushafPage
 import com.beautifulquran.domain.MushafToken
 import com.beautifulquran.domain.englishLeaf
 import com.beautifulquran.domain.englishLeafFittedLeadingEm
+import com.beautifulquran.domain.englishLeafOverflowHandPx
 import com.beautifulquran.domain.englishLeafHandPx
 import com.beautifulquran.domain.ENGLISH_LEAF_LEADING_EM
 import com.beautifulquran.domain.mushafIsOpeningLeaf
@@ -120,22 +121,21 @@ internal fun MushafEnglishSheet(
     verseNumberScript: VerseNumberScript,
     /** The leaf's fore-edge, shared with the running head and the folio. */
     foreEdge: Dp,
+    /** The verses this leaf carries, in the book's order. */
+    leafVerses: List<Pair<Int, Int>>,
     /**
-     * The verses this leaf carries. Null is the whole page — see
-     * `domain/EnglishBook.kt`, which cuts a page into leaves when one will not
-     * hold it at a legible size.
+     * The Arabic word each of those verses opens with — what a tap on an
+     * English sentence plays from. Gathered by the pager, because a leaf may
+     * draw its verses from more than one Madinah page.
      */
-    leafVerses: List<Pair<Int, Int>>?,
+    leafTokens: Map<Pair<Int, Int>, MushafToken>,
     onAyahClick: (MushafToken) -> Unit,
     onBasmalahClick: (Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    // The verses this leaf actually sets — a Madinah page may be two leaves,
-    // and the ink must clock what is on the paper rather than what is on the
-    // page. Null carries the whole page, as it did when they were the same.
-    val keysOnLeaf = remember(page.page, leafVerses) {
-        leafVerses ?: page.ayahKeys.toList()
-    }
+    // The verses this leaf actually sets. The ink clocks what is on the paper,
+    // which since the book paginates itself is not what is on any one page.
+    val keysOnLeaf = leafVerses
     val ayahsOnPage = remember(keysOnLeaf, content.surah.id, content.ayahs) {
         keysOnLeaf.mapNotNull { (surahId, ayah) ->
             if (surahId != content.surah.id) return@mapNotNull null
@@ -174,9 +174,9 @@ internal fun MushafEnglishSheet(
             packsState = packsState,
         )
     }
-    val leaf = remember(page, leafVerses, leafText, hideParentheticals) {
+    val leaf = remember(page.page, leafVerses, leafText, hideParentheticals) {
         val text = leafText ?: return@remember null
-        englishLeaf(page, leafVerses, hideParentheticals) { surahId, ayah ->
+        englishLeaf(page.page, leafVerses, hideParentheticals) { surahId, ayah ->
             text[quranWordKey(surahId, ayah, 1)].orEmpty()
         }
     }
@@ -202,8 +202,20 @@ internal fun MushafEnglishSheet(
         }
         val palette = rememberWordInkPalette()
         val gold = LocalQuranAccents.current.gold
-        val blocks = remember(leaf, palette.fullInkColor, gold, verseNumberScript, page) {
-            englishLeafBlockTexts(leaf, page, palette.fullInkColor, gold, verseNumberScript)
+        val blocks = remember(
+            leaf,
+            palette.fullInkColor,
+            gold,
+            verseNumberScript,
+            leafTokens,
+        ) {
+            englishLeafBlockTexts(
+                leaf,
+                leafTokens,
+                palette.fullInkColor,
+                gold,
+                verseNumberScript,
+            )
         }
         val setting = remember(blocks, wellPx, measurePx, density, measurer) {
             setEnglishLeaf(blocks, wellPx, measurePx, density, measurer)
@@ -405,51 +417,45 @@ internal data class EnglishProseVerse(
  */
 private fun englishLeafBlockTexts(
     leaf: EnglishLeaf,
-    page: MushafPage,
+    openingTokens: Map<Pair<Int, Int>, MushafToken>,
     ink: Color,
     gold: Color,
     verseNumberScript: VerseNumberScript,
-): List<EnglishLeafBlockText> {
-    val openingTokens = page.lines
-        .flatMap { it.tokens }
-        .filter { it.word.position == 1 }
-        .associateBy { it.surahId to it.ayah }
-    return leaf.blocks.map { block ->
-        when (block) {
-            is EnglishLeafBlock.ChapterOpening ->
-                EnglishLeafBlockText.Opening(block.surahId, block.basmalah)
+): List<EnglishLeafBlockText> = leaf.blocks.map { block ->
+    when (block) {
+        is EnglishLeafBlock.ChapterOpening ->
+            EnglishLeafBlockText.Opening(block.surahId, block.basmalah)
 
-            is EnglishLeafBlock.Prose -> {
-                val verses = ArrayList<EnglishProseVerse>(block.verses.size)
-                val text = buildAnnotatedString {
-                    block.verses.forEach { verse ->
-                        if (length > 0) append(" ")
-                        val start = length
-                        withStyle(SpanStyle(color = ink)) { append(verse.text) }
-                        val range = start until length
-                        append(" ")
-                        val markStart = length
-                        appendAyahNumberMark(
-                            number = verse.ayah,
-                            useArabicIndicDigits =
-                                verseNumberScript == VerseNumberScript.ARABIC,
-                            style = SpanStyle(color = gold, fontSize = EnglishLeafMarkType.em),
-                            // The leaf is set left to right whichever digits
-                            // the reader has chosen, so the cups are always the
-                            // LTR pair.
-                            ltr = true,
-                        )
-                        verses += EnglishProseVerse(
-                            surahId = verse.surahId,
-                            ayah = verse.ayah,
-                            range = range,
-                            markRange = markStart until length,
-                            token = openingTokens[verse.surahId to verse.ayah],
-                        )
-                    }
+        is EnglishLeafBlock.Prose -> {
+            val verses = ArrayList<EnglishProseVerse>(block.verses.size)
+            val text = buildAnnotatedString {
+                block.verses.forEach { verse ->
+                    if (length > 0) append(" ")
+                    val start = length
+                    withStyle(SpanStyle(color = ink)) { append(verse.text) }
+                    val range = start until length
+                    append(" ")
+                    val markStart = length
+                    appendAyahNumberMark(
+                        number = verse.ayah,
+                        useArabicIndicDigits =
+                            verseNumberScript == VerseNumberScript.ARABIC,
+                        style = SpanStyle(color = gold, fontSize = EnglishLeafMarkType.em),
+                        // The leaf is set left to right whichever digits the
+                        // reader has chosen, so the cups are always the LTR
+                        // pair.
+                        ltr = true,
+                    )
+                    verses += EnglishProseVerse(
+                        surahId = verse.surahId,
+                        ayah = verse.ayah,
+                        range = range,
+                        markRange = markStart until length,
+                        token = openingTokens[verse.surahId to verse.ayah],
+                    )
                 }
-                EnglishLeafBlockText.Prose(text = text, verses = verses)
             }
+            EnglishLeafBlockText.Prose(text = text, verses = verses)
         }
     }
 }
@@ -485,29 +491,43 @@ private fun setEnglishLeaf(
     density: Density,
     measurer: TextMeasurer,
 ): EnglishLeafSetting {
-    val handPx = englishBookHandPx(wellPx, measurePx, density, measurer)
-    val basmalahPx = englishBasmalahPx(handPx, measurePx, density, measurer)
-    val lineInkPx = englishLineInkPx(handPx, density, measurer)
-    val pitches = englishLeafPitches(blocks, handPx, measurePx, density, measurer)
-    val stands = englishLeafHeightPx(
-        blocks,
-        handPx,
-        basmalahPx,
-        ENGLISH_LEAF_LEADING_EM,
-        measurePx,
-        density,
-        measurer,
-    )
-    return EnglishLeafSetting(
-        handPx = handPx,
-        lineInkPx = lineInkPx,
-        leadingEm = englishLeafFittedLeadingEm(
+    var handPx = englishBookHandPx(wellPx, measurePx, density, measurer)
+    // Three passes at most, and all but one leaf in the book settles on the
+    // first: the hand is the book's, the leading is the book's, and the leaf
+    // fits. The rest is the rescue — close the leading to its floor, and if the
+    // block still stands past the foot, give up a little of the hand. See
+    // englishLeafOverflowHandPx for why that order and not the other.
+    repeat(3) { pass ->
+        val basmalahPx = englishBasmalahPx(handPx, measurePx, density, measurer)
+        val pitches = englishLeafPitches(blocks, handPx, measurePx, density, measurer)
+        val stands = englishLeafHeightPx(
+            blocks,
+            handPx,
+            basmalahPx,
+            ENGLISH_LEAF_LEADING_EM,
+            measurePx,
+            density,
+            measurer,
+        )
+        val leadingEm = englishLeafFittedLeadingEm(
             leadingEm = ENGLISH_LEAF_LEADING_EM,
             measuredHeightPx = stands,
             wellHeightPx = wellPx,
             pitchesPx = (pitches * handPx).coerceAtLeast(1f),
-        ),
-    )
+        )
+        // What the block stands at the leading it will actually be drawn on.
+        val closed = stands - (ENGLISH_LEAF_LEADING_EM - leadingEm) * pitches * handPx
+        val next = englishLeafOverflowHandPx(handPx, closed, wellPx)
+        if (next >= handPx || pass == 2) {
+            return EnglishLeafSetting(
+                handPx = handPx,
+                lineInkPx = englishLineInkPx(handPx, density, measurer),
+                leadingEm = leadingEm,
+            )
+        }
+        handPx = next
+    }
+    error("unreachable")
 }
 
 /**

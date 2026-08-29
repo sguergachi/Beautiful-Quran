@@ -79,6 +79,18 @@ const val ENGLISH_LEAF_LEADING_EM = 1.40f
  * A clamp that bit would be silently setting the book to something other than
  * its measure. Same shape as `MUSHAF_MIN_FONT_PX` / `MUSHAF_MAX_FONT_PX`.
  */
+/**
+ * How tight the book will ever be set.
+ *
+ * The fitted leading closes a leaf that would run past the foot, and left
+ * unbounded it will close as far as the arithmetic asks — which on the leaf
+ * that carries 2:282 is far enough that the lines run into one another. A page
+ * whose ascenders touch the descenders above them is not a tight page, it is an
+ * unreadable one. So the leading stops here, and [englishLeafOverflowHandPx]
+ * takes up whatever is left.
+ */
+const val ENGLISH_LEAF_MIN_LEADING_EM = 1.15f
+
 const val ENGLISH_LEAF_MIN_FONT_PX = 18f
 const val ENGLISH_LEAF_MAX_FONT_PX = 140f
 
@@ -167,5 +179,30 @@ fun englishLeafFittedLeadingEm(
     pitchesPx: Float,
 ): Float {
     if (measuredHeightPx <= wellHeightPx || pitchesPx <= 0f) return leadingEm
-    return leadingEm - (measuredHeightPx - wellHeightPx) / pitchesPx
+    return (leadingEm - (measuredHeightPx - wellHeightPx) / pitchesPx)
+        .coerceAtLeast(ENGLISH_LEAF_MIN_LEADING_EM)
+}
+
+/**
+ * The hand a leaf falls back to when even [ENGLISH_LEAF_MIN_LEADING_EM] will
+ * not bring it inside the well.
+ *
+ * One leaf in the Qur'an needs this and it will always be the same one: 2:282
+ * is a single sentence of 1,333 characters, half as long again as a leaf holds,
+ * and no pagination splits a sentence. Rule 1 says one hand for the whole book
+ * and this breaks it — knowingly, because the alternatives on that one leaf are
+ * lines that overlap or revelation clipped off the foot, and a page set a few
+ * percent small is the only one of the three a reader can still read.
+ *
+ * [standsPx] is what the block measures at the floored leading; height goes as
+ * the square of the hand, so one step lands it and the caller re-measures.
+ */
+fun englishLeafOverflowHandPx(
+    handPx: Float,
+    standsPx: Float,
+    wellHeightPx: Float,
+): Float {
+    if (standsPx <= wellHeightPx || standsPx <= 0f || wellHeightPx <= 0f) return handPx
+    return (handPx * sqrt(wellHeightPx / standsPx))
+        .coerceIn(ENGLISH_LEAF_MIN_FONT_PX, ENGLISH_LEAF_MAX_FONT_PX)
 }
