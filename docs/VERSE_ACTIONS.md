@@ -195,6 +195,7 @@ Developer → **Verse share** (off by default; requires developer mode):
 | Toggle | What you see | Why it might be the one |
 |---|---|---|
 | **Icon** | Android share glyph on the play bar (current verse) | The phone-wide pattern. One meaning: share this verse |
+| **Ribbon** | Same glyph under the bookmark swallowtail | Bookmark already taught “tap the margin”; share sits in that lane, on *that* verse |
 | **Reveal** | The word **Share** under the verse you are on | The action is on the thing it acts on. No secret tap |
 | **Hold** | Hold the verse (translation or `﴿N﴾`) → Share appears | The OS “what can I do with this” gesture. Word hold stays Root Viewer |
 | **Mark** | Tap `﴿N﴾` | Verse handle. Least obvious; kept for comparison |
@@ -223,7 +224,7 @@ Shipped for A/B, not locked as G1:
 
 1. Gold wash on `AyahBlock` when `gatherOrdinal != null`
 2. Share ribbon composable replacing `PlayerBar` when gathering
-3. Four discoverable entries behind `Settings.shareUxVariant` (Icon / Reveal / Hold / Mark)
+3. Discoverable entries behind `Settings.shareUxVariant` (Icon / Ribbon / Reveal / Hold / Mark)
 4. Ribbon Text / Image → existing `shareAsText` / `shareAsImage`
 5. #519 stays: idle transport has no Gather
 6. Happy path skips Send; chooser completion leaves gather

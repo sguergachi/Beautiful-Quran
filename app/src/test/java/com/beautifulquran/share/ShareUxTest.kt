@@ -26,6 +26,7 @@ class ShareUxTest {
             ShareUxVariant.ICON,
             ShareUxVariant.REVEAL,
             ShareUxVariant.HOLD,
+            ShareUxVariant.RIBBON,
         )) {
             assertEquals(
                 ShareUxAction.None,
@@ -88,14 +89,21 @@ class ShareUxTest {
     }
 
     @Test
-    fun `variant flags match the four discoverable designs`() {
+    fun `margin share enters with that verse`() {
+        assertEquals(ShareUxAction.EnterShare(a), ShareUx.onMarginShare(a))
+    }
+
+    @Test
+    fun `variant flags match the discoverable designs`() {
         assertTrue(ShareUxVariant.ICON.usesBarIcon)
+        assertTrue(ShareUxVariant.RIBBON.usesMarginIcon)
         assertTrue(ShareUxVariant.REVEAL.revealsOnCurrent)
         assertTrue(ShareUxVariant.HOLD.usesBodyHold)
         assertTrue(ShareUxVariant.MARK.usesMarkTap)
         assertTrue(ShareUxVariant.MARK.entersOnMarkTap)
         assertFalse(ShareUxVariant.ICON.usesMarkTap)
+        assertFalse(ShareUxVariant.RIBBON.usesBarIcon)
         assertFalse(ShareUxVariant.REVEAL.usesBarIcon)
-        assertEquals(5, ShareUxVariant.entries.size)
+        assertEquals(6, ShareUxVariant.entries.size)
     }
 }
