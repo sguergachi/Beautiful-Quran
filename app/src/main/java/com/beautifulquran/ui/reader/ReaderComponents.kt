@@ -2463,6 +2463,7 @@ fun AyahBlock(
     bookmarkSide: AyahSelectorSide? = null,
     bookmarked: Boolean = false,
     placeMarked: Boolean = false,
+    placeUnfurlSignal: Int = 0,
     bookmarkChromeAlpha: () -> Float = { 1f },
     bookmarkInteractive: Boolean = true,
     onToggleBookmark: (() -> Boolean)? = null,
@@ -2866,6 +2867,7 @@ fun AyahBlock(
                 VerseBookmarkRibbon(
                     bookmarked = bookmarked,
                     placeMarked = placeMarked,
+                    placeUnfurlSignal = placeUnfurlSignal,
                     side = bookmarkSide,
                     chromeAlpha = bookmarkChromeAlpha,
                     interactive = bookmarkInteractive,

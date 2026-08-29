@@ -67,6 +67,7 @@ private const val WAVE_AMP_DP = 4.5f    // cloth sway while unfurling
 private const val SETTLE_AMP_DP = 3.2f  // final flutter amplitude
 private const val NUB_STROKE_DP = 1.25f // idle outline: affordance, not a mark
 private const val RIBBON_GAP_DP = 3f     // two physical ribbons, never one overpainted strip
+private const val PLACE_RIBBON_WIDTH_RATIO = 0.72f // passive marker, quieter than tappable ruby
 private const val OVERSHOOT = 0.06f     // tip past the resting length, then spring back
 private const val SOLID_ALPHA = 0.92f
 private const val IDLE_NUB_ALPHA = 0.4f // quiet affordance when just the tail is showing
@@ -77,6 +78,9 @@ internal fun placeRibbonInsetDp(
     edgeInsetDp: Float,
     ribbonWidthDp: Float,
 ): Float = edgeInsetDp + if (bookmarkLaneVisible) ribbonWidthDp + RIBBON_GAP_DP else 0f
+
+internal fun placeRibbonWidthDp(ribbonWidthDp: Float): Float =
+    ribbonWidthDp * PLACE_RIBBON_WIDTH_RATIO
 
 /** Gravity spill: slow peel, then accelerates, eases as length runs out. */
 private val UnfurlEasing = CubicBezierEasing(0.45f, 0.02f, 0.22f, 1f)
@@ -105,9 +109,10 @@ internal fun VerseBookmarkRibbon(
     modifier: Modifier = Modifier,
     /** False when the ribbon is navigation or asks before changing state. */
     animateOnTap: Boolean = true,
-    /** Non-zero changes replay the same physical unfurl for an already saved
-     * or parked ribbon when it first arrives back on Chapters. */
+    /** Non-zero changes replay a saved ruby bookmark's physical unfurl. */
     unfurlSignal: Int = 0,
+    /** Non-zero changes replay the passive green place marker's unfurl. */
+    placeUnfurlSignal: Int = 0,
     edgeInset: Dp = EDGE_INSET_DP.dp,
     ribbonWidth: Dp = RIBBON_WIDTH_DP.dp,
     topInset: Dp = TOP_INSET_DP.dp,
@@ -142,8 +147,8 @@ internal fun VerseBookmarkRibbon(
             sway.snapTo(0f)
         }
     }
-    LaunchedEffect(placeMarked) {
-        if (placeMarked && placeUnfurl.value < 0.999f) {
+    LaunchedEffect(placeMarked, placeUnfurlSignal) {
+        if (placeMarked && placeUnfurlSignal <= 0 && placeUnfurl.value < 0.999f) {
             placeUnfurl.snapTo(1f)
         } else if (!placeMarked && placeUnfurl.value > 0.001f) {
             placeUnfurl.snapTo(0f)
@@ -190,21 +195,25 @@ internal fun VerseBookmarkRibbon(
     }
 
     LaunchedEffect(unfurlSignal) {
-        if (unfurlSignal <= 0) return@LaunchedEffect
-        if (placeMarked) placeUnfurl.snapTo(0f)
+        if (unfurlSignal <= 0 || !bookmarked) return@LaunchedEffect
         // Let the returning Home sheet finish its first measure so duration
         // and cloth travel use the ribbon's real full-page height.
         delay(16)
         val height = stripSize.height.toFloat().coerceAtLeast(1f)
-        if (bookmarked) playUnfurl(height)
-        if (placeMarked) {
-            val durationMs = (280f + height * 0.55f).coerceIn(420f, 1400f).toInt()
-            placeUnfurl.animateTo(1f + OVERSHOOT, tween(durationMs, easing = UnfurlEasing))
-            placeUnfurl.animateTo(
-                1f,
-                spring(dampingRatio = 0.55f, stiffness = Spring.StiffnessMediumLow),
-            )
-        }
+        playUnfurl(height)
+    }
+
+    LaunchedEffect(placeUnfurlSignal, placeMarked) {
+        if (placeUnfurlSignal <= 0 || !placeMarked) return@LaunchedEffect
+        placeUnfurl.snapTo(0f)
+        delay(16)
+        val height = stripSize.height.toFloat().coerceAtLeast(1f)
+        val durationMs = (280f + height * 0.55f).coerceIn(420f, 1400f).toInt()
+        placeUnfurl.animateTo(1f + OVERSHOOT, tween(durationMs, easing = UnfurlEasing))
+        placeUnfurl.animateTo(
+            1f,
+            spring(dampingRatio = 0.55f, stiffness = Spring.StiffnessMediumLow),
+        )
     }
 
     val latestOnToggle by rememberUpdatedState(onToggle)
@@ -320,6 +329,7 @@ internal fun VerseBookmarkRibbon(
                 bottom: Float,
                 clothMotion: Boolean,
                 inset: Float = edgeInsetPx,
+                width: Float = ribbonW,
             ) = Path().apply {
                 val top = topInsetPx + topFold
                 val bot = bottom.coerceAtLeast(topInsetPx + nubLen * 0.6f)
@@ -328,8 +338,8 @@ internal fun VerseBookmarkRibbon(
                 val steps = (span / 3f).toInt().coerceIn(6, 64)
                 fun motion(y: Float) = if (clothMotion) lateral(y) else 0f
                 val outer = inset
-                val inner = inset + ribbonW
-                val center = inset + ribbonW / 2f
+                val inner = inset + width
+                val center = inset + width / 2f
                 val outerTop = ax(outer + motion(top))
                 val innerTop = ax(inner + motion(top))
                 moveTo(outerTop, top)
@@ -355,6 +365,7 @@ internal fun VerseBookmarkRibbon(
                     edgeInsetDp = edgeInset.value,
                     ribbonWidthDp = ribbonWidth.value,
                 ).dp.toPx()
+                val placeWidth = placeRibbonWidthDp(ribbonWidth.value).dp.toPx()
                 val fill = Brush.verticalGradient(
                     0f to currentPlaceGreen,
                     0.55f to currentPlaceGreen,
@@ -367,7 +378,12 @@ internal fun VerseBookmarkRibbon(
                         (fullLen - retractedTipY) * placeProgress
                     ).coerceAtMost(fullLen * 1.08f)
                 drawPath(
-                    path = ribbonPath(placeTipY, clothMotion = false, inset = placeInset),
+                    path = ribbonPath(
+                        bottom = placeTipY,
+                        clothMotion = false,
+                        inset = placeInset,
+                        width = placeWidth,
+                    ),
                     brush = fill,
                     alpha = chrome * SOLID_ALPHA,
                 )

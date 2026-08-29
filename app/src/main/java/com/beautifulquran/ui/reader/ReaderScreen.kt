@@ -539,6 +539,13 @@ fun ReaderScreen(
     // nothing of "this" surah is playing, so pause restarts instead of pausing.
     val renderedSurahId = uiState.content?.surah?.id ?: surahId
     val isThisSurahPlaying = playerState.nowPlaying?.surahId == renderedSurahId
+    val pausedPlaceAyah = pausedReadingPlaceRibbonAyah(
+        renderedSurahId = renderedSurahId,
+        mediaSurahId = playerState.nowPlaying?.surahId,
+        mediaAyah = playerState.nowPlaying?.ayah,
+        isPlaying = playerState.isPlaying,
+        isBuffering = playerState.isBuffering,
+    )
     val visiblePlaceAyah = readingPlaceRibbonAyah(
         parkedAyah = parkedPlaceAyah,
         renderedSurahId = renderedSurahId,
@@ -2755,6 +2762,7 @@ fun ReaderScreen(
                                 // the lesson. Keep its live anchor ruby meanwhile.
                                 bookmarked = ribbonBookmarked,
                                 placeMarked = ayah.number == visiblePlaceAyah,
+                                placeUnfurlSignal = if (ayah.number == pausedPlaceAyah) 1 else 0,
                                 bookmarkChromeAlpha = bookmarkChromeAlpha,
                                 // Keep the lesson target live so its taught hold
                                 // can be completed without leaving the paper.

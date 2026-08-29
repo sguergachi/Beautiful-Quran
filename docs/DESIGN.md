@@ -984,14 +984,16 @@ screen edge, then drops to full length as the sheet settles. The motion is armed
 only by a committed reader visit, so cold display and cancelled page turns do
 not perform a gratuitous flourish.
 
-Pause is the one in-visit exception: once the chrome returns, green moves to
-the actual paused media verse and the ayah rail follows it. Resume removes that
-temporary mark and restores the visit's parked ribbon. On an unsaved verse the
-empty bookmark tip keeps the outer lane while green uses the inner lane; the
-two never overpaint.
+Pause is the one in-visit exception: once the chrome returns, green
+gravity-unfurls on the actual paused media verse and the ayah rail follows it.
+Resume removes that temporary mark and restores the visit's parked ribbon. On
+an unsaved verse the empty bookmark tip keeps the outer lane while green uses
+the inner lane; the two never overpaint.
 
 The verse mark is a **full ribbon**, with the same top, tail, and block-length
-as a saved ruby bookmark. When one verse owns both meanings, ruby keeps the
+as a saved ruby bookmark, but 72% of its width. That quieter silhouette makes
+green read as a passive place marker, not a second tap target; only the ruby
+lane remains interactive. When one verse owns both meanings, ruby keeps the
 outer lane and green runs beside it in the inner lane with 3 dp of paper
 between them. Neither cloth overlays, caps, recolors, or replaces the other.
 During recitation both follow the existing chrome fade because the word wash

@@ -6,6 +6,7 @@ import org.junit.Test
 class ReadingPlaceRibbonPolicyTest {
     @Test
     fun pausedVerse_replacesParkedPlaceOnThisChapter() {
+        assertEquals(7, pausedReadingPlaceRibbonAyah(2, 2, 7, false, false))
         assertEquals(7, readingPlaceRibbonAyah(3, 2, 2, 7, false, false))
     }
 

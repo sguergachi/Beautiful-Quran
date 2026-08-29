@@ -691,7 +691,7 @@ private fun SurahRow(
                 interactive = false,
                 onToggle = { false },
                 bookmarkTipVisible = false,
-                unfurlSignal = placeUnfurlSignal,
+                placeUnfurlSignal = placeUnfurlSignal,
                 edgeInset = HomeRibbonGutter,
                 ribbonWidth = HomeRibbonWidth,
                 topInset = 0.dp,
