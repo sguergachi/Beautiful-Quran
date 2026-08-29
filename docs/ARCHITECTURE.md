@@ -386,6 +386,8 @@ The green place ribbon is separate (`readingPlaceSurah` /
 `readingPlaceAyah`). `ReaderFocusController` records its focused verse, but a
 reader visit snapshots the previously stored place once: the full green ribbon
 and green rail tick remain parked there instead of following live focus.
+Pausing audio temporarily moves both marks to the actual paused media verse;
+playing, buffering, ending, or leaving that chapter restores the visit snapshot.
 Chapters observes the new stored place after the reader sheet covers it, and a
 tap on that marked chapter returns to its parked ayah. This makes silent
 reading mark a place without changing Continue Listening's audio semantics.

@@ -257,7 +257,7 @@ fun ReaderScreen(
     val activeWordState = viewModel.activeWord.collectAsStateWithLifecycle()
     val settings by viewModel.settings.settings.collectAsStateWithLifecycle()
     // Snapshot once for this visit. The stored place keeps advancing behind
-    // the page, but its ribbon stays where the previous session left it.
+    // the page; only a paused media verse temporarily displaces this ribbon.
     val parkedPlaceAyah = remember(surahId) {
         viewModel.settings.settings.value.let { saved ->
             saved.readingPlaceAyah.takeIf { saved.readingPlaceSurah == surahId }
@@ -539,6 +539,14 @@ fun ReaderScreen(
     // nothing of "this" surah is playing, so pause restarts instead of pausing.
     val renderedSurahId = uiState.content?.surah?.id ?: surahId
     val isThisSurahPlaying = playerState.nowPlaying?.surahId == renderedSurahId
+    val visiblePlaceAyah = readingPlaceRibbonAyah(
+        parkedAyah = parkedPlaceAyah,
+        renderedSurahId = renderedSurahId,
+        mediaSurahId = playerState.nowPlaying?.surahId,
+        mediaAyah = playerState.nowPlaying?.ayah,
+        isPlaying = playerState.isPlaying,
+        isBuffering = playerState.isBuffering,
+    )
     // Lead-adjusted: crosses to the next ayah ~500ms before the current one's
     // audio ends, so the block fade to the next ayah starts a touch early.
     val activeAyahState = viewModel.activeAyah.collectAsStateWithLifecycle()
@@ -2746,7 +2754,7 @@ fun ReaderScreen(
                                 // collected projection can arrive one frame after
                                 // the lesson. Keep its live anchor ruby meanwhile.
                                 bookmarked = ribbonBookmarked,
-                                placeMarked = ayah.number == parkedPlaceAyah,
+                                placeMarked = ayah.number == visiblePlaceAyah,
                                 bookmarkChromeAlpha = bookmarkChromeAlpha,
                                 // Keep the lesson target live so its taught hold
                                 // can be completed without leaving the paper.
@@ -3003,7 +3011,7 @@ fun ReaderScreen(
                     side = selectorSide,
                     currentAyah = railCurrentAyah,
                     currentPosition = railCurrentPosition,
-                    placeAyah = parkedPlaceAyah,
+                    placeAyah = visiblePlaceAyah,
                     bookmarkedAyahs = bookmarkedAyahs,
                     pageStarts = railPageStarts,
                     chromeAlpha = { topBarAlpha.value },

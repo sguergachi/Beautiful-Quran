@@ -71,12 +71,12 @@ private const val OVERSHOOT = 0.06f     // tip past the resting length, then spr
 private const val SOLID_ALPHA = 0.92f
 private const val IDLE_NUB_ALPHA = 0.4f // quiet affordance when just the tail is showing
 
-/** Green uses the ordinary ribbon lane alone, then moves inward beside ruby. */
+/** Chapters uses one lane; verses keep green inside the bookmark cloth or tip. */
 internal fun placeRibbonInsetDp(
-    bookmarked: Boolean,
+    bookmarkLaneVisible: Boolean,
     edgeInsetDp: Float,
     ribbonWidthDp: Float,
-): Float = edgeInsetDp + if (bookmarked) ribbonWidthDp + RIBBON_GAP_DP else 0f
+): Float = edgeInsetDp + if (bookmarkLaneVisible) ribbonWidthDp + RIBBON_GAP_DP else 0f
 
 /** Gravity spill: slow peel, then accelerates, eases as length runs out. */
 private val UnfurlEasing = CubicBezierEasing(0.45f, 0.02f, 0.22f, 1f)
@@ -98,6 +98,8 @@ internal fun VerseBookmarkRibbon(
     chromeAlpha: () -> Float,
     interactive: Boolean,
     onToggle: () -> Boolean,
+    /** False on Chapters, where this component draws only the green place cloth. */
+    bookmarkTipVisible: Boolean = true,
     /** Optional secondary action for an exposed saved ribbon. */
     onLongClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
@@ -349,7 +351,7 @@ internal fun VerseBookmarkRibbon(
             val placeProgress = placeUnfurl.value.coerceAtLeast(0f)
             if (placeMarked && placeProgress > 0.001f) {
                 val placeInset = placeRibbonInsetDp(
-                    bookmarked = bookmarked,
+                    bookmarkLaneVisible = bookmarked || bookmarkTipVisible,
                     edgeInsetDp = edgeInset.value,
                     ribbonWidthDp = ribbonWidth.value,
                 ).dp.toPx()
@@ -380,7 +382,7 @@ internal fun VerseBookmarkRibbon(
                     endY = tipY.coerceAtLeast(1f),
                 )
                 drawPath(path, fill, alpha = alpha)
-            } else if (!placeMarked) {
+            } else if (bookmarkTipVisible) {
                 // An unmarked verse gets an empty ribbon silhouette. Ruby fill
                 // is reserved for the reader's saved marks.
                 drawPath(

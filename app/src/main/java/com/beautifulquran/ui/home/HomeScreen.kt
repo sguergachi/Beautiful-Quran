@@ -690,6 +690,7 @@ private fun SurahRow(
                 chromeAlpha = { 1f },
                 interactive = false,
                 onToggle = { false },
+                bookmarkTipVisible = false,
                 unfurlSignal = placeUnfurlSignal,
                 edgeInset = HomeRibbonGutter,
                 ribbonWidth = HomeRibbonWidth,
