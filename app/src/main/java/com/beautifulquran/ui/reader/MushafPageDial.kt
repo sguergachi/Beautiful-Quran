@@ -2126,19 +2126,6 @@ internal fun MushafPageDial(
                         // The thumb marks a place; it is not a flywheel. A
                         // release lands where the hand left it — no decay, no
                         // overshoot to read past.
-                        scope.launch {
-                            expand.animateTo(0f, spring(dampingRatio = 1f, stiffness = 150f))
-                        }
-                        if (moved && !cancelled) {
-                            // No haptic here: the chapter tick already spoke
-                            // on the crossing, and the landing is that same
-                            // chapter's name arriving under the hand.
-                            release.surahId?.let { seekSurah.value?.invoke(it) }
-                            if (landed != previousPage) {
-                                showReturnBubble(previousPage, landed)
-                                seek.value(landed)
-                            }
-                        }
                         dialPage.floatValue = landed.toFloat()
                         // Hand the thumb back to the rule. It walks from where
                         // the finger left it to the landed leaf's own seat
@@ -2155,6 +2142,25 @@ internal fun MushafPageDial(
                         reportScrub.value(false)
                         hasPulsed = false
                         scope.launch { pulse.snapTo(0f) }
+                        // Close the control before asking the pager to compose
+                        // a distant leaf. Even though its font loads off-main,
+                        // cold page composition can occupy the UI thread; if
+                        // the seek starts here, the comb appears pinned under
+                        // the released finger until that work finishes.
+                        scope.launch {
+                            expand.animateTo(0f, spring(dampingRatio = 1f, stiffness = 150f))
+                            if (moved && !cancelled) {
+                                // No haptic here: the chapter tick already
+                                // spoke on the crossing, and the landing is
+                                // that same chapter's name arriving under the
+                                // hand.
+                                release.surahId?.let { seekSurah.value?.invoke(it) }
+                                if (landed != previousPage) {
+                                    showReturnBubble(previousPage, landed)
+                                    seek.value(landed)
+                                }
+                            }
+                        }
                         // One motion: the trough shuts back into the line
                         // while the thumb rides down onto the seat. Same spec
                         // on both, so they still arrive together — but the
