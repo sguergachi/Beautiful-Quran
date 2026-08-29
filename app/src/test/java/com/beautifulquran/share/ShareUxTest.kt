@@ -11,7 +11,7 @@ class ShareUxTest {
     private val b = AyahRef(2, 256)
 
     @Test
-    fun `off and lift do not open a mark prompt`() {
+    fun `off and lift do not treat a short mark tap as share`() {
         assertEquals(
             ShareUxAction.None,
             ShareUx.onMarkTap(ShareUxVariant.OFF, gathering = false, prompt = null, ref = a),
@@ -23,17 +23,21 @@ class ShareUxTest {
     }
 
     @Test
-    fun `colophon seal and action line prompt on first mark tap`() {
-        for (variant in listOf(
-            ShareUxVariant.COLOPHON,
-            ShareUxVariant.SEAL,
-            ShareUxVariant.ACTION_LINE,
-        )) {
+    fun `colophon and action line prompt on first mark tap`() {
+        for (variant in listOf(ShareUxVariant.COLOPHON, ShareUxVariant.ACTION_LINE)) {
             assertEquals(
                 ShareUxAction.ShowPrompt(a),
                 ShareUx.onMarkTap(variant, gathering = false, prompt = null, ref = a),
             )
         }
+    }
+
+    @Test
+    fun `seal enters on the mark tap`() {
+        assertEquals(
+            ShareUxAction.EnterShare(a),
+            ShareUx.onMarkTap(ShareUxVariant.SEAL, gathering = false, prompt = null, ref = a),
+        )
     }
 
     @Test
@@ -54,7 +58,7 @@ class ShareUxTest {
         assertEquals(
             ShareUxAction.ShowPrompt(b),
             ShareUx.onMarkTap(
-                ShareUxVariant.SEAL,
+                ShareUxVariant.ACTION_LINE,
                 gathering = false,
                 prompt = a,
                 ref = b,
@@ -78,18 +82,18 @@ class ShareUxTest {
     }
 
     @Test
-    fun `lift enters from a body hold only for that variant`() {
+    fun `lift enters from a mark hold only for that variant`() {
         assertEquals(
             ShareUxAction.EnterShare(a),
-            ShareUx.onLift(ShareUxVariant.LIFT, gathering = false, ref = a),
+            ShareUx.onMarkHold(ShareUxVariant.LIFT, gathering = false, ref = a),
         )
         assertEquals(
             ShareUxAction.None,
-            ShareUx.onLift(ShareUxVariant.COLOPHON, gathering = false, ref = a),
+            ShareUx.onMarkHold(ShareUxVariant.COLOPHON, gathering = false, ref = a),
         )
         assertEquals(
             ShareUxAction.None,
-            ShareUx.onLift(ShareUxVariant.LIFT, gathering = true, ref = a),
+            ShareUx.onMarkHold(ShareUxVariant.LIFT, gathering = true, ref = a),
         )
     }
 
@@ -105,11 +109,14 @@ class ShareUxTest {
     @Test
     fun `variant flags match the four entry designs`() {
         assertFalse(ShareUxVariant.OFF.usesMarkTap)
-        assertFalse(ShareUxVariant.OFF.usesLift)
+        assertFalse(ShareUxVariant.OFF.usesMarkHold)
         assertTrue(ShareUxVariant.COLOPHON.usesMarkTap)
+        assertFalse(ShareUxVariant.COLOPHON.entersOnMarkTap)
         assertTrue(ShareUxVariant.SEAL.usesMarkTap)
+        assertTrue(ShareUxVariant.SEAL.entersOnMarkTap)
         assertTrue(ShareUxVariant.ACTION_LINE.usesMarkTap)
-        assertTrue(ShareUxVariant.LIFT.usesLift)
+        assertFalse(ShareUxVariant.ACTION_LINE.entersOnMarkTap)
+        assertTrue(ShareUxVariant.LIFT.usesMarkHold)
         assertFalse(ShareUxVariant.LIFT.usesMarkTap)
         assertEquals(5, ShareUxVariant.entries.size)
     }

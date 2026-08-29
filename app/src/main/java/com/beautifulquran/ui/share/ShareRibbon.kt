@@ -3,6 +3,7 @@ package com.beautifulquran.ui.share
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -19,34 +20,30 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
-import com.beautifulquran.ui.theme.LocalQuranAccents
+import com.beautifulquran.ui.theme.SerifFontFamily
 import com.beautifulquran.ui.theme.quietClickable
 
 /**
- * Replaces [com.beautifulquran.ui.reader.PlayerBar] during share.
+ * Replaces the player bar while gathering: `Cancel    2    Text   Image`.
  *
- * Prompt (action-line, before gather): `Cancel · Share`
- * Gather (every design, verse already selected): `Cancel · N · Text · Image`
- *
- * Ink on paper — no icons, ripples, or elevation. Text/Image stay faint
- * until the list is non-empty, then gold.
+ * A line of type, not a toolbar. Count is Western digits in the book face —
+ * furniture, not illumination. Text/Image stay faint until the list is
+ * non-empty.
  */
 @Composable
 fun ShareRibbon(
-    gathering: Boolean,
     count: Int,
     preparingText: Boolean,
     preparingImage: Boolean,
     onCancel: () -> Unit,
-    onShare: () -> Unit,
     onShareText: () -> Unit,
     onShareImage: () -> Unit,
 ) {
-    val gold = LocalQuranAccents.current.gold
-    val muted = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-    val faint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f)
+    val ink = MaterialTheme.colorScheme.onSurface
+    val muted = ink.copy(alpha = 0.62f)
+    val faint = ink.copy(alpha = 0.32f)
     val busy = preparingText || preparingImage
-    val canExport = gathering && count >= 1 && !busy
+    val canExport = count >= 1 && !busy
 
     Surface(color = MaterialTheme.colorScheme.background) {
         Column(
@@ -57,36 +54,60 @@ fun ShareRibbon(
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceEvenly,
                 modifier = Modifier
                     .widthIn(max = 680.dp)
                     .fillMaxWidth()
-                    .padding(start = 12.dp, end = 12.dp, top = 10.dp, bottom = 12.dp),
+                    .padding(start = 20.dp, end = 20.dp, top = 10.dp, bottom = 12.dp),
             ) {
                 RibbonVerb("Cancel", muted, onClick = onCancel)
-                if (gathering) {
-                    Text(
-                        text = count.toArabicIndicOrdinal(),
-                        style = MaterialTheme.typography.titleMedium,
-                        color = if (count >= 1) gold else faint,
-                    )
-                    RibbonVerb(
-                        label = if (preparingText) "Text…" else "Text",
-                        color = if (canExport) gold else faint,
-                        enabled = canExport,
-                        onClick = onShareText,
-                    )
-                    RibbonVerb(
-                        label = if (preparingImage) "Image…" else "Image",
-                        color = if (canExport) gold else faint,
-                        enabled = canExport,
-                        onClick = onShareImage,
-                    )
-                } else {
-                    RibbonVerb("Share", gold, onClick = onShare)
-                }
+                Spacer(Modifier.weight(1f))
+                Text(
+                    text = count.toString(),
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        fontFamily = SerifFontFamily,
+                    ),
+                    color = if (count >= 1) ink.copy(alpha = 0.78f) else faint,
+                    modifier = Modifier.semantics {
+                        contentDescription = if (count == 1) "1 verse" else "$count verses"
+                    },
+                )
+                Spacer(Modifier.weight(1f))
+                RibbonVerb(
+                    label = if (preparingText) "Text…" else "Text",
+                    color = if (canExport) ink.copy(alpha = 0.88f) else faint,
+                    enabled = canExport,
+                    onClick = onShareText,
+                )
+                RibbonVerb(
+                    label = if (preparingImage) "Image…" else "Image",
+                    color = if (canExport) ink.copy(alpha = 0.88f) else faint,
+                    enabled = canExport,
+                    onClick = onShareImage,
+                )
             }
         }
+    }
+}
+
+/**
+ * Action-line prompt: Share sits above the still-living player bar.
+ * Transport is not replaced until the verse is actually gathered.
+ */
+@Composable
+fun ShareActionPrompt(
+    onCancel: () -> Unit,
+    onShare: () -> Unit,
+) {
+    val ink = MaterialTheme.colorScheme.onSurface
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 20.dp, end = 20.dp, top = 4.dp, bottom = 0.dp),
+    ) {
+        RibbonVerb("Cancel", ink.copy(alpha = 0.62f), onClick = onCancel)
+        RibbonVerb("Share", ink.copy(alpha = 0.92f), onClick = onShare)
     }
 }
 
@@ -110,6 +131,3 @@ private fun RibbonVerb(
             },
     )
 }
-
-private fun Int.toArabicIndicOrdinal(): String =
-    toString().map { '٠' + (it - '0') }.joinToString("")

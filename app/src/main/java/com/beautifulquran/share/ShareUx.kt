@@ -4,27 +4,33 @@ package com.beautifulquran.share
  * Four verse-share entry designs for in-app A/B (Settings → Developer).
  *
  * [OFF] is the shipped reader: gather/export exist, but nothing on the page
- * enters the mode (player-bar Gather was removed in #519). The other four are
- * the interaction experiments from [docs/VERSE_ACTIONS.md]. Export (text /
+ * enters the mode (player-bar Gather was removed in #519). Export (text /
  * image) is shared; only entry chrome differs.
+ *
+ * Chrome (count, margin ordinals) is Western digits in the book face — never
+ * Arabic-Indic. Those digits belong to scripture marks, not furniture.
  */
 enum class ShareUxVariant {
     OFF,
-    /** Tap ﴿N﴾ → quiet "Share" line under that verse. */
+    /** Tap ﴿N﴾ → quiet "Share" line under that verse. Two taps. */
     COLOPHON,
-    /** Long-press the verse body → enter share with that verse selected. */
+    /** Long-press the ayah mark → enter share. Word hold stays Root Viewer. */
     LIFT,
-    /** Tap ﴿N﴾ → "Share" inks beside the ayah mark. */
+    /** Tap ﴿N﴾ → enter share with that verse already selected. One tap. */
     SEAL,
-    /** Tap ﴿N﴾ → player bar rewrites to Share (verse already current). */
+    /** Tap ﴿N﴾ → Share sits above the player bar; transport stays. */
     ACTION_LINE,
     ;
 
     val usesMarkTap: Boolean
         get() = this == COLOPHON || this == SEAL || this == ACTION_LINE
 
-    val usesLift: Boolean
+    /** Long-press the ﴿N﴾ mark, not the verse body. */
+    val usesMarkHold: Boolean
         get() = this == LIFT
+
+    val entersOnMarkTap: Boolean
+        get() = this == SEAL
 
     val label: String
         get() = when (this) {
@@ -39,9 +45,9 @@ enum class ShareUxVariant {
         get() = when (this) {
             OFF -> "Shipped reader — no share entry"
             COLOPHON -> "Tap ﴿N﴾, then Share under the verse"
-            LIFT -> "Hold the verse; gold wash, already selected"
-            SEAL -> "Tap ﴿N﴾, then Share beside the mark"
-            ACTION_LINE -> "Tap ﴿N﴾, Share rewrites the player bar"
+            LIFT -> "Hold ﴿N﴾; gold wash, already selected"
+            SEAL -> "Tap ﴿N﴾ to share that verse"
+            ACTION_LINE -> "Tap ﴿N﴾, Share sits above play"
         }
 }
 
@@ -63,18 +69,19 @@ object ShareUx {
         ref: AyahRef,
     ): ShareUxAction {
         if (gathering) return ShareUxAction.ToggleVerse(ref)
+        if (variant.entersOnMarkTap) return ShareUxAction.EnterShare(ref)
         if (!variant.usesMarkTap) return ShareUxAction.None
         return if (prompt == ref) ShareUxAction.HidePrompt else ShareUxAction.ShowPrompt(ref)
     }
 
     fun onShareVerb(ref: AyahRef): ShareUxAction = ShareUxAction.EnterShare(ref)
 
-    fun onLift(
+    fun onMarkHold(
         variant: ShareUxVariant,
         gathering: Boolean,
         ref: AyahRef,
     ): ShareUxAction {
-        if (!variant.usesLift || gathering) return ShareUxAction.None
+        if (!variant.usesMarkHold || gathering) return ShareUxAction.None
         return ShareUxAction.EnterShare(ref)
     }
 

@@ -104,7 +104,7 @@ becomes share tools; multi is extension) without taxing bookmark.
    Mark through a two-tap menu.
 2. **Note stays a saved-ribbon hold** — optional colophon **Write** later; do
    not require “lift mode” to annotate or give the gold ayah mark a control.
-3. **Share starts with one verse already selected** — gold wash + ordinal `١`.
+3. **Share starts with one verse already selected** — gold wash + Western ordinal `1`.
 4. **Multi-select is the same mode** — tap more verses; tap again to unselect.
 5. **No dual-purpose control** — never one button for enter *and* commit.
 6. **During share, the player bar is replaced** by a gather ribbon, not
@@ -126,7 +126,7 @@ becomes share tools; multi is extension) without taxing bookmark.
 - Primary: short-tap `﴿N﴾` reveals a quiet colophon line under that verse:
   **Share** (and optionally **Write**). Tapping **Share**:
   - pauses playback
-  - selects *that* verse (`١` + soft gold-yellow wash under the ayah block)
+  - selects *that* verse (`1` + soft gold-yellow wash under the ayah block)
   - replaces the player bar with the **share ribbon**
 - Optional power entry: long-press **verse body** (not seal) jumps straight
   into share-select with that verse checked. Only if body vs seal long-press
@@ -146,8 +146,9 @@ becomes share tools; multi is extension) without taxing bookmark.
 
 - Tap any verse to toggle membership while in share mode
 - Selected: soft feathered **gold-yellow paper wash** under the full ayah
-  block (primary signal); gold Arabic-Indic ordinal in the outer margin
-  (secondary)
+  block (primary signal); Western ordinal in Garamond ink in the outer
+  margin (secondary). Gold stays the ayah mark. Chrome never uses
+  Arabic-Indic digits.
 - Unselected: wash recedes — that *is* the unselect feedback
 - Ordinals renumber when a verse is dropped
 
@@ -190,17 +191,39 @@ Developer → **Verse share** (off by default; requires developer mode):
 
 | Toggle | Entry | Then |
 |---|---|---|
-| **Colophon** | Tap `﴿N﴾` → **Share** under the verse | Share selects that ayah, gold wash, ribbon |
-| **Lift** | Long-press the verse body | Immediate gather; root-viewer hold is displaced |
-| **Seal** | Tap `﴿N﴾` → **Share** beside the mark | Same gather as colophon |
-| **Action line** | Tap `﴿N﴾` → player bar becomes **Cancel · Share** | Share selects that ayah |
+| **Colophon** | Tap `﴿N﴾` → **Share** under the verse (ink) | Share selects that ayah |
+| **Lift** | Hold `﴿N﴾` | Immediate gather. Word hold stays Root Viewer |
+| **Seal** | Tap `﴿N﴾` | Immediate gather (one tap) |
+| **Action line** | Tap `﴿N﴾` → **Share** above play | Transport stays until Share |
 
-All four then share: tap more verses to add/drop (wash + margin ordinal),
-ribbon `Cancel · N · Text · Image` (no Send page on the happy path), back
-dismisses prompt or leaves gather.
+All four then share: tap more verses to add/drop (wash + Western margin
+ordinal), ribbon `Cancel    2    Text   Image` (no Send page on the happy
+path), back dismisses prompt or leaves gather.
 
 Policy lives in `share/ShareUx.kt` (pure, JVM-tested). Do not invent
 entry rules in `ReaderScreen`.
+
+## Critique of the first A/B (applied)
+
+The first pass had four names and one gesture. Fixes:
+
+1. **Arabic-Indic in chrome.** `١` on the ribbon and in the margin is
+   furniture pretending to be scripture. Chrome is Western Garamond ink.
+   `﴿N﴾` on the verse stays the reader's verse-number script.
+2. **Gold ordinals.** Gold is illumination (ayah marks). A gold
+   `headlineSmall` number in the same margin as `﴿N﴾` reads as a second
+   verse number. Ordinals are ink, `titleMedium`.
+3. **Colophon / Seal / Action line were the same two-tap.** Seal now
+   enters on the mark tap. Action line keeps play and puts Share above
+   the bar. Colophon keeps the confirm-under-verse.
+4. **Lift stole Root Viewer.** Word hold is a signature feature. Lift is
+   a hold on `﴿N﴾` only.
+5. **Prompt looked selected.** Wash is for gathered verses only. A
+   colophon/action-line prompt is the Share verb, not a wash.
+6. **Ribbon was a Material toolbar.** SpaceEvenly four gold items. Now a
+   line of type: Cancel leading, Western count, Text / Image trailing,
+   ink not gold.
+7. **Action line ate play before gather.** Transport stays until Share.
 
 ## Implementation sketch (later)
 

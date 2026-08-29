@@ -875,8 +875,8 @@ private fun PaperStackApp(
                             )
                         },
                         onShareVerb = shareViewModel::onShareVerb,
-                        onShareLift = { sid, a ->
-                            shareViewModel.onLift(
+                        onShareMarkHold = { sid, a ->
+                            shareViewModel.onMarkHold(
                                 variant = if (settings.developerModeEnabled) {
                                     settings.shareUxVariant
                                 } else {

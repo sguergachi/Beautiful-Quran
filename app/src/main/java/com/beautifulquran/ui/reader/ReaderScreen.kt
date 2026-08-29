@@ -127,6 +127,7 @@ import com.beautifulquran.data.ReadingMode
 import com.beautifulquran.data.model.Surah
 import com.beautifulquran.share.AyahRef
 import com.beautifulquran.share.ShareUxVariant
+import com.beautifulquran.ui.share.ShareActionPrompt
 import com.beautifulquran.ui.share.ShareRibbon
 import com.beautifulquran.domain.BASMALAH_PLAYLIST_AYAH
 import com.beautifulquran.domain.MushafToken
@@ -253,7 +254,7 @@ fun ReaderScreen(
     preparingShareImage: Boolean = false,
     onShareMarkTap: (surahId: Int, ayah: Int) -> Unit = { _, _ -> },
     onShareVerb: (surahId: Int, ayah: Int) -> Unit = { _, _ -> },
-    onShareLift: (surahId: Int, ayah: Int) -> Unit = { _, _ -> },
+    onShareMarkHold: (surahId: Int, ayah: Int) -> Unit = { _, _ -> },
     onShareCancel: () -> Unit = {},
     onShareText: () -> Unit = {},
     onShareImage: () -> Unit = {},
@@ -1598,23 +1599,25 @@ fun ReaderScreen(
                             .padding(vertical = 6.dp),
                     )
                 }
-                val shareRibbon = gathering ||
-                    (shareUx == ShareUxVariant.ACTION_LINE && sharePrompt != null)
-                if (shareRibbon) {
+                if (gathering) {
                     ShareRibbon(
-                        gathering = gathering,
                         count = shareCount,
                         preparingText = preparingShareText,
                         preparingImage = preparingShareImage,
                         onCancel = onShareCancel,
-                        onShare = {
-                            val prompt = sharePrompt ?: return@ShareRibbon
-                            onShareVerb(prompt.surahId, prompt.ayah)
-                        },
                         onShareText = onShareText,
                         onShareImage = onShareImage,
                     )
                 } else {
+                    val actionPrompt = sharePrompt
+                    if (shareUx == ShareUxVariant.ACTION_LINE && actionPrompt != null) {
+                        ShareActionPrompt(
+                            onCancel = onShareCancel,
+                            onShare = {
+                                onShareVerb(actionPrompt.surahId, actionPrompt.ayah)
+                            },
+                        )
+                    }
                     PlayerBar(
                         state = playerState,
                         isThisSurahLoaded = isThisSurahPlaying,
@@ -2826,6 +2829,14 @@ fun ReaderScreen(
                                 } else {
                                     null
                                 },
+                                onAyahMarkLongClick = if (!gathering && shareUx.usesMarkHold) {
+                                    {
+                                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                        onShareMarkHold(ayah.surahId, ayah.number)
+                                    }
+                                } else {
+                                    null
+                                },
                                 onShareVerbClick = {
                                     onShareVerb(ayah.surahId, ayah.number)
                                 },
@@ -2863,21 +2874,10 @@ fun ReaderScreen(
                                         viewModel.playFromAyah(ayah.number)
                                     }
                                 },
-                                onAyahLongClick = if (!gathering && shareUx.usesLift) {
-                                    {
-                                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                                        onShareLift(ayah.surahId, ayah.number)
-                                    }
-                                } else {
+                                onWordLongClick = if (gathering) {
                                     null
-                                },
-                                onWordLongClick = when {
-                                    gathering -> null
-                                    shareUx.usesLift -> { _ ->
-                                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                                        onShareLift(ayah.surahId, ayah.number)
-                                    }
-                                    else -> { word ->
+                                } else {
+                                    { word ->
                                         // Hold opens the Root Word Viewer (or, in
                                         // developer mode, a chooser that can also
                                         // open the Timings Lab). MainActivity owns
