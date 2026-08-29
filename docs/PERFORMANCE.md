@@ -204,8 +204,10 @@ tick must not remasure three pages or recreate 150 `Text` nodes.
   by page, display row, size, and measure. The page's sixteen-row reflow is a
   linear token-width pass remembered by page + typeface; playback ticks and
   ink animation frames never repeat it. Geometry remains in the bounded
-  process cache. Non-adjacent chapter, search, and dial jumps warm that same
-  target window before moving the pager.
+  process cache. Non-adjacent chapter and search jumps warm that same target
+  window before moving the pager. Dial jumps move immediately instead: the
+  leaf's existing loader resolves a missing face off the main thread, so
+  releasing the comb never waits on font I/O.
 - Each Madinah line owns one pointer-input node, not one per word. Its QCF word
   nodes retain the directional `shapedWordBloom`, while the leaf itself owns an
   offscreen layer so a fling transforms a recorded page. The settled page runs
