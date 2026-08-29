@@ -2387,7 +2387,12 @@ fun ReaderScreen(
                         // they are recited, and the thumb has something to mark
                         // and something to be dragged along.
                         pageAt = mushafLeafPage,
-                        pageCount = mushafCatalog?.pageCount ?: 1,
+                        // Whatever the rule is counting: leaves on the English
+                        // book, Madinah pages on the Arabic one.
+                        pageCount = mushafBookLength(
+                            englishBook,
+                            mushafCatalog?.pageCount ?: 1,
+                        ),
                         chapterPages = mushafChapterFirstPages,
                         pageLabel = mushafPageLabel,
                         chapterLabel = mushafChapterLabel,

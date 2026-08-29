@@ -264,6 +264,18 @@ internal fun mushafLeafNumber(
     page: Int,
 ): Int = if (book == null || ayah == null) page else book.leafOfVerse(surahId, ayah, page) + 1
 
+/**
+ * How long the book is, in whatever [mushafLeafNumber] is counting.
+ *
+ * The pager, the folio and the page dial all have to agree with it. The dial
+ * did not: it was handed leaf numbers and a track 604 Madinah pages long, so
+ * 1,145 leaves were scaled onto 604 stops, the chapter comb bunched into the
+ * middle of the rule and the far end of the book was unreachable. A rule has to
+ * be as long as the thing it measures — this is that, said once.
+ */
+internal fun mushafBookLength(book: EnglishBook?, pageCount: Int): Int =
+    book?.leafCount ?: pageCount
+
 /** A second page owns clocks only while the voice is crossing onto it. */
 internal fun mushafUsesLiveInk(
     isSettled: Boolean,
