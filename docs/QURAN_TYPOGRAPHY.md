@@ -264,7 +264,9 @@ forty-five characters. The hand is the size at which a leaf's worth of prose
 exactly fills the well, and it is *measured* rather than modelled: a reference
 block of exactly a leaf's mass (`englishLeafReferenceBlock`) is laid out at a
 probe size in the face, measure, rag and line-breaking it will really be drawn
-in, and
+in — real prose of this translation, 74:29-36, whose characters per word and
+spread of word lengths are the closest of any run in the Qur'an to the whole of
+it — and
 
 ```
     H = probe · √( well / measured )
@@ -316,10 +318,37 @@ book measure and the size the scrolling reader has always set its English at.
 Half again the type of the page-bound leaf.
 
 The cost is leaves, and with the pagination continuous the capacity buys nothing
-but type: the median leaf reaches 91% of its well at any capacity in the range,
-so the choice is purely how long a line the hand wants. Below about 850 it is
-shorter than the measure wants and above about 1,000 it is longer.
+but type: the choice is purely how long a line the hand wants. Below about 850
+it is shorter than the measure wants and above about 1,000 it is longer.
 `tools/measure_english_leaves.py` prints the sweep.
+
+**What is left at the foot, and why.** A leaf ends when the next verse will not
+go on it, and a verse averages three lines, so the leaf ends up to three lines
+short. Measured over the book: **2.7 blank lines out of 22 on average, 7.4 at
+the ninety-fifth percentile.** The book needs 985 leaves' worth of paper and
+takes 1,122 of them, so 12% of the paper is blank — all of it the whole verse.
+Capacity does not help (the sweep is flat: 2.7 blank lines at 900, still 2.0 at
+1,200 for a fifth of the type), and neither does breaking the book optimally
+rather than greedily — a Knuth-Plass pass over the slack redistributes it (p95
+7.4 → 6.2) without reducing it, because the total is fixed by the verses. The
+only thing that removes it is letting a verse run over onto the next leaf, which
+is what a printed book does with a paragraph and what this one does not.
+
+**The constants are fitted, not guessed.** Eleven real leaves were rendered on
+device and their line counts solved for what the layout actually does:
+
+| | guessed | fitted |
+|---|---|---|
+| characters to the line | — | **39.3** |
+| a verse mark, in characters | 6 | **2.8** |
+| reference block, against a leaf | ×1.05 | **×1.06** |
+
+The mark is set a size down and its cups are narrow, so charging it 6 characters
+spent a third of a line per leaf on paper that was there all along. And the
+reference block is one unbroken run of prose where a leaf is not: the specimen
+sets 41.6 characters to the line and the book sets 39.3, so the block has to be
+6% longer than the leaf it stands for. At 1.05 it was not, the hand came out
+small, and 108 leaves ran past their well and closed their leading to hide it.
 
 **Leaves are filled, not evened.** Verses go on the leaf until the next one will
 not fit, and then the next leaf starts — the compositor's order, and the reason

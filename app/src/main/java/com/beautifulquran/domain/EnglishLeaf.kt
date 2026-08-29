@@ -82,10 +82,14 @@ data class EnglishLeaf(
 
 /**
  * What a verse mark and its two spaces cost the measure, in characters.
- * Small, fixed, and counted so the fit is not systematically optimistic on a
- * leaf carrying forty short verses — juz' 30 has several.
+ *
+ * Counted so the fit is not systematically optimistic on a leaf carrying forty
+ * short verses — juz' 30 has several. It was 6, guessed from the glyphs; fitted
+ * against eleven real leaves it is 2.8, because the mark is set a size down and
+ * its cups are narrow. Guessing high cost every leaf about a third of a line of
+ * paper it could have used.
  */
-const val ENGLISH_LEAF_MARK_CHARS = 6
+const val ENGLISH_LEAF_MARK_CHARS = 3
 
 /**
  * Which verses begin on a Madinah page — the leaf's contents, in order.

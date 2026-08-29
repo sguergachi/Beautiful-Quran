@@ -19,8 +19,14 @@ from collections import defaultdict
 
 # Must track EnglishLeafFit.kt / EnglishBook.kt.
 LEADING = 1.40   # one figure, for every leaf in the book
+# Fitted on device against eleven real leaves (see QURAN_TYPOGRAPHY.md 13.4).
+# The hand is cut so that a leaf of exactly CAPACITY fills the well, so the
+# blank at the foot is simply the share of the capacity the leaf did not use.
+# WELL_LINES is what that well comes to on a phone; it is only here to say the
+# answer in lines, which is the unit a reader sees.
+WELL_LINES = 22.0
 CAPACITY = 900  # what a leaf holds; a page takes as many leaves as it needs
-MARK_CHARS = 6  # ENGLISH_LEAF_MARK_CHARS: the verse mark and its two spaces
+MARK_CHARS = 3  # ENGLISH_LEAF_MARK_CHARS: the verse mark and its two spaces
 OPENING_CHARS = 92   # ENGLISH_LEAF_OPENING_CHARS: the panel and its air
 BASMALAH_CHARS = 78  # ENGLISH_LEAF_BASMALAH_CHARS: the preface line and its air
 NO_BASMALAH = (1, 9)  # Al-Fatihah and At-Tawbah open without one
@@ -71,14 +77,31 @@ leaves = leaves_at(CAPACITY)
 fills = sorted(100 * m / CAPACITY for m in leaves)
 print(f"\nat ENGLISH_LEAF_CAPACITY_CHARS = {CAPACITY}, leading {LEADING}:")
 print(f"  leaves                 {len(leaves)}")
-print(f"  median leaf fills      {statistics.median(fills):.0f}% of its well")
-for q in (10, 25, 50, 75, 90):
-    print(f"    p{q:<3} {fills[len(fills) * q // 100]:5.0f}%")
-print(f"  leaves under 70% full  {sum(1 for f in fills if f < 70)}")
+print(f"  median leaf fills      {statistics.median(fills):.0f}% of its capacity")
 
-print("\ncapacity sweep (type against a page-sized leaf, leaves, median fill,")
-print("leaves under 70% — a verse too long to join the leaf it met):")
+# What the reader actually sees: the foot of the page.
+def blank_lines(mass, cap):
+    return max(0.0, (1 - mass / cap) * WELL_LINES)
+
+
+empty = sorted(blank_lines(m, CAPACITY) for m in leaves)
+print(f"\nblank lines at the foot, out of {WELL_LINES:.0f}:")
+print(f"  mean   {statistics.mean(empty):4.2f}")
+for q in (50, 75, 90, 95, 99):
+    print(f"  p{q:<3}   {empty[len(empty) * q // 100]:4.1f}")
+print(f"  leaves with more than 3 blank    {sum(1 for e in empty if e > 3)}")
+
+# The floor: what the book would take if a verse could be split across leaves.
+full = sum(leaves) / CAPACITY
+print(f"\nthe book needs {full:.0f} full leaves of paper and takes {len(leaves)}:")
+print(f"  {100 * (1 - full / len(leaves)):.0f}% of the paper is blank, and all of it is"
+      " the whole verse -")
+print("  a leaf ends when the next verse will not go on it, and a verse averages"
+      " three lines.")
+
+print("\ncapacity sweep (type against a page-sized leaf, leaves, mean blank lines):")
 for cap in (750, 800, 850, 900, 950, 1000, 1200, 1650):
-    f = sorted(100 * m / cap for m in leaves_at(cap))
-    print(f"  {cap:>5}  x{(2160 / cap) ** 0.5:.2f}  {len(f):>5} leaves  "
-          f"{statistics.median(f):>3.0f}%  {sum(1 for x in f if x < 70):>3} short")
+    ls = leaves_at(cap)
+    e = [blank_lines(m, cap) for m in ls]
+    print(f"  {cap:>5}  x{(2160 / cap) ** 0.5:.2f}  {len(ls):>5} leaves  "
+          f"{statistics.mean(e):4.2f} blank")

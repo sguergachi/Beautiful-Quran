@@ -95,25 +95,59 @@ const val ENGLISH_LEAF_MIN_FONT_PX = 18f
 const val ENGLISH_LEAF_MAX_FONT_PX = 140f
 
 /**
- * Ordinary prose from this translation, repeated to make the reference block
- * the hand is cut against.
+ * The type specimen the hand is cut against: real prose from this translation.
  *
- * Prose, not a pangram: what matters is the mix of letters, spaces and word
- * lengths the book is actually set in, because where the *lines break* is what
- * decides how much paper a page takes.
+ * It used to be one sentence repeated — "And it is He who created the heavens
+ * and the earth in truth." — chosen for being ordinary. It is not ordinary. Its
+ * words average 3.7 letters where the translation's average 4.4, and short
+ * words pack tighter and waste less at the end of a ragged line: measured on
+ * device it set **43 characters to the line where the book really sets 40.3**.
+ * The hand was therefore cut 6% too small for the text it had to hold, which
+ * put 108 leaves past their well and closed their leading.
+ *
+ * So the specimen is a passage of the book itself, 74:29–74:36, picked because
+ * its characters per word (5.372) and its spread of word lengths (sd 2.27) are
+ * the closest of any run in the Qur'an to the whole translation's (5.382, 2.28).
+ * Where the lines break is what decides how much paper a page takes, and only
+ * real prose breaks lines where real prose breaks them.
  */
 const val ENGLISH_LEAF_SPECIMEN =
-    "And it is He who created the heavens and the earth in truth. "
+    "Blackening the skins Over it are nineteen [angels] And We have not made " +
+        "the keepers of the Fire except angels. And We have not made their " +
+        "number except as a trial for those who disbelieve - that those who " +
+        "were given the Scripture will be convinced and those who have " +
+        "believed will increase in faith and those who were given the " +
+        "Scripture and the believers will not doubt and that those in whose " +
+        "hearts is hypocrisy and the disbelievers will say, \"What does Allah " +
+        "intend by this as an example?\" Thus does Allah leave astray whom He " +
+        "wills and guides whom He wills. And none knows the soldiers of your " +
+        "Lord except Him. And mention of the Fire is not but a reminder to " +
+        "humanity No! By the moon And [by] the night when it departs And [by] " +
+        "the morning when it brightens Indeed, the Fire is of the greatest " +
+        "[afflictions] As a warning to humanity "
 
 /**
- * A block of exactly the mass a leaf holds, for the hand to be cut against.
+ * How much more than a leaf's worth the hand is cut against.
  *
- * A little over it — 5% — because a ragged line ends where its last whole word
- * ends, half a word short of the measure on average, and the fullest leaf in
- * the book must not be the one that discovers the difference.
+ * Not a safety margin: a measured conversion. The specimen is set as one
+ * unbroken run of prose and a leaf is not — a leaf carries verse marks, which
+ * take room the specimen never asks for. Measured on device against eleven real
+ * leaves, the specimen sets **41.6 characters to the line and the book sets
+ * 39.3**, so the block the hand is cut against has to be that much longer than
+ * the leaf it stands for or the hand comes out too small and the leaf overflows.
+ *
+ * It was 1.05, guessed, where the arithmetic wanted 1.06 — close enough to look
+ * right and wrong enough to put 108 leaves past their well and close their
+ * leading. Rerun `tools/measure_english_leaves.py` after changing the face, the
+ * measure or the mark.
+ */
+const val ENGLISH_LEAF_REFERENCE_MARGIN = 1.06f
+
+/**
+ * A block of the mass a leaf holds, for the hand to be cut against.
  */
 fun englishLeafReferenceBlock(): String {
-    val target = (ENGLISH_LEAF_CAPACITY_CHARS * 1.05f).toInt()
+    val target = (ENGLISH_LEAF_CAPACITY_CHARS * ENGLISH_LEAF_REFERENCE_MARGIN).toInt()
     val out = StringBuilder(target + ENGLISH_LEAF_SPECIMEN.length)
     while (out.length < target) out.append(ENGLISH_LEAF_SPECIMEN)
     return out.substring(0, target)

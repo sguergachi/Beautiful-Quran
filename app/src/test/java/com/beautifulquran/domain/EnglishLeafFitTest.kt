@@ -12,13 +12,29 @@ class EnglishLeafFitTest {
     @Test
     fun `the reference block is a leaf's worth of real prose`() {
         val block = englishLeafReferenceBlock()
-        // A little over the capacity: a ragged line ends short of the measure,
-        // so a ragged page runs longer than the arithmetic expects.
-        assertEquals((ENGLISH_LEAF_CAPACITY_CHARS * 1.05f).toInt(), block.length)
-        assertTrue(block.startsWith("And it is He who created"))
+        assertEquals(
+            (ENGLISH_LEAF_CAPACITY_CHARS * ENGLISH_LEAF_REFERENCE_MARGIN).toInt(),
+            block.length,
+        )
+        assertTrue(block.startsWith("Blackening the skins"))
         // Prose, not a repeated word: it is where the lines break that decides
         // how much paper a page takes.
         assertTrue(block.count { it == ' ' } > block.length / 8)
+    }
+
+    @Test
+    fun `the specimen is set in the same hand as the book it measures`() {
+        // The old specimen was one plain sentence repeated, and it was not
+        // ordinary: 3.7 letters to the word where the translation averages 4.4.
+        // Short words pack tighter and waste less at the end of a ragged line,
+        // so it set 43 characters to the line where the book sets 40.3 — the
+        // hand came out 6% small and 108 leaves overflowed their well.
+        val words = ENGLISH_LEAF_SPECIMEN.trim().split(" ").filter { it.isNotEmpty() }
+        val meanWord = words.sumOf { it.length }.toDouble() / words.size
+        assertTrue("specimen words average $meanWord", meanWord > 4.2 && meanWord < 4.6)
+        // And it is prose of this translation, brackets and all, because that
+        // is what has to fit.
+        assertTrue(ENGLISH_LEAF_SPECIMEN.contains("[angels]"))
     }
 
     @Test
