@@ -2530,8 +2530,6 @@ fun AyahBlock(
     onAyahMarkClick: (() -> Unit)? = null,
     onAyahMarkLongClick: (() -> Unit)? = null,
     onShareVerbClick: (() -> Unit)? = null,
-    /** Share glyph under the bookmark tip. Null hides it. */
-    onMarginShare: (() -> Unit)? = null,
     onWordClick: ((Word) -> Unit)?,
     onWordLongClick: ((Word) -> Unit)? = null,
     onAyahClick: () -> Unit,
@@ -2960,11 +2958,6 @@ fun AyahBlock(
             // so fillMaxHeight would measure to 0 and the ribbon would vanish.
             // This sizes to the Column after layout, keeping the ribbon in-block.
             Box(Modifier.matchParentSize()) {
-                val marginAlign = if (bookmarkSide == AyahSelectorSide.RIGHT) {
-                    AbsoluteAlignment.TopRight
-                } else {
-                    AbsoluteAlignment.TopLeft
-                }
                 VerseBookmarkRibbon(
                     bookmarked = bookmarked,
                     focused = bookmarkFocused,
@@ -2974,7 +2967,13 @@ fun AyahBlock(
                     onToggle = onToggleBookmark,
                     onLongClick = if (bookmarked) onEditAnnotation else null,
                     modifier = Modifier
-                        .align(marginAlign)
+                        .align(
+                            if (bookmarkSide == AyahSelectorSide.RIGHT) {
+                                AbsoluteAlignment.TopRight
+                            } else {
+                                AbsoluteAlignment.TopLeft
+                            },
+                        )
                         .fillMaxHeight()
                         .then(
                             if (onBookmarkRibbonPositioned != null) {
@@ -2984,14 +2983,6 @@ fun AyahBlock(
                             },
                         ),
                 )
-                if (onMarginShare != null) {
-                    VerseShareMark(
-                        chromeAlpha = bookmarkChromeAlpha,
-                        interactive = bookmarkInteractive,
-                        onClick = onMarginShare,
-                        modifier = Modifier.align(marginAlign),
-                    )
-                }
             }
         }
     }

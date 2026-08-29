@@ -7,7 +7,6 @@ package com.beautifulquran.share
  * shares a thing on a phone. These four are the actually-findable options:
  *
  * - [ICON] — the Android share glyph on the play bar (current verse)
- * - [RIBBON] — the same glyph under the bookmark tip, on that verse
  * - [REVEAL] — the word Share written under the verse you are on
  * - [HOLD] — long-press the verse (not a word) and Share appears
  * - [MARK] — tap `﴿N﴾` (verse handle; least obvious, kept for comparison)
@@ -18,7 +17,6 @@ package com.beautifulquran.share
 enum class ShareUxVariant {
     OFF,
     ICON,
-    RIBBON,
     REVEAL,
     HOLD,
     MARK,
@@ -27,10 +25,6 @@ enum class ShareUxVariant {
     /** Share glyph on the player bar. */
     val usesBarIcon: Boolean
         get() = this == ICON
-
-    /** Share glyph under the bookmark swallowtail, on that verse. */
-    val usesMarginIcon: Boolean
-        get() = this == RIBBON
 
     /** Share is written under the current (playing or focused) verse. */
     val revealsOnCurrent: Boolean
@@ -50,7 +44,6 @@ enum class ShareUxVariant {
         get() = when (this) {
             OFF -> "Off"
             ICON -> "Icon"
-            RIBBON -> "Ribbon"
             REVEAL -> "Reveal"
             HOLD -> "Hold"
             MARK -> "Mark"
@@ -60,7 +53,6 @@ enum class ShareUxVariant {
         get() = when (this) {
             OFF -> "Shipped reader — no share entry"
             ICON -> "Share on the play bar — this verse"
-            RIBBON -> "Share under the bookmark tip — that verse"
             REVEAL -> "Share written under the verse you are on"
             HOLD -> "Hold the verse, Share appears"
             MARK -> "Tap ﴿N﴾ to share that verse"
@@ -79,8 +71,6 @@ sealed class ShareUxAction {
 object ShareUx {
 
     fun onBarShare(ref: AyahRef): ShareUxAction = ShareUxAction.EnterShare(ref)
-
-    fun onMarginShare(ref: AyahRef): ShareUxAction = ShareUxAction.EnterShare(ref)
 
     fun onMarkTap(
         variant: ShareUxVariant,

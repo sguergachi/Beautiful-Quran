@@ -1,33 +1,41 @@
 package com.beautifulquran.ui.share
 
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.Notes
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.Image
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.beautifulquran.ui.theme.SerifFontFamily
-import com.beautifulquran.ui.theme.quietClickable
 
 /**
- * Replaces the player bar while gathering: `Cancel    2    Text   Image`.
+ * Replaces the player bar while gathering. Same five-slot geometry as
+ * [com.beautifulquran.ui.reader.PlayerBar]: two 48 dp controls, a 56 dp
+ * centre, two 48 dp controls — so the count sits on the page's centre line
+ * the way Play does. Trailing spacer matches Close.
  *
- * A line of type, not a toolbar. Count is Western digits in the book face —
- * furniture, not illumination. Text/Image stay faint until the list is
- * non-empty.
+ * Close · Text · N · Image · —
  */
 @Composable
 fun ShareRibbon(
@@ -38,11 +46,11 @@ fun ShareRibbon(
     onShareText: () -> Unit,
     onShareImage: () -> Unit,
 ) {
-    val ink = MaterialTheme.colorScheme.onSurface
-    val muted = ink.copy(alpha = 0.62f)
-    val faint = ink.copy(alpha = 0.32f)
+    val compact = LocalConfiguration.current.screenWidthDp < 340
+    val ink = MaterialTheme.colorScheme.onSurfaceVariant
     val busy = preparingText || preparingImage
     val canExport = count >= 1 && !busy
+    val exportTint = if (canExport) ink else ink.copy(alpha = 0.35f)
 
     Surface(color = MaterialTheme.colorScheme.background) {
         Column(
@@ -53,58 +61,89 @@ fun ShareRibbon(
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(
+                    if (compact) 4.dp else 12.dp,
+                    Alignment.CenterHorizontally,
+                ),
                 modifier = Modifier
                     .widthIn(max = 680.dp)
                     .fillMaxWidth()
-                    .padding(start = 20.dp, end = 20.dp, top = 10.dp, bottom = 12.dp),
-            ) {
-                RibbonVerb("Cancel", muted, onClick = onCancel)
-                Spacer(Modifier.weight(1f))
-                Text(
-                    text = count.toString(),
-                    style = MaterialTheme.typography.titleMedium.copy(
-                        fontFamily = SerifFontFamily,
+                    .padding(
+                        start = if (compact) 8.dp else 12.dp,
+                        end = if (compact) 8.dp else 12.dp,
+                        bottom = 4.dp,
                     ),
-                    color = if (count >= 1) ink.copy(alpha = 0.78f) else faint,
-                    modifier = Modifier.semantics {
-                        contentDescription = if (count == 1) "1 verse" else "$count verses"
-                    },
-                )
-                Spacer(Modifier.weight(1f))
-                RibbonVerb(
-                    label = if (preparingText) "Text…" else "Text",
-                    color = if (canExport) ink.copy(alpha = 0.88f) else faint,
-                    enabled = canExport,
+            ) {
+                IconButton(
+                    onClick = onCancel,
+                    modifier = Modifier.size(48.dp),
+                ) {
+                    Icon(
+                        Icons.Rounded.Close,
+                        contentDescription = "Cancel share",
+                        tint = ink,
+                    )
+                }
+                IconButton(
                     onClick = onShareText,
-                )
-                RibbonVerb(
-                    label = if (preparingImage) "Image…" else "Image",
-                    color = if (canExport) ink.copy(alpha = 0.88f) else faint,
                     enabled = canExport,
+                    modifier = Modifier.size(48.dp),
+                ) {
+                    if (preparingText) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(22.dp),
+                            strokeWidth = 2.dp,
+                            color = ink,
+                        )
+                    } else {
+                        Icon(
+                            Icons.AutoMirrored.Rounded.Notes,
+                            contentDescription = "Share as text",
+                            tint = exportTint,
+                        )
+                    }
+                }
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier
+                        .size(56.dp)
+                        .semantics {
+                            contentDescription = if (count == 1) "1 verse" else "$count verses"
+                        },
+                ) {
+                    Text(
+                        text = count.toString(),
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            fontFamily = SerifFontFamily,
+                        ),
+                        color = if (count >= 1) {
+                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.82f)
+                        } else {
+                            ink.copy(alpha = 0.35f)
+                        },
+                    )
+                }
+                IconButton(
                     onClick = onShareImage,
-                )
+                    enabled = canExport,
+                    modifier = Modifier.size(48.dp),
+                ) {
+                    if (preparingImage) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(22.dp),
+                            strokeWidth = 2.dp,
+                            color = ink,
+                        )
+                    } else {
+                        Icon(
+                            Icons.Rounded.Image,
+                            contentDescription = "Share as image",
+                            tint = exportTint,
+                        )
+                    }
+                }
+                Spacer(Modifier.size(48.dp))
             }
         }
     }
-}
-
-@Composable
-private fun RibbonVerb(
-    label: String,
-    color: Color,
-    enabled: Boolean = true,
-    onClick: () -> Unit,
-) {
-    Text(
-        text = label,
-        style = MaterialTheme.typography.labelLarge,
-        color = color,
-        modifier = Modifier
-            .quietClickable(enabled = enabled, onClick = onClick)
-            .padding(horizontal = 8.dp, vertical = 10.dp)
-            .semantics {
-                role = Role.Button
-                contentDescription = label
-            },
-    )
 }

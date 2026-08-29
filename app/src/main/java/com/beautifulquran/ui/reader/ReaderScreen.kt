@@ -2844,11 +2844,6 @@ fun ReaderScreen(
                                 onShareVerbClick = {
                                     onShareVerb(ayah.surahId, ayah.number)
                                 },
-                                onMarginShare = if (!gathering && shareUx.usesMarginIcon) {
-                                    { onShareVerb(ayah.surahId, ayah.number) }
-                                } else {
-                                    null
-                                },
                                 onAyahLongClick = if (!gathering && shareUx.usesBodyHold) {
                                     {
                                         haptics.performHapticFeedback(HapticFeedbackType.LongPress)

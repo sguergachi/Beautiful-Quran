@@ -92,7 +92,7 @@ class DeveloperModeSettingsTest {
     @Test
     fun `verse share UX defaults off and keeps four test designs`() {
         assertEquals(ShareUxVariant.OFF, Settings().shareUxVariant)
-        assertEquals(6, ShareUxVariant.entries.size)
+        assertEquals(5, ShareUxVariant.entries.size)
         val icon = Settings().copy(
             developerModeEnabled = true,
             shareUxVariant = ShareUxVariant.ICON,

@@ -9,12 +9,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Share
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -24,10 +19,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
@@ -35,9 +28,6 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.role
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
@@ -346,47 +336,5 @@ internal fun VerseBookmarkRibbon(
                 )
             }
         }
-    }
-}
-
-/**
- * Quiet share glyph in the same margin as the bookmark swallowtail, sitting
- * just under the idle nub. Furniture ink, not gold. Tapping shares *this*
- * verse.
- */
-@Composable
-internal fun VerseShareMark(
-    chromeAlpha: () -> Float,
-    interactive: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Box(
-        contentAlignment = Alignment.Center,
-        modifier = modifier
-            .width(STRIP_WIDTH)
-            // Idle nub starts at 24dp and is 14dp tall. Land just under it.
-            .padding(top = 42.dp)
-            .size(36.dp)
-            .graphicsLayer { alpha = chromeAlpha() }
-            .then(
-                if (interactive) {
-                    Modifier
-                        .quietClickable(onClick = onClick)
-                        .semantics {
-                            role = Role.Button
-                            contentDescription = "Share this verse"
-                        }
-                } else {
-                    Modifier
-                },
-            ),
-    ) {
-        Icon(
-            Icons.Rounded.Share,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.42f),
-            modifier = Modifier.size(18.dp),
-        )
     }
 }
