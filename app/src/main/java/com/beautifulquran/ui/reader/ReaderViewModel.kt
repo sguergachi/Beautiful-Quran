@@ -15,7 +15,10 @@ import com.beautifulquran.data.model.SurahContent
 import com.beautifulquran.domain.BASMALAH_PLAYLIST_AYAH
 import com.beautifulquran.domain.HighlightClock
 import com.beautifulquran.domain.HighlightEngine
+import com.beautifulquran.domain.EnglishBook
 import com.beautifulquran.domain.MushafCatalog
+import com.beautifulquran.domain.buildEnglishBook
+import com.beautifulquran.domain.quranWordKey
 import com.beautifulquran.domain.OutputLatency
 import com.beautifulquran.domain.SURAH_FATIHA
 import com.beautifulquran.domain.surahOpensWithBasmalahPreface
@@ -156,6 +159,8 @@ internal class ActiveWordPollCache {
 data class MushafUi(
     val catalog: MushafCatalog,
     val surahsById: Map<Int, Surah>,
+    /** The English book's leaves — a Madinah page may take more than one. */
+    val englishBook: EnglishBook,
 )
 
 data class ReaderUiState(
@@ -254,7 +259,11 @@ class ReaderViewModel(
         viewModelScope.launch {
             val catalog = repository.mushafCatalog()
             val surahs = repository.surahs().associateBy { it.id }
-            _mushaf.value = MushafUi(catalog, surahs)
+            val prose = repository.englishVerseProse()
+            val book = buildEnglishBook(catalog) { surahId, ayah ->
+                prose[quranWordKey(surahId, ayah, 1)] ?: 0
+            }
+            _mushaf.value = MushafUi(catalog, surahs, book)
         }
     }
 

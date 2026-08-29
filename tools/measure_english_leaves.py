@@ -3,11 +3,12 @@
 The English leaf borrows the mushaf's 604 page boundaries and sets what falls
 on each of them as a page of a book (see docs/QURAN_TYPOGRAPHY.md §13 and
 domain/EnglishLeaf.kt). Its content is therefore fixed by the Arabic, and the
-nothing fills the page at all: the book is set on one hand and one leading, and
-a leaf simply ends where its content ends. So the hand is cut for the heaviest
-leaf in the book — that one has to fit its well — and every lighter leaf stands
-short of the foot by exactly as much as it is lighter. This is the measurement
-that says where the anchor goes and how short the rest stand.
+nothing stretches to fill the page: the book is set on one hand and one leading
+and a leaf ends where its content ends. What absorbs the range instead is the
+leaf *count* — a page takes as many leaves as its English needs at a legible
+size. This is the sweep that chooses the capacity: too large and the type
+shrinks back toward the old page-bound size, too small and pages split into two
+half-empty leaves faster than the type grows.
 
 This is the measurement ENGLISH_LEAF_REFERENCE_PROSE comes from. Rerun it if
 the translation or the qcf_page column changes:
@@ -24,9 +25,9 @@ import sqlite3
 import statistics
 from collections import defaultdict
 
-# Must track EnglishLeafFit.kt.
-LEADING = 1.40      # one figure, for every leaf in the book
-REFERENCE = 2060.0  # the heaviest leaf, plus 3% for the estimate
+# Must track EnglishLeafFit.kt / EnglishBook.kt.
+LEADING = 1.40   # one figure, for every leaf in the book
+CAPACITY = 1650  # what a leaf holds; a page takes as many leaves as it needs
 MARK_CHARS = 6  # ENGLISH_LEAF_MARK_CHARS: the verse mark and its two spaces
 
 db = sqlite3.connect("data/quran.db")
@@ -63,16 +64,42 @@ for q in (0, 1, 5, 10, 25, 50, 75, 90, 95, 99, 100):
     print(f"  p{q:<3} {pct(q)}")
 print(f"  mean {statistics.mean(masses):.0f}")
 
-print(f"\nat ENGLISH_LEAF_REFERENCE_PROSE = {REFERENCE:.0f}, leading {LEADING}:")
-over = sorted(p for p, m in prose.items() if m > REFERENCE)
-print(f"  would overflow the well  {len(over):3d}  {over[:8]}")
-print(f"  heaviest leaf  page {max(prose, key=prose.get)} "
-      f"({max(masses)} chars) fills {100 * max(masses) / REFERENCE:.0f}% of the well")
+import math
 
-print("\nhow far down the well a leaf reaches:")
-for q in (1, 10, 25, 50, 75, 90, 99, 100):
-    print(f"  p{q:<3} {100 * pct(q) / REFERENCE:5.0f}%")
 
-print("\nthe leading buys type, and the type buys leading (hand^2 x leading is fixed):")
-for lead in (1.30, 1.35, 1.40, 1.45, 1.50, 1.55):
-    print(f"  {lead:.2f} em -> hand x {(LEADING / lead) ** 0.5:.3f} of today's")
+def split(masses, cap):
+    """Fewest leaves that hold the page, then evened out — englishPageParts."""
+    total = sum(masses)
+    n = max(1, math.ceil(total / cap))
+    if n == 1:
+        return [total]
+    target = total / n
+    parts, run = [], 0
+    for m in masses:
+        if run > 0 and run + m > target and len(parts) < n - 1:
+            parts.append(run)
+            run = 0
+        run += m
+    parts.append(run)
+    return parts
+
+
+page_masses = defaultdict(list)
+for surah, ayah, page in opens_on:
+    page_masses[page].append(len(translation[(surah, ayah)]) + MARK_CHARS)
+
+print(f"\nat ENGLISH_LEAF_CAPACITY_CHARS = {CAPACITY}, leading {LEADING}:")
+leaves = [m for p in page_masses for m in split(page_masses[p], CAPACITY)]
+multi = sum(1 for p in page_masses if len(split(page_masses[p], CAPACITY)) > 1)
+fills = sorted(100 * m / CAPACITY for m in leaves)
+print(f"  leaves                 {len(leaves)}   ({multi} pages take more than one)")
+print(f"  median leaf fills      {statistics.median(fills):.0f}% of its well")
+for q in (10, 25, 50, 75, 90):
+    print(f"    p{q:<3} {fills[len(fills) * q // 100]:5.0f}%")
+
+print("\ncapacity sweep (type against today's, leaves, median fill):")
+for cap in (1400, 1500, 1600, 1650, 1700, 1800, 2000, 2160):
+    ls = [m for p in page_masses for m in split(page_masses[p], cap)]
+    f = sorted(100 * m / cap for m in ls)
+    print(f"  {cap:>5}  x{(2160 / cap) ** 0.5:.2f}  {len(ls):>5} leaves  "
+          f"{statistics.median(f):>3.0f}%")

@@ -54,7 +54,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.beautifulquran.data.VerseNumberScript
 import com.beautifulquran.data.model.Surah
 import com.beautifulquran.data.model.SurahContent
+import com.beautifulquran.domain.ENGLISH_LEAF_PROBE_FONT_PX
 import com.beautifulquran.domain.ENGLISH_LEAF_SPECIMEN
+import com.beautifulquran.domain.englishLeafReferenceBlock
 import com.beautifulquran.domain.EnglishLeaf
 import com.beautifulquran.domain.EnglishLeafBlock
 import com.beautifulquran.domain.MushafPage
@@ -118,12 +120,24 @@ internal fun MushafEnglishSheet(
     verseNumberScript: VerseNumberScript,
     /** The leaf's fore-edge, shared with the running head and the folio. */
     foreEdge: Dp,
+    /**
+     * The verses this leaf carries. Null is the whole page — see
+     * `domain/EnglishBook.kt`, which cuts a page into leaves when one will not
+     * hold it at a legible size.
+     */
+    leafVerses: List<Pair<Int, Int>>?,
     onAyahClick: (MushafToken) -> Unit,
     onBasmalahClick: (Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val ayahsOnPage = remember(page.page, content.surah.id, content.ayahs) {
-        page.ayahKeys.mapNotNull { (surahId, ayah) ->
+    // The verses this leaf actually sets — a Madinah page may be two leaves,
+    // and the ink must clock what is on the paper rather than what is on the
+    // page. Null carries the whole page, as it did when they were the same.
+    val keysOnLeaf = remember(page.page, leafVerses) {
+        leafVerses ?: page.ayahKeys.toList()
+    }
+    val ayahsOnPage = remember(keysOnLeaf, content.surah.id, content.ayahs) {
+        keysOnLeaf.mapNotNull { (surahId, ayah) ->
             if (surahId != content.surah.id) return@mapNotNull null
             content.ayahs.firstOrNull { it.number == ayah }
         }
@@ -131,11 +145,11 @@ internal fun MushafEnglishSheet(
     // The neighbouring chapters on a shared leaf, whose text is not loaded.
     // Same reading as the Arabic leaf gives them: a lower id is behind the
     // reciter and keeps its ink, a higher one is still to come and waits.
-    val upcomingOnPage = remember(page.page, content.surah.id) {
-        page.ayahKeys.filter { (surahId, _) -> surahId > content.surah.id }
+    val upcomingOnPage = remember(keysOnLeaf, content.surah.id) {
+        keysOnLeaf.filter { (surahId, _) -> surahId > content.surah.id }
     }
-    val recitedOnPage = remember(page.page, content.surah.id) {
-        page.ayahKeys.filter { (surahId, _) -> surahId < content.surah.id }
+    val recitedOnPage = remember(keysOnLeaf, content.surah.id) {
+        keysOnLeaf.filter { (surahId, _) -> surahId < content.surah.id }
     }
     val packsState = remember { mutableStateMapOf<Pair<Int, Int>, AyahInkPack>() }
     LaunchedEffect(ayahsOnPage, upcomingOnPage, recitedOnPage) {
@@ -160,10 +174,10 @@ internal fun MushafEnglishSheet(
             packsState = packsState,
         )
     }
-    val leaf = remember(page, leafText, hideParentheticals) {
-        val verses = leafText ?: return@remember null
-        englishLeaf(page, hideParentheticals) { surahId, ayah ->
-            verses[quranWordKey(surahId, ayah, 1)].orEmpty()
+    val leaf = remember(page, leafVerses, leafText, hideParentheticals) {
+        val text = leafText ?: return@remember null
+        englishLeaf(page, leafVerses, hideParentheticals) { surahId, ayah ->
+            text[quranWordKey(surahId, ayah, 1)].orEmpty()
         }
     }
     // The leaf comes up on the same short fade the Arabic one uses while its
@@ -471,11 +485,7 @@ private fun setEnglishLeaf(
     density: Density,
     measurer: TextMeasurer,
 ): EnglishLeafSetting {
-    val handPx = englishLeafHandPx(
-        wellHeightPx = wellPx,
-        measureWidthPx = measurePx,
-        charAdvanceEm = englishCharAdvanceEm(measurer, density),
-    )
+    val handPx = englishBookHandPx(wellPx, measurePx, density, measurer)
     val basmalahPx = englishBasmalahPx(handPx, measurePx, density, measurer)
     val lineInkPx = englishLineInkPx(handPx, density, measurer)
     val pitches = englishLeafPitches(blocks, handPx, measurePx, density, measurer)
@@ -600,54 +610,69 @@ private fun englishLeafHeightPx(
 }
 
 /**
- * The face's average character advance, in ems.
+ * The book's one hand, measured: the size at which a leaf's worth of prose
+ * exactly fills the well.
  *
- * Measured rather than assumed: it is the one term of the hand equation that
- * belongs to the type and not to the page, and EB Garamond runs narrow enough
- * that guessing it would set the whole book a size out.
+ * Two passes. The first lands within a percent or so; the second takes up the
+ * rounding, because a block's height moves in whole lines and the arithmetic
+ * moves continuously. Cheap — two layouts of about 1,700 characters, once per
+ * screen geometry rather than once per leaf.
  */
-private fun englishCharAdvanceEm(measurer: TextMeasurer, density: Density): Float {
-    val probeSp = 100.sp
-    val probePx = with(density) { probeSp.toPx() }
-    val width = measurer.measure(
-        text = AnnotatedString(ENGLISH_LEAF_SPECIMEN),
-        style = englishProseStyle(probeSp, TextUnit.Unspecified)
-            .copy(textAlign = TextAlign.Start),
-        constraints = Constraints(),
-        density = density,
-    ).size.width
-    if (width <= 0 || probePx <= 0f) return EnglishLeafFallbackAdvanceEm
-    return width / (probePx * ENGLISH_LEAF_SPECIMEN.length)
+private fun englishBookHandPx(
+    wellPx: Float,
+    measurePx: Float,
+    density: Density,
+    measurer: TextMeasurer,
+): Float {
+    val block = AnnotatedString(englishLeafReferenceBlock())
+    var handPx = ENGLISH_LEAF_PROBE_FONT_PX
+    repeat(2) {
+        val stands = measurer.measure(
+            text = block,
+            style = englishProseStyle(
+                with(density) { handPx.toSp() },
+                with(density) { (handPx * ENGLISH_LEAF_LEADING_EM).toSp() },
+            ),
+            constraints = Constraints(maxWidth = measurePx.toInt().coerceAtLeast(1)),
+            density = density,
+        ).size.height.toFloat()
+        handPx = englishLeafHandPx(handPx, stands, wellPx)
+    }
+    return handPx
 }
 
-/** Only ever used if the measurer answers nothing: EB Garamond's own figure. */
-private const val EnglishLeafFallbackAdvanceEm = 0.40f
-
 /**
- * The book's hand: EB Garamond, justified, unhyphenated.
+ * The book's hand: EB Garamond, ragged right, unhyphenated.
  *
- * Latin fills its line by the word space, which is what `TextAlign.Justify`
- * does — and unlike the mushaf's flush-last rule (`QURAN_TYPOGRAPHY.md` §3) a
- * Latin paragraph's last line stands where it ends, which is what Compose
- * already does. `LineBreak.Paragraph` breaks the whole block at once rather
- * than greedily line by line, which is what keeps a justified narrow measure
- * from ending on one very loose line.
+ * **Ragged, not justified.** The mushaf's own rule is that every full line
+ * reaches both margins (`QURAN_TYPOGRAPHY.md` §3) — but that is a rule about
+ * Arabic, which fills a line by the letterform, and it is the calligrapher's
+ * art. Latin has only the word space to fill with, and on a measure of about
+ * fifty characters that is not enough of a lever: the spaces open unevenly,
+ * the same line's colour changes from one page to the next, and the reader
+ * pays for a straight right edge with rivers of white running down the page.
+ * An even rag is the more readable page, and on a phone it is not close.
  *
- * **Not hyphenated, and this is load-bearing.** A justified measure of about
- * fifty characters would ordinarily be hyphenated, and the type would be better
- * set for it. But hyphenation breaks a *word* across two lines, and
- * `ShapedWordBloom.ColorReveal` takes the union bounds of a range's glyph path
- * — so a tinted wash over a broken word would sweep the width of the whole
- * line. `InkReveal` handles a multi-line range correctly (it advances one wash
- * across the fragments in order, which is what this page's verse wash needs),
- * but the tinted layers do not. Anyone turning hyphens on must fix ColorReveal
- * the same way first.
+ * `LineBreak.Paragraph` stays: it breaks the whole block at once rather than
+ * greedily line by line, which is what makes the rag *even* rather than merely
+ * ragged — the difference between a right edge that undulates and one that
+ * lurches.
+ *
+ * **Not hyphenated, and this is load-bearing.** Hyphenation breaks a *word*
+ * across two lines, and `ShapedWordBloom.ColorReveal` takes the union bounds of
+ * a range's glyph path — so a tinted wash over a broken word would sweep the
+ * width of the whole line. `InkReveal` handles a multi-line range correctly (it
+ * advances one wash across the fragments in order, which is what this page's
+ * verse wash needs), but the tinted layers do not. Anyone turning hyphens on
+ * must fix ColorReveal the same way first. Ragged setting needs them far less
+ * anyway — the rag absorbs the long word that justification would have had to
+ * stretch a line around.
  */
 private fun englishProseStyle(fontSize: TextUnit, lineHeight: TextUnit) = TextStyle(
     fontFamily = SerifFontFamily,
     fontSize = fontSize,
     lineHeight = lineHeight,
-    textAlign = TextAlign.Justify,
+    textAlign = TextAlign.Start,
     lineBreak = LineBreak.Paragraph,
     platformStyle = PlatformTextStyle(includeFontPadding = false),
     // Trim.Both puts the block's own edges on the grid: the first line starts
@@ -700,10 +725,10 @@ private fun EnglishProseBlock(
                 layout = { layoutResult },
                 rtl = false,
                 feather = InkEngine.tuning.washFeather,
-                // The page is justified, and the paper masks have to be told:
-                // a selection path is measured before the line is stretched to
-                // the measure. See Modifier.shapedWordBloom.
-                justified = true,
+                // Ragged: a line is drawn where it was measured, so the paper
+                // masks need no justification correction. See
+                // Modifier.shapedWordBloom.
+                justified = false,
             )
             .pointerInput(block, layoutResult) {
                 detectTapGestures { tap ->

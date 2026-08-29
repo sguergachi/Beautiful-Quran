@@ -3,75 +3,53 @@ package com.beautifulquran.domain
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import kotlin.math.abs
 
-/**
- * The English leaf's setting laws, held to the numbers in
- * `tools/measure_english_leaves.py`. A phone-shaped leaf is used throughout,
- * in device pixels as the fit takes them: a 3x screen's 764 dp well against
- * its 300 dp measure, and EB Garamond's average character advance of about
- * 0.40 em.
- */
+/** How the book's one hand and one leading are arrived at. */
 class EnglishLeafFitTest {
 
     private val well = 764f * 3f
-    private val measure = 300f * 3f
-    private val advance = 0.40f
 
-    /** Characters to the line at the book's hand — the fit's own arithmetic. */
-    private fun charsPerLine(): Float {
-        val hand = englishLeafHandPx(well, measure, advance)
-        return measure / (advance * hand)
-    }
-
-    /** Where a leaf of [mass] characters ends, as a share of the well. */
-    private fun fill(mass: Float): Float {
-        val hand = englishLeafHandPx(well, measure, advance)
-        return mass / charsPerLine() * hand * ENGLISH_LEAF_LEADING_EM / well
+    @Test
+    fun `the reference block is a leaf's worth of real prose`() {
+        val block = englishLeafReferenceBlock()
+        // A little over the capacity: a ragged line ends short of the measure,
+        // so a ragged page runs longer than the arithmetic expects.
+        assertEquals((ENGLISH_LEAF_CAPACITY_CHARS * 1.05f).toInt(), block.length)
+        assertTrue(block.startsWith("And it is He who created"))
+        // Prose, not a repeated word: it is where the lines break that decides
+        // how much paper a page takes.
+        assertTrue(block.count { it == ' ' } > block.length / 8)
     }
 
     @Test
-    fun `one hand for the whole book - the page's mass never enters it`() {
-        // englishLeafHandPx takes no page at all. This is the law expressed as
-        // a signature, and the test that keeps it that way: the only inputs
-        // are the leaf's geometry and the face.
+    fun `the hand is the size at which a leaf's worth of prose fills the well`() {
+        // Nothing estimated: the caller lays the reference block out at a probe
+        // size and this turns what it measured into the size that would fit.
+        // Height goes as the square of the hand, so a block that came out twice
+        // the well means a hand of 1/root-2.
         assertEquals(
-            englishLeafHandPx(well, measure, advance),
-            englishLeafHandPx(well, measure, advance),
+            ENGLISH_LEAF_PROBE_FONT_PX * 0.7071f,
+            englishLeafHandPx(ENGLISH_LEAF_PROBE_FONT_PX, well * 2f, well),
+            0.01f,
+        )
+        assertEquals(
+            ENGLISH_LEAF_PROBE_FONT_PX,
+            englishLeafHandPx(ENGLISH_LEAF_PROBE_FONT_PX, well, well),
+            0.001f,
+        )
+        // A block that came out short asks for a larger hand.
+        assertTrue(englishLeafHandPx(40f, well * 0.5f, well) > 40f)
+    }
+
+    @Test
+    fun `one hand for the whole book - no page enters it`() {
+        // englishLeafHandPx takes no page at all: a probe, what that probe
+        // measured, and the well. That is the law expressed as a signature.
+        assertEquals(
+            englishLeafHandPx(40f, well * 1.2f, well),
+            englishLeafHandPx(40f, well * 1.2f, well),
             0f,
         )
-    }
-
-    @Test
-    fun `a wider measure takes larger type and more characters to the line`() {
-        val narrow = englishLeafHandPx(well, measure, advance)
-        val wide = englishLeafHandPx(well * 1.3f, measure * 1.7f, advance)
-        assertTrue(wide > narrow)
-        // Both stay near fifty characters — the book scales, it does not
-        // simply spread.
-        assertTrue(abs(charsPerLine() - 48f) < 10f)
-        assertTrue(abs(measure * 1.7f / (advance * wide) - 48f) < 14f)
-    }
-
-    @Test
-    fun `the hand is cut so the heaviest leaf in the book fills its well`() {
-        // The whole of rule 3: with one leading for the book, the heaviest leaf
-        // is what sets the type. Page 579 carries 1,997 characters — see
-        // tools/measure_english_leaves.py — and comes out just inside the well,
-        // the margin being the 3% the anchor holds back for the estimate.
-        val heaviest = fill(1997f)
-        assertTrue("heaviest leaf overflows: $heaviest", heaviest <= 1f)
-        assertTrue("heaviest leaf wastes the page: $heaviest", heaviest > 0.94f)
-    }
-
-    @Test
-    fun `every other leaf ends short of the foot, by exactly how much lighter it is`() {
-        // The price of one leading, and the thing that replaces it: the foot.
-        assertEquals(0.71f, fill(1469f), 0.02f) // median
-        assertEquals(0.62f, fill(1286f), 0.02f) // tenth percentile
-        assertEquals(0.51f, fill(1055f), 0.02f) // first percentile
-        // And it is linear in the mass, because nothing else varies.
-        assertEquals(2f, fill(1400f) / fill(700f), 0.001f)
     }
 
     @Test
@@ -102,7 +80,6 @@ class EnglishLeafFitTest {
             ),
             0.0001f,
         )
-        // A leaf with paper to spare keeps the book's leading and its white.
         assertEquals(
             ENGLISH_LEAF_LEADING_EM,
             englishLeafFittedLeadingEm(
@@ -117,9 +94,9 @@ class EnglishLeafFitTest {
 
     @Test
     fun `a degenerate leaf cannot produce nonsense`() {
-        assertEquals(ENGLISH_LEAF_MIN_FONT_PX, englishLeafHandPx(0f, measure, advance), 0f)
-        assertEquals(ENGLISH_LEAF_MIN_FONT_PX, englishLeafHandPx(well, 0f, advance), 0f)
-        assertEquals(ENGLISH_LEAF_MIN_FONT_PX, englishLeafHandPx(well, measure, 0f), 0f)
+        assertEquals(ENGLISH_LEAF_MIN_FONT_PX, englishLeafHandPx(0f, well, well), 0f)
+        assertEquals(ENGLISH_LEAF_MIN_FONT_PX, englishLeafHandPx(40f, 0f, well), 0f)
+        assertEquals(ENGLISH_LEAF_MIN_FONT_PX, englishLeafHandPx(40f, well, 0f), 0f)
         assertEquals(
             ENGLISH_LEAF_LEADING_EM,
             englishLeafFittedLeadingEm(ENGLISH_LEAF_LEADING_EM, well * 2f, well, pitchesPx = 0f),

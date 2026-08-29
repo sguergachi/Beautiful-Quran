@@ -252,48 +252,72 @@ runtime, never assumed), `ℓ` the nominal leading and `R` the reference page ma
 It takes no page: the type depends on the leaf's geometry and the face, and on
 nothing the page happens to carry.
 
-### 13.4 One hand, one leading, and the foot falls where it falls
+### 13.4 One hand, one leading — and the leaf is not the page
 
 The page boundary comes from the Arabic leaf, so a page's mass is fixed at
 somewhere between 1,055 and 1,997 characters. Something has to absorb a range of
-nearly two to one, and it can only be the type, the leading, or the foot.
-
-**It is the foot.** One hand and one leading for the whole book — 1.40 em on
-every leaf of the 604 — and a leaf ends where its content ends. Measured over
-the book, a leaf reaches 71% of the well at the median, 62% at the tenth
-percentile, and 97% on the heaviest. The hand is cut for that heaviest leaf,
-with 3% held back because the fit is solved from an *estimate* of how many
-characters go to a line and the worst page must not be the one the estimate is
-wrong about.
-
-The other two answers were both tried, and both are worse:
+nearly two to one, and there are only four candidates: the type, the leading,
+the foot, or the number of leaves. Three of them were tried:
 
 - **The type gave**, a few percent on the heaviest leaves. That is the one thing
-  rule 13.3 forbids and the first thing a reader notices.
-- **The leading gave**, opening and closing between 1.20 and 2.00 em to bring
-  each block down to the foot. Every leaf filled, and the price was that a page
-  set at 2.00 em turned into one set at 1.20 — the same book in two different
-  hands' worth of air. A reader turning pages sees a change of line spacing at
-  once, far sooner than they notice a page that ends early.
+  §13.3 forbids and the first thing a reader notices.
+- **The leading gave**, opening and closing between 1.20 and 2.00 em so every
+  leaf filled. A page set at 2.00 em then turned into one set at 1.20 — the same
+  book in two different hands' worth of air, and a reader turning pages sees a
+  change in line spacing long before they notice a page that ends early.
+- **The foot gave**: one hand, one leading, and a leaf ended where its content
+  ended. Consistent, and it left the median leaf 68% full and the type dictated
+  by the heaviest page in the book, which is to say every page was set for the
+  worst one.
 
-The white at the foot is the only one of the three a reader reads as *meaning*
-something: a page that ends early ends something. It is also what a printed
-parallel translation looks like on its English side, for exactly this reason.
+**It is the leaf count.** A leaf holds `ENGLISH_LEAF_CAPACITY_CHARS` = 1,650
+characters, and a Madinah page takes as many leaves as that needs — for 71 of
+the 604, two. Page 255 is simply two leaves long, and every leaf still names its
+page, so the folio, the juzʾ, the running head, the page dial and the reciter's
+own place on the paper all go on meaning what they meant.
 
-`hand² × leading` is a constant of the leaf, so the two trade directly against
-each other: 1.30 em would buy 4% more type, 1.55 em would cost 5%.
-`tools/measure_english_leaves.py` prints that table.
+Freeing the type from the worst page pays twice: it comes up 14% (about 42
+characters to the line), *and* pages that used to overrun are now two leaves
+that each fill, so the median leaf reaches 85% of its well against 68% before.
+Larger type on fuller pages, from the same paper.
 
-The leaf is still measured as it will be drawn, and the leading still closes if
+1,650 is where the two costs cross. Larger and the type shrinks back toward the
+page-bound size; smaller and pages split into two half-empty leaves faster than
+the type grows — at 1,500 the median leaf falls from 85% full to 63% for a
+further 5% of type. `tools/measure_english_leaves.py` prints the sweep.
+
+**The hand is measured, not modelled.** It used to be a closed form: characters
+to the line from the face's average advance, lines from the leaf's mass, the two
+solved against the well. The arithmetic was right and the input was not —
+measured on device a line held 56 characters where the model said 42, and a leaf
+filled to its capacity would have overflowed by a tenth, closing its leading,
+which is the one thing the single leading exists to prevent. Now a reference
+block of exactly a leaf's mass is laid out as it will be drawn and the hand is
+the size at which it fills the well. Two passes; a block's height goes as the
+square of the hand, so one step lands it and the second takes up the rounding
+that discrete line counts leave.
+
+The leaf is still measured as it will be drawn, and its leading still closes if
 the block would run past the foot — but only on that leaf, only by the overflow,
 and only because an estimate can be wrong somewhere nobody looked. Being wrong
-there means revelation clipped off the bottom of a page; a leaf set a hair
-tighter than its neighbours is a leaf nobody notices.
+there means revelation clipped off the bottom of a page.
 
-### 13.5 Justified, and deliberately not hyphenated
+### 13.5 Ragged right, and deliberately not hyphenated
 
-`TextAlign.Justify` with `LineBreak.Paragraph`; the last line of a paragraph
-stands where it ends, unlike rule 3.
+`TextAlign.Start` with `LineBreak.Paragraph`.
+
+The mushaf's own rule is that every full line reaches both margins (rule 3) —
+but that is a rule about Arabic, which fills a line by the letterform, and it is
+the calligrapher's art. Latin has only the word space to fill with, and on a
+measure of about fifty characters that is not enough of a lever: the spaces open
+unevenly, the same line's colour changes from one page to the next, and the
+reader pays for a straight right edge with rivers of white running down the
+page. An even rag is the more readable page, and on a phone it is not close.
+
+`LineBreak.Paragraph` stays, and earns more here than it did under
+justification: it breaks the whole block at once rather than greedily line by
+line, which is what makes the rag *even* — the difference between a right edge
+that undulates and one that lurches.
 
 Hyphens are off, and this is load-bearing rather than an omission. Hyphenation
 is the one thing that breaks a *word* across two lines, and
@@ -301,7 +325,9 @@ is the one thing that breaks a *word* across two lines, and
 a tinted wash over a broken word would sweep the width of the whole line.
 (`InkReveal` was taught to advance one wash across a range's line fragments in
 order, because the verse wash below needs exactly that; the tinted layers were
-not.) Anyone turning hyphens on must fix ColorReveal the same way first.
+not.) Anyone turning hyphens on must fix ColorReveal the same way first. Ragged
+setting needs them far less anyway — the rag absorbs the long word that
+justification would have had to stretch a line around.
 
 ### 13.6 The ink says only what is true
 

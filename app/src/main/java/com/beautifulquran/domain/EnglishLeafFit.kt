@@ -27,6 +27,10 @@ import kotlin.math.sqrt
  *    A book is set on one leading. It does not respace its lines because a
  *    page happens to be full, and a reader turning pages sees a change in line
  *    spacing at once — far sooner than they notice a page that ends early.
+ * 4. **The leaf is not the page.** A Madinah page takes as many leaves as its
+ *    English needs at a legible size, which for 71 of the 604 is two. That is
+ *    what stops the heaviest page in the book from setting the type for all of
+ *    them. See `EnglishBook.kt`.
  *
  * Rule 3 is the third answer this setting has given to the same question, and
  * the question is unavoidable: the page boundary comes from the Arabic leaf, so
@@ -55,29 +59,6 @@ import kotlin.math.sqrt
  */
 
 /**
- * The page the hand is cut for, in characters of set prose.
- *
- * With one leading for the whole book (rule 3), the heaviest leaf is what sets
- * the type: it has to fit its well, and every leaf lighter than it then ends
- * short of the foot by exactly as much as it is lighter.
- *
- * Measured over all 604 leaves of `data/quran.db`
- * (`tools/measure_english_leaves.py`, verse translations with their marks and
- * joining spaces) the book runs 1,055 characters at the 1st percentile, 1,286
- * at the 10th, 1,469 at the median, 1,663 at the 90th and 1,997 at the worst,
- * which is page 579. So the anchor is 1,997 and a little over — 3%, because
- * the hand is solved from an *estimate* of how many characters go to a line
- * and the heaviest leaf must not be the one the estimate is wrong about.
- *
- * Leaves therefore fill 71% of the well at the median, 63% at the tenth
- * percentile, and all of it at the worst. That white at the foot is the price
- * of the other two rules, and it is the right one to pay: a reader sees a
- * change of leading between two pages immediately and reads a short page as
- * the end of something.
- */
-const val ENGLISH_LEAF_REFERENCE_PROSE = 2060f
-
-/**
  * The leading the whole book is set on.
  *
  * One number, for every leaf. EB Garamond runs a small x-height and would take
@@ -100,41 +81,60 @@ const val ENGLISH_LEAF_MIN_FONT_PX = 18f
 const val ENGLISH_LEAF_MAX_FONT_PX = 140f
 
 /**
- * A line of ordinary English from this translation, used to measure the
- * face's average character advance. Prose, not a pangram: what matters is
- * the mix of letters and spaces the book is actually set in.
+ * Ordinary prose from this translation, repeated to make the reference block
+ * the hand is cut against.
+ *
+ * Prose, not a pangram: what matters is the mix of letters, spaces and word
+ * lengths the book is actually set in, because where the *lines break* is what
+ * decides how much paper a page takes.
  */
 const val ENGLISH_LEAF_SPECIMEN =
-    "And it is He who created the heavens and the earth in truth."
+    "And it is He who created the heavens and the earth in truth. "
 
 /**
- * The one hand for the whole English book.
+ * A block of exactly the mass a leaf holds, for the hand to be cut against.
  *
- * Solved from rules 1 and 2 together. With `c` the face's average character
- * advance in ems ([charAdvanceEm]), a line of the measure holds
- * `measure / (c · H)` characters and the well holds `well / (ℓ · H)` lines,
- * so a page of `R` characters asks for
+ * A little over it — 5% — because a ragged line ends where its last whole word
+ * ends, half a word short of the measure on average, and the fullest leaf in
+ * the book must not be the one that discovers the difference.
+ */
+fun englishLeafReferenceBlock(): String {
+    val target = (ENGLISH_LEAF_CAPACITY_CHARS * 1.05f).toInt()
+    val out = StringBuilder(target + ENGLISH_LEAF_SPECIMEN.length)
+    while (out.length < target) out.append(ENGLISH_LEAF_SPECIMEN)
+    return out.substring(0, target)
+}
+
+/** Where the hand search starts. Any size works; this one converges in two. */
+const val ENGLISH_LEAF_PROBE_FONT_PX = 40f
+
+/**
+ * The one hand for the whole English book, from a *measurement* rather than a
+ * model: the size at which a full leaf's worth of prose exactly fills the well.
  *
- * ```
- *   R = well · measure / (c · ℓ · H²)      →      H = √(well · measure / (c · ℓ · R))
- * ```
+ * It used to be a closed form — characters to the line from the face's average
+ * advance, lines from the leaf's mass, the two solved against the well. The
+ * arithmetic was right and the input was not: measured on device a line held 56
+ * characters where the advance model said 42, a third out, and a leaf filled to
+ * its capacity would have overflowed by a tenth. Its leading would then have
+ * closed, which is the one thing the book's single leading exists to prevent.
  *
- * which depends only on the leaf, never on the page — and scales the way a
- * book does when it is printed larger: a wider measure takes both more type
- * and more characters to the line.
+ * So nothing is estimated. [measuredHeightPx] is [englishLeafReferenceBlock]
+ * laid out at [probePx] exactly as it will be drawn — same face, same measure,
+ * same rag, same line-breaking — and a block's height goes as the square of the
+ * hand, because it holds `1/k` more characters to the line *and* each line
+ * stands `k` taller. So one step lands it, and the caller takes a second for
+ * the rounding that discrete line counts leave behind.
  */
 fun englishLeafHandPx(
+    probePx: Float,
+    measuredHeightPx: Float,
     wellHeightPx: Float,
-    measureWidthPx: Float,
-    charAdvanceEm: Float,
 ): Float {
-    if (wellHeightPx <= 0f || measureWidthPx <= 0f || charAdvanceEm <= 0f) {
+    if (probePx <= 0f || measuredHeightPx <= 0f || wellHeightPx <= 0f) {
         return ENGLISH_LEAF_MIN_FONT_PX
     }
-    val denominator = charAdvanceEm *
-        ENGLISH_LEAF_LEADING_EM *
-        ENGLISH_LEAF_REFERENCE_PROSE
-    return sqrt(wellHeightPx * measureWidthPx / denominator)
+    return (probePx * sqrt(wellHeightPx / measuredHeightPx))
         .coerceIn(ENGLISH_LEAF_MIN_FONT_PX, ENGLISH_LEAF_MAX_FONT_PX)
 }
 

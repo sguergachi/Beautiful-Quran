@@ -266,22 +266,37 @@ fun ReaderScreen(
         if (mushafMode) viewModel.ensureMushaf()
     }
     val mushafCatalog = mushafUi?.catalog
+    // The English book's leaves. A Madinah page takes more than one where its
+    // English will not fit a leaf at a legible size, so the pager is indexed by
+    // leaf and every leaf still names its page. Null keeps the Arabic leaf on
+    // the identity mapping it has always had.
+    val englishBook = mushafUi?.englishBook?.takeIf { mushafWholeVerses }
+    // Leaf index -> Madinah page, and page -> its first leaf.
+    val leafPage = remember(englishBook) {
+        { index: Int -> englishBook?.leaf(index)?.page ?: (index + 1) }
+    }
+    val pageLeaf = remember(englishBook) {
+        { page: Int -> englishBook?.firstLeafOf(page) ?: (page - 1) }
+    }
     // The leaf the reader asked for, as soon as there is a catalog to ask.
     val mushafOpeningPage = remember(
         mushafCatalog,
+        englishBook,
         surahId,
         startAyah,
         startWordPosition,
         mushafWholeVerses,
     ) {
         val catalog = mushafCatalog ?: return@remember null
+        val ayah = startAyah?.coerceAtLeast(1) ?: 1
         val page = catalog.readingPageOf(
             surahId,
-            startAyah?.coerceAtLeast(1) ?: 1,
+            ayah,
             startWordPosition ?: 1,
             wholeVerses = mushafWholeVerses,
         )
-        (page - 1).coerceIn(0, catalog.pageCount - 1)
+        val leaves = englishBook?.leafCount ?: catalog.pageCount
+        (englishBook?.leafOfVerse(surahId, ayah, page) ?: (page - 1)).coerceIn(0, leaves - 1)
     }
     // Keyed on whether there is a catalog at all, so the state is built once
     // and built knowing where the book opens.
@@ -293,10 +308,10 @@ fun ReaderScreen(
     // because by then the state existed. MushafPager itself is not composed
     // until `mushafUi` is non-null, which is the same composition this key
     // flips on: the first leaf ever mounted is the right one.
-    val mushafPagerState = key(mushafCatalog != null) {
+    val mushafPagerState = key(mushafCatalog != null, englishBook != null) {
         rememberPagerState(
             initialPage = mushafOpeningPage ?: 0,
-            pageCount = { mushafCatalog?.pageCount ?: 1 },
+            pageCount = { englishBook?.leafCount ?: mushafCatalog?.pageCount ?: 1 },
         )
     }
     // Where a dial scrub landed. The reader owns the pager, so the dial hands
@@ -310,7 +325,8 @@ fun ReaderScreen(
     LaunchedEffect(mushafSeekPage) {
         val target = mushafSeekPage ?: return@LaunchedEffect
         val catalog = mushafCatalog ?: return@LaunchedEffect
-        mushafPagerState.scrollToPage((target - 1).coerceIn(0, catalog.pageCount - 1))
+        val leaves = englishBook?.leafCount ?: catalog.pageCount
+        mushafPagerState.scrollToPage(pageLeaf(target).coerceIn(0, leaves - 1))
         mushafSeekPage = null
     }
     // Later navigation only: a chapter opened from the index while the reader
@@ -805,8 +821,10 @@ fun ReaderScreen(
         dispatch(ReaderInteractionEvent.SearchNavigated)
         val catalog = mushafCatalog
         if (mushafMode && catalog != null) {
-            val page = (catalog.pageOf(renderedSurahId, target, 1) - 1)
-                .coerceIn(0, catalog.pageCount - 1)
+            val leaves = englishBook?.leafCount ?: catalog.pageCount
+            val onPage = catalog.pageOf(renderedSurahId, target, 1)
+            val page = (englishBook?.leafOfVerse(renderedSurahId, target, onPage) ?: (onPage - 1))
+                .coerceIn(0, leaves - 1)
             withContext(Dispatchers.Default) {
                 MushafQcfFonts.preload(
                     activityContext,
@@ -846,8 +864,8 @@ fun ReaderScreen(
     // pagerState.currentPage directly here recomposed the entire reader body on
     // every settled page, which is exactly what MushafPager takes such care to
     // avoid by handing playback down as one State.
-    val mushafLeafPage = remember(mushafCatalog) {
-        { mushafPagerState.currentPage + 1 }
+    val mushafLeafPage = remember(mushafCatalog, englishBook) {
+        { leafPage(mushafPagerState.currentPage) }
     }
     // The leaves that open a chapter, walked once when the catalog arrives.
     // These are the dial's coarse tier: it keeps drawing them after the single
@@ -898,14 +916,16 @@ fun ReaderScreen(
             )
         }
     }
-    val mushafLeafSurahId = remember(mushafCatalog) {
-        derivedStateOf { mushafCatalog?.page(mushafPagerState.currentPage + 1)?.primarySurahId }
+    val mushafLeafSurahId = remember(mushafCatalog, englishBook) {
+        derivedStateOf {
+            mushafCatalog?.page(leafPage(mushafPagerState.currentPage))?.primarySurahId
+        }
     }
 
     fun mushafScrolledAyah(): Int? {
         if (!mushafMode) return null
         val catalog = mushafCatalog ?: return null
-        val page = catalog.page(mushafPagerState.currentPage + 1) ?: return null
+        val page = catalog.page(leafPage(mushafPagerState.currentPage)) ?: return null
         return page.ayahKeys
             .filter { it.first == renderedSurahId }
             .minOfOrNull { it.second }
@@ -1021,7 +1041,10 @@ fun ReaderScreen(
                     catalog.pageOf(renderedSurahId, activeAyah, 1)
                 else -> catalog.pageOf(renderedSurahId, lastScrollAyah, 1)
             }
-            val page = (targetPage - 1).coerceIn(0, catalog.pageCount - 1)
+            val leaves = englishBook?.leafCount ?: catalog.pageCount
+            val targetAyah = word?.ayah ?: activeAyah ?: lastScrollAyah
+            val page = (englishBook?.leafOfVerse(renderedSurahId, targetAyah, targetPage)
+                ?: (targetPage - 1)).coerceIn(0, leaves - 1)
             withContext(Dispatchers.Default) {
                 MushafQcfFonts.preload(
                     activityContext,
@@ -2352,16 +2375,23 @@ fun ReaderScreen(
                             val word = activeWordState.value
                             val playbackPage = when {
                                 catalog == null -> null
-                                word != null && isThisSurahPlaying -> catalog.readingPageOf(
-                                    renderedSurahId,
-                                    word.ayah,
-                                    word.wordPosition,
-                                    wholeVerses = mushafWholeVerses,
-                                ) - 1
+                                word != null && isThisSurahPlaying -> {
+                                    val on = catalog.readingPageOf(
+                                        renderedSurahId,
+                                        word.ayah,
+                                        word.wordPosition,
+                                        wholeVerses = mushafWholeVerses,
+                                    )
+                                    englishBook?.leafOfVerse(renderedSurahId, word.ayah, on)
+                                        ?: (on - 1)
+                                }
                                 activeBasmalah == true && isThisSurahPlaying ->
-                                    catalog.firstPageOf(renderedSurahId) - 1
-                                activeAyah != null && isThisSurahPlaying ->
-                                    catalog.pageOf(renderedSurahId, activeAyah, 1) - 1
+                                    pageLeaf(catalog.firstPageOf(renderedSurahId))
+                                activeAyah != null && isThisSurahPlaying -> {
+                                    val on = catalog.pageOf(renderedSurahId, activeAyah, 1)
+                                    englishBook?.leafOfVerse(renderedSurahId, activeAyah, on)
+                                        ?: (on - 1)
+                                }
                                 else -> null
                             }
                             val way = playbackPage?.let {
@@ -2416,18 +2446,19 @@ fun ReaderScreen(
                         mushafReady.catalog,
                         mushafSurahId,
                         mushafWholeVerses,
+                        englishBook,
                     ) {
                         val held = mushafTappedPage ?: return@LaunchedEffect
                         val catalog = mushafReady.catalog
                         snapshotFlow { activeWordState.value }.collect { word ->
                             if (word == null || word.fromTap) return@collect
-                            if (catalog.readingPageOf(
-                                    mushafSurahId,
-                                    word.ayah,
-                                    word.wordPosition,
-                                    wholeVerses = mushafWholeVerses,
-                                ) == held
-                            ) {
+                            val on = catalog.readingPageOf(
+                                mushafSurahId,
+                                word.ayah,
+                                word.wordPosition,
+                                wholeVerses = mushafWholeVerses,
+                            )
+                            if (mushafLeafNumber(englishBook, mushafSurahId, word.ayah, on) == held) {
                                 mushafTappedPage = null
                             }
                         }
@@ -2518,6 +2549,7 @@ fun ReaderScreen(
                         verseNumberScript = settings.verseNumberScript,
                         hideEnglishParentheticals = settings.hideEnglishParentheticals,
                         leafText = viewModel::leafText,
+                        book = englishBook,
                         modifier = Modifier.fillMaxSize(),
                     )
                     }

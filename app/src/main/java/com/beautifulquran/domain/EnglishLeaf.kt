@@ -103,25 +103,37 @@ fun englishLeafVerseKeys(page: MushafPage): List<Pair<Int, Int>> =
  */
 fun englishLeaf(
     page: MushafPage,
+    /**
+     * The verses this leaf carries. Null means the whole page — a Madinah page
+     * that fits one leaf. Where it does not, `EnglishBook` has already cut the
+     * page into leaves and hands each its own slice.
+     */
+    verses: List<Pair<Int, Int>>? = null,
     hideParentheticals: Boolean = false,
     translation: (surahId: Int, ayah: Int) -> String,
 ): EnglishLeaf {
+    val carried = verses?.toHashSet()
     val openings = page.surahStarts.associateBy { it.beforeLineIndex }
     val boundaries = (listOf(0) + openings.keys + page.lines.size).distinct().sorted()
     val blocks = ArrayList<EnglishLeafBlock>(page.surahStarts.size * 2 + boundaries.size)
     boundaries.zipWithNext().forEach { (start, end) ->
-        openings[start]?.let { opening ->
-            blocks += EnglishLeafBlock.ChapterOpening(
-                surahId = opening.surahId,
-                basmalah = surahOpensWithBasmalahPreface(opening.surahId),
-            )
-        }
+        // A chapter's panel belongs to the leaf that carries its first verse,
+        // not to every leaf of the page it opens on.
+        openings[start]
+            ?.takeIf { carried == null || carried.contains(it.surahId to 1) }
+            ?.let { opening ->
+                blocks += EnglishLeafBlock.ChapterOpening(
+                    surahId = opening.surahId,
+                    basmalah = surahOpensWithBasmalahPreface(opening.surahId),
+                )
+            }
         if (start >= end) return@forEach
         val verses = page.lines.subList(start, end)
             .flatMap { it.tokens }
             .filter { it.word.position == 1 }
             .map { it.surahId to it.ayah }
             .distinct()
+            .filter { carried == null || carried.contains(it) }
             .mapNotNull { (surahId, ayah) ->
                 val text = englishVerseProse(translation(surahId, ayah), hideParentheticals)
                 if (text.isEmpty()) {

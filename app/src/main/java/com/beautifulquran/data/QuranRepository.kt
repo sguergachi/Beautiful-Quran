@@ -13,6 +13,7 @@ import com.beautifulquran.data.model.SurahContent
 import com.beautifulquran.data.model.Word
 import com.beautifulquran.data.model.WordMorphology
 import com.beautifulquran.data.model.WordSearchHit
+import com.beautifulquran.domain.ENGLISH_LEAF_MARK_CHARS
 import com.beautifulquran.domain.MushafCatalog
 import com.beautifulquran.domain.MushafSourceWord
 import com.beautifulquran.domain.WORD_SEARCH_MAX_HITS
@@ -131,6 +132,10 @@ class QuranRepository(
     /** Lazily built once — 604 Madinah pages from qcf_page / qcf_line. */
     @Volatile
     private var mushafCatalog: MushafCatalog? = null
+
+    /** Lazily built once — 6,236 verse lengths, for the English book's leaves. */
+    @Volatile
+    private var englishVerseProse: Map<Long, Int>? = null
 
     /**
      * Verse translations for the English leaf, a page at a time.
@@ -255,6 +260,23 @@ class QuranRepository(
             }
             buildMushafCatalog(sources).also { mushafCatalog = it }
         }
+    }
+
+    /**
+     * How long every verse's translation is, keyed by [quranWordKey] at
+     * position 1 — what the English book is paginated by.
+     *
+     * Lengths, not text: 6,236 integers rather than 1.4 MB of strings, and the
+     * pagination only ever asks how much paper a verse takes. Held for the
+     * process lifetime because it is the book's own structure and does not
+     * change.
+     */
+    suspend fun englishVerseProse(): Map<Long, Int> = withContext(Dispatchers.IO) {
+        englishVerseProse ?: queryList(
+            "SELECT surah_id, ayah_number, LENGTH(translation_en) FROM ayahs",
+        ) { c ->
+            quranWordKey(c.getInt(0), c.getInt(1), 1) to c.getInt(2) + ENGLISH_LEAF_MARK_CHARS
+        }.toMap().also { englishVerseProse = it }
     }
 
     /**
