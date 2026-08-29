@@ -38,22 +38,50 @@ class ShareUxTest {
     fun `hold on the verse body reveals Share, it does not fire share`() {
         assertEquals(
             ShareUxAction.ShowPrompt(a),
-            ShareUx.onBodyHold(ShareUxVariant.HOLD, gathering = false, ref = a),
+            ShareUx.onBodyHold(
+                ShareUxVariant.HOLD,
+                gathering = false,
+                prompt = null,
+                ref = a,
+            ),
         )
         assertEquals(
             ShareUxAction.None,
-            ShareUx.onBodyHold(ShareUxVariant.REVEAL, gathering = false, ref = a),
+            ShareUx.onBodyHold(
+                ShareUxVariant.REVEAL,
+                gathering = false,
+                prompt = null,
+                ref = a,
+            ),
         )
         assertEquals(
             ShareUxAction.None,
-            ShareUx.onBodyHold(ShareUxVariant.HOLD, gathering = true, ref = a),
+            ShareUx.onBodyHold(
+                ShareUxVariant.HOLD,
+                gathering = true,
+                prompt = null,
+                ref = a,
+            ),
         )
     }
 
     @Test
-    fun `second tap on the held verse hides the revealed Share`() {
+    fun `holding the same verse again hides the revealed Share`() {
         assertEquals(
             ShareUxAction.HidePrompt,
+            ShareUx.onBodyHold(
+                ShareUxVariant.HOLD,
+                gathering = false,
+                prompt = a,
+                ref = a,
+            ),
+        )
+    }
+
+    @Test
+    fun `hold mark tap does not steal play`() {
+        assertEquals(
+            ShareUxAction.None,
             ShareUx.onMarkTap(
                 ShareUxVariant.HOLD,
                 gathering = false,

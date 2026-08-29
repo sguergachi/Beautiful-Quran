@@ -80,9 +80,6 @@ object ShareUx {
     ): ShareUxAction {
         if (gathering) return ShareUxAction.ToggleVerse(ref)
         if (variant.entersOnMarkTap) return ShareUxAction.EnterShare(ref)
-        if (variant == ShareUxVariant.HOLD && prompt == ref) {
-            return ShareUxAction.HidePrompt
-        }
         return ShareUxAction.None
     }
 
@@ -91,10 +88,11 @@ object ShareUx {
     fun onBodyHold(
         variant: ShareUxVariant,
         gathering: Boolean,
+        prompt: AyahRef?,
         ref: AyahRef,
     ): ShareUxAction {
         if (!variant.usesBodyHold || gathering) return ShareUxAction.None
-        return ShareUxAction.ShowPrompt(ref)
+        return if (prompt == ref) ShareUxAction.HidePrompt else ShareUxAction.ShowPrompt(ref)
     }
 
     fun onVerseTap(gathering: Boolean, ref: AyahRef): ShareUxAction =

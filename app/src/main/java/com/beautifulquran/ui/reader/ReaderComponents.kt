@@ -40,7 +40,10 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -2765,10 +2768,11 @@ fun AyahBlock(
                 val wash = gold.copy(alpha = soak * washAlpha)
                 val fade = gold.copy(alpha = 0f)
                 drawRect(
-                    brush = Brush.radialGradient(
-                        colors = listOf(wash, fade),
-                        center = Offset(size.width * 0.5f, size.height * 0.45f),
-                        radius = size.maxDimension * 0.72f,
+                    brush = Brush.verticalGradient(
+                        0f to fade,
+                        0.14f to wash,
+                        0.86f to wash,
+                        1f to fade,
                     ),
                 )
             },
@@ -2941,6 +2945,7 @@ fun AyahBlock(
                     ordinal = gatherOrdinal,
                     side = bookmarkSide,
                     chromeAlpha = bookmarkChromeAlpha,
+                    onClick = onAyahClick,
                     modifier = Modifier
                         .align(
                             if (bookmarkSide == AyahSelectorSide.RIGHT) {
@@ -2988,23 +2993,21 @@ fun AyahBlock(
     }
 }
 
-/** Quiet ink "Share" under the verse. Furniture, not illumination. */
+/** Quiet share glyph under the current verse. Furniture, not illumination. */
 @Composable
 private fun ShareInkVerb(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Text(
-        text = "Share",
-        style = MaterialTheme.typography.labelLarge,
-        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.78f),
+    Icon(
+        Icons.Rounded.Share,
+        contentDescription = "Share",
+        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
         modifier = modifier
+            .size(40.dp)
             .quietClickable(onClick = onClick)
-            .padding(horizontal = 4.dp, vertical = 6.dp)
-            .semantics {
-                role = Role.Button
-                contentDescription = "Share"
-            },
+            .padding(8.dp)
+            .semantics { role = Role.Button },
     )
 }
 
@@ -3018,6 +3021,7 @@ private fun GatherOrdinalMark(
     ordinal: Int,
     side: AyahSelectorSide,
     chromeAlpha: () -> Float,
+    onClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     Text(
@@ -3028,7 +3032,14 @@ private fun GatherOrdinalMark(
         modifier = modifier
             .width(44.dp)
             .graphicsLayer { alpha = chromeAlpha() }
-            .padding(horizontal = 6.dp),
+            .then(
+                if (onClick != null) {
+                    Modifier.quietClickable(onClick = onClick)
+                } else {
+                    Modifier
+                },
+            )
+            .padding(horizontal = 6.dp, vertical = 6.dp),
     )
 }
 

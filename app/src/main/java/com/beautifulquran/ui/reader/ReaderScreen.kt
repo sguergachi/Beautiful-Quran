@@ -1615,7 +1615,10 @@ fun ReaderScreen(
                         chromeAlpha = { chromeAlpha.value },
                         reciterName = uiState.currentReciter?.name.orEmpty(),
                         onShare = if (shareUx.usesBarIcon) {
-                            { onShareVerb(surahId, selectedPlaybackAyah()) }
+                            {
+                                haptics.performHapticFeedback(HapticFeedbackType.ContextClick)
+                                onShareVerb(surahId, selectedPlaybackAyah())
+                            }
                         } else {
                             null
                         },
@@ -2815,6 +2818,7 @@ fun ReaderScreen(
                                 showShareVerb = !gathering && (
                                     (
                                         shareUx.revealsOnCurrent &&
+                                            !recitingActive &&
                                             if (isThisSurahPlaying) {
                                                 policyActive
                                             } else {

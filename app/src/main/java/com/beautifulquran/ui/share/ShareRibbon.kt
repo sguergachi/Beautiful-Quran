@@ -30,12 +30,13 @@ import androidx.compose.ui.unit.dp
 import com.beautifulquran.ui.theme.SerifFontFamily
 
 /**
- * Replaces the player bar while gathering. Same five-slot geometry as
- * [com.beautifulquran.ui.reader.PlayerBar]: two 48 dp controls, a 56 dp
- * centre, two 48 dp controls — so the count sits on the page's centre line
- * the way Play does. Trailing spacer matches Close.
+ * Replaces the player bar while gathering. Same two-row paper as
+ * [com.beautifulquran.ui.reader.PlayerBar]:
  *
- * Close · Text · N · Image · —
+ * - Top row: Close in the trailing 48 dp slot (where the Icon-variant
+ *   share glyph sits).
+ * - Transport row: Text · N · Image, 48/56/48, with matching 48 dp
+ *   outer slots so N sits on the page centre line the way Play does.
  */
 @Composable
 fun ShareRibbon(
@@ -51,6 +52,7 @@ fun ShareRibbon(
     val busy = preparingText || preparingImage
     val canExport = count >= 1 && !busy
     val exportTint = if (canExport) ink else ink.copy(alpha = 0.35f)
+    val slot = if (compact) 4.dp else 12.dp
 
     Surface(color = MaterialTheme.colorScheme.background) {
         Column(
@@ -61,8 +63,25 @@ fun ShareRibbon(
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Spacer(Modifier.size(48.dp))
+                Spacer(Modifier.weight(1f))
+                IconButton(
+                    onClick = onCancel,
+                    modifier = Modifier.size(48.dp),
+                ) {
+                    Icon(
+                        Icons.Rounded.Close,
+                        contentDescription = "Cancel share",
+                        tint = ink.copy(alpha = 0.55f),
+                    )
+                }
+            }
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(
-                    if (compact) 4.dp else 12.dp,
+                    slot,
                     Alignment.CenterHorizontally,
                 ),
                 modifier = Modifier
@@ -74,16 +93,7 @@ fun ShareRibbon(
                         bottom = 4.dp,
                     ),
             ) {
-                IconButton(
-                    onClick = onCancel,
-                    modifier = Modifier.size(48.dp),
-                ) {
-                    Icon(
-                        Icons.Rounded.Close,
-                        contentDescription = "Cancel share",
-                        tint = ink,
-                    )
-                }
+                Spacer(Modifier.size(48.dp))
                 IconButton(
                     onClick = onShareText,
                     enabled = canExport,
@@ -108,7 +118,8 @@ fun ShareRibbon(
                     modifier = Modifier
                         .size(56.dp)
                         .semantics {
-                            contentDescription = if (count == 1) "1 verse" else "$count verses"
+                            contentDescription =
+                                if (count == 1) "1 verse" else "$count verses"
                         },
                 ) {
                     Text(

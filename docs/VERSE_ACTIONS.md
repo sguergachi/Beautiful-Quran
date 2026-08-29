@@ -195,14 +195,15 @@ Developer → **Verse share** (off by default; requires developer mode):
 | Toggle | What you see | Why it might be the one |
 |---|---|---|
 | **Icon** | Android share glyph on the play bar (current verse) | The phone-wide pattern. One meaning: share this verse |
-| **Reveal** | The word **Share** under the verse you are on | The action is on the thing it acts on. No secret tap |
-| **Hold** | Hold the verse (translation or `﴿N﴾`) → Share appears | The OS “what can I do with this” gesture. Word hold stays Root Viewer |
+| **Reveal** | Share glyph under the verse you are on (paused) | The action is on the thing it acts on. No secret tap |
+| **Hold** | Hold the verse (translation or `﴿N﴾`) → Share glyph | The OS “what can I do with this” gesture. Word hold stays Root Viewer |
 | **Mark** | Tap `﴿N﴾` | Verse handle. Least obvious; kept for comparison |
 
-All four then share: tap more verses to add/drop (wash + Western margin
-ordinal). The gather bar matches the play bar’s five-slot geometry:
-Close · Text · N · Image, count on the centre line. No Send page on the
-happy path; back dismisses prompt or leaves gather.
+All four then share: tap more verses (or their ordinal) to add/drop.
+The gather bar matches the play bar’s two rows: Close in the trailing
+top slot; Text · N · Image on the transport row, count on the centre
+line. No Send page on the happy path; back dismisses prompt or leaves
+gather.
 
 Policy lives in `share/ShareUx.kt` (pure, JVM-tested). Do not invent
 entry rules in `ReaderScreen`.

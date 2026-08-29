@@ -119,7 +119,7 @@ class ShareViewModel(
     }
 
     /**
-     * Verse-first enter: that ayah is already selected (`١`), playback paused,
+     * Verse-first enter: that ayah is already selected (`1`), playback paused,
      * prompt dismissed. Used by every test design's Share verb / lift.
      */
     fun enterShare(surahId: Int, ayah: Int) {
@@ -169,6 +169,7 @@ class ShareViewModel(
             ShareUx.onBodyHold(
                 variant = variant,
                 gathering = _ui.value.gathering,
+                prompt = _ui.value.prompt,
                 ref = AyahRef(surahId, ayah),
             ),
         )
