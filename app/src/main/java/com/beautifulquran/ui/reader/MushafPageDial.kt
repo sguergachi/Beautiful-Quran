@@ -1848,6 +1848,7 @@ internal fun MushafPageDial(
                                     )
                                 ) {
                                     cancelled = true
+                                    view.performHapticFeedback(HapticFeedbackConstants.CONTEXT_CLICK)
                                     dialPage.floatValue = settledState.value.toFloat()
                                     hudRipe.floatValue = 0f
                                     hudShown = false

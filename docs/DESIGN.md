@@ -116,7 +116,8 @@ after the first stroke that ran past an end, neither end means anything any
 more.
 
 The comb is cancellable by the same grammar that backs out of its magnified
-trough: pull upward off the rule and it folds away without turning the leaf.
+trough: pull upward off the rule and a click confirms that it folds away
+without turning the leaf.
 One pull spends one tier only. A pull out of the leaf trough returns to the
 chapter comb; the hand must return to the rule before another upward pull can
 cancel that comb. Letting go still chooses the chapter under the finger.
