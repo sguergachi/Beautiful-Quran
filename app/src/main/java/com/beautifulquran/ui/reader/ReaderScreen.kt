@@ -296,10 +296,20 @@ fun ReaderScreen(
     // Read as a lambda by the pager, so a hand landing on the rule fades the
     // folio without recomposing 604 leaves' worth of reader around it.
     val mushafScrubbing = remember { mutableStateOf(false) }
+    val activityContext = LocalContext.current
     LaunchedEffect(mushafSeekPage) {
         val target = mushafSeekPage ?: return@LaunchedEffect
         val catalog = mushafCatalog ?: return@LaunchedEffect
-        mushafPagerState.scrollToPage((target - 1).coerceIn(0, catalog.pageCount - 1))
+        val page = (target - 1).coerceIn(0, catalog.pageCount - 1)
+        // A distant leaf has no resident face; warm it while the thumb glides
+        // home instead of making its first composition race the font load.
+        withContext(Dispatchers.Default) {
+            MushafQcfFonts.preload(
+                activityContext,
+                mushafFontPreloadPages(page, catalog.pageCount),
+            )
+        }
+        mushafPagerState.scrollToPage(page)
         mushafSeekPage = null
     }
     // Later navigation only: a chapter opened from the index while the reader
@@ -309,7 +319,6 @@ fun ReaderScreen(
     // leaf composing without a resident face holds blank for its face wait
     // and then fades in, which read as the whole screen flashing out and
     // back when play loaded another chapter.
-    val activityContext = LocalContext.current
     LaunchedEffect(mushafOpeningPage) {
         val page = mushafOpeningPage ?: return@LaunchedEffect
         if (mushafPagerState.currentPage == page) return@LaunchedEffect

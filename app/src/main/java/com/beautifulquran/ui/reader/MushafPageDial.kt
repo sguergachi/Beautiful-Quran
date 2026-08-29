@@ -1821,7 +1821,7 @@ internal fun MushafPageDial(
                                 // meter names the proportional target and a
                                 // soft spring chases it, so the label lags
                                 // the hand and settles instead of riding it.
-                                if (!cancelled && (open || !troughPopped)) {
+                                if (open || !troughPopped) {
                                     // The trough may leave either side of the
                                     // rule. The chapter tier leaves only up,
                                     // into the leaf, so a downward roll there
@@ -1905,7 +1905,6 @@ internal fun MushafPageDial(
                                     }
                                     continue
                                 }
-                                if (cancelled) continue
                                 // One pull spends one tier. After a trough
                                 // pop, the hand must come home before another
                                 // upward pull can dismiss the chapter comb.
@@ -1932,7 +1931,9 @@ internal fun MushafPageDial(
                                             spring(dampingRatio = 1f, stiffness = 150f),
                                         )
                                     }
-                                    continue
+                                    // The pointer loop still consumes the hand
+                                    // until lift; the hidden dial needs no clock.
+                                    break
                                 }
                                 // The chapter tier, read against the stable
                                 // cells: the finger's place along the measure
@@ -2182,9 +2183,10 @@ internal fun MushafPageDial(
         )
         val backPage = returnPage.intValue
         if (backPage != 0) {
-            // This is physical dial direction, independent of text direction.
+            // Settled keeps this physical direction live after another turn;
+            // the stored landing direction covers the seek's first frame.
             @Suppress("DEPRECATION")
-            val returnIcon = when (returnWay.value) {
+            val returnIcon = when (mushafReturnWay(settled, backPage) ?: returnWay.value) {
                 MushafReturnWay.Left -> Icons.Rounded.ArrowBack
                 MushafReturnWay.Right -> Icons.Rounded.ArrowForward
             }
