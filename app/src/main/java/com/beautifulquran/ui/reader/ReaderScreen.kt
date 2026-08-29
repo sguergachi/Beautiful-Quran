@@ -256,6 +256,13 @@ fun ReaderScreen(
     // one ayah block — never the whole screen.
     val activeWordState = viewModel.activeWord.collectAsStateWithLifecycle()
     val settings by viewModel.settings.settings.collectAsStateWithLifecycle()
+    // Snapshot once for this visit. The stored place keeps advancing behind
+    // the page, but its ribbon stays where the previous session left it.
+    val parkedPlaceAyah = remember(surahId) {
+        viewModel.settings.settings.value.let { saved ->
+            saved.readingPlaceAyah.takeIf { saved.readingPlaceSurah == surahId }
+        }
+    }
     val mushafUi by viewModel.mushaf.collectAsStateWithLifecycle()
     val mushafMode = settings.readingLayout == ReadingLayout.MUSHAF
     LaunchedEffect(mushafMode) {
@@ -715,9 +722,12 @@ fun ReaderScreen(
     // Track the verse under the reading line for Assistant "bookmark this".
     // Continue Listening only advances when audio is actually playing
     // (see [ReaderViewModel.onAyahBecameActive] / play paths).
-    LaunchedEffect(scrolledAyah.value, surahId) {
+    LaunchedEffect(scrolledAyah.value, surahId, initialFocusSettled) {
         val ayah = scrolledAyah.value
-        if (ayah >= 1) viewModel.onAyahBecameActive(ayah)
+        if (ayah >= 1) {
+            viewModel.onAyahBecameActive(ayah)
+            if (initialFocusSettled && !mushafMode) viewModel.updateReadingPlace(ayah)
+        }
     }
 
     // While reciting, chrome recedes into the paper — the words and core
@@ -898,6 +908,13 @@ fun ReaderScreen(
         return page.ayahKeys
             .filter { it.first == renderedSurahId }
             .minOfOrNull { it.second }
+    }
+
+    LaunchedEffect(mushafMode, renderedSurahId, initialFocusSettled, mushafCatalog) {
+        if (!mushafMode || !initialFocusSettled || mushafCatalog == null) return@LaunchedEffect
+        snapshotFlow { mushafScrolledAyah() }.collect { ayah ->
+            if (ayah != null) viewModel.updateReadingPlace(ayah)
+        }
     }
 
     /**
@@ -2662,11 +2679,6 @@ fun ReaderScreen(
                                     ayah.number == inkAyah || ayah.number == leadAyah
                                 }
                             }
-                            // Per-verse derived read so scrolling only recomposes
-                            // the two ayahs whose focus bit flips, not every block.
-                            val bookmarkFocused by remember(ayah.number) {
-                                derivedStateOf { scrolledAyah.value == ayah.number }
-                            }
                             val bookmarked = ayah.number in bookmarkedAyahs
                             val bookmarkLessonTarget = bookmarkNoteTipOpen &&
                                 bookmarkNoteTipSurah == ayah.surahId &&
@@ -2734,7 +2746,7 @@ fun ReaderScreen(
                                 // collected projection can arrive one frame after
                                 // the lesson. Keep its live anchor ruby meanwhile.
                                 bookmarked = ribbonBookmarked,
-                                bookmarkFocused = bookmarkFocused,
+                                placeMarked = ayah.number == parkedPlaceAyah,
                                 bookmarkChromeAlpha = bookmarkChromeAlpha,
                                 // Keep the lesson target live so its taught hold
                                 // can be completed without leaving the paper.
@@ -2991,6 +3003,7 @@ fun ReaderScreen(
                     side = selectorSide,
                     currentAyah = railCurrentAyah,
                     currentPosition = railCurrentPosition,
+                    placeAyah = parkedPlaceAyah,
                     bookmarkedAyahs = bookmarkedAyahs,
                     pageStarts = railPageStarts,
                     chromeAlpha = { topBarAlpha.value },

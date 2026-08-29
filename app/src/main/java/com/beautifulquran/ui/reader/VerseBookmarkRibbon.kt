@@ -45,7 +45,7 @@ import kotlin.math.sin
  * A verse's own bookmark ribbon — ink that belongs to the ayah block, not a
  * floating overlay. Lives in the block's outer margin (opposite the ayah
  * selector). Idle: just the swallowtail tip of the ribbon, soft and quiet.
- * Current: that tip fills green to mark the live reading line.
+ * Parked place: a full green ribbon from the previous reading session.
  * Saved: the ruby strip down the block, stopping short of the next verse's tip.
  * Tap the margin to mark / unmark.
  *
@@ -66,9 +66,17 @@ private const val NOTCH_DP = 5.5f
 private const val WAVE_AMP_DP = 4.5f    // cloth sway while unfurling
 private const val SETTLE_AMP_DP = 3.2f  // final flutter amplitude
 private const val NUB_STROKE_DP = 1.25f // idle outline: affordance, not a mark
+private const val RIBBON_GAP_DP = 3f     // two physical ribbons, never one overpainted strip
 private const val OVERSHOOT = 0.06f     // tip past the resting length, then spring back
 private const val SOLID_ALPHA = 0.92f
 private const val IDLE_NUB_ALPHA = 0.4f // quiet affordance when just the tail is showing
+
+/** Green uses the ordinary ribbon lane alone, then moves inward beside ruby. */
+internal fun placeRibbonInsetDp(
+    bookmarked: Boolean,
+    edgeInsetDp: Float,
+    ribbonWidthDp: Float,
+): Float = edgeInsetDp + if (bookmarked) ribbonWidthDp + RIBBON_GAP_DP else 0f
 
 /** Gravity spill: slow peel, then accelerates, eases as length runs out. */
 private val UnfurlEasing = CubicBezierEasing(0.45f, 0.02f, 0.22f, 1f)
@@ -84,8 +92,8 @@ private val RetractEasing = CubicBezierEasing(0.55f, 0.05f, 0.35f, 1f)
 @Composable
 internal fun VerseBookmarkRibbon(
     bookmarked: Boolean,
-    /** True for the live reading-line verse; draws the short green place tab. */
-    focused: Boolean,
+    /** True for the place parked at the end of the previous reading session. */
+    placeMarked: Boolean,
     side: AyahSelectorSide,
     chromeAlpha: () -> Float,
     interactive: Boolean,
@@ -252,10 +260,6 @@ internal fun VerseBookmarkRibbon(
             fun ax(logicalX: Float): Float =
                 if (mirrored) size.width - logicalX else logicalX
 
-            val outer = edgeInsetPx
-            val inner = edgeInsetPx + ribbonW
-            val center = edgeInsetPx + ribbonW / 2f
-
             val progress = unfurl.value.coerceAtLeast(0f)
             val tipY = if (progress <= 0.001f) {
                 retractedTipY
@@ -292,13 +296,20 @@ internal fun VerseBookmarkRibbon(
 
             // Always a swallowtail tip — idle "nub" is just that tip, short and
             // faded; a saved mark is the same shape grown to the block bottom.
-            fun ribbonPath(bottom: Float, clothMotion: Boolean) = Path().apply {
+            fun ribbonPath(
+                bottom: Float,
+                clothMotion: Boolean,
+                inset: Float = edgeInsetPx,
+            ) = Path().apply {
                 val top = topInsetPx + topFold
                 val bot = bottom.coerceAtLeast(topInsetPx + nubLen * 0.6f)
                 val span = (bot - top).coerceAtLeast(1f)
                 val notchDepth = minOf(notch, span * 0.45f)
                 val steps = (span / 3f).toInt().coerceIn(6, 64)
                 fun motion(y: Float) = if (clothMotion) lateral(y) else 0f
+                val outer = inset
+                val inner = inset + ribbonW
+                val center = inset + ribbonW / 2f
                 val outerTop = ax(outer + motion(top))
                 val innerTop = ax(inner + motion(top))
                 moveTo(outerTop, top)
@@ -317,6 +328,26 @@ internal fun VerseBookmarkRibbon(
             }
             val path = ribbonPath(tipY, clothMotion = true)
 
+            if (placeMarked) {
+                val placeInset = placeRibbonInsetDp(
+                    bookmarked = bookmarked,
+                    edgeInsetDp = edgeInset.value,
+                    ribbonWidthDp = ribbonWidth.value,
+                ).dp.toPx()
+                val fill = Brush.verticalGradient(
+                    0f to currentPlaceGreen,
+                    0.55f to currentPlaceGreen,
+                    1f to currentPlaceGreen.copy(alpha = 0.82f),
+                    startY = topInsetPx,
+                    endY = fullLen.coerceAtLeast(1f),
+                )
+                drawPath(
+                    path = ribbonPath(fullLen, clothMotion = false, inset = placeInset),
+                    brush = fill,
+                    alpha = chrome * SOLID_ALPHA,
+                )
+            }
+
             if (showingRibbon) {
                 val fill = Brush.verticalGradient(
                     0f to ruby,
@@ -326,7 +357,7 @@ internal fun VerseBookmarkRibbon(
                     endY = tipY.coerceAtLeast(1f),
                 )
                 drawPath(path, fill, alpha = alpha)
-            } else if (!focused) {
+            } else if (!placeMarked) {
                 // An unmarked verse gets an empty ribbon silhouette. Ruby fill
                 // is reserved for the reader's saved marks.
                 drawPath(
@@ -338,16 +369,6 @@ internal fun VerseBookmarkRibbon(
                         cap = StrokeCap.Round,
                         join = StrokeJoin.Round,
                     ),
-                )
-            }
-            if (focused) {
-                // A short green tab marks the verse at the reading line. It
-                // caps a saved ruby ribbon instead of replacing it, preserving
-                // both "current place" and "my mark" at the same ayah.
-                drawPath(
-                    path = ribbonPath(retractedTipY, clothMotion = false),
-                    color = currentPlaceGreen,
-                    alpha = chrome * 0.92f,
                 )
             }
         }

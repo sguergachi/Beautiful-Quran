@@ -973,26 +973,33 @@ weight.
 
 ## Current-place ribbon
 
-The verse at the scroll reader's live reading line owns one short green
-swallowtail. It caps the verse's existing ribbon tip at the first ink line;
-when that verse is also saved, the green tab remains over the head of the
-full ruby cloth so current place and bookmark never erase one another. During
-recitation the word wash already names the place, so the tab follows the same
-chrome fade as the bookmark ribbon and ayah rail.
+The green ribbon is the place left at the end of a reading visit, never a live
+cursor. A fresh visit has no green cloth. As the reader moves, its focused
+verse is recorded behind the paper without displaying a moving mark. Leaving
+exposes that place beside its surah on Chapters; returning snapshots it onto
+that verse for the whole new visit. Reading onward leaves the ribbon behind,
+like opening a physical book at its marker and moving through the pages.
 
-The same mark repeats at two scales. Away from the live reader, its persisted
-counterpart is the last verse actually recited: Chapters puts the green
-swallowtail in the permanently reserved 28 dp outer lane beside that surah,
-without shifting its number or names. The ayah rail recolors the nearest
-existing collapsed bar green rather than adding another tick; in the expanded
-wheel that ayah is green until the gold scrub focus reaches it. A bookmarked
-current ayah keeps its ruby number while its rail tick is green, preserving
-both meanings. Continue Listening remains the explicit text route to the same
-persisted position. Scrolling moves the live reader mark but does not rewrite
-that history; opening or previewing a rail destination does not either.
+The verse mark is a **full ribbon**, with the same top, tail, and block-length
+as a saved ruby bookmark. When one verse owns both meanings, ruby keeps the
+outer lane and green runs beside it in the inner lane with 3 dp of paper
+between them. Neither cloth overlays, caps, recolors, or replaces the other.
+During recitation both follow the existing chrome fade because the word wash
+already names the live position.
+
+Chapters uses the full green swallowtail in its permanently reserved 28 dp
+outer lane without shifting the chapter's number or names. Tapping that marked
+chapter returns to the parked ayah. The ayah rail recolors the nearest existing
+collapsed bar green rather than adding another tick; in the expanded wheel
+that parked ayah is green until gold scrub focus reaches it. A bookmarked
+parked ayah keeps its ruby number while its rail tick is green. Continue
+Listening remains separate: it records the last verse actually heard, while
+the ribbon records the reading line whether the visit used audio or silent
+reading.
 
 Implementation: `ui/reader/VerseBookmarkRibbon.kt`,
 `ui/reader/AyahSelectorRail.kt`, and `ui/home/HomeScreen.kt` over
+`Settings.readingPlaceSurah` / `readingPlaceAyah` and
 `HomeUiState.currentPlace`.
 
 ## Bookmark ribbon

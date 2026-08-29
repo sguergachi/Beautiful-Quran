@@ -457,7 +457,7 @@ private fun BookmarkAyahRow(
         Box(Modifier.matchParentSize()) {
             VerseBookmarkRibbon(
                 bookmarked = true,
-                focused = true,
+                placeMarked = false,
                 side = AyahSelectorSide.LEFT,
                 chromeAlpha = { 1f },
                 interactive = !editingAnnotation,

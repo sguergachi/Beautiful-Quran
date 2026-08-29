@@ -70,6 +70,10 @@ data class Settings(
     /** Continue Listening — last verse actually recited (not mere open/scroll). */
     val lastSurah: Int = 0,
     val lastAyah: Int = 1,
+    /** Ribbon place — latest verse under the reading line. It is rendered only
+     * after leaving and returning, never as a live cursor during that session. */
+    val readingPlaceSurah: Int = 0,
+    val readingPlaceAyah: Int = 1,
     /** Unlocks the Timings Lab and the word-hold chooser. Toggled by
      *  repeatedly tapping the Settings logo; persisted so the reader can
      *  honour it. See docs/ROOT_VIEWER.md and docs/TIMINGS_LAB.md. */
@@ -132,6 +136,8 @@ class SettingsRepository(context: Context) {
         ayahSelectorSide = prefs.enum("ayahSelectorSide", AyahSelectorSide.LEFT),
         lastSurah = prefs.getInt("lastSurah", 0),
         lastAyah = prefs.getInt("lastAyah", 1),
+        readingPlaceSurah = prefs.getInt("readingPlaceSurah", 0),
+        readingPlaceAyah = prefs.getInt("readingPlaceAyah", 1),
         developerModeEnabled = prefs.getBoolean("developerModeEnabled", false),
         educationGuidesEnabled = prefs.getBoolean("educationGuidesEnabled", false),
         inkLabEnabled = prefs.getBoolean("inkLabEnabled", false),
@@ -153,6 +159,17 @@ class SettingsRepository(context: Context) {
         prefs.edit {
             putInt("lastSurah", surah)
             putInt("lastAyah", ayah)
+        }
+    }
+
+    /** Saves the place where the reader would leave its physical ribbon. */
+    fun updateReadingPlace(surah: Int, ayah: Int) {
+        val current = _settings.value
+        if (current.readingPlaceSurah == surah && current.readingPlaceAyah == ayah) return
+        _settings.value = current.copy(readingPlaceSurah = surah, readingPlaceAyah = ayah)
+        prefs.edit {
+            putInt("readingPlaceSurah", surah)
+            putInt("readingPlaceAyah", ayah)
         }
     }
 
@@ -189,6 +206,8 @@ class SettingsRepository(context: Context) {
             putInt("ayahSelectorSide", next.ayahSelectorSide.ordinal)
             putInt("lastSurah", next.lastSurah)
             putInt("lastAyah", next.lastAyah)
+            putInt("readingPlaceSurah", next.readingPlaceSurah)
+            putInt("readingPlaceAyah", next.readingPlaceAyah)
             putBoolean("developerModeEnabled", next.developerModeEnabled)
             putBoolean("educationGuidesEnabled", next.educationGuidesEnabled)
             putBoolean("inkLabEnabled", next.inkLabEnabled)

@@ -324,7 +324,13 @@ fun HomeScreen(
                                     ?.ayah,
                                 onClick = {
                                     focusManager.clearFocus()
-                                    onOpenSurah(surah.id, uiState.ayahTarget, null)
+                                    onOpenSurah(
+                                        surah.id,
+                                        uiState.ayahTarget ?: uiState.currentPlace
+                                            ?.takeIf { it.surah.id == surah.id }
+                                            ?.ayah,
+                                        null,
+                                    )
                                 },
                             )
                         }
@@ -519,7 +525,7 @@ private fun HomeBookmarkOverlay(
 
         VerseBookmarkRibbon(
             bookmarked = true,
-            focused = true,
+            placeMarked = false,
             side = AyahSelectorSide.LEFT,
             chromeAlpha = { 1f },
             interactive = false,
@@ -567,7 +573,7 @@ private fun SavedPassagesRow(
         ) {
             VerseBookmarkRibbon(
                 bookmarked = true,
-                focused = true,
+                placeMarked = false,
                 side = AyahSelectorSide.LEFT,
                 chromeAlpha = { 1f },
                 interactive = false,
@@ -652,7 +658,7 @@ private fun SurahRow(surah: Surah, currentAyah: Int?, onClick: () -> Unit) {
         if (currentAyah != null) {
             VerseBookmarkRibbon(
                 bookmarked = false,
-                focused = true,
+                placeMarked = true,
                 side = AyahSelectorSide.LEFT,
                 chromeAlpha = { 1f },
                 interactive = false,
@@ -660,6 +666,7 @@ private fun SurahRow(surah: Surah, currentAyah: Int?, onClick: () -> Unit) {
                 edgeInset = HomeRibbonGutter,
                 ribbonWidth = HomeRibbonWidth,
                 topInset = 0.dp,
+                bottomGap = 0.dp,
                 modifier = Modifier
                     .width(HomeRibbonLane)
                     .height(44.dp)

@@ -1006,6 +1006,11 @@ class ReaderViewModel(
         focusedAyah = ayah
     }
 
+    /** Parks the green reading ribbon without changing Continue Listening. */
+    fun updateReadingPlace(ayah: Int) {
+        if (surahId in 1..114 && ayah >= 1) settings.updateReadingPlace(surahId, ayah)
+    }
+
     /**
      * The verse currently being recited advanced (or play started on it).
      * Updates Continue Listening — never call this for bare scroll/jump.

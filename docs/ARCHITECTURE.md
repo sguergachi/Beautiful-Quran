@@ -376,15 +376,19 @@ definition of full support live in
 [`docs/ASSISTANT.md`](ASSISTANT.md). Keep that document current whenever an
 Assistant, media-catalog, deep-link, or AppFunctions contract changes.
 
-Continue Listening (`settings.lastSurah` / `lastAyah`) and the Chapters green
-current-place ribbon update only when a verse is actually recited — not on
-open, scroll, or rail jump. In the open scroll reader, the green tab and ayah
-rail tick instead share `ReaderFocusController`'s live focused verse. The
-persisted position is keyed on the
+Continue Listening (`settings.lastSurah` / `lastAyah`) is keyed on the
 **playing media item**, never on the reader's fade-led focus target: that target
 names the next verse up to `InkEngine.fadeLeadMs` before a note of it is heard.
 Writes go through `SettingsRepository.updateListeningPosition`, which touches
 only the two position keys and no-ops when the position is unchanged.
+
+The green place ribbon is separate (`readingPlaceSurah` /
+`readingPlaceAyah`). `ReaderFocusController` records its focused verse, but a
+reader visit snapshots the previously stored place once: the full green ribbon
+and green rail tick remain parked there instead of following live focus.
+Chapters observes the new stored place after the reader sheet covers it, and a
+tap on that marked chapter returns to its parked ayah. This makes silent
+reading mark a place without changing Continue Listening's audio semantics.
 
 ## UI structure
 
