@@ -389,6 +389,9 @@ and green rail tick remain parked there instead of following live focus.
 Chapters observes the new stored place after the reader sheet covers it, and a
 tap on that marked chapter returns to its parked ayah. This makes silent
 reading mark a place without changing Continue Listening's audio semantics.
+Once a return to Chapters commits and its outer ribbon lane nears the screen
+edge, that parked cloth unfurls into the row; an abandoned back swipe does not
+spend the reveal.
 
 ## UI structure
 

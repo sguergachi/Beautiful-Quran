@@ -115,6 +115,10 @@ fun HomeScreen(
     /** True while the paper stack is on (or near) the chapter list — drives
      *  the floating transport's enter/exit across page turns. */
     coverSheetVisible: Boolean = true,
+    /** A reader turn has committed, so its parked place should be revealed on return. */
+    readerVisitActive: Boolean = false,
+    /** The returning chapter sheet is close enough to prepare its entering ribbon lane. */
+    chapterRibbonReady: Boolean = true,
     /** Number of saved verses; zero removes the Home-page ribbon entirely. */
     bookmarkCount: Int = 0,
     bookmarkStyle: HomeBookmarkStyle = HomeBookmarkStyle.TOP_BOUND,
@@ -174,6 +178,8 @@ fun HomeScreen(
     var previousBookmarkCount by remember { mutableIntStateOf(bookmarkCount) }
     var ribbonUnfurlPending by remember { mutableStateOf(false) }
     var ribbonUnfurlEpoch by remember { mutableIntStateOf(0) }
+    var placeRibbonUnfurlPending by remember { mutableStateOf(false) }
+    var placeRibbonUnfurlEpoch by remember { mutableIntStateOf(0) }
 
     // A mark is normally added on Reader while Home is covered. Remember that
     // event, then begin the long unfurl only once the page turn exposes Home.
@@ -185,6 +191,21 @@ fun HomeScreen(
         if (coverSheetVisible && ribbonUnfurlPending) {
             ribbonUnfurlEpoch++
             ribbonUnfurlPending = false
+        }
+    }
+    LaunchedEffect(readerVisitActive) {
+        if (readerVisitActive) placeRibbonUnfurlPending = true
+    }
+    LaunchedEffect(chapterRibbonReady, placeRibbonUnfurlPending, uiState.currentPlace) {
+        if (
+            shouldUnfurlReadingPlaceRibbon(
+                pendingReturn = placeRibbonUnfurlPending,
+                chapterRibbonReady = chapterRibbonReady,
+                currentPlacePresent = uiState.currentPlace != null,
+            )
+        ) {
+            placeRibbonUnfurlEpoch++
+            placeRibbonUnfurlPending = false
         }
     }
 
@@ -322,6 +343,7 @@ fun HomeScreen(
                                 currentAyah = uiState.currentPlace
                                     ?.takeIf { it.surah.id == surah.id }
                                     ?.ayah,
+                                placeUnfurlSignal = placeRibbonUnfurlEpoch,
                                 onClick = {
                                     focusManager.clearFocus()
                                     onOpenSurah(
@@ -642,7 +664,12 @@ private fun ContinueRow(target: ContinueTarget, onClick: () -> Unit) {
 }
 
 @Composable
-private fun SurahRow(surah: Surah, currentAyah: Int?, onClick: () -> Unit) {
+private fun SurahRow(
+    surah: Surah,
+    currentAyah: Int?,
+    placeUnfurlSignal: Int,
+    onClick: () -> Unit,
+) {
     val accents = LocalQuranAccents.current
     Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -663,6 +690,7 @@ private fun SurahRow(surah: Surah, currentAyah: Int?, onClick: () -> Unit) {
                 chromeAlpha = { 1f },
                 interactive = false,
                 onToggle = { false },
+                unfurlSignal = placeUnfurlSignal,
                 edgeInset = HomeRibbonGutter,
                 ribbonWidth = HomeRibbonWidth,
                 topInset = 0.dp,
@@ -710,6 +738,12 @@ private fun SurahRow(surah: Surah, currentAyah: Int?, onClick: () -> Unit) {
         )
     }
 }
+
+internal fun shouldUnfurlReadingPlaceRibbon(
+    pendingReturn: Boolean,
+    chapterRibbonReady: Boolean,
+    currentPlacePresent: Boolean,
+): Boolean = pendingReturn && chapterRibbonReady && currentPlacePresent
 
 @Composable
 private fun SearchSectionLabel(text: String) {

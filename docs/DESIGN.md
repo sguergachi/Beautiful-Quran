@@ -979,6 +979,10 @@ verse is recorded behind the paper without displaying a moving mark. Leaving
 exposes that place beside its surah on Chapters; returning snapshots it onto
 that verse for the whole new visit. Reading onward leaves the ribbon behind,
 like opening a physical book at its marker and moving through the pages.
+On the return swipe, the chapter marker waits until its outer lane nears the
+screen edge, then drops to full length as the sheet settles. The motion is armed
+only by a committed reader visit, so cold display and cancelled page turns do
+not perform a gratuitous flourish.
 
 The verse mark is a **full ribbon**, with the same top, tail, and block-length
 as a saved ruby bookmark. When one verse owns both meanings, ruby keeps the
