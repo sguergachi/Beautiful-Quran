@@ -115,6 +115,12 @@ beyond it and no way to tell the end of the book from the end of the comb; and
 after the first stroke that ran past an end, neither end means anything any
 more.
 
+The comb is cancellable by the same grammar that backs out of its magnified
+trough: pull upward off the rule and it folds away without turning the leaf.
+One pull spends one tier only. A pull out of the leaf trough returns to the
+chapter comb; the hand must return to the rule before another upward pull can
+cancel that comb. Letting go still chooses the chapter under the finger.
+
 **What the reader has hold of at that tier is the comb itself, not a marker.**
 No thumb rides the line while the comb is up — the chapter their finger is in
 is drawn as a bracket, one cell of the comb, and that cell is the thing they

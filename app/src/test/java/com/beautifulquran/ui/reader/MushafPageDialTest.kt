@@ -20,6 +20,7 @@ class MushafPageDialTest {
             MushafDialRelease(page = 590, surahId = null),
             mushafDialRelease(
                 moved = false,
+                cancelled = false,
                 settledPage = 590,
                 selectedPage = 591,
                 selectedSurahId = 87,
@@ -29,9 +30,30 @@ class MushafPageDialTest {
             MushafDialRelease(page = 591, surahId = 87),
             mushafDialRelease(
                 moved = true,
+                cancelled = false,
                 settledPage = 591,
                 selectedPage = 591,
                 selectedSurahId = 87,
+            ),
+        )
+    }
+
+    @Test
+    fun `an upward pull cancels chapters but cannot spend two tiers at once`() {
+        val stray = 74f
+        assertTrue(mushafDialShouldCancelChapter(-stray - 1f, stray, false))
+        assertFalse(mushafDialShouldCancelChapter(stray + 1f, stray, false))
+        assertFalse(mushafDialShouldCancelChapter(-stray, stray, false))
+        assertFalse(mushafDialShouldCancelChapter(-stray - 1f, stray, true))
+
+        assertEquals(
+            MushafDialRelease(page = 590, surahId = null),
+            mushafDialRelease(
+                moved = true,
+                cancelled = true,
+                settledPage = 590,
+                selectedPage = 2,
+                selectedSurahId = 2,
             ),
         )
     }

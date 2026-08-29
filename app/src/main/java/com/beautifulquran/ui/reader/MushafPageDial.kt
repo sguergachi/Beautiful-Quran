@@ -383,6 +383,19 @@ internal fun mushafDialStrayed(yPx: Float, pressYPx: Float, strayPx: Float): Boo
     abs(yPx - pressYPx) > strayPx
 
 /**
+ * Whether an upward pull should dismiss the chapter tier without landing it.
+ *
+ * A pull may spend only one tier at a time. When [returnedFromTrough] is true,
+ * this is the same pull that just closed the leaf trough, so it must stop at
+ * chapters. Returning to the rule arms a later upward pull to leave the dial.
+ */
+internal fun mushafDialShouldCancelChapter(
+    dyPx: Float,
+    strayPx: Float,
+    returnedFromTrough: Boolean,
+): Boolean = !returnedFromTrough && dyPx < -strayPx
+
+/**
  * How far the HUD leans off its seat for a hand [dyPx] off the line, when the
  * stray fires at [strayPx] and a full pull leans the label [leanPx].
  *
@@ -504,13 +517,14 @@ internal data class MushafDialLabel(
 
 internal data class MushafDialRelease(val page: Int, val surahId: Int?)
 
-/** A press alone changes nothing; a moved chapter still commits on a shared leaf. */
+/** A press or cancelled pull changes nothing; a moved chapter still commits on a shared leaf. */
 internal fun mushafDialRelease(
     moved: Boolean,
+    cancelled: Boolean,
     settledPage: Int,
     selectedPage: Int,
     selectedSurahId: Int?,
-): MushafDialRelease = if (moved) {
+): MushafDialRelease = if (moved && !cancelled) {
     MushafDialRelease(selectedPage, selectedSurahId)
 } else {
     MushafDialRelease(settledPage, null)
@@ -1656,6 +1670,7 @@ internal fun MushafPageDial(
                         var lastTroughHapticPage = -1
                         var lastTroughHapticNs = 0L
                         var troughPopped = false
+                        var cancelled = false
                         var leanPop: Job? = null
                         var shut = false
                         // Press x, not settled page — pressing one cell over
@@ -1734,9 +1749,19 @@ internal fun MushafPageDial(
                                 // meter names the proportional target and a
                                 // soft spring chases it, so the label lags
                                 // the hand and settles instead of riding it.
-                                if (open && !troughPopped) {
+                                if (!cancelled && (open || !troughPopped)) {
+                                    // The trough may leave either side of the
+                                    // rule. The chapter tier leaves only up,
+                                    // into the leaf, so a downward roll there
+                                    // relaxes the label instead of promising
+                                    // a cancellation it cannot perform.
+                                    val pull = if (open || handY < pressY) {
+                                        handY - pressY
+                                    } else {
+                                        0f
+                                    }
                                     val lean = mushafDialHudLean(
-                                        handY - pressY,
+                                        pull,
                                         strayPx,
                                         leanPx,
                                     )
@@ -1805,6 +1830,34 @@ internal fun MushafPageDial(
                                         // Reset trough haptics so next open does
                                         // not tick the entry page.
                                         lastTroughHapticPage = -1
+                                    }
+                                    continue
+                                }
+                                if (cancelled) continue
+                                // One pull spends one tier. After a trough
+                                // pop, the hand must come home before another
+                                // upward pull can dismiss the chapter comb.
+                                if (troughPopped && abs(handY - pressY) <= strayPx * 0.5f) {
+                                    troughPopped = false
+                                }
+                                if (
+                                    mushafDialShouldCancelChapter(
+                                        dyPx = handY - pressY,
+                                        strayPx = strayPx,
+                                        returnedFromTrough = troughPopped,
+                                    )
+                                ) {
+                                    cancelled = true
+                                    dialPage.floatValue = settledState.value.toFloat()
+                                    hudRipe.floatValue = 0f
+                                    hudShown = false
+                                    scrubbing = false
+                                    reportScrub.value(false)
+                                    scope.launch {
+                                        expand.animateTo(
+                                            0f,
+                                            spring(dampingRatio = 1f, stiffness = 150f),
+                                        )
                                     }
                                     continue
                                 }
@@ -1989,6 +2042,7 @@ internal fun MushafPageDial(
                             }
                         val release = mushafDialRelease(
                             moved = moved,
+                            cancelled = cancelled,
                             settledPage = settledState.value,
                             selectedPage = selected,
                             selectedSurahId = landedSurahId,
@@ -2000,7 +2054,7 @@ internal fun MushafPageDial(
                         scope.launch {
                             expand.animateTo(0f, spring(dampingRatio = 1f, stiffness = 150f))
                         }
-                        if (moved) {
+                        if (moved && !cancelled) {
                             // No haptic here: the chapter tick already spoke
                             // on the crossing, and the landing is that same
                             // chapter's name arriving under the hand.
