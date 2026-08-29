@@ -72,12 +72,13 @@ private const val OVERSHOOT = 0.06f     // tip past the resting length, then spr
 private const val SOLID_ALPHA = 0.92f
 private const val IDLE_NUB_ALPHA = 0.4f // quiet affordance when just the tail is showing
 
-/** Chapters uses one lane; verses keep green inside the bookmark cloth or tip. */
-internal fun placeRibbonInsetDp(
-    bookmarkLaneVisible: Boolean,
+/** Green owns the quiet screen-edge lane; bookmark cloth shifts inward beside it. */
+internal fun bookmarkRibbonInsetDp(
+    placeMarked: Boolean,
     edgeInsetDp: Float,
     ribbonWidthDp: Float,
-): Float = edgeInsetDp + if (bookmarkLaneVisible) ribbonWidthDp + RIBBON_GAP_DP else 0f
+): Float = edgeInsetDp +
+    if (placeMarked) placeRibbonWidthDp(ribbonWidthDp) + RIBBON_GAP_DP else 0f
 
 internal fun placeRibbonWidthDp(ribbonWidthDp: Float): Float =
     ribbonWidthDp * PLACE_RIBBON_WIDTH_RATIO
@@ -356,15 +357,15 @@ internal fun VerseBookmarkRibbon(
                 }
                 close()
             }
-            val path = ribbonPath(tipY, clothMotion = true)
+            val bookmarkInset = bookmarkRibbonInsetDp(
+                placeMarked = placeMarked,
+                edgeInsetDp = edgeInset.value,
+                ribbonWidthDp = ribbonWidth.value,
+            ).dp.toPx()
+            val path = ribbonPath(tipY, clothMotion = true, inset = bookmarkInset)
 
             val placeProgress = placeUnfurl.value.coerceAtLeast(0f)
             if (placeMarked && placeProgress > 0.001f) {
-                val placeInset = placeRibbonInsetDp(
-                    bookmarkLaneVisible = bookmarked || bookmarkTipVisible,
-                    edgeInsetDp = edgeInset.value,
-                    ribbonWidthDp = ribbonWidth.value,
-                ).dp.toPx()
                 val placeWidth = placeRibbonWidthDp(ribbonWidth.value).dp.toPx()
                 val fill = Brush.verticalGradient(
                     0f to currentPlaceGreen,
@@ -381,7 +382,7 @@ internal fun VerseBookmarkRibbon(
                     path = ribbonPath(
                         bottom = placeTipY,
                         clothMotion = false,
-                        inset = placeInset,
+                        inset = edgeInsetPx,
                         width = placeWidth,
                     ),
                     brush = fill,

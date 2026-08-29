@@ -5,9 +5,9 @@ import org.junit.Test
 
 class VerseBookmarkRibbonTest {
     @Test
-    fun placeRibbon_reservesTheBookmarkClothOrOutlineLane() {
-        assertEquals(8f, placeRibbonInsetDp(false, 8f, 11f), 0f)
-        assertEquals(22f, placeRibbonInsetDp(true, 8f, 11f), 0f)
+    fun bookmarkRibbon_movesInsideTheScreenEdgePlaceMarker() {
+        assertEquals(8f, bookmarkRibbonInsetDp(false, 8f, 11f), 0f)
+        assertEquals(18.92f, bookmarkRibbonInsetDp(true, 8f, 11f), 0.001f)
     }
 
     @Test

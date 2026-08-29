@@ -987,17 +987,17 @@ not perform a gratuitous flourish.
 Pause is the one in-visit exception: once the chrome returns, green
 gravity-unfurls on the actual paused media verse and the ayah rail follows it.
 Resume removes that temporary mark and restores the visit's parked ribbon. On
-an unsaved verse the empty bookmark tip keeps the outer lane while green uses
-the inner lane; the two never overpaint.
+an unsaved verse green keeps the outer, screen-edge lane while the empty
+bookmark tip moves inward; the two never overpaint.
 
 The verse mark is a **full ribbon**, with the same top, tail, and block-length
 as a saved ruby bookmark, but 72% of its width. That quieter silhouette makes
 green read as a passive place marker, not a second tap target; only the ruby
-lane remains interactive. When one verse owns both meanings, ruby keeps the
-outer lane and green runs beside it in the inner lane with 3 dp of paper
-between them. Neither cloth overlays, caps, recolors, or replaces the other.
-During recitation both follow the existing chrome fade because the word wash
-already names the live position.
+lane remains interactive. When one verse owns both meanings, green keeps the
+outer, screen-edge lane and ruby runs beside it toward the page with 3 dp of
+paper between them. Neither cloth overlays, caps, recolors, or replaces the
+other. During recitation both follow the existing chrome fade because the word
+wash already names the live position.
 
 Chapters uses the full green swallowtail in its permanently reserved 28 dp
 outer lane without shifting the chapter's number or names. Tapping that marked
