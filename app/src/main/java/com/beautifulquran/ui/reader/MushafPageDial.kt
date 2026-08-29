@@ -7,6 +7,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Box
@@ -16,8 +17,14 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredHeight
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.systemGestureExclusion
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -34,6 +41,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
@@ -46,6 +54,9 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.IntOffset
@@ -55,7 +66,9 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.util.lerp
 import android.view.HapticFeedbackConstants
 import com.beautifulquran.ui.theme.LocalQuranAccents
+import com.beautifulquran.ui.theme.quietClickable
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.exp
@@ -490,6 +503,22 @@ internal fun mushafDialTrackX(fraction: Float, widthPx: Float, insetPx: Float): 
     return inset + (widthPx - 2f * inset) * fraction.coerceIn(0f, 1f)
 }
 
+/** Left edge of the return bubble, centred on its leaf's seat but kept on-screen. */
+internal fun mushafDialReturnBubbleLeft(
+    page: Int,
+    pageCount: Int,
+    widthPx: Float,
+    insetPx: Float,
+    bubbleWidthPx: Float,
+): Float {
+    val seat = mushafDialTrackX(
+        1f - mushafDialFraction(page.toFloat(), pageCount),
+        widthPx,
+        insetPx,
+    )
+    return (seat - bubbleWidthPx / 2f).coerceIn(0f, (widthPx - bubbleWidthPx).coerceAtLeast(0f))
+}
+
 /**
  * How far along the measure a finger at [xPx] is: 0 at the left end, 1 at the
  * right. The inverse of [mushafDialTrackX], and what the trough reads.
@@ -897,6 +926,11 @@ private val MushafDialPageTick = 7.dp
  * loses.
  */
 internal val MushafDialBelowGrab = 8.dp
+/** The undo target is generous along the rule while its visible dot stays furniture-sized. */
+private val MushafDialReturnHitWidth = 44.dp
+private val MushafDialReturnDot = 26.dp
+private val MushafDialReturnIcon = 15.dp
+internal const val MUSHAF_DIAL_RETURN_MS = 3_000L
 /** Paper between the top of the comb and the foot of the label. */
 private val MushafDialHudAir = 2.dp
 
@@ -1010,6 +1044,10 @@ internal fun MushafPageDial(
     // written before the animation starts and left alone until the next entry.
     var troughRun by remember { mutableStateOf(1..1) }
     var glide by remember { mutableStateOf<Job?>(null) }
+    val returnBubble = remember { Animatable(0f) }
+    val returnPage = remember { mutableIntStateOf(0) }
+    var returnEnabled by remember { mutableStateOf(false) }
+    var returnJob by remember { mutableStateOf<Job?>(null) }
     var widthPx by remember { mutableIntStateOf(0) }
     var hudContentWidthPx by remember { mutableIntStateOf(0) }
     // One mark per surah, surah order 1..114 — duplicates kept when a leaf
@@ -1061,6 +1099,36 @@ internal fun MushafPageDial(
     val troughHud = if (scrubbing || handed) {
         labelOf.value(hudPage, hudChapterIdx + 1)
     } else null
+
+    fun dismissReturnBubble() {
+        if (returnPage.intValue == 0) return
+        returnJob?.cancel()
+        returnEnabled = false
+        returnJob = scope.launch {
+            returnBubble.animateTo(0f, tween(220, easing = FastOutSlowInEasing))
+            returnPage.intValue = 0
+        }
+    }
+
+    fun showReturnBubble(page: Int) {
+        returnJob?.cancel()
+        returnPage.intValue = page
+        returnEnabled = true
+        returnJob = scope.launch {
+            returnBubble.snapTo(0f)
+            val entrance = launch {
+                returnBubble.animateTo(
+                    1f,
+                    spring(dampingRatio = 0.72f, stiffness = 420f),
+                )
+            }
+            delay(MUSHAF_DIAL_RETURN_MS)
+            entrance.cancel()
+            returnEnabled = false
+            returnBubble.animateTo(0f, tween(220, easing = FastOutSlowInEasing))
+            returnPage.intValue = 0
+        }
+    }
 
     Box(
         modifier
@@ -1589,6 +1657,7 @@ internal fun MushafPageDial(
                         val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
                         if (pages <= 1) return@awaitEachGesture
                         down.consume()
+                        dismissReturnBubble()
                         // A glide home may still be running from the last
                         // scrub; the hand takes the thumb back off it.
                         glide?.cancel()
@@ -2049,6 +2118,7 @@ internal fun MushafPageDial(
                             selectedSurahId = landedSurahId,
                         )
                         val landed = release.page
+                        val previousPage = settledState.value
                         // The thumb marks a place; it is not a flywheel. A
                         // release lands where the hand left it — no decay, no
                         // overshoot to read past.
@@ -2060,7 +2130,10 @@ internal fun MushafPageDial(
                             // on the crossing, and the landing is that same
                             // chapter's name arriving under the hand.
                             release.surahId?.let { seekSurah.value?.invoke(it) }
-                            if (landed != settledState.value) seek.value(landed)
+                            if (landed != previousPage) {
+                                showReturnBubble(previousPage)
+                                seek.value(landed)
+                            }
                         }
                         dialPage.floatValue = landed.toFloat()
                         // Hand the thumb back to the rule. It walks from where
@@ -2104,6 +2177,61 @@ internal fun MushafPageDial(
                     }
                 },
         )
+        val backPage = returnPage.intValue
+        if (backPage != 0) {
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .offset {
+                        IntOffset(
+                            mushafDialReturnBubbleLeft(
+                                page = backPage,
+                                pageCount = pages,
+                                widthPx = widthPx.toFloat(),
+                                insetPx = MushafDialEdgeInset.toPx(),
+                                bubbleWidthPx = MushafDialReturnHitWidth.toPx(),
+                            ).roundToInt(),
+                            0,
+                        )
+                    }
+                    .width(MushafDialReturnHitWidth)
+                    .height(MushafDialSlot + MushafDialBelowGrab)
+                    .semantics { contentDescription = "Return to page $backPage" }
+                    .quietClickable(
+                        enabled = returnEnabled,
+                        role = Role.Button,
+                    ) {
+                        val target = returnPage.intValue
+                        if (target == 0) return@quietClickable
+                        dismissReturnBubble()
+                        view.performHapticFeedback(HapticFeedbackConstants.CONTEXT_CLICK)
+                        seek.value(target)
+                    },
+            ) {
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier
+                        .offset(y = MushafDialRuleY - (MushafDialSlot + MushafDialBelowGrab) / 2f)
+                        .size(MushafDialReturnDot)
+                        .graphicsLayer {
+                            val reveal = returnBubble.value
+                            alpha = reveal
+                            scaleX = 0.55f + 0.45f * reveal
+                            scaleY = 0.55f + 0.45f * reveal
+                        }
+                        .clip(CircleShape)
+                        .background(ink.copy(alpha = 0.76f)),
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.background,
+                        modifier = Modifier.size(MushafDialReturnIcon),
+                    )
+                }
+            }
+        }
     }
 }
 

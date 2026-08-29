@@ -2,6 +2,7 @@ package com.beautifulquran.ui.reader
 
 import androidx.compose.ui.unit.dp
 import kotlin.math.abs
+import kotlin.math.roundToInt
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -71,6 +72,25 @@ class MushafPageDialTest {
         val book = 1..604
         assertEquals(1f, mushafDialTroughPage(1f, book), 1e-4f)
         assertEquals(604f, mushafDialTroughPage(0f, book), 1e-4f)
+    }
+
+    @Test
+    fun `return bubble stands on the old leaf seat and stays on glass`() {
+        val width = 1080f
+        val inset = 42f
+        val bubble = 132f
+        assertEquals(
+            width - bubble,
+            mushafDialReturnBubbleLeft(1, 604, width, inset, bubble),
+            1e-3f,
+        )
+        assertEquals(0f, mushafDialReturnBubbleLeft(604, 604, width, inset, bubble), 1e-3f)
+        assertEquals(
+            width / 2f - bubble / 2f,
+            mushafDialReturnBubbleLeft(302.5f.roundToInt(), 604, width, inset, bubble),
+            1f,
+        )
+        assertEquals(3_000L, MUSHAF_DIAL_RETURN_MS)
     }
 
     @Test

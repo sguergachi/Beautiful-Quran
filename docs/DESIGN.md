@@ -122,6 +122,14 @@ One pull spends one tier only. A pull out of the leaf trough returns to the
 chapter comb; the hand must return to the rule before another upward pull can
 cancel that comb. Letting go still chooses the chapter under the finger.
 
+A dial release that turns to a different leaf leaves one brief way back on the
+same rule: a small ink roundel grows at the old leaf's seat with a back arrow
+cut out of its centre. It is the hairline remembering the place, not a floating
+undo message. The roundel remains tappable for three seconds, then shrinks and
+fades into the rule; tapping it returns to that exact leaf and consumes it.
+Taking hold of the dial again also consumes it, because a new search supersedes
+the old landing.
+
 **What the reader has hold of at that tier is the comb itself, not a marker.**
 No thumb rides the line while the comb is up — the chapter their finger is in
 is drawn as a bracket, one cell of the comb, and that cell is the thing they
