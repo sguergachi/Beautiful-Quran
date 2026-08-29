@@ -23,7 +23,8 @@ import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.systemGestureExclusion
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.ArrowForward
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -930,7 +931,7 @@ internal val MushafDialBelowGrab = 8.dp
 private val MushafDialReturnHitWidth = 44.dp
 private val MushafDialReturnDot = 26.dp
 private val MushafDialReturnIcon = 15.dp
-internal const val MUSHAF_DIAL_RETURN_MS = 3_000L
+internal const val MUSHAF_DIAL_RETURN_MS = 5_000L
 /** Paper between the top of the comb and the foot of the label. */
 private val MushafDialHudAir = 2.dp
 
@@ -1046,6 +1047,7 @@ internal fun MushafPageDial(
     var glide by remember { mutableStateOf<Job?>(null) }
     val returnBubble = remember { Animatable(0f) }
     val returnPage = remember { mutableIntStateOf(0) }
+    val returnWay = remember { mutableStateOf(MushafReturnWay.Left) }
     var returnEnabled by remember { mutableStateOf(false) }
     var returnJob by remember { mutableStateOf<Job?>(null) }
     var widthPx by remember { mutableIntStateOf(0) }
@@ -1110,9 +1112,10 @@ internal fun MushafPageDial(
         }
     }
 
-    fun showReturnBubble(page: Int) {
+    fun showReturnBubble(previousPage: Int, newPage: Int) {
         returnJob?.cancel()
-        returnPage.intValue = page
+        returnWay.value = checkNotNull(mushafReturnWay(newPage, previousPage))
+        returnPage.intValue = previousPage
         returnEnabled = true
         returnJob = scope.launch {
             returnBubble.snapTo(0f)
@@ -2131,7 +2134,7 @@ internal fun MushafPageDial(
                             // chapter's name arriving under the hand.
                             release.surahId?.let { seekSurah.value?.invoke(it) }
                             if (landed != previousPage) {
-                                showReturnBubble(previousPage)
+                                showReturnBubble(previousPage, landed)
                                 seek.value(landed)
                             }
                         }
@@ -2179,6 +2182,12 @@ internal fun MushafPageDial(
         )
         val backPage = returnPage.intValue
         if (backPage != 0) {
+            // This is physical dial direction, independent of text direction.
+            @Suppress("DEPRECATION")
+            val returnIcon = when (returnWay.value) {
+                MushafReturnWay.Left -> Icons.Rounded.ArrowBack
+                MushafReturnWay.Right -> Icons.Rounded.ArrowForward
+            }
             Box(
                 contentAlignment = Alignment.Center,
                 modifier = Modifier
@@ -2224,7 +2233,7 @@ internal fun MushafPageDial(
                         .background(ink.copy(alpha = 0.76f)),
                 ) {
                     Icon(
-                        imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
+                        imageVector = returnIcon,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.background,
                         modifier = Modifier.size(MushafDialReturnIcon),

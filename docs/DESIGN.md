@@ -124,9 +124,10 @@ cancel that comb. Letting go still chooses the chapter under the finger.
 
 A dial release that turns to a different leaf leaves one brief way back on the
 same rule: a small ink roundel grows at the old leaf's seat with a back arrow
-cut out of its centre. It is the hairline remembering the place, not a floating
-undo message. The roundel remains tappable for three seconds, then shrinks and
-fades into the rule; tapping it returns to that exact leaf and consumes it.
+cut out of its centre, pointing in the direction the comb would travel to
+return there. It is the hairline remembering the place, not a floating undo
+message. The roundel remains tappable for five seconds, then shrinks and fades
+into the rule; tapping it returns to that exact leaf and consumes it.
 Taking hold of the dial again also consumes it, because a new search supersedes
 the old landing.
 

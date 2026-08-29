@@ -90,7 +90,7 @@ class MushafPageDialTest {
             mushafDialReturnBubbleLeft(302.5f.roundToInt(), 604, width, inset, bubble),
             1f,
         )
-        assertEquals(3_000L, MUSHAF_DIAL_RETURN_MS)
+        assertEquals(5_000L, MUSHAF_DIAL_RETURN_MS)
     }
 
     @Test
