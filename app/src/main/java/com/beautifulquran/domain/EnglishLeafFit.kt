@@ -28,9 +28,9 @@ import kotlin.math.sqrt
  *    page happens to be full, and a reader turning pages sees a change in line
  *    spacing at once — far sooner than they notice a page that ends early.
  * 4. **The leaf is not the page.** A Madinah page takes as many leaves as its
- *    English needs at a legible size, which for 71 of the 604 is two. That is
- *    what stops the heaviest page in the book from setting the type for all of
- *    them. See `EnglishBook.kt`.
+ *    English needs at a legible size — two or three for nearly all of the 604,
+ *    about 1,250 leaves in all. That is what stops the heaviest page in the
+ *    book from setting the type for every other one. See `EnglishBook.kt`.
  *
  * Rule 3 is the third answer this setting has given to the same question, and
  * the question is unavoidable: the page boundary comes from the Arabic leaf, so
@@ -46,16 +46,18 @@ import kotlin.math.sqrt
  * a page set at 2.00 em turned into one set at 1.20: the same book in two
  * different hands' worth of air, which reads as a fault however full the page.
  *
- * So it is the foot. One hand, one leading, and a leaf ends where its content
- * ends — 71% of the well at the median, 63% at the tenth percentile, all of it
- * on the heaviest. That is what a printed parallel translation looks like on
- * its English side, and it is the only one of the three that a reader reads as
- * meaning something: a page that ends early ends something.
+ * So it is the foot, and then rule 4 took most of the range away from it: a
+ * page too heavy for one leaf is now two leaves rather than one crushed one.
+ * What is left for the foot to absorb is the remainder — 81% of the well at the
+ * median, 58% at the tenth percentile, all but full at the ninetieth. That is
+ * what a printed parallel translation looks like on its English side, and it is the
+ * only one of the three that a reader reads as meaning something: a page that
+ * ends early ends something.
  *
- * The hand is therefore cut for the heaviest leaf in the book at that one
- * leading ([ENGLISH_LEAF_REFERENCE_PROSE]), and `MushafEnglishSheet` still
- * measures each leaf as it will be drawn — but only as a guarantee against
- * clipping, never as the thing that sets the page.
+ * The hand is therefore cut for a full leaf at that one leading
+ * ([englishLeafReferenceBlock]), and `MushafEnglishSheet` still measures each
+ * leaf as it will be drawn — but only as a guarantee against clipping, never as
+ * the thing that sets the page.
  */
 
 /**
@@ -142,13 +144,18 @@ fun englishLeafHandPx(
  * The leading a leaf is actually drawn on: the book's, unless that would put
  * the block past the foot of the well.
  *
- * It should never have to. The hand is cut for the heaviest leaf in the book
- * with three percent to spare ([ENGLISH_LEAF_REFERENCE_PROSE]), so every leaf
- * fits by construction. But the hand is solved from an estimate of how many
- * characters go to a line, and an estimate can be wrong on some page nobody
- * looked at — and being wrong there means revelation clipped off the bottom of
- * it. So the leaf is measured as it will be drawn, and if it still stands past
- * the foot the leading closes by exactly the overflow.
+ * It should almost never have to. The hand is cut for a full leaf with five
+ * percent to spare ([englishLeafReferenceBlock]) and `englishPageParts` fills
+ * leaves rather than evening them, so it cannot hand out one over that
+ * capacity: every leaf fits by construction — every leaf but one. 2:282 is a
+ * single sentence of 1,333 characters, half as long again as a leaf holds, and
+ * no rule splits a sentence; that leaf is set tight, and this is what sets it.
+ *
+ * It is also the guarantee behind the estimate. The hand is solved from
+ * *characters*, not from a layout, and a character count can be wrong on some
+ * page nobody looked at — being wrong there would mean revelation clipped off
+ * the bottom of it. So the leaf is measured as it will be drawn, and if it
+ * still stands past the foot the leading closes by exactly the overflow.
  *
  * Only closes, and only that leaf. A page set a hair tighter than its
  * neighbours is a page nobody notices; a page missing its last line is not.

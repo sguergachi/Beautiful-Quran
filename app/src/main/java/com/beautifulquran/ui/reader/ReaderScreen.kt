@@ -326,7 +326,10 @@ fun ReaderScreen(
         val target = mushafSeekPage ?: return@LaunchedEffect
         val catalog = mushafCatalog ?: return@LaunchedEffect
         val leaves = englishBook?.leafCount ?: catalog.pageCount
-        mushafPagerState.scrollToPage(pageLeaf(target).coerceIn(0, leaves - 1))
+        // The dial hands back what it counts: a leaf in English, a page in
+        // Arabic.
+        val landing = if (englishBook != null) target - 1 else pageLeaf(target)
+        mushafPagerState.scrollToPage(landing.coerceIn(0, leaves - 1))
         mushafSeekPage = null
     }
     // Later navigation only: a chapter opened from the index while the reader
@@ -864,34 +867,56 @@ fun ReaderScreen(
     // pagerState.currentPage directly here recomposed the entire reader body on
     // every settled page, which is exactly what MushafPager takes such care to
     // avoid by handing playback down as one State.
+    // What the dial names. The English book has its own pagination — a Madinah
+    // page takes as many leaves as its English needs — so the rule counts
+    // *leaves* there and Madinah pages on the Arabic leaf, and the folio says
+    // the same number the dial does.
     val mushafLeafPage = remember(mushafCatalog, englishBook) {
-        { leafPage(mushafPagerState.currentPage) }
+        {
+            if (englishBook != null) {
+                mushafPagerState.currentPage + 1
+            } else {
+                leafPage(mushafPagerState.currentPage)
+            }
+        }
     }
     // The leaves that open a chapter, walked once when the catalog arrives.
     // These are the dial's coarse tier: it keeps drawing them after the single
     // leaves have closed up, so a hand moving at a normal pace is steering by
     // chapters and a hand that slows down is steering by leaves — one comb at
     // two magnifications.
-    val mushafChapterFirstPages = remember(mushafCatalog) {
+    val mushafChapterFirstPages = remember(mushafCatalog, englishBook) {
         val catalog = mushafCatalog ?: return@remember IntArray(0)
-        IntArray(114) { idx -> catalog.firstPageOf(idx + 1) }
+        IntArray(114) { idx ->
+            val surahId = idx + 1
+            val page = catalog.firstPageOf(surahId)
+            // A chapter opens where its first verse is *set*, which on the
+            // English book is a leaf partway through a Madinah page as often
+            // as not.
+            englishBook?.let { it.leafOfVerse(surahId, 1, page) + 1 } ?: page
+        }
     }
     // What the dial writes over its thumb. The scrubbed leaf almost never
     // belongs to the chapter that is loaded, so this reads the leaf's own
     // chapter rather than the reader's — and it carries the run of verses the
     // leaf holds, which is what the label says once the dial has zoomed in far
     // enough for a single leaf to be a thing you can aim at.
-    val mushafPageLabel = remember(mushafCatalog, mushafUi) {
+    val mushafPageLabel = remember(mushafCatalog, mushafUi, englishBook) {
         label@{ page: Int, requestedSurahId: Int? ->
             val catalog = mushafCatalog ?: return@label null
-            val leaf = catalog.page(page) ?: return@label null
+            // Whatever the rule is counting: a Madinah page's verses, or one
+            // English leaf's. The label names what is actually on that paper.
+            val keys = englishBook?.leaf(page - 1)?.verses
+                ?: catalog.page(page)?.ayahKeys?.toList()
+                ?: return@label null
+            if (keys.isEmpty()) return@label null
             val surahId = requestedSurahId?.takeIf { requested ->
-                leaf.ayahKeys.any { it.first == requested }
-            } ?: leaf.primarySurahId
+                keys.any { it.first == requested }
+            } ?: keys.first().first
             val surah = mushafUi?.surahsById?.get(surahId) ?: return@label null
             var fromAyah = Int.MAX_VALUE
             var toAyah = Int.MIN_VALUE
-            leaf.ayahKeys.forEach { (id, ayah) ->
+            keys.forEach { (id, ayah) ->
                 if (id == surahId) {
                     fromAyah = minOf(fromAyah, ayah)
                     toAyah = maxOf(toAyah, ayah)

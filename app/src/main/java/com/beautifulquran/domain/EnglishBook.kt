@@ -1,6 +1,6 @@
 package com.beautifulquran.domain
 
-import kotlin.math.ceil
+import kotlin.math.abs
 
 /*
  * The English book's leaves.
@@ -13,16 +13,18 @@ import kotlin.math.ceil
  *
  * So the leaf stops being the page. A leaf holds
  * [ENGLISH_LEAF_CAPACITY_CHARS] of prose and no more; a Madinah page takes as
- * many leaves as that needs, and 71 of the 604 take two. The type is then cut
- * for the leaf rather than for the worst page — 14% larger, at about
- * 42 characters to the line — and because a page that overran is now split
- * into two leaves that each fill, the median leaf reaches 85% of its well
- * against 68% before. Larger type on fuller pages, from the same paper.
+ * many leaves as that needs, which for all but a handful of the 604 is two or
+ * three, and the book runs to about 1,250 leaves. The type is then cut for the
+ * leaf rather than for the worst page — half again as large, at about 46
+ * characters to the line, which is a book measure.
  *
  * What is *not* given up is the page. Every leaf still knows which Madinah page
- * it belongs to, so the folio, the juzʾ, the running head, the page dial and
- * the reciter's own place on the paper all go on meaning exactly what they
- * meant. Page 255 is simply two leaves long.
+ * it belongs to, so the juzʾ, the running head and the reciter’s own place
+ * on the paper all go on meaning exactly what they meant; page 255 is simply
+ * two leaves long. What the leaf does take over is the *count*: the folio and
+ * the page dial number leaves, because those are what a reader turns and lands
+ * on, and a folio that repeated itself twice a page would be a lie about where
+ * they are. See `mushafLeafNumber`.
  */
 
 /**
@@ -32,13 +34,24 @@ import kotlin.math.ceil
  * leaf is *paginated* to and the mass the hand is *cut* for, and it has to be
  * both or the two disagree and pages come out over- or under-full.
  *
- * 1,650 is where the two costs cross. Larger, and the type shrinks toward the
- * old page-bound size; smaller, and pages start splitting into two half-empty
- * leaves faster than the type grows — at 1,500 the median leaf falls from 85%
- * full to 59% for a further 5% of type. Swept in
- * `tools/measure_english_leaves.py`.
+ * 900 is chosen for the *line*, not for the page. A leaf of this mass sets at
+ * about 22 sp on a phone and 46 characters to the line, which is where a serif
+ * of EB Garamond's small x-height reads easily in the hand; the scrolling
+ * reader has always set its English at 22 sp, and the leaf had drifted to 16.
+ *
+ * It is not free, and the cost is leaves. Fill is quantised — a page takes
+ * whole verses, so a page of 1,400 characters becomes a full leaf and a half
+ * one — and the smaller the capacity the more often that happens: the median
+ * leaf reaches 81% of its well here and the book runs to about 1,250 leaves,
+ * against 675 at 1,650 and 604 when a leaf was a page. That is the
+ * trade, taken deliberately: white at the foot of a page costs the reader
+ * nothing, and type they have to squint at costs them the page.
+ *
+ * Below about 850 it stops paying — the leaf count climbs by a hundred for
+ * each percent of type — and above about 1,000 the line is longer than the
+ * hand wants. `tools/measure_english_leaves.py` prints the sweep.
  */
-const val ENGLISH_LEAF_CAPACITY_CHARS = 1650
+const val ENGLISH_LEAF_CAPACITY_CHARS = 900
 
 /** One leaf of the English book: a slice of one Madinah page. */
 data class EnglishBookLeaf(
@@ -121,34 +134,80 @@ fun buildEnglishBook(
 }
 
 /**
- * Splits one page's verses into leaves: as few as will hold them, then evened
- * out so the last one is not a stub.
+ * Splits one page's verses into leaves the way a compositor sets a book: fill
+ * the leaf, and when the next verse will not go, start the next leaf.
  *
- * A page of 1,700 characters becomes two leaves of 850 rather than one of
- * 1,650 and one of 50 — the arithmetic that decides *how many* leaves is the
- * capacity, and the arithmetic that decides *where they break* is the average.
- * A verse is never split, because a verse is a sentence
- * (`EnglishLeaf.kt`), so a leaf may run over the average by one verse.
+ * A verse is never split, because a verse is a sentence (`EnglishLeaf.kt`), so
+ * the break lands before the verse that would overrun — which is also the
+ * guarantee that no leaf is handed out over its capacity. Exactly one leaf in
+ * the Qur'an still is: 2:282, a single sentence of 1,333 characters, half as
+ * long again as a leaf holds and unsplittable by any rule. That leaf, alone, is
+ * set tight by the fitted leading.
+ *
+ * This used to even the page out instead — a page of 1,700 became two leaves of
+ * 850 rather than one full one and a stub. That was right when a page made at
+ * most two leaves. It is not right now that a page makes two or three: evening
+ * *every* leaf of the page means every leaf of the page is short, and measured
+ * over the book it cost 137 extra leaves, ten points of median fill, and — the
+ * thing it was there to prevent — nearly twice as many leaves under a third
+ * full. Filling gives the fuller page; the stub is handled where stubs
+ * actually happen, at the end.
  */
 private fun englishPageParts(masses: List<Int>): List<IntRange> {
-    val total = masses.sum()
-    val count = ceil(total.toDouble() / ENGLISH_LEAF_CAPACITY_CHARS).toInt().coerceAtLeast(1)
-    if (count == 1) return listOf(masses.indices.first..masses.indices.last)
-    val target = total.toDouble() / count
-    val parts = ArrayList<IntRange>(count)
+    val runs = ArrayList<IntRange>()
     var start = 0
     var run = 0
     masses.forEachIndexed { index, mass ->
-        // Break *before* this verse when the leaf is already past its share and
-        // there are leaves left to fill — never after, or the last leaf is the
-        // one that overflows.
-        if (run > 0 && run + mass > target && parts.size < count - 1) {
-            parts += start..index - 1
+        if (index > start && run + mass > ENGLISH_LEAF_CAPACITY_CHARS) {
+            runs += start..index - 1
             start = index
             run = 0
         }
         run += mass
     }
-    parts += start..masses.indices.last
-    return parts
+    runs += start..masses.indices.last
+    return englishCarriedBack(runs, masses)
+}
+
+/**
+ * How empty the last leaf of a page may be before a verse is carried back into
+ * it from the leaf above.
+ *
+ * Filling leaves the remainder at the end, and a remainder can be one short
+ * verse — a leaf 5% full, which reads as a mistake rather than as an ending.
+ * Half a leaf is where a short page still reads as a page.
+ */
+private const val ENGLISH_LEAF_STUB_FRACTION = 0.55f
+
+/**
+ * Evens out the last two leaves of a page when the last came out a stub.
+ *
+ * The compositor's move, and only at the end, where the remainder falls: take
+ * the last verse off the fuller leaf and set it on the emptier one, while that
+ * brings the two closer together. Over the book it turns 39 leaves under a
+ * third full into 3, and costs three points of median fill.
+ */
+private fun englishCarriedBack(
+    runs: List<IntRange>,
+    masses: List<Int>,
+): List<IntRange> {
+    if (runs.size < 2) return runs
+    val out = ArrayList(runs)
+    val stub = ENGLISH_LEAF_STUB_FRACTION * ENGLISH_LEAF_CAPACITY_CHARS
+    while (out.size >= 2) {
+        val above = out[out.size - 2]
+        val last = out[out.size - 1]
+        val massAbove = (above.first..above.last).sumOf { masses[it] }
+        val massLast = (last.first..last.last).sumOf { masses[it] }
+        // Nothing to carry, or nothing to carry it from.
+        if (massLast >= stub || above.last <= above.first) break
+        val carried = masses[above.last]
+        // Only while it evens them: a verse that would leave the upper leaf
+        // emptier than the lower has not been carried back, it has been moved.
+        val evened = abs((massAbove - carried) - (massLast + carried))
+        if (evened >= abs(massAbove - massLast)) break
+        out[out.size - 2] = above.first..above.last - 1
+        out[out.size - 1] = above.last..last.last
+    }
+    return out
 }

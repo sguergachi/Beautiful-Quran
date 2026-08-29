@@ -67,7 +67,7 @@ data class EnglishLeaf(
     /**
      * Characters of set prose on the leaf — the mass its hand is fitted to.
      * Counts what the page actually lays out: each verse, its mark, and the
-     * spaces that join them. See [ENGLISH_LEAF_REFERENCE_PROSE].
+     * spaces that join them. See [ENGLISH_LEAF_CAPACITY_CHARS].
      */
     val prose: Int
         get() = verses.sumOf { it.text.length + ENGLISH_LEAF_MARK_CHARS }

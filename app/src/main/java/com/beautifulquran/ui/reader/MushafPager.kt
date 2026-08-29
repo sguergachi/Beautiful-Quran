@@ -1050,7 +1050,11 @@ internal fun MushafPager(
                         label = "mushafFolioStandDown",
                     )
                     MushafPageFolio(
-                        page = page.page,
+                        // The English book paginates itself, so its folio is
+                        // its own leaf number — the same figure the dial counts
+                        // and lands on. The Arabic leaf's folio is the Madinah
+                        // page, as it has always been.
+                        page = if (english) pageIndex + 1 else page.page,
                         unit = unit,
                         glyphSize = leafGlyphSize(unit),
                         script = pageNumberScript,

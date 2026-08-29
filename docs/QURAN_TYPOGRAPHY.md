@@ -240,15 +240,21 @@ the verse translation.
 ### 13.3 One hand for the whole book, solved from the measure
 
 Rule 2 again, by a different route. The Arabic hand comes from the fixed 16.4 em
-line; the Latin one comes from the classical measure — a book line holds about
-fifty characters. Both the well and the measure enter it at once:
+line; the Latin one comes from the classical measure — a book line holds around
+forty-five characters. The hand is the size at which a leaf's worth of prose
+exactly fills the well, and it is *measured* rather than modelled: a reference
+block of exactly a leaf's mass (`englishLeafReferenceBlock`) is laid out at a
+probe size in the face, measure, rag and line-breaking it will really be drawn
+in, and
 
 ```
-    H = √( well · measure / (c · ℓ · R) )
+    H = probe · √( well / measured )
 ```
 
-with `c` the face's average character advance (measured from EB Garamond at
-runtime, never assumed), `ℓ` the nominal leading and `R` the reference page mass.
+because a block's height goes as the square of the hand — it holds `1/k` more
+characters to the line *and* each line stands `k` taller. One step lands it; the
+caller takes a second for the rounding that discrete line counts leave behind.
+
 It takes no page: the type depends on the leaf's geometry and the face, and on
 nothing the page happens to carry.
 
@@ -270,37 +276,54 @@ the foot, or the number of leaves. Three of them were tried:
   by the heaviest page in the book, which is to say every page was set for the
   worst one.
 
-**It is the leaf count.** A leaf holds `ENGLISH_LEAF_CAPACITY_CHARS` = 1,650
-characters, and a Madinah page takes as many leaves as that needs — for 71 of
-the 604, two. Page 255 is simply two leaves long, and every leaf still names its
-page, so the folio, the juzʾ, the running head, the page dial and the reciter's
-own place on the paper all go on meaning what they meant.
+**It is the leaf count.** A leaf holds `ENGLISH_LEAF_CAPACITY_CHARS` = 900
+characters, and a Madinah page takes as many leaves as that needs — two or three
+for nearly all of the 604, about 1,250 leaves in all. Every leaf still names its
+Madinah page, so the juzʾ, the running head and the reciter's own place on the
+paper go on meaning exactly what they meant; page 255 is simply two leaves long.
 
-Freeing the type from the worst page pays twice: it comes up 14% (about 42
-characters to the line), *and* pages that used to overrun are now two leaves
-that each fill, so the median leaf reaches 85% of its well against 68% before.
-Larger type on fuller pages, from the same paper.
+What the leaf does take over is the **count**. The folio and the page dial
+number *leaves*, not Madinah pages, because those are what a reader turns and
+lands on — a folio that repeated itself twice a page would be a lie about where
+they are, and a dial with 604 stops for 1,390 leaves could not land on most of
+them. The dial's chapter comb is rebuilt the same way, from the leaf each
+chapter's first verse falls on (`EnglishBook.leafOfVerse`), so every stop on it
+still lands where it says. That is `mushafLeafNumber`, and it is the one place
+the English book stops sharing the Arabic one's numbering.
 
-1,650 is where the two costs cross. Larger and the type shrinks back toward the
-page-bound size; smaller and pages split into two half-empty leaves faster than
-the type grows — at 1,500 the median leaf falls from 85% full to 63% for a
-further 5% of type. `tools/measure_english_leaves.py` prints the sweep.
+The capacity is chosen for the **line**, not for the page: 900 characters of
+prose sets at about 22 sp on a phone and 46 characters to the line, which is a
+book measure and the size the scrolling reader has always set its English at.
+Half again the type of the page-bound leaf.
 
-**The hand is measured, not modelled.** It used to be a closed form: characters
-to the line from the face's average advance, lines from the leaf's mass, the two
-solved against the well. The arithmetic was right and the input was not —
-measured on device a line held 56 characters where the model said 42, and a leaf
-filled to its capacity would have overflowed by a tenth, closing its leading,
-which is the one thing the single leading exists to prevent. Now a reference
-block of exactly a leaf's mass is laid out as it will be drawn and the hand is
-the size at which it fills the well. Two passes; a block's height goes as the
-square of the hand, so one step lands it and the second takes up the rounding
-that discrete line counts leave.
+The cost is leaves, and the sweep is flat where it matters. Below about 850 the
+count climbs by a hundred leaves for two percent of type; above about 1,000 the
+line is longer than the hand wants and the leaves start emptying again. The
+median leaf reaches 81% of its well, against 85% at 1,650 and 68% when a leaf
+was a page. `tools/measure_english_leaves.py` prints it.
+
+**Leaves are filled, not evened.** A page's verses go on the leaf until the
+next one will not fit, and then the next leaf starts — the compositor's order,
+and the reason no leaf is ever handed out over its capacity. It used to even
+the page out instead, so that a page of 1,700 became two leaves of 850 rather
+than one full leaf and a stub. That was right when a page made at most two
+leaves; it is wrong now that a page makes two or three, because evening *every*
+leaf of a page makes every leaf of that page short. Measured over the book it
+cost 137 extra leaves, ten points of median fill, and — the thing it existed to
+prevent — nearly twice as many leaves under a third full.
+
+The stub is handled where stubs actually happen, at the end. When the last leaf
+of a page comes out under `ENGLISH_LEAF_STUB_FRACTION` = 55% full, the last
+verse of the leaf above is carried back into it, while that brings the two
+closer together. Over the book that turns 39 leaves under a third full into 3.
+
+One leaf in the Qur'an is still over its capacity — 2:282, a single sentence of
+1,333 characters, which no rule splits. That leaf, alone, is set tight.
 
 The leaf is still measured as it will be drawn, and its leading still closes if
 the block would run past the foot — but only on that leaf, only by the overflow,
-and only because an estimate can be wrong somewhere nobody looked. Being wrong
-there means revelation clipped off the bottom of a page.
+and now only for 2:282 and for wherever a character count turns out to be wrong.
+Being wrong there means revelation clipped off the bottom of a page.
 
 ### 13.5 Ragged right, and deliberately not hyphenated
 
