@@ -319,6 +319,9 @@ fun HomeScreen(
                         uiState.surahs.forEach { surah ->
                             SurahRow(
                                 surah = surah,
+                                currentAyah = uiState.currentPlace
+                                    ?.takeIf { it.surah.id == surah.id }
+                                    ?.ayah,
                                 onClick = {
                                     focusManager.clearFocus()
                                     onOpenSurah(surah.id, uiState.ayahTarget, null)
@@ -633,7 +636,7 @@ private fun ContinueRow(target: ContinueTarget, onClick: () -> Unit) {
 }
 
 @Composable
-private fun SurahRow(surah: Surah, onClick: () -> Unit) {
+private fun SurahRow(surah: Surah, currentAyah: Int?, onClick: () -> Unit) {
     val accents = LocalQuranAccents.current
     Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -641,12 +644,32 @@ private fun SurahRow(surah: Surah, onClick: () -> Unit) {
             .fillMaxWidth()
             .quietClickable(onClick = onClick)
             .padding(
-                start = HomeStartInset,
                 end = HomeEndInset,
                 top = 15.dp,
                 bottom = 15.dp,
             ),
     ) {
+        if (currentAyah != null) {
+            VerseBookmarkRibbon(
+                bookmarked = false,
+                focused = true,
+                side = AyahSelectorSide.LEFT,
+                chromeAlpha = { 1f },
+                interactive = false,
+                onToggle = { false },
+                edgeInset = HomeRibbonGutter,
+                ribbonWidth = HomeRibbonWidth,
+                topInset = 0.dp,
+                modifier = Modifier
+                    .width(HomeRibbonLane)
+                    .height(44.dp)
+                    .semantics {
+                        contentDescription = "Current place, ayah $currentAyah"
+                    },
+            )
+        } else {
+            Spacer(Modifier.width(HomeRibbonLane))
+        }
         Box(Modifier.width(HomeNumberColumn)) {
             Text(
                 text = surah.id.toString(),

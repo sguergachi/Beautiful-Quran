@@ -587,7 +587,7 @@ verses recess to upcoming ink over ~400 ms.
 Two themes, both "paper":
 
 - **Paper**: warm sepia off-white `#FAF3E8`, ink `#1C1B18`,
-  deep green `#0E5C4A` as the single interactive accent,
+  deep green `#0E5C4A` as the single interactive and current-place accent,
   muted gold `#B8901C` reserved for Quranic ornament (ayah marks, surah
   numbers, the ۞).
 - **Nightfall**: near-black charcoal `#0A0B0C`, parchment ink `#E8E2D5`,
@@ -602,7 +602,8 @@ Two themes, both "paper":
   soft green `#7FB8A4`, warmer gold `#D9B44A`, same deep repeat orange and
   fresh-ink glint as Nightfall.
 
-Gold never marks interaction; green never decorates. One accent each.
+Gold never marks interaction; green never decorates. Green may identify the
+reader's current place because that mark is wayfinding, not ornament.
 
 **Ruby** `#B3122F` (paper) / `#D64358` (nightfall + royal green) is the one
 deliberate third hue, and it belongs to saved-verse ink: the
@@ -969,6 +970,30 @@ weight.
   the float** (`verticalFadingEdges` `bottomInset`), not stretched through
   it — same paper edge as the reader above its embedded `PlayerBar`.
   Opening the reader replaces the float with that bar.
+
+## Current-place ribbon
+
+The verse at the scroll reader's live reading line owns one short green
+swallowtail. It caps the verse's existing ribbon tip at the first ink line;
+when that verse is also saved, the green tab remains over the head of the
+full ruby cloth so current place and bookmark never erase one another. During
+recitation the word wash already names the place, so the tab follows the same
+chrome fade as the bookmark ribbon and ayah rail.
+
+The same mark repeats at two scales. Away from the live reader, its persisted
+counterpart is the last verse actually recited: Chapters puts the green
+swallowtail in the permanently reserved 28 dp outer lane beside that surah,
+without shifting its number or names. The ayah rail recolors the nearest
+existing collapsed bar green rather than adding another tick; in the expanded
+wheel that ayah is green until the gold scrub focus reaches it. A bookmarked
+current ayah keeps its ruby number while its rail tick is green, preserving
+both meanings. Continue Listening remains the explicit text route to the same
+persisted position. Scrolling moves the live reader mark but does not rewrite
+that history; opening or previewing a rail destination does not either.
+
+Implementation: `ui/reader/VerseBookmarkRibbon.kt`,
+`ui/reader/AyahSelectorRail.kt`, and `ui/home/HomeScreen.kt` over
+`HomeUiState.currentPlace`.
 
 ## Bookmark ribbon
 

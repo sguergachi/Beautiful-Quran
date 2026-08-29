@@ -37,6 +37,9 @@ data class HomeUiState(
     val surahs: List<Surah> = emptyList(),
     /** Every surah, unfiltered — the jump dials scroll across the whole book. */
     val allSurahs: List<Surah> = emptyList(),
+    /** Last verse actually recited, kept visible as the green place marker
+     * even while the chapter list is filtered. */
+    val currentPlace: ContinueTarget? = null,
     val continueTarget: ContinueTarget? = null,
     /** When the query is a `surah:ayah` reference, the ayah to open the matched surah at. */
     val ayahTarget: Int? = null,
@@ -146,6 +149,8 @@ class HomeViewModel(
             wordSearchLoading,
         ) { base, hits, expanded, loading ->
             val (filtered, ayahTarget) = filterSurahs(base.surahs, base.query)
+            val currentPlace = base.surahs.firstOrNull { it.id == base.lastSurah }
+                ?.let { ContinueTarget(it, base.lastAyah) }
             val nowPlaying = base.playerState.nowPlaying
             val floating = nowPlaying?.let { np ->
                 // The basmalah lead-in reports ayah 0; the float reads (and
@@ -159,12 +164,8 @@ class HomeViewModel(
                 query = base.query,
                 surahs = filtered,
                 allSurahs = base.surahs,
-                continueTarget = if (base.query.isBlank()) {
-                    base.surahs.firstOrNull { it.id == base.lastSurah }
-                        ?.let { ContinueTarget(it, base.lastAyah) }
-                } else {
-                    null
-                },
+                currentPlace = currentPlace,
+                continueTarget = currentPlace.takeIf { base.query.isBlank() },
                 ayahTarget = ayahTarget,
                 floatingPlayback = floating,
                 playerState = base.playerState,

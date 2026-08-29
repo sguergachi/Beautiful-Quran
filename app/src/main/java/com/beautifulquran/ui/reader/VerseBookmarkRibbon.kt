@@ -45,6 +45,7 @@ import kotlin.math.sin
  * A verse's own bookmark ribbon — ink that belongs to the ayah block, not a
  * floating overlay. Lives in the block's outer margin (opposite the ayah
  * selector). Idle: just the swallowtail tip of the ribbon, soft and quiet.
+ * Current: that tip fills green to mark the live reading line.
  * Saved: the ruby strip down the block, stopping short of the next verse's tip.
  * Tap the margin to mark / unmark.
  *
@@ -83,6 +84,7 @@ private val RetractEasing = CubicBezierEasing(0.55f, 0.05f, 0.35f, 1f)
 @Composable
 internal fun VerseBookmarkRibbon(
     bookmarked: Boolean,
+    /** True for the live reading-line verse; draws the short green place tab. */
     focused: Boolean,
     side: AyahSelectorSide,
     chromeAlpha: () -> Float,
@@ -103,6 +105,7 @@ internal fun VerseBookmarkRibbon(
 ) {
     val mirrored = side == AyahSelectorSide.RIGHT
     val ruby = LocalQuranAccents.current.bookmarkRibbon
+    val currentPlaceGreen = MaterialTheme.colorScheme.primary
     // Match the monochrome play/pause icon, not the green interactive accent.
     val playbackInk = MaterialTheme.colorScheme.onSurfaceVariant
     val view = LocalView.current
@@ -289,28 +292,30 @@ internal fun VerseBookmarkRibbon(
 
             // Always a swallowtail tip — idle "nub" is just that tip, short and
             // faded; a saved mark is the same shape grown to the block bottom.
-            val path = Path().apply {
+            fun ribbonPath(bottom: Float, clothMotion: Boolean) = Path().apply {
                 val top = topInsetPx + topFold
-                val bot = tipY.coerceAtLeast(topInsetPx + nubLen * 0.6f)
+                val bot = bottom.coerceAtLeast(topInsetPx + nubLen * 0.6f)
                 val span = (bot - top).coerceAtLeast(1f)
                 val notchDepth = minOf(notch, span * 0.45f)
                 val steps = (span / 3f).toInt().coerceIn(6, 64)
-                val outerTop = ax(outer + lateral(top))
-                val innerTop = ax(inner + lateral(top))
+                fun motion(y: Float) = if (clothMotion) lateral(y) else 0f
+                val outerTop = ax(outer + motion(top))
+                val innerTop = ax(inner + motion(top))
                 moveTo(outerTop, top)
                 quadraticTo(outerTop, top - topFold, ax(center), top - topFold)
                 quadraticTo(innerTop, top - topFold, innerTop, top)
                 for (i in 1..steps) {
                     val y = top + span * (i / steps.toFloat())
-                    lineTo(ax(inner + lateral(y)), y)
+                    lineTo(ax(inner + motion(y)), y)
                 }
-                lineTo(ax(center + lateral(bot - notchDepth)), bot - notchDepth)
+                lineTo(ax(center + motion(bot - notchDepth)), bot - notchDepth)
                 for (i in steps downTo 0) {
                     val y = top + span * (i / steps.toFloat())
-                    lineTo(ax(outer + lateral(y)), y)
+                    lineTo(ax(outer + motion(y)), y)
                 }
                 close()
             }
+            val path = ribbonPath(tipY, clothMotion = true)
 
             if (showingRibbon) {
                 val fill = Brush.verticalGradient(
@@ -321,7 +326,7 @@ internal fun VerseBookmarkRibbon(
                     endY = tipY.coerceAtLeast(1f),
                 )
                 drawPath(path, fill, alpha = alpha)
-            } else {
+            } else if (!focused) {
                 // An unmarked verse gets an empty ribbon silhouette. Ruby fill
                 // is reserved for the reader's saved marks.
                 drawPath(
@@ -333,6 +338,16 @@ internal fun VerseBookmarkRibbon(
                         cap = StrokeCap.Round,
                         join = StrokeJoin.Round,
                     ),
+                )
+            }
+            if (focused) {
+                // A short green tab marks the verse at the reading line. It
+                // caps a saved ruby ribbon instead of replacing it, preserving
+                // both "current place" and "my mark" at the same ayah.
+                drawPath(
+                    path = ribbonPath(retractedTipY, clothMotion = false),
+                    color = currentPlaceGreen,
+                    alpha = chrome * 0.92f,
                 )
             }
         }

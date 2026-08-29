@@ -16,6 +16,14 @@ class AyahSelectorRailTest {
     }
 
     @Test
+    fun collapsedAyahBarIndex_mapsCurrentVerseAcrossTheWholeStack() {
+        assertEquals(0, collapsedAyahBarIndex(286, 1))
+        assertEquals(8, collapsedAyahBarIndex(286, 143))
+        assertEquals(16, collapsedAyahBarIndex(286, 286))
+        assertEquals(0, collapsedAyahBarIndex(1, 1))
+    }
+
+    @Test
     fun collapsedStackSpan_matchesDrawLayout() {
         // count=4 → spacing 8, step 9.5, span = 3*9.5 + 1.5 = 30
         assertEquals(30f, collapsedStackSpanDp(1), 0.01f)
