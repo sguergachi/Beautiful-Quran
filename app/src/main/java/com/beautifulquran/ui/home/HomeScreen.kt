@@ -80,6 +80,7 @@ import com.beautifulquran.data.HomeBookmarkStyle
 import com.beautifulquran.domain.WORD_SEARCH_PREVIEW_LIMIT
 import com.beautifulquran.domain.englishTranslationHighlightSpans
 import com.beautifulquran.ui.reader.VerseBookmarkRibbon
+import com.beautifulquran.ui.reader.remainingUnfurlSignal
 import com.beautifulquran.ui.theme.AlphaTag
 import com.beautifulquran.ui.theme.ArabicTitleStyle
 import com.beautifulquran.ui.theme.GildedRosette
@@ -346,6 +347,12 @@ fun HomeScreen(
                                     ?.takeIf { it.surah.id == surah.id }
                                     ?.ayah,
                                 placeUnfurlSignal = placeRibbonUnfurlEpoch,
+                                onPlaceUnfurlConsumed = { consumed ->
+                                    placeRibbonUnfurlEpoch = remainingUnfurlSignal(
+                                        current = placeRibbonUnfurlEpoch,
+                                        consumed = consumed,
+                                    )
+                                },
                                 onClick = {
                                     focusManager.clearFocus()
                                     onOpenSurah(
@@ -670,6 +677,7 @@ private fun SurahRow(
     surah: Surah,
     currentAyah: Int?,
     placeUnfurlSignal: Int,
+    onPlaceUnfurlConsumed: (Int) -> Unit,
     onClick: () -> Unit,
 ) {
     val accents = LocalQuranAccents.current
@@ -694,6 +702,7 @@ private fun SurahRow(
                 onToggle = { false },
                 bookmarkTipVisible = false,
                 placeUnfurlSignal = placeUnfurlSignal,
+                onPlaceUnfurlConsumed = onPlaceUnfurlConsumed,
                 edgeInset = HomeRibbonGutter,
                 ribbonWidth = HomeRibbonWidth,
                 topInset = 0.dp,

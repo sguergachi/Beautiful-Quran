@@ -388,7 +388,9 @@ A reader visit snapshots the stored last ayah: the full green ribbon and green
 rail tick remain parked there instead of following bare scroll or focus. Once a
 real pause holds past Media3's brief transition dip, that media verse becomes
 the stored last ayah and the thinner passive ribbon unfurls onto it. Resuming
-leaves the newly placed marker there. Green owns the screen-edge
+leaves the newly placed marker there. The parked state retains both chapter and
+ayah, so an in-place mushaf or continuous-reader chapter handoff cannot inherit
+the old chapter's same-numbered verse. Green owns the screen-edge
 lane while the bookmark cloth or outline stays fixed in a reserved inner lane.
 That reservation is Reader-only; Home bookmark ribbons retain their original
 chapter-document position. Reader green is inset 4 dp farther toward the edge.

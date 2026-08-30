@@ -8,7 +8,9 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
@@ -19,6 +21,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Path
@@ -33,6 +36,7 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import com.beautifulquran.data.AyahSelectorSide
 import com.beautifulquran.ui.theme.LocalQuranAccents
+import com.beautifulquran.ui.theme.absorbPointerEvents
 import com.beautifulquran.ui.theme.quietClickable
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
@@ -87,6 +91,13 @@ internal fun placeRibbonInsetDp(reservePlaceLane: Boolean, edgeInsetDp: Float): 
 internal fun placeRibbonWidthDp(ribbonWidthDp: Float): Float =
     ribbonWidthDp * PLACE_RIBBON_WIDTH_RATIO
 
+internal fun placeRibbonTapGuardWidthDp(placeMarked: Boolean, ribbonWidthDp: Float): Float =
+    if (placeMarked) placeRibbonWidthDp(ribbonWidthDp) else 0f
+
+/** A completion only consumes the animation generation it actually presented. */
+internal fun remainingUnfurlSignal(current: Int, consumed: Int): Int =
+    if (current == consumed) 0 else current
+
 /** Gravity spill: slow peel, then accelerates, eases as length runs out. */
 private val UnfurlEasing = CubicBezierEasing(0.45f, 0.02f, 0.22f, 1f)
 
@@ -118,6 +129,8 @@ internal fun VerseBookmarkRibbon(
     unfurlSignal: Int = 0,
     /** Non-zero changes replay the passive green place marker's unfurl. */
     placeUnfurlSignal: Int = 0,
+    /** Acknowledges a completed green unfurl so remounting cannot replay it. */
+    onPlaceUnfurlConsumed: (Int) -> Unit = {},
     /** Reader-only paired lanes; Home ribbons retain their original geometry. */
     reservePlaceLane: Boolean = false,
     edgeInset: Dp = EDGE_INSET_DP.dp,
@@ -141,6 +154,10 @@ internal fun VerseBookmarkRibbon(
     var animating by remember { mutableStateOf(false) }
     var job by remember { mutableStateOf<Job?>(null) }
     var stripSize by remember { mutableStateOf(IntSize.Zero) }
+    val latestOnToggle by rememberUpdatedState(onToggle)
+    val latestOnLongClick by rememberUpdatedState(onLongClick)
+    val latestChrome by rememberUpdatedState(chromeAlpha)
+    val latestOnPlaceUnfurlConsumed by rememberUpdatedState(onPlaceUnfurlConsumed)
 
     // External bookmark changes snap without animation — only the tap path
     // below runs the unfurl.
@@ -221,15 +238,11 @@ internal fun VerseBookmarkRibbon(
             1f,
             spring(dampingRatio = 0.55f, stiffness = Spring.StiffnessMediumLow),
         )
+        latestOnPlaceUnfurlConsumed(placeUnfurlSignal)
     }
 
-    val latestOnToggle by rememberUpdatedState(onToggle)
-    val latestOnLongClick by rememberUpdatedState(onLongClick)
-    val latestChrome by rememberUpdatedState(chromeAlpha)
-
-    // Tap target is the whole strip: clickable is more reliable than a nested
-    // empty pointerInput Box, and the strip already sits in the ayah block's
-    // outer margin opposite the selector.
+    // Ruby owns the wide gutter target; the passive green cloth places a child
+    // guard over only its own pixels below so those touches never reach ruby.
     val tapModifier = if (interactive) {
         Modifier.quietClickable(
             role = Role.Button,
@@ -422,6 +435,24 @@ internal fun VerseBookmarkRibbon(
                     ),
                 )
             }
+        }
+        val placeTapGuardWidth = placeRibbonTapGuardWidthDp(
+            placeMarked = placeMarked,
+            ribbonWidthDp = ribbonWidth.value,
+        ).dp
+        if (interactive && placeTapGuardWidth > 0.dp) {
+            val placeInset = placeRibbonInsetDp(
+                reservePlaceLane = reservePlaceLane,
+                edgeInsetDp = edgeInset.value,
+            ).dp
+            Box(
+                Modifier
+                    .align(if (mirrored) Alignment.TopEnd else Alignment.TopStart)
+                    .offset(x = if (mirrored) -placeInset else placeInset)
+                    .width(placeTapGuardWidth)
+                    .fillMaxHeight()
+                    .absorbPointerEvents(),
+            )
         }
     }
 }

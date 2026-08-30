@@ -988,9 +988,12 @@ Pause is the placement gesture: once the chrome returns, green
 gravity-unfurls on the actual paused media verse, the ayah rail follows it, and
 that verse becomes the durable `lastAyah` used by Continue. Resume leaves the
 new marker parked there. Opening an already-paused reader does not replay the
-drop; it only runs after playback was heard in that visit. On an unsaved verse
-green uses the outer, screen-edge lane while the empty bookmark tip stays fixed
-in its reserved inner lane; the two never overpaint.
+drop; it only runs after playback was heard in that visit. A completed drop
+consumes its motion token, so scrolling the verse away and back shows settled
+cloth instead of replaying the placement. On an unsaved verse green uses the
+outer, screen-edge lane while the empty bookmark tip stays fixed in its reserved
+inner lane; the two never overpaint. That green cloth absorbs its own touch area
+without dispatching to the ruby bookmark action beside it.
 
 The verse mark is a **full ribbon**, with the same top, tail, and block-length
 as a saved ruby bookmark, but 72% of its width. That quieter silhouette makes

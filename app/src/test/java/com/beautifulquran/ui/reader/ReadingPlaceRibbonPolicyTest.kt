@@ -5,6 +5,15 @@ import org.junit.Test
 
 class ReadingPlaceRibbonPolicyTest {
     @Test
+    fun parkedPlace_keepsItsChapterIdentityAcrossInPlaceHandoffs() {
+        val place = readingPlace(2, 50)
+
+        assertEquals(50, place.ayahIn(2))
+        assertEquals(null, place.ayahIn(3))
+        assertEquals(null, readingPlace(0, 1))
+    }
+
+    @Test
     fun playedVerse_becomesPauseDropTargetOnThisChapter() {
         assertEquals(7, pausedReadingPlaceRibbonAyah(2, 2, 7, false, false, true))
     }

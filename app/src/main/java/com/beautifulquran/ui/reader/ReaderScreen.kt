@@ -258,14 +258,14 @@ fun ReaderScreen(
     val settings by viewModel.settings.settings.collectAsStateWithLifecycle()
     // Snapshot the shared Continue / green-ribbon target for this visit. A
     // deliberate pause moves this local marker and persists the same target.
-    var parkedPlaceAyah by remember(surahId) {
+    var parkedPlace by remember(surahId) {
         mutableStateOf(
             viewModel.settings.settings.value.let { saved ->
-                saved.lastAyah.takeIf { saved.lastSurah == surahId }
+                readingPlace(saved.lastSurah, saved.lastAyah)
             },
         )
     }
-    var placeUnfurlAyah by remember(surahId) { mutableIntStateOf(0) }
+    var placeUnfurlTarget by remember(surahId) { mutableStateOf<ReadingPlace?>(null) }
     var placeUnfurlToken by remember(surahId) { mutableIntStateOf(0) }
     val mushafUi by viewModel.mushaf.collectAsStateWithLifecycle()
     val mushafMode = settings.readingLayout == ReadingLayout.MUSHAF
@@ -544,6 +544,8 @@ fun ReaderScreen(
     val renderedSurahId = uiState.content?.surah?.id ?: surahId
     val isThisSurahPlaying = playerState.nowPlaying?.surahId == renderedSurahId
     val playingNow = isThisSurahPlaying && playerState.isPlaying
+    val parkedPlaceAyah = parkedPlace.ayahIn(renderedSurahId)
+    val placeUnfurlAyah = placeUnfurlTarget.ayahIn(renderedSurahId)
     var playedHere by remember(renderedSurahId) { mutableStateOf(playingNow) }
     val pausedPlaceAyah = pausedReadingPlaceRibbonAyah(
         renderedSurahId = renderedSurahId,
@@ -560,9 +562,10 @@ fun ReaderScreen(
             // Ignore Media3's brief non-playing dip between repeat items. The
             // ribbon arrives with the chrome only after the pause holds.
             delay(350)
-            parkedPlaceAyah = pausedPlaceAyah
-            viewModel.onPausedAyah(pausedPlaceAyah)
-            placeUnfurlAyah = pausedPlaceAyah
+            val place = ReadingPlace(renderedSurahId, pausedPlaceAyah)
+            parkedPlace = place
+            viewModel.onPausedAyah(place.surahId, place.ayah)
+            placeUnfurlTarget = place
             placeUnfurlToken++
             playedHere = false
         }
@@ -2766,6 +2769,12 @@ fun ReaderScreen(
                                     placeUnfurlToken
                                 } else {
                                     0
+                                },
+                                onPlaceUnfurlConsumed = { consumed ->
+                                    placeUnfurlToken = remainingUnfurlSignal(
+                                        current = placeUnfurlToken,
+                                        consumed = consumed,
+                                    )
                                 },
                                 bookmarkChromeAlpha = bookmarkChromeAlpha,
                                 // Keep the lesson target live so its taught hold
