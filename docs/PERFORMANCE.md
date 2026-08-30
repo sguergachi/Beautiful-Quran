@@ -205,10 +205,13 @@ tick must not remasure three pages or recreate 150 `Text` nodes.
   linear token-width pass remembered by page + typeface; playback ticks and
   ink animation frames never repeat it. Geometry remains in the bounded
   process cache. Non-adjacent chapter and search jumps warm that same target
-  window before moving the pager. A dial release retracts its comb before the
-  page swap begins; the leaf's existing loader then resolves a missing face
-  off the main thread. Cold composition can therefore never pin the control
-  under a finger that has already let go.
+  window before moving the pager. The dial warms only the target that rests
+  under the finger (fly-over cells are debounced), then releases its bubble
+  and retract on one frame and moves the pager on the next. A fast lift also
+  starts an urgent target-only warm-up; it never serially loads the five-page
+  window or waits for the retract spring before requesting the selected leaf.
+  Pager neighbours stay disposed through the selected leaf's first frame and
+  return afterward, avoiding the old three-leaf cold composition burst.
 - Each Madinah line owns one pointer-input node, not one per word. Its QCF word
   nodes retain the directional `shapedWordBloom`, while the leaf itself owns an
   offscreen layer so a fling transforms a recorded page. The settled page runs

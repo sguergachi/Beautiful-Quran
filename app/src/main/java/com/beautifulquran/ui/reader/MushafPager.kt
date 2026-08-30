@@ -734,7 +734,10 @@ internal fun MushafPager(
     }
     HorizontalPager(
         state = pagerState,
-        beyondViewportPageCount = if (holdNeighbours) 1 else 0,
+        // A distant dial jump composes one selected leaf first. Its neighbours
+        // return two frames later; asking Compose to build all three at once
+        // was the visible pause between release and the new folio.
+        beyondViewportPageCount = if (holdNeighbours && !scrubbing()) 1 else 0,
         reverseLayout = true,
         key = { it },
         modifier = modifier

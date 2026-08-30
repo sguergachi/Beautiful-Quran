@@ -68,9 +68,11 @@ import androidx.compose.ui.util.lerp
 import android.view.HapticFeedbackConstants
 import com.beautifulquran.ui.theme.LocalQuranAccents
 import com.beautifulquran.ui.theme.quietClickable
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlin.math.abs
 import kotlin.math.exp
 import kotlin.math.roundToInt
@@ -932,8 +934,18 @@ private val MushafDialReturnHitWidth = 44.dp
 private val MushafDialReturnDot = 26.dp
 private val MushafDialReturnIcon = 15.dp
 internal const val MUSHAF_DIAL_RETURN_MS = 5_000L
+/** Ignore chapter cells merely crossed between two display frames. */
+private const val MUSHAF_DIAL_WARM_SETTLE_MS = 24L
 /** Paper between the top of the comb and the foot of the label. */
 private val MushafDialHudAir = 2.dp
+
+/** Mutable gesture plumbing that must not recompose the dial when it changes. */
+private class MushafDialWarmState {
+    var page = 0
+    var loadingPage = 0
+    var job: Job? = null
+    var landingJob: Job? = null
+}
 
 /**
  * How far the label stands clear of the tick line, over and above the air.
@@ -1050,6 +1062,7 @@ internal fun MushafPageDial(
     val returnWay = remember { mutableStateOf(MushafReturnWay.Left) }
     var returnEnabled by remember { mutableStateOf(false) }
     var returnJob by remember { mutableStateOf<Job?>(null) }
+    val warmState = remember { MushafDialWarmState() }
     var widthPx by remember { mutableIntStateOf(0) }
     var hudContentWidthPx by remember { mutableIntStateOf(0) }
     // One mark per surah, surah order 1..114 — duplicates kept when a leaf
@@ -1130,6 +1143,26 @@ internal fun MushafPageDial(
             returnEnabled = false
             returnBubble.animateTo(0f, tween(220, easing = FastOutSlowInEasing))
             returnPage.intValue = 0
+        }
+    }
+
+    fun warmTarget(page: Int, immediate: Boolean = false) {
+        if (MushafQcfFonts.cached(page) != null) return
+        if (warmState.loadingPage == page) return
+        if (!immediate && warmState.page == page) return
+        warmState.page = page
+        warmState.job?.cancel()
+        warmState.job = scope.launch {
+            if (!immediate) delay(MUSHAF_DIAL_WARM_SETTLE_MS)
+            if (warmState.page != page) return@launch
+            warmState.loadingPage = page
+            try {
+                withContext(Dispatchers.Default) {
+                    MushafQcfFonts.face(view.context.applicationContext, page)
+                }
+            } finally {
+                if (warmState.loadingPage == page) warmState.loadingPage = 0
+            }
         }
     }
 
@@ -1661,6 +1694,7 @@ internal fun MushafPageDial(
                         if (pages <= 1) return@awaitEachGesture
                         down.consume()
                         dismissReturnBubble()
+                        warmState.landingJob?.cancel()
                         // A glide home may still be running from the last
                         // scrub; the hand takes the thumb back off it.
                         glide?.cancel()
@@ -1754,6 +1788,7 @@ internal fun MushafPageDial(
                         )
                         var lastHapticIdx = initialIdxForLast
                         dialPage.floatValue = chapterMarks[initialIdxForLast].toFloat()
+                        warmTarget(chapterMarks[initialIdxForLast])
                         hudChapterIdx = initialIdxForLast
                         // The thumb goes to the finger on contact, before any
                         // movement: the reader has taken hold of the rule
@@ -1874,6 +1909,7 @@ internal fun MushafPageDial(
                                     // Page ticks inside the trough — one per leaf
                                     // crossed, so the hand feels each page.
                                     val curTroughPage = raw.roundToInt().coerceIn(1, pages)
+                                    warmTarget(curTroughPage)
                                     if (lastTroughHapticPage == -1) {
                                         lastTroughHapticPage = curTroughPage
                                     } else if (curTroughPage != lastTroughHapticPage) {
@@ -1970,6 +2006,7 @@ internal fun MushafPageDial(
                                 val effectiveIdx = if (abs(rawIdx - hudChapterIdx) > 1) rawIdx else curIdx
                                 raw = chapterMarks[effectiveIdx].toFloat()
                                 dialPage.floatValue = raw
+                                warmTarget(chapterMarks[effectiveIdx])
                                 // haptics + HUD track the idx directly — using the
                                 // page would collapse co-located 591×2 (86/87) to
                                 // the same page and make 86 think 87 is still 86.
@@ -2139,25 +2176,36 @@ internal fun MushafPageDial(
                         handed = true
                         hudShown = false
                         scrubbing = false
-                        reportScrub.value(false)
+                        val pageChanges = moved && !cancelled && landed != previousPage
+                        if (!pageChanges) reportScrub.value(false)
                         hasPulsed = false
                         scope.launch { pulse.snapTo(0f) }
-                        // Close the control before asking the pager to compose
-                        // a distant leaf. Even though its font loads off-main,
-                        // cold page composition can occupy the UI thread; if
-                        // the seek starts here, the comb appears pinned under
-                        // the released finger until that work finishes.
+                        // The target has been warming while the hand read its
+                        // label. A fast release gets one last urgent request;
+                        // it never waits for the whole retract spring before
+                        // handing the already-resident leaf to the pager.
+                        if (moved && !cancelled) warmTarget(landed, immediate = true)
                         scope.launch {
                             expand.animateTo(0f, spring(dampingRatio = 1f, stiffness = 150f))
-                            if (moved && !cancelled) {
-                                // No haptic here: the chapter tick already
-                                // spoke on the crossing, and the landing is
-                                // that same chapter's name arriving under the
-                                // hand.
-                                release.surahId?.let { seekSurah.value?.invoke(it) }
-                                if (landed != previousPage) {
-                                    showReturnBubble(previousPage, landed)
+                        }
+                        if (moved && !cancelled) {
+                            // No haptic here: the chapter tick already spoke
+                            // on the crossing, and the landing is that same
+                            // chapter's name arriving under the hand.
+                            release.surahId?.let { seekSurah.value?.invoke(it) }
+                            if (pageChanges) {
+                                showReturnBubble(previousPage, landed)
+                                // Give the bubble and retract one draw before
+                                // cold leaf composition joins the next frame.
+                                // Keep neighbours parked until the target leaf
+                                // has owned that frame; composing all three is
+                                // the expensive part of a distant pager jump.
+                                warmState.landingJob = scope.launch {
+                                    withFrameNanos { }
                                     seek.value(landed)
+                                    withFrameNanos { }
+                                    withFrameNanos { }
+                                    reportScrub.value(false)
                                 }
                             }
                         }
