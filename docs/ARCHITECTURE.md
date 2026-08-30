@@ -103,7 +103,9 @@ For each selected reciter and chapter, both clients use the same order:
    clients retry automatically when connectivity returns.
    A missing or expired word/QCF cache keeps the cold-start mushaf cover up
    until that first refresh succeeds or fails; a fresh/still-readable cache
-   makes zero API calls. While the cover remains closed, Android parses all
+   makes zero API calls. The first legacy bootstrap reports completed chapters
+   against all 114 on the cover's gold progress rule; neither tap, back, nor a
+   paper-stack swipe can expose an unprepared reader. While the cover remains closed, Android parses all
    77,429 cached QF word rows into its process-lifetime lookup maps and opens
    and verifies the complete bundled SQLite file into its native page cache;
    the first chapter therefore does no deferred cache work. Web already
@@ -123,7 +125,12 @@ clients normalize direct legacy `by_chapter` responses into `mushafs:1`; after
 approval the replaceable transport can consume QF Content Sync without changing
 the repositories or cache schema. Android stores rows in `qf-content-cache.db`;
 the browser uses IndexedDB. Neither cache is part of Git, the APK, or the Pages
-artifact.
+artifact. The legacy API has no documented sync cursor, so its six-day network
+comparison still reads the fixed corpus. Android compares that snapshot with
+the cache inside one transaction and mutates only added, changed, or removed
+rows. Authenticated Content Sync uses the saved opaque token and applies its
+native row upserts/deletes directly, giving both a small network delta and a
+small SQLite delta after bootstrap.
 Developer Mode shows the selected resource's state, next refresh, seven-day
 limit, last failure, and the exact number of API requests made in that process
 or browser session. The cold-start cover reports requests as they start, then

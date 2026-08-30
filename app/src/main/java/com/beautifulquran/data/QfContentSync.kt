@@ -63,6 +63,19 @@ internal interface QfNetworkCallReporter {
     fun setNetworkCallReporter(reporter: () -> Unit)
 }
 
+/** Optional coarse progress for providers whose bootstrap has known work units. */
+internal interface QfSyncProgressReporter {
+    fun setSyncProgressReporter(reporter: (QfSyncProgress) -> Unit)
+}
+
+data class QfSyncProgress(val completed: Int, val total: Int) {
+    init {
+        require(total > 0 && completed in 0..total)
+    }
+
+    val fraction: Float get() = completed.toFloat() / total
+}
+
 /** Separate from the reader database: QF's cache can be replaced without mixing rows. */
 interface QfContentSyncStore {
     fun state(filter: QfResourceFilter): QfSyncState?

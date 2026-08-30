@@ -111,6 +111,10 @@ Their use must be disclosed to QF rather than represented as already approved.
 - [x] `mushafs:1` supplies exactly 77,429 normalized word records to Android
   and web through the same atomic six-day/seven-day cache contract. The direct
   adapters verify the 604 QCF page-font codepoint runs before installation.
+- [x] A missing/expired first bootstrap is gated behind the entrance cover and
+  reports 0–114 chapter progress on Android and web. Android full-snapshot
+  comparisons mutate only changed cache rows; authenticated syncs already use
+  row-level upsert/delete deltas after their bootstrap token.
 - [x] CI tests the backend, Python timing pipeline, Android cache, web cache,
   and database provenance/freshness gates.
 

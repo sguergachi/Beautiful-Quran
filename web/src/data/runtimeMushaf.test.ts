@@ -251,11 +251,13 @@ describe('RuntimeMushafCache', () => {
     expect(cache.status().phase).toBe('refreshing')
     expect(cache.status().apiCalls).toBe(1)
     expect(cache.haveRequestsSettled()).toBe(false)
+    expect(cache.downloadProgress()).toEqual({ completed: 0, total: 1, fraction: 0 })
 
     release()
     await restoring
     expect(settled).toBe(true)
     expect(cache.haveRequestsSettled()).toBe(true)
+    expect(cache.downloadProgress()).toEqual({ completed: 1, total: 1, fraction: 1 })
     expect(cache.word(5, 1, 1)?.translation_en).toBe('O')
   })
 

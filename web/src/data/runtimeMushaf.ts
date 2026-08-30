@@ -86,6 +86,8 @@ export class RuntimeMushafCache {
   private error: string | null = null
   private apiCalls = 0
   private requestsSettled = false
+  private progressCompleted = 0
+  private progressTotal = 0
   private byKey = new Map<string, RuntimeMushafWord>()
   private refreshTimer: number | null = null
   private expiryTimer: number | null = null
@@ -131,6 +133,16 @@ export class RuntimeMushafCache {
     return this.requestsSettled
   }
 
+  downloadProgress(): { completed: number; total: number; fraction: number } | null {
+    return this.progressTotal > 0
+      ? {
+          completed: this.progressCompleted,
+          total: this.progressTotal,
+          fraction: this.progressCompleted / this.progressTotal,
+        }
+      : null
+  }
+
   async restore(): Promise<void> {
     try {
       const saved = await this.store.get()
@@ -156,6 +168,8 @@ export class RuntimeMushafCache {
     if (this.inFlight) return this.inFlight
     this.error = null
     this.requestsSettled = false
+    this.progressCompleted = 0
+    this.progressTotal = 0
     this.inFlight = this.sync().then(() => true).catch((error: unknown) => {
       this.error = error instanceof Error ? error.message : String(error)
       return false
@@ -244,6 +258,8 @@ export class RuntimeMushafCache {
       }
       surahs.add(surah)
     }
+    this.progressTotal = surahs.size
+    this.notifyDiagnostics()
     await mapConcurrent([...surahs].sort((a, b) => a - b), 4, async (surah) => {
       const verses: unknown[] = []
       let page = 1
@@ -256,6 +272,8 @@ export class RuntimeMushafCache {
         page = Number.isInteger(next) && next > 0 ? next : 0
       } while (page > 0)
       chapters.set(surah, verses)
+      this.progressCompleted += 1
+      this.notifyDiagnostics()
     })
     const records = normalizeLegacyMushaf(canonical, chapters)
     assertQcfV2Runs(records, this.expectedQcfPages)

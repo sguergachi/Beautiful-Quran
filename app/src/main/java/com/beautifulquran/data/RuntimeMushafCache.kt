@@ -65,6 +65,7 @@ class RuntimeMushafCache(
 
     init {
         (api as? QfNetworkCallReporter)?.setNetworkCallReporter(::countApiCall)
+        (api as? QfSyncProgressReporter)?.setSyncProgressReporter(::reportSyncProgress)
     }
 
     fun status(now: Long = nowMs()): RuntimeCacheStatus {
@@ -119,7 +120,7 @@ class RuntimeMushafCache(
         }
         blockReadRefresh = false
         _diagnostics.update {
-            RuntimeCacheDiagnostics(it.apiCalls, it.resources, false)
+            RuntimeCacheDiagnostics(it.apiCalls, it.resources, false, null)
         }
         updateResource {
             it.copy(updatedAtMs = rememberedState()?.updatedAtMs, refreshing = true, lastError = null)
@@ -219,13 +220,19 @@ class RuntimeMushafCache(
 
     private fun countApiCall() {
         _diagnostics.update {
-            RuntimeCacheDiagnostics(it.apiCalls + 1, it.resources, false)
+            RuntimeCacheDiagnostics(it.apiCalls + 1, it.resources, false, it.syncProgress)
+        }
+    }
+
+    private fun reportSyncProgress(progress: QfSyncProgress) {
+        _diagnostics.update {
+            RuntimeCacheDiagnostics(it.apiCalls, it.resources, false, progress)
         }
     }
 
     private fun markRequestsSettled() {
         _diagnostics.update {
-            RuntimeCacheDiagnostics(it.apiCalls, it.resources, true)
+            RuntimeCacheDiagnostics(it.apiCalls, it.resources, true, it.syncProgress)
         }
     }
 
@@ -269,6 +276,7 @@ class RuntimeMushafCache(
                     current.resources[MUSHAF_ID] ?: RuntimeCacheResource(),
                 )),
                 current.requestsSettled,
+                current.syncProgress,
             )
         }
     }

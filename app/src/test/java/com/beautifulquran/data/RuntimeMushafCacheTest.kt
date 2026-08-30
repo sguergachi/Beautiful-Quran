@@ -123,6 +123,7 @@ class RuntimeMushafCacheTest {
         assertEquals("seeking", cache.word(5, 2, 19)?.translation)
         assertEquals(3L, cache.status().apiCalls)
         assertEquals(3L, cache.status().lastRefreshApiCalls)
+        assertEquals(QfSyncProgress(3, 3), cache.diagnostics.value.syncProgress)
         assertEquals(1, api.syncs)
     }
 
@@ -139,10 +140,12 @@ class RuntimeMushafCacheTest {
         started.await()
         assertEquals(1L, cache.diagnostics.value.apiCalls)
         assertFalse(cache.diagnostics.value.requestsSettled)
+        assertEquals(QfSyncProgress(0, 1), cache.diagnostics.value.syncProgress)
 
         release.complete(Unit)
         runCurrent()
         assertTrue(cache.diagnostics.value.requestsSettled)
+        assertEquals(QfSyncProgress(1, 1), cache.diagnostics.value.syncProgress)
         assertEquals("seeking", cache.word(5, 2, 19)?.translation)
     }
 
@@ -260,11 +263,15 @@ class RuntimeMushafCacheTest {
         private val httpCalls: Int,
         private val started: CompletableDeferred<Unit>? = null,
         private val release: CompletableDeferred<Unit>? = null,
-    ) : QfContentSyncApi, QfNetworkCallReporter {
+    ) : QfContentSyncApi, QfNetworkCallReporter, QfSyncProgressReporter {
         var syncs = 0
         private var reporter: () -> Unit = {}
+        private var progressReporter: (QfSyncProgress) -> Unit = {}
         override fun setNetworkCallReporter(reporter: () -> Unit) {
             this.reporter = reporter
+        }
+        override fun setSyncProgressReporter(reporter: (QfSyncProgress) -> Unit) {
+            progressReporter = reporter
         }
         override suspend fun sync(request: QfSyncRequest): QfSyncPage {
             syncs++
@@ -275,10 +282,12 @@ class RuntimeMushafCacheTest {
             )
         }
         override suspend fun snapshot(relativePath: String): QfSnapshot {
-            repeat(httpCalls) {
+            progressReporter(QfSyncProgress(0, httpCalls))
+            repeat(httpCalls) { index ->
                 reporter()
                 started?.complete(Unit)
                 release?.await()
+                progressReporter(QfSyncProgress(index + 1, httpCalls))
             }
             return QfSnapshot(resource, listOf(row))
         }

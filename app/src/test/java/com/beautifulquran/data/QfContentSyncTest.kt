@@ -25,6 +25,7 @@ class QfContentSyncTest {
                     changes = listOf(QfContentChange.Upsert(row)),
                     nextPagePath = null,
                     nextSyncToken = "next-token",
+                    contentAgeMs = 10L,
                 ),
             ),
             snapshots = listOf(QfSnapshot(resource, listOf(row))),
@@ -34,7 +35,7 @@ class QfContentSyncTest {
 
         assertEquals(listOf(QfSyncRequest.Bootstrap(filter), QfSyncRequest.NextPage("/api/v4/resources/sync?cursor=second")), api.requests)
         assertEquals("next-token", store.savedState?.token)
-        assertEquals(42L, store.savedState?.updatedAtMs)
+        assertEquals(32L, store.savedState?.updatedAtMs)
         assertEquals(listOf(row), store.rows)
     }
 
@@ -88,6 +89,85 @@ class QfContentSyncTest {
         assertFalse(isQfContentFresh(null, 0L))
     }
 
+    @Test
+    fun `invalid provider age never advances checkpoint`() = runBlocking {
+        val store = FakeStore(QfSyncState(filter, "old-token", 1L))
+        val api = FakeApi(
+            pages = listOf(
+                QfSyncPage(
+                    emptyList(),
+                    null,
+                    "new-token",
+                    QF_MAX_CACHE_AGE_MS + 1,
+                ),
+            ),
+            snapshots = emptyList(),
+        )
+
+        runCatching { QfContentSyncer(api, store) { 42L }.sync(filter) }
+
+        assertEquals("old-token", store.savedState?.token)
+        assertEquals(1L, store.savedState?.updatedAtMs)
+    }
+
+    @Test
+    fun `duplicate row delivery is idempotent and later deletion wins`() = runBlocking {
+        val store = FakeStore()
+        QfContentSyncer(
+            FakeApi(
+                pages = listOf(
+                    QfSyncPage(
+                        listOf(
+                            QfContentChange.Upsert(row),
+                            QfContentChange.Upsert(row),
+                            QfContentChange.FreshnessMarker,
+                        ),
+                        null,
+                        "one",
+                    ),
+                ),
+                snapshots = emptyList(),
+            ),
+            store,
+        ).sync(filter)
+        assertEquals(listOf(row), store.rows)
+
+        QfContentSyncer(
+            FakeApi(
+                pages = listOf(
+                    QfSyncPage(
+                        listOf(
+                            QfContentChange.DeleteRow(resource, "audio_file", "1:1"),
+                        ),
+                        null,
+                        "two",
+                    ),
+                ),
+                snapshots = emptyList(),
+            ),
+            store,
+        ).sync(filter)
+        assertTrue(store.rows.isEmpty())
+        assertEquals("two", store.savedState?.token)
+    }
+
+    @Test
+    fun `full snapshot computes only changed row mutations`() {
+        val removed = row.copy(recordKey = "1:2", payload = "old")
+        val changed = row.copy(payload = "new")
+        val added = row.copy(recordKey = "1:3", payload = "added")
+
+        val delta = qfSnapshotDelta(
+            existing = listOf(row, removed),
+            incoming = listOf(changed, added),
+        )
+
+        assertEquals(listOf(changed, added), delta.upserts)
+        assertEquals(listOf(removed), delta.deletes)
+        assertTrue(qfSnapshotDelta(listOf(row), listOf(row)).upserts.isEmpty())
+        assertTrue(qfSnapshotDelta(listOf(row), listOf(row)).deletes.isEmpty())
+    }
+
     private class FakeApi(
         private val pages: List<QfSyncPage>,
         private val snapshots: List<QfSnapshot>,
@@ -109,6 +189,16 @@ class QfContentSyncTest {
         var rows = emptyList<QfCacheRow>()
 
         override fun state(filter: QfResourceFilter) = savedState?.takeIf { it.filter == filter }
+
+        override fun rows(
+            resource: QfResource,
+            recordType: String,
+            recordKeyPrefix: String?,
+        ) = rows.filter {
+            it.resource == resource &&
+                it.recordType == recordType &&
+                (recordKeyPrefix == null || it.recordKey.startsWith(recordKeyPrefix))
+        }
 
         override fun clear() {
             savedState = null

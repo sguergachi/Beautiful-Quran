@@ -195,6 +195,7 @@ class MainActivity : ComponentActivity() {
             val mushafDiagnostics by app.runtimeMushaf!!.diagnostics.collectAsStateWithLifecycle()
             val mushafStatus = remember(mushafDiagnostics) { app.runtimeMushaf!!.status() }
             val mushafReady = runtimeMushafEntranceReady(mushafStatus, System.currentTimeMillis())
+            val mushafProgress = mushafDiagnostics.syncProgress
             var mushafMemoryReady by remember { mutableStateOf(false) }
             LaunchedEffect(mushafReady, mushafStatus.updatedAtMs) {
                 mushafMemoryReady = false
@@ -216,6 +217,10 @@ class MainActivity : ComponentActivity() {
                     RuntimeCachePhase.REFRESHING -> when {
                         mushafDiagnostics.requestsSettled && mushafStatus.apiCalls > 0 ->
                             "Saving Quran pages · ${mushafStatus.apiCalls} requests complete"
+                        mushafProgress != null && mushafProgress.completed == mushafProgress.total ->
+                            "Checking Quran pages"
+                        mushafProgress != null ->
+                            "Downloading Quran pages · ${mushafProgress.completed} of ${mushafProgress.total} chapters"
                         mushafStatus.apiCalls > 0 ->
                             "Downloading Quran pages · ${mushafStatus.apiCalls} API requests"
                         else -> "Preparing Quran pages"
@@ -282,6 +287,10 @@ class MainActivity : ComponentActivity() {
                             ornament = coverOrnament,
                             contentReady = contentReady,
                             loadLabel = contentLoadLabel,
+                            loadProgress = when {
+                                mushafDiagnostics.requestsSettled -> 1f
+                                else -> mushafProgress?.fraction
+                            },
                             onOpenBegan = {
                                 val sounds = coverSounds
                                     ?: PageTurnSounds(this@MainActivity).also { coverSounds = it }

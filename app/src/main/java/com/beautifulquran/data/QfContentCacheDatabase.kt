@@ -75,8 +75,7 @@ class QfContentCacheDatabase(context: Context) : QfContentSyncStore {
                     check(fetchedSnapshots.hasNext()) { "Missing fetched QF snapshot" }
                     val snapshot = fetchedSnapshots.next()
                     check(snapshot.resource == change.resource) { "QF snapshot order mismatch" }
-                    deleteResource(snapshot.resource)
-                    snapshot.rows.forEach { row -> this.upsert(row) }
+                    applySnapshotDelta(snapshot)
                 }
                 is QfContentChange.Upsert -> upsert(change.row)
                 is QfContentChange.DeleteRow -> delete(
@@ -107,6 +106,49 @@ class QfContentCacheDatabase(context: Context) : QfContentSyncStore {
         )
     }
 
+    /** A legacy full comparison must not rewrite 77,429 unchanged rows. */
+    private fun SQLiteDatabase.applySnapshotDelta(snapshot: QfSnapshot) {
+        check(snapshot.rows.all { it.resource == snapshot.resource }) {
+            "QF snapshot contained a row from another resource"
+        }
+        val existing = rowsForResource(snapshot.resource)
+        val delta = qfSnapshotDelta(existing, snapshot.rows)
+        delta.deletes.forEach { row ->
+            delete(
+                "cached_rows",
+                "resource_group = ? AND resource_id = ? AND record_type = ? AND record_key = ?",
+                arrayOf(
+                    row.resource.group,
+                    row.resource.id.toString(),
+                    row.recordType,
+                    row.recordKey,
+                ),
+            )
+        }
+        delta.upserts.forEach { upsert(it) }
+    }
+
+    private fun SQLiteDatabase.rowsForResource(resource: QfResource): List<QfCacheRow> =
+        rawQuery(
+            "SELECT record_type,record_key,payload,updated_at FROM cached_rows " +
+                "WHERE resource_group=? AND resource_id=?",
+            arrayOf(resource.group, resource.id.toString()),
+        ).use { cursor ->
+            buildList {
+                while (cursor.moveToNext()) {
+                    add(
+                        QfCacheRow(
+                            resource,
+                            cursor.getString(0),
+                            cursor.getString(1),
+                            cursor.getString(2),
+                            cursor.getString(3),
+                        ),
+                    )
+                }
+            }
+        }
+
     private fun SQLiteDatabase.upsert(row: QfCacheRow) {
         replace("cached_rows", null, ContentValues().apply {
             put("resource_group", row.resource.group)
@@ -117,6 +159,26 @@ class QfContentCacheDatabase(context: Context) : QfContentSyncStore {
             put("updated_at", row.updatedAt)
         })
     }
+}
+
+internal data class QfSnapshotDelta(
+    val upserts: List<QfCacheRow>,
+    val deletes: List<QfCacheRow>,
+)
+
+/** Computes the smallest row mutation set needed to publish a full snapshot. */
+internal fun qfSnapshotDelta(
+    existing: List<QfCacheRow>,
+    incoming: List<QfCacheRow>,
+): QfSnapshotDelta {
+    fun QfCacheRow.key() = recordType to recordKey
+    val before = existing.associateBy { it.key() }
+    val after = incoming.associateBy { it.key() }
+    check(after.size == incoming.size) { "Duplicate QF snapshot row" }
+    return QfSnapshotDelta(
+        upserts = incoming.filter { before[it.key()] != it },
+        deletes = existing.filter { it.key() !in after },
+    )
 }
 
 private fun SQLiteDatabase.hasColumn(table: String, column: String): Boolean =

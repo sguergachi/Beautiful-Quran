@@ -5,6 +5,7 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.nio.charset.StandardCharsets
 import java.text.Normalizer
+import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -33,15 +34,21 @@ class LegacyQuranComMushafApi internal constructor(
     private val chapters: IntRange = 1..114,
     private val expectedQcfPages: IntRange = 1..604,
     transport: ((String) -> JsonElement)? = null,
-) : QfContentSyncApi, QfNetworkCallReporter {
+) : QfContentSyncApi, QfNetworkCallReporter, QfSyncProgressReporter {
     constructor(database: QuranDatabase) : this({ readCanonicalWords(database) })
 
     @Volatile
     private var reportNetworkCall: () -> Unit = {}
+    @Volatile
+    private var reportSyncProgress: (QfSyncProgress) -> Unit = {}
     private val transport = transport ?: { path -> httpGet(path) }
 
     override fun setNetworkCallReporter(reporter: () -> Unit) {
         reportNetworkCall = reporter
+    }
+
+    override fun setSyncProgressReporter(reporter: (QfSyncProgress) -> Unit) {
+        reportSyncProgress = reporter
     }
 
     override suspend fun sync(request: QfSyncRequest): QfSyncPage {
@@ -64,6 +71,9 @@ class LegacyQuranComMushafApi internal constructor(
         return withContext(Dispatchers.IO) {
             val canonical = canonicalWords()
             val gate = Semaphore(CHAPTER_CONCURRENCY)
+            val completed = AtomicInteger()
+            val totalChapters = chapters.count()
+            reportSyncProgress(QfSyncProgress(0, totalChapters))
             val rows = coroutineScope {
                 chapters.map { surah ->
                     async {
@@ -72,7 +82,11 @@ class LegacyQuranComMushafApi internal constructor(
                                 surah,
                                 canonical[surah] ?: error("Canonical text omitted surah $surah"),
                                 fetchVerses(surah),
-                            )
+                            ).also {
+                                reportSyncProgress(
+                                    QfSyncProgress(completed.incrementAndGet(), totalChapters),
+                                )
+                            }
                         }
                     }
                 }.awaitAll().flatten()

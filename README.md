@@ -125,8 +125,11 @@ it also assembles the release APK and publishes it to the rolling latest release
 
 Word/QCF download needs no build variable: released clients call
 `https://api.quran.com` automatically, refresh after six days, and withhold the
-cache after seven. A missing/expired first fill completes on the closed-mushaf
-loading screen, with offline failure falling through to the independent reader.
+cache after seven. A missing/expired first fill completes behind the locked
+closed-mushaf loading screen with chapter progress, while offline failure falls
+through to the independent reader. The legacy API requires a fixed-corpus
+comparison; Android only mutates cache rows that changed. Authenticated Content
+Sync uses small token-based upsert/delete deltas after bootstrap.
 `TIMING_CONTENT_BASE_URL` (Android) / its Vite equivalent is
 only for the normalized repeat-timing service; leave it unset until that HTTPS
 host passes the deployment and parity gates. quran-align remains the timing
