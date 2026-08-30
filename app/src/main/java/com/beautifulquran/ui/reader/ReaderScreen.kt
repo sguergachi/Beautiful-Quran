@@ -256,13 +256,17 @@ fun ReaderScreen(
     // one ayah block — never the whole screen.
     val activeWordState = viewModel.activeWord.collectAsStateWithLifecycle()
     val settings by viewModel.settings.settings.collectAsStateWithLifecycle()
-    // Snapshot the shared Continue / green-ribbon target once for this visit;
-    // only a paused media verse temporarily displaces it.
-    val parkedPlaceAyah = remember(surahId) {
-        viewModel.settings.settings.value.let { saved ->
-            saved.lastAyah.takeIf { saved.lastSurah == surahId }
-        }
+    // Snapshot the shared Continue / green-ribbon target for this visit. A
+    // deliberate pause moves this local marker and persists the same target.
+    var parkedPlaceAyah by remember(surahId) {
+        mutableStateOf(
+            viewModel.settings.settings.value.let { saved ->
+                saved.lastAyah.takeIf { saved.lastSurah == surahId }
+            },
+        )
     }
+    var placeUnfurlAyah by remember(surahId) { mutableIntStateOf(0) }
+    var placeUnfurlToken by remember(surahId) { mutableIntStateOf(0) }
     val mushafUi by viewModel.mushaf.collectAsStateWithLifecycle()
     val mushafMode = settings.readingLayout == ReadingLayout.MUSHAF
     LaunchedEffect(mushafMode) {
@@ -539,21 +543,30 @@ fun ReaderScreen(
     // nothing of "this" surah is playing, so pause restarts instead of pausing.
     val renderedSurahId = uiState.content?.surah?.id ?: surahId
     val isThisSurahPlaying = playerState.nowPlaying?.surahId == renderedSurahId
+    val playingNow = isThisSurahPlaying && playerState.isPlaying
+    var playedHere by remember(renderedSurahId) { mutableStateOf(playingNow) }
     val pausedPlaceAyah = pausedReadingPlaceRibbonAyah(
         renderedSurahId = renderedSurahId,
         mediaSurahId = playerState.nowPlaying?.surahId,
         mediaAyah = playerState.nowPlaying?.ayah,
         isPlaying = playerState.isPlaying,
         isBuffering = playerState.isBuffering,
+        playedHere = playedHere,
     )
-    val visiblePlaceAyah = readingPlaceRibbonAyah(
-        parkedAyah = parkedPlaceAyah,
-        renderedSurahId = renderedSurahId,
-        mediaSurahId = playerState.nowPlaying?.surahId,
-        mediaAyah = playerState.nowPlaying?.ayah,
-        isPlaying = playerState.isPlaying,
-        isBuffering = playerState.isBuffering,
-    )
+    LaunchedEffect(playingNow, pausedPlaceAyah) {
+        if (playingNow) {
+            playedHere = true
+        } else if (pausedPlaceAyah != null) {
+            // Ignore Media3's brief non-playing dip between repeat items. The
+            // ribbon arrives with the chrome only after the pause holds.
+            delay(350)
+            parkedPlaceAyah = pausedPlaceAyah
+            viewModel.onPausedAyah(pausedPlaceAyah)
+            placeUnfurlAyah = pausedPlaceAyah
+            placeUnfurlToken++
+            playedHere = false
+        }
+    }
     // Lead-adjusted: crosses to the next ayah ~500ms before the current one's
     // audio ends, so the block fade to the next ayah starts a touch early.
     val activeAyahState = viewModel.activeAyah.collectAsStateWithLifecycle()
@@ -564,7 +577,6 @@ fun ReaderScreen(
     // frame or two before it resumes at the range's start. Debounce that so the
     // receded chrome / status-bar overlay hold steady across the restart instead
     // of flashing in — only a genuine, sustained pause brings the chrome back.
-    val playingNow = isThisSurahPlaying && playerState.isPlaying
     var recitingActive by remember { mutableStateOf(playingNow) }
     LaunchedEffect(playingNow) {
         if (playingNow) {
@@ -2749,8 +2761,12 @@ fun ReaderScreen(
                                 // collected projection can arrive one frame after
                                 // the lesson. Keep its live anchor ruby meanwhile.
                                 bookmarked = ribbonBookmarked,
-                                placeMarked = ayah.number == visiblePlaceAyah,
-                                placeUnfurlSignal = if (ayah.number == pausedPlaceAyah) 1 else 0,
+                                placeMarked = ayah.number == parkedPlaceAyah,
+                                placeUnfurlSignal = if (ayah.number == placeUnfurlAyah) {
+                                    placeUnfurlToken
+                                } else {
+                                    0
+                                },
                                 bookmarkChromeAlpha = bookmarkChromeAlpha,
                                 // Keep the lesson target live so its taught hold
                                 // can be completed without leaving the paper.
@@ -3007,7 +3023,7 @@ fun ReaderScreen(
                     side = selectorSide,
                     currentAyah = railCurrentAyah,
                     currentPosition = railCurrentPosition,
-                    placeAyah = visiblePlaceAyah,
+                    placeAyah = parkedPlaceAyah,
                     bookmarkedAyahs = bookmarkedAyahs,
                     pageStarts = railPageStarts,
                     chromeAlpha = { topBarAlpha.value },

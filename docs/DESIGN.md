@@ -984,11 +984,13 @@ screen edge, then drops to full length as the sheet settles. The motion is armed
 only by a committed reader visit, so cold display and cancelled page turns do
 not perform a gratuitous flourish.
 
-Pause is the one in-visit exception: once the chrome returns, green
-gravity-unfurls on the actual paused media verse and the ayah rail follows it.
-Resume removes that temporary mark and restores the visit's parked ribbon. On
-an unsaved verse green uses the outer, screen-edge lane while the empty
-bookmark tip stays fixed in its reserved inner lane; the two never overpaint.
+Pause is the placement gesture: once the chrome returns, green
+gravity-unfurls on the actual paused media verse, the ayah rail follows it, and
+that verse becomes the durable `lastAyah` used by Continue. Resume leaves the
+new marker parked there. Opening an already-paused reader does not replay the
+drop; it only runs after playback was heard in that visit. On an unsaved verse
+green uses the outer, screen-edge lane while the empty bookmark tip stays fixed
+in its reserved inner lane; the two never overpaint.
 
 The verse mark is a **full ribbon**, with the same top, tail, and block-length
 as a saved ruby bookmark, but 72% of its width. That quieter silhouette makes

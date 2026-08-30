@@ -5,16 +5,16 @@ import org.junit.Test
 
 class ReadingPlaceRibbonPolicyTest {
     @Test
-    fun pausedVerse_replacesParkedPlaceOnThisChapter() {
-        assertEquals(7, pausedReadingPlaceRibbonAyah(2, 2, 7, false, false))
-        assertEquals(7, readingPlaceRibbonAyah(3, 2, 2, 7, false, false))
+    fun playedVerse_becomesPauseDropTargetOnThisChapter() {
+        assertEquals(7, pausedReadingPlaceRibbonAyah(2, 2, 7, false, false, true))
     }
 
     @Test
-    fun liveOrUnrelatedPlayback_keepsParkedPlace() {
-        assertEquals(3, readingPlaceRibbonAyah(3, 2, 2, 7, true, false))
-        assertEquals(3, readingPlaceRibbonAyah(3, 2, 2, 7, false, true))
-        assertEquals(3, readingPlaceRibbonAyah(3, 2, 1, 7, false, false))
-        assertEquals(3, readingPlaceRibbonAyah(3, 2, 2, 0, false, false))
+    fun liveBufferingUnrelatedOrAlreadyPausedPlayback_doesNotDrop() {
+        assertEquals(null, pausedReadingPlaceRibbonAyah(2, 2, 7, true, false, true))
+        assertEquals(null, pausedReadingPlaceRibbonAyah(2, 2, 7, false, true, true))
+        assertEquals(null, pausedReadingPlaceRibbonAyah(2, 1, 7, false, false, true))
+        assertEquals(null, pausedReadingPlaceRibbonAyah(2, 2, 0, false, false, true))
+        assertEquals(null, pausedReadingPlaceRibbonAyah(2, 2, 7, false, false, false))
     }
 }

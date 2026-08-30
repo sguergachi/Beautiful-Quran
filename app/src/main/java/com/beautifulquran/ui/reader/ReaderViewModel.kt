@@ -1014,6 +1014,11 @@ class ReaderViewModel(
         rememberListened(ayah)
     }
 
+    /** A held pause makes its media verse the durable Continue / green target. */
+    fun onPausedAyah(ayah: Int) {
+        rememberListened(ayah)
+    }
+
     /** Persist the shared Continue / green target for a verse actually heard. */
     private fun rememberListened(ayah: Int) {
         if (surahId in 1..114 && ayah >= 1) {

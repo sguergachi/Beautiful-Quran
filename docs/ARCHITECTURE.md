@@ -384,11 +384,11 @@ only the two position keys and no-ops when the position is unchanged. Those
 same keys are the green ribbon's sole source: Home's Continue row, green chapter
 mark, chapter-row return, Reader ribbon, and green rail tick share one target.
 
-A reader visit snapshots the stored last ayah once: the full green ribbon and
-green rail tick remain parked there instead of following bare scroll or focus.
-Pausing audio temporarily unfurls a thinner, passive green ribbon on the actual
-paused media verse and moves the rail tick with it; playing, buffering, ending,
-or leaving that chapter restores the visit snapshot. Green owns the screen-edge
+A reader visit snapshots the stored last ayah: the full green ribbon and green
+rail tick remain parked there instead of following bare scroll or focus. Once a
+real pause holds past Media3's brief transition dip, that media verse becomes
+the stored last ayah and the thinner passive ribbon unfurls onto it. Resuming
+leaves the newly placed marker there. Green owns the screen-edge
 lane while the bookmark cloth or outline stays fixed in a reserved inner lane.
 That reservation is Reader-only; Home bookmark ribbons retain their original
 chapter-document position. Reader green is inset 4 dp farther toward the edge.
