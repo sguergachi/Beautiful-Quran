@@ -802,6 +802,19 @@ internal fun mushafDialChapterAtHysteresis(
     }
 }
 
+/** The chapter promised by the comb, including its quiet boundary and end stops. */
+internal fun mushafDialStableChapterAt(
+    seats: FloatArray,
+    xPx: Float,
+    lastIdx: Int,
+    hysteresisPx: Float,
+    atTrackWall: Boolean,
+): Int = if (atTrackWall) {
+    mushafDialChapterAt(seats, xPx)
+} else {
+    mushafDialChapterAtHysteresis(seats, xPx, lastIdx, hysteresisPx)
+}
+
 /**
  * Where each chapter mark is DRAWN on the chapter tier, in px, under the
  * fisheye the finger applies: lens around [centerX], progressive tail boost,
@@ -2063,7 +2076,6 @@ internal fun MushafPageDial(
                                 // change: a hand parked on a 70+ boundary
                                 // jitters 1-2px and would otherwise flip every
                                 // frame — constant vibration while still.
-                                val rawIdx = mushafDialChapterAt(cellSeats, handPx)
                                 // At either wall the hand has run out of
                                 // track — it cannot go further, so there is
                                 // no jitter for hysteresis to absorb, and an
@@ -2072,18 +2084,13 @@ internal fun MushafPageDial(
                                 // behind its neighbour forever.
                                 val atWall = handPx <= insetPx + 0.5f ||
                                     handPx >= widthPxNow - insetPx - 0.5f
-                                val curIdx = if (atWall) {
-                                    rawIdx
-                                } else {
-                                    mushafDialChapterAtHysteresis(
-                                        cellSeats, handPx, hudChapterIdx, hysteresisPx,
-                                    )
-                                }
-                                // HUD tracks the hysteretic chapter, so text
-                                // does not flicker; rawIdx still drives the
-                                // page so a fast swipe that jumps 2+ cells
-                                // lands immediately.
-                                val effectiveIdx = if (abs(rawIdx - hudChapterIdx) > 1) rawIdx else curIdx
+                                val effectiveIdx = mushafDialStableChapterAt(
+                                    cellSeats,
+                                    handPx,
+                                    hudChapterIdx,
+                                    hysteresisPx,
+                                    atWall,
+                                )
                                 raw = chapterMarks[effectiveIdx].toFloat()
                                 dialPage.floatValue = raw
                                 warmTarget(chapterMarks[effectiveIdx])
@@ -2223,7 +2230,15 @@ internal fun MushafPageDial(
                                 // Land in the cell the tier has been reading
                                 // all along, so letting go lands the stroke
                                 // where the HUD says it sat.
-                                val bestIdx = mushafDialChapterAt(cellSeats, handX.floatValue)
+                                val releaseX = handX.floatValue
+                                val bestIdx = mushafDialStableChapterAt(
+                                    cellSeats,
+                                    releaseX,
+                                    lastHapticIdx,
+                                    hysteresisPx,
+                                    releaseX <= insetPx + 0.5f ||
+                                        releaseX >= widthPxNow - insetPx - 0.5f,
+                                )
                                 landedSurahId = bestIdx + 1
                                 mushafDialChapterRun(
                                     chapterMarks,

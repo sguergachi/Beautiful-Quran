@@ -120,7 +120,9 @@ trough: pull upward off the rule and a click confirms that it folds away
 without turning the leaf.
 One pull spends one tier only. A pull out of the leaf trough returns to the
 chapter comb; the hand must return to the rule before another upward pull can
-cancel that comb. Letting go still chooses the chapter under the finger.
+cancel that comb. Letting go chooses the chapter the bracket names; the comb's
+quiet boundary still applies at lift, so a tiny thumb wobble cannot silently
+choose the neighbouring chapter.
 
 A dial release that turns to a different leaf leaves one brief way back on the
 same rule: a small ink roundel grows at the old leaf's seat with a back arrow

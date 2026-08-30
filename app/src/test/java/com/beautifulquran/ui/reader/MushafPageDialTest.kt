@@ -740,6 +740,19 @@ class MushafPageDialTest {
     }
 
     @Test
+    fun `release wobble cannot choose a chapter the comb did not name`() {
+        val seats = floatArrayOf(100f, 0f)
+        val hyst = 4f
+        // Raw geometry crosses at 50, but the comb still names chapter 1
+        // until the hand decisively crosses its quiet boundary at 20.
+        assertEquals(1, mushafDialChapterAt(seats, 49f))
+        assertEquals(0, mushafDialStableChapterAt(seats, 49f, 0, hyst, false))
+        assertEquals(1, mushafDialStableChapterAt(seats, 19f, 0, hyst, false))
+        // End chapters remain reachable at the physical track walls.
+        assertEquals(1, mushafDialStableChapterAt(seats, 0f, 0, hyst, true))
+    }
+
+    @Test
     fun `a seat at the track's clamp stays reachable through hysteresis`() {
         // Al-Fatihah and al-Baqarah sit minGap apart at the compressed head,
         // and al-Fatihah's seat is the track's own clamp — an uncapped
