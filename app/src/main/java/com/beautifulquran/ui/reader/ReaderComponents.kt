@@ -2462,7 +2462,9 @@ fun AyahBlock(
      * [gatherOrdinal] reuses this margin instead of the ribbon. */
     bookmarkSide: AyahSelectorSide? = null,
     bookmarked: Boolean = false,
-    bookmarkFocused: Boolean = false,
+    placeMarked: Boolean = false,
+    placeUnfurlSignal: Int = 0,
+    onPlaceUnfurlConsumed: (Int) -> Unit = {},
     bookmarkChromeAlpha: () -> Float = { 1f },
     bookmarkInteractive: Boolean = true,
     onToggleBookmark: (() -> Boolean)? = null,
@@ -2865,7 +2867,10 @@ fun AyahBlock(
             Box(Modifier.matchParentSize()) {
                 VerseBookmarkRibbon(
                     bookmarked = bookmarked,
-                    focused = bookmarkFocused,
+                    placeMarked = placeMarked,
+                    placeUnfurlSignal = placeUnfurlSignal,
+                    onPlaceUnfurlConsumed = onPlaceUnfurlConsumed,
+                    reservePlaceLane = true,
                     side = bookmarkSide,
                     chromeAlpha = bookmarkChromeAlpha,
                     interactive = bookmarkInteractive,
