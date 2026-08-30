@@ -471,13 +471,10 @@ internal fun MushafPager(
     onTappedLeaf: (Int) -> Unit,
     flashAyah: Int?,
     flashWordPosition: Int?,
-    /**
-     * True while the page dial is under a hand. The folio and the dial's label
-     * both name a leaf, one the reader is on and one they are heading for, and
-     * they sit in the same band — so the folio gives the band up for as long
-     * as the scrub lasts rather than arguing with it.
-     */
+    /** True while a hand is physically on the page dial, for the folio fade. */
     scrubbing: () -> Boolean,
+    /** True only while a distant dial landing keeps neighbour leaves parked. */
+    parkNeighbours: () -> Boolean,
     onUserTurnedPage: () -> Unit,
     onWordClick: (MushafToken) -> Unit,
     onWordLongClick: (MushafToken) -> Unit,
@@ -737,7 +734,7 @@ internal fun MushafPager(
         // A distant dial jump composes one selected leaf first. Its neighbours
         // return two frames later; asking Compose to build all three at once
         // was the visible pause between release and the new folio.
-        beyondViewportPageCount = if (holdNeighbours && !scrubbing()) 1 else 0,
+        beyondViewportPageCount = if (holdNeighbours && !parkNeighbours()) 1 else 0,
         reverseLayout = true,
         key = { it },
         modifier = modifier

@@ -76,6 +76,16 @@ class BaselineProfileGenerator {
         device.swipe(midX - 400, midY, midX + 400, midY, 40)
         device.waitForIdle()
 
+        // Exercise the reader's other primary navigation path too. Derive the
+        // hairline from the transport's measured control rather than assuming
+        // one device height or density, then use its return roundel once.
+        val playBounds = checkNotNull(device.findObject(By.desc("Play"))).visibleBounds
+        val dialY = playBounds.top - playBounds.height() * 3 / 2
+        device.swipe(device.displayWidth * 3 / 4, dialY, device.displayWidth / 4, dialY, 30)
+        device.waitForIdle()
+        device.click(device.displayWidth - playBounds.height(), dialY)
+        device.waitForIdle()
+
         val reader = device.findObject(By.scrollable(true))
         reader?.fling(Direction.DOWN)
         reader?.fling(Direction.UP)

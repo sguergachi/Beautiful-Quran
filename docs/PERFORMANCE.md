@@ -212,9 +212,11 @@ tick must not remasure three pages or recreate 150 `Text` nodes.
   starts an urgent target-only warm-up; it never serially loads the five-page
   window or waits for the retract spring before requesting the selected leaf.
   The return dot's tappable seed is immediate; its entrance starts after the
-  selected leaf's first frame. Pager neighbours stay disposed through that
-  entrance and return only once the dot is full-sized, avoiding cold leaf work
-  on the animation clock.
+  selected leaf's first frame. Only a confirmed page-changing release parks
+  pager neighbours; taps, cancellations, and same-page gestures never tear
+  them down. On a real landing they stay disposed through the entrance and
+  return only once the dot is full-sized, avoiding cold leaf work on the
+  animation clock.
 - Each Madinah line owns one pointer-input node, not one per word. Its QCF word
   nodes retain the directional `shapedWordBloom`, while the leaf itself owns an
   offscreen layer so a fling transforms a recorded page. The settled page runs

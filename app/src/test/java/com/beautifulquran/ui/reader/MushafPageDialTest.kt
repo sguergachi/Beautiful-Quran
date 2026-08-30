@@ -103,6 +103,14 @@ class MushafPageDialTest {
     }
 
     @Test
+    fun `a tap wobble does not become a dial stroke`() {
+        val slop = 24f
+        assertFalse(mushafDialCommitsMovement(500f, 523f, slop))
+        assertTrue(mushafDialCommitsMovement(500f, 524f, slop))
+        assertTrue(mushafDialCommitsMovement(500f, 476f, slop))
+    }
+
+    @Test
     fun `the comb the finger reads stands where the finger says it is`() {
         // The comb is nailed to the rule, and the tier is read off the same
         // scale, so a mark's place on screen and the finger's place over it

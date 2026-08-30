@@ -29,6 +29,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -536,6 +537,10 @@ internal fun mushafDialReturnBubbleHit(
     return xPx in left..(left + bubbleWidthPx)
 }
 
+/** A horizontal stroke commits only after it clears the platform's touch slop. */
+internal fun mushafDialCommitsMovement(startXPx: Float, currentXPx: Float, touchSlopPx: Float): Boolean =
+    abs(currentXPx - startXPx) >= touchSlopPx
+
 /**
  * How far along the measure a finger at [xPx] is: 0 at the left end, 1 at the
  * right. The inverse of [mushafDialTrackX], and what the trough reads.
@@ -971,6 +976,7 @@ private val MushafDialHudAir = 2.dp
 private class MushafDialWarmState {
     var page = 0
     var loadingPage = 0
+    var readyPage = 0
     var job: Job? = null
     var landingJob: Job? = null
 }
@@ -1033,9 +1039,10 @@ internal fun MushafPageDial(
     onSeekSurah: ((Int) -> Unit)? = null,
     /** Warms the leaf's font and ink geometry while the finger still rests. */
     onWarmPage: (suspend (Int) -> Unit)? = null,
-    /** Raised while a hand is on the rule. The leaf's folio steps aside for
-     * the label, which is naming a page the folio has not reached yet. */
+    /** Raised while a hand is physically on the rule, for the folio fade. */
     onScrubbing: (Boolean) -> Unit,
+    /** Parks pager neighbours only during a confirmed distant landing. */
+    onLanding: (Boolean) -> Unit,
     /** True while the reciter has the leaf: the marker steps back. */
     reciting: Boolean = false,
     modifier: Modifier = Modifier,
@@ -1053,6 +1060,7 @@ internal fun MushafPageDial(
     val seekSurah = rememberUpdatedState(onSeekSurah)
     val warmPage = rememberUpdatedState(onWarmPage)
     val reportScrub = rememberUpdatedState(onScrubbing)
+    val reportLanding = rememberUpdatedState(onLanding)
 
     var scrubbing by remember { mutableStateOf(false) }
     val dialPage = remember { mutableFloatStateOf(settled.toFloat()) }
@@ -1103,6 +1111,14 @@ internal fun MushafPageDial(
     val chapterMarks = remember(chapterPages) { chapterPages.copyOf() }
     val combDrawnXs = remember(chapterMarks) { FloatArray(chapterMarks.size) }
     var hudHeightPx by remember { mutableIntStateOf(0) }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            warmState.landingJob?.cancel()
+            reportScrub.value(false)
+            reportLanding.value(false)
+        }
+    }
 
     // A ribbon is for finding your place, not for watching. While the page is
     // being recited it steps back rather than vanishing — still findable under
@@ -1161,7 +1177,9 @@ internal fun MushafPageDial(
     fun returnToPage(target: Int) {
         if (target == 0 || !returnEnabled) return
         warmState.landingJob?.cancel()
+        warmState.landingJob = null
         reportScrub.value(false)
+        reportLanding.value(false)
         dismissReturnBubble()
         view.performHapticFeedback(HapticFeedbackConstants.CONTEXT_CLICK)
         seek.value(target)
@@ -1198,6 +1216,7 @@ internal fun MushafPageDial(
     }
 
     fun warmTarget(page: Int, immediate: Boolean = false) {
+        if (warmState.readyPage == page) return
         if (warmState.loadingPage == page) return
         if (!immediate && warmState.page == page) return
         warmState.page = page
@@ -1215,6 +1234,7 @@ internal fun MushafPageDial(
                         MushafQcfFonts.face(view.context.applicationContext, page)
                     }
                 }
+                warmState.readyPage = page
             } finally {
                 if (warmState.loadingPage == page) warmState.loadingPage = 0
             }
@@ -1749,6 +1769,8 @@ internal fun MushafPageDial(
                         if (pages <= 1) return@awaitEachGesture
                         down.consume()
                         warmState.landingJob?.cancel()
+                        warmState.landingJob = null
+                        reportLanding.value(false)
                         var start = down.position
                         var movedFromReturn = false
                         val backPage = returnPage.intValue
@@ -2198,11 +2220,23 @@ internal fun MushafPageDial(
                             handX.floatValue =
                                 mushafDialClampToTrack(change.position.x, widthPxNow, insetPx)
                             if (!change.pressed) {
-                                if (dxPx != 0f) moved = true
+                                if (!moved) {
+                                    moved = mushafDialCommitsMovement(
+                                        down.position.x,
+                                        change.position.x,
+                                        viewConfiguration.touchSlop,
+                                    )
+                                }
                                 break
                             }
                             if (dxPx == 0f) continue
-                            moved = true
+                            if (!moved) {
+                                moved = mushafDialCommitsMovement(
+                                    down.position.x,
+                                    change.position.x,
+                                    viewConfiguration.touchSlop,
+                                )
+                            }
                             pendingDp += dxPx / density
                         }
                         meter.cancel()
@@ -2271,8 +2305,8 @@ internal fun MushafPageDial(
                         handed = true
                         hudShown = false
                         scrubbing = false
+                        reportScrub.value(false)
                         val pageChanges = moved && !cancelled && landed != previousPage
-                        if (!pageChanges) reportScrub.value(false)
                         hasPulsed = false
                         scope.launch { pulse.snapTo(0f) }
                         // The target has been warming while the hand read its
@@ -2295,6 +2329,7 @@ internal fun MushafPageDial(
                                 // Keep neighbours parked until the target leaf
                                 // has owned that frame; composing all three is
                                 // the expensive part of a distant pager jump.
+                                reportLanding.value(true)
                                 warmState.landingJob = scope.launch {
                                     withFrameNanos { }
                                     seek.value(landed)
@@ -2304,7 +2339,8 @@ internal fun MushafPageDial(
                                     // composition burst. Bring them back only
                                     // after the return dot has finished growing.
                                     returnEntrance.join()
-                                    reportScrub.value(false)
+                                    reportLanding.value(false)
+                                    warmState.landingJob = null
                                 }
                             }
                         }
