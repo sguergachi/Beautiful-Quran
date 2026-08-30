@@ -35,6 +35,29 @@ class MushafBookLengthTest {
     }
 
     @Test
+    fun `a verseless moment lands on a leaf, not on a Madinah page`() {
+        // The basmalah has no verse of its own, and answering the raw page
+        // handed a page number back as a leaf number. The two are the same
+        // scale only on the Arabic leaf; on the English book the voice landed
+        // on an unrelated leaf and the one carrying the preface never lit.
+        val length = mushafBookLength(book, catalog.pageCount)
+        val leaf = mushafLeafNumber(book, surahId = 2, ayah = null, page = 3)
+        assertTrue("no verse landed on leaf $leaf of $length", leaf in 1..length)
+        assertEquals(book.firstLeafOf(3) + 1, leaf)
+    }
+
+    @Test
+    fun `the reciter's place inside a verse picks the leaf`() {
+        // What the page turn reads. A verse the book carried stands on two
+        // leaves; following its opening one for the whole verse left the reader
+        // on the first half until the next verse began.
+        val page = 3
+        val opening = mushafLeafNumber(book, 2, 1, page, through = 0f)
+        val late = mushafLeafNumber(book, 2, 1, page, through = 1f)
+        assertTrue(late >= opening)
+    }
+
+    @Test
     fun `every leaf the reader can be sent to lands on the rule`() {
         val length = mushafBookLength(book, catalog.pageCount)
         (1..12).forEach { ayah ->

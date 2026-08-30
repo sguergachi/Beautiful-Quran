@@ -269,10 +269,15 @@ internal fun mushafLeafNumber(
      * and washless for as long as the first half took to say.
      */
     through: Float = 0f,
-): Int = if (book == null || ayah == null) {
-    page
-} else {
-    book.leafOfVerse(surahId, ayah, page, through) + 1
+): Int = when {
+    book == null -> page
+    // No verse to place: the leaf the page opens on. Returning [page] here
+    // handed a Madinah page number back as if it were a leaf number - the two
+    // are the same only on the Arabic leaf, and on the English book 604 and
+    // 1,041 are different scales, so the voice landed on some unrelated leaf
+    // and the leaf it was really on never lit.
+    ayah == null -> book.firstLeafOf(page) + 1
+    else -> book.leafOfVerse(surahId, ayah, page, through) + 1
 }
 
 /**
@@ -631,6 +636,10 @@ internal fun MushafPager(
     // Read inside the follow effect, which must not restart when the reader
     // changes speed mid-recitation.
     val speedNow = rememberUpdatedState(playbackSpeed)
+    // Read through a holder so the follow rule and the voice-leaf rule can ask
+    // how long a verse is without either restarting when the chapter's text
+    // arrives.
+    val contentNow = rememberUpdatedState(content)
     val heldPageNow = rememberUpdatedState(heldPage)
     // heldPage is read, not keyed: keying it restarted this collector on
     // every tap and cancelled in-flight work. The hold is checked per tick.
@@ -666,11 +675,20 @@ internal fun MushafPager(
                     else -> return@collect
                 }
                 // In leaves from here down: a Madinah page may be more than one.
+                // And a verse the book carried over stands on two, so where the
+                // reciter is *inside* the verse decides which of them to turn
+                // to — without it the reader sat on the first half for the
+                // whole verse and the page only turned at the next one.
+                val followAyah = if (moment.basmalahActive) 1 else focusAyah
                 val page = mushafLeafNumber(
-                    book,
-                    loadedSurahId,
-                    if (moment.basmalahActive) 1 else focusAyah,
-                    onPage,
+                    book = book,
+                    surahId = loadedSurahId,
+                    ayah = followAyah,
+                    page = onPage,
+                    through = mushafVerseThrough(
+                        word,
+                        contentNow.value.wordsIn(followAyah),
+                    ),
                 )
                 // Still hearing the word from before the tap, or sitting on the
                 // leaf's last word: stay put. The hold exists so the seek can
@@ -850,9 +868,6 @@ internal fun MushafPager(
     val onBasmalahClickNow = rememberUpdatedState(onBasmalahClick)
     val onTappedLeafNow = rememberUpdatedState(onTappedLeaf)
     val leafTextNow = rememberUpdatedState(leafText)
-    // Read through a holder so the voice-leaf rule can ask how long a verse is
-    // without making every leaf recompose when the chapter's text arrives.
-    val contentNow = rememberUpdatedState(content)
     val paper = MaterialTheme.colorScheme.background
     // Opening a chapter should cost one leaf, not three. Holding a neighbour
     // composed either side is what makes a page turn smooth, but doing it
@@ -879,7 +894,11 @@ internal fun MushafPager(
                 word = word,
                 wholeVerses = english,
             ) ?: return@derivedStateOf null
-            val ayah = word?.ayah ?: voice.activeAyah
+            // The basmalah belongs to the chapter's first verse, which is what
+            // puts it on the leaf that opens the chapter. Without this the
+            // preface had no verse at all and the leaf carrying it never owned
+            // the voice, so it was read with no ink running across it.
+            val ayah = if (voice.basmalahActive) 1 else word?.ayah ?: voice.activeAyah
             mushafLeafNumber(
                 book = book,
                 surahId = loadedSurahId,
