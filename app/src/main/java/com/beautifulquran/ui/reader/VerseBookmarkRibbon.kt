@@ -67,16 +67,22 @@ private const val WAVE_AMP_DP = 4.5f    // cloth sway while unfurling
 private const val SETTLE_AMP_DP = 3.2f  // final flutter amplitude
 private const val NUB_STROKE_DP = 1.25f // idle outline: affordance, not a mark
 private const val RIBBON_GAP_DP = 3f     // two physical ribbons, never one overpainted strip
+private const val VERSE_PLACE_EDGE_SHIFT_DP = 4f
 private const val PLACE_RIBBON_WIDTH_RATIO = 0.72f // passive marker, quieter than tappable ruby
 private const val OVERSHOOT = 0.06f     // tip past the resting length, then spring back
 private const val SOLID_ALPHA = 0.92f
 private const val IDLE_NUB_ALPHA = 0.4f // quiet affordance when just the tail is showing
 
-/** The green screen-edge lane stays reserved so bookmark cloth never shifts. */
+/** Reader reserves green's screen-edge lane; Home keeps its original inset. */
 internal fun bookmarkRibbonInsetDp(
+    reservePlaceLane: Boolean,
     edgeInsetDp: Float,
     ribbonWidthDp: Float,
-): Float = edgeInsetDp + placeRibbonWidthDp(ribbonWidthDp) + RIBBON_GAP_DP
+): Float = edgeInsetDp +
+    if (reservePlaceLane) placeRibbonWidthDp(ribbonWidthDp) + RIBBON_GAP_DP else 0f
+
+internal fun placeRibbonInsetDp(reservePlaceLane: Boolean, edgeInsetDp: Float): Float =
+    (edgeInsetDp - if (reservePlaceLane) VERSE_PLACE_EDGE_SHIFT_DP else 0f).coerceAtLeast(0f)
 
 internal fun placeRibbonWidthDp(ribbonWidthDp: Float): Float =
     ribbonWidthDp * PLACE_RIBBON_WIDTH_RATIO
@@ -112,6 +118,8 @@ internal fun VerseBookmarkRibbon(
     unfurlSignal: Int = 0,
     /** Non-zero changes replay the passive green place marker's unfurl. */
     placeUnfurlSignal: Int = 0,
+    /** Reader-only paired lanes; Home ribbons retain their original geometry. */
+    reservePlaceLane: Boolean = false,
     edgeInset: Dp = EDGE_INSET_DP.dp,
     ribbonWidth: Dp = RIBBON_WIDTH_DP.dp,
     topInset: Dp = TOP_INSET_DP.dp,
@@ -356,6 +364,7 @@ internal fun VerseBookmarkRibbon(
                 close()
             }
             val bookmarkInset = bookmarkRibbonInsetDp(
+                reservePlaceLane = reservePlaceLane,
                 edgeInsetDp = edgeInset.value,
                 ribbonWidthDp = ribbonWidth.value,
             ).dp.toPx()
@@ -379,7 +388,10 @@ internal fun VerseBookmarkRibbon(
                     path = ribbonPath(
                         bottom = placeTipY,
                         clothMotion = false,
-                        inset = edgeInsetPx,
+                        inset = placeRibbonInsetDp(
+                            reservePlaceLane = reservePlaceLane,
+                            edgeInsetDp = edgeInset.value,
+                        ).dp.toPx(),
                         width = placeWidth,
                     ),
                     brush = fill,

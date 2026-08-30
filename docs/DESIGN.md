@@ -995,10 +995,15 @@ as a saved ruby bookmark, but 72% of its width. That quieter silhouette makes
 green read as a passive place marker, not a second tap target; only the ruby
 lane remains interactive. When one verse owns both meanings, green keeps the
 outer, screen-edge lane and ruby remains in its permanently reserved lane
-toward the page, with 3 dp of paper between them. The ruby cloth and empty
+toward the page. Green sits 4 dp closer to the screen edge, increasing the
+paper between them without moving ruby. The ruby cloth and empty
 outline never shift when green appears or disappears. Neither cloth overlays,
 caps, recolors, or replaces the other. During recitation both follow the
 existing chrome fade because the word wash already names the live position.
+
+This paired-lane geometry belongs only to verse blocks in the Reader. Home's
+chapter-list ruby ribbons keep their original 2 dp optical position; the shared
+component must not reserve Reader gutter space on that sheet.
 
 Chapters uses the full green swallowtail in its permanently reserved 28 dp
 outer lane without shifting the chapter's number or names. Tapping that marked

@@ -2868,6 +2868,7 @@ fun AyahBlock(
                     bookmarked = bookmarked,
                     placeMarked = placeMarked,
                     placeUnfurlSignal = placeUnfurlSignal,
+                    reservePlaceLane = true,
                     side = bookmarkSide,
                     chromeAlpha = bookmarkChromeAlpha,
                     interactive = bookmarkInteractive,
