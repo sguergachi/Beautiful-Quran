@@ -262,7 +262,31 @@ internal fun mushafLeafNumber(
     surahId: Int,
     ayah: Int?,
     page: Int,
-): Int = if (book == null || ayah == null) page else book.leafOfVerse(surahId, ayah, page) + 1
+    /**
+     * How far into the verse the reciter has come. A verse the book carried
+     * over stands on two leaves, and past the cut the reciter is on the second
+     * one — left at 0 the tail leaf never owned the voice, so it sat recessed
+     * and washless for as long as the first half took to say.
+     */
+    through: Float = 0f,
+): Int = if (book == null || ayah == null) {
+    page
+} else {
+    book.leafOfVerse(surahId, ayah, page, through) + 1
+}
+
+/**
+ * How far through its verse the reciter's word stands, as a fraction — what
+ * [mushafLeafNumber] needs to tell one half of a carried verse from the other.
+ */
+internal fun mushafVerseThrough(word: ActiveWord?, wordCount: Int): Float {
+    if (word == null || wordCount <= 0) return 0f
+    return ((word.wordPosition - 1).toFloat() / wordCount).coerceIn(0f, 1f)
+}
+
+/** How many words a verse of the loaded chapter has, or 0 if it is not loaded. */
+private fun SurahContent.wordsIn(ayah: Int?): Int =
+    ayahs.firstOrNull { it.number == ayah }?.words?.size ?: 0
 
 /**
  * How long the book is, in whatever [mushafLeafNumber] is counting.
@@ -826,6 +850,9 @@ internal fun MushafPager(
     val onBasmalahClickNow = rememberUpdatedState(onBasmalahClick)
     val onTappedLeafNow = rememberUpdatedState(onTappedLeaf)
     val leafTextNow = rememberUpdatedState(leafText)
+    // Read through a holder so the voice-leaf rule can ask how long a verse is
+    // without making every leaf recompose when the chapter's text arrives.
+    val contentNow = rememberUpdatedState(content)
     val paper = MaterialTheme.colorScheme.background
     // Opening a chapter should cost one leaf, not three. Holding a neighbour
     // composed either side is what makes a page turn smooth, but doing it
@@ -852,7 +879,14 @@ internal fun MushafPager(
                 word = word,
                 wholeVerses = english,
             ) ?: return@derivedStateOf null
-            mushafLeafNumber(book, loadedSurahId, word?.ayah ?: voice.activeAyah, page)
+            val ayah = word?.ayah ?: voice.activeAyah
+            mushafLeafNumber(
+                book = book,
+                surahId = loadedSurahId,
+                ayah = ayah,
+                page = page,
+                through = mushafVerseThrough(word, contentNow.value.wordsIn(ayah)),
+            )
         }
     }
     HorizontalPager(
@@ -884,7 +918,13 @@ internal fun MushafPager(
                         word.wordPosition,
                         wholeVerses = english,
                     )
-                    mushafLeafNumber(book, loadedSurahId, word.ayah, page) == pageIndex + 1
+                    mushafLeafNumber(
+                        book = book,
+                        surahId = loadedSurahId,
+                        ayah = word.ayah,
+                        page = page,
+                        through = mushafVerseThrough(word, contentNow.value.wordsIn(word.ayah)),
+                    ) == pageIndex + 1
                 }
             }
             val waitingForVoice by remember(pageIndex, heldPage) {

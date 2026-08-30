@@ -78,6 +78,34 @@ class EnglishBookTest {
     }
 
     @Test
+    fun `a carried verse is found on the leaf the reciter is actually reading`() {
+        // The bug this guards: a leaf holding only the tail of a verse answered
+        // "the leaf it began on", so it never owned the voice - it sat recessed
+        // and washless for as long as the first half took to recite, and a tap
+        // on it looked like it had done nothing.
+        val b = book(3 to listOf(2 to 2, 2 to 3)) { _, a -> if (a == 2) cap / 2 else cap }
+        val first = b.firstLeafOf(3)
+        val head = b.leaves[first].runs.single { it.ayah == 3 }
+        // 2:3 is cut: the head leaf carries the front of it, the next the rest.
+        assertTrue(head.to < cap)
+        // At the opening of the verse the answer is the leaf it opens on, which
+        // is what the dial and a deep link want.
+        assertEquals(first, b.leafOfVerse(2, 3, page = 3))
+        assertEquals(first, b.leafOfVerse(2, 3, page = 3, through = 0f))
+        // Once the reciter is past the cut, it is the leaf that picks it up.
+        assertEquals(first + 1, b.leafOfVerse(2, 3, page = 3, through = 0.99f))
+    }
+
+    @Test
+    fun `a verse set whole answers the same leaf however far through it is`() {
+        val b = book(3 to listOf(2 to 2, 2 to 3)) { _, _ -> cap / 3 }
+        val first = b.firstLeafOf(3)
+        listOf(0f, 0.5f, 1f).forEach { through ->
+            assertEquals(first, b.leafOfVerse(2, 3, page = 3, through = through))
+        }
+    }
+
+    @Test
     fun `a verse the book does not carry falls back to its page`() {
         val b = book(3 to listOf(2 to 1)) { _, _ -> cap / 6 }
         assertEquals(b.firstLeafOf(3), b.leafOfVerse(2, 99, page = 3))

@@ -183,6 +183,12 @@ class EnglishBook internal constructor(
     val leaves: List<EnglishBookLeaf>,
     private val firstLeafByPage: IntArray,
     private val leafByVerse: Map<Long, Int>,
+    /**
+     * For a verse the book carried over, where each of its later leaves picks
+     * it up, as a fraction of the verse. Verses set whole have no entry, which
+     * is all but 302 of the 6,236.
+     */
+    private val carriedByVerse: Map<Long, FloatArray>,
 ) {
     val leafCount: Int get() = leaves.size
 
@@ -193,13 +199,31 @@ class EnglishBook internal constructor(
         firstLeafByPage.getOrNull(page.coerceIn(1, MushafCatalog.MUSHAF_PAGE_COUNT)) ?: 0
 
     /**
-     * The leaf a verse is set on. A verse that begins on a Madinah page is set
-     * whole on one of that page's leaves (`EnglishLeaf.kt`), so this is exact
-     * rather than a nearest-match; a verse the book does not carry falls back
-     * to the first leaf of the page it began on.
+     * The leaf a verse is set on, and — where the book carried it over — which
+     * of its leaves the reciter is on.
+     *
+     * [through] is how far into the verse the voice has come, as a fraction. At
+     * 0 this is the leaf the verse opens on, which is what a deep link, the dial
+     * and the chapter comb want. Past a cut it is the leaf that picks the verse
+     * up, which is what the ink and the page turn want: a leaf carrying only the
+     * tail of a verse is still the leaf the reciter is reading from, and
+     * answering "the leaf it began on" left that leaf recessed and silent for
+     * as long as the first half took to recite.
+     *
+     * A verse the book does not carry falls back to the first leaf of the page
+     * it began on.
      */
-    fun leafOfVerse(surahId: Int, ayah: Int, page: Int): Int =
-        leafByVerse[quranWordKey(surahId, ayah, 1)] ?: firstLeafOf(page)
+    fun leafOfVerse(surahId: Int, ayah: Int, page: Int, through: Float = 0f): Int {
+        val key = quranWordKey(surahId, ayah, 1)
+        val first = leafByVerse[key] ?: return firstLeafOf(page)
+        val cuts = carriedByVerse[key] ?: return first
+        var leaf = first
+        for (cut in cuts) {
+            if (through < cut) break
+            leaf++
+        }
+        return leaf.coerceAtMost(leaves.lastIndex)
+    }
 }
 
 /**
@@ -227,6 +251,8 @@ fun buildEnglishBook(
     val leaves = ArrayList<EnglishBookLeaf>(1_200)
     val firstLeafByPage = IntArray(MushafCatalog.MUSHAF_PAGE_COUNT + 1) { -1 }
     val leafByVerse = HashMap<Long, Int>(8_192)
+    // Where a carried verse is picked up again, as a fraction of itself.
+    val carriedCuts = HashMap<Long, MutableList<Float>>()
 
     val run = ArrayList<EnglishVerseRun>(16)
     val runPages = ArrayList<Int>(16)
@@ -302,6 +328,10 @@ fun buildEnglishBook(
                     mass = ENGLISH_LEAF_CAPACITY_CHARS
                     break
                 }
+                if (length > 0) {
+                    carriedCuts.getOrPut(quranWordKey(surahId, ayah, 1)) { ArrayList(2) }
+                        .add(from.toFloat() / length)
+                }
                 close()
             }
         }
@@ -317,7 +347,12 @@ fun buildEnglishBook(
             carried = firstLeafByPage[page]
         }
     }
-    return EnglishBook(leaves, firstLeafByPage, leafByVerse)
+    return EnglishBook(
+        leaves = leaves,
+        firstLeafByPage = firstLeafByPage,
+        leafByVerse = leafByVerse,
+        carriedByVerse = carriedCuts.mapValues { (_, cuts) -> cuts.toFloatArray() },
+    )
 }
 
 /** What a chapter's opening costs the leaf, panel and basmalah together. */

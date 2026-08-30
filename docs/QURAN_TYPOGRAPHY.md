@@ -384,6 +384,16 @@ It also retires the one leaf the book could not set: 2:282 is 1,333 characters
 and now runs across two leaves at the book's own hand and leading, instead of
 alone on one with the leading closed to fit it.
 
+**A carried verse is on two leaves, and the reciter is on one of them.** The ink
+and the page turn ask which leaf the voice is on, and answering "the leaf the
+verse began on" left the leaf holding the tail recessed and silent for as long
+as the first half took to recite — its own words being said aloud with no wash
+on them, and a tap on it looking like it had done nothing.
+`EnglishBook.leafOfVerse` therefore takes how far through the verse the voice
+has come: at 0 it is the leaf the verse opens on, which is what a deep link, the
+dial and the chapter comb want, and past a cut it is the leaf that picks the
+verse up.
+
 The offsets are estimates — the pagination counts characters, not glyphs — so
 the leaf snaps them to a word boundary as it sets them (`englishLeafBreak`).
 It only ever moves forward and is a pure function of the text, so the leaf that
