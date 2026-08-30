@@ -389,7 +389,7 @@ and green rail tick remain parked there instead of following live focus.
 Pausing audio temporarily unfurls a thinner, passive green ribbon on the actual
 paused media verse and moves the rail tick with it; playing, buffering, ending,
 or leaving that chapter restores the visit snapshot. Green owns the screen-edge
-lane while the interactive bookmark cloth or outline shifts inward beside it.
+lane while the bookmark cloth or outline stays fixed in a reserved inner lane.
 Chapters observes the new stored place after the reader sheet covers it, and a
 tap on that marked chapter returns to its parked ayah. This makes silent
 reading mark a place without changing Continue Listening's audio semantics.

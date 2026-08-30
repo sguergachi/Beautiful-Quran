@@ -72,13 +72,11 @@ private const val OVERSHOOT = 0.06f     // tip past the resting length, then spr
 private const val SOLID_ALPHA = 0.92f
 private const val IDLE_NUB_ALPHA = 0.4f // quiet affordance when just the tail is showing
 
-/** Green owns the quiet screen-edge lane; bookmark cloth shifts inward beside it. */
+/** The green screen-edge lane stays reserved so bookmark cloth never shifts. */
 internal fun bookmarkRibbonInsetDp(
-    placeMarked: Boolean,
     edgeInsetDp: Float,
     ribbonWidthDp: Float,
-): Float = edgeInsetDp +
-    if (placeMarked) placeRibbonWidthDp(ribbonWidthDp) + RIBBON_GAP_DP else 0f
+): Float = edgeInsetDp + placeRibbonWidthDp(ribbonWidthDp) + RIBBON_GAP_DP
 
 internal fun placeRibbonWidthDp(ribbonWidthDp: Float): Float =
     ribbonWidthDp * PLACE_RIBBON_WIDTH_RATIO
@@ -358,7 +356,6 @@ internal fun VerseBookmarkRibbon(
                 close()
             }
             val bookmarkInset = bookmarkRibbonInsetDp(
-                placeMarked = placeMarked,
                 edgeInsetDp = edgeInset.value,
                 ribbonWidthDp = ribbonWidth.value,
             ).dp.toPx()
