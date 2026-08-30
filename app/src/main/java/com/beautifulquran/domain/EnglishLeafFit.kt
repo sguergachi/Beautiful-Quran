@@ -129,19 +129,25 @@ const val ENGLISH_LEAF_SPECIMEN =
 /**
  * How much more than a leaf's worth the hand is cut against.
  *
- * Not a safety margin: a measured conversion. The specimen is set as one
- * unbroken run of prose and a leaf is not — a leaf carries verse marks, which
- * take room the specimen never asks for. Measured on device against eleven real
- * leaves, the specimen sets **41.6 characters to the line and the book sets
- * 39.3**, so the block the hand is cut against has to be that much longer than
- * the leaf it stands for or the hand comes out too small and the leaf overflows.
+ * Not a safety margin: a measured conversion between the block the hand is cut
+ * against and the leaf it stands for. Two things used to separate them and both
+ * are now counted, so what is left is one percent.
  *
- * It was 1.05, guessed, where the arithmetic wanted 1.06 — close enough to look
- * right and wrong enough to put 108 leaves past their well and close their
- * leading. Rerun `tools/measure_english_leaves.py` after changing the face, the
- * measure or the mark.
+ * The first was the mark. The specimen is unbroken prose and a leaf is not, and
+ * charging the mark six characters when it takes 2.8 made every leaf look
+ * heavier than it was. The second was the specimen: one plain sentence
+ * repeated, whose words ran 3.7 letters against the book's 4.4.
+ *
+ * With a real passage of the translation as the specimen and the mark charged
+ * what it costs, a leaf and its reference block set at the same density, and
+ * the margin is only the ordinary variation from one page of prose to the next.
+ * It falls on the safe side: a leaf that overflows closes its leading, and a
+ * leaf that comes up short loses a hundredth of a line.
+ *
+ * Re-measure with `tools/measure_english_leaves.py` and a device capture after
+ * changing the face, the measure or the mark.
  */
-const val ENGLISH_LEAF_REFERENCE_MARGIN = 1.06f
+const val ENGLISH_LEAF_REFERENCE_MARGIN = 1.01f
 
 /**
  * A block of the mass a leaf holds, for the hand to be cut against.

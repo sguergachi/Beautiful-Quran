@@ -922,6 +922,7 @@ internal fun MushafPager(
                     }
                 }
             }
+            val leafRuns = bookLeaf?.runs.orEmpty()
             val leafVerses = bookLeaf?.verses.orEmpty()
             // The Arabic word each verse of the leaf opens with — what a tap on
             // an English sentence plays from. Gathered here rather than in the
@@ -1061,7 +1062,7 @@ internal fun MushafPager(
                             hideParentheticals = hideEnglishParentheticals,
                             verseNumberScript = verseNumberScript,
                             foreEdge = foreEdge,
-                            leafVerses = leafVerses,
+                            leafRuns = leafRuns,
                             leafTokens = leafTokens,
                             onAyahClick = leafAyahClick,
                             onBasmalahClick = leafBasmalahClick,

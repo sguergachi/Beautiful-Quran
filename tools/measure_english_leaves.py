@@ -27,6 +27,9 @@ LEADING = 1.40   # one figure, for every leaf in the book
 WELL_LINES = 22.0
 CAPACITY = 900  # what a leaf holds; a page takes as many leaves as it needs
 MARK_CHARS = 3  # ENGLISH_LEAF_MARK_CHARS: the verse mark and its two spaces
+LINE_CHARS = CAPACITY // 22       # ENGLISH_LEAF_LINE_CHARS
+SPLIT_HOLE = 3 * LINE_CHARS       # ENGLISH_LEAF_SPLIT_HOLE_CHARS
+MIN_FRAGMENT = 2 * LINE_CHARS     # ENGLISH_LEAF_MIN_FRAGMENT_CHARS
 OPENING_CHARS = 92   # ENGLISH_LEAF_OPENING_CHARS: the panel and its air
 BASMALAH_CHARS = 78  # ENGLISH_LEAF_BASMALAH_CHARS: the preface line and its air
 NO_BASMALAH = (1, 9)  # Al-Fatihah and At-Tawbah open without one
@@ -61,16 +64,61 @@ for q in (50, 90, 99, 100):
     print(f"  p{q:<3} {masses[min(len(masses) - 1, len(masses) * q // 100)]}")
 
 
-def leaves_at(cap):
-    """The book packed continuously — buildEnglishBook."""
-    out, run = [], 0
-    for surah, ayah, _page, mass in seq:
-        if run > 0 and (run + mass > cap or (surah == 2 and ayah == 1)):
-            out.append(run)
-            run = 0
-        run += mass
-    out.append(run)
-    return out
+def leaves_at(cap, split=True):
+    """buildEnglishBook, in miniature: fill the leaf, carry a long verse over."""
+    hole = 3 * (cap // 22)
+    frag = 2 * (cap // 22)
+    leaves, run, mass = [], [], 0
+
+    def close():
+        nonlocal run, mass
+        if run:
+            leaves.append(run)
+            run, mass = [], 0
+
+    for surah, ayah, _page in rows:
+        if run and surah == 2 and ayah == 1:
+            close()
+        if ayah == 1:
+            opening = OPENING_CHARS + (BASMALAH_CHARS if surah not in NO_BASMALAH else 0)
+            if run and mass + opening > cap:
+                close()
+            mass += opening
+        length = len(translation[(surah, ayah)])
+        frm = 0
+        while True:
+            left, rest = cap - mass, length - frm
+            if rest + MARK_CHARS <= left:
+                run.append((surah, ayah, frm, length))
+                mass += rest + MARK_CHARS
+                break
+            take = min(left, rest - frag)
+            carry = split and left >= hole and take >= frag
+            if not carry and run:
+                close()
+                continue
+            cut = take if carry else min(rest, max(left, frag))
+            to = length if frm + cut >= length else frm + cut
+            run.append((surah, ayah, frm, to))
+            frm = to
+            if frm >= length:
+                mass = cap
+                break
+            close()
+    close()
+    return [leaf_mass(r) for r in leaves]
+
+
+def leaf_mass(runs):
+    """What the leaf really sets: its halves of verses, marks and panels."""
+    total = 0
+    for surah, ayah, frm, to in runs:
+        if ayah == 1 and frm == 0:
+            total += OPENING_CHARS + (BASMALAH_CHARS if surah not in NO_BASMALAH else 0)
+        total += (to - frm)
+        if to >= len(translation[(surah, ayah)]):
+            total += MARK_CHARS
+    return total
 
 
 leaves = leaves_at(CAPACITY)
@@ -94,10 +142,13 @@ print(f"  leaves with more than 3 blank    {sum(1 for e in empty if e > 3)}")
 # The floor: what the book would take if a verse could be split across leaves.
 full = sum(leaves) / CAPACITY
 print(f"\nthe book needs {full:.0f} full leaves of paper and takes {len(leaves)}:")
-print(f"  {100 * (1 - full / len(leaves)):.0f}% of the paper is blank, and all of it is"
-      " the whole verse -")
-print("  a leaf ends when the next verse will not go on it, and a verse averages"
-      " three lines.")
+print(f"  {100 * (1 - full / len(leaves)):.0f}% of the paper is blank.")
+whole = leaves_at(CAPACITY, split=False)
+we = [blank_lines(m, CAPACITY) for m in whole]
+print(f"  with no verse ever carried it would be {len(whole)} leaves and"
+      f" {statistics.mean(we):.2f} blank lines,")
+print(f"  and {sum(1 for e in we if e > 3)} leaves more than three lines short"
+      f" against {sum(1 for e in empty if e > 3)}.")
 
 print("\ncapacity sweep (type against a page-sized leaf, leaves, mean blank lines):")
 for cap in (750, 800, 850, 900, 950, 1000, 1200, 1650):

@@ -91,6 +91,69 @@ fun englishLeafVerseMass(surahId: Int, ayah: Int, prose: Int): Int = when {
     else -> prose + ENGLISH_LEAF_OPENING_CHARS
 }
 
+/**
+ * About what one line of the leaf holds, in the characters the capacity counts.
+ *
+ * The well comes to 22 lines on a phone, and the hand is solved so that a leaf
+ * exactly fills it, so a line is a twenty-second of the capacity. It is an
+ * approximation on a tablet, whose well is fewer and longer lines — near enough,
+ * because the two rules below only need to know a line from a page.
+ */
+const val ENGLISH_LEAF_LINE_CHARS = ENGLISH_LEAF_CAPACITY_CHARS / 22
+
+/**
+ * How big a hole has to be before a verse is carried over rather than moved
+ * whole to the next leaf.
+ *
+ * A leaf ends when the next verse will not go on it, and a verse averages three
+ * lines, so the foot of the page is blank by up to that much: measured over the
+ * book, 2.6 lines of 22 on average and 7.3 at the ninety-fifth percentile. A
+ * printed book does not do this — it carries the paragraph over — and neither
+ * does a printed translation of the Qur'an, which runs its verses on and lets
+ * the page break fall where it falls.
+ *
+ * But a verse is a sentence, and cutting one is not free: the reader loses the
+ * end of a thought to a page turn. So it is not done to save a line or two. It
+ * is done when leaving the verse whole would waste **three lines or more**,
+ * which needs the verse to be at least five lines long — the top sixth of the
+ * book by length. Below that the leaf simply ends.
+ *
+ * Measured: 371 leaves with more than three blank lines become 24, the average
+ * blank falls from 2.6 lines to 1.2, and 311 verses of 6,236 are carried over.
+ */
+const val ENGLISH_LEAF_SPLIT_HOLE_CHARS = 3 * ENGLISH_LEAF_LINE_CHARS
+
+/**
+ * The least of a carried verse that may stand alone on either leaf.
+ *
+ * Two lines. One line of a sentence stranded at the foot of a page, or left
+ * over at the head of the next, is a widow, and a compositor moves the break
+ * rather than set one. Here the break moves back up the verse until both halves
+ * clear this; if it cannot, the verse is not split at all.
+ */
+const val ENGLISH_LEAF_MIN_FRAGMENT_CHARS = 2 * ENGLISH_LEAF_LINE_CHARS
+
+/**
+ * One verse, or the part of one, that a leaf sets.
+ *
+ * [from] and [to] are character offsets into the verse's own text, and they are
+ * *estimates* — the pagination counts characters, not glyphs. The leaf snaps
+ * them to a word boundary as it sets them (`englishLeafBreak`), and because
+ * both the leaf that ends at an offset and the leaf that begins there snap it
+ * the same way, the two agree without either knowing about the other.
+ */
+data class EnglishVerseRun(
+    val surahId: Int,
+    val ayah: Int,
+    val from: Int,
+    val to: Int,
+) {
+    /** Whether this run carries the end of the verse, and so its mark. */
+    fun endsVerse(length: Int): Boolean = to >= length
+
+    val key: Pair<Int, Int> get() = surahId to ayah
+}
+
 /** One leaf of the English book: a run of the translation, set as a page. */
 data class EnglishBookLeaf(
     /**
@@ -105,9 +168,12 @@ data class EnglishBookLeaf(
      * a tap on an English sentence should play from.
      */
     val pages: IntRange,
-    /** The verses set on this leaf, in the book's own order. */
-    val verses: List<Pair<Int, Int>>,
-)
+    /** What this leaf sets, in the book's own order. */
+    val runs: List<EnglishVerseRun>,
+) {
+    /** The verses the leaf touches, whole or in part, without repeats. */
+    val verses: List<Pair<Int, Int>> get() = runs.map { it.key }.distinct()
+}
 
 /**
  * The English book as a sequence of leaves, and the two lookups the reader
@@ -158,26 +224,29 @@ fun buildEnglishBook(
     catalog: MushafCatalog,
     prose: (surahId: Int, ayah: Int) -> Int,
 ): EnglishBook {
-    val leaves = ArrayList<EnglishBookLeaf>(1_300)
+    val leaves = ArrayList<EnglishBookLeaf>(1_200)
     val firstLeafByPage = IntArray(MushafCatalog.MUSHAF_PAGE_COUNT + 1) { -1 }
     val leafByVerse = HashMap<Long, Int>(8_192)
 
-    val run = ArrayList<Pair<Int, Int>>(16)
+    val run = ArrayList<EnglishVerseRun>(16)
     val runPages = ArrayList<Int>(16)
     var mass = 0
 
     fun close() {
         if (run.isEmpty()) return
         val index = leaves.size
-        run.forEach { (s, a) -> leafByVerse[quranWordKey(s, a, 1)] = index }
-        // A page's leaf is the first one that carries any of its verses.
+        // A verse is found on the leaf it *begins* on, so a carried one keeps
+        // pointing at where the reader would start reading it.
+        run.forEach { r ->
+            if (r.from == 0) leafByVerse.putIfAbsent(quranWordKey(r.surahId, r.ayah, 1), index)
+        }
         runPages.forEach { page ->
             if (firstLeafByPage[page] < 0) firstLeafByPage[page] = index
         }
         leaves += EnglishBookLeaf(
             page = runPages.first(),
             pages = runPages.first()..runPages.last(),
-            verses = ArrayList(run),
+            runs = ArrayList(run),
         )
         run.clear()
         runPages.clear()
@@ -186,14 +255,55 @@ fun buildEnglishBook(
 
     for (page in 1..MushafCatalog.MUSHAF_PAGE_COUNT) {
         val keys = catalog.page(page)?.let(::englishLeafVerseKeys).orEmpty()
-        for (key in keys) {
-            val verseMass =
-                englishLeafVerseMass(key.first, key.second, prose(key.first, key.second))
-            val full = mass + verseMass > ENGLISH_LEAF_CAPACITY_CHARS
-            if (run.isNotEmpty() && (full || englishLeafOpensHere(key))) close()
-            run += key
-            runPages += page
-            mass += verseMass
+        for ((surahId, ayah) in keys) {
+            if (run.isNotEmpty() && englishLeafOpensHere(surahId to ayah)) close()
+            // The panel and its basmalah take paper before a word is set.
+            if (ayah == 1) {
+                val opening = englishLeafOpeningChars(surahId)
+                if (run.isNotEmpty() && mass + opening > ENGLISH_LEAF_CAPACITY_CHARS) close()
+                mass += opening
+                if (runPages.isEmpty()) runPages += page
+            }
+            val length = (prose(surahId, ayah) - ENGLISH_LEAF_MARK_CHARS).coerceAtLeast(0)
+            var from = 0
+            while (true) {
+                val left = ENGLISH_LEAF_CAPACITY_CHARS - mass
+                val rest = length - from
+                if (rest + ENGLISH_LEAF_MARK_CHARS <= left) {
+                    run += EnglishVerseRun(surahId, ayah, from, length)
+                    runPages += page
+                    mass += rest + ENGLISH_LEAF_MARK_CHARS
+                    break
+                }
+                // Carry the verse over only when leaving it whole would waste a
+                // real hole, and only where both halves stand on their own.
+                val take = minOf(left, rest - ENGLISH_LEAF_MIN_FRAGMENT_CHARS)
+                val carry = left >= ENGLISH_LEAF_SPLIT_HOLE_CHARS &&
+                    take >= ENGLISH_LEAF_MIN_FRAGMENT_CHARS
+                if (!carry && run.isNotEmpty()) {
+                    // Not worth cutting: the verse opens the next leaf instead.
+                    close()
+                    continue
+                }
+                // Either the cut is worth making, or there is nothing to move
+                // the verse to — an empty leaf already holding a chapter's
+                // panel, or a verse longer than any leaf holds, which in the
+                // whole Qur'an is 2:282 alone.
+                val cut = if (carry) {
+                    take
+                } else {
+                    minOf(rest, maxOf(left, ENGLISH_LEAF_MIN_FRAGMENT_CHARS))
+                }
+                val to = if (from + cut >= length) length else from + cut
+                run += EnglishVerseRun(surahId, ayah, from, to)
+                runPages += page
+                from = to
+                if (from >= length) {
+                    mass = ENGLISH_LEAF_CAPACITY_CHARS
+                    break
+                }
+                close()
+            }
         }
     }
     close()
@@ -209,6 +319,14 @@ fun buildEnglishBook(
     }
     return EnglishBook(leaves, firstLeafByPage, leafByVerse)
 }
+
+/** What a chapter's opening costs the leaf, panel and basmalah together. */
+private fun englishLeafOpeningChars(surahId: Int): Int =
+    if (surahOpensWithBasmalahPreface(surahId)) {
+        ENGLISH_LEAF_OPENING_CHARS + ENGLISH_LEAF_BASMALAH_CHARS
+    } else {
+        ENGLISH_LEAF_OPENING_CHARS
+    }
 
 /**
  * The one place the packing is told to break: Al-Baqarah opens a leaf, so

@@ -84,15 +84,47 @@ class EnglishBookTest {
     }
 
     @Test
-    fun `a verse longer than a leaf is set whole, and set alone`() {
-        // Twice a leaf, then a short one. No pagination splits a sentence, so
-        // the long verse takes its own leaf and runs over it — 2:282 is the one
-        // place in the Qur'an this happens.
+    fun `a verse longer than a leaf is carried across as many as it needs`() {
+        // Twice a leaf, then a short one. No leaf can hold the first verse, so
+        // it runs on — 2:282 is the one verse in the Qur'an this reaches.
         val b = book(3 to listOf(2 to 1, 2 to 2)) { _, a -> if (a == 1) cap * 2 else cap / 4 }
         val leaves = leavesFrom(b, 3)
+        assertTrue(leaves.size >= 3)
+        // Every leaf until the last carries part of it, in order and without
+        // repeating or dropping a character.
+        val runs = leaves.flatMap { it.runs }.filter { it.ayah == 1 }
+        assertEquals(0, runs.first().from)
+        runs.zipWithNext().forEach { (a, z) -> assertEquals(a.to, z.from) }
+        // The short verse follows it, whole.
+        val tail = leaves.last().runs.single { it.ayah == 2 }
+        assertEquals(0, tail.from)
+    }
+
+    @Test
+    fun `a verse is carried only when leaving it whole would waste a real hole`() {
+        // Half a leaf, then a verse that will not fit in what is left. The hole
+        // it would leave is worth cutting for, so the second verse is carried.
+        val b = book(3 to listOf(2 to 2, 2 to 3)) { _, a -> if (a == 2) cap / 2 else cap }
+        val leaves = leavesFrom(b, 3)
         assertEquals(2, leaves.size)
-        assertEquals(listOf(2 to 1), leaves[0].verses)
-        assertEquals(listOf(2 to 2), leaves[1].verses)
+        assertEquals(2, leaves[0].runs.size)
+        assertTrue(leaves[0].runs.last().to < cap)
+    }
+
+    @Test
+    fun `a small hole is left alone rather than cut a sentence for it`() {
+        // Only a couple of lines are going spare, which is not worth the end of
+        // a thought falling on the other side of a page turn.
+        val short = ENGLISH_LEAF_LINE_CHARS
+        val b = book(3 to listOf(2 to 2, 2 to 3)) { _, a ->
+            if (a == 2) cap - short else cap / 2
+        }
+        val leaves = leavesFrom(b, 3)
+        assertEquals(2, leaves.size)
+        assertEquals(listOf(2 to 2), leaves[0].verses)
+        assertEquals(listOf(2 to 3), leaves[1].verses)
+        // Whole on both: nothing was cut.
+        assertTrue(leaves.all { l -> l.runs.all { it.from == 0 } })
     }
 
     @Test

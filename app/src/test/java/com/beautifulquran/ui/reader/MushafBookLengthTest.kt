@@ -48,10 +48,13 @@ class MushafBookLengthTest {
         // What the dial's coarse comb is built from.
         val length = mushafBookLength(book, catalog.pageCount)
         val opening = mushafLeafNumber(book, surahId = 2, ayah = 1, page = 3)
-        assertTrue(opening in 1..length)
-        // And the last leaf of the book is reachable: the comb has to be able
-        // to stand on it, which a short rule made impossible.
-        assertEquals(length, mushafLeafNumber(book, surahId = 2, ayah = 12, page = 3))
+        assertEquals(1, opening)
+        // The comb walks forward through the book and never off the end of the
+        // rule. (The last leaf may carry only the tail of a verse that began on
+        // the one before, so nothing need *open* on it.)
+        val reached = (1..12).map { mushafLeafNumber(book, surahId = 2, ayah = it, page = 3) }
+        assertTrue(reached.zipWithNext().all { (a, z) -> z >= a })
+        assertTrue(reached.max() <= length)
     }
 }
 

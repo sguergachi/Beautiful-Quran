@@ -228,8 +228,10 @@ type gives 1,145 leaves at 91% full with 77 short ones instead of 365.
 
 What is still true, and is what the leaf actually rests on: a verse is a
 sentence, and a sentence cannot be cut at whatever word the calligrapher reached
-at the foot of a page. Verses are set whole, in the mushaf's own order, so the
-English runs continuously with nothing repeated and nothing dropped.
+at the foot of *his* page. Verses are set whole across the Arabic break, in the
+mushaf's own order, so the English runs continuously with nothing repeated and
+nothing dropped. At the English book's own break it is different — that break is
+the book's to place, and §13.4 places it.
 
 Al-Fatihah is the one break the packing keeps — it opens the book on a leaf of
 its own, as it stands on a page of its own in every mushaf. Every other chapter
@@ -322,17 +324,47 @@ but type: the choice is purely how long a line the hand wants. Below about 850
 it is shorter than the measure wants and above about 1,000 it is longer.
 `tools/measure_english_leaves.py` prints the sweep.
 
-**What is left at the foot, and why.** A leaf ends when the next verse will not
-go on it, and a verse averages three lines, so the leaf ends up to three lines
-short. Measured over the book: **2.7 blank lines out of 22 on average, 7.4 at
-the ninety-fifth percentile.** The book needs 985 leaves' worth of paper and
-takes 1,122 of them, so 12% of the paper is blank — all of it the whole verse.
-Capacity does not help (the sweep is flat: 2.7 blank lines at 900, still 2.0 at
-1,200 for a fifth of the type), and neither does breaking the book optimally
-rather than greedily — a Knuth-Plass pass over the slack redistributes it (p95
-7.4 → 6.2) without reducing it, because the total is fixed by the verses. The
-only thing that removes it is letting a verse run over onto the next leaf, which
-is what a printed book does with a paragraph and what this one does not.
+**A long verse is carried over, as a book carries a paragraph.**
+
+A leaf ends when the next verse will not go on it, and a verse averages three
+lines, so the foot of the page was blank by up to that much: **2.7 lines out of
+22 on average and 7.4 at the ninety-fifth percentile**, 379 leaves more than
+three lines short, 12% of the book's paper. Capacity does not touch it (the
+sweep is flat), and neither does breaking the book optimally rather than
+greedily — a Knuth-Plass pass over the slack redistributes it (p95 7.4 → 6.2)
+without reducing it, because the total is fixed by the verses.
+
+The only thing that removes it is the thing a printed book does: carry the
+sentence over. The verse continues at the head of the next leaf and is numbered
+where it finishes, and neither half repeats or drops a word.
+
+It is not done to save a line. Cutting a verse costs the reader the end of a
+thought to a page turn, so it is done only where leaving it whole would waste
+`ENGLISH_LEAF_SPLIT_HOLE_CHARS` — **three lines or more** — which needs a verse
+of at least five lines, the top sixth of the book by length. And never within
+`ENGLISH_LEAF_MIN_FRAGMENT_CHARS` of either end: one line of a sentence stranded
+at a foot or left at a head is a widow, so the break moves back up the verse
+until both halves clear two lines, or the verse is not cut at all.
+
+| | whole verses | carried |
+|---|---|---|
+| leaves | 1,118 | **1,041** |
+| blank lines, mean | 2.66 | **1.21** |
+| blank lines, p95 | 7.4 | **2.8** |
+| leaves more than 3 short | 379 | **30** |
+| verses cut, of 6,236 | 0 | **302** |
+
+It also retires the one leaf the book could not set: 2:282 is 1,333 characters
+and now runs across two leaves at the book's own hand and leading, instead of
+alone on one with the leading closed to fit it.
+
+The offsets are estimates — the pagination counts characters, not glyphs — so
+the leaf snaps them to a word boundary as it sets them (`englishLeafBreak`).
+It only ever moves forward and is a pure function of the text, so the leaf that
+ends at an offset and the leaf that begins there land on the same character
+without either knowing about the other. It never stops inside brackets either:
+the reader may have asked for the translator's asides to come off, those are
+stripped per half, and half a bracket on each leaf would strip from neither.
 
 **The constants are fitted, not guessed.** Eleven real leaves were rendered on
 device and their line counts solved for what the layout actually does:

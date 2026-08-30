@@ -11,12 +11,17 @@ package com.beautifulquran.domain
  * and to buy nothing a reader could see — `EnglishBook.kt` has the measurement.
  * The English book paginates itself, continuously.
  *
- * What the leaf still carries is the verses that *begin* somewhere, in the
- * mushaf's own order, whole. A verse is a sentence and a sentence cannot be cut
- * at the word the calligrapher happened to reach at the foot of a page, so a
- * verse that straddles an Arabic page break is set whole where it starts —
- * which is how a parallel-text Qur'an is printed, and it means the English runs
+ * A verse is never cut at the *Arabic* page break — a sentence cannot end at
+ * whatever word the calligrapher reached at the foot of his page — so verses
+ * are set whole and in the mushaf's own order, and the English runs
  * continuously with nothing repeated and nothing dropped.
+ *
+ * At the English book's own page break it is different, because there the break
+ * is the book's to place. A verse too long to go on the leaf it met is carried
+ * over rather than left to open the next one, exactly as a printed book carries
+ * a paragraph: the sentence continues at the head of the following leaf and is
+ * numbered where it finishes. Only when leaving it whole would waste three
+ * lines or more; see `ENGLISH_LEAF_SPLIT_HOLE_CHARS`.
  *
  * The two layouts are still one book, but through the *verse* rather than
  * through the page: `EnglishBook.leafOfVerse` is exact for all 6,236 of them,
@@ -38,12 +43,74 @@ package com.beautifulquran.domain
  * `ui/reader/MushafEnglishSheet.kt`.
  */
 
-/** One verse of the leaf: its sentence, and the verse the ink belongs to. */
+/**
+ * One verse of the leaf, or the part of one: its sentence, and the verse the
+ * ink belongs to.
+ *
+ * A long verse may be carried across a leaf break (`EnglishBook.kt`), so what
+ * is set here can be a fragment. [from] and [to] say which part of the verse it
+ * is, in characters of [EnglishLeafVerse.text]'s source, and the ink uses them
+ * to place the reciter inside the fragment rather than inside the verse.
+ */
 data class EnglishLeafVerse(
     val surahId: Int,
     val ayah: Int,
     val text: String,
-)
+    /** Where this fragment sits in the verse, and how long the verse is. */
+    val from: Int = 0,
+    val to: Int = text.length,
+    val verseLength: Int = text.length,
+) {
+    /** The mark closes the verse, so only the fragment that ends it carries one. */
+    val endsVerse: Boolean get() = to >= verseLength
+
+    /**
+     * Where the reciter is within *this* fragment, given where they are within
+     * the verse. A whole verse maps straight through.
+     */
+    fun fragmentProgress(verseProgress: Float): Float {
+        val span = (to - from).toFloat()
+        if (span <= 0f) return verseProgress
+        return ((verseProgress * verseLength - from) / span).coerceIn(0f, 1f)
+    }
+}
+
+/**
+ * Where a leaf really breaks a verse, given the offset the pagination guessed.
+ *
+ * The pagination counts characters and knows nothing about words, so it hands
+ * out an offset that will usually fall inside one. This moves it to the end of
+ * that word. Two rules, and both matter:
+ *
+ * - It only ever moves *forward*, and it is a pure function of the text and the
+ *   offset. So the leaf that ends at an offset and the leaf that begins there
+ *   land on the same character without either knowing about the other.
+ * - It never stops inside brackets. The reader may have asked for the
+ *   translator's asides to come off, and those are stripped per fragment; a
+ *   break inside `[O Muhammad]` would leave half a bracket on each leaf and
+ *   strip neither.
+ */
+fun englishLeafBreak(text: String, at: Int): Int {
+    if (at <= 0) return 0
+    if (at >= text.length) return text.length
+    var depth = 0
+    for (i in 0 until at) {
+        when (text[i]) {
+            '[', '(' -> depth++
+            ']', ')' -> if (depth > 0) depth--
+        }
+    }
+    var i = at
+    while (i < text.length) {
+        when (text[i]) {
+            '[', '(' -> depth++
+            ']', ')' -> if (depth > 0) depth--
+            ' ' -> if (depth == 0) return i
+        }
+        i++
+    }
+    return text.length
+}
 
 /** A block of the leaf, in printing order. */
 sealed class EnglishLeafBlock {
@@ -72,11 +139,18 @@ data class EnglishLeaf(
      */
     val prose: Int
         get() = verses.sumOf { verse ->
-            englishLeafVerseMass(
-                surahId = verse.surahId,
-                ayah = verse.ayah,
-                prose = verse.text.length + ENGLISH_LEAF_MARK_CHARS,
-            )
+            val mark = if (verse.endsVerse) ENGLISH_LEAF_MARK_CHARS else 0
+            val opening = if (verse.ayah == 1 && verse.from == 0) {
+                ENGLISH_LEAF_OPENING_CHARS +
+                    if (surahOpensWithBasmalahPreface(verse.surahId)) {
+                        ENGLISH_LEAF_BASMALAH_CHARS
+                    } else {
+                        0
+                    }
+            } else {
+                0
+            }
+            verse.text.length + mark + opening
         }
 }
 
@@ -121,29 +195,42 @@ fun englishLeafVerseKeys(page: MushafPage): List<Pair<Int, Int>> =
  */
 fun englishLeaf(
     page: Int,
-    verses: List<Pair<Int, Int>>,
+    runs: List<EnglishVerseRun>,
     hideParentheticals: Boolean = false,
     translation: (surahId: Int, ayah: Int) -> String,
 ): EnglishLeaf {
     val blocks = ArrayList<EnglishLeafBlock>(4)
-    var prose = ArrayList<EnglishLeafVerse>(verses.size)
+    var prose = ArrayList<EnglishLeafVerse>(runs.size)
     fun closeProse() {
         if (prose.isNotEmpty()) {
             blocks += EnglishLeafBlock.Prose(prose)
-            prose = ArrayList(verses.size)
+            prose = ArrayList(runs.size)
         }
     }
-    verses.forEach { (surahId, ayah) ->
-        if (ayah == 1) {
+    runs.forEach { verseRun ->
+        val whole = translation(verseRun.surahId, verseRun.ayah)
+        // The chapter's panel belongs to the leaf that opens the chapter, which
+        // is the leaf carrying the *start* of its first verse.
+        if (verseRun.ayah == 1 && verseRun.from == 0) {
             closeProse()
             blocks += EnglishLeafBlock.ChapterOpening(
-                surahId = surahId,
-                basmalah = surahOpensWithBasmalahPreface(surahId),
+                surahId = verseRun.surahId,
+                basmalah = surahOpensWithBasmalahPreface(verseRun.surahId),
             )
         }
-        val text = englishVerseProse(translation(surahId, ayah), hideParentheticals)
+        val from = englishLeafBreak(whole, verseRun.from)
+        val to = englishLeafBreak(whole, verseRun.to)
+        if (to <= from && whole.isNotEmpty()) return@forEach
+        val text = englishVerseProse(whole.substring(from, to), hideParentheticals)
         if (text.isNotEmpty()) {
-            prose += EnglishLeafVerse(surahId = surahId, ayah = ayah, text = text)
+            prose += EnglishLeafVerse(
+                surahId = verseRun.surahId,
+                ayah = verseRun.ayah,
+                text = text,
+                from = from,
+                to = to,
+                verseLength = whole.length,
+            )
         }
     }
     closeProse()

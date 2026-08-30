@@ -16,7 +16,9 @@ class EnglishLeafTest {
         translation: (Int, Int) -> String,
     ) = englishLeaf(
         page = page,
-        verses = englishLeafVerseKeys(catalog.page(page)!!),
+        runs = englishLeafVerseKeys(catalog.page(page)!!).map { (s, a) ->
+            EnglishVerseRun(s, a, from = 0, to = Int.MAX_VALUE)
+        },
         hideParentheticals = hideParentheticals,
         translation = translation,
     )
@@ -134,11 +136,57 @@ class EnglishLeafTest {
         // leaf is set as one page whether or not the Arabic broke inside it.
         val leaf = englishLeaf(
             page = 3,
-            verses = listOf(2 to 5, 2 to 6, 2 to 7),
+            runs = listOf(2 to 5, 2 to 6, 2 to 7).map { (s, a) ->
+                EnglishVerseRun(s, a, from = 0, to = Int.MAX_VALUE)
+            },
         ) { _, ayah -> "verse $ayah" }
         assertEquals(3, leaf.page)
         assertEquals(listOf(5, 6, 7), leaf.verses.map { it.ayah })
         assertEquals(listOf("Prose"), leaf.blocks.map { it::class.simpleName })
+    }
+
+    @Test
+    fun `a carried verse is set in two halves, and numbered where it ends`() {
+        val text = "one two three four five six seven eight nine ten"
+        val head = englishLeaf(3, listOf(EnglishVerseRun(2, 5, 0, 18))) { _, _ -> text }
+        val tail = englishLeaf(4, listOf(EnglishVerseRun(2, 5, 18, text.length))) { _, _ -> text }
+        // The break lands on a word, and neither half loses or repeats one.
+        assertEquals("one two three four", head.verses.single().text)
+        assertEquals("five six seven eight nine ten", tail.verses.single().text)
+        assertEquals(text, head.verses.single().text + " " + tail.verses.single().text)
+        // Only the half that finishes the sentence carries its number.
+        assertFalse(head.verses.single().endsVerse)
+        assertTrue(tail.verses.single().endsVerse)
+    }
+
+    @Test
+    fun `the break never falls inside the translator's brackets`() {
+        // The reader may ask for the asides to come off, and they are stripped
+        // per half; half a bracket on each leaf would strip from neither.
+        val text = "And it was revealed to [O Muhammad, the Prophet] at that time"
+        // An offset inside the aside is carried past the closing bracket.
+        assertEquals(text.indexOf(" at that"), englishLeafBreak(text, text.indexOf("Muhammad")))
+        // The break only ever moves forward, so an offset just before the
+        // bracket stops at the space in front of it and the aside stays whole.
+        assertEquals(text.indexOf(" [O"), englishLeafBreak(text, 20))
+    }
+
+    @Test
+    fun `the ink finds the reciter inside the half the leaf is setting`() {
+        val verse = EnglishLeafVerse(2, 5, "second half", from = 50, to = 100, verseLength = 100)
+        // The voice is at the middle of the verse, which is the head of this half.
+        assertEquals(0f, verse.fragmentProgress(0.50f), 0.001f)
+        assertEquals(1f, verse.fragmentProgress(1.00f), 0.001f)
+        assertEquals(0.5f, verse.fragmentProgress(0.75f), 0.001f)
+        // Still in the half before this one: nothing of this one is read.
+        assertEquals(0f, verse.fragmentProgress(0.20f), 0.001f)
+    }
+
+    @Test
+    fun `a verse the leaf sets whole maps straight through`() {
+        val verse = EnglishLeafVerse(2, 5, "all of it")
+        assertEquals(0.4f, verse.fragmentProgress(0.4f), 0.001f)
+        assertTrue(verse.endsVerse)
     }
 
     @Test

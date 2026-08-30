@@ -59,6 +59,7 @@ import com.beautifulquran.domain.ENGLISH_LEAF_SPECIMEN
 import com.beautifulquran.domain.englishLeafReferenceBlock
 import com.beautifulquran.domain.EnglishLeaf
 import com.beautifulquran.domain.EnglishLeafBlock
+import com.beautifulquran.domain.EnglishVerseRun
 import com.beautifulquran.domain.MushafPage
 import com.beautifulquran.domain.MushafToken
 import com.beautifulquran.domain.englishLeaf
@@ -121,8 +122,8 @@ internal fun MushafEnglishSheet(
     verseNumberScript: VerseNumberScript,
     /** The leaf's fore-edge, shared with the running head and the folio. */
     foreEdge: Dp,
-    /** The verses this leaf carries, in the book's order. */
-    leafVerses: List<Pair<Int, Int>>,
+    /** What this leaf sets, in the book's order — whole verses and carried ones. */
+    leafRuns: List<EnglishVerseRun>,
     /**
      * The Arabic word each of those verses opens with — what a tap on an
      * English sentence plays from. Gathered by the pager, because a leaf may
@@ -134,8 +135,9 @@ internal fun MushafEnglishSheet(
     modifier: Modifier = Modifier,
 ) {
     // The verses this leaf actually sets. The ink clocks what is on the paper,
-    // which since the book paginates itself is not what is on any one page.
-    val keysOnLeaf = leafVerses
+    // which since the book paginates itself is not what is on any one page —
+    // and a carried verse is on two leaves, so this is the distinct set.
+    val keysOnLeaf = remember(leafRuns) { leafRuns.map { it.key }.distinct() }
     val ayahsOnPage = remember(keysOnLeaf, content.surah.id, content.ayahs) {
         keysOnLeaf.mapNotNull { (surahId, ayah) ->
             if (surahId != content.surah.id) return@mapNotNull null
@@ -174,9 +176,9 @@ internal fun MushafEnglishSheet(
             packsState = packsState,
         )
     }
-    val leaf = remember(page.page, leafVerses, leafText, hideParentheticals) {
+    val leaf = remember(page.page, leafRuns, leafText, hideParentheticals) {
         val text = leafText ?: return@remember null
-        englishLeaf(page.page, leafVerses, hideParentheticals) { surahId, ayah ->
+        englishLeaf(page.page, leafRuns, hideParentheticals) { surahId, ayah ->
             text[quranWordKey(surahId, ayah, 1)].orEmpty()
         }
     }
@@ -406,9 +408,15 @@ internal data class EnglishProseVerse(
     val ayah: Int,
     /** The sentence itself, without its mark: what the wash crosses. */
     val range: IntRange,
+    /** Empty on a fragment that does not end its verse — the mark closes it. */
     val markRange: IntRange,
     /** The verse's first word on the page — what a tap plays from. */
     val token: MushafToken?,
+    /**
+     * Where the reciter is inside *this* fragment, given where they are inside
+     * the verse. Identity for a verse the leaf sets whole.
+     */
+    val fragmentProgress: (Float) -> Float = { it },
 )
 
 /**
@@ -434,24 +442,33 @@ private fun englishLeafBlockTexts(
                     val start = length
                     withStyle(SpanStyle(color = ink)) { append(verse.text) }
                     val range = start until length
-                    append(" ")
-                    val markStart = length
-                    appendAyahNumberMark(
-                        number = verse.ayah,
-                        useArabicIndicDigits =
-                            verseNumberScript == VerseNumberScript.ARABIC,
-                        style = SpanStyle(color = gold, fontSize = EnglishLeafMarkType.em),
-                        // The leaf is set left to right whichever digits the
-                        // reader has chosen, so the cups are always the LTR
-                        // pair.
-                        ltr = true,
-                    )
+                    // Only the fragment that ends the verse carries its mark: a
+                    // carried sentence is numbered where it finishes, as a
+                    // paragraph carried over a page is punctuated where it ends.
+                    val markRange = if (verse.endsVerse) {
+                        append(" ")
+                        val markStart = length
+                        appendAyahNumberMark(
+                            number = verse.ayah,
+                            useArabicIndicDigits =
+                                verseNumberScript == VerseNumberScript.ARABIC,
+                            style = SpanStyle(color = gold, fontSize = EnglishLeafMarkType.em),
+                            // The leaf is set left to right whichever digits the
+                            // reader has chosen, so the cups are always the LTR
+                            // pair.
+                            ltr = true,
+                        )
+                        markStart until length
+                    } else {
+                        IntRange.EMPTY
+                    }
                     verses += EnglishProseVerse(
                         surahId = verse.surahId,
                         ayah = verse.ayah,
                         range = range,
-                        markRange = markStart until length,
+                        markRange = markRange,
                         token = openingTokens[verse.surahId to verse.ayah],
+                        fragmentProgress = verse::fragmentProgress,
                     )
                 }
             }
@@ -792,7 +809,7 @@ private fun englishVerseBlooms(
             )
         }
     } else {
-        val read = englishVerseReadProgress(pack.motions)
+        val read = verse.fragmentProgress(englishVerseReadProgress(pack.motions))
         if (read < 1f) {
             blooms += ShapedWordBloom.InkReveal(
                 range = verse.range,
@@ -807,7 +824,7 @@ private fun englishVerseBlooms(
         }
     }
     val markCover = (1f - pack.markAlpha.value).coerceIn(0f, 1f)
-    if (markCover > 0f) {
+    if (markCover > 0f && !verse.markRange.isEmpty()) {
         blooms += ShapedWordBloom.UpcomingDim(
             range = verse.markRange,
             paper = paper,
