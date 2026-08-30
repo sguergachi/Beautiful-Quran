@@ -94,6 +94,15 @@ class MushafPageDialTest {
     }
 
     @Test
+    fun `return bubble hit target contains its seat without owning the whole dial`() {
+        val bubble = 132f
+        val left = mushafDialReturnBubbleLeft(267, 604, widthPx, insetPx, bubble)
+        assertTrue(mushafDialReturnBubbleHit(left + bubble / 2f, 267, 604, widthPx, insetPx, bubble))
+        assertFalse(mushafDialReturnBubbleHit(left - 1f, 267, 604, widthPx, insetPx, bubble))
+        assertFalse(mushafDialReturnBubbleHit(left + bubble + 1f, 267, 604, widthPx, insetPx, bubble))
+    }
+
+    @Test
     fun `the comb the finger reads stands where the finger says it is`() {
         // The comb is nailed to the rule, and the tier is read off the same
         // scale, so a mark's place on screen and the finger's place over it

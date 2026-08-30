@@ -129,7 +129,9 @@ return there. It is the hairline remembering the place, not a floating undo
 message. The roundel remains tappable for five seconds, then shrinks and fades
 into the rule; tapping it returns to that exact leaf and consumes it.
 Taking hold of the dial again also consumes it, because a new search supersedes
-the old landing.
+the old landing. The roundel and rule share one gesture owner: a still release
+on the roundel goes back, while movement past touch slop becomes a new dial
+stroke. Its generous tap target must never swallow a drag along the rule.
 
 **What the reader has hold of at that tier is the comb itself, not a marker.**
 No thumb rides the line while the comb is up — the chapter their finger is in

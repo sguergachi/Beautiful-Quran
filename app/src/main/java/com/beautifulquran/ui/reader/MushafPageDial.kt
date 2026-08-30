@@ -57,6 +57,8 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
@@ -67,7 +69,6 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.util.lerp
 import android.view.HapticFeedbackConstants
 import com.beautifulquran.ui.theme.LocalQuranAccents
-import com.beautifulquran.ui.theme.quietClickable
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -520,6 +521,19 @@ internal fun mushafDialReturnBubbleLeft(
         insetPx,
     )
     return (seat - bubbleWidthPx / 2f).coerceIn(0f, (widthPx - bubbleWidthPx).coerceAtLeast(0f))
+}
+
+/** Whether a press belongs to the return roundel's generous touch target. */
+internal fun mushafDialReturnBubbleHit(
+    xPx: Float,
+    page: Int,
+    pageCount: Int,
+    widthPx: Float,
+    insetPx: Float,
+    bubbleWidthPx: Float,
+): Boolean {
+    val left = mushafDialReturnBubbleLeft(page, pageCount, widthPx, insetPx, bubbleWidthPx)
+    return xPx in left..(left + bubbleWidthPx)
 }
 
 /**
@@ -1131,6 +1145,15 @@ internal fun MushafPageDial(
         }
     }
 
+    fun returnToPage(target: Int) {
+        if (target == 0 || !returnEnabled) return
+        warmState.landingJob?.cancel()
+        reportScrub.value(false)
+        dismissReturnBubble()
+        view.performHapticFeedback(HapticFeedbackConstants.CONTEXT_CLICK)
+        seek.value(target)
+    }
+
     fun showReturnBubble(previousPage: Int, newPage: Int): Job {
         returnJob?.cancel()
         returnEntrance?.cancel()
@@ -1712,8 +1735,46 @@ internal fun MushafPageDial(
                         val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
                         if (pages <= 1) return@awaitEachGesture
                         down.consume()
-                        dismissReturnBubble()
                         warmState.landingJob?.cancel()
+                        var start = down.position
+                        var movedFromReturn = false
+                        val backPage = returnPage.intValue
+                        if (
+                            returnEnabled && backPage != 0 &&
+                            mushafDialReturnBubbleHit(
+                                xPx = down.position.x,
+                                page = backPage,
+                                pageCount = pages,
+                                widthPx = size.width.toFloat(),
+                                insetPx = MushafDialEdgeInset.toPx(),
+                                bubbleWidthPx = MushafDialReturnHitWidth.toPx(),
+                            )
+                        ) {
+                            // The dot and dial share one hairline. Wait only
+                            // long enough to tell a dot tap from a fresh drag;
+                            // a drag then continues in this same pointer owner
+                            // instead of being lost when a separate clickable
+                            // cancels its tap.
+                            while (true) {
+                                val event = awaitPointerEvent(PointerEventPass.Initial)
+                                val change = event.changes.firstOrNull { it.id == down.id }
+                                    ?: return@awaitEachGesture
+                                change.consume()
+                                if (!change.pressed) {
+                                    returnToPage(backPage)
+                                    return@awaitEachGesture
+                                }
+                                if (
+                                    (change.position - down.position).getDistance() >=
+                                    viewConfiguration.touchSlop
+                                ) {
+                                    start = change.position
+                                    movedFromReturn = true
+                                    break
+                                }
+                            }
+                        }
+                        dismissReturnBubble()
                         // A glide home may still be running from the last
                         // scrub; the hand takes the thumb back off it.
                         glide?.cancel()
@@ -1729,15 +1790,15 @@ internal fun MushafPageDial(
                         // that followed them could not be left. It moves once,
                         // and only when an insistent hold declares a new one.
                         var pressY = down.position.y
-                        var handY = pressY
-                        var lastX = down.position.x
+                        var handY = start.y
+                        var lastX = start.x
                         // What the hand has travelled since the meter last
                         // looked, in dp. The pointer loop fills it; the frame
                         // loop drains it.
                         var pendingDp = 0f
                         var speed = 0f
                         var raw = settledState.value.toFloat()
-                        var moved = false
+                        var moved = movedFromReturn
                         var open = false
                         // Carried at the moment the trough opens and paid off
                         // underneath the animation: the difference between the
@@ -1803,7 +1864,7 @@ internal fun MushafPageDial(
                         // release to the neighbour it never named.
                         val initialIdxForLast = mushafDialChapterAt(
                             cellSeats,
-                            mushafDialClampToTrack(down.position.x, widthPxNow, insetPx),
+                            mushafDialClampToTrack(start.x, widthPxNow, insetPx),
                         )
                         var lastHapticIdx = initialIdxForLast
                         dialPage.floatValue = chapterMarks[initialIdxForLast].toFloat()
@@ -1813,7 +1874,7 @@ internal fun MushafPageDial(
                         // movement: the reader has taken hold of the rule
                         // here, and the mark belongs where the hand is.
                         handX.floatValue =
-                            mushafDialClampToTrack(down.position.x, widthPxNow, insetPx)
+                            mushafDialClampToTrack(start.x, widthPxNow, insetPx)
                         val initialRunStart = chapterMarks[initialIdxForLast]
                         val initialRunEnd = if (initialIdxForLast + 1 < chapterMarks.size) {
                             chapterMarks[initialIdxForLast + 1] - 1
@@ -2285,16 +2346,15 @@ internal fun MushafPageDial(
                     }
                     .width(MushafDialReturnHitWidth)
                     .height(MushafDialSlot + MushafDialBelowGrab)
-                    .semantics { contentDescription = "Return to page $backPage" }
-                    .quietClickable(
-                        enabled = returnEnabled,
-                        role = Role.Button,
-                    ) {
-                        val target = returnPage.intValue
-                        if (target == 0) return@quietClickable
-                        dismissReturnBubble()
-                        view.performHapticFeedback(HapticFeedbackConstants.CONTEXT_CLICK)
-                        seek.value(target)
+                    .semantics {
+                        role = Role.Button
+                        contentDescription = "Return to page $backPage"
+                        if (returnEnabled) {
+                            onClick {
+                                returnToPage(returnPage.intValue)
+                                true
+                            }
+                        }
                     },
             ) {
                 Box(
