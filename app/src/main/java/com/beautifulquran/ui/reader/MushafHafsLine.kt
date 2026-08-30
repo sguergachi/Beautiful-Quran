@@ -45,6 +45,7 @@ import androidx.compose.ui.layout.Layout
 import kotlin.math.roundToInt
 import com.beautifulquran.domain.MUSHAF_LINE_EM
 import com.beautifulquran.domain.MushafLine
+import com.beautifulquran.domain.MushafPage
 import com.beautifulquran.domain.MushafToken
 import com.beautifulquran.domain.buildMushafQcfLine
 import com.beautifulquran.domain.mushafGapSpacingPx
@@ -623,6 +624,17 @@ private fun mushafLineJoins(
     val profiles = texts.map { MushafInkProfiles.of(typeface, it.text) }
     return List(texts.size - 1) { i ->
         mushafInkJoin(profiles[i], profiles[i + 1], texts[i].mark || texts[i + 1].mark)
+    }
+}
+
+/** Rasterizes a leaf's ink joins before that leaf reaches composition. */
+internal fun warmMushafInkProfiles(
+    page: MushafPage?,
+    typeface: android.graphics.Typeface?,
+) {
+    if (page == null || typeface == null) return
+    page.lines.forEach { line ->
+        mushafLineTexts(line).forEach { MushafInkProfiles.of(typeface, it.text) }
     }
 }
 
