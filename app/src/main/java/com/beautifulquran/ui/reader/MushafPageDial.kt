@@ -934,6 +934,7 @@ private val MushafDialReturnHitWidth = 44.dp
 private val MushafDialReturnDot = 26.dp
 private val MushafDialReturnIcon = 15.dp
 internal const val MUSHAF_DIAL_RETURN_MS = 5_000L
+private const val MUSHAF_DIAL_RETURN_ENTRANCE_MS = 220
 /** Ignore chapter cells merely crossed between two display frames. */
 private const val MUSHAF_DIAL_WARM_SETTLE_MS = 24L
 /** Paper between the top of the comb and the foot of the label. */
@@ -1003,6 +1004,8 @@ internal fun MushafPageDial(
     chapterLabel: (Int) -> MushafDialLabel? = { null },
     onSeekPage: (Int) -> Unit,
     onSeekSurah: ((Int) -> Unit)? = null,
+    /** Warms the leaf's font and ink geometry while the finger still rests. */
+    onWarmPage: (suspend (Int) -> Unit)? = null,
     /** Raised while a hand is on the rule. The leaf's folio steps aside for
      * the label, which is naming a page the folio has not reached yet. */
     onScrubbing: (Boolean) -> Unit,
@@ -1021,6 +1024,7 @@ internal fun MushafPageDial(
     val chapterLabelOf = rememberUpdatedState(chapterLabel)
     val seek = rememberUpdatedState(onSeekPage)
     val seekSurah = rememberUpdatedState(onSeekSurah)
+    val warmPage = rememberUpdatedState(onWarmPage)
     val reportScrub = rememberUpdatedState(onScrubbing)
 
     var scrubbing by remember { mutableStateOf(false) }
@@ -1062,6 +1066,7 @@ internal fun MushafPageDial(
     val returnWay = remember { mutableStateOf(MushafReturnWay.Left) }
     var returnEnabled by remember { mutableStateOf(false) }
     var returnJob by remember { mutableStateOf<Job?>(null) }
+    var returnEntrance by remember { mutableStateOf<Job?>(null) }
     val warmState = remember { MushafDialWarmState() }
     var widthPx by remember { mutableIntStateOf(0) }
     var hudContentWidthPx by remember { mutableIntStateOf(0) }
@@ -1118,6 +1123,7 @@ internal fun MushafPageDial(
     fun dismissReturnBubble() {
         if (returnPage.intValue == 0) return
         returnJob?.cancel()
+        returnEntrance?.cancel()
         returnEnabled = false
         returnJob = scope.launch {
             returnBubble.animateTo(0f, tween(220, easing = FastOutSlowInEasing))
@@ -1125,29 +1131,37 @@ internal fun MushafPageDial(
         }
     }
 
-    fun showReturnBubble(previousPage: Int, newPage: Int) {
+    fun showReturnBubble(previousPage: Int, newPage: Int): Job {
         returnJob?.cancel()
+        returnEntrance?.cancel()
         returnWay.value = checkNotNull(mushafReturnWay(newPage, previousPage))
         returnPage.intValue = previousPage
         returnEnabled = true
-        returnJob = scope.launch {
+        val entrance = scope.launch {
             returnBubble.snapTo(0f)
-            val entrance = launch {
-                returnBubble.animateTo(
-                    1f,
-                    spring(dampingRatio = 0.72f, stiffness = 420f),
-                )
-            }
-            delay(MUSHAF_DIAL_RETURN_MS)
-            entrance.cancel()
+            // The seed is visible immediately, but its growth begins only
+            // after the selected leaf owns a frame. Compose animations share
+            // the UI clock with composition; starting both together let a
+            // cold leaf visibly freeze the dot halfway through its entrance.
+            withFrameNanos { }
+            withFrameNanos { }
+            returnBubble.animateTo(
+                1f,
+                tween(MUSHAF_DIAL_RETURN_ENTRANCE_MS, easing = FastOutSlowInEasing),
+            )
+        }
+        returnEntrance = entrance
+        returnJob = scope.launch {
+            entrance.join()
+            delay(MUSHAF_DIAL_RETURN_MS - MUSHAF_DIAL_RETURN_ENTRANCE_MS)
             returnEnabled = false
             returnBubble.animateTo(0f, tween(220, easing = FastOutSlowInEasing))
             returnPage.intValue = 0
         }
+        return entrance
     }
 
     fun warmTarget(page: Int, immediate: Boolean = false) {
-        if (MushafQcfFonts.cached(page) != null) return
         if (warmState.loadingPage == page) return
         if (!immediate && warmState.page == page) return
         warmState.page = page
@@ -1157,8 +1171,13 @@ internal fun MushafPageDial(
             if (warmState.page != page) return@launch
             warmState.loadingPage = page
             try {
+                val warm = warmPage.value
                 withContext(Dispatchers.Default) {
-                    MushafQcfFonts.face(view.context.applicationContext, page)
+                    if (warm != null) {
+                        warm(page)
+                    } else {
+                        MushafQcfFonts.face(view.context.applicationContext, page)
+                    }
                 }
             } finally {
                 if (warmState.loadingPage == page) warmState.loadingPage = 0
@@ -2194,7 +2213,7 @@ internal fun MushafPageDial(
                             // chapter's name arriving under the hand.
                             release.surahId?.let { seekSurah.value?.invoke(it) }
                             if (pageChanges) {
-                                showReturnBubble(previousPage, landed)
+                                val returnEntrance = showReturnBubble(previousPage, landed)
                                 // Give the bubble and retract one draw before
                                 // cold leaf composition joins the next frame.
                                 // Keep neighbours parked until the target leaf
@@ -2205,6 +2224,10 @@ internal fun MushafPageDial(
                                     seek.value(landed)
                                     withFrameNanos { }
                                     withFrameNanos { }
+                                    // Neighbour leaves are the largest cold
+                                    // composition burst. Bring them back only
+                                    // after the return dot has finished growing.
+                                    returnEntrance.join()
                                     reportScrub.value(false)
                                 }
                             }
@@ -2281,7 +2304,10 @@ internal fun MushafPageDial(
                         .size(MushafDialReturnDot)
                         .graphicsLayer {
                             val reveal = returnBubble.value
-                            alpha = reveal
+                            // A tappable seed appears on release; after the
+                            // target leaf arrives it grows from here without
+                            // sharing a frame with cold page composition.
+                            alpha = if (returnEnabled) 0.55f + 0.45f * reveal else reveal
                             scaleX = 0.55f + 0.45f * reveal
                             scaleY = 0.55f + 0.45f * reveal
                         }

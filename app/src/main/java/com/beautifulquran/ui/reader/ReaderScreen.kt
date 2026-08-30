@@ -2336,6 +2336,12 @@ fun ReaderScreen(
                         chapterLabel = mushafChapterLabel,
                         onSeekPage = { mushafSeekPage = it },
                         onSeekSurah = { mushafSeekSurahId = it },
+                        onWarmPage = { page ->
+                            mushafCatalog?.let { catalog ->
+                                val face = MushafQcfFonts.face(activityContext.applicationContext, page)
+                                warmMushafInkProfiles(catalog.page(page), face?.typeface)
+                            }
+                        },
                         onScrubbing = { mushafScrubbing.value = it },
                         modifier = Modifier.weight(1f),
                         leafFooter = {

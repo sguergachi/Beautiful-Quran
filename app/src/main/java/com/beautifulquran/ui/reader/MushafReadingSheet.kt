@@ -155,6 +155,8 @@ internal fun MushafReadingSheet(
     /** Where a scrub landed, once the hand comes off the rule. */
     onSeekPage: (Int) -> Unit,
     onSeekSurah: ((Int) -> Unit)? = null,
+    /** Warms the leaf while the dial's hand is still deciding. */
+    onWarmPage: (suspend (Int) -> Unit)? = null,
     /** Raised while a hand is on the rule. */
     onScrubbing: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
@@ -201,6 +203,7 @@ internal fun MushafReadingSheet(
             chapterLabel = chapterLabel,
             onSeekPage = onSeekPage,
             onSeekSurah = onSeekSurah,
+            onWarmPage = onWarmPage,
             onScrubbing = onScrubbing,
             reciting = reciting,
             // Paper between the leaf's own tail and the rule, so the folio

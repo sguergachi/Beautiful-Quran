@@ -206,12 +206,15 @@ tick must not remasure three pages or recreate 150 `Text` nodes.
   ink animation frames never repeat it. Geometry remains in the bounded
   process cache. Non-adjacent chapter and search jumps warm that same target
   window before moving the pager. The dial warms only the target that rests
-  under the finger (fly-over cells are debounced), then releases its bubble
-  and retract on one frame and moves the pager on the next. A fast lift also
+  under the finger (fly-over cells are debounced), including that leaf's
+  glyph-ink profiles, then releases its bubble and retract on one frame and
+  moves the pager on the next. A fast lift also
   starts an urgent target-only warm-up; it never serially loads the five-page
   window or waits for the retract spring before requesting the selected leaf.
-  Pager neighbours stay disposed through the selected leaf's first frame and
-  return afterward, avoiding the old three-leaf cold composition burst.
+  The return dot's tappable seed is immediate; its entrance starts after the
+  selected leaf's first frame. Pager neighbours stay disposed through that
+  entrance and return only once the dot is full-sized, avoiding cold leaf work
+  on the animation clock.
 - Each Madinah line owns one pointer-input node, not one per word. Its QCF word
   nodes retain the directional `shapedWordBloom`, while the leaf itself owns an
   offscreen layer so a fling transforms a recorded page. The settled page runs
