@@ -641,6 +641,12 @@ internal fun MushafPager(
     onWordClick: (MushafToken) -> Unit,
     onWordLongClick: (MushafToken) -> Unit,
     onAyahClick: (MushafToken) -> Unit,
+    /**
+     * Play from a share of a verse — the English leaf's tap. It has no word to
+     * aim at, so it says which verse and how far into it and the reader turns
+     * that into a word. See `englishSeekWordPosition`.
+     */
+    onVerseSeek: (surahId: Int, ayah: Int, through: Float) -> Unit = { _, _, _ -> },
     onBasmalahClick: (Int) -> Unit,
     pageNumberScript: PageNumberScript = PageNumberScript.BOTH,
     /**
@@ -936,6 +942,7 @@ internal fun MushafPager(
     val onWordClickNow = rememberUpdatedState(onWordClick)
     val onWordLongClickNow = rememberUpdatedState(onWordLongClick)
     val onAyahClickNow = rememberUpdatedState(onAyahClick)
+    val onVerseSeekNow = rememberUpdatedState(onVerseSeek)
     val onBasmalahClickNow = rememberUpdatedState(onBasmalahClick)
     val onTappedLeafNow = rememberUpdatedState(onTappedLeaf)
     val leafTextNow = rememberUpdatedState(leafText)
@@ -1058,6 +1065,15 @@ internal fun MushafPager(
                         waitingPage = pageIndex + 1
                         onTappedLeafNow.value(pageIndex + 1)
                         onAyahClickNow.value(token)
+                    }
+                }
+            }
+            val leafVerseSeek = remember(pageIndex, page.page) {
+                { surahId: Int, ayah: Int, through: Float ->
+                    if (mushafLeafAcceptsTap(pageIndex, currentPageNow.value)) {
+                        waitingPage = pageIndex + 1
+                        onTappedLeafNow.value(pageIndex + 1)
+                        onVerseSeekNow.value(surahId, ayah, through)
                     }
                 }
             }
@@ -1228,7 +1244,7 @@ internal fun MushafPager(
                             foreEdge = foreEdge,
                             leafRuns = leafRuns,
                             leafTokens = leafTokens,
-                            onAyahClick = leafAyahClick,
+                            onVerseSeek = leafVerseSeek,
                             onBasmalahClick = leafBasmalahClick,
                             modifier = wellModifier,
                         )

@@ -130,7 +130,12 @@ internal fun MushafEnglishSheet(
      * draw its verses from more than one Madinah page.
      */
     leafTokens: Map<Pair<Int, Int>, MushafToken>,
-    onAyahClick: (MushafToken) -> Unit,
+    /**
+     * Play from a share of a verse. The leaf has no word-level alignment, so a
+     * tap says which verse and how far into it; the reader resolves that to a
+     * word (`englishSeekWordPosition`).
+     */
+    onVerseSeek: (surahId: Int, ayah: Int, through: Float) -> Unit,
     onBasmalahClick: (Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -293,7 +298,7 @@ internal fun MushafEnglishSheet(
                         fontSize = fontSize,
                         lineHeight = pitch,
                         liveInk = liveInk,
-                        onAyahClick = onAyahClick,
+                        onVerseSeek = onVerseSeek,
                     )
                 }
             }
@@ -417,6 +422,11 @@ internal data class EnglishProseVerse(
      * the verse. Identity for a verse the leaf sets whole.
      */
     val fragmentProgress: (Float) -> Float = { it },
+    /**
+     * The share of the verse a point this many characters into [range] stands
+     * at — what a tap seeks by. Identity-ish for a verse set whole.
+     */
+    val verseFractionAt: (Int) -> Float = { 0f },
 )
 
 /**
@@ -469,6 +479,9 @@ private fun englishLeafBlockTexts(
                         markRange = markRange,
                         token = openingTokens[verse.surahId to verse.ayah],
                         fragmentProgress = verse::fragmentProgress,
+                        verseFractionAt = { at ->
+                            verse.verseFractionAt(at, verse.text.length)
+                        },
                     )
                 }
             }
@@ -733,7 +746,7 @@ private fun EnglishProseBlock(
     fontSize: TextUnit,
     lineHeight: TextUnit,
     liveInk: Boolean,
-    onAyahClick: (MushafToken) -> Unit,
+    onVerseSeek: (surahId: Int, ayah: Int, through: Float) -> Unit,
 ) {
     val palette = rememberWordInkPalette()
     var layoutResult by remember { mutableStateOf<TextLayoutResult?>(null) }
@@ -770,13 +783,19 @@ private fun EnglishProseBlock(
             .pointerInput(block, layoutResult) {
                 detectTapGestures { tap ->
                     val layout = layoutResult ?: return@detectTapGestures
-                    // A tap anywhere in a verse plays it. There is no word to
-                    // aim at here — the sentence is the unit of this page, as
-                    // the word is the unit of the Arabic one.
-                    block.verses
+                    // The sentence is the unit of this page, as the word is the
+                    // unit of the Arabic one — but a tap still says *where* in
+                    // the sentence, and the reciter can be sent to the same
+                    // share of the verse. See englishSeekWordPosition.
+                    val verse = block.verses
                         .firstOrNull { layout.rangeContains(tap, it.range, hitSlopPx) }
-                        ?.token
-                        ?.let(onAyahClick)
+                        ?: return@detectTapGestures
+                    val at = layout.getOffsetForPosition(tap) - verse.range.first
+                    onVerseSeek(
+                        verse.surahId,
+                        verse.ayah,
+                        verse.verseFractionAt(at.coerceAtLeast(0)),
+                    )
                 }
             },
         onTextLayout = { layoutResult = it },

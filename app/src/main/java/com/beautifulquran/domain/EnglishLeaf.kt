@@ -65,6 +65,17 @@ data class EnglishLeafVerse(
     val endsVerse: Boolean get() = to >= verseLength
 
     /**
+     * The share of the *verse* that a point [at] characters into this fragment
+     * stands at — the inverse of [fragmentProgress], and what a tap uses to
+     * ask the reciter to start somewhere other than the verse's first word.
+     */
+    fun verseFractionAt(at: Int, length: Int): Float {
+        if (verseLength <= 0) return 0f
+        val within = if (length <= 0) 0f else (at.toFloat() / length).coerceIn(0f, 1f)
+        return ((from + within * (to - from)) / verseLength).coerceIn(0f, 1f)
+    }
+
+    /**
      * Where the reciter is within *this* fragment, given where they are within
      * the verse. A whole verse maps straight through.
      */
@@ -253,3 +264,25 @@ private fun englishVerseProse(text: String, hideParentheticals: Boolean): String
 }
 
 private val WHITESPACE_RUN = Regex("\\s+")
+
+/**
+ * The word of a verse to start reciting from, given how far into the verse's
+ * *English* a reader has tapped.
+ *
+ * The leaf has no word-level alignment and cannot pretend to one: the Arabic
+ * order is not the English order, so a tap two thirds of the way through the
+ * sentence lands near — not exactly on — the word two thirds of the way through
+ * the recitation. That is the same approximation the leaf already shows the
+ * reader, since the wash crosses the sentence at the fraction of the verse the
+ * voice has reached (`englishVerseReadProgress`). If proportion is honest
+ * enough to say where the reciter *is*, it is honest enough to say where to
+ * send them.
+ *
+ * What it replaces is worse than approximate: every tap restarted the verse, so
+ * a reader who wanted the last clause of a thirty-second verse heard the whole
+ * of it again.
+ */
+fun englishSeekWordPosition(through: Float, words: Int): Int {
+    if (words <= 0) return 1
+    return ((through.coerceIn(0f, 1f) * words).toInt() + 1).coerceIn(1, words)
+}

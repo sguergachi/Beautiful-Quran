@@ -125,6 +125,7 @@ import com.beautifulquran.data.AyahSelectorSide
 import com.beautifulquran.data.ReadingLayout
 import com.beautifulquran.data.ReadingMode
 import com.beautifulquran.data.model.Surah
+import com.beautifulquran.domain.englishSeekWordPosition
 import com.beautifulquran.domain.BASMALAH_PLAYLIST_AYAH
 import com.beautifulquran.domain.MushafToken
 import com.beautifulquran.domain.mushafFontPreloadPages
@@ -2539,6 +2540,29 @@ fun ReaderScreen(
                         }
                         }
                     }
+                    // The English leaf has no word to aim at, so its tap says
+                    // which verse and how far into it. Resolving that to a word
+                    // needs the verse's own length, which lives here.
+                    val onMushafVerseSeek = remember(mushafSurahId, viewModel, content) {
+                        { surahId: Int, ayah: Int, through: Float ->
+                            mushafDispatch.value(ReaderInteractionEvent.EnableFollow)
+                            val words = if (surahId == mushafSurahId) {
+                                content.ayahs.firstOrNull { it.number == ayah }?.words?.size ?: 0
+                            } else {
+                                0
+                            }
+                            val position = englishSeekWordPosition(through, words)
+                            if (surahId == mushafSurahId) {
+                                viewModel.playFromAyahWord(ayah, position)
+                            } else {
+                                viewModel.load(
+                                    surahId = surahId,
+                                    startPlaybackAtAyah = ayah,
+                                    keepContent = true,
+                                )
+                            }
+                        }
+                    }
                     val onMushafBasmalahClick = remember(mushafSurahId, viewModel) {
                         { surahId: Int ->
                             mushafDispatch.value(ReaderInteractionEvent.EnableFollow)
@@ -2573,6 +2597,7 @@ fun ReaderScreen(
                         onWordClick = onMushafWordClick,
                         onWordLongClick = onMushafWordLongClick,
                         onAyahClick = onMushafAyahClick,
+                        onVerseSeek = onMushafVerseSeek,
                         onBasmalahClick = onMushafBasmalahClick,
                         pageNumberScript = settings.pageNumberScript,
                         english = settings.readingMode == ReadingMode.ENGLISH_ONLY,

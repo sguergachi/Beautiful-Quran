@@ -494,11 +494,24 @@ behind the voice, plus the letter sweep of the word on it
 is. Verses still to come wait under the same recess as the Arabic leaf's; verses
 already read hold their ink; the packs are the very same `AyahInkPack`.
 
+**A tap reads the same way, in reverse.** There is no word to aim at, but a tap
+still says *where* in the sentence, so the reciter is sent to the same share of
+the verse (`englishSeekWordPosition`). It is approximate — the Arabic order is
+not the English order, so a tap two thirds through the sentence lands near, not
+exactly on, the word two thirds through the recitation. It is the same
+approximation the leaf already shows: if proportion is honest enough to say
+where the reciter *is*, it is honest enough to say where to send them. What it
+replaced was worse than approximate — every tap restarted the verse, so a reader
+who wanted the last clause of a thirty-second verse heard the whole of it again.
+
 For the same reason the leaf carries no orange repeat and no wet-ink glint.
 Both are statements about one Arabic word — that the reciter went back over it,
-that its ink is still wet — and there is no word here to say them of. Nor does
-it lead-turn: the lead is measured from the last word *printed* on the page,
-which is routinely mid-sentence on a leaf that set that sentence whole.
+that its ink is still wet — and there is no word here to say them of.
+
+It does lead-turn, but only at its own cut (§13.4). The Arabic lead is measured
+from the last word *printed* on the page, which is routinely mid-sentence on a
+leaf that set that sentence whole; the book's own cut is the one place the leaf
+really does stop mid-sentence, so that is where the lead belongs.
 
 ### 13.7 The grid
 
