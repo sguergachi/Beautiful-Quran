@@ -999,27 +999,22 @@ class ReaderViewModel(
     /**
      * Focus / scroll / rail target changed.
      * Bookmark "this verse" uses the focused ayah; does not touch Continue
-     * Listening (that only tracks verses actually recited).
+     * Listening or the green ribbon (both track verses actually recited).
      */
     fun onAyahBecameActive(ayah: Int) {
         if (ayah < 1) return
         focusedAyah = ayah
     }
 
-    /** Parks the green reading ribbon without changing Continue Listening. */
-    fun updateReadingPlace(ayah: Int) {
-        if (surahId in 1..114 && ayah >= 1) settings.updateReadingPlace(surahId, ayah)
-    }
-
     /**
      * The verse currently being recited advanced (or play started on it).
-     * Updates Continue Listening — never call this for bare scroll/jump.
+     * Updates Continue Listening and green — never call for bare scroll/jump.
      */
     fun onListenedAyah(ayah: Int) {
         rememberListened(ayah)
     }
 
-    /** Persist Continue Listening — only for verses the user actually heard. */
+    /** Persist the shared Continue / green target for a verse actually heard. */
     private fun rememberListened(ayah: Int) {
         if (surahId in 1..114 && ayah >= 1) {
             focusedAyah = ayah

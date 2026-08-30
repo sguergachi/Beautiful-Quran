@@ -39,7 +39,6 @@ data class HomeUiState(
     val allSurahs: List<Surah> = emptyList(),
     /** Reading place parked on the previous visit, kept visible as the green
      * marker even while the chapter list is filtered. */
-    val currentPlace: ContinueTarget? = null,
     val continueTarget: ContinueTarget? = null,
     /** When the query is a `surah:ayah` reference, the ayah to open the matched surah at. */
     val ayahTarget: Int? = null,
@@ -139,8 +138,6 @@ class HomeViewModel(
                     surahs = surahs,
                     lastSurah = prefs.lastSurah,
                     lastAyah = prefs.lastAyah,
-                    readingPlaceSurah = prefs.readingPlaceSurah,
-                    readingPlaceAyah = prefs.readingPlaceAyah,
                     reciterId = prefs.reciterId,
                     playerState = playerState,
                     names = names,
@@ -151,8 +148,6 @@ class HomeViewModel(
             wordSearchLoading,
         ) { base, hits, expanded, loading ->
             val (filtered, ayahTarget) = filterSurahs(base.surahs, base.query)
-            val currentPlace = base.surahs.firstOrNull { it.id == base.readingPlaceSurah }
-                ?.let { ContinueTarget(it, base.readingPlaceAyah) }
             val continueTarget = base.surahs.firstOrNull { it.id == base.lastSurah }
                 ?.let { ContinueTarget(it, base.lastAyah) }
             val nowPlaying = base.playerState.nowPlaying
@@ -168,8 +163,7 @@ class HomeViewModel(
                 query = base.query,
                 surahs = filtered,
                 allSurahs = base.surahs,
-                currentPlace = currentPlace,
-                continueTarget = continueTarget.takeIf { base.query.isBlank() },
+                continueTarget = continueTarget,
                 ayahTarget = ayahTarget,
                 floatingPlayback = floating,
                 playerState = base.playerState,
@@ -256,8 +250,6 @@ private data class HomeCombineBase(
     val surahs: List<Surah>,
     val lastSurah: Int,
     val lastAyah: Int,
-    val readingPlaceSurah: Int,
-    val readingPlaceAyah: Int,
     val reciterId: Int,
     val playerState: PlayerUiState,
     val names: Map<Int, String>,

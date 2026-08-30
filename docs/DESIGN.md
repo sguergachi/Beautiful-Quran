@@ -973,12 +973,12 @@ weight.
 
 ## Current-place ribbon
 
-The green ribbon is the place left at the end of a reading visit, never a live
-cursor. A fresh visit has no green cloth. As the reader moves, its focused
-verse is recorded behind the paper without displaying a moving mark. Leaving
-exposes that place beside its surah on Chapters; returning snapshots it onto
-that verse for the whole new visit. Reading onward leaves the ribbon behind,
-like opening a physical book at its marker and moving through the pages.
+The green ribbon marks the last ayah actually heard: the same `lastSurah` /
+`lastAyah` target used by Home's Continue Listening row. A fresh install has no
+green cloth. Leaving exposes the last-heard place beside its surah on Chapters;
+returning snapshots it onto that verse for the whole new visit. Bare scrolling
+leaves the ribbon behind, like opening a physical book at its marker and moving
+through the pages.
 On the return swipe, the chapter marker waits until its outer lane nears the
 screen edge, then drops to full length as the sheet settles. The motion is armed
 only by a committed reader visit, so cold display and cancelled page turns do
@@ -1011,14 +1011,12 @@ chapter returns to the parked ayah. The ayah rail recolors the nearest existing
 collapsed bar green rather than adding another tick; in the expanded wheel
 that parked ayah is green until gold scrub focus reaches it. A bookmarked
 parked ayah keeps its ruby number while its rail tick is green. Continue
-Listening remains separate: it records the last verse actually heard, while
-the ribbon records the reading line whether the visit used audio or silent
-reading.
+Listening and green deliberately share the last verse actually heard; tapping
+either the Continue row or the green-marked chapter opens that same ayah.
 
 Implementation: `ui/reader/VerseBookmarkRibbon.kt`,
 `ui/reader/AyahSelectorRail.kt`, and `ui/home/HomeScreen.kt` over
-`Settings.readingPlaceSurah` / `readingPlaceAyah` and
-`HomeUiState.currentPlace`.
+`Settings.lastSurah` / `lastAyah` and `HomeUiState.continueTarget`.
 
 ## Bookmark ribbon
 

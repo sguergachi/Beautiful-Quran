@@ -196,12 +196,12 @@ fun HomeScreen(
     LaunchedEffect(readerVisitActive) {
         if (readerVisitActive) placeRibbonUnfurlPending = true
     }
-    LaunchedEffect(chapterRibbonReady, placeRibbonUnfurlPending, uiState.currentPlace) {
+    LaunchedEffect(chapterRibbonReady, placeRibbonUnfurlPending, uiState.continueTarget) {
         if (
             shouldUnfurlReadingPlaceRibbon(
                 pendingReturn = placeRibbonUnfurlPending,
                 chapterRibbonReady = chapterRibbonReady,
-                currentPlacePresent = uiState.currentPlace != null,
+                currentPlacePresent = uiState.continueTarget != null,
             )
         ) {
             placeRibbonUnfurlEpoch++
@@ -317,11 +317,13 @@ fun HomeScreen(
                                 },
                         )
 
-                        uiState.continueTarget?.let { target ->
-                            ContinueRow(
-                                target = target,
-                                onClick = { onOpenSurah(target.surah.id, target.ayah, null) },
-                            )
+                        if (!searching) {
+                            uiState.continueTarget?.let { target ->
+                                ContinueRow(
+                                    target = target,
+                                    onClick = { onOpenSurah(target.surah.id, target.ayah, null) },
+                                )
+                            }
                         }
                         if (
                             bookmarkCount > 0 &&
@@ -340,7 +342,7 @@ fun HomeScreen(
                         uiState.surahs.forEach { surah ->
                             SurahRow(
                                 surah = surah,
-                                currentAyah = uiState.currentPlace
+                                currentAyah = uiState.continueTarget
                                     ?.takeIf { it.surah.id == surah.id }
                                     ?.ayah,
                                 placeUnfurlSignal = placeRibbonUnfurlEpoch,
@@ -348,7 +350,7 @@ fun HomeScreen(
                                     focusManager.clearFocus()
                                     onOpenSurah(
                                         surah.id,
-                                        uiState.ayahTarget ?: uiState.currentPlace
+                                        uiState.ayahTarget ?: uiState.continueTarget
                                             ?.takeIf { it.surah.id == surah.id }
                                             ?.ayah,
                                         null,

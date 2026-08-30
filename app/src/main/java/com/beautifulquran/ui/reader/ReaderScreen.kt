@@ -256,11 +256,11 @@ fun ReaderScreen(
     // one ayah block — never the whole screen.
     val activeWordState = viewModel.activeWord.collectAsStateWithLifecycle()
     val settings by viewModel.settings.settings.collectAsStateWithLifecycle()
-    // Snapshot once for this visit. The stored place keeps advancing behind
-    // the page; only a paused media verse temporarily displaces this ribbon.
+    // Snapshot the shared Continue / green-ribbon target once for this visit;
+    // only a paused media verse temporarily displaces it.
     val parkedPlaceAyah = remember(surahId) {
         viewModel.settings.settings.value.let { saved ->
-            saved.readingPlaceAyah.takeIf { saved.readingPlaceSurah == surahId }
+            saved.lastAyah.takeIf { saved.lastSurah == surahId }
         }
     }
     val mushafUi by viewModel.mushaf.collectAsStateWithLifecycle()
@@ -735,14 +735,9 @@ fun ReaderScreen(
     val scrolledAyahPosition = focusController.focusedPosition
 
     // Track the verse under the reading line for Assistant "bookmark this".
-    // Continue Listening only advances when audio is actually playing
-    // (see [ReaderViewModel.onAyahBecameActive] / play paths).
-    LaunchedEffect(scrolledAyah.value, surahId, initialFocusSettled) {
+    LaunchedEffect(scrolledAyah.value, surahId) {
         val ayah = scrolledAyah.value
-        if (ayah >= 1) {
-            viewModel.onAyahBecameActive(ayah)
-            if (initialFocusSettled && !mushafMode) viewModel.updateReadingPlace(ayah)
-        }
+        if (ayah >= 1) viewModel.onAyahBecameActive(ayah)
     }
 
     // While reciting, chrome recedes into the paper — the words and core
@@ -923,13 +918,6 @@ fun ReaderScreen(
         return page.ayahKeys
             .filter { it.first == renderedSurahId }
             .minOfOrNull { it.second }
-    }
-
-    LaunchedEffect(mushafMode, renderedSurahId, initialFocusSettled, mushafCatalog) {
-        if (!mushafMode || !initialFocusSettled || mushafCatalog == null) return@LaunchedEffect
-        snapshotFlow { mushafScrolledAyah() }.collect { ayah ->
-            if (ayah != null) viewModel.updateReadingPlace(ayah)
-        }
     }
 
     /**

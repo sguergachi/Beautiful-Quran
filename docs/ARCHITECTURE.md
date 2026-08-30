@@ -380,12 +380,12 @@ Continue Listening (`settings.lastSurah` / `lastAyah`) is keyed on the
 **playing media item**, never on the reader's fade-led focus target: that target
 names the next verse up to `InkEngine.fadeLeadMs` before a note of it is heard.
 Writes go through `SettingsRepository.updateListeningPosition`, which touches
-only the two position keys and no-ops when the position is unchanged.
+only the two position keys and no-ops when the position is unchanged. Those
+same keys are the green ribbon's sole source: Home's Continue row, green chapter
+mark, chapter-row return, Reader ribbon, and green rail tick share one target.
 
-The green place ribbon is separate (`readingPlaceSurah` /
-`readingPlaceAyah`). `ReaderFocusController` records its focused verse, but a
-reader visit snapshots the previously stored place once: the full green ribbon
-and green rail tick remain parked there instead of following live focus.
+A reader visit snapshots the stored last ayah once: the full green ribbon and
+green rail tick remain parked there instead of following bare scroll or focus.
 Pausing audio temporarily unfurls a thinner, passive green ribbon on the actual
 paused media verse and moves the rail tick with it; playing, buffering, ending,
 or leaving that chapter restores the visit snapshot. Green owns the screen-edge
@@ -394,7 +394,7 @@ That reservation is Reader-only; Home bookmark ribbons retain their original
 chapter-document position. Reader green is inset 4 dp farther toward the edge.
 Chapters observes the new stored place after the reader sheet covers it, and a
 tap on that marked chapter returns to its parked ayah. This makes silent
-reading mark a place without changing Continue Listening's audio semantics.
+reading leave the last-heard marker untouched.
 Once a return to Chapters commits and its outer ribbon lane nears the screen
 edge, that parked cloth unfurls into the row; an abandoned back swipe does not
 spend the reveal.
