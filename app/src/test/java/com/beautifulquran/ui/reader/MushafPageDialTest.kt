@@ -2,6 +2,7 @@ package com.beautifulquran.ui.reader
 
 import androidx.compose.ui.unit.dp
 import kotlin.math.abs
+import kotlin.math.roundToInt
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -20,6 +21,7 @@ class MushafPageDialTest {
             MushafDialRelease(page = 590, surahId = null),
             mushafDialRelease(
                 moved = false,
+                cancelled = false,
                 settledPage = 590,
                 selectedPage = 591,
                 selectedSurahId = 87,
@@ -29,9 +31,30 @@ class MushafPageDialTest {
             MushafDialRelease(page = 591, surahId = 87),
             mushafDialRelease(
                 moved = true,
+                cancelled = false,
                 settledPage = 591,
                 selectedPage = 591,
                 selectedSurahId = 87,
+            ),
+        )
+    }
+
+    @Test
+    fun `an upward pull cancels chapters but cannot spend two tiers at once`() {
+        val stray = 74f
+        assertTrue(mushafDialShouldCancelChapter(-stray - 1f, stray, false))
+        assertFalse(mushafDialShouldCancelChapter(stray + 1f, stray, false))
+        assertFalse(mushafDialShouldCancelChapter(-stray, stray, false))
+        assertFalse(mushafDialShouldCancelChapter(-stray - 1f, stray, true))
+
+        assertEquals(
+            MushafDialRelease(page = 590, surahId = null),
+            mushafDialRelease(
+                moved = true,
+                cancelled = true,
+                settledPage = 590,
+                selectedPage = 2,
+                selectedSurahId = 2,
             ),
         )
     }
@@ -49,6 +72,42 @@ class MushafPageDialTest {
         val book = 1..604
         assertEquals(1f, mushafDialTroughPage(1f, book), 1e-4f)
         assertEquals(604f, mushafDialTroughPage(0f, book), 1e-4f)
+    }
+
+    @Test
+    fun `return bubble stands on the old leaf seat and stays on glass`() {
+        val width = 1080f
+        val inset = 42f
+        val bubble = 132f
+        assertEquals(
+            width - bubble,
+            mushafDialReturnBubbleLeft(1, 604, width, inset, bubble),
+            1e-3f,
+        )
+        assertEquals(0f, mushafDialReturnBubbleLeft(604, 604, width, inset, bubble), 1e-3f)
+        assertEquals(
+            width / 2f - bubble / 2f,
+            mushafDialReturnBubbleLeft(302.5f.roundToInt(), 604, width, inset, bubble),
+            1f,
+        )
+        assertEquals(5_000L, MUSHAF_DIAL_RETURN_MS)
+    }
+
+    @Test
+    fun `return bubble hit target contains its seat without owning the whole dial`() {
+        val bubble = 132f
+        val left = mushafDialReturnBubbleLeft(267, 604, widthPx, insetPx, bubble)
+        assertTrue(mushafDialReturnBubbleHit(left + bubble / 2f, 267, 604, widthPx, insetPx, bubble))
+        assertFalse(mushafDialReturnBubbleHit(left - 1f, 267, 604, widthPx, insetPx, bubble))
+        assertFalse(mushafDialReturnBubbleHit(left + bubble + 1f, 267, 604, widthPx, insetPx, bubble))
+    }
+
+    @Test
+    fun `a tap wobble does not become a dial stroke`() {
+        val slop = 24f
+        assertFalse(mushafDialCommitsMovement(500f, 523f, slop))
+        assertTrue(mushafDialCommitsMovement(500f, 524f, slop))
+        assertTrue(mushafDialCommitsMovement(500f, 476f, slop))
     }
 
     @Test
@@ -686,6 +745,19 @@ class MushafPageDialTest {
         // Fast jump >1 is immediate (with 3 seats, gap 50 each, tested elsewhere)
         val seats3 = floatArrayOf(100f, 50f, 0f)
         assertEquals(2, mushafDialChapterAtHysteresis(seats3, 0f, 0, hyst))
+    }
+
+    @Test
+    fun `release wobble cannot choose a chapter the comb did not name`() {
+        val seats = floatArrayOf(100f, 0f)
+        val hyst = 4f
+        // Raw geometry crosses at 50, but the comb still names chapter 1
+        // until the hand decisively crosses its quiet boundary at 20.
+        assertEquals(1, mushafDialChapterAt(seats, 49f))
+        assertEquals(0, mushafDialStableChapterAt(seats, 49f, 0, hyst, false))
+        assertEquals(1, mushafDialStableChapterAt(seats, 19f, 0, hyst, false))
+        // End chapters remain reachable at the physical track walls.
+        assertEquals(1, mushafDialStableChapterAt(seats, 0f, 0, hyst, true))
     }
 
     @Test

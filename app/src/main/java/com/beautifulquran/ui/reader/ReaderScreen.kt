@@ -304,12 +304,16 @@ fun ReaderScreen(
     // last writer of the pager's position.
     var mushafSeekPage by remember { mutableStateOf<Int?>(null) }
     var mushafSeekSurahId by remember { mutableStateOf<Int?>(null) }
-    // Read as a lambda by the pager, so a hand landing on the rule fades the
-    // folio without recomposing 604 leaves' worth of reader around it.
+    // Separate physical contact from landing work: every hand fades the folio,
+    // but only a confirmed distant landing parks expensive neighbour leaves.
     val mushafScrubbing = remember { mutableStateOf(false) }
+    val mushafDialLanding = remember { mutableStateOf(false) }
     LaunchedEffect(mushafSeekPage) {
         val target = mushafSeekPage ?: return@LaunchedEffect
         val catalog = mushafCatalog ?: return@LaunchedEffect
+        // A dial release must move the book at once. MushafPage already loads
+        // a missing QCF face off the main thread; awaiting it here pins the
+        // old leaf under the released comb until that load finishes.
         mushafPagerState.scrollToPage((target - 1).coerceIn(0, catalog.pageCount - 1))
         mushafSeekPage = null
     }
@@ -2368,7 +2372,14 @@ fun ReaderScreen(
                         chapterLabel = mushafChapterLabel,
                         onSeekPage = { mushafSeekPage = it },
                         onSeekSurah = { mushafSeekSurahId = it },
+                        onWarmPage = { page ->
+                            mushafCatalog?.let { catalog ->
+                                val face = MushafQcfFonts.face(activityContext.applicationContext, page)
+                                warmMushafInkProfiles(catalog.page(page), face?.typeface)
+                            }
+                        },
                         onScrubbing = { mushafScrubbing.value = it },
+                        onLanding = { mushafDialLanding.value = it },
                         modifier = Modifier.weight(1f),
                         leafFooter = {
                             val catalog = mushafCatalog
@@ -2524,6 +2535,7 @@ fun ReaderScreen(
                         heldPage = mushafTappedPage,
                         onTappedLeaf = { mushafTappedPage = it },
                         scrubbing = { mushafScrubbing.value },
+                        parkNeighbours = { mushafDialLanding.value },
                         onUserTurnedPage = onMushafTurnedPage,
                         onWordClick = onMushafWordClick,
                         onWordLongClick = onMushafWordLongClick,
