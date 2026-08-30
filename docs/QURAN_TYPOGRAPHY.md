@@ -180,6 +180,32 @@ for exactly this reason (`surah_name`, `basmallah`, `ayah`).
 
 **We follow it.** The band and the basmalah are centred; ayah lines are flush.
 
+**And the panel is ruled to one line's ink, not to one line's slot.** A slot is
+a line's ink and the leading around it. Ruling the panel to the whole slot —
+0.94 of it, so three percent of air a side — left it hard against its
+neighbours: measured on the last leaf of the Qur'an, where three chapters open,
+the line above each panel closed to 10–16 px of air while the basmalah below
+stood at 23. Cramped, and visibly tighter on one side than the other.
+
+Ruled to the ink alone (`MushafPanelBand` = 0.72) the slot's own leading becomes
+the panel's air, half above and half below, equal by construction: 23–29 px
+above and 36 px below on the same leaf, and what is left is glyph slack — the
+line above may end on a descender or an ayah mark where the basmalah below does
+not. Against a token gap that slack was the whole difference; against a seventh
+of a line it is not something the eye picks out.
+
+The name comes down with the band (`MushafPanelType` = 0.95, under the page's
+own hand rather than the step above it the deeper band could carry), because the
+cartouche is a quarter shallower and a name set larger than its band stops
+fitting inside it.
+
+Nothing else moves. The slot is the same slot, so an opening still costs the
+grid one line and the hand is still the one hand of all 604 pages (§2); only the
+rules inside the slot come in. This is the same law the English leaf sets the
+same panel by — see §13.7, which rules its band to one line's *measured* ink and
+centres it in a box of that plus `EnglishLeafPanelAir` on each side. One panel,
+one grammar, whichever language the leaf is set in.
+
 ## 11. The basmalah is written in the page's own hand
 
 It is not body text and not a stand-in from another face: the QCF set carries it

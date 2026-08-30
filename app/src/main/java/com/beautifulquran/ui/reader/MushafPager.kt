@@ -452,6 +452,40 @@ private const val MushafNeighbourHoldDelayMs = 520L
  * Read from the grid rather than measured, so the running head and folio can
  * be sized before a page font has even loaded.
  */
+/**
+ * How deep the chapter's panel is ruled, as a share of the line slot it stands
+ * in — and so, by what is left over, how much air it keeps on each side.
+ *
+ * The panel is a plate set into the page, not another line of it, and it was
+ * ruled at 0.94 of its slot: three percent of air a side, which is none. On the
+ * last leaf of the Qur'an, where three chapters open, the line above each panel
+ * closed to 10-16px of it while the basmalah below stood at 23 — cramped, and
+ * visibly unequal.
+ *
+ * A slot is a line's ink and the leading around it. Ruling the panel to the ink
+ * alone leaves that leading as the panel's own air, half above and half below,
+ * equal by construction and about a seventh of a line each way. It is the same
+ * law the English leaf sets its ʿunwān by, which rules its band to one line's
+ * measured ink and centres it in a box of that plus air
+ * (`EnglishLeafPanelAir`) — one panel, one grammar, whichever language the leaf
+ * is set in.
+ *
+ * Nothing else moves. The slot is the same slot, so the leaf still spends one
+ * line of its grid on an opening and the hand is still the one hand of all 604
+ * pages; only the rules inside the slot come in.
+ */
+private const val MushafPanelBand = 0.72f
+
+/**
+ * The chapter's name inside the panel, against the page's own hand.
+ *
+ * It stood a step above the page at 1.08, which the old band was deep enough to
+ * carry. Ruled to the ink the cartouche is a quarter shallower, and a name set
+ * larger than the band stops fitting inside it. Under the hand rather than over
+ * it, as the English leaf sets the same panel.
+ */
+private const val MushafPanelType = 0.95f
+
 @Composable
 private fun leafGlyphSize(unit: Dp): TextUnit = with(LocalDensity.current) {
     (unit.toPx() / MUSHAF_LINE_PITCH_EM).toSp()
@@ -1371,10 +1405,8 @@ private fun MushafPageSheet(
                             ) {
                                 MushafSurahTitleBand(
                                     surah = surahsById[start.surahId],
-                                    fontSize = fontSp * 1.08f,
-                                    // Air above and below: the panel is a plate
-                                    // set into the page, not another line of it.
-                                    bandHeight = lineSlot * 0.94f,
+                                    fontSize = fontSp * MushafPanelType,
+                                    bandHeight = lineSlot * MushafPanelBand,
                                 )
                             }
                             if (surahOpensWithBasmalahPreface(start.surahId)) {
