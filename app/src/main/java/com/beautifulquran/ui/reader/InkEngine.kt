@@ -671,6 +671,31 @@ object InkEngine {
     fun prefaceFeather(): Float = minOf(tuning.washFeather, BasmalahWash.MAX_FEATHER)
 
     /**
+     * The preface wash for a rendering with no Arabic letters under it — the
+     * English leaf's display line ([BasmalahWash.plainProgress]).
+     *
+     * Same voice, same row, same settle; only the two claims about Arabic
+     * letterforms are dropped. There is no tajweed [prefaceHold] here for the
+     * same reason the English verses take [InkMotion.plainSweepProgress]: the
+     * curve says where inside a *word* the time goes, and a line of English
+     * prose has no letter the reciter is sustaining.
+     */
+    fun prefaceProseWashProgress(
+        positionMs: Long,
+        durationMs: Long,
+        segments: List<Segment>? = null,
+    ): Float {
+        segments
+            ?.let { BasmalahWash.plainProgress(positionMs, it, durationMs) }
+            ?.let { return it }
+        return prefaceRampProgress(positionMs, durationMs)
+    }
+
+    /** [prefaceFeather] for that prose line's even word bands. */
+    fun prefaceProseFeather(): Float =
+        minOf(tuning.washFeather, BasmalahWash.PLAIN_MAX_FEATHER)
+
+    /**
      * Tajweed pacing for the preface words, or null when Ink Lab has pacing
      * off. The closer's dwell is over half the clip and lands on one glyph, so
      * the preface parks it on the madd the stop lengthens

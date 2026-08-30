@@ -2581,6 +2581,7 @@ fun ReaderScreen(
                         catalog = mushafReady.catalog,
                         content = content,
                         basmalahWash = viewModel.basmalahWashProgress,
+                        proseBasmalahWash = viewModel.englishBasmalahWashProgress,
                         surahsById = mushafReady.surahsById,
                         pagerState = mushafPagerState,
                         activeWordState = activeWordState,

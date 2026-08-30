@@ -494,6 +494,31 @@ behind the voice, plus the letter sweep of the word on it
 is. Verses still to come wait under the same recess as the Arabic leaf's; verses
 already read hold their ink; the packs are the very same `AyahInkPack`.
 
+**But it reads the plain clock out of them, not the paced one.** The word's own
+share comes from `InkMotion.plainSweepProgress` — linear across the word's
+karaoke hold — and never from `sweepProgress`, which carries the two corrections
+that make the Arabic wash right and the English one wrong: the tajweed letter
+map (`TajweedPacing.Curve`) and the wasl carry-in. Both are statements about
+where inside an Arabic *word* the time is going. A word holding a madd spends
+about half its dwell parked on one letter (`Hold.waqfShare` is 0.55, `creep`
+0.08), and mid-ayah words run ~1 s: drawn on English prose that is half a second
+of a sentence frozen where nobody is holding anything, then a sprint to catch
+up, which is exactly what "the ink is behind the voice" looks like. The
+scrolling reader's English mode refuses the same curve at the source
+(`rememberInkMotions(pacing = null)`); the mushaf cannot, because one pack draws
+both leaves — so the correction is refused at the *reader*, which is why the
+plain clock exists.
+
+The chapter-opening basmalah takes the same rule twice over
+(`BasmalahWash.plainProgress`). Its calligraphy wash is doubly Arabic: tajweed
+inside each word, and word *bands* measured off the artwork, where the kashida
+gives بِسۡمِ over half the width for a half-second syllable. Laid over "In the
+name of Allah, the Entirely Merciful, the Especially Merciful" that inks past
+the middle of the line while the voice is still on the first word. The prose
+line gets even quarters — one per word — crossed linearly, and its own feather
+cap (`BasmalahWash.PLAIN_MAX_FEATHER`) so the last quarter stays untouched until
+its turn.
+
 **A tap reads the same way, in reverse.** There is no word to aim at, but a tap
 still says *where* in the sentence, so the reciter is sent to the same share of
 the verse (`englishSeekWordPosition`). It is approximate — the Arabic order is

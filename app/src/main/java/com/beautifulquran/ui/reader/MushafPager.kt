@@ -607,6 +607,9 @@ internal fun MushafPager(
     content: SurahContent,
     /** The chapter-opening basmalah's reveal, 0..1, or null when it is idle. */
     basmalahWash: StateFlow<Float?>,
+    /** The same reveal for the English leaf's prose line, which carries no
+     * Arabic letterforms: even word bands, no tajweed pacing. */
+    proseBasmalahWash: StateFlow<Float?>,
     surahsById: Map<Int, Surah>,
     pagerState: PagerState,
     activeWordState: State<ActiveWord?>,
@@ -1228,7 +1231,7 @@ internal fun MushafPager(
                             page = page,
                             leafText = leafText,
                             content = content,
-                            basmalahWash = basmalahWash,
+                            basmalahWash = proseBasmalahWash,
                             surahsById = surahsById,
                             liveInk = liveInk,
                             pageOwnsVoice = pageOwnsVoice,

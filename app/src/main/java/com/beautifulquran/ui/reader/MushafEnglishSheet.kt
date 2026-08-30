@@ -895,6 +895,14 @@ private const val EnglishWashFeatherFloor = 0.06f
  * Read off the active word's *index* rather than by counting what is behind it,
  * so the wash cannot run backwards on a frame where a word ahead of the voice
  * has not yet settled into its state.
+ *
+ * The word's own share is taken from [InkMotion.plainSweepProgress] — the
+ * linear clock — and never from the tajweed-paced one. Pacing says where
+ * inside an Arabic *word* the time is going, which is a true and useful thing
+ * to draw on Arabic letters and a false one to draw on English prose: it parks
+ * the sentence's wash for as long as the reciter sustains a madd (a closing
+ * word is held ~3 s), then sprints it. The scrolling reader's English mode
+ * refuses the same curve for the same reason.
  */
 internal fun englishVerseReadProgress(motions: List<InkMotion>): Float {
     if (motions.isEmpty()) return 1f
@@ -905,7 +913,7 @@ internal fun englishVerseReadProgress(motions: List<InkMotion>): Float {
         val waiting = motions.count { it.ink.state == InkEngine.State.Upcoming }
         return if (waiting == motions.size) 0f else 1f
     }
-    val sweep = motions[active].sweepProgress.coerceIn(0f, 1f)
+    val sweep = motions[active].plainSweepProgress.coerceIn(0f, 1f)
     return ((active + sweep) / motions.size).coerceIn(0f, 1f)
 }
 
@@ -964,7 +972,10 @@ private fun EnglishBasmalahLine(
                             // read left to right.
                             rtl = false,
                             restingAlpha = InkEngine.State.Upcoming.inkAlpha(),
-                            feather = InkEngine.prefaceFeather(),
+                            // The prose line's own cap: its four words own even
+                            // quarters of the sentence, not the bands their
+                            // glyphs cover in the calligraphy.
+                            feather = InkEngine.prefaceProseFeather(),
                         )
                     } else {
                         Modifier.graphicsLayer { alpha = lyricInk }

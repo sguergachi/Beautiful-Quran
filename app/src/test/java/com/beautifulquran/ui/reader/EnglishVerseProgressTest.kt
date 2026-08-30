@@ -64,6 +64,18 @@ class EnglishVerseProgressTest {
     fun `a verse with no clock of its own is left at full ink`() {
         assertEquals(1f, englishVerseReadProgress(emptyList()), 0f)
     }
+
+    @Test
+    fun `the sentence is washed by the plain clock, not the tajweed-paced one`() {
+        // A word whose letter map has parked the Arabic wash at a tenth while
+        // half the word's hold has gone (a madd being sustained). The English
+        // sentence has no letter being held, so it takes the half.
+        val motions = listOf(
+            motion(InkEngine.State.Recited),
+            motion(InkEngine.State.Active, sweep = 0.1f, plainSweep = 0.5f),
+        )
+        assertEquals(0.75f, englishVerseReadProgress(motions), 0.0001f)
+    }
 }
 
 private fun verse(
@@ -84,13 +96,18 @@ private fun verse(
     return words
 }
 
-private fun motion(state: InkEngine.State, sweep: Float = 0f) = InkMotion(
+private fun motion(
+    state: InkEngine.State,
+    sweep: Float = 0f,
+    plainSweep: Float = sweep,
+) = InkMotion(
     ink = InkEngine.Word(state = state, repeat = false),
     lyricInk = mutableStateOf(state.inkAlpha()),
     sweep = LetterSweep(
         progress = mutableStateOf(sweep),
         feather = mutableStateOf(null),
         pacing = mutableStateOf(null),
+        plainProgress = mutableStateOf(plainSweep),
     ),
     repeatWash = RepeatWash(
         progress = mutableStateOf(1f),

@@ -604,11 +604,20 @@ private fun Modifier.repeatInkLayer(
  * is non-null only while a tajweed-paced activation (or its residual) is
  * running, so handoff does not widen/narrow the edge mid-wash. [pacing] lets
  * the glint layer know this word carries a hold worth resonating with.
+ *
+ * [plainProgress] is the same clock with neither the tajweed letter map nor
+ * the wasl carry-in applied: linear across the word's karaoke hold. Both are
+ * true statements about the word, but only the first is a statement about its
+ * *letters* — so a renderer that is not drawing Arabic letters must read the
+ * plain one. See [InkMotion.plainSweepProgress].
  */
 internal class LetterSweep(
     val progress: State<Float>,
     val feather: State<Float?>,
     val pacing: State<TajweedPacing.Curve?>,
+    /** Defaults to [progress]: with no pacing curve and no wasl prefix, the
+     * two are the same number. */
+    val plainProgress: State<Float> = progress,
 )
 
 internal enum class SweepEntryAction { Arm, Keep, Clear }
@@ -902,11 +911,16 @@ private fun rememberLetterSweep(
             continuedSweepProgress(raw, revealStartState.value)
         }
     }
-    return remember(progress) {
+    // The unmapped clock, for renderers with no Arabic letters under the wash.
+    val plainProgress = remember {
+        derivedStateOf { if (!applied.value) 0f else sweep.value }
+    }
+    return remember(progress, plainProgress) {
         LetterSweep(
             progress = progress,
             feather = lockedFeather,
             pacing = lockedPacing,
+            plainProgress = plainProgress,
         )
     }
 }
@@ -1084,6 +1098,23 @@ internal class InkMotion(
 
     /** Already continued through wasl revealStart inside [rememberLetterSweep]. */
     val sweepProgress: Float get() = sweep.progress.value
+
+    /**
+     * The same wash clock, linear across the word's karaoke hold: no tajweed
+     * letter map, no wasl carry-in.
+     *
+     * [sweepProgress] answers "where inside this Arabic word is the voice",
+     * and the two Arabic-letter corrections are what make that answer right.
+     * A renderer with no Arabic letters under its wash — the English leaf,
+     * which crosses a sentence of prose — is asking a different question:
+     * "how much of this word's time has gone". Feeding it the letter map
+     * parks the English wash wherever the reciter is sustaining a madd, and
+     * then races it to catch up, which reads as ink out of time with the
+     * voice. The scrolling reader's English mode already drops both
+     * corrections at the source (`rememberInkMotions(pacing = null)`); the
+     * mushaf cannot, because the same pack draws the Arabic leaf.
+     */
+    val plainSweepProgress: Float get() = sweep.plainProgress.value
     val sweepFeather: Float?
         get() = sweep.feather.value
     val lyricAlpha: Float get() = lyricInk.value

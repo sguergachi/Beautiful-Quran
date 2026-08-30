@@ -114,6 +114,14 @@ internal fun resolveActiveWord(
     }
 }
 
+/**
+ * One tick of the basmalah lead-in's wash, read for both renderings of it: the
+ * Naskh calligraphy and the English leaf's prose line. They differ only in the
+ * two claims about Arabic letterforms — artwork word bands and tajweed pacing —
+ * which the prose line has no letters to carry.
+ */
+private data class BasmalahInk(val calligraphy: Float, val prose: Float)
+
 /** Reuses the immutable UI snapshot while the 33 ms poll stays in one word. */
 internal class ActiveWordPollCache {
     private var info: HighlightEngine.ActiveInfo? = null
@@ -525,29 +533,52 @@ class ReaderViewModel(
     }
 
     /**
+     * The basmalah lead-in's wash, sampled once for both the renderings that
+     * want it. Two flows off one poll: the position is read on the ear clock,
+     * and reading it twice per tick would be two different moments.
+     */
+    private val basmalahInk: StateFlow<BasmalahInk?> =
+        pollingWhileLoaded(key = { it.ayah }) { ayah ->
+            if (ayah != BASMALAH_PLAYLIST_AYAH) return@pollingWhileLoaded null
+            val timed = timings[BASMALAH_PLAYLIST_AYAH]
+            // The real media duration once known: it is both the fallback ramp's
+            // span and the ceiling the paced wash is fitted inside (a source row
+            // that overruns its own MP3 must still finish). Until then the timing
+            // span, so the wash still advances on the first ticks.
+            val duration = player.durationMs
+            val endMs = when {
+                duration > 0L -> duration
+                timed != null -> timed.last().endMs
+                else -> 0L
+            }
+            // The pure ear clock: this consumer must not arm the ink clock's
+            // "accept next sample" latch on the ink poll's behalf.
+            val heardMs = heardPositionMs()
+            BasmalahInk(
+                calligraphy = InkEngine.prefaceWashProgress(heardMs, endMs, timed),
+                prose = InkEngine.prefaceProseWashProgress(heardMs, endMs, timed),
+            )
+        }
+
+    /**
      * Calligraphy wash 0..1 while the basmalah lead-in plays: locked to the
      * clip's own word timings and paced by tajweed inside each word's band of
      * artwork, falling back to a plain clip ramp when those timings are missing
      * (see [InkEngine.prefaceWashProgress] /
      * [com.beautifulquran.domain.BasmalahWash]). Null when not on the lead-in.
      */
-    val basmalahWashProgress: StateFlow<Float?> = pollingWhileLoaded(key = { it.ayah }) { ayah ->
-        if (ayah != BASMALAH_PLAYLIST_AYAH) return@pollingWhileLoaded null
-        val timed = timings[BASMALAH_PLAYLIST_AYAH]
-        // The real media duration once known: it is both the fallback ramp's
-        // span and the ceiling the paced wash is fitted inside (a source row
-        // that overruns its own MP3 must still finish). Until then the timing
-        // span, so the wash still advances on the first ticks.
-        val duration = player.durationMs
-        val endMs = when {
-            duration > 0L -> duration
-            timed != null -> timed.last().endMs
-            else -> 0L
-        }
-        // The pure ear clock: this consumer must not arm the ink clock's
-        // "accept next sample" latch on the ink poll's behalf.
-        InkEngine.prefaceWashProgress(heardPositionMs(), endMs, timed)
-    }
+    val basmalahWashProgress: StateFlow<Float?> = basmalahInk
+        .map { it?.calligraphy }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(1_000), null)
+
+    /**
+     * The same wash for the English leaf's display line, which has no Arabic
+     * letterforms under it: even word bands, no tajweed
+     * ([InkEngine.prefaceProseWashProgress]).
+     */
+    val englishBasmalahWashProgress: StateFlow<Float?> = basmalahInk
+        .map { it?.prose }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(1_000), null)
 
     /** Advances the lit ayah to the next one during the final
      * [InkEngine.fadeLeadMs] of the current ayah's *recitation*, so its fade-in

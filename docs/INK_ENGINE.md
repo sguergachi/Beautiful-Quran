@@ -571,6 +571,16 @@ rather than forcing its opening letter complete at handoff — see
 `rememberLetterSweep` (not at each draw site) so residual and glint share one
 latched edge.
 
+**The plain clock.** Both the tajweed map and the wasl continuation are claims
+about where inside an Arabic *word* the time is going, so `LetterSweep` also
+publishes `plainProgress` — the same Animatable with neither applied — surfaced
+as `InkMotion.plainSweepProgress`. A renderer with no Arabic letters under its
+wash must read that one: the mushaf's English leaf crosses a sentence of prose
+(`englishVerseReadProgress`), and the paced value parks that sentence wherever
+the reciter sustains a madd. The scrolling reader's English mode gets the same
+result at the source, by passing `pacing = null` to `rememberInkMotions`; the
+mushaf cannot, because one `AyahInkPack` draws both leaves.
+
 **Short wasl donors** (`مَن يَشْرِى`, `مِن رَّبِّكُم`, …) need a **speed
 ceiling** on that early bloom so the next opening does not race: details and
 constants in
