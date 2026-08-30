@@ -6,6 +6,7 @@ import com.beautifulquran.domain.MushafSourceWord
 import com.beautifulquran.domain.buildEnglishBook
 import com.beautifulquran.domain.buildMushafCatalog
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -57,6 +58,84 @@ class MushafBookLengthTest {
         assertTrue(late >= opening)
     }
 
+    // A page whose second verse is too long to finish on the leaf, so the book
+    // carries it over and there is a cut to lead the turn from.
+    private val carriedBook = buildEnglishBook(
+        buildMushafCatalog(listOf(source(2, 2, page = 3), source(2, 3, page = 3))),
+    ) { _, a -> if (a == 2) ENGLISH_LEAF_CAPACITY_CHARS / 2 else ENGLISH_LEAF_CAPACITY_CHARS }
+
+    @Test
+    fun `the turn is led from the last word before the book's cut`() {
+        // A page turned exactly when the first word overleaf is spoken is
+        // late, so the turn starts inside the word before it. On the English
+        // leaf that word is the one before the carry cut, which is the only
+        // place the leaf really stops mid-sentence.
+        val words = 10
+        val page = 3
+        val here = mushafLeafNumber(carriedBook, 2, 3, page, through = 0f)
+        val cutWord = (1..words).first {
+            mushafLeafNumber(carriedBook, 2, 3, page, through = it.toFloat() / words) > here
+        }
+        // On the word before the cut the rule leads onto the next leaf.
+        assertEquals(
+            here + 1,
+            mushafLeadCarriedTurn(
+                book = carriedBook,
+                surahId = 2,
+                ayah = 3,
+                onPage = page,
+                word = activeWord(cutWord),
+                words = words,
+                leafNow = here,
+            ),
+        )
+        // Anywhere earlier there is no turn to lead.
+        (1 until cutWord).forEach { earlier ->
+            assertNull(
+                "word $earlier led a turn",
+                mushafLeadCarriedTurn(
+                    book = carriedBook,
+                    surahId = 2,
+                    ayah = 3,
+                    onPage = page,
+                    word = activeWord(earlier),
+                    words = words,
+                    leafNow = here,
+                ),
+            )
+        }
+    }
+
+    @Test
+    fun `a verse set whole never leads a turn`() {
+        assertNull(
+            mushafLeadCarriedTurn(
+                book = carriedBook,
+                surahId = 2,
+                ayah = 2,
+                onPage = 3,
+                word = activeWord(5),
+                words = 10,
+                leafNow = mushafLeafNumber(carriedBook, 2, 2, 3),
+            ),
+        )
+    }
+
+    @Test
+    fun `nothing is led on the Arabic leaf, which has no cuts of its own`() {
+        assertNull(
+            mushafLeadCarriedTurn(
+                book = null,
+                surahId = 2,
+                ayah = 1,
+                onPage = 3,
+                word = activeWord(1),
+                words = 10,
+                leafNow = 3,
+            ),
+        )
+    }
+
     @Test
     fun `every leaf the reader can be sent to lands on the rule`() {
         val length = mushafBookLength(book, catalog.pageCount)
@@ -80,6 +159,12 @@ class MushafBookLengthTest {
         assertTrue(reached.max() <= length)
     }
 }
+
+private fun activeWord(position: Int) = ActiveWord(
+    ayah = 1,
+    wordPosition = position,
+    durationMs = 500L,
+)
 
 private fun source(surahId: Int, ayah: Int, page: Int) = MushafSourceWord(
     surahId = surahId,

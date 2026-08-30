@@ -384,6 +384,17 @@ It also retires the one leaf the book could not set: 2:282 is 1,333 characters
 and now runs across two leaves at the book's own hand and leading, instead of
 alone on one with the leading closed to fit it.
 
+**The turn onto the second half is led, like any other.** A page turned exactly
+when the first word overleaf is spoken is always late — the reader is still
+looking at the word being said, and the paper only starts moving once the voice
+has left. So the turn begins inside the word *before* the cut, `MushafTurnLeadMs`
+= 500 ms early, which is the same lead the Arabic leaf takes at a page boundary.
+The English leaf could not take that lead before: its last printed word is
+usually mid-sentence, because a verse straddling the Arabic break is set whole,
+and leading on it would turn the paper away from the sentence being read. The
+book's own cut is the opposite case — the leaf really does stop mid-sentence
+there — so it is exactly where the lead belongs. See `mushafLeadCarriedTurn`.
+
 **A carried verse is on two leaves, and the reciter is on one of them.** The ink
 and the page turn ask which leaf the voice is on, and answering "the leaf the
 verse began on" left the leaf holding the tail recessed and silent for as long

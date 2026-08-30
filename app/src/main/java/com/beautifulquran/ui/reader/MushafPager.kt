@@ -289,6 +289,41 @@ internal fun mushafVerseThrough(word: ActiveWord?, wordCount: Int): Float {
     return ((word.wordPosition - 1).toFloat() / wordCount).coerceIn(0f, 1f)
 }
 
+/**
+ * The leaf to lead onto when the reciter is on the last word before the book's
+ * own cut, or null when no cut is coming with this word.
+ *
+ * A page turned exactly when the first word overleaf is spoken is always late
+ * ([MushafTurnLeadMs]). On the English leaf that lead has nowhere to stand at an
+ * Arabic page boundary, because the leaf sets a straddling verse whole and its
+ * last printed word is mid-sentence. At a carry cut it is the other way round:
+ * the sentence really does break there, so the word before the cut is the last
+ * word on the paper and the lead belongs to it.
+ *
+ * Answers the leaf the *next* word falls on, and only when that is further on
+ * than the one the reader is holding.
+ */
+internal fun mushafLeadCarriedTurn(
+    book: EnglishBook?,
+    surahId: Int,
+    ayah: Int?,
+    onPage: Int,
+    word: ActiveWord?,
+    words: Int,
+    leafNow: Int,
+): Int? {
+    if (book == null || ayah == null || word == null || words <= 0) return null
+    val next = mushafLeafNumber(
+        book = book,
+        surahId = surahId,
+        ayah = ayah,
+        page = onPage,
+        // Where the voice will be one word from now.
+        through = (word.wordPosition.toFloat() / words).coerceIn(0f, 1f),
+    )
+    return next.takeIf { it > leafNow }
+}
+
 /** How many words a verse of the loaded chapter has, or 0 if it is not loaded. */
 private fun SurahContent.wordsIn(ayah: Int?): Int =
     ayahs.firstOrNull { it.number == ayah }?.words?.size ?: 0
@@ -759,14 +794,50 @@ internal fun MushafPager(
                 // then arrives to a page that is already there, and this
                 // collector finds nothing left to do.
                 //
-                // Not on the English leaf. The lead is measured from the last
-                // *word* printed on the page, and that word is very often in
-                // the middle of a sentence this leaf has set whole (see
-                // MushafCatalog.readingPageOf) — leading on it would turn the
-                // paper away from the sentence being read. There the ordinary
-                // follow moves the leaf when the voice reaches a verse the next
-                // page opens with, which is a sentence end by construction.
-                if (word == null || english) return@collect
+                // On the English leaf the lead is taken at the book's own cut
+                // rather than at the Arabic page's last word. That word is very
+                // often in the middle of a sentence the leaf has set whole (see
+                // MushafCatalog.readingPageOf) and leading on it would turn the
+                // paper away from the sentence being read. The cut is the
+                // opposite case: the leaf really does stop mid-sentence there
+                // and the rest is printed overleaf, so it is exactly where a
+                // reader turning for someone else would start to move.
+                if (word == null) return@collect
+                if (english) {
+                    val lead = mushafLeadCarriedTurn(
+                        book = book,
+                        surahId = loadedSurahId,
+                        ayah = followAyah,
+                        onPage = onPage,
+                        word = word,
+                        words = contentNow.value.wordsIn(followAyah),
+                        leafNow = page,
+                    ) ?: return@collect
+                    val leadIndex = (lead - 1).coerceIn(0, pagerState.pageCount - 1)
+                    // Cover the incoming leaf before the paper moves, so the
+                    // turn reveals Upcoming paper rather than a finished page.
+                    waitingPage = lead
+                    delay(mushafTurnLeadDelayMs(word.durationMs, speedNow.value))
+                    // Paused, seeked, or turned by hand while the word was
+                    // still being said: the leaf is no longer ours to move.
+                    val voiceStill = playback.value
+                    if (!voiceStill.playingHere || !voiceStill.isPlaying ||
+                        !mushafSameActivation(word, activeWordState.value)
+                    ) {
+                        waitingPage = 0
+                        return@collect
+                    }
+                    if (pagerState.currentPage != index || pagerState.isScrollInProgress) {
+                        waitingPage = 0
+                        return@collect
+                    }
+                    followPage = leadIndex
+                    pagerState.animateScrollToPage(
+                        leadIndex,
+                        animationSpec = MushafFollowTurnSpec,
+                    )
+                    return@collect
+                }
                 val next = index + 1
                 if (next > catalog.pageCount - 1) return@collect
                 val tail = catalog.page(page)
