@@ -95,6 +95,7 @@ import com.beautifulquran.domain.mushafLineSlotPx
 import com.beautifulquran.domain.qcfTrailingMark
 import com.beautifulquran.domain.qcfWordGlyphs
 import com.beautifulquran.domain.EnglishBook
+import com.beautifulquran.domain.EnglishVerseAlignments
 import com.beautifulquran.domain.englishLeafVerseKeys
 import com.beautifulquran.domain.quranWordKey
 import com.beautifulquran.domain.reflowMushafPage
@@ -283,10 +284,23 @@ internal fun mushafLeafNumber(
 /**
  * How far through its verse the reciter's word stands, as a fraction — what
  * [mushafLeafNumber] needs to tell one half of a carried verse from the other.
+ *
+ * The book cut the verse at a *character*, so the fraction has to be in the
+ * same units the wash is: [wordEnds] is where this word's English begins
+ * (`EnglishWordAlignment`), and without one the words divide the sentence
+ * evenly. Reading the cut with a different map than the ink would turn the page
+ * while the wash was still visibly on the leaf behind it.
  */
-internal fun mushafVerseThrough(word: ActiveWord?, wordCount: Int): Float {
+internal fun mushafVerseThrough(
+    word: ActiveWord?,
+    wordCount: Int,
+    wordEnds: FloatArray? = null,
+): Float {
     if (word == null || wordCount <= 0) return 0f
-    return ((word.wordPosition - 1).toFloat() / wordCount).coerceIn(0f, 1f)
+    val index = (word.wordPosition - 1).coerceIn(0, wordCount - 1)
+    val ends = wordEnds?.takeIf { it.size == wordCount }
+        ?: return (index.toFloat() / wordCount).coerceIn(0f, 1f)
+    return if (index == 0) 0f else ends[index - 1].coerceIn(0f, 1f)
 }
 
 /**
@@ -311,15 +325,20 @@ internal fun mushafLeadCarriedTurn(
     word: ActiveWord?,
     words: Int,
     leafNow: Int,
+    wordEnds: FloatArray? = null,
 ): Int? {
     if (book == null || ayah == null || word == null || words <= 0) return null
+    val index = (word.wordPosition - 1).coerceIn(0, words - 1)
+    val ends = wordEnds?.takeIf { it.size == words }
     val next = mushafLeafNumber(
         book = book,
         surahId = surahId,
         ayah = ayah,
         page = onPage,
-        // Where the voice will be one word from now.
-        through = (word.wordPosition.toFloat() / words).coerceIn(0f, 1f),
+        // Where the voice will be one word from now — in the same units the
+        // wash reads, so the lead fires exactly at the cut.
+        through = ends?.get(index)?.coerceIn(0f, 1f)
+            ?: (word.wordPosition.toFloat() / words).coerceIn(0f, 1f),
     )
     return next.takeIf { it > leafNow }
 }
@@ -684,6 +703,12 @@ internal fun MushafPager(
     // how long a verse is without either restarting when the chapter's text
     // arrives.
     val contentNow = rememberUpdatedState(content)
+    // Where each Arabic word lands in its English, solved per verse on first
+    // ask and kept. The English leaf's wash, the leaf a carried verse's voice
+    // is on, and the lead onto the book's own cut all read the same map — if
+    // they disagreed, the page would turn away from ink still running.
+    val alignments = remember(content) { EnglishVerseAlignments(content) }
+    val alignmentsNow = rememberUpdatedState(alignments)
     val heldPageNow = rememberUpdatedState(heldPage)
     // heldPage is read, not keyed: keying it restarted this collector on
     // every tap and cancelled in-flight work. The hold is checked per tick.
@@ -732,6 +757,7 @@ internal fun MushafPager(
                     through = mushafVerseThrough(
                         word,
                         contentNow.value.wordsIn(followAyah),
+                        if (english) alignmentsNow.value.of(followAyah) else null,
                     ),
                 )
                 // Still hearing the word from before the tap, or sitting on the
@@ -821,6 +847,7 @@ internal fun MushafPager(
                         word = word,
                         words = contentNow.value.wordsIn(followAyah),
                         leafNow = page,
+                        wordEnds = alignmentsNow.value.of(followAyah),
                     ) ?: return@collect
                     val leadIndex = (lead - 1).coerceIn(0, pagerState.pageCount - 1)
                     // Cover the incoming leaf before the paper moves, so the
@@ -985,7 +1012,11 @@ internal fun MushafPager(
                 surahId = loadedSurahId,
                 ayah = ayah,
                 page = page,
-                through = mushafVerseThrough(word, contentNow.value.wordsIn(ayah)),
+                through = mushafVerseThrough(
+                    word,
+                    contentNow.value.wordsIn(ayah),
+                    if (english) alignments.of(ayah) else null,
+                ),
             )
         }
     }
@@ -1023,7 +1054,11 @@ internal fun MushafPager(
                         surahId = loadedSurahId,
                         ayah = word.ayah,
                         page = page,
-                        through = mushafVerseThrough(word, contentNow.value.wordsIn(word.ayah)),
+                        through = mushafVerseThrough(
+                            word,
+                            contentNow.value.wordsIn(word.ayah),
+                            if (english) alignments.of(word.ayah) else null,
+                        ),
                     ) == pageIndex + 1
                 }
             }
@@ -1247,6 +1282,7 @@ internal fun MushafPager(
                             foreEdge = foreEdge,
                             leafRuns = leafRuns,
                             leafTokens = leafTokens,
+                            alignments = alignments,
                             onVerseSeek = leafVerseSeek,
                             onBasmalahClick = leafBasmalahClick,
                             modifier = wellModifier,

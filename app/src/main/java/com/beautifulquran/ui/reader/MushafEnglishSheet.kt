@@ -60,6 +60,7 @@ import com.beautifulquran.domain.englishLeafReferenceBlock
 import com.beautifulquran.domain.EnglishLeaf
 import com.beautifulquran.domain.EnglishLeafBlock
 import com.beautifulquran.domain.EnglishVerseRun
+import com.beautifulquran.domain.EnglishVerseAlignments
 import com.beautifulquran.domain.MushafPage
 import com.beautifulquran.domain.MushafToken
 import com.beautifulquran.domain.englishLeaf
@@ -89,12 +90,13 @@ import kotlinx.coroutines.flow.StateFlow
  * one hand is fitted and how each page fills its well.
  *
  * The ink is the same ink, driven from the very same [AyahInkPack] the Arabic
- * leaf and the scrolling reader are driven from ([MushafPageInkClocks]) — what
- * differs is only what it can honestly say. The reciter's timings name Arabic
- * words and this page has none, so the wash is not per word here: it crosses
- * the sentence of the verse being recited at the fraction of that verse the
- * voice has actually reached ([englishVerseReadProgress]). Verses still to come
- * wait under the same recess; verses already read hold their ink.
+ * leaf and the scrolling reader are driven from ([MushafPageInkClocks]). The
+ * reciter's timings name Arabic words and this page prints none of them, so the
+ * wash crosses the sentence — but it crosses it on the map
+ * `EnglishWordAlignment` builds from the word glosses, so the ink is on the
+ * English of the word being said, not on the same fraction of the characters
+ * ([englishVerseReadProgress]). Verses still to come wait under the same
+ * recess; verses already read hold their ink.
  *
  * For the same reason the leaf carries no orange repeat and no wet-ink glint:
  * both are statements about one Arabic word — that the reciter went back over
@@ -131,9 +133,15 @@ internal fun MushafEnglishSheet(
      */
     leafTokens: Map<Pair<Int, Int>, MushafToken>,
     /**
-     * Play from a share of a verse. The leaf has no word-level alignment, so a
-     * tap says which verse and how far into it; the reader resolves that to a
-     * word (`englishSeekWordPosition`).
+     * Where each Arabic word of a verse lands in its English — the map the wash
+     * crosses the sentence on. Shared with the pager so the leaf a carried
+     * verse's voice is on is read the same way the ink is.
+     */
+    alignments: EnglishVerseAlignments,
+    /**
+     * Play from a share of a verse. A tap says which verse and how far into it;
+     * the reader turns that back into a word through the same alignment
+     * (`englishSeekWordPosition`).
      */
     onVerseSeek: (surahId: Int, ayah: Int, through: Float) -> Unit,
     onBasmalahClick: (Int) -> Unit,
@@ -187,6 +195,15 @@ internal fun MushafEnglishSheet(
             text[quranWordKey(surahId, ayah, 1)].orEmpty()
         }
     }
+    // The alignment for every verse this leaf sets, gathered once: the wash
+    // reads it every frame, and the shared memo solves each verse only once.
+    val leafWordEnds = remember(ayahsOnPage, alignments) {
+        buildMap {
+            ayahsOnPage.forEach { ayah ->
+                alignments.of(ayah.number)?.let { put(ayah.surahId to ayah.number, it) }
+            }
+        }
+    }
     // The leaf comes up on the same short fade the Arabic one uses while its
     // page face loads: a page settling into the light rather than text
     // appearing on paper that was already there.
@@ -215,10 +232,12 @@ internal fun MushafEnglishSheet(
             gold,
             verseNumberScript,
             leafTokens,
+            leafWordEnds,
         ) {
             englishLeafBlockTexts(
                 leaf,
                 leafTokens,
+                leafWordEnds,
                 palette.fullInkColor,
                 gold,
                 verseNumberScript,
@@ -427,6 +446,12 @@ internal data class EnglishProseVerse(
      * at — what a tap seeks by. Identity-ish for a verse set whole.
      */
     val verseFractionAt: (Int) -> Float = { 0f },
+    /**
+     * Where each Arabic word of the verse ends inside the *whole* translation,
+     * as a share of it (`EnglishWordAlignment`). Null when the verse could not
+     * be aligned, and the wash divides the sentence evenly instead.
+     */
+    val wordEnds: FloatArray? = null,
 )
 
 /**
@@ -436,6 +461,7 @@ internal data class EnglishProseVerse(
 private fun englishLeafBlockTexts(
     leaf: EnglishLeaf,
     openingTokens: Map<Pair<Int, Int>, MushafToken>,
+    wordEnds: Map<Pair<Int, Int>, FloatArray>,
     ink: Color,
     gold: Color,
     verseNumberScript: VerseNumberScript,
@@ -482,6 +508,7 @@ private fun englishLeafBlockTexts(
                         verseFractionAt = { at ->
                             verse.verseFractionAt(at, verse.text.length)
                         },
+                        wordEnds = wordEnds[verse.surahId to verse.ayah],
                     )
                 }
             }
@@ -828,7 +855,9 @@ private fun englishVerseBlooms(
             )
         }
     } else {
-        val read = verse.fragmentProgress(englishVerseReadProgress(pack.motions))
+        val read = verse.fragmentProgress(
+            englishVerseReadProgress(pack.motions, verse.wordEnds),
+        )
         if (read < 1f) {
             blooms += ShapedWordBloom.InkReveal(
                 range = verse.range,
@@ -884,27 +913,32 @@ private const val EnglishWashFeatherLines = 1.1f
 private const val EnglishWashFeatherFloor = 0.06f
 
 /**
- * How far through a verse the reciter has actually read, 0..1.
+ * How far through a verse's *English* the reciter has read, 0..1.
  *
- * The honest quantity behind the English leaf's wash. The timings name Arabic
- * words, so this counts them: the words before the one being recited, plus how
- * far into that word its own letter sweep has come. It is not a claim that any
- * English word lines up with any Arabic one — it is the statement that the
- * voice is this far through this verse, which is true.
+ * The timings name Arabic words, so this starts from them: the word being
+ * recited, plus how far into it its own letter sweep has come. [wordEnds] then
+ * says where that word's English actually is — the share of the sentence it
+ * ends at — so the ink lands on the words the listener is hearing rather than
+ * on the same fraction of the characters (`EnglishWordAlignment`). Without an
+ * alignment the words divide the sentence evenly, which is what the leaf did
+ * before and what an unalignable verse still gets.
  *
  * Read off the active word's *index* rather than by counting what is behind it,
  * so the wash cannot run backwards on a frame where a word ahead of the voice
  * has not yet settled into its state.
  *
- * The word's own share is taken from [InkMotion.plainSweepProgress] — the
- * linear clock — and never from the tajweed-paced one. Pacing says where
+ * The word's own share is crossed on [InkMotion.plainSweepProgress] — the
+ * linear clock — and never on the tajweed-paced one. Pacing says where
  * inside an Arabic *word* the time is going, which is a true and useful thing
  * to draw on Arabic letters and a false one to draw on English prose: it parks
  * the sentence's wash for as long as the reciter sustains a madd (a closing
  * word is held ~3 s), then sprints it. The scrolling reader's English mode
  * refuses the same curve for the same reason.
  */
-internal fun englishVerseReadProgress(motions: List<InkMotion>): Float {
+internal fun englishVerseReadProgress(
+    motions: List<InkMotion>,
+    wordEnds: FloatArray? = null,
+): Float {
     if (motions.isEmpty()) return 1f
     val active = motions.indexOfFirst { it.isActive }
     if (active < 0) {
@@ -914,7 +948,10 @@ internal fun englishVerseReadProgress(motions: List<InkMotion>): Float {
         return if (waiting == motions.size) 0f else 1f
     }
     val sweep = motions[active].plainSweepProgress.coerceIn(0f, 1f)
-    return ((active + sweep) / motions.size).coerceIn(0f, 1f)
+    val ends = wordEnds?.takeIf { it.size == motions.size }
+        ?: return ((active + sweep) / motions.size).coerceIn(0f, 1f)
+    val from = if (active == 0) 0f else ends[active - 1]
+    return (from + sweep * (ends[active] - from)).coerceIn(0f, 1f)
 }
 
 /**

@@ -484,14 +484,47 @@ not.) Anyone turning hyphens on must fix ColorReveal the same way first. Ragged
 setting needs them far less anyway — the rag absorbs the long word that
 justification would have had to stretch a line around.
 
-### 13.6 The ink says only what is true
+### 13.6 The ink is on the word you are hearing
 
-The reciter's timings name Arabic words. This page has none, and the leaf does
-not invent an alignment: it washes the verse being recited across its own
-sentence at the fraction of that verse the voice has actually reached — words
-behind the voice, plus the letter sweep of the word on it
-(`englishVerseReadProgress`). That is a true statement about where the reciter
-is. Verses still to come wait under the same recess as the Arabic leaf's; verses
+The reciter's timings name Arabic words, and this page prints none of them. For
+a while the leaf refused to bridge that and washed by proportion — word three of
+seven meant three sevenths of the characters. It is a true statement about where
+the voice is, and it is not what a reader hears: the reciter says ٱلْكِتَٰبُ and
+the ink is somewhere in the middle of "about which".
+
+The link is recoverable. Every Arabic word carries its own gloss — the
+interlinear crib the scrolling reader lyricizes — and the translation is a
+translation of the same sentence, so the two share most of their content words.
+`EnglishWordAlignment` aligns the gloss stream to the translation and hands back
+the share of the sentence each Arabic word ends at. Over all 6,236 verses **84 %
+of Arabic words land on a lexical anchor**; an unanchored run is spread between
+the anchors around it, which is the old proportion applied locally, so the map is
+never worse than what it replaces and with no anchors at all it *is* that.
+
+Three rules make it usable:
+
+- **Monotone.** Arabic is not English word order — لَا رَيْبَ فِيهِ is "no doubt
+  in it", and Sahih International sets "about which there is no doubt". A
+  faithful alignment would run backwards there, and the wash cannot: laid ink
+  never lifts (`docs/INK_ENGINE.md`). So the alignment is constrained to advance
+  and a reordered clause is absorbed by sliding a word or two.
+- **Snapped to word ends.** An interpolated boundary lands wherever the
+  arithmetic put it, and "slumbe|r" is not a place ink rests. Boundaries that
+  collapse onto each other are correct: the English has no separate words for
+  that Arabic one.
+- **One map for everything.** The wash, the tap, and the leaf a carried verse's
+  voice is on all read it (`EnglishVerseAlignments`, solved per verse on first
+  ask). If the page turn read the cut with a different map than the ink, it
+  would turn away from a wash still running.
+
+Measured on 2:2 (Alafasy) with the app playing: tap "no" and the reciter starts
+at 1,776 ms against لَا's 1,760; "doubt" → 2,142 against رَيْبَ's 2,140;
+"guidance" → 4,989 against هُدًى's 4,970; "the Book" → 862 against ٱلْكِتَٰبُ's
+860. And the wash holds nearly still for the 2.26 s the reciter spends on فِيهِ,
+whose English is the three characters ", a", then crosses " guidance" in the
+0.3 s of هُدًى — which is the shape of the recitation, not of the sentence.
+
+Verses still to come wait under the same recess as the Arabic leaf's; verses
 already read hold their ink; the packs are the very same `AyahInkPack`.
 
 **But it reads the plain clock out of them, not the paced one.** The word's own
@@ -519,15 +552,13 @@ line gets even quarters — one per word — crossed linearly, and its own feath
 cap (`BasmalahWash.PLAIN_MAX_FEATHER`) so the last quarter stays untouched until
 its turn.
 
-**A tap reads the same way, in reverse.** There is no word to aim at, but a tap
-still says *where* in the sentence, so the reciter is sent to the same share of
-the verse (`englishSeekWordPosition`). It is approximate — the Arabic order is
-not the English order, so a tap two thirds through the sentence lands near, not
-exactly on, the word two thirds through the recitation. It is the same
-approximation the leaf already shows: if proportion is honest enough to say
-where the reciter *is*, it is honest enough to say where to send them. What it
-replaced was worse than approximate — every tap restarted the verse, so a reader
-who wanted the last clause of a thirty-second verse heard the whole of it again.
+**A tap reads the same map backwards.** It says *where* in the sentence, and
+`englishSeekWordPosition` answers with the word whose share of the sentence
+covers that point — tap "the Book" and the reciter says ٱلْكِتَٰبُ. Without an
+alignment it falls back to plain proportion, which is near but not exact. What
+both replaced was worse than approximate: every tap restarted the verse, so a
+reader who wanted the last clause of a thirty-second verse heard the whole of it
+again.
 
 For the same reason the leaf carries no orange repeat and no wet-ink glint.
 Both are statements about one Arabic word — that the reciter went back over it,

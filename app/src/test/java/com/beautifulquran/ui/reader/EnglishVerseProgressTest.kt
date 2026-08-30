@@ -66,6 +66,36 @@ class EnglishVerseProgressTest {
     }
 
     @Test
+    fun `the wash lands on the English the active word is about`() {
+        // Four words; the third owns the middle half of the sentence because
+        // that is where its English is, not because it is third of four.
+        val ends = floatArrayOf(0.1f, 0.2f, 0.7f, 1f)
+        val motions = verse(active = 2, upcoming = 1, recited = 2, sweep = 0f)
+        assertEquals(0.2f, englishVerseReadProgress(motions, ends), 0.0001f)
+        val half = verse(active = 2, upcoming = 1, recited = 2, sweep = 0.5f)
+        assertEquals(0.45f, englishVerseReadProgress(half, ends), 0.0001f)
+    }
+
+    @Test
+    fun `the first word opens the wash at the start of the sentence`() {
+        val ends = floatArrayOf(0.4f, 1f)
+        val motions = verse(active = 0, upcoming = 1, sweep = 0.5f)
+        assertEquals(0.2f, englishVerseReadProgress(motions, ends), 0.0001f)
+    }
+
+    @Test
+    fun `an alignment for a different number of words is refused`() {
+        // A guard, not a nicety: the verse's words and the timing segments can
+        // disagree, and reading past the end of the map would be a crash.
+        val motions = verse(active = 1, upcoming = 2, recited = 1, sweep = 0.5f)
+        assertEquals(
+            0.375f,
+            englishVerseReadProgress(motions, floatArrayOf(0.5f, 1f)),
+            0.0001f,
+        )
+    }
+
+    @Test
     fun `the sentence is washed by the plain clock, not the tajweed-paced one`() {
         // A word whose letter map has parked the Arabic wash at a tenth while
         // half the word's hold has gone (a madd being sustained). The English

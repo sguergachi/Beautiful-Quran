@@ -125,6 +125,7 @@ import com.beautifulquran.data.AyahSelectorSide
 import com.beautifulquran.data.ReadingLayout
 import com.beautifulquran.data.ReadingMode
 import com.beautifulquran.data.model.Surah
+import com.beautifulquran.domain.EnglishVerseAlignments
 import com.beautifulquran.domain.englishSeekWordPosition
 import com.beautifulquran.domain.BASMALAH_PLAYLIST_AYAH
 import com.beautifulquran.domain.MushafToken
@@ -2577,16 +2578,18 @@ fun ReaderScreen(
                     }
                     // The English leaf has no word to aim at, so its tap says
                     // which verse and how far into it. Resolving that to a word
-                    // needs the verse's own length, which lives here.
-                    val onMushafVerseSeek = remember(mushafSurahId, viewModel, content) {
+                    // needs the verse itself, which lives here: its word count,
+                    // and where each of those words lands in its English.
+                    val seekAlignments = remember(content) { EnglishVerseAlignments(content) }
+                    val onMushafVerseSeek = remember(mushafSurahId, viewModel, content, seekAlignments) {
                         { surahId: Int, ayah: Int, through: Float ->
                             mushafDispatch.value(ReaderInteractionEvent.EnableFollow)
-                            val words = if (surahId == mushafSurahId) {
-                                content.ayahs.firstOrNull { it.number == ayah }?.words?.size ?: 0
-                            } else {
-                                0
-                            }
-                            val position = englishSeekWordPosition(through, words)
+                            val verse = content.ayahs
+                                .firstOrNull { it.number == ayah }
+                                ?.takeIf { surahId == mushafSurahId }
+                            val words = verse?.words?.size ?: 0
+                            val wordEnds = verse?.let { seekAlignments.of(it.number) }
+                            val position = englishSeekWordPosition(through, words, wordEnds)
                             if (surahId == mushafSurahId) {
                                 viewModel.playFromAyahWord(ayah, position)
                             } else {

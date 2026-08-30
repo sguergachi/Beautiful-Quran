@@ -107,6 +107,53 @@ class MushafBookLengthTest {
     }
 
     @Test
+    fun `the voice's place in a carried verse is read on the ink's own map`() {
+        // The book cut the verse at a character, so where the voice stands has
+        // to be measured the way the wash measures it. Word 4's English begins
+        // three tenths of the way in, not three fifths.
+        val ends = floatArrayOf(0.1f, 0.2f, 0.3f, 0.9f, 1f)
+        assertEquals(0.3f, mushafVerseThrough(activeWord(4), 5, ends), 1e-6f)
+        assertEquals(0f, mushafVerseThrough(activeWord(1), 5, ends), 1e-6f)
+        // No map, or one for a different verse: even shares, as before.
+        assertEquals(0.6f, mushafVerseThrough(activeWord(4), 5), 1e-6f)
+        assertEquals(0.6f, mushafVerseThrough(activeWord(4), 5, floatArrayOf(1f)), 1e-6f)
+    }
+
+    @Test
+    fun `the lead onto the cut fires where the English says the cut is`() {
+        // A verse whose first word already carries the whole sentence: one word
+        // from now the voice is past every cut, so the turn is led immediately
+        // — where the even-share reading would have waited for word 10.
+        val words = 10
+        val page = 3
+        val here = mushafLeafNumber(carriedBook, 2, 3, page, through = 0f)
+        assertEquals(
+            here + 1,
+            mushafLeadCarriedTurn(
+                book = carriedBook,
+                surahId = 2,
+                ayah = 3,
+                onPage = page,
+                word = activeWord(1),
+                words = words,
+                leafNow = here,
+                wordEnds = FloatArray(words) { 1f },
+            ),
+        )
+        assertNull(
+            mushafLeadCarriedTurn(
+                book = carriedBook,
+                surahId = 2,
+                ayah = 3,
+                onPage = page,
+                word = activeWord(1),
+                words = words,
+                leafNow = here,
+            ),
+        )
+    }
+
+    @Test
     fun `a verse set whole never leads a turn`() {
         assertNull(
             mushafLeadCarriedTurn(

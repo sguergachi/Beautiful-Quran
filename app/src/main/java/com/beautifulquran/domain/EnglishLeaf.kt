@@ -35,12 +35,14 @@ package com.beautifulquran.domain
  * from the translation the book is translated into.
  *
  * **The ink.** The cost of that choice is that the reciter's word timings name
- * Arabic words, and this page has none. So the leaf does not claim a word-level
- * alignment it does not have. It washes the verse being recited across its own
- * sentence, at the fraction of that verse the reciter has actually reached
- * (`englishVerseReadProgress`) — a true statement about where the voice is —
- * with the same recess and the same retained ink the Arabic leaf uses. See
- * `ui/reader/MushafEnglishSheet.kt`.
+ * Arabic words, and this page prints none of them. The leaf recovers the link
+ * rather than doing without it: each Arabic word carries its own gloss, and
+ * `EnglishWordAlignment` aligns that gloss stream to the translation, so the
+ * wash crosses the English the reciter is actually saying — say ٱلْكِتَٰبُ and
+ * "the Book" inks. 84 % of Arabic words land on a lexical anchor; the rest are
+ * spread between their neighbours, which is the plain proportion the leaf used
+ * before and is what an unalignable verse still gets. The recess and the
+ * retained ink are the Arabic leaf's. See `ui/reader/MushafEnglishSheet.kt`.
  */
 
 /**
@@ -269,20 +271,25 @@ private val WHITESPACE_RUN = Regex("\\s+")
  * The word of a verse to start reciting from, given how far into the verse's
  * *English* a reader has tapped.
  *
- * The leaf has no word-level alignment and cannot pretend to one: the Arabic
- * order is not the English order, so a tap two thirds of the way through the
- * sentence lands near — not exactly on — the word two thirds of the way through
- * the recitation. That is the same approximation the leaf already shows the
- * reader, since the wash crosses the sentence at the fraction of the verse the
- * voice has reached (`englishVerseReadProgress`). If proportion is honest
- * enough to say where the reciter *is*, it is honest enough to say where to
- * send them.
+ * The tap is the wash read backwards, so it answers with the same map. With
+ * [wordEnds] — the share of the sentence each Arabic word ends at
+ * (`EnglishWordAlignment`) — the tap lands on the word whose English the reader
+ * actually pointed at: tap "the Book" and the reciter says ٱلْكِتَٰبُ. Without
+ * one it falls back to plain proportion, which is near but not exact, because
+ * the Arabic order is not the English order.
  *
- * What it replaces is worse than approximate: every tap restarted the verse, so
- * a reader who wanted the last clause of a thirty-second verse heard the whole
- * of it again.
+ * What both replace is worse than approximate: every tap restarted the verse,
+ * so a reader who wanted the last clause of a thirty-second verse heard the
+ * whole of it again.
  */
-fun englishSeekWordPosition(through: Float, words: Int): Int {
+fun englishSeekWordPosition(through: Float, words: Int, wordEnds: FloatArray? = null): Int {
     if (words <= 0) return 1
-    return ((through.coerceIn(0f, 1f) * words).toInt() + 1).coerceIn(1, words)
+    val at = through.coerceIn(0f, 1f)
+    val ends = wordEnds?.takeIf { it.size == words }
+        ?: return ((at * words).toInt() + 1).coerceIn(1, words)
+    // The first word whose share of the sentence reaches the tap. Words the
+    // English gives no room to are skipped, which is right: there is nothing
+    // there to have tapped.
+    val index = ends.indexOfFirst { at < it }
+    return (if (index < 0) words else index + 1).coerceIn(1, words)
 }
