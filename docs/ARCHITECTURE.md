@@ -376,12 +376,30 @@ definition of full support live in
 [`docs/ASSISTANT.md`](ASSISTANT.md). Keep that document current whenever an
 Assistant, media-catalog, deep-link, or AppFunctions contract changes.
 
-Continue Listening (`settings.lastSurah` / `lastAyah`) updates only when a
-verse is actually recited — not on open, scroll, or rail jump. It is keyed on the
+Continue Listening (`settings.lastSurah` / `lastAyah`) is keyed on the
 **playing media item**, never on the reader's fade-led focus target: that target
 names the next verse up to `InkEngine.fadeLeadMs` before a note of it is heard.
 Writes go through `SettingsRepository.updateListeningPosition`, which touches
-only the two position keys and no-ops when the position is unchanged.
+only the two position keys and no-ops when the position is unchanged. Those
+same keys are the green ribbon's sole source: Home's Continue row, green chapter
+mark, chapter-row return, Reader ribbon, and green rail tick share one target.
+
+A reader visit snapshots the stored last ayah: the full green ribbon and green
+rail tick remain parked there instead of following bare scroll or focus. Once a
+real pause holds past Media3's brief transition dip, that media verse becomes
+the stored last ayah and the thinner passive ribbon unfurls onto it. Resuming
+leaves the newly placed marker there. The parked state retains both chapter and
+ayah, so an in-place mushaf or continuous-reader chapter handoff cannot inherit
+the old chapter's same-numbered verse. Green owns the screen-edge
+lane while the bookmark cloth or outline stays fixed in a reserved inner lane.
+That reservation is Reader-only; Home bookmark ribbons retain their original
+chapter-document position. Reader green is inset 4 dp farther toward the edge.
+Chapters observes the new stored place after the reader sheet covers it, and a
+tap on that marked chapter returns to its parked ayah. This makes silent
+reading leave the last-heard marker untouched.
+Once a return to Chapters commits and its outer ribbon lane nears the screen
+edge, that parked cloth unfurls into the row; an abandoned back swipe does not
+spend the reveal.
 
 ## UI structure
 

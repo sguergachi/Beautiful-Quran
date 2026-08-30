@@ -81,6 +81,17 @@ internal fun symbolicAyahBarCount(ayahCount: Int): Int {
     return ceil(sqrt(ayahCount.toFloat())).roundToInt().coerceIn(4, 18)
 }
 
+/** Nearest collapsed-stack bar for an ayah, shared by current-place and bookmark ink. */
+internal fun collapsedAyahBarIndex(ayahCount: Int, ayah: Int): Int {
+    val barCount = symbolicAyahBarCount(ayahCount)
+    val progress = if (ayahCount > 1) {
+        (ayah.coerceIn(1, ayahCount) - 1f) / (ayahCount - 1f)
+    } else {
+        0f
+    }
+    return (progress * (barCount - 1)).roundToInt().coerceIn(0, barCount - 1)
+}
+
 /**
  * Vertical span (dp) of the collapsed dash stack drawn by [AyahSelectorRail].
  * Matches the Canvas layout: bar height 1.5dp, spacing 72/count clamped 4–8.
@@ -181,6 +192,8 @@ internal fun AyahSelectorRail(
     side: AyahSelectorSide,
     currentAyah: State<Int>,
     currentPosition: State<Float>,
+    /** Place parked at the end of the previous reader visit; null on a fresh session. */
+    placeAyah: Int? = null,
     /** Ayah numbers bookmarked in this surah — ruby ticks on the collapsed stack. */
     bookmarkedAyahs: Set<Int> = emptySet(),
     /** Ayah number → mushaf page where a new page opens — a faded diamond and
@@ -309,6 +322,7 @@ internal fun AyahSelectorRail(
     }
     val accents = LocalQuranAccents.current
     val onSurface = MaterialTheme.colorScheme.onSurface
+    val currentPlaceGreen = MaterialTheme.colorScheme.primary
 
     Box(
         modifier = modifier
@@ -368,6 +382,9 @@ internal fun AyahSelectorRail(
                 0f
             }
             val collapsedActivePosition = readProgress * (collapsedBarsCount - 1)
+            val placeBarIndex = placeAyah
+                ?.takeIf { it in 1..ayahCount }
+                ?.let { collapsedAyahBarIndex(ayahCount, it) }
 
             if (collapsedAlpha > 0.01f) {
                 // Symbolic summary of the surah: bar count grows with ayah
@@ -383,16 +400,7 @@ internal fun AyahSelectorRail(
                     buildSet {
                         for (ayah in bookmarkedAyahs) {
                             if (ayah !in 1..ayahCount) continue
-                            val progress = if (ayahCount > 1) {
-                                ((ayah - 1f) / (ayahCount - 1).toFloat()).coerceIn(0f, 1f)
-                            } else {
-                                0f
-                            }
-                            add(
-                                (progress * (collapsedBarsCount - 1))
-                                    .roundToInt()
-                                    .coerceIn(0, collapsedBarsCount - 1),
-                            )
+                            add(collapsedAyahBarIndex(ayahCount, ayah))
                         }
                     }
                 }
@@ -412,10 +420,12 @@ internal fun AyahSelectorRail(
                     // as flush at x = 0 despite the rounded corners.
                     val collapsedBarW = collapsedBarWidth * (0.7f + 0.45f * focus) + collapsedBarHeight
                     val inkAlpha = (0.18f + 0.72f * focus) * exit
-                    val barColor = if (index in bookmarkedBarIndices) {
-                        accents.bookmarkRibbon.copy(alpha = (0.55f + 0.35f * focus) * exit)
-                    } else {
-                        onSurface.copy(alpha = inkAlpha)
+                    val barColor = when {
+                        index == placeBarIndex -> currentPlaceGreen.copy(alpha = 0.92f * exit)
+                        index in bookmarkedBarIndices -> accents.bookmarkRibbon.copy(
+                            alpha = (0.55f + 0.35f * focus) * exit,
+                        )
+                        else -> onSurface.copy(alpha = inkAlpha)
                     }
                     drawRoundRect(
                         color = barColor,
@@ -487,15 +497,17 @@ internal fun AyahSelectorRail(
                     val tickCorner = CornerRadius(tickThickness, tickThickness)
                     val alpha = (0.1f + 0.62f * focus) * arrival * edgeFade
                     val isSelected = ayah == selectedAyah
+                    val isPlace = ayah == placeAyah
                     val isBookmarked = ayah in bookmarkedAyahs
                     // Start behind the screen edge so the rounded left cap is
                     // hidden and the visible end sits truly flush at x = 0.
                     val tickFullWidth = length + tickThickness
-                    // Gold = dial focus; ruby = saved verse; ink = ordinary tick.
-                    // Focus wins when a bookmarked ayah is under the finger.
+                    // Gold = dial focus; green = current place; ruby = saved verse.
+                    // The finger's focus wins over every persistent mark.
                     drawRoundRect(
                         color = when {
                             isSelected -> accents.gold.copy(alpha = 0.96f * arrival)
+                            isPlace -> currentPlaceGreen.copy(alpha = 0.92f * arrival * edgeFade)
                             isBookmarked -> accents.bookmarkRibbon.copy(alpha = (0.55f + 0.35f * focus) * arrival * edgeFade)
                             else -> onSurface.copy(alpha = alpha)
                         },
@@ -525,6 +537,9 @@ internal fun AyahSelectorRail(
                     numberPaint.color = when {
                         isSelected -> accents.gold.copy(alpha = 0.95f * arrival).toArgb()
                         isBookmarked -> accents.bookmarkRibbon
+                            .copy(alpha = (0.4f + 0.5f * focus) * arrival * edgeFade)
+                            .toArgb()
+                        isPlace -> currentPlaceGreen
                             .copy(alpha = (0.4f + 0.5f * focus) * arrival * edgeFade)
                             .toArgb()
                         else -> onSurface
