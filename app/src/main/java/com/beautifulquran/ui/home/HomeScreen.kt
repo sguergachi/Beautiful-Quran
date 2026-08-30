@@ -80,6 +80,7 @@ import com.beautifulquran.data.HomeBookmarkStyle
 import com.beautifulquran.domain.WORD_SEARCH_PREVIEW_LIMIT
 import com.beautifulquran.domain.englishTranslationHighlightSpans
 import com.beautifulquran.ui.reader.VerseBookmarkRibbon
+import com.beautifulquran.ui.reader.remainingUnfurlSignal
 import com.beautifulquran.ui.theme.AlphaTag
 import com.beautifulquran.ui.theme.ArabicTitleStyle
 import com.beautifulquran.ui.theme.GildedRosette
@@ -115,6 +116,10 @@ fun HomeScreen(
     /** True while the paper stack is on (or near) the chapter list — drives
      *  the floating transport's enter/exit across page turns. */
     coverSheetVisible: Boolean = true,
+    /** A reader turn has committed, so its parked place should be revealed on return. */
+    readerVisitActive: Boolean = false,
+    /** The returning chapter sheet is close enough to prepare its entering ribbon lane. */
+    chapterRibbonReady: Boolean = true,
     /** Number of saved verses; zero removes the Home-page ribbon entirely. */
     bookmarkCount: Int = 0,
     bookmarkStyle: HomeBookmarkStyle = HomeBookmarkStyle.TOP_BOUND,
@@ -174,6 +179,8 @@ fun HomeScreen(
     var previousBookmarkCount by remember { mutableIntStateOf(bookmarkCount) }
     var ribbonUnfurlPending by remember { mutableStateOf(false) }
     var ribbonUnfurlEpoch by remember { mutableIntStateOf(0) }
+    var placeRibbonUnfurlPending by remember { mutableStateOf(false) }
+    var placeRibbonUnfurlEpoch by remember { mutableIntStateOf(0) }
 
     // A mark is normally added on Reader while Home is covered. Remember that
     // event, then begin the long unfurl only once the page turn exposes Home.
@@ -185,6 +192,21 @@ fun HomeScreen(
         if (coverSheetVisible && ribbonUnfurlPending) {
             ribbonUnfurlEpoch++
             ribbonUnfurlPending = false
+        }
+    }
+    LaunchedEffect(readerVisitActive) {
+        if (readerVisitActive) placeRibbonUnfurlPending = true
+    }
+    LaunchedEffect(chapterRibbonReady, placeRibbonUnfurlPending, uiState.continueTarget) {
+        if (
+            shouldUnfurlReadingPlaceRibbon(
+                pendingReturn = placeRibbonUnfurlPending,
+                chapterRibbonReady = chapterRibbonReady,
+                currentPlacePresent = uiState.continueTarget != null,
+            )
+        ) {
+            placeRibbonUnfurlEpoch++
+            placeRibbonUnfurlPending = false
         }
     }
 
@@ -296,11 +318,13 @@ fun HomeScreen(
                                 },
                         )
 
-                        uiState.continueTarget?.let { target ->
-                            ContinueRow(
-                                target = target,
-                                onClick = { onOpenSurah(target.surah.id, target.ayah, null) },
-                            )
+                        if (!searching) {
+                            uiState.continueTarget?.let { target ->
+                                ContinueRow(
+                                    target = target,
+                                    onClick = { onOpenSurah(target.surah.id, target.ayah, null) },
+                                )
+                            }
                         }
                         if (
                             bookmarkCount > 0 &&
@@ -319,9 +343,25 @@ fun HomeScreen(
                         uiState.surahs.forEach { surah ->
                             SurahRow(
                                 surah = surah,
+                                currentAyah = uiState.continueTarget
+                                    ?.takeIf { it.surah.id == surah.id }
+                                    ?.ayah,
+                                placeUnfurlSignal = placeRibbonUnfurlEpoch,
+                                onPlaceUnfurlConsumed = { consumed ->
+                                    placeRibbonUnfurlEpoch = remainingUnfurlSignal(
+                                        current = placeRibbonUnfurlEpoch,
+                                        consumed = consumed,
+                                    )
+                                },
                                 onClick = {
                                     focusManager.clearFocus()
-                                    onOpenSurah(surah.id, uiState.ayahTarget, null)
+                                    onOpenSurah(
+                                        surah.id,
+                                        uiState.ayahTarget ?: uiState.continueTarget
+                                            ?.takeIf { it.surah.id == surah.id }
+                                            ?.ayah,
+                                        null,
+                                    )
                                 },
                             )
                         }
@@ -516,7 +556,7 @@ private fun HomeBookmarkOverlay(
 
         VerseBookmarkRibbon(
             bookmarked = true,
-            focused = true,
+            placeMarked = false,
             side = AyahSelectorSide.LEFT,
             chromeAlpha = { 1f },
             interactive = false,
@@ -564,7 +604,7 @@ private fun SavedPassagesRow(
         ) {
             VerseBookmarkRibbon(
                 bookmarked = true,
-                focused = true,
+                placeMarked = false,
                 side = AyahSelectorSide.LEFT,
                 chromeAlpha = { 1f },
                 interactive = false,
@@ -633,7 +673,13 @@ private fun ContinueRow(target: ContinueTarget, onClick: () -> Unit) {
 }
 
 @Composable
-private fun SurahRow(surah: Surah, onClick: () -> Unit) {
+private fun SurahRow(
+    surah: Surah,
+    currentAyah: Int?,
+    placeUnfurlSignal: Int,
+    onPlaceUnfurlConsumed: (Int) -> Unit,
+    onClick: () -> Unit,
+) {
     val accents = LocalQuranAccents.current
     Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -641,12 +687,36 @@ private fun SurahRow(surah: Surah, onClick: () -> Unit) {
             .fillMaxWidth()
             .quietClickable(onClick = onClick)
             .padding(
-                start = HomeStartInset,
                 end = HomeEndInset,
                 top = 15.dp,
                 bottom = 15.dp,
             ),
     ) {
+        if (currentAyah != null) {
+            VerseBookmarkRibbon(
+                bookmarked = false,
+                placeMarked = true,
+                side = AyahSelectorSide.LEFT,
+                chromeAlpha = { 1f },
+                interactive = false,
+                onToggle = { false },
+                bookmarkTipVisible = false,
+                placeUnfurlSignal = placeUnfurlSignal,
+                onPlaceUnfurlConsumed = onPlaceUnfurlConsumed,
+                edgeInset = HomeRibbonGutter,
+                ribbonWidth = HomeRibbonWidth,
+                topInset = 0.dp,
+                bottomGap = 0.dp,
+                modifier = Modifier
+                    .width(HomeRibbonLane)
+                    .height(44.dp)
+                    .semantics {
+                        contentDescription = "Current place, ayah $currentAyah"
+                    },
+            )
+        } else {
+            Spacer(Modifier.width(HomeRibbonLane))
+        }
         Box(Modifier.width(HomeNumberColumn)) {
             Text(
                 text = surah.id.toString(),
@@ -680,6 +750,12 @@ private fun SurahRow(surah: Surah, onClick: () -> Unit) {
         )
     }
 }
+
+internal fun shouldUnfurlReadingPlaceRibbon(
+    pendingReturn: Boolean,
+    chapterRibbonReady: Boolean,
+    currentPlacePresent: Boolean,
+): Boolean = pendingReturn && chapterRibbonReady && currentPlacePresent
 
 @Composable
 private fun SearchSectionLabel(text: String) {
