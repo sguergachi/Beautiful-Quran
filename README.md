@@ -11,7 +11,7 @@ illuminates in time with the audio, with its English meaning beneath it.
 - 🔁 Repeat one ayah, the whole surah, or any ayah range you choose
 - 🔍 Search the English translation and word glosses within a surah
 - 🌙 Warm paper light theme and near-black charcoal dark theme
-- 📴 All text + quran-align timings work offline; repeat timings sync and cache
+- 📴 All Quran text and repeat-aware timings work offline
 - 🚫 No ads, no accounts, no analytics
 
 ## Install on your phone

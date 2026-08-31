@@ -94,6 +94,9 @@ connection data is still visible to the service receiving the request.
   mutates only added, changed, or removed rows.
 - [x] Developer Mode shows phase, age, next refresh, expiry, last failure, API
   calls this launch, and calls made by the last successful refresh.
+- [x] Developer Mode can force the same atomic refresh while content is still
+  fresh; the legacy adapter replaces its snapshot today and the authenticated
+  adapter will issue an incremental request from the stored sync checkpoint.
 - [x] A short Android toast appears only after a successful atomic refresh.
 - [x] Privacy Policy, Terms, attribution, project URL, logo, and contact are public.
 - [x] No QF credential or secret exists in Android, web, Git, or CI.

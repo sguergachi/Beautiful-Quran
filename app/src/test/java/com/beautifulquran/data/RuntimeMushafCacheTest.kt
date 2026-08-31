@@ -96,6 +96,22 @@ class RuntimeMushafCacheTest {
     }
 
     @Test
+    fun `manual refresh forces the atomic update while cache is fresh`() = runTest {
+        val store = Store(QfSyncState(filter, "cached", 90L), listOf(row))
+        val api = SnapshotApi()
+        val cache = RuntimeMushafCache(api, store, backgroundScope, nowMs = { 100L }, minimumWords = 1)
+
+        assertTrue(cache.warm())
+        cache.refresh()
+        runCurrent()
+
+        assertEquals(1, api.syncs)
+        assertTrue(api.lastRequest is QfSyncRequest.Incremental)
+        assertEquals(2L, cache.status().lastRefreshApiCalls)
+        assertEquals("seeking", cache.word(5, 2, 19)?.translation)
+    }
+
+    @Test
     fun `launch warm parses and retains every fresh row without an API call`() = runTest {
         val store = Store(QfSyncState(filter, "cached", 90L, 190L), listOf(row))
         val api = CountingApi { error("should not fetch") }
@@ -250,8 +266,10 @@ class RuntimeMushafCacheTest {
 
     private inner class SnapshotApi : QfContentSyncApi {
         var syncs = 0
+        var lastRequest: QfSyncRequest? = null
         override suspend fun sync(request: QfSyncRequest): QfSyncPage {
             syncs++
+            lastRequest = request
             return QfSyncPage(
                 listOf(QfContentChange.Snapshot(resource, "/api/v4/resources/snapshots/mushafs/1")),
                 null,

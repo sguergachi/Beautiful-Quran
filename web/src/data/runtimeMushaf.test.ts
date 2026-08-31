@@ -39,9 +39,10 @@ function jsonResponse(body: unknown) {
   })
 }
 
-function contentFetcher() {
+function contentFetcher(calls?: string[]) {
   return async (input: RequestInfo | URL) => {
     const path = String(input)
+    calls?.push(path)
     return jsonResponse(path.includes('/snapshots/') ? {
       schema_version: 1, resource_group: 'mushafs', resource_id: 1, records: [record],
     } : {
@@ -100,6 +101,24 @@ describe('RuntimeMushafCache', () => {
     await cache.refresh()
     expect(cache.word(5, 2, 19)?.translation_en).toBe('seeking')
     expect(cache.status().apiCalls).toBe(2)
+  })
+
+  it('manual refresh forces the atomic update while cache is fresh', async () => {
+    const store = new Store()
+    store.value = { id: 1, token: 'old', updatedAtMs: 90, records: [record] }
+    const calls: string[] = []
+    const cache = new RuntimeMushafCache(
+      'https://content.example', store, contentFetcher(calls) as typeof fetch, () => 100, 1,
+    )
+
+    await cache.restore()
+    expect(cache.status().apiCalls).toBe(0)
+    expect(await cache.refresh()).toBe(true)
+    expect(cache.status().apiCalls).toBe(2)
+    expect(calls[0]).toContain('sync_token=old')
+    expect(calls[0]).not.toContain('bootstrap=true')
+    expect(store.value?.token).toBe('token')
+    expect(cache.word(5, 2, 19)?.translation_en).toBe('seeking')
   })
 
   it('keeps the prior cache when a replacement snapshot is incomplete', async () => {
