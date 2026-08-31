@@ -521,6 +521,8 @@ private fun HomeHeader(
             contentAlignment = Alignment.Center,
             modifier = Modifier
                 .size(48.dp)
+                // The title sits 7 dp below the masthead's overall center.
+                .offset(y = 7.dp)
                 .clip(CircleShape)
                 .quietClickable(role = Role.Button, onClick = onOpenSettings)
                 .semantics { contentDescription = "Open settings" },
