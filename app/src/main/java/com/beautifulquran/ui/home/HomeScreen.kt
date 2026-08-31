@@ -30,6 +30,9 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Tune
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -81,9 +84,7 @@ import com.beautifulquran.domain.WORD_SEARCH_PREVIEW_LIMIT
 import com.beautifulquran.domain.englishTranslationHighlightSpans
 import com.beautifulquran.ui.reader.VerseBookmarkRibbon
 import com.beautifulquran.ui.reader.remainingUnfurlSignal
-import com.beautifulquran.ui.theme.AlphaTag
 import com.beautifulquran.ui.theme.ArabicTitleStyle
-import com.beautifulquran.ui.theme.GildedRosette
 import com.beautifulquran.ui.theme.LocalQuranAccents
 import com.beautifulquran.ui.theme.PaperSearchField
 import com.beautifulquran.ui.theme.quietClickable
@@ -493,8 +494,6 @@ fun HomeScreen(
 private fun HomeHeader(
     onOpenSettings: () -> Unit,
 ) {
-    val accents = LocalQuranAccents.current
-    val titleSheen = remember { mutableStateOf(0.35f) }
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
@@ -515,7 +514,6 @@ private fun HomeHeader(
                     ),
                     color = MaterialTheme.colorScheme.onBackground,
                 )
-                AlphaTag()
             }
             Spacer(Modifier.height(24.dp))
         }
@@ -523,17 +521,17 @@ private fun HomeHeader(
             contentAlignment = Alignment.Center,
             modifier = Modifier
                 .size(48.dp)
+                // The title sits 7 dp below the masthead's overall center.
+                .offset(y = 7.dp)
                 .clip(CircleShape)
                 .quietClickable(role = Role.Button, onClick = onOpenSettings)
                 .semantics { contentDescription = "Open settings" },
         ) {
-            GildedRosette(
-                size = 30.dp,
-                brightGold = accents.goldBright,
-                deepGold = accents.goldDeep,
-                embossDark = accents.embossDark,
-                embossLight = accents.embossLight,
-                sheen = titleSheen,
+            Icon(
+                imageVector = Icons.Rounded.Tune,
+                contentDescription = "Open settings",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
+                modifier = Modifier.size(26.dp),
             )
         }
     }
