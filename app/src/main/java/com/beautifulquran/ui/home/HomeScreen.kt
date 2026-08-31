@@ -31,7 +31,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -526,7 +526,7 @@ private fun HomeHeader(
                 .semantics { contentDescription = "Open settings" },
         ) {
             Icon(
-                imageVector = Icons.Rounded.Settings,
+                imageVector = Icons.Rounded.Tune,
                 contentDescription = "Open settings",
                 tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
                 modifier = Modifier.size(26.dp),
