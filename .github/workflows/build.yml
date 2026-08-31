@@ -27,9 +27,6 @@ jobs:
         with:
           node-version: "22"
 
-      - name: Transitional cache service tests
-        run: npm --prefix backend test
-
       - name: Verify bundled Quran database asset
         run: test -s data/quran.db && test -s data/lexicon.db && test -s data/dictionary.db
 

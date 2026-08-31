@@ -16,11 +16,14 @@ Sources (all fetched over HTTPS, cached in tools/.cache):
   * tools/audio_onsets — generated voice onsets from the streamed everyayah MP3s
                         (only the compact committed measurements are consumed).
 
+  * Quran.com recitation timings — repeat topology, normalized and verified by
+                        the offline pipeline before an app release.
+
 Output: data/quran.db (the canonical asset consumed by Android and web builds).
-A normal rebuild excludes Quran.com-derived word/QCF/QDC fields and uses the
-independent quran-align timing fallback. ``--include-quran-com-content`` and
-``--include-qdc-timings`` create local parity/audit candidates; neither mode is
-used for the committed public database.
+A normal rebuild excludes Quran.com-derived word/QCF fields while preserving
+the reviewed repeat-aware timing table byte-for-byte. ``--refresh-qdc-timings``
+explicitly regenerates that table for corpus review; ``--quran-align-only`` is
+an audit/fallback build. Neither explicit mode is the committed reader database.
 
 The word segmentation canon is the space-split of the Uthmani text; the WBW
 gloss and the timing data are mapped onto it by position and clamped when a
@@ -2398,13 +2401,44 @@ def write_morphology(db: sqlite3.Connection, morph_rows, roots_rows, occ_rows):
     )
 
 
+def load_reviewed_timing_baseline(path=OUT):
+    """Retain the accepted timing table unless a maintainer requests a refresh."""
+    if not path.exists():
+        return None
+    db = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
+    try:
+        provenance = dict(db.execute("SELECT key,value FROM data_provenance"))
+        if not provenance.get("timings", "").startswith("QDC-derived repeat timings"):
+            return None
+        timing_rows = list(db.execute(
+            "SELECT reciter_id,surah_id,ayah_number,segments FROM timings"
+        ))
+        audio_onsets = {
+            (rid, surah, ayah): onset
+            for rid, surah, ayah, onset in db.execute(
+                "SELECT reciter_id,surah_id,ayah_number,audio_onset_ms FROM timings"
+            )
+            if onset
+        }
+        reciters = list(db.execute("SELECT id,slug,name,style,has_timings FROM reciters"))
+        return timing_rows, reciters, audio_onsets
+    finally:
+        db.close()
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--skip-timings", action="store_true")
-    ap.add_argument(
-        "--include-qdc-timings",
+    timing_mode = ap.add_mutually_exclusive_group()
+    timing_mode.add_argument(
+        "--quran-align-only",
         action="store_true",
-        help="build a QDC migration candidate; the timing delta audit must pass",
+        help="omit repeat topology and build only the quran-align fallback",
+    )
+    timing_mode.add_argument(
+        "--refresh-qdc-timings",
+        action="store_true",
+        help="regenerate repeat rows for explicit full-corpus review",
     )
     ap.add_argument(
         "--include-quran-com-content",
@@ -2412,6 +2446,7 @@ def main():
         help="build a local parity candidate with Quran.com word/QCF fields",
     )
     args = ap.parse_args()
+    include_qdc_timings = args.refresh_qdc_timings
 
     print("[1/6] fetching text + metadata (quran-json)")
     qj = fetch(QURAN_JSON_TGZ, "quran-json.tgz")
@@ -2477,7 +2512,20 @@ def main():
     singleton_gap_candidates = {}
     audio_durations = load_audio_durations()
     audio_onsets = load_audio_onsets()
-    if args.skip_timings:
+    reviewed_baseline = (
+        None
+        if args.skip_timings or args.quran_align_only or args.refresh_qdc_timings
+        else load_reviewed_timing_baseline()
+    )
+    if reviewed_baseline is not None:
+        timing_rows, reciter_rows, audio_onsets = reviewed_baseline
+        print(f"[5/6] preserving {len(timing_rows)} reviewed repeat timing rows")
+    elif not (args.skip_timings or args.quran_align_only or args.refresh_qdc_timings):
+        sys.exit(
+            "no reviewed repeat timing baseline found; use --refresh-qdc-timings "
+            "for an explicit candidate or --quran-align-only for the fallback"
+        )
+    elif args.skip_timings:
         print("[5/6] SKIPPING timings (--skip-timings)")
         reciter_rows = [(r[0], r[1], r[2], r[3], 0) for r in RECITERS]
     else:
@@ -2490,7 +2538,7 @@ def main():
             )
             alignment_references.update(reciter_alignment)
             qdc_id = QDC_REPEAT_RECITERS.get(rid)
-            if qdc_id is not None and args.include_qdc_timings:
+            if qdc_id is not None and include_qdc_timings:
                 # Repeat-aware timings from quran.com instead of quran-align.
                 print(f"  {slug}: repeat-aware timings from quran.com (qdc {qdc_id})")
                 data = load_qdc_timings(qdc_id)
@@ -2514,13 +2562,14 @@ def main():
                     row_key = (rid, key[0], key[1])
                     reference = reciter_alignment.get(row_key)
                     duration = audio_durations.get(row_key)
-                    if reference is None and not _covers_all_words(cleaned, n):
+                    if not _covers_all_words(cleaned, n):
                         rescue_stats = {name: 0 for name in stats}
                         rescued = adjust_qdc_segments(
                             data.get(key), n, rescue_stats,
                             recover_singleton_gap=True,
                             words=word_text.get(key),
                         )
+                        rescued, _ = rebase_qdc_clock(rescued, reference, duration)
                         if _covers_all_words(rescued, n) and fits_audio(rescued, duration):
                             singleton_gap_candidates[row_key] = rescued
                     rebased, offset = rebase_qdc_clock(cleaned, reference, duration)
@@ -2613,7 +2662,7 @@ def main():
                 sys.exit(1)
             reciter_rows.append((rid, slug, name, style, 1))
 
-        if args.include_qdc_timings:
+        if include_qdc_timings:
             print("[typed corrections] applying irreducible timing verdicts")
             timing_rows = apply_timing_corrections(timing_rows)
 
@@ -2717,21 +2766,21 @@ def main():
                     (
                         "timings",
                         "QDC-derived repeat timings over everyayah recordings; "
-                        "transitional compatibility baseline",
+                        "bundled app-release dataset",
                     ),
                     (
                         "qdc_delivery",
-                        "bundled compatibility baseline; runtime cache may replace",
+                        "bundled; updated through app releases",
                     ),
                 ]
-                if args.include_qdc_timings
+                if reviewed_baseline is not None or include_qdc_timings
                 else [
                     (
                         "timings",
                         "cpfair/quran-align CC-BY-4.0; "
-                        "QDC excluded from bundled database",
+                        "QDC excluded by --quran-align-only",
                     ),
-                    ("qdc_delivery", "runtime cache only"),
+                    ("qdc_delivery", "quran-align-only audit build"),
                 ]
             ),
         ],

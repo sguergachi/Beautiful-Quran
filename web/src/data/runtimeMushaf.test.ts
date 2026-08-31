@@ -1,12 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import {
   RuntimeMushafCache,
+  QF_MAX_CACHE_AGE_MS,
+  QF_REVALIDATE_AFTER_MS,
   assertQcfV2Runs,
   normalizeLegacyMushaf,
   type RuntimeMushafStore,
   type StoredMushaf,
 } from './runtimeMushaf'
-import { QF_MAX_CACHE_AGE_MS, QF_REVALIDATE_AFTER_MS } from './runtimeTimings'
 
 const record = {
   record_type: 'mushaf_word' as const,

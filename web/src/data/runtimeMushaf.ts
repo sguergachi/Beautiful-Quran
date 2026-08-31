@@ -1,10 +1,18 @@
-import {
-  QF_MAX_CACHE_AGE_MS,
-  QF_REVALIDATE_AFTER_MS,
-  type RuntimeCacheStatus,
-} from './runtimeTimings'
 import { queryAll } from './database'
 import { normalizeArabicForSearch } from '../domain/WordSearch'
+
+export const QF_MAX_CACHE_AGE_MS = 7 * 24 * 60 * 60 * 1_000
+export const QF_REVALIDATE_AFTER_MS = 6 * 24 * 60 * 60 * 1_000
+
+export interface RuntimeCacheStatus {
+  phase: 'empty' | 'fresh' | 'refresh_due' | 'expired' | 'refreshing' | 'error'
+  updatedAtMs: number | null
+  refreshAtMs: number | null
+  expiresAtMs: number | null
+  apiCalls: number
+  lastError: string | null
+  lastRefreshApiCalls?: number | null
+}
 
 const MIN_WORDS = 77_429
 const MAX_RESPONSE_CHARS = 40 * 1024 * 1024
@@ -566,11 +574,4 @@ function refreshDue(updated: number, now: number) {
   return age < 0 || age > QF_REVALIDATE_AFTER_MS
 }
 
-const contentBaseUrl = import.meta.env.VITE_TIMING_CONTENT_BASE_URL?.trim()
-function configuredMushafCache(): RuntimeMushafCache {
-  if (contentBaseUrl) {
-    try { return new RuntimeMushafCache(contentBaseUrl) } catch { /* fall back to Quran.com */ }
-  }
-  return new RuntimeMushafCache('https://api.quran.com')
-}
-export const runtimeMushafCache = configuredMushafCache()
+export const runtimeMushafCache = new RuntimeMushafCache('https://api.quran.com')

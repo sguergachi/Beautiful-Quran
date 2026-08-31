@@ -31,17 +31,15 @@ npm run build:pages  # → ../_site/app (CI does this on master)
 
 Requires Node 22+. `npm run dev` and `npm run build` copy the canonical
 `../data/quran.db` into the generated web assets. The database is committed
-once and shared with Android; it contains independent quran-align timing only.
-The browser automatically fills a separate IndexedDB word/QCF cache from the
-unauthenticated Quran.com API. When `VITE_TIMING_CONTENT_BASE_URL` is set, it
-also restores normalized repeat-aware timing snapshots through the timing
-facade in the background.
+once and shared with Android; it contains the reviewed repeat-aware timing
+dataset. The browser automatically fills a separate IndexedDB word/QCF cache
+from the unauthenticated Quran.com API.
 
 ## Architecture
 
 ```
 src/domain/     HighlightEngine, HighlightClock, basmalah and search policy
-src/data/       WASM SQLite + separate IndexedDB Content Sync timing cache
+src/data/       WASM SQLite + separate IndexedDB word/QCF cache
 src/playback/   Dual HTMLAudioElement + Cache API prefetch + Media Session + rAF clock
 src/render/     WordUnit / HafsWord / AyahBlock (directional ink + paper-cover bloom)
 src/ui/         paper stack plus Android-mirrored reader/focus/Ink/Fade policy
@@ -82,10 +80,8 @@ Engines are DOM-free and unit-tested against the Android JVM suites. See
   hard abut — no crossfade). Word highlight still uses the same per-ayah
   `positionMs` clock. Developer mode can disable it to A/B the legacy
   dual-`<audio>` transport.
-- Runtime timing sync never blocks a chapter open. Fresh IndexedDB rows win;
-  otherwise the bundled quran-align rows render immediately. Revalidation
-  starts after six days, and runtime rows are not used past seven days. The
-  backend's snapshot age is retained locally, so those windows do not stack.
+- Repeat-aware timings always come from the bundled database, so chapter open
+  and repeat highlighting require no timing network request.
 - Click a word to play from there; right-click / long-press opens the Root Word Viewer.
 - Themes: Paper / Nightfall / Royal green (Settings).
 - Form controls use [Base UI](https://base-ui.com) primitives (`Select`,

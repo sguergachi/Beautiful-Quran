@@ -15,12 +15,11 @@ viewer, and a PWA shell. Production build is published to GitHub Pages at
 `web/README.md` for run instructions. The sections
 below remain the design record and quality bar.
 
-The current data layer also mirrors Android's runtime timing path: quran-align
-fallback stays in the shared database, while normalized repeat-aware snapshots
-live in a separate IndexedDB Content Sync cache with six-day revalidation, a
-seven-day hard freshness limit, and automatic retry when the browser comes
-back online. Developer Mode exposes cache state, refresh/expiry times, and
-session API-call count.
+The current data layer mirrors Android: reviewed repeat-aware timings live in
+the shared database, while Quran.com word/QCF fields live in a separate
+IndexedDB cache with six-day revalidation, a seven-day hard freshness limit,
+and automatic retry when the browser comes back online. Developer Mode exposes
+that cache's state, refresh/expiry times, and session API-call count.
 
 The reader also treats its focused ayah as a keyboard cursor: Up/Down move one
 ayah, Page Up/Down move five, Home/End reach chapter bounds, Space toggles
@@ -62,7 +61,7 @@ tools/build_db.py  ──►  quran.db  (shared asset; optional web export step)
                               │
 web/                          ▼
   domain/          HighlightEngine / HighlightClock + domain policy
-  data/            WASM SQLite + typed queries + separate IndexedDB timing cache
+  data/            WASM SQLite + typed queries + separate IndexedDB word/QCF cache
   playback/        Gapless-5 (default) / dual-`<audio>` fallback + Media Session + Cache API LRU
   ui/reader/       InkEngine + focus engine/controller + reader state policy
   ui/theme/        shared fade math; DOM masks remain render adapters
@@ -209,10 +208,8 @@ Renderers consume these; they do not re-derive curves.
   This keeps the main-thread sql.js work from freezing the cover or paper
   peel. Timings remain lazy and hydrate after the reader's first frame.
 - **Do not** add data-repair logic in the web app (Android invariant #2).
-- The shared DB contains the independent quran-align timing fallback only.
-  Fresh normalized repeat-aware rows come from `runtimeTimings.ts`, are committed atomically with an
-  opaque token in IndexedDB, refresh after six days, and expire after seven.
-  Missing/expired/network-failed runtime data returns to the one-pass fallback.
+- The shared DB contains the same reviewed repeat-aware timing rows Android
+  uses. Opening a chapter performs no timing API request.
 
 Optional later optimization (not required for v1): export per-surah JSON
 shards for faster first paint. Only if 27 MB WASM open proves too slow on
@@ -494,7 +491,7 @@ sans.
 - Root Word Viewer (ink bleed) + corpus-backed morphology, lemma-frequency
   analyses, and per-chapter concordance lists truncated to five references
   until expanded.
-- PWA installability; offline shell + DB + audio + runtime timing cache.
+- PWA installability; offline shell + DB + audio + word/QCF cache.
 - Optional Ink Lab (developer unlock).
 
 ### Phase 5 — Parity polish / cut line

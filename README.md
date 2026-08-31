@@ -37,7 +37,6 @@ matrix, testing commands, current platform limits, and full-support checklist.
 ./gradlew assembleDebug       # Android; copies data/quran.db into generated assets
 npm --prefix web ci
 npm --prefix web run build    # Web; copies the same database into dist
-npm --prefix backend test     # Timing facade + transitional provider
 ```
 
 Local debug and release APKs use the uncommitted `release.keystore` when it is
@@ -114,13 +113,14 @@ verifies that it is signed with the upload certificate expected by Google Play.
 In a linked Git worktree it also checks the primary checkout for
 `release.keystore`; set `RELEASE_KEYSTORE_FILE` to use a key stored elsewhere.
 
-`tools/build_db.py` downloads independently sourced Quran text, morphology,
-and open quran-align timings and packs them into SQLite. The committed asset
-contains no Quran.com-derived word, QCF, page-layout, or QDC timing values.
-Android and web fetch word/QCF fields from the unauthenticated Quran.com API
-and normalize them into a separate seven-day device cache. Repeat timings use
-the normalized timing service only when configured. CI (GitHub Actions) runs unit
-tests on every push; on `master`
+`tools/build_db.py` downloads Quran text, morphology, open quran-align timings,
+and QDC repeat topology, then normalizes and validates the result offline. The
+committed asset contains no Quran.com-derived word gloss, transliteration, QCF,
+or page-layout values. Android and web fetch those fields from the
+unauthenticated Quran.com API into a separate seven-day device cache.
+Repeat-aware timings are bundled in `quran.db`, work fully offline, and change
+only through a reviewed app release. CI (GitHub Actions) runs unit tests on
+every push; on `master`
 it also assembles the release APK and publishes it to the rolling latest release.
 
 Word/QCF download needs no build variable: released clients call
@@ -129,11 +129,9 @@ cache after seven. A missing/expired first fill completes behind the locked
 closed-mushaf loading screen with chapter progress, while offline failure falls
 through to the independent reader. The legacy API requires a fixed-corpus
 comparison; Android only mutates cache rows that changed. Authenticated Content
-Sync uses small token-based upsert/delete deltas after bootstrap.
-`TIMING_CONTENT_BASE_URL` (Android) / its Vite equivalent is
-only for the normalized repeat-timing service; leave it unset until that HTTPS
-host passes the deployment and parity gates. quran-align remains the timing
-fallback without a blocking network path.
+Sync can use small token-based upsert/delete deltas after bootstrap once QF
+approves an integration and provides a client-safe content path. No QF secret
+is embedded in either client.
 
 ## Run in an Android emulator on Linux
 
@@ -222,7 +220,6 @@ If host Vulkan is broken on your machine, you can still fall back with
 - [docs/ROOT_VIEWER.md](docs/ROOT_VIEWER.md) — hold-to-reveal root lexicon: counts, ayah concordance, jump-to-chapter
 - [docs/TIMINGS_LAB.md](docs/TIMINGS_LAB.md) — in-app timing editor (developer mode)
 - [docs/QF_CONTENT_SYNC.md](docs/QF_CONTENT_SYNC.md) — authenticated Quran Foundation Content API migration and offline-sync gate
-- [backend/README.md](backend/README.md) — stable timing facade, deployment controls, and authenticated provider seam
 
 ## Data & attribution
 
@@ -231,7 +228,7 @@ If host Vulkan is broken on your machine, you can still fall back with
 | Uthmani text + Saheeh Intl. translation | [quran-json](https://github.com/risan/quran-json) (Tanzil / Al Quran Cloud) | free with attribution |
 | Word-by-word gloss + transliteration (runtime cache only) | Quran.com API | governed by provider terms/approval |
 | Root / lemma / morphology | [Quranic Arabic Corpus](http://corpus.quran.com) v0.4 | free with attribution + link |
-| Word timing segments | [cpfair/quran-align](https://github.com/cpfair/quran-align) | CC-BY 4.0 |
-| Repeat-aware timing segments (runtime cache only) | [quran.com](https://quran.com) legacy `qdc` audio API | transitional permission and QF migration pending |
+| Word timing clock/fallback | [cpfair/quran-align](https://github.com/cpfair/quran-align) | CC-BY 4.0 |
+| Bundled repeat topology | [quran.com](https://quran.com) legacy `qdc` audio API, normalized offline | written QF permission requested before release |
 | Recitation audio | [everyayah.com](https://everyayah.com) | free; rights remain with reciters |
-| Arabic typeface | KFGQPC HAFS Uthmanic Script, King Fahd Complex | free redistribution |
+| Arabic typeface | KFGQPC HAFS Uthmanic Script, King Fahd Complex | redistribution permission/official license confirmation pending |

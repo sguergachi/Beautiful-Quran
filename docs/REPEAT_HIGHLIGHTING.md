@@ -10,21 +10,18 @@ data comes from, and the traps we hit making it ship.
 
 ## Current state
 
-As of `quran-v56.db`, the public committed database contains no QDC-derived
-timing. It carries the independent, one-pass quran-align fallback. Ordinary
-word wash remains available offline, but the orange repeat pass is unavailable
-until a fresh normalized runtime snapshot is configured and cached.
+As of `quran-v57.db`, Android and web both read the same verified repeat-aware
+rows from the bundled database. There is no runtime timing API, cache, backend,
+or on-device audio analysis. The offline build pipeline combines QDC repeat
+topology with quran-align's everyayah audio clock, applies every correction and
+physical gate, and ships changes only through a reviewed app release.
 
-The runtime resource path remains layered above that baseline. When the timing
-facade is configured, Android SQLite or browser IndexedDB restores a fresh
-snapshot immediately and refreshes it in the background. The backend applies
-this exact TimingEngine pipeline before returning any row. After six days it
-revalidates; after seven days the client rejects the runtime snapshot and falls
-back to the bundled quran-align rows. A sync that lands during playback is
-installed only while quiet.
+The database deliberately excludes Quran.com word gloss, transliteration, QCF,
+and page-layout fields; those remain in the separate seven-day runtime cache.
+Bundling the QDC-derived topology requires written QF permission before release.
+The code architecture and that permission question are separate.
 
-For historical parity comparison, the removed `quran-v55.db` compatibility
-timing table (unchanged from `quran-v53.db`) had:
+The current timing table has:
 
 | Fact | Value |
 |---|---|
@@ -38,16 +35,16 @@ timing table (unchanged from `quran-v53.db`) had:
 load-bearing. Do not "tighten" it to `<`.** Two things depend on it:
 
 1. A genuine **single-word** repeat is two same-position segments — that is the
-   only shape it can have. Ear-confirmed runtime example: Hani
+   only shape it can have. Ear-confirmed example: Hani
    **4:163 word 20** (1180 ms + 1510 ms).
 2. A multi-word chain's **final** word returns to the high-water rather than
    below it (Mishary 2:14 replays 7…11; that closing `11` equals `maxBefore`).
    Under `<` the chain would drop its last word.
 
 Alignment artifacts that *would* read as false repeats are stripped by the
-**backend normalizer**, by duration and ratio rather than adjacency — see
+**offline build normalizer**, by duration and ratio rather than adjacency — see
 [Cleanup](#false-repeats-the-qdc-artifacts-we-scrub). Anything surviving into a
-runtime snapshot is data the pipeline judged real. If a specific row is wrong,
+release database is data the pipeline judged real. If a specific row is wrong,
 ear-check it and fix its class in `tools/build_db.py`; never with an engine-wide
 heuristic or a client-side repair.
 
@@ -152,7 +149,7 @@ only when the recitation advances past `highWater` onto new, unread words. The
 chain start is found by walking back from the active segment over the contiguous
 run of backtracked segments and taking the minimum position (see `activeInfo`).
 
-## TimingEngine V1.5 (`tools/build_db.py` + runtime normalizer)
+## TimingEngine V1.5 (`tools/build_db.py`)
 
 TimingEngine is deliberately not a source-voting system. Each input answers one
 question it is qualified to answer:
@@ -168,16 +165,12 @@ safety. Uncertainty never grows another heuristic branch: it falls back to the
 monotonic reference, or withholds word timing when even that is unsafe.
 
 Repeat-aware reciters are listed in `QDC_REPEAT_RECITERS` (map: our `reciter_id`
-→ quran.com recitation id). The backend's provider map mirrors those stable app
-IDs. `createLegacyRecitationProvider` fetches all chapters into a private raw
-cache, then `normalize_runtime_timings.py` produces the device snapshot:
+→ quran.com recitation id). `load_qdc_timings()` fetches and hash-verifies their
+offline build inputs, then `tools/build_db.py` produces the bundled rows:
 
-- `parse_source_chapters()` accepts today's legacy `verse_timings` and QF's
-  documented authenticated `audio_file.timestamps` shape. It rebases each
-  verse's gapless-file offsets to ayah-relative ms (`start − timestamp_from`)
-  and preserves repeats. `load_qdc_timings()` remains available for explicit
-  `--include-qdc-timings` migration audits; every candidate must pass the
-  full-corpus timing delta gate before it can replace the pinned baseline.
+- `load_qdc_timings()` rebases each verse's gapless-file offsets to ayah-relative
+  ms (`start − timestamp_from`) and preserves repeats. A normal build includes
+  this path; `--quran-align-only` exists only for explicit fallback audits.
 - `adjust_qdc_segments()` clamps word positions to our canonical word count,
   drops zero-length spans, keeps repeats, and counts the repeat spans.
 - `rebase_qdc_clock()` translates the complete repeat-aware row by the upper
@@ -217,11 +210,10 @@ The finalizer then enforces four corpus laws:
    complete monotonic quran-align row; if that is also unsafe, word timings are
    withheld and the reader highlights the whole ayah.
 
-The first runtime parity audit checked Alafasy against all 6,235 rows of the
-last historical database: every row was byte-for-byte identical, and runtime
-normalization additionally recovered 37:152 from the quran-align fallback. The
-same retained report still needs to be run for the other five runtime reciters
-before production deployment.
+The committed database audit checks all reciters for full word coverage, repeat
+topology, file duration, voice onset, non-overlap, provenance, and exact known
+fixtures. The Hani 5:2 two-pass phrase is pinned explicitly so a one-pass build
+cannot silently ship again.
 
 ### The small heuristic set
 
@@ -492,17 +484,17 @@ read ink together while 12 fades in white as a new word.
 
 ## Traps we hit (read before touching this)
 
-- **Do not remove the pinned repeat rows before runtime parity is live.** Change
-  the canonical pipeline and runtime normalizer tests, deploy the backend, set
-  the release endpoint, and prove all six reciters match before removing them.
-  The full-corpus timing delta gate must stay fail-closed.
+- **Do not replace the pinned repeat rows without full-corpus parity.** Change
+  the canonical pipeline, run its regression suite, and prove the replacement
+  matches the accepted topology before shipping. The timing delta gate stays
+  fail-closed.
 - **Bump the DB version when bundled fallback content changes.** `QuranDatabase.DB_FILE_NAME`
   (`quran-vN.db`) is the extraction key: the bundled asset is copied to internal
   storage only if that file doesn't already exist. Changing the DB's *content*
   without bumping the suffix means existing installs keep the stale cached copy —
   which is exactly why the orange first "didn't appear" in the historical
   bundled implementation. Always read the live value rather than trusting a
-  number here; runtime-only timing changes do not require a database bump.
+  number here; every timing change requires a database bump and app release.
 - **quran.com timestamps are gapless-file offsets**, not per-ayah. Always
   subtract the verse's `timestamp_from`. (The build does this; noted here because
   it's the first thing that looks wrong if you inspect the raw API.)
@@ -519,8 +511,7 @@ read ink together while 12 fades in white as a new word.
 ## Adding another repeat-aware reciter
 
 1. Add `our_reciter_id: qdc_id` to `QDC_REPEAT_RECITERS` in `tools/build_db.py`.
-2. Add the same app-ID → provider-ID mapping in `backend/src/cache.mjs`.
-3. Run an audit normalization and check repeat-span, coverage, physical gates,
+2. Run an audit build and check repeat-span, coverage, physical gates,
    and exact reader parity without committing the audit database.
-4. Ear-verify a flagged ayah, then deploy the backend. No client or bundled DB
-   change is needed unless the reciter lacks a quran-align fallback.
+3. Ear-verify flagged ayahs, add regression fixtures, rebuild `quran.db`, bump
+   `DB_FILE_NAME` and the fingerprint, then ship it through an app release.

@@ -60,11 +60,6 @@ from timing_delta import (  # noqa: E402
     read_timing_rows,
     rejected_changes,
 )
-from normalize_runtime_timings import (  # noqa: E402
-    normalize_snapshot,
-    parse_source_chapters,
-)
-
 CASES_DIR = TOOLS / "timing_patch_cases"
 VERDICTS_DIR = TOOLS / "timing_verdicts"
 PIPELINES = frozenset(
@@ -478,6 +473,7 @@ def audit_bundled_db():
         ):
             bad.append((rid, s, a))
     provenance = dict(db.execute("SELECT key,value FROM data_provenance"))
+    provider_ok = True
     if provenance.get("quran_com_content", "").startswith("excluded"):
         provider_values = db.execute(
             """
@@ -489,19 +485,7 @@ def audit_bundled_db():
             """
         ).fetchone()
         ayah_pages = db.execute("SELECT SUM(page) FROM ayahs").fetchone()[0]
-        overrides = list((TOOLS / "timing_overrides").glob("*.json"))
-        return (
-            not bad
-            and provider_values == (0, 0, 0, 0, 0, 0)
-            and ayah_pages == 0
-            and provenance == {
-                "quran_com_content": "excluded from committed database; runtime cache only",
-                "timings": "cpfair/quran-align CC-BY-4.0; QDC excluded from bundled database",
-                "qdc_delivery": "runtime cache only",
-            }
-            and not overrides
-            and db.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
-        )
+        provider_ok = provider_values == (0, 0, 0, 0, 0, 0) and ayah_pages == 0
     row = db.execute(
         "SELECT segments FROM timings WHERE reciter_id=1 "
         "AND surah_id=2 AND ayah_number=214"
@@ -577,14 +561,12 @@ def audit_bundled_db():
         [23, 27_890, 29_810],
     ]
     exact &= dict(db.execute("SELECT key,value FROM data_provenance")) == {
-        "quran_com_content": "local parity candidate",
+        "quran_com_content": "excluded from committed database; runtime cache only",
         "timings": (
             "QDC-derived repeat timings over everyayah recordings; "
-            "transitional compatibility baseline"
+            "bundled app-release dataset"
         ),
-        "qdc_delivery": (
-            "bundled compatibility baseline; runtime cache may replace"
-        ),
+        "qdc_delivery": "bundled; updated through app releases",
     }
     # A withheld row is an intentional whole-ayah fallback only when neither
     # source can describe the streamed recording safely. Pin every reciter's
@@ -662,13 +644,16 @@ def audit_bundled_db():
         "OR transliteration != trim(transliteration)"
     ).fetchone()[0]
     exact &= untrimmed == 0
-    # 4:152 — the reported English-only double space between أولئك and سوف.
+    # 4:152 — the public DB strips provider glosses; parity builds still pin
+    # the historical trailing-space regression to its normalized value.
     exact &= db.execute(
         "SELECT translation_en FROM words "
         "WHERE surah_id=4 AND ayah_number=152 AND position=10"
-    ).fetchone() == ("those",)
+    ).fetchone() == (
+        "" if provenance.get("quran_com_content", "").startswith("excluded") else "those",
+    )
     overrides = list((TOOLS / "timing_overrides").glob("*.json"))
-    return not bad and exact and not overrides and db.execute(
+    return not bad and exact and provider_ok and not overrides and db.execute(
         "PRAGMA integrity_check"
     ).fetchone()[0] == "ok"
 
@@ -799,7 +784,7 @@ def check_timing_delta():
     try:
         with sqlite3.connect(ROOT / "data" / "quran.db") as current:
             provenance = dict(current.execute("SELECT key,value FROM data_provenance"))
-        if provenance.get("qdc_delivery") == "runtime cache only":
+        if provenance.get("qdc_delivery") == "quran-align-only audit build":
             return True, "QDC corpus intentionally excluded; quran-align fallback audited separately"
         base = subprocess.run(
             ["git", "merge-base", "HEAD", "origin/master"],
@@ -838,37 +823,6 @@ def check_alignment_payload_parse():
         return False
     except json.JSONDecodeError:
         return valid
-
-
-def check_runtime_source_parse():
-    legacy = [{
-        "audio_files": [{
-            "verse_timings": [{
-                "verse_key": "2:1",
-                "timestamp_from": 100,
-                "segments": [[1, 120, 160]],
-            }],
-        }],
-    }]
-    authenticated = [{
-        "audio_file": {
-            "timestamps": [{
-                "verse_key": "2:1",
-                "timestamp_from": 100,
-                "segments": [[1, 120, 160]],
-            }],
-        },
-    }]
-    expected = {(2, 1): [[1, 20, 60]]}
-    parsed = (
-        parse_source_chapters(legacy) == expected
-        and parse_source_chapters(authenticated) == expected
-    )
-    try:
-        normalize_snapshot(1, legacy)
-        return False
-    except ValueError as error:
-        return parsed and "timed ayahs" in str(error)
 
 
 def main():
@@ -923,7 +877,6 @@ def main():
     completion_ok = check_completion_pipeline()
     gloss_ok = check_gloss_normalize()
     alignment_payload_ok = check_alignment_payload_parse()
-    runtime_source_ok = check_runtime_source_parse()
     database_ok = audit_bundled_db()
     qcf_runs_ok = check_qcf_v2_page_runs()
     qcf_assert_ok = check_qcf_v2_run_assertion()
@@ -937,7 +890,6 @@ def main():
         f"  {'ok  ' if alignment_payload_ok else 'FAIL'} "
         "quran-align release payload parse"
     )
-    print(f"  {'ok  ' if runtime_source_ok else 'FAIL'} runtime provider response parse")
     print(f"  {'ok  ' if database_ok else 'FAIL'} bundled timing database invariants")
     print(f"  {'ok  ' if qcf_runs_ok else 'FAIL'} public DB excludes QCF V2 fields")
     print(f"  {'ok  ' if qcf_assert_ok else 'FAIL'} QCF V2 run assertion rejects a wrong page")
@@ -953,8 +905,6 @@ def main():
         failures.append(("gloss normalize", "trailing-space strip failed", None))
     if not alignment_payload_ok:
         failures.append(("quran-align payload", "release artifact parse failed", None))
-    if not runtime_source_ok:
-        failures.append(("runtime provider", "response parse failed", None))
     if not database_ok:
         failures.append(("bundled database", "timing audit failed", None))
     if not qcf_runs_ok:
@@ -974,7 +924,7 @@ def main():
                 for line in str(detail).splitlines():
                     print(f"    {line}")
         return 1
-    print(f"all {len(cases) + 11} cases pass ({CASES_DIR.relative_to(Path.cwd())})")
+    print(f"all {len(cases) + 10} cases pass ({CASES_DIR.relative_to(Path.cwd())})")
     return 0
 
 

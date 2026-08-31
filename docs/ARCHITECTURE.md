@@ -4,8 +4,8 @@ How Beautiful Quran is put together, and why each piece is the way it is.
 
 ## The one-sentence version
 
-A **prepackaged SQLite database** of independently sourced Quran content and
-open timing fallbacks, plus a **separate seven-day runtime content cache**, feed a **single-module
+A **prepackaged SQLite database** of Quran content and reviewed repeat-aware
+timings, plus a **separate seven-day word/QCF cache**, feed a **single-module
 Compose app** whose signature feature — words lighting up in time with the
 reciter — is driven by a **pure-function sync engine** polling a **Media3
 player** 30 times a second.
@@ -14,12 +14,13 @@ player** 30 times a second.
 tools/build_db.py  (offline generation; committed asset verified in CI)
    quran-json (npm) ─┐
    quran-align zip  ─┼─► validate, align, pack ─► data/quran.db
+   QDC repeat data  ─┤
    QAC morphology   ─┘   (roots / lemma / POS — see ROOT_VIEWER.md)
                                                         │
 app (runtime)                                           ▼
    QuranDatabase ── copies asset once, opens read-only SQLite
-   QfContentCacheDatabase ── atomic runtime timing + mushaf rows and sync tokens
-   QuranRepository ── merges fresh runtime fields with independent bundled rows
+   QfContentCacheDatabase ── atomic word/QCF rows and sync tokens
+   QuranRepository ── merges fresh word/QCF fields with bundled reader rows
    SettingsRepository ── SharedPreferences behind a StateFlow
    PlayerController ─┬─ MediaController → PlaybackService (ExoPlayer + cache)
                      └─ PlayerUiState StateFlow (what's playing, where)
@@ -34,17 +35,13 @@ app (runtime)                                           ▼
 
 1. **Offline-first reader.** The released reader still has no accounts,
    analytics, or client API keys and works in airplane mode using the verified
-   bundled timing baseline and cached audio. Recitation audio uses a 1 GB
-   listening cache; explicit downloads keep chapters on the phone. A narrow
-   backend is the timing-content boundary: legacy QDC is its transitional
-   provider; after QF approval, authenticated QF content replaces only that
-   provider.
+   bundled repeat-aware timing dataset and cached audio. Recitation audio uses
+   a 1 GB listening cache; explicit downloads keep chapters on the phone.
 2. **The data pipeline is a build step, not app code.** Everything fragile
    about data (different word segmentations, a diagnostic prefix in an upstream
    release, basmalah offsets) is resolved by the canonical Python pipeline with
-   validation and logged diagnostics. It runs at build time for quran-align and
-   on the backend for runtime timing snapshots; repair logic never enters a
-   client.
+   validation and logged diagnostics. Repeat topology is generated, repaired,
+   and audited offline before an app release; repair logic never enters a client.
 3. **Purity where correctness matters.** The sync engine (`HighlightEngine`)
    is a pure function over immutable data — trivially unit-testable, no
    Android dependencies.
@@ -55,8 +52,8 @@ app (runtime)                                           ▼
 
 > **Quran Foundation Content API migration.** The cache architecture is in
 > place, but the provider is not yet an authenticated QF integration. QF
-> credentials remain a backend-only post-approval step. The remaining approval
-> and deployment gates live in [QF_CONTENT_SYNC.md](QF_CONTENT_SYNC.md).
+> credentials cannot be placed in a public client. The remaining approval and
+> integration gates live in [QF_CONTENT_SYNC.md](QF_CONTENT_SYNC.md).
 
 ### Transitional provider boundaries
 
@@ -65,9 +62,8 @@ word/QCF today: Android / web ── direct fixed-corpus GETs ── api.quran.c
                                       │
                                       └─ atomic 6-day/7-day device cache
 
-repeat timing: Android / web ── Content Sync facade ── Python normalizer
-                                      │
-                                      └─ legacy QDC today / authenticated QF later
+repeat timing: offline build pipeline ── normalize + verify ── quran.db
+                                      └─ Android and web read it locally
 ```
 
 The unauthenticated legacy word/QCF adapter fetches the same fixed 114-chapter
@@ -76,27 +72,20 @@ bookmark, or note data. It validates all 77,429 records and each QCF page-font
 codepoint run before one atomic client-cache replacement. The future QF-shaped
 Content Sync transport remains available behind the same cache interface.
 
-Repeat timing never consumes raw QDC in a client: the service runs the canonical
-cleaner, clock rebase, corrections, repairs, and physical finalizer first. It
-accepts no arbitrary upstream URL, stores no client identifier, and keeps the
-future QF ID map and OAuth flow server-side. See
-[`backend/README.md`](../backend/README.md). This is a transitional engineering
-control, not evidence of QF permission for the legacy endpoint.
+Repeat timing never consumes raw QDC or performs audio analysis in a client.
+`tools/build_db.py` runs the canonical cleaner, clock rebase, corrections,
+repairs, and physical finalizer. Android and web then read identical reviewed
+rows from the bundled database. This engineering control is not evidence of
+QF permission to redistribute legacy QDC-derived timing; written permission is
+an application blocker.
 
-### Runtime timing read path
+### Runtime content read path
 
-For each selected reciter and chapter, both clients use the same order:
+Repeat timings are always read from `quran.db`; there is no timing network path.
+For word gloss, transliteration, and QCF layout, both clients:
 
-1. Read a locally stored normalized snapshot when its source age is no more
-   than seven days. The facade sends the backend snapshot's actual age and the
-   device subtracts it from its checkpoint; the two cache layers cannot create
-   a hidden 14-day window.
-2. Otherwise read the bundled quran-align row immediately. First install,
-   airplane mode, backend outage, revocation, and an expired cache therefore do
-   not block the reader or change its controls. Because quran-align is one-pass,
-   the orange repeat overlay is the one capability unavailable until a fresh
-   runtime snapshot exists; ordinary word-by-word wash remains available.
-3. Bootstrap/incremental sync in the background on launch and resource open.
+1. Restore a local snapshot only while its source age is no more than seven days.
+2. Bootstrap/incremental sync in the background on launch and resource open.
    Revalidate after six days so a normal retry window remains before day seven;
    launch and network-restored hooks first inspect the local checkpoint, so a
    current cache makes zero API calls. If a due refresh fails offline, both
@@ -112,13 +101,10 @@ For each selected reciter and chapter, both clients use the same order:
    retains the complete sql.js database buffer. The cover opens only after
    local preparation and the runtime-cache decision finish. Offline failure
    still releases the independent reader.
-4. Validate full-corpus coverage, then commit snapshot rows, source age, and the
+3. Validate full-corpus coverage, then commit snapshot rows, source age, and the
    new opaque token atomically. A failed page, partial snapshot, parse, or write
    preserves the prior token and rows. Android's short “Quran cache refreshed”
    system toast is emitted only after that successful atomic commit.
-5. If playback is active when a snapshot arrives, retain the current timing
-   object for that session. The new rows take effect only while quiet or on the
-   next load, preventing an in-flight word from jumping.
 
 The word/QCF cache uses the same freshness and atomicity contract. Today the
 clients normalize direct legacy `by_chapter` responses into `mushafs:1`; after
@@ -146,7 +132,7 @@ Sources (all fetched over HTTPS, cached in `tools/.cache/`):
 | `quran-json` (npm) | Uthmani Unicode text, Saheeh International translation, surah metadata | Tanzil-derived, verse-keyed, no auth |
 | Quran.com chapter API (runtime only) | Per-word English gloss, transliteration, QCF V2 layout, page | Normalized and validated directly into the client `mushafs:1` cache; never committed to `quran.db` |
 | `cpfair/quran-align` release zip | Word-level timestamps per reciter, CC-BY 4.0 | The canonical open word-alignment dataset, matched to everyayah.com audio |
-| quran.com `qdc` audio API (runtime only) | **Repeat-aware** word timestamps for reciters in `QDC_REPEAT_RECITERS` | Normalized behind `recitations:*`; never committed to `quran.db`. See [REPEAT_HIGHLIGHTING.md](REPEAT_HIGHLIGHTING.md) |
+| quran.com legacy `qdc` audio API (offline build input) | **Repeat-aware** word topology for reciters in `QDC_REPEAT_RECITERS` | Normalized, repaired, and bundled in `quran.db`; written redistribution permission pending. See [REPEAT_HIGHLIGHTING.md](REPEAT_HIGHLIGHTING.md) |
 | everyayah MP3 ranges | Leading-silence and duration measurements in `tools/audio_onsets/` | Some individual ayah files begin with silence. The offline scanner holds the first wash until sustained voice without moving valid later word boundaries, and records each file's length as the ceiling no timing row may cross. |
 | Quranic Arabic Corpus (QAC) v0.4 | Per-word root, lemma, POS, morphology; root concordance | Standard open Quranic morphology / root dictionary. Powers the [Root Word Viewer](ROOT_VIEWER.md) |
 
@@ -163,11 +149,10 @@ The other two sources are mapped onto it by position:
   otherwise complete JSON array. `parse_alignment_payload` accepts only that
   known narrow shape; coverage and the locked archive digest still gate it.
 - **TimingEngine V1.5** gives each timing source one job: qdc supplies repeat
-  topology at runtime, quran-align supplies the bundled streamed-file clock and
-  monotonic fallback, and measured audio supplies physical limits.
-  `normalize_runtime_timings.py` runs `rebase_qdc_clock` and every canonical
-  correction/repair/finalizer on the backend before a snapshot can reach a
-  client. Full detail:
+  topology, quran-align supplies the streamed-file clock and monotonic fallback,
+  and measured audio supplies physical limits. `tools/build_db.py` runs
+  `rebase_qdc_clock` and every canonical correction/repair/finalizer offline
+  before the database can reach a client. Full detail:
   [REPEAT_HIGHLIGHTING.md](REPEAT_HIGHLIGHTING.md).
 - `clean_qdc_artifacts` produces one topology candidate from local structural
   evidence. Generated CTC rows then change only differing spans; verified
@@ -220,9 +205,8 @@ Corpus). Concordance counts and jump lists come from `roots` /
 `root_occurrences`.
 
 Timing segments are stored as one compact JSON array per (reciter, ayah)
-rather than one row per word: 43,641 verified compatibility rows instead of
-hundreds of thousands of word rows. Runtime snapshots use the same segment
-shape in a separate Android SQLite / browser IndexedDB cache.
+rather than one row per word: 43,641 verified app-release rows instead of
+hundreds of thousands of word rows.
 
 ## The sync engine
 
