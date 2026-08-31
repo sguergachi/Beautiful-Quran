@@ -205,7 +205,6 @@ internal fun normalizeLegacyChapter(
             val aligned = alignQcfWords(arabicWords, sourceWords, surah, ayah)
             arabicWords.indices.forEach { index ->
                 val position = index + 1
-                val gloss = sourceWords[minOf(index, sourceWords.lastIndex)]
                 val qcf = aligned[position] ?: AlignedQcf("", 0, 0, position)
                 val record = buildJsonObject {
                     put("record_type", RECORD_TYPE)
@@ -213,8 +212,8 @@ internal fun normalizeLegacyChapter(
                     put("surah_id", surah)
                     put("ayah_number", ayah)
                     put("position", position)
-                    put("translation_en", gloss.translation)
-                    put("transliteration", gloss.transliteration)
+                    put("translation_en", qcf.translation)
+                    put("transliteration", qcf.transliteration)
                     put("qcf_v2", qcf.glyph)
                     put("qcf_page", qcf.page)
                     put("qcf_line", qcf.line)
@@ -241,6 +240,7 @@ private fun alignQcfWords(
     var sourceIndex = 0
     while (canonicalIndex < canonical.size && sourceIndex < source.size) {
         val start = canonicalIndex
+        val sourceStart = sourceIndex
         val page = source[sourceIndex].page
         val line = source[sourceIndex].line
         val glyphs = mutableListOf<String>()
@@ -270,7 +270,15 @@ private fun alignQcfWords(
             }
         }
         check(looselyEqual(canonicalText, sourceText)) { "Cannot align Quran.com word $surah:$ayah" }
-        aligned[start + 1] = AlignedQcf(glyphs.joinToString(" "), page, line, canonicalIndex)
+        val sourceWords = source.subList(sourceStart, sourceIndex)
+        aligned[start + 1] = AlignedQcf(
+            glyphs.joinToString(" "),
+            page,
+            line,
+            canonicalIndex,
+            joinGloss(sourceWords.map { it.translation }),
+            joinGloss(sourceWords.map { it.transliteration }),
+        )
     }
     check(canonicalIndex == canonical.size && sourceIndex == source.size) {
         "Quran.com alignment ended early for $surah:$ayah"
@@ -346,7 +354,20 @@ private data class SourceWord(
     fun withMarker(marker: String) = copy(glyph = "$glyph $marker")
 }
 
-private data class AlignedQcf(val glyph: String, val page: Int, val line: Int, val spanEnd: Int)
+private fun joinGloss(parts: List<String>) =
+    parts.filter(String::isNotBlank).fold(mutableListOf<String>()) { joined, part ->
+        if (joined.lastOrNull() != part) joined += part
+        joined
+    }.joinToString(" ")
+
+private data class AlignedQcf(
+    val glyph: String,
+    val page: Int,
+    val line: Int,
+    val spanEnd: Int,
+    val translation: String = "",
+    val transliteration: String = "",
+)
 
 private const val RECORD_TYPE = "mushaf_word"
 private const val QCF_V2_FIRST_CODEPOINT = 0xFC41

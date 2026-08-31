@@ -63,6 +63,21 @@ describe('RuntimeMushafCache', () => {
     expect(records[1]).toMatchObject({ qcf_v2: '\uFC42 \uFC43', qcf_page: 106, ayah_page: 106 })
   })
 
+  it('keeps glosses aligned when canonical and provider token boundaries differ', () => {
+    const fusedCanonical = new Map([['36:22', ['وَمَالِيَ', 'لَآ']]])
+    const records = normalizeLegacyMushaf(fusedCanonical, new Map([[36, [{
+      verse_key: '36:22', page_number: 442,
+      words: [
+        { char_type_name: 'word', text_uthmani: 'وَمَا', code_v2: '\uFC41', page_number: 442, line_number: 4, translation: { text: 'And what' }, transliteration: { text: 'wamā' } },
+        { char_type_name: 'word', text_uthmani: 'لِىَ', code_v2: '\uFC42', page_number: 442, line_number: 4, translation: { text: '(is) for me' }, transliteration: { text: 'liya' } },
+        { char_type_name: 'word', text_uthmani: 'لَآ', code_v2: '\uFC43', page_number: 442, line_number: 4, translation: { text: 'not' }, transliteration: { text: 'lā' } },
+      ],
+    }]]]))
+
+    expect(records[0]).toMatchObject({ translation_en: 'And what (is) for me', transliteration: 'wamā liya' })
+    expect(records[1]).toMatchObject({ translation_en: 'not', transliteration: 'lā' })
+  })
+
   it('rejects a verse_key that only shares a prefix with the requested surah', () => {
     expect(() => normalizeLegacyMushaf(canonical, new Map([[5, [{
       ...legacyVerse, verse_key: '50:1',

@@ -13,7 +13,9 @@ Official references:
 - [Developer Terms](https://api-docs.quran.foundation/legal/developer-terms/)
 - [Developer Privacy Requirements](https://api-docs.quran.foundation/legal/developer-privacy/)
 - [API quickstart](https://api-docs.quran.foundation/docs/quickstart/)
-- [Manual authentication](https://api-docs.quran.foundation/docs/getting-started/authentication/manual-authentication/)
+- [Manual authentication](https://api-docs.quran.foundation/docs/quickstart/manual-authentication/)
+- [Legacy API migration](https://api-docs.quran.foundation/docs/quickstart/migration/)
+- [Content Sync getting started](https://api-docs.quran.foundation/docs/tutorials/content-sync/getting-started/)
 - [Content Sync client flow](https://api-docs.quran.foundation/docs/tutorials/content-sync/client-flow/)
 - [Offline cache patterns](https://api-docs.quran.foundation/docs/tutorials/content-sync/offline-cache-patterns/)
 
@@ -77,11 +79,17 @@ connection data is still visible to the service receiving the request.
 - [x] Word/QCF content is stored separately from the committed database on both
   platforms.
 - [x] The first word/QCF bootstrap validates all 77,429 words and 604 QCF page
-  runs before one atomic commit.
-- [x] The opening cover remains locked while a missing or due cache is checked,
+  runs before one atomic commit. The canonical/Quran.com token-boundary
+  mismatches are aligned as groups, so their glosses cannot shift onto later
+  words.
+- [x] The opening cover remains locked while a missing or expired cache is checked,
   reports chapter progress, warms the complete local database, and then opens.
 - [x] Fresh caches make zero API calls. Refresh starts after six days; content
   is withheld after seven days; offline failures retry when connectivity returns.
+- [x] A corrupt fresh cache is withheld and replaced in the background instead
+  of remaining unusable until its next scheduled refresh.
+- [x] Runtime cache schema v2 forces one clean bootstrap when token-boundary
+  mapping semantics change; older fresh snapshots are never reinterpreted.
 - [x] Android compares complete legacy snapshots inside one transaction and
   mutates only added, changed, or removed rows.
 - [x] Developer Mode shows phase, age, next refresh, expiry, last failure, API
@@ -151,6 +159,16 @@ the unauthenticated endpoint is authenticated.
 - [ ] Keep the QF client ID/secret server-side, use only approved content scope,
   cache access tokens for their lifetime, and retry a `401` at most once after
   refreshing the token.
+- [ ] Replace the transitional combined `mushafs:1` row mapper with the exact
+  approved multi-resource filter. Current QF documentation separates Mushaf
+  positioned words, word translations, and word transliterations into
+  `mushafs`, `word_by_word_translations`, and
+  `word_by_word_transliterations`; those snapshots must be joined by stable
+  word identity and validated as one complete reader view before publication.
+- [ ] Confirm the approved resource IDs in prelive. The current documentation
+  examples use word-translation resource `85` and production transliteration
+  resource `60`; examples are not approval or a substitute for the response
+  attached to this application.
 - [ ] Implement Content Sync bootstrap, relative cursors, snapshots, atomic
   upsert/delete application, opaque checkpoints, `resync_required`, termination
   purge, and seven-day freshness without stacking server and client TTLs.

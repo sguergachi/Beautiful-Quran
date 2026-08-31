@@ -50,9 +50,47 @@ class LegacyQuranComMushafApiTest {
         val second = parseMushafWord(Json.parseToJsonElement(rows[1].payload).jsonObject)
         assertEquals("\uFC41", first.qcfV2)
         assertEquals(2, first.qcfSpanEnd)
+        assertEquals("In the name of Allah", first.translation)
         assertEquals("", second.qcfV2)
+        assertEquals("", second.translation)
         assertEquals(0, second.qcfPage)
         assertEquals(1, second.ayahPage)
+    }
+
+    @Test
+    fun `combines source glosses when canonical text fuses words`() {
+        val rows = normalizeLegacyMushaf(
+            mapOf(36 to mapOf(22 to listOf("وَمَالِيَ", "لَآ"))),
+            mapOf(36 to listOf(verse(
+                "36:22",
+                442,
+                word("وَمَا", "\uFC41", 442, 4, "And what", "wamā"),
+                word("لِىَ", "\uFC42", 442, 4, "(is) for me", "liya"),
+                word("لَآ", "\uFC43", 442, 4, "not", "lā"),
+            ))),
+        ).map { parseMushafWord(Json.parseToJsonElement(it.payload).jsonObject) }
+
+        assertEquals("And what (is) for me", rows[0].translation)
+        assertEquals("wamā liya", rows[0].transliteration)
+        assertEquals("not", rows[1].translation)
+        assertEquals("lā", rows[1].transliteration)
+    }
+
+    @Test
+    fun `deduplicates identical source glosses when canonical text fuses words`() {
+        val rows = normalizeLegacyMushaf(
+            mapOf(27 to mapOf(20 to listOf("مَالِيَ"))),
+            mapOf(27 to listOf(verse(
+                "27:20",
+                378,
+                word("مَا", "\uFC41", 378, 7, "Why", "mā"),
+                word("لِىَ", "\uFC42", 378, 7, "Why", "liya"),
+            ))),
+        )
+        val word = parseMushafWord(Json.parseToJsonElement(rows.single().payload).jsonObject)
+
+        assertEquals("Why", word.translation)
+        assertEquals("mā liya", word.transliteration)
     }
 
     @Test

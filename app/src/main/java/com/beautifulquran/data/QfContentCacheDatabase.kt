@@ -38,6 +38,13 @@ class QfContentCacheDatabase(context: Context) : QfContentSyncStore {
                 PRIMARY KEY (resource_group, resource_id, record_type, record_key)
             )
         """.trimIndent())
+        // Schema v2 pins canonical/provider token-boundary alignment. Discard
+        // v1 atomically rather than reinterpret a still-fresh bad snapshot.
+        if (version < 2) {
+            execSQL("DELETE FROM cached_rows")
+            execSQL("DELETE FROM sync_state")
+            version = 2
+        }
     }
 
     override fun state(filter: QfResourceFilter): QfSyncState? =

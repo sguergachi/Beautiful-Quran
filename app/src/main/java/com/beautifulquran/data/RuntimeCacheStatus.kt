@@ -19,9 +19,11 @@ internal data class RuntimeCacheResource(
     val lastRefreshApiCalls: Long? = null,
 )
 
-class RuntimeCacheDiagnostics internal constructor(
+@ConsistentCopyVisibility
+data class RuntimeCacheDiagnostics internal constructor(
     val apiCalls: Long = 0,
     internal val resources: Map<Int, RuntimeCacheResource> = emptyMap(),
     internal val requestsSettled: Boolean = false,
     internal val syncProgress: QfSyncProgress? = null,
+    internal val cachedWords: Int = 0,
 )

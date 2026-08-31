@@ -226,22 +226,24 @@ class RuntimeMushafCacheTest {
     }
 
     @Test
-    fun `corrupt cached rows are withheld without rereading`() = runTest {
+    fun `corrupt fresh cached rows are withheld and repaired in background`() = runTest {
         val bad = QfCacheRow(
             resource, "mushaf_word", "5:2:19",
             """{"record_type":"mushaf_word","record_key":"5:2:19","surah_id":5,"ayah_number":2,"position":19,"translation_en":"seeking","transliteration":"x","qcf_v2":"x","qcf_page":0,"qcf_line":0,"qcf_span_end":19,"ayah_page":106}""",
             "1",
         )
         val store = Store(QfSyncState(filter, "old", 0L), listOf(bad))
+        val api = SnapshotApi()
         val cache = RuntimeMushafCache(
-            failingApi(), store, backgroundScope,
+            api, store, backgroundScope,
             nowMs = { 100L }, minimumWords = 1,
         )
 
         assertNull(cache.word(5, 2, 19))
-        assertNull(cache.word(5, 2, 19))
-        assertEquals(1, store.rowReads)
-        assertEquals(RuntimeCachePhase.ERROR, cache.status().phase)
+        runCurrent()
+        assertEquals("seeking", cache.word(5, 2, 19)?.translation)
+        assertEquals(1, api.syncs)
+        assertEquals(2, store.rowReads)
     }
 
     private fun failingApi() = CountingApi { error("offline") }

@@ -91,8 +91,7 @@ class RuntimeMushafCache(
     fun warm(): Boolean = currentWords() != null
 
     /** Number of QF word rows retained in memory for immediate chapter reads. */
-    fun cachedWordCount(): Int =
-        if (parsedToken != null && parsedToken == cachedState?.token) parsedWords.size else 0
+    fun cachedWordCount(): Int = _diagnostics.value.cachedWords
 
     fun words(surahId: Int): Map<Pair<Int, Int>, RuntimeMushafWord>? =
         currentWords()?.let { parsedBySurah[surahId].orEmpty() }
@@ -119,9 +118,7 @@ class RuntimeMushafCache(
             syncing = true
         }
         blockReadRefresh = false
-        _diagnostics.update {
-            RuntimeCacheDiagnostics(it.apiCalls, it.resources, false, null)
-        }
+        _diagnostics.update { it.copy(requestsSettled = false, syncProgress = null) }
         updateResource {
             it.copy(updatedAtMs = rememberedState()?.updatedAtMs, refreshing = true, lastError = null)
         }
@@ -132,6 +129,7 @@ class RuntimeMushafCache(
                 cachedState = state
                 parsedToken = null
                 unreadableToken = null
+                _diagnostics.update { it.copy(cachedWords = 0) }
                 rememberUpdatedAt(state)
                 scheduleChecks(state)
                 _changes.tryEmit(Unit)
@@ -170,6 +168,7 @@ class RuntimeMushafCache(
         }.getOrElse { error ->
             unreadableToken = expected.token
             updateResource { it.copy(lastError = error.message ?: error::class.simpleName) }
+            refresh()
             return null
         }
         val bySurah = parsed.values.groupBy { it.surahId }.mapValues { (_, words) ->
@@ -183,6 +182,7 @@ class RuntimeMushafCache(
             parsedBySurah = bySurah
             parsedToken = expected.token
             unreadableToken = null
+            _diagnostics.update { it.copy(cachedWords = parsed.size) }
             return parsed
         }
     }
@@ -219,21 +219,15 @@ class RuntimeMushafCache(
     }
 
     private fun countApiCall() {
-        _diagnostics.update {
-            RuntimeCacheDiagnostics(it.apiCalls + 1, it.resources, false, it.syncProgress)
-        }
+        _diagnostics.update { it.copy(apiCalls = it.apiCalls + 1, requestsSettled = false) }
     }
 
     private fun reportSyncProgress(progress: QfSyncProgress) {
-        _diagnostics.update {
-            RuntimeCacheDiagnostics(it.apiCalls, it.resources, false, progress)
-        }
+        _diagnostics.update { it.copy(requestsSettled = false, syncProgress = progress) }
     }
 
     private fun markRequestsSettled() {
-        _diagnostics.update {
-            RuntimeCacheDiagnostics(it.apiCalls, it.resources, true, it.syncProgress)
-        }
+        _diagnostics.update { it.copy(requestsSettled = true) }
     }
 
     /** Refresh while current, then notify readers exactly when retained data expires. */
@@ -262,6 +256,7 @@ class RuntimeMushafCache(
             val current = cachedState ?: store.state(FILTER)
             if (current?.token == token && !isQfContentFresh(current.updatedAtMs, nowMs())) {
                 parsedToken = null
+                _diagnostics.update { it.copy(cachedWords = 0) }
                 _changes.tryEmit(Unit)
                 refreshIfNeeded()
             }
@@ -270,13 +265,10 @@ class RuntimeMushafCache(
 
     private fun updateResource(transform: (RuntimeCacheResource) -> RuntimeCacheResource) {
         _diagnostics.update { current ->
-            RuntimeCacheDiagnostics(
-                current.apiCalls,
-                current.resources + (MUSHAF_ID to transform(
+            current.copy(
+                resources = current.resources + (MUSHAF_ID to transform(
                     current.resources[MUSHAF_ID] ?: RuntimeCacheResource(),
                 )),
-                current.requestsSettled,
-                current.syncProgress,
             )
         }
     }

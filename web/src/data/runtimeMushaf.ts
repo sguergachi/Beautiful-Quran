@@ -73,9 +73,14 @@ class MushafStore implements RuntimeMushafStore {
   private open(): Promise<IDBDatabase> {
     if (this.database) return this.database
     this.database = new Promise((resolve, reject) => {
-      const request = indexedDB.open('beautiful-quran-qf-mushaf-v1', 1)
+      const request = indexedDB.open('beautiful-quran-qf-mushaf-v2', 1)
       request.onupgradeneeded = () => request.result.createObjectStore('resources', { keyPath: 'id' })
-      request.onsuccess = () => resolve(request.result)
+      request.onsuccess = () => {
+        resolve(request.result)
+        // A separate name cannot be blocked by an old tab holding v1 open.
+        const stale = indexedDB.deleteDatabase('beautiful-quran-qf-mushaf-v1')
+        stale.onerror = () => undefined
+      }
       request.onerror = () => reject(request.error)
     })
     return this.database
@@ -429,12 +434,13 @@ export function normalizeLegacyMushaf(
     const aligned = alignQcfWords(arabicWords, sourceWords, verseKey)
     for (let index = 0; index < arabicWords.length; index += 1) {
       const position = index + 1
-      const gloss = sourceWords[Math.min(index, sourceWords.length - 1)]!
-      const qcf = aligned.get(position) ?? { glyph: '', page: 0, line: 0, spanEnd: position }
+      const qcf = aligned.get(position) ?? {
+        glyph: '', page: 0, line: 0, spanEnd: position, translation: '', transliteration: '',
+      }
       records.push({
         record_type: 'mushaf_word', record_key: `${verseKey}:${position}`,
         surah_id: surah!, ayah_number: ayah!, position,
-        translation_en: gloss.translation, transliteration: gloss.transliteration,
+        translation_en: qcf.translation, transliteration: qcf.transliteration,
         qcf_v2: qcf.glyph, qcf_page: qcf.page, qcf_line: qcf.line,
         qcf_span_end: qcf.spanEnd, ayah_page: ayahPages.get(verseKey) ?? qcf.page,
       })
@@ -446,11 +452,19 @@ export function normalizeLegacyMushaf(
 function alignQcfWords(canonical: string[], source: LegacySourceWord[], verseKey: string) {
   const canonicalNorm = canonical.map(normalizeForAlignment)
   const sourceNorm = source.map((word) => normalizeForAlignment(word.text))
-  const aligned = new Map<number, { glyph: string; page: number; line: number; spanEnd: number }>()
+  const aligned = new Map<number, {
+    glyph: string
+    page: number
+    line: number
+    spanEnd: number
+    translation: string
+    transliteration: string
+  }>()
   let canonicalIndex = 0
   let sourceIndex = 0
   while (canonicalIndex < canonical.length && sourceIndex < source.length) {
     const start = canonicalIndex
+    const sourceStart = sourceIndex
     const { page, line } = source[sourceIndex]!
     const glyphs: string[] = []
     let canonicalText = ''
@@ -471,12 +485,21 @@ function alignQcfWords(canonical: string[], source: LegacySourceWord[], verseKey
       } else canonicalText += canonicalNorm[canonicalIndex++]
     }
     if (!looselyEqual(canonicalText, sourceText)) throw new Error(`Cannot align Quran.com word ${verseKey}`)
-    aligned.set(start + 1, { glyph: glyphs.join(' '), page, line, spanEnd: canonicalIndex })
+    const sourceWords = source.slice(sourceStart, sourceIndex)
+    aligned.set(start + 1, {
+      glyph: glyphs.join(' '), page, line, spanEnd: canonicalIndex,
+      translation: joinGloss(sourceWords.map((word) => word.translation)),
+      transliteration: joinGloss(sourceWords.map((word) => word.transliteration)),
+    })
   }
   if (canonicalIndex !== canonical.length || sourceIndex !== source.length) {
     throw new Error(`Quran.com alignment ended early for ${verseKey}`)
   }
   return aligned
+}
+
+function joinGloss(parts: string[]) {
+  return parts.filter(Boolean).filter((part, index, all) => index === 0 || part !== all[index - 1]).join(' ')
 }
 
 /** Proves that each glyph is in the contiguous run encoded by its page font. */
