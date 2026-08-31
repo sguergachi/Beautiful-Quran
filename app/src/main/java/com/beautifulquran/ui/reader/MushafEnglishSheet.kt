@@ -843,8 +843,8 @@ private fun EnglishProseBlock(
 }
 
 /**
- * The blooms for one verse of the paragraph — the scrolling reader's own three
- * bands, drawn on a sentence instead of on a row of word nodes.
+ * The blooms for one verse of the paragraph — the scrolling reader's own word
+ * states, drawn as bands of a sentence instead of a row of word nodes.
  *
  * The scrolling reader washes **one word at a time**: the word being said gets
  * an [ShapedWordBloom.InkReveal] over its own glyphs, on its own letter sweep,
@@ -881,6 +881,13 @@ private fun englishVerseBlooms(
     val waiting = maxOf(cover, 1f - resting)
     val motions = pack.motions
     val active = motions.indexOfFirst { it.isActive }
+    // Where the words nobody has said yet begin. Not "after the active word":
+    // a reciter going back over a phrase leaves everything they already said
+    // Recited (InkEngine.wordState holds it to activeWord.highWater), and ink
+    // once laid never lifts. Reading the paper cover off the active index put
+    // it back over words the voice had already crossed, so a repeat dimmed the
+    // phrase it should have been tinting.
+    val unread = motions.indexOfFirst { it.ink.state == InkEngine.State.Upcoming }
     // Where each word's English sits on this leaf. Without an alignment the
     // words divide the sentence evenly, which is the proportion the leaf used
     // before it had one.
@@ -890,47 +897,39 @@ private fun englishVerseBlooms(
         verse.wordEnds?.takeIf { it.size == motions.size }
             ?: FloatArray(motions.size) { (it + 1f) / motions.size }
     }
-    when {
+    if (ends == null) {
         // No clock of its own: a leaf the voice is not on, waiting or settled.
-        ends == null ->
-            if (cover > 0f) blooms += cover(verse.range, paper, cover)
-
-        // A verse the voice has not reached, or has finished. Counted rather
-        // than read off the active index, because there is no active index.
-        active < 0 -> {
-            val unread = motions.count { it.ink.state == InkEngine.State.Upcoming }
-            if (unread == motions.size) blooms += cover(verse.range, paper, waiting)
-            else if (cover > 0f) blooms += cover(verse.range, paper, cover)
+        if (cover > 0f) blooms += cover(verse.range, paper, cover)
+    } else {
+        fun opensAt(word: Int) = verse.fragmentProgress(if (word <= 0) 0f else ends[word - 1])
+        val bands = englishWashBands(
+            range = verse.range,
+            from = if (active < 0) 0f else opensAt(active),
+            to = if (active < 0) 0f else verse.fragmentProgress(ends[active]),
+            unread = if (unread < 0) 1f else opensAt(unread),
+            text = text,
+        )
+        if (cover > 0f) {
+            if (!bands.read.isEmpty()) blooms += cover(bands.read, paper, cover)
+            if (!bands.retained.isEmpty()) blooms += cover(bands.retained, paper, cover)
         }
-
-        else -> {
-            val bands = englishWashBands(
-                range = verse.range,
-                from = verse.fragmentProgress(if (active == 0) 0f else ends[active - 1]),
-                to = verse.fragmentProgress(ends[active]),
-                text = text,
+        // A word the reciter has gone back over takes the orange instead of
+        // the first-pass wash, exactly as it does everywhere else — running
+        // both over the same span would wash it white and tint it at once.
+        if (active >= 0 && !bands.saying.isEmpty() && !motions[active].repeat) {
+            blooms += ShapedWordBloom.InkReveal(
+                range = bands.saying,
+                // The linear clock, never the tajweed-paced one: pacing places
+                // ink on Arabic letters, and there are none here.
+                progress = motions[active].plainSweepProgress.coerceIn(0f, 1f),
+                paper = paper,
+                restingAlpha = resting,
+                // No override: the bloom's range *is* a word now, so the
+                // engine's own figure is the right edge for it.
+                feather = null,
             )
-            if (cover > 0f && !bands.read.isEmpty()) {
-                blooms += cover(bands.read, paper, cover)
-            }
-            // A word the reciter has gone back over takes the orange instead of
-            // the first-pass wash, exactly as it does everywhere else — running
-            // both over the same span would wash it white and tint it at once.
-            if (!bands.saying.isEmpty() && !motions[active].repeat) {
-                blooms += ShapedWordBloom.InkReveal(
-                    range = bands.saying,
-                    // The linear clock, never the tajweed-paced one: pacing
-                    // places ink on Arabic letters, and there are none here.
-                    progress = motions[active].plainSweepProgress.coerceIn(0f, 1f),
-                    paper = paper,
-                    restingAlpha = resting,
-                    // No override: the bloom's range *is* a word now, so the
-                    // engine's own figure is the right edge for it.
-                    feather = null,
-                )
-            }
-            if (!bands.ahead.isEmpty()) blooms += cover(bands.ahead, paper, waiting)
         }
+        if (!bands.ahead.isEmpty()) blooms += cover(bands.ahead, paper, waiting)
     }
     if (ends != null) blooms.addEnglishRepeatBlooms(verse, motions, ends, palette, text)
     val markCover = (1f - pack.markAlpha.value).coerceIn(0f, 1f)
@@ -971,6 +970,7 @@ private fun MutableList<ShapedWordBloom>.addEnglishRepeatBlooms(
             range = verse.range,
             from = verse.fragmentProgress(if (index == 0) 0f else ends[index - 1]),
             to = verse.fragmentProgress(ends[index]),
+            unread = 1f,
             text = text,
         ).saying
         if (span.isEmpty()) return@forEachIndexed
@@ -1004,18 +1004,23 @@ internal fun englishWashBands(
     range: IntRange,
     from: Float,
     to: Float,
+    unread: Float,
     text: CharSequence = "",
 ): EnglishWashBands {
-    if (range.isEmpty()) return EnglishWashBands(IntRange.EMPTY, IntRange.EMPTY, IntRange.EMPTY)
+    if (range.isEmpty()) {
+        return EnglishWashBands(IntRange.EMPTY, IntRange.EMPTY, IntRange.EMPTY, IntRange.EMPTY)
+    }
     val length = range.last - range.first + 1
     fun at(fraction: Float) =
         range.first + (fraction.coerceIn(0f, 1f) * length).roundToInt().coerceIn(0, length)
     val opens = englishBandEdge(at(from), range, text)
     val closes = maxOf(englishBandEdge(at(to), range, text), opens)
+    val waits = maxOf(englishBandEdge(at(unread), range, text), closes)
     return EnglishWashBands(
         read = range.first until opens,
         saying = opens until closes,
-        ahead = closes..range.last,
+        retained = closes until waits,
+        ahead = waits..range.last,
     )
 }
 
@@ -1050,7 +1055,14 @@ internal data class EnglishWashBands(
     val read: IntRange,
     /** The word being said — the only thing on the leaf that blooms. */
     val saying: IntRange,
-    /** Still to come: paper. */
+    /**
+     * Said already, but ahead of where the voice now stands: what a reciter
+     * going back over a phrase leaves behind them. It keeps its ink — that is
+     * the whole of "ink once laid never lifts" — and is empty whenever the
+     * voice is at its own furthest point, which is nearly always.
+     */
+    val retained: IntRange,
+    /** Never yet said: paper. */
     val ahead: IntRange,
 )
 
