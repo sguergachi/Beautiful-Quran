@@ -67,6 +67,7 @@ import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import com.beautifulquran.QuranApp
 import com.beautifulquran.data.AyahSelectorSide
+import com.beautifulquran.data.EnglishLeafText
 import com.beautifulquran.data.PageNumberScript
 import com.beautifulquran.data.ReadingLayout
 import com.beautifulquran.data.ReadingMode
@@ -228,6 +229,29 @@ internal fun CustomizeScreen(
             },
             onSelect = { mode -> onUpdate { applyReadingMode(it, mode) } },
         )
+
+        // Which English the leaf is set from. Only the English leaf has the
+        // question to answer: the scrolling reader has always set the gloss,
+        // and the Arabic leaf sets no English at all.
+        if (
+            settings.readingLayout == ReadingLayout.MUSHAF &&
+            settings.readingMode == ReadingMode.ENGLISH_ONLY
+        ) {
+            Section("English")
+            InkCircledChoiceRow(
+                entries = ENGLISH_LEAF_TEXTS,
+                selected = settings.englishLeafText,
+                params = brushParams,
+                paintToken = paintToken,
+                label = { text ->
+                    when (text) {
+                        EnglishLeafText.TRANSLATION -> "Translation"
+                        EnglishLeafText.GLOSS -> "Word by word"
+                    }
+                },
+                onSelect = { text -> onUpdate { it.copy(englishLeafText = text) } },
+            )
+        }
 
         // The mushaf leaf sets its own hand from the page grid — the text
         // dial is a scroll-layout control and has nothing to turn there.

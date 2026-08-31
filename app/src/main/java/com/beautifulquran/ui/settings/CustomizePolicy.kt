@@ -1,6 +1,7 @@
 package com.beautifulquran.ui.settings
 
 import com.beautifulquran.data.ReadingLayout
+import com.beautifulquran.data.EnglishLeafText
 import com.beautifulquran.data.ReadingMode
 import com.beautifulquran.data.Settings
 import com.beautifulquran.data.ThemeMode
@@ -19,6 +20,16 @@ import com.beautifulquran.data.VerseNumberScript
  * functions below forced the setting back to it.
  */
 val MUSHAF_VIEW_MODES = listOf(ReadingMode.ARABIC_ONLY, ReadingMode.ENGLISH_ONLY)
+
+/**
+ * Which English the leaf may be set from.
+ *
+ * The published translation reads as a book and lines up with the recitation
+ * only approximately; the word-by-word gloss reads less well and lines up
+ * exactly. Neither is the right answer for every reader, so the reader picks.
+ * See `EnglishLeafText`.
+ */
+val ENGLISH_LEAF_TEXTS = listOf(EnglishLeafText.TRANSLATION, EnglishLeafText.GLOSS)
 
 /** Bilingual has no printed leaf, so entering mushaf from it lands on Arabic. */
 fun applyReadingLayout(settings: Settings, layout: ReadingLayout): Settings =

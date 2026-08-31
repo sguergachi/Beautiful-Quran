@@ -17,6 +17,7 @@ import com.beautifulquran.domain.HighlightClock
 import com.beautifulquran.domain.HighlightEngine
 import com.beautifulquran.domain.EnglishBook
 import com.beautifulquran.domain.MushafCatalog
+import com.beautifulquran.data.EnglishLeafText
 import com.beautifulquran.domain.buildEnglishBook
 import com.beautifulquran.domain.quranWordKey
 import com.beautifulquran.domain.OutputLatency
@@ -260,14 +261,24 @@ class ReaderViewModel(
      * The verses that begin on one mushaf leaf — what the English leaf is set
      * from. A page at a time, and windowed in the repository.
      */
-    suspend fun leafText(page: Int): Map<Long, String> = repository.mushafPageTranslations(page)
+    suspend fun leafText(page: Int, text: EnglishLeafText): Map<Long, String> =
+        repository.mushafPageTranslations(page, text)
 
-    fun ensureMushaf() {
-        if (_mushaf.value != null) return
+    /** Which English the book in [_mushaf] was paginated for. */
+    private var mushafLeafText: EnglishLeafText? = null
+
+    /**
+     * [text] is which English the leaf is set from, and the book has to be
+     * rebuilt when it changes: the gloss chain and the published translation
+     * are different lengths, so they do not break into the same leaves.
+     */
+    fun ensureMushaf(text: EnglishLeafText) {
+        if (_mushaf.value != null && mushafLeafText == text) return
+        mushafLeafText = text
         viewModelScope.launch {
             val catalog = repository.mushafCatalog()
             val surahs = repository.surahs().associateBy { it.id }
-            val prose = repository.englishVerseProse()
+            val prose = repository.englishVerseProse(text)
             val book = buildEnglishBook(catalog) { surahId, ayah ->
                 prose[quranWordKey(surahId, ayah, 1)] ?: 0
             }

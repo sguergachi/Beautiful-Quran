@@ -1132,8 +1132,16 @@ internal fun MushafPager(
             // English book paginates itself and its leaves do not stop where
             // the Arabic ones do.
             val leafPages = bookLeaf?.pages ?: page.page..page.page
-            var leafText by remember(leafPages) { mutableStateOf<Map<Long, String>?>(null) }
-            LaunchedEffect(leafPages, english) {
+            // Keyed on the loader itself, not only on the leaf: the reader can
+            // change which English the leaf is set from
+            // (`Settings.englishLeafText`), and that hands down a new lambda.
+            // Keyed on the pages alone, the leaf kept the text it had loaded
+            // and the choice did nothing until the page was turned away from
+            // and back.
+            var leafText by remember(leafPages, leafTextNow.value) {
+                mutableStateOf<Map<Long, String>?>(null)
+            }
+            LaunchedEffect(leafPages, english, leafTextNow.value) {
                 if (english) {
                     leafText = buildMap {
                         leafPages.forEach { putAll(leafTextNow.value(it)) }

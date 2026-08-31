@@ -276,7 +276,7 @@ fun ReaderScreen(
     // rather than the word's own. See MushafCatalog.readingPageOf.
     val mushafWholeVerses = mushafMode && settings.readingMode == ReadingMode.ENGLISH_ONLY
     LaunchedEffect(mushafMode) {
-        if (mushafMode) viewModel.ensureMushaf()
+        if (mushafMode) viewModel.ensureMushaf(settings.englishLeafText)
     }
     val mushafCatalog = mushafUi?.catalog
     // The English book's leaves. A Madinah page takes more than one where its
@@ -2591,6 +2591,11 @@ fun ReaderScreen(
                     // which verse and how far into it. Resolving that to a word
                     // needs the verse itself, which lives here: its word count,
                     // and where each of those words lands in its English.
+                    val leafTextSource = settings.englishLeafText
+                    val leafTextForSetting: suspend (Int) -> Map<Long, String> =
+                        remember(viewModel, leafTextSource) {
+                            { page -> viewModel.leafText(page, leafTextSource) }
+                        }
                     val seekAlignments = remember(content) { EnglishVerseAlignments(content) }
                     val onMushafVerseSeek = remember(mushafSurahId, viewModel, content, seekAlignments) {
                         { surahId: Int, ayah: Int, through: Float ->
@@ -2654,7 +2659,7 @@ fun ReaderScreen(
                         english = settings.readingMode == ReadingMode.ENGLISH_ONLY,
                         verseNumberScript = settings.verseNumberScript,
                         hideEnglishParentheticals = settings.hideEnglishParentheticals,
-                        leafText = viewModel::leafText,
+                        leafText = leafTextForSetting,
                         book = englishBook,
                         modifier = Modifier.fillMaxSize(),
                     )

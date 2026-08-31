@@ -592,6 +592,18 @@ line gets even quarters — one per word — crossed linearly, and its own feath
 cap (`BasmalahWash.PLAIN_MAX_FEATHER`) so the last quarter stays untouched until
 its turn.
 
+**Which English, though, is the reader's to choose.** The leaf is set from the
+published translation by default, and `Settings.englishLeafText` will set it
+from the word-by-word gloss instead — the same text the scrolling reader has
+always shown. The two are not the same trade. The translation reads as a book
+and lines up with the recitation only through the alignment above; the gloss
+reads as a crib and lines up exactly, because every Arabic word carries its own
+English and there is nothing to align. Someone listening to learn the Arabic
+wants the second; someone listening to follow the meaning wants the first.
+
+The pagination follows the choice: the two texts are different lengths, so
+`EnglishBook` is rebuilt when it changes and the leaves fall differently.
+
 **A tap reads the same map backwards.** It says *where* in the sentence, and
 `englishSeekWordPosition` answers with the word whose share of the sentence
 covers that point — tap "the Book" and the reciter says ٱلْكِتَٰبُ. Without an

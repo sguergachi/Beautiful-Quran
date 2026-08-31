@@ -21,6 +21,20 @@ enum class ReadingLayout { SCROLL, MUSHAF }
 /** Digit form of the trailing ﴿N﴾ / ﴾N﴿ verse mark. */
 enum class VerseNumberScript { ARABIC, ENGLISH }
 
+/**
+ * Which English the leaf is set from.
+ *
+ * [TRANSLATION] is the published verse translation, which reads as a book but
+ * only lines up with the recitation approximately — Arabic word order is not
+ * English word order, so `EnglishWordAlignment` has to bridge the two and
+ * anchors about 84 % of words. [GLOSS] is the word-by-word crib the scrolling
+ * reader sets, stitched into a line: it reads less well, and every Arabic word
+ * lights exactly its own English, because there is nothing to align.
+ *
+ * A reading preference rather than a right answer, so it is the reader's.
+ */
+enum class EnglishLeafText { TRANSLATION, GLOSS }
+
 /** Folio figures on a mushaf page break: one script, or both. */
 enum class PageNumberScript { BOTH, ARABIC, ENGLISH }
 
@@ -62,6 +76,8 @@ data class Settings(
     val readingLayout: ReadingLayout = ReadingLayout.SCROLL,
     val verseNumberScript: VerseNumberScript = VerseNumberScript.ARABIC,
     val pageNumberScript: PageNumberScript = PageNumberScript.BOTH,
+    /** Which English the mushaf's English leaf is set from. */
+    val englishLeafText: EnglishLeafText = EnglishLeafText.TRANSLATION,
     val showWordGloss: Boolean = true,
     val showTransliteration: Boolean = false,
     val showTranslation: Boolean = false,
@@ -128,6 +144,7 @@ class SettingsRepository(context: Context) {
         readingLayout = prefs.enum("readingLayout", ReadingLayout.SCROLL),
         verseNumberScript = prefs.enum("verseNumberScript", VerseNumberScript.ARABIC),
         pageNumberScript = prefs.enum("pageNumberScript", PageNumberScript.BOTH),
+        englishLeafText = prefs.enum("englishLeafText", EnglishLeafText.TRANSLATION),
         showWordGloss = prefs.getBoolean("showWordGloss", true),
         showTransliteration = prefs.getBoolean("showTransliteration", false),
         showTranslation = prefs.getBoolean("showTranslation", false),
@@ -184,6 +201,7 @@ class SettingsRepository(context: Context) {
             putInt("readingLayout", next.readingLayout.ordinal)
             putInt("verseNumberScript", next.verseNumberScript.ordinal)
             putInt("pageNumberScript", next.pageNumberScript.ordinal)
+            putInt("englishLeafText", next.englishLeafText.ordinal)
             putBoolean("showWordGloss", next.showWordGloss)
             putBoolean("showTransliteration", next.showTransliteration)
             putBoolean("showTranslation", next.showTranslation)
