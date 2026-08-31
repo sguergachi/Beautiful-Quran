@@ -600,9 +600,19 @@ both replaced was worse than approximate: every tap restarted the verse, so a
 reader who wanted the last clause of a thirty-second verse heard the whole of it
 again.
 
-For the same reason the leaf carries no orange repeat and no wet-ink glint.
-Both are statements about one Arabic word — that the reciter went back over it,
-that its ink is still wet — and there is no word here to say them of.
+**The orange repeat rides the same map.** A word the reciter goes back over is
+tinted on its own English, one `ColorReveal` per word of the chain, on that
+word's own repeat clock — the occurrence being spoken sweeps its orange on, the
+ones before it hold theirs, and they release together when the chain completes.
+That is the scrolling reader's construction unchanged. The leaf carried no
+repeat while it had no alignment, for the honest reason that a repeat is a
+statement about one Arabic word and there was no word here to say it of; the
+alignment answers that. A repeated word takes the orange *instead of* the
+first-pass wash, as it does everywhere else — running both over the same span
+would wash it white and tint it at once.
+
+The wet-ink glint stays off. It is the sheen on ink being laid this instant,
+and a span of prose is too big a thing to glisten.
 
 It does lead-turn, but only at its own cut (§13.4). The Arabic lead is measured
 from the last word *printed* on the page, which is routinely mid-sentence on a

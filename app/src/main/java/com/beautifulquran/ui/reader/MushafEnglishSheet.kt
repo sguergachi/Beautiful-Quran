@@ -99,9 +99,12 @@ import kotlinx.coroutines.flow.StateFlow
  * Verses still to come wait under the same recess; verses already read hold
  * their ink.
  *
- * For the same reason the leaf carries no orange repeat and no wet-ink glint:
- * both are statements about one Arabic word — that the reciter went back over
- * it, that its ink is still wet — and there is no word here to say them of.
+ * The orange repeat rides the same map: a word the reciter goes back over is
+ * tinted on its own English ([addEnglishRepeatBlooms]). The leaf carried
+ * neither that nor the wet-ink glint while it had no alignment, because both
+ * are statements about one Arabic word and there was no word here to say them
+ * of. There is now. The glint stays off: it is the sheen on ink being laid this
+ * instant, and a span of prose is too big a thing to glisten.
  */
 @Composable
 internal fun MushafEnglishSheet(
@@ -793,7 +796,7 @@ private fun EnglishProseBlock(
                             englishVerseBlooms(
                                 verse = verse,
                                 pack = packs[verse.surahId to verse.ayah],
-                                paper = palette.paperColor,
+                                palette = palette,
                                 text = block.text,
                             )
                         }
@@ -866,20 +869,30 @@ private fun EnglishProseBlock(
 private fun englishVerseBlooms(
     verse: EnglishProseVerse,
     pack: AyahInkPack?,
-    paper: Color,
+    palette: WordInkPalette,
     /** The paragraph, so a band's edge can be kept out of the middle of a word. */
     text: CharSequence,
 ): List<ShapedWordBloom> {
     if (pack == null) return emptyList()
+    val paper = palette.paperColor
     val blooms = ArrayList<ShapedWordBloom>(4)
     val cover = pack.recessCover.value.coerceIn(0f, 1f)
     val resting = InkEngine.State.Upcoming.inkAlpha()
     val waiting = maxOf(cover, 1f - resting)
     val motions = pack.motions
     val active = motions.indexOfFirst { it.isActive }
+    // Where each word's English sits on this leaf. Without an alignment the
+    // words divide the sentence evenly, which is the proportion the leaf used
+    // before it had one.
+    val ends = if (motions.isEmpty()) {
+        null
+    } else {
+        verse.wordEnds?.takeIf { it.size == motions.size }
+            ?: FloatArray(motions.size) { (it + 1f) / motions.size }
+    }
     when {
         // No clock of its own: a leaf the voice is not on, waiting or settled.
-        motions.isEmpty() ->
+        ends == null ->
             if (cover > 0f) blooms += cover(verse.range, paper, cover)
 
         // A verse the voice has not reached, or has finished. Counted rather
@@ -891,11 +904,6 @@ private fun englishVerseBlooms(
         }
 
         else -> {
-            // Where this word's English sits on this leaf. Without an alignment
-            // the words divide the sentence evenly, which is the proportion the
-            // leaf used before it had one.
-            val ends = verse.wordEnds?.takeIf { it.size == motions.size }
-                ?: FloatArray(motions.size) { (it + 1f) / motions.size }
             val bands = englishWashBands(
                 range = verse.range,
                 from = verse.fragmentProgress(if (active == 0) 0f else ends[active - 1]),
@@ -905,7 +913,10 @@ private fun englishVerseBlooms(
             if (cover > 0f && !bands.read.isEmpty()) {
                 blooms += cover(bands.read, paper, cover)
             }
-            if (!bands.saying.isEmpty()) {
+            // A word the reciter has gone back over takes the orange instead of
+            // the first-pass wash, exactly as it does everywhere else — running
+            // both over the same span would wash it white and tint it at once.
+            if (!bands.saying.isEmpty() && !motions[active].repeat) {
                 blooms += ShapedWordBloom.InkReveal(
                     range = bands.saying,
                     // The linear clock, never the tajweed-paced one: pacing
@@ -921,11 +932,60 @@ private fun englishVerseBlooms(
             if (!bands.ahead.isEmpty()) blooms += cover(bands.ahead, paper, waiting)
         }
     }
+    if (ends != null) blooms.addEnglishRepeatBlooms(verse, motions, ends, palette, text)
     val markCover = (1f - pack.markAlpha.value).coerceIn(0f, 1f)
     if (markCover > 0f && !verse.markRange.isEmpty()) {
         blooms += cover(verse.markRange, paper, markCover)
     }
     return blooms
+}
+
+/**
+ * The orange the reciter leaves on a word they went back over, on this leaf's
+ * English of it.
+ *
+ * The leaf used to carry no repeat, and the reason was sound while it lasted:
+ * a repeat is a statement about one Arabic word, and the leaf had no way to
+ * say which English that was. It has one now ([EnglishWordAlignment]), so the
+ * statement can be made — and it is the same statement the scrolling reader
+ * and the Arabic leaf make, drawn the same way: a [ShapedWordBloom.ColorReveal]
+ * on each word of the chain, on that word's own repeat clock.
+ *
+ * One bloom per word rather than one over the chain, because the chain's words
+ * do not share a clock: the occurrence being spoken sweeps its orange on, the
+ * ones before it hold theirs at full, and they release together when the chain
+ * completes. The chain is a handful of words, and with the leaf's covers
+ * abutting rather than reaching (`coverPad = 0`) the spans tile without
+ * double-tinting at the seams.
+ */
+private fun MutableList<ShapedWordBloom>.addEnglishRepeatBlooms(
+    verse: EnglishProseVerse,
+    motions: List<InkMotion>,
+    ends: FloatArray,
+    palette: WordInkPalette,
+    text: CharSequence,
+) {
+    motions.forEachIndexed { index, motion ->
+        if (motion.repeatAlpha <= 0f) return@forEachIndexed
+        val span = englishWashBands(
+            range = verse.range,
+            from = verse.fragmentProgress(if (index == 0) 0f else ends[index - 1]),
+            to = verse.fragmentProgress(ends[index]),
+            text = text,
+        ).saying
+        if (span.isEmpty()) return@forEachIndexed
+        add(
+            ShapedWordBloom.ColorReveal(
+                range = span,
+                progress = motion.repeatProgress,
+                color = palette.repeatInkColor,
+                restingAlpha = 0f,
+                layerAlpha = motion.repeatAlpha,
+                feather = motion.repeatFeather,
+                colorAlpha = InkEngine.tuning.repeatInkAlpha,
+            ),
+        )
+    }
 }
 
 private fun cover(range: IntRange, paper: Color, alpha: Float) =
