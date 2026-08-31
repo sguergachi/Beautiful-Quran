@@ -623,7 +623,7 @@ really does stop mid-sentence, so that is where the lead belongs.
 
 The leaf is one grid, and everything on it lands on the grid.
 
-**Vertically**, both settings divide the same 16.69 units of `MushafGrid`, and
+**Vertically**, both settings divide the same 17.05 units of `MushafGrid`, and
 `MushafLeafBands` holds them to it — the five bands must sum to `SLOTS`, or the
 folio runs off the paper at one end and a strip of nothing is unaccounted for at
 the other. They spend the budget differently because their ink does:

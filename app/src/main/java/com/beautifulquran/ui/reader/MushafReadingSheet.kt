@@ -493,7 +493,7 @@ internal fun MushafFolioMarks(
     val ink = MaterialTheme.colorScheme.onBackground
     val folio = mushafFolioLayout(page, script)
     val westernStyle = MaterialTheme.typography.labelSmall.copy(
-        fontSize = glyphSize * MushafType.RATIO.pow(MushafType.HEAD),
+        fontSize = glyphSize * MushafType.RATIO.pow(MushafType.FOLIO_GLOSS),
         letterSpacing = 0.14.em,
     )
     val westernColor = ink.copy(alpha = 0.50f)

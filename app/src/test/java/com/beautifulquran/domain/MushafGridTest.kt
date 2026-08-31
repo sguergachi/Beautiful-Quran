@@ -8,7 +8,7 @@ class MushafGridTest {
 
     @Test
     fun `fifteen of the leaf's units are revelation and the chrome takes the rest`() {
-        assertEquals(16.69f, MushafGrid.SLOTS, 0.001f)
+        assertEquals(17.05f, MushafGrid.SLOTS, 0.001f)
         assertEquals(15, MushafGrid.TEXT_LINES)
         // The head and its gutter stand clear without spending a second line.
         assertEquals(
@@ -38,15 +38,21 @@ class MushafGridTest {
         val glyph = 57f
         // A chapter's name is written in the same hand as the revelation.
         assertEquals(glyph, MushafType.stepPx(glyph, MushafType.TITLE), 0.01f)
-        // The folio's figure is three steps down, wayfinding four.
+        // The running head and the folio's Arabic figure share the third step
+        // down; the Latin numeral glossing that figure is a fourth.
         assertEquals(
             glyph / (1.25f * 1.25f * 1.25f),
             MushafType.stepPx(glyph, MushafType.FOLIO_FIGURE),
             0.01f,
         )
         assertEquals(
-            glyph / (1.25f * 1.25f * 1.25f * 1.25f),
+            glyph / (1.25f * 1.25f * 1.25f),
             MushafType.stepPx(glyph, MushafType.HEAD),
+            0.01f,
+        )
+        assertEquals(
+            glyph / (1.25f * 1.25f * 1.25f * 1.25f),
+            MushafType.stepPx(glyph, MushafType.FOLIO_GLOSS),
             0.01f,
         )
         // Each step is the same interval as the last: that is what makes it a
@@ -54,9 +60,10 @@ class MushafGridTest {
         val a = MushafType.stepPx(glyph, -1) / MushafType.stepPx(glyph, 0)
         val b = MushafType.stepPx(glyph, -2) / MushafType.stepPx(glyph, -1)
         assertEquals(a, b, 0.0001f)
-        // The running head is the smallest hand on the leaf.
+        // The Latin gloss is the smallest hand on the leaf, and stands a step
+        // under the Arabic figure it glosses.
         assertTrue(
-            MushafType.stepPx(glyph, MushafType.HEAD) <
+            MushafType.stepPx(glyph, MushafType.FOLIO_GLOSS) <
                 MushafType.stepPx(glyph, MushafType.FOLIO_FIGURE),
         )
     }

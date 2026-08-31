@@ -14,15 +14,15 @@ import kotlin.math.pow
  * The unit is one line's pitch, and the leaf is [SLOTS] of them:
  *
  * ```
- * 0.24  running head — the smallest hand on the leaf, and no more paper
- *       than its own line box: the leaf begins under the status bar, so
- *       the phone's forehead is already the margin above it
- *  0.7  head gutter — enough paper to stand the head off the text
+ *  0.3  running head — no more paper than its own line box: the leaf
+ *       begins under the status bar, so the phone's forehead is already
+ *       the margin above it
+ *    1  head gutter — a whole line's pitch, the figure the grid names
  *  15   the revelation — the Madinah page's own grid
  * 0.35  tail — paper between revelation and folio
  *  0.4  folio, its figure centred in the band
  *  ---
- * 16.69
+ * 17.05
  * ```
  *
  * The furniture is trimmed to what it actually needs to read as furniture,
@@ -32,7 +32,7 @@ import kotlin.math.pow
  * a bare 10dp; fourteen percent of the leaf on vertical chrome was the odd one
  * out.
  *
- * These constants remain the canonical fifteen-row fit and the total 16.69
+ * These constants remain the canonical fifteen-row fit and the total 17.05
  * unit budget. The pager's larger display hand reassigns one unit of that same
  * budget from head/tail furniture to a sixteenth visual row; the leaf itself
  * does not grow and its 604 page boundaries do not move.
@@ -47,24 +47,27 @@ object MushafGrid {
      * wayfinding needs about half of that, and the paper saved goes to the
      * text, which is what the leaf is for.
      *
-     * It is now the label's own line box and nothing more, set hard against
-     * the top of the leaf. Centred in a taller band it carried a strip of air
+     * It is the label's own line box and nothing more, set hard against the
+     * top of the leaf. Centred in a taller band it carried a strip of air
      * above it, and the leaf already begins below the status bar — the phone's
      * forehead is the margin, and buying a second one came out of the text.
-     * Measured on the reference leaf the label inks 15 px against a 81 px
-     * unit, so this is its line box with nothing to spare: any less clips it.
+     * The figure tracks [MushafType.HEAD]: at that hand the label inks about
+     * 19 px against an 81 px unit, and a band under 0.30 clips its descenders.
      */
-    const val RUNNING_HEAD = 0.24f
+    const val RUNNING_HEAD = 0.30f
 
     /**
-     * Paper between the head and the first line of revelation. A head that
-     * sits closer than about a line's pitch reads as part of the block
-     * instead of standing off it — and the first line's ink reaches high
+     * Paper between the head and the first line of revelation.
+     *
+     * A head that sits closer than about a line's pitch reads as part of the
+     * block instead of standing off it — and the first line's ink reaches high
      * into its own slot (the faces ink 1.37 em above the baseline), so the
-     * visible gap is the gutter less that reach. Set to most of a line's
-     * pitch so the head reads as a head, with air under it.
+     * visible gap is the gutter *less* that reach. At most of a pitch the
+     * head still read as the block's first line once that reach was taken off
+     * it. A whole pitch is the figure the grid already names as the threshold,
+     * so the gutter is that and not a fraction chosen beside it.
      */
-    const val HEAD_GUTTER = 0.70f
+    const val HEAD_GUTTER = 1.00f
     const val TEXT_LINES = MUSHAF_LINES_PER_PAGE
     /**
      * Paper between the last line and the folio. The folio belongs to the
@@ -130,7 +133,11 @@ val MUSHAF_ENGLISH_BANDS = MushafLeafBands(
 /** The display bands: the furniture gives a unit up for a sixteenth row. */
 val MUSHAF_ARABIC_BANDS = MushafLeafBands(
     runningHead = MushafGrid.RUNNING_HEAD,
-    headGutter = 0.20f,
+    // The sixteenth row is bought out of the gutters and the tail, so this
+    // stays the tighter of the two — but it moves with the English gutter,
+    // because both leaves divide one budget and the head must stand off the
+    // revelation on either of them.
+    headGutter = 0.50f,
     well = MUSHAF_DISPLAY_LINES_PER_PAGE.toFloat(),
     tail = 0.05f,
     folio = 0.20f,
@@ -151,8 +158,8 @@ fun mushafLeafBands(english: Boolean): MushafLeafBands =
  *
  * ```
  *   0   the revelation, and a chapter's name in its panel — the same hand
- *  -3   the folio's own Arabic figure
- *  -4   the running head, and the Latin numeral glossing the folio
+ *  -3   the running head, and the folio's own Arabic figure
+ *  -4   the Latin numeral glossing the folio
  * ```
  *
  * The two figures of the folio stand a step apart because they are two
@@ -174,14 +181,23 @@ object MushafType {
     const val FOLIO_FIGURE = -3
 
     /**
-     * The leaf's smallest hand: the running head, and the Latin numeral that
-     * glosses the folio — one size for everything you read once a page turn
-     * and then ignore for fifteen lines.
+     * The running head.
      *
-     * The head stood two steps under the revelation and the folio's figures
-     * one step under that, which made wayfinding the second loudest thing on
-     * the page. Both came down; the bands they sit in came down with them, and
-     * the paper is the revelation's.
+     * It stood two steps under the revelation once, which made wayfinding the
+     * second loudest thing on the page, and it was brought down four — to the
+     * leaf's smallest hand, shared with the folio's Latin gloss. Four is a
+     * rung too far: at that size the head reads as a caption mislaid at the
+     * top of the leaf rather than as the leaf's own heading, and it no longer
+     * sits on the scale with anything. Three is the rung the folio's Arabic
+     * figure already stands on, which is the company a running head keeps.
      */
-    const val HEAD = -4
+    const val HEAD = -3
+
+    /**
+     * The Latin numeral glossing the folio — the leaf's smallest hand, and the
+     * only thing left on it. It stays a step under the Arabic figure beside
+     * it for the reason those two are a step apart at all: a Latin numeral set
+     * at a Hafs numeral's size reads larger than it.
+     */
+    const val FOLIO_GLOSS = -4
 }
