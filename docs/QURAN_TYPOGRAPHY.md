@@ -527,31 +527,32 @@ whose English is the three characters ", a", then crosses " guidance" in the
 Verses still to come wait under the same recess as the Arabic leaf's; verses
 already read hold their ink; the packs are the very same `AyahInkPack`.
 
-**The edge is a word wide, not a line wide.** `Tuning.washFeather` is 1.6 of a
-*word* — an edge wider than the thing it crosses, so a word breathes in rather
-than being wiped — and that is what the scrolling reader draws on each English
-gloss. The leaf's range is a whole sentence rather than one word, so the number
-cannot be used raw: 1.6 of a sentence is wider than the sentence, and nothing
-behind the voice would ever reach full ink. It was a *line of the page* for a
-while, which is the wrong unit: a line of prose is six or seven words, so the
-soft edge crossed six or seven words at once and the wash read as a slow
-brightening of the paragraph rather than as words being said. The unit is the
-word, as everywhere else — the sentence holds one English span per Arabic word,
-so `washFeather / words` of the sentence is the same 1.6 words the scrolling
-reader shows, whatever length the verse is. Measured on 2:167 (23 words over
-seven lines): exactly one line is part-inked at any moment, where the line rule
-kept two in the air and let neither settle.
+**And it blooms one word at a time, which is the whole point.** The scrolling
+reader gives the word being said an `InkReveal` over its own glyphs, on its own
+letter sweep, with the engine's own feather; the words behind it hold full ink
+and draw nothing; the words ahead sit under paper. That is this app's ink. The
+leaf could not copy it while it had no alignment, so it swept one continuous
+front across the sentence instead — and a front crossing a paragraph is not a
+word blooming, however narrow its edge is made. Two attempts at the edge width
+(a line of the page, then 1.6 word-widths of the sentence) both missed for the
+same reason: the shape was wrong, not the size.
 
-**A verse seeked into rises out of the paper rather than appearing on it.**
-Tapping the middle of a sentence puts the voice there, which makes everything
-before the tap already read — and drawing that read ink at full strength on the
-next frame made the sentence flash on. The Arabic leaf never did that: its
-already-read words carry the ayah's recess cover and lift over
-`Tuning.recessMs`. A verse of prose is one range rather than a row of words, so
-it takes the same lift through `ShapedWordBloom.InkReveal.readAlpha` — the ink
-strength *behind* the wash, which starts at the upcoming floor and reaches full
-in 400 ms. Measured on device: a mid-sentence tap that used to complete in a
-single frame now takes ~370 ms of rise.
+With an alignment it is a direct copy, because the states are contiguous —
+everything before the word being said is read, everything after is not. So the
+sentence is drawn as three bands rather than one bloom per word
+(`englishWashBands`): the read band, the word being said, and the band still to
+come. Same picture as fifty per-word blooms, at three. The bloom's range *is* a
+word now, so it takes `Tuning.washFeather` unmodified, exactly as the scrolling
+reader does.
+
+The three bands also give the recess its place. **A verse seeked into rises out
+of the paper rather than appearing on it:** tapping the middle of a sentence
+makes everything before the tap already read, and drawing that at full strength
+on the next frame made the sentence flash on. The cover rides the read band and
+lifts over `Tuning.recessMs`, which is precisely what the Arabic leaf does with
+its already-read words; the word being said never carries it, because it is
+revealed by its own bloom. Measured on device: a mid-sentence tap that used to
+complete in a single frame takes ~370 ms of rise.
 
 **But it reads the plain clock out of them, not the paced one.** The word's own
 share comes from `InkMotion.plainSweepProgress` — linear across the word's

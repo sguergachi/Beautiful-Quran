@@ -76,6 +76,7 @@ import com.beautifulquran.ui.theme.ShapedWordBloom
 import com.beautifulquran.ui.theme.letterFadeIn
 import com.beautifulquran.ui.theme.quietClickable
 import com.beautifulquran.ui.theme.shapedWordBloom
+import kotlin.math.roundToInt
 import kotlinx.coroutines.flow.StateFlow
 
 /**
@@ -92,11 +93,11 @@ import kotlinx.coroutines.flow.StateFlow
  * The ink is the same ink, driven from the very same [AyahInkPack] the Arabic
  * leaf and the scrolling reader are driven from ([MushafPageInkClocks]). The
  * reciter's timings name Arabic words and this page prints none of them, so the
- * wash crosses the sentence — but it crosses it on the map
- * `EnglishWordAlignment` builds from the word glosses, so the ink is on the
- * English of the word being said, not on the same fraction of the characters
- * ([englishVerseReadProgress]). Verses still to come wait under the same
- * recess; verses already read hold their ink.
+ * leaf finds them: `EnglishWordAlignment` says which English each Arabic word
+ * is about, and the wash blooms *that span* on that word's own letter sweep —
+ * one word at a time, as the scrolling reader does ([englishVerseBlooms]).
+ * Verses still to come wait under the same recess; verses already read hold
+ * their ink.
  *
  * For the same reason the leaf carries no orange repeat and no wet-ink glint:
  * both are statements about one Arabic word — that the reciter went back over
@@ -828,21 +829,28 @@ private fun EnglishProseBlock(
 }
 
 /**
- * The blooms for one verse of the paragraph.
+ * The blooms for one verse of the paragraph — the scrolling reader's own three
+ * bands, drawn on a sentence instead of on a row of word nodes.
  *
- * Three states and no more. A verse still to come waits under a paper cover; a
- * verse being recited is washed across at the fraction of it the voice has
- * reached; a verse already read holds full ink and draws nothing at all.
+ * The scrolling reader washes **one word at a time**: the word being said gets
+ * an [ShapedWordBloom.InkReveal] over its own glyphs, on its own letter sweep,
+ * with the engine's own feather; the words behind it hold full ink and draw
+ * nothing; the words ahead sit under paper. That is the pace and the fidelity
+ * of this app's ink, and for a while the leaf could not copy it — it had no way
+ * to say which English a word was — so it swept one continuous front across the
+ * whole sentence instead. A front crossing a paragraph is not a word blooming,
+ * however narrow its edge is made, and it read as the page brightening rather
+ * than as words being said.
  *
- * A verse the reader has just seeked into is the awkward fourth case, and it is
- * the one the recess cover exists for. Tapping the middle of a sentence puts the
- * voice there, which makes everything before the tap *already read* — and the
- * wash drew that read ink at full strength on the very next frame, so the
- * sentence flashed on and then dimmed again as the wash restarted behind the
- * voice. The Arabic leaf never did that: its already-read words carry the ayah's
- * `recessCover` and rise out of the paper over `recessMs`. A verse of prose is
- * one range rather than a row of words, so it takes the same rise through
- * [ShapedWordBloom.InkReveal.readAlpha].
+ * With an alignment the leaf can copy it exactly, because the states are
+ * contiguous: everything before the word being said is read, everything after
+ * is not. So it is three ranges rather than one bloom per word
+ * ([englishWashBands]) — the same picture, at three blooms instead of fifty.
+ *
+ * The recess cover rides the read band, which is what the Arabic leaf does with
+ * its already-read words: a verse seeked into rises out of the paper over
+ * `recessMs` rather than appearing on it. The word being said never carries the
+ * cover — it is revealed by its own bloom, exactly as on the Arabic leaf.
  */
 private fun englishVerseBlooms(
     verse: EnglishProseVerse,
@@ -850,142 +858,98 @@ private fun englishVerseBlooms(
     paper: Color,
 ): List<ShapedWordBloom> {
     if (pack == null) return emptyList()
-    val blooms = ArrayList<ShapedWordBloom>(2)
-    if (pack.motions.isEmpty()) {
-        val cover = pack.recessCover.value.coerceIn(0f, 1f)
-        if (cover > 0f) {
-            blooms += ShapedWordBloom.UpcomingDim(
-                range = verse.range,
-                paper = paper,
-                coverAlpha = cover,
-            )
+    val blooms = ArrayList<ShapedWordBloom>(4)
+    val cover = pack.recessCover.value.coerceIn(0f, 1f)
+    val resting = InkEngine.State.Upcoming.inkAlpha()
+    val waiting = maxOf(cover, 1f - resting)
+    val motions = pack.motions
+    val active = motions.indexOfFirst { it.isActive }
+    when {
+        // No clock of its own: a leaf the voice is not on, waiting or settled.
+        motions.isEmpty() ->
+            if (cover > 0f) blooms += cover(verse.range, paper, cover)
+
+        // A verse the voice has not reached, or has finished. Counted rather
+        // than read off the active index, because there is no active index.
+        active < 0 -> {
+            val unread = motions.count { it.ink.state == InkEngine.State.Upcoming }
+            if (unread == motions.size) blooms += cover(verse.range, paper, waiting)
+            else if (cover > 0f) blooms += cover(verse.range, paper, cover)
         }
-    } else {
-        val read = verse.fragmentProgress(
-            englishVerseReadProgress(pack.motions, verse.wordEnds),
-        )
-        val resting = InkEngine.State.Upcoming.inkAlpha()
-        val readAlpha = englishReadInkAlpha(pack.recessCover.value, resting)
-        if (read < 1f || readAlpha < 1f) {
-            blooms += ShapedWordBloom.InkReveal(
+
+        else -> {
+            // Where this word's English sits on this leaf. Without an alignment
+            // the words divide the sentence evenly, which is the proportion the
+            // leaf used before it had one.
+            val ends = verse.wordEnds?.takeIf { it.size == motions.size }
+                ?: FloatArray(motions.size) { (it + 1f) / motions.size }
+            val bands = englishWashBands(
                 range = verse.range,
-                progress = read,
-                paper = paper,
-                // What the sentence rests at before the voice reaches it —
-                // the same floor the unread words of a recited verse sit at on
-                // the Arabic leaf.
-                restingAlpha = resting,
-                // One English span per Arabic word, so the sentence's word
-                // count is the unit the edge is measured in.
-                feather = englishWashFeather(pack.motions.size),
-                readAlpha = readAlpha,
+                from = verse.fragmentProgress(if (active == 0) 0f else ends[active - 1]),
+                to = verse.fragmentProgress(ends[active]),
             )
+            if (cover > 0f && !bands.read.isEmpty()) {
+                blooms += cover(bands.read, paper, cover)
+            }
+            if (!bands.saying.isEmpty()) {
+                blooms += ShapedWordBloom.InkReveal(
+                    range = bands.saying,
+                    // The linear clock, never the tajweed-paced one: pacing
+                    // places ink on Arabic letters, and there are none here.
+                    progress = motions[active].plainSweepProgress.coerceIn(0f, 1f),
+                    paper = paper,
+                    restingAlpha = resting,
+                    // No override: the bloom's range *is* a word now, so the
+                    // engine's own figure is the right edge for it.
+                    feather = null,
+                )
+            }
+            if (!bands.ahead.isEmpty()) blooms += cover(bands.ahead, paper, waiting)
         }
     }
     val markCover = (1f - pack.markAlpha.value).coerceIn(0f, 1f)
     if (markCover > 0f && !verse.markRange.isEmpty()) {
-        blooms += ShapedWordBloom.UpcomingDim(
-            range = verse.markRange,
-            paper = paper,
-            coverAlpha = markCover,
-        )
+        blooms += cover(verse.markRange, paper, markCover)
     }
     return blooms
 }
 
+private fun cover(range: IntRange, paper: Color, alpha: Float) =
+    ShapedWordBloom.UpcomingDim(range = range, paper = paper, coverAlpha = alpha)
+
 /**
- * How strong the ink *behind* the wash stands while a verse lifts out of the
- * page recess, 0..1.
+ * The three bands a verse's sentence stands in while one of its words is being
+ * said: what is behind the voice, the word itself, and what is still to come.
  *
- * The cover runs from a full recess (`1 - upcoming ink`) to nothing over
- * [InkEngine.Tuning.recessMs]; read ink runs the other way, from the upcoming
- * floor up to full, so a sentence seeked into rises out of the paper instead of
- * appearing on it. Full recess and the upcoming floor are the same number, so
- * at the start of the lift the read ink and the unread ink are indistinguishable
- * — which is exactly right: nothing has been read *on this page* yet.
+ * [from] and [to] are where that word's English begins and ends as a share of
+ * the *fragment* on this leaf, so a verse the book carried over needs no special
+ * case: the half the voice is not on comes out with an empty middle band and
+ * either all read or all ahead, which is what it is.
  */
-internal fun englishReadInkAlpha(recessCover: Float, restingAlpha: Float): Float {
-    val full = 1f - restingAlpha
-    if (full <= 0f) return 1f
-    val lift = (1f - recessCover.coerceIn(0f, full) / full).coerceIn(0f, 1f)
-    return restingAlpha + (1f - restingAlpha) * lift
+internal fun englishWashBands(range: IntRange, from: Float, to: Float): EnglishWashBands {
+    if (range.isEmpty()) return EnglishWashBands(IntRange.EMPTY, IntRange.EMPTY, IntRange.EMPTY)
+    val length = range.last - range.first + 1
+    fun at(fraction: Float) =
+        range.first + (fraction.coerceIn(0f, 1f) * length).roundToInt().coerceIn(0, length)
+    val opens = at(from)
+    val closes = maxOf(at(to), opens)
+    return EnglishWashBands(
+        read = range.first until opens,
+        saying = opens until closes,
+        ahead = closes..range.last,
+    )
 }
 
-/**
- * The wash's edge, as a fraction of the sentence it crosses.
- *
- * [InkEngine.tuning.washFeather] is 1.6 of a **word** — an edge wider than the
- * thing it crosses, so a word breathes in rather than being wiped. That is what
- * the scrolling reader draws on each English gloss, and it is the feel this leaf
- * has to match. The leaf's difficulty is only that its range is the whole
- * sentence rather than one word, so the same number cannot be used raw: 1.6 of a
- * sentence is an edge wider than the sentence, and nothing behind the voice ever
- * reaches full ink.
- *
- * It was a *line of the page* for a while, which is the wrong unit — a line of
- * prose is six or seven words, so the edge crossed six or seven words at once
- * and the wash read as a slow brightening rather than as words being said. The
- * unit is the word, as everywhere else: the sentence holds one English span per
- * Arabic word ([EnglishWordAlignment]), so an edge of `washFeather` word-spans
- * is `washFeather / words` of the sentence — the same 1.6 words the scrolling
- * reader shows, whatever length the verse is.
- *
- * A one-word verse (2:1, الٓمٓ) comes out at the cap and breathes as one, which
- * is right: it *is* one word.
- */
-internal fun englishWashFeather(words: Int): Float =
-    (InkEngine.tuning.washFeather / words.coerceAtLeast(1))
-        .coerceIn(EnglishWashFeatherFloor, InkEngine.tuning.washFeather)
+/** See [englishWashBands]. */
+internal data class EnglishWashBands(
+    /** Behind the voice: full ink, or rising out of the page recess. */
+    val read: IntRange,
+    /** The word being said — the only thing on the leaf that blooms. */
+    val saying: IntRange,
+    /** Still to come: paper. */
+    val ahead: IntRange,
+)
 
-/**
- * Only a guard. The rule above is already scale-free — it is 1.6 words wide on
- * a seven-word verse and on a fifty-word one — so this exists to stop a verse
- * with an implausible word count from producing a hard peel, not to widen a
- * long sentence's edge back out.
- */
-private const val EnglishWashFeatherFloor = 0.02f
-
-/**
- * How far through a verse's *English* the reciter has read, 0..1.
- *
- * The timings name Arabic words, so this starts from them: the word being
- * recited, plus how far into it its own letter sweep has come. [wordEnds] then
- * says where that word's English actually is — the share of the sentence it
- * ends at — so the ink lands on the words the listener is hearing rather than
- * on the same fraction of the characters (`EnglishWordAlignment`). Without an
- * alignment the words divide the sentence evenly, which is what the leaf did
- * before and what an unalignable verse still gets.
- *
- * Read off the active word's *index* rather than by counting what is behind it,
- * so the wash cannot run backwards on a frame where a word ahead of the voice
- * has not yet settled into its state.
- *
- * The word's own share is crossed on [InkMotion.plainSweepProgress] — the
- * linear clock — and never on the tajweed-paced one. Pacing says where
- * inside an Arabic *word* the time is going, which is a true and useful thing
- * to draw on Arabic letters and a false one to draw on English prose: it parks
- * the sentence's wash for as long as the reciter sustains a madd (a closing
- * word is held ~3 s), then sprints it. The scrolling reader's English mode
- * refuses the same curve for the same reason.
- */
-internal fun englishVerseReadProgress(
-    motions: List<InkMotion>,
-    wordEnds: FloatArray? = null,
-): Float {
-    if (motions.isEmpty()) return 1f
-    val active = motions.indexOfFirst { it.isActive }
-    if (active < 0) {
-        // No word is being recited: either the verse is done (or an idle leaf,
-        // which reads as done) or it has not begun.
-        val waiting = motions.count { it.ink.state == InkEngine.State.Upcoming }
-        return if (waiting == motions.size) 0f else 1f
-    }
-    val sweep = motions[active].plainSweepProgress.coerceIn(0f, 1f)
-    val ends = wordEnds?.takeIf { it.size == motions.size }
-        ?: return ((active + sweep) / motions.size).coerceIn(0f, 1f)
-    val from = if (active == 0) 0f else ends[active - 1]
-    return (from + sweep * (ends[active] - from)).coerceIn(0f, 1f)
-}
 
 /**
  * The basmalah, in English, as a printed translation sets it: a display line of

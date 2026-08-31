@@ -575,9 +575,9 @@ latched edge.
 about where inside an Arabic *word* the time is going, so `LetterSweep` also
 publishes `plainProgress` — the same Animatable with neither applied — surfaced
 as `InkMotion.plainSweepProgress`. A renderer with no Arabic letters under its
-wash must read that one: the mushaf's English leaf crosses a sentence of prose
-(`englishVerseReadProgress`), and the paced value parks that sentence wherever
-the reciter sustains a madd. The scrolling reader's English mode gets the same
+wash must read that one: the mushaf's English leaf blooms the English span of
+the word being said (`englishVerseBlooms`), and the paced value parks that
+bloom wherever the reciter sustains a madd. The scrolling reader's English mode gets the same
 result at the source, by passing `pacing = null` to `rememberInkMotions`; the
 mushaf cannot, because one `AyahInkPack` draws both leaves.
 
