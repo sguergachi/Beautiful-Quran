@@ -61,6 +61,25 @@ class EnglishVerseProgressTest {
     }
 
     @Test
+    fun `a verse seeked into rises out of the recess instead of flashing on`() {
+        val resting = InkEngine.State.Upcoming.inkAlpha()
+        val full = 1f - resting
+        // The frame the tap lands on: read ink is indistinguishable from
+        // unread, because nothing has been read on this page yet.
+        assertEquals(resting, englishReadInkAlpha(full, resting), 0.0001f)
+        // Half way through the lift, and settled.
+        assertEquals(
+            resting + (1f - resting) * 0.5f,
+            englishReadInkAlpha(full * 0.5f, resting),
+            0.0001f,
+        )
+        assertEquals(1f, englishReadInkAlpha(0f, resting), 0.0001f)
+        // Out-of-range covers cannot push the ink past either end.
+        assertEquals(1f, englishReadInkAlpha(-1f, resting), 0.0001f)
+        assertEquals(resting, englishReadInkAlpha(2f, resting), 0.0001f)
+    }
+
+    @Test
     fun `a verse with no clock of its own is left at full ink`() {
         assertEquals(1f, englishVerseReadProgress(emptyList()), 0f)
     }

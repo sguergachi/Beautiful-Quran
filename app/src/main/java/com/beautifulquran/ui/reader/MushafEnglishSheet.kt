@@ -835,6 +835,16 @@ private fun EnglishProseBlock(
  * Three states and no more. A verse still to come waits under a paper cover; a
  * verse being recited is washed across at the fraction of it the voice has
  * reached; a verse already read holds full ink and draws nothing at all.
+ *
+ * A verse the reader has just seeked into is the awkward fourth case, and it is
+ * the one the recess cover exists for. Tapping the middle of a sentence puts the
+ * voice there, which makes everything before the tap *already read* — and the
+ * wash drew that read ink at full strength on the very next frame, so the
+ * sentence flashed on and then dimmed again as the wash restarted behind the
+ * voice. The Arabic leaf never did that: its already-read words carry the ayah's
+ * `recessCover` and rise out of the paper over `recessMs`. A verse of prose is
+ * one range rather than a row of words, so it takes the same rise through
+ * [ShapedWordBloom.InkReveal.readAlpha].
  */
 private fun englishVerseBlooms(
     verse: EnglishProseVerse,
@@ -858,7 +868,9 @@ private fun englishVerseBlooms(
         val read = verse.fragmentProgress(
             englishVerseReadProgress(pack.motions, verse.wordEnds),
         )
-        if (read < 1f) {
+        val resting = InkEngine.State.Upcoming.inkAlpha()
+        val readAlpha = englishReadInkAlpha(pack.recessCover.value, resting)
+        if (read < 1f || readAlpha < 1f) {
             blooms += ShapedWordBloom.InkReveal(
                 range = verse.range,
                 progress = read,
@@ -866,8 +878,9 @@ private fun englishVerseBlooms(
                 // What the sentence rests at before the voice reaches it —
                 // the same floor the unread words of a recited verse sit at on
                 // the Arabic leaf.
-                restingAlpha = InkEngine.State.Upcoming.inkAlpha(),
+                restingAlpha = resting,
                 feather = englishWashFeather(lines),
+                readAlpha = readAlpha,
             )
         }
     }
@@ -880,6 +893,24 @@ private fun englishVerseBlooms(
         )
     }
     return blooms
+}
+
+/**
+ * How strong the ink *behind* the wash stands while a verse lifts out of the
+ * page recess, 0..1.
+ *
+ * The cover runs from a full recess (`1 - upcoming ink`) to nothing over
+ * [InkEngine.Tuning.recessMs]; read ink runs the other way, from the upcoming
+ * floor up to full, so a sentence seeked into rises out of the paper instead of
+ * appearing on it. Full recess and the upcoming floor are the same number, so
+ * at the start of the lift the read ink and the unread ink are indistinguishable
+ * — which is exactly right: nothing has been read *on this page* yet.
+ */
+internal fun englishReadInkAlpha(recessCover: Float, restingAlpha: Float): Float {
+    val full = 1f - restingAlpha
+    if (full <= 0f) return 1f
+    val lift = (1f - recessCover.coerceIn(0f, full) / full).coerceIn(0f, 1f)
+    return restingAlpha + (1f - restingAlpha) * lift
 }
 
 /** The lines of the paragraph this verse's sentence is set over. */

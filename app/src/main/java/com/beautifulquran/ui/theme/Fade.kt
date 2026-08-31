@@ -168,15 +168,24 @@ sealed class ShapedWordBloom {
     ) : ShapedWordBloom()
 
     /** First-pass ink: paper cover over full-ink glyphs, wash from
-     * [restingAlpha] → 1 (same curve as [letterFadeIn]). [feather] overrides
-     * the modifier-level feather when set — a tajweed-paced word narrows its
-     * edge so letter dwell stays visible. */
+     * [restingAlpha] → [readAlpha] (same curve as [letterFadeIn]). [feather]
+     * overrides the modifier-level feather when set — a tajweed-paced word
+     * narrows its edge so letter dwell stays visible. */
     data class InkReveal(
         override val range: IntRange,
         val progress: Float,
         val paper: Color,
         val restingAlpha: Float,
         val feather: Float? = null,
+        /**
+         * Ink strength *behind* the wash. One, except while a range is lifting
+         * out of the page recess: a verse seeked into stands partly read
+         * already, and that read ink has to rise out of the paper over
+         * [InkEngine.Tuning.recessMs] rather than appear at full strength in
+         * one frame. The Arabic leaf gets the same rise from its per-word
+         * covers; a verse of prose is one range, so it takes it here.
+         */
+        val readAlpha: Float = 1f,
     ) : ShapedWordBloom()
 
     /** Tinted ink (orange repeat, white-gold glint): shaped glyphs tinted to
@@ -301,12 +310,16 @@ fun Modifier.shapedWordBloom(
                     // wash so glyphs breathe in. Padded clip covers mark/AA
                     // overhangs (same as UpcomingDim).
                     val p = bloom.progress.coerceIn(0f, 1f)
-                    if (p >= 1f) return@forEach
+                    val read = bloom.readAlpha.coerceIn(0f, 1f)
+                    // A finished wash still draws while its read ink is rising
+                    // out of the recess — skipping it there is the frame that
+                    // reads as the whole range flashing on.
+                    if (p >= 1f && read >= 1f) return@forEach
                     val lineBounds = lineBoundsCache.boundsFor(textLayout, start, endExclusive)
                     val paperColors = stops.map { t ->
                         val s = inkSmootherstep(t)
                         val glyphAlpha = bloom.restingAlpha +
-                            (1f - bloom.restingAlpha) * (if (rtl) s else 1f - s)
+                            (read - bloom.restingAlpha) * (if (rtl) s else 1f - s)
                         bloom.paper.copy(alpha = (1f - glyphAlpha).coerceIn(0f, 1f))
                     }
                     val pad = coverPad.toPx()

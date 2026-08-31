@@ -527,6 +527,17 @@ whose English is the three characters ", a", then crosses " guidance" in the
 Verses still to come wait under the same recess as the Arabic leaf's; verses
 already read hold their ink; the packs are the very same `AyahInkPack`.
 
+**A verse seeked into rises out of the paper rather than appearing on it.**
+Tapping the middle of a sentence puts the voice there, which makes everything
+before the tap already read — and drawing that read ink at full strength on the
+next frame made the sentence flash on. The Arabic leaf never did that: its
+already-read words carry the ayah's recess cover and lift over
+`Tuning.recessMs`. A verse of prose is one range rather than a row of words, so
+it takes the same lift through `ShapedWordBloom.InkReveal.readAlpha` — the ink
+strength *behind* the wash, which starts at the upcoming floor and reaches full
+in 400 ms. Measured on device: a mid-sentence tap that used to complete in a
+single frame now takes ~370 ms of rise.
+
 **But it reads the plain clock out of them, not the paced one.** The word's own
 share comes from `InkMotion.plainSweepProgress` — linear across the word's
 karaoke hold — and never from `sweepProgress`, which carries the two corrections
