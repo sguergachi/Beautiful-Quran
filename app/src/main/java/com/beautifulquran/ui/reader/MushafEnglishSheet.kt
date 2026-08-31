@@ -788,13 +788,11 @@ private fun EnglishProseBlock(
                     if (!liveInk) {
                         emptyList()
                     } else {
-                        val layout = layoutResult
                         block.verses.flatMap { verse ->
                             englishVerseBlooms(
                                 verse = verse,
                                 pack = packs[verse.surahId to verse.ayah],
                                 paper = palette.paperColor,
-                                lines = layout?.let { englishVerseLines(it, verse) } ?: 1,
                             )
                         }
                     }
@@ -850,8 +848,6 @@ private fun englishVerseBlooms(
     verse: EnglishProseVerse,
     pack: AyahInkPack?,
     paper: Color,
-    /** How many lines the sentence is set over — the wash's edge is one of them. */
-    lines: Int,
 ): List<ShapedWordBloom> {
     if (pack == null) return emptyList()
     val blooms = ArrayList<ShapedWordBloom>(2)
@@ -879,7 +875,9 @@ private fun englishVerseBlooms(
                 // the same floor the unread words of a recited verse sit at on
                 // the Arabic leaf.
                 restingAlpha = resting,
-                feather = englishWashFeather(lines),
+                // One English span per Arabic word, so the sentence's word
+                // count is the unit the edge is measured in.
+                feather = englishWashFeather(pack.motions.size),
                 readAlpha = readAlpha,
             )
         }
@@ -913,35 +911,39 @@ internal fun englishReadInkAlpha(recessCover: Float, restingAlpha: Float): Float
     return restingAlpha + (1f - restingAlpha) * lift
 }
 
-/** The lines of the paragraph this verse's sentence is set over. */
-private fun englishVerseLines(layout: TextLayoutResult, verse: EnglishProseVerse): Int {
-    val text = layout.layoutInput.text
-    if (text.isEmpty() || verse.range.isEmpty()) return 1
-    val first = layout.getLineForOffset(verse.range.first.coerceIn(0, text.length - 1))
-    val last = layout.getLineForOffset(verse.range.last.coerceIn(0, text.length - 1))
-    return (last - first + 1).coerceAtLeast(1)
-}
-
 /**
  * The wash's edge, as a fraction of the sentence it crosses.
  *
- * [InkEngine.tuning.washFeather] is 1.6 of a *word*, which is the shape of the
- * Arabic leaf's ink: an edge wider than the thing it crosses, so a word breathes
- * in rather than being wiped. A verse of English prose is eight lines of that
- * thing, and the same fraction made the edge wider than the whole sentence —
- * which meant nothing behind the voice ever reached full ink, and the page
- * brightened as one wash instead of being read through. Already-recited ink
- * holds full strength; that is not negotiable (docs/INK_ENGINE.md).
+ * [InkEngine.tuning.washFeather] is 1.6 of a **word** — an edge wider than the
+ * thing it crosses, so a word breathes in rather than being wiped. That is what
+ * the scrolling reader draws on each English gloss, and it is the feel this leaf
+ * has to match. The leaf's difficulty is only that its range is the whole
+ * sentence rather than one word, so the same number cannot be used raw: 1.6 of a
+ * sentence is an edge wider than the sentence, and nothing behind the voice ever
+ * reaches full ink.
  *
- * So the edge is a line of the page instead, whatever the sentence's length.
- * A one-line verse comes out near the word's own figure and is capped at it.
+ * It was a *line of the page* for a while, which is the wrong unit — a line of
+ * prose is six or seven words, so the edge crossed six or seven words at once
+ * and the wash read as a slow brightening rather than as words being said. The
+ * unit is the word, as everywhere else: the sentence holds one English span per
+ * Arabic word ([EnglishWordAlignment]), so an edge of `washFeather` word-spans
+ * is `washFeather / words` of the sentence — the same 1.6 words the scrolling
+ * reader shows, whatever length the verse is.
+ *
+ * A one-word verse (2:1, الٓمٓ) comes out at the cap and breathes as one, which
+ * is right: it *is* one word.
  */
-private fun englishWashFeather(lines: Int): Float =
-    (EnglishWashFeatherLines / lines.coerceAtLeast(1))
+internal fun englishWashFeather(words: Int): Float =
+    (InkEngine.tuning.washFeather / words.coerceAtLeast(1))
         .coerceIn(EnglishWashFeatherFloor, InkEngine.tuning.washFeather)
 
-private const val EnglishWashFeatherLines = 1.1f
-private const val EnglishWashFeatherFloor = 0.06f
+/**
+ * Only a guard. The rule above is already scale-free — it is 1.6 words wide on
+ * a seven-word verse and on a fifty-word one — so this exists to stop a verse
+ * with an implausible word count from producing a hard peel, not to widen a
+ * long sentence's edge back out.
+ */
+private const val EnglishWashFeatherFloor = 0.02f
 
 /**
  * How far through a verse's *English* the reciter has read, 0..1.

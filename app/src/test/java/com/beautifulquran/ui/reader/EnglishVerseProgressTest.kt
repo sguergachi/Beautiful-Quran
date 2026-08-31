@@ -80,6 +80,24 @@ class EnglishVerseProgressTest {
     }
 
     @Test
+    fun `the wash edge is a word wide, whatever length the verse is`() {
+        // The scrolling reader draws 1.6 of a word on each English gloss. The
+        // leaf's range is the whole sentence, which holds one English span per
+        // Arabic word, so the same edge is 1.6 / words of it — the same width
+        // on a seven-word verse and on a fifty-word one.
+        val feather = InkEngine.tuning.washFeather
+        val seven = englishWashFeather(7)
+        val fifty = englishWashFeather(50)
+        assertEquals(feather / 7f, seven, 0.0001f)
+        assertEquals(feather / 50f, fifty, 0.0001f)
+        // Same number of words of edge, both times.
+        assertEquals(seven * 7f, fifty * 50f, 0.0001f)
+        // A one-word verse breathes as one, and cannot exceed the word's figure.
+        assertEquals(feather, englishWashFeather(1), 0.0001f)
+        assertEquals(feather, englishWashFeather(0), 0.0001f)
+    }
+
+    @Test
     fun `a verse with no clock of its own is left at full ink`() {
         assertEquals(1f, englishVerseReadProgress(emptyList()), 0f)
     }

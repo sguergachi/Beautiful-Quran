@@ -527,6 +527,21 @@ whose English is the three characters ", a", then crosses " guidance" in the
 Verses still to come wait under the same recess as the Arabic leaf's; verses
 already read hold their ink; the packs are the very same `AyahInkPack`.
 
+**The edge is a word wide, not a line wide.** `Tuning.washFeather` is 1.6 of a
+*word* — an edge wider than the thing it crosses, so a word breathes in rather
+than being wiped — and that is what the scrolling reader draws on each English
+gloss. The leaf's range is a whole sentence rather than one word, so the number
+cannot be used raw: 1.6 of a sentence is wider than the sentence, and nothing
+behind the voice would ever reach full ink. It was a *line of the page* for a
+while, which is the wrong unit: a line of prose is six or seven words, so the
+soft edge crossed six or seven words at once and the wash read as a slow
+brightening of the paragraph rather than as words being said. The unit is the
+word, as everywhere else — the sentence holds one English span per Arabic word,
+so `washFeather / words` of the sentence is the same 1.6 words the scrolling
+reader shows, whatever length the verse is. Measured on 2:167 (23 words over
+seven lines): exactly one line is part-inked at any moment, where the line rule
+kept two in the air and let neither settle.
+
 **A verse seeked into rises out of the paper rather than appearing on it.**
 Tapping the middle of a sentence puts the voice there, which makes everything
 before the tap already read — and drawing that read ink at full strength on the
