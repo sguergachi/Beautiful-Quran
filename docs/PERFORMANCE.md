@@ -48,6 +48,9 @@ the whole ayah. It keeps the shaped ayah as static full-ink spans and applies
 `shapedWordBloom` in the draw phase: upcoming words get a full-strength paper
 cover from the first Upcoming frame — and the same cover is used while the ayah
 is recessed (`dimmed`), so landing on the next verse does not change unread ink.
+On Paper, the verse that just owned the lyric line ramps that cover in over the
+existing recess tween; verses still ahead mount at the full Upcoming cover, so
+the soft outgoing handoff cannot introduce a full-ink flash.
 Block alpha stays at 1 during recitation in every mode (word-layer alpha for
 gloss; paper covers over opaque glyphs for shaped English/Hafs). First-pass
 pulls the cover back on the ink-wash curve; repeat SrcIn-tints the same shaped
