@@ -395,7 +395,11 @@ internal fun MushafPageHeader(
             .fillMaxWidth()
             .padding(horizontal = foreEdge)
             .height(unit * MushafGrid.RUNNING_HEAD),
-        verticalAlignment = Alignment.CenterVertically,
+        // Hard against the top of the leaf. Centred, the label carried a strip
+        // of air above it, and the leaf already begins below the status bar —
+        // the phone's forehead is the margin, and buying a second one came out
+        // of the text well.
+        verticalAlignment = Alignment.Top,
     ) {
         MushafHeadLabel(
             text = "Part $juz",

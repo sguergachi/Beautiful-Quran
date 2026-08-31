@@ -14,13 +14,15 @@ import kotlin.math.pow
  * The unit is one line's pitch, and the leaf is [SLOTS] of them:
  *
  * ```
- *  0.3  running head — the smallest hand on the leaf
+ * 0.24  running head — the smallest hand on the leaf, and no more paper
+ *       than its own line box: the leaf begins under the status bar, so
+ *       the phone's forehead is already the margin above it
  *  0.7  head gutter — enough paper to stand the head off the text
  *  15   the revelation — the Madinah page's own grid
  * 0.35  tail — paper between revelation and folio
  *  0.4  folio, its figure centred in the band
  *  ---
- * 16.75
+ * 16.69
  * ```
  *
  * The furniture is trimmed to what it actually needs to read as furniture,
@@ -30,7 +32,7 @@ import kotlin.math.pow
  * a bare 10dp; fourteen percent of the leaf on vertical chrome was the odd one
  * out.
  *
- * These constants remain the canonical fifteen-row fit and the total 16.75
+ * These constants remain the canonical fifteen-row fit and the total 16.69
  * unit budget. The pager's larger display hand reassigns one unit of that same
  * budget from head/tail furniture to a sixteenth visual row; the leaf itself
  * does not grow and its 604 page boundaries do not move.
@@ -44,8 +46,15 @@ object MushafGrid {
      * and a full unit went on saying the same thing in two hands. One line of
      * wayfinding needs about half of that, and the paper saved goes to the
      * text, which is what the leaf is for.
+     *
+     * It is now the label's own line box and nothing more, set hard against
+     * the top of the leaf. Centred in a taller band it carried a strip of air
+     * above it, and the leaf already begins below the status bar — the phone's
+     * forehead is the margin, and buying a second one came out of the text.
+     * Measured on the reference leaf the label inks 15 px against a 81 px
+     * unit, so this is its line box with nothing to spare: any less clips it.
      */
-    const val RUNNING_HEAD = 0.30f
+    const val RUNNING_HEAD = 0.24f
 
     /**
      * Paper between the head and the first line of revelation. A head that
