@@ -76,6 +76,37 @@ class EnglishWashBandsTest {
     }
 
     @Test
+    fun `a band edge is never left in the middle of a word`() {
+        // The bands abut, so an edge inside a word is a hard cut down a letter.
+        val prose = "one two three four five six seven eight nine ten"
+        val whole = prose.indices.first..prose.indices.last
+        for (cut in 1 until prose.length) {
+            val bands = englishWashBands(
+                range = whole,
+                from = cut.toFloat() / prose.length,
+                to = 1f,
+                text = prose,
+            )
+            val edge = bands.saying.first
+            if (edge <= 0 || edge > prose.lastIndex) continue
+            assertTrue(
+                "edge $edge splits '${prose.substring(edge - 1, edge + 1)}'",
+                !prose[edge - 1].isLetter() || !prose[edge].isLetter(),
+            )
+        }
+    }
+
+    @Test
+    fun `an edge already between words is left where it is`() {
+        val prose = "one two three"
+        val whole = prose.indices.first..prose.indices.last
+        // Character 3 is the space after "one".
+        val bands = englishWashBands(whole, 3f / prose.length, 1f, prose)
+        assertEquals(0 until 3, bands.read)
+        assertEquals("one", prose.substring(bands.read))
+    }
+
+    @Test
     fun `an empty sentence has no bands to draw`() {
         val bands = englishWashBands(IntRange.EMPTY, from = 0f, to = 1f)
         assertTrue(bands.read.isEmpty())

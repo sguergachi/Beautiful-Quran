@@ -794,6 +794,7 @@ private fun EnglishProseBlock(
                                 verse = verse,
                                 pack = packs[verse.surahId to verse.ayah],
                                 paper = palette.paperColor,
+                                text = block.text,
                             )
                         }
                     }
@@ -801,6 +802,16 @@ private fun EnglishProseBlock(
                 layout = { layoutResult },
                 rtl = false,
                 feather = InkEngine.tuning.washFeather,
+                // No reach past the box, and this is the one caller that must
+                // not have it. The default 4 dp is right where a bloom covers a
+                // word with whitespace either side of it — the reach lands on
+                // the space and nothing shows. This leaf's blooms *abut*: the
+                // word being said is drawn against the band still to come, and
+                // a reach on both sides of that seam paints the same strip of
+                // prose with paper twice, so an eight-dp notch of half-erased
+                // text travelled along with the voice. The bands tile the
+                // sentence exactly, so they need no reach to close over it.
+                coverPad = 0.dp,
                 // Ragged: a line is drawn where it was measured, so the paper
                 // masks need no justification correction. See
                 // Modifier.shapedWordBloom.
@@ -856,6 +867,8 @@ private fun englishVerseBlooms(
     verse: EnglishProseVerse,
     pack: AyahInkPack?,
     paper: Color,
+    /** The paragraph, so a band's edge can be kept out of the middle of a word. */
+    text: CharSequence,
 ): List<ShapedWordBloom> {
     if (pack == null) return emptyList()
     val blooms = ArrayList<ShapedWordBloom>(4)
@@ -887,6 +900,7 @@ private fun englishVerseBlooms(
                 range = verse.range,
                 from = verse.fragmentProgress(if (active == 0) 0f else ends[active - 1]),
                 to = verse.fragmentProgress(ends[active]),
+                text = text,
             )
             if (cover > 0f && !bands.read.isEmpty()) {
                 blooms += cover(bands.read, paper, cover)
@@ -926,19 +940,49 @@ private fun cover(range: IntRange, paper: Color, alpha: Float) =
  * case: the half the voice is not on comes out with an empty middle band and
  * either all read or all ahead, which is what it is.
  */
-internal fun englishWashBands(range: IntRange, from: Float, to: Float): EnglishWashBands {
+internal fun englishWashBands(
+    range: IntRange,
+    from: Float,
+    to: Float,
+    text: CharSequence = "",
+): EnglishWashBands {
     if (range.isEmpty()) return EnglishWashBands(IntRange.EMPTY, IntRange.EMPTY, IntRange.EMPTY)
     val length = range.last - range.first + 1
     fun at(fraction: Float) =
         range.first + (fraction.coerceIn(0f, 1f) * length).roundToInt().coerceIn(0, length)
-    val opens = at(from)
-    val closes = maxOf(at(to), opens)
+    val opens = englishBandEdge(at(from), range, text)
+    val closes = maxOf(englishBandEdge(at(to), range, text), opens)
     return EnglishWashBands(
         read = range.first until opens,
         saying = opens until closes,
         ahead = closes..range.last,
     )
 }
+
+/**
+ * Moves a band's edge out of the middle of an English word.
+ *
+ * The alignment's own boundaries are already word ends, and for a verse set
+ * whole they arrive here unchanged. A carried verse, or one the reader has
+ * asked to have its bracketed asides taken off, is a shorter string than the
+ * one the shares were measured against, so the arithmetic can land a character
+ * or two inside a word — and with the bands abutting, that edge is a hard cut
+ * down the middle of a letter. The nearest gap between words is never far.
+ */
+private fun englishBandEdge(at: Int, range: IntRange, text: CharSequence): Int {
+    if (text.isEmpty() || at <= range.first || at > range.last) return at
+    if (!text[at - 1].isLetter() || !text[at].isLetter()) return at
+    for (step in 1..EnglishBandEdgeReach) {
+        val back = at - step
+        if (back > range.first && !text[back - 1].isLetter()) return back
+        val on = at + step
+        if (on <= range.last && !text[on].isLetter()) return on + 1
+    }
+    return at
+}
+
+/** How far to look for a gap between words. Longer than any word worth cutting. */
+private const val EnglishBandEdgeReach = 14
 
 /** See [englishWashBands]. */
 internal data class EnglishWashBands(

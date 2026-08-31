@@ -545,6 +545,19 @@ come. Same picture as fifty per-word blooms, at three. The bloom's range *is* a
 word now, so it takes `Tuning.washFeather` unmodified, exactly as the scrolling
 reader does.
 
+**Bands that abut must not reach past their boxes.** A paper cover is drawn
+`PaperCoverPad` (4 dp) wider than its own line box, to catch ink that overhangs
+it. That is right where a bloom covers a word with whitespace either side, as
+in the scrolling reader: the reach lands on the space and nothing shows. These
+bands touch, so the reach put paper over the same strip of prose twice, and an
+8 dp notch of half-erased text travelled along with the voice — the shimmer at
+the wash's edge. The leaf passes `coverPad = 0`; the bands tile the sentence
+exactly, so they have nothing to close over. Their edges are also kept out of
+the middle of a word (`englishBandEdge`), because two abutting covers meeting
+inside a letter is a hard cut down it — the alignment's own boundaries are word
+ends already, but a carried verse or one with its asides hidden is a shorter
+string than the shares were measured against.
+
 The three bands also give the recess its place. **A verse seeked into rises out
 of the paper rather than appearing on it:** tapping the middle of a sentence
 makes everything before the tap already read, and drawing that at full strength
