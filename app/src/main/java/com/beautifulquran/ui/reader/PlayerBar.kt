@@ -28,8 +28,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.media3.common.Player
 import com.beautifulquran.playback.PlayerUiState
 
@@ -117,6 +119,7 @@ fun PlayerBar(
                         } else {
                             MaterialTheme.colorScheme.primary
                         },
+                        modifier = Modifier.size(22.dp),
                     )
                 }
                 IconButton(
@@ -175,7 +178,10 @@ fun PlayerBar(
                 ) {
                     Text(
                         text = "${if (state.speed % 1f == 0f) state.speed.toInt() else state.speed}×",
-                        style = MaterialTheme.typography.labelMedium,
+                        style = MaterialTheme.typography.labelMedium.copy(
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 15.sp,
+                        ),
                         color = if (state.speed == 1f) {
                             MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f)
                         } else {
