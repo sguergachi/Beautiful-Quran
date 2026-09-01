@@ -146,8 +146,8 @@ becomes share tools; multi is extension) without taxing bookmark.
 
 - Tap any verse to toggle membership while in share mode
 - Selected: soft feathered **gold-yellow paper wash** under the full ayah
-  block (primary signal); Western ordinal in Garamond ink in the outer
-  margin (secondary). Gold stays the ayah mark. Chrome never uses
+  block (primary signal); Western ordinal in Garamond ink on the bookmark
+  swallowtail (secondary). Gold stays the ayah mark. Chrome never uses
   Arabic-Indic digits.
 - Unselected: wash recedes — that *is* the unselect feedback
 - Ordinals renumber when a verse is dropped

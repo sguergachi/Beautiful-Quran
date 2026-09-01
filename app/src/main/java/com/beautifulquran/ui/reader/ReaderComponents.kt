@@ -2954,8 +2954,7 @@ fun AyahBlock(
                                 AbsoluteAlignment.TopLeft
                             },
                         )
-                        // Align with first ink line (ribbon tip uses ~24 dp).
-                        .padding(top = 22.dp),
+                        .fillMaxHeight(),
                 )
             }
         } else if (bookmarkSide != null && onToggleBookmark != null) {
@@ -3012,9 +3011,8 @@ private fun ShareInkVerb(
 }
 
 /**
- * Western gather ordinal in the verse's outer margin. Replaces the bookmark
- * ribbon for the duration of the mode so the margin never carries two marks.
- * Ink, not gold — gold is the ayah mark.
+ * Western gather ordinal sitting on the bookmark swallowtail: same 44 dp
+ * strip, same 24 dp first-line inset, same 8 dp edge inset. Ink, not gold.
  */
 @Composable
 private fun GatherOrdinalMark(
@@ -3024,13 +3022,14 @@ private fun GatherOrdinalMark(
     onClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
-    Text(
-        text = ordinal.toString(),
-        style = MaterialTheme.typography.titleMedium.copy(fontFamily = SerifFontFamily),
-        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.72f),
-        textAlign = if (side == AyahSelectorSide.RIGHT) TextAlign.End else TextAlign.Start,
+    val onRibbon = if (side == AyahSelectorSide.RIGHT) {
+        Alignment.TopEnd
+    } else {
+        Alignment.TopStart
+    }
+    Box(
         modifier = modifier
-            .width(44.dp)
+            .width(BookmarkStripWidth)
             .graphicsLayer { alpha = chromeAlpha() }
             .then(
                 if (onClick != null) {
@@ -3038,9 +3037,22 @@ private fun GatherOrdinalMark(
                 } else {
                     Modifier
                 },
-            )
-            .padding(horizontal = 6.dp, vertical = 6.dp),
-    )
+            ),
+    ) {
+        Text(
+            text = ordinal.toString(),
+            style = MaterialTheme.typography.titleSmall.copy(fontFamily = SerifFontFamily),
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.72f),
+            textAlign = if (side == AyahSelectorSide.RIGHT) TextAlign.End else TextAlign.Start,
+            modifier = Modifier
+                .align(onRibbon)
+                .padding(top = BookmarkTopInsetDp.dp)
+                .padding(
+                    start = if (side == AyahSelectorSide.LEFT) BookmarkEdgeInsetDp.dp else 0.dp,
+                    end = if (side == AyahSelectorSide.RIGHT) BookmarkEdgeInsetDp.dp else 0.dp,
+                ),
+        )
+    }
 }
 
 /**

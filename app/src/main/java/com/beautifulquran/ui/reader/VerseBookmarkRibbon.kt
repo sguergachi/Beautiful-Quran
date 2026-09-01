@@ -53,11 +53,11 @@ import kotlin.math.sin
  */
 
 /** Wide enough to sit in the ayah block's 28.dp outer margin and stay tappable. */
-private val STRIP_WIDTH = 44.dp
+internal val BookmarkStripWidth = 44.dp
 
-private const val EDGE_INSET_DP = 8f    // from the block's outer edge
+internal const val BookmarkEdgeInsetDp = 8f    // from the block's outer edge
 private const val RIBBON_WIDTH_DP = 11f
-private const val TOP_INSET_DP = 24f    // align the tip with the verse's first ink line
+internal const val BookmarkTopInsetDp = 24f    // align the tip with the verse's first ink line
 private const val NUB_LENGTH_DP = 14f   // just the swallowtail tip peeking out
 private const val TOP_FOLD_DP = 3.5f    // soft fold over the page edge, matching web
 private const val BOTTOM_GAP_DP = 48f   // leave air above the next verse's tip
@@ -96,9 +96,9 @@ internal fun VerseBookmarkRibbon(
     /** Non-zero changes replay the same physical unfurl for an already saved
      * ribbon, used when a new bookmark first arrives back on Chapters. */
     unfurlSignal: Int = 0,
-    edgeInset: Dp = EDGE_INSET_DP.dp,
+    edgeInset: Dp = BookmarkEdgeInsetDp.dp,
     ribbonWidth: Dp = RIBBON_WIDTH_DP.dp,
-    topInset: Dp = TOP_INSET_DP.dp,
+    topInset: Dp = BookmarkTopInsetDp.dp,
     bottomGap: Dp = BOTTOM_GAP_DP.dp,
 ) {
     val mirrored = side == AyahSelectorSide.RIGHT
@@ -219,7 +219,7 @@ internal fun VerseBookmarkRibbon(
 
     Box(
         modifier = modifier
-            .width(STRIP_WIDTH)
+            .width(BookmarkStripWidth)
             .onSizeChanged { stripSize = it }
             .then(tapModifier),
     ) {

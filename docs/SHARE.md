@@ -34,10 +34,10 @@ its layout; it grows ordinals in the margin.
   ([#519](https://github.com/sguergachi/Beautiful-Quran-/pull/519)). Four
   discoverable entry designs (Icon / Reveal / Hold / Mark) live behind
   Settings → Developer → Verse share ([VERSE_ACTIONS.md](VERSE_ACTIONS.md)).
-- **Pick** by tapping a verse (word or ayah). Its ordinal is written in the
-  outer margin in Western digits (1 2 3), Garamond ink — furniture, not
-  illumination. The same margin the bookmark ribbon lives in; the ribbon is
-  hidden while gathering. Tap again to drop it; the rest renumber.
+- **Pick** by tapping a verse (word or ayah). Its ordinal sits on the
+  bookmark swallowtail — same strip, first-line inset, and edge inset —
+  in Western digits (1 2 3), Garamond ink. The ribbon is hidden while
+  gathering. Tap again to drop it; the rest renumber.
 - **Order is tap order.** Tapping 2:255, then 112:1, then 2:1 gathers exactly
   that sequence. No ranges, no sorting, no "from / to" pickers. Cap:
   `SHARE_SELECTION_MAX` (20).
@@ -52,8 +52,8 @@ While gathering, word taps do not seek, word long-press does not open the
 Root Viewer, and the bookmark ribbon (including its note hold) is inactive.
 The mode owns the tap — interactions are *replaced*, not stacked.
 
-**Mode chrome (visual QA):** margin ordinals use `titleMedium` Garamond
-Western digits in ink (not gold, not Arabic-Indic).
+**Mode chrome (visual QA):** gather ordinals use `titleSmall` Garamond
+Western digits in ink on the bookmark nub (not gold, not Arabic-Indic).
 Selection wash and gather-bar takeover are planned — see
 [VERSE_ACTIONS.md](VERSE_ACTIONS.md).
 
