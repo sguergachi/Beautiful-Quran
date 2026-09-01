@@ -1022,7 +1022,12 @@ internal fun MushafPager(
         // return two frames later; asking Compose to build all three at once
         // was the visible pause between release and the new folio.
         beyondViewportPageCount = if (holdNeighbours && !parkNeighbours()) 1 else 0,
-        reverseLayout = true,
+        // A mushaf is bound on the right: its first leaf is the rightmost and
+        // the hand travels leftward to reach it. A book of the translation is
+        // bound on the left and turns the other way — it is set in English,
+        // read left to right, and a reader who has just finished a line at the
+        // right edge expects the next leaf to come from there.
+        reverseLayout = !english,
         key = { it },
         modifier = modifier
             .fillMaxSize()

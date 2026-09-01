@@ -475,8 +475,28 @@ internal fun mushafDialFraction(page: Float, pageCount: Int): Float {
  * picking a place inside one that has been laid out for them, and both ends
  * of the measure mean something they can aim at.
  */
-internal fun mushafDialTroughPage(fraction: Float, run: IntRange): Float {
-    val t = 1f - fraction.coerceIn(0f, 1f)
+/**
+ * Where a fraction of the book sits along the rule, given which way it turns.
+ *
+ * The whole dial is drawn and read through this: a mushaf's first leaf is at
+ * the right of the rule, an English book's at the left, and every seat, comb
+ * mark, trough and landing follows from that one flip.
+ */
+internal fun mushafDialAlong(fraction: Float, rightToLeft: Boolean): Float =
+    if (rightToLeft) 1f - fraction else fraction
+
+internal fun mushafDialTroughPage(
+    fraction: Float,
+    run: IntRange,
+    /**
+     * Which way the book turns. A mushaf is bound on the right and its first
+     * leaf sits at the right of the rule; a book of the translation is bound on
+     * the left and reads the other way, so its rule runs the other way too. The
+     * dial is the book's edge seen side-on — it cannot run against the pages.
+     */
+    rightToLeft: Boolean = true,
+): Float {
+    val t = mushafDialAlong(fraction.coerceIn(0f, 1f), rightToLeft)
     return run.first + t * (run.last - run.first)
 }
 
@@ -515,9 +535,11 @@ internal fun mushafDialReturnBubbleLeft(
     widthPx: Float,
     insetPx: Float,
     bubbleWidthPx: Float,
+    /** Which way the book turns — see [mushafDialAlong]. */
+    rightToLeft: Boolean = true,
 ): Float {
     val seat = mushafDialTrackX(
-        1f - mushafDialFraction(page.toFloat(), pageCount),
+        mushafDialAlong(mushafDialFraction(page.toFloat(), pageCount), rightToLeft),
         widthPx,
         insetPx,
     )
@@ -532,8 +554,12 @@ internal fun mushafDialReturnBubbleHit(
     widthPx: Float,
     insetPx: Float,
     bubbleWidthPx: Float,
+    /** Which way the book turns — see [mushafDialAlong]. */
+    rightToLeft: Boolean = true,
 ): Boolean {
-    val left = mushafDialReturnBubbleLeft(page, pageCount, widthPx, insetPx, bubbleWidthPx)
+    val left = mushafDialReturnBubbleLeft(page, pageCount, widthPx, insetPx, bubbleWidthPx,
+                rightToLeft = rightToLeft,
+            )
     return xPx in left..(left + bubbleWidthPx)
 }
 
@@ -727,11 +753,13 @@ internal fun mushafDialCombCellSeats(
     insetPx: Float,
     widthPx: Float,
     rulePx: Float,
+    /** Which way the book turns — see [mushafDialAlong]. */
+    rightToLeft: Boolean = true,
 ): FloatArray {
     val result = FloatArray(marks.size)
     for ((idx, mark) in marks.withIndex()) {
         var x = mushafDialTrackX(
-            1f - mushafDialChapterFraction(mark.toFloat(), marks, pageCount),
+            mushafDialAlong(mushafDialChapterFraction(mark.toFloat(), marks, pageCount), rightToLeft),
             widthPx,
             insetPx,
         )
@@ -850,13 +878,15 @@ internal fun mushafDialCombDrawnXs(
     tailPushPx: Float,
     epsilonPx: Float,
     result: FloatArray = FloatArray(marks.size),
+    /** Which way the book turns — see [mushafDialAlong]. */
+    rightToLeft: Boolean = true,
 ): FloatArray {
     require(result.size == marks.size)
     if (!isLensed || combInk <= 0.004f) {
         for (idx in marks.indices) {
             val mark = marks[idx]
             var x = mushafDialTrackX(
-                1f - mushafDialChapterFraction(mark.toFloat(), marks, pageCount),
+                mushafDialAlong(mushafDialChapterFraction(mark.toFloat(), marks, pageCount), rightToLeft),
                 widthPx,
                 insetPx,
             )
@@ -887,7 +917,7 @@ internal fun mushafDialCombDrawnXs(
     for (idx in marks.indices) {
         val mark = marks[idx]
         var trueX = mushafDialTrackX(
-            1f - mushafDialChapterFraction(mark.toFloat(), marks, pageCount),
+            mushafDialAlong(mushafDialChapterFraction(mark.toFloat(), marks, pageCount), rightToLeft),
             widthPx,
             insetPx,
         )
@@ -1045,6 +1075,11 @@ internal fun MushafPageDial(
     onLanding: (Boolean) -> Unit,
     /** True while the reciter has the leaf: the marker steps back. */
     reciting: Boolean = false,
+    /**
+     * Which way the book turns. False on the English leaf, which is a book of
+     * the translation bound on the left — see [mushafDialAlong].
+     */
+    rightToLeft: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
     val ink = MaterialTheme.colorScheme.onBackground
@@ -1272,7 +1307,7 @@ internal fun MushafPageDial(
                 size = Size((size.width - inset * 2f).coerceAtLeast(rule), rule),
                 cornerRadius = CornerRadius(rule, rule),
             )
-            val seatX = mushafDialTrackX(1f - mushafDialFraction(at, pages), size.width, inset)
+            val seatX = mushafDialTrackX(mushafDialAlong(mushafDialFraction(at, pages), rightToLeft), size.width, inset)
             // Under the hand while there is one, at the leaf's seat when there
             // is not. See the note at the head of this file for why the thumb
             // follows the finger rather than the page.
@@ -1288,7 +1323,7 @@ internal fun MushafPageDial(
             // tell whether that is the end of the book or the end of the comb.
             // The book does not move. The reader moves along it.
             fun bookX(page: Float) =
-                mushafDialTrackX(1f - mushafDialFraction(page, pages), size.width, inset)
+                mushafDialTrackX(mushafDialAlong(mushafDialFraction(page, pages), rightToLeft), size.width, inset)
             val run = troughRun
             val runSpan = (run.last - run.first).coerceAtLeast(1)
             val headroom = ruleY - 1.5.dp.toPx()
@@ -1307,7 +1342,7 @@ internal fun MushafPageDial(
             // a reader whose own finger is covering the line.
             if (lift > 0.004f && chapterMarks.isNotEmpty()) {
                 fun tailX(page: Float) =
-                    mushafDialTrackX(1f - mushafDialChapterFraction(page, chapterMarks, pages), size.width, inset)
+                    mushafDialTrackX(mushafDialAlong(mushafDialChapterFraction(page, chapterMarks, pages), rightToLeft), size.width, inset)
                 val fromX = tailX(run.first.toFloat())
                 val toX = tailX(run.last.toFloat())
                 val minW = MushafDialBracketMin.toPx()
@@ -1340,7 +1375,7 @@ internal fun MushafPageDial(
                 val isLensed = scrubbing || handed
                 val centerX = if (isLensed) handX.floatValue else seatX
                 fun tailX(page: Float) =
-                    mushafDialTrackX(1f - mushafDialChapterFraction(page, chapterMarks, pages), size.width, inset)
+                    mushafDialTrackX(mushafDialAlong(mushafDialChapterFraction(page, chapterMarks, pages), rightToLeft), size.width, inset)
                 val centreProgress = if (isLensed) {
                     val centreFrac = mushafDialTrackFraction(centerX, size.width, inset)
                     (1f - centreFrac).coerceIn(0f, 1f)
@@ -1366,7 +1401,9 @@ internal fun MushafPageDial(
                     tailPushPx = 10.dp.toPx(),
                     epsilonPx = 1.8.dp.toPx(),
                     result = combDrawnXs,
-                )
+                
+                rightToLeft = rightToLeft,
+            )
                 for (idx in chapterMarks.indices) {
                     val mark = chapterMarks[idx]
                     val x = drawnXs[idx]
@@ -1429,7 +1466,7 @@ internal fun MushafPageDial(
                 val n = run.last - run.first + 1
                 fun drawTroughTick(fraction: Float, pageForSeat: Float) {
                     val seat = bookX(pageForSeat)
-                    val troughX = mushafDialTrackX(1f - fraction, size.width, troughInset)
+                    val troughX = mushafDialTrackX(mushafDialAlong(fraction, rightToLeft), size.width, troughInset)
                     val x = lerp(seat, troughX, open)
                     if (x < -rule || x > size.width + rule) return
                     val length = (tick * strength).coerceAtMost(headroom)
@@ -1783,6 +1820,7 @@ internal fun MushafPageDial(
                                 widthPx = size.width.toFloat(),
                                 insetPx = MushafDialEdgeInset.toPx(),
                                 bubbleWidthPx = MushafDialReturnHitWidth.toPx(),
+                                rightToLeft = rightToLeft,
                             )
                         ) {
                             // The dot and dial share one hairline. Wait only
@@ -1882,7 +1920,9 @@ internal fun MushafPageDial(
                             insetPx,
                             widthPxNow,
                             MushafDialRuleWeightPx * density,
-                        )
+                        
+                rightToLeft = rightToLeft,
+            )
                         // Hysteresis so a hand parked on a 70+ boundary (~7.8px
                         // cells) does not flip HUD every frame from 1-2px sensor
                         // noise — still a 3-4px deliberate move crosses.
@@ -2014,7 +2054,7 @@ internal fun MushafPageDial(
                                     // names a place between the two ends.
                                     val fraction =
                                         mushafDialTrackFraction(handPx, widthPxNow, troughInsetPx)
-                                    val target = mushafDialTroughPage(fraction, troughRun)
+                                    val target = mushafDialTroughPage(fraction, troughRun, rightToLeft)
                                     settleOffset *= exp(-dt / MUSHAF_DIAL_TROUGH_SETTLE_TAU_S)
                                     raw = (target + settleOffset).coerceIn(
                                         troughRun.first.toFloat(),
@@ -2191,7 +2231,7 @@ internal fun MushafPageDial(
                                     val fraction =
                                         mushafDialTrackFraction(handPx, widthPxNow, troughInsetPx)
                                     settleOffset =
-                                        raw - mushafDialTroughPage(fraction, troughRun)
+                                        raw - mushafDialTroughPage(fraction, troughRun, rightToLeft)
                                     open = true
                                     heldS = 0f
                                     troughPopped = false
@@ -2252,7 +2292,7 @@ internal fun MushafPageDial(
                                 widthPxNow,
                                 troughInsetPx,
                             )
-                            (mushafDialTroughPage(fraction, troughRun) + settleOffset)
+                            (mushafDialTroughPage(fraction, troughRun, rightToLeft) + settleOffset)
                                 .roundToInt()
                                 .coerceIn(troughRun.first, troughRun.last)
                         } else {
@@ -2298,7 +2338,7 @@ internal fun MushafPageDial(
                         // while the trough closes over it, one motion — cutting
                         // it there instead would read as the marker jumping.
                         val seat = mushafDialTrackX(
-                            1f - mushafDialFraction(landed.toFloat(), pages),
+                            mushafDialAlong(mushafDialFraction(landed.toFloat(), pages), rightToLeft),
                             widthPxNow,
                             insetPx,
                         )
@@ -2391,7 +2431,9 @@ internal fun MushafPageDial(
                                 widthPx = widthPx.toFloat(),
                                 insetPx = MushafDialEdgeInset.toPx(),
                                 bubbleWidthPx = MushafDialReturnHitWidth.toPx(),
-                            ).roundToInt(),
+                            
+                rightToLeft = rightToLeft,
+            ).roundToInt(),
                             0,
                         )
                     }

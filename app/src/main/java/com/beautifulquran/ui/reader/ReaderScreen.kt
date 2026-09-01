@@ -322,6 +322,11 @@ fun ReaderScreen(
     val leafPage = remember(englishBook) {
         { index: Int -> englishBook?.leaf(index)?.page ?: (index + 1) }
     }
+    // The figure printed on a leaf: its own number in the English book, and the
+    // Madinah page on the Arabic one — the same figure the dial counts.
+    val mushafFolioAt = remember(englishBook) {
+        { index: Int -> if (englishBook != null) index + 1 else leafPage(index) }
+    }
     val pageLeaf = remember(englishBook) {
         { page: Int -> englishBook?.firstLeafOf(page) ?: (page - 1) }
     }
@@ -2469,6 +2474,11 @@ fun ReaderScreen(
                         pageAt = mushafLeafPage,
                         english = englishBook != null,
                         pageNumberScript = settings.pageNumberScript,
+                        // The folio rides the leaf: the band is centred on the
+                        // pager's own page and slid by its own offset.
+                        pageIndex = { mushafPagerState.currentPage },
+                        pageOffset = { mushafPagerState.currentPageOffsetFraction },
+                        folioAt = mushafFolioAt,
                         // Whatever the rule is counting: leaves on the English
                         // book, Madinah pages on the Arabic one.
                         pageCount = mushafBookLength(

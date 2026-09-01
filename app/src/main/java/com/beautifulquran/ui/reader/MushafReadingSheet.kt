@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -43,6 +44,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
@@ -53,12 +55,14 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import androidx.media3.common.Player
 import com.beautifulquran.data.PageNumberScript
 import com.beautifulquran.domain.MUSHAF_LINE_PITCH_EM
+import kotlin.math.roundToInt
 import com.beautifulquran.domain.MushafGrid
 import com.beautifulquran.domain.mushafLeafBands
 import com.beautifulquran.domain.MushafType
@@ -177,6 +181,12 @@ internal fun MushafReadingSheet(
     /** Which hand the leaf is set in — the two divide their height differently. */
     english: Boolean = false,
     pageNumberScript: PageNumberScript = PageNumberScript.BOTH,
+    /** The pager's own page, 0-based — the leaf the folio band is centred on. */
+    pageIndex: () -> Int = { 0 },
+    /** How far the leaf has been dragged, in leaves: the pager's offset. */
+    pageOffset: () -> Float = { 0f },
+    /** The figure printed on the leaf at an index — its folio. */
+    folioAt: (index: Int) -> Int = { it + 1 },
     content: @Composable () -> Unit,
 ) {
     // Rank by role, not by taste. Back / play / forward are what a listener
@@ -227,20 +237,48 @@ internal fun MushafReadingSheet(
                 leafFooter()
             }
         }
-        // The folio, off the paper. It used to be the leaf's last band and the
-        // leaf paid for it twice over — the figure and the tail above it — for
-        // a number that belongs to the frame as much as to the page. Standing
-        // it in the dial's head air costs nothing that was being read, moves it
-        // down beside the transport, and gives the text the line back.
-        MushafPageFolio(
-            page = pageAt(),
-            unit = leafUnit.value,
-            glyphSize = with(density) { (leafUnit.value.toPx() / MUSHAF_LINE_PITCH_EM).toSp() },
-            script = pageNumberScript,
-            modifier = Modifier
-                .padding(horizontal = MushafPageMargin + MushafEdgeGutter)
+        // The folio, off the paper but not off the leaf.
+        //
+        // It used to be the leaf's last band, and the leaf paid for it twice
+        // over — the figure and the tail above it — for a number that belongs
+        // to the frame as much as to the page. Standing it in the dial's head
+        // air costs the text nothing. But a page number is *printed on the
+        // page*, and one that snaps to the new leaf after the turn instead of
+        // travelling with it reads as a label on the frame rather than as the
+        // leaf's own. So it travels: the band carries the leaf on either side
+        // of this one and slides them by exactly the pager's offset, which is
+        // the paper moving under the finger with nothing on the leaf paying for
+        // it.
+        BoxWithConstraints(
+            Modifier
+                .fillMaxWidth()
+                .height(leafUnit.value * MushafGrid.FOLIO)
+                .clipToBounds()
                 .graphicsLayer { alpha = folioInk },
-        )
+        ) {
+            val trackPx = constraints.maxWidth.toFloat()
+            val glyph = with(density) { (leafUnit.value.toPx() / MUSHAF_LINE_PITCH_EM).toSp() }
+            val centre = pageIndex()
+            for (index in (centre - 1)..(centre + 1)) {
+                if (index < 0 || index >= pageCount) continue
+                MushafFolioMarks(
+                    page = folioAt(index),
+                    glyphSize = glyph,
+                    script = pageNumberScript,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .offset {
+                            // Read here rather than in composition: a turn
+                            // moves the figure without recomposing the sheet.
+                            val away = index - centre - pageOffset()
+                            val x = if (english) away else -away
+                            IntOffset((x * trackPx).roundToInt(), 0)
+                        }
+                        .padding(horizontal = MushafPageMargin + MushafEdgeGutter)
+                        .wrapContentHeight(align = Alignment.CenterVertically, unbounded = true),
+                )
+            }
+        }
         MushafPageDial(
             pageAt = pageAt,
             pageCount = pageCount,
@@ -251,6 +289,10 @@ internal fun MushafReadingSheet(
             onSeekSurah = onSeekSurah,
             onWarmPage = onWarmPage,
             onScrubbing = { scrubbing.value = it; onScrubbing(it) },
+            // The rule is the book's edge seen side-on, so it runs the way the
+            // book turns: right to left for the mushaf, left to right for a
+            // book of the translation.
+            rightToLeft = !english,
             onLanding = onLanding,
             reciting = reciting,
             // Paper between the folio and the rule. The figure now stands in
