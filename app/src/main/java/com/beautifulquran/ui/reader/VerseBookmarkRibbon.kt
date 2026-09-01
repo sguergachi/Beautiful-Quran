@@ -61,9 +61,9 @@ import kotlin.math.sin
 internal val BookmarkStripWidth = 44.dp
 
 internal const val BookmarkEdgeInsetDp = 8f    // from the block's outer edge
-private const val RIBBON_WIDTH_DP = 11f
+internal const val BookmarkRibbonWidthDp = 11f
 internal const val BookmarkTopInsetDp = 24f    // align the tip with the verse's first ink line
-private const val NUB_LENGTH_DP = 14f   // just the swallowtail tip peeking out
+internal const val BookmarkNubLengthDp = 14f   // just the swallowtail tip peeking out
 private const val TOP_FOLD_DP = 3.5f    // soft fold over the page edge, matching web
 private const val BOTTOM_GAP_DP = 48f   // leave air above the next verse's tip
 private const val NOTCH_DP = 5.5f
@@ -134,7 +134,7 @@ internal fun VerseBookmarkRibbon(
     /** Reader-only paired lanes; Home ribbons retain their original geometry. */
     reservePlaceLane: Boolean = false,
     edgeInset: Dp = BookmarkEdgeInsetDp.dp,
-    ribbonWidth: Dp = RIBBON_WIDTH_DP.dp,
+    ribbonWidth: Dp = BookmarkRibbonWidthDp.dp,
     topInset: Dp = BookmarkTopInsetDp.dp,
     bottomGap: Dp = BOTTOM_GAP_DP.dp,
 ) {
@@ -294,7 +294,7 @@ internal fun VerseBookmarkRibbon(
             val edgeInsetPx = edgeInset.toPx()
             val ribbonW = ribbonWidth.toPx()
             val topInsetPx = topInset.toPx()
-            val nubLen = NUB_LENGTH_DP.dp.toPx()
+            val nubLen = BookmarkNubLengthDp.dp.toPx()
             val topFold = TOP_FOLD_DP.dp.toPx()
             val bottomGapPx = bottomGap.toPx()
             val notch = NOTCH_DP.dp.toPx()

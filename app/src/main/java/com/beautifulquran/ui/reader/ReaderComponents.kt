@@ -37,6 +37,7 @@ import androidx.compose.foundation.layout.requiredHeight
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -108,10 +109,12 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.LineHeightStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.text.style.TextOverflow
@@ -3040,8 +3043,9 @@ private fun ShareInkVerb(
 }
 
 /**
- * Western gather ordinal sitting on the bookmark swallowtail: same 44 dp
- * strip, same 24 dp first-line inset, same 8 dp edge inset. Ink, not gold.
+ * Western gather ordinal sitting in the idle swallowtail nub — same
+ * strip, first-line inset, ribbon width, and nub height as the bookmark
+ * icon. Ink, not gold.
  */
 @Composable
 private fun GatherOrdinalMark(
@@ -3056,6 +3060,11 @@ private fun GatherOrdinalMark(
     } else {
         Alignment.TopStart
     }
+    val edgeInset = bookmarkRibbonInsetDp(
+        reservePlaceLane = true,
+        edgeInsetDp = BookmarkEdgeInsetDp,
+        ribbonWidthDp = BookmarkRibbonWidthDp,
+    ).dp
     Box(
         modifier = modifier
             .width(BookmarkStripWidth)
@@ -3068,19 +3077,37 @@ private fun GatherOrdinalMark(
                 },
             ),
     ) {
-        Text(
-            text = ordinal.toString(),
-            style = MaterialTheme.typography.titleSmall.copy(fontFamily = SerifFontFamily),
-            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.72f),
-            textAlign = if (side == AyahSelectorSide.RIGHT) TextAlign.End else TextAlign.Start,
+        Box(
+            contentAlignment = Alignment.Center,
             modifier = Modifier
                 .align(onRibbon)
                 .padding(top = BookmarkTopInsetDp.dp)
                 .padding(
-                    start = if (side == AyahSelectorSide.LEFT) BookmarkEdgeInsetDp.dp else 0.dp,
-                    end = if (side == AyahSelectorSide.RIGHT) BookmarkEdgeInsetDp.dp else 0.dp,
+                    start = if (side == AyahSelectorSide.LEFT) edgeInset else 0.dp,
+                    end = if (side == AyahSelectorSide.RIGHT) edgeInset else 0.dp,
+                )
+                .size(BookmarkRibbonWidthDp.dp, BookmarkNubLengthDp.dp),
+        ) {
+            Text(
+                text = ordinal.toString(),
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.72f),
+                style = TextStyle(
+                    fontFamily = SerifFontFamily,
+                    fontSize = BookmarkRibbonWidthDp.sp,
+                    lineHeight = BookmarkNubLengthDp.sp,
+                    fontWeight = FontWeight.Normal,
+                    textAlign = TextAlign.Center,
+                    platformStyle = PlatformTextStyle(includeFontPadding = false),
+                    lineHeightStyle = LineHeightStyle(
+                        alignment = LineHeightStyle.Alignment.Center,
+                        trim = LineHeightStyle.Trim.Both,
+                    ),
                 ),
-        )
+                maxLines = 1,
+                softWrap = false,
+                modifier = Modifier.wrapContentWidth(unbounded = true),
+            )
+        }
     }
 }
 

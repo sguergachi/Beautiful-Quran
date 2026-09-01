@@ -20,6 +20,18 @@ class VerseBookmarkRibbonTest {
     }
 
     @Test
+    fun gatherOrdinal_sitsInTheBookmarkNubSlot() {
+        assertEquals(11f, BookmarkRibbonWidthDp)
+        assertEquals(14f, BookmarkNubLengthDp)
+        assertEquals(24f, BookmarkTopInsetDp)
+        assertEquals(
+            18.92f,
+            bookmarkRibbonInsetDp(true, BookmarkEdgeInsetDp, BookmarkRibbonWidthDp),
+            0.001f,
+        )
+    }
+
+    @Test
     fun completedPlaceUnfurl_consumesOnlyItsOwnGeneration() {
         assertEquals(0, remainingUnfurlSignal(current = 3, consumed = 3))
         assertEquals(4, remainingUnfurlSignal(current = 4, consumed = 3))

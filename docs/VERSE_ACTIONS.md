@@ -147,8 +147,8 @@ becomes share tools; multi is extension) without taxing bookmark.
 - Tap any verse to toggle membership while in share mode
 - Selected: a green vellum ink blot spreads under that ayah (primary
   signal) — Deep Green pigment, fibre rim, paper gutters so neighbours
-  do not fuse. Western ordinal in Garamond ink on the bookmark
-  swallowtail (secondary). Gold stays the ayah mark. Chrome never uses
+  do not fuse. Western ordinal in Garamond ink, centered in the
+  bookmark swallowtail nub (secondary). Gold stays the ayah mark. Chrome never uses
   Arabic-Indic digits.
 - Unselected: wash recedes — that *is* the unselect feedback
 - Ordinals renumber when a verse is dropped
