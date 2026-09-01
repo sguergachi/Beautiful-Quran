@@ -414,3 +414,159 @@ private fun englishLeafOpeningChars(surahId: Int): Int =
  * as an ending rather than as a gap.
  */
 private fun englishLeafOpensHere(verse: Pair<Int, Int>): Boolean = verse.second == 1
+
+/** One verse, or the rest of one, as [EnglishLeafRuler] receives it. */
+class EnglishRulerVerse(
+    /** The translation this run sets — already cut to what is left of it. */
+    val text: String,
+    val ayah: Int,
+)
+
+/**
+ * Where a leaf stops: an index into the run the ruler was handed, and how many
+ * of that verse's characters the leaf holds. [chars] is the verse's whole
+ * length when the leaf takes it entire.
+ */
+class EnglishRulerCut(val verseIndex: Int, val chars: Int)
+
+/**
+ * Measures a leaf as it will actually be drawn.
+ *
+ * The character estimate cannot be made exact, and the reason is structural
+ * rather than a constant that wants tuning: `ENGLISH_LEAF_REFERENCE_MARGIN` has
+ * to cover the *worst* leaf in the book or that leaf overflows its well, so the
+ * typical leaf comes out short by the spread between worst and typical — a line
+ * and a half of twenty-three, measured on device. Carding the leading out hides
+ * it at the cost of a leading that moves from leaf to leaf.
+ *
+ * A ruler removes the estimate instead of compensating for it. It is given more
+ * text than a leaf holds, lays it out at the book's own hand and measure, and
+ * says where the well is full — so every leaf is exactly its lines, flush at the
+ * foot, on one leading. It costs one text layout a leaf, about a thousand for
+ * the Qur'an, once.
+ *
+ * This is what an ebook does and a printed book cannot: the break lands where
+ * *this* screen breaks it, so the book repaginates when the leaf changes size.
+ */
+fun interface EnglishLeafRuler {
+    /**
+     * How much of [verses] a leaf holds, given the chapter panel that opens it.
+     *
+     * [opening] is the chapter whose panel and basmalah stand above the prose,
+     * or null on a leaf that opens with none. The run is guaranteed to be more
+     * than one leaf's worth unless the book has run out.
+     */
+    fun fill(opening: Int?, verses: List<EnglishRulerVerse>): EnglishRulerCut
+}
+
+/**
+ * Paginates the book by measuring it, one text layout to the leaf.
+ *
+ * The same rules as [buildEnglishBook] — a chapter opens a leaf, the leaf fills,
+ * the break falls where the line falls — but the leaf's own layout says where
+ * the line falls instead of a character count guessing. See [EnglishLeafRuler].
+ */
+fun buildEnglishBookByLayout(
+    catalog: MushafCatalog,
+    /** The verse's English, as the leaf sets it. */
+    text: (surahId: Int, ayah: Int) -> String,
+    ruler: EnglishLeafRuler,
+): EnglishBook {
+    // The whole book in reading order, with the Madinah page each verse begins
+    // on — the pagination is continuous, so the page is only a label now.
+    val order = ArrayList<IntArray>(6_300)
+    for (page in 1..MushafCatalog.MUSHAF_PAGE_COUNT) {
+        catalog.page(page)?.let(::englishLeafVerseKeys)?.forEach { (surahId, ayah) ->
+            order += intArrayOf(surahId, ayah, page)
+        }
+    }
+
+    val leaves = ArrayList<EnglishBookLeaf>(1_200)
+    val firstLeafByPage = IntArray(MushafCatalog.MUSHAF_PAGE_COUNT + 1) { -1 }
+    val leafByVerse = HashMap<Long, Int>(8_192)
+    val carriedCuts = HashMap<Long, MutableList<Float>>()
+
+    var at = 0
+    var offset = 0
+    while (at < order.size) {
+        val opening = if (order[at][1] == 1 && offset == 0) order[at][0] else null
+
+        // Hand the ruler more than a leaf can hold, so it is always the layout
+        // and never the end of the run that decides where the leaf stops. Half
+        // as much again is enough: no leaf sets more than its well.
+        val run = ArrayList<EnglishRulerVerse>(24)
+        val texts = ArrayList<String>(24)
+        var mass = 0
+        var j = at
+        while (j < order.size) {
+            val (surahId, ayah) = order[j]
+            // A chapter opens a leaf of its own, so the run stops before it.
+            if (j > at && ayah == 1) break
+            val whole = text(surahId, ayah)
+            val from = if (j == at) offset else 0
+            val rest = if (from >= whole.length) "" else whole.substring(from)
+            texts += whole
+            run += EnglishRulerVerse(rest, ayah)
+            mass += rest.length + ENGLISH_LEAF_MARK_CHARS
+            j++
+            if (mass > ENGLISH_LEAF_CAPACITY_CHARS * 3 / 2) break
+        }
+        if (run.isEmpty()) break
+
+        val cut = ruler.fill(opening, run)
+        val lastIndex = cut.verseIndex.coerceIn(0, run.lastIndex)
+        // A leaf that measures as holding nothing would never advance. It
+        // cannot happen with a well of any size, but the book must not hang on
+        // a ruler that says so.
+        val lastChars = cut.chars.coerceIn(
+            if (lastIndex == 0 && offset > 0) 1 else 0,
+            run[lastIndex].text.length,
+        ).coerceAtLeast(if (lastIndex == 0) 1 else 0)
+
+        val index = leaves.size
+        val runs = ArrayList<EnglishVerseRun>(lastIndex + 1)
+        val pages = ArrayList<Int>(lastIndex + 1)
+        for (k in 0..lastIndex) {
+            val row = order[at + k]
+            val whole = texts[k]
+            val from = if (k == 0) offset else 0
+            val to = if (k == lastIndex) from + lastChars else whole.length
+            runs += EnglishVerseRun(row[0], row[1], from, to)
+            pages += row[2]
+            if (from == 0) leafByVerse.putIfAbsent(quranWordKey(row[0], row[1], 1), index)
+            if (firstLeafByPage[row[2]] < 0) firstLeafByPage[row[2]] = index
+        }
+        leaves += EnglishBookLeaf(
+            page = pages.first(),
+            pages = pages.first()..pages.last(),
+            runs = runs,
+        )
+
+        val lastRun = runs.last()
+        val lastWhole = texts[lastIndex]
+        if (lastRun.to >= lastWhole.length) {
+            at += lastIndex + 1
+            offset = 0
+        } else {
+            // The verse is carried: the next leaf picks it up here, and the
+            // turn is led from the word before the cut.
+            at += lastIndex
+            offset = lastRun.to
+            if (lastWhole.isNotEmpty()) {
+                carriedCuts.getOrPut(quranWordKey(lastRun.surahId, lastRun.ayah, 1)) { ArrayList(2) }
+                    .add(offset.toFloat() / lastWhole.length)
+            }
+        }
+    }
+
+    var carried = 0
+    for (page in 1..MushafCatalog.MUSHAF_PAGE_COUNT) {
+        if (firstLeafByPage[page] < 0) firstLeafByPage[page] = carried else carried = firstLeafByPage[page]
+    }
+    return EnglishBook(
+        leaves = leaves,
+        firstLeafByPage = firstLeafByPage,
+        leafByVerse = leafByVerse,
+        carriedByVerse = carriedCuts.mapValues { (_, cuts) -> cuts.toFloatArray() },
+    )
+}

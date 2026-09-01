@@ -502,10 +502,38 @@ leading: a leaf that holds 23 lines cards to a pitch of 81 px and one that holds
 estimate forces — one leading and a ragged foot, or a flush foot and a leading
 that moves — and between them the flush foot is the one a reader is asking for.
 
-Getting both would take a real layout rather than an estimate: measure each leaf
-as it will be drawn and cut it at the end of its twenty-third line. That is a
-book that repaginates per device, as an ebook does and a printed book cannot,
-and it is about a thousand text layouts once at startup.
+**So the estimate is gone.** `buildEnglishBookByLayout` paginates the book by
+*measuring* it: `EnglishLeafRuler` is handed half again as much text as a leaf
+can hold, lays it out at the book's own hand, leading and measure — the same
+`englishProseStyle` the leaf is drawn in, the same marks in the same size — and
+says where the well is full. One text layout to a leaf, about a thousand for the
+Qur'an, once, off the main thread.
+
+It cannot run before the leaf has a size, so the book opens on the character
+estimate and repaginates a frame later, and again whenever the leaf changes
+size. That is not a workaround: it is what an ebook *is*. A printed book breaks
+in the same place in every copy because every copy is the same size; a book on a
+screen breaks where that screen breaks it.
+
+Two details cost a second layout on a few leaves and are worth naming:
+
+- **The mark that will be drawn.** If the cut lands at a verse's end, the leaf
+  draws that verse's mark — and in the generous run the ruler measured, the mark
+  had text after it and may have been carried onto a line the leaf does not
+  have. So the ruler re-measures exactly what the leaf will set, and cuts inside
+  the verse instead if the mark will not fit, sending it over the fold with the
+  tail it belongs to.
+- **Lines are not all the same height.** A line carrying only a verse mark is
+  set in a different face and stands differently, and that is precisely the line
+  that falls at the foot. So the ruler counts by `getLineBottom` — where the
+  lines actually land — rather than by a pitch and an assumed ink.
+
+Measured over twelve consecutive leaves of Al-Baqarah: **every leaf exactly 23
+lines**, the last line's top at 2033 px on ten of them, and the book's own
+leading of 81 px on ten — 80 on two and 77 on one, where the leaf still finds a
+hair more than the ruler did and cards or closes to take it up. The carding
+above is what absorbs that remainder; the ruler is what made it a remainder
+instead of a line and a half.
 
 It is not done to save a line. Cutting a verse costs the reader the end of a
 thought to a page turn, so it is done only where leaving it whole would waste

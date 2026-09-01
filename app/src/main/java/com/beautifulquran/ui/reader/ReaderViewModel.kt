@@ -18,6 +18,8 @@ import com.beautifulquran.domain.HighlightEngine
 import com.beautifulquran.domain.EnglishBook
 import com.beautifulquran.domain.MushafCatalog
 import com.beautifulquran.data.EnglishLeafText
+import com.beautifulquran.domain.EnglishLeafRuler
+import com.beautifulquran.domain.buildEnglishBookByLayout
 import com.beautifulquran.domain.buildEnglishBook
 import com.beautifulquran.domain.quranWordKey
 import com.beautifulquran.domain.OutputLatency
@@ -29,6 +31,7 @@ import com.beautifulquran.playback.PlayerController
 import com.beautifulquran.playback.PlayerUiState
 import com.beautifulquran.playback.TarjiBacklogAnchor
 import kotlin.math.abs
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -44,6 +47,7 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /** The word currently being recited: ayah number + 1-based word position.
  * [durationMs] is how long the reciter dwells on it (at 1× speed) and paces
@@ -272,19 +276,44 @@ class ReaderViewModel(
      * rebuilt when it changes: the gloss chain and the published translation
      * are different lengths, so they do not break into the same leaves.
      */
-    fun ensureMushaf(text: EnglishLeafText) {
-        if (_mushaf.value != null && mushafLeafText == text) return
+    fun ensureMushaf(
+        text: EnglishLeafText,
+        /**
+         * The leaf, once it knows its own size. Given one, the book is
+         * paginated by *measuring* each leaf rather than counting characters
+         * into it — see [EnglishLeafRuler]. Null until the reader has laid out
+         * once, so the book opens on the estimate and is repaginated a frame
+         * later, the way an ebook repaginates when you turn a phone.
+         */
+        ruler: EnglishLeafRuler? = null,
+        /** What the ruler was made from: rebuild when the leaf changes size. */
+        rulerKey: Any? = null,
+    ) {
+        if (_mushaf.value != null && mushafLeafText == text && mushafRulerKey == rulerKey) return
         mushafLeafText = text
+        mushafRulerKey = rulerKey
         viewModelScope.launch {
             val catalog = repository.mushafCatalog()
             val surahs = repository.surahs().associateBy { it.id }
-            val prose = repository.englishVerseProse(text)
-            val book = buildEnglishBook(catalog) { surahId, ayah ->
-                prose[quranWordKey(surahId, ayah, 1)] ?: 0
+            val book = if (ruler == null) {
+                val prose = repository.englishVerseProse(text)
+                buildEnglishBook(catalog) { surahId, ayah ->
+                    prose[quranWordKey(surahId, ayah, 1)] ?: 0
+                }
+            } else {
+                val words = repository.englishVerseText(text)
+                // A thousand text layouts. Off the main thread, once.
+                withContext(Dispatchers.Default) {
+                    buildEnglishBookByLayout(catalog, { surahId, ayah ->
+                        words[quranWordKey(surahId, ayah, 1)].orEmpty()
+                    }, ruler)
+                }
             }
             _mushaf.value = MushafUi(catalog, surahs, book)
         }
     }
+
+    private var mushafRulerKey: Any? = null
 
     /**
      * Verse under the reading line (scroll / rail / follow). Used for Assistant

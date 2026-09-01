@@ -138,6 +138,8 @@ class QuranRepository(
     @Volatile
     private var englishVerseProse: Map<Long, Int>? = null
     private var englishVerseGloss: Map<Long, Int>? = null
+    private var englishVerseTextCache: Map<Long, String>? = null
+    private var englishVerseGlossText: Map<Long, String>? = null
 
     /**
      * Verse translations for the English leaf, a page at a time.
@@ -343,6 +345,28 @@ class QuranRepository(
         }
         flush()
     }
+
+    /**
+     * Every verse's English, as the leaf sets it.
+     *
+     * The lengths are enough to *count* a leaf; measuring one needs the words.
+     * 1.4 MB of strings against 6,236 integers, and held for the same reason —
+     * it is the book's own text and does not change.
+     */
+    suspend fun englishVerseText(text: EnglishLeafText): Map<Long, String> =
+        withContext(Dispatchers.IO) {
+            when (text) {
+                EnglishLeafText.TRANSLATION -> englishVerseTextCache ?: queryList(
+                    "SELECT surah_id, ayah_number, translation_en FROM ayahs",
+                ) { c ->
+                    quranWordKey(c.getInt(0), c.getInt(1), 1) to c.getString(2)
+                }.toMap().also { englishVerseTextCache = it }
+
+                EnglishLeafText.GLOSS -> englishVerseGlossText ?: buildMap {
+                    forEachGlossVerse(null) { key, chain -> put(key, chain) }
+                }.also { englishVerseGlossText = it }
+            }
+        }
 
     /** What one verse's English costs the pagination. */
     private fun measure(text: String) = text.length + ENGLISH_LEAF_MARK_CHARS

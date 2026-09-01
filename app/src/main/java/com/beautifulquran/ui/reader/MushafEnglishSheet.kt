@@ -68,6 +68,9 @@ import com.beautifulquran.domain.englishLeafFittedLeadingEm
 import com.beautifulquran.domain.englishLeafOverflowHandPx
 import com.beautifulquran.domain.englishLeafHandPx
 import com.beautifulquran.domain.ENGLISH_LEAF_LEADING_EM
+import com.beautifulquran.domain.EnglishLeafRuler
+import com.beautifulquran.domain.EnglishRulerCut
+import com.beautifulquran.domain.surahOpensWithBasmalahPreface
 import com.beautifulquran.domain.mushafIsOpeningLeaf
 import com.beautifulquran.domain.quranWordKey
 import com.beautifulquran.ui.theme.LocalQuranAccents
@@ -125,6 +128,8 @@ internal fun MushafEnglishSheet(
     flashAyah: Int?,
     flashWordPosition: Int?,
     hideParentheticals: Boolean,
+    /** The leaf's well and measure, in px, once it has laid out. */
+    onMetrics: (wellPx: Float, measurePx: Float) -> Unit = { _, _ -> },
     verseNumberScript: VerseNumberScript,
     /** The leaf's fore-edge, shared with the running head and the folio. */
     foreEdge: Dp,
@@ -228,6 +233,10 @@ internal fun MushafEnglishSheet(
         val measurePx = with(density) {
             (constraints.maxWidth - foreEdge.roundToPx() * 2).toFloat().coerceAtLeast(1f)
         }
+        // The leaf's own size, for the ruler that paginates the book from it.
+        // Reported rather than recomputed: this is the only place that knows
+        // what the sheet actually measures against.
+        LaunchedEffect(wellPx, measurePx) { onMetrics(wellPx, measurePx) }
         val palette = rememberWordInkPalette()
         val gold = LocalQuranAccents.current.gold
         val blocks = remember(
@@ -1217,3 +1226,107 @@ private fun englishBasmalahPx(
 /** Saheeh International's rendering — the translation the book is set in. */
 private const val ENGLISH_BASMALAH =
     "In the name of Allah, the Entirely Merciful, the Especially Merciful."
+
+/**
+ * The book's ruler: a leaf measured as it will be drawn.
+ *
+ * It lays the run out at the book's own hand, leading and measure — the same
+ * `englishProseStyle` the leaf is set in, the same marks in the same size —
+ * and reads off the character the twenty-third line ends on. So the leaf takes
+ * exactly the lines its well has, flush at the foot, with the leading it shares
+ * with every other leaf in the book. See [EnglishLeafRuler].
+ *
+ * [wellPx] and [measurePx] are the leaf's, so the book repaginates when the
+ * leaf changes size — which is what an ebook is.
+ */
+internal fun englishLeafRuler(
+    wellPx: Float,
+    measurePx: Float,
+    density: Density,
+    measurer: TextMeasurer,
+    verseNumberScript: VerseNumberScript,
+): EnglishLeafRuler {
+    val handPx = englishBookHandPx(wellPx, measurePx, density, measurer)
+    val pitchPx = handPx * ENGLISH_LEAF_LEADING_EM
+    val inkPx = englishLineInkPx(handPx, density, measurer)
+    val basmalahPx = englishBasmalahPx(handPx, measurePx, density, measurer)
+    val style = with(density) {
+        englishProseStyle(handPx.toSp(), pitchPx.toSp())
+    }
+    val constraints = Constraints(maxWidth = measurePx.toInt().coerceAtLeast(1))
+    return EnglishLeafRuler { opening, verses ->
+        // What the panel and its basmalah take before a word is set — measured,
+        // the same figures EnglishLeafBlockText.Opening is drawn from.
+        val head = if (opening == null) {
+            0f
+        } else {
+            inkPx + pitchPx * EnglishLeafPanelAir * 2f +
+                if (surahOpensWithBasmalahPreface(opening)) basmalahPx else 0f
+        }
+        val room = (wellPx - head).coerceAtLeast(1f)
+        val starts = IntArray(verses.size)
+        fun mark(builder: AnnotatedString.Builder, ayah: Int) {
+            builder.append(" ")
+            builder.appendAyahNumberMark(
+                number = ayah,
+                useArabicIndicDigits = verseNumberScript == VerseNumberScript.ARABIC,
+                style = SpanStyle(fontSize = EnglishLeafMarkType.em),
+                ltr = true,
+            )
+        }
+        val text = buildAnnotatedString {
+            verses.forEachIndexed { index, verse ->
+                if (length > 0) append(" ")
+                starts[index] = length
+                append(verse.text)
+                mark(this, verse.ayah)
+            }
+        }
+        fun lay(of: AnnotatedString) =
+            measurer.measure(of, style, constraints = constraints, density = density)
+        val laid = lay(text)
+        // How many lines the well really holds, by where the lines actually
+        // land rather than by a pitch and an assumed ink. A line carrying only
+        // a verse mark is set in a different face and stands a different
+        // height, and that is exactly the line that falls at the foot.
+        var lines = 0
+        while (lines < laid.lineCount && laid.getLineBottom(lines) <= room) lines++
+        if (lines >= laid.lineCount) {
+            EnglishRulerCut(verses.lastIndex, verses.last().text.length)
+        } else {
+            val at = laid.getLineEnd(lines.coerceAtLeast(1) - 1, visibleEnd = true)
+            var index = verses.lastIndex
+            for (k in verses.indices) {
+                if (at <= starts[k] + verses[k].text.length) { index = k; break }
+            }
+            var chars = (at - starts[index]).coerceIn(0, verses[index].text.length)
+            if (chars >= verses[index].text.length) {
+                // The leaf ends this verse, so it draws the verse's mark as
+                // well — and the run measured above has more text after that
+                // mark, which can carry it onto a line the leaf does not have.
+                // Measuring what the leaf will really set is the only way to
+                // know. A second layout, on the leaves where a mark falls near
+                // the foot and on no others.
+                val exact = lay(
+                    buildAnnotatedString {
+                        append(text.subSequence(0, starts[index] + verses[index].text.length))
+                        mark(this, verses[index].ayah)
+                    },
+                )
+                if (exact.size.height > room) {
+                    // It will not fit: cut inside the verse instead, so the
+                    // mark goes over the fold with the tail it belongs to.
+                    var back = 0
+                    while (back < exact.lineCount && exact.getLineBottom(back) <= room) back++
+                    val end = exact.getLineEnd(back.coerceAtLeast(1) - 1, visibleEnd = true)
+                    chars = (end - starts[index]).coerceAtMost(verses[index].text.length - 1)
+                    if (chars <= 0) {
+                        index = (index - 1).coerceAtLeast(0)
+                        chars = verses[index].text.length
+                    }
+                }
+            }
+            EnglishRulerCut(index, chars)
+        }
+    }
+}

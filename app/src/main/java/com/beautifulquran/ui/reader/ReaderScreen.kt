@@ -104,6 +104,8 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.platform.LocalFontFamilyResolver
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
@@ -111,6 +113,7 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
@@ -277,6 +280,37 @@ fun ReaderScreen(
     val mushafWholeVerses = mushafMode && settings.readingMode == ReadingMode.ENGLISH_ONLY
     LaunchedEffect(mushafMode) {
         if (mushafMode) viewModel.ensureMushaf(settings.englishLeafText)
+    }
+    // The English book is paginated by *measuring* each leaf, which cannot be
+    // done until the leaf has a size. So the book opens on the character
+    // estimate and is repaginated once the leaf reports its well and measure —
+    // and again whenever those change, the way an ebook repaginates on a turn
+    // of the phone. See EnglishLeafRuler.
+    val mushafLeafMetrics = remember { mutableStateOf<FloatArray?>(null) }
+    val rulerDensity = LocalDensity.current
+    val rulerResolver = LocalFontFamilyResolver.current
+    val rulerLayoutDirection = LocalLayoutDirection.current
+    // Its own measurer: the ruler lays out a thousand leaves off the main
+    // thread and must not share a cache with the one the leaves are drawn from.
+    val rulerMeasurer = remember(rulerResolver, rulerDensity, rulerLayoutDirection) {
+        TextMeasurer(rulerResolver, rulerDensity, rulerLayoutDirection)
+    }
+    val leafMetrics = mushafLeafMetrics.value
+    LaunchedEffect(mushafMode, leafMetrics, settings.englishLeafText, settings.verseNumberScript) {
+        val well = leafMetrics?.getOrNull(0) ?: return@LaunchedEffect
+        val measure = leafMetrics.getOrNull(1) ?: return@LaunchedEffect
+        if (!mushafMode || well <= 0f || measure <= 0f) return@LaunchedEffect
+        viewModel.ensureMushaf(
+            text = settings.englishLeafText,
+            ruler = englishLeafRuler(
+                wellPx = well,
+                measurePx = measure,
+                density = rulerDensity,
+                measurer = rulerMeasurer,
+                verseNumberScript = settings.verseNumberScript,
+            ),
+            rulerKey = listOf(well, measure, settings.verseNumberScript),
+        )
     }
     val mushafCatalog = mushafUi?.catalog
     // The English book's leaves. A Madinah page takes more than one where its
@@ -2654,6 +2688,12 @@ fun ReaderScreen(
                         flashWordPosition = searchFlashWord,
                         heldPage = mushafTappedPage,
                         onTappedLeaf = { mushafTappedPage = it },
+                        onLeafMetrics = { well, measure ->
+                            val was = mushafLeafMetrics.value
+                            if (was == null || was[0] != well || was[1] != measure) {
+                                mushafLeafMetrics.value = floatArrayOf(well, measure)
+                            }
+                        },
                         parkNeighbours = { mushafDialLanding.value },
                         onUserTurnedPage = onMushafTurnedPage,
                         onWordClick = onMushafWordClick,
