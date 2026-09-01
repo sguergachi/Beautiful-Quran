@@ -28,7 +28,8 @@ import com.beautifulquran.ui.theme.TranslationFontFamily
  * [com.beautifulquran.data.ThemeMode.LIGHT] so shares stay readable parchment.
  *
  * The sheet is as tall as the gather: every verse, then the gold chapter
- * footer. Do not clip to a phone-screen height.
+ * footer. Do not clip to a phone-screen height. Pixel scale is the
+ * gather size — see [com.beautifulquran.share.shareImageScale].
  */
 @Composable
 fun ShareImageCard(

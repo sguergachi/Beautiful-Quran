@@ -336,6 +336,7 @@ class ShareViewModel(
                 }
                 bitmap = ShareImageRenderer.render(
                     activity = activity,
+                    verseCount = lines.size,
                     content = {
                         ShareImageCard(
                             verses = lines,

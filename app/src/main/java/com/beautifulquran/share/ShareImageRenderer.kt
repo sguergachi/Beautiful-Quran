@@ -7,8 +7,12 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.ui.platform.ComposeView
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.ViewCompositionStrategy
+import androidx.compose.ui.unit.Density
 import com.beautifulquran.data.ThemeMode
 import com.beautifulquran.ui.theme.BeautifulQuranTheme
 import kotlinx.coroutines.Dispatchers
@@ -16,6 +20,9 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
+import kotlin.math.min
+import kotlin.math.roundToInt
+import kotlin.math.sqrt
 
 /**
  * Offscreen Compose → [Bitmap] for share images.
@@ -27,15 +34,25 @@ import kotlin.coroutines.resumeWithException
  */
 object ShareImageRenderer {
 
-    /** Portrait share width in px. */
+    /** One-verse portrait share width in px. A longer gather scales up from this. */
     const val WIDTH_PX = 1080
+
+    /** Logical card width so 28.sp is 84 px at 1×, independent of the phone. */
+    internal const val CARD_WIDTH_DP = 360f
+
+    /** Software-canvas budget (~64 MB ARGB). Long gathers scale down to fit. */
+    internal const val MAX_BITMAP_PIXELS = 16_777_216
+
+    internal const val MAX_BITMAP_SIDE = 16_384
+
+    private const val BASE_DENSITY = WIDTH_PX / CARD_WIDTH_DP
 
     private const val LAYOUT_ATTEMPTS = 8
 
     suspend fun render(
         activity: Activity,
         content: @Composable () -> Unit,
-        widthPx: Int = WIDTH_PX,
+        verseCount: Int = 1,
     ): Bitmap = withContext(Dispatchers.Main.immediate) {
         suspendCancellableCoroutine { cont ->
             val decor = activity.window.decorView as? ViewGroup
@@ -44,6 +61,7 @@ object ShareImageRenderer {
                 return@suspendCancellableCoroutine
             }
 
+            val scaleState = mutableFloatStateOf(1f)
             val host = FrameLayout(activity).apply {
                 // Invisible but still laid out and drawn (GONE would skip both).
                 visibility = View.INVISIBLE
@@ -53,18 +71,23 @@ object ShareImageRenderer {
                     ViewCompositionStrategy.DisposeOnDetachedFromWindow,
                 )
                 setContent {
-                    BeautifulQuranTheme(themeMode = ThemeMode.LIGHT) {
-                        content()
+                    val density = BASE_DENSITY * scaleState.floatValue
+                    CompositionLocalProvider(
+                        LocalDensity provides Density(density, fontScale = 1f),
+                    ) {
+                        BeautifulQuranTheme(themeMode = ThemeMode.LIGHT) {
+                            content()
+                        }
                     }
                 }
             }
             host.addView(
                 composeView,
-                ViewGroup.LayoutParams(widthPx, ViewGroup.LayoutParams.WRAP_CONTENT),
+                ViewGroup.LayoutParams(WIDTH_PX, ViewGroup.LayoutParams.WRAP_CONTENT),
             )
             decor.addView(
                 host,
-                ViewGroup.LayoutParams(widthPx, ViewGroup.LayoutParams.WRAP_CONTENT),
+                ViewGroup.LayoutParams(WIDTH_PX, ViewGroup.LayoutParams.WRAP_CONTENT),
             )
 
             fun cleanup() {
@@ -77,12 +100,20 @@ object ShareImageRenderer {
 
             cont.invokeOnCancellation { cleanup() }
 
+            var scaled = false
             fun capture(attempt: Int) {
                 if (!cont.isActive) {
                     cleanup()
                     return
                 }
                 try {
+                    val widthPx = shareImageWidthPx(scaleState.floatValue)
+                    val wrap = ViewGroup.LayoutParams(
+                        widthPx,
+                        ViewGroup.LayoutParams.WRAP_CONTENT,
+                    )
+                    composeView.layoutParams = wrap
+                    host.layoutParams = wrap
                     val widthSpec = View.MeasureSpec.makeMeasureSpec(widthPx, View.MeasureSpec.EXACTLY)
                     val heightSpec = View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
                     composeView.measure(widthSpec, heightSpec)
@@ -94,6 +125,16 @@ object ShareImageRenderer {
                     // As tall as the gather — do not crop verses or the
                     // chapter footer to a phone-screen height.
                     height = height.coerceAtLeast(1)
+                    if (!scaled) {
+                        val next = shareImageScale(verseCount, WIDTH_PX, height)
+                        scaled = true
+                        if (next > scaleState.floatValue + 0.01f) {
+                            scaleState.floatValue = next
+                            // Two posts: density change recomposes, then we measure.
+                            composeView.post { composeView.post { capture(0) } }
+                            return
+                        }
+                    }
                     composeView.layout(0, 0, widthPx, height)
                     host.measure(
                         View.MeasureSpec.makeMeasureSpec(widthPx, View.MeasureSpec.EXACTLY),
@@ -116,4 +157,29 @@ object ShareImageRenderer {
             composeView.post { capture(0) }
         }
     }
+}
+
+/** Pixel width of the sheet at [scale]. One verse is [WIDTH_PX]. */
+internal fun shareImageWidthPx(scale: Float): Int =
+    (ShareImageRenderer.WIDTH_PX * scale).roundToInt().coerceAtLeast(1)
+
+/**
+ * Extra pixels per gathered verse. Two ayahs render at 2×, three at 3×,
+ * until the bitmap would exceed [maxPixels] or [maxSide] — then the
+ * scale that still fits. Never below 1×: a long gather stays wrap-height
+ * at 1080 rather than shrinking the type.
+ */
+internal fun shareImageScale(
+    verseCount: Int,
+    widthPx: Int,
+    heightPx: Int,
+    maxPixels: Int = ShareImageRenderer.MAX_BITMAP_PIXELS,
+    maxSide: Int = ShareImageRenderer.MAX_BITMAP_SIDE,
+): Float {
+    val want = verseCount.coerceAtLeast(1).toFloat()
+    val w = widthPx.coerceAtLeast(1).toFloat()
+    val h = heightPx.coerceAtLeast(1).toFloat()
+    val byPixels = sqrt(maxPixels / (w * h))
+    val bySide = min(maxSide / w, maxSide / h)
+    return min(want, min(byPixels, bySide)).coerceAtLeast(1f)
 }
