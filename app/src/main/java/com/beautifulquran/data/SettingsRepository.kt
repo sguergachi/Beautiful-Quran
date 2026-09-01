@@ -68,7 +68,7 @@ data class Settings(
     val annotationsEnabled: Boolean = true,
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
     val ayahSelectorSide: AyahSelectorSide = AyahSelectorSide.LEFT,
-    /** Continue Listening — last verse actually recited (not mere open/scroll). */
+    /** Last verse recited — shared by Continue Listening and the green ribbon. */
     val lastSurah: Int = 0,
     val lastAyah: Int = 1,
     /** Unlocks the Timings Lab and the word-hold chooser. Toggled by
@@ -148,10 +148,9 @@ class SettingsRepository(context: Context) {
     )
 
     /**
-     * Continue Listening only — the one setting written during playback, on
-     * every ayah advance. [update] rewrites every settings key per call, which is
-     * needless write amplification for two integers that change every few
-     * seconds. No-ops when the position is unchanged.
+     * Shared Continue Listening / green-ribbon target, written on every audio
+     * ayah advance. [update] rewrites every settings key per call, which is
+     * needless write amplification for two frequently changing integers.
      */
     fun updateListeningPosition(surah: Int, ayah: Int) {
         val current = _settings.value

@@ -362,6 +362,11 @@ private fun PaperStackApp(
     val coverSheetVisible by remember {
         derivedStateOf { stackPosition.value <= FloatingPlaybackCoverVisibleMaxPage }
     }
+    val chapterRibbonReady by remember {
+        derivedStateOf {
+            settledLayer == COVER_LAYER && stackPosition.value <= 0.04f
+        }
+    }
     val stackAboveReaderPlayer by remember {
         derivedStateOf { stackPosition.value in 0.5f..1.5f }
     }
@@ -984,6 +989,8 @@ private fun PaperStackApp(
                 // slides in when returning to chapter selection and out when
                 // leaving for the reader — not only when nowPlaying flips.
                 coverSheetVisible = coverSheetVisible,
+                readerVisitActive = settledLayer == AYAH_LAYER,
+                chapterRibbonReady = chapterRibbonReady,
                 bookmarkCount = bookmarkCount,
                 bookmarkStyle = homeBookmarkStyle,
                 onOpenBookmarks = { animateTo(BOOKMARKS_LAYER) },

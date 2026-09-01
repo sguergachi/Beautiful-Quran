@@ -17,6 +17,7 @@ class DeveloperModeSettingsTest {
     fun `developer mode defaults off`() {
         assertFalse(Settings().developerModeEnabled)
         assertFalse(Settings().educationGuidesEnabled)
+        assertEquals(0, Settings().lastSurah)
     }
 
     @Test

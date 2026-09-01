@@ -115,6 +115,26 @@ beyond it and no way to tell the end of the book from the end of the comb; and
 after the first stroke that ran past an end, neither end means anything any
 more.
 
+The comb is cancellable by the same grammar that backs out of its magnified
+trough: pull upward off the rule and a click confirms that it folds away
+without turning the leaf.
+One pull spends one tier only. A pull out of the leaf trough returns to the
+chapter comb; the hand must return to the rule before another upward pull can
+cancel that comb. Letting go chooses the chapter the bracket names; the comb's
+quiet boundary still applies at lift, so a tiny thumb wobble cannot silently
+choose the neighbouring chapter.
+
+A dial release that turns to a different leaf leaves one brief way back on the
+same rule: a small ink roundel grows at the old leaf's seat with a back arrow
+cut out of its centre, pointing in the direction the comb would travel to
+return there. It is the hairline remembering the place, not a floating undo
+message. The roundel remains tappable for five seconds, then shrinks and fades
+into the rule; tapping it returns to that exact leaf and consumes it.
+Taking hold of the dial again also consumes it, because a new search supersedes
+the old landing. The roundel and rule share one gesture owner: a still release
+on the roundel goes back, while movement past touch slop becomes a new dial
+stroke. Its generous tap target must never swallow a drag along the rule.
+
 **What the reader has hold of at that tier is the comb itself, not a marker.**
 No thumb rides the line while the comb is up — the chapter their finger is in
 is drawn as a bracket, one cell of the comb, and that cell is the thing they
@@ -591,7 +611,7 @@ verses recess to upcoming ink over ~400 ms.
 Two themes, both "paper":
 
 - **Paper**: warm sepia off-white `#FAF3E8`, ink `#1C1B18`,
-  deep green `#0E5C4A` as the single interactive accent,
+  deep green `#0E5C4A` as the single interactive and current-place accent,
   muted gold `#B8901C` reserved for Quranic ornament (ayah marks, surah
   numbers, the ۞).
 - **Nightfall**: near-black charcoal `#0A0B0C`, parchment ink `#E8E2D5`,
@@ -606,7 +626,8 @@ Two themes, both "paper":
   soft green `#7FB8A4`, warmer gold `#D9B44A`, same deep repeat orange and
   fresh-ink glint as Nightfall.
 
-Gold never marks interaction; green never decorates. One accent each.
+Gold never marks interaction; green never decorates. Green may identify the
+reader's current place because that mark is wayfinding, not ornament.
 
 **Ruby** `#B3122F` (paper) / `#D64358` (nightfall + royal green) is the one
 deliberate third hue, and it belongs to saved-verse ink: the
@@ -973,6 +994,58 @@ weight.
   the float** (`verticalFadingEdges` `bottomInset`), not stretched through
   it — same paper edge as the reader above its embedded `PlayerBar`.
   Opening the reader replaces the float with that bar.
+
+## Current-place ribbon
+
+The green ribbon marks the last ayah actually heard: the same `lastSurah` /
+`lastAyah` target used by Home's Continue Listening row. A fresh install has no
+green cloth. Leaving exposes the last-heard place beside its surah on Chapters;
+returning snapshots it onto that verse for the whole new visit. Bare scrolling
+leaves the ribbon behind, like opening a physical book at its marker and moving
+through the pages.
+On the return swipe, the chapter marker waits until its outer lane nears the
+screen edge, then drops to full length as the sheet settles. The motion is armed
+only by a committed reader visit, so cold display and cancelled page turns do
+not perform a gratuitous flourish.
+
+Pause is the placement gesture: once the chrome returns, green
+gravity-unfurls on the actual paused media verse, the ayah rail follows it, and
+that verse becomes the durable `lastAyah` used by Continue. Resume leaves the
+new marker parked there. Opening an already-paused reader does not replay the
+drop; it only runs after playback was heard in that visit. A completed drop
+consumes its motion token, so scrolling the verse away and back shows settled
+cloth instead of replaying the placement. On an unsaved verse green uses the
+outer, screen-edge lane while the empty bookmark tip stays fixed in its reserved
+inner lane; the two never overpaint. That green cloth absorbs its own touch area
+without dispatching to the ruby bookmark action beside it.
+
+The verse mark is a **full ribbon**, with the same top, tail, and block-length
+as a saved ruby bookmark, but 72% of its width. That quieter silhouette makes
+green read as a passive place marker, not a second tap target; only the ruby
+lane remains interactive. When one verse owns both meanings, green keeps the
+outer, screen-edge lane and ruby remains in its permanently reserved lane
+toward the page. Green sits 4 dp closer to the screen edge, increasing the
+paper between them without moving ruby. The ruby cloth and empty
+outline never shift when green appears or disappears. Neither cloth overlays,
+caps, recolors, or replaces the other. During recitation both follow the
+existing chrome fade because the word wash already names the live position.
+
+This paired-lane geometry belongs only to verse blocks in the Reader. Home's
+chapter-list ruby ribbons keep their original 2 dp optical position; the shared
+component must not reserve Reader gutter space on that sheet.
+
+Chapters uses the full green swallowtail in its permanently reserved 28 dp
+outer lane without shifting the chapter's number or names. Tapping that marked
+chapter returns to the parked ayah. The ayah rail recolors the nearest existing
+collapsed bar green rather than adding another tick; in the expanded wheel
+that parked ayah is green until gold scrub focus reaches it. A bookmarked
+parked ayah keeps its ruby number while its rail tick is green. Continue
+Listening and green deliberately share the last verse actually heard; tapping
+either the Continue row or the green-marked chapter opens that same ayah.
+
+Implementation: `ui/reader/VerseBookmarkRibbon.kt`,
+`ui/reader/AyahSelectorRail.kt`, and `ui/home/HomeScreen.kt` over
+`Settings.lastSurah` / `lastAyah` and `HomeUiState.continueTarget`.
 
 ## Bookmark ribbon
 

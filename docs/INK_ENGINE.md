@@ -466,6 +466,12 @@ tween-vs-snap rules, sweep entry and residual rules, repeat wash timing, the
   creates an `Animatable`, `SideEffect`, ordered gate, or word-motion lifecycle.
   The two shaped modes still keep independent text construction because their
   typography differs; only their motion-to-bloom adapter is shared.
+- **Paper scroll handoff.** When playback advances, the shaped Arabic/English
+  verse that owned the lyric line eases its paper cover back over the dry ink
+  instead of snapping every word to Upcoming. Only that outgoing verse may use
+  the ramp; future verses retain the full Upcoming cover from their first frame,
+  preserving the no-full-ink-flash guard. Layered gloss already makes the same
+  handoff through its draw-phase word-alpha tween.
 - **Mushaf progression is page-local.** The leaf carrying the voice begins
   beneath the Upcoming paper cover; its active word uses the same motion pack
   as the scrolling reader, completed ayahs retain full ink, and later ayahs use

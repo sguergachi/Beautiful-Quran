@@ -271,6 +271,17 @@ fun ReaderScreen(
     // one ayah block — never the whole screen.
     val activeWordState = viewModel.activeWord.collectAsStateWithLifecycle()
     val settings by viewModel.settings.settings.collectAsStateWithLifecycle()
+    // Snapshot the shared Continue / green-ribbon target for this visit. A
+    // deliberate pause moves this local marker and persists the same target.
+    var parkedPlace by remember(surahId) {
+        mutableStateOf(
+            viewModel.settings.settings.value.let { saved ->
+                readingPlace(saved.lastSurah, saved.lastAyah)
+            },
+        )
+    }
+    var placeUnfurlTarget by remember(surahId) { mutableStateOf<ReadingPlace?>(null) }
+    var placeUnfurlToken by remember(surahId) { mutableIntStateOf(0) }
     val mushafUi by viewModel.mushaf.collectAsStateWithLifecycle()
     val mushafMode = settings.readingLayout == ReadingLayout.MUSHAF
     LaunchedEffect(mushafMode) {
@@ -308,12 +319,16 @@ fun ReaderScreen(
     // last writer of the pager's position.
     var mushafSeekPage by remember { mutableStateOf<Int?>(null) }
     var mushafSeekSurahId by remember { mutableStateOf<Int?>(null) }
-    // Read as a lambda by the pager, so a hand landing on the rule fades the
-    // folio without recomposing 604 leaves' worth of reader around it.
+    // Separate physical contact from landing work: every hand fades the folio,
+    // but only a confirmed distant landing parks expensive neighbour leaves.
     val mushafScrubbing = remember { mutableStateOf(false) }
+    val mushafDialLanding = remember { mutableStateOf(false) }
     LaunchedEffect(mushafSeekPage) {
         val target = mushafSeekPage ?: return@LaunchedEffect
         val catalog = mushafCatalog ?: return@LaunchedEffect
+        // A dial release must move the book at once. MushafPage already loads
+        // a missing QCF face off the main thread; awaiting it here pins the
+        // old leaf under the released comb until that load finishes.
         mushafPagerState.scrollToPage((target - 1).coerceIn(0, catalog.pageCount - 1))
         mushafSeekPage = null
     }
@@ -547,6 +562,33 @@ fun ReaderScreen(
     // nothing of "this" surah is playing, so pause restarts instead of pausing.
     val renderedSurahId = uiState.content?.surah?.id ?: surahId
     val isThisSurahPlaying = playerState.nowPlaying?.surahId == renderedSurahId
+    val playingNow = isThisSurahPlaying && playerState.isPlaying
+    val parkedPlaceAyah = parkedPlace.ayahIn(renderedSurahId)
+    val placeUnfurlAyah = placeUnfurlTarget.ayahIn(renderedSurahId)
+    var playedHere by remember(renderedSurahId) { mutableStateOf(playingNow) }
+    val pausedPlaceAyah = pausedReadingPlaceRibbonAyah(
+        renderedSurahId = renderedSurahId,
+        mediaSurahId = playerState.nowPlaying?.surahId,
+        mediaAyah = playerState.nowPlaying?.ayah,
+        isPlaying = playerState.isPlaying,
+        isBuffering = playerState.isBuffering,
+        playedHere = playedHere,
+    )
+    LaunchedEffect(playingNow, pausedPlaceAyah) {
+        if (playingNow) {
+            playedHere = true
+        } else if (pausedPlaceAyah != null) {
+            // Ignore Media3's brief non-playing dip between repeat items. The
+            // ribbon arrives with the chrome only after the pause holds.
+            delay(350)
+            val place = ReadingPlace(renderedSurahId, pausedPlaceAyah)
+            parkedPlace = place
+            viewModel.onPausedAyah(place.surahId, place.ayah)
+            placeUnfurlTarget = place
+            placeUnfurlToken++
+            playedHere = false
+        }
+    }
     // Lead-adjusted: crosses to the next ayah ~500ms before the current one's
     // audio ends, so the block fade to the next ayah starts a touch early.
     val activeAyahState = viewModel.activeAyah.collectAsStateWithLifecycle()
@@ -557,7 +599,6 @@ fun ReaderScreen(
     // frame or two before it resumes at the range's start. Debounce that so the
     // receded chrome / status-bar overlay hold steady across the restart instead
     // of flashing in — only a genuine, sustained pause brings the chrome back.
-    val playingNow = isThisSurahPlaying && playerState.isPlaying
     var recitingActive by remember { mutableStateOf(playingNow) }
     LaunchedEffect(playingNow) {
         if (playingNow) {
@@ -728,8 +769,6 @@ fun ReaderScreen(
     val scrolledAyahPosition = focusController.focusedPosition
 
     // Track the verse under the reading line for Assistant "bookmark this".
-    // Continue Listening only advances when audio is actually playing
-    // (see [ReaderViewModel.onAyahBecameActive] / play paths).
     LaunchedEffect(scrolledAyah.value, surahId) {
         val ayah = scrolledAyah.value
         if (ayah >= 1) viewModel.onAyahBecameActive(ayah)
@@ -2367,7 +2406,14 @@ fun ReaderScreen(
                         chapterLabel = mushafChapterLabel,
                         onSeekPage = { mushafSeekPage = it },
                         onSeekSurah = { mushafSeekSurahId = it },
+                        onWarmPage = { page ->
+                            mushafCatalog?.let { catalog ->
+                                val face = MushafQcfFonts.face(activityContext.applicationContext, page)
+                                warmMushafInkProfiles(catalog.page(page), face?.typeface)
+                            }
+                        },
                         onScrubbing = { mushafScrubbing.value = it },
+                        onLanding = { mushafDialLanding.value = it },
                         modifier = Modifier.weight(1f),
                         leafFooter = {
                             val catalog = mushafCatalog
@@ -2523,6 +2569,7 @@ fun ReaderScreen(
                         heldPage = mushafTappedPage,
                         onTappedLeaf = { mushafTappedPage = it },
                         scrubbing = { mushafScrubbing.value },
+                        parkNeighbours = { mushafDialLanding.value },
                         onUserTurnedPage = onMushafTurnedPage,
                         onWordClick = onMushafWordClick,
                         onWordLongClick = onMushafWordLongClick,
@@ -2696,11 +2743,6 @@ fun ReaderScreen(
                                     ayah.number == inkAyah || ayah.number == leadAyah
                                 }
                             }
-                            // Per-verse derived read so scrolling only recomposes
-                            // the two ayahs whose focus bit flips, not every block.
-                            val bookmarkFocused by remember(ayah.number) {
-                                derivedStateOf { scrolledAyah.value == ayah.number }
-                            }
                             val bookmarked = ayah.number in bookmarkedAyahs
                             val bookmarkLessonTarget = bookmarkNoteTipOpen &&
                                 bookmarkNoteTipSurah == ayah.surahId &&
@@ -2773,7 +2815,18 @@ fun ReaderScreen(
                                 // collected projection can arrive one frame after
                                 // the lesson. Keep its live anchor ruby meanwhile.
                                 bookmarked = ribbonBookmarked,
-                                bookmarkFocused = bookmarkFocused,
+                                placeMarked = ayah.number == parkedPlaceAyah,
+                                placeUnfurlSignal = if (ayah.number == placeUnfurlAyah) {
+                                    placeUnfurlToken
+                                } else {
+                                    0
+                                },
+                                onPlaceUnfurlConsumed = { consumed ->
+                                    placeUnfurlToken = remainingUnfurlSignal(
+                                        current = placeUnfurlToken,
+                                        consumed = consumed,
+                                    )
+                                },
                                 bookmarkChromeAlpha = bookmarkChromeAlpha,
                                 // Keep the lesson target live so its taught hold
                                 // can be completed without leaving the paper.
@@ -3082,6 +3135,7 @@ fun ReaderScreen(
                     side = selectorSide,
                     currentAyah = railCurrentAyah,
                     currentPosition = railCurrentPosition,
+                    placeAyah = parkedPlaceAyah,
                     bookmarkedAyahs = bookmarkedAyahs,
                     pageStarts = railPageStarts,
                     chromeAlpha = { topBarAlpha.value },

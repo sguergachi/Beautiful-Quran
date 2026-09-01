@@ -13,6 +13,32 @@ import org.junit.Test
 
 class InkEngineTest {
 
+    @Test
+    fun `paper handoff fades outgoing shaped ink without exposing future verses`() {
+        val upcomingCover = 0.73f
+
+        assertEquals(
+            0f,
+            shapedWordCoverAlpha(State.Upcoming, 0f, upcomingCover, softHandoff = true),
+            0f,
+        )
+        assertEquals(
+            0.4f,
+            shapedWordCoverAlpha(State.Upcoming, 0.4f, upcomingCover, softHandoff = true),
+            0f,
+        )
+        assertEquals(
+            upcomingCover,
+            shapedWordCoverAlpha(State.Upcoming, 0f, upcomingCover, softHandoff = false),
+            0f,
+        )
+        assertEquals(
+            0f,
+            shapedWordCoverAlpha(State.Active, 0.4f, upcomingCover, softHandoff = true),
+            0f,
+        )
+    }
+
     private fun active(
         wordPosition: Int,
         durationMs: Long = 600,

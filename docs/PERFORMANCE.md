@@ -48,6 +48,9 @@ the whole ayah. It keeps the shaped ayah as static full-ink spans and applies
 `shapedWordBloom` in the draw phase: upcoming words get a full-strength paper
 cover from the first Upcoming frame — and the same cover is used while the ayah
 is recessed (`dimmed`), so landing on the next verse does not change unread ink.
+On Paper, the verse that just owned the lyric line ramps that cover in over the
+existing recess tween; verses still ahead mount at the full Upcoming cover, so
+the soft outgoing handoff cannot introduce a full-ink flash.
 Block alpha stays at 1 during recitation in every mode (word-layer alpha for
 gloss; paper covers over opaque glyphs for shaped English/Hafs). First-pass
 pulls the cover back on the ink-wash curve; repeat SrcIn-tints the same shaped
@@ -204,7 +207,19 @@ tick must not remasure three pages or recreate 150 `Text` nodes.
   by page, display row, size, and measure. The page's sixteen-row reflow is a
   linear token-width pass remembered by page + typeface; playback ticks and
   ink animation frames never repeat it. Geometry remains in the bounded
-  process cache.
+  process cache. Non-adjacent chapter and search jumps warm that same target
+  window before moving the pager. The dial warms only the target that rests
+  under the finger (fly-over cells are debounced), including that leaf's
+  glyph-ink profiles, then releases its bubble and retract on one frame and
+  moves the pager on the next. A fast lift also
+  starts an urgent target-only warm-up; it never serially loads the five-page
+  window or waits for the retract spring before requesting the selected leaf.
+  The return dot's tappable seed is immediate; its entrance starts after the
+  selected leaf's first frame. Only a confirmed page-changing release parks
+  pager neighbours; taps, cancellations, and same-page gestures never tear
+  them down. On a real landing they stay disposed through the entrance and
+  return only once the dot is full-sized, avoiding cold leaf work on the
+  animation clock.
 - Each Madinah line owns one pointer-input node, not one per word. Its QCF word
   nodes retain the directional `shapedWordBloom`, while the leaf itself owns an
   offscreen layer so a fling transforms a recorded page. The settled page runs
