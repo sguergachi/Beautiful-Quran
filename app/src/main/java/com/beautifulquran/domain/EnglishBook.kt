@@ -68,20 +68,31 @@ const val ENGLISH_LEAF_CAPACITY_CHARS = 940
  * counts.
  *
  * The capacity is a mass of *prose*, and a chapter opening sets no prose at
- * all — it sets a panel, and the air on either side of it, and it ends the
- * paragraph above it half a line early. Paper, not words. Left uncounted it is
- * paper the pagination believes is free, and the last leaf of the Qur'an,
- * which opens four chapters, came out with fifteen of its twenty-two lines
- * already spent before a word of translation was set on it. The leading closed
- * to pay for it and the lines ran into one another.
+ * all — it sets a panel, and the air on either side of it, and a basmalah.
+ * Paper, not words. Left uncounted it is paper the pagination believes is free,
+ * and the last leaf of the Qur'an, which opened four chapters before chapters
+ * took a leaf of their own, came out with fifteen of its lines already spent
+ * before a word of translation was set on it.
  *
- * So an opening is charged what it takes. About one line for the panel, a
- * third of one for the air on each side, and half a line for the ragged end of
- * the paragraph above: call it two lines, and a line of this book is about 46
- * characters. The basmalah preface is charged its own line and its air.
+ * These are *measured*, off a screen capture of an opening leaf, and not
+ * reasoned about. `MushafEnglishSheet` builds the panel's slot from the line's
+ * ink and [EnglishLeafPanelAir] on each side and the basmalah's from its own
+ * line and [EnglishLeafBasmalahAirEm] under it, and on the reference leaf those
+ * come to 126 px and 113 px against a line pitch of 80 — 1.58 lines and 1.41,
+ * three lines together. A line of this book is [ENGLISH_LEAF_LINE_CHARS], so
+ * they are 64 characters and 58.
+ *
+ * They were 92 and 78 — four and a sixth lines for three — and a chapter's leaf
+ * came up an eighth of its well short every time. Half of the excess was a
+ * charge for "the ragged end of the paragraph above", which was real when a
+ * panel could land halfway down a leaf and became a charge for nothing the day
+ * chapters started opening leaves of their own ([englishLeafOpensHere]).
+ *
+ * Re-measure with a device capture after changing the panel, the basmalah or
+ * the leading.
  */
-const val ENGLISH_LEAF_OPENING_CHARS = 92
-const val ENGLISH_LEAF_BASMALAH_CHARS = 78
+const val ENGLISH_LEAF_OPENING_CHARS = 64
+const val ENGLISH_LEAF_BASMALAH_CHARS = 58
 
 /** What a verse costs the leaf: its prose, and the opening it may bring. */
 fun englishLeafVerseMass(surahId: Int, ayah: Int, prose: Int): Int = when {

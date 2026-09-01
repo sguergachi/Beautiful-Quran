@@ -490,19 +490,38 @@ small, and 108 leaves ran past their well and closed their leading to hide it.
 not fit, and then the next leaf starts — the compositor's order, and the reason
 no leaf is ever handed out over its capacity.
 
-**An opening is charged the paper it takes.** The capacity is a mass of *prose*,
-and a chapter opening sets none — it sets a panel, the air on either side of it,
-and it ends the paragraph above half a line early. Left uncounted that is paper
-the pagination believes is free, and the last leaf of the Qur'an, which opens
-four chapters, spent fifteen of its twenty-two lines before a word of
-translation was set on it; the leading closed to pay and the lines ran into one
-another. So `ENGLISH_LEAF_OPENING_CHARS` = 92 for the panel and its air, plus
-`ENGLISH_LEAF_BASMALAH_CHARS` = 78 for the preface line where a chapter takes
-one — two lines of a 46-character measure.
+**An opening is charged the paper it takes — and only that.** The capacity is a
+mass of *prose*, and a chapter opening sets none: it sets a panel, the air on
+either side of it, and a basmalah. Left uncounted that is paper the pagination
+believes is free, and the last leaf of the Qur'an, which opened four chapters
+before chapters took leaves of their own, spent fifteen of its lines before a
+word of translation was set on it; the leading closed to pay and the lines ran
+into one another.
+
+The charge is *measured*, off a device capture of an opening leaf, and this is
+the one number in the pagination that a simulation cannot check — the model
+believes the leaf is full either way, so the error is only ever visible on
+glass. On the reference leaf, at a line pitch of 80 px:
+
+```
+                          measured   charged        was
+    panel slot             126 px     1.58 lines    2.25 lines  (92 ch)
+    basmalah slot          113 px     1.41 lines    1.91 lines  (78 ch)
+    ----                   ------     ----------    ----------
+                           239 px     2.99 lines    4.16 lines
+```
+
+So `ENGLISH_LEAF_OPENING_CHARS` = 64 and `ENGLISH_LEAF_BASMALAH_CHARS` = 58.
+They were 92 and 78 — four and a sixth lines charged for three — and every
+chapter's leaf came up an eighth of its well short. Half of the excess was a
+charge for "the ragged end of the paragraph above", real when a panel could
+land halfway down a leaf and a charge for nothing the day chapters started
+opening leaves of their own. Sad is the case to look at: it used to stop
+mid-verse at *"about My message. Rather,"* with two and a half lines of white
+under it, and now carries 38:1–8 whole and fills to the foot.
 
 **One leaf is over capacity and always will be.** 2:282 is a single sentence of
-1,333 characters, half as long again as a leaf holds, and no pagination splits a
-sentence.
+1,333 characters, half as long again as a leaf holds.
 
 **The rescue, in order.** The leaf is measured as it will be drawn, and if the
 block would run past the foot its leading closes — only on that leaf, only by
