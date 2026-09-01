@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   ayahHighlightSpans,
+  conceptRelevance,
   englishTranslationHighlightSpans,
   filterSurahs,
   isWordSearchQuery,
@@ -8,6 +9,7 @@ import {
   matchWordSearchAsync,
   normalizeArabicForSearch,
   parseAyahReference,
+  parseSearchQuery,
   sectionWordSearchHits,
   shouldRunWordSearch,
   windowAroundMatch,
@@ -35,6 +37,7 @@ function entry(
     translationLower: translation.toLowerCase(),
     transliteration,
     transliterationLower: transliteration.toLowerCase(),
+    root: '',
     ayahText,
     ayahTranslation: '',
     surahNameTransliteration: `Surah${surahId}`,
@@ -85,6 +88,55 @@ describe('matchWordSearch', () => {
       [55, 1],
     ])
     expect(matchWordSearch(index, 'الرحمان').some((h) => h.surahId === 1)).toBe(true)
+  })
+
+  it('uses quotes for literal-only search', () => {
+    expect(matchWordSearch(index, '"mercifull"')).toEqual([])
+    expect(matchWordSearch(index, '"merciful"')).toHaveLength(2)
+    expect(matchWordSearch(index, '“merciful”')).toHaveLength(2)
+    expect(matchWordSearch(index, '"mercy"')).toEqual([])
+    expect(isWordSearchQuery('""')).toBe(false)
+  })
+
+  it('searches an exact quoted phrase across the ayah translation', () => {
+    const phrase = {
+      ...entry(1, 1, 1, 'بِسْمِ', 'In the name'),
+      ayahTranslation: 'In the name of Allah, the Entirely Merciful.',
+    }
+    expect(matchWordSearch([phrase], '"name of Allah"')[0]!.position).toBe(0)
+  })
+
+  it('retrieves and labels concept vocabulary below literal matches', () => {
+    const concept = {
+      name: 'Divine Mercy',
+      primaryTerms: ['mercy of Allah', 'divine compassion'],
+      secondaryTerms: ['clemency', 'forgiveness'],
+      category: 'Divine Attributes and Signs',
+      domain: 'Aqeedah',
+      ayahKeys: [1_001, 55_001],
+    }
+    const hits = matchWordSearch(index, 'clemency', 400, [concept])
+    expect(hits.map((hit) => [hit.surahId, hit.ayahNumber])).toEqual([
+      [1, 1],
+      [55, 1],
+    ])
+    expect(hits.every((hit) => hit.position === 0 && hit.matchLabel === 'Divine Mercy')).toBe(true)
+    expect(matchWordSearch(index, 'clemncy', 400, [concept])).not.toEqual([])
+    expect(matchWordSearch(index, '"clemency"', 400, [concept])).toEqual([])
+    expect(
+      conceptRelevance(concept, parseSearchQuery('show me verses about clemency')),
+    ).toBeGreaterThan(0)
+
+    const lexical = [...index, entry(60, 1, 1, 'رَحْمَة', 'clemency')]
+    expect(matchWordSearch(lexical, 'clemency', 400, [concept])[0]!.surahId).toBe(60)
+  })
+
+  it('expands a matched Arabic root to related word forms', () => {
+    const rooted = [
+      { ...entry(2, 37, 1, 'فَتَابَ', 'so He turned'), root: 'توب' },
+      { ...entry(9, 104, 2, 'ٱلتَّوَّٰبُ', 'the Oft-Returning'), root: 'توب' },
+    ]
+    expect(matchWordSearch(rooted, 'turned').map((hit) => hit.surahId)).toEqual([2, 9])
   })
 
   it('keeps exact matches ahead of fuzzy neighbors', () => {
@@ -267,6 +319,7 @@ describe('filterSurahs', () => {
     expect(filterSurahs(surahs, 'baqara').surahs.map((s) => s.id)).toEqual([2])
     expect(filterSurahs(surahs, 'baqrah').surahs.map((s) => s.id)).toEqual([2])
     expect(filterSurahs(surahs, 'opner').surahs.map((s) => s.id)).toEqual([1])
+    expect(filterSurahs(surahs, '"baqrah"').surahs).toEqual([])
     expect(filterSurahs(surahs, '2:255')).toEqual({
       surahs: [surahs[1]],
       ayahTarget: 255,

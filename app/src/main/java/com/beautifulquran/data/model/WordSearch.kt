@@ -12,6 +12,8 @@ data class WordSearchHit(
     val ayahTranslation: String,
     val surahNameTransliteration: String,
     val surahNameArabic: String,
+    /** Ontology concept that surfaced an ayah-level semantic result. */
+    val matchLabel: String? = null,
 )
 
 /**

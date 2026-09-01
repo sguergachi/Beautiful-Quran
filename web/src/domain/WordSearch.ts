@@ -15,6 +15,7 @@ export interface WordSearchHit {
   ayahTranslation: string
   surahNameTransliteration: string
   surahNameArabic: string
+  matchLabel?: string | null
 }
 
 export interface SurahWordSearchSection {
@@ -37,10 +38,120 @@ export interface WordSearchIndexEntry {
   translationLower: string
   transliteration: string
   transliterationLower: string
+  root: string
   ayahText: string
   ayahTranslation: string
   surahNameTransliteration: string
   surahNameArabic: string
+}
+
+export interface SearchConcept {
+  name: string
+  primaryTerms: string[]
+  secondaryTerms: string[]
+  category: string
+  domain: string
+  ayahKeys: number[]
+}
+
+export interface ParsedSearchQuery {
+  text: string
+  exactOnly: boolean
+}
+
+/** Double quotes around the whole query disable spelling and concept expansion. */
+export function parseSearchQuery(query: string): ParsedSearchQuery {
+  const trimmed = query.trim()
+  const quoted =
+    trimmed.length >= 2 &&
+    ((trimmed.startsWith('"') && trimmed.endsWith('"')) ||
+      (trimmed.startsWith('“') && trimmed.endsWith('”')))
+  return {
+    text: (quoted ? trimmed.slice(1, -1) : trimmed).trim(),
+    exactOnly: quoted,
+  }
+}
+
+const SEARCH_SEPARATOR = /[^\p{L}\p{N}]+/u
+const QUERY_FILLERS = new Set([
+  'a', 'an', 'about', 'and', 'find', 'for', 'from', 'in', 'me', 'of', 'on', 'quran',
+  'regarding', 'related', 'show', 'the', 'to', 'verse', 'verses', 'with',
+])
+
+const canonicalWords = (text: string): string[] =>
+  text.toLowerCase().split(SEARCH_SEPARATOR).filter(Boolean)
+
+const stem = (word: string): string => {
+  if (word.length > 6 && word.endsWith('ness')) return word.slice(0, -4)
+  if (word.length > 5 && word.endsWith('ies')) return `${word.slice(0, -3)}y`
+  if (word.length > 4 && word.endsWith('s')) return word.slice(0, -1)
+  return word
+}
+
+/** Exact phrases lead, then reordered content words, substrings, and spelling. */
+export function searchTextRelevance(
+  text: string,
+  query: ParsedSearchQuery,
+): number {
+  const target = text.toLowerCase()
+  const needle = query.text.toLowerCase()
+  if (!target || !needle) return 0
+  if (target === needle) return 3_200
+  if (containsBounded(target, needle)) return 3_000
+  if (query.exactOnly) {
+    const phrase = canonicalWords(target).join(' ')
+    const canonicalNeedle = canonicalWords(needle).join(' ')
+    return canonicalNeedle && containsBounded(phrase, canonicalNeedle) ? 3_000 : 0
+  }
+  if (target.includes(needle)) return 2_200
+  if (/^[\p{L}\p{N}]+$/u.test(needle)) {
+    return fuzzyWordContains(target, needle) ? 1_600 : 0
+  }
+
+  const queryWords = canonicalWords(needle)
+  const meaningful = queryWords.filter((word) => !QUERY_FILLERS.has(word))
+  const content = meaningful.length > 0 ? meaningful : queryWords
+  if (content.length > 1 || content.length < queryWords.length) {
+    const stems = new Set(canonicalWords(target).map(stem))
+    if (content.every((word) => stems.has(stem(word)))) return 2_600
+  }
+  return 0
+}
+
+function containsBounded(text: string, needle: string): boolean {
+  let at = text.indexOf(needle)
+  while (at >= 0) {
+    const end = at + needle.length
+    const before = at === 0 || !/[\p{L}\p{N}]/u.test(text[at - 1]!)
+    const after = end === text.length || !/[\p{L}\p{N}]/u.test(text[end]!)
+    if (before && after) return true
+    at = text.indexOf(needle, at + 1)
+  }
+  return false
+}
+
+/** Score ontology vocabulary below literal text and above broad hierarchy matches. */
+export function conceptRelevance(
+  concept: SearchConcept,
+  query: ParsedSearchQuery,
+): number {
+  if (query.exactOnly || normalizeArabicForSearch(query.text)) return 0
+  const best = (terms: string[]): number =>
+    terms.reduce((score, term) => Math.max(score, searchTextRelevance(term, query)), 0)
+  const relevance = Math.max(
+    searchTextRelevance(concept.name, query) - 1_400,
+    best(concept.primaryTerms) - 1_400,
+    best(concept.secondaryTerms) - 1_500,
+    searchTextRelevance(concept.category, query) - 1_900,
+    searchTextRelevance(concept.domain, query) - 2_100,
+    0,
+  )
+  if (relevance === 0) return 0
+  const specificity =
+    concept.ayahKeys.length > 0
+      ? Math.min(150, Math.trunc(800 / Math.sqrt(concept.ayahKeys.length)))
+      : 0
+  return relevance + specificity
 }
 
 /**
@@ -83,7 +194,7 @@ export function normalizeArabicForSearch(input: string): string {
 }
 
 export function isWordSearchQuery(query: string): boolean {
-  return query.trim().length >= WORD_SEARCH_MIN_QUERY_LENGTH
+  return parseSearchQuery(query).text.length >= WORD_SEARCH_MIN_QUERY_LENGTH
 }
 
 export interface AyahReference {
@@ -130,31 +241,168 @@ export function matchWordSearch(
   index: WordSearchIndexEntry[],
   query: string,
   maxHits = WORD_SEARCH_MAX_HITS,
+  concepts: SearchConcept[] = [],
 ): WordSearchHit[] {
-  const trimmed = query.trim()
-  if (!isWordSearchQuery(trimmed)) return []
-  const arabicNorm = normalizeArabicForSearch(trimmed)
-  const lower = trimmed.toLowerCase()
-  const wantArabic = arabicNorm.length >= WORD_SEARCH_MIN_QUERY_LENGTH
-  function scan(fuzzy: boolean): WordSearchHit[] {
-    const out: WordSearchHit[] = []
-    for (let i = 0; i < index.length; i++) {
-      const entry = index[i]!
-      const hit = fuzzy
-        ? fuzzyWordContains(entry.arabicNorm, arabicNorm) ||
-          fuzzyWordContains(entry.translationLower, lower) ||
-          fuzzyWordContains(entry.transliterationLower, lower)
-        : (wantArabic && entry.arabicNorm.includes(arabicNorm)) ||
-          entry.translationLower.includes(lower) ||
-          entry.transliterationLower.includes(lower)
-      if (!hit) continue
-      out.push(toHitWithDisplayTranslation(entry, index, i, trimmed))
-      if (out.length >= maxHits) break
-    }
-    return out
+  const state = createRanking(index, query)
+  if (!state || maxHits <= 0) return []
+  scanLexical(state, 0, index.length)
+  scanAyahText(state)
+  scanRoots(state, 0, index.length)
+  scanConcepts(state, concepts)
+  return finishRanking(state, maxHits)
+}
+
+interface RankedHit {
+  key: number
+  indexAt: number
+  position: number
+  score: number
+  matchLabel?: string
+}
+
+interface RankingState {
+  index: WordSearchIndexEntry[]
+  parsed: ParsedSearchQuery
+  arabic: string
+  latin: ParsedSearchQuery
+  ranked: Map<number, RankedHit>
+  firstIndex: Map<number, number>
+  matchedRoots: Set<string>
+}
+
+function createRanking(
+  index: WordSearchIndexEntry[],
+  query: string,
+): RankingState | null {
+  const parsed = parseSearchQuery(query)
+  if (parsed.text.length < WORD_SEARCH_MIN_QUERY_LENGTH) return null
+  const arabic = normalizeArabicForSearch(parsed.text)
+  return {
+    index,
+    parsed,
+    arabic,
+    latin: arabic ? { ...parsed, text: '' } : parsed,
+    ranked: new Map(),
+    firstIndex: new Map(),
+    matchedRoots: new Set(),
   }
-  const exact = scan(false)
-  return exact.length > 0 ? exact : scan(true)
+}
+
+function addRanked(
+  state: RankingState,
+  indexAt: number,
+  position: number,
+  score: number,
+  matchLabel?: string,
+): void {
+  if (score <= 0) return
+  const entry = state.index[indexAt]!
+  const key = entry.surahId * 1_000 + entry.ayahNumber
+  const current = state.ranked.get(key)
+  if (
+    current == null ||
+    score > current.score ||
+    (score === current.score && position > 0 && current.position === 0)
+  ) {
+    state.ranked.set(key, { key, indexAt, position, score, matchLabel })
+  }
+}
+
+function scanLexical(state: RankingState, from: number, to: number): void {
+  for (let i = from; i < to; i++) {
+    const entry = state.index[i]!
+    const score = Math.max(
+      state.arabic
+        ? searchTextRelevance(entry.arabicNorm, { ...state.parsed, text: state.arabic })
+        : 0,
+      searchTextRelevance(entry.translationLower, state.latin),
+      searchTextRelevance(entry.transliterationLower, state.latin),
+    )
+    addRanked(state, i, entry.position, score)
+    if (!state.parsed.exactOnly && score > 0 && entry.root) state.matchedRoots.add(entry.root)
+    const key = entry.surahId * 1_000 + entry.ayahNumber
+    if (!state.firstIndex.has(key)) state.firstIndex.set(key, i)
+  }
+}
+
+function scanAyahText(state: RankingState): void {
+  let at = 0
+  while (at < state.index.length) {
+    const anchor = state.index[at]!
+    let end = at + 1
+    while (
+      end < state.index.length &&
+      state.index[end]!.surahId === anchor.surahId &&
+      state.index[end]!.ayahNumber === anchor.ayahNumber
+    ) {
+      end++
+    }
+    let glossScore = 0
+    if (/\s/u.test(state.parsed.text)) {
+      const glosses: string[] = []
+      for (let i = at; i < end; i++) glosses.push(state.index[i]!.translation)
+      glossScore = searchTextRelevance(glosses.join(' '), state.latin)
+    }
+    const score = Math.max(
+      state.arabic
+        ? searchTextRelevance(normalizeArabicForSearch(anchor.ayahText), {
+            ...state.parsed,
+            text: state.arabic,
+          })
+        : 0,
+      searchTextRelevance(anchor.ayahTranslation, state.latin),
+      glossScore,
+    )
+    addRanked(state, at, 0, score)
+    at = end
+  }
+}
+
+function scanRoots(state: RankingState, from: number, to: number): void {
+  if (state.parsed.exactOnly || state.matchedRoots.size === 0) return
+  for (let i = from; i < to; i++) {
+    const entry = state.index[i]!
+    if (state.matchedRoots.has(entry.root)) addRanked(state, i, entry.position, 1_450)
+  }
+}
+
+function scanConcepts(state: RankingState, concepts: SearchConcept[]): void {
+  if (state.parsed.exactOnly) return
+  const semantic = new Map<number, { best: number; bonus: number; label: string }>()
+  for (const concept of concepts) {
+    const score = conceptRelevance(concept, state.parsed)
+    if (score <= 0) continue
+    for (const key of concept.ayahKeys) {
+      const current = semantic.get(key)
+      semantic.set(
+        key,
+        current == null
+          ? { best: score, bonus: 0, label: concept.name }
+          : {
+              best: Math.max(current.best, score),
+              bonus: Math.min(250, current.bonus + Math.trunc(Math.min(current.best, score) / 5)),
+              label: score > current.best ? concept.name : current.label,
+            },
+      )
+    }
+  }
+  for (const [key, match] of semantic) {
+    const indexAt = state.firstIndex.get(key)
+    if (indexAt != null) addRanked(state, indexAt, 0, match.best + match.bonus, match.label)
+  }
+}
+
+function finishRanking(state: RankingState, maxHits: number): WordSearchHit[] {
+  return [...state.ranked.values()]
+    .sort((a, b) => b.score - a.score || a.key - b.key || a.position - b.position)
+    .slice(0, maxHits)
+    .map((match) => {
+      const entry = state.index[match.indexAt]!
+      const base = { ...toHit(entry), matchLabel: match.matchLabel ?? null }
+      return match.position > 0
+        ? toHitWithDisplayTranslation(entry, state.index, match.indexAt, state.parsed.text, base)
+        : { ...base, position: 0, arabic: '', translation: '', transliteration: '' }
+    })
 }
 
 const FUZZY_WORD = /[\p{L}\p{N}]+/gu
@@ -209,8 +457,8 @@ function toHitWithDisplayTranslation(
   index: WordSearchIndexEntry[],
   at: number,
   query: string,
+  base: WordSearchHit = toHit(entry),
 ): WordSearchHit {
-  const base = toHit(entry)
   if (highlightNeedle(entry.ayahTranslation, query, entry.translation) != null) {
     return base
   }
@@ -262,37 +510,31 @@ export async function matchWordSearchAsync(
   query: string,
   maxHits = WORD_SEARCH_MAX_HITS,
   isCancelled: () => boolean = () => false,
+  concepts: SearchConcept[] = [],
 ): Promise<WordSearchHit[]> {
-  const trimmed = query.trim()
-  if (!isWordSearchQuery(trimmed)) return []
-  const arabicNorm = normalizeArabicForSearch(trimmed)
-  const lower = trimmed.toLowerCase()
-  const wantArabic = arabicNorm.length >= WORD_SEARCH_MIN_QUERY_LENGTH
-  async function scan(fuzzy: boolean): Promise<WordSearchHit[]> {
-    const out: WordSearchHit[] = []
-    for (let i = 0; i < index.length; i++) {
-      if (i > 0 && i % WORD_SEARCH_CHUNK === 0) {
-        if (isCancelled()) return out
-        await yieldToEventLoop()
-        if (isCancelled()) return out
-      }
-      const entry = index[i]!
-      const hit = fuzzy
-        ? fuzzyWordContains(entry.arabicNorm, arabicNorm) ||
-          fuzzyWordContains(entry.translationLower, lower) ||
-          fuzzyWordContains(entry.transliterationLower, lower)
-        : (wantArabic && entry.arabicNorm.includes(arabicNorm)) ||
-          entry.translationLower.includes(lower) ||
-          entry.transliterationLower.includes(lower)
-      if (!hit) continue
-      out.push(toHitWithDisplayTranslation(entry, index, i, trimmed))
-      if (out.length >= maxHits) break
+  const state = createRanking(index, query)
+  if (!state || maxHits <= 0) return []
+  for (let from = 0; from < index.length; from += WORD_SEARCH_CHUNK) {
+    if (from > 0) {
+      if (isCancelled()) return []
+      await yieldToEventLoop()
+      if (isCancelled()) return []
     }
-    return out
+    scanLexical(state, from, Math.min(index.length, from + WORD_SEARCH_CHUNK))
   }
-  const exact = await scan(false)
-  if (exact.length > 0 || isCancelled()) return exact
-  return scan(true)
+  scanAyahText(state)
+  if (state.matchedRoots.size > 0) {
+    for (let from = 0; from < index.length; from += WORD_SEARCH_CHUNK) {
+      if (from > 0) {
+        if (isCancelled()) return []
+        await yieldToEventLoop()
+        if (isCancelled()) return []
+      }
+      scanRoots(state, from, Math.min(index.length, from + WORD_SEARCH_CHUNK))
+    }
+  }
+  scanConcepts(state, concepts)
+  return finishRanking(state, maxHits)
 }
 
 function yieldToEventLoop(): Promise<void> {
@@ -509,21 +751,27 @@ export function filterSurahs<T extends {
     }
     return { surahs: [], ayahTarget: null }
   }
-  const trimmed = query.trim()
-  const lower = trimmed.toLowerCase()
-  const arabic = normalizeArabicForSearch(trimmed)
-  const matches = (s: T, fuzzy: boolean): boolean =>
-    fuzzy
-      ? fuzzyWordContains(s.nameTransliteration.toLowerCase(), lower) ||
-        fuzzyWordContains(s.nameTranslation.toLowerCase(), lower) ||
-        fuzzyWordContains(normalizeArabicForSearch(s.nameArabic), arabic)
-      : s.nameTransliteration.toLowerCase().includes(lower) ||
-        s.nameTranslation.toLowerCase().includes(lower) ||
-        s.nameArabic.includes(trimmed) ||
-        String(s.id) === trimmed
-  const exact = surahs.filter((s) => matches(s, false))
+  const parsed = parseSearchQuery(query)
+  const arabic = normalizeArabicForSearch(parsed.text)
   return {
-    surahs: exact.length > 0 ? exact : surahs.filter((s) => matches(s, true)),
+    surahs: surahs
+      .map((surah) => ({
+        surah,
+        score: Math.max(
+          searchTextRelevance(surah.nameTransliteration, parsed),
+          searchTextRelevance(surah.nameTranslation, parsed),
+          arabic
+            ? searchTextRelevance(normalizeArabicForSearch(surah.nameArabic), {
+                ...parsed,
+                text: arabic,
+              })
+            : 0,
+          String(surah.id) === parsed.text ? 3_200 : 0,
+        ),
+      }))
+      .filter((match) => match.score > 0)
+      .sort((a, b) => b.score - a.score || a.surah.id - b.surah.id)
+      .map((match) => match.surah),
     ayahTarget: null,
   }
 }

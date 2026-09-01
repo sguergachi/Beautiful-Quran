@@ -8,9 +8,10 @@ import com.beautifulquran.data.SettingsRepository
 import com.beautifulquran.data.model.Surah
 import com.beautifulquran.data.model.SurahWordSearchSection
 import com.beautifulquran.data.model.WordSearchHit
-import com.beautifulquran.domain.fuzzyWordContains
 import com.beautifulquran.domain.isWordSearchQuery
 import com.beautifulquran.domain.normalizeArabicForSearch
+import com.beautifulquran.domain.parseSearchQuery
+import com.beautifulquran.domain.searchTextRelevance
 import com.beautifulquran.domain.sectionWordSearchHits
 import com.beautifulquran.playback.PlayerController
 import com.beautifulquran.playback.PlayerUiState
@@ -79,7 +80,8 @@ internal data class SurahFilterResult(val surahs: List<Surah>, val ayahTarget: I
 /** The home search: blank shows everything; a `surah:ayah` reference resolves
  * to that one surah (empty when out of range); anything else matches names
  * (transliteration/translation case-insensitively, Arabic exactly) or the
- * bare surah number. */
+ * bare surah number. Text matches are relevance-ranked; quotes disable fuzzy
+ * matching just as they do for Quran-wide results. */
 internal fun filterSurahs(surahs: List<Surah>, query: String): SurahFilterResult {
     val reference = parseAyahReference(query)
     return when {
@@ -98,22 +100,23 @@ internal fun filterSurahs(surahs: List<Surah>, query: String): SurahFilterResult
             // Match on the trimmed query so stray leading/trailing whitespace
             // (common from keyboard autocomplete) never hides an otherwise
             // matching surah name or number.
-            val trimmed = query.trim()
-            val lower = trimmed.lowercase()
-            val arabic = normalizeArabicForSearch(trimmed)
-            fun Surah.matches(fuzzy: Boolean): Boolean = if (fuzzy) {
-                fuzzyWordContains(nameTransliteration.lowercase(), lower) ||
-                    fuzzyWordContains(nameTranslation.lowercase(), lower) ||
-                    fuzzyWordContains(normalizeArabicForSearch(nameArabic), arabic)
-            } else {
-                nameTransliteration.contains(trimmed, ignoreCase = true) ||
-                    nameTranslation.contains(trimmed, ignoreCase = true) ||
-                    nameArabic.contains(trimmed) ||
-                    id.toString() == trimmed
-            }
-            val exact = surahs.filter { it.matches(fuzzy = false) }
+            val parsed = parseSearchQuery(query)
+            val arabic = normalizeArabicForSearch(parsed.text)
             SurahFilterResult(
-                exact.ifEmpty { surahs.filter { it.matches(fuzzy = true) } },
+                surahs.mapNotNull { surah ->
+                    val score = maxOf(
+                        searchTextRelevance(surah.nameTransliteration, parsed),
+                        searchTextRelevance(surah.nameTranslation, parsed),
+                        if (arabic.isEmpty()) 0 else searchTextRelevance(
+                            normalizeArabicForSearch(surah.nameArabic),
+                            parsed.copy(text = arabic),
+                        ),
+                        if (surah.id.toString() == parsed.text) 3_200 else 0,
+                    )
+                    score.takeIf { it > 0 }?.let { surah to it }
+                }.sortedWith(
+                    compareByDescending<Pair<Surah, Int>> { it.second }.thenBy { it.first.id },
+                ).map { it.first },
             )
         }
     }

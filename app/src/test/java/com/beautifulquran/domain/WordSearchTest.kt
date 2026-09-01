@@ -83,6 +83,74 @@ class WordSearchTest {
     }
 
     @Test
+    fun `quoted query stays literal and disables fuzzy spelling`() {
+        assertTrue(matchWordSearch(index, "\"mercifull\"").isEmpty())
+        assertEquals(2, matchWordSearch(index, "\"merciful\"").size)
+        assertEquals(2, matchWordSearch(index, "“merciful”").size)
+        assertTrue(matchWordSearch(index, "\"mercy\"").isEmpty())
+        assertFalse(isWordSearchQuery("\"\""))
+    }
+
+    @Test
+    fun `quoted phrase searches full ayah translation`() {
+        val phrase = listOf(
+            entry(
+                surahId = 1,
+                ayah = 1,
+                position = 1,
+                arabic = "بِسْمِ",
+                translation = "In the name",
+                ayahTranslation = "In the name of Allah, the Entirely Merciful.",
+            ),
+        )
+        val hit = matchWordSearch(phrase, "\"name of Allah\"").single()
+        assertEquals(0, hit.position)
+    }
+
+    @Test
+    fun `ontology vocabulary retrieves and labels related concepts`() {
+        val concept = SearchConcept(
+            name = "Divine Mercy",
+            primaryTerms = listOf("mercy of Allah", "divine compassion"),
+            secondaryTerms = listOf("clemency", "forgiveness"),
+            category = "Divine Attributes and Signs",
+            domain = "Aqeedah",
+            ayahKeys = intArrayOf(1_001, 55_001),
+        )
+        val hits = matchWordSearch(index, "clemency", concepts = listOf(concept))
+        assertEquals(listOf(1 to 1, 55 to 1), hits.map { it.surahId to it.ayahNumber })
+        assertTrue(hits.all { it.position == 0 && it.matchLabel == "Divine Mercy" })
+        assertTrue(matchWordSearch(index, "clemncy", concepts = listOf(concept)).isNotEmpty())
+        assertTrue(matchWordSearch(index, "\"clemency\"", concepts = listOf(concept)).isEmpty())
+        assertTrue(conceptRelevance(concept, parseSearchQuery("show me verses about clemency")) > 0)
+    }
+
+    @Test
+    fun `literal relevance ranks ahead of concept matches`() {
+        val lexical = index + entry(60, 1, 1, "رَحْمَة", "clemency")
+        val concept = SearchConcept(
+            name = "Divine Mercy",
+            primaryTerms = listOf("clemency"),
+            secondaryTerms = emptyList(),
+            category = "Divine Attributes",
+            domain = "Aqeedah",
+            ayahKeys = intArrayOf(1_001),
+        )
+        assertEquals(60, matchWordSearch(lexical, "clemency", concepts = listOf(concept)).first().surahId)
+    }
+
+    @Test
+    fun `matched Arabic root expands to related word forms`() {
+        val rooted = listOf(
+            entry(2, 37, 1, "فَتَابَ", "so He turned").copy(root = "توب"),
+            entry(9, 104, 2, "ٱلتَّوَّٰبُ", "the Oft-Returning").copy(root = "توب"),
+        )
+        val hits = matchWordSearch(rooted, "turned")
+        assertEquals(listOf(2, 9), hits.map { it.surahId })
+        assertEquals(listOf(1, 2), hits.map { it.position })
+    }
+
+    @Test
     fun `exact matches take precedence over fuzzy neighbors`() {
         val neighbors = listOf(
             entry(1, 1, 1, "قَالَ", "lone"),

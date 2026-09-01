@@ -354,17 +354,21 @@ the complete layer and visual-verification contract.
 
 Three sheets, hand-rolled paper stack (no router chrome):
 
-1. **Home** — surah list, Quran-wide word search (exact first, then a one-edit
-   spelling fallback, sectioned by surah with truncated expand-in-place lists),
-   `surah:ayah` references, continue-
-   listening, floating playback control while a verse is loaded (chapter ·
+1. **Home** — surah list, Quran-wide search ranked across literal phrases,
+   related QAC roots, one-edit spelling, and the packaged QSAC concept
+   vocabulary; enclosing a query in quotes keeps it literal. Results are
+   sectioned by surah with truncated expand-in-place lists. It also carries
+   `surah:ayah` references, continue-listening, and a floating playback control
+   while a verse is loaded (chapter ·
    ayah label, transport, quiet Close that stops the session — Android
    parity). The control spans the full chapter sheet width while its ink and
    transport remain centred. Opening a word hit flashes that Arabic (and English gloss) word
    twice with the orange repeat wash (directional wash in, dissolve out).
    Word search keeps the query in local home state (no global store fan-out),
    builds its slim in-memory index on demand (never during chapter browsing),
-   and scans cooperatively with cancellation so typing stays responsive.
+   and scans cooperatively with cancellation so typing stays responsive. The
+   179 KB concept index loads only on first search and is then service-worker
+   cached for offline use; see [SEARCH.md](SEARCH.md).
    Its fixed masthead, 30 px gilded Settings rosette, rounded search field,
    full-width continue wash, and compact 28 / 26 / 4 px chapter grid mirror
    the Android Home sheet while the whole composition remains centred at a

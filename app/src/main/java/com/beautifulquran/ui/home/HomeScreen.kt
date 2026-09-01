@@ -82,6 +82,7 @@ import com.beautifulquran.data.AyahSelectorSide
 import com.beautifulquran.data.HomeBookmarkStyle
 import com.beautifulquran.domain.WORD_SEARCH_PREVIEW_LIMIT
 import com.beautifulquran.domain.englishTranslationHighlightSpans
+import com.beautifulquran.domain.parseSearchQuery
 import com.beautifulquran.ui.reader.VerseBookmarkRibbon
 import com.beautifulquran.ui.reader.remainingUnfurlSignal
 import com.beautifulquran.ui.theme.ArabicTitleStyle
@@ -308,7 +309,7 @@ fun HomeScreen(
                         PaperSearchField(
                             value = uiState.query,
                             onValueChange = viewModel::onQueryChange,
-                            placeholder = "Search surah, word, or 2:255",
+                            placeholder = "Search concept, “exact phrase”, or 2:255",
                             onFocusChanged = { searchFocused = it },
                             modifier = Modifier
                                 .padding(start = HomeStartInset, end = HomeEndInset)
@@ -828,11 +829,12 @@ private fun WordSearchHitRow(
 ) {
     val accents = LocalQuranAccents.current
     val highlightColor = accents.gold
-    val translation = remember(hit.ayahTranslation, hit.translation, query, highlightColor) {
+    val displayQuery = remember(query) { parseSearchQuery(query).text }
+    val translation = remember(hit.ayahTranslation, hit.translation, displayQuery, highlightColor) {
         buildAnnotatedString {
             for (span in englishTranslationHighlightSpans(
                 ayahTranslation = hit.ayahTranslation,
-                query = query,
+                query = displayQuery,
                 wordGloss = hit.translation,
             )) {
                 if (span.highlighted) {
@@ -862,7 +864,10 @@ private fun WordSearchHitRow(
             ),
     ) {
         Text(
-            text = "${hit.surahId}:${hit.ayahNumber}",
+            text = buildString {
+                append("${hit.surahId}:${hit.ayahNumber}")
+                hit.matchLabel?.let { append(" · $it") }
+            },
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f),
         )

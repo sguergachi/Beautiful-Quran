@@ -139,12 +139,14 @@ val syncQuranDbAsset by tasks.registering(Sync::class) {
     val dbAsset = rootProject.layout.projectDirectory.file("data/quran.db")
     val lexiconAsset = rootProject.layout.projectDirectory.file("data/lexicon.db")
     val dictionaryAsset = rootProject.layout.projectDirectory.file("data/dictionary.db")
+    val searchConceptAsset = rootProject.layout.projectDirectory.file("data/search_concepts.json")
     from(dbAsset)
     // Lane / Wiktionary ship as .sqlite, not .db, so they fall outside
     // `noCompress` above and travel deflated. The *Database classes copy them
     // out of assets, where AssetManager inflates them.
     from(lexiconAsset) { rename { "lexicon.sqlite" } }
     from(dictionaryAsset) { rename { "dictionary.sqlite" } }
+    from(searchConceptAsset)
     into(layout.buildDirectory.dir("generated/quranAssets"))
 
     doLast {
@@ -164,6 +166,12 @@ val syncQuranDbAsset by tasks.registering(Sync::class) {
             throw GradleException(
                 "Missing canonical dictionary database: ${dictionaryAsset.asFile}. " +
                     "Run `python3 tools/build_dictionary_db.py` from the repo root before building locally.",
+            )
+        }
+        if (!searchConceptAsset.asFile.isFile) {
+            throw GradleException(
+                "Missing search concept index: ${searchConceptAsset.asFile}. " +
+                    "Run `python3 tools/build_search_concepts.py` from the repo root.",
             )
         }
     }
@@ -237,6 +245,7 @@ tasks.withType<Test>().configureEach {
         "quran.db", "quran.db.sha256",
         "lexicon.db", "lexicon.db.sha256",
         "dictionary.db", "dictionary.db.sha256",
+        "search_concepts.json",
     )
         .forEach { asset ->
             inputs.file(rootProject.layout.projectDirectory.file("data/$asset"))

@@ -46,6 +46,7 @@ data class WordSearchIndexEntry(
     val translationLower: String,
     val transliteration: String,
     val transliterationLower: String,
+    val root: String = "",
     /** Shared with every other word of this ayah — see [WordSearchAyahContext]. */
     val context: WordSearchAyahContext,
 ) {
@@ -75,15 +76,13 @@ fun WordSearchIndexEntry.toHit(): WordSearchHit =
  * those queries themselves.
  */
 fun isWordSearchQuery(query: String): Boolean {
-    val trimmed = query.trim()
-    return trimmed.length >= WORD_SEARCH_MIN_QUERY_LENGTH
+    return parseSearchQuery(query).text.length >= WORD_SEARCH_MIN_QUERY_LENGTH
 }
 
 /**
- * Scans [index] for Arabic (diacritic-insensitive), English gloss, or
- * transliteration substring matches. When none exist, a one-edit fuzzy pass
- * catches a misspelling without diluting exact results. Results stay in
- * Quranic order.
+ * Ranks Arabic, English and transliteration matches, related QAC-root words,
+ * and QSAC [concepts]. Enclosing the whole query in double quotes keeps only
+ * literal whole-word/phrase matches.
  *
  * When the SI ayah translation cannot show the matched English, the hit's
  * [WordSearchHit.ayahTranslation] is the same-ayah word-gloss line instead,
@@ -93,37 +92,125 @@ fun matchWordSearch(
     index: List<WordSearchIndexEntry>,
     query: String,
     maxHits: Int = WORD_SEARCH_MAX_HITS,
+    concepts: List<SearchConcept> = emptyList(),
 ): List<WordSearchHit> {
-    val trimmed = query.trim()
-    if (!isWordSearchQuery(trimmed)) return emptyList()
-    val arabicNorm = normalizeArabicForSearch(trimmed)
-    val lower = trimmed.lowercase()
-    fun scan(fuzzy: Boolean): List<WordSearchHit> {
-        val out = ArrayList<WordSearchHit>(minOf(64, maxHits))
-        for (i in index.indices) {
-            val entry = index[i]
-            val hit = if (fuzzy) {
-                fuzzyWordContains(entry.arabicNorm, arabicNorm) ||
-                    fuzzyWordContains(entry.translationLower, lower) ||
-                    fuzzyWordContains(entry.transliterationLower, lower)
-            } else when {
-            arabicNorm.length >= WORD_SEARCH_MIN_QUERY_LENGTH &&
-                entry.arabicNorm.contains(arabicNorm) -> true
-            entry.translationLower.contains(lower) -> true
-            entry.transliterationLower.contains(lower) -> true
-            else -> false
-            }
-            if (!hit) continue
-            val base = entry.toHit()
-            // Word glosses and SI ayah lines often disagree ("a resting place" vs
-            // "a bed"). Prefer the gloss line only when it can host the highlight.
-            val display = snippetDisplayText(entry, index, i, trimmed)
-            out.add(if (display == entry.ayahTranslation) base else base.copy(ayahTranslation = display))
-            if (out.size >= maxHits) break
+    val parsed = parseSearchQuery(query)
+    if (parsed.text.length < WORD_SEARCH_MIN_QUERY_LENGTH || maxHits <= 0) return emptyList()
+    val arabic = normalizeArabicForSearch(parsed.text)
+    val latin = if (arabic.isEmpty()) parsed else parsed.copy(text = "")
+
+    data class RankedHit(
+        val key: Int,
+        val indexAt: Int,
+        val position: Int,
+        val score: Int,
+        val matchLabel: String? = null,
+    )
+
+    val ranked = HashMap<Int, RankedHit>(512)
+    val firstIndex = HashMap<Int, Int>(7_000)
+    val matchedRoots = HashSet<String>()
+    fun add(indexAt: Int, position: Int, score: Int, label: String? = null) {
+        if (score <= 0) return
+        val entry = index[indexAt]
+        val key = entry.surahId * 1_000 + entry.ayahNumber
+        val current = ranked[key]
+        if (current == null || score > current.score ||
+            (score == current.score && position > 0 && current.position == 0)
+        ) {
+            ranked[key] = RankedHit(key, indexAt, position, score, label)
         }
-        return out
     }
-    return scan(fuzzy = false).ifEmpty { scan(fuzzy = true) }
+
+    for (i in index.indices) {
+        val entry = index[i]
+        val score = maxOf(
+            if (arabic.isEmpty()) 0 else searchTextRelevance(
+                entry.arabicNorm,
+                parsed.copy(text = arabic),
+            ),
+            searchTextRelevance(entry.translationLower, latin),
+            searchTextRelevance(entry.transliterationLower, latin),
+        )
+        add(i, entry.position, score)
+        if (!parsed.exactOnly && score > 0 && entry.root.isNotEmpty()) matchedRoots += entry.root
+        firstIndex.putIfAbsent(entry.surahId * 1_000 + entry.ayahNumber, i)
+    }
+
+    var at = 0
+    while (at < index.size) {
+        val anchor = index[at]
+        var end = at + 1
+        while (end < index.size && index[end].surahId == anchor.surahId &&
+            index[end].ayahNumber == anchor.ayahNumber
+        ) {
+            end++
+        }
+        val ayahScore = maxOf(
+            if (arabic.isEmpty()) 0 else searchTextRelevance(
+                normalizeArabicForSearch(anchor.ayahText),
+                parsed.copy(text = arabic),
+            ),
+            searchTextRelevance(anchor.ayahTranslation, latin),
+            if (parsed.text.any(Char::isWhitespace)) {
+                searchTextRelevance((at until end).joinToString(" ") { index[it].translation }, latin)
+            } else {
+                0
+            },
+        )
+        add(at, position = 0, score = ayahScore)
+        at = end
+    }
+
+    if (!parsed.exactOnly && matchedRoots.isNotEmpty()) {
+        for (i in index.indices) {
+            if (index[i].root in matchedRoots) add(i, index[i].position, score = 1_450)
+        }
+    }
+
+    if (!parsed.exactOnly && concepts.isNotEmpty()) {
+        data class SemanticRank(val best: Int, val bonus: Int, val label: String) {
+            val total: Int get() = best + bonus
+        }
+        val semantic = HashMap<Int, SemanticRank>()
+        for (concept in concepts) {
+            val score = conceptRelevance(concept, parsed)
+            if (score <= 0) continue
+            for (key in concept.ayahKeys) {
+                val current = semantic[key]
+                semantic[key] = if (current == null) {
+                    SemanticRank(score, bonus = 0, concept.name)
+                } else {
+                    SemanticRank(
+                        best = maxOf(current.best, score),
+                        bonus = (current.bonus + minOf(current.best, score) / 5).coerceAtMost(250),
+                        label = if (score > current.best) concept.name else current.label,
+                    )
+                }
+            }
+        }
+        for ((key, match) in semantic) {
+            firstIndex[key]?.let { add(it, position = 0, score = match.total, label = match.label) }
+        }
+    }
+
+    return ranked.values
+        .sortedWith(
+            compareByDescending<RankedHit> { it.score }
+                .thenBy { it.key }
+                .thenBy { it.position },
+        )
+        .take(maxHits)
+        .map { match ->
+            val entry = index[match.indexAt]
+            val base = entry.toHit().copy(matchLabel = match.matchLabel)
+            if (match.position > 0) {
+                val display = snippetDisplayText(entry, index, match.indexAt, parsed.text)
+                if (display == entry.ayahTranslation) base else base.copy(ayahTranslation = display)
+            } else {
+                base.copy(position = 0, arabic = "", translation = "", transliteration = "")
+            }
+        }
 }
 
 /** True when one whole word in [text] is at most one edit from [query]. */

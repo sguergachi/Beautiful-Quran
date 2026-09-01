@@ -424,9 +424,10 @@ horizontal page turn — draggable, fling-able, with page-turn audio
   the seek lands. Scroll and mushaf hand one another their visible ayah/leaf
   when the reading layout changes.
 - `home/HomeScreen` — surah list with search (surah names / `surah:ayah`
-  references, plus Quran-wide word hits with a one-edit spelling fallback,
-  sectioned by surah with truncated expand-in-place lists), a continue-listening
-  card, and a floating playback
+  references, plus relevance-ranked literal, QAC-root, spelling, and QSAC
+  concept hits; enclosing a query in quotes keeps it literal). Results remain
+  sectioned by surah with truncated expand-in-place lists. See
+  [SEARCH.md](SEARCH.md). The sheet also holds a continue-listening card and a floating playback
   control (paper-native transport) while a verse is loaded in the session;
   opening a word hit flashes that Arabic (and English gloss) word twice with
   the orange repeat wash (directional wash in, dissolve out) on the reader. The reader's

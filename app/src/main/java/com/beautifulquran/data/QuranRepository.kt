@@ -103,6 +103,7 @@ class QuranRepository(
      * here instead of the bundled DB row. Null keeps this class usable from
      * JVM unit tests that don't ship an override store. */
     private val timingOverrides: TimingOverrides? = null,
+    private val searchConcepts: SearchConceptRepository? = null,
 ) {
 
     /** Change signal for the Lab's on-device corrections: emits whenever the
@@ -327,13 +328,18 @@ class QuranRepository(
         }
 
     /**
-     * Quran-wide word search for the cover sheet: Arabic (diacritic-insensitive),
-     * English gloss, or transliteration substring. Returns hits in mushaf order.
+     * Ranked Quran-wide search for literal text, related roots, spelling, and
+     * ontology concepts. Quoted queries stay literal.
      * Blank / too-short / `surah:ayah` queries yield an empty list.
      */
     suspend fun searchWords(query: String): List<WordSearchHit> = withContext(Dispatchers.IO) {
         if (!isWordSearchQuery(query)) return@withContext emptyList()
-        matchWordSearch(wordSearchIndex(), query, WORD_SEARCH_MAX_HITS)
+        matchWordSearch(
+            wordSearchIndex(),
+            query,
+            WORD_SEARCH_MAX_HITS,
+            searchConcepts?.concepts().orEmpty(),
+        )
     }
 
     private fun wordSearchIndex(): List<WordSearchIndexEntry> {
@@ -347,9 +353,12 @@ class QuranRepository(
         val built = queryList(
             """
             SELECT w.surah_id, w.ayah_number, w.position, w.arabic, w.translation_en, w.transliteration,
+                   COALESCE(m.root, ''),
                    a.text_uthmani, a.translation_en,
                    s.name_transliteration, s.name_arabic
             FROM words w
+            LEFT JOIN word_morphology m
+              ON m.surah_id = w.surah_id AND m.ayah_number = w.ayah_number AND m.position = w.position
             JOIN ayahs a
               ON a.surah_id = w.surah_id AND a.ayah_number = w.ayah_number
             JOIN surahs s ON s.id = w.surah_id
@@ -371,12 +380,13 @@ class QuranRepository(
                 translationLower = translation.lowercase(),
                 transliteration = transliteration,
                 transliterationLower = transliteration.lowercase(),
+                root = c.getString(6),
                 context = contexts.getOrPut(surahId * 1_000 + ayahNumber) {
                     WordSearchAyahContext(
-                        ayahText = c.getString(6),
-                        ayahTranslation = c.getString(7),
-                        surahNameTransliteration = c.getString(8),
-                        surahNameArabic = c.getString(9),
+                        ayahText = c.getString(7),
+                        ayahTranslation = c.getString(8),
+                        surahNameTransliteration = c.getString(9),
+                        surahNameArabic = c.getString(10),
                     )
                 },
             )

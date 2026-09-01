@@ -26,6 +26,7 @@ import { VerseBookmarkRibbon } from '../../render/VerseBookmarkRibbon'
 import {
   englishTranslationHighlightSpans,
   filterSurahs,
+  parseSearchQuery,
   sectionWordSearchHits,
   shouldRunWordSearch,
   WORD_SEARCH_PREVIEW_LIMIT,
@@ -246,12 +247,12 @@ export function HomeScreen({ stackLayer }: { stackLayer: StackLayer }) {
                     id="chapter-search"
                     name="chapter-search"
                     type="search"
-                    placeholder="Search surah, word, or 2:255"
+                    placeholder="Search concept, “exact phrase”, or 2:255"
                     value={search}
                     onValueChange={setSearch}
                     onFocus={() => setSearchFocused(true)}
                     onBlur={() => setSearchFocused(false)}
-                    aria-label="Search surah, word, or ayah reference"
+                    aria-label="Search concepts, exact phrases, or ayah reference"
                   />
                   {search ? (
                     <button
@@ -543,6 +544,7 @@ function WordSearchSection({
   onPrepareHit: (hit: WordSearchHit) => void
   onOpenHit: (hit: WordSearchHit) => void
 }) {
+  const displayQuery = parseSearchQuery(query).text
   return (
     <section className="word-search-section">
       <header className="word-search-surah-header">
@@ -567,11 +569,12 @@ function WordSearchSection({
             >
               <span className="word-search-ref">
                 {hit.surahId}:{hit.ayahNumber}
+                {hit.matchLabel ? ` · ${hit.matchLabel}` : ''}
               </span>
               <span className="word-search-translation">
                 {englishTranslationHighlightSpans(
                   hit.ayahTranslation,
-                  query,
+                  displayQuery,
                   hit.translation,
                 ).map((span, i) =>
                   span.highlighted ? (
