@@ -3297,13 +3297,23 @@ fun ReaderScreen(
         // inside this Box so the bleed has the sheet to spread across.
         val repeatContent = uiState.content
         val repeatOverlayColors = contrastingOverlayColorScheme(settings.themeMode)
+        // Read outside the `let`, and into locals.
+        //
+        // These four were unboxed inside the lambda, and in a debug build that
+        // NPEd on `Integer.intValue()` after a page turn — reliably, twice out
+        // of two. The null is not observable: logging the four values at that
+        // same spot makes the crash go away, every time, and prints four
+        // non-null numbers. So this does not claim to name which read came back
+        // null; it stops the unboxing happening inside a nested lambda inside a
+        // conditional, which is the shape the fault needs. Semantics are
+        // unchanged for every case that has a defined answer, and the last
+        // resort is the first verse rather than a crash.
+        val activeNow = activeAyah
+        val jumpNow = requestedJumpAyah.takeIf { n -> n > 0 }
+        val scrolledNow: Int? = scrolledAyah.value
         val repeatStartAyah = repeatContent?.let {
-            (
-                activeAyah
-                    ?: requestedJumpAyah.takeIf { n -> n > 0 }
-                    ?: startAyah
-                    ?: scrolledAyah.value
-                ).coerceIn(1, it.surah.ayahCount)
+            val chosen = activeNow ?: jumpNow ?: startAyah ?: scrolledNow ?: 1
+            chosen.coerceIn(1, it.surah.ayahCount.coerceAtLeast(1))
         }
         InkRevealOverlay(
             visible = showRepeatDialog && repeatContent != null,
