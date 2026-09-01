@@ -424,6 +424,53 @@ ends and the white reads as an ending. Against the sentence rule it replaced —
 1,055 leaves at 1.47 lines blank *each* — it is 57 fewer leaves, and the waste
 on the pages a reader spends their time on is gone rather than reduced.
 
+**And the mark had to be priced.** The capacity is a mass of *specimen* prose
+and the specimen carries no verse marks, so the hand is cut against text that
+has none. A leaf of the same charged mass therefore fits only if what its marks
+really take is covered by `ENGLISH_LEAF_REFERENCE_MARGIN`:
+
+```
+    marks × (real cost − charge)  ≤  capacity × (margin − 1)  =  9.4
+    charge 3:   marks × 1.61      ≤  9.4    →   six marks, and no more
+```
+
+The book averages **6.2 marks to a leaf**, so about half of it was over the
+line. An over-full leaf does not spill — it closes its leading and squeezes one
+more line in, which is the one thing a single leading exists to prevent. The
+leaf that made this visible is in As-Saffat, whose verses are short: nineteen
+marks, twenty-four lines where the well holds twenty-three, set measurably
+tighter than the leaf before it, and the twenty-fourth line holding the single
+word "which".
+
+The real cost is measured off that photograph. The mark's gold is the only gold
+on the page, so it isolates by hue: 76 px on every one of the nineteen, and 96
+with a space either side. The same photograph gives the advance — total ink
+across the twenty-four lines, less the marks, over the 883 characters of
+translation — at 20.84 px. So a mark costs **4.61 characters** and is charged 5,
+at which the term goes negative and the question stops being asked. It had been
+6, then 2.8, then 3; 3 is the one a leaf could not survive.
+
+**The margin had to be swept.** Pricing the mark was necessary and not
+sufficient: with it corrected the leaves still wanted 24 lines, because the
+specimen the hand is cut against is one unbroken run of prose and a leaf is the
+same translation broken by marks, brackets and quotation, which does not pack as
+tightly. `ENGLISH_LEAF_REFERENCE_MARGIN` is that difference and it is the *only*
+knob that moves it — the capacity cancels, since the reference block is itself
+the capacity, so a smaller capacity merely buys a larger hand and the leaf keeps
+the same share of the well. Swept on device, three builds, eight leaves each:
+
+```
+    1.01    24-25 lines wanted of 23.1    leading closes to 77, and to 74
+    1.04    23 lines of 23.4, pitch 79    one leaf in six still closes it
+    1.05    22 lines of 23.7, pitch 78    none close it
+    1.06    22 lines of 23.7, pitch 78    none close it
+```
+
+1.04, because the leaf a reader complains about is the one with white on it, and
+above 1.04 every leaf in the book gives up most of a line to buy out the last
+leaf in six. What is left is a leading 2.5 % tight on that sixth leaf — the
+residue of a character estimate, which does not come out with a constant.
+
 What is left at the foot of an ordinary leaf is not blank paper but a short
 *last line*: the cut lands wherever the character count runs out, which is
 rarely a line ending. Landing it on one would take a real layout rather than an

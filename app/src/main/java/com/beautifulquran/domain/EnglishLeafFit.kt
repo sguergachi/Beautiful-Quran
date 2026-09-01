@@ -130,24 +130,47 @@ const val ENGLISH_LEAF_SPECIMEN =
  * How much more than a leaf's worth the hand is cut against.
  *
  * Not a safety margin: a measured conversion between the block the hand is cut
- * against and the leaf it stands for. Two things used to separate them and both
- * are now counted, so what is left is one percent.
+ * against and the leaf it stands for. The specimen is unbroken prose set as one
+ * long run; a leaf is the same translation broken by verse marks, brackets and
+ * quotation, and it does not pack as tightly. The margin is the difference, and
+ * it is the *only* knob that changes it — the capacity cancels, because the
+ * reference block is itself the capacity, so a smaller capacity simply buys a
+ * larger hand and the leaf holds the same share of the well.
  *
- * The first was the mark. The specimen is unbroken prose and a leaf is not, and
- * charging the mark six characters when it takes 2.8 made every leaf look
- * heavier than it was. The second was the specimen: one plain sentence
- * repeated, whose words ran 3.7 letters against the book's 4.4.
+ * It was 1.01, and 1.01 is not enough. Measured on device across five leaves of
+ * Ar-Rahman and As-Saffat, with the well at 1,849 px and the book's leading at
+ * 80 px — 23.1 lines — a leaf's 940 charged characters wanted **24 and
+ * sometimes 25** lines. The observed density ran 39.2 to 40.9 charged
+ * characters to the line against the 41.1 the margin assumed: optimistic by
+ * three percent typically and by five at the worst.
  *
- * With a real passage of the translation as the specimen and the mark charged
- * what it costs, a leaf and its reference block set at the same density, and
- * the margin is only the ordinary variation from one page of prose to the next.
- * It falls on the safe side: a leaf that overflows closes its leading, and a
- * leaf that comes up short loses a hundredth of a line.
+ * A leaf that asks for more lines than the well has does not spill. It closes
+ * its leading — measurably, from 80 px to 77 and to 74 on the leaf that wanted
+ * twenty-five — so leaves set beside each other in the same book were set at
+ * three different leadings, which is the one thing a single leading exists to
+ * prevent. The hand itself never moved: the verse mark's gold inks 80 to 83 px
+ * on every one of those leaves.
  *
- * Re-measure with `tools/measure_english_leaves.py` and a device capture after
- * changing the face, the measure or the mark.
+ * The figure is swept on device, three builds, eight leaves each:
+ *
+ * ```
+ *     1.01   24-25 lines wanted of 23.1   leading closes to 77, and to 74
+ *     1.04   23 lines of 23.4, pitch 79   one leaf in six still closes it
+ *     1.05   22 lines of 23.7, pitch 78   none close it
+ *     1.06   22 lines of 23.7, pitch 78   none close it
+ * ```
+ *
+ * 1.04, because the leaf a reader complains about is the one with white on it,
+ * and above 1.04 every leaf gives up most of a line to buy out the last leaf in
+ * six. What is left at 1.04 is a leading 2.5% tight on that sixth leaf, which is
+ * the residue of a character estimate and does not come out with a constant.
+ * It costs 1.5% of the hand — the block goes as the square of it.
+ *
+ * Re-measure with a device capture after changing the face, the measure or the
+ * mark. A leaf whose leading has closed is the symptom: photograph two leaves
+ * and compare their line pitch.
  */
-const val ENGLISH_LEAF_REFERENCE_MARGIN = 1.01f
+const val ENGLISH_LEAF_REFERENCE_MARGIN = 1.04f
 
 /**
  * A block of the mass a leaf holds, for the hand to be cut against.

@@ -177,12 +177,35 @@ data class EnglishLeaf(
  * What a verse mark and its two spaces cost the measure, in characters.
  *
  * Counted so the fit is not systematically optimistic on a leaf carrying forty
- * short verses — juz' 30 has several. It was 6, guessed from the glyphs; fitted
- * against eleven real leaves it is 2.8, because the mark is set a size down and
- * its cups are narrow. Guessing high cost every leaf about a third of a line of
- * paper it could have used.
+ * short verses — juz' 30 has several, and As-Saffat's leaves carry nineteen.
+ *
+ * It is *measured*, off a photograph of a leaf. The mark's gold is the only
+ * gold on the page, so it can be isolated by hue: it inks 76 px on every one of
+ * the nineteen marks of that leaf, and with a space either side it takes 96 px.
+ * The same photograph gives the advance — total ink across the twenty-four
+ * lines, less the marks, over the 883 characters of translation on it — at
+ * 20.84 px. So the mark and its spaces cost **4.61 characters**, and this is 5.
+ *
+ * It was 6, then 2.8, then 3, and 3 is what a leaf could not survive. The
+ * capacity is a mass of specimen prose, which carries no marks at all, and the
+ * hand is cut so that [ENGLISH_LEAF_CAPACITY_CHARS] × [ENGLISH_LEAF_REFERENCE_MARGIN]
+ * of it fills the well. A leaf of the same charged mass fits only if what its
+ * marks really take is covered by that margin:
+ *
+ * ```
+ *     marks × (4.61 − charge)  ≤  capacity × (margin − 1)  =  9.4
+ *     charge 3:  marks × 1.61  ≤  9.4   →  six marks, and no more
+ * ```
+ *
+ * Six. Most leaves in the book carry more, and every one of them overflowed the
+ * well and closed its leading to squeeze a further line in — a line holding one
+ * word, on a leaf set tighter than the leaf before it, which is the one thing
+ * the book's single leading exists to prevent. At 5 the term goes negative and
+ * the question stops being asked.
+ *
+ * Re-measure from a device photograph after changing the mark or the face.
  */
-const val ENGLISH_LEAF_MARK_CHARS = 3
+const val ENGLISH_LEAF_MARK_CHARS = 5
 
 /**
  * Which verses begin on a Madinah page — the leaf's contents, in order.
