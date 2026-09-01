@@ -30,7 +30,11 @@ object ShareImageRenderer {
     /** Portrait share width in px. */
     const val WIDTH_PX = 1080
 
-    /** Soft cap so a long gather cannot produce an enormous PNG. */
+    /**
+     * Soft cap so a long gather cannot produce an enormous PNG.
+     * A taller card is still this tall: [ShareImageCard] pins the gold
+     * chapter footer in the last rows and clips verses above it.
+     */
     const val MAX_HEIGHT_PX = 1920
 
     private const val LAYOUT_ATTEMPTS = 8
@@ -95,15 +99,20 @@ object ShareImageRenderer {
                         composeView.post { capture(attempt + 1) }
                         return
                     }
-                    height = height.coerceAtLeast(1)
-                    if (height > maxHeightPx) {
-                        val cappedSpec = View.MeasureSpec.makeMeasureSpec(
-                            maxHeightPx,
-                            View.MeasureSpec.AT_MOST,
+                    val fit = shareImageFit(height, maxHeightPx)
+                    if (fit.pinFooter) {
+                        // Exact height, not AT_MOST: wrap-content would still
+                        // overflow, and drawing the bitmap would crop the
+                        // gold chapter footer off the bottom.
+                        composeView.measure(
+                            widthSpec,
+                            View.MeasureSpec.makeMeasureSpec(
+                                fit.heightPx,
+                                View.MeasureSpec.EXACTLY,
+                            ),
                         )
-                        composeView.measure(widthSpec, cappedSpec)
-                        height = composeView.measuredHeight.coerceIn(1, maxHeightPx)
                     }
+                    height = fit.heightPx
                     composeView.layout(0, 0, widthPx, height)
                     host.measure(
                         View.MeasureSpec.makeMeasureSpec(widthPx, View.MeasureSpec.EXACTLY),
@@ -125,5 +134,24 @@ object ShareImageRenderer {
             // Composition is async; a few posts let the first frame settle.
             composeView.post { capture(0) }
         }
+    }
+}
+
+/** How a measured card fits the share bitmap cap. */
+internal data class ShareImageFit(
+    val heightPx: Int,
+    val pinFooter: Boolean,
+)
+
+/**
+ * Long gathers keep a 1080×[max] sheet. The card must then pin its footer
+ * so the chapter reference stays in frame.
+ */
+internal fun shareImageFit(measuredHeightPx: Int, maxHeightPx: Int): ShareImageFit {
+    val measured = measuredHeightPx.coerceAtLeast(1)
+    return if (measured > maxHeightPx) {
+        ShareImageFit(heightPx = maxHeightPx, pinFooter = true)
+    } else {
+        ShareImageFit(heightPx = measured, pinFooter = false)
     }
 }

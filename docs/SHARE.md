@@ -104,7 +104,10 @@ screenshot of the live reader, not the wash yet:
    readable parchment regardless of the reader's night/royal mode.
 2. `ShareImageRenderer` hosts that card offscreen under a temporary
    invisible decor child, measures at 1080×(≤1920), software-draws to a
-   `Bitmap`. **Not** full `ReaderScreen` (no LazyColumn / playback / gestures).
+   `Bitmap`. A gather taller than 1920 is still one 1080×1920 sheet: the
+   gold chapter footer stays in the last rows and verses fade into the
+   paper above it — the cap must not crop the reference off the bottom.
+   **Not** full `ReaderScreen` (no LazyColumn / playback / gestures).
 3. `ShareFiles` writes PNG under `cacheDir/share/`, exposes a `FileProvider`
    URI (`${applicationId}.share`), keeps the newest few files.
 4. `ACTION_SEND` `image/png` + `FLAG_GRANT_READ_URI_PERMISSION`.
@@ -135,8 +138,10 @@ Original pipeline notes (for later PRs):
 
 Image (and later video) carries a quiet footer: the reference in gold
 (`al-Baqarah 2:255`, or a same-surah range / multi-surah join) with
-**Beautiful Quran** beneath it in faint ink. Text shares carry the reference
-only (no app watermark in the chat body).
+**Beautiful Quran** beneath it in faint ink. That footer is part of the
+sheet, not an afterthought: a long gather is capped at 1920px tall and
+the chapter stays in frame. Text shares carry the reference only (no app
+watermark in the chat body).
 
 ## Shape of the code
 
