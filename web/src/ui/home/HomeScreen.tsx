@@ -576,7 +576,7 @@ function WordSearchSection({
                   hit.ayahTranslation,
                   displayQuery,
                   hit.translation,
-                  hit.matchLabel ?? '',
+                  [hit.matchTerm, hit.matchLabel].filter(Boolean).join(' '),
                 ).map((span, i) =>
                   span.highlighted ? (
                     <mark key={i} className="word-search-mark">

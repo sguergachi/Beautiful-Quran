@@ -90,6 +90,26 @@ describe('matchWordSearch', () => {
     expect(matchWordSearch(index, 'الرحمان').some((h) => h.surahId === 1)).toBe(true)
   })
 
+  it('ranks semantic vocabulary and suppresses spelling neighbors', async () => {
+    const semanticIndex = [
+      { ...entry(7, 154, 2, 'سَكَتَ', '(was) calmed'), ayahTranslation: 'the anger subsided' },
+      { ...entry(7, 44, 1, 'وَنَادَىٰ', 'will call out'), ayahTranslation: 'they will call out' },
+      { ...entry(9, 26, 1, 'سَكِينَتَهُ', 'His tranquility'), ayahTranslation: 'His tranquility' },
+    ]
+    const thesaurus = new Map([
+      ['calm', [{ text: 'tranquility', distance: 2 }]],
+    ])
+    const hits = matchWordSearch(semanticIndex, 'calm', 400, [], thesaurus)
+    expect(hits.map((hit) => [hit.surahId, hit.ayahNumber])).toEqual([
+      [7, 154],
+      [9, 26],
+    ])
+    expect(hits[1]!.matchTerm).toBe('tranquility')
+    expect(hits.some((hit) => hit.ayahNumber === 44)).toBe(false)
+    expect(await matchWordSearchAsync(semanticIndex, 'calm', 400, () => false, [], thesaurus))
+      .toEqual(hits)
+  })
+
   it('uses quotes for literal-only search', () => {
     expect(matchWordSearch(index, '"mercifull"')).toEqual([])
     expect(matchWordSearch(index, '"merciful"')).toHaveLength(2)
@@ -243,10 +263,10 @@ describe('englishTranslationHighlightSpans', () => {
     ).toBe(true)
   })
 
-  it('chooses a query-related gloss word instead of a function word', () => {
+  it('chooses the word that won typo fallback instead of a function word', () => {
     const spans = englishTranslationHighlightSpans(
       'And the companions of Paradise will call out',
-      'calm',
+      'calp',
       'And they will call out',
     )
     expect(spans.filter((span) => span.highlighted).map((span) => span.text)).toEqual([
@@ -255,12 +275,12 @@ describe('englishTranslationHighlightSpans', () => {
     expect(
       englishTranslationHighlightSpans(
         'their inscription was guidance',
-        'calm',
+        'calp',
         '(was) calmed',
       ).some((span) => span.highlighted),
     ).toBe(false)
     expect(
-      englishTranslationHighlightSpans('They will answer', 'calm', 'will').some(
+      englishTranslationHighlightSpans('They will answer', 'calp', 'will').some(
         (span) => span.highlighted,
       ),
     ).toBe(false)

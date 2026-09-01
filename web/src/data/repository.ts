@@ -20,6 +20,7 @@ import {
   WORD_SEARCH_MAX_HITS,
   type WordSearchHit,
   type WordSearchIndexEntry,
+  type RelatedSearchTerm,
   type SearchConcept,
 } from '../domain/WordSearch'
 import { assetUrl } from '../assetUrl'
@@ -29,6 +30,7 @@ let recitersCache: Reciter[] | null = null
 let wordSearchIndex: WordSearchIndexEntry[] | null = null
 let wordSearchIndexPromise: Promise<WordSearchIndexEntry[]> | null = null
 let searchConcepts: SearchConcept[] | null = null
+let searchThesaurus = new Map<string, RelatedSearchTerm[]>()
 let searchConceptPromise: Promise<SearchConcept[]> | null = null
 /** Per-surah content — reopening a chapter must not re-scan sql.js. */
 const surahContentCache = new Map<number, SurahContent>()
@@ -351,6 +353,7 @@ function buildWordSearchIndex(): WordSearchIndexEntry[] {
 interface SearchConceptAsset {
   version: number
   sourceCommit: string
+  thesaurusSha256: string
   concepts: {
     n: string
     p: string[]
@@ -359,6 +362,7 @@ interface SearchConceptAsset {
     d: string
     a: number[]
   }[]
+  thesaurus: Record<string, [string, number][]>
 }
 
 /** Load the attributed 179 KB concept index only when search first needs it. */
@@ -372,8 +376,10 @@ export function warmSearchConcepts(): Promise<SearchConcept[]> {
     })
     .then((asset) => {
       if (
-        asset.version !== 1 ||
-        asset.sourceCommit !== 'cb3852b127bfdda6668c5eec9e5c1d9cdcde3810'
+        asset.version !== 2 ||
+        asset.sourceCommit !== 'cb3852b127bfdda6668c5eec9e5c1d9cdcde3810' ||
+        asset.thesaurusSha256 !==
+          '38b16326159f51853626b7d24a44c453fa88ab33f06fce5ec8fc5996d1c2be93'
       ) {
         throw new Error(`Unsupported concept search asset ${asset.version}/${asset.sourceCommit}`)
       }
@@ -385,6 +391,12 @@ export function warmSearchConcepts(): Promise<SearchConcept[]> {
         domain: concept.d,
         ayahKeys: concept.a,
       }))
+      searchThesaurus = new Map(
+        Object.entries(asset.thesaurus).map(([query, related]) => [
+          query,
+          related.map(([text, distance]) => ({ text, distance })),
+        ]),
+      )
       return searchConcepts
     })
     .catch(() => {
@@ -445,6 +457,7 @@ export function searchWords(query: string): WordSearchHit[] {
     query,
     WORD_SEARCH_MAX_HITS,
     searchConcepts ?? [],
+    searchThesaurus,
   )
 }
 
@@ -459,7 +472,14 @@ export async function searchWordsAsync(
   if (!shouldRunWordSearch(query)) return []
   const [index, concepts] = await Promise.all([warmWordSearchIndex(), warmSearchConcepts()])
   if (isCancelled()) return []
-  return matchWordSearchAsync(index, query, WORD_SEARCH_MAX_HITS, isCancelled, concepts)
+  return matchWordSearchAsync(
+    index,
+    query,
+    WORD_SEARCH_MAX_HITS,
+    isCancelled,
+    concepts,
+    searchThesaurus,
+  )
 }
 
 export const QuranRepository = {

@@ -16,6 +16,7 @@ export interface WordSearchHit {
   surahNameTransliteration: string
   surahNameArabic: string
   matchLabel?: string | null
+  matchTerm?: string | null
 }
 
 export interface SurahWordSearchSection {
@@ -54,12 +55,17 @@ export interface SearchConcept {
   ayahKeys: number[]
 }
 
+export interface RelatedSearchTerm {
+  text: string
+  distance: number
+}
+
 export interface ParsedSearchQuery {
   text: string
   exactOnly: boolean
 }
 
-/** Double quotes around the whole query disable spelling and concept expansion. */
+/** Double quotes around the whole query disable spelling and semantic expansion. */
 export function parseSearchQuery(query: string): ParsedSearchQuery {
   const trimmed = query.trim()
   const quoted =
@@ -92,6 +98,7 @@ const stem = (word: string): string => {
 export function searchTextRelevance(
   text: string,
   query: ParsedSearchQuery,
+  allowFuzzy = true,
 ): number {
   const target = text.toLowerCase()
   const needle = query.text.toLowerCase()
@@ -104,7 +111,7 @@ export function searchTextRelevance(
     return canonicalNeedle && containsBounded(phrase, canonicalNeedle) ? 3_000 : 0
   }
   if (target.includes(needle)) return 2_200
-  if (/^[\p{L}\p{N}]+$/u.test(needle)) {
+  if (allowFuzzy && /^[\p{L}\p{N}]+$/u.test(needle)) {
     return fuzzyWordContains(target, needle) ? 1_600 : 0
   }
 
@@ -134,16 +141,21 @@ function containsBounded(text: string, needle: string): boolean {
 export function conceptRelevance(
   concept: SearchConcept,
   query: ParsedSearchQuery,
+  allowFuzzy = true,
 ): number {
   if (query.exactOnly || normalizeArabicForSearch(query.text)) return 0
   const best = (terms: string[]): number =>
-    terms.reduce((score, term) => Math.max(score, searchTextRelevance(term, query)), 0)
+    terms.reduce(
+      (score, term) => Math.max(score, searchTextRelevance(term, query, allowFuzzy)),
+      0,
+    )
+  const score = (text: string): number => searchTextRelevance(text, query, allowFuzzy)
   const relevance = Math.max(
-    searchTextRelevance(concept.name, query) - 1_400,
+    score(concept.name) - 1_400,
     best(concept.primaryTerms) - 1_400,
     best(concept.secondaryTerms) - 1_500,
-    searchTextRelevance(concept.category, query) - 1_900,
-    searchTextRelevance(concept.domain, query) - 2_100,
+    score(concept.category) - 1_900,
+    score(concept.domain) - 2_100,
     0,
   )
   if (relevance === 0) return 0
@@ -152,6 +164,15 @@ export function conceptRelevance(
       ? Math.min(150, Math.trunc(800 / Math.sqrt(concept.ayahKeys.length)))
       : 0
   return relevance + specificity
+}
+
+/** The one meaningful English word eligible for thesaurus expansion. */
+export function thesaurusLookupKey(query: ParsedSearchQuery): string | null {
+  if (query.exactOnly || normalizeArabicForSearch(query.text)) return null
+  const words = canonicalWords(query.text)
+  const meaningful = words.filter((word) => !QUERY_FILLERS.has(word))
+  const content = meaningful.length > 0 ? meaningful : words
+  return content.length === 1 ? content[0]! : null
 }
 
 /**
@@ -242,13 +263,25 @@ export function matchWordSearch(
   query: string,
   maxHits = WORD_SEARCH_MAX_HITS,
   concepts: SearchConcept[] = [],
+  thesaurus: Map<string, RelatedSearchTerm[]> = new Map(),
 ): WordSearchHit[] {
   const state = createRanking(index, query)
   if (!state || maxHits <= 0) return []
-  scanLexical(state, 0, index.length)
-  scanAyahText(state)
+  scanLexical(state, 0, index.length, false)
+  scanAyahText(state, false)
+  scanConcepts(state, concepts, false)
+  if (state.ranked.size < 3) {
+    const key = thesaurusLookupKey(state.parsed)
+    const related = key ? (thesaurus.get(key) ?? []) : []
+    scanRelatedWords(state, related, 0, index.length)
+    scanRelatedAyahs(state, related)
+  }
+  if (state.ranked.size === 0) {
+    scanLexical(state, 0, index.length, true)
+    scanAyahText(state, true)
+    scanConcepts(state, concepts, true)
+  }
   scanRoots(state, 0, index.length)
-  scanConcepts(state, concepts)
   return finishRanking(state, maxHits)
 }
 
@@ -258,6 +291,7 @@ interface RankedHit {
   position: number
   score: number
   matchLabel?: string
+  matchTerm?: string
 }
 
 interface RankingState {
@@ -294,6 +328,7 @@ function addRanked(
   position: number,
   score: number,
   matchLabel?: string,
+  matchTerm?: string,
 ): void {
   if (score <= 0) return
   const entry = state.index[indexAt]!
@@ -304,19 +339,28 @@ function addRanked(
     score > current.score ||
     (score === current.score && position > 0 && current.position === 0)
   ) {
-    state.ranked.set(key, { key, indexAt, position, score, matchLabel })
+    state.ranked.set(key, { key, indexAt, position, score, matchLabel, matchTerm })
   }
 }
 
-function scanLexical(state: RankingState, from: number, to: number): void {
+function scanLexical(
+  state: RankingState,
+  from: number,
+  to: number,
+  allowFuzzy: boolean,
+): void {
   for (let i = from; i < to; i++) {
     const entry = state.index[i]!
     const score = Math.max(
       state.arabic
-        ? searchTextRelevance(entry.arabicNorm, { ...state.parsed, text: state.arabic })
+        ? searchTextRelevance(
+            entry.arabicNorm,
+            { ...state.parsed, text: state.arabic },
+            allowFuzzy,
+          )
         : 0,
-      searchTextRelevance(entry.translationLower, state.latin),
-      searchTextRelevance(entry.transliterationLower, state.latin),
+      searchTextRelevance(entry.translationLower, state.latin, allowFuzzy),
+      searchTextRelevance(entry.transliterationLower, state.latin, allowFuzzy),
     )
     addRanked(state, i, entry.position, score)
     if (!state.parsed.exactOnly && score > 0 && entry.root) state.matchedRoots.add(entry.root)
@@ -325,7 +369,7 @@ function scanLexical(state: RankingState, from: number, to: number): void {
   }
 }
 
-function scanAyahText(state: RankingState): void {
+function scanAyahText(state: RankingState, allowFuzzy: boolean): void {
   let at = 0
   while (at < state.index.length) {
     const anchor = state.index[at]!
@@ -341,16 +385,17 @@ function scanAyahText(state: RankingState): void {
     if (/\s/u.test(state.parsed.text)) {
       const glosses: string[] = []
       for (let i = at; i < end; i++) glosses.push(state.index[i]!.translation)
-      glossScore = searchTextRelevance(glosses.join(' '), state.latin)
+      glossScore = searchTextRelevance(glosses.join(' '), state.latin, allowFuzzy)
     }
     const score = Math.max(
       state.arabic
-        ? searchTextRelevance(normalizeArabicForSearch(anchor.ayahText), {
-            ...state.parsed,
-            text: state.arabic,
-          })
+        ? searchTextRelevance(
+            normalizeArabicForSearch(anchor.ayahText),
+            { ...state.parsed, text: state.arabic },
+            allowFuzzy,
+          )
         : 0,
-      searchTextRelevance(anchor.ayahTranslation, state.latin),
+      searchTextRelevance(anchor.ayahTranslation, state.latin, allowFuzzy),
       glossScore,
     )
     addRanked(state, at, 0, score)
@@ -366,11 +411,15 @@ function scanRoots(state: RankingState, from: number, to: number): void {
   }
 }
 
-function scanConcepts(state: RankingState, concepts: SearchConcept[]): void {
+function scanConcepts(
+  state: RankingState,
+  concepts: SearchConcept[],
+  allowFuzzy: boolean,
+): void {
   if (state.parsed.exactOnly) return
   const semantic = new Map<number, { best: number; bonus: number; label: string }>()
   for (const concept of concepts) {
-    const score = conceptRelevance(concept, state.parsed)
+    const score = conceptRelevance(concept, state.parsed, allowFuzzy)
     if (score <= 0) continue
     for (const key of concept.ayahKeys) {
       const current = semantic.get(key)
@@ -392,15 +441,87 @@ function scanConcepts(state: RankingState, concepts: SearchConcept[]): void {
   }
 }
 
+function bestRelated(
+  text: string,
+  related: RelatedSearchTerm[],
+): { score: number; term: string } | null {
+  let best: { score: number; term: string } | null = null
+  for (const candidate of related) {
+    const score =
+      searchTextRelevance(
+        text,
+        { text: candidate.text, exactOnly: false },
+        false,
+      ) -
+      (600 + candidate.distance * 150)
+    if (score > 0 && (best == null || score > best.score)) {
+      best = { score, term: candidate.text }
+    }
+  }
+  return best
+}
+
+function scanRelatedWords(
+  state: RankingState,
+  related: RelatedSearchTerm[],
+  from: number,
+  to: number,
+): void {
+  if (related.length === 0) return
+  for (let i = from; i < to; i++) {
+    const entry = state.index[i]!
+    const match = bestRelated(entry.translationLower, related)
+    if (!match) continue
+    addRanked(state, i, entry.position, match.score, undefined, match.term)
+    if (entry.root) state.matchedRoots.add(entry.root)
+  }
+}
+
+function scanRelatedAyahs(state: RankingState, related: RelatedSearchTerm[]): void {
+  if (related.length === 0) return
+  let at = 0
+  while (at < state.index.length) {
+    const anchor = state.index[at]!
+    let end = at + 1
+    const glosses = [anchor.translation]
+    while (
+      end < state.index.length &&
+      state.index[end]!.surahId === anchor.surahId &&
+      state.index[end]!.ayahNumber === anchor.ayahNumber
+    ) {
+      glosses.push(state.index[end]!.translation)
+      end++
+    }
+    const translation = bestRelated(anchor.ayahTranslation, related)
+    const gloss = bestRelated(glosses.join(' '), related)
+    const match = translation == null || (gloss != null && gloss.score > translation.score)
+      ? gloss
+      : translation
+    if (match) addRanked(state, at, 0, match.score, undefined, match.term)
+    at = end
+  }
+}
+
 function finishRanking(state: RankingState, maxHits: number): WordSearchHit[] {
   return [...state.ranked.values()]
     .sort((a, b) => b.score - a.score || a.key - b.key || a.position - b.position)
     .slice(0, maxHits)
     .map((match) => {
       const entry = state.index[match.indexAt]!
-      const base = { ...toHit(entry), matchLabel: match.matchLabel ?? null }
+      const base = {
+        ...toHit(entry),
+        matchLabel: match.matchLabel ?? null,
+        matchTerm: match.matchTerm ?? null,
+      }
       return match.position > 0
-        ? toHitWithDisplayTranslation(entry, state.index, match.indexAt, state.parsed.text, base)
+        ? toHitWithDisplayTranslation(
+            entry,
+            state.index,
+            match.indexAt,
+            state.parsed.text,
+            base,
+            match.matchTerm,
+          )
         : { ...base, position: 0, arabic: '', translation: '', transliteration: '' }
     })
 }
@@ -458,12 +579,13 @@ function toHitWithDisplayTranslation(
   at: number,
   query: string,
   base: WordSearchHit = toHit(entry),
+  semanticTerm = '',
 ): WordSearchHit {
-  if (highlightNeedle(entry.ayahTranslation, query, entry.translation) != null) {
+  if (highlightNeedle(entry.ayahTranslation, query, entry.translation, semanticTerm) != null) {
     return base
   }
   const glossLine = sameAyahGlossLine(index, at)
-  if (highlightNeedle(glossLine, query, entry.translation) != null) {
+  if (highlightNeedle(glossLine, query, entry.translation, semanticTerm) != null) {
     return { ...base, ayahTranslation: glossLine }
   }
   return base
@@ -511,29 +633,43 @@ export async function matchWordSearchAsync(
   maxHits = WORD_SEARCH_MAX_HITS,
   isCancelled: () => boolean = () => false,
   concepts: SearchConcept[] = [],
+  thesaurus: Map<string, RelatedSearchTerm[]> = new Map(),
 ): Promise<WordSearchHit[]> {
   const state = createRanking(index, query)
   if (!state || maxHits <= 0) return []
-  for (let from = 0; from < index.length; from += WORD_SEARCH_CHUNK) {
-    if (from > 0) {
-      if (isCancelled()) return []
-      await yieldToEventLoop()
-      if (isCancelled()) return []
-    }
-    scanLexical(state, from, Math.min(index.length, from + WORD_SEARCH_CHUNK))
-  }
-  scanAyahText(state)
-  if (state.matchedRoots.size > 0) {
+  const scanChunks = async (
+    scan: (from: number, to: number) => void,
+  ): Promise<boolean> => {
     for (let from = 0; from < index.length; from += WORD_SEARCH_CHUNK) {
       if (from > 0) {
-        if (isCancelled()) return []
+        if (isCancelled()) return false
         await yieldToEventLoop()
-        if (isCancelled()) return []
+        if (isCancelled()) return false
       }
-      scanRoots(state, from, Math.min(index.length, from + WORD_SEARCH_CHUNK))
+      scan(from, Math.min(index.length, from + WORD_SEARCH_CHUNK))
     }
+    return true
   }
-  scanConcepts(state, concepts)
+
+  if (!(await scanChunks((from, to) => scanLexical(state, from, to, false)))) return []
+  scanAyahText(state, false)
+  scanConcepts(state, concepts, false)
+  if (state.ranked.size < 3) {
+    const key = thesaurusLookupKey(state.parsed)
+    const related = key ? (thesaurus.get(key) ?? []) : []
+    if (!(await scanChunks((from, to) => scanRelatedWords(state, related, from, to)))) {
+      return []
+    }
+    scanRelatedAyahs(state, related)
+  }
+  if (state.ranked.size === 0) {
+    if (!(await scanChunks((from, to) => scanLexical(state, from, to, true)))) return []
+    scanAyahText(state, true)
+    scanConcepts(state, concepts, true)
+  }
+  if (state.matchedRoots.size > 0) {
+    if (!(await scanChunks((from, to) => scanRoots(state, from, to)))) return []
+  }
   return finishRanking(state, maxHits)
 }
 

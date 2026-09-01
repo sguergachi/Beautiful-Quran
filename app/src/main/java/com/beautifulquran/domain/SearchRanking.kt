@@ -12,10 +12,13 @@ data class SearchConcept(
     val ayahKeys: IntArray,
 )
 
+/** A grounded Quran-vocabulary term reached through the offline thesaurus. */
+data class RelatedSearchTerm(val text: String, val distance: Int)
+
 /** A user query after recognizing an enclosing pair of exact-search quotes. */
 data class ParsedSearchQuery(val text: String, val exactOnly: Boolean)
 
-/** Double quotes around the whole query disable spelling and concept expansion. */
+/** Double quotes around the whole query disable spelling and semantic expansion. */
 fun parseSearchQuery(query: String): ParsedSearchQuery {
     val trimmed = query.trim()
     val quoted = trimmed.length >= 2 && (
@@ -50,7 +53,11 @@ private fun stem(word: String): String = when {
  * Relevance of [text] to [query]. Exact phrases lead, reordered content words
  * follow, then substrings and a one-edit spelling match.
  */
-fun searchTextRelevance(text: String, query: ParsedSearchQuery): Int {
+fun searchTextRelevance(
+    text: String,
+    query: ParsedSearchQuery,
+    allowFuzzy: Boolean = true,
+): Int {
     val target = text.lowercase()
     val needle = query.text.lowercase()
     if (target.isEmpty() || needle.isEmpty()) return 0
@@ -62,7 +69,7 @@ fun searchTextRelevance(text: String, query: ParsedSearchQuery): Int {
         return if (canonicalNeedle.isNotEmpty() && containsBounded(phrase, canonicalNeedle)) 3_000 else 0
     }
     if (target.contains(needle)) return 2_200
-    if (needle.all(Char::isLetterOrDigit)) {
+    if (allowFuzzy && needle.all(Char::isLetterOrDigit)) {
         return if (fuzzyWordContains(target, needle)) 1_600 else 0
     }
 
@@ -91,15 +98,20 @@ private fun containsBounded(text: String, needle: String): Boolean {
 }
 
 /** Score a concept name/vocabulary match below literal text but above broad hierarchy matches. */
-fun conceptRelevance(concept: SearchConcept, query: ParsedSearchQuery): Int {
+fun conceptRelevance(
+    concept: SearchConcept,
+    query: ParsedSearchQuery,
+    allowFuzzy: Boolean = true,
+): Int {
     if (query.exactOnly || normalizeArabicForSearch(query.text).isNotEmpty()) return 0
-    fun best(terms: Iterable<String>) = terms.maxOfOrNull { searchTextRelevance(it, query) } ?: 0
+    fun score(text: String) = searchTextRelevance(text, query, allowFuzzy)
+    fun best(terms: Iterable<String>) = terms.maxOfOrNull(::score) ?: 0
     val relevance = maxOf(
-        searchTextRelevance(concept.name, query) - 1_400,
+        score(concept.name) - 1_400,
         best(concept.primaryTerms) - 1_400,
         best(concept.secondaryTerms) - 1_500,
-        searchTextRelevance(concept.category, query) - 1_900,
-        searchTextRelevance(concept.domain, query) - 2_100,
+        score(concept.category) - 1_900,
+        score(concept.domain) - 2_100,
     ).coerceAtLeast(0)
     if (relevance == 0) return 0
     return relevance + if (concept.ayahKeys.isEmpty()) {
@@ -107,4 +119,11 @@ fun conceptRelevance(concept: SearchConcept, query: ParsedSearchQuery): Int {
     } else {
         (800 / sqrt(concept.ayahKeys.size.toDouble())).toInt().coerceAtMost(150)
     }
+}
+
+/** The one meaningful English word eligible for thesaurus expansion. */
+fun thesaurusLookupKey(query: ParsedSearchQuery): String? {
+    if (query.exactOnly || normalizeArabicForSearch(query.text).isNotEmpty()) return null
+    val words = canonicalWords(query.text)
+    return words.filterNot(queryFillers::contains).ifEmpty { words }.singleOrNull()
 }

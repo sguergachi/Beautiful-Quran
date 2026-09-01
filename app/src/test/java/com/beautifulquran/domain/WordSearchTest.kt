@@ -83,6 +83,23 @@ class WordSearchTest {
     }
 
     @Test
+    fun `semantic vocabulary outranks and suppresses spelling neighbors`() {
+        val semanticIndex = listOf(
+            entry(7, 154, 2, "سَكَتَ", "(was) calmed", ayahTranslation = "the anger subsided"),
+            entry(7, 44, 1, "وَنَادَىٰ", "will call out", ayahTranslation = "they will call out"),
+            entry(9, 26, 1, "سَكِينَتَهُ", "His tranquility", ayahTranslation = "His tranquility"),
+        )
+        val hits = matchWordSearch(
+            semanticIndex,
+            "calm",
+            thesaurus = mapOf("calm" to listOf(RelatedSearchTerm("tranquility", 2))),
+        )
+        assertEquals(listOf(7 to 154, 9 to 26), hits.map { it.surahId to it.ayahNumber })
+        assertEquals("tranquility", hits[1].matchTerm)
+        assertTrue(hits.none { it.ayahNumber == 44 })
+    }
+
+    @Test
     fun `quoted query stays literal and disables fuzzy spelling`() {
         assertTrue(matchWordSearch(index, "\"mercifull\"").isEmpty())
         assertEquals(2, matchWordSearch(index, "\"merciful\"").size)
@@ -242,22 +259,22 @@ class WordSearchTest {
     }
 
     @Test
-    fun `english highlight chooses a query-related gloss word`() {
+    fun `english highlight chooses the word that won typo fallback`() {
         val spans = englishTranslationHighlightSpans(
             "And the companions of Paradise will call out",
-            "calm",
+            "calp",
             "And they will call out",
         )
         assertEquals(listOf("call"), spans.filter { it.highlighted }.map { it.text })
         assertTrue(
             englishTranslationHighlightSpans(
                 "their inscription was guidance",
-                "calm",
+                "calp",
                 "(was) calmed",
             ).none { it.highlighted },
         )
         assertTrue(
-            englishTranslationHighlightSpans("They will answer", "calm", "will")
+            englishTranslationHighlightSpans("They will answer", "calp", "will")
                 .none { it.highlighted },
         )
     }

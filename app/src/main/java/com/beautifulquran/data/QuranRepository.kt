@@ -334,11 +334,13 @@ class QuranRepository(
      */
     suspend fun searchWords(query: String): List<WordSearchHit> = withContext(Dispatchers.IO) {
         if (!isWordSearchQuery(query)) return@withContext emptyList()
+        val vocabulary = searchConcepts?.vocabulary()
         matchWordSearch(
             wordSearchIndex(),
             query,
             WORD_SEARCH_MAX_HITS,
-            searchConcepts?.concepts().orEmpty(),
+            vocabulary?.concepts.orEmpty(),
+            vocabulary?.thesaurus.orEmpty(),
         )
     }
 

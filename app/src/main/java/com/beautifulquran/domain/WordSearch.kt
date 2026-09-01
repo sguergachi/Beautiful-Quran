@@ -93,24 +93,29 @@ fun matchWordSearch(
     query: String,
     maxHits: Int = WORD_SEARCH_MAX_HITS,
     concepts: List<SearchConcept> = emptyList(),
+    thesaurus: Map<String, List<RelatedSearchTerm>> = emptyMap(),
 ): List<WordSearchHit> {
     val parsed = parseSearchQuery(query)
     if (parsed.text.length < WORD_SEARCH_MIN_QUERY_LENGTH || maxHits <= 0) return emptyList()
-    val arabic = normalizeArabicForSearch(parsed.text)
-    val latin = if (arabic.isEmpty()) parsed else parsed.copy(text = "")
-
     data class RankedHit(
         val key: Int,
         val indexAt: Int,
         val position: Int,
         val score: Int,
         val matchLabel: String? = null,
+        val matchTerm: String? = null,
     )
 
     val ranked = HashMap<Int, RankedHit>(512)
     val firstIndex = HashMap<Int, Int>(7_000)
     val matchedRoots = HashSet<String>()
-    fun add(indexAt: Int, position: Int, score: Int, label: String? = null) {
+    fun add(
+        indexAt: Int,
+        position: Int,
+        score: Int,
+        label: String? = null,
+        term: String? = null,
+    ) {
         if (score <= 0) return
         val entry = index[indexAt]
         val key = entry.surahId * 1_000 + entry.ayahNumber
@@ -118,63 +123,67 @@ fun matchWordSearch(
         if (current == null || score > current.score ||
             (score == current.score && position > 0 && current.position == 0)
         ) {
-            ranked[key] = RankedHit(key, indexAt, position, score, label)
+            ranked[key] = RankedHit(key, indexAt, position, score, label, term)
         }
     }
 
-    for (i in index.indices) {
-        val entry = index[i]
-        val score = maxOf(
-            if (arabic.isEmpty()) 0 else searchTextRelevance(
-                entry.arabicNorm,
-                parsed.copy(text = arabic),
-            ),
-            searchTextRelevance(entry.translationLower, latin),
-            searchTextRelevance(entry.transliterationLower, latin),
-        )
-        add(i, entry.position, score)
-        if (!parsed.exactOnly && score > 0 && entry.root.isNotEmpty()) matchedRoots += entry.root
-        firstIndex.putIfAbsent(entry.surahId * 1_000 + entry.ayahNumber, i)
-    }
-
-    var at = 0
-    while (at < index.size) {
-        val anchor = index[at]
-        var end = at + 1
-        while (end < index.size && index[end].surahId == anchor.surahId &&
-            index[end].ayahNumber == anchor.ayahNumber
-        ) {
-            end++
-        }
-        val ayahScore = maxOf(
-            if (arabic.isEmpty()) 0 else searchTextRelevance(
-                normalizeArabicForSearch(anchor.ayahText),
-                parsed.copy(text = arabic),
-            ),
-            searchTextRelevance(anchor.ayahTranslation, latin),
-            if (parsed.text.any(Char::isWhitespace)) {
-                searchTextRelevance((at until end).joinToString(" ") { index[it].translation }, latin)
-            } else {
-                0
-            },
-        )
-        add(at, position = 0, score = ayahScore)
-        at = end
-    }
-
-    if (!parsed.exactOnly && matchedRoots.isNotEmpty()) {
+    fun scanOriginal(allowFuzzy: Boolean) {
+        val arabic = normalizeArabicForSearch(parsed.text)
+        val latin = if (arabic.isEmpty()) parsed else parsed.copy(text = "")
         for (i in index.indices) {
-            if (index[i].root in matchedRoots) add(i, index[i].position, score = 1_450)
+            val entry = index[i]
+            val score = maxOf(
+                if (arabic.isEmpty()) 0 else searchTextRelevance(
+                    entry.arabicNorm,
+                    parsed.copy(text = arabic),
+                    allowFuzzy,
+                ),
+                searchTextRelevance(entry.translationLower, latin, allowFuzzy),
+                searchTextRelevance(entry.transliterationLower, latin, allowFuzzy),
+            )
+            add(i, entry.position, score)
+            if (!parsed.exactOnly && score > 0 && entry.root.isNotEmpty()) matchedRoots += entry.root
+            firstIndex.putIfAbsent(entry.surahId * 1_000 + entry.ayahNumber, i)
+        }
+        var at = 0
+        while (at < index.size) {
+            val anchor = index[at]
+            var end = at + 1
+            while (end < index.size && index[end].surahId == anchor.surahId &&
+                index[end].ayahNumber == anchor.ayahNumber
+            ) {
+                end++
+            }
+            val score = maxOf(
+                if (arabic.isEmpty()) 0 else searchTextRelevance(
+                    normalizeArabicForSearch(anchor.ayahText),
+                    parsed.copy(text = arabic),
+                    allowFuzzy,
+                ),
+                searchTextRelevance(anchor.ayahTranslation, latin, allowFuzzy),
+                if (parsed.text.any(Char::isWhitespace)) {
+                    searchTextRelevance(
+                        (at until end).joinToString(" ") { index[it].translation },
+                        latin,
+                        allowFuzzy,
+                    )
+                } else {
+                    0
+                },
+            )
+            add(at, position = 0, score = score)
+            at = end
         }
     }
 
-    if (!parsed.exactOnly && concepts.isNotEmpty()) {
+    fun scanConcepts(allowFuzzy: Boolean) {
+        if (parsed.exactOnly || concepts.isEmpty()) return
         data class SemanticRank(val best: Int, val bonus: Int, val label: String) {
             val total: Int get() = best + bonus
         }
         val semantic = HashMap<Int, SemanticRank>()
         for (concept in concepts) {
-            val score = conceptRelevance(concept, parsed)
+            val score = conceptRelevance(concept, parsed, allowFuzzy)
             if (score <= 0) continue
             for (key in concept.ayahKeys) {
                 val current = semantic[key]
@@ -194,6 +203,68 @@ fun matchWordSearch(
         }
     }
 
+    fun bestRelated(text: String, related: List<RelatedSearchTerm>): Pair<Int, String>? {
+        var bestScore = 0
+        var bestTerm: String? = null
+        for (candidate in related) {
+            val score = searchTextRelevance(
+                text,
+                ParsedSearchQuery(candidate.text, exactOnly = false),
+                allowFuzzy = false,
+            ) - (600 + candidate.distance * 150)
+            if (score > bestScore) {
+                bestScore = score
+                bestTerm = candidate.text
+            }
+        }
+        return bestTerm?.let { bestScore to it }
+    }
+
+    fun scanRelated(related: List<RelatedSearchTerm>) {
+        if (related.isEmpty()) return
+        for (i in index.indices) {
+            val entry = index[i]
+            val match = bestRelated(entry.translationLower, related) ?: continue
+            add(i, entry.position, match.first, term = match.second)
+            if (entry.root.isNotEmpty()) matchedRoots += entry.root
+        }
+        var at = 0
+        while (at < index.size) {
+            val anchor = index[at]
+            var end = at + 1
+            while (end < index.size && index[end].surahId == anchor.surahId &&
+                index[end].ayahNumber == anchor.ayahNumber
+            ) {
+                end++
+            }
+            val translation = bestRelated(anchor.ayahTranslation, related)
+            val gloss = bestRelated(
+                (at until end).joinToString(" ") { index[it].translation },
+                related,
+            )
+            val match = listOfNotNull(translation, gloss).maxByOrNull { it.first }
+            if (match != null) add(at, position = 0, score = match.first, term = match.second)
+            at = end
+        }
+    }
+
+    scanOriginal(allowFuzzy = false)
+    scanConcepts(allowFuzzy = false)
+    if (ranked.size < 3) {
+        thesaurusLookupKey(parsed)?.let { key ->
+            scanRelated(thesaurus[key].orEmpty())
+        }
+    }
+    if (ranked.isEmpty()) {
+        scanOriginal(allowFuzzy = true)
+        scanConcepts(allowFuzzy = true)
+    }
+    if (!parsed.exactOnly && matchedRoots.isNotEmpty()) {
+        for (i in index.indices) {
+            if (index[i].root in matchedRoots) add(i, index[i].position, score = 1_450)
+        }
+    }
+
     return ranked.values
         .sortedWith(
             compareByDescending<RankedHit> { it.score }
@@ -203,9 +274,18 @@ fun matchWordSearch(
         .take(maxHits)
         .map { match ->
             val entry = index[match.indexAt]
-            val base = entry.toHit().copy(matchLabel = match.matchLabel)
+            val base = entry.toHit().copy(
+                matchLabel = match.matchLabel,
+                matchTerm = match.matchTerm,
+            )
             if (match.position > 0) {
-                val display = snippetDisplayText(entry, index, match.indexAt, parsed.text)
+                val display = snippetDisplayText(
+                    entry,
+                    index,
+                    match.indexAt,
+                    parsed.text,
+                    match.matchTerm.orEmpty(),
+                )
                 if (display == entry.ayahTranslation) base else base.copy(ayahTranslation = display)
             } else {
                 base.copy(position = 0, arabic = "", translation = "", transliteration = "")
@@ -274,12 +354,13 @@ internal fun snippetDisplayText(
     index: List<WordSearchIndexEntry>,
     at: Int,
     query: String,
+    semanticTerm: String = "",
 ): String {
-    if (highlightNeedle(entry.ayahTranslation, query, entry.translation) != null) {
+    if (highlightNeedle(entry.ayahTranslation, query, entry.translation, semanticTerm) != null) {
         return entry.ayahTranslation
     }
     val glossLine = sameAyahGlossLine(index, at)
-    if (highlightNeedle(glossLine, query, entry.translation) != null) return glossLine
+    if (highlightNeedle(glossLine, query, entry.translation, semanticTerm) != null) return glossLine
     return entry.ayahTranslation
 }
 

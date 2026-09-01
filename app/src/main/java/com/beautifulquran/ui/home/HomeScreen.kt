@@ -836,7 +836,7 @@ private fun WordSearchHitRow(
                 ayahTranslation = hit.ayahTranslation,
                 query = displayQuery,
                 wordGloss = hit.translation,
-                semanticLabel = hit.matchLabel.orEmpty(),
+                semanticLabel = listOfNotNull(hit.matchTerm, hit.matchLabel).joinToString(" "),
             )) {
                 if (span.highlighted) {
                     withStyle(
