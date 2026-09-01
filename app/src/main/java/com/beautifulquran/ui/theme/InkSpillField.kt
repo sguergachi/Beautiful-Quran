@@ -421,7 +421,7 @@ internal const val VellumSpotShader = """
                 hash(float2(seed, 4.7))
             ) - 0.5) * res * 0.006;
             float2 p = fragCoord - center;
-            float2 halfSize = 0.5 * res * mix(0.12, 0.93, progress);
+            float2 halfSize = 0.5 * res * mix(0.36, 0.93, progress);
             float cr = min(halfSize.x, halfSize.y) * 0.12;
             float2 q = abs(p) - halfSize + cr;
             float sdf = length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - cr;

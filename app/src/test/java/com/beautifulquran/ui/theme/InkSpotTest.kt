@@ -56,6 +56,7 @@ class InkSpotTest {
         assertTrue(VellumSpotShader.contains("1.0 / (1.0 + exp(sdf / diffusion))"))
         assertTrue(VellumSpotShader.contains("rimGate"))
         assertTrue(VellumSpotShader.contains("sourcePool * (1.0 - fill)"))
+        assertTrue(VellumSpotShader.contains("mix(0.36, 0.93, progress)"))
         assertFalse(VellumSpotShader.contains("midpoint - r + warp"))
     }
 }

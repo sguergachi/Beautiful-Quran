@@ -96,8 +96,8 @@ fun Modifier.inkSpotHighlight(
             val cy = size.height * 0.5f
             val center = Offset(cx, cy)
             if (fillBox) {
-                val rx = cx * 0.93f * progress
-                val ry = cy * 0.93f * progress
+                val rx = cx * (0.36f + 0.57f * progress)
+                val ry = cy * (0.36f + 0.57f * progress)
                 val cr = minOf(rx, ry) * 0.12f
                 drawRoundRect(
                     color.copy(alpha = 0.12f * progress),
