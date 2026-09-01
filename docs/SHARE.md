@@ -108,8 +108,9 @@ screenshot of the live reader, not the wash yet:
    invisible decor child, software-draws to a `Bitmap`. One verse is
    1080 × wrap-height; each added verse raises the pixel scale (2 ayahs
    at 2×, 3 at 3×) so a long gather still reads after a preview shrinks
-   the page to fit, capped at 16 MP. The sheet also grows in height so
-   every verse and the gold chapter footer stay on the page. **Not**
+   the page to fit, capped at 8 MP / 8192 px so Canvas cannot abort the
+   process. A stub first layout stays 1×. The sheet also grows in height
+   so every verse and the gold chapter footer stay on the page. **Not**
    full `ReaderScreen` (no LazyColumn / playback / gestures).
 3. `ShareFiles` writes PNG under `cacheDir/share/`, exposes a `FileProvider`
    URI (`${applicationId}.share`), keeps the newest few files.
@@ -190,7 +191,8 @@ Each phase ships something usable on its own.
 - **Audio cache is not an export API.** `SimpleCache` is private to
   `PlaybackService`. Audio export needs an explicit staging boundary.
 - **Long selections.** Gather cap 20; the image is as tall as the verses,
-  and its pixel scale grows with the gather until the 16 MP budget.
+  and its pixel scale grows with the gather until the 8 MP / 8192 px
+  canvas budget. Over-budget sheets downscale as a whole (footer stays).
 
 ## Non-goals
 

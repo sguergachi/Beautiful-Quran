@@ -352,11 +352,11 @@ class ShareViewModel(
                         error = null,
                     )
                 }
-            } catch (e: Exception) {
+            } catch (t: Throwable) {
                 _ui.update {
                     it.copy(
                         preparingImage = false,
-                        error = e.message?.takeIf { msg -> msg.isNotBlank() }
+                        error = t.message?.takeIf { msg -> msg.isNotBlank() }
                             ?: "Could not render the image.",
                     )
                 }
