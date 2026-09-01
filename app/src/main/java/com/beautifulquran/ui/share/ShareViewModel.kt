@@ -2,6 +2,7 @@ package com.beautifulquran.ui.share
 
 import android.app.Activity
 import android.graphics.Bitmap
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.beautifulquran.data.QuranRepository
@@ -10,7 +11,10 @@ import com.beautifulquran.share.AyahRef
 import com.beautifulquran.share.SHARE_SELECTION_MAX
 import com.beautifulquran.share.ShareFiles
 import com.beautifulquran.share.ShareImageRenderer
+import com.beautifulquran.share.ShareUx
+import com.beautifulquran.share.ShareUxAction
 import com.beautifulquran.share.VerseTextComposer
+import com.beautifulquran.share.stitchBitmaps
 import com.beautifulquran.share.gatherOrdinals
 import com.beautifulquran.share.toggleGatheredAyah
 import kotlinx.coroutines.Job
@@ -42,6 +46,11 @@ data class ShareVerseLine(
 data class ShareUiState(
     val gathering: Boolean = false,
     val sendOpen: Boolean = false,
+    /**
+     * Verse whose share prompt is open (colophon / seal / action-line current).
+     * Null while gathering or idle.
+     */
+    val prompt: AyahRef? = null,
     val selection: List<AyahRef> = emptyList(),
     /** 1-based ordinals derived from [selection] — read by ayah blocks only. */
     val ordinals: Map<AyahRef, Int> = emptyMap(),
@@ -101,11 +110,68 @@ class ShareViewModel(
         _ui.update {
             it.copy(
                 gathering = true,
+                prompt = null,
                 sendOpen = false,
                 error = null,
                 pendingShareText = null,
                 pendingShareImageUri = null,
             )
+        }
+    }
+
+    /**
+     * Verse-first enter: that ayah is already selected (`1`), playback paused,
+     * prompt dismissed. Used by every test design's Share verb / lift.
+     */
+    fun enterShare(surahId: Int, ayah: Int) {
+        if (surahId < 1 || ayah < 1) return
+        val ref = AyahRef(surahId, ayah)
+        if (_ui.value.gathering) {
+            if (ref !in _ui.value.selection) toggle(surahId, ayah)
+            hidePrompt()
+            return
+        }
+        player.pause()
+        val selection = listOf(ref)
+        _ui.update {
+            it.copy(
+                gathering = true,
+                prompt = null,
+                sendOpen = false,
+                selection = selection,
+                ordinals = gatherOrdinals(selection),
+                error = null,
+                pendingShareText = null,
+                pendingShareImageUri = null,
+            )
+        }
+    }
+
+    fun onMarkTap(surahId: Int, ayah: Int) {
+        if (surahId < 1 || ayah < 1) return
+        apply(
+            ShareUx.onMarkTap(
+                gathering = _ui.value.gathering,
+                ref = AyahRef(surahId, ayah),
+            ),
+        )
+    }
+
+    fun hidePrompt() {
+        if (_ui.value.prompt == null) return
+        _ui.update { it.copy(prompt = null) }
+    }
+
+    /** Cancel on the share ribbon: leave gather, or dismiss a pre-gather prompt. */
+    fun onChromeCancel() {
+        if (_ui.value.gathering) exitGather() else hidePrompt()
+    }
+
+    private fun apply(action: ShareUxAction) {
+        when (action) {
+            is ShareUxAction.EnterShare -> enterShare(action.ref.surahId, action.ref.ayah)
+            is ShareUxAction.ToggleVerse -> toggle(action.ref.surahId, action.ref.ayah)
+            ShareUxAction.None -> Unit
         }
     }
 
@@ -248,15 +314,36 @@ class ShareViewModel(
                     }
                     return@launch
                 }
-                bitmap = ShareImageRenderer.render(
-                    activity = activity,
-                    content = {
-                        ShareImageCard(
-                            verses = lines,
+                var versesBmp: Bitmap? = null
+                var footerBmp: Bitmap? = null
+                try {
+                    versesBmp = ShareImageRenderer.renderSegments(
+                        activity = activity,
+                        segmentCount = lines.size,
+                    ) { index ->
+                        ShareImageVerseStrip(
+                            verse = lines[index],
                             includeTranslation = includeTranslation,
+                            padTop = if (index == 0) {
+                                ShareImagePadTop
+                            } else {
+                                ShareImagePadBetween
+                            },
+                            padBottom = if (index == lines.lastIndex) {
+                                0.dp
+                            } else {
+                                ShareImagePadBetween
+                            },
                         )
-                    },
-                )
+                    }
+                    footerBmp = ShareImageRenderer.render(activity) {
+                        ShareImageFooterStrip(shareFooterCopy(lines))
+                    }
+                    bitmap = stitchBitmaps(listOf(versesBmp, footerBmp))
+                } finally {
+                    versesBmp?.recycle()
+                    footerBmp?.recycle()
+                }
                 val uri = ShareFiles.writePng(activity.applicationContext, bitmap)
                 _ui.update {
                     it.copy(
@@ -265,11 +352,11 @@ class ShareViewModel(
                         error = null,
                     )
                 }
-            } catch (e: Exception) {
+            } catch (t: Throwable) {
                 _ui.update {
                     it.copy(
                         preparingImage = false,
-                        error = e.message?.takeIf { msg -> msg.isNotBlank() }
+                        error = t.message?.takeIf { msg -> msg.isNotBlank() }
                             ?: "Could not render the image.",
                     )
                 }

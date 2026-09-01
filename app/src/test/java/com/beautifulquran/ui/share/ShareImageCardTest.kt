@@ -14,26 +14,37 @@ class ShareImageCardTest {
     )
 
     @Test
-    fun `single verse footer is full reference`() {
+    fun `single verse splits name and citation`() {
         assertEquals(
-            "al-Baqarah 2:255",
-            footerReference(listOf(line(2, 255))),
+            ShareFooterCopy("al-Baqarah", "2:255"),
+            shareFooterCopy(listOf(line(2, 255))),
         )
     }
 
     @Test
-    fun `same-surah range uses en-dash`() {
+    fun `same-surah range keeps the name and dashes ayahs`() {
         assertEquals(
-            "al-Baqarah 2:1–3",
-            footerReference(listOf(line(2, 1), line(2, 2), line(2, 3))),
+            ShareFooterCopy("al-Baqarah", "2:1–3"),
+            shareFooterCopy(listOf(line(2, 1), line(2, 2), line(2, 3))),
         )
     }
 
     @Test
-    fun `cross-surah footer joins ends`() {
+    fun `chapter footer is its own last segment`() {
+        assertEquals(0, shareImageSegmentCount(0))
+        assertEquals(2, shareImageSegmentCount(1))
+        assertEquals(4, shareImageSegmentCount(3))
+        assertEquals(true, shareImageIsFooterSegment(1, 1))
+        assertEquals(false, shareImageIsFooterSegment(0, 1))
+        assertEquals(false, shareImageIsFooterSegment(2, 3))
+        assertEquals(true, shareImageIsFooterSegment(3, 3))
+    }
+
+    @Test
+    fun `cross-surah footer joins both names and citations`() {
         assertEquals(
-            "al-Baqarah 2:255 · al-Ikhlas 112:1",
-            footerReference(
+            ShareFooterCopy("al-Baqarah · al-Ikhlas", "2:255 · 112:1"),
+            shareFooterCopy(
                 listOf(
                     line(2, 255, "al-Baqarah"),
                     line(112, 1, "al-Ikhlas"),

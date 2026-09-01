@@ -37,10 +37,15 @@ import androidx.compose.foundation.layout.requiredHeight
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.wrapContentHeight
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -78,6 +83,7 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.RoundRect
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Paint
 import androidx.compose.ui.graphics.Path
@@ -104,10 +110,12 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.LineHeightStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.text.style.TextOverflow
@@ -121,6 +129,7 @@ import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import com.beautifulquran.QuranApp
 import com.beautifulquran.data.AyahSelectorSide
+import com.beautifulquran.data.BrushCircleStyle
 import com.beautifulquran.data.PageNumberScript
 import com.beautifulquran.data.ReadingMode
 import com.beautifulquran.data.VerseNumberScript
@@ -138,10 +147,17 @@ import com.beautifulquran.ui.theme.IslamicBackToOriginCapsule
 import com.beautifulquran.ui.theme.LocalQuranAccents
 import com.beautifulquran.ui.theme.ShapedWordBloom
 import com.beautifulquran.ui.theme.ScribeFontFamily
+import com.beautifulquran.ui.theme.SerifFontFamily
 import com.beautifulquran.ui.theme.TranslationFontFamily
 import com.beautifulquran.ui.theme.generatedFieldWeave
 import com.beautifulquran.ui.theme.gilded
 import com.beautifulquran.ui.theme.glyphLayerAlpha
+import com.beautifulquran.ui.theme.InkExpandEasing
+import com.beautifulquran.ui.theme.brushCircleParams
+import com.beautifulquran.ui.theme.inkBrushCircleMark
+import com.beautifulquran.ui.theme.inkBrushCircleTarget
+import com.beautifulquran.ui.theme.inkSpotHighlight
+import com.beautifulquran.ui.theme.rememberInkBrushCircle
 import com.beautifulquran.ui.theme.letterFadeIn
 import com.beautifulquran.ui.theme.ornament.chapterOrnamentSeed
 import com.beautifulquran.ui.theme.ornament.generateChapterOrnament
@@ -1793,6 +1809,8 @@ private fun ResponsiveEnglishAyah(
     onAyahClick: () -> Unit,
     onWordClick: ((Word) -> Unit)?,
     onWordLongClick: ((Word) -> Unit)?,
+    onMarkClick: (() -> Unit)? = null,
+    onMarkLongClick: (() -> Unit)? = null,
     useArabicIndicDigits: Boolean = false,
 ) {
     val palette = rememberWordInkPalette()
@@ -1908,6 +1926,8 @@ private fun ResponsiveEnglishAyah(
                 onAyahClick = onAyahClick,
                 onWordClick = onWordClick,
                 onWordLongClick = onWordLongClick,
+                onMarkClick = onMarkClick,
+                onMarkLongClick = onMarkLongClick,
             ),
         onTextLayout = { layoutResult = it },
     )
@@ -1924,21 +1944,45 @@ internal fun Modifier.wordTapTarget(
     ranges: List<IntRange>,
     layoutResult: TextLayoutResult?,
     hitSlopPx: Float,
-    onWordClick: (Word) -> Unit,
+    onWordClick: ((Word) -> Unit)?,
     onWordLongClick: ((Word) -> Unit)? = null,
     onMiss: (() -> Unit)? = null,
+    onMarkClick: (() -> Unit)? = null,
+    onMarkLongClick: (() -> Unit)? = null,
     inertLongPressRange: IntRange = IntRange.EMPTY,
-): Modifier = pointerInput(ranges, words, layoutResult, onWordLongClick, inertLongPressRange) {
+): Modifier = pointerInput(
+    ranges,
+    words,
+    layoutResult,
+    onWordLongClick,
+    inertLongPressRange,
+    onMarkClick,
+    onMarkLongClick,
+    onWordClick,
+) {
     detectTapGestures(
         onTap = { tap ->
+            if (
+                onMarkClick != null &&
+                layoutResult?.rangeContains(tap, inertLongPressRange, hitSlopPx) == true
+            ) {
+                onMarkClick()
+                return@detectTapGestures
+            }
             val wordIndex = layoutResult?.wordIndexAt(tap, ranges, hitSlopPx) ?: -1
-            if (wordIndex >= 0) onWordClick(words[wordIndex]) else onMiss?.invoke()
+            if (wordIndex >= 0 && onWordClick != null) {
+                onWordClick(words[wordIndex])
+            } else {
+                onMiss?.invoke()
+            }
         },
-        onLongPress = if (onWordLongClick == null) {
+        onLongPress = if (onWordLongClick == null && onMarkLongClick == null) {
             null
         } else {
             { pos ->
-                if (layoutResult?.rangeContains(pos, inertLongPressRange, hitSlopPx) != true) {
+                if (layoutResult?.rangeContains(pos, inertLongPressRange, hitSlopPx) == true) {
+                    onMarkLongClick?.invoke()
+                } else if (onWordLongClick != null) {
                     val wordIndex = layoutResult?.wordIndexAt(pos, ranges, hitSlopPx) ?: -1
                     if (wordIndex >= 0) onWordLongClick(words[wordIndex])
                 }
@@ -1948,7 +1992,8 @@ internal fun Modifier.wordTapTarget(
 }
 
 /** Tap chrome shared by both shaped modes: word-precise when word actions
- * exist, the whole ayah otherwise. */
+ * exist, the whole ayah otherwise. The trailing ﴿N﴾ mark can be its own
+ * target when [onMarkClick] is set (share entry). */
 private fun Modifier.ayahTapTarget(
     ayah: Ayah,
     rendered: RenderedLineText,
@@ -1957,8 +2002,10 @@ private fun Modifier.ayahTapTarget(
     onAyahClick: () -> Unit,
     onWordClick: ((Word) -> Unit)?,
     onWordLongClick: ((Word) -> Unit)?,
+    onMarkClick: (() -> Unit)? = null,
+    onMarkLongClick: (() -> Unit)? = null,
 ): Modifier = then(
-    if (onWordClick == null) {
+    if (onWordClick == null && onMarkClick == null && onMarkLongClick == null) {
         Modifier.quietClickable(onClick = onAyahClick)
     } else {
         Modifier.wordTapTarget(
@@ -1969,6 +2016,8 @@ private fun Modifier.ayahTapTarget(
             onWordClick = onWordClick,
             onWordLongClick = onWordLongClick,
             onMiss = onAyahClick,
+            onMarkClick = onMarkClick,
+            onMarkLongClick = onMarkLongClick,
             inertLongPressRange = rendered.markRange,
         )
     },
@@ -1996,6 +2045,8 @@ private fun ResponsiveHafsAyah(
     onAyahClick: () -> Unit,
     onWordClick: ((Word) -> Unit)?,
     onWordLongClick: ((Word) -> Unit)? = null,
+    onMarkClick: (() -> Unit)? = null,
+    onMarkLongClick: (() -> Unit)? = null,
 ) {
     val palette = rememberWordInkPalette()
     val ayahMarkInk = LocalQuranAccents.current.gold
@@ -2087,6 +2138,8 @@ private fun ResponsiveHafsAyah(
                 onAyahClick = onAyahClick,
                 onWordClick = onWordClick,
                 onWordLongClick = onWordLongClick,
+                onMarkClick = onMarkClick,
+                onMarkLongClick = onMarkLongClick,
             ),
         onTextLayout = { layoutResult = it },
     )
@@ -2156,6 +2209,8 @@ private fun ArabicAyahNumberUnit(
     number: Int,
     fontScale: Float,
     useArabicIndicDigits: Boolean = true,
+    onClick: (() -> Unit)? = null,
+    onLongClick: (() -> Unit)? = null,
 ) {
     val density = LocalDensity.current
     val arabicLineHeight = with(density) {
@@ -2164,7 +2219,17 @@ private fun ArabicAyahNumberUnit(
     Box(
         modifier = Modifier
             .padding(horizontal = 6.dp)
-            .requiredHeight(arabicLineHeight),
+            .requiredHeight(arabicLineHeight)
+            .then(
+                if (onClick != null || onLongClick != null) {
+                    Modifier.quietClickable(
+                        onClick = onClick ?: {},
+                        onLongClick = onLongClick,
+                    )
+                } else {
+                    Modifier
+                },
+            ),
         contentAlignment = Alignment.Center,
     ) {
         AyahNumberMark(number, fontScale, useArabicIndicDigits = useArabicIndicDigits)
@@ -2493,13 +2558,19 @@ fun AyahBlock(
     /** Reports the live ribbon's screen position to a contextual reader overlay. */
     onBookmarkRibbonPositioned: ((LayoutCoordinates) -> Unit)? = null,
     /**
-     * 1-based gather ordinal drawn in the outer margin (gold Arabic-Indic).
+     * 1-based gather ordinal drawn in the outer margin (Western digits).
      * Non-null only while gather mode has this verse selected.
      */
     gatherOrdinal: Int? = null,
+    /** Write the word Share under this verse (Reveal / Hold). */
+    showShareVerb: Boolean = false,
+    onAyahMarkClick: (() -> Unit)? = null,
+    onAyahMarkLongClick: (() -> Unit)? = null,
+    onShareVerbClick: (() -> Unit)? = null,
     onWordClick: ((Word) -> Unit)?,
     onWordLongClick: ((Word) -> Unit)? = null,
     onAyahClick: () -> Unit,
+    onAyahLongClick: (() -> Unit)? = null,
     /** Text to display: the saved note when idle, the in-progress draft while editing. */
     annotationText: String? = null,
     /** True while the reader is composing a note on this specific verse. */
@@ -2726,7 +2797,15 @@ fun AyahBlock(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .graphicsLayer { alpha = blockAlpha.value },
+            .graphicsLayer { alpha = blockAlpha.value }
+            .inkSpotHighlight(
+                selected = gatherOrdinal != null,
+                seed = ayah.surahId * 1_000 + ayah.number,
+                color = LocalQuranAccents.current.gold.copy(alpha = 0.26f),
+                fillBox = true,
+                durationMillis = 400,
+                easing = InkExpandEasing,
+            ),
     ) {
         Column(
             modifier = Modifier
@@ -2761,6 +2840,8 @@ fun AyahBlock(
                     onAyahClick = onAyahClick,
                     onWordClick = onWordClick,
                     onWordLongClick = onWordLongClick,
+                    onMarkClick = onAyahMarkClick,
+                    onMarkLongClick = onAyahMarkLongClick,
                     useArabicIndicDigits = useArabicIndicDigits,
                 )
             } else if (readingMode == ReadingMode.ARABIC_ENGLISH && showGloss) {
@@ -2796,6 +2877,8 @@ fun AyahBlock(
                                 ayah.number,
                                 fontScale,
                                 useArabicIndicDigits = useArabicIndicDigits,
+                                onClick = onAyahMarkClick,
+                                onLongClick = onAyahMarkLongClick,
                             )
                         }
                     }
@@ -2820,6 +2903,8 @@ fun AyahBlock(
                         onAyahClick = onAyahClick,
                         onWordClick = onWordClick?.let { handler -> { word -> handler(word) } },
                         onWordLongClick = onWordLongClick?.let { handler -> { word -> handler(word) } },
+                        onMarkClick = onAyahMarkClick,
+                        onMarkLongClick = onAyahMarkLongClick,
                     )
                 }
             }
@@ -2842,7 +2927,16 @@ fun AyahBlock(
                     modifier = Modifier
                         .fillMaxWidth()
                         .graphicsLayer { alpha = translationRecess.value }
-                        .quietClickable(onClick = onAyahClick),
+                        .quietClickable(
+                            onClick = onAyahClick,
+                            onLongClick = onAyahLongClick,
+                        ),
+                )
+            }
+            if (showShareVerb && onShareVerbClick != null) {
+                ShareInkVerb(
+                    onClick = onShareVerbClick,
+                    modifier = Modifier.padding(top = 8.dp),
                 )
             }
             // Reciting clears annotation off the sheet so only scripture is
@@ -2884,8 +2978,8 @@ fun AyahBlock(
             Box(Modifier.matchParentSize()) {
                 GatherOrdinalMark(
                     ordinal = gatherOrdinal,
-                    side = bookmarkSide,
                     chromeAlpha = bookmarkChromeAlpha,
+                    onClick = onAyahClick,
                     modifier = Modifier
                         .align(
                             if (bookmarkSide == AyahSelectorSide.RIGHT) {
@@ -2894,8 +2988,19 @@ fun AyahBlock(
                                 AbsoluteAlignment.TopLeft
                             },
                         )
-                        // Align with first ink line (ribbon tip uses ~24 dp).
-                        .padding(top = 22.dp),
+                        .padding(
+                            start = if (bookmarkSide == AyahSelectorSide.LEFT) {
+                                GatherOrdinalEdgeInsetDp.dp
+                            } else {
+                                0.dp
+                            },
+                            end = if (bookmarkSide == AyahSelectorSide.RIGHT) {
+                                GatherOrdinalEdgeInsetDp.dp
+                            } else {
+                                0.dp
+                            },
+                        )
+                        .fillMaxHeight(),
                 )
             }
         } else if (bookmarkSide != null && onToggleBookmark != null) {
@@ -2936,29 +3041,88 @@ fun AyahBlock(
     }
 }
 
+/** Quiet share glyph under the current verse. Furniture, not illumination. */
+@Composable
+private fun ShareInkVerb(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Icon(
+        Icons.Rounded.Share,
+        contentDescription = "Share",
+        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
+        modifier = modifier
+            .size(40.dp)
+            .quietClickable(onClick = onClick)
+            .padding(8.dp)
+            .semantics { role = Role.Button },
+    )
+}
+
 /**
- * Gold Arabic-Indic ordinal in the verse's outer margin while gather mode is
- * active. Replaces the bookmark ribbon for the duration of the mode so the
- * margin never carries two marks. Sized to read as a mark, not decoration.
+ * Western gather ordinal in the existing bookmark gutter (the 38 dp
+ * the verse already leaves). A tight ink-brush circle holds the digit.
+ * The slot never enters the Hafs. Ink, not gold.
  */
 @Composable
 private fun GatherOrdinalMark(
     ordinal: Int,
-    side: AyahSelectorSide,
     chromeAlpha: () -> Float,
+    onClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
-    val gold = LocalQuranAccents.current.gold
-    Text(
-        text = ordinal.toArabicIndic(),
-        style = MaterialTheme.typography.headlineSmall,
-        color = gold,
-        textAlign = if (side == AyahSelectorSide.RIGHT) TextAlign.End else TextAlign.Start,
-        modifier = modifier
-            .width(44.dp)
-            .graphicsLayer { alpha = chromeAlpha() }
-            .padding(horizontal = 6.dp),
+    val circle = rememberInkBrushCircle(
+        selectedKey = ordinal,
+        params = brushCircleParams(BrushCircleStyle.BASELINE).copy(
+            padXDp = 3f,
+            padYDp = 2f,
+            bow = 2f,
+        ),
     )
+    Box(
+        modifier = modifier
+            .width(GatherOrdinalSlotWidthDp.dp)
+            .graphicsLayer { alpha = chromeAlpha() }
+            .then(
+                if (onClick != null) {
+                    Modifier.quietClickable(onClick = onClick)
+                } else {
+                    Modifier
+                },
+            ),
+    ) {
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .padding(top = BookmarkTopInsetDp.dp)
+                .inkBrushCircleMark(circle, ordinal),
+        ) {
+            Text(
+                text = ordinal.toString(),
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.72f),
+                style = TextStyle(
+                    fontFamily = SerifFontFamily,
+                    fontSize = GatherOrdinalSp.sp,
+                    lineHeight = GatherOrdinalSp.sp,
+                    fontWeight = FontWeight.Normal,
+                    textAlign = TextAlign.Center,
+                    platformStyle = PlatformTextStyle(includeFontPadding = false),
+                    lineHeightStyle = LineHeightStyle(
+                        alignment = LineHeightStyle.Alignment.Center,
+                        trim = LineHeightStyle.Trim.Both,
+                    ),
+                ),
+                maxLines = 1,
+                softWrap = false,
+                modifier = Modifier
+                    .inkBrushCircleTarget(circle, ordinal)
+                    .padding(horizontal = 1.dp)
+                    .wrapContentWidth(unbounded = true)
+                    .wrapContentHeight(unbounded = true),
+            )
+        }
+    }
 }
 
 /**

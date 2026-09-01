@@ -195,6 +195,7 @@ class SettingsRepository(context: Context) {
             remove("homeBookmarkStyle")
             putInt("brushCircleStyle", next.brushCircleStyle.ordinal)
             putBoolean("hideEnglishParentheticals", next.hideEnglishParentheticals)
+            remove("shareUxVariant")
         }
     }
 }

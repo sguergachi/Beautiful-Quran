@@ -1,6 +1,7 @@
 package com.beautifulquran.ui.theme
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import kotlin.math.hypot
@@ -45,5 +46,29 @@ class InkSpotTest {
         assertTrue(VellumSpotShader.contains("float soak"))
         assertTrue(VellumSpotShader.contains("float halo"))
         assertTrue(VellumSpotShader.contains("rimWobble"))
+        assertTrue(VellumSpotShader.contains("uniform float fill"))
+    }
+
+    @Test
+    fun `verse soak is a fibre-warped rounded rectangle not an oval`() {
+        assertTrue(VellumSpotShader.contains("abs(p) - halfSize"))
+        assertTrue(VellumSpotShader.contains("min(max(q.x, q.y), 0.0)"))
+        assertTrue(VellumSpotShader.contains("1.0 / (1.0 + exp(sdf / diffusion))"))
+        assertTrue(VellumSpotShader.contains("rimGate"))
+        assertTrue(VellumSpotShader.contains("sourcePool * (1.0 - fill)"))
+        assertTrue(VellumSpotShader.contains("mix(0.36, 0.93, progress)"))
+        assertFalse(VellumSpotShader.contains("midpoint - r + warp"))
+        assertFalse(
+            "verse soak opacity must track progress, not snap on in the first fifth",
+            VellumSpotShader.contains("progress * 5.0"),
+        )
+    }
+
+    @Test
+    fun `spot pigment interpolates with progress so deselect fades out`() {
+        assertEquals(0f, inkSpotAppear(0f), 0f)
+        assertEquals(0.5f, inkSpotAppear(0.5f), 0f)
+        assertEquals(1f, inkSpotAppear(1f), 0f)
+        assertTrue(VellumSpotShader.contains("appear = progress"))
     }
 }

@@ -1,10 +1,10 @@
 # Sharing verses
 
 **Status: PR1 + PR2 shipped (gather + text + full-ink image).** Video remains
-proposed. **Interaction rework** (verse-first share, gold wash, no dual-purpose
-bar control) is designed in [VERSE_ACTIONS.md](VERSE_ACTIONS.md) — not yet
-implemented. This file is the design record for *gather mode* and the export
-pipeline: **text**, **image**, and later **video that carries the ink**.
+proposed. **Entry UX** is Mark: tap `﴿N﴾` to gather that verse — see
+[VERSE_ACTIONS.md](VERSE_ACTIONS.md). This file is the design record for
+*gather mode* and the export pipeline: **text**, **image**, and later
+**video that carries the ink**.
 
 ## Why it exists
 
@@ -27,15 +27,16 @@ The second is why selection is an ordered list and not a range.
 Gathering is a **mode of the reader sheet**, not a new sheet. The page keeps
 its layout; it grows ordinals in the margin.
 
-- **Enter** via `ShareViewModel.enterGather()` (pauses recitation — the mode
-  owns the tap). The player bar does **not** host a Gather control
-  ([#519](https://github.com/sguergachi/Beautiful-Quran-/pull/519)). Entry
-  UX is redesigned in [VERSE_ACTIONS.md](VERSE_ACTIONS.md) (not yet
-  implemented): verse-first, multi-select as an extension.
-- **Pick** by tapping a verse (word or ayah). Its ordinal is written in the
-  outer margin in gold Arabic-Indic numerals (١ ٢ ٣) — the same margin the
-  bookmark ribbon lives in. The ribbon is hidden while gathering. Tap again
-  to drop it; the rest renumber.
+- **Enter** via `ShareViewModel.enterShare(surah, ayah)` (verse-first: that
+  ayah is already `١`; pauses recitation — the mode owns the tap). Tap
+  `﴿N﴾` is the entry ([VERSE_ACTIONS.md](VERSE_ACTIONS.md)). The idle
+  player bar does **not** host a Gather control
+  ([#519](https://github.com/sguergachi/Beautiful-Quran-/pull/519)).
+- **Pick** by tapping a verse (word or ayah). Its ordinal sits in the
+  bookmark swallowtail nub — same strip, first-line inset, ribbon
+  width, and nub height — in Western digits (1 2 3), Garamond ink.
+  The ribbon is hidden while gathering. Tap again to drop it; the rest
+  renumber.
 - **Order is tap order.** Tapping 2:255, then 112:1, then 2:1 gathers exactly
   that sequence. No ranges, no sorting, no "from / to" pickers. Cap:
   `SHARE_SELECTION_MAX` (20).
@@ -50,7 +51,11 @@ While gathering, word taps do not seek, word long-press does not open the
 Root Viewer, and the bookmark ribbon (including its note hold) is inactive.
 The mode owns the tap — interactions are *replaced*, not stacked.
 
-**Mode chrome (visual QA):** margin ordinals use `headlineSmall` full gold.
+**Mode chrome (visual QA):** gather ordinals live in the existing
+bookmark gutter (38 dp the verse already leaves). 14 sp Garamond
+Western digits, tight ink-brush circle, 14 dp in from the soak rim
+so the loop stays on the gold and never enters the Hafs. Not gold,
+not Arabic-Indic. The verse layout does not change.
 Selection wash and gather-bar takeover are planned — see
 [VERSE_ACTIONS.md](VERSE_ACTIONS.md).
 
@@ -96,12 +101,14 @@ Handoff is `ACTION_SEND` + `EXTRA_TEXT` (no file).
 One PNG of a **paper sheet with verses at rest in full ink** — not a
 screenshot of the live reader, not the wash yet:
 
-1. Thin `ShareImageCard` composable (Hafs + translation + gold reference
-   footer + faint **Beautiful Quran**). Fixed **Paper** theme so shares stay
+1. Thin `ShareImageCard` composable (Hafs + translation + gold chapter
+   name under a hairline shelf, verses beneath). Fixed **Paper** theme so shares stay
    readable parchment regardless of the reader's night/royal mode.
-2. `ShareImageRenderer` hosts that card offscreen under a temporary
-   invisible decor child, measures at 1080×(≤1920), software-draws to a
-   `Bitmap`. **Not** full `ReaderScreen` (no LazyColumn / playback / gestures).
+2. `ShareImageRenderer` hosts each **verse strip** offscreen at 1080 ×
+   wrap-height on a **new ComposeView**. The **chapter footer**
+   (display name + verse citation) is a **separate attach**, then the bitmaps are
+   **stitched**. Reusing one view dropped the footer (stale last verse).
+   The GPU never rasterises the full gather. **Not** full `ReaderScreen`.
 3. `ShareFiles` writes PNG under `cacheDir/share/`, exposes a `FileProvider`
    URI (`${applicationId}.share`), keeps the newest few files.
 4. `ACTION_SEND` `image/png` + `FLAG_GRANT_READ_URI_PERMISSION`.
@@ -130,22 +137,25 @@ Original pipeline notes (for later PRs):
 
 ## The footer mark
 
-Image (and later video) carries a quiet footer: the reference in gold
-(`al-Baqarah 2:255`, or a same-surah range / multi-surah join) with
-**Beautiful Quran** beneath it in faint ink. Text shares carry the reference
-only (no app watermark in the chat body).
+Image (and later video) carries a quiet footer: a gold hairline shelf,
+then a compact Cormorant chapter name, then the verse citation under
+it (`al-Baqarah` / `2:1–3`, or a multi-surah join). No app watermark. A long gather makes a tall, higher-resolution sheet — verses
+are not cropped to a phone-screen height. Text shares carry the
+reference only.
 
 ## Shape of the code
 
 ```text
 share/AyahRef.kt                 AyahRef + toggle/ordinals pure helpers
+share/ShareUx.kt                 Mark UX entry + pure gather toggle policy
 share/VerseTextComposer.kt       text formatting — pure, JVM-tested
 share/ShareFiles.kt              cacheDir/share + FileProvider URI
 share/ShareImageRenderer.kt      offscreen ComposeView → Bitmap
 share/WashEdgeProbe.kt           soft-edge assertion (JVM-tested)
 ui/share/ShareImageCard.kt       fixed Paper full-ink card
-ui/share/ShareViewModel.kt       selection + text/image export state
+ui/share/ShareViewModel.kt       selection + prompt + text/image export state
 ui/share/ShareHost.kt            BackHandler + InkRevealOverlay + chooser
+ui/share/ShareRibbon.kt          replaces PlayerBar while sharing
 ui/share/ShareComposeSheet.kt    Send page (list + text + image)
 res/xml/share_paths.xml          FileProvider paths
 ```
@@ -159,7 +169,7 @@ longer hosts Gather (#519). Entry/chrome rework: [VERSE_ACTIONS.md](VERSE_ACTION
 |---|---|---|
 | 1 | Gather mode + text share | **shipped** |
 | 2 | Full-ink image export + FileProvider + wash probe | **shipped** |
-| 2b | Verse-first share UX (G1) — wash, share ribbon, no dual button | **designed** ([VERSE_ACTIONS.md](VERSE_ACTIONS.md)) |
+| 2b | Verse-first share UX — four Developer entry designs + gold wash + share ribbon | **in-app A/B** ([VERSE_ACTIONS.md](VERSE_ACTIONS.md)); production still OFF |
 | 3 | Bounded silent ink video | after 2b (or parallel once entry exists) |
 | 4 | Audio staging + mux | after silent video is stable |
 | 5 | Web parity | later |
@@ -177,7 +187,9 @@ Each phase ships something usable on its own.
   1080×1920 multi-minute exports.
 - **Audio cache is not an export API.** `SimpleCache` is private to
   `PlaybackService`. Audio export needs an explicit staging boundary.
-- **Long selections.** Gather cap 20; image height soft-capped at 1920 px.
+- **Long selections.** Gather cap 20. Each verse is its own 1080-wide
+  strip; strips are stitched. Do not rasterise the whole wrap as one
+  view — HWUI aborts the process.
 
 ## Non-goals
 

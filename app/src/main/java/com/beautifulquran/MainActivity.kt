@@ -281,6 +281,7 @@ private fun PaperStackApp(
     onRecordSystemTrace: () -> Unit,
 ) {
     val app = LocalContext.current.applicationContext as QuranApp
+    val activity = LocalContext.current as? android.app.Activity
     val homeViewModel: HomeViewModel = viewModel(factory = AppViewModelFactory)
     val bookmarksViewModel: BookmarksViewModel = viewModel(factory = AppViewModelFactory)
     val readerViewModel: ReaderViewModel = viewModel(factory = AppViewModelFactory)
@@ -857,6 +858,15 @@ private fun PaperStackApp(
                         gathering = shareUi.gathering,
                         gatherOrdinal = { sid, a -> shareUi.ordinals[AyahRef(sid, a)] },
                         onToggleGatheredAyah = shareViewModel::toggle,
+                        shareCount = shareUi.selection.size,
+                        preparingShareText = shareUi.preparingText,
+                        preparingShareImage = shareUi.preparingImage,
+                        onShareMarkTap = shareViewModel::onMarkTap,
+                        onShareCancel = shareViewModel::onChromeCancel,
+                        onShareText = { shareViewModel.shareAsText() },
+                        onShareImage = {
+                            if (activity != null) shareViewModel.shareAsImage(activity)
+                        },
                     )
                 }
 

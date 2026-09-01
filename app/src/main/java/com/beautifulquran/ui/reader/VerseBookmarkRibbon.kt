@@ -58,12 +58,18 @@ import kotlin.math.sin
  */
 
 /** Wide enough to sit in the ayah block's 28.dp outer margin and stay tappable. */
-private val STRIP_WIDTH = 44.dp
+internal val BookmarkStripWidth = 44.dp
 
-private const val EDGE_INSET_DP = 8f    // from the block's outer edge
-private const val RIBBON_WIDTH_DP = 11f
-private const val TOP_INSET_DP = 24f    // align the tip with the verse's first ink line
-private const val NUB_LENGTH_DP = 14f   // just the swallowtail tip peeking out
+internal const val BookmarkEdgeInsetDp = 8f    // from the block's outer edge
+internal const val BookmarkRibbonWidthDp = 11f
+internal const val BookmarkTopInsetDp = 24f    // align the tip with the verse's first ink line
+internal const val BookmarkNubLengthDp = 14f   // just the swallowtail tip peeking out
+/** Gather ordinal type — fits the 24 dp bookmark-gutter slot. */
+internal const val GatherOrdinalSp = 14f
+/** From the ayah box edge to the ordinal slot, inside the fillBox stain. */
+internal const val GatherOrdinalEdgeInsetDp = 14f
+/** Width of the ordinal slot: bookmark-side pad (38) minus edge inset. */
+internal const val GatherOrdinalSlotWidthDp = 24f
 private const val TOP_FOLD_DP = 3.5f    // soft fold over the page edge, matching web
 private const val BOTTOM_GAP_DP = 48f   // leave air above the next verse's tip
 private const val NOTCH_DP = 5.5f
@@ -133,9 +139,9 @@ internal fun VerseBookmarkRibbon(
     onPlaceUnfurlConsumed: (Int) -> Unit = {},
     /** Reader-only paired lanes; Home ribbons retain their original geometry. */
     reservePlaceLane: Boolean = false,
-    edgeInset: Dp = EDGE_INSET_DP.dp,
-    ribbonWidth: Dp = RIBBON_WIDTH_DP.dp,
-    topInset: Dp = TOP_INSET_DP.dp,
+    edgeInset: Dp = BookmarkEdgeInsetDp.dp,
+    ribbonWidth: Dp = BookmarkRibbonWidthDp.dp,
+    topInset: Dp = BookmarkTopInsetDp.dp,
     bottomGap: Dp = BOTTOM_GAP_DP.dp,
 ) {
     val mirrored = side == AyahSelectorSide.RIGHT
@@ -279,7 +285,7 @@ internal fun VerseBookmarkRibbon(
 
     Box(
         modifier = modifier
-            .width(STRIP_WIDTH)
+            .width(BookmarkStripWidth)
             .onSizeChanged { stripSize = it }
             .then(tapModifier),
     ) {
@@ -294,7 +300,7 @@ internal fun VerseBookmarkRibbon(
             val edgeInsetPx = edgeInset.toPx()
             val ribbonW = ribbonWidth.toPx()
             val topInsetPx = topInset.toPx()
-            val nubLen = NUB_LENGTH_DP.dp.toPx()
+            val nubLen = BookmarkNubLengthDp.dp.toPx()
             val topFold = TOP_FOLD_DP.dp.toPx()
             val bottomGapPx = bottomGap.toPx()
             val notch = NOTCH_DP.dp.toPx()

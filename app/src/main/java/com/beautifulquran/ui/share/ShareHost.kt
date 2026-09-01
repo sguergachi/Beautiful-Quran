@@ -42,6 +42,7 @@ fun ShareHost(
 
     BackHandler(enabled = ui.sendOpen) { viewModel.closeSend() }
     BackHandler(enabled = ui.gathering && !ui.sendOpen) { viewModel.exitGather() }
+    BackHandler(enabled = ui.prompt != null && !ui.gathering) { viewModel.hidePrompt() }
 
     LaunchedEffect(ui.pendingShareText) {
         val text = ui.pendingShareText ?: return@LaunchedEffect
@@ -51,6 +52,7 @@ fun ShareHost(
         }
         context.startActivity(Intent.createChooser(intent, null))
         viewModel.consumePendingShareText()
+        if (!viewModel.ui.value.sendOpen) viewModel.exitGather()
     }
 
     LaunchedEffect(ui.pendingShareImageUri) {
@@ -69,6 +71,7 @@ fun ShareHost(
         }
         context.startActivity(Intent.createChooser(intent, null))
         viewModel.consumePendingShareImage()
+        if (!viewModel.ui.value.sendOpen) viewModel.exitGather()
     }
 
     LaunchedEffect(sendRendered) {

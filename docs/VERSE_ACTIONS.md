@@ -1,14 +1,14 @@
 # Verse actions: bookmark · note · share
 
-**Status: design — not implemented.** Implementation deferred.
+**Status: Mark UX is the product.** Tap `﴿N﴾` to gather that verse; tap more
+verses to add or drop them. Export (text/image) is shipped. Icon / Reveal /
+Hold A/B toggles are gone.
 
 This document records the product decision for how three **different**
 actions on a verse coexist without cluttering reading or violating the
 paper metaphor. It supersedes the dual-purpose player-bar Gather control
 (removed in #519) and the multi-step gather-first share flow as the
-**target UX**. Shipping code today still implements the older gather
-pipeline for text/image export — see [SHARE.md](SHARE.md) for the code
-shape; change the interaction surface to match **this** doc when building.
+**target UX**. The export pipeline is unchanged — see [SHARE.md](SHARE.md).
 
 Related: [DESIGN.md](DESIGN.md) (paper rules), [ANNOTATIONS.md](ANNOTATIONS.md)
 (notes), [SHARE.md](SHARE.md) (export pipeline).
@@ -103,7 +103,7 @@ becomes share tools; multi is extension) without taxing bookmark.
    Mark through a two-tap menu.
 2. **Note stays a saved-ribbon hold** — optional colophon **Write** later; do
    not require “lift mode” to annotate or give the gold ayah mark a control.
-3. **Share starts with one verse already selected** — gold wash + ordinal `١`.
+3. **Share starts with one verse already selected** — gold wash + Western ordinal `1`.
 4. **Multi-select is the same mode** — tap more verses; tap again to unselect.
 5. **No dual-purpose control** — never one button for enter *and* commit.
 6. **During share, the player bar is replaced** by a gather ribbon, not
@@ -125,7 +125,7 @@ becomes share tools; multi is extension) without taxing bookmark.
 - Primary: short-tap `﴿N﴾` reveals a quiet colophon line under that verse:
   **Share** (and optionally **Write**). Tapping **Share**:
   - pauses playback
-  - selects *that* verse (`١` + soft gold-yellow wash under the ayah block)
+  - selects *that* verse (`1` + green vellum ink blot under the ayah)
   - replaces the player bar with the **share ribbon**
 - Optional power entry: long-press **verse body** (not seal) jumps straight
   into share-select with that verse checked. Only if body vs seal long-press
@@ -144,9 +144,11 @@ becomes share tools; multi is extension) without taxing bookmark.
 **Select / unselect**
 
 - Tap any verse to toggle membership while in share mode
-- Selected: soft feathered **gold-yellow paper wash** under the full ayah
-  block (primary signal); gold Arabic-Indic ordinal in the outer margin
-  (secondary)
+- Selected: a pale gold vellum wash spreads under that ayah (primary
+  signal) — same gold token as the ayah marks, fibre on the rim,
+  paper gutters so neighbours do not fuse. Western ordinal in Garamond
+  ink, centered in the bookmark swallowtail nub (secondary). Chrome
+  never uses Arabic-Indic digits.
 - Unselected: wash recedes — that *is* the unselect feedback
 - Ordinals renumber when a verse is dropped
 
@@ -169,10 +171,15 @@ With G1, the intermediate Send list is **optional**:
 
 ### Visual rules for the wash
 
-- Soft, feathered gold-yellow tint on paper — ink soak, not a hard rectangle
+- Pale even gold wash per verse (`inkSpotHighlight(fillBox = true)`
+  with `LocalQuranAccents.gold` at ~26% alpha). Rounded rectangle,
+  fibre on the rim only, type stays readable. Not a pooled blob, not
+  an oval. Size and opacity interpolate together (fade in on mark,
+  fade out on unmark).
+- Recitation wash punches through the blot: unread words fade into the
+  stain. Never paint a cream rectangle of page paper over the soak.
 - No border, elevation, or Material ripple
-- Works on Paper / Nightfall / Royal (theme tokens, not fixed hex that
-  only looks right on one theme)
+- Works on Paper / Nightfall / Royal (page ink, not a fixed hex)
 - Must remain visible while scrolling
 
 ## Explicit non-goals (this rework)
@@ -183,19 +190,34 @@ With G1, the intermediate Send list is **optional**:
 - Forcing bookmark or note through multi-select
 - Putting Gather back on the idle player bar
 
-## Implementation sketch (later)
+## Entry: Mark UX
 
-Order of work when we build — not started:
+Tap `﴿N﴾` to share that verse. While gathering, tap a verse (or its
+ordinal) to add or drop it. Word long-press stays Root Viewer; notes stay
+on the bookmark ribbon. Idle transport has no Share / Gather control
+(#519).
 
-1. Gold wash on `AyahBlock` when `gatherOrdinal != null` (or share-selected set)
-2. Share ribbon composable replacing `PlayerBar` when `shareUi.gathering`
-3. Enter share: `﴿N﴾` short-tap → colophon **Share** → `enterShare(surah, ayah)`
-   auto-selects that ref
-4. Wire ribbon Text / Image to existing `shareAsText` / `shareAsImage`
-5. Remove dual-purpose gather entry remnants; ensure #519 stays (no gather
-   on idle transport)
-6. Soft-delete or bypass Send page for the happy path
-7. Visual QA on Paper + Nightfall + multi-verse toggle
+Marking uses the paper toggle haptic: a confirm click on, a lighter clock
+tick off. Same family as Settings checks and the ayah rail.
+
+The gather bar is not a copy of play. One row, two jobs: Close at the
+start (leave), Text and Image a tight pair at the end (send). The count
+lives on the verses; the empty middle is paper. No Send page on the happy
+path; back leaves gather.
+
+Policy lives in `share/ShareUx.kt` (pure, JVM-tested). Do not invent
+entry rules in `ReaderScreen`.
+
+Icon / Reveal / Hold were in-app A/B designs and have been deleted.
+
+## Implementation
+
+1. Gold wash on `AyahBlock` when `gatherOrdinal != null`
+2. Share ribbon composable replacing `PlayerBar` when gathering
+3. Tap `﴿N﴾` enters gather with that verse already selected
+4. Ribbon Text / Image → existing `shareAsText` / `shareAsImage`
+5. #519 stays: idle transport has no Gather
+6. Happy path skips Send; chooser completion leaves gather
 
 Reuse: `ShareViewModel` selection list, ordinals, text/image exporters,
 `ShareHost` / FileProvider. Change the **entry and chrome**, not the export
