@@ -2743,6 +2743,11 @@ fun ReaderScreen(
                                     ayah.number == inkAyah || ayah.number == leadAyah
                                 }
                             }
+                            // Per-verse derived read so scrolling only recomposes
+                            // the two ayahs whose focus bit flips, not every block.
+                            val bookmarkFocused by remember(ayah.number) {
+                                derivedStateOf { scrolledAyah.value == ayah.number }
+                            }
                             val bookmarked = ayah.number in bookmarkedAyahs
                             val bookmarkLessonTarget = bookmarkNoteTipOpen &&
                                 bookmarkNoteTipSurah == ayah.surahId &&
