@@ -47,9 +47,9 @@ import kotlin.math.sin
  * rim; older platforms keep three soft circles. [seed] keeps each
  * splash a different grain. The stain lands and spreads in 170 ms.
  *
- * [fillBox] paints a green-capable oval blot *inside* the bounds —
- * paper gutters remain so neighbouring soaks do not fuse into a slab.
- * Verse soaks grow from a seed; tool-strip drops still land mid-size.
+ * [fillBox] soaks the bounds with the guide's progressive-vellum
+ * diffusion — fibre-warped ink, not a box-fitted oval. Verse soaks
+ * grow from a seed; tool-strip drops still land mid-size.
  */
 @Composable
 fun Modifier.inkSpotHighlight(
@@ -84,7 +84,9 @@ fun Modifier.inkSpotHighlight(
                     color.red,
                     color.green,
                     color.blue,
-                    color.alpha * 0.38f,
+                    // Verse soaks keep the caller's ink; tool-strip drops
+                    // are a concentrated stain and need the 0.38 wash.
+                    if (fillBox) color.alpha else color.alpha * 0.38f,
                 ),
             )
             drawRect(brush)
@@ -93,13 +95,14 @@ fun Modifier.inkSpotHighlight(
             val cy = size.height * 0.5f
             val center = Offset(cx, cy)
             if (fillBox) {
-                val rx = cx * progress
-                val ry = cy * progress
-                drawOval(
-                    color.copy(alpha = 0.08f * progress),
-                    topLeft = Offset(cx - rx, cy - ry),
-                    size = Size(rx * 2f, ry * 2f),
+                val path = inkSpotPath(
+                    width = size.width,
+                    height = size.height,
+                    seed = seed,
+                    pad = minOf(size.width, size.height) * 0.04f,
+                    scale = 0.50f + 0.50f * progress,
                 )
+                drawPath(path, color.copy(alpha = 0.22f * progress))
             } else {
                 val reach = minOf(size.width, size.height) * 0.5f
                 drawCircle(color.copy(alpha = 0.06f * progress), radius = reach * 0.92f, center = center)

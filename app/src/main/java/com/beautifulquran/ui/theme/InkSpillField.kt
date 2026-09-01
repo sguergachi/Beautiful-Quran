@@ -346,7 +346,7 @@ private const val VellumFieldFunctions = """
     }
 """
 
-private const val VellumFieldShader = """
+internal const val VellumFieldShader = """
     uniform float2 resolution;
     uniform float2 spotlight;
     uniform float2 bodyCenter;
@@ -394,7 +394,8 @@ private const val VellumFieldShader = """
 /**
  * A circular ink drop on vellum. The silhouette is a circle; fibre and
  * a capillary halo live only in the rim so the box never clips a lobe.
- * [progress] grows the soak.
+ * [progress] grows the soak. [fill] > 0.5 uses the guide field's
+ * logistic diffusion — an organic verse soak, not a box-fitted oval.
  */
 internal const val VellumSpotShader = """
     uniform float2 resolution;
@@ -407,31 +408,54 @@ internal const val VellumSpotShader = """
 """ + VellumPigmentFunctions + """
     half4 main(float2 fragCoord) {
         float2 res = max(resolution, float2(1.0, 1.0));
-        float circleAxis = 0.5 * min(res.x, res.y);
-        float2 reach = mix(float2(circleAxis), 0.5 * res, fill);
         float2 origin = fragCoord + float2(seed * 17.0, seed * 11.0);
-        float2 center = 0.5 * res + (float2(
-            hash(float2(seed, 1.3)),
-            hash(float2(seed, 4.7))
-        ) - 0.5) * reach * 0.04;
-        float2 p = (fragCoord - center) / max(reach, float2(1.0));
-        float r = length(p);
-        float ang = atan(p.y, p.x);
         float fibre = brushedPigment(origin);
-        // Rim-only irregularity — the drop stays a circle (or a looser oval when fill).
-        float rimWobble = mix(0.025, 0.06, fill) * sin(ang * 3.0 + seed)
-            + mix(0.02, 0.045, fill) * (fibre - 0.5);
-        // Verse blots sit inside the ayah with paper gutters; they must not
-        // fill the box or consecutive marks fuse into a slab.
-        float radius = mix(0.56, 0.84, fill) + rimWobble;
-        // Tool-strip drops start mid-size; a verse soak grows from a seed.
-        float soak = mix(mix(0.55, 0.06, fill), 1.0, progress);
-        float edge = r - radius * soak;
-        float body = 1.0 - smoother(clamp(edge / mix(0.18, 0.22, fill) + 0.15, 0.0, 1.0));
-        float pool = 1.0 - smoother(clamp(r / 0.34, 0.0, 1.0));
-        float density = body * mix(0.40 + 0.60 * pool, 0.82 + 0.10 * pool, fill);
-        float halo = exp(-max(edge, 0.0) * mix(18.0, 12.0, fill)) * 0.38 * progress;
-        density = max(density, halo * (0.35 + 0.65 * fibre));
+        float density;
+        float appear;
+        float r;
+        if (fill > 0.5) {
+            // Same clouds + fibre field as VellumFieldShader, pooled from a
+            // seed so the mark reads as ink spreading into the paper.
+            float2 reach = 0.5 * res;
+            float2 center = 0.5 * res + (float2(
+                hash(float2(seed, 1.3)),
+                hash(float2(seed, 4.7))
+            ) - 0.5) * reach * 0.05;
+            float2 p = (fragCoord - center) / max(reach, float2(1.0));
+            r = length(p);
+            float clouds = noise(origin * float2(0.006, 0.008)) * 0.65
+                + noise(origin * float2(0.017, 0.021)) * 0.35;
+            float fibres = noise(origin * float2(0.055, 0.071));
+            float texture = (clouds - 0.5) + (fibres - 0.5) * 0.18;
+            float lobes = noise(float2(seed, seed) + p * 2.1) - 0.5;
+            float warp = texture * 0.20 + (fibre - 0.5) * 0.10 + lobes * 0.08;
+            float midpoint = mix(0.06, 0.70, progress);
+            float diffusion = max(0.11, 0.16 * fadeSoftness * 0.55);
+            float absorbed = midpoint - r + warp;
+            density = 1.0 / (1.0 + exp(-absorbed / diffusion));
+            appear = smoother(clamp(progress * 5.0, 0.0, 1.0));
+        } else {
+            float circleAxis = 0.5 * min(res.x, res.y);
+            float2 reach = float2(circleAxis);
+            float2 center = 0.5 * res + (float2(
+                hash(float2(seed, 1.3)),
+                hash(float2(seed, 4.7))
+            ) - 0.5) * reach * 0.04;
+            float2 p = (fragCoord - center) / max(reach, float2(1.0));
+            r = length(p);
+            float ang = atan(p.y, p.x);
+            float rimWobble = 0.025 * sin(ang * 3.0 + seed)
+                + 0.02 * (fibre - 0.5);
+            float radius = 0.56 + rimWobble;
+            float soak = mix(0.55, 1.0, progress);
+            float edge = r - radius * soak;
+            float body = 1.0 - smoother(clamp(edge / 0.18 + 0.15, 0.0, 1.0));
+            float pool = 1.0 - smoother(clamp(r / 0.34, 0.0, 1.0));
+            density = body * (0.40 + 0.60 * pool);
+            float halo = exp(-max(edge, 0.0) * 18.0) * 0.38 * progress;
+            density = max(density, halo * (0.35 + 0.65 * fibre));
+            appear = progress;
+        }
         float rim = 4.0 * density * (1.0 - density);
         float grain = max(vellumGrain, 0.08);
         density = clamp(
@@ -441,12 +465,12 @@ internal const val VellumSpotShader = """
             1.0
         );
         // Hard zero before the box edge so Compose never shears the drop.
-        float clipStart = mix(0.92, 1.08, fill);
-        density *= 1.0 - smoother(clamp((r - clipStart) / 0.08, 0.0, 1.0));
+        float clipStart = mix(0.92, 1.06, fill);
+        density *= 1.0 - smoother(clamp((r - clipStart) / 0.10, 0.0, 1.0));
         float coverage = vellumCoverage(density);
-        // Verse soaks are opaque while they grow so the spread reads as ink,
-        // not a fade. Tool-strip drops still ride progress for alpha.
-        float appear = mix(progress, smoother(clamp(progress * 5.0, 0.0, 1.0)), fill);
+        // Guide reservoir: denser pigment in the body, not a flat oval.
+        float sourcePool = smoother(clamp((0.55 - r) / 0.55, 0.0, 1.0));
+        coverage = 1.0 - pow(1.0 - coverage, 1.0 + 0.55 * sourcePool * fill);
         half alpha = inkColor.a * half(coverage * appear);
         return half4(inkColor.rgb * alpha, alpha);
     }

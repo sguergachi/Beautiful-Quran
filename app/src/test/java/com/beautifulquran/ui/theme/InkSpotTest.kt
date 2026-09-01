@@ -1,6 +1,7 @@
 package com.beautifulquran.ui.theme
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import kotlin.math.hypot
@@ -46,8 +47,15 @@ class InkSpotTest {
         assertTrue(VellumSpotShader.contains("float halo"))
         assertTrue(VellumSpotShader.contains("rimWobble"))
         assertTrue(VellumSpotShader.contains("uniform float fill"))
-        assertTrue(VellumSpotShader.contains("mix(float2(circleAxis), 0.5 * res, fill)"))
-        assertTrue(VellumSpotShader.contains("mix(mix(0.55, 0.06, fill), 1.0, progress)"))
-        assertTrue(VellumSpotShader.contains("mix(0.56, 0.84, fill)"))
+    }
+
+    @Test
+    fun `verse soak uses the guide field diffusion not a box oval`() {
+        assertTrue(VellumSpotShader.contains("1.0 / (1.0 + exp(-absorbed / diffusion))"))
+        assertTrue(VellumSpotShader.contains("noise(origin * float2(0.006, 0.008))"))
+        assertTrue(VellumSpotShader.contains("noise(origin * float2(0.055, 0.071))"))
+        assertTrue(VellumFieldShader.contains("noise(fragCoord * float2(0.006, 0.008))"))
+        assertTrue(VellumFieldShader.contains("1.0 / (1.0 + exp(-absorbed / diffusion))"))
+        assertFalse(VellumSpotShader.contains("mix(0.56, 0.84, fill)"))
     }
 }
