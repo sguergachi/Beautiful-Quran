@@ -337,26 +337,27 @@ class ShareViewModel(
                 }
                 bitmap = ShareImageRenderer.renderSegments(
                     activity = activity,
-                    segmentCount = lines.size + 1,
+                    segmentCount = lines.size,
                 ) { index ->
-                    if (index < lines.size) {
-                        ShareImageVerseStrip(
-                            verse = lines[index],
-                            includeTranslation = includeTranslation,
-                            padTop = if (index == 0) {
-                                ShareImagePadTop
-                            } else {
-                                ShareImagePadBetween
-                            },
-                            padBottom = if (index == lines.lastIndex) {
-                                0.dp
-                            } else {
-                                ShareImagePadBetween
-                            },
-                        )
-                    } else {
-                        ShareImageFooterStrip(footerReference(lines))
-                    }
+                    ShareImageExportStrip(
+                        verse = lines[index],
+                        includeTranslation = includeTranslation,
+                        padTop = if (index == 0) {
+                            ShareImagePadTop
+                        } else {
+                            ShareImagePadBetween
+                        },
+                        padBottom = if (index == lines.lastIndex) {
+                            0.dp
+                        } else {
+                            ShareImagePadBetween
+                        },
+                        footerRef = if (shareImageFooterOnStrip(index, lines.size)) {
+                            footerReference(lines)
+                        } else {
+                            null
+                        },
+                    )
                 }
                 val uri = ShareFiles.writePng(activity.applicationContext, bitmap)
                 _ui.update {

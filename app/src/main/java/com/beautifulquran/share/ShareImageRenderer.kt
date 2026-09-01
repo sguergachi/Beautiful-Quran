@@ -7,7 +7,6 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.ViewCompositionStrategy
 import com.beautifulquran.data.ThemeMode
@@ -54,7 +53,6 @@ object ShareImageRenderer {
                     return@suspendCancellableCoroutine
                 }
 
-                val indexState = mutableIntStateOf(0)
                 val parts = ArrayList<Bitmap>(segmentCount)
                 val host = FrameLayout(activity).apply {
                     visibility = View.INVISIBLE
@@ -63,11 +61,6 @@ object ShareImageRenderer {
                     setViewCompositionStrategy(
                         ViewCompositionStrategy.DisposeOnDetachedFromWindow,
                     )
-                    setContent {
-                        BeautifulQuranTheme(themeMode = ThemeMode.LIGHT) {
-                            content(indexState.intValue)
-                        }
-                    }
                 }
                 host.addView(
                     composeView,
@@ -94,7 +87,9 @@ object ShareImageRenderer {
 
                 cont.invokeOnCancellation { cleanup() }
 
-                fun capture(attempt: Int) {
+                lateinit var present: (Int) -> Unit
+
+                fun capture(index: Int, attempt: Int) {
                     if (!cont.isActive) {
                         cleanup()
                         return
@@ -111,7 +106,7 @@ object ShareImageRenderer {
                         composeView.measure(widthSpec, heightSpec)
                         var height = composeView.measuredHeight
                         if (height <= 0 && attempt < LAYOUT_ATTEMPTS) {
-                            composeView.post { capture(attempt + 1) }
+                            composeView.post { capture(index, attempt + 1) }
                             return
                         }
                         height = height.coerceAtLeast(1)
@@ -130,10 +125,9 @@ object ShareImageRenderer {
                         composeView.draw(Canvas(bitmap))
                         parts += bitmap
 
-                        val next = indexState.intValue + 1
+                        val next = index + 1
                         if (next < segmentCount) {
-                            indexState.intValue = next
-                            composeView.post { composeView.post { capture(0) } }
+                            present(next)
                             return
                         }
 
@@ -151,7 +145,16 @@ object ShareImageRenderer {
                     }
                 }
 
-                composeView.post { capture(0) }
+                present = { index ->
+                    composeView.setContent {
+                        BeautifulQuranTheme(themeMode = ThemeMode.LIGHT) {
+                            content(index)
+                        }
+                    }
+                    composeView.post { composeView.post { capture(index, 0) } }
+                }
+
+                present(0)
             }
         }
     }

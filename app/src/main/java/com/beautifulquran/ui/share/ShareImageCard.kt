@@ -26,6 +26,10 @@ internal val ShareImagePadBetween = 14.dp
 internal val ShareImagePadFooterTop = 40.dp
 internal val ShareImagePadBottom = 56.dp
 
+/** Chapter colophon is composed on the last verse strip so stitching cannot drop it. */
+internal fun shareImageFooterOnStrip(index: Int, verseCount: Int): Boolean =
+    verseCount > 0 && index == verseCount - 1
+
 /**
  * Fixed paper sheet for image export — verses at rest in full ink.
  * Not the live [ReaderScreen]: a thin, offline-renderable card that ships the
@@ -48,14 +52,40 @@ fun ShareImageCard(
         modifier = modifier.fillMaxWidth(),
     ) {
         verses.forEachIndexed { index, verse ->
-            ShareImageVerseStrip(
+            ShareImageExportStrip(
                 verse = verse,
                 includeTranslation = includeTranslation,
                 padTop = if (index == 0) ShareImagePadTop else ShareImagePadBetween,
                 padBottom = if (index == verses.lastIndex) 0.dp else ShareImagePadBetween,
+                footerRef = if (index == verses.lastIndex) footerReference(verses) else null,
             )
         }
-        ShareImageFooterStrip(footerReference(verses))
+    }
+}
+
+/**
+ * One export strip: the verse, and on the last strip the gold chapter
+ * footer so stitching cannot drop the colophon.
+ */
+@Composable
+fun ShareImageExportStrip(
+    verse: ShareVerseLine,
+    includeTranslation: Boolean,
+    padTop: Dp,
+    padBottom: Dp,
+    footerRef: String? = null,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier = modifier.fillMaxWidth()) {
+        ShareImageVerseStrip(
+            verse = verse,
+            includeTranslation = includeTranslation,
+            padTop = padTop,
+            padBottom = padBottom,
+        )
+        if (footerRef != null) {
+            ShareImageFooterStrip(footerRef)
+        }
     }
 }
 

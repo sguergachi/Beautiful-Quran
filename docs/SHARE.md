@@ -104,11 +104,11 @@ screenshot of the live reader, not the wash yet:
 1. Thin `ShareImageCard` composable (Hafs + translation + gold reference
    footer + faint **Beautiful Quran**). Fixed **Paper** theme so shares stay
    readable parchment regardless of the reader's night/royal mode.
-2. `ShareImageRenderer` hosts each **verse strip** (then the gold footer)
-   offscreen at 1080 × wrap-height, software-draws a bitmap per strip, and
-   **stitches** them. The GPU never rasterises the full gather — that
-   aborted the process. The sheet still holds every verse and the chapter
-   footer. **Not** full `ReaderScreen` (no LazyColumn / playback / gestures).
+2. `ShareImageRenderer` hosts each **verse strip** offscreen at 1080 ×
+   wrap-height, software-draws a bitmap per strip, and **stitches** them.
+   The gold chapter footer (`al-Baqarah 2:1–N`) is composed on the last
+   strip so it cannot be dropped. The GPU never rasterises the full
+   gather. **Not** full `ReaderScreen` (no LazyColumn / playback / gestures).
 3. `ShareFiles` writes PNG under `cacheDir/share/`, exposes a `FileProvider`
    URI (`${applicationId}.share`), keeps the newest few files.
 4. `ACTION_SEND` `image/png` + `FLAG_GRANT_READ_URI_PERMISSION`.

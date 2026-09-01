@@ -30,6 +30,15 @@ class ShareImageCardTest {
     }
 
     @Test
+    fun `chapter footer rides the last verse strip`() {
+        assertEquals(true, shareImageFooterOnStrip(0, 1))
+        assertEquals(false, shareImageFooterOnStrip(0, 3))
+        assertEquals(false, shareImageFooterOnStrip(1, 3))
+        assertEquals(true, shareImageFooterOnStrip(2, 3))
+        assertEquals(false, shareImageFooterOnStrip(0, 0))
+    }
+
+    @Test
     fun `cross-surah footer joins ends`() {
         assertEquals(
             "al-Baqarah 2:255 · al-Ikhlas 112:1",
