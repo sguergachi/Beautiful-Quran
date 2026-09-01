@@ -91,6 +91,25 @@ const val ENGLISH_LEAF_LEADING_EM = 1.40f
  */
 const val ENGLISH_LEAF_MIN_LEADING_EM = 1.15f
 
+/**
+ * How loose the book will ever be set — the other end of the same rescue.
+ *
+ * A leaf whose text stops a line and a half above the foot is the fault a
+ * reader actually reports, and no constant removes it: the pagination counts
+ * characters, the margin has to cover the *worst* leaf or that leaf overflows,
+ * and so the typical leaf comes out short by the spread between them. Swept on
+ * device the spread is about a line and a half of twenty-three.
+ *
+ * A compositor setting a page short of the foot cards it out — adds a little
+ * lead between the lines until the block sits flush. That is what this is, and
+ * it is the same lever as [ENGLISH_LEAF_MIN_LEADING_EM] pushed the other way.
+ * 1.50 against the book's 1.40 covers seven percent, which covers the spread
+ * with room; past it the leaf is not a nearly-full page that wants carding but
+ * a chapter ending, and a chapter ending is *supposed* to stop short. Those are
+ * left on the book's own leading — see [englishLeafFittedLeadingEm].
+ */
+const val ENGLISH_LEAF_MAX_LEADING_EM = 1.50f
+
 const val ENGLISH_LEAF_MIN_FONT_PX = 18f
 const val ENGLISH_LEAF_MAX_FONT_PX = 140f
 
@@ -232,8 +251,21 @@ fun englishLeafHandPx(
  * the bottom of it. So the leaf is measured as it will be drawn, and if it
  * still stands past the foot the leading closes by exactly the overflow.
  *
- * Only closes, and only that leaf. A page set a hair tighter than its
- * neighbours is a page nobody notices; a page missing its last line is not.
+ * **And it opens, for the same reason.** It used to only close, on the argument
+ * that a page a hair tighter than its neighbours is a page nobody notices. True
+ * — and the page a *line and a half short* of its foot is one every reader
+ * notices, which is the one this book kept producing. The estimate cannot be
+ * made exact: the margin has to cover the worst leaf or that leaf overflows, so
+ * the typical leaf is short by the spread between worst and typical. The lever
+ * that closes an over-full leaf is the same lever, and a compositor setting a
+ * page short cards it out until the block sits flush.
+ *
+ * So the leading is solved to the well in both directions, between
+ * [ENGLISH_LEAF_MIN_LEADING_EM] and [ENGLISH_LEAF_MAX_LEADING_EM] — and a leaf
+ * that would need *more* than the maximum is not a nearly-full page wanting
+ * carding, it is a chapter ending, which is supposed to stop short. Those keep
+ * the book's own leading rather than being stretched halfway to the foot, which
+ * would read as a mistake instead of as an ending.
  */
 fun englishLeafFittedLeadingEm(
     leadingEm: Float,
@@ -241,9 +273,16 @@ fun englishLeafFittedLeadingEm(
     wellHeightPx: Float,
     pitchesPx: Float,
 ): Float {
-    if (measuredHeightPx <= wellHeightPx || pitchesPx <= 0f) return leadingEm
-    return (leadingEm - (measuredHeightPx - wellHeightPx) / pitchesPx)
-        .coerceAtLeast(ENGLISH_LEAF_MIN_LEADING_EM)
+    if (pitchesPx <= 0f) return leadingEm
+    val flush = leadingEm + (wellHeightPx - measuredHeightPx) / pitchesPx
+    return when {
+        // Over the foot: close, as far as the floor.
+        flush < leadingEm -> flush.coerceAtLeast(ENGLISH_LEAF_MIN_LEADING_EM)
+        // Short of it, but within carding distance: card it out flush.
+        flush <= ENGLISH_LEAF_MAX_LEADING_EM -> flush
+        // Short by more than that: a chapter ends here. Leave it short.
+        else -> leadingEm
+    }
 }
 
 /**

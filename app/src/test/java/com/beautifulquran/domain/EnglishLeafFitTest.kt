@@ -69,12 +69,32 @@ class EnglishLeafFitTest {
     }
 
     @Test
-    fun `a leaf that lands inside its well is drawn on the book's leading`() {
+    fun `a leaf that lands short of its foot is carded out to it`() {
+        // The compositor's answer to a page that stops above the foot: a little
+        // lead between the lines until the block sits flush. Sixty px short over
+        // 600 px of baseline steps is a tenth of an em, the mirror of closing.
+        assertEquals(
+            ENGLISH_LEAF_LEADING_EM + 0.1f,
+            englishLeafFittedLeadingEm(
+                ENGLISH_LEAF_LEADING_EM,
+                measuredHeightPx = well - 60f,
+                wellHeightPx = well,
+                pitchesPx = 600f,
+            ),
+            1e-5f,
+        )
+    }
+
+    @Test
+    fun `a leaf short by more than carding distance is left short`() {
+        // Not a nearly-full page wanting lead: a chapter ends here, and a
+        // chapter ending is supposed to stop short. Stretching it halfway to
+        // the foot would read as a mistake rather than as an ending.
         assertEquals(
             ENGLISH_LEAF_LEADING_EM,
             englishLeafFittedLeadingEm(
                 ENGLISH_LEAF_LEADING_EM,
-                measuredHeightPx = well - 1f,
+                measuredHeightPx = well / 3f,
                 wellHeightPx = well,
                 pitchesPx = 600f,
             ),
@@ -83,9 +103,20 @@ class EnglishLeafFitTest {
     }
 
     @Test
-    fun `only an overflow moves it, and only by the overflow`() {
+    fun `carding stops at the loosest the book is set`() {
+        val em = englishLeafFittedLeadingEm(
+            ENGLISH_LEAF_LEADING_EM,
+            measuredHeightPx = well - (ENGLISH_LEAF_MAX_LEADING_EM - ENGLISH_LEAF_LEADING_EM) * 600f,
+            wellHeightPx = well,
+            pitchesPx = 600f,
+        )
+        assertEquals(ENGLISH_LEAF_MAX_LEADING_EM, em, 1e-4f)
+    }
+
+    @Test
+    fun `an overflow closes it, and only by the overflow`() {
         // The block moves one pitch for every baseline step it holds, so 60 px
-        // over 600 px of steps is a tenth of an em — closing, never opening.
+        // over 600 px of steps is a tenth of an em.
         assertEquals(
             ENGLISH_LEAF_LEADING_EM - 0.1f,
             englishLeafFittedLeadingEm(

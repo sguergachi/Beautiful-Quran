@@ -471,11 +471,41 @@ above 1.04 every leaf in the book gives up most of a line to buy out the last
 leaf in six. What is left is a leading 2.5 % tight on that sixth leaf — the
 residue of a character estimate, which does not come out with a constant.
 
-What is left at the foot of an ordinary leaf is not blank paper but a short
-*last line*: the cut lands wherever the character count runs out, which is
-rarely a line ending. Landing it on one would take a real layout rather than an
-estimate — which is to say a book that repaginates per device, as an ebook does
-and a printed book cannot.
+**And the leading cards out, as well as closing.** None of the above makes the
+estimate exact, and it cannot be made exact: the margin has to cover the *worst*
+leaf or that leaf overflows, so the typical leaf comes out short by the spread
+between worst and typical — a line and a half of twenty-three, measured on
+device. That is the white a reader actually reports.
+
+`englishLeafFittedLeadingEm` already had the lever. It solved the leading
+against the well in one direction only, closing a leaf that ran past the foot on
+the argument that a page a hair tighter than its neighbours is a page nobody
+notices. True, and the page a line and a half *short* of its foot is one every
+reader notices. So it now solves in both directions, between
+`ENGLISH_LEAF_MIN_LEADING_EM` and `ENGLISH_LEAF_MAX_LEADING_EM` — a compositor
+setting a page short cards it out, adding a little lead between the lines until
+the block sits flush, and that is exactly this. A leaf wanting *more* than the
+maximum is not a nearly-full page: it is a chapter ending, which is supposed to
+stop short, and those keep the book's own leading rather than being stretched
+halfway to the foot, which would read as a mistake instead of as an ending.
+
+Measured across eight consecutive leaves of Al-Baqarah, the last line's top:
+
+```
+    before carding    1989  1989  1989  1990  2006  2039
+    after carding     2011  2033  2033  2034  2034  2050
+```
+
+Every leaf flush at the foot, within half a line of each other. The price is the
+leading: a leaf that holds 23 lines cards to a pitch of 81 px and one that holds
+24 closes to 77, so adjacent leaves can differ by 2.5 %. That is the trade the
+estimate forces — one leading and a ragged foot, or a flush foot and a leading
+that moves — and between them the flush foot is the one a reader is asking for.
+
+Getting both would take a real layout rather than an estimate: measure each leaf
+as it will be drawn and cut it at the end of its twenty-third line. That is a
+book that repaginates per device, as an ebook does and a printed book cannot,
+and it is about a thousand text layouts once at startup.
 
 It is not done to save a line. Cutting a verse costs the reader the end of a
 thought to a page turn, so it is done only where leaving it whole would waste
