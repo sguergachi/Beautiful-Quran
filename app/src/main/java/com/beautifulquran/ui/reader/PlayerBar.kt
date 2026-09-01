@@ -119,6 +119,7 @@ fun PlayerBar(
                         } else {
                             MaterialTheme.colorScheme.primary
                         },
+                        modifier = Modifier.size(20.dp),
                     )
                 }
                 IconButton(
