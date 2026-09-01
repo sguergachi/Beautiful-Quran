@@ -2,7 +2,6 @@ package com.beautifulquran.ui.share
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -10,31 +9,29 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.Notes
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.FormatQuote
 import androidx.compose.material.icons.rounded.Image
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
-import com.beautifulquran.ui.theme.SerifFontFamily
+import com.beautifulquran.ui.theme.quietClickable
 
 /**
- * Replaces the player bar while gathering.
+ * Replaces the player bar while gathering. Not a copy of play.
  *
- * The count is the fact of the mode, so it sits where the reciter name sits:
- * centered on the top row, Close in the trailing 48 dp slot. Text and Image
- * are a pair of equal verbs on the row below, centered together. The count
- * is not Play, and the two exports are not Rewind / Forward.
+ * One row, two jobs, like a running head: leave at the start, send at the
+ * end. The count lives on the verses. The empty middle is paper.
  */
 @Composable
 fun ShareRibbon(
@@ -45,105 +42,88 @@ fun ShareRibbon(
     onShareText: () -> Unit,
     onShareImage: () -> Unit,
 ) {
-    val compact = LocalConfiguration.current.screenWidthDp < 340
     val ink = MaterialTheme.colorScheme.onSurfaceVariant
     val busy = preparingText || preparingImage
     val canExport = count >= 1 && !busy
     val exportTint = if (canExport) ink else ink.copy(alpha = 0.35f)
 
     Surface(color = MaterialTheme.colorScheme.background) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
                 .fillMaxWidth()
-                .navigationBarsPadding(),
+                .navigationBarsPadding()
+                .padding(start = 4.dp, end = 4.dp, bottom = 4.dp)
+                .semantics {
+                    contentDescription =
+                        if (count == 1) "1 verse selected" else "$count verses selected"
+                },
         ) {
+            ShareBarIcon(
+                imageVector = Icons.Rounded.Close,
+                contentDescription = "Cancel share",
+                tint = ink.copy(alpha = 0.55f),
+                onClick = onCancel,
+            )
+            Spacer(Modifier.weight(1f))
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Spacer(Modifier.size(48.dp))
-                Box(
-                    contentAlignment = Alignment.Center,
-                    modifier = Modifier
-                        .weight(1f)
-                        .semantics {
-                            contentDescription =
-                                if (count == 1) "1 verse" else "$count verses"
-                        },
-                ) {
-                    Text(
-                        text = count.toString(),
-                        style = MaterialTheme.typography.titleMedium.copy(
-                            fontFamily = SerifFontFamily,
-                        ),
-                        color = if (count >= 1) {
-                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.82f)
-                        } else {
-                            ink.copy(alpha = 0.35f)
-                        },
-                    )
-                }
-                IconButton(
-                    onClick = onCancel,
-                    modifier = Modifier.size(48.dp),
-                ) {
-                    Icon(
-                        Icons.Rounded.Close,
-                        contentDescription = "Cancel share",
-                        tint = ink.copy(alpha = 0.55f),
-                    )
-                }
-            }
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(
-                    if (compact) 20.dp else 32.dp,
-                    Alignment.CenterHorizontally,
-                ),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 4.dp),
-            ) {
-                IconButton(
+                ShareBarIcon(
+                    imageVector = Icons.Rounded.FormatQuote,
+                    contentDescription = "Share as text",
+                    tint = exportTint,
+                    enabled = canExport,
+                    preparing = preparingText,
                     onClick = onShareText,
+                )
+                ShareBarIcon(
+                    imageVector = Icons.Rounded.Image,
+                    contentDescription = "Share as image",
+                    tint = exportTint,
                     enabled = canExport,
-                    modifier = Modifier.size(48.dp),
-                ) {
-                    if (preparingText) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(22.dp),
-                            strokeWidth = 2.dp,
-                            color = ink,
-                        )
-                    } else {
-                        Icon(
-                            Icons.AutoMirrored.Rounded.Notes,
-                            contentDescription = "Share as text",
-                            tint = exportTint,
-                        )
-                    }
-                }
-                IconButton(
+                    preparing = preparingImage,
                     onClick = onShareImage,
-                    enabled = canExport,
-                    modifier = Modifier.size(48.dp),
-                ) {
-                    if (preparingImage) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(22.dp),
-                            strokeWidth = 2.dp,
-                            color = ink,
-                        )
-                    } else {
-                        Icon(
-                            Icons.Rounded.Image,
-                            contentDescription = "Share as image",
-                            tint = exportTint,
-                        )
-                    }
-                }
+                )
             }
+        }
+    }
+}
+
+@Composable
+private fun ShareBarIcon(
+    imageVector: ImageVector,
+    contentDescription: String,
+    tint: Color,
+    onClick: () -> Unit,
+    enabled: Boolean = true,
+    preparing: Boolean = false,
+) {
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = Modifier
+            .size(48.dp)
+            .quietClickable(
+                enabled = enabled && !preparing,
+                role = Role.Button,
+                onClick = onClick,
+            )
+            .semantics { this.contentDescription = contentDescription },
+    ) {
+        if (preparing) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(22.dp),
+                strokeWidth = 2.dp,
+                color = tint,
+            )
+        } else {
+            Icon(
+                imageVector,
+                contentDescription = null,
+                tint = tint,
+                modifier = Modifier.size(24.dp),
+            )
         }
     }
 }
