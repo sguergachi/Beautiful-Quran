@@ -37,6 +37,7 @@ import androidx.compose.foundation.layout.requiredHeight
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
@@ -3093,7 +3094,7 @@ private fun GatherOrdinalMark(
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.72f),
                 style = TextStyle(
                     fontFamily = SerifFontFamily,
-                    fontSize = BookmarkRibbonWidthDp.sp,
+                    fontSize = BookmarkNubLengthDp.sp,
                     lineHeight = BookmarkNubLengthDp.sp,
                     fontWeight = FontWeight.Normal,
                     textAlign = TextAlign.Center,
@@ -3105,7 +3106,9 @@ private fun GatherOrdinalMark(
                 ),
                 maxLines = 1,
                 softWrap = false,
-                modifier = Modifier.wrapContentWidth(unbounded = true),
+                modifier = Modifier
+                    .wrapContentWidth(unbounded = true)
+                    .wrapContentHeight(unbounded = true),
             )
         }
     }

@@ -53,9 +53,9 @@ While gathering, word taps do not seek, word long-press does not open the
 Root Viewer, and the bookmark ribbon (including its note hold) is inactive.
 The mode owns the tap — interactions are *replaced*, not stacked.
 
-**Mode chrome (visual QA):** gather ordinals use 11 sp Garamond
+**Mode chrome (visual QA):** gather ordinals use 14 sp Garamond
 Western digits, centered in the 11×14 dp bookmark nub (not gold, not
-Arabic-Indic).
+Arabic-Indic) — the same height as the swallowtail icon.
 Selection wash and gather-bar takeover are planned — see
 [VERSE_ACTIONS.md](VERSE_ACTIONS.md).
 
