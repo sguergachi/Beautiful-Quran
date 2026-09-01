@@ -119,10 +119,10 @@ What actually ships:
   Digital Khatt is the Unicode fallback only.
   Ink is `shapedWordBloom`.
 - Highlight is the **soft directional ink wash**, not colour animation:
-  `Modifier.shapedWordBloom` paints draw-phase paper covers and washes over the
-  already-shaped run (`UpcomingDim` / `InkReveal` / `ColorReveal`). Glyphs stay
-  full-opacity ink under a paper cover; see AGENTS.md invariant 7 and
-  docs/INK_ENGINE.md.
+  `Modifier.shapedWordBloom` punches unread glyphs (`DstOut` in a layer) so
+  the wash reveals the paper already there — the page, or a gather stain —
+  then `ColorReveal` tints. Glyphs stay full-opacity ink in the `Text`;
+  see AGENTS.md invariant 7 and docs/INK_ENGINE.md.
 
 ## Recommended Direction
 

@@ -148,26 +148,26 @@ fun Modifier.glyphLayerAlpha(alpha: () -> Float): Modifier = drawWithContent {
  *
  * So every bloom operates on the ayah's already-shaped [TextLayoutResult],
  * clipped to [TextLayoutResult.getPathForRange]:
- * - [UpcomingDim]: static paper cover (padded horizontally beyond the
- *   selection box, but confined to its line so it cannot wash adjacent text).
- * - [InkReveal]: paper coverage of `1 − glyphAlpha` along the wash curve
- *   (same pad as UpcomingDim).
+ * - [UpcomingDim]: punches the glyph layer over the word's line box
+ *   (padded horizontally, confined to its line) so unread ink reveals
+ *   the paper already there — the page, or a gather stain.
+ * - [InkReveal]: same punch, coverage `1 − glyphAlpha` along the wash curve.
  * - [ColorReveal]: re-draw shaped glyphs, [BlendMode.SrcIn]-tint orange,
  *   then apply the [letterFadeIn] DstIn wash.
  */
 sealed class ShapedWordBloom {
     abstract val range: IntRange
 
-    /** Upcoming words: full-strength paper cover over full-ink glyphs from
-     * the first frame the word is Upcoming — never animate up from 0 (that
-     * briefly showed the whole unread ayah at full ink). */
+    /** Upcoming words: punch unread glyphs from the first Upcoming frame —
+     * never animate the cover up from 0 (that briefly showed the whole
+     * unread ayah at full ink). */
     data class UpcomingDim(
         override val range: IntRange,
         val paper: Color,
         val coverAlpha: Float,
     ) : ShapedWordBloom()
 
-    /** First-pass ink: paper cover over full-ink glyphs, wash from
+    /** First-pass ink: punch over full-ink glyphs, wash from
      * [restingAlpha] → 1 (same curve as [letterFadeIn]). [feather] overrides
      * the modifier-level feather when set — a tajweed-paced word narrows its
      * edge so letter dwell stays visible. */
@@ -198,6 +198,12 @@ sealed class ShapedWordBloom {
         val revealFraction: Float = 1f,
     ) : ShapedWordBloom()
 }
+
+/** Unread covers punch the glyph layer ([BlendMode.DstOut]) so the wash
+ * reveals whatever is already on the paper. Painting page colour would
+ * cut a cream hole in a gather stain. */
+internal fun paperCoverBlendMode(punchToBackdrop: Boolean): BlendMode =
+    if (punchToBackdrop) BlendMode.DstOut else BlendMode.SrcOver
 
 /**
  * Draw-phase blooms for word(s) inside a shaped ayah [Text]. Layers are read
@@ -244,10 +250,29 @@ fun Modifier.shapedWordBloom(
     val lineBoundsCache = LineBoundsCache()
     val glyphHaloCache = GlyphHaloCache()
     return drawWithContent {
-        drawContent()
+        val bloomList = blooms()
+        val punchLayer = bloomList.any { bloom ->
+            when (bloom) {
+                is ShapedWordBloom.UpcomingDim -> bloom.coverAlpha > 0f
+                is ShapedWordBloom.InkReveal -> bloom.progress < 1f
+                is ShapedWordBloom.ColorReveal -> false
+            }
+        }
+        val coverBlend = paperCoverBlendMode(punchLayer)
+        if (punchLayer) {
+            val extra = maxOf(FadeLayerBleed.toPx(), coverPad.toPx())
+            drawIntoCanvas { canvas ->
+                canvas.saveLayer(
+                    Rect(-extra, -extra, size.width + extra, size.height + extra),
+                    Paint(),
+                )
+            }
+        }
+        try {
+            drawContent()
         val textLayout = layout() ?: return@drawWithContent
         val bleed = FadeLayerBleed.toPx()
-        blooms().forEach { bloom ->
+        bloomList.forEach { bloom ->
             val range = bloom.range
             if (range.isEmpty()) return@forEach
             val length = textLayout.layoutInput.text.length
@@ -283,6 +308,7 @@ fun Modifier.shapedWordBloom(
                                 color = bloom.paper.copy(alpha = a),
                                 topLeft = Offset(cover.left, cover.top),
                                 size = Size(cover.width, cover.height),
+                                blendMode = coverBlend,
                             )
                         }
                     }
@@ -336,6 +362,7 @@ fun Modifier.shapedWordBloom(
                                 brush = brush,
                                 topLeft = Offset(washLeft, cover.top),
                                 size = Size(w, cover.height),
+                                blendMode = coverBlend,
                             )
                         }
                     }
@@ -467,6 +494,11 @@ fun Modifier.shapedWordBloom(
                     }
                     drawIntoCanvas { canvas -> canvas.restore() }
                 }
+            }
+        }
+        } finally {
+            if (punchLayer) {
+                drawIntoCanvas { canvas -> canvas.restore() }
             }
         }
     }

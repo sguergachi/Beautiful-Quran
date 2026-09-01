@@ -439,7 +439,9 @@ The ink-spot is a circular drop of ink on vellum: a round pooled
 centre, a fibre rim, and a capillary halo that fades before the box
 edge so nothing clips. It spreads in 170 ms. `fillBox` makes a green
 ink blot inside the bounds (gather selection) — paper gutters remain
-so neighbouring verses do not fuse. On Android 13+ the same
+so neighbouring verses do not fuse. Recitation wash punches through the
+blot (unread words fade into the stain) instead of painting a cream hole
+of page paper over it. On Android 13+ the same
 progressive-vellum pigment the contextual guides use (hash, fibre,
 tooth, glaze) *is* the stain; older platforms keep three soft circles.
 

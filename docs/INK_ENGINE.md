@@ -516,6 +516,9 @@ tween-vs-snap rules, sweep entry and residual rules, repeat wash timing, the
   whole bloom list in the draw phase, so what each bloom kind may derive there is
   a performance contract, not a style preference — see
   [PERFORMANCE.md](PERFORMANCE.md#1-draw-phase-only-animations-zero-recomposition-fades).
+  Unread covers (`UpcomingDim` / `InkReveal`) punch the glyph layer (`DstOut`)
+  so the wash reveals the paper already there — the page, or a gather stain —
+  instead of painting a cream rectangle of page colour over it.
 
 ### The sweep lifecycle
 

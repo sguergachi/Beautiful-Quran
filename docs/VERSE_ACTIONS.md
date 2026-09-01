@@ -174,6 +174,8 @@ With G1, the intermediate Send list is **optional**:
 
 - Green vellum ink blot per verse (`inkSpotHighlight(fillBox = true)`
   with primary green). A soak, not a gray rectangle. Not gold.
+- Recitation wash punches through the blot: unread words fade into the
+  stain. Never paint a cream rectangle of page paper over the soak.
 - No border, elevation, or Material ripple
 - Works on Paper / Nightfall / Royal (page ink, not a fixed hex)
 - Must remain visible while scrolling
