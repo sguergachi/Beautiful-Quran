@@ -337,27 +337,26 @@ class ShareViewModel(
                 }
                 bitmap = ShareImageRenderer.renderSegments(
                     activity = activity,
-                    segmentCount = lines.size,
+                    segmentCount = shareImageSegmentCount(lines.size),
                 ) { index ->
-                    ShareImageExportStrip(
-                        verse = lines[index],
-                        includeTranslation = includeTranslation,
-                        padTop = if (index == 0) {
-                            ShareImagePadTop
-                        } else {
-                            ShareImagePadBetween
-                        },
-                        padBottom = if (index == lines.lastIndex) {
-                            0.dp
-                        } else {
-                            ShareImagePadBetween
-                        },
-                        footerRef = if (shareImageFooterOnStrip(index, lines.size)) {
-                            footerReference(lines)
-                        } else {
-                            null
-                        },
-                    )
+                    if (shareImageIsFooterSegment(index, lines.size)) {
+                        ShareImageFooterStrip(footerReference(lines))
+                    } else {
+                        ShareImageVerseStrip(
+                            verse = lines[index],
+                            includeTranslation = includeTranslation,
+                            padTop = if (index == 0) {
+                                ShareImagePadTop
+                            } else {
+                                ShareImagePadBetween
+                            },
+                            padBottom = if (index == lines.lastIndex) {
+                                0.dp
+                            } else {
+                                ShareImagePadBetween
+                            },
+                        )
+                    }
                 }
                 val uri = ShareFiles.writePng(activity.applicationContext, bitmap)
                 _ui.update {

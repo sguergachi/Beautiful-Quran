@@ -30,12 +30,14 @@ class ShareImageCardTest {
     }
 
     @Test
-    fun `chapter footer rides the last verse strip`() {
-        assertEquals(true, shareImageFooterOnStrip(0, 1))
-        assertEquals(false, shareImageFooterOnStrip(0, 3))
-        assertEquals(false, shareImageFooterOnStrip(1, 3))
-        assertEquals(true, shareImageFooterOnStrip(2, 3))
-        assertEquals(false, shareImageFooterOnStrip(0, 0))
+    fun `chapter footer is its own last segment`() {
+        assertEquals(0, shareImageSegmentCount(0))
+        assertEquals(2, shareImageSegmentCount(1))
+        assertEquals(4, shareImageSegmentCount(3))
+        assertEquals(true, shareImageIsFooterSegment(1, 1))
+        assertEquals(false, shareImageIsFooterSegment(0, 1))
+        assertEquals(false, shareImageIsFooterSegment(2, 3))
+        assertEquals(true, shareImageIsFooterSegment(3, 3))
     }
 
     @Test

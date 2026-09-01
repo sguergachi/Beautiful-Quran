@@ -23,9 +23,10 @@ import kotlin.coroutines.resumeWithException
  * Hosts a thin card (not full ReaderScreen) under a temporary invisible child
  * of the activity decor so measure/layout and fonts resolve correctly.
  *
- * A gather is drawn **one strip at a time** (each verse, then the gold
- * footer) and the strips are stitched. Rasterising the whole sheet as
- * one wrap aborted the process — HWUI will not draw a view that tall.
+ * A gather is drawn **one strip at a time** — each verse, then a
+ * chapter-footer strip — and the strips are stitched. Rasterising the
+ * whole sheet as one wrap aborted the process. Each strip gets a
+ * fresh `setContent` so the footer cannot be a stale last verse.
  */
 object ShareImageRenderer {
 
