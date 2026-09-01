@@ -25,16 +25,7 @@ class EnglishBookTest {
                     verses.map { (s, a) -> source(s, a, page) }
                 },
             ),
-        ) { s, a -> everySentence(mass(s, a)) }
-
-    /**
-     * A verse that may be cut anywhere: a sentence end at every offset. The
-     * pagination then behaves exactly as it did before it took sentences into
-     * account, which is what most of these cases are about — the sentence rule
-     * has its own cases below.
-     */
-    private fun everySentence(length: Int) =
-        EnglishVerseMeasure(length, IntArray(length.coerceAtLeast(0)) { it })
+        ) { s, a -> mass(s, a) }
 
     /** The leaves a page's verses land on, in order, with no repeats. */
     private fun leavesFrom(b: EnglishBook, page: Int): List<EnglishBookLeaf> {
@@ -168,19 +159,14 @@ class EnglishBookTest {
     }
 
     @Test
-    fun `a verse with nowhere to break is still set whole on the next leaf`() {
-        // No sentence end in reach, so there is nothing to cut at — the verse
-        // moves down entire, the way a paragraph too big for the foot does.
-        val short = ENGLISH_LEAF_LINE_CHARS
+    fun `a verse with no room for a whole line of it is set whole on the next leaf`() {
+        // Less than a line of room left, so anything cut into it would be an
+        // orphan at the foot — the verse moves down entire, the way a paragraph
+        // too big for the foot of a page does.
+        val short = ENGLISH_LEAF_LINE_CHARS - 1
         val b = buildEnglishBook(
             buildMushafCatalog(listOf(source(2, 2, 3), source(2, 3, 3))),
-        ) { _, a ->
-            if (a == 2) {
-                EnglishVerseMeasure(cap - short, IntArray(0))
-            } else {
-                EnglishVerseMeasure(cap / 2, IntArray(0))
-            }
-        }
+        ) { _, a -> if (a == 2) cap - short else cap / 2 }
         val leaves = leavesFrom(b, 3)
         assertEquals(2, leaves.size)
         assertEquals(listOf(2 to 2), leaves[0].verses)
@@ -229,12 +215,43 @@ class EnglishBookTest {
     }
 
     @Test
-    fun `every chapter after the second runs on where it falls`() {
-        // A book of translation does not start each of its 114 on a fresh page;
-        // the panel is set inside the leaf, which is what keeps the leaves full.
+    fun `every chapter opens a leaf of its own, however much room is left`() {
+        // The rule a book keeps and this one used to keep only for Al-Baqarah:
+        // a chapter starts a new page. Three chapters that would all fit on one
+        // leaf take three, and the ragged paper goes to the foot of each — which
+        // is the one place a book allows it.
         val b = book(3 to listOf(2 to 1, 3 to 1, 4 to 1)) { _, _ -> cap / 8 }
-        assertEquals(1, leavesFrom(b, 3).size)
-        assertEquals(listOf(2 to 1, 3 to 1, 4 to 1), b.leaves[b.firstLeafOf(3)].verses)
+        val leaves = leavesFrom(b, 3)
+        assertEquals(3, leaves.size)
+        assertEquals(listOf(2 to 1), leaves[0].verses)
+        assertEquals(listOf(3 to 1), leaves[1].verses)
+        assertEquals(listOf(4 to 1), leaves[2].verses)
+    }
+
+    @Test
+    fun `a chapter opening breaks the leaf even mid-verse-run`() {
+        // The verse before it is not carried on to keep the leaf full: the
+        // chapter's page break outranks the fill.
+        val b = book(3 to listOf(2 to 1, 2 to 2, 3 to 1)) { _, _ -> cap / 8 }
+        val leaves = leavesFrom(b, 3)
+        assertEquals(2, leaves.size)
+        assertEquals(listOf(2 to 1, 2 to 2), leaves[0].verses)
+        assertEquals(listOf(3 to 1), leaves[1].verses)
+    }
+
+    @Test
+    fun `the break falls where the line falls, not at a sentence`() {
+        // A book runs a paragraph straight over the page break. The leaf takes
+        // every character of room it has and the verse picks up where it left.
+        val b = book(3 to listOf(2 to 1, 2 to 2)) { _, a ->
+            if (a == 1) cap / 2 else cap
+        }
+        val leaves = leavesFrom(b, 3)
+        assertEquals(2, leaves.size)
+        val cut = leaves[0].runs.last()
+        assertEquals(2 to 2, cut.surahId to cut.ayah)
+        assertTrue("the first leaf must fill", cut.to - cut.from > 0)
+        assertEquals(cut.to, leaves[1].runs.first().from)
     }
 
     @Test

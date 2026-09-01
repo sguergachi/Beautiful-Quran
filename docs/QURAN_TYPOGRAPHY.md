@@ -373,31 +373,53 @@ Allah."* and the next opens on *"One of them wishes…"*. A verse with no senten
 end in reach is not cut at all: it goes whole on the next leaf, the way a
 paragraph too big for the foot of a page does.
 
-**And because the cut costs nothing, the leaf fills.** Two thresholds used to
-hold a carry back, and both were priced against a mid-sentence break: a verse
-was cut only where leaving it whole would waste three lines or more, and never
-within two lines of either end. Neither survives the sentence rule. A break
-between sentences is what every page of every book does, so there is nothing to
-weigh against the paper: **if a sentence ends anywhere in the room left, the
-leaf takes it.** The floor is one line rather than two — a whole sentence on a
-line of its own is a short paragraph, not a widow — and below that it would be
-five characters of "Say." alone at a head, which is nobody's idea of a page.
+**The rules a book actually keeps.** They are short, and this book keeps them:
 
-Over the book: **1,041 leaves to 1,055**, one in seventy-five, with carries
-302 to 324 and mean blank 1.20 lines to 1.47 (p95 2.81 to 3.94). Holding the
-old two-line floor cost twenty leaves and a third of a blank line on each.
+1. **The page fills.** The type page is a fixed rectangle and text fills it;
+   every page carries the same number of lines. Everything else is an exception
+   to this one.
+2. **A chapter opens a new page.** A printed book will burn a leaf — a whole
+   blank verso, in a book with spreads — rather than start a chapter halfway
+   down one. This is the one page break a reader is meant to notice.
+3. **The last page of a chapter is the only short page**, which is where all the
+   ragged paper in a book lives.
+4. **Widows and orphans move the break, and nothing else does.**
 
-A sentence end is found by [englishSentenceEnds], which reads the space after
-`.`, `!` or `?` — behind any closing quote — and never inside brackets, since
-the reader may have asked for the translator's asides to come off.
+What is *not* on that list is the sentence. This leaf briefly refused to cut a
+verse anywhere but at a full stop, reasoning that a listener should not carry
+half a thought over a page turn. It is a real argument for a page being recited
+aloud, but it is not what a book does: a paragraph runs straight over the break,
+mid-clause, and the break is meant to be *invisible* — the eye carries on.
+Holding out for a full stop left the foot of an ordinary leaf blank by 1.47
+lines and 3.94 at the ninety-fifth percentile, paper spent on a fault the reader
+was never going to see.
 
-What is left is the estimator, not the rule. The pagination counts characters,
-and a leaf it fills to 872 of 900 can still show white: 2:286's tail, Ali
-'Imran's panel and its first six verses fill leaf 83 with 28 characters spare,
-and 3:7's first sentence needs 157, so nothing more will go on it — but the
-panel and basmalah are charged 4.2 lines and do not take that much paper. That
-is `ENGLISH_LEAF_OPENING_CHARS` to answer for, and it wants measuring rather
-than guessing.
+So the break falls where the line falls. `englishLeafBreak` still moves it off
+the middle of a word, because this book does not hyphenate — a word break, not a
+sentence break, and it costs at most a word.
+
+The widow and orphan rule is `ENGLISH_LEAF_MIN_FRAGMENT_CHARS`, one line: an
+*orphan* is the opening of a verse alone at the foot, a *widow* its last line
+alone at the head. One line rather than the printer's usual two, because these
+verses have no paragraph indents to make a single line read as stranded. When
+the tail would be a widow the break moves back up the verse; when even that
+leaves an orphan, the verse goes whole to the next leaf.
+
+Measured over the book, with the chapter rule in force:
+
+```
+                            leaves   carries   mean blank   p95
+    ordinary leaves            895       611       0.28     0.95
+    chapter-final leaves       114         —      11.50       —
+    ----                     -----
+    whole book               1,009
+```
+
+Which is the shape a book has: 895 leaves full to within a third of a line, and
+every ragged foot in the Qur'an gathered onto the 114 leaves where a chapter
+ends and the white reads as an ending. Against the sentence rule it replaced —
+1,055 leaves at 1.47 lines blank *each* — it is 46 fewer leaves and five times
+less waste on the pages a reader spends their time on.
 
 It is not done to save a line. Cutting a verse costs the reader the end of a
 thought to a page turn, so it is done only where leaving it whole would waste

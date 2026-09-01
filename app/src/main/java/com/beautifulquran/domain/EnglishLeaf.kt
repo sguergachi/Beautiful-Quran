@@ -21,7 +21,7 @@ package com.beautifulquran.domain
  * over rather than left to open the next one, exactly as a printed book carries
  * a paragraph: the sentence continues at the head of the following leaf and is
  * numbered where it finishes. The cut is always the end of a sentence, and a
- * leaf fills as far as a whole sentence will fill it; see `englishSentenceCut`.
+ * leaf fills, and the break falls where the line falls; see `buildEnglishBook`.
  *
  * The two layouts are still one book, but through the *verse* rather than
  * through the page: `EnglishBook.leafOfVerse` is exact for all 6,236 of them,
@@ -103,34 +103,6 @@ data class EnglishLeafVerse(
  *   break inside `[O Muhammad]` would leave half a bracket on each leaf and
  *   strip neither.
  */
-/**
- * Where the sentences of one verse end, as offsets into [text].
- *
- * Each is the index of the space *after* a terminator, so a leaf cut there
- * keeps the whole sentence — "…except by His permission?" — and the next leaf
- * opens on the word that follows. That is the same place [englishLeafBreak]
- * would leave an offset alone, so the two agree without either knowing about
- * the other.
- *
- * A terminator inside brackets is not a sentence end: the reader may have asked
- * for the translator's asides to come off, and a leaf cut inside one would
- * leave half a bracket on each leaf.
- */
-fun englishSentenceEnds(text: String): IntArray {
-    val ends = ArrayList<Int>(8)
-    var depth = 0
-    for (i in text.indices) {
-        when (text[i]) {
-            '[', '(' -> depth++
-            ']', ')' -> if (depth > 0) depth--
-        }
-        if (depth > 0 || text[i] !in SENTENCE_TERMINATORS) continue
-        var after = i + 1
-        while (after < text.length && text[after] in SENTENCE_CLOSERS) after++
-        if (after < text.length && text[after].isWhitespace()) ends += after
-    }
-    return ends.toIntArray()
-}
 
 private const val SENTENCE_TERMINATORS = ".!?"
 

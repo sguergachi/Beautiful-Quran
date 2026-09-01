@@ -3,7 +3,6 @@ package com.beautifulquran.ui.reader
 import com.beautifulquran.data.model.Word
 import com.beautifulquran.domain.ENGLISH_LEAF_CAPACITY_CHARS
 import com.beautifulquran.domain.MushafSourceWord
-import com.beautifulquran.domain.EnglishVerseMeasure
 import com.beautifulquran.domain.buildEnglishBook
 import com.beautifulquran.domain.buildMushafCatalog
 import org.junit.Assert.assertEquals
@@ -27,12 +26,8 @@ class MushafBookLengthTest {
         (1..12).map { ayah -> source(2, ayah, page = 3) },
     )
     private val book = buildEnglishBook(catalog) { _, _ ->
-        everySentence(ENGLISH_LEAF_CAPACITY_CHARS / 2)
+        ENGLISH_LEAF_CAPACITY_CHARS / 2
     }
-
-    /** A verse the book may cut anywhere: a sentence end at every offset. */
-    private fun everySentence(length: Int) =
-        EnglishVerseMeasure(length, IntArray(length.coerceAtLeast(0)) { it })
 
     @Test
     fun `the Arabic rule is the mushaf, the English rule is the book`() {
@@ -70,9 +65,7 @@ class MushafBookLengthTest {
     private val carriedBook = buildEnglishBook(
         buildMushafCatalog(listOf(source(2, 2, page = 3), source(2, 3, page = 3))),
     ) { _, a ->
-        everySentence(
-            if (a == 2) ENGLISH_LEAF_CAPACITY_CHARS / 2 else ENGLISH_LEAF_CAPACITY_CHARS,
-        )
+        if (a == 2) ENGLISH_LEAF_CAPACITY_CHARS / 2 else ENGLISH_LEAF_CAPACITY_CHARS
     }
 
     @Test

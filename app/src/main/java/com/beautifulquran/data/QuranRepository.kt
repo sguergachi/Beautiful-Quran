@@ -23,8 +23,6 @@ import com.beautifulquran.domain.buildMushafCatalog
 import com.beautifulquran.domain.isWordSearchQuery
 import com.beautifulquran.domain.matchWordSearch
 import com.beautifulquran.domain.normalizeArabicForSearch
-import com.beautifulquran.domain.EnglishVerseMeasure
-import com.beautifulquran.domain.englishSentenceEnds
 import com.beautifulquran.domain.EnglishTypography
 import com.beautifulquran.domain.quranWordKey
 import com.beautifulquran.timingslab.OverrideEntry
@@ -138,8 +136,8 @@ class QuranRepository(
 
     /** Lazily built once — 6,236 verse lengths, for the English book's leaves. */
     @Volatile
-    private var englishVerseProse: Map<Long, EnglishVerseMeasure>? = null
-    private var englishVerseGloss: Map<Long, EnglishVerseMeasure>? = null
+    private var englishVerseProse: Map<Long, Int>? = null
+    private var englishVerseGloss: Map<Long, Int>? = null
 
     /**
      * Verse translations for the English leaf, a page at a time.
@@ -275,7 +273,7 @@ class QuranRepository(
      * process lifetime because it is the book's own structure and does not
      * change.
      */
-    suspend fun englishVerseProse(text: EnglishLeafText): Map<Long, EnglishVerseMeasure> =
+    suspend fun englishVerseProse(text: EnglishLeafText): Map<Long, Int> =
         withContext(Dispatchers.IO) {
             when (text) {
                 // The text itself, not just its length: the pagination cuts a
@@ -346,11 +344,8 @@ class QuranRepository(
         flush()
     }
 
-    /** What one verse's English costs the pagination, and where it may be cut. */
-    private fun measure(text: String) = EnglishVerseMeasure(
-        length = text.length + ENGLISH_LEAF_MARK_CHARS,
-        sentenceEnds = englishSentenceEnds(text),
-    )
+    /** What one verse's English costs the pagination. */
+    private fun measure(text: String) = text.length + ENGLISH_LEAF_MARK_CHARS
 
     private class GlossRow(
         val surah: Int,

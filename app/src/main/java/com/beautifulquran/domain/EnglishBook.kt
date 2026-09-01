@@ -102,43 +102,37 @@ fun englishLeafVerseMass(surahId: Int, ayah: Int, prose: Int): Int = when {
 const val ENGLISH_LEAF_LINE_CHARS = ENGLISH_LEAF_CAPACITY_CHARS / 23
 
 /**
- * How big a hole has to be before a verse is carried over rather than moved
- * whole to the next leaf.
+ * How the leaf breaks: it doesn't, except where a book breaks.
  *
- * A leaf ends when the next verse will not go on it, and a verse averages three
- * lines, so the foot of the page is blank by up to that much: measured over the
- * book, 2.6 lines of 22 on average and 7.3 at the ninety-fifth percentile. A
- * printed book does not do this — it carries the paragraph over — and neither
- * does a printed translation of the Qur'an, which runs its verses on and lets
- * the page break fall where it falls.
+ * The rules a trade compositor works to are short, and this book now works to
+ * them:
  *
- * A verse used to be cut only where leaving it whole would waste three lines or
- * more, because the cut fell wherever the character budget ran out and breaking
- * a sentence across the fold is a real cost — not one to pay for a line or two.
+ *  1. **The page fills.** The type page is a fixed rectangle and text fills it;
+ *     every page carries the same number of lines. Everything else is an
+ *     exception to this one.
+ *  2. **A chapter opens a new page** ([englishLeafOpensHere]). A printed book
+ *     will burn a whole leaf rather than start a chapter halfway down one.
+ *  3. **The last page of a chapter is the only short page.** That is where the
+ *     ragged foot is allowed to live, and because it always coincides with a
+ *     chapter ending it reads as intended rather than as a gap.
+ *  4. **Widows and orphans move the break, and nothing else does** — see
+ *     [ENGLISH_LEAF_MIN_FRAGMENT_CHARS].
  *
- * The cut is a sentence end now ([englishSentenceCut]), and that changes the
- * arithmetic: the reader loses nothing at the turn, so there is no cost to
- * weigh against the paper and no reason to leave the foot of a leaf empty. A
- * leaf fills as far as a whole sentence will fill it.
+ * What is *not* on that list is the sentence. This book used to refuse to cut a
+ * verse anywhere but at a full stop, on the reasoning that a reader should not
+ * carry half a thought over the fold. It is a real argument for a page that is
+ * being recited aloud, but it is not what a book does: a paragraph runs
+ * straight over the break, mid-clause, and the break is meant to be invisible.
+ * The reader's eye simply carries on. Holding out for a full stop left the foot
+ * of an ordinary leaf blank by 1.47 lines on average and 3.94 at the
+ * ninety-fifth percentile, which is paper spent on a fault the reader was never
+ * going to notice.
  *
- * Measured over the book: 1,075 leaves become 1,055, average blank 1.86 lines
- * becomes 1.47, and 195 carried verses become 324.
+ * So the break falls where the line falls. `englishLeafBreak` still moves it off
+ * the middle of a word, because this book does not hyphenate — that is a word
+ * break, not a sentence break, and it costs at most a word of the leaf.
  */
 
-/**
- * The least of a carried verse that may stand alone on either leaf.
- *
- * One line. It was two, from when a fragment could be any run of words a budget
- * happened to end on — half a sentence alone at a foot is a widow, and a
- * compositor moves the break rather than set one. A fragment is a whole
- * sentence now, and a whole sentence on a line of its own is not a widow; it is
- * a short paragraph. Holding out for two lines simply refused good cuts: it
- * cost twenty leaves and a third of a blank line on every one of them.
- *
- * Below one line it would be: five characters of "Say." alone at the head of a
- * leaf is nobody's idea of a page. The break moves back up the verse until both
- * halves clear this, and if none does the verse is not split at all.
- */
 const val ENGLISH_LEAF_MIN_FRAGMENT_CHARS = ENGLISH_LEAF_LINE_CHARS
 
 /**
@@ -252,17 +246,10 @@ class EnglishBook internal constructor(
  * back, because with the page boundary gone there is no remainder to even: the
  * only leaf that ends short is one that met a verse too long to take.
  */
-/** What the pagination needs to know about one verse's English. */
-class EnglishVerseMeasure(
-    /** Characters the verse takes, its mark included — see [EnglishLeaf.prose]. */
-    val length: Int,
-    /** Where its sentences end ([englishSentenceEnds]), in the same characters. */
-    val sentenceEnds: IntArray,
-)
-
 fun buildEnglishBook(
     catalog: MushafCatalog,
-    prose: (surahId: Int, ayah: Int) -> EnglishVerseMeasure,
+    /** Characters the verse takes, its mark included — see [EnglishLeaf.prose]. */
+    prose: (surahId: Int, ayah: Int) -> Int,
 ): EnglishBook {
     val leaves = ArrayList<EnglishBookLeaf>(1_200)
     val firstLeafByPage = IntArray(MushafCatalog.MUSHAF_PAGE_COUNT + 1) { -1 }
@@ -301,13 +288,12 @@ fun buildEnglishBook(
             if (run.isNotEmpty() && englishLeafOpensHere(surahId to ayah)) close()
             // The panel and its basmalah take paper before a word is set.
             if (ayah == 1) {
-                val opening = englishLeafOpeningChars(surahId)
-                if (run.isNotEmpty() && mass + opening > ENGLISH_LEAF_CAPACITY_CHARS) close()
-                mass += opening
+                // The leaf is always fresh here — a chapter opened it — so the
+                // panel never has to be tested against the room left.
+                mass += englishLeafOpeningChars(surahId)
                 if (runPages.isEmpty()) runPages += page
             }
-            val measure = prose(surahId, ayah)
-            val length = (measure.length - ENGLISH_LEAF_MARK_CHARS).coerceAtLeast(0)
+            val length = (prose(surahId, ayah) - ENGLISH_LEAF_MARK_CHARS).coerceAtLeast(0)
             var from = 0
             while (true) {
                 val left = ENGLISH_LEAF_CAPACITY_CHARS - mass
@@ -318,30 +304,22 @@ fun buildEnglishBook(
                     mass += rest + ENGLISH_LEAF_MARK_CHARS
                     break
                 }
-                // Fill the leaf, and break on a sentence rather than on a
-                // verse.
+                // Fill the leaf. The break falls where the line falls.
                 //
-                // A page break inside a sentence is the one thing a printed
-                // book does not do to prose it can help: the reader carries
-                // half a thought over the fold and has to reassemble it on the
-                // other side. A break *between* sentences costs nothing — it is
-                // what every page of every book does. So there is no threshold
-                // to clear here any more: if a sentence ends anywhere in the
-                // room left, the leaf takes it. What used to gate this was the
-                // price of cutting mid-sentence, and that price is gone.
-                //
-                // A verse with no sentence end in reach is still not cut: it
-                // goes whole on the next leaf, the way a paragraph too big for
+                // Widows and orphans are the only thing that moves it: if the
+                // tail would come to less than a line it is pulled back down
+                // the verse until it clears one, and if that leaves less than a
+                // line standing at the foot the verse is not cut at all — it
+                // goes whole to the next leaf, the way a paragraph too big for
                 // the foot of a page does.
-                val sentenceCut = englishSentenceCut(
-                    sentenceEnds = measure.sentenceEnds,
-                    from = from,
-                    length = length,
-                    room = left,
-                )
-                val carry = sentenceCut != null
+                var cut = left
+                if (rest - cut < ENGLISH_LEAF_MIN_FRAGMENT_CHARS) {
+                    cut = rest - ENGLISH_LEAF_MIN_FRAGMENT_CHARS
+                }
+                val carry = cut >= ENGLISH_LEAF_MIN_FRAGMENT_CHARS
                 if (!carry && run.isNotEmpty()) {
-                    // Not worth cutting: the verse opens the next leaf instead.
+                    // Nowhere to cut that is not a widow: the verse opens the
+                    // next leaf instead.
                     close()
                     continue
                 }
@@ -349,11 +327,7 @@ fun buildEnglishBook(
                 // the verse to — an empty leaf already holding a chapter's
                 // panel, or a verse longer than any leaf holds, which in the
                 // whole Qur'an is 2:282 alone.
-                val cut = if (carry) {
-                    sentenceCut!! - from
-                } else {
-                    minOf(rest, maxOf(left, ENGLISH_LEAF_MIN_FRAGMENT_CHARS))
-                }
+                if (!carry) cut = maxOf(left, ENGLISH_LEAF_MIN_FRAGMENT_CHARS)
                 val to = if (from + cut >= length) length else from + cut
                 run += EnglishVerseRun(surahId, ayah, from, to)
                 runPages += page
@@ -390,31 +364,6 @@ fun buildEnglishBook(
 }
 
 /** What a chapter's opening costs the leaf, panel and basmalah together. */
-/**
- * The sentence end to cut a carried verse at, or null when there is none to
- * cut at.
- *
- * The last one that fits the [room] left on the leaf, so the leaf is filled as
- * far as a whole sentence will fill it, and only where what is left over is
- * worth a fragment of its own. Null is not a failure: it is the answer that
- * this verse should be set whole on the next leaf.
- */
-internal fun englishSentenceCut(
-    sentenceEnds: IntArray,
-    from: Int,
-    length: Int,
-    room: Int,
-): Int? {
-    var best: Int? = null
-    for (end in sentenceEnds) {
-        if (end <= from) continue
-        if (end - from < ENGLISH_LEAF_MIN_FRAGMENT_CHARS) continue
-        if (end - from > room) break
-        if (length - end < ENGLISH_LEAF_MIN_FRAGMENT_CHARS) continue
-        best = end
-    }
-    return best
-}
 
 private fun englishLeafOpeningChars(surahId: Int): Int =
     if (surahOpensWithBasmalahPreface(surahId)) {
@@ -424,15 +373,16 @@ private fun englishLeafOpeningChars(surahId: Int): Int =
     }
 
 /**
- * The one place the packing is told to break: Al-Baqarah opens a leaf, so
- * Al-Fatihah has one to itself.
+ * Does this verse open a leaf of its own?
  *
- * Every other chapter runs on, its panel set inside the page where it falls —
- * which is how a printed Qur'an translation sets them, and starting each of the
- * 114 on a fresh leaf would leave 39 of them under a third full. Al-Fatihah is
- * not one of the 114 in this respect: it is the opening of the book, it stands
- * on a page of its own in every mushaf, and `mushafIsOpeningLeaf` already sets
- * that page differently from all the rest.
+ * Every chapter does. A printed book starts a chapter on a new page — on a
+ * *recto* at that, burning the blank verso — and this is the one page break a
+ * reader is meant to notice. It was Al-Baqarah alone before, so a chapter's
+ * panel could land halfway down a leaf with the chapter above it still warm,
+ * which is the one thing no book does.
+ *
+ * The cost is the short leaf at the end of every chapter, and that cost is the
+ * point: it is where all the ragged paper in the book now lives, and it reads
+ * as an ending rather than as a gap.
  */
-private fun englishLeafOpensHere(verse: Pair<Int, Int>): Boolean =
-    verse.first == 2 && verse.second == 1
+private fun englishLeafOpensHere(verse: Pair<Int, Int>): Boolean = verse.second == 1

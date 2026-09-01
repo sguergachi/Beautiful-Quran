@@ -18,7 +18,6 @@ import com.beautifulquran.domain.HighlightEngine
 import com.beautifulquran.domain.EnglishBook
 import com.beautifulquran.domain.MushafCatalog
 import com.beautifulquran.data.EnglishLeafText
-import com.beautifulquran.domain.EnglishVerseMeasure
 import com.beautifulquran.domain.buildEnglishBook
 import com.beautifulquran.domain.quranWordKey
 import com.beautifulquran.domain.OutputLatency
@@ -281,7 +280,7 @@ class ReaderViewModel(
             val surahs = repository.surahs().associateBy { it.id }
             val prose = repository.englishVerseProse(text)
             val book = buildEnglishBook(catalog) { surahId, ayah ->
-                prose[quranWordKey(surahId, ayah, 1)] ?: EnglishVerseMeasure(0, IntArray(0))
+                prose[quranWordKey(surahId, ayah, 1)] ?: 0
             }
             _mushaf.value = MushafUi(catalog, surahs, book)
         }
