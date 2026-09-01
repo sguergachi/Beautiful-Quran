@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -65,7 +64,7 @@ fun ShareImageCard(
                 padBottom = if (index == verses.lastIndex) 0.dp else ShareImagePadBetween,
             )
         }
-        ShareImageFooterStrip(footerReference(verses))
+        ShareImageFooterStrip(shareFooterCopy(verses))
     }
 }
 
@@ -117,7 +116,7 @@ fun ShareImageVerseStrip(
 
 @Composable
 fun ShareImageFooterStrip(
-    footerRef: String,
+    copy: ShareFooterCopy,
     modifier: Modifier = Modifier,
 ) {
     val gold = LocalQuranAccents.current.gold
@@ -136,30 +135,55 @@ fun ShareImageFooterStrip(
     ) {
         Spacer(
             Modifier
-                .width(48.dp)
+                .fillMaxWidth()
                 .height(0.5.dp)
                 .background(gold.copy(alpha = 0.45f)),
         )
-        Spacer(Modifier.height(10.dp))
+        Spacer(Modifier.height(16.dp))
         Text(
-            text = footerRef,
-            style = MaterialTheme.typography.labelLarge,
+            text = copy.chapter,
+            style = MaterialTheme.typography.headlineMedium,
             color = gold,
             textAlign = TextAlign.Center,
         )
+        if (copy.verses.isNotBlank()) {
+            Spacer(Modifier.height(6.dp))
+            Text(
+                text = copy.verses,
+                style = MaterialTheme.typography.bodyMedium,
+                color = gold.copy(alpha = 0.72f),
+                textAlign = TextAlign.Center,
+            )
+        }
     }
 }
 
-/** Quiet gold footer: single ref, or first…last when several. */
-internal fun footerReference(verses: List<ShareVerseLine>): String {
-    if (verses.isEmpty()) return ""
-    if (verses.size == 1) return verses.first().reference
+/** Chapter display name and the verse citation that sits under it. */
+data class ShareFooterCopy(
+    val chapter: String,
+    val verses: String,
+)
+
+/** Quiet gold colophon: display name above, verse numbers below. */
+internal fun shareFooterCopy(verses: List<ShareVerseLine>): ShareFooterCopy {
+    if (verses.isEmpty()) return ShareFooterCopy("", "")
     val first = verses.first()
     val last = verses.last()
-    return if (first.ref.surahId == last.ref.surahId) {
-        val name = first.surahName.ifBlank { "Surah ${first.ref.surahId}" }
-        "$name ${first.ref.surahId}:${first.ref.ayah}–${last.ref.ayah}"
+    fun name(line: ShareVerseLine) =
+        line.surahName.ifBlank { "Surah ${line.ref.surahId}" }
+    val chapter = if (first.ref.surahId == last.ref.surahId) {
+        name(first)
     } else {
-        "${first.reference} · ${last.reference}"
+        "${name(first)} · ${name(last)}"
     }
+    val verseLine = if (first.ref.surahId == last.ref.surahId) {
+        if (first.ref.ayah == last.ref.ayah) {
+            "${first.ref.surahId}:${first.ref.ayah}"
+        } else {
+            "${first.ref.surahId}:${first.ref.ayah}–${last.ref.ayah}"
+        }
+    } else {
+        "${first.ref.surahId}:${first.ref.ayah} · ${last.ref.surahId}:${last.ref.ayah}"
+    }
+    return ShareFooterCopy(chapter, verseLine)
 }

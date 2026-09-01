@@ -337,7 +337,7 @@ class ShareViewModel(
                         )
                     }
                     footerBmp = ShareImageRenderer.render(activity) {
-                        ShareImageFooterStrip(footerReference(lines))
+                        ShareImageFooterStrip(shareFooterCopy(lines))
                     }
                     bitmap = stitchBitmaps(listOf(versesBmp, footerBmp))
                 } finally {

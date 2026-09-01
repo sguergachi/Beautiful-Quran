@@ -100,11 +100,11 @@ One PNG of a **paper sheet with verses at rest in full ink** — not a
 screenshot of the live reader, not the wash yet:
 
 1. Thin `ShareImageCard` composable (Hafs + translation + gold chapter
-   footer under a short hairline). Fixed **Paper** theme so shares stay
+   name under a hairline shelf, verses beneath). Fixed **Paper** theme so shares stay
    readable parchment regardless of the reader's night/royal mode.
 2. `ShareImageRenderer` hosts each **verse strip** offscreen at 1080 ×
    wrap-height on a **new ComposeView**. The **chapter footer**
-   (`al-Baqarah 2:1–N`) is a **separate attach**, then the bitmaps are
+   (display name + verse citation) is a **separate attach**, then the bitmaps are
    **stitched**. Reusing one view dropped the footer (stale last verse).
    The GPU never rasterises the full gather. **Not** full `ReaderScreen`.
 3. `ShareFiles` writes PNG under `cacheDir/share/`, exposes a `FileProvider`
@@ -135,11 +135,12 @@ Original pipeline notes (for later PRs):
 
 ## The footer mark
 
-Image (and later video) carries a quiet footer: a short gold hairline
-above the reference (`al-Baqarah 2:255`, or a same-surah range /
-multi-surah join). No app watermark. A long gather makes a tall,
-higher-resolution sheet — verses are not cropped to a phone-screen height. Text shares
-carry the reference only.
+Image (and later video) carries a quiet footer: a gold hairline shelf,
+then the chapter name in Cormorant display, then the verse citation
+under it (`al-Baqarah` / `2:1–3`, or a multi-surah join). No app
+watermark. A long gather makes a tall, higher-resolution sheet — verses
+are not cropped to a phone-screen height. Text shares carry the
+reference only.
 
 ## Shape of the code
 
