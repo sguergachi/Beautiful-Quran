@@ -129,6 +129,7 @@ import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import com.beautifulquran.QuranApp
 import com.beautifulquran.data.AyahSelectorSide
+import com.beautifulquran.data.BrushCircleStyle
 import com.beautifulquran.data.PageNumberScript
 import com.beautifulquran.data.ReadingMode
 import com.beautifulquran.data.VerseNumberScript
@@ -152,7 +153,11 @@ import com.beautifulquran.ui.theme.generatedFieldWeave
 import com.beautifulquran.ui.theme.gilded
 import com.beautifulquran.ui.theme.glyphLayerAlpha
 import com.beautifulquran.ui.theme.InkExpandEasing
+import com.beautifulquran.ui.theme.brushCircleParams
+import com.beautifulquran.ui.theme.inkBrushCircleMark
+import com.beautifulquran.ui.theme.inkBrushCircleTarget
 import com.beautifulquran.ui.theme.inkSpotHighlight
+import com.beautifulquran.ui.theme.rememberInkBrushCircle
 import com.beautifulquran.ui.theme.letterFadeIn
 import com.beautifulquran.ui.theme.ornament.chapterOrnamentSeed
 import com.beautifulquran.ui.theme.ornament.generateChapterOrnament
@@ -2973,7 +2978,6 @@ fun AyahBlock(
             Box(Modifier.matchParentSize()) {
                 GatherOrdinalMark(
                     ordinal = gatherOrdinal,
-                    side = bookmarkSide,
                     chromeAlpha = bookmarkChromeAlpha,
                     onClick = onAyahClick,
                     modifier = Modifier
@@ -3044,28 +3048,24 @@ private fun ShareInkVerb(
 }
 
 /**
- * Western gather ordinal sitting in the idle swallowtail nub — same
- * strip, first-line inset, and ribbon width as the bookmark icon.
- * Type is [GatherOrdinalSp], 2pt larger than the nub. Ink, not gold.
+ * Western gather ordinal in the bookmark strip, first-line inset.
+ * The Settings/Customize ink-brush circle paints around the digit so
+ * it is held, not floating in the margin. Ink, not gold.
  */
 @Composable
 private fun GatherOrdinalMark(
     ordinal: Int,
-    side: AyahSelectorSide,
     chromeAlpha: () -> Float,
     onClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
-    val onRibbon = if (side == AyahSelectorSide.RIGHT) {
-        Alignment.TopEnd
-    } else {
-        Alignment.TopStart
-    }
-    val edgeInset = bookmarkRibbonInsetDp(
-        reservePlaceLane = true,
-        edgeInsetDp = BookmarkEdgeInsetDp,
-        ribbonWidthDp = BookmarkRibbonWidthDp,
-    ).dp
+    val circle = rememberInkBrushCircle(
+        selectedKey = ordinal,
+        params = brushCircleParams(BrushCircleStyle.BASELINE).copy(
+            padXDp = 8f,
+            padYDp = 4f,
+        ),
+    )
     Box(
         modifier = modifier
             .width(BookmarkStripWidth)
@@ -3081,13 +3081,9 @@ private fun GatherOrdinalMark(
         Box(
             contentAlignment = Alignment.Center,
             modifier = Modifier
-                .align(onRibbon)
+                .align(Alignment.TopCenter)
                 .padding(top = BookmarkTopInsetDp.dp)
-                .padding(
-                    start = if (side == AyahSelectorSide.LEFT) edgeInset else 0.dp,
-                    end = if (side == AyahSelectorSide.RIGHT) edgeInset else 0.dp,
-                )
-                .size(BookmarkRibbonWidthDp.dp, BookmarkNubLengthDp.dp),
+                .inkBrushCircleMark(circle, ordinal),
         ) {
             Text(
                 text = ordinal.toString(),
@@ -3107,6 +3103,8 @@ private fun GatherOrdinalMark(
                 maxLines = 1,
                 softWrap = false,
                 modifier = Modifier
+                    .inkBrushCircleTarget(circle, ordinal)
+                    .padding(horizontal = 5.dp, vertical = 1.dp)
                     .wrapContentWidth(unbounded = true)
                     .wrapContentHeight(unbounded = true),
             )

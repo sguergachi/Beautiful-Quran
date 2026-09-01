@@ -52,8 +52,10 @@ Root Viewer, and the bookmark ribbon (including its note hold) is inactive.
 The mode owns the tap — interactions are *replaced*, not stacked.
 
 **Mode chrome (visual QA):** gather ordinals use 16 sp Garamond
-Western digits, centered in the 11×14 dp bookmark nub (not gold, not
-Arabic-Indic) — 2pt larger than the swallowtail icon.
+Western digits in the bookmark strip, first-line inset. The same
+ink-brush circle that marks Settings/Customize segment tabs paints
+around the digit so it is held, not floating. Not gold, not
+Arabic-Indic.
 Selection wash and gather-bar takeover are planned — see
 [VERSE_ACTIONS.md](VERSE_ACTIONS.md).
 
@@ -136,9 +138,8 @@ Original pipeline notes (for later PRs):
 ## The footer mark
 
 Image (and later video) carries a quiet footer: a gold hairline shelf,
-then the chapter name in Cormorant display, then the verse citation
-under it (`al-Baqarah` / `2:1–3`, or a multi-surah join). No app
-watermark. A long gather makes a tall, higher-resolution sheet — verses
+then a compact Cormorant chapter name, then the verse citation under
+it (`al-Baqarah` / `2:1–3`, or a multi-surah join). No app watermark. A long gather makes a tall, higher-resolution sheet — verses
 are not cropped to a phone-screen height. Text shares carry the
 reference only.
 

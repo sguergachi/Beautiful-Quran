@@ -23,8 +23,8 @@ import com.beautifulquran.ui.theme.TranslationFontFamily
 internal val ShareImagePadH = 48.dp
 internal val ShareImagePadTop = 56.dp
 internal val ShareImagePadBetween = 14.dp
-internal val ShareImagePadFooterTop = 40.dp
-internal val ShareImagePadBottom = 56.dp
+internal val ShareImagePadFooterTop = 24.dp
+internal val ShareImagePadBottom = 32.dp
 
 /** Verses plus one gold chapter strip at the end. */
 internal fun shareImageSegmentCount(verseCount: Int): Int =
@@ -139,18 +139,18 @@ fun ShareImageFooterStrip(
                 .height(0.5.dp)
                 .background(gold.copy(alpha = 0.45f)),
         )
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(8.dp))
         Text(
             text = copy.chapter,
-            style = MaterialTheme.typography.headlineMedium,
+            style = MaterialTheme.typography.titleLarge,
             color = gold,
             textAlign = TextAlign.Center,
         )
         if (copy.verses.isNotBlank()) {
-            Spacer(Modifier.height(6.dp))
+            Spacer(Modifier.height(2.dp))
             Text(
                 text = copy.verses,
-                style = MaterialTheme.typography.bodyMedium,
+                style = MaterialTheme.typography.labelMedium,
                 color = gold.copy(alpha = 0.72f),
                 textAlign = TextAlign.Center,
             )
