@@ -418,17 +418,19 @@ internal const val VellumSpotShader = """
         float r = length(p);
         float ang = atan(p.y, p.x);
         float fibre = brushedPigment(origin);
-        // Rim-only irregularity — the drop stays a circle (or an oval when fill).
-        float rimWobble = 0.025 * sin(ang * 3.0 + seed)
-            + 0.02 * (fibre - 0.5);
-        float radius = mix(0.56, 1.38, fill) + rimWobble;
+        // Rim-only irregularity — the drop stays a circle (or a looser oval when fill).
+        float rimWobble = mix(0.025, 0.06, fill) * sin(ang * 3.0 + seed)
+            + mix(0.02, 0.045, fill) * (fibre - 0.5);
+        // Verse blots sit inside the ayah with paper gutters; they must not
+        // fill the box or consecutive marks fuse into a slab.
+        float radius = mix(0.56, 0.84, fill) + rimWobble;
         // Tool-strip drops start mid-size; a verse soak grows from a seed.
         float soak = mix(mix(0.55, 0.06, fill), 1.0, progress);
         float edge = r - radius * soak;
-        float body = 1.0 - smoother(clamp(edge / 0.18 + 0.15, 0.0, 1.0));
+        float body = 1.0 - smoother(clamp(edge / mix(0.18, 0.22, fill) + 0.15, 0.0, 1.0));
         float pool = 1.0 - smoother(clamp(r / 0.34, 0.0, 1.0));
-        float density = body * (0.40 + 0.60 * pool);
-        float halo = exp(-max(edge, 0.0) * 18.0) * 0.38 * progress;
+        float density = body * mix(0.40 + 0.60 * pool, 0.82 + 0.10 * pool, fill);
+        float halo = exp(-max(edge, 0.0) * mix(18.0, 12.0, fill)) * 0.38 * progress;
         density = max(density, halo * (0.35 + 0.65 * fibre));
         float rim = 4.0 * density * (1.0 - density);
         float grain = max(vellumGrain, 0.08);
@@ -439,7 +441,7 @@ internal const val VellumSpotShader = """
             1.0
         );
         // Hard zero before the box edge so Compose never shears the drop.
-        float clipStart = mix(0.92, 1.50, fill);
+        float clipStart = mix(0.92, 1.08, fill);
         density *= 1.0 - smoother(clamp((r - clipStart) / 0.08, 0.0, 1.0));
         float coverage = vellumCoverage(density);
         // Verse soaks are opaque while they grow so the spread reads as ink,

@@ -126,7 +126,7 @@ becomes share tools; multi is extension) without taxing bookmark.
 - Primary: short-tap `﴿N﴾` reveals a quiet colophon line under that verse:
   **Share** (and optionally **Write**). Tapping **Share**:
   - pauses playback
-  - selects *that* verse (`1` + vellum ink spread under the ayah block)
+  - selects *that* verse (`1` + green vellum ink blot under the ayah)
   - replaces the player bar with the **share ribbon**
 - Optional power entry: long-press **verse body** (not seal) jumps straight
   into share-select with that verse checked. Only if body vs seal long-press
@@ -145,10 +145,11 @@ becomes share tools; multi is extension) without taxing bookmark.
 **Select / unselect**
 
 - Tap any verse to toggle membership while in share mode
-- Selected: the vellum ink-spot shader spreads as an oval blot under the
-  ayah (primary signal) — same pigment as Settings marks, not gold.
-  Western ordinal in Garamond ink on the bookmark swallowtail (secondary).
-  Gold stays the ayah mark. Chrome never uses Arabic-Indic digits.
+- Selected: a green vellum ink blot spreads under that ayah (primary
+  signal) — Deep Green pigment, fibre rim, paper gutters so neighbours
+  do not fuse. Western ordinal in Garamond ink on the bookmark
+  swallowtail (secondary). Gold stays the ayah mark. Chrome never uses
+  Arabic-Indic digits.
 - Unselected: wash recedes — that *is* the unselect feedback
 - Ordinals renumber when a verse is dropped
 
@@ -171,9 +172,8 @@ With G1, the intermediate Send list is **optional**:
 
 ### Visual rules for the wash
 
-- Vellum ink-spot shader as an oval blot that spreads under the ayah —
-  same pigment as Settings marks (`inkSpotHighlight(fillBox = true)`).
-  Not gold: gold is the ayah mark
+- Green vellum ink blot per verse (`inkSpotHighlight(fillBox = true)`
+  with primary green). A soak, not a gray rectangle. Not gold.
 - No border, elevation, or Material ripple
 - Works on Paper / Nightfall / Royal (page ink, not a fixed hex)
 - Must remain visible while scrolling

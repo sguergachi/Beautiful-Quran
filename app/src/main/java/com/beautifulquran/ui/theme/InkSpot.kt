@@ -47,8 +47,8 @@ import kotlin.math.sin
  * rim; older platforms keep three soft circles. [seed] keeps each
  * splash a different grain. The stain lands and spreads in 170 ms.
  *
- * [fillBox] spreads the same pigment as an oval that fills this
- * modifier's bounds — a verse-sized soak, not a tool-strip drop.
+ * [fillBox] paints a green-capable oval blot *inside* the bounds —
+ * paper gutters remain so neighbouring soaks do not fuse into a slab.
  * Verse soaks grow from a seed; tool-strip drops still land mid-size.
  */
 @Composable
