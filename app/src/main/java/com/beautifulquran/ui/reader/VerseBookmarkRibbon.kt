@@ -69,6 +69,19 @@ internal const val GatherOrdinalSp = 16f
 /** Pull the circled ordinal in from the soak's outer edge so the
  *  brush loop stays inside the fillBox stain (halfSize 0.93). */
 internal const val GatherOrdinalEdgeInsetDp = 18f
+/** Idle ayah padding on the bookmark-ribbon side. */
+internal const val AyahBookmarkSidePadDp = 38f
+/** Opposite-side ayah padding. */
+internal const val AyahGutterPadDp = 28f
+/** While gathered, verse type starts here so ﴿N﴾ cannot meet the circle. */
+internal const val GatherOrdinalLaneDp = 80f
+
+/** Horizontal pad for the verse column. [ordinalSide] is the bookmark edge. */
+internal fun ayahTextPadDp(gathered: Boolean, ordinalSide: Boolean): Float = when {
+    gathered && ordinalSide -> GatherOrdinalLaneDp
+    ordinalSide -> AyahBookmarkSidePadDp
+    else -> AyahGutterPadDp
+}
 private const val TOP_FOLD_DP = 3.5f    // soft fold over the page edge, matching web
 private const val BOTTOM_GAP_DP = 48f   // leave air above the next verse's tip
 private const val NOTCH_DP = 5.5f

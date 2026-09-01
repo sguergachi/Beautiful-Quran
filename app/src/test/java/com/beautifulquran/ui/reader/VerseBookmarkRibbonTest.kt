@@ -25,6 +25,11 @@ class VerseBookmarkRibbonTest {
         assertEquals(14f, BookmarkNubLengthDp)
         assertEquals(16f, GatherOrdinalSp)
         assertEquals(18f, GatherOrdinalEdgeInsetDp)
+        assertEquals(80f, GatherOrdinalLaneDp)
+        assertEquals(38f, ayahTextPadDp(gathered = false, ordinalSide = true))
+        assertEquals(28f, ayahTextPadDp(gathered = false, ordinalSide = false))
+        assertEquals(80f, ayahTextPadDp(gathered = true, ordinalSide = true))
+        assertEquals(28f, ayahTextPadDp(gathered = true, ordinalSide = false))
         assertEquals(24f, BookmarkTopInsetDp)
         assertEquals(
             18.92f,

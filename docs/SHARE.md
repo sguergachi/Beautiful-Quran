@@ -52,10 +52,10 @@ Root Viewer, and the bookmark ribbon (including its note hold) is inactive.
 The mode owns the tap — interactions are *replaced*, not stacked.
 
 **Mode chrome (visual QA):** gather ordinals use 16 sp Garamond
-Western digits in the bookmark strip, first-line inset, pulled in
-from the soak edge so the ink-brush circle stays inside the gold
-highlight. The same circle that marks Settings/Customize segment
-tabs holds the digit. Not gold, not Arabic-Indic.
+Western digits in a dedicated lane inside the gold soak (80 dp of
+text pad on that edge, 18 dp in from the stain rim). The Settings
+ink-brush circle holds the digit; verse type including ﴿N﴾ cannot
+enter the lane. Not gold, not Arabic-Indic.
 Selection wash and gather-bar takeover are planned — see
 [VERSE_ACTIONS.md](VERSE_ACTIONS.md).
 
