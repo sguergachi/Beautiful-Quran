@@ -58,5 +58,17 @@ class InkSpotTest {
         assertTrue(VellumSpotShader.contains("sourcePool * (1.0 - fill)"))
         assertTrue(VellumSpotShader.contains("mix(0.36, 0.93, progress)"))
         assertFalse(VellumSpotShader.contains("midpoint - r + warp"))
+        assertFalse(
+            "verse soak opacity must track progress, not snap on in the first fifth",
+            VellumSpotShader.contains("progress * 5.0"),
+        )
+    }
+
+    @Test
+    fun `spot pigment interpolates with progress so deselect fades out`() {
+        assertEquals(0f, inkSpotAppear(0f), 0f)
+        assertEquals(0.5f, inkSpotAppear(0.5f), 0f)
+        assertEquals(1f, inkSpotAppear(1f), 0f)
+        assertTrue(VellumSpotShader.contains("appear = progress"))
     }
 }

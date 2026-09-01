@@ -175,7 +175,8 @@ With G1, the intermediate Send list is **optional**:
 - Pale even gold wash per verse (`inkSpotHighlight(fillBox = true)`
   with `LocalQuranAccents.gold` at ~26% alpha). Rounded rectangle,
   fibre on the rim only, type stays readable. Not a pooled blob, not
-  an oval.
+  an oval. Size and opacity interpolate together (fade in on mark,
+  fade out on unmark).
 - Recitation wash punches through the blot: unread words fade into the
   stain. Never paint a cream rectangle of page paper over the soak.
 - No border, elevation, or Material ripple

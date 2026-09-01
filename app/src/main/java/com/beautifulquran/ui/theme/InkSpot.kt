@@ -49,8 +49,9 @@ import kotlin.math.sin
  * splash a different grain. The stain lands and spreads in 170 ms.
  *
  * [fillBox] lays a pale even rounded-rect wash — fibre on the rim
- * only — so verse type stays readable. Grows from a seed; tool-strip
- * drops still land mid-size.
+ * only — so verse type stays readable. Size and opacity both follow
+ * [progress]: select fades in as it grows, deselect fades out as it
+ * recedes. Tool-strip drops still land mid-size.
  */
 @Composable
 fun Modifier.inkSpotHighlight(
@@ -100,7 +101,7 @@ fun Modifier.inkSpotHighlight(
                 val ry = cy * (0.36f + 0.57f * progress)
                 val cr = minOf(rx, ry) * 0.12f
                 drawRoundRect(
-                    color.copy(alpha = 0.12f * progress),
+                    color.copy(alpha = inkSpotAppear(progress) * color.alpha),
                     topLeft = Offset(cx - rx, cy - ry),
                     size = Size(rx * 2f, ry * 2f),
                     cornerRadius = CornerRadius(cr, cr),
@@ -208,6 +209,9 @@ fun <T> InkSpotChoiceRow(
         Text(text = label(entry), style = textStyle, color = ink)
     }
 }
+
+/** Pigment follows [progress] so select fades in and deselect fades out. */
+internal fun inkSpotAppear(progress: Float): Float = progress.coerceIn(0f, 1f)
 
 /** Closed cubic blot. [scale] > 1 draws the fainter outer soak. */
 fun inkSpotPath(

@@ -459,8 +459,9 @@ The ink-spot is a circular drop of ink on vellum: a round pooled
 centre, a fibre rim, and a capillary halo that fades before the box
 edge so nothing clips. It spreads in 170 ms. `fillBox` lays a **pale even gold rounded-rect
 wash** under a verse: modest corner rounding, fibre only on the rim,
-no central pool, so the type stays readable. Neighbouring soaks keep a
-paper gutter.
+no central pool, so the type stays readable. Size and opacity interpolate
+together — select fades in as it grows, deselect fades out as it recedes.
+Neighbouring soaks keep a paper gutter.
 Recitation wash punches through the blot (unread words fade into the
 stain) instead of painting a cream hole of page paper over it. On
 Android 13+ that GPU field *is* the stain; older platforms keep a

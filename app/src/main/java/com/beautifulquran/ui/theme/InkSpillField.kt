@@ -438,7 +438,7 @@ internal const val VellumSpotShader = """
             density = 1.0 / (1.0 + exp(sdf / diffusion));
             // Kill the long logistic halo so the silhouette stays a rectangle.
             density *= 1.0 - smoother(clamp((sdf - 6.0) / 5.0, 0.0, 1.0));
-            appear = smoother(clamp(progress * 5.0, 0.0, 1.0));
+            appear = progress;
             float2 boxEdge = abs(fragCoord - 0.5 * res) / max(0.5 * res, float2(1.0));
             r = max(boxEdge.x, boxEdge.y);
         } else {
