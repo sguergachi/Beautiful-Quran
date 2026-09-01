@@ -126,7 +126,7 @@ becomes share tools; multi is extension) without taxing bookmark.
 - Primary: short-tap `﴿N﴾` reveals a quiet colophon line under that verse:
   **Share** (and optionally **Write**). Tapping **Share**:
   - pauses playback
-  - selects *that* verse (`1` + soft gold-yellow wash under the ayah block)
+  - selects *that* verse (`1` + vellum ink spread under the ayah block)
   - replaces the player bar with the **share ribbon**
 - Optional power entry: long-press **verse body** (not seal) jumps straight
   into share-select with that verse checked. Only if body vs seal long-press
@@ -145,10 +145,10 @@ becomes share tools; multi is extension) without taxing bookmark.
 **Select / unselect**
 
 - Tap any verse to toggle membership while in share mode
-- Selected: soft feathered **gold-yellow paper wash** under the full ayah
-  block (primary signal); Western ordinal in Garamond ink on the bookmark
-  swallowtail (secondary). Gold stays the ayah mark. Chrome never uses
-  Arabic-Indic digits.
+- Selected: the vellum ink-spot shader spreads as an oval blot under the
+  ayah (primary signal) — same pigment as Settings marks, not gold.
+  Western ordinal in Garamond ink on the bookmark swallowtail (secondary).
+  Gold stays the ayah mark. Chrome never uses Arabic-Indic digits.
 - Unselected: wash recedes — that *is* the unselect feedback
 - Ordinals renumber when a verse is dropped
 
@@ -171,10 +171,11 @@ With G1, the intermediate Send list is **optional**:
 
 ### Visual rules for the wash
 
-- Soft, feathered gold-yellow tint on paper — ink soak, not a hard rectangle
+- Vellum ink-spot shader as an oval blot that spreads under the ayah —
+  same pigment as Settings marks (`inkSpotHighlight(fillBox = true)`).
+  Not gold: gold is the ayah mark
 - No border, elevation, or Material ripple
-- Works on Paper / Nightfall / Royal (theme tokens, not fixed hex that
-  only looks right on one theme)
+- Works on Paper / Nightfall / Royal (page ink, not a fixed hex)
 - Must remain visible while scrolling
 
 ## Explicit non-goals (this rework)

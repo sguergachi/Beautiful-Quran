@@ -437,9 +437,11 @@ may use them** — they are not Settings-only, which is where they started.
 
 The ink-spot is a circular drop of ink on vellum: a round pooled
 centre, a fibre rim, and a capillary halo that fades before the box
-edge so nothing clips. It spreads in 170 ms. On Android 13+ the same
-progressive-vellum pigment the contextual guides use (hash, fibre,
-tooth, glaze) *is* the stain; older platforms keep three soft circles.
+edge so nothing clips. It spreads in 170 ms. `fillBox` stretches the
+same pigment into an oval that soaks the modifier's bounds (gather
+selection). On Android 13+ the same progressive-vellum pigment the
+contextual guides use (hash, fibre, tooth, glaze) *is* the stain;
+older platforms keep three soft circles.
 
 The circle is a filled calligraphic stroke on an oval centreline: it overshoots
 its own join at both ends and bows outward on entry / inward on exit, so the tips

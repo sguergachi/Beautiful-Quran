@@ -18,6 +18,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.ShaderBrush
@@ -44,21 +45,27 @@ import kotlin.math.sin
  * soaks the progressive-vellum pigment as a round stain with a fibre
  * rim; older platforms keep three soft circles. [seed] keeps each
  * splash a different grain. The stain lands and spreads in 170 ms.
+ *
+ * [fillBox] spreads the same pigment as an oval that fills this
+ * modifier's bounds — a verse-sized soak, not a tool-strip drop.
  */
 @Composable
 fun Modifier.inkSpotHighlight(
     selected: Boolean,
     seed: Int,
     color: Color = MaterialTheme.colorScheme.onSurface,
+    fillBox: Boolean = false,
+    durationMillis: Int = 170,
 ): Modifier {
     val progress by animateFloatAsState(
         targetValue = if (selected) 1f else 0f,
-        animationSpec = tween(durationMillis = 170, easing = FastOutSlowInEasing),
+        animationSpec = tween(durationMillis = durationMillis, easing = FastOutSlowInEasing),
         label = "inkSpot",
     )
     val shader = rememberVellumSpotShader()
     val brush = remember(shader) { shader?.let { ShaderBrush(it) } }
     val tuning = ContextualGuideStyle.tuning
+    val fill = if (fillBox) 1f else 0f
     return drawBehind {
         if (progress <= 0.01f) return@drawBehind
         if (shader != null && brush != null) {
@@ -67,6 +74,7 @@ fun Modifier.inkSpotHighlight(
             shader.setFloatUniform("seed", seed.toFloat())
             shader.setFloatUniform("fadeSoftness", tuning.fadeSoftness)
             shader.setFloatUniform("vellumGrain", tuning.vellumGrain)
+            shader.setFloatUniform("fill", fill)
             shader.setColorUniform(
                 "inkColor",
                 android.graphics.Color.valueOf(
@@ -78,11 +86,23 @@ fun Modifier.inkSpotHighlight(
             )
             drawRect(brush)
         } else {
-            val reach = minOf(size.width, size.height) * 0.5f
-            val center = Offset(size.width * 0.5f, size.height * 0.5f)
-            drawCircle(color.copy(alpha = 0.06f * progress), radius = reach * 0.92f, center = center)
-            drawCircle(color.copy(alpha = 0.10f * progress), radius = reach * 0.74f, center = center)
-            drawCircle(color.copy(alpha = 0.16f * progress), radius = reach * 0.56f, center = center)
+            val cx = size.width * 0.5f
+            val cy = size.height * 0.5f
+            val center = Offset(cx, cy)
+            if (fillBox) {
+                val rx = cx * progress
+                val ry = cy * progress
+                drawOval(
+                    color.copy(alpha = 0.08f * progress),
+                    topLeft = Offset(cx - rx, cy - ry),
+                    size = Size(rx * 2f, ry * 2f),
+                )
+            } else {
+                val reach = minOf(size.width, size.height) * 0.5f
+                drawCircle(color.copy(alpha = 0.06f * progress), radius = reach * 0.92f, center = center)
+                drawCircle(color.copy(alpha = 0.10f * progress), radius = reach * 0.74f, center = center)
+                drawCircle(color.copy(alpha = 0.16f * progress), radius = reach * 0.56f, center = center)
+            }
         }
     }
 }

@@ -402,24 +402,26 @@ internal const val VellumSpotShader = """
     uniform float seed;
     uniform float fadeSoftness;
     uniform float vellumGrain;
+    uniform float fill;
     layout(color) uniform half4 inkColor;
 """ + VellumPigmentFunctions + """
     half4 main(float2 fragCoord) {
         float2 res = max(resolution, float2(1.0, 1.0));
-        float reach = 0.5 * min(res.x, res.y);
+        float circleAxis = 0.5 * min(res.x, res.y);
+        float2 reach = mix(float2(circleAxis), 0.5 * res, fill);
         float2 origin = fragCoord + float2(seed * 17.0, seed * 11.0);
         float2 center = 0.5 * res + (float2(
             hash(float2(seed, 1.3)),
             hash(float2(seed, 4.7))
         ) - 0.5) * reach * 0.04;
-        float2 p = (fragCoord - center) / reach;
+        float2 p = (fragCoord - center) / max(reach, float2(1.0));
         float r = length(p);
         float ang = atan(p.y, p.x);
         float fibre = brushedPigment(origin);
-        // Rim-only irregularity — the drop stays a circle.
+        // Rim-only irregularity — the drop stays a circle (or an oval when fill).
         float rimWobble = 0.025 * sin(ang * 3.0 + seed)
             + 0.02 * (fibre - 0.5);
-        float radius = 0.56 + rimWobble;
+        float radius = mix(0.56, 1.38, fill) + rimWobble;
         float soak = mix(0.55, 1.0, progress);
         float edge = r - radius * soak;
         float body = 1.0 - smoother(clamp(edge / 0.18 + 0.15, 0.0, 1.0));
@@ -436,7 +438,8 @@ internal const val VellumSpotShader = """
             1.0
         );
         // Hard zero before the box edge so Compose never shears the drop.
-        density *= 1.0 - smoother(clamp((r - 0.92) / 0.08, 0.0, 1.0));
+        float clipStart = mix(0.92, 1.50, fill);
+        density *= 1.0 - smoother(clamp((r - clipStart) / 0.08, 0.0, 1.0));
         float coverage = vellumCoverage(density);
         half alpha = inkColor.a * half(coverage * progress);
         return half4(inkColor.rgb * alpha, alpha);

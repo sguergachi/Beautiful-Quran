@@ -83,7 +83,6 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.Paint
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shadow
@@ -148,6 +147,7 @@ import com.beautifulquran.ui.theme.TranslationFontFamily
 import com.beautifulquran.ui.theme.generatedFieldWeave
 import com.beautifulquran.ui.theme.gilded
 import com.beautifulquran.ui.theme.glyphLayerAlpha
+import com.beautifulquran.ui.theme.inkSpotHighlight
 import com.beautifulquran.ui.theme.letterFadeIn
 import com.beautifulquran.ui.theme.ornament.chapterOrnamentSeed
 import com.beautifulquran.ui.theme.ornament.generateChapterOrnament
@@ -2745,16 +2745,6 @@ fun AyahBlock(
         label = "translationRecess",
     )
 
-    val gold = LocalQuranAccents.current.gold
-    val paper = MaterialTheme.colorScheme.background
-    val soak = if (paper.luminance() > 0.5f) 0.14f else 0.10f
-    val shareWash = gatherOrdinal != null
-    val washAlpha by animateFloatAsState(
-        targetValue = if (shareWash) 1f else 0f,
-        animationSpec = tween(280, easing = FastOutSlowInEasing),
-        label = "shareWash",
-    )
-
     // The ribbon is part of the verse block itself — same Box, same height —
     // so it never "follows" from a floating overlay. Text keeps the existing
     // horizontal inset; the ribbon sits in the outer margin opposite the
@@ -2763,19 +2753,12 @@ fun AyahBlock(
         modifier = Modifier
             .fillMaxWidth()
             .graphicsLayer { alpha = blockAlpha.value }
-            .drawBehind {
-                if (washAlpha < 0.01f) return@drawBehind
-                val wash = gold.copy(alpha = soak * washAlpha)
-                val fade = gold.copy(alpha = 0f)
-                drawRect(
-                    brush = Brush.verticalGradient(
-                        0f to fade,
-                        0.14f to wash,
-                        0.86f to wash,
-                        1f to fade,
-                    ),
-                )
-            },
+            .inkSpotHighlight(
+                selected = gatherOrdinal != null,
+                seed = ayah.surahId * 1_000 + ayah.number,
+                fillBox = true,
+                durationMillis = 280,
+            ),
     ) {
         Column(
             modifier = Modifier

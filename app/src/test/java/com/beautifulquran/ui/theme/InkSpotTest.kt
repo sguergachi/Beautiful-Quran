@@ -45,5 +45,7 @@ class InkSpotTest {
         assertTrue(VellumSpotShader.contains("float soak"))
         assertTrue(VellumSpotShader.contains("float halo"))
         assertTrue(VellumSpotShader.contains("rimWobble"))
+        assertTrue(VellumSpotShader.contains("uniform float fill"))
+        assertTrue(VellumSpotShader.contains("mix(float2(circleAxis), 0.5 * res, fill)"))
     }
 }
