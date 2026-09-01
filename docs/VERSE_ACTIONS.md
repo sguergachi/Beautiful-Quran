@@ -172,10 +172,9 @@ With G1, the intermediate Send list is **optional**:
 
 ### Visual rules for the wash
 
-- Green vellum ink soak per verse (`inkSpotHighlight(fillBox = true)`
-  with primary green). A rounded, fibre-warped rectangle using the
-  same progressive-vellum diffusion as the contextual guides. Not an
-  oval, not a gray slab, not gold.
+- Pale even green wash per verse (`inkSpotHighlight(fillBox = true)`
+  with primary at ~20% alpha). Rounded rectangle, fibre on the rim
+  only, type stays readable. Not a pooled blob, not an oval, not gold.
 - Recitation wash punches through the blot: unread words fade into the
   stain. Never paint a cream rectangle of page paper over the soak.
 - No border, elevation, or Material ripple

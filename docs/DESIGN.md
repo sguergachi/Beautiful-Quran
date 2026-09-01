@@ -457,11 +457,10 @@ may use them** — they are not Settings-only, which is where they started.
 
 The ink-spot is a circular drop of ink on vellum: a round pooled
 centre, a fibre rim, and a capillary halo that fades before the box
-edge so nothing clips. It spreads in 170 ms. `fillBox` soaks a verse as a **rounded
-rectangle** whose edge is warped by the same progressive-vellum
-diffusion as the contextual guides (logistic coverage, clouds + fibre,
-pigment reservoir) — ink on paper, not an oval and not a hard box.
-Paper still shows at the corners so neighbouring soaks do not fuse.
+edge so nothing clips. It spreads in 170 ms. `fillBox` lays a **pale even rounded-rect wash**
+under a verse: modest corner rounding, fibre only on the rim, no
+central pool, so the type stays readable. Neighbouring soaks keep a
+paper gutter.
 Recitation wash punches through the blot (unread words fade into the
 stain) instead of painting a cream hole of page paper over it. On
 Android 13+ that GPU field *is* the stain; older platforms keep a

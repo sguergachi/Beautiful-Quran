@@ -48,9 +48,9 @@ import kotlin.math.sin
  * rim; older platforms keep three soft circles. [seed] keeps each
  * splash a different grain. The stain lands and spreads in 170 ms.
  *
- * [fillBox] soaks the bounds as a rounded, fibre-warped rectangle
- * using the guide's progressive-vellum diffusion. Verse soaks grow
- * from a seed; tool-strip drops still land mid-size.
+ * [fillBox] lays a pale even rounded-rect wash — fibre on the rim
+ * only — so verse type stays readable. Grows from a seed; tool-strip
+ * drops still land mid-size.
  */
 @Composable
 fun Modifier.inkSpotHighlight(
@@ -96,11 +96,11 @@ fun Modifier.inkSpotHighlight(
             val cy = size.height * 0.5f
             val center = Offset(cx, cy)
             if (fillBox) {
-                val rx = cx * 0.88f * progress
-                val ry = cy * 0.88f * progress
-                val cr = minOf(rx, ry) * 0.24f
+                val rx = cx * 0.93f * progress
+                val ry = cy * 0.93f * progress
+                val cr = minOf(rx, ry) * 0.12f
                 drawRoundRect(
-                    color.copy(alpha = 0.22f * progress),
+                    color.copy(alpha = 0.12f * progress),
                     topLeft = Offset(cx - rx, cy - ry),
                     size = Size(rx * 2f, ry * 2f),
                     cornerRadius = CornerRadius(cr, cr),

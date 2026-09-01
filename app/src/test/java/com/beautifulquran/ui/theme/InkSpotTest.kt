@@ -54,8 +54,8 @@ class InkSpotTest {
         assertTrue(VellumSpotShader.contains("abs(p) - halfSize"))
         assertTrue(VellumSpotShader.contains("min(max(q.x, q.y), 0.0)"))
         assertTrue(VellumSpotShader.contains("1.0 / (1.0 + exp(sdf / diffusion))"))
-        assertTrue(VellumSpotShader.contains("noise(origin * float2(0.006, 0.008))"))
-        assertTrue(VellumFieldShader.contains("noise(fragCoord * float2(0.006, 0.008))"))
+        assertTrue(VellumSpotShader.contains("rimGate"))
+        assertTrue(VellumSpotShader.contains("sourcePool * (1.0 - fill)"))
         assertFalse(VellumSpotShader.contains("midpoint - r + warp"))
     }
 }

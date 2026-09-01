@@ -414,27 +414,30 @@ internal const val VellumSpotShader = """
         float appear;
         float r;
         if (fill > 0.5) {
-            // Rounded-rect SDF, then the guide's clouds/fibre field warps
-            // only the edge — a rectangular soak, not an ellipse.
+            // Pale even rounded-rect. Fibre warps the rim only — a
+            // wash the type can sit on, not a pooled airbrush blob.
             float2 center = 0.5 * res + (float2(
                 hash(float2(seed, 1.3)),
                 hash(float2(seed, 4.7))
-            ) - 0.5) * res * 0.012;
+            ) - 0.5) * res * 0.006;
             float2 p = fragCoord - center;
-            float2 halfSize = 0.5 * res * mix(0.10, 0.88, progress);
-            float cr = min(halfSize.x, halfSize.y) * 0.24;
+            float2 halfSize = 0.5 * res * mix(0.12, 0.93, progress);
+            float cr = min(halfSize.x, halfSize.y) * 0.12;
             float2 q = abs(p) - halfSize + cr;
             float sdf = length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - cr;
             float clouds = noise(origin * float2(0.006, 0.008)) * 0.65
                 + noise(origin * float2(0.017, 0.021)) * 0.35;
             float fibres = noise(origin * float2(0.055, 0.071));
             float texture = (clouds - 0.5) + (fibres - 0.5) * 0.18;
-            float lobes = noise(float2(seed, seed) + fragCoord * 0.012) - 0.5;
-            float warp = (texture * 0.10 + (fibre - 0.5) * 0.06 + lobes * 0.05)
-                * min(halfSize.x, halfSize.y);
+            float lobes = noise(float2(seed, seed) + fragCoord * 0.018) - 0.5;
+            float rimGate = smoother(clamp(1.0 + sdf / 10.0, 0.0, 1.0));
+            float warp = (texture * 0.028 + (fibre - 0.5) * 0.018 + lobes * 0.016)
+                * min(halfSize.x, halfSize.y) * rimGate;
             sdf -= warp;
-            float diffusion = max(8.0, 0.11 * min(res.x, res.y));
+            float diffusion = 4.5;
             density = 1.0 / (1.0 + exp(sdf / diffusion));
+            // Kill the long logistic halo so the silhouette stays a rectangle.
+            density *= 1.0 - smoother(clamp((sdf - 6.0) / 5.0, 0.0, 1.0));
             appear = smoother(clamp(progress * 5.0, 0.0, 1.0));
             float2 boxEdge = abs(fragCoord - 0.5 * res) / max(0.5 * res, float2(1.0));
             r = max(boxEdge.x, boxEdge.y);
@@ -461,20 +464,23 @@ internal const val VellumSpotShader = """
             appear = progress;
         }
         float rim = 4.0 * density * (1.0 - density);
-        float grain = max(vellumGrain, 0.08);
+        // Verse washes keep grain on the rim; a drop may mottle its pool.
+        float grain = mix(max(vellumGrain, 0.08), vellumGrain, fill);
+        float grainAmp = mix(1.6 + 2.2 * rim, 0.35 + 2.4 * rim, fill);
         density = clamp(
-            density * (1.0 + (fibre - 0.5) * grain * (1.6 + 2.2 * rim))
+            density * (1.0 + (fibre - 0.5) * grain * grainAmp)
                 + (hash(floor(origin)) - 0.5) * rim / 200.0,
             0.0,
             1.0
         );
         // Hard zero before the box edge so Compose never shears the drop.
-        float clipStart = mix(0.92, 1.06, fill);
-        density *= 1.0 - smoother(clamp((r - clipStart) / 0.10, 0.0, 1.0));
+        float clipStart = mix(0.92, 0.985, fill);
+        density *= 1.0 - smoother(clamp((r - clipStart) / 0.08, 0.0, 1.0));
         float coverage = vellumCoverage(density);
-        // Guide reservoir: denser pigment in the body, not a flat oval.
+        // Circular drops pool in the centre. Verse washes stay even so
+        // the type remains readable.
         float sourcePool = smoother(clamp((0.55 - r) / 0.55, 0.0, 1.0));
-        coverage = 1.0 - pow(1.0 - coverage, 1.0 + 0.55 * sourcePool * fill);
+        coverage = 1.0 - pow(1.0 - coverage, 1.0 + 0.55 * sourcePool * (1.0 - fill));
         half alpha = inkColor.a * half(coverage * appear);
         return half4(inkColor.rgb * alpha, alpha);
     }
