@@ -19,8 +19,9 @@ import kotlin.math.pow
  *       the margin above it
  *    1  head gutter — a whole line's pitch, the figure the grid names
  *  15   the revelation — the Madinah page's own grid
+ * 0.55  foot — paper under the last line, before the folio's band
  *  ---
- * 16.30
+ * 16.85
  * ```
  *
  * The tail and the folio used to close that list, and the leaf paid for both:
@@ -77,6 +78,28 @@ object MushafGrid {
     const val HEAD_GUTTER = 1.00f
     const val TEXT_LINES = MUSHAF_LINES_PER_PAGE
     /**
+     * Paper under the last line of the leaf.
+     *
+     * It was taken out with the folio, on the reasoning that nothing stands
+     * under the text any more — and that was true only for as long as the text
+     * did not reach the foot. The pagination counted characters into the leaf
+     * and always left a line or so unspent, and that unspent line was doing the
+     * work of a foot margin without anybody having asked it to. Measuring the
+     * leaf instead of counting it ([EnglishLeafRuler]) took the accident away:
+     * the last line's descenders came down to 2,076 px on a device where the
+     * folio's own ink begins at 2,064, so the page number was being set *into*
+     * the text.
+     *
+     * A page has a foot. This is it, and it is a real band of the grid rather
+     * than a slack the arithmetic happens to leave: the leaf grows by it, so
+     * the type comes down about three percent and the well holds the same
+     * number of lines, each a little longer. It is not the head's 1.30 — the
+     * folio and the dial stand below it and carry their own air — but it is
+     * enough that the last line and the page number are two things.
+     */
+    const val TAIL = 0.55f
+
+    /**
      * The folio's band — no longer a band *of the leaf*. The figure stands in
      * the air above the dial's rule, so the leaf's own height ends with the
      * last line of text and the folio is furniture of the sheet, sitting with
@@ -88,7 +111,7 @@ object MushafGrid {
     const val FOLIO = 0.40f
 
     /** The whole leaf, in units. */
-    const val SLOTS = RUNNING_HEAD + HEAD_GUTTER + TEXT_LINES
+    const val SLOTS = RUNNING_HEAD + HEAD_GUTTER + TEXT_LINES + TAIL
 
     /** One line's pitch: the leaf divided by its slots. */
     fun unitPx(leafHeightPx: Float): Float =
@@ -120,9 +143,10 @@ object MushafGrid {
  * canonical gutter, which was sized for exactly this: "a head that sits closer
  * than about a line's pitch reads as part of the block".
  *
- * Neither carries a tail or a folio any more. Both stood under the text and
- * both have gone to the dial's head air; the leaf ends where the revelation
- * does. The two settings no longer sum to the same figure because of it — the
+ * Neither carries a folio any more: it stood under the text and has gone to the
+ * dial's head air. The tail stayed behind it, because a page has a foot and the
+ * text now reaches it. The two settings still do not sum to the same figure —
+ * the
  * English gutter is half a unit wider than the Arabic one — so each divides
  * the leaf by its own [slots] rather than by one shared total. That total was
  * only ever a convenience: what a leaf must not do is spend more height than
@@ -132,8 +156,10 @@ data class MushafLeafBands(
     val runningHead: Float,
     val headGutter: Float,
     val well: Float,
+    /** Paper under the last line — see [MushafGrid.TAIL]. */
+    val tail: Float,
 ) {
-    val slots: Float get() = runningHead + headGutter + well
+    val slots: Float get() = runningHead + headGutter + well + tail
 
     /** One line's pitch on this leaf: its height divided by its own slots. */
     fun unitPx(leafHeightPx: Float): Float = (leafHeightPx / slots).coerceAtLeast(1f)
@@ -144,6 +170,7 @@ val MUSHAF_ENGLISH_BANDS = MushafLeafBands(
     runningHead = MushafGrid.RUNNING_HEAD,
     headGutter = MushafGrid.HEAD_GUTTER,
     well = MushafGrid.TEXT_LINES.toFloat(),
+    tail = MushafGrid.TAIL,
 )
 
 /** The display bands: the furniture gives a unit up for a sixteenth row. */
@@ -155,6 +182,7 @@ val MUSHAF_ARABIC_BANDS = MushafLeafBands(
     // under an English block.
     headGutter = 0.50f,
     well = MUSHAF_DISPLAY_LINES_PER_PAGE.toFloat(),
+    tail = MushafGrid.TAIL,
 )
 
 fun mushafLeafBands(english: Boolean): MushafLeafBands =

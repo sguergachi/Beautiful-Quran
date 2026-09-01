@@ -18,7 +18,7 @@ class MushafLeafBandsTest {
         val leaf = 2004f
         for (bands in listOf(MUSHAF_ARABIC_BANDS, MUSHAF_ENGLISH_BANDS)) {
             val unit = bands.unitPx(leaf)
-            val spent = (bands.runningHead + bands.headGutter + bands.well) * unit
+            val spent = (bands.runningHead + bands.headGutter + bands.well + bands.tail) * unit
             assertEquals(leaf, spent, 0.5f)
         }
         // The English leaf is the canonical grid; the Arabic one buys a row.
@@ -26,16 +26,24 @@ class MushafLeafBandsTest {
     }
 
     @Test
-    fun `neither leaf pays for the folio any more`() {
-        // It stands in the dial's head air, so the leaf's height ends with the
-        // revelation and the English hand gets a twenty-third line for it.
+    fun `neither leaf pays for the folio, and both keep a foot`() {
+        // The folio stands in the dial's head air. The foot stayed on the leaf,
+        // because the text reaches it now that the leaf is measured rather than
+        // counted, and a page whose descenders reach its page number has none.
         assertEquals(
-            MushafGrid.RUNNING_HEAD + MushafGrid.HEAD_GUTTER + MushafGrid.TEXT_LINES,
+            MushafGrid.RUNNING_HEAD + MushafGrid.HEAD_GUTTER + MushafGrid.TEXT_LINES +
+                MushafGrid.TAIL,
             MUSHAF_ENGLISH_BANDS.slots,
             0.0001f,
         )
+        assertEquals(MushafGrid.TAIL, MUSHAF_ENGLISH_BANDS.tail, 0f)
+        assertEquals(MushafGrid.TAIL, MUSHAF_ARABIC_BANDS.tail, 0f)
+        // The English leaf is still ahead of where the folio's band left it —
+        // it gave up 0.40 for the folio and 0.35 for a tail, and buys the foot
+        // back for 0.55. The Arabic leaf pays a little: its tail was 0.05, and
+        // a leaf whose revelation reaches the page number has no foot at all.
         assertTrue(MUSHAF_ENGLISH_BANDS.well / MUSHAF_ENGLISH_BANDS.slots > 15f / 17.05f)
-        assertTrue(MUSHAF_ARABIC_BANDS.well / MUSHAF_ARABIC_BANDS.slots > 16f / 17.05f)
+        assertTrue(MUSHAF_ARABIC_BANDS.tail > 0.05f)
     }
 
     @Test

@@ -7,16 +7,20 @@ import org.junit.Test
 class MushafGridTest {
 
     @Test
-    fun `fifteen of the leaf's units are revelation and the head takes the rest`() {
-        assertEquals(16.30f, MushafGrid.SLOTS, 0.001f)
+    fun `fifteen of the leaf's units are revelation and the furniture takes the rest`() {
+        assertEquals(16.85f, MushafGrid.SLOTS, 0.001f)
         assertEquals(15, MushafGrid.TEXT_LINES)
         // The head and its gutter stand clear without spending a second line,
-        // and nothing at all stands under the text: the folio is the dial's.
+        // and the foot is paper under the last line — the folio itself stands
+        // below the leaf, in the dial's own band.
         assertEquals(
             MushafGrid.SLOTS - MushafGrid.TEXT_LINES,
-            MushafGrid.RUNNING_HEAD + MushafGrid.HEAD_GUTTER,
+            MushafGrid.RUNNING_HEAD + MushafGrid.HEAD_GUTTER + MushafGrid.TAIL,
             0.001f,
         )
+        // A page has a foot, and it is smaller than its head: the folio and the
+        // dial stand under it and carry air of their own.
+        assertTrue(MushafGrid.TAIL < MushafGrid.RUNNING_HEAD + MushafGrid.HEAD_GUTTER)
     }
 
     @Test
@@ -27,6 +31,7 @@ class MushafGridTest {
             MushafGrid.RUNNING_HEAD,
             MushafGrid.HEAD_GUTTER,
             MushafGrid.TEXT_LINES.toFloat(),
+            MushafGrid.TAIL,
         )
         assertEquals(leaf, bands.sum() * unit, 0.5f)
         assertEquals(MushafGrid.textWellPx(leaf), unit * 15, 0.01f)

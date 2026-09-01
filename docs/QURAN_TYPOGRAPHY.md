@@ -832,9 +832,9 @@ unaccounted for at the other. They spend the leaf differently because their ink
 does:
 
 ```
-                head   gutter   well   = slots
-    Arabic      0.30     0.50     16     16.80
-    English     0.30     1.00     15     16.30
+                head   gutter   well   foot   = slots
+    Arabic      0.30     0.50     16     0.55    17.35
+    English     0.30     1.00     15     0.55    16.85
 ```
 
 The Arabic leaf spends almost nothing on the gutter and buys a sixteenth row of
@@ -845,7 +845,8 @@ sixteenth row to buy, and its ink stops *exactly* at the ascent and the
 descender, so it keeps the canonical gutter, which was sized for precisely this:
 a head that sits closer than about a line's pitch reads as part of the block.
 
-**Nothing stands under the text.** There used to be a tail and a folio band —
+**The folio does not stand under the text; the foot does.** There used to be a
+tail and a folio band —
 0.35 of a unit of paper and 0.40 for the figure, three quarters of a line spent
 below the last line of every leaf in the book — and both have gone. The folio
 now stands in the air the dial already kept above its rule (`MushafDialHeadAir`,
@@ -854,7 +855,18 @@ band it shares with the transport. That is where a folio belongs on a device:
 the page number is furniture of the frame, not of the paper, and the reader's
 thumb is already down there.
 
-The leaf keeps the three quarters of a line. On the Arabic hand it goes into
+The tail came back, and it took the leaf being *measured* to show why it had to.
+While the pagination counted characters into a leaf it always left a line or so
+unspent, and that unspent line was doing the work of a foot margin without
+anyone having asked it to. The ruler took the accident away and the last line's
+descenders came down to 2,076 px on a device whose folio begins its ink at
+2,064: the page number was being set into the text. So 0.55 of a unit, a real
+band rather than a slack — the leaf grows by it, so the type comes down about
+three percent and the well holds the same lines, each a little longer. It is not
+the head's 1.30, because the folio and the dial stand below it with air of their
+own; measured after, the foot runs 84 to 95 px on every leaf.
+
+The leaf keeps the rest of the three quarters of a line. On the Arabic hand it goes into
 type size, since the well's share of the leaf rises from 16 / 17.05 to 16 /
 16.80. On the English hand, whose type is solved from the well, it is a whole
 extra line: the well's share rises from 15 / 17.05 to 15 / 16.30, 4.6 % more

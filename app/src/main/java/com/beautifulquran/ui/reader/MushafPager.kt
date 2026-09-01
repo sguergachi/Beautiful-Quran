@@ -1318,6 +1318,10 @@ internal fun MushafPager(
                             modifier = wellModifier,
                         )
                     }
+                    // The leaf's foot. The folio stands below it in the dial's
+                    // own band, so this is the paper between the last line and
+                    // the page number.
+                    Spacer(Modifier.height(unit * bands.tail))
                 }
             }
         }
