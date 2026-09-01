@@ -2,6 +2,7 @@ package com.beautifulquran.ui.theme
 
 import android.graphics.RuntimeShader
 import android.os.Build
+import androidx.compose.animation.core.Easing
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -48,6 +49,7 @@ import kotlin.math.sin
  *
  * [fillBox] spreads the same pigment as an oval that fills this
  * modifier's bounds — a verse-sized soak, not a tool-strip drop.
+ * Verse soaks grow from a seed; tool-strip drops still land mid-size.
  */
 @Composable
 fun Modifier.inkSpotHighlight(
@@ -56,10 +58,11 @@ fun Modifier.inkSpotHighlight(
     color: Color = MaterialTheme.colorScheme.onSurface,
     fillBox: Boolean = false,
     durationMillis: Int = 170,
+    easing: Easing = FastOutSlowInEasing,
 ): Modifier {
     val progress by animateFloatAsState(
         targetValue = if (selected) 1f else 0f,
-        animationSpec = tween(durationMillis = durationMillis, easing = FastOutSlowInEasing),
+        animationSpec = tween(durationMillis = durationMillis, easing = easing),
         label = "inkSpot",
     )
     val shader = rememberVellumSpotShader()

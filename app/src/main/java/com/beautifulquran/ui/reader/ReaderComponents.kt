@@ -147,6 +147,7 @@ import com.beautifulquran.ui.theme.TranslationFontFamily
 import com.beautifulquran.ui.theme.generatedFieldWeave
 import com.beautifulquran.ui.theme.gilded
 import com.beautifulquran.ui.theme.glyphLayerAlpha
+import com.beautifulquran.ui.theme.InkExpandEasing
 import com.beautifulquran.ui.theme.inkSpotHighlight
 import com.beautifulquran.ui.theme.letterFadeIn
 import com.beautifulquran.ui.theme.ornament.chapterOrnamentSeed
@@ -2757,7 +2758,8 @@ fun AyahBlock(
                 selected = gatherOrdinal != null,
                 seed = ayah.surahId * 1_000 + ayah.number,
                 fillBox = true,
-                durationMillis = 280,
+                durationMillis = 400,
+                easing = InkExpandEasing,
             ),
     ) {
         Column(

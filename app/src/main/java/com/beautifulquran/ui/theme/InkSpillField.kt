@@ -422,7 +422,8 @@ internal const val VellumSpotShader = """
         float rimWobble = 0.025 * sin(ang * 3.0 + seed)
             + 0.02 * (fibre - 0.5);
         float radius = mix(0.56, 1.38, fill) + rimWobble;
-        float soak = mix(0.55, 1.0, progress);
+        // Tool-strip drops start mid-size; a verse soak grows from a seed.
+        float soak = mix(mix(0.55, 0.06, fill), 1.0, progress);
         float edge = r - radius * soak;
         float body = 1.0 - smoother(clamp(edge / 0.18 + 0.15, 0.0, 1.0));
         float pool = 1.0 - smoother(clamp(r / 0.34, 0.0, 1.0));
@@ -441,7 +442,10 @@ internal const val VellumSpotShader = """
         float clipStart = mix(0.92, 1.50, fill);
         density *= 1.0 - smoother(clamp((r - clipStart) / 0.08, 0.0, 1.0));
         float coverage = vellumCoverage(density);
-        half alpha = inkColor.a * half(coverage * progress);
+        // Verse soaks are opaque while they grow so the spread reads as ink,
+        // not a fade. Tool-strip drops still ride progress for alpha.
+        float appear = mix(progress, smoother(clamp(progress * 5.0, 0.0, 1.0)), fill);
+        half alpha = inkColor.a * half(coverage * appear);
         return half4(inkColor.rgb * alpha, alpha);
     }
 """
