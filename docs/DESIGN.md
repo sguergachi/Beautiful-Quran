@@ -457,10 +457,10 @@ may use them** — they are not Settings-only, which is where they started.
 
 The ink-spot is a circular drop of ink on vellum: a round pooled
 centre, a fibre rim, and a capillary halo that fades before the box
-edge so nothing clips. It spreads in 170 ms. `fillBox` soaks a verse
-with the **same progressive-vellum diffusion as the contextual guides**
-(logistic coverage, clouds + fibre warp, pigment reservoir) so the
-mark reads as ink spreading into the paper, not a box-fitted oval.
+edge so nothing clips. It spreads in 170 ms. `fillBox` soaks a verse as a **rounded
+rectangle** whose edge is warped by the same progressive-vellum
+diffusion as the contextual guides (logistic coverage, clouds + fibre,
+pigment reservoir) — ink on paper, not an oval and not a hard box.
 Paper still shows at the corners so neighbouring soaks do not fuse.
 Recitation wash punches through the blot (unread words fade into the
 stain) instead of painting a cream hole of page paper over it. On

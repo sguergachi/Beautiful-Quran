@@ -50,12 +50,12 @@ class InkSpotTest {
     }
 
     @Test
-    fun `verse soak uses the guide field diffusion not a box oval`() {
-        assertTrue(VellumSpotShader.contains("1.0 / (1.0 + exp(-absorbed / diffusion))"))
+    fun `verse soak is a fibre-warped rounded rectangle not an oval`() {
+        assertTrue(VellumSpotShader.contains("abs(p) - halfSize"))
+        assertTrue(VellumSpotShader.contains("min(max(q.x, q.y), 0.0)"))
+        assertTrue(VellumSpotShader.contains("1.0 / (1.0 + exp(sdf / diffusion))"))
         assertTrue(VellumSpotShader.contains("noise(origin * float2(0.006, 0.008))"))
-        assertTrue(VellumSpotShader.contains("noise(origin * float2(0.055, 0.071))"))
         assertTrue(VellumFieldShader.contains("noise(fragCoord * float2(0.006, 0.008))"))
-        assertTrue(VellumFieldShader.contains("1.0 / (1.0 + exp(-absorbed / diffusion))"))
-        assertFalse(VellumSpotShader.contains("mix(0.56, 0.84, fill)"))
+        assertFalse(VellumSpotShader.contains("midpoint - r + warp"))
     }
 }

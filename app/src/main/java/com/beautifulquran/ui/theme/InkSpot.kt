@@ -18,6 +18,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
@@ -47,9 +48,9 @@ import kotlin.math.sin
  * rim; older platforms keep three soft circles. [seed] keeps each
  * splash a different grain. The stain lands and spreads in 170 ms.
  *
- * [fillBox] soaks the bounds with the guide's progressive-vellum
- * diffusion — fibre-warped ink, not a box-fitted oval. Verse soaks
- * grow from a seed; tool-strip drops still land mid-size.
+ * [fillBox] soaks the bounds as a rounded, fibre-warped rectangle
+ * using the guide's progressive-vellum diffusion. Verse soaks grow
+ * from a seed; tool-strip drops still land mid-size.
  */
 @Composable
 fun Modifier.inkSpotHighlight(
@@ -95,14 +96,15 @@ fun Modifier.inkSpotHighlight(
             val cy = size.height * 0.5f
             val center = Offset(cx, cy)
             if (fillBox) {
-                val path = inkSpotPath(
-                    width = size.width,
-                    height = size.height,
-                    seed = seed,
-                    pad = minOf(size.width, size.height) * 0.04f,
-                    scale = 0.50f + 0.50f * progress,
+                val rx = cx * 0.88f * progress
+                val ry = cy * 0.88f * progress
+                val cr = minOf(rx, ry) * 0.24f
+                drawRoundRect(
+                    color.copy(alpha = 0.22f * progress),
+                    topLeft = Offset(cx - rx, cy - ry),
+                    size = Size(rx * 2f, ry * 2f),
+                    cornerRadius = CornerRadius(cr, cr),
                 )
-                drawPath(path, color.copy(alpha = 0.22f * progress))
             } else {
                 val reach = minOf(size.width, size.height) * 0.5f
                 drawCircle(color.copy(alpha = 0.06f * progress), radius = reach * 0.92f, center = center)

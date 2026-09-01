@@ -394,8 +394,8 @@ internal const val VellumFieldShader = """
 /**
  * A circular ink drop on vellum. The silhouette is a circle; fibre and
  * a capillary halo live only in the rim so the box never clips a lobe.
- * [progress] grows the soak. [fill] > 0.5 uses the guide field's
- * logistic diffusion — an organic verse soak, not a box-fitted oval.
+ * [progress] grows the soak. [fill] > 0.5 soaks a rounded rectangle
+ * with the guide field's fibre warp — organic, not an oval, not a slab.
  */
 internal const val VellumSpotShader = """
     uniform float2 resolution;
@@ -414,26 +414,30 @@ internal const val VellumSpotShader = """
         float appear;
         float r;
         if (fill > 0.5) {
-            // Same clouds + fibre field as VellumFieldShader, pooled from a
-            // seed so the mark reads as ink spreading into the paper.
-            float2 reach = 0.5 * res;
+            // Rounded-rect SDF, then the guide's clouds/fibre field warps
+            // only the edge — a rectangular soak, not an ellipse.
             float2 center = 0.5 * res + (float2(
                 hash(float2(seed, 1.3)),
                 hash(float2(seed, 4.7))
-            ) - 0.5) * reach * 0.05;
-            float2 p = (fragCoord - center) / max(reach, float2(1.0));
-            r = length(p);
+            ) - 0.5) * res * 0.012;
+            float2 p = fragCoord - center;
+            float2 halfSize = 0.5 * res * mix(0.10, 0.88, progress);
+            float cr = min(halfSize.x, halfSize.y) * 0.24;
+            float2 q = abs(p) - halfSize + cr;
+            float sdf = length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - cr;
             float clouds = noise(origin * float2(0.006, 0.008)) * 0.65
                 + noise(origin * float2(0.017, 0.021)) * 0.35;
             float fibres = noise(origin * float2(0.055, 0.071));
             float texture = (clouds - 0.5) + (fibres - 0.5) * 0.18;
-            float lobes = noise(float2(seed, seed) + p * 2.1) - 0.5;
-            float warp = texture * 0.20 + (fibre - 0.5) * 0.10 + lobes * 0.08;
-            float midpoint = mix(0.06, 0.70, progress);
-            float diffusion = max(0.11, 0.16 * fadeSoftness * 0.55);
-            float absorbed = midpoint - r + warp;
-            density = 1.0 / (1.0 + exp(-absorbed / diffusion));
+            float lobes = noise(float2(seed, seed) + fragCoord * 0.012) - 0.5;
+            float warp = (texture * 0.10 + (fibre - 0.5) * 0.06 + lobes * 0.05)
+                * min(halfSize.x, halfSize.y);
+            sdf -= warp;
+            float diffusion = max(8.0, 0.11 * min(res.x, res.y));
+            density = 1.0 / (1.0 + exp(sdf / diffusion));
             appear = smoother(clamp(progress * 5.0, 0.0, 1.0));
+            float2 boxEdge = abs(fragCoord - 0.5 * res) / max(0.5 * res, float2(1.0));
+            r = max(boxEdge.x, boxEdge.y);
         } else {
             float circleAxis = 0.5 * min(res.x, res.y);
             float2 reach = float2(circleAxis);
