@@ -244,9 +244,17 @@ class EnglishBook internal constructor(
  * back, because with the page boundary gone there is no remainder to even: the
  * only leaf that ends short is one that met a verse too long to take.
  */
+/** What the pagination needs to know about one verse's English. */
+class EnglishVerseMeasure(
+    /** Characters the verse takes, its mark included — see [EnglishLeaf.prose]. */
+    val length: Int,
+    /** Where its sentences end ([englishSentenceEnds]), in the same characters. */
+    val sentenceEnds: IntArray,
+)
+
 fun buildEnglishBook(
     catalog: MushafCatalog,
-    prose: (surahId: Int, ayah: Int) -> Int,
+    prose: (surahId: Int, ayah: Int) -> EnglishVerseMeasure,
 ): EnglishBook {
     val leaves = ArrayList<EnglishBookLeaf>(1_200)
     val firstLeafByPage = IntArray(MushafCatalog.MUSHAF_PAGE_COUNT + 1) { -1 }
@@ -290,7 +298,8 @@ fun buildEnglishBook(
                 mass += opening
                 if (runPages.isEmpty()) runPages += page
             }
-            val length = (prose(surahId, ayah) - ENGLISH_LEAF_MARK_CHARS).coerceAtLeast(0)
+            val measure = prose(surahId, ayah)
+            val length = (measure.length - ENGLISH_LEAF_MARK_CHARS).coerceAtLeast(0)
             var from = 0
             while (true) {
                 val left = ENGLISH_LEAF_CAPACITY_CHARS - mass
@@ -302,10 +311,28 @@ fun buildEnglishBook(
                     break
                 }
                 // Carry the verse over only when leaving it whole would waste a
-                // real hole, and only where both halves stand on their own.
+                // real hole, and only where both halves stand on their own —
+                // and only ever at the end of a sentence.
+                //
+                // A page break inside a sentence is the one thing a printed
+                // book does not do to prose it can help: the reader carries
+                // half a thought over the fold and has to reassemble it on the
+                // other side. So the cut is the last sentence end that fits,
+                // rather than the last word that fits. A verse with no sentence
+                // end in reach is not cut at all — it goes whole on the next
+                // leaf, the way a paragraph too big for the foot of a page does.
+                // It costs about a leaf in thirty (1,041 to 1,075 over the whole
+                // book) and it is what the rule is worth.
                 val take = minOf(left, rest - ENGLISH_LEAF_MIN_FRAGMENT_CHARS)
+                val sentenceCut = englishSentenceCut(
+                    sentenceEnds = measure.sentenceEnds,
+                    from = from,
+                    length = length,
+                    room = left,
+                )
                 val carry = left >= ENGLISH_LEAF_SPLIT_HOLE_CHARS &&
-                    take >= ENGLISH_LEAF_MIN_FRAGMENT_CHARS
+                    take >= ENGLISH_LEAF_MIN_FRAGMENT_CHARS &&
+                    sentenceCut != null
                 if (!carry && run.isNotEmpty()) {
                     // Not worth cutting: the verse opens the next leaf instead.
                     close()
@@ -316,7 +343,7 @@ fun buildEnglishBook(
                 // panel, or a verse longer than any leaf holds, which in the
                 // whole Qur'an is 2:282 alone.
                 val cut = if (carry) {
-                    take
+                    sentenceCut!! - from
                 } else {
                     minOf(rest, maxOf(left, ENGLISH_LEAF_MIN_FRAGMENT_CHARS))
                 }
@@ -356,6 +383,32 @@ fun buildEnglishBook(
 }
 
 /** What a chapter's opening costs the leaf, panel and basmalah together. */
+/**
+ * The sentence end to cut a carried verse at, or null when there is none to
+ * cut at.
+ *
+ * The last one that fits the [room] left on the leaf, so the leaf is filled as
+ * far as a whole sentence will fill it, and only where what is left over is
+ * worth a fragment of its own. Null is not a failure: it is the answer that
+ * this verse should be set whole on the next leaf.
+ */
+internal fun englishSentenceCut(
+    sentenceEnds: IntArray,
+    from: Int,
+    length: Int,
+    room: Int,
+): Int? {
+    var best: Int? = null
+    for (end in sentenceEnds) {
+        if (end <= from) continue
+        if (end - from < ENGLISH_LEAF_MIN_FRAGMENT_CHARS) continue
+        if (end - from > room) break
+        if (length - end < ENGLISH_LEAF_MIN_FRAGMENT_CHARS) continue
+        best = end
+    }
+    return best
+}
+
 private fun englishLeafOpeningChars(surahId: Int): Int =
     if (surahOpensWithBasmalahPreface(surahId)) {
         ENGLISH_LEAF_OPENING_CHARS + ENGLISH_LEAF_BASMALAH_CHARS

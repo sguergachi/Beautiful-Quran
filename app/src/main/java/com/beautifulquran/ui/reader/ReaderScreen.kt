@@ -301,15 +301,20 @@ fun ReaderScreen(
         mushafWholeVerses,
     ) {
         val catalog = mushafCatalog ?: return@remember null
-        val ayah = startAyah?.coerceAtLeast(1) ?: 1
-        val page = catalog.readingPageOf(
+        val ayah: Int = startAyah?.coerceAtLeast(1) ?: 1
+        val page: Int = catalog.readingPageOf(
             surahId,
             ayah,
             startWordPosition ?: 1,
             wholeVerses = mushafWholeVerses,
         )
-        val leaves = englishBook?.leafCount ?: catalog.pageCount
-        (englishBook?.leafOfVerse(surahId, ayah, page) ?: (page - 1)).coerceIn(0, leaves - 1)
+        // Typed locals, and no elvis unboxed in place — the second instance in
+        // this file of the fault fixed in `repeatStartAyah`, and it arrived the
+        // same way: an NPE on Integer.intValue() where nothing is nullable.
+        val book = englishBook
+        val leaves: Int = book?.leafCount ?: catalog.pageCount
+        val leaf: Int = book?.leafOfVerse(surahId, ayah, page) ?: (page - 1)
+        leaf.coerceIn(0, (leaves - 1).coerceAtLeast(0))
     }
     // Keyed on whether there is a catalog at all, so the state is built once
     // and built knowing where the book opens.

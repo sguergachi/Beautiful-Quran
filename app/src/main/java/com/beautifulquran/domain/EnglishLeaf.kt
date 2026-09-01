@@ -103,6 +103,40 @@ data class EnglishLeafVerse(
  *   break inside `[O Muhammad]` would leave half a bracket on each leaf and
  *   strip neither.
  */
+/**
+ * Where the sentences of one verse end, as offsets into [text].
+ *
+ * Each is the index of the space *after* a terminator, so a leaf cut there
+ * keeps the whole sentence — "…except by His permission?" — and the next leaf
+ * opens on the word that follows. That is the same place [englishLeafBreak]
+ * would leave an offset alone, so the two agree without either knowing about
+ * the other.
+ *
+ * A terminator inside brackets is not a sentence end: the reader may have asked
+ * for the translator's asides to come off, and a leaf cut inside one would
+ * leave half a bracket on each leaf.
+ */
+fun englishSentenceEnds(text: String): IntArray {
+    val ends = ArrayList<Int>(8)
+    var depth = 0
+    for (i in text.indices) {
+        when (text[i]) {
+            '[', '(' -> depth++
+            ']', ')' -> if (depth > 0) depth--
+        }
+        if (depth > 0 || text[i] !in SENTENCE_TERMINATORS) continue
+        var after = i + 1
+        while (after < text.length && text[after] in SENTENCE_CLOSERS) after++
+        if (after < text.length && text[after].isWhitespace()) ends += after
+    }
+    return ends.toIntArray()
+}
+
+private const val SENTENCE_TERMINATORS = ".!?"
+
+/** Quotes and brackets a terminator may hide behind before the space. */
+private const val SENTENCE_CLOSERS = "\"')]\u2019\u201d"
+
 fun englishLeafBreak(text: String, at: Int): Int {
     if (at <= 0) return 0
     if (at >= text.length) return text.length

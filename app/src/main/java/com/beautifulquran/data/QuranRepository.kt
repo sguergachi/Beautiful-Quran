@@ -23,6 +23,8 @@ import com.beautifulquran.domain.buildMushafCatalog
 import com.beautifulquran.domain.isWordSearchQuery
 import com.beautifulquran.domain.matchWordSearch
 import com.beautifulquran.domain.normalizeArabicForSearch
+import com.beautifulquran.domain.EnglishVerseMeasure
+import com.beautifulquran.domain.englishSentenceEnds
 import com.beautifulquran.domain.EnglishTypography
 import com.beautifulquran.domain.quranWordKey
 import com.beautifulquran.timingslab.OverrideEntry
@@ -136,8 +138,8 @@ class QuranRepository(
 
     /** Lazily built once — 6,236 verse lengths, for the English book's leaves. */
     @Volatile
-    private var englishVerseProse: Map<Long, Int>? = null
-    private var englishVerseGloss: Map<Long, Int>? = null
+    private var englishVerseProse: Map<Long, EnglishVerseMeasure>? = null
+    private var englishVerseGloss: Map<Long, EnglishVerseMeasure>? = null
 
     /**
      * Verse translations for the English leaf, a page at a time.
@@ -273,14 +275,16 @@ class QuranRepository(
      * process lifetime because it is the book's own structure and does not
      * change.
      */
-    suspend fun englishVerseProse(text: EnglishLeafText): Map<Long, Int> =
+    suspend fun englishVerseProse(text: EnglishLeafText): Map<Long, EnglishVerseMeasure> =
         withContext(Dispatchers.IO) {
             when (text) {
+                // The text itself, not just its length: the pagination cuts a
+                // carried verse at a sentence end, and only the string knows
+                // where those are.
                 EnglishLeafText.TRANSLATION -> englishVerseProse ?: queryList(
-                    "SELECT surah_id, ayah_number, LENGTH(translation_en) FROM ayahs",
+                    "SELECT surah_id, ayah_number, translation_en FROM ayahs",
                 ) { c ->
-                    quranWordKey(c.getInt(0), c.getInt(1), 1) to
-                        c.getInt(2) + ENGLISH_LEAF_MARK_CHARS
+                    quranWordKey(c.getInt(0), c.getInt(1), 1) to measure(c.getString(2))
                 }.toMap().also { englishVerseProse = it }
 
                 // The gloss chain has to be built to be measured — lyricize
@@ -288,9 +292,7 @@ class QuranRepository(
                 // length is not the sum of the glosses. One pass over the word
                 // table, once, behind the same cache as the other.
                 EnglishLeafText.GLOSS -> englishVerseGloss ?: buildMap {
-                    forEachGlossVerse(null) { key, chain ->
-                        put(key, chain.length + ENGLISH_LEAF_MARK_CHARS)
-                    }
+                    forEachGlossVerse(null) { key, chain -> put(key, measure(chain)) }
                 }.also { englishVerseGloss = it }
             }
         }
@@ -343,6 +345,12 @@ class QuranRepository(
         }
         flush()
     }
+
+    /** What one verse's English costs the pagination, and where it may be cut. */
+    private fun measure(text: String) = EnglishVerseMeasure(
+        length = text.length + ENGLISH_LEAF_MARK_CHARS,
+        sentenceEnds = englishSentenceEnds(text),
+    )
 
     private class GlossRow(
         val surah: Int,

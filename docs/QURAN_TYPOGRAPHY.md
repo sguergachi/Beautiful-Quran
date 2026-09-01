@@ -364,6 +364,24 @@ The only thing that removes it is the thing a printed book does: carry the
 sentence over. The verse continues at the head of the next leaf and is numbered
 where it finishes, and neither half repeats or drops a word.
 
+**And the cut is always the end of a sentence.** A page break inside one is the
+one thing a book does not do to prose it can help: the reader carries half a
+thought over the fold and reassembles it on the other side. So the book cuts at
+the last sentence end that fits the room left (`englishSentenceCut`), not the
+last word — 2:96 leaves the leaf on *"…more than those who associate others with
+Allah."* and the next opens on *"One of them wishes…"*. A verse with no sentence
+end in reach is not cut at all: it goes whole on the next leaf, the way a
+paragraph too big for the foot of a page does.
+
+It is not free. Over the book it is **1,041 leaves to 1,075** — about one leaf
+in thirty — and 302 carries fall to 195, so mean blank rises from 1.20 lines to
+1.86 (p95 2.81 to 4.72). The alternative, letting the cut overrun the leaf to
+reach the next period, keeps 210 carries but squeezes twenty leaves by up to 117
+characters, and a squeezed leaf is a worse fault than a fuller one. A sentence
+end is found by [englishSentenceEnds], which reads the space after `.`, `!` or
+`?` — behind any closing quote — and never inside brackets, since the reader may
+have asked for the translator's asides to come off.
+
 It is not done to save a line. Cutting a verse costs the reader the end of a
 thought to a page turn, so it is done only where leaving it whole would waste
 `ENGLISH_LEAF_SPLIT_HOLE_CHARS` — **three lines or more** — which needs a verse

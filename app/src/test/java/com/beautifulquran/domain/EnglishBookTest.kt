@@ -25,7 +25,16 @@ class EnglishBookTest {
                     verses.map { (s, a) -> source(s, a, page) }
                 },
             ),
-        ) { s, a -> mass(s, a) }
+        ) { s, a -> everySentence(mass(s, a)) }
+
+    /**
+     * A verse that may be cut anywhere: a sentence end at every offset. The
+     * pagination then behaves exactly as it did before it took sentences into
+     * account, which is what most of these cases are about — the sentence rule
+     * has its own cases below.
+     */
+    private fun everySentence(length: Int) =
+        EnglishVerseMeasure(length, IntArray(length.coerceAtLeast(0)) { it })
 
     /** The leaves a page's verses land on, in order, with no repeats. */
     private fun leavesFrom(b: EnglishBook, page: Int): List<EnglishBookLeaf> {
