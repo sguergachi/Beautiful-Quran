@@ -94,7 +94,7 @@ export function HomeScreen({ stackLayer }: { stackLayer: StackLayer }) {
         setWordHits(hits)
         setWordLoading(false)
       })
-    }, 160)
+    }, 120)
     return () => {
       cancelled = true
       window.clearTimeout(handle)
@@ -368,7 +368,7 @@ export function HomeScreen({ stackLayer }: { stackLayer: StackLayer }) {
                 <p className="search-section-label">
                   {wordLoading && wordSections.length === 0
                     ? 'Searching ayahs…'
-                    : 'In the Quran'}
+                    : `In the Quran · ${wordHits.length} relevant ${wordHits.length === 1 ? 'ayah' : 'ayahs'}`}
                 </p>
                 {wordSections.map((section) => (
                   <WordSearchSection
@@ -390,7 +390,7 @@ export function HomeScreen({ stackLayer }: { stackLayer: StackLayer }) {
             ) : null}
 
             {showEmpty ? (
-              <p className="search-empty">No matches</p>
+              <p className="search-empty">No relevant ayahs found</p>
             ) : null}
             </div>
           </div>
@@ -569,14 +569,15 @@ function WordSearchSection({
             >
               <span className="word-search-ref">
                 {hit.surahId}:{hit.ayahNumber}
-                {hit.matchLabel ? ` · ${hit.matchLabel}` : ''}
+                {` · ${hit.matchReason ?? 'Text match'}`}
               </span>
               <span className="word-search-translation">
                 {englishTranslationHighlightSpans(
                   hit.ayahTranslation,
                   displayQuery,
                   hit.translation,
-                  [hit.matchTerm, hit.matchLabel].filter(Boolean).join(' '),
+                  hit.matchLabel ?? '',
+                  hit.matchTerms ?? [],
                 ).map((span, i) =>
                   span.highlighted ? (
                     <mark key={i} className="word-search-mark">

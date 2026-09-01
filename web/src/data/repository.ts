@@ -365,7 +365,7 @@ interface SearchConceptAsset {
   thesaurus: Record<string, [string, number][]>
 }
 
-/** Load the attributed 179 KB concept index only when search first needs it. */
+/** Load the attributed concept and thesaurus index only when search first needs it. */
 export function warmSearchConcepts(): Promise<SearchConcept[]> {
   if (searchConcepts) return Promise.resolve(searchConcepts)
   if (searchConceptPromise) return searchConceptPromise
@@ -422,25 +422,15 @@ export function warmWordSearchIndex(): Promise<WordSearchIndexEntry[]> {
   if (wordSearchIndex) return Promise.resolve(wordSearchIndex)
   if (wordSearchIndexPromise) return wordSearchIndexPromise
   wordSearchIndexPromise = new Promise((resolve) => {
-    const run = () => {
+    // Let the loading ink paint, then honor the active query immediately.
+    setTimeout(() => {
       try {
         resolve(wordSearchIndexRows())
       } catch {
         wordSearchIndexPromise = null
         resolve([])
       }
-    }
-    // Prefer idle time; fall back to a macrotask so Safari still warms.
-    const ric = (
-      globalThis as unknown as {
-        requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number
-      }
-    ).requestIdleCallback
-    if (typeof ric === 'function') {
-      ric(run, { timeout: 2_500 })
-    } else {
-      setTimeout(run, 0)
-    }
+    }, 0)
   })
   return wordSearchIndexPromise
 }

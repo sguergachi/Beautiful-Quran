@@ -35,6 +35,9 @@ THESAURUS_FILLERS = {
     "then", "there", "they", "this", "was", "were", "what", "when", "where", "who",
     "why", "will", "with", "would", "you", "your",
 }
+FOCUSED_THESAURUS_LINKS = {
+    "calm": {"peace": 2, "stillness": 2},
+}
 
 
 def source_bytes(name: str) -> bytes:
@@ -123,7 +126,7 @@ def build_thesaurus(db: sqlite3.Connection) -> dict[str, list[list[str | int]]]:
     targets = {
         word for word in frequency
         if len(word) >= 3 and word not in THESAURUS_FILLERS and
-        word in lemma_synsets and len(lemma_synsets[word]) <= 4
+        word in lemma_synsets and len(lemma_synsets[word]) <= 3
     }
     thesaurus = {}
     for query in sorted(lemma_synsets):
@@ -143,6 +146,9 @@ def build_thesaurus(db: sqlite3.Connection) -> dict[str, list[list[str | int]]]:
         for word in lexical_relations[query]:
             if word in targets and word != query:
                 related[word] = min(1, related.get(word, 1))
+        for word, distance in FOCUSED_THESAURUS_LINKS.get(query, {}).items():
+            if frequency[word] and word != query:
+                related[word] = min(distance, related.get(word, distance))
         ranked = sorted(
             related.items(),
             key=lambda item: (

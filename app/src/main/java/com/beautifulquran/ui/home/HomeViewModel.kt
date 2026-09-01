@@ -193,7 +193,7 @@ class HomeViewModel(
         }
         viewModelScope.launch {
             query
-                .debounce(220)
+                .debounce(120)
                 .collectLatest { q ->
                     if (!shouldRunWordSearch(q)) {
                         wordHits.value = emptyList()

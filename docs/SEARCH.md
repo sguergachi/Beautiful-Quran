@@ -11,11 +11,13 @@ signals rather than a general-purpose language model:
    compact Open English WordNet graph supplements them with related words that
    actually occur in this Quran. Synonyms lead precise derivational, similar,
    and narrower terms; ambiguous target words and broad hypernyms are withheld.
-   Thus `calm` reaches `tranquility`, not the edit-distance neighbor `call`.
-3. **QAC roots** — once a literal or semantic word matches, other Quran words
-   sharing its Quranic Arabic Corpus root enter below the literal result. This
-   supplies morphology-aware Arabic retrieval without stemming sacred text in
-   the app.
+   Thus `calm` reaches `peace`, `tranquility`, and `stillness`, not the
+   edit-distance neighbor `call` or the unrelated locative sense of `settled`.
+3. **QAC roots** — once a literal word matches, other Quran words sharing its
+   Quranic Arabic Corpus root enter below the literal result. Semantic matches
+   do not seed more roots, avoiding broad chains such as `calm → peace → سلم`.
+   This supplies morphology-aware Arabic retrieval without stemming sacred
+   text in the app.
 4. **Concept vocabulary** — QSAC tag names, primary terms, secondary terms,
    categories, and domains resolve an English concept to its annotated ayahs.
    Direct tag/primary vocabulary leads secondary vocabulary; category and
@@ -30,11 +32,22 @@ Results are deduplicated per ayah, sorted by descending score, and retain Qurani
 order as the tie-break. The UI then groups that ranked stream by surah. Literal
 word hits preserve their word position for the reader flash. Full-ayah phrase
 and concept hits use position zero and do not fabricate a highlighted word.
-Result snippets color the exact term that won the rank: the typed text, a
-thesaurus term such as `tranquility`, or a visible word from the matched concept
-label. If the canonical translation contains none of those, the result stays
+Result snippets color every visible term that helped the result rank: the typed
+text, thesaurus terms such as `peace` and `tranquility`, query-related word
+glosses, and non-filler words from a matched concept label. Overlapping terms
+resolve to the longest precise phrase, and connective words remain ordinary
+ink. If the canonical translation contains none of those, the result stays
 unaccented (or uses the word-gloss line) rather than coloring a merely similar
 or unrelated word.
+
+The quiet reference line explains each result as `Text match`,
+`Related · tranquility`, `Concept · Divine Mercy`, `Same Arabic root`, or
+`Spelling match`. The section heading reports the number of relevant ayahs, and
+the empty state says when no relevant ayah was found. Both apps begin searching
+after a 120 ms pause. The web paints its loading cue, builds a cold index on the
+next task instead of waiting for an idle callback, and then yields between scan
+chunks; Android checks cancellation throughout the scan. Typing therefore
+never waits on an obsolete rank.
 
 ## Exact quotes
 
@@ -54,11 +67,11 @@ Quoted `"2:255"` is text search; unquoted `2:255` remains the direct ayah jump.
 
 ## Concept asset
 
-`data/search_concepts.json` is a deterministic 660 KB adaptation of
+`data/search_concepts.json` is a deterministic 560 KB adaptation of
 [QSAC — Quran Semantic Annotation Corpus 1.0](https://github.com/dev-ahmadbilal/quran-semantic-annotation-corpus),
 plus [Open English WordNet 2025](https://en-word.net/), both licensed CC BY 4.0.
 It contains 338 ontology concepts, 16,309 assignments covering all 6,236 ayahs,
-and 12,400 focused thesaurus entries linked only to vocabulary present in the
+and 10,426 focused thesaurus entries linked only to vocabulary present in the
 packaged Quran. It deliberately omits QSAC's copies of Arabic text and English
 translation and WordNet definitions/examples; the app continues to render its
 canonical `quran.db` rows.

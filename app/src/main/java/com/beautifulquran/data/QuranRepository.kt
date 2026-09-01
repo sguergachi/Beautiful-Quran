@@ -26,6 +26,8 @@ import com.beautifulquran.timingslab.OverrideEntry
 import com.beautifulquran.timingslab.OverrideKey
 import com.beautifulquran.timingslab.TimingOverrides
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
@@ -328,19 +330,21 @@ class QuranRepository(
         }
 
     /**
-     * Ranked Quran-wide search for literal text, related roots, spelling, and
-     * ontology concepts. Quoted queries stay literal.
+     * Ranked Quran-wide search for literal text, semantic vocabulary, related
+     * roots, concepts, and last-resort spelling. Quoted queries stay literal.
      * Blank / too-short / `surah:ayah` queries yield an empty list.
      */
     suspend fun searchWords(query: String): List<WordSearchHit> = withContext(Dispatchers.IO) {
         if (!isWordSearchQuery(query)) return@withContext emptyList()
         val vocabulary = searchConcepts?.vocabulary()
+        val context = currentCoroutineContext()
         matchWordSearch(
             wordSearchIndex(),
             query,
             WORD_SEARCH_MAX_HITS,
             vocabulary?.concepts.orEmpty(),
             vocabulary?.thesaurus.orEmpty(),
+            checkCancelled = context::ensureActive,
         )
     }
 

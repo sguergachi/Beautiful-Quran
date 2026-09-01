@@ -19,8 +19,10 @@ class SearchConceptRepositoryTest {
         val mercy = concepts.single { it.name == "Divine Mercy" }
         assertTrue("clemency" in mercy.secondaryTerms)
         assertTrue(1_001 in mercy.ayahKeys)
-        assertEquals(12_400, vocabulary.thesaurus.size)
+        assertEquals(10_426, vocabulary.thesaurus.size)
         assertTrue(RelatedSearchTerm("tranquility", 2) in vocabulary.thesaurus.getValue("calm"))
+        assertTrue(RelatedSearchTerm("peace", 2) in vocabulary.thesaurus.getValue("calm"))
+        assertTrue(RelatedSearchTerm("settled", 1) !in vocabulary.thesaurus.getValue("calm"))
     }
 
     private fun repoFile(path: String): File {

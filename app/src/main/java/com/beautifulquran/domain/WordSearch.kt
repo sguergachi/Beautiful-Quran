@@ -94,6 +94,7 @@ fun matchWordSearch(
     maxHits: Int = WORD_SEARCH_MAX_HITS,
     concepts: List<SearchConcept> = emptyList(),
     thesaurus: Map<String, List<RelatedSearchTerm>> = emptyMap(),
+    checkCancelled: () -> Unit = {},
 ): List<WordSearchHit> {
     val parsed = parseSearchQuery(query)
     if (parsed.text.length < WORD_SEARCH_MIN_QUERY_LENGTH || maxHits <= 0) return emptyList()
@@ -103,7 +104,8 @@ fun matchWordSearch(
         val position: Int,
         val score: Int,
         val matchLabel: String? = null,
-        val matchTerm: String? = null,
+        val matchTerms: List<String> = emptyList(),
+        val matchReason: String = "Text match",
     )
 
     val ranked = HashMap<Int, RankedHit>(512)
@@ -114,7 +116,8 @@ fun matchWordSearch(
         position: Int,
         score: Int,
         label: String? = null,
-        term: String? = null,
+        terms: List<String> = emptyList(),
+        reason: String = "Text match",
     ) {
         if (score <= 0) return
         val entry = index[indexAt]
@@ -123,7 +126,7 @@ fun matchWordSearch(
         if (current == null || score > current.score ||
             (score == current.score && position > 0 && current.position == 0)
         ) {
-            ranked[key] = RankedHit(key, indexAt, position, score, label, term)
+            ranked[key] = RankedHit(key, indexAt, position, score, label, terms, reason)
         }
     }
 
@@ -131,6 +134,7 @@ fun matchWordSearch(
         val arabic = normalizeArabicForSearch(parsed.text)
         val latin = if (arabic.isEmpty()) parsed else parsed.copy(text = "")
         for (i in index.indices) {
+            if ((i and 0xfff) == 0) checkCancelled()
             val entry = index[i]
             val score = maxOf(
                 if (arabic.isEmpty()) 0 else searchTextRelevance(
@@ -141,12 +145,18 @@ fun matchWordSearch(
                 searchTextRelevance(entry.translationLower, latin, allowFuzzy),
                 searchTextRelevance(entry.transliterationLower, latin, allowFuzzy),
             )
-            add(i, entry.position, score)
+            add(
+                i,
+                entry.position,
+                score,
+                reason = if (allowFuzzy) "Spelling match" else "Text match",
+            )
             if (!parsed.exactOnly && score > 0 && entry.root.isNotEmpty()) matchedRoots += entry.root
             firstIndex.putIfAbsent(entry.surahId * 1_000 + entry.ayahNumber, i)
         }
         var at = 0
         while (at < index.size) {
+            checkCancelled()
             val anchor = index[at]
             var end = at + 1
             while (end < index.size && index[end].surahId == anchor.surahId &&
@@ -171,7 +181,12 @@ fun matchWordSearch(
                     0
                 },
             )
-            add(at, position = 0, score = score)
+            add(
+                at,
+                position = 0,
+                score = score,
+                reason = if (allowFuzzy) "Spelling match" else "Text match",
+            )
             at = end
         }
     }
@@ -183,6 +198,7 @@ fun matchWordSearch(
         }
         val semantic = HashMap<Int, SemanticRank>()
         for (concept in concepts) {
+            checkCancelled()
             val score = conceptRelevance(concept, parsed, allowFuzzy)
             if (score <= 0) continue
             for (key in concept.ayahKeys) {
@@ -199,37 +215,58 @@ fun matchWordSearch(
             }
         }
         for ((key, match) in semantic) {
-            firstIndex[key]?.let { add(it, position = 0, score = match.total, label = match.label) }
+            firstIndex[key]?.let {
+                add(
+                    it,
+                    position = 0,
+                    score = match.total,
+                    label = match.label,
+                    reason = "Concept · ${match.label}",
+                )
+            }
         }
     }
 
-    fun bestRelated(text: String, related: List<RelatedSearchTerm>): Pair<Int, String>? {
+    data class RelatedMatch(val score: Int, val terms: List<String>)
+
+    fun bestRelated(text: String, related: List<RelatedSearchTerm>): RelatedMatch? {
         var bestScore = 0
         var bestTerm: String? = null
+        val terms = ArrayList<String>(related.size)
         for (candidate in related) {
             val score = searchTextRelevance(
                 text,
                 ParsedSearchQuery(candidate.text, exactOnly = false),
                 allowFuzzy = false,
-            ) - (600 + candidate.distance * 150)
+            ) - (1_100 + candidate.distance * 150)
             if (score > bestScore) {
                 bestScore = score
                 bestTerm = candidate.text
             }
+            if (score > 0) terms += candidate.text
         }
-        return bestTerm?.let { bestScore to it }
+        return bestTerm?.let { term ->
+            RelatedMatch(bestScore, listOf(term) + terms.filterNot { it == term })
+        }
     }
 
     fun scanRelated(related: List<RelatedSearchTerm>) {
         if (related.isEmpty()) return
         for (i in index.indices) {
+            if ((i and 0xfff) == 0) checkCancelled()
             val entry = index[i]
             val match = bestRelated(entry.translationLower, related) ?: continue
-            add(i, entry.position, match.first, term = match.second)
-            if (entry.root.isNotEmpty()) matchedRoots += entry.root
+            add(
+                i,
+                entry.position,
+                match.score,
+                terms = match.terms,
+                reason = "Related · ${match.terms.first()}",
+            )
         }
         var at = 0
         while (at < index.size) {
+            checkCancelled()
             val anchor = index[at]
             var end = at + 1
             while (end < index.size && index[end].surahId == anchor.surahId &&
@@ -242,8 +279,16 @@ fun matchWordSearch(
                 (at until end).joinToString(" ") { index[it].translation },
                 related,
             )
-            val match = listOfNotNull(translation, gloss).maxByOrNull { it.first }
-            if (match != null) add(at, position = 0, score = match.first, term = match.second)
+            val match = listOfNotNull(translation, gloss).maxByOrNull { it.score }
+            if (match != null) {
+                add(
+                    at,
+                    position = 0,
+                    score = match.score,
+                    terms = match.terms,
+                    reason = "Related · ${match.terms.first()}",
+                )
+            }
             at = end
         }
     }
@@ -261,7 +306,16 @@ fun matchWordSearch(
     }
     if (!parsed.exactOnly && matchedRoots.isNotEmpty()) {
         for (i in index.indices) {
-            if (index[i].root in matchedRoots) add(i, index[i].position, score = 1_450)
+            if ((i and 0xfff) == 0) checkCancelled()
+            if (index[i].root in matchedRoots) {
+                add(
+                    i,
+                    index[i].position,
+                    score = 1_450,
+                    terms = listOf(index[i].translation),
+                    reason = "Same Arabic root",
+                )
+            }
         }
     }
 
@@ -276,7 +330,8 @@ fun matchWordSearch(
             val entry = index[match.indexAt]
             val base = entry.toHit().copy(
                 matchLabel = match.matchLabel,
-                matchTerm = match.matchTerm,
+                matchTerms = match.matchTerms,
+                matchReason = match.matchReason,
             )
             if (match.position > 0) {
                 val display = snippetDisplayText(
@@ -284,7 +339,7 @@ fun matchWordSearch(
                     index,
                     match.indexAt,
                     parsed.text,
-                    match.matchTerm.orEmpty(),
+                    match.matchTerms,
                 )
                 if (display == entry.ayahTranslation) base else base.copy(ayahTranslation = display)
             } else {
@@ -354,13 +409,29 @@ internal fun snippetDisplayText(
     index: List<WordSearchIndexEntry>,
     at: Int,
     query: String,
-    semanticTerm: String = "",
+    semanticTerms: List<String> = emptyList(),
 ): String {
-    if (highlightNeedle(entry.ayahTranslation, query, entry.translation, semanticTerm) != null) {
+    if (
+        highlightNeedles(
+            entry.ayahTranslation,
+            query,
+            entry.translation,
+            semanticTerms = semanticTerms,
+        ).isNotEmpty()
+    ) {
         return entry.ayahTranslation
     }
     val glossLine = sameAyahGlossLine(index, at)
-    if (highlightNeedle(glossLine, query, entry.translation, semanticTerm) != null) return glossLine
+    if (
+        highlightNeedles(
+            glossLine,
+            query,
+            entry.translation,
+            semanticTerms = semanticTerms,
+        ).isNotEmpty()
+    ) {
+        return glossLine
+    }
     return entry.ayahTranslation
 }
 
@@ -473,22 +544,23 @@ fun englishTranslationHighlightSpans(
     query: String,
     wordGloss: String,
     semanticLabel: String = "",
+    semanticTerms: List<String> = emptyList(),
 ): List<AyahTextSpan> {
     if (ayahTranslation.isEmpty()) return emptyList()
-    val needle = highlightNeedle(
+    val needles = highlightNeedles(
         ayahTranslation,
         query.trim(),
         wordGloss.trim(),
         semanticLabel.trim(),
+        semanticTerms,
     )
     val snippet = windowAroundMatch(
         text = ayahTranslation,
-        needle = needle,
+        needle = needles.firstOrNull(),
         wordsBefore = SNIPPET_WORDS_BEFORE,
         wordsAfter = SNIPPET_WORDS_AFTER,
     )
-    if (needle == null) return listOf(AyahTextSpan(snippet, highlighted = false))
-    return highlightAllOccurrences(snippet, needle)
+    return highlightAllOccurrences(snippet, needles)
 }
 
 /**
@@ -522,46 +594,48 @@ internal fun windowAroundMatch(
 }
 
 /**
- * Prefers the typed query, then a query-related gloss token. Arabic matches
- * may use their corresponding English gloss, and semantic hits may use a
- * non-filler word from their concept label. Unrelated fallback words stay ink.
+ * Finds every visible term that earned a result: the query, related Quran
+ * vocabulary, query-related gloss words, and non-filler concept-label words.
+ * Unrelated fallback words stay ink.
  */
-internal fun highlightNeedle(
+internal fun highlightNeedles(
     haystack: String,
     query: String,
     wordGloss: String,
     semanticLabel: String = "",
-): String? {
+    semanticTerms: List<String> = emptyList(),
+): List<String> {
+    val needles = linkedMapOf<String, String>()
+    fun add(text: String) {
+        val term = text.trim()
+        if (term.isNotEmpty() && haystack.contains(term, ignoreCase = true)) {
+            needles.putIfAbsent(term.lowercase(), term)
+        }
+    }
     if (query.isNotEmpty() && haystack.contains(query, ignoreCase = true)) {
-        return query
+        add(query)
     }
     val parsed = parseSearchQuery(query)
     val arabicQuery = normalizeArabicForSearch(query).isNotEmpty()
-    if (wordGloss.isNotEmpty() && haystack.contains(wordGloss, ignoreCase = true) &&
-        (arabicQuery || searchTextRelevance(wordGloss, parsed) >= 2_200)
-    ) {
-        return wordGloss
-    }
     fun presentTokens(text: String) = text
         .split(Regex("[\\s,;:]+"))
         .map { it.trim().trim('(', ')', '[', ']', '"', '\'') }
         .filter { it.length >= 3 }
         .filter { haystack.contains(it, ignoreCase = true) }
 
-    val glossTokens = presentTokens(wordGloss)
+    val glossTokens = presentTokens(wordGloss).filterNot { it.lowercase() in highlightFillers }
     if (arabicQuery) {
-        glossTokens.maxByOrNull(String::length)?.let { return it }
+        glossTokens.forEach(::add)
     } else {
         glossTokens
-            .map { it to searchTextRelevance(it, parsed) }
-            .filter { it.second > 0 }
-            .maxWithOrNull(compareBy<Pair<String, Int>> { it.second }.thenBy { it.first.length })
-            ?.first
-            ?.let { return it }
+            .filter { searchTextRelevance(it, parsed) > 0 }
+            .forEach(::add)
     }
-    return presentTokens(semanticLabel)
+    semanticTerms.forEach(::add)
+    presentTokens(semanticLabel)
         .filterNot { it.lowercase() in highlightFillers }
-        .maxByOrNull(String::length)
+        .forEach(::add)
+    return needles.values.toList()
 }
 
 private val highlightFillers = setOf(
@@ -569,17 +643,31 @@ private val highlightFillers = setOf(
     "they", "this", "those", "was", "were", "will", "with", "you", "your",
 )
 
-private fun highlightAllOccurrences(text: String, needle: String): List<AyahTextSpan> {
+private fun highlightAllOccurrences(text: String, needles: List<String>): List<AyahTextSpan> {
+    if (needles.isEmpty()) return listOf(AyahTextSpan(text, highlighted = false))
+    val ranges = needles.flatMap { needle ->
+        buildList {
+            var at = text.indexOf(needle, ignoreCase = true)
+            while (at >= 0) {
+                add(at until at + needle.length)
+                at = text.indexOf(needle, at + needle.length, ignoreCase = true)
+            }
+        }
+    }.sortedWith(compareBy<IntRange> { it.first }.thenByDescending { it.last })
+    val visible = ArrayList<IntRange>(ranges.size)
+    for (range in ranges) {
+        if (visible.lastOrNull()?.last?.let { range.first <= it } != true) visible += range
+    }
+    if (visible.isEmpty()) return listOf(AyahTextSpan(text, highlighted = false))
     val spans = ArrayList<AyahTextSpan>()
     var start = 0
-    var i = text.indexOf(needle, ignoreCase = true)
-    if (i < 0) return listOf(AyahTextSpan(text, highlighted = false))
-    while (i >= 0) {
-        if (i > start) spans.add(AyahTextSpan(text.substring(start, i), highlighted = false))
-        val end = i + needle.length
-        spans.add(AyahTextSpan(text.substring(i, end), highlighted = true))
+    for (range in visible) {
+        if (range.first > start) {
+            spans.add(AyahTextSpan(text.substring(start, range.first), highlighted = false))
+        }
+        val end = range.last + 1
+        spans.add(AyahTextSpan(text.substring(range.first, end), highlighted = true))
         start = end
-        i = text.indexOf(needle, start, ignoreCase = true)
     }
     if (start < text.length) {
         spans.add(AyahTextSpan(text.substring(start), highlighted = false))

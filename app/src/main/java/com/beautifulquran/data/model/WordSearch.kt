@@ -14,8 +14,10 @@ data class WordSearchHit(
     val surahNameArabic: String,
     /** Ontology concept that surfaced an ayah-level semantic result. */
     val matchLabel: String? = null,
-    /** Visible Quran-vocabulary term reached through the thesaurus. */
-    val matchTerm: String? = null,
+    /** Every visible Quran-vocabulary term that helped this result rank. */
+    val matchTerms: List<String> = emptyList(),
+    /** Quiet, user-facing explanation of why this result is relevant. */
+    val matchReason: String = "Text match",
 )
 
 /**

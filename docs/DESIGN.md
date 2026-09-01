@@ -1128,12 +1128,15 @@ number lane must not read as an empty decorative gutter.
 
 The Android and web search pills own an even 16 dp/px internal inset on both
 ends; icon and text spacing is independent of the chapter-number grid.
-Search results keep relevance in the existing paper hierarchy: a semantic hit
-may append its matched concept after the `surah:ayah` reference in that same
-quiet metadata line (`2:83 · Kindness to Parents`). It never becomes a badge,
-chip, card, or second heading. Literal word hits still open with the word flash;
-ayah-level concept and quoted-phrase hits open the verse without inventing a
-word to highlight.
+Search results keep relevance in the existing paper hierarchy. The quiet
+metadata line explains why each result appeared (`7:154 · Text match`,
+`9:26 · Related · tranquility`, or `2:83 · Concept · Kindness to Parents`),
+while the section line gives the relevant-ayah count. These never become
+badges, chips, cards, confidence meters, or second headings. Every visible word
+that genuinely earned a result may take the gold accent; connective or merely
+similar words remain ordinary ink. Literal word hits still open with the word
+flash; ayah-level concept and quoted-phrase hits open the verse without
+inventing an Arabic word to highlight.
 Continue listening is the one full-bleed row in the scrolling chapter
 document: its quiet green wash and tap target reach both sheet edges, while
 its bilingual text remains on the same inner English and Arabic rails as the

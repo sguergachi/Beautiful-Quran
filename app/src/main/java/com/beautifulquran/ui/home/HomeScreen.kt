@@ -373,7 +373,8 @@ fun HomeScreen(
                                 text = if (uiState.wordSearchLoading && uiState.wordSections.isEmpty()) {
                                     "Searching ayahs…"
                                 } else {
-                                    "In the Quran"
+                                    val count = uiState.wordSections.sumOf { it.totalCount }
+                                    "In the Quran · $count relevant ${if (count == 1) "ayah" else "ayahs"}"
                                 },
                             )
                             uiState.wordSections.forEach { section ->
@@ -406,7 +407,7 @@ fun HomeScreen(
 
                         if (showEmpty) {
                             Text(
-                                text = "No matches",
+                                text = "No relevant ayahs found",
                                 style = MaterialTheme.typography.bodyLarge,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f),
                                 modifier = Modifier
@@ -830,13 +831,21 @@ private fun WordSearchHitRow(
     val accents = LocalQuranAccents.current
     val highlightColor = accents.gold
     val displayQuery = remember(query) { parseSearchQuery(query).text }
-    val translation = remember(hit.ayahTranslation, hit.translation, displayQuery, highlightColor) {
+    val translation = remember(
+        hit.ayahTranslation,
+        hit.translation,
+        hit.matchTerms,
+        hit.matchLabel,
+        displayQuery,
+        highlightColor,
+    ) {
         buildAnnotatedString {
             for (span in englishTranslationHighlightSpans(
                 ayahTranslation = hit.ayahTranslation,
                 query = displayQuery,
                 wordGloss = hit.translation,
-                semanticLabel = listOfNotNull(hit.matchTerm, hit.matchLabel).joinToString(" "),
+                semanticLabel = hit.matchLabel.orEmpty(),
+                semanticTerms = hit.matchTerms,
             )) {
                 if (span.highlighted) {
                     withStyle(
@@ -867,7 +876,7 @@ private fun WordSearchHitRow(
         Text(
             text = buildString {
                 append("${hit.surahId}:${hit.ayahNumber}")
-                hit.matchLabel?.let { append(" · $it") }
+                append(" · ${hit.matchReason}")
             },
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f),

@@ -69,9 +69,11 @@ fun searchTextRelevance(
         return if (canonicalNeedle.isNotEmpty() && containsBounded(phrase, canonicalNeedle)) 3_000 else 0
     }
     if (target.contains(needle)) return 2_200
-    if (allowFuzzy && needle.all(Char::isLetterOrDigit)) {
+    val singleWord = needle.all(Char::isLetterOrDigit)
+    if (allowFuzzy && singleWord) {
         return if (fuzzyWordContains(target, needle)) 1_600 else 0
     }
+    if (singleWord && needle !in queryFillers) return 0
 
     val queryWords = canonicalWords(needle)
     val content = queryWords.filterNot(queryFillers::contains).ifEmpty { queryWords }

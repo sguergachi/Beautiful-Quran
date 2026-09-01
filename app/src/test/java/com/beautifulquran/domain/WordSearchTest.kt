@@ -58,6 +58,7 @@ class WordSearchTest {
     fun `english gloss matches are case-insensitive`() {
         val hits = matchWordSearch(index, "merciful")
         assertEquals(listOf(1 to 4, 55 to 1), hits.map { it.surahId to it.position })
+        assertTrue(hits.all { it.matchReason == "Text match" })
     }
 
     @Test
@@ -74,6 +75,7 @@ class WordSearchTest {
             listOf(1 to 4, 55 to 1),
             matchWordSearch(index, "mercifl").map { it.surahId to it.position },
         )
+        assertTrue(matchWordSearch(index, "mercifl").all { it.matchReason == "Spelling match" })
         assertEquals(2, matchWordSearch(index, "mercifull").size)
         assertEquals(
             listOf(1 to 4, 55 to 1),
@@ -95,8 +97,17 @@ class WordSearchTest {
             thesaurus = mapOf("calm" to listOf(RelatedSearchTerm("tranquility", 2))),
         )
         assertEquals(listOf(7 to 154, 9 to 26), hits.map { it.surahId to it.ayahNumber })
-        assertEquals("tranquility", hits[1].matchTerm)
+        assertEquals(listOf("tranquility"), hits[1].matchTerms)
+        assertEquals("Related · tranquility", hits[1].matchReason)
         assertTrue(hits.none { it.ayahNumber == 44 })
+    }
+
+    @Test
+    fun `search observes cancellation during the scan`() {
+        val failure = runCatching {
+            matchWordSearch(index, "merciful", checkCancelled = { error("cancelled") })
+        }.exceptionOrNull()
+        assertEquals("cancelled", failure?.message)
     }
 
     @Test
@@ -137,6 +148,7 @@ class WordSearchTest {
         val hits = matchWordSearch(index, "clemency", concepts = listOf(concept))
         assertEquals(listOf(1 to 1, 55 to 1), hits.map { it.surahId to it.ayahNumber })
         assertTrue(hits.all { it.position == 0 && it.matchLabel == "Divine Mercy" })
+        assertTrue(hits.all { it.matchReason == "Concept · Divine Mercy" })
         assertTrue(matchWordSearch(index, "clemncy", concepts = listOf(concept)).isNotEmpty())
         assertTrue(matchWordSearch(index, "\"clemency\"", concepts = listOf(concept)).isEmpty())
         assertTrue(conceptRelevance(concept, parseSearchQuery("show me verses about clemency")) > 0)
@@ -165,6 +177,8 @@ class WordSearchTest {
         val hits = matchWordSearch(rooted, "turned")
         assertEquals(listOf(2, 9), hits.map { it.surahId })
         assertEquals(listOf(1, 2), hits.map { it.position })
+        assertEquals(listOf("Text match", "Same Arabic root"), hits.map { it.matchReason })
+        assertEquals(listOf("the Oft-Returning"), hits[1].matchTerms)
     }
 
     @Test
@@ -280,14 +294,19 @@ class WordSearchTest {
     }
 
     @Test
-    fun `semantic highlight uses a visible concept word`() {
+    fun `semantic highlight uses every visible related concept word`() {
         val spans = englishTranslationHighlightSpans(
-            "Peace be upon you.",
+            "Peace and reconciliation brought tranquility and stillness.",
             "calm",
             wordGloss = "",
             semanticLabel = "Peace and Reconciliation",
+            semanticTerms = listOf("tranquility", "stillness"),
         )
-        assertEquals(listOf("Peace"), spans.filter { it.highlighted }.map { it.text })
+        assertEquals(
+            listOf("Peace", "reconciliation", "tranquility", "stillness"),
+            spans.filter { it.highlighted }.map { it.text },
+        )
+        assertTrue(spans.any { !it.highlighted && "and" in it.text })
     }
 
     @Test

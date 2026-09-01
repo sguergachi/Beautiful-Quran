@@ -368,7 +368,7 @@ Three sheets, hand-rolled paper stack (no router chrome):
    Word search keeps the query in local home state (no global store fan-out),
    builds its slim in-memory index on demand (never during chapter browsing),
    and scans cooperatively with cancellation so typing stays responsive. The
-   660 KB search-vocabulary index loads only on first search and is then
+   560 KB search-vocabulary index loads only on first search and is then
    service-worker cached for offline use; see [SEARCH.md](SEARCH.md).
    Its fixed masthead, 30 px gilded Settings rosette, rounded search field,
    full-width continue wash, and compact 28 / 26 / 4 px chapter grid mirror

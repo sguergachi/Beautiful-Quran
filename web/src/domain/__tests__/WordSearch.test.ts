@@ -68,6 +68,7 @@ describe('matchWordSearch', () => {
       [1, 4],
       [55, 1],
     ])
+    expect(hits.every((hit) => hit.matchReason === 'Text match')).toBe(true)
   })
 
   it('matches Arabic without diacritics', () => {
@@ -82,6 +83,8 @@ describe('matchWordSearch', () => {
       [1, 4],
       [55, 1],
     ])
+    expect(matchWordSearch(index, 'mercifl').every((hit) => hit.matchReason === 'Spelling match'))
+      .toBe(true)
     expect(matchWordSearch(index, 'mercifull')).toHaveLength(2)
     expect(matchWordSearch(index, 'mercfiul').map((h) => [h.surahId, h.position])).toEqual([
       [1, 4],
@@ -104,7 +107,8 @@ describe('matchWordSearch', () => {
       [7, 154],
       [9, 26],
     ])
-    expect(hits[1]!.matchTerm).toBe('tranquility')
+    expect(hits[1]!.matchTerms).toEqual(['tranquility'])
+    expect(hits[1]!.matchReason).toBe('Related · tranquility')
     expect(hits.some((hit) => hit.ayahNumber === 44)).toBe(false)
     expect(await matchWordSearchAsync(semanticIndex, 'calm', 400, () => false, [], thesaurus))
       .toEqual(hits)
@@ -141,6 +145,7 @@ describe('matchWordSearch', () => {
       [55, 1],
     ])
     expect(hits.every((hit) => hit.position === 0 && hit.matchLabel === 'Divine Mercy')).toBe(true)
+    expect(hits.every((hit) => hit.matchReason === 'Concept · Divine Mercy')).toBe(true)
     expect(matchWordSearch(index, 'clemncy', 400, [concept])).not.toEqual([])
     expect(matchWordSearch(index, '"clemency"', 400, [concept])).toEqual([])
     expect(
@@ -156,7 +161,10 @@ describe('matchWordSearch', () => {
       { ...entry(2, 37, 1, 'فَتَابَ', 'so He turned'), root: 'توب' },
       { ...entry(9, 104, 2, 'ٱلتَّوَّٰبُ', 'the Oft-Returning'), root: 'توب' },
     ]
-    expect(matchWordSearch(rooted, 'turned').map((hit) => hit.surahId)).toEqual([2, 9])
+    const hits = matchWordSearch(rooted, 'turned')
+    expect(hits.map((hit) => hit.surahId)).toEqual([2, 9])
+    expect(hits.map((hit) => hit.matchReason)).toEqual(['Text match', 'Same Arabic root'])
+    expect(hits[1]!.matchTerms).toEqual(['the Oft-Returning'])
   })
 
   it('keeps exact matches ahead of fuzzy neighbors', () => {
@@ -286,16 +294,21 @@ describe('englishTranslationHighlightSpans', () => {
     ).toBe(false)
   })
 
-  it('uses a visible concept-label word for semantic results', () => {
+  it('uses every visible related concept word for semantic results', () => {
     const spans = englishTranslationHighlightSpans(
-      'Peace be upon you.',
+      'Peace and reconciliation brought tranquility and stillness.',
       'calm',
       '',
       'Peace and Reconciliation',
+      ['tranquility', 'stillness'],
     )
     expect(spans.filter((span) => span.highlighted).map((span) => span.text)).toEqual([
       'Peace',
+      'reconciliation',
+      'tranquility',
+      'stillness',
     ])
+    expect(spans.some((span) => !span.highlighted && span.text.includes('and'))).toBe(true)
   })
 
   it('windows the snippet around a mid-ayah match', () => {
