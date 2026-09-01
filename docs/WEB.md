@@ -354,8 +354,9 @@ the complete layer and visual-verification contract.
 
 Three sheets, hand-rolled paper stack (no router chrome):
 
-1. **Home** — surah list, Quran-wide word search (sectioned by surah with
-   truncated expand-in-place lists), `surah:ayah` references, continue-
+1. **Home** — surah list, Quran-wide word search (exact first, then a one-edit
+   spelling fallback, sectioned by surah with truncated expand-in-place lists),
+   `surah:ayah` references, continue-
    listening, floating playback control while a verse is loaded (chapter ·
    ayah label, transport, quiet Close that stops the session — Android
    parity). The control spans the full chapter sheet width while its ink and

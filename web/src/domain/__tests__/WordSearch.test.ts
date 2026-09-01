@@ -74,6 +74,24 @@ describe('matchWordSearch', () => {
     expect(hits.some((h) => h.surahId === 55 && h.position === 1)).toBe(true)
   })
 
+  it('falls back to fuzzy matches for one edit and a transposition', () => {
+    expect(matchWordSearch(index, 'mercifl').map((h) => [h.surahId, h.position])).toEqual([
+      [1, 4],
+      [55, 1],
+    ])
+    expect(matchWordSearch(index, 'mercifull')).toHaveLength(2)
+    expect(matchWordSearch(index, 'mercfiul').map((h) => [h.surahId, h.position])).toEqual([
+      [1, 4],
+      [55, 1],
+    ])
+    expect(matchWordSearch(index, 'الرحمان').some((h) => h.surahId === 1)).toBe(true)
+  })
+
+  it('keeps exact matches ahead of fuzzy neighbors', () => {
+    const neighbors = [entry(1, 1, 1, 'قَالَ', 'lone'), entry(2, 1, 1, 'حُبّ', 'love')]
+    expect(matchWordSearch(neighbors, 'love', 1).map((h) => h.translation)).toEqual(['love'])
+  })
+
   it('rejects short queries', () => {
     expect(matchWordSearch(index, 'a')).toEqual([])
     expect(isWordSearchQuery('a')).toBe(false)
@@ -100,6 +118,9 @@ describe('matchWordSearch', () => {
     })
     // Cancelled at the second yield — never reaches the planted hit.
     expect(hits.some((h) => h.translation === 'merciful')).toBe(false)
+    expect(await matchWordSearchAsync(index, 'mercifl')).toEqual(
+      matchWordSearch(index, 'mercifl'),
+    )
   })
 })
 
@@ -244,6 +265,8 @@ describe('filterSurahs', () => {
 
   it('matches names and references', () => {
     expect(filterSurahs(surahs, 'baqara').surahs.map((s) => s.id)).toEqual([2])
+    expect(filterSurahs(surahs, 'baqrah').surahs.map((s) => s.id)).toEqual([2])
+    expect(filterSurahs(surahs, 'opner').surahs.map((s) => s.id)).toEqual([1])
     expect(filterSurahs(surahs, '2:255')).toEqual({
       surahs: [surahs[1]],
       ayahTarget: 255,

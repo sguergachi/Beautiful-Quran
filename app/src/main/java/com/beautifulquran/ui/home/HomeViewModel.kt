@@ -8,7 +8,9 @@ import com.beautifulquran.data.SettingsRepository
 import com.beautifulquran.data.model.Surah
 import com.beautifulquran.data.model.SurahWordSearchSection
 import com.beautifulquran.data.model.WordSearchHit
+import com.beautifulquran.domain.fuzzyWordContains
 import com.beautifulquran.domain.isWordSearchQuery
+import com.beautifulquran.domain.normalizeArabicForSearch
 import com.beautifulquran.domain.sectionWordSearchHits
 import com.beautifulquran.playback.PlayerController
 import com.beautifulquran.playback.PlayerUiState
@@ -97,13 +99,21 @@ internal fun filterSurahs(surahs: List<Surah>, query: String): SurahFilterResult
             // (common from keyboard autocomplete) never hides an otherwise
             // matching surah name or number.
             val trimmed = query.trim()
+            val lower = trimmed.lowercase()
+            val arabic = normalizeArabicForSearch(trimmed)
+            fun Surah.matches(fuzzy: Boolean): Boolean = if (fuzzy) {
+                fuzzyWordContains(nameTransliteration.lowercase(), lower) ||
+                    fuzzyWordContains(nameTranslation.lowercase(), lower) ||
+                    fuzzyWordContains(normalizeArabicForSearch(nameArabic), arabic)
+            } else {
+                nameTransliteration.contains(trimmed, ignoreCase = true) ||
+                    nameTranslation.contains(trimmed, ignoreCase = true) ||
+                    nameArabic.contains(trimmed) ||
+                    id.toString() == trimmed
+            }
+            val exact = surahs.filter { it.matches(fuzzy = false) }
             SurahFilterResult(
-                surahs.filter {
-                    it.nameTransliteration.contains(trimmed, ignoreCase = true) ||
-                        it.nameTranslation.contains(trimmed, ignoreCase = true) ||
-                        it.nameArabic.contains(trimmed) ||
-                        it.id.toString() == trimmed
-                },
+                exact.ifEmpty { surahs.filter { it.matches(fuzzy = true) } },
             )
         }
     }

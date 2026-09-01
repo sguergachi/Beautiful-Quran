@@ -81,7 +81,9 @@ fun isWordSearchQuery(query: String): Boolean {
 
 /**
  * Scans [index] for Arabic (diacritic-insensitive), English gloss, or
- * transliteration substring matches. Results stay in Quranic order.
+ * transliteration substring matches. When none exist, a one-edit fuzzy pass
+ * catches a misspelling without diluting exact results. Results stay in
+ * Quranic order.
  *
  * When the SI ayah translation cannot show the matched English, the hit's
  * [WordSearchHit.ayahTranslation] is the same-ayah word-gloss line instead,
@@ -96,25 +98,84 @@ fun matchWordSearch(
     if (!isWordSearchQuery(trimmed)) return emptyList()
     val arabicNorm = normalizeArabicForSearch(trimmed)
     val lower = trimmed.lowercase()
-    val out = ArrayList<WordSearchHit>(minOf(64, maxHits))
-    for (i in index.indices) {
-        val entry = index[i]
-        val hit = when {
+    fun scan(fuzzy: Boolean): List<WordSearchHit> {
+        val out = ArrayList<WordSearchHit>(minOf(64, maxHits))
+        for (i in index.indices) {
+            val entry = index[i]
+            val hit = if (fuzzy) {
+                fuzzyWordContains(entry.arabicNorm, arabicNorm) ||
+                    fuzzyWordContains(entry.translationLower, lower) ||
+                    fuzzyWordContains(entry.transliterationLower, lower)
+            } else when {
             arabicNorm.length >= WORD_SEARCH_MIN_QUERY_LENGTH &&
                 entry.arabicNorm.contains(arabicNorm) -> true
             entry.translationLower.contains(lower) -> true
             entry.transliterationLower.contains(lower) -> true
             else -> false
+            }
+            if (!hit) continue
+            val base = entry.toHit()
+            // Word glosses and SI ayah lines often disagree ("a resting place" vs
+            // "a bed"). Prefer the gloss line only when it can host the highlight.
+            val display = snippetDisplayText(entry, index, i, trimmed)
+            out.add(if (display == entry.ayahTranslation) base else base.copy(ayahTranslation = display))
+            if (out.size >= maxHits) break
         }
-        if (!hit) continue
-        val base = entry.toHit()
-        // Word glosses and SI ayah lines often disagree ("a resting place" vs
-        // "a bed"). Prefer the gloss line only when it can host the highlight.
-        val display = snippetDisplayText(entry, index, i, trimmed)
-        out.add(if (display == entry.ayahTranslation) base else base.copy(ayahTranslation = display))
-        if (out.size >= maxHits) break
+        return out
     }
-    return out
+    return scan(fuzzy = false).ifEmpty { scan(fuzzy = true) }
+}
+
+/** True when one whole word in [text] is at most one edit from [query]. */
+fun fuzzyWordContains(text: String, query: String): Boolean {
+    if (query.length < 4 || query.any { !it.isLetterOrDigit() }) return false
+    var start = -1
+    for (i in 0..text.length) {
+        if (i < text.length && text[i].isLetterOrDigit()) {
+            if (start < 0) start = i
+        } else if (start >= 0) {
+            if (isWithinOneEdit(text, start, i, query)) return true
+            start = -1
+        }
+    }
+    return false
+}
+
+private fun isWithinOneEdit(text: String, start: Int, end: Int, query: String): Boolean {
+    val wordLength = end - start
+    if (kotlin.math.abs(wordLength - query.length) > 1) return false
+    var wordAt = start
+    var queryAt = 0
+    var edits = 0
+    while (wordAt < end && queryAt < query.length) {
+        if (text[wordAt] == query[queryAt]) {
+            wordAt++
+            queryAt++
+        } else {
+            edits++
+            if (edits > 1) break
+            when {
+                wordLength > query.length -> wordAt++
+                wordLength < query.length -> queryAt++
+                else -> {
+                    wordAt++
+                    queryAt++
+                }
+            }
+        }
+    }
+    edits += end - wordAt + query.length - queryAt
+    if (edits <= 1) return true
+
+    if (wordLength != query.length) return false
+    val first = (0 until wordLength).firstOrNull { text[start + it] != query[it] } ?: return true
+    if (first + 1 >= wordLength ||
+        text[start + first] != query[first + 1] ||
+        text[start + first + 1] != query[first]
+    ) {
+        return false
+    }
+    return (first + 2 until wordLength).all { text[start + it] == query[it] }
 }
 
 /**

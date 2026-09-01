@@ -136,18 +136,68 @@ export function matchWordSearch(
   const arabicNorm = normalizeArabicForSearch(trimmed)
   const lower = trimmed.toLowerCase()
   const wantArabic = arabicNorm.length >= WORD_SEARCH_MIN_QUERY_LENGTH
-  const out: WordSearchHit[] = []
-  for (let i = 0; i < index.length; i++) {
-    const entry = index[i]!
-    const hit =
-      (wantArabic && entry.arabicNorm.includes(arabicNorm)) ||
-      entry.translationLower.includes(lower) ||
-      entry.transliterationLower.includes(lower)
-    if (!hit) continue
-    out.push(toHitWithDisplayTranslation(entry, index, i, trimmed))
-    if (out.length >= maxHits) break
+  function scan(fuzzy: boolean): WordSearchHit[] {
+    const out: WordSearchHit[] = []
+    for (let i = 0; i < index.length; i++) {
+      const entry = index[i]!
+      const hit = fuzzy
+        ? fuzzyWordContains(entry.arabicNorm, arabicNorm) ||
+          fuzzyWordContains(entry.translationLower, lower) ||
+          fuzzyWordContains(entry.transliterationLower, lower)
+        : (wantArabic && entry.arabicNorm.includes(arabicNorm)) ||
+          entry.translationLower.includes(lower) ||
+          entry.transliterationLower.includes(lower)
+      if (!hit) continue
+      out.push(toHitWithDisplayTranslation(entry, index, i, trimmed))
+      if (out.length >= maxHits) break
+    }
+    return out
   }
-  return out
+  const exact = scan(false)
+  return exact.length > 0 ? exact : scan(true)
+}
+
+const FUZZY_WORD = /[\p{L}\p{N}]+/gu
+
+/** True when one whole word in text is at most one edit from query. */
+export function fuzzyWordContains(text: string, query: string): boolean {
+  if (query.length < 4 || !/^[\p{L}\p{N}]+$/u.test(query)) return false
+  FUZZY_WORD.lastIndex = 0
+  let match: RegExpExecArray | null
+  while ((match = FUZZY_WORD.exec(text)) != null) {
+    if (isWithinOneEdit(match[0], query)) return true
+  }
+  return false
+}
+
+function isWithinOneEdit(word: string, query: string): boolean {
+  if (Math.abs(word.length - query.length) > 1) return false
+  let wordAt = 0
+  let queryAt = 0
+  let edits = 0
+  while (wordAt < word.length && queryAt < query.length) {
+    if (word[wordAt] === query[queryAt]) {
+      wordAt++
+      queryAt++
+    } else {
+      edits++
+      if (edits > 1) break
+      if (word.length >= query.length) wordAt++
+      if (word.length <= query.length) queryAt++
+    }
+  }
+  edits += word.length - wordAt + query.length - queryAt
+  if (edits <= 1) return true
+
+  if (word.length !== query.length) return false
+  const first = [...word].findIndex((char, i) => char !== query[i])
+  return (
+    first >= 0 &&
+    first + 1 < word.length &&
+    word[first] === query[first + 1] &&
+    word[first + 1] === query[first] &&
+    word.slice(first + 2) === query.slice(first + 2)
+  )
 }
 
 /**
@@ -218,23 +268,31 @@ export async function matchWordSearchAsync(
   const arabicNorm = normalizeArabicForSearch(trimmed)
   const lower = trimmed.toLowerCase()
   const wantArabic = arabicNorm.length >= WORD_SEARCH_MIN_QUERY_LENGTH
-  const out: WordSearchHit[] = []
-  for (let i = 0; i < index.length; i++) {
-    if (i > 0 && i % WORD_SEARCH_CHUNK === 0) {
-      if (isCancelled()) return out
-      await yieldToEventLoop()
-      if (isCancelled()) return out
+  async function scan(fuzzy: boolean): Promise<WordSearchHit[]> {
+    const out: WordSearchHit[] = []
+    for (let i = 0; i < index.length; i++) {
+      if (i > 0 && i % WORD_SEARCH_CHUNK === 0) {
+        if (isCancelled()) return out
+        await yieldToEventLoop()
+        if (isCancelled()) return out
+      }
+      const entry = index[i]!
+      const hit = fuzzy
+        ? fuzzyWordContains(entry.arabicNorm, arabicNorm) ||
+          fuzzyWordContains(entry.translationLower, lower) ||
+          fuzzyWordContains(entry.transliterationLower, lower)
+        : (wantArabic && entry.arabicNorm.includes(arabicNorm)) ||
+          entry.translationLower.includes(lower) ||
+          entry.transliterationLower.includes(lower)
+      if (!hit) continue
+      out.push(toHitWithDisplayTranslation(entry, index, i, trimmed))
+      if (out.length >= maxHits) break
     }
-    const entry = index[i]!
-    const hit =
-      (wantArabic && entry.arabicNorm.includes(arabicNorm)) ||
-      entry.translationLower.includes(lower) ||
-      entry.transliterationLower.includes(lower)
-    if (!hit) continue
-    out.push(toHitWithDisplayTranslation(entry, index, i, trimmed))
-    if (out.length >= maxHits) break
+    return out
   }
-  return out
+  const exact = await scan(false)
+  if (exact.length > 0 || isCancelled()) return exact
+  return scan(true)
 }
 
 function yieldToEventLoop(): Promise<void> {
@@ -453,14 +511,19 @@ export function filterSurahs<T extends {
   }
   const trimmed = query.trim()
   const lower = trimmed.toLowerCase()
-  return {
-    surahs: surahs.filter(
-      (s) =>
-        s.nameTransliteration.toLowerCase().includes(lower) ||
+  const arabic = normalizeArabicForSearch(trimmed)
+  const matches = (s: T, fuzzy: boolean): boolean =>
+    fuzzy
+      ? fuzzyWordContains(s.nameTransliteration.toLowerCase(), lower) ||
+        fuzzyWordContains(s.nameTranslation.toLowerCase(), lower) ||
+        fuzzyWordContains(normalizeArabicForSearch(s.nameArabic), arabic)
+      : s.nameTransliteration.toLowerCase().includes(lower) ||
         s.nameTranslation.toLowerCase().includes(lower) ||
         s.nameArabic.includes(trimmed) ||
-        String(s.id) === trimmed,
-    ),
+        String(s.id) === trimmed
+  const exact = surahs.filter((s) => matches(s, false))
+  return {
+    surahs: exact.length > 0 ? exact : surahs.filter((s) => matches(s, true)),
     ayahTarget: null,
   }
 }

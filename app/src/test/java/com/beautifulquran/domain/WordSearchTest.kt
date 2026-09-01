@@ -69,6 +69,35 @@ class WordSearchTest {
     }
 
     @Test
+    fun `one edit typo falls back to fuzzy word matches`() {
+        assertEquals(
+            listOf(1 to 4, 55 to 1),
+            matchWordSearch(index, "mercifl").map { it.surahId to it.position },
+        )
+        assertEquals(2, matchWordSearch(index, "mercifull").size)
+        assertEquals(
+            listOf(1 to 4, 55 to 1),
+            matchWordSearch(index, "mercfiul").map { it.surahId to it.position },
+        )
+        assertTrue(matchWordSearch(index, "الرحمان").any { it.surahId == 1 && it.position == 3 })
+    }
+
+    @Test
+    fun `exact matches take precedence over fuzzy neighbors`() {
+        val neighbors = listOf(
+            entry(1, 1, 1, "قَالَ", "lone"),
+            entry(2, 1, 1, "حُبّ", "love"),
+        )
+        assertEquals(listOf("love"), matchWordSearch(neighbors, "love", maxHits = 1).map { it.translation })
+    }
+
+    @Test
+    fun `short and distant words do not fuzzy match`() {
+        assertFalse(fuzzyWordContains("the Most Merciful", "met"))
+        assertFalse(fuzzyWordContains("the Most Merciful", "mercy"))
+    }
+
+    @Test
     fun `short queries yield nothing`() {
         assertTrue(matchWordSearch(index, "a").isEmpty())
         assertTrue(matchWordSearch(index, " ").isEmpty())

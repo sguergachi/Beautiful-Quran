@@ -27,6 +27,12 @@ class SurahFilterTest {
     }
 
     @Test
+    fun `misspelled name falls back to fuzzy matching`() {
+        assertEquals(listOf(surahs[1]), filterSurahs(surahs, "baqrah").surahs)
+        assertEquals(listOf(surahs[0]), filterSurahs(surahs, "opner").surahs)
+    }
+
+    @Test
     fun `arabic name matches exactly`() {
         assertEquals(listOf(surahs[2]), filterSurahs(surahs, "الناس").surahs)
     }
