@@ -23,6 +23,7 @@ class VerseBookmarkRibbonTest {
     fun gatherOrdinal_sitsInTheBookmarkNubSlot() {
         assertEquals(11f, BookmarkRibbonWidthDp)
         assertEquals(14f, BookmarkNubLengthDp)
+        assertEquals(16f, GatherOrdinalSp)
         assertEquals(24f, BookmarkTopInsetDp)
         assertEquals(
             18.92f,

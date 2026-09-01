@@ -51,9 +51,9 @@ While gathering, word taps do not seek, word long-press does not open the
 Root Viewer, and the bookmark ribbon (including its note hold) is inactive.
 The mode owns the tap — interactions are *replaced*, not stacked.
 
-**Mode chrome (visual QA):** gather ordinals use 14 sp Garamond
+**Mode chrome (visual QA):** gather ordinals use 16 sp Garamond
 Western digits, centered in the 11×14 dp bookmark nub (not gold, not
-Arabic-Indic) — the same height as the swallowtail icon.
+Arabic-Indic) — 2pt larger than the swallowtail icon.
 Selection wash and gather-bar takeover are planned — see
 [VERSE_ACTIONS.md](VERSE_ACTIONS.md).
 
@@ -99,15 +99,14 @@ Handoff is `ACTION_SEND` + `EXTRA_TEXT` (no file).
 One PNG of a **paper sheet with verses at rest in full ink** — not a
 screenshot of the live reader, not the wash yet:
 
-1. Thin `ShareImageCard` composable (Hafs + translation + gold reference
-   footer + faint **Beautiful Quran**). Fixed **Paper** theme so shares stay
+1. Thin `ShareImageCard` composable (Hafs + translation + gold chapter
+   footer under a short hairline). Fixed **Paper** theme so shares stay
    readable parchment regardless of the reader's night/royal mode.
 2. `ShareImageRenderer` hosts each **verse strip** offscreen at 1080 ×
    wrap-height on a **new ComposeView**. The **chapter footer**
-   (`al-Baqarah 2:1–N` + Beautiful Quran) is a **separate attach**, then
-   the bitmaps are **stitched**. Reusing one view dropped the footer
-   (stale last verse). The GPU never rasterises the full gather. **Not**
-   full `ReaderScreen`.
+   (`al-Baqarah 2:1–N`) is a **separate attach**, then the bitmaps are
+   **stitched**. Reusing one view dropped the footer (stale last verse).
+   The GPU never rasterises the full gather. **Not** full `ReaderScreen`.
 3. `ShareFiles` writes PNG under `cacheDir/share/`, exposes a `FileProvider`
    URI (`${applicationId}.share`), keeps the newest few files.
 4. `ACTION_SEND` `image/png` + `FLAG_GRANT_READ_URI_PERMISSION`.
@@ -136,11 +135,11 @@ Original pipeline notes (for later PRs):
 
 ## The footer mark
 
-Image (and later video) carries a quiet footer: the reference in gold
-(`al-Baqarah 2:255`, or a same-surah range / multi-surah join) with
-**Beautiful Quran** beneath it in faint ink. A long gather makes a tall,
+Image (and later video) carries a quiet footer: a short gold hairline
+above the reference (`al-Baqarah 2:255`, or a same-surah range /
+multi-surah join). No app watermark. A long gather makes a tall,
 higher-resolution sheet — verses are not cropped to a phone-screen height. Text shares
-carry the reference only (no app watermark in the chat body).
+carry the reference only.
 
 ## Shape of the code
 

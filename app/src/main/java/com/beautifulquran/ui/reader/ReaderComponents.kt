@@ -3045,8 +3045,8 @@ private fun ShareInkVerb(
 
 /**
  * Western gather ordinal sitting in the idle swallowtail nub — same
- * strip, first-line inset, ribbon width, and nub height as the bookmark
- * icon. Ink, not gold.
+ * strip, first-line inset, and ribbon width as the bookmark icon.
+ * Type is [GatherOrdinalSp], 2pt larger than the nub. Ink, not gold.
  */
 @Composable
 private fun GatherOrdinalMark(
@@ -3094,8 +3094,8 @@ private fun GatherOrdinalMark(
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.72f),
                 style = TextStyle(
                     fontFamily = SerifFontFamily,
-                    fontSize = BookmarkNubLengthDp.sp,
-                    lineHeight = BookmarkNubLengthDp.sp,
+                    fontSize = GatherOrdinalSp.sp,
+                    lineHeight = GatherOrdinalSp.sp,
                     fontWeight = FontWeight.Normal,
                     textAlign = TextAlign.Center,
                     platformStyle = PlatformTextStyle(includeFontPadding = false),

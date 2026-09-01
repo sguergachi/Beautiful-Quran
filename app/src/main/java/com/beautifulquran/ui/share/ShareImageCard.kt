@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -120,7 +121,6 @@ fun ShareImageFooterStrip(
     modifier: Modifier = Modifier,
 ) {
     val gold = LocalQuranAccents.current.gold
-    val ink = MaterialTheme.colorScheme.onSurface
     val paper = MaterialTheme.colorScheme.background
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -134,17 +134,17 @@ fun ShareImageFooterStrip(
                 bottom = ShareImagePadBottom,
             ),
     ) {
+        Spacer(
+            Modifier
+                .width(48.dp)
+                .height(0.5.dp)
+                .background(gold.copy(alpha = 0.45f)),
+        )
+        Spacer(Modifier.height(10.dp))
         Text(
             text = footerRef,
             style = MaterialTheme.typography.labelLarge,
             color = gold,
-            textAlign = TextAlign.Center,
-        )
-        Spacer(Modifier.height(6.dp))
-        Text(
-            text = "Beautiful Quran",
-            style = MaterialTheme.typography.labelMedium,
-            color = ink.copy(alpha = 0.38f),
             textAlign = TextAlign.Center,
         )
     }
