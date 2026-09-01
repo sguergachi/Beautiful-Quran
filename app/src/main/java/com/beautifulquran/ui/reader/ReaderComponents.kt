@@ -2988,6 +2988,18 @@ fun AyahBlock(
                                 AbsoluteAlignment.TopLeft
                             },
                         )
+                        .padding(
+                            start = if (bookmarkSide == AyahSelectorSide.LEFT) {
+                                GatherOrdinalEdgeInsetDp.dp
+                            } else {
+                                0.dp
+                            },
+                            end = if (bookmarkSide == AyahSelectorSide.RIGHT) {
+                                GatherOrdinalEdgeInsetDp.dp
+                            } else {
+                                0.dp
+                            },
+                        )
                         .fillMaxHeight(),
                 )
             }
@@ -3050,7 +3062,8 @@ private fun ShareInkVerb(
 /**
  * Western gather ordinal in the bookmark strip, first-line inset.
  * The Settings/Customize ink-brush circle paints around the digit so
- * it is held, not floating in the margin. Ink, not gold.
+ * it is held, not floating in the margin. Inset from the outer edge
+ * so the loop stays inside the gold soak. Ink, not gold.
  */
 @Composable
 private fun GatherOrdinalMark(

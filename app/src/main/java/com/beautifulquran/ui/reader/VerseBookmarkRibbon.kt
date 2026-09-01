@@ -66,6 +66,9 @@ internal const val BookmarkTopInsetDp = 24f    // align the tip with the verse's
 internal const val BookmarkNubLengthDp = 14f   // just the swallowtail tip peeking out
 /** Gather ordinal type: 2pt larger than the 14 dp nub. */
 internal const val GatherOrdinalSp = 16f
+/** Pull the circled ordinal in from the soak's outer edge so the
+ *  brush loop stays inside the fillBox stain (halfSize 0.93). */
+internal const val GatherOrdinalEdgeInsetDp = 18f
 private const val TOP_FOLD_DP = 3.5f    // soft fold over the page edge, matching web
 private const val BOTTOM_GAP_DP = 48f   // leave air above the next verse's tip
 private const val NOTCH_DP = 5.5f
