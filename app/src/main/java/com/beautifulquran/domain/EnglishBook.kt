@@ -126,8 +126,8 @@ const val ENGLISH_LEAF_LINE_CHARS = ENGLISH_LEAF_CAPACITY_CHARS / 23
  *  3. **The last page of a chapter is the only short page.** That is where the
  *     ragged foot is allowed to live, and because it always coincides with a
  *     chapter ending it reads as intended rather than as a gap.
- *  4. **Widows and orphans move the break, and nothing else does** — see
- *     [ENGLISH_LEAF_MIN_FRAGMENT_CHARS].
+ *  4. **Widows and orphans move the break** — in a book. Not in this one, and
+ *     [ENGLISH_LEAF_MIN_FRAGMENT_CHARS] says why. So here, nothing moves it.
  *
  * What is *not* on that list is the sentence. This book used to refuse to cut a
  * verse anywhere but at a full stop, on the reasoning that a reader should not
@@ -144,7 +144,27 @@ const val ENGLISH_LEAF_LINE_CHARS = ENGLISH_LEAF_CAPACITY_CHARS / 23
  * break, not a sentence break, and it costs at most a word of the leaf.
  */
 
-const val ENGLISH_LEAF_MIN_FRAGMENT_CHARS = ENGLISH_LEAF_LINE_CHARS
+/**
+ * The least of a carried verse worth cutting: one word.
+ *
+ * This was a line, standing in for the widow and orphan rule, and that rule
+ * does not apply to this book. A *widow* is a paragraph's last line alone at
+ * the head of a page with white beside it — and a carried verse is never
+ * alone. The rest of it is followed on the same line by the next verse, and
+ * the next, for twenty-three lines. There is no white beside it to look wrong,
+ * so there is nothing to protect.
+ *
+ * It was not cheap to keep. Measured over the book it refused a good cut on
+ * 239 leaves and held 5,253 characters off the paper — twenty-two leaves'
+ * worth — and left an ordinary leaf 0.27 of a line short where without it the
+ * figure is 0.01.
+ *
+ * A word is what is left, and it is arithmetic rather than typography: a cut of
+ * nothing sets an empty run and never advances. `englishLeafBreak` snaps the
+ * offset off the middle of a word as the leaf sets it, so a cut this small
+ * lands on whichever word straddles the break.
+ */
+const val ENGLISH_LEAF_MIN_FRAGMENT_CHARS = 6
 
 /**
  * One verse, or the part of one, that a leaf sets.
@@ -317,20 +337,17 @@ fun buildEnglishBook(
                 }
                 // Fill the leaf. The break falls where the line falls.
                 //
-                // Widows and orphans are the only thing that moves it: if the
-                // tail would come to less than a line it is pulled back down
-                // the verse until it clears one, and if that leaves less than a
-                // line standing at the foot the verse is not cut at all — it
+                // Nothing moves it. The leaf takes every character of room it
+                // has and the verse picks up where it left off, because the
+                // carried half is never stranded: the rest of the verse, and
+                // the next verse, follow it on the same line. Only a leaf with
+                // less than a word of room does not cut at all — that verse
                 // goes whole to the next leaf, the way a paragraph too big for
                 // the foot of a page does.
                 var cut = left
-                if (rest - cut < ENGLISH_LEAF_MIN_FRAGMENT_CHARS) {
-                    cut = rest - ENGLISH_LEAF_MIN_FRAGMENT_CHARS
-                }
                 val carry = cut >= ENGLISH_LEAF_MIN_FRAGMENT_CHARS
                 if (!carry && run.isNotEmpty()) {
-                    // Nowhere to cut that is not a widow: the verse opens the
-                    // next leaf instead.
+                    // Not a word of room left: the verse opens the next leaf.
                     close()
                     continue
                 }

@@ -398,28 +398,37 @@ So the break falls where the line falls. `englishLeafBreak` still moves it off
 the middle of a word, because this book does not hyphenate — a word break, not a
 sentence break, and it costs at most a word.
 
-The widow and orphan rule is `ENGLISH_LEAF_MIN_FRAGMENT_CHARS`, one line: an
-*orphan* is the opening of a verse alone at the foot, a *widow* its last line
-alone at the head. One line rather than the printer's usual two, because these
-verses have no paragraph indents to make a single line read as stranded. When
-the tail would be a widow the break moves back up the verse; when even that
-leaves an orphan, the verse goes whole to the next leaf.
+**And the widow rule does not apply here either.** A *widow* is a paragraph's
+last line alone at the head of a page with white beside it — and a carried verse
+is never alone: the rest of it is followed on the same line by the next verse,
+and the next, for twenty-three lines. There is no white beside it to look wrong.
+Keeping the rule anyway refused a good cut on 239 leaves and held 5,253
+characters off the paper, twenty-two leaves' worth, leaving an ordinary leaf
+0.27 of a line short where without it the figure is 0.01. So
+`ENGLISH_LEAF_MIN_FRAGMENT_CHARS` is a *word*, and that is arithmetic rather
+than typography: a cut of nothing sets an empty run and never advances.
 
 Measured over the book, with the chapter rule in force:
 
 ```
                             leaves   carries   mean blank   p95
-    ordinary leaves            895       611       0.28     0.95
+    ordinary leaves            884       624       0.01     0.10
     chapter-final leaves       114         —      11.50       —
     ----                     -----
-    whole book               1,009
+    whole book                 998
 ```
 
-Which is the shape a book has: 895 leaves full to within a third of a line, and
+Which is the shape a book has: 884 leaves full to the character, and
 every ragged foot in the Qur'an gathered onto the 114 leaves where a chapter
 ends and the white reads as an ending. Against the sentence rule it replaced —
-1,055 leaves at 1.47 lines blank *each* — it is 46 fewer leaves and five times
-less waste on the pages a reader spends their time on.
+1,055 leaves at 1.47 lines blank *each* — it is 57 fewer leaves, and the waste
+on the pages a reader spends their time on is gone rather than reduced.
+
+What is left at the foot of an ordinary leaf is not blank paper but a short
+*last line*: the cut lands wherever the character count runs out, which is
+rarely a line ending. Landing it on one would take a real layout rather than an
+estimate — which is to say a book that repaginates per device, as an ebook does
+and a printed book cannot.
 
 It is not done to save a line. Cutting a verse costs the reader the end of a
 thought to a page turn, so it is done only where leaving it whole would waste

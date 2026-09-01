@@ -45,8 +45,9 @@ class EnglishBookTest {
     @Test
     fun `a page that will not fit takes two leaves`() {
         // Four verses of just under half a leaf, none of them a chapter's
-        // first: two go on, the third will not, and it opens the next leaf.
-        val b = book(3 to listOf(2 to 2, 2 to 3, 2 to 4, 2 to 5)) { _, _ -> cap / 2 - 10 }
+        // first: two go on and leave less than a word of room, so the third
+        // cannot even be cut into it and opens the next leaf.
+        val b = book(3 to listOf(2 to 2, 2 to 3, 2 to 4, 2 to 5)) { _, _ -> cap / 2 - 2 }
         val leaves = leavesFrom(b, 3)
         assertEquals(2, leaves.size)
         assertEquals(listOf(2 to 2, 2 to 3), leaves[0].verses)
@@ -159,11 +160,10 @@ class EnglishBookTest {
     }
 
     @Test
-    fun `a verse with no room for a whole line of it is set whole on the next leaf`() {
-        // Less than a line of room left, so anything cut into it would be an
-        // orphan at the foot — the verse moves down entire, the way a paragraph
-        // too big for the foot of a page does.
-        val short = ENGLISH_LEAF_LINE_CHARS - 1
+    fun `a verse with less than a word of room is set whole on the next leaf`() {
+        // Not enough room to cut anything into: the verse moves down entire,
+        // the way a paragraph too big for the foot of a page does.
+        val short = ENGLISH_LEAF_MIN_FRAGMENT_CHARS - 1
         val b = buildEnglishBook(
             buildMushafCatalog(listOf(source(2, 2, 3), source(2, 3, 3))),
         ) { _, a -> if (a == 2) cap - short else cap / 2 }
@@ -226,6 +226,20 @@ class EnglishBookTest {
         assertEquals(listOf(2 to 1), leaves[0].verses)
         assertEquals(listOf(3 to 1), leaves[1].verses)
         assertEquals(listOf(4 to 1), leaves[2].verses)
+    }
+
+    @Test
+    fun `the leaf takes every character of room it has`() {
+        // No threshold pulls the break back. Whatever room is left when a verse
+        // will not fit, the leaf takes exactly that much of it — the carried
+        // half is never stranded, because the next verse follows it on the same
+        // line, so there is no widow to move the break for.
+        val b = book(3 to listOf(2 to 2, 2 to 3)) { _, a -> if (a == 2) cap - 20 else cap }
+        val leaves = leavesFrom(b, 3)
+        val cut = leaves[0].runs.last()
+        // 20 characters of room, less the mark already charged to 2:2.
+        assertEquals(20, cut.to - cut.from)
+        assertEquals(cut.to, leaves[1].runs.first().from)
     }
 
     @Test
