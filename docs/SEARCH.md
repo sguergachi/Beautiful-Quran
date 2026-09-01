@@ -23,6 +23,10 @@ Results are deduplicated per ayah, sorted by descending score, and retain Qurani
 order as the tie-break. The UI then groups that ranked stream by surah. Literal
 word hits preserve their word position for the reader flash. Full-ayah phrase
 and concept hits use position zero and do not fabricate a highlighted word.
+Result snippets color only a visible query-related gloss term or a word from
+the matched concept label. If the canonical translation contains neither, the
+result stays unaccented (or uses the word-gloss line) rather than coloring an
+unrelated function word.
 
 ## Exact quotes
 

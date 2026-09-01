@@ -576,6 +576,7 @@ function WordSearchSection({
                   hit.ayahTranslation,
                   displayQuery,
                   hit.translation,
+                  hit.matchLabel ?? '',
                 ).map((span, i) =>
                   span.highlighted ? (
                     <mark key={i} className="word-search-mark">

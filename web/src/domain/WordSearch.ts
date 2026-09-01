@@ -631,12 +631,14 @@ export function englishTranslationHighlightSpans(
   ayahTranslation: string,
   query: string,
   wordGloss: string,
+  semanticLabel = '',
 ): AyahTextSpan[] {
   if (!ayahTranslation) return []
   const needle = highlightNeedle(
     ayahTranslation,
     query.trim(),
     wordGloss.trim(),
+    semanticLabel.trim(),
   )
   const snippet = windowAroundMatch(
     ayahTranslation,
@@ -685,28 +687,54 @@ export function windowAroundMatch(
   return prefix + core + suffix
 }
 
-/** Prefers the typed query when present; otherwise the word gloss / a token. */
+/** Chooses only a query-, Arabic-word-, or concept-related visible term. */
 export function highlightNeedle(
   haystack: string,
   query: string,
   wordGloss: string,
+  semanticLabel = '',
 ): string | null {
   if (query && haystack.toLowerCase().includes(query.toLowerCase())) {
     return query
   }
-  if (wordGloss && haystack.toLowerCase().includes(wordGloss.toLowerCase())) {
+  const parsed = parseSearchQuery(query)
+  const arabicQuery = Boolean(normalizeArabicForSearch(query))
+  if (
+    wordGloss &&
+    haystack.toLowerCase().includes(wordGloss.toLowerCase()) &&
+    (arabicQuery || searchTextRelevance(wordGloss, parsed) >= 2_200)
+  ) {
     return wordGloss
   }
-  const tokens = wordGloss
-    .split(/[\s,;:]+/)
-    .map((t) => t.trim().replace(/^[([{"']+|[)\]}"']+$/g, ''))
-    .filter((t) => t.length >= 3)
-    .sort((a, b) => b.length - a.length)
-  for (const token of tokens) {
-    if (haystack.toLowerCase().includes(token.toLowerCase())) return token
+  const presentTokens = (text: string): string[] =>
+    text
+      .split(/[\s,;:]+/)
+      .map((token) => token.trim().replace(/^[([{"']+|[)\]}"']+$/g, ''))
+      .filter(
+        (token) =>
+          token.length >= 3 && haystack.toLowerCase().includes(token.toLowerCase()),
+      )
+
+  const glossTokens = presentTokens(wordGloss)
+  if (arabicQuery) {
+    return glossTokens.sort((a, b) => b.length - a.length)[0] ?? null
   }
-  return null
+  const relatedGloss = glossTokens
+    .map((token) => ({ token, score: searchTextRelevance(token, parsed) }))
+    .filter(({ score }) => score > 0)
+    .sort((a, b) => b.score - a.score || b.token.length - a.token.length)[0]?.token
+  if (relatedGloss) return relatedGloss
+  return (
+    presentTokens(semanticLabel)
+      .filter((token) => !HIGHLIGHT_FILLERS.has(token.toLowerCase()))
+      .sort((a, b) => b.length - a.length)[0] ?? null
+  )
 }
+
+const HIGHLIGHT_FILLERS = new Set([
+  'and', 'are', 'for', 'from', 'has', 'have', 'into', 'that', 'the', 'their', 'then',
+  'they', 'this', 'those', 'was', 'were', 'will', 'with', 'you', 'your',
+])
 
 function highlightAllOccurrences(text: string, needle: string): AyahTextSpan[] {
   const spans: AyahTextSpan[] = []

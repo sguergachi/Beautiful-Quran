@@ -391,9 +391,15 @@ fun englishTranslationHighlightSpans(
     ayahTranslation: String,
     query: String,
     wordGloss: String,
+    semanticLabel: String = "",
 ): List<AyahTextSpan> {
     if (ayahTranslation.isEmpty()) return emptyList()
-    val needle = highlightNeedle(ayahTranslation, query.trim(), wordGloss.trim())
+    val needle = highlightNeedle(
+        ayahTranslation,
+        query.trim(),
+        wordGloss.trim(),
+        semanticLabel.trim(),
+    )
     val snippet = windowAroundMatch(
         text = ayahTranslation,
         needle = needle,
@@ -435,32 +441,52 @@ internal fun windowAroundMatch(
 }
 
 /**
- * Prefers the typed query when it appears in the translation; otherwise the
- * word gloss. Returns null when neither can be found (case-insensitive).
+ * Prefers the typed query, then a query-related gloss token. Arabic matches
+ * may use their corresponding English gloss, and semantic hits may use a
+ * non-filler word from their concept label. Unrelated fallback words stay ink.
  */
 internal fun highlightNeedle(
     haystack: String,
     query: String,
     wordGloss: String,
+    semanticLabel: String = "",
 ): String? {
     if (query.isNotEmpty() && haystack.contains(query, ignoreCase = true)) {
         return query
     }
-    if (wordGloss.isNotEmpty() && haystack.contains(wordGloss, ignoreCase = true)) {
+    val parsed = parseSearchQuery(query)
+    val arabicQuery = normalizeArabicForSearch(query).isNotEmpty()
+    if (wordGloss.isNotEmpty() && haystack.contains(wordGloss, ignoreCase = true) &&
+        (arabicQuery || searchTextRelevance(wordGloss, parsed) >= 2_200)
+    ) {
         return wordGloss
     }
-    // Gloss rows are often "(is) the Merciful" while the ayah says "the Merciful" —
-    // try the longest whitespace token from the gloss that still appears.
-    val tokens = wordGloss
+    fun presentTokens(text: String) = text
         .split(Regex("[\\s,;:]+"))
         .map { it.trim().trim('(', ')', '[', ']', '"', '\'') }
         .filter { it.length >= 3 }
-        .sortedByDescending { it.length }
-    for (token in tokens) {
-        if (haystack.contains(token, ignoreCase = true)) return token
+        .filter { haystack.contains(it, ignoreCase = true) }
+
+    val glossTokens = presentTokens(wordGloss)
+    if (arabicQuery) {
+        glossTokens.maxByOrNull(String::length)?.let { return it }
+    } else {
+        glossTokens
+            .map { it to searchTextRelevance(it, parsed) }
+            .filter { it.second > 0 }
+            .maxWithOrNull(compareBy<Pair<String, Int>> { it.second }.thenBy { it.first.length })
+            ?.first
+            ?.let { return it }
     }
-    return null
+    return presentTokens(semanticLabel)
+        .filterNot { it.lowercase() in highlightFillers }
+        .maxByOrNull(String::length)
 }
+
+private val highlightFillers = setOf(
+    "and", "are", "for", "from", "has", "have", "into", "that", "the", "their", "then",
+    "they", "this", "those", "was", "were", "will", "with", "you", "your",
+)
 
 private fun highlightAllOccurrences(text: String, needle: String): List<AyahTextSpan> {
     val spans = ArrayList<AyahTextSpan>()

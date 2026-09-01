@@ -243,6 +243,41 @@ describe('englishTranslationHighlightSpans', () => {
     ).toBe(true)
   })
 
+  it('chooses a query-related gloss word instead of a function word', () => {
+    const spans = englishTranslationHighlightSpans(
+      'And the companions of Paradise will call out',
+      'calm',
+      'And they will call out',
+    )
+    expect(spans.filter((span) => span.highlighted).map((span) => span.text)).toEqual([
+      'call',
+    ])
+    expect(
+      englishTranslationHighlightSpans(
+        'their inscription was guidance',
+        'calm',
+        '(was) calmed',
+      ).some((span) => span.highlighted),
+    ).toBe(false)
+    expect(
+      englishTranslationHighlightSpans('They will answer', 'calm', 'will').some(
+        (span) => span.highlighted,
+      ),
+    ).toBe(false)
+  })
+
+  it('uses a visible concept-label word for semantic results', () => {
+    const spans = englishTranslationHighlightSpans(
+      'Peace be upon you.',
+      'calm',
+      '',
+      'Peace and Reconciliation',
+    )
+    expect(spans.filter((span) => span.highlighted).map((span) => span.text)).toEqual([
+      'Peace',
+    ])
+  })
+
   it('windows the snippet around a mid-ayah match', () => {
     const lead = Array.from({ length: 40 }, (_, i) => `w${i + 1}`).join(' ')
     const ayah = `${lead} resting place more words after that keep going`

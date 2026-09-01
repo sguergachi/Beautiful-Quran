@@ -242,6 +242,38 @@ class WordSearchTest {
     }
 
     @Test
+    fun `english highlight chooses a query-related gloss word`() {
+        val spans = englishTranslationHighlightSpans(
+            "And the companions of Paradise will call out",
+            "calm",
+            "And they will call out",
+        )
+        assertEquals(listOf("call"), spans.filter { it.highlighted }.map { it.text })
+        assertTrue(
+            englishTranslationHighlightSpans(
+                "their inscription was guidance",
+                "calm",
+                "(was) calmed",
+            ).none { it.highlighted },
+        )
+        assertTrue(
+            englishTranslationHighlightSpans("They will answer", "calm", "will")
+                .none { it.highlighted },
+        )
+    }
+
+    @Test
+    fun `semantic highlight uses a visible concept word`() {
+        val spans = englishTranslationHighlightSpans(
+            "Peace be upon you.",
+            "calm",
+            wordGloss = "",
+            semanticLabel = "Peace and Reconciliation",
+        )
+        assertEquals(listOf("Peace"), spans.filter { it.highlighted }.map { it.text })
+    }
+
+    @Test
     fun `english snippet windows around a mid-ayah match`() {
         val words = (1..40).joinToString(" ") { "w$it" }
         val ayah = "$words resting place more words after that keep going"
