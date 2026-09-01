@@ -204,10 +204,11 @@ the paper toggle haptic: a confirm click on, a lighter clock tick off.
 Same family as Settings checks and the ayah rail, not a long-press thud.
 
 All four then share: tap more verses (or their ordinal) to add/drop.
-The gather bar matches the play bar’s two rows: Close in the trailing
-top slot; Text · N · Image on the transport row, count on the centre
-line. No Send page on the happy path; back dismisses prompt or leaves
-gather.
+The gather bar keeps the play bar’s two rows, but not its five-slot
+transport: the count sits where the reciter name sits (centered, Close
+trailing); Text and Image are a centered pair of equal verbs below.
+The count is not Play. No Send page on the happy path; back dismisses
+prompt or leaves gather.
 
 Policy lives in `share/ShareUx.kt` (pure, JVM-tested). Do not invent
 entry rules in `ReaderScreen`.

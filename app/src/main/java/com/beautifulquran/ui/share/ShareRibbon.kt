@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.Notes
 import androidx.compose.material.icons.rounded.Close
@@ -30,13 +29,12 @@ import androidx.compose.ui.unit.dp
 import com.beautifulquran.ui.theme.SerifFontFamily
 
 /**
- * Replaces the player bar while gathering. Same two-row paper as
- * [com.beautifulquran.ui.reader.PlayerBar]:
+ * Replaces the player bar while gathering.
  *
- * - Top row: Close in the trailing 48 dp slot (where the Icon-variant
- *   share glyph sits).
- * - Transport row: Text · N · Image, 48/56/48, with matching 48 dp
- *   outer slots so N sits on the page centre line the way Play does.
+ * The count is the fact of the mode, so it sits where the reciter name sits:
+ * centered on the top row, Close in the trailing 48 dp slot. Text and Image
+ * are a pair of equal verbs on the row below, centered together. The count
+ * is not Play, and the two exports are not Rewind / Forward.
  */
 @Composable
 fun ShareRibbon(
@@ -52,7 +50,6 @@ fun ShareRibbon(
     val busy = preparingText || preparingImage
     val canExport = count >= 1 && !busy
     val exportTint = if (canExport) ink else ink.copy(alpha = 0.35f)
-    val slot = if (compact) 4.dp else 12.dp
 
     Surface(color = MaterialTheme.colorScheme.background) {
         Column(
@@ -66,7 +63,27 @@ fun ShareRibbon(
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Spacer(Modifier.size(48.dp))
-                Spacer(Modifier.weight(1f))
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier
+                        .weight(1f)
+                        .semantics {
+                            contentDescription =
+                                if (count == 1) "1 verse" else "$count verses"
+                        },
+                ) {
+                    Text(
+                        text = count.toString(),
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            fontFamily = SerifFontFamily,
+                        ),
+                        color = if (count >= 1) {
+                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.82f)
+                        } else {
+                            ink.copy(alpha = 0.35f)
+                        },
+                    )
+                }
                 IconButton(
                     onClick = onCancel,
                     modifier = Modifier.size(48.dp),
@@ -81,19 +98,13 @@ fun ShareRibbon(
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(
-                    slot,
+                    if (compact) 20.dp else 32.dp,
                     Alignment.CenterHorizontally,
                 ),
                 modifier = Modifier
-                    .widthIn(max = 680.dp)
                     .fillMaxWidth()
-                    .padding(
-                        start = if (compact) 8.dp else 12.dp,
-                        end = if (compact) 8.dp else 12.dp,
-                        bottom = 4.dp,
-                    ),
+                    .padding(bottom = 4.dp),
             ) {
-                Spacer(Modifier.size(48.dp))
                 IconButton(
                     onClick = onShareText,
                     enabled = canExport,
@@ -112,27 +123,6 @@ fun ShareRibbon(
                             tint = exportTint,
                         )
                     }
-                }
-                Box(
-                    contentAlignment = Alignment.Center,
-                    modifier = Modifier
-                        .size(56.dp)
-                        .semantics {
-                            contentDescription =
-                                if (count == 1) "1 verse" else "$count verses"
-                        },
-                ) {
-                    Text(
-                        text = count.toString(),
-                        style = MaterialTheme.typography.titleMedium.copy(
-                            fontFamily = SerifFontFamily,
-                        ),
-                        color = if (count >= 1) {
-                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.82f)
-                        } else {
-                            ink.copy(alpha = 0.35f)
-                        },
-                    )
                 }
                 IconButton(
                     onClick = onShareImage,
@@ -153,7 +143,6 @@ fun ShareRibbon(
                         )
                     }
                 }
-                Spacer(Modifier.size(48.dp))
             }
         }
     }
