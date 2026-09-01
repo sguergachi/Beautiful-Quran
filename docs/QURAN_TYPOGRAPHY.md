@@ -373,14 +373,31 @@ Allah."* and the next opens on *"One of them wishes…"*. A verse with no senten
 end in reach is not cut at all: it goes whole on the next leaf, the way a
 paragraph too big for the foot of a page does.
 
-It is not free. Over the book it is **1,041 leaves to 1,075** — about one leaf
-in thirty — and 302 carries fall to 195, so mean blank rises from 1.20 lines to
-1.86 (p95 2.81 to 4.72). The alternative, letting the cut overrun the leaf to
-reach the next period, keeps 210 carries but squeezes twenty leaves by up to 117
-characters, and a squeezed leaf is a worse fault than a fuller one. A sentence
-end is found by [englishSentenceEnds], which reads the space after `.`, `!` or
-`?` — behind any closing quote — and never inside brackets, since the reader may
-have asked for the translator's asides to come off.
+**And because the cut costs nothing, the leaf fills.** Two thresholds used to
+hold a carry back, and both were priced against a mid-sentence break: a verse
+was cut only where leaving it whole would waste three lines or more, and never
+within two lines of either end. Neither survives the sentence rule. A break
+between sentences is what every page of every book does, so there is nothing to
+weigh against the paper: **if a sentence ends anywhere in the room left, the
+leaf takes it.** The floor is one line rather than two — a whole sentence on a
+line of its own is a short paragraph, not a widow — and below that it would be
+five characters of "Say." alone at a head, which is nobody's idea of a page.
+
+Over the book: **1,041 leaves to 1,055**, one in seventy-five, with carries
+302 to 324 and mean blank 1.20 lines to 1.47 (p95 2.81 to 3.94). Holding the
+old two-line floor cost twenty leaves and a third of a blank line on each.
+
+A sentence end is found by [englishSentenceEnds], which reads the space after
+`.`, `!` or `?` — behind any closing quote — and never inside brackets, since
+the reader may have asked for the translator's asides to come off.
+
+What is left is the estimator, not the rule. The pagination counts characters,
+and a leaf it fills to 872 of 900 can still show white: 2:286's tail, Ali
+'Imran's panel and its first six verses fill leaf 83 with 28 characters spare,
+and 3:7's first sentence needs 157, so nothing more will go on it — but the
+panel and basmalah are charged 4.2 lines and do not take that much paper. That
+is `ENGLISH_LEAF_OPENING_CHARS` to answer for, and it wants measuring rather
+than guessing.
 
 It is not done to save a line. Cutting a verse costs the reader the end of a
 thought to a page turn, so it is done only where leaving it whole would waste

@@ -112,26 +112,34 @@ const val ENGLISH_LEAF_LINE_CHARS = ENGLISH_LEAF_CAPACITY_CHARS / 22
  * does a printed translation of the Qur'an, which runs its verses on and lets
  * the page break fall where it falls.
  *
- * But a verse is a sentence, and cutting one is not free: the reader loses the
- * end of a thought to a page turn. So it is not done to save a line or two. It
- * is done when leaving the verse whole would waste **three lines or more**,
- * which needs the verse to be at least five lines long — the top sixth of the
- * book by length. Below that the leaf simply ends.
+ * A verse used to be cut only where leaving it whole would waste three lines or
+ * more, because the cut fell wherever the character budget ran out and breaking
+ * a sentence across the fold is a real cost — not one to pay for a line or two.
  *
- * Measured: 371 leaves with more than three blank lines become 24, the average
- * blank falls from 2.6 lines to 1.2, and 311 verses of 6,236 are carried over.
+ * The cut is a sentence end now ([englishSentenceCut]), and that changes the
+ * arithmetic: the reader loses nothing at the turn, so there is no cost to
+ * weigh against the paper and no reason to leave the foot of a leaf empty. A
+ * leaf fills as far as a whole sentence will fill it.
+ *
+ * Measured over the book: 1,075 leaves become 1,055, average blank 1.86 lines
+ * becomes 1.47, and 195 carried verses become 324.
  */
-const val ENGLISH_LEAF_SPLIT_HOLE_CHARS = 3 * ENGLISH_LEAF_LINE_CHARS
 
 /**
  * The least of a carried verse that may stand alone on either leaf.
  *
- * Two lines. One line of a sentence stranded at the foot of a page, or left
- * over at the head of the next, is a widow, and a compositor moves the break
- * rather than set one. Here the break moves back up the verse until both halves
- * clear this; if it cannot, the verse is not split at all.
+ * One line. It was two, from when a fragment could be any run of words a budget
+ * happened to end on — half a sentence alone at a foot is a widow, and a
+ * compositor moves the break rather than set one. A fragment is a whole
+ * sentence now, and a whole sentence on a line of its own is not a widow; it is
+ * a short paragraph. Holding out for two lines simply refused good cuts: it
+ * cost twenty leaves and a third of a blank line on every one of them.
+ *
+ * Below one line it would be: five characters of "Say." alone at the head of a
+ * leaf is nobody's idea of a page. The break moves back up the verse until both
+ * halves clear this, and if none does the verse is not split at all.
  */
-const val ENGLISH_LEAF_MIN_FRAGMENT_CHARS = 2 * ENGLISH_LEAF_LINE_CHARS
+const val ENGLISH_LEAF_MIN_FRAGMENT_CHARS = ENGLISH_LEAF_LINE_CHARS
 
 /**
  * One verse, or the part of one, that a leaf sets.
@@ -310,29 +318,28 @@ fun buildEnglishBook(
                     mass += rest + ENGLISH_LEAF_MARK_CHARS
                     break
                 }
-                // Carry the verse over only when leaving it whole would waste a
-                // real hole, and only where both halves stand on their own —
-                // and only ever at the end of a sentence.
+                // Fill the leaf, and break on a sentence rather than on a
+                // verse.
                 //
                 // A page break inside a sentence is the one thing a printed
                 // book does not do to prose it can help: the reader carries
                 // half a thought over the fold and has to reassemble it on the
-                // other side. So the cut is the last sentence end that fits,
-                // rather than the last word that fits. A verse with no sentence
-                // end in reach is not cut at all — it goes whole on the next
-                // leaf, the way a paragraph too big for the foot of a page does.
-                // It costs about a leaf in thirty (1,041 to 1,075 over the whole
-                // book) and it is what the rule is worth.
-                val take = minOf(left, rest - ENGLISH_LEAF_MIN_FRAGMENT_CHARS)
+                // other side. A break *between* sentences costs nothing — it is
+                // what every page of every book does. So there is no threshold
+                // to clear here any more: if a sentence ends anywhere in the
+                // room left, the leaf takes it. What used to gate this was the
+                // price of cutting mid-sentence, and that price is gone.
+                //
+                // A verse with no sentence end in reach is still not cut: it
+                // goes whole on the next leaf, the way a paragraph too big for
+                // the foot of a page does.
                 val sentenceCut = englishSentenceCut(
                     sentenceEnds = measure.sentenceEnds,
                     from = from,
                     length = length,
                     room = left,
                 )
-                val carry = left >= ENGLISH_LEAF_SPLIT_HOLE_CHARS &&
-                    take >= ENGLISH_LEAF_MIN_FRAGMENT_CHARS &&
-                    sentenceCut != null
+                val carry = sentenceCut != null
                 if (!carry && run.isNotEmpty()) {
                     // Not worth cutting: the verse opens the next leaf instead.
                     close()

@@ -20,8 +20,8 @@ package com.beautifulquran.domain
  * is the book's to place. A verse too long to go on the leaf it met is carried
  * over rather than left to open the next one, exactly as a printed book carries
  * a paragraph: the sentence continues at the head of the following leaf and is
- * numbered where it finishes. Only when leaving it whole would waste three
- * lines or more; see `ENGLISH_LEAF_SPLIT_HOLE_CHARS`.
+ * numbered where it finishes. The cut is always the end of a sentence, and a
+ * leaf fills as far as a whole sentence will fill it; see `englishSentenceCut`.
  *
  * The two layouts are still one book, but through the *verse* rather than
  * through the page: `EnglishBook.leafOfVerse` is exact for all 6,236 of them,

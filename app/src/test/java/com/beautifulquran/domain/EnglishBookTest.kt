@@ -149,18 +149,42 @@ class EnglishBookTest {
     }
 
     @Test
-    fun `a small hole is left alone rather than cut a sentence for it`() {
-        // Only a couple of lines are going spare, which is not worth the end of
-        // a thought falling on the other side of a page turn.
+    fun `even a small hole is filled, because the cut is a sentence`() {
+        // This used to be left alone: a couple of spare lines were not worth
+        // the end of a thought falling on the other side of a page turn. The
+        // cut lands between sentences now, so it costs the reader nothing and
+        // there is no reason to leave the foot of the leaf empty.
         val short = ENGLISH_LEAF_LINE_CHARS
         val b = book(3 to listOf(2 to 2, 2 to 3)) { _, a ->
             if (a == 2) cap - short else cap / 2
         }
         val leaves = leavesFrom(b, 3)
         assertEquals(2, leaves.size)
+        assertEquals(listOf(2 to 2, 2 to 3), leaves[0].verses)
+        assertEquals(listOf(2 to 3), leaves[1].verses)
+        // The hole is taken by the head of verse 3, which continues overleaf.
+        assertTrue(leaves[0].runs.last().let { it.from == 0 && !it.endsVerse(cap / 2) })
+        assertEquals(leaves[0].runs.last().to, leaves[1].runs.first().from)
+    }
+
+    @Test
+    fun `a verse with nowhere to break is still set whole on the next leaf`() {
+        // No sentence end in reach, so there is nothing to cut at — the verse
+        // moves down entire, the way a paragraph too big for the foot does.
+        val short = ENGLISH_LEAF_LINE_CHARS
+        val b = buildEnglishBook(
+            buildMushafCatalog(listOf(source(2, 2, 3), source(2, 3, 3))),
+        ) { _, a ->
+            if (a == 2) {
+                EnglishVerseMeasure(cap - short, IntArray(0))
+            } else {
+                EnglishVerseMeasure(cap / 2, IntArray(0))
+            }
+        }
+        val leaves = leavesFrom(b, 3)
+        assertEquals(2, leaves.size)
         assertEquals(listOf(2 to 2), leaves[0].verses)
         assertEquals(listOf(2 to 3), leaves[1].verses)
-        // Whole on both: nothing was cut.
         assertTrue(leaves.all { l -> l.runs.all { it.from == 0 } })
     }
 
@@ -169,13 +193,25 @@ class EnglishBookTest {
         val masses = listOf(700, 500, 300, 800, 200, 640)
         val b = book(3 to masses.indices.map { 2 to it + 1 }) { _, a -> masses[a - 1] }
         val leaves = leavesFrom(b, 3)
-        // Every verse of the page set exactly once, in order.
+        // Every verse of the page set, in order, and none skipped. A carried
+        // one appears on both the leaf it leaves and the leaf it lands on.
         assertEquals(
             masses.indices.map { 2 to it + 1 },
-            leaves.flatMap { it.verses },
+            leaves.flatMap { it.verses }.distinct(),
         )
+        // No leaf is set past its capacity, counting only what it actually sets.
         leaves.forEach { leaf ->
-            assertTrue(leaf.verses.sumOf { masses[it.second - 1] } <= cap)
+            assertTrue(leaf.runs.sumOf { it.to - it.from } <= cap)
+        }
+        // A carried verse hands its offset straight to the next leaf.
+        leaves.zipWithNext { a, b2 ->
+            // The mass a verse is given includes its mark; the text it sets
+            // does not.
+            val tail = a.runs.last()
+            if (!tail.endsVerse(masses[tail.ayah - 1] - ENGLISH_LEAF_MARK_CHARS)) {
+                assertEquals(tail.key, b2.runs.first().key)
+                assertEquals(tail.to, b2.runs.first().from)
+            }
         }
     }
 
