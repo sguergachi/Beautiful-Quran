@@ -23,13 +23,10 @@ class VerseBookmarkRibbonTest {
     fun gatherOrdinal_sitsInTheBookmarkNubSlot() {
         assertEquals(11f, BookmarkRibbonWidthDp)
         assertEquals(14f, BookmarkNubLengthDp)
-        assertEquals(16f, GatherOrdinalSp)
-        assertEquals(18f, GatherOrdinalEdgeInsetDp)
-        assertEquals(80f, GatherOrdinalLaneDp)
-        assertEquals(38f, ayahTextPadDp(gathered = false, ordinalSide = true))
-        assertEquals(28f, ayahTextPadDp(gathered = false, ordinalSide = false))
-        assertEquals(80f, ayahTextPadDp(gathered = true, ordinalSide = true))
-        assertEquals(28f, ayahTextPadDp(gathered = true, ordinalSide = false))
+        assertEquals(14f, GatherOrdinalSp)
+        assertEquals(14f, GatherOrdinalEdgeInsetDp)
+        assertEquals(24f, GatherOrdinalSlotWidthDp)
+        assertEquals(38f, GatherOrdinalEdgeInsetDp + GatherOrdinalSlotWidthDp)
         assertEquals(24f, BookmarkTopInsetDp)
         assertEquals(
             18.92f,

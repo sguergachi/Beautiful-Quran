@@ -2812,17 +2812,9 @@ fun AyahBlock(
                 .fillMaxWidth()
                 .padding(
                     // Extra room on the bookmark ribbon's side so its tip
-                    // doesn't crowd the verse text. While gathered, that
-                    // side opens a dedicated ordinal lane so the brush
-                    // circle cannot meet ﴿N﴾ or the Hafs.
-                    start = ayahTextPadDp(
-                        gathered = gatherOrdinal != null,
-                        ordinalSide = bookmarkSide == AyahSelectorSide.LEFT,
-                    ).dp,
-                    end = ayahTextPadDp(
-                        gathered = gatherOrdinal != null,
-                        ordinalSide = bookmarkSide == AyahSelectorSide.RIGHT,
-                    ).dp,
+                    // doesn't crowd the verse text.
+                    start = if (bookmarkSide == AyahSelectorSide.LEFT) 38.dp else 28.dp,
+                    end = if (bookmarkSide == AyahSelectorSide.RIGHT) 38.dp else 28.dp,
                     top = 14.dp,
                     bottom = 14.dp,
                 ),
@@ -3068,10 +3060,9 @@ private fun ShareInkVerb(
 }
 
 /**
- * Western gather ordinal in the bookmark strip, first-line inset.
- * The Settings/Customize ink-brush circle paints around the digit so
- * it is held, not floating in the margin. Inset from the outer edge
- * so the loop stays inside the gold soak. Ink, not gold.
+ * Western gather ordinal in the existing bookmark gutter (the 38 dp
+ * the verse already leaves). A tight ink-brush circle holds the digit.
+ * The slot never enters the Hafs. Ink, not gold.
  */
 @Composable
 private fun GatherOrdinalMark(
@@ -3083,13 +3074,14 @@ private fun GatherOrdinalMark(
     val circle = rememberInkBrushCircle(
         selectedKey = ordinal,
         params = brushCircleParams(BrushCircleStyle.BASELINE).copy(
-            padXDp = 8f,
-            padYDp = 4f,
+            padXDp = 3f,
+            padYDp = 2f,
+            bow = 2f,
         ),
     )
     Box(
         modifier = modifier
-            .width(BookmarkStripWidth)
+            .width(GatherOrdinalSlotWidthDp.dp)
             .graphicsLayer { alpha = chromeAlpha() }
             .then(
                 if (onClick != null) {
@@ -3125,7 +3117,7 @@ private fun GatherOrdinalMark(
                 softWrap = false,
                 modifier = Modifier
                     .inkBrushCircleTarget(circle, ordinal)
-                    .padding(horizontal = 5.dp, vertical = 1.dp)
+                    .padding(horizontal = 1.dp)
                     .wrapContentWidth(unbounded = true)
                     .wrapContentHeight(unbounded = true),
             )

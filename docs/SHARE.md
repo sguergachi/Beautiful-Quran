@@ -51,11 +51,11 @@ While gathering, word taps do not seek, word long-press does not open the
 Root Viewer, and the bookmark ribbon (including its note hold) is inactive.
 The mode owns the tap — interactions are *replaced*, not stacked.
 
-**Mode chrome (visual QA):** gather ordinals use 16 sp Garamond
-Western digits in a dedicated lane inside the gold soak (80 dp of
-text pad on that edge, 18 dp in from the stain rim). The Settings
-ink-brush circle holds the digit; verse type including ﴿N﴾ cannot
-enter the lane. Not gold, not Arabic-Indic.
+**Mode chrome (visual QA):** gather ordinals live in the existing
+bookmark gutter (38 dp the verse already leaves). 14 sp Garamond
+Western digits, tight ink-brush circle, 14 dp in from the soak rim
+so the loop stays on the gold and never enters the Hafs. Not gold,
+not Arabic-Indic. The verse layout does not change.
 Selection wash and gather-bar takeover are planned — see
 [VERSE_ACTIONS.md](VERSE_ACTIONS.md).
 
