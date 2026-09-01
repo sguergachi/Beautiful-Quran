@@ -13,11 +13,18 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDirection
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.beautifulquran.ui.theme.HafsFontFamily
 import com.beautifulquran.ui.theme.LocalQuranAccents
 import com.beautifulquran.ui.theme.TranslationFontFamily
+
+internal val ShareImagePadH = 48.dp
+internal val ShareImagePadTop = 56.dp
+internal val ShareImagePadBetween = 14.dp
+internal val ShareImagePadFooterTop = 40.dp
+internal val ShareImagePadBottom = 56.dp
 
 /**
  * Fixed paper sheet for image export — verses at rest in full ink.
@@ -27,9 +34,8 @@ import com.beautifulquran.ui.theme.TranslationFontFamily
  * Always composed under [com.beautifulquran.ui.theme.BeautifulQuranTheme] with
  * [com.beautifulquran.data.ThemeMode.LIGHT] so shares stay readable parchment.
  *
- * The sheet is as tall as the gather: every verse, then the gold chapter
- * footer. Do not clip to a phone-screen height. Pixel scale is the
- * gather size — see [com.beautifulquran.share.shareImageScale].
+ * Export draws this as **one strip per verse plus the footer**, then stitches
+ * the bitmaps, so the GPU never rasterises the whole wrap.
  */
 @Composable
 fun ShareImageCard(
@@ -37,49 +43,88 @@ fun ShareImageCard(
     includeTranslation: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
-    val gold = LocalQuranAccents.current.gold
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = modifier.fillMaxWidth(),
+    ) {
+        verses.forEachIndexed { index, verse ->
+            ShareImageVerseStrip(
+                verse = verse,
+                includeTranslation = includeTranslation,
+                padTop = if (index == 0) ShareImagePadTop else ShareImagePadBetween,
+                padBottom = if (index == verses.lastIndex) 0.dp else ShareImagePadBetween,
+            )
+        }
+        ShareImageFooterStrip(footerReference(verses))
+    }
+}
+
+@Composable
+fun ShareImageVerseStrip(
+    verse: ShareVerseLine,
+    includeTranslation: Boolean,
+    padTop: Dp,
+    padBottom: Dp,
+    modifier: Modifier = Modifier,
+) {
     val ink = MaterialTheme.colorScheme.onSurface
     val paper = MaterialTheme.colorScheme.background
-    val footerRef = footerReference(verses)
-
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = modifier
             .fillMaxWidth()
             .background(paper)
-            .padding(horizontal = 48.dp, vertical = 56.dp),
+            .padding(start = ShareImagePadH, end = ShareImagePadH, top = padTop, bottom = padBottom),
     ) {
-        verses.forEachIndexed { index, verse ->
-            if (index > 0) Spacer(Modifier.height(28.dp))
+        Text(
+            text = verse.arabic,
+            style = MaterialTheme.typography.bodyLarge.copy(
+                fontFamily = HafsFontFamily,
+                fontSize = 28.sp,
+                lineHeight = 46.sp,
+                textDirection = TextDirection.Rtl,
+            ),
+            color = ink,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        if (includeTranslation && verse.translation.isNotBlank()) {
+            Spacer(Modifier.height(12.dp))
             Text(
-                text = verse.arabic,
+                text = verse.translation,
                 style = MaterialTheme.typography.bodyLarge.copy(
-                    fontFamily = HafsFontFamily,
-                    fontSize = 28.sp,
-                    lineHeight = 46.sp,
-                    textDirection = TextDirection.Rtl,
+                    fontFamily = TranslationFontFamily,
+                    fontSize = 16.sp,
+                    lineHeight = 24.sp,
                 ),
-                color = ink,
+                color = ink.copy(alpha = 0.66f),
                 textAlign = TextAlign.Center,
                 modifier = Modifier.fillMaxWidth(),
             )
-            if (includeTranslation && verse.translation.isNotBlank()) {
-                Spacer(Modifier.height(12.dp))
-                Text(
-                    text = verse.translation,
-                    style = MaterialTheme.typography.bodyLarge.copy(
-                        fontFamily = TranslationFontFamily,
-                        fontSize = 16.sp,
-                        lineHeight = 24.sp,
-                    ),
-                    color = ink.copy(alpha = 0.66f),
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            }
         }
+    }
+}
 
-        Spacer(Modifier.height(40.dp))
+@Composable
+fun ShareImageFooterStrip(
+    footerRef: String,
+    modifier: Modifier = Modifier,
+) {
+    val gold = LocalQuranAccents.current.gold
+    val ink = MaterialTheme.colorScheme.onSurface
+    val paper = MaterialTheme.colorScheme.background
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = modifier
+            .fillMaxWidth()
+            .background(paper)
+            .padding(
+                start = ShareImagePadH,
+                end = ShareImagePadH,
+                top = ShareImagePadFooterTop,
+                bottom = ShareImagePadBottom,
+            ),
+    ) {
         Text(
             text = footerRef,
             style = MaterialTheme.typography.labelLarge,

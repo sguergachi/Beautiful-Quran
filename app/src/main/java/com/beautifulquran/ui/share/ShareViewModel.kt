@@ -2,6 +2,7 @@ package com.beautifulquran.ui.share
 
 import android.app.Activity
 import android.graphics.Bitmap
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.beautifulquran.data.QuranRepository
@@ -334,16 +335,29 @@ class ShareViewModel(
                     }
                     return@launch
                 }
-                bitmap = ShareImageRenderer.render(
+                bitmap = ShareImageRenderer.renderSegments(
                     activity = activity,
-                    verseCount = lines.size,
-                    content = {
-                        ShareImageCard(
-                            verses = lines,
+                    segmentCount = lines.size + 1,
+                ) { index ->
+                    if (index < lines.size) {
+                        ShareImageVerseStrip(
+                            verse = lines[index],
                             includeTranslation = includeTranslation,
+                            padTop = if (index == 0) {
+                                ShareImagePadTop
+                            } else {
+                                ShareImagePadBetween
+                            },
+                            padBottom = if (index == lines.lastIndex) {
+                                0.dp
+                            } else {
+                                ShareImagePadBetween
+                            },
                         )
-                    },
-                )
+                    } else {
+                        ShareImageFooterStrip(footerReference(lines))
+                    }
+                }
                 val uri = ShareFiles.writePng(activity.applicationContext, bitmap)
                 _ui.update {
                     it.copy(

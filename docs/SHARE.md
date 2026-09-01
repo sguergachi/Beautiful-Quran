@@ -104,14 +104,11 @@ screenshot of the live reader, not the wash yet:
 1. Thin `ShareImageCard` composable (Hafs + translation + gold reference
    footer + faint **Beautiful Quran**). Fixed **Paper** theme so shares stay
    readable parchment regardless of the reader's night/royal mode.
-2. `ShareImageRenderer` hosts that card offscreen under a temporary
-   invisible decor child, software-draws to a `Bitmap`. One verse is
-   1080 × wrap-height; each added verse raises the pixel scale (2 ayahs
-   at 2×, 3 at 3×) so a long gather still reads after a preview shrinks
-   the page to fit, capped at 8 MP / 8192 px so Canvas cannot abort the
-   process. A stub first layout stays 1×. The sheet also grows in height
-   so every verse and the gold chapter footer stay on the page. **Not**
-   full `ReaderScreen` (no LazyColumn / playback / gestures).
+2. `ShareImageRenderer` hosts each **verse strip** (then the gold footer)
+   offscreen at 1080 × wrap-height, software-draws a bitmap per strip, and
+   **stitches** them. The GPU never rasterises the full gather — that
+   aborted the process. The sheet still holds every verse and the chapter
+   footer. **Not** full `ReaderScreen` (no LazyColumn / playback / gestures).
 3. `ShareFiles` writes PNG under `cacheDir/share/`, exposes a `FileProvider`
    URI (`${applicationId}.share`), keeps the newest few files.
 4. `ACTION_SEND` `image/png` + `FLAG_GRANT_READ_URI_PERMISSION`.
@@ -190,9 +187,9 @@ Each phase ships something usable on its own.
   1080×1920 multi-minute exports.
 - **Audio cache is not an export API.** `SimpleCache` is private to
   `PlaybackService`. Audio export needs an explicit staging boundary.
-- **Long selections.** Gather cap 20; the image is as tall as the verses,
-  and its pixel scale grows with the gather until the 8 MP / 8192 px
-  canvas budget. Over-budget sheets downscale as a whole (footer stays).
+- **Long selections.** Gather cap 20. Each verse is its own 1080-wide
+  strip; strips are stitched. Do not rasterise the whole wrap as one
+  view — HWUI aborts the process.
 
 ## Non-goals
 
