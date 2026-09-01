@@ -457,9 +457,9 @@ may use them** — they are not Settings-only, which is where they started.
 
 The ink-spot is a circular drop of ink on vellum: a round pooled
 centre, a fibre rim, and a capillary halo that fades before the box
-edge so nothing clips. It spreads in 170 ms. `fillBox` lays a **pale even rounded-rect wash**
-under a verse: modest corner rounding, fibre only on the rim, no
-central pool, so the type stays readable. Neighbouring soaks keep a
+edge so nothing clips. It spreads in 170 ms. `fillBox` lays a **pale even gold rounded-rect
+wash** under a verse: modest corner rounding, fibre only on the rim,
+no central pool, so the type stays readable. Neighbouring soaks keep a
 paper gutter.
 Recitation wash punches through the blot (unread words fade into the
 stain) instead of painting a cream hole of page paper over it. On

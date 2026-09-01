@@ -2795,7 +2795,7 @@ fun AyahBlock(
             .inkSpotHighlight(
                 selected = gatherOrdinal != null,
                 seed = ayah.surahId * 1_000 + ayah.number,
-                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.20f),
+                color = LocalQuranAccents.current.gold.copy(alpha = 0.26f),
                 fillBox = true,
                 durationMillis = 400,
                 easing = InkExpandEasing,

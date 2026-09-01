@@ -145,11 +145,11 @@ becomes share tools; multi is extension) without taxing bookmark.
 **Select / unselect**
 
 - Tap any verse to toggle membership while in share mode
-- Selected: a green vellum ink blot spreads under that ayah (primary
-  signal) — Deep Green pigment, fibre rim, paper gutters so neighbours
-  do not fuse. Western ordinal in Garamond ink, centered in the
-  bookmark swallowtail nub (secondary). Gold stays the ayah mark. Chrome never uses
-  Arabic-Indic digits.
+- Selected: a pale gold vellum wash spreads under that ayah (primary
+  signal) — same gold token as the ayah marks, fibre on the rim,
+  paper gutters so neighbours do not fuse. Western ordinal in Garamond
+  ink, centered in the bookmark swallowtail nub (secondary). Chrome
+  never uses Arabic-Indic digits.
 - Unselected: wash recedes — that *is* the unselect feedback
 - Ordinals renumber when a verse is dropped
 
@@ -172,9 +172,10 @@ With G1, the intermediate Send list is **optional**:
 
 ### Visual rules for the wash
 
-- Pale even green wash per verse (`inkSpotHighlight(fillBox = true)`
-  with primary at ~20% alpha). Rounded rectangle, fibre on the rim
-  only, type stays readable. Not a pooled blob, not an oval, not gold.
+- Pale even gold wash per verse (`inkSpotHighlight(fillBox = true)`
+  with `LocalQuranAccents.gold` at ~26% alpha). Rounded rectangle,
+  fibre on the rim only, type stays readable. Not a pooled blob, not
+  an oval.
 - Recitation wash punches through the blot: unread words fade into the
   stain. Never paint a cream rectangle of page paper over the soak.
 - No border, elevation, or Material ripple
