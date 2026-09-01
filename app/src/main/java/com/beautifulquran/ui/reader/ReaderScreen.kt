@@ -141,6 +141,7 @@ import com.beautifulquran.ui.theme.InkRevealOverlay
 import com.beautifulquran.ui.theme.absorbPointerEvents
 import com.beautifulquran.ui.theme.contrastingOverlayColorScheme
 import com.beautifulquran.ui.theme.contextualGuideProgressiveBlur
+import com.beautifulquran.ui.theme.paperToggleHaptic
 import com.beautifulquran.ui.theme.verticalFadingEdges
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -2705,6 +2706,11 @@ fun ReaderScreen(
                                 bookmarkNoteTipSurah == ayah.surahId &&
                                 bookmarkNoteTipAyah == ayah.number
                             val ribbonBookmarked = bookmarked || bookmarkLessonTarget
+                            val gatheredHere = if (gathering) {
+                                gatherOrdinal(ayah.surahId, ayah.number)
+                            } else {
+                                null
+                            }
                             Box(
                                 Modifier.contextualGuideProgressiveBlur(
                                     enabled = settings.developerModeEnabled &&
@@ -2810,11 +2816,7 @@ fun ReaderScreen(
                                 } else {
                                     null
                                 },
-                                gatherOrdinal = if (gathering) {
-                                    gatherOrdinal(ayah.surahId, ayah.number)
-                                } else {
-                                    null
-                                },
+                                gatherOrdinal = gatheredHere,
                                 showShareVerb = !gathering && (
                                     (
                                         shareUx.revealsOnCurrent &&
@@ -2833,7 +2835,12 @@ fun ReaderScreen(
                                 onAyahMarkClick = if (
                                     gathering || shareUx.usesMarkTap
                                 ) {
-                                    { onShareMarkTap(ayah.surahId, ayah.number) }
+                                    {
+                                        view.paperToggleHaptic(
+                                            turningOn = gatheredHere == null,
+                                        )
+                                        onShareMarkTap(ayah.surahId, ayah.number)
+                                    }
                                 } else {
                                     null
                                 },
@@ -2857,7 +2864,12 @@ fun ReaderScreen(
                                     null
                                 },
                                 onWordClick = if (gathering) {
-                                    { onToggleGatheredAyah(ayah.surahId, ayah.number) }
+                                    {
+                                        view.paperToggleHaptic(
+                                            turningOn = gatheredHere == null,
+                                        )
+                                        onToggleGatheredAyah(ayah.surahId, ayah.number)
+                                    }
                                 } else {
                                     wordClick@{ word ->
                                         if (editingAnnotationAyah != 0) return@wordClick
@@ -2882,7 +2894,12 @@ fun ReaderScreen(
                                     }
                                 },
                                 onAyahClick = if (gathering) {
-                                    { onToggleGatheredAyah(ayah.surahId, ayah.number) }
+                                    {
+                                        view.paperToggleHaptic(
+                                            turningOn = gatheredHere == null,
+                                        )
+                                        onToggleGatheredAyah(ayah.surahId, ayah.number)
+                                    }
                                 } else {
                                     ayahClick@{
                                         if (editingAnnotationAyah != 0) return@ayahClick

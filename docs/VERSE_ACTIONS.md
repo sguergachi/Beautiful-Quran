@@ -199,6 +199,10 @@ Developer → **Verse share** (off by default; requires developer mode):
 | **Hold** | Hold the verse (translation or `﴿N﴾`) → Share glyph | The OS “what can I do with this” gesture. Word hold stays Root Viewer |
 | **Mark** | Tap `﴿N﴾` | Verse handle. Least obvious; kept for comparison |
 
+Marking a verse (the `﴿N﴾` tap, or another verse while gathering) uses
+the paper toggle haptic: a confirm click on, a lighter clock tick off.
+Same family as Settings checks and the ayah rail, not a long-press thud.
+
 All four then share: tap more verses (or their ordinal) to add/drop.
 The gather bar matches the play bar’s two rows: Close in the trailing
 top slot; Text · N · Image on the transport row, count on the centre
