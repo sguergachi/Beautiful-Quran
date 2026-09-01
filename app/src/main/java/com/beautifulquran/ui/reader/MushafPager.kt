@@ -652,8 +652,6 @@ internal fun MushafPager(
     onTappedLeaf: (Int) -> Unit,
     flashAyah: Int?,
     flashWordPosition: Int?,
-    /** True while a hand is physically on the page dial, for the folio fade. */
-    scrubbing: () -> Boolean,
     /** True only while a distant dial landing keeps neighbour leaves parked. */
     parkNeighbours: () -> Boolean,
     onUserTurnedPage: () -> Unit,
@@ -667,7 +665,6 @@ internal fun MushafPager(
      */
     onVerseSeek: (surahId: Int, ayah: Int, through: Float) -> Unit = { _, _, _ -> },
     onBasmalahClick: (Int) -> Unit,
-    pageNumberScript: PageNumberScript = PageNumberScript.BOTH,
     /**
      * Sets the leaf in English instead of the page's own hand — the same 604
      * leaves, read in the reader's language. See [MushafEnglishSheet].
@@ -1230,11 +1227,15 @@ internal fun MushafPager(
                     .padding(horizontal = MushafPageMargin),
             ) {
                 val density = LocalDensity.current
-                // One unit for the whole leaf — see MushafGrid. Every band below is
-                // a whole number of them, so the head, the well, the tail and the
-                // folio all sit on the same rhythm as the lines of revelation.
+                // How this leaf spends its height. The two settings divide it
+                // differently because their ink does, so each divides by its
+                // own total. See MushafLeafBands.
+                val bands = mushafLeafBands(english)
+                // One unit for the whole leaf — see MushafGrid. Both bands below
+                // are a whole number of them, so the head and the well sit on the
+                // same rhythm as the lines of revelation.
                 val unit = with(density) {
-                    MushafGrid.unitPx(constraints.maxHeight.toFloat()).toDp()
+                    bands.unitPx(constraints.maxHeight.toFloat()).toDp()
                 }
                 // One measure for the whole leaf. The running head and the
                 // folio are furniture *of the text block* — in any book they
@@ -1252,10 +1253,6 @@ internal fun MushafPager(
                 } else {
                     MushafEdgeGutter
                 }
-                // How this leaf spends its height. Both settings sum to
-                // MushafGrid.SLOTS; they divide it differently because their
-                // ink does. See MushafLeafBands.
-                val bands = mushafLeafBands(english)
                 Column(Modifier.fillMaxSize()) {
                     MushafPageHeader(
                         surahNameArabic = surahsById[leafSurahId]?.nameArabic,
@@ -1318,29 +1315,6 @@ internal fun MushafPager(
                             modifier = wellModifier,
                         )
                     }
-                    Spacer(Modifier.height(unit * bands.tail))
-                    val folioInk by animateFloatAsState(
-                        targetValue = if (scrubbing()) 0f else 1f,
-                        animationSpec = tween(
-                            InkEngine.tuning.recessMs,
-                            easing = FastOutSlowInEasing,
-                        ),
-                        label = "mushafFolioStandDown",
-                    )
-                    MushafPageFolio(
-                        // The English book paginates itself, so its folio is
-                        // its own leaf number — the same figure the dial counts
-                        // and lands on. The Arabic leaf's folio is the Madinah
-                        // page, as it has always been.
-                        page = if (english) pageIndex + 1 else page.page,
-                        unit = unit,
-                        glyphSize = leafGlyphSize(unit),
-                        script = pageNumberScript,
-                        modifier = Modifier
-                            .height(unit * bands.folio)
-                            .padding(horizontal = foreEdge)
-                            .graphicsLayer { alpha = folioInk },
-                    )
                 }
             }
         }

@@ -19,11 +19,18 @@ import kotlin.math.pow
  *       the margin above it
  *    1  head gutter — a whole line's pitch, the figure the grid names
  *  15   the revelation — the Madinah page's own grid
- * 0.35  tail — paper between revelation and folio
- *  0.4  folio, its figure centred in the band
  *  ---
- * 17.05
+ * 16.30
  * ```
+ *
+ * The tail and the folio used to close that list, and the leaf paid for both:
+ * 0.35 of a unit of paper and 0.40 for the figure, three quarters of a line
+ * spent under the text. They have moved off the leaf and into the air the dial
+ * already kept above its rule ([MushafDialHeadAir]) — air that was padding and
+ * nothing else. The folio sits lower on the screen for it, closer to the
+ * transport it now shares a band with, and the leaf keeps the three quarters
+ * of a line: on the English hand, whose type is solved from the well, that is
+ * a twenty-third line of prose where there were twenty-two.
  *
  * The furniture is trimmed to what it actually needs to read as furniture,
  * because the leaf's height is what caps the type: measured on the reference
@@ -70,16 +77,18 @@ object MushafGrid {
     const val HEAD_GUTTER = 1.00f
     const val TEXT_LINES = MUSHAF_LINES_PER_PAGE
     /**
-     * Paper between the last line and the folio. The folio belongs to the
-     * gap between the leaf's text and the dial's hairline — centred in it,
-     * not glued to the text — so the band carries the air that sets it
-     * there.
+     * The folio's band — no longer a band *of the leaf*. The figure stands in
+     * the air above the dial's rule, so the leaf's own height ends with the
+     * last line of text and the folio is furniture of the sheet, sitting with
+     * the dial and the transport rather than on the paper.
+     *
+     * It is still a unit of the leaf's grid, because it is still the same
+     * book: the figure keeps the pitch of the lines it numbers.
      */
-    const val TAIL = 0.35f
     const val FOLIO = 0.40f
 
     /** The whole leaf, in units. */
-    const val SLOTS = RUNNING_HEAD + HEAD_GUTTER + TEXT_LINES + TAIL + FOLIO
+    const val SLOTS = RUNNING_HEAD + HEAD_GUTTER + TEXT_LINES
 
     /** One line's pitch: the leaf divided by its slots. */
     fun unitPx(leafHeightPx: Float): Float =
@@ -92,9 +101,9 @@ object MushafGrid {
 /**
  * How a leaf divides its height, in units of [MushafGrid].
  *
- * The five bands always sum to [MushafGrid.SLOTS] — that is the whole point of
+ * The three bands always sum to [MushafGrid.SLOTS] — that is the whole point of
  * a grid, and the one thing a test can hold: a leaf whose bands sum to more
- * than its height runs its folio off the paper, and one that sums to less
+ * than its height runs its last line off the paper, and one that sums to less
  * leaves a strip of dead paper at the foot that nothing accounts for.
  *
  * The two settings spend the budget differently because their ink does.
@@ -108,17 +117,26 @@ object MushafGrid {
  * The English leaf has no sixteenth row to buy — its well is continuous prose —
  * and its ink stops exactly at the ascent and the descender, because the block
  * is set `Trim.Both`. A band of nothing there is nothing. So it keeps the
- * canonical gutter and tail, which were sized for exactly this: "a head that
- * sits closer than about a line's pitch reads as part of the block".
+ * canonical gutter, which was sized for exactly this: "a head that sits closer
+ * than about a line's pitch reads as part of the block".
+ *
+ * Neither carries a tail or a folio any more. Both stood under the text and
+ * both have gone to the dial's head air; the leaf ends where the revelation
+ * does. The two settings no longer sum to the same figure because of it — the
+ * English gutter is half a unit wider than the Arabic one — so each divides
+ * the leaf by its own [slots] rather than by one shared total. That total was
+ * only ever a convenience: what a leaf must not do is spend more height than
+ * it has, and its own sum is what says whether it does.
  */
 data class MushafLeafBands(
     val runningHead: Float,
     val headGutter: Float,
     val well: Float,
-    val tail: Float,
-    val folio: Float,
 ) {
-    val slots: Float get() = runningHead + headGutter + well + tail + folio
+    val slots: Float get() = runningHead + headGutter + well
+
+    /** One line's pitch on this leaf: its height divided by its own slots. */
+    fun unitPx(leafHeightPx: Float): Float = (leafHeightPx / slots).coerceAtLeast(1f)
 }
 
 /** The canonical bands: wide gutters, fifteen units of well. */
@@ -126,21 +144,17 @@ val MUSHAF_ENGLISH_BANDS = MushafLeafBands(
     runningHead = MushafGrid.RUNNING_HEAD,
     headGutter = MushafGrid.HEAD_GUTTER,
     well = MushafGrid.TEXT_LINES.toFloat(),
-    tail = MushafGrid.TAIL,
-    folio = MushafGrid.FOLIO,
 )
 
 /** The display bands: the furniture gives a unit up for a sixteenth row. */
 val MUSHAF_ARABIC_BANDS = MushafLeafBands(
     runningHead = MushafGrid.RUNNING_HEAD,
-    // The sixteenth row is bought out of the gutters and the tail, so this
-    // stays the tighter of the two — but it moves with the English gutter,
-    // because both leaves divide one budget and the head must stand off the
-    // revelation on either of them.
+    // The sixteenth row is bought out of the gutter, so this stays the tighter
+    // of the two: the QCF faces mark 1.37 em above the baseline, so the head
+    // stands off the revelation on half a unit that would read as crowded
+    // under an English block.
     headGutter = 0.50f,
     well = MUSHAF_DISPLAY_LINES_PER_PAGE.toFloat(),
-    tail = 0.05f,
-    folio = 0.20f,
 )
 
 fun mushafLeafBands(english: Boolean): MushafLeafBands =

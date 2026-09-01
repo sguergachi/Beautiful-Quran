@@ -670,25 +670,47 @@ really does stop mid-sentence, so that is where the lead belongs.
 
 The leaf is one grid, and everything on it lands on the grid.
 
-**Vertically**, both settings divide the same 17.05 units of `MushafGrid`, and
-`MushafLeafBands` holds them to it — the five bands must sum to `SLOTS`, or the
-folio runs off the paper at one end and a strip of nothing is unaccounted for at
-the other. They spend the budget differently because their ink does:
+**Vertically**, each setting divides the leaf into three bands and
+`MushafLeafBands` holds it to its own total — the bands must sum to `slots`, or
+the last line runs off the paper at one end and a strip of nothing is
+unaccounted for at the other. They spend the leaf differently because their ink
+does:
 
 ```
-                head   gutter   well    tail   folio
-    Arabic      0.30     0.20     16     0.05   0.20
-    English     0.30     0.70     15     0.35   0.40
+                head   gutter   well   = slots
+    Arabic      0.30     0.50     16     16.80
+    English     0.30     1.00     15     16.30
 ```
 
-The Arabic leaf spends almost nothing on the gutter and the tail and buys a
-sixteenth row of revelation with it. It can, because the QCF faces mark 1.37 em
-above the baseline and 0.75 below, so a band of nearly nothing still leaves
-visible air — and every unit not spent on furniture is type size (§2). The
-English leaf has no sixteenth row to buy, and its ink stops *exactly* at the
-ascent and the descender, so it keeps the canonical gutters, which were sized
-for precisely this: a head that sits closer than about a line's pitch reads as
-part of the block.
+The Arabic leaf spends almost nothing on the gutter and buys a sixteenth row of
+revelation with it. It can, because the QCF faces mark 1.37 em above the
+baseline and 0.75 below, so a band of nearly nothing still leaves visible air —
+and every unit not spent on furniture is type size (§2). The English leaf has no
+sixteenth row to buy, and its ink stops *exactly* at the ascent and the
+descender, so it keeps the canonical gutter, which was sized for precisely this:
+a head that sits closer than about a line's pitch reads as part of the block.
+
+**Nothing stands under the text.** There used to be a tail and a folio band —
+0.35 of a unit of paper and 0.40 for the figure, three quarters of a line spent
+below the last line of every leaf in the book — and both have gone. The folio
+now stands in the air the dial already kept above its rule (`MushafDialHeadAir`,
+24 dp of pure padding, now 8), which puts the figure lower on the screen, in a
+band it shares with the transport. That is where a folio belongs on a device:
+the page number is furniture of the frame, not of the paper, and the reader's
+thumb is already down there.
+
+The leaf keeps the three quarters of a line. On the Arabic hand it goes into
+type size, since the well's share of the leaf rises from 16 / 17.05 to 16 /
+16.80. On the English hand, whose type is solved from the well, it is a whole
+extra line: the well's share rises from 15 / 17.05 to 15 / 16.30, 4.6 % more
+paper, and 4.6 % of twenty-two lines is one — so `ENGLISH_LEAF_CAPACITY_CHARS`
+goes from 900 to 940 and `ENGLISH_LEAF_LINE_CHARS` divides it by 23 rather than
+22. It is the only change here that a reader will count.
+
+The two settings no longer sum to the same figure, which is why each divides by
+its own `slots` rather than by one shared `SLOTS`. The shared total was always a
+convenience: what a leaf must not do is spend more height than it has, and its
+own sum is the thing that says whether it does.
 
 That last point is why the block is set `LineHeightStyle.Trim.Both`. Untrimmed,
 a line box carries half its leading above the first ascent and half below the

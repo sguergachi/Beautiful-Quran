@@ -61,7 +61,7 @@ package com.beautifulquran.domain
  * Below about 850 the line is shorter than the hand wants and above about 1,000
  * it is longer. `tools/measure_english_leaves.py` prints the sweep.
  */
-const val ENGLISH_LEAF_CAPACITY_CHARS = 900
+const val ENGLISH_LEAF_CAPACITY_CHARS = 940
 
 /**
  * What a chapter's opening costs the leaf, in the characters the capacity
@@ -99,7 +99,7 @@ fun englishLeafVerseMass(surahId: Int, ayah: Int, prose: Int): Int = when {
  * approximation on a tablet, whose well is fewer and longer lines — near enough,
  * because the two rules below only need to know a line from a page.
  */
-const val ENGLISH_LEAF_LINE_CHARS = ENGLISH_LEAF_CAPACITY_CHARS / 22
+const val ENGLISH_LEAF_LINE_CHARS = ENGLISH_LEAF_CAPACITY_CHARS / 23
 
 /**
  * How big a hole has to be before a verse is carried over rather than moved

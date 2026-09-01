@@ -2433,6 +2433,8 @@ fun ReaderScreen(
                         // they are recited, and the thumb has something to mark
                         // and something to be dragged along.
                         pageAt = mushafLeafPage,
+                        english = englishBook != null,
+                        pageNumberScript = settings.pageNumberScript,
                         // Whatever the rule is counting: leaves on the English
                         // book, Madinah pages on the Arabic one.
                         pageCount = mushafBookLength(
@@ -2652,7 +2654,6 @@ fun ReaderScreen(
                         flashWordPosition = searchFlashWord,
                         heldPage = mushafTappedPage,
                         onTappedLeaf = { mushafTappedPage = it },
-                        scrubbing = { mushafScrubbing.value },
                         parkNeighbours = { mushafDialLanding.value },
                         onUserTurnedPage = onMushafTurnedPage,
                         onWordClick = onMushafWordClick,
@@ -2660,7 +2661,6 @@ fun ReaderScreen(
                         onAyahClick = onMushafAyahClick,
                         onVerseSeek = onMushafVerseSeek,
                         onBasmalahClick = onMushafBasmalahClick,
-                        pageNumberScript = settings.pageNumberScript,
                         english = settings.readingMode == ReadingMode.ENGLISH_ONLY,
                         verseNumberScript = settings.verseNumberScript,
                         hideEnglishParentheticals = settings.hideEnglishParentheticals,

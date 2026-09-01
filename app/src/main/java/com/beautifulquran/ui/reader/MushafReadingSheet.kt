@@ -6,6 +6,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.Row
@@ -32,7 +33,9 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -41,6 +44,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -54,7 +58,9 @@ import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import androidx.media3.common.Player
 import com.beautifulquran.data.PageNumberScript
+import com.beautifulquran.domain.MUSHAF_LINE_PITCH_EM
 import com.beautifulquran.domain.MushafGrid
+import com.beautifulquran.domain.mushafLeafBands
 import com.beautifulquran.domain.MushafType
 import kotlin.math.pow
 import com.beautifulquran.playback.PlayerUiState
@@ -84,7 +90,11 @@ private val MushafRuleTailAir = 0.dp
  * read as shifted up. This sets it off the leaf so the line sits between
  * the page and the transport instead of hanging off the page.
  */
-private val MushafDialHeadAir = 24.dp
+// The air between the leaf's last line and the dial's rule. The folio now
+// stands in it — it used to cost the leaf three quarters of a line to stand on
+// the paper — so what is left is the paper under the figure rather than under
+// the text.
+private val MushafDialHeadAir = 8.dp
 
 /** Each folio figure's column, equal either side of the centre line. */
 private val MushafFolioColumn = 40.dp
@@ -164,6 +174,9 @@ internal fun MushafReadingSheet(
     modifier: Modifier = Modifier,
     /** Sits on the leaf's foot, above the dial and the play bar. */
     leafFooter: @Composable () -> Unit = {},
+    /** Which hand the leaf is set in — the two divide their height differently. */
+    english: Boolean = false,
+    pageNumberScript: PageNumberScript = PageNumberScript.BOTH,
     content: @Composable () -> Unit,
 ) {
     // Rank by role, not by taste. Back / play / forward are what a listener
@@ -186,8 +199,25 @@ internal fun MushafReadingSheet(
         animationSpec = tween(InkEngine.tuning.recessMs, easing = FastOutSlowInEasing),
         label = "mushafSecondaryFade",
     )
+    // The leaf's own pitch, kept so the folio below it can be set on the same
+    // grid as the lines it numbers. The leaf is this Box, so its height is the
+    // only place the figure can be read from.
+    val leafUnit = remember { mutableStateOf(0.dp) }
+    val density = LocalDensity.current
+    // The folio stands down while the dial is under the thumb: scrubbing, the
+    // figure the dial itself is calling out does not need saying twice.
+    val scrubbing = remember { mutableStateOf(false) }
+    val folioInk by animateFloatAsState(
+        targetValue = if (scrubbing.value) 0f else 1f,
+        animationSpec = tween(InkEngine.tuning.recessMs, easing = FastOutSlowInEasing),
+        label = "mushafFolioStandDown",
+    )
     Column(modifier.fillMaxSize()) {
-        Box(Modifier.weight(1f).fillMaxWidth()) {
+        BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
+            val unit = with(density) {
+                mushafLeafBands(english).unitPx(constraints.maxHeight.toFloat()).toDp()
+            }
+            SideEffect { leafUnit.value = unit }
             content()
             Box(
                 Modifier
@@ -197,6 +227,20 @@ internal fun MushafReadingSheet(
                 leafFooter()
             }
         }
+        // The folio, off the paper. It used to be the leaf's last band and the
+        // leaf paid for it twice over — the figure and the tail above it — for
+        // a number that belongs to the frame as much as to the page. Standing
+        // it in the dial's head air costs nothing that was being read, moves it
+        // down beside the transport, and gives the text the line back.
+        MushafPageFolio(
+            page = pageAt(),
+            unit = leafUnit.value,
+            glyphSize = with(density) { (leafUnit.value.toPx() / MUSHAF_LINE_PITCH_EM).toSp() },
+            script = pageNumberScript,
+            modifier = Modifier
+                .padding(horizontal = MushafPageMargin + MushafEdgeGutter)
+                .graphicsLayer { alpha = folioInk },
+        )
         MushafPageDial(
             pageAt = pageAt,
             pageCount = pageCount,
@@ -206,13 +250,12 @@ internal fun MushafReadingSheet(
             onSeekPage = onSeekPage,
             onSeekSurah = onSeekSurah,
             onWarmPage = onWarmPage,
-            onScrubbing = onScrubbing,
+            onScrubbing = { scrubbing.value = it; onScrubbing(it) },
             onLanding = onLanding,
             reciting = reciting,
-            // Paper between the leaf's own tail and the rule, so the folio
-            // groups with the page above it rather than with the controls.
-            // The air above now belongs to the dial's own band, which stands
-            // the comb up inside it: the rule's line has not moved.
+            // Paper between the folio and the rule. The figure now stands in
+            // this band rather than on the leaf, so the air above it is the
+            // leaf's foot and the air below is the dial's own.
             modifier = Modifier.padding(
                 start = MushafPageMargin + MushafEdgeGutter,
                 end = MushafPageMargin + MushafEdgeGutter,
