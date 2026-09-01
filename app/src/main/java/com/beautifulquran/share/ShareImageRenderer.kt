@@ -24,9 +24,10 @@ import kotlin.coroutines.resumeWithException
  * of the activity decor so measure/layout and fonts resolve correctly.
  *
  * A gather is drawn **one strip at a time** — each verse, then a
- * chapter-footer strip — and the strips are stitched. Rasterising the
- * whole sheet as one wrap aborted the process. Each strip gets a
- * fresh `setContent` so the footer cannot be a stale last verse.
+ * chapter-footer strip on a **separate attach** — and the strips are
+ * stitched. Rasterising the whole sheet as one wrap aborted the process.
+ * Reusing one [ComposeView] across strips captured a stale last verse
+ * instead of the footer; every strip gets a new view.
  */
 object ShareImageRenderer {
 
@@ -37,8 +38,8 @@ object ShareImageRenderer {
 
     /**
      * Draw [segmentCount] strips via [content] `(index) ->` and stitch them
-     * top to bottom. Each strip is 1080 × wrap; the GPU never sees the
-     * combined height.
+     * top to bottom. Each strip is 1080 × wrap on a fresh [ComposeView];
+     * the GPU never sees the combined height.
      */
     suspend fun renderSegments(
         activity: Activity,
@@ -58,15 +59,6 @@ object ShareImageRenderer {
                 val host = FrameLayout(activity).apply {
                     visibility = View.INVISIBLE
                 }
-                val composeView = ComposeView(activity).apply {
-                    setViewCompositionStrategy(
-                        ViewCompositionStrategy.DisposeOnDetachedFromWindow,
-                    )
-                }
-                host.addView(
-                    composeView,
-                    ViewGroup.LayoutParams(WIDTH_PX, ViewGroup.LayoutParams.WRAP_CONTENT),
-                )
                 decor.addView(
                     host,
                     ViewGroup.LayoutParams(WIDTH_PX, ViewGroup.LayoutParams.WRAP_CONTENT),
@@ -90,7 +82,7 @@ object ShareImageRenderer {
 
                 lateinit var present: (Int) -> Unit
 
-                fun capture(index: Int, attempt: Int) {
+                fun capture(target: ComposeView, index: Int, attempt: Int) {
                     if (!cont.isActive) {
                         cleanup()
                         return
@@ -104,14 +96,14 @@ object ShareImageRenderer {
                             0,
                             View.MeasureSpec.UNSPECIFIED,
                         )
-                        composeView.measure(widthSpec, heightSpec)
-                        var height = composeView.measuredHeight
+                        target.measure(widthSpec, heightSpec)
+                        var height = target.measuredHeight
                         if (height <= 0 && attempt < LAYOUT_ATTEMPTS) {
-                            composeView.post { capture(index, attempt + 1) }
+                            target.post { capture(target, index, attempt + 1) }
                             return
                         }
                         height = height.coerceAtLeast(1)
-                        composeView.layout(0, 0, WIDTH_PX, height)
+                        target.layout(0, 0, WIDTH_PX, height)
                         host.measure(
                             View.MeasureSpec.makeMeasureSpec(WIDTH_PX, View.MeasureSpec.EXACTLY),
                             View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.EXACTLY),
@@ -123,7 +115,7 @@ object ShareImageRenderer {
                             height,
                             Bitmap.Config.ARGB_8888,
                         )
-                        composeView.draw(Canvas(bitmap))
+                        target.draw(Canvas(bitmap))
                         parts += bitmap
 
                         val next = index + 1
@@ -147,12 +139,22 @@ object ShareImageRenderer {
                 }
 
                 present = { index ->
-                    composeView.setContent {
-                        BeautifulQuranTheme(themeMode = ThemeMode.LIGHT) {
-                            content(index)
+                    host.removeAllViews()
+                    val composeView = ComposeView(activity).apply {
+                        setViewCompositionStrategy(
+                            ViewCompositionStrategy.DisposeOnDetachedFromWindow,
+                        )
+                        setContent {
+                            BeautifulQuranTheme(themeMode = ThemeMode.LIGHT) {
+                                content(index)
+                            }
                         }
                     }
-                    composeView.post { composeView.post { capture(index, 0) } }
+                    host.addView(
+                        composeView,
+                        ViewGroup.LayoutParams(WIDTH_PX, ViewGroup.LayoutParams.WRAP_CONTENT),
+                    )
+                    composeView.post { composeView.post { capture(composeView, index, 0) } }
                 }
 
                 present(0)
@@ -163,7 +165,6 @@ object ShareImageRenderer {
     suspend fun render(
         activity: Activity,
         content: @Composable () -> Unit,
-        widthPx: Int = WIDTH_PX,
     ): Bitmap = renderSegments(activity, 1) { content() }
 }
 

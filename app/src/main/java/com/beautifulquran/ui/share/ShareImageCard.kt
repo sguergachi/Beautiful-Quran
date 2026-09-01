@@ -42,8 +42,9 @@ internal fun shareImageIsFooterSegment(index: Int, verseCount: Int): Boolean =
  * Always composed under [com.beautifulquran.ui.theme.BeautifulQuranTheme] with
  * [com.beautifulquran.data.ThemeMode.LIGHT] so shares stay readable parchment.
  *
- * Export draws this as **one strip per verse plus the footer**, then stitches
- * the bitmaps, so the GPU never rasterises the whole wrap.
+ * Export draws this as **one strip per verse**, then a **separate** footer
+ * attach, then stitches the bitmaps, so the GPU never rasterises the whole
+ * wrap and the chapter line cannot be a stale last verse.
  */
 @Composable
 fun ShareImageCard(

@@ -125,8 +125,6 @@ import com.beautifulquran.data.AyahSelectorSide
 import com.beautifulquran.data.ReadingLayout
 import com.beautifulquran.data.ReadingMode
 import com.beautifulquran.data.model.Surah
-import com.beautifulquran.share.AyahRef
-import com.beautifulquran.share.ShareUxVariant
 import com.beautifulquran.ui.share.ShareRibbon
 import com.beautifulquran.domain.BASMALAH_PLAYLIST_AYAH
 import com.beautifulquran.domain.MushafToken
@@ -247,14 +245,10 @@ fun ReaderScreen(
     /** 1-based ordinal for a gathered verse, or null when not selected. */
     gatherOrdinal: (surahId: Int, ayah: Int) -> Int? = { _, _ -> null },
     onToggleGatheredAyah: (surahId: Int, ayah: Int) -> Unit = { _, _ -> },
-    shareUx: ShareUxVariant = ShareUxVariant.OFF,
-    sharePrompt: AyahRef? = null,
     shareCount: Int = 0,
     preparingShareText: Boolean = false,
     preparingShareImage: Boolean = false,
     onShareMarkTap: (surahId: Int, ayah: Int) -> Unit = { _, _ -> },
-    onShareVerb: (surahId: Int, ayah: Int) -> Unit = { _, _ -> },
-    onShareBodyHold: (surahId: Int, ayah: Int) -> Unit = { _, _ -> },
     onShareCancel: () -> Unit = {},
     onShareText: () -> Unit = {},
     onShareImage: () -> Unit = {},
@@ -1654,14 +1648,6 @@ fun ReaderScreen(
                         enabled = !contextualGuideOpen,
                         chromeAlpha = { chromeAlpha.value },
                         reciterName = uiState.currentReciter?.name.orEmpty(),
-                        onShare = if (shareUx.usesBarIcon) {
-                            {
-                                haptics.performHapticFeedback(HapticFeedbackType.ContextClick)
-                                onShareVerb(surahId, selectedPlaybackAyah())
-                            }
-                        } else {
-                            null
-                        },
                         onPlayPause = {
                             if (isThisSurahPlaying) {
                                 if (playerState.isPlaying) {
@@ -2875,51 +2861,11 @@ fun ReaderScreen(
                                     null
                                 },
                                 gatherOrdinal = gatheredHere,
-                                showShareVerb = !gathering && (
-                                    (
-                                        shareUx.revealsOnCurrent &&
-                                            !recitingActive &&
-                                            if (isThisSurahPlaying) {
-                                                policyActive
-                                            } else {
-                                                bookmarkFocused
-                                            }
-                                    ) || (
-                                        sharePrompt != null &&
-                                            sharePrompt.surahId == ayah.surahId &&
-                                            sharePrompt.ayah == ayah.number
+                                onAyahMarkClick = {
+                                    view.paperToggleHaptic(
+                                        turningOn = gatheredHere == null,
                                     )
-                                ),
-                                onAyahMarkClick = if (
-                                    gathering || shareUx.usesMarkTap
-                                ) {
-                                    {
-                                        view.paperToggleHaptic(
-                                            turningOn = gatheredHere == null,
-                                        )
-                                        onShareMarkTap(ayah.surahId, ayah.number)
-                                    }
-                                } else {
-                                    null
-                                },
-                                onAyahMarkLongClick = if (!gathering && shareUx.usesBodyHold) {
-                                    {
-                                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                                        onShareBodyHold(ayah.surahId, ayah.number)
-                                    }
-                                } else {
-                                    null
-                                },
-                                onShareVerbClick = {
-                                    onShareVerb(ayah.surahId, ayah.number)
-                                },
-                                onAyahLongClick = if (!gathering && shareUx.usesBodyHold) {
-                                    {
-                                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                                        onShareBodyHold(ayah.surahId, ayah.number)
-                                    }
-                                } else {
-                                    null
+                                    onShareMarkTap(ayah.surahId, ayah.number)
                                 },
                                 onWordClick = if (gathering) {
                                     {

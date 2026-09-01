@@ -13,8 +13,8 @@ import com.beautifulquran.share.ShareFiles
 import com.beautifulquran.share.ShareImageRenderer
 import com.beautifulquran.share.ShareUx
 import com.beautifulquran.share.ShareUxAction
-import com.beautifulquran.share.ShareUxVariant
 import com.beautifulquran.share.VerseTextComposer
+import com.beautifulquran.share.stitchBitmaps
 import com.beautifulquran.share.gatherOrdinals
 import com.beautifulquran.share.toggleGatheredAyah
 import kotlinx.coroutines.Job
@@ -147,30 +147,11 @@ class ShareViewModel(
         }
     }
 
-    fun onMarkTap(variant: ShareUxVariant, surahId: Int, ayah: Int) {
+    fun onMarkTap(surahId: Int, ayah: Int) {
         if (surahId < 1 || ayah < 1) return
         apply(
             ShareUx.onMarkTap(
-                variant = variant,
                 gathering = _ui.value.gathering,
-                prompt = _ui.value.prompt,
-                ref = AyahRef(surahId, ayah),
-            ),
-        )
-    }
-
-    fun onShareVerb(surahId: Int, ayah: Int) {
-        if (surahId < 1 || ayah < 1) return
-        apply(ShareUx.onShareVerb(AyahRef(surahId, ayah)))
-    }
-
-    fun onBodyHold(variant: ShareUxVariant, surahId: Int, ayah: Int) {
-        if (surahId < 1 || ayah < 1) return
-        apply(
-            ShareUx.onBodyHold(
-                variant = variant,
-                gathering = _ui.value.gathering,
-                prompt = _ui.value.prompt,
                 ref = AyahRef(surahId, ayah),
             ),
         )
@@ -188,8 +169,6 @@ class ShareViewModel(
 
     private fun apply(action: ShareUxAction) {
         when (action) {
-            is ShareUxAction.ShowPrompt -> _ui.update { it.copy(prompt = action.ref) }
-            ShareUxAction.HidePrompt -> hidePrompt()
             is ShareUxAction.EnterShare -> enterShare(action.ref.surahId, action.ref.ayah)
             is ShareUxAction.ToggleVerse -> toggle(action.ref.surahId, action.ref.ayah)
             ShareUxAction.None -> Unit
@@ -335,13 +314,13 @@ class ShareViewModel(
                     }
                     return@launch
                 }
-                bitmap = ShareImageRenderer.renderSegments(
-                    activity = activity,
-                    segmentCount = shareImageSegmentCount(lines.size),
-                ) { index ->
-                    if (shareImageIsFooterSegment(index, lines.size)) {
-                        ShareImageFooterStrip(footerReference(lines))
-                    } else {
+                var versesBmp: Bitmap? = null
+                var footerBmp: Bitmap? = null
+                try {
+                    versesBmp = ShareImageRenderer.renderSegments(
+                        activity = activity,
+                        segmentCount = lines.size,
+                    ) { index ->
                         ShareImageVerseStrip(
                             verse = lines[index],
                             includeTranslation = includeTranslation,
@@ -357,6 +336,13 @@ class ShareViewModel(
                             },
                         )
                     }
+                    footerBmp = ShareImageRenderer.render(activity) {
+                        ShareImageFooterStrip(footerReference(lines))
+                    }
+                    bitmap = stitchBitmaps(listOf(versesBmp, footerBmp))
+                } finally {
+                    versesBmp?.recycle()
+                    footerBmp?.recycle()
                 }
                 val uri = ShareFiles.writePng(activity.applicationContext, bitmap)
                 _ui.update {

@@ -3,7 +3,6 @@ package com.beautifulquran.data
 import android.content.Context
 import android.content.SharedPreferences
 import androidx.core.content.edit
-import com.beautifulquran.share.ShareUxVariant
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
@@ -89,11 +88,6 @@ data class Settings(
     val brushCircleStyle: BrushCircleStyle = BrushCircleStyle.BASELINE,
     /** Developer-only: removes parenthetical and bracketed asides from English-only reading. */
     val hideEnglishParentheticals: Boolean = false,
-    /**
-     * Developer-only verse-share entry design. [ShareUxVariant.OFF] is the
-     * shipped reader (gather exists; nothing on the page enters it).
-     */
-    val shareUxVariant: ShareUxVariant = ShareUxVariant.OFF,
 )
 
 /** Maps a persisted ordinal back to an enum entry, falling back to [default]
@@ -144,7 +138,6 @@ class SettingsRepository(context: Context) {
         homeBookmarkStyle = prefs.homeBookmarkStyle(),
         brushCircleStyle = prefs.enum("brushCircleStyle", BrushCircleStyle.BASELINE),
         hideEnglishParentheticals = prefs.getBoolean("hideEnglishParentheticals", false),
-        shareUxVariant = prefs.shareUxVariant(),
     )
 
     /**
@@ -202,12 +195,7 @@ class SettingsRepository(context: Context) {
             remove("homeBookmarkStyle")
             putInt("brushCircleStyle", next.brushCircleStyle.ordinal)
             putBoolean("hideEnglishParentheticals", next.hideEnglishParentheticals)
-            putString("shareUxVariant", next.shareUxVariant.name)
+            remove("shareUxVariant")
         }
     }
-}
-
-private fun SharedPreferences.shareUxVariant(): ShareUxVariant {
-    val stored = getString("shareUxVariant", null) ?: return ShareUxVariant.OFF
-    return runCatching { ShareUxVariant.valueOf(stored) }.getOrDefault(ShareUxVariant.OFF)
 }

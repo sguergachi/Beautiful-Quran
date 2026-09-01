@@ -1,9 +1,8 @@
 # Verse actions: bookmark · note · share
 
-**Status: four discoverable entry designs in Developer for in-app A/B.**
-Export (text/image) is shipped; production still has **no** share entry
-(`ShareUxVariant.OFF`). Settings → Developer → **Verse share** toggles
-Icon, Reveal, Hold, and Mark — exclusive, paper checkmarks.
+**Status: Mark UX is the product.** Tap `﴿N﴾` to gather that verse; tap more
+verses to add or drop them. Export (text/image) is shipped. Icon / Reveal /
+Hold A/B toggles are gone.
 
 This document records the product decision for how three **different**
 actions on a verse coexist without cluttering reading or violating the
@@ -191,57 +190,34 @@ With G1, the intermediate Send list is **optional**:
 - Forcing bookmark or note through multi-select
 - Putting Gather back on the idle player bar
 
-## In-app test designs
+## Entry: Mark UX
 
-The first A/B hid Share behind `﴿N﴾`. Nobody looks at a verse number and
-thinks “share.” Discoverability is the test now.
+Tap `﴿N﴾` to share that verse. While gathering, tap a verse (or its
+ordinal) to add or drop it. Word long-press stays Root Viewer; notes stay
+on the bookmark ribbon. Idle transport has no Share / Gather control
+(#519).
 
-Developer → **Verse share** (off by default; requires developer mode):
+Marking uses the paper toggle haptic: a confirm click on, a lighter clock
+tick off. Same family as Settings checks and the ayah rail.
 
-| Toggle | What you see | Why it might be the one |
-|---|---|---|
-| **Icon** | Android share glyph on the play bar (current verse) | The phone-wide pattern. One meaning: share this verse |
-| **Reveal** | Share glyph under the verse you are on (paused) | The action is on the thing it acts on. No secret tap |
-| **Hold** | Hold the verse (translation or `﴿N﴾`) → Share glyph | The OS “what can I do with this” gesture. Word hold stays Root Viewer |
-| **Mark** | Tap `﴿N﴾` | Verse handle. Least obvious; kept for comparison |
-
-Marking a verse (the `﴿N﴾` tap, or another verse while gathering) uses
-the paper toggle haptic: a confirm click on, a lighter clock tick off.
-Same family as Settings checks and the ayah rail, not a long-press thud.
-
-All four then share: tap more verses (or their ordinal) to add/drop.
-The gather bar is not a copy of play. One row, two jobs, like a
-running head: Close at the start (leave), Text and Image a tight pair
-at the end (send). The count lives on the verses; the empty middle is
-paper. No Send page on the happy path; back dismisses prompt or leaves
-gather.
+The gather bar is not a copy of play. One row, two jobs: Close at the
+start (leave), Text and Image a tight pair at the end (send). The count
+lives on the verses; the empty middle is paper. No Send page on the happy
+path; back leaves gather.
 
 Policy lives in `share/ShareUx.kt` (pure, JVM-tested). Do not invent
 entry rules in `ReaderScreen`.
 
-The play-bar Share is **not** the #519 Gather control. It shares the
-current verse. It does not enter-and-commit.
+Icon / Reveal / Hold were in-app A/B designs and have been deleted.
 
-## Why the first four failed
-
-Hidden gestures are not share. `﴿N﴾` means “this is verse N.” Hold on the
-mark is a power move. A confirm-Share that never appears until you already
-know the secret is a dead end. The action has to be visible (icon or the
-word Share) or attached to a gesture everyone already uses (hold the
-thing).
-
-## Implementation sketch (later)
-
-Shipped for A/B, not locked as G1:
+## Implementation
 
 1. Gold wash on `AyahBlock` when `gatherOrdinal != null`
 2. Share ribbon composable replacing `PlayerBar` when gathering
-3. Discoverable entries behind `Settings.shareUxVariant` (Icon / Reveal / Hold / Mark)
+3. Tap `﴿N﴾` enters gather with that verse already selected
 4. Ribbon Text / Image → existing `shareAsText` / `shareAsImage`
 5. #519 stays: idle transport has no Gather
 6. Happy path skips Send; chooser completion leaves gather
-7. Visual QA on Paper + Nightfall + multi-verse toggle — pick a winner,
-   then delete the other three
 
 Reuse: `ShareViewModel` selection list, ordinals, text/image exporters,
 `ShareHost` / FileProvider. Change the **entry and chrome**, not the export

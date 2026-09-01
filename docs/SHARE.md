@@ -1,11 +1,10 @@
 # Sharing verses
 
 **Status: PR1 + PR2 shipped (gather + text + full-ink image).** Video remains
-proposed. **Entry UX** is four Developer-gated designs (colophon / lift /
-seal / action line) — see [VERSE_ACTIONS.md](VERSE_ACTIONS.md). Production
-entry is still **off** (`ShareUxVariant.OFF`): nothing on the page starts
-gather. This file is the design record for *gather mode* and the export
-pipeline: **text**, **image**, and later **video that carries the ink**.
+proposed. **Entry UX** is Mark: tap `﴿N﴾` to gather that verse — see
+[VERSE_ACTIONS.md](VERSE_ACTIONS.md). This file is the design record for
+*gather mode* and the export pipeline: **text**, **image**, and later
+**video that carries the ink**.
 
 ## Why it exists
 
@@ -29,11 +28,10 @@ Gathering is a **mode of the reader sheet**, not a new sheet. The page keeps
 its layout; it grows ordinals in the margin.
 
 - **Enter** via `ShareViewModel.enterShare(surah, ayah)` (verse-first: that
-  ayah is already `١`; pauses recitation — the mode owns the tap). The idle
+  ayah is already `١`; pauses recitation — the mode owns the tap). Tap
+  `﴿N﴾` is the entry ([VERSE_ACTIONS.md](VERSE_ACTIONS.md)). The idle
   player bar does **not** host a Gather control
-  ([#519](https://github.com/sguergachi/Beautiful-Quran-/pull/519)). Four
-  discoverable entry designs (Icon / Reveal / Hold / Mark) live behind
-  Settings → Developer → Verse share ([VERSE_ACTIONS.md](VERSE_ACTIONS.md)).
+  ([#519](https://github.com/sguergachi/Beautiful-Quran-/pull/519)).
 - **Pick** by tapping a verse (word or ayah). Its ordinal sits in the
   bookmark swallowtail nub — same strip, first-line inset, ribbon
   width, and nub height — in Western digits (1 2 3), Garamond ink.
@@ -105,10 +103,11 @@ screenshot of the live reader, not the wash yet:
    footer + faint **Beautiful Quran**). Fixed **Paper** theme so shares stay
    readable parchment regardless of the reader's night/royal mode.
 2. `ShareImageRenderer` hosts each **verse strip** offscreen at 1080 ×
-   wrap-height, then a **chapter footer strip** (`al-Baqarah 2:1–N` +
-   Beautiful Quran), software-draws each, and **stitches** them. Each
-   strip gets a fresh composition so the footer cannot be dropped. The
-   GPU never rasterises the full gather. **Not** full `ReaderScreen`.
+   wrap-height on a **new ComposeView**. The **chapter footer**
+   (`al-Baqarah 2:1–N` + Beautiful Quran) is a **separate attach**, then
+   the bitmaps are **stitched**. Reusing one view dropped the footer
+   (stale last verse). The GPU never rasterises the full gather. **Not**
+   full `ReaderScreen`.
 3. `ShareFiles` writes PNG under `cacheDir/share/`, exposes a `FileProvider`
    URI (`${applicationId}.share`), keeps the newest few files.
 4. `ACTION_SEND` `image/png` + `FLAG_GRANT_READ_URI_PERMISSION`.
@@ -147,7 +146,7 @@ carry the reference only (no app watermark in the chat body).
 
 ```text
 share/AyahRef.kt                 AyahRef + toggle/ordinals pure helpers
-share/ShareUx.kt                 four entry designs + pure gesture policy
+share/ShareUx.kt                 Mark UX entry + pure gather toggle policy
 share/VerseTextComposer.kt       text formatting — pure, JVM-tested
 share/ShareFiles.kt              cacheDir/share + FileProvider URI
 share/ShareImageRenderer.kt      offscreen ComposeView → Bitmap
