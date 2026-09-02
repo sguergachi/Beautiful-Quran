@@ -4,6 +4,9 @@ export const WORD_SEARCH_MAX_HITS = 400
 export const WORD_SEARCH_MIN_QUERY_LENGTH = 2
 export const WORD_SEARCH_PREVIEW_LIMIT = 3
 
+/** Keeps visible concept evidence ahead of any bounded corroboration bonus. */
+const VISIBLE_CONCEPT_EVIDENCE_BONUS = 300
+
 export interface WordSearchHit {
   surahId: number
   ayahNumber: number
@@ -479,17 +482,27 @@ function scanConcepts(
           .map((term) => fuzzyWordMatch(term.toLowerCase(), state.parsed.text.toLowerCase()))
           .find((term) => term != null) ?? null
       : null
+    const evidenceQuery = { text: correction ?? state.parsed.text, exactOnly: false }
     for (const key of concept.ayahKeys) {
+      const indexAt = state.firstIndex.get(key)
+      const hasVisibleEvidence = indexAt != null && Math.max(
+        searchTextRelevance(state.index[indexAt]!.ayahTranslation, evidenceQuery, false),
+        searchTextRelevance(sameAyahGlossLine(state.index, indexAt), evidenceQuery, false),
+      ) > 0
+      const groundedScore = score + (hasVisibleEvidence ? VISIBLE_CONCEPT_EVIDENCE_BONUS : 0)
       const current = semantic.get(key)
       semantic.set(
         key,
         current == null
-          ? { best: score, bonus: 0, label: concept.name, correction }
+          ? { best: groundedScore, bonus: 0, label: concept.name, correction }
           : {
-              best: Math.max(current.best, score),
-              bonus: Math.min(250, current.bonus + Math.trunc(Math.min(current.best, score) / 5)),
-              label: score > current.best ? concept.name : current.label,
-              correction: score > current.best ? correction : current.correction,
+              best: Math.max(current.best, groundedScore),
+              bonus: Math.min(
+                250,
+                current.bonus + Math.trunc(Math.min(current.best, groundedScore) / 5),
+              ),
+              label: groundedScore > current.best ? concept.name : current.label,
+              correction: groundedScore > current.best ? correction : current.correction,
             },
       )
     }

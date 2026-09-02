@@ -12,6 +12,9 @@ const val WORD_SEARCH_MIN_QUERY_LENGTH = 2
 /** How many ayah hits to show per surah before the expand line. */
 const val WORD_SEARCH_PREVIEW_LIMIT = 3
 
+/** Keeps visible concept evidence ahead of any bounded corroboration bonus. */
+private const val VISIBLE_CONCEPT_EVIDENCE_BONUS = 300
+
 /**
  * The ayah- and surah-level text every word of one ayah shares.
  *
@@ -238,16 +241,29 @@ fun matchWordSearch(
             } else {
                 null
             }
+            val evidenceQuery = ParsedSearchQuery(correction ?: parsed.text, exactOnly = false)
             for (key in concept.ayahKeys) {
+                val hasVisibleEvidence = firstIndex[key]?.let { at ->
+                    maxOf(
+                        searchTextRelevance(index[at].ayahTranslation, evidenceQuery, allowFuzzy = false),
+                        searchTextRelevance(sameAyahGlossLine(index, at), evidenceQuery, allowFuzzy = false),
+                    ) > 0
+                } == true
+                val groundedScore = score + if (hasVisibleEvidence) {
+                    VISIBLE_CONCEPT_EVIDENCE_BONUS
+                } else {
+                    0
+                }
                 val current = semantic[key]
                 semantic[key] = if (current == null) {
-                    SemanticRank(score, bonus = 0, concept.name, correction)
+                    SemanticRank(groundedScore, bonus = 0, concept.name, correction)
                 } else {
                     SemanticRank(
-                        best = maxOf(current.best, score),
-                        bonus = (current.bonus + minOf(current.best, score) / 5).coerceAtMost(250),
-                        label = if (score > current.best) concept.name else current.label,
-                        correction = if (score > current.best) correction else current.correction,
+                        best = maxOf(current.best, groundedScore),
+                        bonus = (current.bonus + minOf(current.best, groundedScore) / 5)
+                            .coerceAtMost(250),
+                        label = if (groundedScore > current.best) concept.name else current.label,
+                        correction = if (groundedScore > current.best) correction else current.correction,
                     )
                 }
             }

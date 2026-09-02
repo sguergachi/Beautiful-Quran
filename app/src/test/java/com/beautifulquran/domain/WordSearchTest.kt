@@ -185,6 +185,50 @@ class WordSearchTest {
     }
 
     @Test
+    fun `corrected concepts rank visible evidence ahead of broad associations`() {
+        val evidenceIndex = listOf(
+            entry(
+                2,
+                9,
+                1,
+                "يُخَادِعُونَ",
+                "They deceive",
+                ayahTranslation = "They deceive themselves",
+            ),
+            entry(
+                2,
+                11,
+                1,
+                "تُفْسِدُوا",
+                "cause corruption",
+                ayahTranslation = "Do not cause corruption on earth",
+            ),
+        )
+        val broad = SearchConcept(
+            "Diseases of the Heart",
+            listOf("corrupt heart"),
+            emptyList(),
+            "Heart and Soul",
+            "Tazkiyah",
+            intArrayOf(2_009),
+        )
+        val direct = SearchConcept(
+            "Prohibition of Corruption on Earth",
+            listOf("do not corrupt the earth"),
+            emptyList(),
+            "Stewardship",
+            "Ethics",
+            intArrayOf(2_011),
+        )
+
+        val hits = matchWordSearch(evidenceIndex, "corrupy", concepts = listOf(broad, direct))
+
+        assertEquals(listOf(11, 9), hits.map { it.ayahNumber })
+        assertEquals("Prohibition of Corruption on Earth", hits.first().matchLabel)
+        assertEquals("corrupt", spellingCorrection(hits))
+    }
+
+    @Test
     fun `matched Arabic root expands to related word forms`() {
         val rooted = listOf(
             entry(2, 37, 1, "فَتَابَ", "so He turned").copy(root = "توب"),

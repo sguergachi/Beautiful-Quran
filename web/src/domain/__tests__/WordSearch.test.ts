@@ -181,6 +181,41 @@ describe('matchWordSearch', () => {
     expect(hits[1]!.matchTerms).toEqual(['the Oft-Returning'])
   })
 
+  it('ranks visible corrected-concept evidence ahead of broad associations', () => {
+    const evidenceIndex = [
+      {
+        ...entry(2, 9, 1, 'يُخَادِعُونَ', 'They deceive'),
+        ayahTranslation: 'They deceive themselves',
+      },
+      {
+        ...entry(2, 11, 1, 'تُفْسِدُوا', 'cause corruption'),
+        ayahTranslation: 'Do not cause corruption on earth',
+      },
+    ]
+    const broad = {
+      name: 'Diseases of the Heart',
+      primaryTerms: ['corrupt heart'],
+      secondaryTerms: [],
+      category: 'Heart and Soul',
+      domain: 'Tazkiyah',
+      ayahKeys: [2_009],
+    }
+    const direct = {
+      name: 'Prohibition of Corruption on Earth',
+      primaryTerms: ['do not corrupt the earth'],
+      secondaryTerms: [],
+      category: 'Stewardship',
+      domain: 'Ethics',
+      ayahKeys: [2_011],
+    }
+
+    const hits = matchWordSearch(evidenceIndex, 'corrupy', 400, [broad, direct])
+
+    expect(hits.map((hit) => hit.ayahNumber)).toEqual([11, 9])
+    expect(hits[0]!.matchLabel).toBe('Prohibition of Corruption on Earth')
+    expect(spellingCorrection(hits)).toBe('corrupt')
+  })
+
   it('keeps exact matches ahead of fuzzy neighbors', () => {
     const neighbors = [entry(1, 1, 1, 'قَالَ', 'lone'), entry(2, 1, 1, 'حُبّ', 'love')]
     expect(matchWordSearch(neighbors, 'love', 1).map((h) => h.translation)).toEqual(['love'])

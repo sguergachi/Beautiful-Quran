@@ -23,7 +23,9 @@ signals rather than a general-purpose language model:
    Direct tag/primary vocabulary leads secondary vocabulary; category and
    domain matches are broader and score lower. Rarer concepts receive a small
    specificity bonus, and ayahs supported by several matching concepts receive
-   a bounded corroboration bonus.
+   a bounded corroboration bonus. Visible evidence of the query—or its
+   spelling correction—in the ayah translation or word glosses receives a
+   small grounding boost, so it leads broader ayahs that only share the tag.
 5. **Spelling fallback** — a single insertion, deletion, substitution, or
    adjacent transposition, only for queries of four or more characters and
    only when literal, concept, and thesaurus stages all return nothing.
