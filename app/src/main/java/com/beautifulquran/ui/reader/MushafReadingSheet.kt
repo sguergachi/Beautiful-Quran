@@ -110,6 +110,24 @@ private val MushafRuleTailAir = 0.dp
 // stands in it — it used to cost the leaf three quarters of a line to stand on
 // the paper — so what is left is the paper under the figure rather than under
 // the text.
+/**
+ * Which way the book turns: the leaf, the rule under it and the folio between
+ * them, in one figure.
+ *
+ * They are one thing seen three ways — the paper, its edge side-on, and the
+ * number printed on it — so they cannot hold separate opinions. They did, twice
+ * in one afternoon: the leaf was turned left to right for the English book
+ * while the dial's seats still answered in book order, and then the leaf was
+ * turned back while the folio still slid the other way, so the page number
+ * travelled against the page carrying it.
+ *
+ * Turning the English book the way an English book turns is still right, and it
+ * is two things rather than this one: flip this, and make [mushafDialAlong]
+ * true of the comb's *seats* and trough as well as of where its marks draw.
+ * Prove it on the comb, not on the thumb — the thumb looks correct either way.
+ */
+internal const val MushafTurnsRightToLeft = true
+
 private val MushafDialHeadAir = 8.dp
 
 /** Each folio figure's column, equal either side of the centre line. */
@@ -283,7 +301,7 @@ internal fun MushafReadingSheet(
                             // Read here rather than in composition: a turn
                             // moves the figure without recomposing the sheet.
                             val away = index - centre - pageOffset()
-                            val x = if (english) away else -away
+                            val x = if (MushafTurnsRightToLeft) -away else away
                             IntOffset((x * trackPx).roundToInt(), 0)
                         }
                         .padding(horizontal = MushafPageMargin + MushafEdgeGutter)
@@ -301,11 +319,7 @@ internal fun MushafReadingSheet(
             onSeekSurah = onSeekSurah,
             onWarmPage = onWarmPage,
             onScrubbing = { scrubbing.value = it; onScrubbing(it) },
-            // The rule runs the way the book turns, and for now that is the
-            // mushaf's direction on both settings — see MushafPager's
-            // reverseLayout for why the English leaf is not turning the other
-            // way yet.
-            rightToLeft = true,
+            rightToLeft = MushafTurnsRightToLeft,
             onLanding = onLanding,
             reciting = reciting,
             // Paper between the folio and the rule. The figure now stands in
