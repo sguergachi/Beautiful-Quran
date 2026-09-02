@@ -467,20 +467,29 @@ function scanConcepts(
   allowFuzzy: boolean,
 ): void {
   if (state.parsed.exactOnly) return
-  const semantic = new Map<number, { best: number; bonus: number; label: string }>()
+  const semantic = new Map<
+    number,
+    { best: number; bonus: number; label: string; correction: string | null }
+  >()
   for (const concept of concepts) {
     const score = conceptRelevance(concept, state.parsed, allowFuzzy)
     if (score <= 0) continue
+    const correction = allowFuzzy
+      ? [concept.name, ...concept.primaryTerms, ...concept.secondaryTerms]
+          .map((term) => fuzzyWordMatch(term.toLowerCase(), state.parsed.text.toLowerCase()))
+          .find((term) => term != null) ?? null
+      : null
     for (const key of concept.ayahKeys) {
       const current = semantic.get(key)
       semantic.set(
         key,
         current == null
-          ? { best: score, bonus: 0, label: concept.name }
+          ? { best: score, bonus: 0, label: concept.name, correction }
           : {
               best: Math.max(current.best, score),
               bonus: Math.min(250, current.bonus + Math.trunc(Math.min(current.best, score) / 5)),
               label: score > current.best ? concept.name : current.label,
+              correction: score > current.best ? correction : current.correction,
             },
       )
     }
@@ -494,7 +503,7 @@ function scanConcepts(
         0,
         match.best + match.bonus,
         match.label,
-        [],
+        match.correction ? [match.correction] : [],
         `Concept · ${match.label}`,
       )
     }
@@ -631,7 +640,10 @@ export function fuzzyWordContains(text: string, query: string): boolean {
 /** Corrected vocabulary term shown only when spelling fallback won. */
 export function spellingCorrection(hits: Iterable<WordSearchHit>): string | null {
   for (const hit of hits) {
-    if (hit.matchReason === 'Spelling match' && hit.matchTerms?.[0]) {
+    if (
+      hit.matchTerms?.[0] &&
+      (hit.matchReason === 'Spelling match' || hit.matchReason?.startsWith('Concept ·'))
+    ) {
       return hit.matchTerms[0]
     }
   }

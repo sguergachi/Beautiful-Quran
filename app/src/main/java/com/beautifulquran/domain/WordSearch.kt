@@ -216,7 +216,12 @@ fun matchWordSearch(
 
     fun scanConcepts(allowFuzzy: Boolean) {
         if (parsed.exactOnly || concepts.isEmpty()) return
-        data class SemanticRank(val best: Int, val bonus: Int, val label: String) {
+        data class SemanticRank(
+            val best: Int,
+            val bonus: Int,
+            val label: String,
+            val correction: String?,
+        ) {
             val total: Int get() = best + bonus
         }
         val semantic = HashMap<Int, SemanticRank>()
@@ -224,15 +229,25 @@ fun matchWordSearch(
             checkCancelled()
             val score = conceptRelevance(concept, parsed, allowFuzzy)
             if (score <= 0) continue
+            val correction = if (allowFuzzy) {
+                sequenceOf(concept.name)
+                    .plus(concept.primaryTerms)
+                    .plus(concept.secondaryTerms)
+                    .mapNotNull { fuzzyWordMatch(it.lowercase(), parsed.text.lowercase()) }
+                    .firstOrNull()
+            } else {
+                null
+            }
             for (key in concept.ayahKeys) {
                 val current = semantic[key]
                 semantic[key] = if (current == null) {
-                    SemanticRank(score, bonus = 0, concept.name)
+                    SemanticRank(score, bonus = 0, concept.name, correction)
                 } else {
                     SemanticRank(
                         best = maxOf(current.best, score),
                         bonus = (current.bonus + minOf(current.best, score) / 5).coerceAtMost(250),
                         label = if (score > current.best) concept.name else current.label,
+                        correction = if (score > current.best) correction else current.correction,
                     )
                 }
             }
@@ -244,6 +259,7 @@ fun matchWordSearch(
                     position = 0,
                     score = match.total,
                     label = match.label,
+                    terms = listOfNotNull(match.correction),
                     reason = "Concept · ${match.label}",
                 )
             }
@@ -391,7 +407,9 @@ fun fuzzyWordContains(text: String, query: String): Boolean = fuzzyWordMatch(tex
 
 /** Corrected vocabulary term shown only when spelling fallback won. */
 fun spellingCorrection(hits: Iterable<WordSearchHit>): String? = hits.firstNotNullOfOrNull { hit ->
-    hit.matchTerms.firstOrNull().takeIf { hit.matchReason == "Spelling match" }
+    hit.matchTerms.firstOrNull().takeIf {
+        hit.matchReason == "Spelling match" || hit.matchReason.startsWith("Concept ·")
+    }
 }
 
 private fun isWithinOneEdit(text: String, start: Int, end: Int, query: String): Boolean {

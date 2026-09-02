@@ -153,7 +153,19 @@ class WordSearchTest {
         assertEquals(listOf(1 to 1, 55 to 1), hits.map { it.surahId to it.ayahNumber })
         assertTrue(hits.all { it.position == 0 && it.matchLabel == "Divine Mercy" })
         assertTrue(hits.all { it.matchReason == "Concept · Divine Mercy" })
-        assertTrue(matchWordSearch(index, "clemncy", concepts = listOf(concept)).isNotEmpty())
+        assertEquals(null, spellingCorrection(hits))
+        val corrected = matchWordSearch(index, "clemncy", concepts = listOf(concept))
+        assertTrue(corrected.all { it.matchTerms == listOf("clemency") })
+        assertEquals("clemency", spellingCorrection(corrected))
+        val corruption = concept.copy(
+            name = "Prohibition of Corruption on Earth",
+            primaryTerms = listOf("do not corrupt the earth"),
+            secondaryTerms = emptyList(),
+        )
+        assertEquals(
+            "corrupt",
+            spellingCorrection(matchWordSearch(index, "corrupy", concepts = listOf(corruption))),
+        )
         assertTrue(matchWordSearch(index, "\"clemency\"", concepts = listOf(concept)).isEmpty())
         assertTrue(conceptRelevance(concept, parseSearchQuery("show me verses about clemency")) > 0)
     }

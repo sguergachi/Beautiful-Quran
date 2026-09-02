@@ -150,7 +150,17 @@ describe('matchWordSearch', () => {
     ])
     expect(hits.every((hit) => hit.position === 0 && hit.matchLabel === 'Divine Mercy')).toBe(true)
     expect(hits.every((hit) => hit.matchReason === 'Concept · Divine Mercy')).toBe(true)
-    expect(matchWordSearch(index, 'clemncy', 400, [concept])).not.toEqual([])
+    expect(spellingCorrection(hits)).toBeNull()
+    const corrected = matchWordSearch(index, 'clemncy', 400, [concept])
+    expect(corrected.every((hit) => hit.matchTerms?.[0] === 'clemency')).toBe(true)
+    expect(spellingCorrection(corrected)).toBe('clemency')
+    const corruption = {
+      ...concept,
+      name: 'Prohibition of Corruption on Earth',
+      primaryTerms: ['do not corrupt the earth'],
+      secondaryTerms: [],
+    }
+    expect(spellingCorrection(matchWordSearch(index, 'corrupy', 400, [corruption]))).toBe('corrupt')
     expect(matchWordSearch(index, '"clemency"', 400, [concept])).toEqual([])
     expect(
       conceptRelevance(concept, parseSearchQuery('show me verses about clemency')),
