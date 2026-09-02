@@ -166,6 +166,42 @@ class SettingsRepository(context: Context) {
      * ayah advance. [update] rewrites every settings key per call, which is
      * needless write amplification for two frequently changing integers.
      */
+    /**
+     * The English leaf's well and measure, as last laid out, with the window
+     * they were laid out in.
+     *
+     * The book is paginated by measuring a leaf ([EnglishLeafRuler]), and a leaf
+     * has no size until it has been composed — so the first time the reader ever
+     * opens, the book has to open on the character estimate and repaginate a
+     * frame later. Only the first time. Remembering the figures means every
+     * launch after it can measure the whole book before anything is opened, and
+     * the reader never sees the estimate at all.
+     *
+     * Kept beside the settings rather than in them: they are a fact about the
+     * screen, not a preference, and they change on nobody's decision. The window
+     * is stored with them because a leaf on a folded phone is not the leaf on an
+     * unfolded one, and a remembered figure that no longer describes the screen
+     * is worse than none.
+     */
+    fun rememberLeafMetrics(wellPx: Float, measurePx: Float, windowWidthPx: Int, windowHeightPx: Int) {
+        if (wellPx <= 0f || measurePx <= 0f) return
+        prefs.edit {
+            putFloat("leafWellPx", wellPx)
+            putFloat("leafMeasurePx", measurePx)
+            putInt("leafWindowW", windowWidthPx)
+            putInt("leafWindowH", windowHeightPx)
+        }
+    }
+
+    /** The remembered well and measure, if they still describe this window. */
+    fun leafMetrics(windowWidthPx: Int, windowHeightPx: Int): FloatArray? {
+        if (prefs.getInt("leafWindowW", 0) != windowWidthPx) return null
+        if (prefs.getInt("leafWindowH", 0) != windowHeightPx) return null
+        val well = prefs.getFloat("leafWellPx", 0f)
+        val measure = prefs.getFloat("leafMeasurePx", 0f)
+        return if (well > 0f && measure > 0f) floatArrayOf(well, measure) else null
+    }
+
     fun updateListeningPosition(surah: Int, ayah: Int) {
         val current = _settings.value
         if (current.lastSurah == surah && current.lastAyah == ayah) return

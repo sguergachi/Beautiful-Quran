@@ -106,6 +106,7 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalFontFamilyResolver
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
@@ -295,6 +296,7 @@ fun ReaderScreen(
     val rulerMeasurer = remember(rulerResolver, rulerDensity, rulerLayoutDirection) {
         TextMeasurer(rulerResolver, rulerDensity, rulerLayoutDirection)
     }
+    val rulerWindow = LocalWindowInfo.current.containerSize
     val leafMetrics = mushafLeafMetrics.value
     LaunchedEffect(
         mushafMode,
@@ -306,6 +308,14 @@ fun ReaderScreen(
         val well = leafMetrics?.getOrNull(0) ?: return@LaunchedEffect
         val measure = leafMetrics.getOrNull(1) ?: return@LaunchedEffect
         if (!mushafMode || well <= 0f || measure <= 0f) return@LaunchedEffect
+        // Remembered so the next launch can paginate the book at the root,
+        // before the reader exists — see SettingsRepository.rememberLeafMetrics.
+        viewModel.settings.rememberLeafMetrics(
+            wellPx = well,
+            measurePx = measure,
+            windowWidthPx = rulerWindow.width,
+            windowHeightPx = rulerWindow.height,
+        )
         viewModel.ensureMushaf(
             text = settings.englishLeafText,
             rulerFor = { translation ->

@@ -79,6 +79,12 @@ import com.beautifulquran.ui.home.HomeViewModel
 import com.beautifulquran.ui.reader.BackToOriginPill
 import com.beautifulquran.ui.reader.ReaderPlaybackSnapshot
 import com.beautifulquran.ui.reader.ReaderScreen
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalFontFamilyResolver
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.platform.LocalWindowInfo
+import androidx.compose.ui.text.TextMeasurer
+import com.beautifulquran.ui.reader.englishLeafRuler
 import com.beautifulquran.ui.reader.ReaderViewModel
 import com.beautifulquran.ui.reader.RootReturnTarget
 import com.beautifulquran.ui.rootviewer.RootViewerScreen
@@ -293,6 +299,50 @@ private fun PaperStackApp(
     val settings by app.settings.settings.collectAsStateWithLifecycle()
     val settingsInkPreview = remember {
         SettingsInkPreviewState(settings.brushCircleStyle)
+    }
+    // Paginate the English book before anything is opened.
+    //
+    // It is paginated by *measuring* a leaf, and a leaf has no size until it has
+    // been composed — so the first time this app is ever run it has to open on
+    // the character estimate and repaginate a frame later. Only the first time:
+    // the leaf remembers its well and measure, and every launch after that has
+    // them here, at the root, before the reader exists. A thousand text layouts
+    // on a background thread while the chapter list is being read.
+    val leafDensity = LocalDensity.current
+    val leafResolver = LocalFontFamilyResolver.current
+    val leafLayoutDirection = LocalLayoutDirection.current
+    val leafMeasurer = remember(leafResolver, leafDensity, leafLayoutDirection) {
+        TextMeasurer(leafResolver, leafDensity, leafLayoutDirection)
+    }
+    val windowSize = LocalWindowInfo.current.containerSize
+    LaunchedEffect(
+        windowSize,
+        settings.englishLeafText,
+        settings.verseNumberScript,
+        settings.hideEnglishParentheticals,
+    ) {
+        val metrics = app.settings.leafMetrics(windowSize.width, windowSize.height)
+            ?: return@LaunchedEffect
+        readerViewModel.ensureMushaf(
+            text = settings.englishLeafText,
+            rulerFor = { translation ->
+                englishLeafRuler(
+                    wellPx = metrics[0],
+                    measurePx = metrics[1],
+                    density = leafDensity,
+                    measurer = leafMeasurer,
+                    verseNumberScript = settings.verseNumberScript,
+                    hideParentheticals = settings.hideEnglishParentheticals,
+                    translation = translation,
+                )
+            },
+            rulerKey = listOf(
+                metrics[0],
+                metrics[1],
+                settings.verseNumberScript,
+                settings.hideEnglishParentheticals,
+            ),
+        )
     }
     val bookmarkCount by bookmarksViewModel.bookmarkCount.collectAsStateWithLifecycle()
     val shareUi by shareViewModel.ui.collectAsStateWithLifecycle()

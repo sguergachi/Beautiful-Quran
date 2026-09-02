@@ -290,6 +290,11 @@ class ReaderViewModel(
         rulerKey: Any? = null,
     ) {
         if (_mushaf.value != null && mushafLeafText == text && mushafRulerKey == rulerKey) return
+        // Never fall back. A book already paginated by measuring a leaf is not
+        // replaced by one counting characters into it — the reader opens the
+        // mushaf after the app has loaded, and its own first call carries no
+        // ruler.
+        if (rulerFor == null && mushafRulerKey != null && mushafLeafText == text) return
         mushafLeafText = text
         mushafRulerKey = rulerKey
         viewModelScope.launch {

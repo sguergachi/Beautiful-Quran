@@ -509,11 +509,20 @@ can hold, lays it out at the book's own hand, leading and measure — the same
 says where the well is full. One text layout to a leaf, about a thousand for the
 Qur'an, once, off the main thread.
 
-It cannot run before the leaf has a size, so the book opens on the character
-estimate and repaginates a frame later, and again whenever the leaf changes
-size. That is not a workaround: it is what an ebook *is*. A printed book breaks
-in the same place in every copy because every copy is the same size; a book on a
-screen breaks where that screen breaks it.
+It cannot run before the leaf has a size — so the leaf *remembers its size*.
+`SettingsRepository.rememberLeafMetrics` keeps the well and the measure with the
+window they were laid out in, and `MainActivity` paginates the whole book from
+them at the root, before the reader exists: a thousand text layouts on a
+background thread while the chapter list is being read. The reader never sees a
+book counted into leaves. Only the first run this app has ever had — or the
+first after the window changes shape — has to open on the estimate and
+repaginate, because that is the one run with nothing remembered, and the window
+is stored beside the figures so a leaf on a folded phone is never mistaken for
+the leaf on an unfolded one.
+
+Which is what an ebook *is*. A printed book breaks in the same place in every
+copy because every copy is the same size; a book on a screen breaks where that
+screen breaks it, and remembers the screen.
 
 **And the ruler measures the leaf, not a copy of it.** The first one built its
 own string from the raw translation and measured that. It is the obvious way to
