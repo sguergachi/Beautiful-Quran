@@ -509,6 +509,28 @@ can hold, lays it out at the book's own hand, leading and measure — the same
 says where the well is full. One text layout to a leaf, about a thousand for the
 Qur'an, once, off the main thread.
 
+**And a thousand text layouts is not free.** Timed on a device it was **15.4
+seconds**, which is not a cost, it is a wait. Two things in it were paying for
+nothing:
+
+- **The offer.** The ruler was handed a fixed two dozen verses, so it laid out
+  three and a half thousand characters to decide a leaf that holds a thousand,
+  and laying out text is the whole expense here. It takes a third more than a
+  leaf holds now (`ENGLISH_LEAF_OFFER`), and asks for more only when the layout
+  says the offer rather than the well decided the leaf. 15.4 s to 10.2 s.
+- **A guard that had never fired.** The ruler checked its own cut by setting the
+  leaf again and counting its lines — a second layout of every leaf in the book,
+  for a correction that never once applied. It cannot: the cut is the end of a
+  line the leaf itself laid out, and everything after it is a mapping back
+  through ranges the same leaf recorded. 10.2 s to **4.8 s**.
+
+Three times faster, and still a wait. The answer to the rest is the one an ebook
+gives, and this book is already shaped for it: **a chapter opens a leaf**, so the
+114 chapters are 114 independent paginations — the spine items of an EPUB.
+Nothing in Sad's leaves depends on As-Saffat's, so the chapter being opened can
+be paginated in a handful of layouts and the rest follow behind it, the way a
+reader computes page numbers behind the book you are already reading.
+
 It cannot run before the leaf has a size — so the leaf *remembers its size*.
 `SettingsRepository.rememberLeafMetrics` keeps the well and the measure with the
 window they were laid out in, and `MainActivity` paginates the whole book from
