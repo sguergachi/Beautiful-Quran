@@ -130,6 +130,15 @@ internal fun MushafEnglishSheet(
     hideParentheticals: Boolean,
     /** The leaf's well and measure, in px, once it has laid out. */
     onMetrics: (wellPx: Float, measurePx: Float) -> Unit = { _, _ -> },
+    /**
+     * Whether the book these leaves came from was measured rather than counted.
+     *
+     * The leaf still lays out when it is false — that is how the well and the
+     * measure are known at all, and the book cannot be measured until they are.
+     * It simply does not *ink* until the leaves are the right ones, so the
+     * reader never watches a page rearrange itself.
+     */
+    measured: Boolean = true,
     verseNumberScript: VerseNumberScript,
     /** The leaf's fore-edge, shared with the running head and the folio. */
     foreEdge: Dp,
@@ -272,8 +281,17 @@ internal fun MushafEnglishSheet(
             }
         }
         val pitch = with(density) { (setting.handPx * setting.leadingEm).toSp() }
+        // The leaf lays out either way; it inks only once the book that decided
+        // its leaves was measured against a leaf this size. A page that arrives
+        // a moment late is a page; a page that rearranges itself is a fault.
+        val inked by animateFloatAsState(
+            targetValue = if (measured) 1f else 0f,
+            animationSpec = tween(EnglishLeafFadeMs, easing = FastOutSlowInEasing),
+            label = "englishLeafInk",
+        )
         Column(
             modifier = Modifier
+                .graphicsLayer { alpha = inked }
                 .fillMaxSize()
                 .padding(horizontal = foreEdge),
             // A leaf whose content will not reach the foot hangs from the

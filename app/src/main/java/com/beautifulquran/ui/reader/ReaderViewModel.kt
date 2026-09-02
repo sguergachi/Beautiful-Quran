@@ -174,6 +174,17 @@ data class MushafUi(
     val surahsById: Map<Int, Surah>,
     /** The English book's leaves — a Madinah page may take more than one. */
     val englishBook: EnglishBook,
+    /**
+     * True when the leaves were decided by *measuring* a leaf rather than by
+     * counting characters into one ([EnglishLeafRuler]).
+     *
+     * The English leaf does not set a word until this is true. A book counted
+     * into leaves and then repaginated is a page that rearranges itself under
+     * the reader a moment after it opens, which is worse than a page that takes
+     * a moment to arrive — nobody minds waiting for a page and everybody
+     * notices one moving.
+     */
+    val measured: Boolean = false,
 )
 
 data class ReaderUiState(
@@ -316,7 +327,7 @@ class ReaderViewModel(
                     buildEnglishBookByLayout(catalog, verse, ruler)
                 }
             }
-            _mushaf.value = MushafUi(catalog, surahs, book)
+            _mushaf.value = MushafUi(catalog, surahs, book, measured = rulerFor != null)
         }
     }
 

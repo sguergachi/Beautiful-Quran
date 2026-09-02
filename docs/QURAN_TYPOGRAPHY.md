@@ -524,6 +524,18 @@ Which is what an ebook *is*. A printed book breaks in the same place in every
 copy because every copy is the same size; a book on a screen breaks where that
 screen breaks it, and remembers the screen.
 
+**And the leaf does not ink until its leaves are the right ones.** `MushafUi`
+carries whether the book was measured or counted, and the English sheet fades in
+on it. The leaf still *lays out* while it is false — that is how the well and
+the measure become known at all, and the book cannot be measured until they are
+— it simply sets no words. A page that arrives a moment late is a page; a page
+that rearranges itself under the reader a moment after it opens is a fault, and
+it is the one thing nobody fails to notice. Measured on device: opening the
+mushaf with the figures remembered goes list → two frames of transition → 22
+lines, and every frame after is the same 22. On the one launch that has nothing
+remembered the leaf stands blank for about a second and then inks, already
+right.
+
 **And the ruler measures the leaf, not a copy of it.** The first one built its
 own string from the raw translation and measured that. It is the obvious way to
 write it and it is wrong, because the leaf's string is not the raw translation:

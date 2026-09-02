@@ -2723,6 +2723,7 @@ fun ReaderScreen(
                         flashWordPosition = searchFlashWord,
                         heldPage = mushafTappedPage,
                         onTappedLeaf = { mushafTappedPage = it },
+                        bookMeasured = mushafUi?.measured != false,
                         onLeafMetrics = { well, measure ->
                             val was = mushafLeafMetrics.value
                             if (was == null || was[0] != well || was[1] != measure) {

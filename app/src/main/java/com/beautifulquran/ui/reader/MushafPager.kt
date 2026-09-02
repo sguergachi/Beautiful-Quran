@@ -674,6 +674,8 @@ internal fun MushafPager(
     hideEnglishParentheticals: Boolean = false,
     /** The English leaf's well and measure, once it has laid out. */
     onLeafMetrics: (wellPx: Float, measurePx: Float) -> Unit = { _, _ -> },
+    /** Whether the book's leaves were measured — see MushafUi.measured. */
+    bookMeasured: Boolean = true,
     /** The verses that begin on one leaf, a page at a time. English only. */
     leafText: suspend (Int) -> Map<Long, String> = { emptyMap() },
     /**
@@ -1291,6 +1293,7 @@ internal fun MushafPager(
                             flashWordPosition = flashWordPosition.takeIf { settled },
                             hideParentheticals = hideEnglishParentheticals,
                             onMetrics = onLeafMetrics,
+                            measured = bookMeasured,
                             verseNumberScript = verseNumberScript,
                             foreEdge = foreEdge,
                             leafRuns = leafRuns,
