@@ -715,7 +715,7 @@ function toHitWithDisplayTranslation(
   return base
 }
 
-/** Space-joined English glosses for every word of the same ayah as [at]. */
+/** Space-joined English glosses, coalescing adjacent shared-phrase copies. */
 export function sameAyahGlossLine(
   index: WordSearchIndexEntry[],
   at: number,
@@ -739,7 +739,17 @@ export function sameAyahGlossLine(
     hi++
   }
   const parts: string[] = []
-  for (let i = lo; i <= hi; i++) parts.push(index[i]!.translation)
+  for (let i = lo; i <= hi; i++) {
+    const entry = index[i]!
+    const part = entry.translation.trim()
+    const previous = i > lo ? index[i - 1]! : null
+    const sharedPhrase = previous != null &&
+      part.toLocaleLowerCase() === previous.translation.trim().toLocaleLowerCase() &&
+      normalizeArabicForSearch(entry.arabic) !== normalizeArabicForSearch(previous.arabic)
+    if (part && !sharedPhrase) {
+      parts.push(part)
+    }
+  }
   return parts.join(' ')
 }
 

@@ -1263,13 +1263,21 @@ fun ReaderScreen(
     // word unit / Hafs bloom; this effect only gates which word is active.
     var searchFlashAyah by remember { mutableStateOf<Int?>(null) }
     var searchFlashWord by remember { mutableStateOf<Int?>(null) }
-    LaunchedEffect(uiState.content?.surah?.id, startAyah, startWordPosition) {
+    LaunchedEffect(
+        uiState.content?.surah?.id,
+        initialFocusSettled,
+        startAyah,
+        startWordPosition,
+    ) {
         searchFlashAyah = null
         searchFlashWord = null
         val ayah = startAyah
         val word = startWordPosition
         val content = uiState.content
-        if (ayah == null || word == null || content == null) return@LaunchedEffect
+        if (!initialFocusSettled || ayah == null || word == null || content == null) {
+            return@LaunchedEffect
+        }
+        if (content.surah.id != surahId) return@LaunchedEffect
         if (ayah !in 1..content.ayahs.size) return@LaunchedEffect
         val ayahWords = content.ayahs[ayah - 1].words
         if (ayahWords.none { it.position == word }) return@LaunchedEffect

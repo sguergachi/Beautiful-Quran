@@ -10,6 +10,7 @@ import {
   normalizeArabicForSearch,
   parseAyahReference,
   parseSearchQuery,
+  sameAyahGlossLine,
   sectionWordSearchHits,
   shouldRunWordSearch,
   spellingCorrection,
@@ -394,6 +395,22 @@ describe('matchWordSearch gloss-line fallback', () => {
     expect(
       spans.some((s) => s.highlighted && s.text.toLowerCase().startsWith('rest')),
     ).toBe(true)
+  })
+
+  it('coalesces adjacent shared phrase copies in the preview', () => {
+    const entries = [
+      entry(25, 70, 1, 'إِلَّا', 'Except'),
+      entry(25, 70, 6, 'وَعَمِلَ', 'righteous deeds'),
+      entry(25, 70, 7, 'صَٰلِحٗا', 'righteous deeds'),
+      entry(25, 70, 9, 'يُبَدِّلُ', 'Allah will replace'),
+      entry(25, 70, 10, 'ٱللَّهُ', 'Allah will replace'),
+      entry(25, 70, 11, 'سَيِّـَٔاتِهِمۡ', 'their evil deeds'),
+      entry(25, 70, 12, 'سَلَـٰمٰا', 'Peace'),
+      entry(25, 70, 13, 'سَلَـٰمٰا', 'Peace'),
+    ]
+    expect(sameAyahGlossLine(entries, 2)).toBe(
+      'Except righteous deeds Allah will replace their evil deeds Peace Peace',
+    )
   })
 })
 

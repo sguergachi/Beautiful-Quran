@@ -1,7 +1,10 @@
 import { memo, useEffect, useMemo, useRef, useState } from 'react'
 import type { ActiveWord, Ayah, Word } from '../data/models'
 import type { ReadingMode, VerseNumberScript } from '../data/settings'
-import { lyricizeEnglishGlosses } from '../domain/EnglishTypography'
+import {
+  coalescedGlossOwnerIndex,
+  lyricizeEnglishGlosses,
+} from '../domain/EnglishTypography'
 import { InkEngine, InkState } from '../ui/reader/InkEngine'
 import { ayahTranslationAlpha } from '../ui/reader/WordHighlight'
 import { formatAyahNumberMark } from '../util/digits'
@@ -78,6 +81,15 @@ function AyahBlockInner({
     ),
     [words],
   )
+  const visibleEnglishFlashPosition = useMemo(() => {
+    const requestedIndex = words.findIndex((word) => word.position === flashWordPosition)
+    const owner = coalescedGlossOwnerIndex(
+      words.map((word) => word.translation),
+      words.map((word) => word.arabic),
+      requestedIndex,
+    )
+    return owner == null ? null : words[owner]!.position
+  }, [words, flashWordPosition])
   // Derive ink policy once for the ayah, matching Android AyahBlock. The
   // renderer branches consume these decisions and never reinterpret playback.
   const activeSweepMs = InkEngine.sweepMs(activeWord, speed)
@@ -173,7 +185,7 @@ function AyahBlockInner({
                   showTransliteration={showTransliteration}
                   englishMode={englishOnly}
                   searchHit={hits(w.translation)}
-                  searchFlash={flashWordPosition === w.position}
+                  searchFlash={(englishOnly ? visibleEnglishFlashPosition : flashWordPosition) === w.position}
                   rootRef={isActive ? activeWordRef : undefined}
                   onPlay={() => onPlayWord(ayah.number, w.position)}
                   onHold={() =>

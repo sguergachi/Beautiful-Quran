@@ -775,7 +775,7 @@ export function ReaderScreen({ stackLayer }: { stackLayer: StackLayer }) {
     wordPosition: number
   } | null>(null)
   useEffect(() => {
-    if (!content || !isTop || pendingFlash == null) {
+    if (!content || !isTop || !initialFocusSettled || pendingFlash == null) {
       setFlashTarget(null)
       return
     }
@@ -805,6 +805,7 @@ export function ReaderScreen({ stackLayer }: { stackLayer: StackLayer }) {
   }, [
     content?.surah.id,
     isTop,
+    initialFocusSettled,
     pendingFlash?.ayah,
     pendingFlash?.wordPosition,
   ])

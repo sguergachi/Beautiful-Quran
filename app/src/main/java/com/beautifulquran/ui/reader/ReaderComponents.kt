@@ -1816,6 +1816,14 @@ private fun ResponsiveEnglishAyah(
             hideParentheticals = hideParentheticals,
         )
     }
+    val visibleFlashWordPosition = remember(ayah, flashWordPosition) {
+        val requestedIndex = ayah.words.indexOfFirst { it.position == flashWordPosition }
+        EnglishTypography.coalescedGlossOwnerIndex(
+            glosses = ayah.words.map { it.translation },
+            arabicWords = ayah.words.map { it.arabic },
+            requestedIndex = requestedIndex,
+        )?.let { ayah.words[it].position }
+    }
 
     val rendered = remember(
         ayah,
@@ -1891,7 +1899,7 @@ private fun ResponsiveEnglishAyah(
                         glintInk = glintInk,
                         markAlpha = markAlpha,
                         recessCover = recessCover,
-                        flashWordPosition = flashWordPosition,
+                        flashWordPosition = visibleFlashWordPosition,
                         searchHitWash = searchHitWash,
                         softHandoff = softHandoff,
                     )

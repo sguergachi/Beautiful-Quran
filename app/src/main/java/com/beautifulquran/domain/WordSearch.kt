@@ -500,7 +500,7 @@ internal fun snippetDisplayText(
     return entry.ayahTranslation
 }
 
-/** Space-joined English glosses for every word of the same ayah as [at]. */
+/** Space-joined English glosses, coalescing adjacent shared-phrase copies. */
 internal fun sameAyahGlossLine(index: List<WordSearchIndexEntry>, at: Int): String {
     if (at !in index.indices) return ""
     val anchor = index[at]
@@ -520,7 +520,19 @@ internal fun sameAyahGlossLine(index: List<WordSearchIndexEntry>, at: Int): Stri
     ) {
         hi++
     }
-    return (lo..hi).joinToString(" ") { index[it].translation }
+    val parts = ArrayList<String>(hi - lo + 1)
+    for (i in lo..hi) {
+        val entry = index[i]
+        val part = entry.translation.trim()
+        val previous = index.getOrNull(i - 1)?.takeIf { i > lo }
+        val sharedPhrase = previous != null &&
+            part.equals(previous.translation.trim(), ignoreCase = true) &&
+            normalizeArabicForSearch(entry.arabic) != normalizeArabicForSearch(previous.arabic)
+        if (part.isNotEmpty() && !sharedPhrase) {
+            parts += part
+        }
+    }
+    return parts.joinToString(" ")
 }
 
 /**

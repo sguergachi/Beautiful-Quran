@@ -424,6 +424,25 @@ class WordSearchTest {
     }
 
     @Test
+    fun `gloss line coalesces only adjacent shared phrase copies`() {
+        val entries = listOf(
+            entry(25, 70, 1, "إِلَّا", "Except"),
+            entry(25, 70, 6, "وَعَمِلَ", "righteous deeds"),
+            entry(25, 70, 7, "صَٰلِحٗا", "righteous deeds"),
+            entry(25, 70, 9, "يُبَدِّلُ", "Allah will replace"),
+            entry(25, 70, 10, "ٱللَّهُ", "Allah will replace"),
+            entry(25, 70, 11, "سَيِّـَٔاتِهِمۡ", "their evil deeds"),
+            entry(25, 70, 12, "سَلَـٰمٰا", "Peace"),
+            entry(25, 70, 13, "سَلَـٰمٰا", "Peace"),
+        )
+
+        assertEquals(
+            "Except righteous deeds Allah will replace their evil deeds Peace Peace",
+            sameAyahGlossLine(entries, 2),
+        )
+    }
+
+    @Test
     fun `windowAroundMatch keeps neighbors and ellipsis`() {
         val text = "one two three four five six seven eight nine ten eleven twelve"
         val windowed = windowAroundMatch(text, "seven", wordsBefore = 2, wordsAfter = 2)

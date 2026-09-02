@@ -40,7 +40,9 @@ glosses, and non-filler words from a matched concept label. Overlapping terms
 resolve to the longest precise phrase, and connective words remain ordinary
 ink. If the canonical translation contains none of those, the result stays
 unaccented (or uses the word-gloss line) rather than coloring a merely similar
-or unrelated word.
+or unrelated word. The gloss fallback coalesces adjacent copies of a shared
+multi-word gloss, matching the reader's English prose instead of showing the
+source phrase once per Arabic word.
 
 The quiet reference line explains each result as `Text match`,
 `Related · tranquility`, `Concept · Divine Mercy`, `Same Arabic root`, or
@@ -56,6 +58,11 @@ its actual corrected term is carried with the hit rather than inferred by the
 UI. A quiet, regular-weight line above the Quran count says
 `Searching instead for corrupt`; correctly spelled searches and quoted, root,
 or thesaurus results never show an autocorrection notice.
+
+Opening a positioned word hit waits until the target verse has settled, then
+pulses it twice with the orange repeat wash. If English prose coalesced a gloss
+shared by several Arabic words, its hidden slot redirects to the visible phrase;
+Arabic layouts still pulse the exact matched Arabic word.
 
 ## Exact quotes
 
