@@ -83,6 +83,18 @@ internal val MushafRunningHead = 36.dp
  * against the transport instead, it drifted every time the chrome changed:
  * when the progress rule arrived between them it left the folio 120px under
  * the text and 64px over the rule, reading as part of the controls.
+ *
+ * And it is fixed, which is the one figure on this page deliberately *off* the
+ * leaf's grid. It was `leafUnit * MushafGrid.FOLIO` for a while, and that is a
+ * loop: the leaf's height is what is left after this band, and this band was a
+ * fraction of the leaf's height. The first pass measures with the unit still
+ * zero, so the leaf comes out a band too tall — and that is the size the ruler
+ * paginates the whole book against ([EnglishLeafRuler]). The leaf then settles
+ * a band shorter and holds a line less than it was given text for, which reads
+ * as a leaf stopping a few words short of its own last line, on every leaf in
+ * the book. The figure inside the band is still set from the leaf's hand,
+ * because that is type and belongs on the grid; the paper it stands on is
+ * furniture of the frame and does not.
  */
 internal val MushafFolioBand = 30.dp
 /** Paper between the rule and the transport it divides the leaf from. */
@@ -252,7 +264,7 @@ internal fun MushafReadingSheet(
         BoxWithConstraints(
             Modifier
                 .fillMaxWidth()
-                .height(leafUnit.value * MushafGrid.FOLIO)
+                .height(MushafFolioBand)
                 .clipToBounds()
                 .graphicsLayer { alpha = folioInk },
         ) {

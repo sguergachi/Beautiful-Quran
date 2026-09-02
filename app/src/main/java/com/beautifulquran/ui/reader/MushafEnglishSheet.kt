@@ -586,7 +586,16 @@ private fun setEnglishLeaf(
             pitchesPx = (pitches * handPx).coerceAtLeast(1f),
         )
         // What the block stands at the leading it will actually be drawn on.
-        val closed = stands - (ENGLISH_LEAF_LEADING_EM - leadingEm) * pitches * handPx
+        // Only a *closed* leading counts here. Carding the leading out fills a
+        // short leaf to its foot, which raises the block to about the well's
+        // own height — and feeding that back into the overflow test reads a
+        // filled leaf as an overflowing one and gives up hand for it. The leaf
+        // then sets smaller type than the ruler paginated it for and comes out
+        // a line short, its last line half empty. The rescue is for leaves that
+        // run past the foot; a leaf carded to reach the foot has not.
+        val closed = stands -
+            (ENGLISH_LEAF_LEADING_EM - minOf(leadingEm, ENGLISH_LEAF_LEADING_EM)) *
+            pitches * handPx
         val next = englishLeafOverflowHandPx(handPx, closed, wellPx)
         if (next >= handPx || pass == 2) {
             return EnglishLeafSetting(
@@ -1313,8 +1322,59 @@ internal fun englishLeafRuler(
                 // the verse it opens with, it takes that word anyway rather
                 // than paginating for ever.
                 val floor = if (runIndex == 0) runs[0].from + 1 else runs[runIndex].from
-                EnglishRulerCut(runIndex, to.coerceAtLeast(floor))
+                var end = to.coerceAtLeast(floor)
+                // Check the answer against the leaf it produces.
+                //
+                // Everything above is a mapping: from a character in the string
+                // the candidate leaf composed, back to an offset in a verse. The
+                // leaf composes that string from *its* text — trimmed, closed
+                // up, its asides perhaps dropped — so the two coordinate systems
+                // agree only as long as nothing between them changes a length.
+                // Rather than trust that, set the leaf and count its lines. If
+                // it came out short, the mapping lost something: give the lines
+                // back by walking the cut forward through the candidate's own
+                // line ends, which is where the leaf can break anyway.
+                repeat(3) {
+                    val short = lines - englishLeafLines(
+                        page, runs, runIndex, end, hideParentheticals, translation,
+                        verseNumberScript, style, constraints, density, measurer,
+                    )
+                    if (short <= 0) return@repeat
+                    val line = (laid.getLineForOffset(at) + short).coerceAtMost(lines - 1)
+                    val wider = laid.getLineEnd(line, visibleEnd = true)
+                    if (wider <= at) return@repeat
+                    end += wider - at
+                }
+                EnglishRulerCut(runIndex, end)
             }
         }
     }
+}
+
+
+/** How many lines the leaf actually sets, cut here. See [englishLeafRuler]. */
+private fun englishLeafLines(
+    page: Int,
+    runs: List<EnglishVerseRun>,
+    runIndex: Int,
+    to: Int,
+    hideParentheticals: Boolean,
+    translation: (Int, Int) -> String,
+    verseNumberScript: VerseNumberScript,
+    style: TextStyle,
+    constraints: Constraints,
+    density: Density,
+    measurer: TextMeasurer,
+): Int {
+    val kept = runs.subList(0, runIndex + 1).toMutableList()
+    kept[kept.lastIndex] = kept.last().let { EnglishVerseRun(it.surahId, it.ayah, it.from, to) }
+    val prose = englishLeafBlockTexts(
+        leaf = englishLeaf(page, kept, hideParentheticals, translation),
+        openingTokens = emptyMap(),
+        wordEnds = emptyMap(),
+        ink = Color.Black,
+        gold = Color.Black,
+        verseNumberScript = verseNumberScript,
+    ).filterIsInstance<EnglishLeafBlockText.Prose>().firstOrNull() ?: return 0
+    return measurer.measure(prose.text, style, constraints = constraints, density = density).lineCount
 }

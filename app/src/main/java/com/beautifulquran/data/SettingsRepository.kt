@@ -129,6 +129,19 @@ private fun SharedPreferences.homeBookmarkStyle(): HomeBookmarkStyle =
         HomeBookmarkStyle.TOP_BOUND
     }
 
+/**
+ * What the remembered leaf figures describe.
+ *
+ * A well and a measure are only meaningful against the grid that produced them,
+ * and the grid moves: a foot band, a running head, a fore-edge. A figure kept
+ * from a build whose leaf was a different shape is worse than no figure at all —
+ * it paginates the whole book against a leaf that no longer exists, and the
+ * symptom is a leaf that stops a few words short of its own last line. **Bump
+ * this whenever anything in `MushafGrid`, `MushafLeafBands` or the leaf's
+ * fore-edge changes**, and the next launch measures instead of remembering.
+ */
+private const val LEAF_METRICS_VERSION = 3
+
 class SettingsRepository(context: Context) {
 
     private val prefs: SharedPreferences =
@@ -190,11 +203,13 @@ class SettingsRepository(context: Context) {
             putFloat("leafMeasurePx", measurePx)
             putInt("leafWindowW", windowWidthPx)
             putInt("leafWindowH", windowHeightPx)
+            putInt("leafMetricsVersion", LEAF_METRICS_VERSION)
         }
     }
 
     /** The remembered well and measure, if they still describe this window. */
     fun leafMetrics(windowWidthPx: Int, windowHeightPx: Int): FloatArray? {
+        if (prefs.getInt("leafMetricsVersion", 0) != LEAF_METRICS_VERSION) return null
         if (prefs.getInt("leafWindowW", 0) != windowWidthPx) return null
         if (prefs.getInt("leafWindowH", 0) != windowHeightPx) return null
         val well = prefs.getFloat("leafWellPx", 0f)
