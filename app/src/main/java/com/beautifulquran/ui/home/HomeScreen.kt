@@ -105,6 +105,7 @@ private val HomeRowRibbonGutter = (HomeNumberColumn - HomeRibbonWidth) / 2f
 private val HomeColumnGap = 4.dp
 private val HomeArabicOpticalInset = 4.dp
 private val TopBoundRibbonHeight = 96.dp
+private val SearchBottomBreath = 12.dp
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -150,7 +151,7 @@ fun HomeScreen(
     val searchPaneVisible = searchFocused && uiState.query.isEmpty()
     val density = LocalDensity.current
     val imeBottom = WindowInsets.ime.getBottom(density).toFloat()
-    val searchPaneTopGap = 10.dp
+    val searchPaneTopGap = SearchBottomBreath
     val searchPaneBottomGap = 10.dp
     val searchPaneTopGapPx = with(density) { searchPaneTopGap.toPx() }
     val searchPaneBottomGapPx = with(density) { searchPaneBottomGap.toPx() }
@@ -310,6 +311,7 @@ fun HomeScreen(
                                         searchBounds = it.boundsInRoot()
                                     },
                             )
+                            Spacer(Modifier.height(SearchBottomBreath))
                         }
                     }
             item(key = "chapter-page") {
