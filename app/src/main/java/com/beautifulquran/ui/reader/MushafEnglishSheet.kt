@@ -1228,13 +1228,17 @@ private const val ENGLISH_BASMALAH =
     "In the name of Allah, the Entirely Merciful, the Especially Merciful."
 
 /**
- * The book's ruler: a leaf measured as it will be drawn.
+ * The book's ruler: the leaf itself, measured.
  *
- * It lays the run out at the book's own hand, leading and measure — the same
- * `englishProseStyle` the leaf is set in, the same marks in the same size —
- * and reads off the character the twenty-third line ends on. So the leaf takes
- * exactly the lines its well has, flush at the foot, with the leading it shares
- * with every other leaf in the book. See [EnglishLeafRuler].
+ * It builds the candidate leaf through exactly the code that draws one —
+ * `englishLeaf` and [englishLeafBlockTexts] — lays it out at the book's own
+ * hand, leading and measure, and reads off the character its last full line
+ * ends on. Nothing here re-implements the leaf, which is the whole point: the
+ * leaf closes whitespace, trims, drops the translator's asides when the reader
+ * has asked for that, snaps its offsets off the middle of words, and sets a
+ * verse's mark only on the run that ends it. A ruler that rebuilt that string
+ * itself would drift from it in exactly the places where drift is invisible in
+ * a test and obvious on a page.
  *
  * [wellPx] and [measurePx] are the leaf's, so the book repaginates when the
  * leaf changes size — which is what an ebook is.
@@ -1245,88 +1249,72 @@ internal fun englishLeafRuler(
     density: Density,
     measurer: TextMeasurer,
     verseNumberScript: VerseNumberScript,
+    hideParentheticals: Boolean,
+    translation: (surahId: Int, ayah: Int) -> String,
 ): EnglishLeafRuler {
     val handPx = englishBookHandPx(wellPx, measurePx, density, measurer)
     val pitchPx = handPx * ENGLISH_LEAF_LEADING_EM
     val inkPx = englishLineInkPx(handPx, density, measurer)
     val basmalahPx = englishBasmalahPx(handPx, measurePx, density, measurer)
-    val style = with(density) {
-        englishProseStyle(handPx.toSp(), pitchPx.toSp())
-    }
+    val style = with(density) { englishProseStyle(handPx.toSp(), pitchPx.toSp()) }
     val constraints = Constraints(maxWidth = measurePx.toInt().coerceAtLeast(1))
-    return EnglishLeafRuler { opening, verses ->
-        // What the panel and its basmalah take before a word is set — measured,
-        // the same figures EnglishLeafBlockText.Opening is drawn from.
-        val head = if (opening == null) {
-            0f
-        } else {
-            inkPx + pitchPx * EnglishLeafPanelAir * 2f +
-                if (surahOpensWithBasmalahPreface(opening)) basmalahPx else 0f
-        }
+    return EnglishLeafRuler { page, runs ->
+        val leaf = englishLeaf(page, runs, hideParentheticals, translation)
+        val blocks = englishLeafBlockTexts(
+            leaf = leaf,
+            openingTokens = emptyMap(),
+            wordEnds = emptyMap(),
+            ink = Color.Black,
+            gold = Color.Black,
+            verseNumberScript = verseNumberScript,
+        )
+        // What the chapter's panel and basmalah take before a word is set —
+        // the block's own figure, not a second guess at it.
+        val head = blocks.filterIsInstance<EnglishLeafBlockText.Opening>()
+            .sumOf { it.heightPx(pitchPx, inkPx, basmalahPx).toDouble() }
+            .toFloat()
+        val prose = blocks.filterIsInstance<EnglishLeafBlockText.Prose>().firstOrNull()
         val room = (wellPx - head).coerceAtLeast(1f)
-        val starts = IntArray(verses.size)
-        fun mark(builder: AnnotatedString.Builder, ayah: Int) {
-            builder.append(" ")
-            builder.appendAyahNumberMark(
-                number = ayah,
-                useArabicIndicDigits = verseNumberScript == VerseNumberScript.ARABIC,
-                style = SpanStyle(fontSize = EnglishLeafMarkType.em),
-                ltr = true,
-            )
-        }
-        val text = buildAnnotatedString {
-            verses.forEachIndexed { index, verse ->
-                if (length > 0) append(" ")
-                starts[index] = length
-                append(verse.text)
-                mark(this, verse.ayah)
-            }
-        }
-        fun lay(of: AnnotatedString) =
-            measurer.measure(of, style, constraints = constraints, density = density)
-        val laid = lay(text)
-        // How many lines the well really holds, by where the lines actually
-        // land rather than by a pitch and an assumed ink. A line carrying only
-        // a verse mark is set in a different face and stands a different
-        // height, and that is exactly the line that falls at the foot.
-        var lines = 0
-        while (lines < laid.lineCount && laid.getLineBottom(lines) <= room) lines++
-        if (lines >= laid.lineCount) {
-            EnglishRulerCut(verses.lastIndex, verses.last().text.length)
+        if (prose == null) {
+            null
         } else {
-            val at = laid.getLineEnd(lines.coerceAtLeast(1) - 1, visibleEnd = true)
-            var index = verses.lastIndex
-            for (k in verses.indices) {
-                if (at <= starts[k] + verses[k].text.length) { index = k; break }
-            }
-            var chars = (at - starts[index]).coerceIn(0, verses[index].text.length)
-            if (chars >= verses[index].text.length) {
-                // The leaf ends this verse, so it draws the verse's mark as
-                // well — and the run measured above has more text after that
-                // mark, which can carry it onto a line the leaf does not have.
-                // Measuring what the leaf will really set is the only way to
-                // know. A second layout, on the leaves where a mark falls near
-                // the foot and on no others.
-                val exact = lay(
-                    buildAnnotatedString {
-                        append(text.subSequence(0, starts[index] + verses[index].text.length))
-                        mark(this, verses[index].ayah)
-                    },
-                )
-                if (exact.size.height > room) {
-                    // It will not fit: cut inside the verse instead, so the
-                    // mark goes over the fold with the tail it belongs to.
-                    var back = 0
-                    while (back < exact.lineCount && exact.getLineBottom(back) <= room) back++
-                    val end = exact.getLineEnd(back.coerceAtLeast(1) - 1, visibleEnd = true)
-                    chars = (end - starts[index]).coerceAtMost(verses[index].text.length - 1)
-                    if (chars <= 0) {
-                        index = (index - 1).coerceAtLeast(0)
-                        chars = verses[index].text.length
-                    }
+            val laid = measurer.measure(
+                prose.text,
+                style,
+                constraints = constraints,
+                density = density,
+            )
+            // How many lines the well really holds, by where the lines land
+            // rather than by a pitch and an assumed ink: a line carrying only a
+            // verse mark is set in another face and stands another height, and
+            // that is exactly the line that falls at the foot.
+            var lines = 0
+            while (lines < laid.lineCount && laid.getLineBottom(lines) <= room) lines++
+            if (lines >= laid.lineCount) {
+                null
+            } else {
+                val at = laid.getLineEnd(lines.coerceAtLeast(1) - 1, visibleEnd = true)
+                // Back into the book's coordinates. The leaf recorded where each
+                // verse sits in the string it composed, and englishLeaf recorded
+                // where each of those begins in its verse, so the two together
+                // are exact — no arithmetic of mine in between.
+                val verses = leaf.verses
+                var pick = prose.verses.lastIndex
+                for (k in prose.verses.indices) {
+                    if (at <= prose.verses[k].range.last + 1) { pick = k; break }
                 }
+                val set = verses[pick]
+                val into = (at - prose.verses[pick].range.first).coerceIn(0, set.to - set.from)
+                val to = (set.from + into).coerceAtMost(set.to)
+                val runIndex = runs.indexOfFirst {
+                    it.surahId == set.surahId && it.ayah == set.ayah
+                }.coerceAtLeast(0)
+                // A leaf must advance. If the well cannot hold even a word of
+                // the verse it opens with, it takes that word anyway rather
+                // than paginating for ever.
+                val floor = if (runIndex == 0) runs[0].from + 1 else runs[runIndex].from
+                EnglishRulerCut(runIndex, to.coerceAtLeast(floor))
             }
-            EnglishRulerCut(index, chars)
         }
     }
 }

@@ -415,19 +415,13 @@ private fun englishLeafOpeningChars(surahId: Int): Int =
  */
 private fun englishLeafOpensHere(verse: Pair<Int, Int>): Boolean = verse.second == 1
 
-/** One verse, or the rest of one, as [EnglishLeafRuler] receives it. */
-class EnglishRulerVerse(
-    /** The translation this run sets — already cut to what is left of it. */
-    val text: String,
-    val ayah: Int,
-)
-
 /**
- * Where a leaf stops: an index into the run the ruler was handed, and how many
- * of that verse's characters the leaf holds. [chars] is the verse's whole
- * length when the leaf takes it entire.
+ * Where a leaf stops, in the book's own coordinates: an index into the runs the
+ * ruler was handed, and the offset into that verse's whole text at which the
+ * leaf ends. Null is the answer that all of it fitted — the run was too short
+ * to fill the leaf, and the caller must offer more.
  */
-class EnglishRulerCut(val verseIndex: Int, val chars: Int)
+class EnglishRulerCut(val runIndex: Int, val to: Int)
 
 /**
  * Measures a leaf as it will actually be drawn.
@@ -435,28 +429,27 @@ class EnglishRulerCut(val verseIndex: Int, val chars: Int)
  * The character estimate cannot be made exact, and the reason is structural
  * rather than a constant that wants tuning: `ENGLISH_LEAF_REFERENCE_MARGIN` has
  * to cover the *worst* leaf in the book or that leaf overflows its well, so the
- * typical leaf comes out short by the spread between worst and typical — a line
- * and a half of twenty-three, measured on device. Carding the leading out hides
- * it at the cost of a leading that moves from leaf to leaf.
+ * typical leaf comes out short by the spread between worst and typical.
  *
- * A ruler removes the estimate instead of compensating for it. It is given more
- * text than a leaf holds, lays it out at the book's own hand and measure, and
- * says where the well is full — so every leaf is exactly its lines, flush at the
- * foot, on one leading. It costs one text layout a leaf, about a thousand for
- * the Qur'an, once.
+ * A ruler removes the estimate instead of compensating for it. It costs one
+ * text layout a leaf, about a thousand for the Qur'an, once — and it is what an
+ * ebook does and a printed book cannot: the break lands where *this* screen
+ * breaks it, so the book repaginates when the leaf changes size.
  *
- * This is what an ebook does and a printed book cannot: the break lands where
- * *this* screen breaks it, so the book repaginates when the leaf changes size.
+ * The contract is deliberately in [EnglishVerseRun]s rather than in strings. A
+ * ruler that builds its own copy of the leaf's text is a second implementation
+ * of the leaf, and the two drift: the leaf closes whitespace, trims, drops the
+ * translator's asides when the reader has asked for that, snaps its offsets off
+ * the middle of words, and sets a verse's mark only on the run that ends it. A
+ * ruler measuring anything but the leaf's own string is measuring a page that
+ * will not be printed. So it is handed the runs and builds the leaf.
  */
 fun interface EnglishLeafRuler {
     /**
-     * How much of [verses] a leaf holds, given the chapter panel that opens it.
-     *
-     * [opening] is the chapter whose panel and basmalah stand above the prose,
-     * or null on a leaf that opens with none. The run is guaranteed to be more
-     * than one leaf's worth unless the book has run out.
+     * Where a leaf of [runs] stops. The caller offers more than a leaf can
+     * hold; null means it did not, and more should be offered.
      */
-    fun fill(opening: Int?, verses: List<EnglishRulerVerse>): EnglishRulerCut
+    fun fill(page: Int, runs: List<EnglishVerseRun>): EnglishRulerCut?
 }
 
 /**
@@ -468,12 +461,10 @@ fun interface EnglishLeafRuler {
  */
 fun buildEnglishBookByLayout(
     catalog: MushafCatalog,
-    /** The verse's English, as the leaf sets it. */
+    /** The verse's English, whole. */
     text: (surahId: Int, ayah: Int) -> String,
     ruler: EnglishLeafRuler,
 ): EnglishBook {
-    // The whole book in reading order, with the Madinah page each verse begins
-    // on — the pagination is continuous, so the page is only a label now.
     val order = ArrayList<IntArray>(6_300)
     for (page in 1..MushafCatalog.MUSHAF_PAGE_COUNT) {
         catalog.page(page)?.let(::englishLeafVerseKeys)?.forEach { (surahId, ayah) ->
@@ -489,72 +480,58 @@ fun buildEnglishBookByLayout(
     var at = 0
     var offset = 0
     while (at < order.size) {
-        val opening = if (order[at][1] == 1 && offset == 0) order[at][0] else null
-
-        // Hand the ruler more than a leaf can hold, so it is always the layout
-        // and never the end of the run that decides where the leaf stops. Half
-        // as much again is enough: no leaf sets more than its well.
-        val run = ArrayList<EnglishRulerVerse>(24)
-        val texts = ArrayList<String>(24)
-        var mass = 0
-        var j = at
-        while (j < order.size) {
-            val (surahId, ayah) = order[j]
-            // A chapter opens a leaf of its own, so the run stops before it.
-            if (j > at && ayah == 1) break
-            val whole = text(surahId, ayah)
-            val from = if (j == at) offset else 0
-            val rest = if (from >= whole.length) "" else whole.substring(from)
-            texts += whole
-            run += EnglishRulerVerse(rest, ayah)
-            mass += rest.length + ENGLISH_LEAF_MARK_CHARS
-            j++
-            if (mass > ENGLISH_LEAF_CAPACITY_CHARS * 3 / 2) break
+        // How many verses to offer. Enough that the leaf is decided by the
+        // layout and not by the end of the offer — and if it was not enough,
+        // the ruler says so and the offer grows. Two rounds settle every leaf
+        // in the Qur'an; the guess only decides whether there is a second.
+        var take = ENGLISH_LEAF_OFFER_VERSES
+        var runs: List<EnglishVerseRun>
+        var cut: EnglishRulerCut?
+        while (true) {
+            runs = englishLeafOffer(order, text, at, offset, take)
+            cut = ruler.fill(order[at][2], runs)
+            val exhausted = at + runs.size < order.size &&
+                order[at + runs.size][1] != 1   // a chapter opens: the leaf ends anyway
+            if (cut != null || !exhausted) break
+            take += ENGLISH_LEAF_OFFER_VERSES
         }
-        if (run.isEmpty()) break
-
-        val cut = ruler.fill(opening, run)
-        val lastIndex = cut.verseIndex.coerceIn(0, run.lastIndex)
-        // A leaf that measures as holding nothing would never advance. It
-        // cannot happen with a well of any size, but the book must not hang on
-        // a ruler that says so.
-        val lastChars = cut.chars.coerceIn(
-            if (lastIndex == 0 && offset > 0) 1 else 0,
-            run[lastIndex].text.length,
-        ).coerceAtLeast(if (lastIndex == 0) 1 else 0)
 
         val index = leaves.size
-        val runs = ArrayList<EnglishVerseRun>(lastIndex + 1)
-        val pages = ArrayList<Int>(lastIndex + 1)
-        for (k in 0..lastIndex) {
-            val row = order[at + k]
-            val whole = texts[k]
-            val from = if (k == 0) offset else 0
-            val to = if (k == lastIndex) from + lastChars else whole.length
-            runs += EnglishVerseRun(row[0], row[1], from, to)
-            pages += row[2]
-            if (from == 0) leafByVerse.putIfAbsent(quranWordKey(row[0], row[1], 1), index)
-            if (firstLeafByPage[row[2]] < 0) firstLeafByPage[row[2]] = index
+        val kept = if (cut == null) {
+            runs
+        } else {
+            runs.subList(0, cut.runIndex + 1).toMutableList().also {
+                val last = it.last()
+                // A leaf must advance. Whatever a ruler answers — and a ruler is
+                // a measurement of a device, so it can answer anything — a leaf
+                // that took nothing would paginate for ever.
+                val to = if (it.size == 1) maxOf(cut.to, last.from + 1) else cut.to
+                it[it.lastIndex] = EnglishVerseRun(last.surahId, last.ayah, last.from, to)
+            }
+        }
+        val pages = ArrayList<Int>(kept.size)
+        kept.forEachIndexed { k, run ->
+            pages += order[at + k][2]
+            if (run.from == 0) leafByVerse.putIfAbsent(quranWordKey(run.surahId, run.ayah, 1), index)
+            if (firstLeafByPage[order[at + k][2]] < 0) firstLeafByPage[order[at + k][2]] = index
         }
         leaves += EnglishBookLeaf(
             page = pages.first(),
             pages = pages.first()..pages.last(),
-            runs = runs,
+            runs = ArrayList(kept),
         )
 
-        val lastRun = runs.last()
-        val lastWhole = texts[lastIndex]
-        if (lastRun.to >= lastWhole.length) {
-            at += lastIndex + 1
+        val last = kept.last()
+        val whole = text(last.surahId, last.ayah)
+        if (last.to >= whole.length) {
+            at += kept.size
             offset = 0
         } else {
-            // The verse is carried: the next leaf picks it up here, and the
-            // turn is led from the word before the cut.
-            at += lastIndex
-            offset = lastRun.to
-            if (lastWhole.isNotEmpty()) {
-                carriedCuts.getOrPut(quranWordKey(lastRun.surahId, lastRun.ayah, 1)) { ArrayList(2) }
-                    .add(offset.toFloat() / lastWhole.length)
+            at += kept.size - 1
+            offset = last.to
+            if (whole.isNotEmpty()) {
+                carriedCuts.getOrPut(quranWordKey(last.surahId, last.ayah, 1)) { ArrayList(2) }
+                    .add(offset.toFloat() / whole.length)
             }
         }
     }
@@ -569,4 +546,34 @@ fun buildEnglishBookByLayout(
         leafByVerse = leafByVerse,
         carriedByVerse = carriedCuts.mapValues { (_, cuts) -> cuts.toFloatArray() },
     )
+}
+
+/**
+ * How many verses a leaf is offered to choose from, to begin with.
+ *
+ * A leaf of the translation carries six or seven, and a leaf of juz' 30 carries
+ * twenty. This is generous enough that one layout decides almost every leaf and
+ * cheap enough that the few needing a second cost nothing anyone can see.
+ */
+private const val ENGLISH_LEAF_OFFER_VERSES = 24
+
+/** The verses on offer from [at], the first of them picked up at [offset]. */
+private fun englishLeafOffer(
+    order: List<IntArray>,
+    text: (Int, Int) -> String,
+    at: Int,
+    offset: Int,
+    take: Int,
+): List<EnglishVerseRun> {
+    val out = ArrayList<EnglishVerseRun>(take)
+    var j = at
+    while (j < order.size && out.size < take) {
+        val (surahId, ayah) = order[j]
+        // A chapter opens a leaf of its own, so the offer stops before it.
+        if (j > at && ayah == 1) break
+        val whole = text(surahId, ayah)
+        out += EnglishVerseRun(surahId, ayah, if (j == at) offset else 0, whole.length)
+        j++
+    }
+    return out
 }

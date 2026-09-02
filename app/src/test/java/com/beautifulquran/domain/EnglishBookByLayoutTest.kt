@@ -25,22 +25,22 @@ class EnglishBookByLayoutTest {
         ),
     )
 
-    /** A ruler whose leaf holds [holds] characters of prose, marks included. */
-    private fun ruler(holds: Int, openingCost: Int = 0) = EnglishLeafRuler { opening, verses ->
-        var room = holds - if (opening == null) 0 else openingCost
-        var index = 0
-        var chars = 0
-        for ((k, verse) in verses.withIndex()) {
-            index = k
-            if (verse.text.length + 1 <= room) {
-                chars = verse.text.length
-                room -= verse.text.length + 1
+    /**
+     * A ruler whose leaf holds [holds] characters, standing in for a layout.
+     * Null when the offer did not fill it, which is the answer that asks for
+     * more — the same contract a real layout answers with.
+     */
+    private fun ruler(holds: Int) = EnglishLeafRuler { _, runs ->
+        var room = holds
+        for ((k, run) in runs.withIndex()) {
+            val len = run.to - run.from
+            if (len + 1 <= room) {
+                room -= len + 1
             } else {
-                chars = room.coerceAtLeast(1)
-                break
+                return@EnglishLeafRuler EnglishRulerCut(k, run.from + room.coerceAtLeast(1))
             }
         }
-        EnglishRulerCut(index, chars)
+        null
     }
 
     private fun book(vararg pages: Pair<Int, List<Pair<Int, Int>>>, text: (Int, Int) -> String) =
@@ -59,6 +59,19 @@ class EnglishBookByLayoutTest {
         assertEquals(listOf(2 to 2, 2 to 3), leaves[0].verses)
         assertEquals(19, leaves[0].runs.last().let { it.to - it.from })
         assertEquals(19, leaves[1].runs.first().from)
+    }
+
+    @Test
+    fun `a leaf the offer could not fill is offered more`() {
+        // The ruler answers null when the run it was handed all fitted, and the
+        // pagination widens the offer rather than ending the leaf short. Sixty
+        // verses of ten characters is well past the first offer of 24.
+        val verses = (2..80).map { 2 to it }
+        val b = book(3 to verses) { _, _ -> "0123456789" }
+        // A leaf holds a hundred characters, so nine of these verses at eleven
+        // apiece: nothing near the offer decides it.
+        assertTrue("offer must not decide the leaf", b.leaves.all { it.verses.size <= 10 })
+        assertTrue(b.leaves.size >= 8)
     }
 
     @Test

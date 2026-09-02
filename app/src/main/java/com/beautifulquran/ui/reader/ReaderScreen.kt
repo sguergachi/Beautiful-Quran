@@ -296,20 +296,35 @@ fun ReaderScreen(
         TextMeasurer(rulerResolver, rulerDensity, rulerLayoutDirection)
     }
     val leafMetrics = mushafLeafMetrics.value
-    LaunchedEffect(mushafMode, leafMetrics, settings.englishLeafText, settings.verseNumberScript) {
+    LaunchedEffect(
+        mushafMode,
+        leafMetrics,
+        settings.englishLeafText,
+        settings.verseNumberScript,
+        settings.hideEnglishParentheticals,
+    ) {
         val well = leafMetrics?.getOrNull(0) ?: return@LaunchedEffect
         val measure = leafMetrics.getOrNull(1) ?: return@LaunchedEffect
         if (!mushafMode || well <= 0f || measure <= 0f) return@LaunchedEffect
         viewModel.ensureMushaf(
             text = settings.englishLeafText,
-            ruler = englishLeafRuler(
-                wellPx = well,
-                measurePx = measure,
-                density = rulerDensity,
-                measurer = rulerMeasurer,
-                verseNumberScript = settings.verseNumberScript,
+            rulerFor = { translation ->
+                englishLeafRuler(
+                    wellPx = well,
+                    measurePx = measure,
+                    density = rulerDensity,
+                    measurer = rulerMeasurer,
+                    verseNumberScript = settings.verseNumberScript,
+                    hideParentheticals = settings.hideEnglishParentheticals,
+                    translation = translation,
+                )
+            },
+            rulerKey = listOf(
+                well,
+                measure,
+                settings.verseNumberScript,
+                settings.hideEnglishParentheticals,
             ),
-            rulerKey = listOf(well, measure, settings.verseNumberScript),
         )
     }
     val mushafCatalog = mushafUi?.catalog

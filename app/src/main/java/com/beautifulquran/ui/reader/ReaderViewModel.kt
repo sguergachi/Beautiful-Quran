@@ -285,7 +285,7 @@ class ReaderViewModel(
          * once, so the book opens on the estimate and is repaginated a frame
          * later, the way an ebook repaginates when you turn a phone.
          */
-        ruler: EnglishLeafRuler? = null,
+        rulerFor: ((translation: (Int, Int) -> String) -> EnglishLeafRuler)? = null,
         /** What the ruler was made from: rebuild when the leaf changes size. */
         rulerKey: Any? = null,
     ) {
@@ -295,18 +295,20 @@ class ReaderViewModel(
         viewModelScope.launch {
             val catalog = repository.mushafCatalog()
             val surahs = repository.surahs().associateBy { it.id }
-            val book = if (ruler == null) {
+            val book = if (rulerFor == null) {
                 val prose = repository.englishVerseProse(text)
                 buildEnglishBook(catalog) { surahId, ayah ->
                     prose[quranWordKey(surahId, ayah, 1)] ?: 0
                 }
             } else {
                 val words = repository.englishVerseText(text)
+                val verse = { surahId: Int, ayah: Int ->
+                    words[quranWordKey(surahId, ayah, 1)].orEmpty()
+                }
                 // A thousand text layouts. Off the main thread, once.
+                val ruler = rulerFor(verse)
                 withContext(Dispatchers.Default) {
-                    buildEnglishBookByLayout(catalog, { surahId, ayah ->
-                        words[quranWordKey(surahId, ayah, 1)].orEmpty()
-                    }, ruler)
+                    buildEnglishBookByLayout(catalog, verse, ruler)
                 }
             }
             _mushaf.value = MushafUi(catalog, surahs, book)
