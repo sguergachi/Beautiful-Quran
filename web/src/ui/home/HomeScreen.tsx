@@ -29,6 +29,7 @@ import {
   parseSearchQuery,
   sectionWordSearchHits,
   shouldRunWordSearch,
+  spellingCorrection,
   WORD_SEARCH_PREVIEW_LIMIT,
   type SurahWordSearchSection,
   type WordSearchHit,
@@ -80,6 +81,20 @@ export function HomeScreen({ stackLayer }: { stackLayer: StackLayer }) {
   const [ribbonUnfurlSignal, setRibbonUnfurlSignal] = useState(0)
 
   useEffect(() => {
+    const dismissSearch = (event: KeyboardEvent) => {
+      if (
+        event.key !== 'Escape' ||
+        document.activeElement?.id !== 'chapter-search'
+      ) return
+      event.preventDefault()
+      event.stopImmediatePropagation()
+      document.getElementById('chapter-search')?.blur()
+    }
+    window.addEventListener('keydown', dismissSearch, true)
+    return () => window.removeEventListener('keydown', dismissSearch, true)
+  }, [])
+
+  useEffect(() => {
     setExpandedSurahIds(new Set())
     if (!shouldRunWordSearch(search)) {
       setWordHits([])
@@ -118,6 +133,7 @@ export function HomeScreen({ stackLayer }: { stackLayer: StackLayer }) {
     () => sectionWordSearchHits(wordHits, expandedSurahIds),
     [wordHits, expandedSurahIds],
   )
+  const correctedQuery = useMemo(() => spellingCorrection(wordHits), [wordHits])
 
   const continueSurah =
     !searching && state.settings.lastSurah > 0
@@ -241,7 +257,15 @@ export function HomeScreen({ stackLayer }: { stackLayer: StackLayer }) {
               data-search-focused={searchFocused || undefined}
             >
               <div className="search-row">
-                <div className="home-search">
+                <div
+                  className="home-search"
+                  onFocusCapture={() => setSearchFocused(true)}
+                  onBlurCapture={(event) => {
+                    if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+                      setSearchFocused(false)
+                    }
+                  }}
+                >
                   <SearchIcon />
                   <PaperInput
                     id="chapter-search"
@@ -250,8 +274,6 @@ export function HomeScreen({ stackLayer }: { stackLayer: StackLayer }) {
                     placeholder="Search concept, “exact phrase”, or 2:255"
                     value={search}
                     onValueChange={setSearch}
-                    onFocus={() => setSearchFocused(true)}
-                    onBlur={() => setSearchFocused(false)}
                     aria-label="Search concepts, exact phrases, or ayah reference"
                   />
                   {search ? (
@@ -365,6 +387,11 @@ export function HomeScreen({ stackLayer }: { stackLayer: StackLayer }) {
 
             {showWordSections ? (
               <div className="word-search-results">
+                {correctedQuery ? (
+                  <p className="search-correction">
+                    Searching instead for <span>{correctedQuery}</span>
+                  </p>
+                ) : null}
                 <p className="search-section-label">
                   {wordLoading && wordSections.length === 0
                     ? 'Searching ayahs…'

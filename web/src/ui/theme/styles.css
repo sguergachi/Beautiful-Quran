@@ -471,8 +471,12 @@ select {
 }
 
 .home-scroll-page > .search-row {
+  position: sticky;
+  top: 0;
+  z-index: 3;
   padding-right: 0;
   padding-left: 0;
+  background: var(--paper);
 }
 
 .home-bookmark-ribbon {
@@ -793,6 +797,23 @@ select {
   color: color-mix(in srgb, var(--ink-muted) 70%, transparent);
   font-size: 0.92rem;
   letter-spacing: 0.02em;
+}
+
+.search-correction {
+  max-width: var(--home-max);
+  margin: 0.5rem auto 0;
+  padding: 0 var(--home-end-inset) 0 var(--home-start-inset);
+  color: color-mix(in srgb, var(--ink-muted) 70%, transparent);
+  font-size: 0.92rem;
+  letter-spacing: 0.02em;
+}
+
+.search-correction + .search-section-label {
+  margin-top: 0.12rem;
+}
+
+.search-correction span {
+  color: color-mix(in srgb, var(--gold) 80%, transparent);
 }
 
 .search-empty {

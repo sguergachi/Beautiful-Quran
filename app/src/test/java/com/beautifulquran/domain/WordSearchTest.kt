@@ -71,11 +71,15 @@ class WordSearchTest {
 
     @Test
     fun `one edit typo falls back to fuzzy word matches`() {
+        val corrected = matchWordSearch(index, "mercifl")
         assertEquals(
             listOf(1 to 4, 55 to 1),
-            matchWordSearch(index, "mercifl").map { it.surahId to it.position },
+            corrected.map { it.surahId to it.position },
         )
-        assertTrue(matchWordSearch(index, "mercifl").all { it.matchReason == "Spelling match" })
+        assertTrue(corrected.all { it.matchReason == "Spelling match" })
+        assertTrue(corrected.all { it.matchTerms == listOf("merciful") })
+        assertEquals("merciful", spellingCorrection(corrected))
+        assertEquals(null, spellingCorrection(matchWordSearch(index, "merciful")))
         assertEquals(2, matchWordSearch(index, "mercifull").size)
         assertEquals(
             listOf(1 to 4, 55 to 1),

@@ -1128,6 +1128,11 @@ number lane must not read as an empty decorative gutter.
 
 The Android and web search pills own an even 16 dp/px internal inset on both
 ends; icon and text spacing is independent of the chapter-number grid.
+The pill is the fixed head of the chapter document: chapters and results move
+beneath it while it remains available at the top of the scrollport. Scrolling
+does not dismiss its focus. Android Back, or Escape on web, first dismisses
+the keyboard/focus while preserving the query and its results; only a later
+Back action may leave the sheet.
 Search results keep relevance in the existing paper hierarchy. The quiet
 metadata line explains why each result appeared (`7:154 · Text match`,
 `9:26 · Related · tranquility`, or `2:83 · Concept · Kindness to Parents`),

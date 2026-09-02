@@ -1,5 +1,6 @@
 package com.beautifulquran.ui.home
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
@@ -7,6 +8,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.waitForUpOrCancellation
@@ -41,7 +43,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -71,7 +72,6 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlin.math.roundToInt
-import kotlinx.coroutines.flow.drop
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.res.stringResource
 import com.beautifulquran.R
@@ -83,6 +83,7 @@ import com.beautifulquran.data.HomeBookmarkStyle
 import com.beautifulquran.domain.WORD_SEARCH_PREVIEW_LIMIT
 import com.beautifulquran.domain.englishTranslationHighlightSpans
 import com.beautifulquran.domain.parseSearchQuery
+import com.beautifulquran.domain.spellingCorrection
 import com.beautifulquran.ui.reader.VerseBookmarkRibbon
 import com.beautifulquran.ui.reader.remainingUnfurlSignal
 import com.beautifulquran.ui.theme.ArabicTitleStyle
@@ -93,9 +94,6 @@ import com.beautifulquran.ui.theme.verticalFadingEdges
 
 /** The search field leads the scrolling document beneath the fixed masthead. */
 private const val SEARCH_ITEM_INDEX = 0
-
-/** How far (px) the list must scroll past the lifted search before a scroll counts as "dismiss". */
-private const val DISMISS_SCROLL_THRESHOLD_PX = 24
 
 private val HomeRibbonLane = 28.dp
 private val HomeRibbonWidth = 13.dp
@@ -108,6 +106,7 @@ private val HomeColumnGap = 4.dp
 private val HomeArabicOpticalInset = 4.dp
 private val TopBoundRibbonHeight = 96.dp
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun HomeScreen(
     viewModel: HomeViewModel,
@@ -178,6 +177,7 @@ fun HomeScreen(
         uiState.surahs.isEmpty() &&
         uiState.wordSections.isEmpty() &&
         !uiState.wordSearchLoading
+    val correctedQuery = spellingCorrection(uiState.wordSections.flatMap { it.hits })
     var previousBookmarkCount by remember { mutableIntStateOf(bookmarkCount) }
     var ribbonUnfurlPending by remember { mutableStateOf(false) }
     var ribbonUnfurlEpoch by remember { mutableIntStateOf(0) }
@@ -212,26 +212,14 @@ fun HomeScreen(
         }
     }
 
-    // Keep the focused search at the top of its scrolling document. A
-    // deliberate list scroll then dismisses it, hiding the keyboard and dials.
-    // Search result changes themselves never steal focus.
+    // Lift the focused search to the top of its scrolling document. The field
+    // stays focused while results move beneath it; Back owns dismissal.
     LaunchedEffect(searchFocused) {
         if (!searchFocused) return@LaunchedEffect
         listState.animateScrollToItem(SEARCH_ITEM_INDEX)
-        snapshotFlow {
-            Triple(
-                listState.isScrollInProgress,
-                listState.firstVisibleItemIndex,
-                listState.firstVisibleItemScrollOffset,
-            )
-        }
-            .drop(1)
-            .collect { (isScrolling, index, offset) ->
-                if (isScrolling && (index != SEARCH_ITEM_INDEX || offset > DISMISS_SCROLL_THRESHOLD_PX)) {
-                    focusManager.clearFocus()
-                }
-            }
     }
+
+    BackHandler(enabled = searchFocused) { focusManager.clearFocus() }
 
     Scaffold(containerColor = MaterialTheme.colorScheme.background) { padding ->
         Box(
@@ -298,28 +286,35 @@ fun HomeScreen(
                         bottom = listBottomPadding,
                     ),
                 ) {
+                    stickyHeader(key = "search") {
+                        Column(
+                            Modifier
+                                .fillMaxWidth()
+                                .background(MaterialTheme.colorScheme.background),
+                        ) {
+                            // Small top breath when the masthead is gone so the
+                            // field is not hard against the status-bar padding.
+                            if (searchFocused) {
+                                Spacer(Modifier.height(8.dp))
+                            }
+                            PaperSearchField(
+                                value = uiState.query,
+                                onValueChange = viewModel::onQueryChange,
+                                placeholder = "Search concept, “exact phrase”, or 2:255",
+                                onFocusChanged = { searchFocused = it },
+                                modifier = Modifier
+                                    .padding(start = HomeStartInset, end = HomeEndInset)
+                                    .fillMaxWidth()
+                                    .onGloballyPositioned {
+                                        searchBottom = it.boundsInWindow().bottom
+                                        searchBounds = it.boundsInRoot()
+                                    },
+                            )
+                        }
+                    }
             item(key = "chapter-page") {
                 Box(Modifier.fillMaxWidth()) {
                     Column(Modifier.fillMaxWidth()) {
-                        // Small top breath when the masthead is gone so the
-                        // field is not hard against the status-bar padding.
-                        if (searchFocused) {
-                            Spacer(Modifier.height(8.dp))
-                        }
-                        PaperSearchField(
-                            value = uiState.query,
-                            onValueChange = viewModel::onQueryChange,
-                            placeholder = "Search concept, “exact phrase”, or 2:255",
-                            onFocusChanged = { searchFocused = it },
-                            modifier = Modifier
-                                .padding(start = HomeStartInset, end = HomeEndInset)
-                                .fillMaxWidth()
-                                .onGloballyPositioned {
-                                    searchBottom = it.boundsInWindow().bottom
-                                    searchBounds = it.boundsInRoot()
-                                },
-                        )
-
                         if (!searching) {
                             uiState.continueTarget?.let { target ->
                                 ContinueRow(
@@ -369,6 +364,9 @@ fun HomeScreen(
                         }
 
                         if (showWordSections) {
+                            if (correctedQuery != null) {
+                                SearchCorrectionLabel(correctedQuery)
+                            }
                             SearchSectionLabel(
                                 text = if (uiState.wordSearchLoading && uiState.wordSections.isEmpty()) {
                                     "Searching ayahs…"
@@ -376,6 +374,7 @@ fun HomeScreen(
                                     val count = uiState.wordSections.sumOf { it.totalCount }
                                     "In the Quran · $count relevant ${if (count == 1) "ayah" else "ayahs"}"
                                 },
+                                topPadding = if (correctedQuery == null) 8.dp else 2.dp,
                             )
                             uiState.wordSections.forEach { section ->
                                 WordSearchSurahHeader(section = section)
@@ -758,7 +757,7 @@ internal fun shouldUnfurlReadingPlaceRibbon(
 ): Boolean = pendingReturn && chapterRibbonReady && currentPlacePresent
 
 @Composable
-private fun SearchSectionLabel(text: String) {
+private fun SearchSectionLabel(text: String, topPadding: Dp = 8.dp) {
     Text(
         text = text,
         style = MaterialTheme.typography.labelLarge,
@@ -768,8 +767,30 @@ private fun SearchSectionLabel(text: String) {
             .padding(
                 start = HomeStartInset,
                 end = HomeEndInset,
-                top = 8.dp,
+                top = topPadding,
                 bottom = 4.dp,
+            ),
+    )
+}
+
+@Composable
+private fun SearchCorrectionLabel(correctedQuery: String) {
+    val accents = LocalQuranAccents.current
+    Text(
+        text = buildAnnotatedString {
+            append("Searching instead for ")
+            withStyle(SpanStyle(color = accents.gold.copy(alpha = 0.8f))) {
+                append(correctedQuery)
+            }
+        },
+        style = MaterialTheme.typography.labelLarge,
+        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(
+                start = HomeStartInset,
+                end = HomeEndInset,
+                top = 8.dp,
             ),
     )
 }

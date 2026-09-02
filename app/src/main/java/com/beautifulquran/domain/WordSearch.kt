@@ -149,6 +149,18 @@ fun matchWordSearch(
                 i,
                 entry.position,
                 score,
+                terms = if (allowFuzzy && score > 0) {
+                    listOfNotNull(
+                        if (arabic.isNotEmpty()) {
+                            fuzzyWordMatch(entry.arabicNorm, arabic)
+                        } else {
+                            fuzzyWordMatch(entry.translationLower, latin.text)
+                                ?: fuzzyWordMatch(entry.transliterationLower, latin.text)
+                        },
+                    )
+                } else {
+                    emptyList()
+                },
                 reason = if (allowFuzzy) "Spelling match" else "Text match",
             )
             if (!parsed.exactOnly && score > 0 && entry.root.isNotEmpty()) matchedRoots += entry.root
@@ -185,6 +197,17 @@ fun matchWordSearch(
                 at,
                 position = 0,
                 score = score,
+                terms = if (allowFuzzy && score > 0) {
+                    listOfNotNull(
+                        if (arabic.isNotEmpty()) {
+                            fuzzyWordMatch(normalizeArabicForSearch(anchor.ayahText), arabic)
+                        } else {
+                            fuzzyWordMatch(anchor.ayahTranslation.lowercase(), latin.text)
+                        },
+                    )
+                } else {
+                    emptyList()
+                },
                 reason = if (allowFuzzy) "Spelling match" else "Text match",
             )
             at = end
@@ -348,19 +371,27 @@ fun matchWordSearch(
         }
 }
 
-/** True when one whole word in [text] is at most one edit from [query]. */
-fun fuzzyWordContains(text: String, query: String): Boolean {
-    if (query.length < 4 || query.any { !it.isLetterOrDigit() }) return false
+/** The first whole word in [text] at most one edit from [query]. */
+fun fuzzyWordMatch(text: String, query: String): String? {
+    if (query.length < 4 || query.any { !it.isLetterOrDigit() }) return null
     var start = -1
     for (i in 0..text.length) {
         if (i < text.length && text[i].isLetterOrDigit()) {
             if (start < 0) start = i
         } else if (start >= 0) {
-            if (isWithinOneEdit(text, start, i, query)) return true
+            if (isWithinOneEdit(text, start, i, query)) return text.substring(start, i)
             start = -1
         }
     }
-    return false
+    return null
+}
+
+/** True when one whole word in [text] is at most one edit from [query]. */
+fun fuzzyWordContains(text: String, query: String): Boolean = fuzzyWordMatch(text, query) != null
+
+/** Corrected vocabulary term shown only when spelling fallback won. */
+fun spellingCorrection(hits: Iterable<WordSearchHit>): String? = hits.firstNotNullOfOrNull { hit ->
+    hit.matchTerms.firstOrNull().takeIf { hit.matchReason == "Spelling match" }
 }
 
 private fun isWithinOneEdit(text: String, start: Int, end: Int, query: String): Boolean {

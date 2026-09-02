@@ -12,6 +12,7 @@ import {
   parseSearchQuery,
   sectionWordSearchHits,
   shouldRunWordSearch,
+  spellingCorrection,
   windowAroundMatch,
   type WordSearchIndexEntry,
   type WordSearchHit,
@@ -79,12 +80,15 @@ describe('matchWordSearch', () => {
   })
 
   it('falls back to fuzzy matches for one edit and a transposition', () => {
-    expect(matchWordSearch(index, 'mercifl').map((h) => [h.surahId, h.position])).toEqual([
+    const corrected = matchWordSearch(index, 'mercifl')
+    expect(corrected.map((h) => [h.surahId, h.position])).toEqual([
       [1, 4],
       [55, 1],
     ])
-    expect(matchWordSearch(index, 'mercifl').every((hit) => hit.matchReason === 'Spelling match'))
-      .toBe(true)
+    expect(corrected.every((hit) => hit.matchReason === 'Spelling match')).toBe(true)
+    expect(corrected.every((hit) => hit.matchTerms?.[0] === 'merciful')).toBe(true)
+    expect(spellingCorrection(corrected)).toBe('merciful')
+    expect(spellingCorrection(matchWordSearch(index, 'merciful'))).toBeNull()
     expect(matchWordSearch(index, 'mercifull')).toHaveLength(2)
     expect(matchWordSearch(index, 'mercfiul').map((h) => [h.surahId, h.position])).toEqual([
       [1, 4],

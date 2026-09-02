@@ -49,6 +49,11 @@ next task instead of waiting for an idle callback, and then yields between scan
 chunks; Android checks cancellation throughout the scan. Typing therefore
 never waits on an obsolete rank.
 
+When spelling fallback wins, its actual Quran vocabulary term is carried with
+the hit rather than inferred by the UI. A quiet line above the Quran count says
+`Searching instead for corruption`; literal, quoted, root, concept, and
+thesaurus results never show an autocorrection notice.
+
 ## Exact quotes
 
 A pair of straight or typographic double quotes around the complete query

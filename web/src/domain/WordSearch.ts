@@ -375,13 +375,19 @@ function scanLexical(
       searchTextRelevance(entry.translationLower, state.latin, allowFuzzy),
       searchTextRelevance(entry.transliterationLower, state.latin, allowFuzzy),
     )
+    const correction = allowFuzzy && score > 0
+      ? state.arabic
+        ? fuzzyWordMatch(entry.arabicNorm, state.arabic)
+        : fuzzyWordMatch(entry.translationLower, state.latin.text) ??
+          fuzzyWordMatch(entry.transliterationLower, state.latin.text)
+      : null
     addRanked(
       state,
       i,
       entry.position,
       score,
       undefined,
-      [],
+      correction ? [correction] : [],
       allowFuzzy ? 'Spelling match' : 'Text match',
     )
     if (!state.parsed.exactOnly && score > 0 && entry.root) state.matchedRoots.add(entry.root)
@@ -419,13 +425,18 @@ function scanAyahText(state: RankingState, allowFuzzy: boolean): void {
       searchTextRelevance(anchor.ayahTranslation, state.latin, allowFuzzy),
       glossScore,
     )
+    const correction = allowFuzzy && score > 0
+      ? state.arabic
+        ? fuzzyWordMatch(normalizeArabicForSearch(anchor.ayahText), state.arabic)
+        : fuzzyWordMatch(anchor.ayahTranslation.toLowerCase(), state.latin.text)
+      : null
     addRanked(
       state,
       at,
       0,
       score,
       undefined,
-      [],
+      correction ? [correction] : [],
       allowFuzzy ? 'Spelling match' : 'Text match',
     )
     at = end
@@ -601,15 +612,30 @@ function finishRanking(state: RankingState, maxHits: number): WordSearchHit[] {
 
 const FUZZY_WORD = /[\p{L}\p{N}]+/gu
 
-/** True when one whole word in text is at most one edit from query. */
-export function fuzzyWordContains(text: string, query: string): boolean {
-  if (query.length < 4 || !/^[\p{L}\p{N}]+$/u.test(query)) return false
+/** The first whole word in text at most one edit from query. */
+export function fuzzyWordMatch(text: string, query: string): string | null {
+  if (query.length < 4 || !/^[\p{L}\p{N}]+$/u.test(query)) return null
   FUZZY_WORD.lastIndex = 0
   let match: RegExpExecArray | null
   while ((match = FUZZY_WORD.exec(text)) != null) {
-    if (isWithinOneEdit(match[0], query)) return true
+    if (isWithinOneEdit(match[0], query)) return match[0]
   }
-  return false
+  return null
+}
+
+/** True when one whole word in text is at most one edit from query. */
+export function fuzzyWordContains(text: string, query: string): boolean {
+  return fuzzyWordMatch(text, query) != null
+}
+
+/** Corrected vocabulary term shown only when spelling fallback won. */
+export function spellingCorrection(hits: Iterable<WordSearchHit>): string | null {
+  for (const hit of hits) {
+    if (hit.matchReason === 'Spelling match' && hit.matchTerms?.[0]) {
+      return hit.matchTerms[0]
+    }
+  }
+  return null
 }
 
 function isWithinOneEdit(word: string, query: string): boolean {
