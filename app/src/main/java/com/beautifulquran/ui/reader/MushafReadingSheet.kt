@@ -301,10 +301,11 @@ internal fun MushafReadingSheet(
             onSeekSurah = onSeekSurah,
             onWarmPage = onWarmPage,
             onScrubbing = { scrubbing.value = it; onScrubbing(it) },
-            // The rule is the book's edge seen side-on, so it runs the way the
-            // book turns: right to left for the mushaf, left to right for a
-            // book of the translation.
-            rightToLeft = !english,
+            // The rule runs the way the book turns, and for now that is the
+            // mushaf's direction on both settings — see MushafPager's
+            // reverseLayout for why the English leaf is not turning the other
+            // way yet.
+            rightToLeft = true,
             onLanding = onLanding,
             reciting = reciting,
             // Paper between the folio and the rule. The figure now stands in

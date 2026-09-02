@@ -1026,10 +1026,22 @@ internal fun MushafPager(
         beyondViewportPageCount = if (holdNeighbours && !parkNeighbours()) 1 else 0,
         // A mushaf is bound on the right: its first leaf is the rightmost and
         // the hand travels leftward to reach it. A book of the translation is
-        // bound on the left and turns the other way — it is set in English,
-        // read left to right, and a reader who has just finished a line at the
-        // right edge expects the next leaf to come from there.
-        reverseLayout = !english,
+        // bound on the left and should turn the other way — and it did, for a
+        // while, until the dial went with it and did not arrive.
+        //
+        // The rule is the book's edge seen side-on, so the two cannot disagree:
+        // a leaf that turns left-to-left beside a comb that runs right-to-left
+        // means dragging the rule forward turns the page back. Mirroring the
+        // dial is not one flip — the comb's lens, its stable selection seats,
+        // its trough and its landing all place themselves along the rule, and
+        // mirroring the drawing while a seat still answers in book order puts
+        // chapter 1 under a finger halfway down the book. That was shipped and
+        // it should not have been.
+        //
+        // So both turn the mushaf's way until the dial can turn with the leaf.
+        // The direction is a property of the *pair*, and half of it is worse
+        // than neither.
+        reverseLayout = true,
         key = { it },
         modifier = modifier
             .fillMaxSize()
