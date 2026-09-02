@@ -484,7 +484,7 @@ fun buildEnglishBookByLayout(
         // layout and not by the end of the offer — and if it was not enough,
         // the ruler says so and the offer grows. Two rounds settle every leaf
         // in the Qur'an; the guess only decides whether there is a second.
-        var take = ENGLISH_LEAF_OFFER_VERSES
+        var take = (ENGLISH_LEAF_CAPACITY_CHARS * ENGLISH_LEAF_OFFER).toInt()
         var runs: List<EnglishVerseRun>
         var cut: EnglishRulerCut?
         while (true) {
@@ -493,7 +493,7 @@ fun buildEnglishBookByLayout(
             val exhausted = at + runs.size < order.size &&
                 order[at + runs.size][1] != 1   // a chapter opens: the leaf ends anyway
             if (cut != null || !exhausted) break
-            take += ENGLISH_LEAF_OFFER_VERSES
+            take += (ENGLISH_LEAF_CAPACITY_CHARS * ENGLISH_LEAF_OFFER).toInt()
         }
 
         val index = leaves.size
@@ -549,15 +549,21 @@ fun buildEnglishBookByLayout(
 }
 
 /**
- * How many verses a leaf is offered to choose from, to begin with.
+ * How much more than a leaf's worth is offered to the ruler, to begin with.
  *
- * A leaf of the translation carries six or seven, and a leaf of juz' 30 carries
- * twenty. This is generous enough that one layout decides almost every leaf and
- * cheap enough that the few needing a second cost nothing anyone can see.
+ * Every character offered is a character laid out, and laying out text is not
+ * free: offering a fixed two dozen verses meant setting three and a half
+ * thousand characters to decide a leaf that holds a thousand, and the whole book
+ * took **15.4 seconds** on a device. A third more than a leaf holds is enough
+ * to be sure the layout decides the leaf and not the end of the offer — and
+ * when it is not, [EnglishLeafRuler] says so and the offer grows.
  */
-private const val ENGLISH_LEAF_OFFER_VERSES = 24
+private const val ENGLISH_LEAF_OFFER = 1.35f
 
-/** The verses on offer from [at], the first of them picked up at [offset]. */
+/**
+ * The verses on offer from [at], the first of them picked up at [offset], up to
+ * [take] characters of them.
+ */
 private fun englishLeafOffer(
     order: List<IntArray>,
     text: (Int, Int) -> String,
@@ -565,15 +571,19 @@ private fun englishLeafOffer(
     offset: Int,
     take: Int,
 ): List<EnglishVerseRun> {
-    val out = ArrayList<EnglishVerseRun>(take)
+    val out = ArrayList<EnglishVerseRun>(16)
+    var mass = 0
     var j = at
-    while (j < order.size && out.size < take) {
+    while (j < order.size) {
         val (surahId, ayah) = order[j]
         // A chapter opens a leaf of its own, so the offer stops before it.
         if (j > at && ayah == 1) break
         val whole = text(surahId, ayah)
-        out += EnglishVerseRun(surahId, ayah, if (j == at) offset else 0, whole.length)
+        val from = if (j == at) offset else 0
+        out += EnglishVerseRun(surahId, ayah, from, whole.length)
+        mass += whole.length - from + ENGLISH_LEAF_MARK_CHARS
         j++
+        if (mass >= take) break
     }
     return out
 }
