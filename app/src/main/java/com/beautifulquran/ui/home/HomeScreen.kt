@@ -786,6 +786,7 @@ private fun SearchCorrectionLabel(correctedQuery: String) {
             }
         },
         style = MaterialTheme.typography.labelLarge,
+        fontWeight = FontWeight.Normal,
         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
         modifier = Modifier
             .fillMaxWidth()

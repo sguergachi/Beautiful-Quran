@@ -51,9 +51,9 @@ never waits on an obsolete rank.
 
 When spelling fallback wins through either Quran text or concept vocabulary,
 its actual corrected term is carried with the hit rather than inferred by the
-UI. A quiet line above the Quran count says `Searching instead for corrupt`;
-correctly spelled searches and quoted, root, or thesaurus results never show
-an autocorrection notice.
+UI. A quiet, regular-weight line above the Quran count says
+`Searching instead for corrupt`; correctly spelled searches and quoted, root,
+or thesaurus results never show an autocorrection notice.
 
 ## Exact quotes
 

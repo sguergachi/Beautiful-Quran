@@ -806,6 +806,7 @@ select {
   padding: 0 var(--home-end-inset) 0 var(--home-start-inset);
   color: color-mix(in srgb, var(--ink-muted) 70%, transparent);
   font-size: 0.92rem;
+  font-weight: 400;
   letter-spacing: 0.02em;
 }
 
