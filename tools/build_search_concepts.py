@@ -38,6 +38,11 @@ THESAURUS_FILLERS = {
 FOCUSED_THESAURUS_LINKS = {
     "calm": {"peace": 2, "stillness": 2},
 }
+FOCUSED_CONCEPT_ALIASES = {
+    "Wealth Management": [
+        "saving money", "save money", "managing money", "personal finance", "budgeting",
+    ],
+}
 
 
 def source_bytes(name: str) -> bytes:
@@ -169,7 +174,10 @@ def main() -> None:
                 concepts[tag["name"]] = {
                     "n": tag["name"],
                     "p": tag["keywords"]["primary"],
-                    "s": tag["keywords"]["secondary"],
+                    "s": [
+                        *tag["keywords"]["secondary"],
+                        *FOCUSED_CONCEPT_ALIASES.get(tag["name"], ()),
+                    ],
                     "c": category["name"],
                     "d": domain["name"],
                     "a": [],

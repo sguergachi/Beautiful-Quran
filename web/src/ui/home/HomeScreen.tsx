@@ -65,6 +65,7 @@ export function HomeScreen({ stackLayer }: { stackLayer: StackLayer }) {
   // whole paper stack, including the mounted reader under the cover).
   const [search, setSearch] = useState('')
   const [searchFocused, setSearchFocused] = useState(false)
+  const searchInputRef = useRef<HTMLInputElement>(null)
   const searching = search.trim().length > 0
   const { surahs: filtered, ayahTarget } = useMemo(
     () => filterSurahs(state.surahs, search),
@@ -268,6 +269,7 @@ export function HomeScreen({ stackLayer }: { stackLayer: StackLayer }) {
                 >
                   <SearchIcon />
                   <PaperInput
+                    inputRef={searchInputRef}
                     id="chapter-search"
                     name="chapter-search"
                     type="search"
@@ -283,7 +285,10 @@ export function HomeScreen({ stackLayer }: { stackLayer: StackLayer }) {
                       aria-label="Clear search"
                       // Keep the field focused so the masthead stays receded.
                       onMouseDown={(e) => e.preventDefault()}
-                      onClick={() => setSearch('')}
+                      onClick={() => {
+                        setSearch('')
+                        searchInputRef.current?.focus()
+                      }}
                     >
                       <ClearIcon />
                     </button>

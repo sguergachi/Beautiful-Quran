@@ -171,6 +171,22 @@ describe('matchWordSearch', () => {
     expect(matchWordSearch(lexical, 'clemency', 400, [concept])[0]!.surahId).toBe(60)
   })
 
+  it('retrieves multi-word concept vocabulary without another text scan', () => {
+    const concept = {
+      name: 'Wealth Management',
+      primaryTerms: ['wealth management'],
+      secondaryTerms: ['saving money'],
+      category: 'Economic Transactions',
+      domain: "Mu'amalat",
+      ayahKeys: [1_001],
+    }
+    const [hit] = matchWordSearch(index, 'saving money', 400, [concept])
+    expect(hit?.matchReason).toBe('Concept · Wealth Management')
+    expect(hit?.position).toBe(0)
+    expect(spellingCorrection(hit ? [hit] : [])).toBeNull()
+    expect(matchWordSearch(index, '"saving money"', 400, [concept])).toEqual([])
+  })
+
   it('expands a matched Arabic root to related word forms', () => {
     const rooted = [
       { ...entry(2, 37, 1, 'فَتَابَ', 'so He turned'), root: 'توب' },

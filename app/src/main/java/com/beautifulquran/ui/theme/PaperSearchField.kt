@@ -25,8 +25,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -47,6 +50,8 @@ fun PaperSearchField(
     clearContentDescription: String = "Clear search",
 ) {
     var focused by remember { mutableStateOf(false) }
+    val focusRequester = remember { FocusRequester() }
+    val keyboard = LocalSoftwareKeyboardController.current
     val ink = MaterialTheme.colorScheme.onBackground
     val mutedInk = MaterialTheme.colorScheme.onSurfaceVariant
     BasicTextField(
@@ -56,6 +61,7 @@ fun PaperSearchField(
         textStyle = MaterialTheme.typography.bodyLarge.copy(color = ink),
         cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
         modifier = modifier
+            .focusRequester(focusRequester)
             .height(56.dp)
             .onFocusChanged {
                 focused = it.isFocused
@@ -105,7 +111,11 @@ fun PaperSearchField(
                         contentAlignment = Alignment.Center,
                         modifier = Modifier
                             .size(44.dp)
-                            .ownedQuietClickable(role = Role.Button) { onValueChange("") }
+                            .ownedQuietClickable(role = Role.Button) {
+                                onValueChange("")
+                                focusRequester.requestFocus()
+                                keyboard?.show()
+                            }
                             .semantics { this.contentDescription = clearContentDescription },
                     ) {
                         Icon(

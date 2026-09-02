@@ -413,9 +413,7 @@ function scanAyahText(state: RankingState, allowFuzzy: boolean): void {
     }
     let glossScore = 0
     if (/\s/u.test(state.parsed.text)) {
-      const glosses: string[] = []
-      for (let i = at; i < end; i++) glosses.push(state.index[i]!.translation)
-      glossScore = searchTextRelevance(glosses.join(' '), state.latin, allowFuzzy)
+      glossScore = searchTextRelevance(sameAyahGlossLine(state.index, at), state.latin, allowFuzzy)
     }
     const score = Math.max(
       state.arabic
@@ -578,17 +576,15 @@ function scanRelatedAyahs(state: RankingState, related: RelatedSearchTerm[]): vo
   while (at < state.index.length) {
     const anchor = state.index[at]!
     let end = at + 1
-    const glosses = [anchor.translation]
     while (
       end < state.index.length &&
       state.index[end]!.surahId === anchor.surahId &&
       state.index[end]!.ayahNumber === anchor.ayahNumber
     ) {
-      glosses.push(state.index[end]!.translation)
       end++
     }
     const translation = bestRelated(anchor.ayahTranslation, related)
-    const gloss = bestRelated(glosses.join(' '), related)
+    const gloss = bestRelated(sameAyahGlossLine(state.index, at), related)
     const match = translation == null || (gloss != null && gloss.score > translation.score)
       ? gloss
       : translation

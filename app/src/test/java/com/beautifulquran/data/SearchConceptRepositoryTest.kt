@@ -1,6 +1,8 @@
 package com.beautifulquran.data
 
 import com.beautifulquran.domain.RelatedSearchTerm
+import com.beautifulquran.domain.conceptRelevance
+import com.beautifulquran.domain.parseSearchQuery
 import java.io.File
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -19,6 +21,9 @@ class SearchConceptRepositoryTest {
         val mercy = concepts.single { it.name == "Divine Mercy" }
         assertTrue("clemency" in mercy.secondaryTerms)
         assertTrue(1_001 in mercy.ayahKeys)
+        val wealth = concepts.single { it.name == "Wealth Management" }
+        assertTrue("saving money" in wealth.secondaryTerms)
+        assertTrue(conceptRelevance(wealth, parseSearchQuery("saving money")) > 0)
         assertEquals(10_426, vocabulary.thesaurus.size)
         assertTrue(RelatedSearchTerm("tranquility", 2) in vocabulary.thesaurus.getValue("calm"))
         assertTrue(RelatedSearchTerm("peace", 2) in vocabulary.thesaurus.getValue("calm"))

@@ -171,6 +171,25 @@ class WordSearchTest {
     }
 
     @Test
+    fun `multi-word vocabulary retrieves a concept without another text scan`() {
+        val concept = SearchConcept(
+            name = "Wealth Management",
+            primaryTerms = listOf("wealth management"),
+            secondaryTerms = listOf("saving money"),
+            category = "Economic Transactions",
+            domain = "Mu'amalat",
+            ayahKeys = intArrayOf(1_001),
+        )
+
+        val hit = matchWordSearch(index, "saving money", concepts = listOf(concept)).single()
+
+        assertEquals("Concept · Wealth Management", hit.matchReason)
+        assertEquals(0, hit.position)
+        assertEquals(null, spellingCorrection(listOf(hit)))
+        assertTrue(matchWordSearch(index, "\"saving money\"", concepts = listOf(concept)).isEmpty())
+    }
+
+    @Test
     fun `literal relevance ranks ahead of concept matches`() {
         val lexical = index + entry(60, 1, 1, "رَحْمَة", "clemency")
         val concept = SearchConcept(

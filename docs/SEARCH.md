@@ -26,6 +26,9 @@ signals rather than a general-purpose language model:
    a bounded corroboration bonus. Visible evidence of the query—or its
    spelling correction—in the ayah translation or word glosses receives a
    small grounding boost, so it leads broader ayahs that only share the tag.
+   Multi-word phrases use the same pass: for example, `saving money`, `personal
+   finance`, and `budgeting` resolve to `Wealth Management`. Focused aliases
+   supplement gaps in the pinned ontology without an extra Quran scan.
 5. **Spelling fallback** — a single insertion, deletion, substitution, or
    adjacent transposition, only for queries of four or more characters and
    only when literal, concept, and thesaurus stages all return nothing.
@@ -43,6 +46,9 @@ unaccented (or uses the word-gloss line) rather than coloring a merely similar
 or unrelated word. The gloss fallback coalesces adjacent copies of a shared
 multi-word gloss, matching the reader's English prose instead of showing the
 source phrase once per Arabic word.
+
+Clearing a search keeps the field focused and the keyboard available for the
+next query. Back/Escape remains the explicit focus-dismiss action.
 
 The quiet reference line explains each result as `Text match`,
 `Related · tranquility`, `Concept · Divine Mercy`, `Same Arabic root`, or

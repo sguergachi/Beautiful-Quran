@@ -187,11 +187,7 @@ fun matchWordSearch(
                 ),
                 searchTextRelevance(anchor.ayahTranslation, latin, allowFuzzy),
                 if (parsed.text.any(Char::isWhitespace)) {
-                    searchTextRelevance(
-                        (at until end).joinToString(" ") { index[it].translation },
-                        latin,
-                        allowFuzzy,
-                    )
+                    searchTextRelevance(sameAyahGlossLine(index, at), latin, allowFuzzy)
                 } else {
                     0
                 },
@@ -330,10 +326,7 @@ fun matchWordSearch(
                 end++
             }
             val translation = bestRelated(anchor.ayahTranslation, related)
-            val gloss = bestRelated(
-                (at until end).joinToString(" ") { index[it].translation },
-                related,
-            )
+            val gloss = bestRelated(sameAyahGlossLine(index, at), related)
             val match = listOfNotNull(translation, gloss).maxByOrNull { it.score }
             if (match != null) {
                 add(

@@ -9,6 +9,8 @@ QSAC's dataset and ontology are licensed under the
 [Creative Commons Attribution 4.0 International License](https://creativecommons.org/licenses/by/4.0/).
 The generated index retains only the ontology vocabulary and ayah-to-concept
 assignments; it omits QSAC's copies of the Arabic text and English translation.
+The generator also appends a small, declared set of product-authored search
+aliases where natural English phrasing is absent from the ontology vocabulary.
 
 The exact upstream revision and source-file hashes are pinned in
 `tools/build_search_concepts.py`.
