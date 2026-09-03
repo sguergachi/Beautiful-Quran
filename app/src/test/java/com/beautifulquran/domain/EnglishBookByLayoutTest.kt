@@ -30,17 +30,24 @@ class EnglishBookByLayoutTest {
      * Null when the offer did not fill it, which is the answer that asks for
      * more — the same contract a real layout answers with.
      */
-    private fun ruler(holds: Int) = EnglishLeafRuler { _, runs ->
-        var room = holds
+    private fun ruler(holds: Int) = EnglishLeafRuler { _, runs, maxLines ->
+        // A line of this stand-in holds ten characters, so a leaf run short to
+        // divide a chapter's tail holds ten fewer for every line it gives up.
+        var room = minOf(holds, maxLines.toLong().coerceAtMost(1_000L).toInt() * 10)
+        var used = 0
         for ((k, run) in runs.withIndex()) {
             val len = run.to - run.from
             if (len + 1 <= room) {
                 room -= len + 1
+                used += len + 1
             } else {
-                return@EnglishLeafRuler EnglishRulerCut(k, run.from + room.coerceAtLeast(1))
+                return@EnglishLeafRuler EnglishLeafFill(
+                    lines = (used + room) / 10,
+                    cut = EnglishRulerCut(k, run.from + room.coerceAtLeast(1)),
+                )
             }
         }
-        null
+        EnglishLeafFill(lines = used / 10, cut = null)
     }
 
     private fun book(vararg pages: Pair<Int, List<Pair<Int, Int>>>, text: (Int, Int) -> String) =
@@ -110,7 +117,7 @@ class EnglishBookByLayoutTest {
         val b = buildEnglishBookByLayout(
             buildMushafCatalog(listOf(source(2, 2, 3), source(2, 3, 3))),
             { _, _ -> "x".repeat(50) },
-            { _, _ -> EnglishRulerCut(0, 0) },
+            { _, _, _ -> EnglishLeafFill(1, EnglishRulerCut(0, 0)) },
         )
         assertTrue(b.leaves.size in 1..200)
     }

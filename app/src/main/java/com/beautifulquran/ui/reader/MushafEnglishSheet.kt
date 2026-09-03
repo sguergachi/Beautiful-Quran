@@ -68,6 +68,7 @@ import com.beautifulquran.domain.englishLeafFittedLeadingEm
 import com.beautifulquran.domain.englishLeafOverflowHandPx
 import com.beautifulquran.domain.englishLeafHandPx
 import com.beautifulquran.domain.ENGLISH_LEAF_LEADING_EM
+import com.beautifulquran.domain.EnglishLeafFill
 import com.beautifulquran.domain.EnglishLeafRuler
 import com.beautifulquran.domain.EnglishRulerCut
 import com.beautifulquran.domain.surahOpensWithBasmalahPreface
@@ -1285,7 +1286,7 @@ internal fun englishLeafRuler(
     val basmalahPx = englishBasmalahPx(handPx, measurePx, density, measurer)
     val style = with(density) { englishProseStyle(handPx.toSp(), pitchPx.toSp()) }
     val constraints = Constraints(maxWidth = measurePx.toInt().coerceAtLeast(1))
-    return EnglishLeafRuler { page, runs ->
+    return EnglishLeafRuler { page, runs, maxLines ->
         val leaf = englishLeaf(page, runs, hideParentheticals, translation)
         val blocks = englishLeafBlockTexts(
             leaf = leaf,
@@ -1303,7 +1304,7 @@ internal fun englishLeafRuler(
         val prose = blocks.filterIsInstance<EnglishLeafBlockText.Prose>().firstOrNull()
         val room = (wellPx - head).coerceAtLeast(1f)
         if (prose == null) {
-            null
+            EnglishLeafFill(0, null)
         } else {
             val laid = measurer.measure(
                 prose.text,
@@ -1317,8 +1318,10 @@ internal fun englishLeafRuler(
             // that is exactly the line that falls at the foot.
             var lines = 0
             while (lines < laid.lineCount && laid.getLineBottom(lines) <= room) lines++
+            // A leaf run short to divide a chapter's last two pages.
+            lines = lines.coerceAtMost(maxLines)
             if (lines >= laid.lineCount) {
-                null
+                EnglishLeafFill(laid.lineCount, null)
             } else {
                 val at = laid.getLineEnd(lines.coerceAtLeast(1) - 1, visibleEnd = true)
                 // Back into the book's coordinates. The leaf recorded where each
@@ -1349,7 +1352,7 @@ internal fun englishLeafRuler(
                 // book. A guard that has never been right is a guard that is
                 // wrong about what it is guarding.
                 val end = to.coerceAtLeast(floor)
-                EnglishRulerCut(runIndex, end)
+                EnglishLeafFill(lines, EnglishRulerCut(runIndex, end))
             }
         }
     }

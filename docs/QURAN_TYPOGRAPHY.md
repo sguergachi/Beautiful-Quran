@@ -382,7 +382,18 @@ paragraph too big for the foot of a page does.
    blank verso, in a book with spreads — rather than start a chapter halfway
    down one. This is the one page break a reader is meant to notice.
 3. **The last page of a chapter is the only short page**, which is where all the
-   ragged paper in a book lives.
+   ragged paper in a book lives — but it is not free to be *any* length. Ya-Sin
+   came out with a closing leaf carrying two lines and nothing else, and that
+   reads as a fault rather than as an ending. A compositor meeting it runs the
+   page *before* it short and divides the two, and `englishBalanceChapterTail`
+   does exactly that: it walks the fuller page down a line at a time and takes
+   the first split that clears `ENGLISH_LEAF_MIN_TAIL_LINES` on both. Five
+   lines, that being about where a short page stops looking like an accident.
+
+   Over the book it moves 17 chapters — Sad from a three-line ending to five,
+   An-Naml from *one* — and afterwards no chapter of more than one leaf ends on
+   fewer than five lines. It is the one place in this book where filling a page
+   is the wrong thing to do.
 4. **Widows and orphans move the break, and nothing else does.**
 
 What is *not* on that list is the sentence. This leaf briefly refused to cut a
