@@ -608,23 +608,42 @@ function finishRanking(state: RankingState, maxHits: number): WordSearchHit[] {
     .sort((a, b) => b.score - a.score || a.key - b.key || a.position - b.position)
     .slice(0, maxHits)
     .map((match) => {
-      const entry = state.index[match.indexAt]!
+      const anchor = state.index[match.indexAt]!
       const base = {
-        ...toHit(entry),
+        ...toHit(anchor),
         matchLabel: match.matchLabel ?? null,
         matchTerms: match.matchTerms,
         matchReason: match.matchReason,
       }
-      return match.position > 0
-        ? toHitWithDisplayTranslation(
-            entry,
+      const displayed = toHitWithDisplayTranslation(
+        anchor,
+        state.index,
+        match.indexAt,
+        state.parsed.text,
+        base,
+        match.matchLabel ?? '',
+        match.matchTerms,
+      )
+      const targetAt = match.position > 0
+        ? match.indexAt
+        : visibleSearchTargetIndex(
             state.index,
             match.indexAt,
+            displayed.ayahTranslation,
             state.parsed.text,
-            base,
+            match.matchLabel ?? '',
             match.matchTerms,
           )
-        : { ...base, position: 0, arabic: '', translation: '', transliteration: '' }
+      if (targetAt == null) {
+        return { ...displayed, position: 0, arabic: '', translation: '', transliteration: '' }
+      }
+      return {
+        ...toHit(state.index[targetAt]!),
+        matchLabel: match.matchLabel ?? null,
+        matchTerms: match.matchTerms,
+        matchReason: match.matchReason,
+        ayahTranslation: displayed.ayahTranslation,
+      }
     })
 }
 
@@ -699,16 +718,88 @@ function toHitWithDisplayTranslation(
   at: number,
   query: string,
   base: WordSearchHit = toHit(entry),
+  semanticLabel = '',
   semanticTerms: string[] = [],
 ): WordSearchHit {
-  if (highlightNeedles(entry.ayahTranslation, query, entry.translation, '', semanticTerms).length) {
+  if (
+    highlightNeedles(
+      entry.ayahTranslation,
+      query,
+      entry.translation,
+      semanticLabel,
+      semanticTerms,
+    ).length
+  ) {
     return base
   }
   const glossLine = sameAyahGlossLine(index, at)
-  if (highlightNeedles(glossLine, query, entry.translation, '', semanticTerms).length) {
+  if (highlightNeedles(glossLine, query, entry.translation, semanticLabel, semanticTerms).length) {
     return { ...base, ayahTranslation: glossLine }
   }
   return base
+}
+
+/** Resolves an ayah-level result to the word gloss behind its visible gold term. */
+function visibleSearchTargetIndex(
+  index: WordSearchIndexEntry[],
+  at: number,
+  displayText: string,
+  query: string,
+  semanticLabel = '',
+  semanticTerms: string[] = [],
+): number | null {
+  if (at < 0 || at >= index.length) return null
+  const anchor = index[at]!
+  let lo = at
+  while (
+    lo > 0 &&
+    index[lo - 1]!.surahId === anchor.surahId &&
+    index[lo - 1]!.ayahNumber === anchor.ayahNumber
+  ) lo--
+  let hi = at
+  while (
+    hi + 1 < index.length &&
+    index[hi + 1]!.surahId === anchor.surahId &&
+    index[hi + 1]!.ayahNumber === anchor.ayahNumber
+  ) hi++
+
+  const arabicTerms = query
+    .split(SEARCH_SEPARATOR)
+    .map(normalizeArabicForSearch)
+    .filter(Boolean)
+  if (arabicTerms.length) {
+    for (let i = lo; i <= hi; i++) {
+      if (arabicTerms.some((term) => index[i]!.arabicNorm.includes(term))) return i
+    }
+    return null
+  }
+
+  const terms = [...new Set(
+    highlightNeedles(displayText, query, '', semanticLabel, semanticTerms)
+      .flatMap((needle) => [needle, ...(needle.match(/[\p{L}\p{N}]+/gu) ?? [])])
+      .filter((term) => term.length >= 3 && !HIGHLIGHT_FILLERS.has(term.toLowerCase()))
+      .map((term) => term.toLowerCase()),
+  )]
+  let bestAt: number | null = null
+  let bestScore = 0
+  for (let i = lo; i <= hi; i++) {
+    const score = terms.reduce(
+      (best, term) => Math.max(
+        best,
+        searchTextRelevance(
+          index[i]!.translationLower,
+          { text: term, exactOnly: false },
+          false,
+        ),
+      ),
+      0,
+    )
+    if (score > bestScore) {
+      bestAt = i
+      bestScore = score
+    }
+  }
+  return bestAt
 }
 
 /** Space-joined English glosses, coalescing adjacent shared-phrase copies. */

@@ -375,23 +375,38 @@ fun matchWordSearch(
         )
         .take(maxHits)
         .map { match ->
-            val entry = index[match.indexAt]
-            val base = entry.toHit().copy(
+            val anchor = index[match.indexAt]
+            val display = snippetDisplayText(
+                anchor,
+                index,
+                match.indexAt,
+                parsed.text,
+                match.matchLabel.orEmpty(),
+                match.matchTerms,
+            )
+            val targetAt = if (match.position > 0) {
+                match.indexAt
+            } else {
+                visibleSearchTargetIndex(
+                    index,
+                    match.indexAt,
+                    display,
+                    parsed.text,
+                    match.matchLabel.orEmpty(),
+                    match.matchTerms,
+                )
+            }
+            val target = targetAt?.let(index::get)
+            val base = (target ?: anchor).toHit().copy(
                 matchLabel = match.matchLabel,
                 matchTerms = match.matchTerms,
                 matchReason = match.matchReason,
+                ayahTranslation = display,
             )
-            if (match.position > 0) {
-                val display = snippetDisplayText(
-                    entry,
-                    index,
-                    match.indexAt,
-                    parsed.text,
-                    match.matchTerms,
-                )
-                if (display == entry.ayahTranslation) base else base.copy(ayahTranslation = display)
-            } else {
+            if (target == null) {
                 base.copy(position = 0, arabic = "", translation = "", transliteration = "")
+            } else {
+                base
             }
         }
 }
@@ -467,6 +482,7 @@ internal fun snippetDisplayText(
     index: List<WordSearchIndexEntry>,
     at: Int,
     query: String,
+    semanticLabel: String = "",
     semanticTerms: List<String> = emptyList(),
 ): String {
     if (
@@ -474,6 +490,7 @@ internal fun snippetDisplayText(
             entry.ayahTranslation,
             query,
             entry.translation,
+            semanticLabel,
             semanticTerms = semanticTerms,
         ).isNotEmpty()
     ) {
@@ -485,12 +502,69 @@ internal fun snippetDisplayText(
             glossLine,
             query,
             entry.translation,
+            semanticLabel,
             semanticTerms = semanticTerms,
         ).isNotEmpty()
     ) {
         return glossLine
     }
     return entry.ayahTranslation
+}
+
+/** Resolves an ayah-level result to the word gloss behind its visible gold term. */
+internal fun visibleSearchTargetIndex(
+    index: List<WordSearchIndexEntry>,
+    at: Int,
+    displayText: String,
+    query: String,
+    semanticLabel: String = "",
+    semanticTerms: List<String> = emptyList(),
+): Int? {
+    if (at !in index.indices) return null
+    val anchor = index[at]
+    var lo = at
+    while (
+        lo > 0 && index[lo - 1].surahId == anchor.surahId &&
+        index[lo - 1].ayahNumber == anchor.ayahNumber
+    ) lo--
+    var hi = at
+    while (
+        hi + 1 < index.size && index[hi + 1].surahId == anchor.surahId &&
+        index[hi + 1].ayahNumber == anchor.ayahNumber
+    ) hi++
+
+    val arabicTerms = query.split(Regex("[^\\p{L}\\p{N}]+"))
+        .map(::normalizeArabicForSearch)
+        .filter(String::isNotEmpty)
+    if (arabicTerms.isNotEmpty()) {
+        return (lo..hi).firstOrNull { i ->
+            arabicTerms.any { term -> index[i].arabicNorm.contains(term) }
+        }
+    }
+
+    val needles = highlightNeedles(displayText, query, "", semanticLabel, semanticTerms)
+    val terms = needles
+        .flatMap { needle ->
+            listOf(needle) + Regex("[\\p{L}\\p{N}]+").findAll(needle).map { it.value }
+        }
+        .filter { it.length >= 3 && it.lowercase() !in highlightFillers }
+        .distinctBy(String::lowercase)
+    var bestAt: Int? = null
+    var bestScore = 0
+    for (i in lo..hi) {
+        val score = terms.maxOfOrNull { term ->
+            searchTextRelevance(
+                index[i].translationLower,
+                ParsedSearchQuery(term, exactOnly = false),
+                allowFuzzy = false,
+            )
+        } ?: 0
+        if (score > bestScore) {
+            bestAt = i
+            bestScore = score
+        }
+    }
+    return bestAt
 }
 
 /** Space-joined English glosses, coalescing adjacent shared-phrase copies. */

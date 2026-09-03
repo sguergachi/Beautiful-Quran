@@ -73,7 +73,9 @@ orange overlay uses bold English or a tight glyph-shaped ink spread, making the
 filled moment conspicuous without reflowing the verse or reshaping Arabic. If
 English prose coalesced a gloss shared by several Arabic words, its hidden slot
 redirects to the visible phrase; Arabic layouts still pulse the exact matched
-Arabic word.
+Arabic word. Ayah-level phrase and concept hits are resolved back to the word
+gloss behind the visible gold term before navigation, so a preview highlight
+such as `hearts` is also the word that pulses in the reader.
 
 ## Exact quotes
 

@@ -136,7 +136,7 @@ class WordSearchTest {
             ),
         )
         val hit = matchWordSearch(phrase, "\"name of Allah\"").single()
-        assertEquals(0, hit.position)
+        assertEquals(1, hit.position)
     }
 
     @Test
@@ -245,6 +245,51 @@ class WordSearchTest {
         assertEquals(listOf(11, 9), hits.map { it.ayahNumber })
         assertEquals("Prohibition of Corruption on Earth", hits.first().matchLabel)
         assertEquals("corrupt", spellingCorrection(hits))
+    }
+
+    @Test
+    fun `concept result targets the word behind its visible highlight`() {
+        val hearts = listOf(
+            entry(3, 7, 16, "فِي", "in", ayahTranslation = "those in whose hearts is deviation"),
+            entry(
+                3,
+                7,
+                17,
+                "قُلُوبِهِمْ",
+                "their hearts",
+                ayahTranslation = "those in whose hearts is deviation",
+            ),
+            entry(
+                3,
+                7,
+                18,
+                "زَيْغٌ",
+                "is deviation",
+                ayahTranslation = "those in whose hearts is deviation",
+            ),
+        )
+        val concept = SearchConcept(
+            "Diseases of the Heart",
+            listOf("corrupt heart"),
+            emptyList(),
+            "Heart and Soul",
+            "Tazkiyah",
+            intArrayOf(3_007),
+        )
+
+        val hit = matchWordSearch(hearts, "corrupt", concepts = listOf(concept)).single()
+
+        assertEquals(17, hit.position)
+        assertEquals("their hearts", hit.translation)
+        assertTrue(
+            englishTranslationHighlightSpans(
+                hit.ayahTranslation,
+                "corrupt",
+                hit.translation,
+                hit.matchLabel.orEmpty(),
+                hit.matchTerms,
+            ).any { it.highlighted && it.text.equals("heart", ignoreCase = true) },
+        )
     }
 
     @Test

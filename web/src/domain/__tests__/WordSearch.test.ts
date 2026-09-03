@@ -132,7 +132,7 @@ describe('matchWordSearch', () => {
       ...entry(1, 1, 1, 'بِسْمِ', 'In the name'),
       ayahTranslation: 'In the name of Allah, the Entirely Merciful.',
     }
-    expect(matchWordSearch([phrase], '"name of Allah"')[0]!.position).toBe(0)
+    expect(matchWordSearch([phrase], '"name of Allah"')[0]!.position).toBe(1)
   })
 
   it('retrieves and labels concept vocabulary below literal matches', () => {
@@ -231,6 +231,37 @@ describe('matchWordSearch', () => {
     expect(hits.map((hit) => hit.ayahNumber)).toEqual([11, 9])
     expect(hits[0]!.matchLabel).toBe('Prohibition of Corruption on Earth')
     expect(spellingCorrection(hits)).toBe('corrupt')
+  })
+
+  it('targets the word behind a concept result visible highlight', () => {
+    const ayahTranslation = 'those in whose hearts is deviation'
+    const hearts = [
+      { ...entry(3, 7, 16, 'فِي', 'in'), ayahTranslation },
+      { ...entry(3, 7, 17, 'قُلُوبِهِمْ', 'their hearts'), ayahTranslation },
+      { ...entry(3, 7, 18, 'زَيْغٌ', 'is deviation'), ayahTranslation },
+    ]
+    const concept = {
+      name: 'Diseases of the Heart',
+      primaryTerms: ['corrupt heart'],
+      secondaryTerms: [],
+      category: 'Heart and Soul',
+      domain: 'Tazkiyah',
+      ayahKeys: [3_007],
+    }
+
+    const [hit] = matchWordSearch(hearts, 'corrupt', 400, [concept])
+
+    expect(hit?.position).toBe(17)
+    expect(hit?.translation).toBe('their hearts')
+    expect(
+      englishTranslationHighlightSpans(
+        hit!.ayahTranslation,
+        'corrupt',
+        hit!.translation,
+        hit!.matchLabel ?? '',
+        hit!.matchTerms,
+      ).some((span) => span.highlighted && span.text.toLowerCase() === 'heart'),
+    ).toBe(true)
   })
 
   it('keeps exact matches ahead of fuzzy neighbors', () => {
