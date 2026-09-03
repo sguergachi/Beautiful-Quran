@@ -382,18 +382,22 @@ paragraph too big for the foot of a page does.
    blank verso, in a book with spreads — rather than start a chapter halfway
    down one. This is the one page break a reader is meant to notice.
 3. **The last page of a chapter is the only short page**, which is where all the
-   ragged paper in a book lives — but it is not free to be *any* length. Ya-Sin
-   came out with a closing leaf carrying two lines and nothing else, and that
-   reads as a fault rather than as an ending. A compositor meeting it runs the
-   page *before* it short and divides the two, and `englishBalanceChapterTail`
-   does exactly that: it walks the fuller page down a line at a time and takes
-   the first split that clears `ENGLISH_LEAF_MIN_TAIL_LINES` on both. Five
-   lines, that being about where a short page stops looking like an accident.
+   ragged paper in a book lives — but it is not free to be *any* length, and on
+   a phone it is less free than in print. A codex shows a spread, so a very
+   short closing page sits beside a full one and the white is half of what the
+   eye takes in. A phone shows one leaf. A closing page of five lines is four
+   fifths of a blank screen, and reads as a fault however correct it is.
 
-   Over the book it moves 17 chapters — Sad from a three-line ending to five,
-   An-Naml from *one* — and afterwards no chapter of more than one leaf ends on
-   fewer than five lines. It is the one place in this book where filling a page
-   is the wrong thing to do.
+   So `englishBalanceChapterTail` *divides* rather than fills: when a chapter's
+   tail comes out under `ENGLISH_LEAF_TAIL_SHARE` of a full leaf, it walks the
+   page before it down a line at a time and keeps the evenest split — the one
+   where the two differ least. Ya-Sin ended on **two** lines, then five when a
+   floor was the whole rule, and is **15 and 14** now.
+
+   Over the book: 91 chapters run to more than one leaf, **35 are divided** —
+   Al-Baqarah 23/6 to 15/14, An-Naml 22/**1** to 13/12 — the shortest ending in
+   the Qur'an is now eight lines, and none is under a third of a leaf. It is the
+   one place in this book where filling a page is the wrong thing to do.
 4. **Widows and orphans move the break, and nothing else does.**
 
 What is *not* on that list is the sentence. This leaf briefly refused to cut a
