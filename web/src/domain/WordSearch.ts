@@ -785,14 +785,7 @@ function visibleSearchTargetIndex(
   let bestScore = 0
   for (let i = lo; i <= hi; i++) {
     const score = terms.reduce(
-      (best, term) => Math.max(
-        best,
-        searchTextRelevance(
-          index[i]!.translationLower,
-          { text: term, exactOnly: false },
-          false,
-        ),
-      ),
+      (best, term) => Math.max(best, glossAlignmentRelevance(index[i]!.translationLower, term)),
       0,
     )
     if (score > bestScore) {
@@ -813,11 +806,7 @@ function visibleSearchTargetIndex(
     let target: number | null = null
     let targetScore = 0
     for (let i = lo; i <= hi; i++) {
-      const score = searchTextRelevance(
-        index[i]!.translationLower,
-        { text: term, exactOnly: false },
-        false,
-      )
+      const score = glossAlignmentRelevance(index[i]!.translationLower, term)
       if (score > targetScore) {
         target = i
         targetScore = score
@@ -826,6 +815,28 @@ function visibleSearchTargetIndex(
     if (target != null) return target
   }
   return null
+}
+
+const ALIGNMENT_WORD = /[\p{L}\p{N}]+/gu
+
+function alignmentForm(word: string): string {
+  if (word.length > 4 && word.endsWith('ing')) return word.slice(0, -3)
+  if (word.length > 6 && word.endsWith('ness')) return word.slice(0, -4)
+  if (word.length > 5 && word.endsWith('ies')) return `${word.slice(0, -3)}y`
+  if (word.length > 4 && word.endsWith('s')) return word.slice(0, -1)
+  return word
+}
+
+/** Whole-token/stem score for mapping visible translation evidence to a Quran gloss. */
+export function glossAlignmentRelevance(gloss: string, visibleTerm: string): number {
+  const glossWords = gloss.toLowerCase().match(ALIGNMENT_WORD) ?? []
+  const termWords = visibleTerm.toLowerCase().match(ALIGNMENT_WORD) ?? []
+  if (!glossWords.length || !termWords.length) return 0
+  for (let at = 0; at <= glossWords.length - termWords.length; at++) {
+    if (termWords.every((word, offset) => glossWords[at + offset] === word)) return 2
+  }
+  const glossForms = new Set(glossWords.map(alignmentForm))
+  return termWords.every((word) => glossForms.has(alignmentForm(word))) ? 1 : 0
 }
 
 /** Nearby content words that can ground a translation-only auxiliary match. */

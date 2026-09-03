@@ -336,6 +336,14 @@ class WordSearchTest {
     }
 
     @Test
+    fun `gloss alignment is bounded and inflection aware`() {
+        assertEquals(0, glossAlignmentRelevance("Indeed, I", "in"))
+        assertTrue(glossAlignmentRelevance("their hearts", "heart") > 0)
+        assertTrue(glossAlignmentRelevance("(do) they see", "see") > 0)
+        assertTrue(glossAlignmentRelevance("(to) doing (it)", "do") > 0)
+    }
+
+    @Test
     fun `matched Arabic root expands to related word forms`() {
         val rooted = listOf(
             entry(2, 37, 1, "فَتَابَ", "so He turned").copy(root = "توب"),

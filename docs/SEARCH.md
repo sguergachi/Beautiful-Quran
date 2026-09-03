@@ -38,9 +38,11 @@ order as the tie-break. The UI then groups that ranked stream by surah. Literal
 word hits preserve their word position for the reader flash. Full-ayah phrase
 and concept hits resolve to a grounded word gloss when the visible evidence has
 one; translation-only auxiliaries such as `could` use the nearest grounded verb.
-That auxiliary fallback is restricted to modal verbs: an adjacent preposition
-can never substring-match an unrelated gloss (for example, `in` inside
-`indeed`). Translator additions with no Quran-word gloss, such as
+Word-position alignment deliberately does not reuse broad search substring
+ranking: it matches whole gloss tokens and simple inflections, so an adjacent
+preposition can never hide inside an unrelated gloss (for example, `in` inside
+`indeed`). The nearby-word fallback is additionally restricted to modal verbs.
+Translator additions with no Quran-word gloss, such as
 `[in Hellfire]` in 19:45, instead wipe the exact canonical-translation term.
 Result snippets color every visible term that helped the result rank: the typed
 text, thesaurus terms such as `peace` and `tranquility`, query-related word

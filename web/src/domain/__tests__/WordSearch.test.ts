@@ -3,6 +3,7 @@ import {
   ayahHighlightSpans,
   conceptRelevance,
   englishTranslationHighlightSpans,
+  glossAlignmentRelevance,
   filterSurahs,
   isWordSearchQuery,
   matchWordSearch,
@@ -303,6 +304,13 @@ describe('matchWordSearch', () => {
 
     expect(hit?.position).toBe(0)
     expect(hit?.translation).toBe('')
+  })
+
+  it('aligns glosses by bounded words and inflections, never substrings', () => {
+    expect(glossAlignmentRelevance('Indeed, I', 'in')).toBe(0)
+    expect(glossAlignmentRelevance('their hearts', 'heart')).toBeGreaterThan(0)
+    expect(glossAlignmentRelevance('(do) they see', 'see')).toBeGreaterThan(0)
+    expect(glossAlignmentRelevance('(to) doing (it)', 'do')).toBeGreaterThan(0)
   })
 
   it('keeps exact matches ahead of fuzzy neighbors', () => {

@@ -553,11 +553,7 @@ internal fun visibleSearchTargetIndex(
     var bestScore = 0
     for (i in lo..hi) {
         val score = terms.maxOfOrNull { term ->
-            searchTextRelevance(
-                index[i].translationLower,
-                ParsedSearchQuery(term, exactOnly = false),
-                allowFuzzy = false,
-            )
+            glossAlignmentRelevance(index[i].translationLower, term)
         } ?: 0
         if (score > bestScore) {
             bestAt = i
@@ -576,21 +572,31 @@ internal fun visibleSearchTargetIndex(
     // outward from that visible match and pulse its nearest grounded verb.
     for (term in neighboringVisibleTerms(displayText, needles)) {
         val target = (lo..hi).maxByOrNull { i ->
-            searchTextRelevance(
-                index[i].translationLower,
-                ParsedSearchQuery(term, exactOnly = false),
-                allowFuzzy = false,
-            )
+            glossAlignmentRelevance(index[i].translationLower, term)
         } ?: continue
-        if (
-            searchTextRelevance(
-                index[target].translationLower,
-                ParsedSearchQuery(term, exactOnly = false),
-                allowFuzzy = false,
-            ) > 0
-        ) return target
+        if (glossAlignmentRelevance(index[target].translationLower, term) > 0) return target
     }
     return null
+}
+
+private val alignmentWordPattern = Regex("[\\p{L}\\p{N}]+")
+
+private fun alignmentForm(word: String): String = when {
+    word.length > 4 && word.endsWith("ing") -> word.dropLast(3)
+    word.length > 6 && word.endsWith("ness") -> word.dropLast(4)
+    word.length > 5 && word.endsWith("ies") -> word.dropLast(3) + "y"
+    word.length > 4 && word.endsWith("s") -> word.dropLast(1)
+    else -> word
+}
+
+/** Whole-token/stem score for mapping visible translation evidence to a Quran gloss. */
+internal fun glossAlignmentRelevance(gloss: String, visibleTerm: String): Int {
+    val glossWords = alignmentWordPattern.findAll(gloss.lowercase()).map(MatchResult::value).toList()
+    val termWords = alignmentWordPattern.findAll(visibleTerm.lowercase()).map(MatchResult::value).toList()
+    if (glossWords.isEmpty() || termWords.isEmpty()) return 0
+    if (glossWords.windowed(termWords.size).any { it == termWords }) return 2
+    val glossForms = glossWords.mapTo(HashSet(glossWords.size), ::alignmentForm)
+    return if (termWords.all { alignmentForm(it) in glossForms }) 1 else 0
 }
 
 /** Nearby content words that can ground a translation-only auxiliary match. */
