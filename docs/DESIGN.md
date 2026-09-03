@@ -1252,6 +1252,10 @@ does not repeat section labels above those two navigation rows. Text size,
 transliteration, and ayah translation live in Customize with theme, view,
 layout, numeral scripts, verse annotations, the ayah-selector side, and
 word-by-word English under Arabic.
+On the scrolling reader, pinching the scripture changes text size through the
+same nine stops as Customize and keeps the current verse on its reading line.
+The mushaf does not respond: its hand is a property of the fixed page grid, not
+a reader preference.
 A live miniature at the top is a faded leaf with a gold hairline — Hafs,
 Garamond, gold verse marks, and the folio — so each choice shows what the
 sheet will look like. The leaf stays pinned at the top while the choices

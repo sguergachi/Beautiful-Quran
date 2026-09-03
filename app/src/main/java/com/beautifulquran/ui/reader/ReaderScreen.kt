@@ -465,6 +465,12 @@ fun ReaderScreen(
         }
     }
     val haptics = LocalHapticFeedback.current
+    val onPinchFontScale = remember(viewModel.settings, haptics) {
+        { scale: Float ->
+            viewModel.settings.update { it.copy(fontScale = scale) }
+            haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+        }
+    }
     val onRootReturnUserMovedLatest = rememberUpdatedState(onRootReturnUserMoved)
     // Continuous next-chapter advance: fly the opening from footer → header.
     var chapterAdvancing by remember { mutableStateOf(false) }
@@ -2593,6 +2599,10 @@ fun ReaderScreen(
                         }
                         .nestedScroll(chapterPullConnection)
                         .onGloballyPositioned { listCoordinates = it }
+                        .readerFontScalePinch(
+                            currentScale = { viewModel.settings.settings.value.fontScale },
+                            onScale = onPinchFontScale,
+                        )
                         .pointerInput(Unit) {
                             val touchSlop = viewConfiguration.touchSlop
                             awaitEachGesture {
@@ -2602,10 +2612,14 @@ fun ReaderScreen(
                                 gestureBeganAtChapterTop = !listState.canScrollBackward
                                 gestureBeganAtChapterBottom = !listState.canScrollForward
                                 var dragStarted = false
+                                var multiTouch = false
                                 try {
                                     do {
                                         val event = awaitPointerEvent()
-                                        if (!dragStarted) {
+                                        if (event.changes.count { it.pressed } >= 2) {
+                                            multiTouch = true
+                                        }
+                                        if (!dragStarted && !multiTouch) {
                                             val change = event.changes.firstOrNull { it.id == down.id }
                                             if (change != null) {
                                                 val distance =

@@ -100,6 +100,8 @@ import com.beautifulquran.ui.theme.quietClickable
 import com.beautifulquran.ui.theme.shippedCheckParams
 import com.beautifulquran.ui.theme.themePreviewColors
 import com.beautifulquran.ui.theme.verticalFadingEdges
+import kotlin.math.ceil
+import kotlin.math.floor
 import kotlin.math.roundToInt
 
 private val ATTRIBUTIONS = """
@@ -145,6 +147,18 @@ internal fun nudgeFontScale(scale: Float, deltaStops: Int): Float {
         .coerceIn(0, FONT_SCALE_STOPS)
     val next = (current + deltaStops).coerceIn(0, FONT_SCALE_STOPS)
     return FONT_SCALE_MIN + next * FONT_SCALE_STEP
+}
+
+/** Maps a relative pinch to the same discrete stops as the Customize dial. */
+internal fun pinchFontScale(scale: Float, zoom: Float): Float {
+    if (!zoom.isFinite() || zoom <= 0f) return scale
+    val stops = scale * (zoom - 1f) / FONT_SCALE_STEP
+    val delta = when {
+        stops >= 0.5f -> floor(stops + 0.5f).toInt()
+        stops <= -0.5f -> ceil(stops - 0.5f).toInt()
+        else -> 0
+    }
+    return if (delta == 0) scale else nudgeFontScale(scale, delta)
 }
 
 /** Settings as its own sheet of paper — a full page, nothing floating, no
