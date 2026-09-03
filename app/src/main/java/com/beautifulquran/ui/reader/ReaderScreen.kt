@@ -467,7 +467,7 @@ fun ReaderScreen(
     val haptics = LocalHapticFeedback.current
     val onPinchFontScale = remember(viewModel.settings, haptics) {
         { scale: Float ->
-            viewModel.settings.update { it.copy(fontScale = scale) }
+            viewModel.settings.updateFontScale(scale)
             haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
         }
     }

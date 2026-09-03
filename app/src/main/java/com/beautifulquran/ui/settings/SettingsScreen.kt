@@ -100,8 +100,6 @@ import com.beautifulquran.ui.theme.quietClickable
 import com.beautifulquran.ui.theme.shippedCheckParams
 import com.beautifulquran.ui.theme.themePreviewColors
 import com.beautifulquran.ui.theme.verticalFadingEdges
-import kotlin.math.ceil
-import kotlin.math.floor
 import kotlin.math.roundToInt
 
 private val ATTRIBUTIONS = """
@@ -126,6 +124,7 @@ private const val FONT_SCALE_MIN = 0.8f
 private const val FONT_SCALE_MAX = 1.6f
 private const val FONT_SCALE_STOPS = 8 // intervals; nine tappable stops
 private val FONT_SCALE_STEP = (FONT_SCALE_MAX - FONT_SCALE_MIN) / FONT_SCALE_STOPS
+private val PINCH_SCALE_THRESHOLD = FONT_SCALE_STEP * 0.6f
 
 internal enum class SettingsDetail { CUSTOMIZE, DOWNLOADS }
 
@@ -149,16 +148,18 @@ internal fun nudgeFontScale(scale: Float, deltaStops: Int): Float {
     return FONT_SCALE_MIN + next * FONT_SCALE_STEP
 }
 
-/** Maps a relative pinch to the same discrete stops as the Customize dial. */
-internal fun pinchFontScale(scale: Float, zoom: Float): Float {
-    if (!zoom.isFinite() || zoom <= 0f) return scale
-    val stops = scale * (zoom - 1f) / FONT_SCALE_STEP
-    val delta = when {
-        stops >= 0.5f -> floor(stops + 0.5f).toInt()
-        stops <= -0.5f -> ceil(stops - 0.5f).toInt()
-        else -> 0
+/** Maps a relative pinch to Customize stops with a quiet deadband around each boundary. */
+internal fun pinchFontScale(openingScale: Float, zoom: Float, acceptedScale: Float): Float {
+    if (!zoom.isFinite() || zoom <= 0f) return acceptedScale
+    val pinchedScale = openingScale * zoom
+    var next = acceptedScale
+    while (pinchedScale >= next + PINCH_SCALE_THRESHOLD && next < FONT_SCALE_MAX) {
+        next = nudgeFontScale(next, 1)
     }
-    return if (delta == 0) scale else nudgeFontScale(scale, delta)
+    while (pinchedScale <= next - PINCH_SCALE_THRESHOLD && next > FONT_SCALE_MIN) {
+        next = nudgeFontScale(next, -1)
+    }
+    return next
 }
 
 /** Settings as its own sheet of paper — a full page, nothing floating, no

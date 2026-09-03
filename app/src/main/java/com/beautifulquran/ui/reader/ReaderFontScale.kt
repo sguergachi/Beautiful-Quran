@@ -16,25 +16,40 @@ internal fun Modifier.readerFontScalePinch(
         awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
         var openingSpan = 0f
         var openingScale = 1f
+        var acceptedScale = 1f
         var pinching = false
         while (true) {
             val event = awaitPointerEvent(PointerEventPass.Initial)
-            val pressed = event.changes.filter { it.pressed }
-            if (pressed.size >= 2) {
-                val span = (pressed[0].position - pressed[1].position).getDistance()
+            var firstPressed = -1
+            var secondPressed = -1
+            for (index in event.changes.indices) {
+                if (!event.changes[index].pressed) continue
+                if (firstPressed < 0) firstPressed = index else {
+                    secondPressed = index
+                    break
+                }
+            }
+            if (secondPressed >= 0) {
+                val span = (
+                    event.changes[firstPressed].position - event.changes[secondPressed].position
+                ).getDistance()
                 if (!pinching) {
                     openingSpan = span
                     openingScale = currentScale()
+                    acceptedScale = openingScale
                     pinching = true
                 } else if (openingSpan > 0f) {
-                    val scale = pinchFontScale(openingScale, span / openingSpan)
-                    if (scale != currentScale()) onScale(scale)
+                    val scale = pinchFontScale(openingScale, span / openingSpan, acceptedScale)
+                    if (scale != acceptedScale) {
+                        acceptedScale = scale
+                        onScale(scale)
+                    }
                 }
                 event.changes.forEach { it.consume() }
             } else if (pinching) {
                 event.changes.forEach { it.consume() }
             }
-            if (pressed.isEmpty()) break
+            if (firstPressed < 0) break
         }
     }
 }

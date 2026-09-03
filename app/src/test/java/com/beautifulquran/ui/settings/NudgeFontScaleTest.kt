@@ -32,20 +32,38 @@ class NudgeFontScaleTest {
 
     @Test
     fun `pinch crosses the same scale stops`() {
-        assertEquals(1.1f, pinchFontScale(1f, 1.06f), 0.001f)
-        assertEquals(0.9f, pinchFontScale(1f, 0.94f), 0.001f)
-        assertEquals(1.3f, pinchFontScale(1f, 1.26f), 0.001f)
+        assertEquals(1.1f, pinchFontScale(1f, 1.061f, 1f), 0.001f)
+        assertEquals(0.9f, pinchFontScale(1f, 0.939f, 1f), 0.001f)
+        assertEquals(1.3f, pinchFontScale(1f, 1.261f, 1f), 0.001f)
     }
 
     @Test
     fun `small pinch stays at the current scale`() {
-        assertEquals(1f, pinchFontScale(1f, 1.04f), 0.001f)
-        assertEquals(1.04f, pinchFontScale(1.04f, 1f), 0.001f)
+        assertEquals(1f, pinchFontScale(1f, 1.04f, 1f), 0.001f)
+        assertEquals(1.04f, pinchFontScale(1.04f, 1f, 1.04f), 0.001f)
+    }
+
+    @Test
+    fun `pinch hysteresis does not chatter around a stop boundary`() {
+        var accepted = 1f
+        repeat(4) {
+            accepted = pinchFontScale(1f, 1.051f, accepted)
+            accepted = pinchFontScale(1f, 1.049f, accepted)
+        }
+        assertEquals(1f, accepted, 0.001f)
+
+        accepted = pinchFontScale(1f, 1.061f, accepted)
+        repeat(4) {
+            accepted = pinchFontScale(1f, 1.049f, accepted)
+            accepted = pinchFontScale(1f, 1.051f, accepted)
+        }
+        assertEquals(1.1f, accepted, 0.001f)
+        assertEquals(1f, pinchFontScale(1f, 1.039f, accepted), 0.001f)
     }
 
     @Test
     fun `pinch clamps at the reader limits`() {
-        assertEquals(1.6f, pinchFontScale(1.5f, 2f), 0.001f)
-        assertEquals(0.8f, pinchFontScale(0.9f, 0.1f), 0.001f)
+        assertEquals(1.6f, pinchFontScale(1.5f, 2f, 1.5f), 0.001f)
+        assertEquals(0.8f, pinchFontScale(0.9f, 0.1f, 0.9f), 0.001f)
     }
 }

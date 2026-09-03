@@ -248,8 +248,10 @@ ReaderFocusController ── holds the LazyListState; the sole writer to it
   pinning line one.
 - Pinching the scrolling reader moves its font scale through the same persisted
   0.8×–1.6× stops as Customize. The two-pointer detector consumes only after a
-  second contact arrives, leaving one-finger scrolling and word gestures alone;
-  the fixed-grid mushaf intentionally does not resize.
+  second contact arrives, cancels any page-stack pull, and applies hysteresis
+  around each stop so hand jitter cannot repeatedly reflow the page. One-finger
+  scrolling and word gestures remain alone; the fixed-grid mushaf intentionally
+  does not resize.
 - Word-level follow is the engine's *secondary* constraint: while follow is on,
   each active word reports its list-viewport bounds and
   `ReaderFocusController.keepWordInView` applies a **bottom-only** reading-band
