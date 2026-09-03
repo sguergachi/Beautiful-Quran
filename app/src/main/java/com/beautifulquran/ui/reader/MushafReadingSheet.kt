@@ -112,29 +112,35 @@ private val MushafRuleTailAir = 0.dp
 // the text.
 /**
  * Which way the book turns: the leaf, the rule under it and the folio between
- * them, in one figure.
+ * them, from one answer.
  *
  * They are one thing seen three ways — the paper, its edge side-on, and the
  * number printed on it — so they cannot hold separate opinions. They did, twice
  * in one afternoon, and each time half a turn was worse than none.
  *
- * **False**, because this is a book of the translation: set in English, read
- * left to right, bound on the left. Turning it the mushaf's way put every
- * chapter's evenly divided ending *after* its opening instead of before it, so
- * a reader swiping the way an English reader swipes met a half page every time
- * a chapter began. The pagination was right and the direction was reading it
- * backwards.
+ * A mushaf is bound on the right and read right to left. A book of the
+ * translation is set in English, read left to right and bound on the left, and
+ * turning it the mushaf's way puts every chapter's evenly divided ending
+ * *after* its opening instead of before it — so a reader met a half page each
+ * time a chapter began, the pagination correct and the direction reading it
+ * backwards. It is the same book either way; it is not the same object.
+ *
+ * The [english] handed here must be the one the *leaf* is set from, and one
+ * value of it, not two definitions that agree until they do not. An English
+ * book exists whenever the mushaf does — the pagination is built for both
+ * settings — so "is there an English book" is not the question. "Which is this
+ * leaf" is.
  *
  * Mirroring the rule with it is not one flip, which is what made this hard.
  * [mushafDialAlong] turns a book fraction into a place on the rule and every
  * mark, seat, trough and landing asks it — but two of them then *relax* their
  * results apart, walking the rule and pushing each neighbour clear of the last,
- * and those walks had the mushaf's direction built into them. Reversed, they do
+ * and those walks had the mushaf's direction built into them. Reversed they do
  * not mirror the comb: they force every seat past its neighbour and pile the
- * whole book into half the rule, which is precisely what shipped the first time
- * and precisely what the thumb cannot show you. Prove it on the comb.
+ * whole book into half the rule, which is what shipped the first time and what
+ * the thumb cannot show you. Prove it on the comb.
  */
-internal const val MushafTurnsRightToLeft = false
+internal fun mushafTurnsRightToLeft(english: Boolean): Boolean = !english
 
 private val MushafDialHeadAir = 8.dp
 
@@ -309,7 +315,7 @@ internal fun MushafReadingSheet(
                             // Read here rather than in composition: a turn
                             // moves the figure without recomposing the sheet.
                             val away = index - centre - pageOffset()
-                            val x = if (MushafTurnsRightToLeft) -away else away
+                            val x = if (mushafTurnsRightToLeft(english)) -away else away
                             IntOffset((x * trackPx).roundToInt(), 0)
                         }
                         .padding(horizontal = MushafPageMargin + MushafEdgeGutter)
@@ -327,7 +333,7 @@ internal fun MushafReadingSheet(
             onSeekSurah = onSeekSurah,
             onWarmPage = onWarmPage,
             onScrubbing = { scrubbing.value = it; onScrubbing(it) },
-            rightToLeft = MushafTurnsRightToLeft,
+            rightToLeft = mushafTurnsRightToLeft(english),
             onLanding = onLanding,
             reciting = reciting,
             // Paper between the folio and the rule. The figure now stands in

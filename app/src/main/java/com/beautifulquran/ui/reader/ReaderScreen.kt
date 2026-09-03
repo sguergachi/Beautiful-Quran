@@ -2504,7 +2504,10 @@ fun ReaderScreen(
                         // they are recited, and the thumb has something to mark
                         // and something to be dragged along.
                         pageAt = mushafLeafPage,
-                        english = englishBook != null,
+                        // The same answer the pager turns on: which hand this
+                        // leaf is set in, not whether an English book exists —
+                        // it exists in both settings.
+                        english = settings.readingMode == ReadingMode.ENGLISH_ONLY,
                         pageNumberScript = settings.pageNumberScript,
                         // The folio rides the leaf: the band is centred on the
                         // pager's own page and slid by its own offset.

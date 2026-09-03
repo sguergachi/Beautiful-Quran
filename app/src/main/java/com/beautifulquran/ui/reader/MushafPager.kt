@@ -1025,8 +1025,9 @@ internal fun MushafPager(
         // was the visible pause between release and the new folio.
         beyondViewportPageCount = if (holdNeighbours && !parkNeighbours()) 1 else 0,
         // The leaf, the rule and the folio turn together — see
-        // MushafTurnsRightToLeft, which is the only place that decides it.
-        reverseLayout = MushafTurnsRightToLeft,
+        // mushafTurnsRightToLeft, which is the only thing that decides it, and
+        // is handed the same `english` the sheet's rule is.
+        reverseLayout = mushafTurnsRightToLeft(english),
         key = { it },
         modifier = modifier
             .fillMaxSize()
