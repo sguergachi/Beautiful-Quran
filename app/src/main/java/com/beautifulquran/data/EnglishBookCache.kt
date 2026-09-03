@@ -110,6 +110,6 @@ class EnglishBookCache(context: Context) {
 
     private companion object {
         /** Bump when the meaning of a written leaf changes. */
-        const val FORMAT = 3
+        const val FORMAT = 4
     }
 }

@@ -626,6 +626,19 @@ arithmetic of its own in between. The contract returns null for "the offer all
 fitted", and the pagination widens the offer rather than ending a leaf short,
 so no leaf is ever decided by how much text it happened to be shown.
 
+**And the cut is snapped where the leaf will snap it.** `englishLeafBreak` moves
+an offset off the middle of a word and *out of any bracket* — the reader may
+have asked for the translator's asides to come off, and half a bracket on each
+leaf would strip neither. So a cut landing inside `[the cause of]` is pushed
+past the closing bracket, and those words wrap onto a line the leaf was never
+given: the last line comes out holding `cause of]` and nothing else. The ruler
+snaps it itself now, where the layout can still be asked whether the snapped cut
+is on the last line the leaf has — and offers the line before it when it is not,
+so the leaf sets one line fewer and *fills* it rather than one more and leaves
+it a fragment. Measured over six leaves of Ali 'Imran, the last line went from
+0.46 of a median line at its worst to 0.77, and three of the six now end within
+a percent of a full line.
+
 One detail is worth naming: **lines are not all the same height.** A line
 carrying only a verse mark is set in another face and stands another height, and
 that is exactly the line that falls at the foot. So the ruler counts by

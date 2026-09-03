@@ -777,7 +777,16 @@ internal fun mushafDialCombCellSeats(
         result[idx] = x.coerceIn(insetPx, widthPx - insetPx)
     }
     val span = (widthPx - 2f * insetPx).coerceAtLeast(0f)
-    val minGap = minOf(rulePx * 1.5f, span / (marks.size - 1).coerceAtLeast(1))
+    // A cell wide enough to hit. These seats are not the comb — the drawn ticks
+    // keep their own tighter spacing — they are the slices of rule each chapter
+    // alone answers to, and a slice has to be reachable by a finger. Al-Baqarah
+    // opens the leaf after Al-Fatihah, so on page position the two sit within a
+    // pixel of each other and 1.5 rule-widths of relaxation left chapter two a
+    // four-pixel target: present on the comb and impossible to land on. An even
+    // share of the rule is 114 chapters into its measure, and that is the floor
+    // now — crowded runs spread to it, and everywhere the book breathes the
+    // seats stay where the pages put them.
+    val minGap = span / marks.size.coerceAtLeast(1)
     // Relax the seats apart in reading order, then clamp them back inside the
     // track from the far end. Both walks run the way the book does: seats
     // descend the rule in a mushaf and climb it in a book of the translation,
