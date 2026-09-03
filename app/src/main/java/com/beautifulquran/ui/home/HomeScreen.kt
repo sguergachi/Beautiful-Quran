@@ -111,9 +111,9 @@ private val SearchBottomBreath = 12.dp
 @Composable
 fun HomeScreen(
     viewModel: HomeViewModel,
-    /** [wordPosition] is set when opening from a Quran-wide word hit so the
-     *  reader can flash that word; null for surah / reference / continue. */
-    onOpenSurah: (surahId: Int, ayah: Int?, wordPosition: Int?) -> Unit,
+    /** Search hits carry a word position, or zero plus [searchText] when the
+     * visible match is a translator addition with no Quran-word position. */
+    onOpenSurah: (surahId: Int, ayah: Int?, wordPosition: Int?, searchText: String?) -> Unit,
     onOpenSettings: () -> Unit,
     /** True while the paper stack is on (or near) the chapter list — drives
      *  the floating transport's enter/exit across page turns. */
@@ -321,7 +321,7 @@ fun HomeScreen(
                             uiState.continueTarget?.let { target ->
                                 ContinueRow(
                                     target = target,
-                                    onClick = { onOpenSurah(target.surah.id, target.ayah, null) },
+                                    onClick = { onOpenSurah(target.surah.id, target.ayah, null, null) },
                                 )
                             }
                         }
@@ -360,6 +360,7 @@ fun HomeScreen(
                                             ?.takeIf { it.surah.id == surah.id }
                                             ?.ayah,
                                         null,
+                                        null,
                                     )
                                 },
                             )
@@ -386,7 +387,12 @@ fun HomeScreen(
                                         query = uiState.query,
                                         onClick = {
                                             focusManager.clearFocus()
-                                            onOpenSurah(hit.surahId, hit.ayahNumber, hit.position)
+                                            onOpenSurah(
+                                                hit.surahId,
+                                                hit.ayahNumber,
+                                                hit.position,
+                                                uiState.query,
+                                            )
                                         },
                                     )
                                 }
@@ -444,7 +450,7 @@ fun HomeScreen(
                 visible = searchPaneVisible,
                 onOpen = { surahId, ayah ->
                     focusManager.clearFocus()
-                    onOpenSurah(surahId, ayah, null)
+                    onOpenSurah(surahId, ayah, null, null)
                 },
                 modifier = Modifier
                     .align(Alignment.TopCenter)
@@ -470,7 +476,7 @@ fun HomeScreen(
                 onOpenNowPlaying = {
                     val target = floatingPlayback ?: return@FloatingPlaybackControl
                     focusManager.clearFocus()
-                    onOpenSurah(target.surah.id, target.ayah, null)
+                    onOpenSurah(target.surah.id, target.ayah, null, null)
                 },
                 onReciterClick = onOpenSettings,
                 onPlayPause = viewModel::togglePlayPause,

@@ -773,6 +773,7 @@ export function ReaderScreen({ stackLayer }: { stackLayer: StackLayer }) {
   const [flashTarget, setFlashTarget] = useState<{
     ayah: number
     wordPosition: number
+    text?: string
   } | null>(null)
   useEffect(() => {
     if (!content || !isTop || !initialFocusSettled || pendingFlash == null) {
@@ -782,7 +783,8 @@ export function ReaderScreen({ stackLayer }: { stackLayer: StackLayer }) {
     const ayah = pendingFlash.ayah
     const word = pendingFlash.wordPosition
     const ayahRow = content.ayahs.find((a) => a.number === ayah)
-    if (!ayahRow || !ayahRow.words.some((w) => w.position === word)) {
+    if (!ayahRow || (word > 0 && !ayahRow.words.some((w) => w.position === word)) ||
+      (word === 0 && !pendingFlash.text)) {
       appStore.clearSearchFlash()
       return
     }
@@ -790,7 +792,7 @@ export function ReaderScreen({ stackLayer }: { stackLayer: StackLayer }) {
     let clearTimer = 0
     const startTimer = window.setTimeout(() => {
       if (cancelled) return
-      setFlashTarget({ ayah, wordPosition: word })
+      setFlashTarget({ ayah, wordPosition: word, text: pendingFlash.text })
       clearTimer = window.setTimeout(() => {
         if (cancelled) return
         setFlashTarget(null)
@@ -808,6 +810,7 @@ export function ReaderScreen({ stackLayer }: { stackLayer: StackLayer }) {
     initialFocusSettled,
     pendingFlash?.ayah,
     pendingFlash?.wordPosition,
+    pendingFlash?.text,
   ])
 
   // Scroll readout + return-to-verse placement.
@@ -1500,6 +1503,11 @@ export function ReaderScreen({ stackLayer }: { stackLayer: StackLayer }) {
                         flashTarget?.ayah === ayah.number
                           ? flashTarget.wordPosition
                           : null
+                      }
+                      searchFlashText={
+                        flashTarget?.ayah === ayah.number
+                          ? flashTarget.text
+                          : undefined
                       }
                     />
                   </div>

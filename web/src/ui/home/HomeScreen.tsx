@@ -414,6 +414,7 @@ export function HomeScreen({ stackLayer }: { stackLayer: StackLayer }) {
                         hit.surahId,
                         hit.ayahNumber,
                         hit.position,
+                        search,
                       )
                     }
                   />

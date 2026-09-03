@@ -802,6 +802,11 @@ function visibleSearchTargetIndex(
   }
   if (bestAt != null) return bestAt
 
+  const auxiliaryOnly = needles
+    .flatMap((needle) => needle.match(/[\p{L}\p{N}]+/gu) ?? [])
+    .every((term) => TRANSLATION_ONLY_AUXILIARIES.has(term.toLowerCase()))
+  if (!auxiliaryOnly) return null
+
   // The canonical translation can add an auxiliary with no one-to-one word
   // gloss ("could see", "could have taken"). Pulse its nearest grounded verb.
   for (const term of neighboringVisibleTerms(displayText, needles)) {
@@ -1156,10 +1161,14 @@ const HIGHLIGHT_FILLERS = new Set([
 
 const TARGET_CONTEXT_FILLERS = new Set([
   ...HIGHLIGHT_FILLERS,
-  'but', 'can', 'could', 'had', 'he', 'her', 'him', 'his', 'how', 'if', 'is', 'it',
+  'but', 'can', 'could', 'had', 'he', 'her', 'him', 'his', 'how', 'if', 'in', 'is', 'it',
   'its', 'may', 'might', 'nor', 'not', 'or', 'shall', 'she', 'should', 'so', 'than',
   'them', 'there', 'these', 'to', 'we', 'what', 'when', 'where', 'which', 'who',
   'whom', 'whose', 'why', 'would',
+])
+
+const TRANSLATION_ONLY_AUXILIARIES = new Set([
+  'can', 'could', 'may', 'might', 'shall', 'should', 'will', 'would',
 ])
 
 function highlightAllOccurrences(text: string, needles: string[]): AyahTextSpan[] {

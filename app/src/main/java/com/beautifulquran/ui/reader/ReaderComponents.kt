@@ -2512,6 +2512,8 @@ fun AyahBlock(
     searchQuery: String? = null,
     /** 1-based word to orange-flash (home search hit); null = no flash. */
     flashWordPosition: Int? = null,
+    /** Exact canonical-translation term used when [flashWordPosition] is zero. */
+    searchFlashText: String? = null,
     keepActiveWordInView: Boolean = false,
     /** LazyColumn layout coords — used to map the active word into viewport
      * space for word-band follow. */
@@ -2735,6 +2737,17 @@ fun AyahBlock(
         wetInk = reciting,
     )
     val searchHitWash = rememberSearchHitWash(flashWordPosition)
+    val translationFlashRanges = remember(ayah.translation, searchFlashText, flashWordPosition) {
+        if (flashWordPosition == 0) {
+            SearchHitFlash.textRanges(ayah.translation, searchFlashText)
+        } else {
+            emptyList()
+        }
+    }
+    var translationLayout by remember(ayah.surahId, ayah.number) {
+        mutableStateOf<TextLayoutResult?>(null)
+    }
+    val searchInk = LocalQuranAccents.current.repeatInk
     // Arabic-only uses this ayah-level paper cover. Owning its clock here
     // keeps the shaped renderer paint-only.
     val recessCover = animateFloatAsState(
@@ -2883,7 +2896,31 @@ fun AyahBlock(
                     modifier = Modifier
                         .fillMaxWidth()
                         .graphicsLayer { alpha = translationRecess.value }
+                        .shapedWordBloom(
+                            blooms = {
+                                if (searchHitWash.alpha.value <= 0f) {
+                                    emptyList()
+                                } else {
+                                    translationFlashRanges.map { range ->
+                                        ShapedWordBloom.ColorReveal(
+                                            range = range,
+                                            progress = searchHitWash.progress.value,
+                                            color = searchInk,
+                                            layerAlpha = searchHitWash.alpha.value,
+                                            colorAlpha = InkEngine.tuning.repeatInkAlpha,
+                                            glowAlpha = SearchHitFlash.EMPHASIS_GLOW_ALPHA,
+                                            glowRadius = SearchHitFlash.EMPHASIS_GLOW_RADIUS,
+                                            travelingBandFraction = SearchHitFlash.BAND_FRACTION,
+                                            travelingEdgeShare = SearchHitFlash.EDGE_SHARE,
+                                        )
+                                    }
+                                }
+                            },
+                            layout = { translationLayout },
+                            rtl = false,
+                        )
                         .quietClickable(onClick = onAyahClick),
+                    onTextLayout = { translationLayout = it },
                 )
             }
             // Reciting clears annotation off the sheet so only scripture is

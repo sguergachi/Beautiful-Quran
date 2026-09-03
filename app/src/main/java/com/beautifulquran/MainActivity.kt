@@ -300,8 +300,9 @@ private fun PaperStackApp(
     var selectedSurahId by rememberSaveable { mutableIntStateOf(0) }
     var selectedStartAyah by rememberSaveable { mutableIntStateOf(0) }
     var selectedStartPlayback by rememberSaveable { mutableStateOf(false) }
-    /** 1-based word position from a home word-search hit; 0 means no flash. */
-    var selectedStartWord by rememberSaveable { mutableIntStateOf(0) }
+    /** Search target: positive = Quran word, zero = exact translator text, negative = none. */
+    var selectedStartWord by rememberSaveable { mutableIntStateOf(-1) }
+    var selectedSearchText by rememberSaveable { mutableStateOf<String?>(null) }
     var settingsDetail by rememberSaveable(
         stateSaver = Saver<SettingsDetail?, String>(
             save = { it?.name },
@@ -506,7 +507,8 @@ private fun PaperStackApp(
         selectedSurahId = surahId
         selectedStartAyah = startAyah
         selectedStartPlayback = play
-        selectedStartWord = 0
+        selectedStartWord = -1
+        selectedSearchText = null
         jumpEpoch++
         readerSession++
         animateTo(AYAH_LAYER)
@@ -614,7 +616,8 @@ private fun PaperStackApp(
         selectedSurahId = surahId
         selectedStartAyah = ayah
         selectedStartPlayback = false
-        selectedStartWord = 0
+        selectedStartWord = -1
+        selectedSearchText = null
         jumpEpoch++
         readerSession++
         animateTo(AYAH_LAYER)
@@ -630,7 +633,8 @@ private fun PaperStackApp(
         selectedSurahId = target.surahId
         selectedStartAyah = target.ayah
         selectedStartPlayback = false
-        selectedStartWord = 0
+        selectedStartWord = -1
+        selectedSearchText = null
         jumpEpoch++
         readerSession++
         animateTo(AYAH_LAYER)
@@ -751,7 +755,8 @@ private fun PaperStackApp(
                     selectedSurahId = surahId
                     selectedStartAyah = ayah
                     selectedStartPlayback = false
-                    selectedStartWord = 0
+                    selectedStartWord = -1
+                    selectedSearchText = null
                     jumpEpoch++
                     readerSession++
                     animateTo(AYAH_LAYER)
@@ -830,7 +835,8 @@ private fun PaperStackApp(
                         surahId = selectedSurahId,
                         startAyah = selectedStartAyah.takeIf { it > 0 },
                         startPlaybackRequested = selectedStartPlayback,
-                        startWordPosition = selectedStartWord.takeIf { it > 0 },
+                        startWordPosition = selectedStartWord.takeIf { it >= 0 },
+                        startSearchText = selectedSearchText,
                         readerSheetSettled = {
                             abs(stackPosition.value - AYAH_LAYER) <= 0.01f
                         },
@@ -843,13 +849,15 @@ private fun PaperStackApp(
                             selectedSurahId = nextId
                             selectedStartAyah = 0
                             selectedStartPlayback = false
-                            selectedStartWord = 0
+                            selectedStartWord = -1
+                            selectedSearchText = null
                         },
                         onOpenPreviousChapter = { prevId ->
                             selectedSurahId = prevId
                             selectedStartAyah = 0
                             selectedStartPlayback = false
-                            selectedStartWord = 0
+                            selectedStartWord = -1
+                            selectedSearchText = null
                         },
                         onAyahSelectorExpandedChange = { ayahSelectorExpanded = it },
                         onOpenRootViewer = { sid, a, word -> onWordLongPress(sid, a, word) },
@@ -939,12 +947,13 @@ private fun PaperStackApp(
         ) {
             HomeScreen(
                 viewModel = homeViewModel,
-                onOpenSurah = { surahId, ayah, wordPosition ->
+                onOpenSurah = { surahId, ayah, wordPosition, searchText ->
                     readerViewModel.load(surahId)
                     selectedSurahId = surahId
                     selectedStartAyah = ayah ?: 0
                     selectedStartPlayback = false
-                    selectedStartWord = wordPosition ?: 0
+                    selectedStartWord = wordPosition ?: -1
+                    selectedSearchText = searchText
                     readerSession++
                     animateTo(AYAH_LAYER)
                 },

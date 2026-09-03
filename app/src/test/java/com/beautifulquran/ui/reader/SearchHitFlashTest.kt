@@ -24,6 +24,14 @@ class SearchHitFlashTest {
     }
 
     @Test
+    fun `translator-only prefix match flashes the complete visible word`() {
+        val text = "a companion [in Hellfire]"
+
+        assertEquals(listOf(16..23), SearchHitFlash.textRanges(text, "hell"))
+        assertEquals(listOf(16..23), SearchHitFlash.textRanges(text, "\"Hell\""))
+    }
+
+    @Test
     fun `mushaf waits for its leaf and never for the unmounted scrolling list`() {
         assertTrue(
             SearchHitFlash.isTargetSettled(

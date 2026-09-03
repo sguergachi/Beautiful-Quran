@@ -566,6 +566,11 @@ internal fun visibleSearchTargetIndex(
     }
     if (bestAt != null) return bestAt
 
+    val auxiliaryOnly = needles
+        .flatMap { Regex("[\\p{L}\\p{N}]+").findAll(it).map(MatchResult::value) }
+        .all { it.lowercase() in translationOnlyAuxiliaries }
+    if (!auxiliaryOnly) return null
+
     // Saheeh International sometimes adds an English auxiliary that has no
     // one-to-one Quran word gloss ("could see", "could have taken"). Walk
     // outward from that visible match and pulse its nearest grounded verb.
@@ -828,10 +833,14 @@ private val highlightFillers = setOf(
 )
 
 private val targetContextFillers = highlightFillers + setOf(
-    "but", "can", "could", "had", "he", "her", "him", "his", "how", "if", "is", "it",
+    "but", "can", "could", "had", "he", "her", "him", "his", "how", "if", "in", "is", "it",
     "its", "may", "might", "nor", "not", "or", "shall", "she", "should", "so", "than",
     "them", "there", "these", "to", "we", "what", "when", "where", "which", "who",
     "whom", "whose", "why", "would",
+)
+
+private val translationOnlyAuxiliaries = setOf(
+    "can", "could", "may", "might", "shall", "should", "will", "would",
 )
 
 private fun highlightAllOccurrences(text: String, needles: List<String>): List<AyahTextSpan> {

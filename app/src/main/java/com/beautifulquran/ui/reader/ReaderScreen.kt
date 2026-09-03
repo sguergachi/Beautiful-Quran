@@ -211,8 +211,9 @@ fun ReaderScreen(
     startAyah: Int?,
     /** True when [startAyah] came from an autoplay intent, not a bare focus selection. */
     startPlaybackRequested: Boolean = false,
-    /** 1-based word from a home word-search hit — triggers the orange flash. */
+    /** Positive = word hit; zero = translator-only [startSearchText] hit. */
     startWordPosition: Int? = null,
+    startSearchText: String? = null,
     /** True only after the reader sheet has finished turning into view. */
     readerSheetSettled: () -> Boolean = { true },
     viewModel: ReaderViewModel,
@@ -281,7 +282,7 @@ fun ReaderScreen(
         val page = catalog.pageOf(
             surahId,
             startAyah?.coerceAtLeast(1) ?: 1,
-            startWordPosition ?: 1,
+            (startWordPosition ?: 1).coerceAtLeast(1),
         )
         (page - 1).coerceIn(0, catalog.pageCount - 1)
     }
@@ -1284,6 +1285,7 @@ fun ReaderScreen(
         mushafOpeningPage,
         startAyah,
         startWordPosition,
+        startSearchText,
     ) {
         searchFlashAyah = null
         searchFlashWord = null
@@ -1296,7 +1298,8 @@ fun ReaderScreen(
         if (content.surah.id != surahId) return@LaunchedEffect
         if (ayah !in 1..content.ayahs.size) return@LaunchedEffect
         val ayahWords = content.ayahs[ayah - 1].words
-        if (ayahWords.none { it.position == word }) return@LaunchedEffect
+        if (word > 0 && ayahWords.none { it.position == word }) return@LaunchedEffect
+        if (word == 0 && startSearchText.isNullOrBlank()) return@LaunchedEffect
         val targetPage = mushafOpeningPage
         if (mushafMode && targetPage == null) return@LaunchedEffect
         snapshotFlow {
@@ -2799,6 +2802,10 @@ fun ReaderScreen(
                                 searchQuery = activeQuery,
                                 flashWordPosition = searchFlashWord
                                     ?.takeIf { searchFlashAyah == ayah.number },
+                                searchFlashText = startSearchText
+                                    ?.takeIf {
+                                        searchFlashAyah == ayah.number && searchFlashWord == 0
+                                    },
                                 // Word-level following tracks the karaoke owner,
                                 // not the fade-led focus target — otherwise the
                                 // last word is abandoned during the lead window.

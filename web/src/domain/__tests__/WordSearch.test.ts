@@ -289,6 +289,22 @@ describe('matchWordSearch', () => {
     }
   })
 
+  it('never falls through a translator addition into indeed', () => {
+    const ayahTranslation =
+      'O my father, indeed I fear a punishment, so you would be a companion [in Hellfire]'
+    const ayah = [
+      { ...entry(19, 45, 1, 'يَـٰٓأَبَتِ', 'O my father'), ayahTranslation },
+      { ...entry(19, 45, 2, 'إِنِّيٓ', 'Indeed, I'), ayahTranslation },
+      { ...entry(19, 45, 3, 'أَخَافُ', '[I] fear'), ayahTranslation },
+      { ...entry(19, 45, 4, 'وَلِيّٗا', 'a friend'), ayahTranslation },
+    ]
+
+    const [hit] = matchWordSearch(ayah, 'hell')
+
+    expect(hit?.position).toBe(0)
+    expect(hit?.translation).toBe('')
+  })
+
   it('keeps exact matches ahead of fuzzy neighbors', () => {
     const neighbors = [entry(1, 1, 1, 'قَالَ', 'lone'), entry(2, 1, 1, 'حُبّ', 'love')]
     expect(matchWordSearch(neighbors, 'love', 1).map((h) => h.translation)).toEqual(['love'])

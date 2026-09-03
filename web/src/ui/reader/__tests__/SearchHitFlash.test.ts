@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   SearchHitFlash,
+  searchHitTextRanges,
   searchHitWipeMs,
   searchHitFlashTotalMs,
 } from '../SearchHitFlash'
@@ -15,5 +16,10 @@ describe('SearchHitFlash', () => {
     expect(SearchHitFlash.EDGE_SHARE).toBeGreaterThanOrEqual(0.15)
     expect(SearchHitFlash.EDGE_SHARE).toBeLessThanOrEqual(0.3)
     expect(searchHitFlashTotalMs()).toBeLessThan(3000)
+  })
+
+  it('expands a translator-only prefix to the complete visible word', () => {
+    expect(searchHitTextRanges('a companion [in Hellfire]', 'hell')).toEqual([[16, 24]])
+    expect(searchHitTextRanges('a companion [in Hellfire]', '"Hell"')).toEqual([[16, 24]])
   })
 })

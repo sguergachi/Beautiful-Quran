@@ -1,4 +1,4 @@
-import { memo, useEffect, useMemo, useRef, useState } from 'react'
+import { memo, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { ActiveWord, Ayah, Word } from '../data/models'
 import type { ReadingMode, VerseNumberScript } from '../data/settings'
 import {
@@ -12,6 +12,8 @@ import { WordUnit } from './WordUnit'
 import { HafsWord } from './HafsWord'
 import { VerseBookmarkRibbon } from './VerseBookmarkRibbon'
 import { RepeatWashGateProvider } from './RepeatWashContext'
+import { runSearchHitWash } from './inkWash'
+import { SearchHitFlash, searchHitTextRanges } from '../ui/reader/SearchHitFlash'
 
 interface Props {
   ayah: Ayah
@@ -37,6 +39,8 @@ interface Props {
   searchQuery?: string | null
   /** 1-based word to orange-flash (home search hit); null = no flash. */
   flashWordPosition?: number | null
+  /** Exact canonical-translation term when [flashWordPosition] is zero. */
+  searchFlashText?: string | null
   /** Tap a word to start recitation at that word's timing. */
   onPlayWord: (ayah: number, wordPosition: number) => void
   onToggleBookmark: (ayah: number) => boolean
@@ -64,6 +68,7 @@ function AyahBlockInner({
   fontScale,
   searchQuery = null,
   flashWordPosition = null,
+  searchFlashText = null,
   onPlayWord,
   onToggleBookmark,
   onHoldWord,
@@ -103,6 +108,39 @@ function AyahBlockInner({
     query != null && ayah.translation.toLowerCase().includes(query)
   const hits = (translation: string) =>
     query != null && translation.toLowerCase().includes(query)
+  const translationRef = useRef<HTMLParagraphElement>(null)
+  const translationContent = useMemo<ReactNode>(() => {
+    if (flashWordPosition !== 0) return ayah.translation
+    const ranges = searchHitTextRanges(ayah.translation, searchFlashText)
+    if (!ranges.length) return ayah.translation
+    const parts: ReactNode[] = []
+    let cursor = 0
+    for (const [start, end] of ranges) {
+      if (start > cursor) parts.push(ayah.translation.slice(cursor, start))
+      const match = ayah.translation.slice(start, end)
+      parts.push(
+        <span className="translation-search-term" key={`${start}-${end}`}>
+          {match}
+          <span className="translation-search-term__wash" data-search-flash-overlay aria-hidden>
+            {match}
+          </span>
+        </span>,
+      )
+      cursor = end
+    }
+    if (cursor < ayah.translation.length) parts.push(ayah.translation.slice(cursor))
+    return parts
+  }, [ayah.translation, flashWordPosition, searchFlashText])
+
+  useEffect(() => {
+    if (flashWordPosition !== 0) return
+    const overlays = translationRef.current
+      ?.querySelectorAll<HTMLElement>('[data-search-flash-overlay]') ?? []
+    const cancels = [...overlays].map((overlay) =>
+      runSearchHitWash(overlay, SearchHitFlash),
+    )
+    return () => cancels.forEach((cancel) => cancel())
+  }, [flashWordPosition, searchFlashText])
 
   useEffect(() => {
     if (!keepActiveWordInView || !onKeepWordInView) return
@@ -211,6 +249,7 @@ function AyahBlockInner({
 
       {showTranslation && readingMode === 'arabic_english' && ayah.translation ? (
         <p
+          ref={translationRef}
           className="ayah-translation"
           data-search-hit={translationHit ? 'true' : undefined}
           // Combined alpha documented for tests/devtools; visual recess is CSS.
@@ -218,7 +257,7 @@ function AyahBlockInner({
             ['--ayah-translation-alpha' as string]: String(ayahTranslationAlpha(dimmed)),
           }}
         >
-          {ayah.translation}
+          {translationContent}
         </p>
       ) : null}
     </article>
@@ -249,6 +288,7 @@ export const AyahBlock = memo(AyahBlockInner, (prev, next) => {
     prev.speed === next.speed &&
     prev.fontScale === next.fontScale &&
     prev.searchQuery === next.searchQuery &&
-    prev.flashWordPosition === next.flashWordPosition
+    prev.flashWordPosition === next.flashWordPosition &&
+    prev.searchFlashText === next.searchFlashText
   )
 })

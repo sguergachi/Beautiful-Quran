@@ -319,6 +319,23 @@ class WordSearchTest {
     }
 
     @Test
+    fun `translator addition never falls through a preposition into indeed`() {
+        val ayahTranslation =
+            "O my father, indeed I fear a punishment, so you would be a companion [in Hellfire]"
+        val ayah = listOf(
+            entry(19, 45, 1, "يَـٰٓأَبَتِ", "O my father", ayahTranslation = ayahTranslation),
+            entry(19, 45, 2, "إِنِّيٓ", "Indeed, I", ayahTranslation = ayahTranslation),
+            entry(19, 45, 3, "أَخَافُ", "[I] fear", ayahTranslation = ayahTranslation),
+            entry(19, 45, 4, "وَلِيّٗا", "a friend", ayahTranslation = ayahTranslation),
+        )
+
+        val hit = matchWordSearch(ayah, "hell").single()
+
+        assertEquals(0, hit.position)
+        assertEquals("", hit.translation)
+    }
+
+    @Test
     fun `matched Arabic root expands to related word forms`() {
         val rooted = listOf(
             entry(2, 37, 1, "فَتَابَ", "so He turned").copy(root = "توب"),

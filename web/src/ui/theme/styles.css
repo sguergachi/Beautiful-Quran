@@ -2074,6 +2074,19 @@ select {
   font-weight: 600;
 }
 
+.translation-search-term {
+  position: relative;
+  display: inline-block;
+  color: var(--gold);
+}
+
+.translation-search-term__wash {
+  position: absolute;
+  inset: 0;
+  color: var(--repeat);
+  pointer-events: none;
+}
+
 .hafs-ayah {
   font-family: var(--font-arabic);
   font-size: calc(1.85rem * var(--font-scale, 1));

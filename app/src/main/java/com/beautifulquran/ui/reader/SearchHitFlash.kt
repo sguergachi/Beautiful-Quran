@@ -35,4 +35,34 @@ object SearchHitFlash {
         scrollingVerseSettled: Boolean,
         mushafLeafSettled: Boolean,
     ): Boolean = if (mushafMode) mushafLeafSettled else scrollingVerseSettled
+
+    /** Exact text ranges for a translator-only hit; prefix matches own the full word. */
+    internal fun textRanges(text: String, rawQuery: String?): List<IntRange> {
+        val query = rawQuery?.trim()?.let { value ->
+            if (value.length >= 2 && value.first() in setOf('"', '“') &&
+                value.last() in setOf('"', '”')
+            ) {
+                value.substring(1, value.lastIndex).trim()
+            } else {
+                value
+            }
+        }.orEmpty()
+        if (query.isEmpty()) return emptyList()
+        val expandWord = query.all(Char::isLetterOrDigit)
+        return buildList {
+            var from = 0
+            while (from < text.length) {
+                val match = text.indexOf(query, from, ignoreCase = true)
+                if (match < 0) break
+                var start = match
+                var end = match + query.length
+                if (expandWord) {
+                    while (start > 0 && text[start - 1].isLetterOrDigit()) start--
+                    while (end < text.length && text[end].isLetterOrDigit()) end++
+                }
+                add(start until end)
+                from = end.coerceAtLeast(match + 1)
+            }
+        }.distinct()
+    }
 }
