@@ -95,9 +95,19 @@ data class EnglishLeafVerse(
  * out an offset that will usually fall inside one. This moves it to the end of
  * that word. Two rules, and both matter:
  *
- * - It only ever moves *forward*, and it is a pure function of the text and the
+ * - It only ever moves *back*, and it is a pure function of the text and the
  *   offset. So the leaf that ends at an offset and the leaf that begins there
  *   land on the same character without either knowing about the other.
+ *
+ *   Back, not forward, and that direction is the whole of a long argument. The
+ *   leaf is measured before it is set ([EnglishLeafRuler]) and the offset that
+ *   comes back is the end of a line the well has room for. A snap that moves
+ *   *forward* hands the leaf words the ruler never measured — they wrap to a
+ *   line the leaf does not have, and every remedy for that costs a whole line:
+ *   the page then ends a line early with a stub on it, or an empty line under
+ *   it. A snap that moves back can only ever hand the leaf less than it was
+ *   measured for, so the line count it was given is the line count it keeps,
+ *   and there is nothing to remedy.
  * - It never stops inside brackets. The reader may have asked for the
  *   translator's asides to come off, and those are stripped per fragment; a
  *   break inside `[O Muhammad]` would leave half a bracket on each leaf and
@@ -112,6 +122,7 @@ private const val SENTENCE_CLOSERS = "\"')]\u2019\u201d"
 fun englishLeafBreak(text: String, at: Int): Int {
     if (at <= 0) return 0
     if (at >= text.length) return text.length
+    // How deep in brackets the offset itself stands.
     var depth = 0
     for (i in 0 until at) {
         when (text[i]) {
@@ -119,16 +130,19 @@ fun englishLeafBreak(text: String, at: Int): Int {
             ']', ')' -> if (depth > 0) depth--
         }
     }
+    // Walk back to the last space outside them. [depth] is kept as the depth
+    // *before* the character being looked at, so stepping left past a bracket
+    // undoes it.
     var i = at
-    while (i < text.length) {
-        when (text[i]) {
-            '[', '(' -> depth++
-            ']', ')' -> if (depth > 0) depth--
-            ' ' -> if (depth == 0) return i
+    while (i > 0) {
+        if (text[i] == ' ' && depth == 0) return i
+        when (text[i - 1]) {
+            '[', '(' -> if (depth > 0) depth--
+            ']', ')' -> depth++
         }
-        i++
+        i--
     }
-    return text.length
+    return 0
 }
 
 /** A block of the leaf, in printing order. */

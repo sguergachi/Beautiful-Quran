@@ -626,18 +626,29 @@ arithmetic of its own in between. The contract returns null for "the offer all
 fitted", and the pagination widens the offer rather than ending a leaf short,
 so no leaf is ever decided by how much text it happened to be shown.
 
-**And the cut is snapped where the leaf will snap it.** `englishLeafBreak` moves
-an offset off the middle of a word and *out of any bracket* — the reader may
-have asked for the translator's asides to come off, and half a bracket on each
-leaf would strip neither. So a cut landing inside `[the cause of]` is pushed
-past the closing bracket, and those words wrap onto a line the leaf was never
-given: the last line comes out holding `cause of]` and nothing else. The ruler
-snaps it itself now, where the layout can still be asked whether the snapped cut
-is on the last line the leaf has — and offers the line before it when it is not,
-so the leaf sets one line fewer and *fills* it rather than one more and leaves
-it a fragment. Measured over six leaves of Ali 'Imran, the last line went from
-0.46 of a median line at its worst to 0.77, and three of the six now end within
-a percent of a full line.
+**And the cut only ever moves back.** `englishLeafBreak` takes the offset the
+ruler measured and moves it to a word boundary outside any bracket — the reader
+may have asked for the translator's asides to come off, and half a bracket on
+each leaf would strip neither. It used to move *forward*, and that one word of
+direction was the cause of every short last line in this section's history.
+
+A leaf is measured before it is set, and the offset that comes back is the end
+of a line the well has room for. Snapping forward hands the leaf words nobody
+measured: they wrap to a line it does not have, and *every* remedy costs a whole
+line — the ruler backs off and the page ends a line early, or it does not and
+the page overflows and closes its leading. Snapping back can only hand the leaf
+less than was measured, so the lines it was given are the lines it keeps and
+there is nothing to remedy. The rule is the same rule; only its direction
+changed, and the whole apparatus that compensated for it is gone.
+
+One thing can still overrun and is checked for: a cut landing exactly at a
+verse's end makes the leaf draw that verse's *mark*, which may be sitting on the
+next line. Then the verse does not end here — the word before it is taken and
+the mark goes over the fold with the tail it belongs to.
+
+Ten consecutive leaves after: every one of them 22 lines with the foot beneath
+it and no unused line, the last line averaging 0.92 of a median line and six of
+the ten within five percent of a full one.
 
 One detail is worth naming: **lines are not all the same height.** A line
 carrying only a verse mark is set in another face and stands another height, and

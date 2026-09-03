@@ -1324,53 +1324,40 @@ internal fun englishLeafRuler(
             if (lines >= laid.lineCount) {
                 EnglishLeafFill(laid.lineCount, null)
             } else {
-                // The leaf will not take this cut as it stands. englishLeafBreak
-                // moves an offset off the middle of a word and *out of any
-                // bracket* — the reader may have asked for the translator's
-                // asides to come off, and half a bracket on each leaf would
-                // strip neither. So a cut landing inside "[the cause of]" is
-                // pushed past the closing bracket, and those words wrap onto a
-                // line the leaf was not given: the last line comes out holding
-                // "cause of]" and nothing else.
-                //
-                // So snap it here, where the layout can still be asked whether
-                // the snapped cut is still on the last line the leaf has. When
-                // it is not, the line before it is offered instead — the leaf
-                // sets one line fewer and fills it, rather than one more and
-                // leaves it a fragment.
-                // The leaf recorded where each verse sits in the string it
-                // composed, and englishLeaf recorded where each begins in its
-                // verse; the two together map a character back exactly.
+                // Snap the cut the way the leaf will. englishLeafBreak moves
+                // an offset back to the last word boundary outside any bracket,
+                // and *back* is what makes this safe: the leaf can only be
+                // handed less than was measured, never more, so the lines it
+                // was given are the lines it keeps.
                 val verses = leaf.verses
-                var line = lines - 1
-                var index = 0
-                var end = 0
-                while (true) {
-                    val at = laid.getLineEnd(line.coerceAtLeast(0), visibleEnd = true)
-                    var pick = prose.verses.lastIndex
-                    for (k in prose.verses.indices) {
-                        if (at <= prose.verses[k].range.last + 1) { pick = k; break }
-                    }
-                    val set = verses[pick]
-                    val into = (at - prose.verses[pick].range.first).coerceIn(0, set.to - set.from)
-                    val to = (set.from + into).coerceAtMost(set.to)
-                    val runIndex = runs.indexOfFirst {
-                        it.surahId == set.surahId && it.ayah == set.ayah
-                    }.coerceAtLeast(0)
-                    // A leaf must advance. If the well cannot hold even a word
-                    // of the verse it opens with, it takes that word anyway
-                    // rather than paginating for ever.
-                    val floor = if (runIndex == 0) runs[0].from + 1 else runs[runIndex].from
-                    val snapped = englishLeafBreak(translation(set.surahId, set.ayah), to)
-                        .coerceAtLeast(floor)
-                    index = runIndex
-                    end = snapped
-                    if (line <= 0) break
-                    val snappedAt = prose.verses[pick].range.first + (snapped - set.from)
-                    if (snappedAt >= prose.text.length) break
-                    if (laid.getLineForOffset(snappedAt) <= lines - 1) break
-                    line--
+                val at = laid.getLineEnd(lines.coerceAtLeast(1) - 1, visibleEnd = true)
+                var pick = prose.verses.lastIndex
+                for (k in prose.verses.indices) {
+                    if (at <= prose.verses[k].range.last + 1) { pick = k; break }
                 }
+                val set = verses[pick]
+                val into = (at - prose.verses[pick].range.first).coerceIn(0, set.to - set.from)
+                var to = (set.from + into).coerceAtMost(set.to)
+                // The one thing that can still overrun: a cut landing exactly
+                // at a verse's end makes the leaf draw that verse's *mark*, and
+                // the mark may be sitting on the next line. Then the verse does
+                // not end here — take the word before it and let the mark go
+                // over the fold with the tail it belongs to.
+                val mark = prose.verses[pick].markRange
+                if (to >= set.to && !mark.isEmpty() &&
+                    laid.getLineForOffset(mark.last) > lines - 1
+                ) {
+                    to = (to - 1).coerceAtLeast(0)
+                }
+                val index = runs.indexOfFirst {
+                    it.surahId == set.surahId && it.ayah == set.ayah
+                }.coerceAtLeast(0)
+                // A leaf must advance. If the well cannot hold even a word of
+                // the verse it opens with, it takes that word anyway rather
+                // than paginating for ever.
+                val floor = if (index == 0) runs[0].from + 1 else runs[index].from
+                val end = englishLeafBreak(translation(set.surahId, set.ayah), to)
+                    .coerceAtLeast(floor)
                 EnglishLeafFill(lines, EnglishRulerCut(index, end))
             }
         }

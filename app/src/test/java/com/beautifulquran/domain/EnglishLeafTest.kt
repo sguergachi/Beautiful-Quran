@@ -164,11 +164,35 @@ class EnglishLeafTest {
         // The reader may ask for the asides to come off, and they are stripped
         // per half; half a bracket on each leaf would strip from neither.
         val text = "And it was revealed to [O Muhammad, the Prophet] at that time"
-        // An offset inside the aside is carried past the closing bracket.
-        assertEquals(text.indexOf(" at that"), englishLeafBreak(text, text.indexOf("Muhammad")))
-        // The break only ever moves forward, so an offset just before the
-        // bracket stops at the space in front of it and the aside stays whole.
-        assertEquals(text.indexOf(" [O"), englishLeafBreak(text, 20))
+        // An offset inside the aside is carried back before the opening bracket.
+        assertEquals(text.indexOf(" [O"), englishLeafBreak(text, text.indexOf("Muhammad")))
+        // The break only ever moves back, so an offset just past the aside stops
+        // at the space after it and the aside stays whole on this leaf.
+        assertEquals(text.indexOf(" at that"), englishLeafBreak(text, text.indexOf("at that")))
+    }
+
+    @Test
+    fun `the break only ever moves back, so a leaf is never handed more`() {
+        // The direction is the point. A leaf is measured before it is set, and
+        // the offset that comes back is the end of a line the well has room
+        // for. Moving forward would hand it words nobody measured, which wrap
+        // to a line it does not have; moving back can only hand it less.
+        val text = "one two three four five"
+        for (at in text.indices) {
+            assertTrue("break at $at moved forward", englishLeafBreak(text, at) <= at)
+        }
+    }
+
+    @Test
+    fun `the break is where both leaves meet`() {
+        // The leaf that ends at an offset and the leaf that begins there have to
+        // land on the same character without either knowing about the other,
+        // which is what makes it a pure function of the text and the offset.
+        val text = "And [make him] a messenger to the Children of Israel, who said"
+        for (at in text.indices) {
+            val once = englishLeafBreak(text, at)
+            assertEquals("break at $at is not settled", once, englishLeafBreak(text, once))
+        }
     }
 
     @Test
