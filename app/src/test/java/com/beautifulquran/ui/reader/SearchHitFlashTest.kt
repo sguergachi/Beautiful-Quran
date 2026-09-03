@@ -8,14 +8,12 @@ import org.junit.Test
 class SearchHitFlashTest {
 
     @Test
-    fun `pulses reuse the ink-engine repeat wash timings`() {
+    fun `four quick pulses finish sooner than the old double wash`() {
         val cycleMs = SearchHitFlash.cycleMs()
-        assertEquals(2, SearchHitFlash.PULSES)
-        assertEquals(
-            InkEngine.tuning.repeatSweepMs + InkEngine.tuning.repeatFadeOutMs,
-            cycleMs,
-        )
+        assertEquals(4, SearchHitFlash.PULSES)
+        assertEquals(520, cycleMs)
         assertEquals(cycleMs.toLong() * SearchHitFlash.PULSES, SearchHitFlash.totalMs())
+        assertTrue(SearchHitFlash.totalMs() < 2_700L)
     }
 
     @Test

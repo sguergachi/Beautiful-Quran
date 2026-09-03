@@ -489,10 +489,10 @@ private fun rememberRepeatWash(
 
 /**
  * One-shot search-hit flash: the same directional orange wash as
- * [rememberRepeatWash], run [SearchHitFlash.PULSES] times (wash in → dissolve
- * out → wash in → dissolve out). Independent of karaoke `ink.repeat` so a
- * real repeat chain is never cancelled or restarted. [identity] restarts the
- * flash when search moves directly from one word to another.
+ * [rememberRepeatWash], run [SearchHitFlash.PULSES] quick times (wash in →
+ * dissolve out). Independent of karaoke `ink.repeat` so a real repeat chain
+ * is never cancelled or restarted. [identity] restarts the flash when search
+ * moves directly from one word to another.
  */
 @Composable
 internal fun rememberSearchHitWash(identity: Int?): RepeatWash {
@@ -505,13 +505,17 @@ internal fun rememberSearchHitWash(identity: Int?): RepeatWash {
             alpha.snapTo(0f)
             return@LaunchedEffect
         }
-        val sweepMs = InkEngine.tuning.repeatSweepMs
-        val fadeMs = InkEngine.tuning.repeatFadeOutMs
         repeat(SearchHitFlash.PULSES) {
             alpha.snapTo(1f)
             progress.snapTo(0f)
-            progress.animateTo(1f, tween(sweepMs, easing = InkEngine.sweepEasing))
-            alpha.animateTo(0f, tween(fadeMs, easing = InkEngine.sweepEasing))
+            progress.animateTo(
+                1f,
+                tween(SearchHitFlash.SWEEP_MS, easing = InkEngine.sweepEasing),
+            )
+            alpha.animateTo(
+                0f,
+                tween(SearchHitFlash.FADE_OUT_MS, easing = InkEngine.sweepEasing),
+            )
         }
     }
     return RepeatWash(

@@ -363,8 +363,9 @@ Three sheets, hand-rolled paper stack (no router chrome):
    while a verse is loaded (chapter ·
    ayah label, transport, quiet Close that stops the session — Android
    parity). The control spans the full chapter sheet width while its ink and
-   transport remain centred. Opening a word hit flashes that Arabic (and English gloss) word
-   twice with the orange repeat wash (directional wash in, dissolve out).
+   transport remain centred. Opening a word hit flashes that Arabic (and
+   English gloss) word four quick times with the orange repeat wash
+   (directional wash in, dissolve out).
    Word search keeps the query in local home state (no global store fan-out),
    builds its slim in-memory index on demand (never during chapter browsing),
    and scans cooperatively with cancellation so typing stays responsive. The

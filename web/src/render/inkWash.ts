@@ -440,12 +440,12 @@ export function runRepeatFadeOutAsync(el: HTMLElement): CancellablePromise {
 export function runRepeatFadeOut(
   el: HTMLElement,
   onDone?: () => void,
+  durationMs = getTuning().repeatFadeOutMs,
 ): () => void {
-  const t = getTuning()
   applyMask(el, 'none')
   setRepeatWashProgress(el, 1)
   return runWash(
-    t.repeatFadeOutMs,
+    durationMs,
     sweepEase(),
     cubicBezierEase,
     (_p, eased) => {
@@ -518,13 +518,12 @@ export function runGlintFadeOut(
  * Callers pass a dedicated orange overlay (same classes as the karaoke repeat
  * layer) so the mask sizes to the glyphs. Overlay may be unmounted after [onDone].
  */
-export function runSearchHitDoubleWash(
+export function runSearchHitWash(
   el: HTMLElement,
   rtl: boolean,
-  pulses: number,
+  timing: { PULSES: number; SWEEP_MS: number; FADE_OUT_MS: number },
   onDone?: () => void,
 ): () => void {
-  const t = getTuning()
   let cancelled = false
   let cancelCurrent: (() => void) | null = null
 
@@ -544,16 +543,16 @@ export function runSearchHitDoubleWash(
       if (!cancelled) onDone?.()
       return
     }
-    cancelCurrent = runRepeatWashIn(el, rtl, t.repeatSweepMs, () => {
+    cancelCurrent = runRepeatWashIn(el, rtl, timing.SWEEP_MS, () => {
       if (cancelled) return
       cancelCurrent = runRepeatFadeOut(el, () => {
         if (cancelled) return
         runPulse(remaining - 1)
-      })
+      }, timing.FADE_OUT_MS)
     })
   }
 
-  runPulse(pulses)
+  runPulse(timing.PULSES)
 
   return () => {
     cancelled = true

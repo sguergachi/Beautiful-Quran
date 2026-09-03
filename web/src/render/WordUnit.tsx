@@ -26,7 +26,7 @@ import {
   runRepeatFadeOutAsync,
   runRepeatResidualAsync,
   runRepeatWashInAsync,
-  runSearchHitDoubleWash,
+  runSearchHitWash,
   type CancellablePromise,
 } from './inkWash'
 import { SearchHitFlash } from '../ui/reader/SearchHitFlash'
@@ -507,10 +507,10 @@ export function WordUnit({
     if (flashRef.current) {
       pending++
       cancels.push(
-        runSearchHitDoubleWash(
+        runSearchHitWash(
           flashRef.current,
           !englishMode,
-          SearchHitFlash.PULSES,
+          SearchHitFlash,
           doneOne,
         ),
       )
@@ -518,10 +518,10 @@ export function WordUnit({
     if (glossFlashRef.current) {
       pending++
       cancels.push(
-        runSearchHitDoubleWash(
+        runSearchHitWash(
           glossFlashRef.current,
           false,
-          SearchHitFlash.PULSES,
+          SearchHitFlash,
           doneOne,
         ),
       )

@@ -24,7 +24,7 @@ import {
   runRepeatFadeOutAsync,
   runRepeatResidualAsync,
   runRepeatWashInAsync,
-  runSearchHitDoubleWash,
+  runSearchHitWash,
   type CancellablePromise,
 } from './inkWash'
 import { SearchHitFlash } from '../ui/reader/SearchHitFlash'
@@ -315,10 +315,10 @@ export function HafsWord({
       return
     }
     if (!flashRef.current) return
-    return runSearchHitDoubleWash(
+    return runSearchHitWash(
       flashRef.current,
       true,
-      SearchHitFlash.PULSES,
+      SearchHitFlash,
       () => setFlashMounted(false),
     )
   }, [searchFlash, flashMounted])

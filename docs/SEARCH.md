@@ -66,11 +66,12 @@ UI. A quiet, regular-weight line above the Quran count says
 or thesaurus results never show an autocorrection notice.
 
 Opening a positioned word hit waits until the reader sheet and its target have
-both settled, then pulses it twice with the orange repeat wash. The scrolling
-layout waits for its verse geometry; Mushaf waits for the requested leaf to be
-visible and never depends on the unmounted scrolling list. If English prose
-coalesced a gloss shared by several Arabic words, its hidden slot redirects to
-the visible phrase; Arabic layouts still pulse the exact matched Arabic word.
+both settled, then pulses it four quick times with the orange repeat wash. The
+scrolling layout waits for its verse geometry; Mushaf waits for the requested
+leaf to be visible and never depends on the unmounted scrolling list. If
+English prose coalesced a gloss shared by several Arabic words, its hidden slot
+redirects to the visible phrase; Arabic layouts still pulse the exact matched
+Arabic word.
 
 ## Exact quotes
 
