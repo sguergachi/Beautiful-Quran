@@ -67,10 +67,10 @@ UI. A quiet, regular-weight line above the Quran count says
 or thesaurus results never show an autocorrection notice.
 
 Opening a positioned word hit waits until the reader sheet and its target have
-both settled, runs five eased directional orange wipes through the word, and
-briefly clears the overlay between passes so each sweep remains visible. Search
-uses a tighter one-letter-scale feather than recitation, making the moving edge
-read clearly even on short words. The
+both settled, then runs six constant-speed directional orange wipes as one
+continuous loop, restarting at the leading edge with no fade, pause, or blank
+beat. Search uses a tighter one-letter-scale feather than recitation, making the
+moving edge read clearly even on short words. The
 scrolling layout waits for its
 verse geometry; Mushaf waits for the requested
 leaf to be visible and never depends on the unmounted scrolling list. The

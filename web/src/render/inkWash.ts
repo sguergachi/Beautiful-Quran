@@ -517,7 +517,7 @@ export function runGlintFadeOut(
 }
 
 /**
- * Search-hit locator: repeated directional fills with a brief clear interval.
+ * Search-hit locator: one uninterrupted loop of directional fills.
  * Callers pass a dedicated orange overlay (same classes as the karaoke repeat
  * layer) so the mask sizes to the glyphs. Overlay may be unmounted after [onDone].
  */
@@ -527,8 +527,6 @@ export function runSearchHitWash(
   timing: {
     WIPES: number
     SWEEP_MS: number
-    RELEASE_MS: number
-    REST_MS: number
     FEATHER: number
     EASING: CubicBezierEase
   },
@@ -536,18 +534,8 @@ export function runSearchHitWash(
 ): () => void {
   let cancelled = false
   let cancelCurrent: (() => void) | null = null
-  let waitTimer: ReturnType<typeof setTimeout> | null = null
-
-  const wait = (durationMs: number, next: () => void) => {
-    waitTimer = setTimeout(() => {
-      waitTimer = null
-      if (!cancelled) next()
-    }, durationMs)
-  }
 
   const finish = () => {
-    if (waitTimer != null) clearTimeout(waitTimer)
-    waitTimer = null
     el.style.opacity = '0'
     el.style.removeProperty('transform')
     el.style.removeProperty('transform-origin')
@@ -558,36 +546,14 @@ export function runSearchHitWash(
     clearRepeatWashProgress(el)
   }
 
-  const animateAlpha = (
-    from: number,
-    to: number,
-    durationMs: number,
-    next: () => void,
-  ) => {
-    el.style.opacity = String(from)
-    cancelCurrent = runWash(
-      durationMs,
-      timing.EASING,
-      cubicBezierEase,
-      (_p, eased) => {
-        el.style.opacity = String(from + (to - from) * eased)
-      },
-      () => {
-        el.style.opacity = String(to)
-        if (!cancelled) next()
-      },
-    )
-  }
-
   const wipe = (remaining: number) => {
     cancelCurrent = runRepeatWashIn(el, rtl, timing.SWEEP_MS, () => {
-      animateAlpha(1, 0, timing.RELEASE_MS, () => {
-        if (remaining > 1) wait(timing.REST_MS, () => wipe(remaining - 1))
-        else {
-          finish()
-          onDone?.()
-        }
-      })
+      if (cancelled) return
+      if (remaining > 1) wipe(remaining - 1)
+      else {
+        finish()
+        onDone?.()
+      }
     }, timing.EASING, timing.FEATHER)
   }
 

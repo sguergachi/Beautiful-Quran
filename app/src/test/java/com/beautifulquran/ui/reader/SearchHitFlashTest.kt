@@ -8,11 +8,10 @@ import org.junit.Test
 class SearchHitFlashTest {
 
     @Test
-    fun `five side wipes stay distinct and brief`() {
-        assertEquals(5, SearchHitFlash.WIPES)
-        assertEquals(480L, SearchHitFlash.wipeMs())
-        assertEquals(2_720L, SearchHitFlash.totalMs())
-        assertTrue(SearchHitFlash.REST_MS >= 60L)
+    fun `six side wipes form one continuous loop`() {
+        assertEquals(6, SearchHitFlash.WIPES)
+        assertEquals(420L, SearchHitFlash.wipeMs())
+        assertEquals(2_520L, SearchHitFlash.totalMs())
         assertTrue(SearchHitFlash.FEATHER in 0.2f..0.4f)
         assertTrue(SearchHitFlash.totalMs() < 3_000L)
     }

@@ -505,21 +505,15 @@ internal fun rememberSearchHitWash(identity: Int?): RepeatWash {
             alpha.snapTo(0f)
             return@LaunchedEffect
         }
-        repeat(SearchHitFlash.WIPES) { wipe ->
+        alpha.snapTo(1f)
+        repeat(SearchHitFlash.WIPES) {
             progress.snapTo(0f)
-            alpha.snapTo(1f)
             progress.animateTo(
                 1f,
                 tween(SearchHitFlash.SWEEP_MS, easing = SearchHitFlash.EASING),
             )
-            alpha.animateTo(
-                0f,
-                tween(SearchHitFlash.RELEASE_MS, easing = SearchHitFlash.EASING),
-            )
-            if (wipe < SearchHitFlash.WIPES - 1) {
-                delay(SearchHitFlash.REST_MS)
-            }
         }
+        alpha.snapTo(0f)
     }
     return RepeatWash(
         progress = progress.asState(),
