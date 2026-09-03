@@ -320,8 +320,9 @@ export function runRepeatWashIn(
   durationMs: number,
   onDone?: () => void,
   ease: CubicBezierEase | ReturnType<typeof sweepEase> = sweepEase(),
+  feather = getTuning().washFeather,
 ): () => void {
-  return runRepeatWashFrom(el, rtl, 0, durationMs, onDone, ease)
+  return runRepeatWashFrom(el, rtl, 0, durationMs, onDone, ease, feather)
 }
 
 /**
@@ -335,8 +336,8 @@ export function runRepeatWashFrom(
   totalDurationMs: number,
   onDone?: () => void,
   ease: CubicBezierEase | ReturnType<typeof sweepEase> = sweepEase(),
+  feather = getTuning().washFeather,
 ): () => void {
-  const t = getTuning()
   const from = Math.min(1, Math.max(0, fromProgress))
   el.style.opacity = '1'
   el.style.removeProperty('transform')
@@ -353,7 +354,7 @@ export function runRepeatWashFrom(
 
   const remainMs = Math.max(1, (1 - from) * totalDurationMs)
   setRepeatWashProgress(el, from)
-  applyMask(el, cachedWashMask(from, 0, rtl, t.washFeather))
+  applyMask(el, cachedWashMask(from, 0, rtl, feather))
   return runWash(
     remainMs,
     ease,
@@ -361,7 +362,7 @@ export function runRepeatWashFrom(
     (_p, eased) => {
       const progress = from + eased * (1 - from)
       setRepeatWashProgress(el, progress)
-      applyMask(el, cachedWashMask(progress, 0, rtl, t.washFeather))
+      applyMask(el, cachedWashMask(progress, 0, rtl, feather))
     },
     () => {
       setRepeatWashProgress(el, 1)
@@ -528,6 +529,7 @@ export function runSearchHitWash(
     SWEEP_MS: number
     RELEASE_MS: number
     REST_MS: number
+    FEATHER: number
     EASING: CubicBezierEase
   },
   onDone?: () => void,
@@ -586,7 +588,7 @@ export function runSearchHitWash(
           onDone?.()
         }
       })
-    }, timing.EASING)
+    }, timing.EASING, timing.FEATHER)
   }
 
   wipe(timing.WIPES)

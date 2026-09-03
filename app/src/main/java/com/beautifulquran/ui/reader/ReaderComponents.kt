@@ -498,7 +498,7 @@ private fun rememberRepeatWash(
 internal fun rememberSearchHitWash(identity: Int?): RepeatWash {
     val progress = remember { Animatable(1f) }
     val alpha = remember { Animatable(0f) }
-    val feather = remember { mutableStateOf<Float?>(null) }
+    val feather = remember { mutableStateOf<Float?>(SearchHitFlash.FEATHER) }
     LaunchedEffect(identity) {
         if (identity == null) {
             progress.snapTo(1f)
@@ -1772,6 +1772,7 @@ internal fun buildShapedBlooms(
                 restingAlpha = 0f,
                 layerAlpha = searchHitWash.alpha.value,
                 colorAlpha = InkEngine.tuning.repeatInkAlpha,
+                feather = searchHitWash.feather.value,
                 glowAlpha = SearchHitFlash.EMPHASIS_GLOW_ALPHA,
                 glowRadius = SearchHitFlash.EMPHASIS_GLOW_RADIUS,
             )

@@ -5,6 +5,7 @@ export const SearchHitFlash = {
   RELEASE_MS: 120,
   REST_MS: 80,
   WIPES: 5,
+  FEATHER: 0.28,
   EASING: [0.45, 0, 0.55, 1] as const,
 } as const
 

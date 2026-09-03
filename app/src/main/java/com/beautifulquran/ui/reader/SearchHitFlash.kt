@@ -14,6 +14,8 @@ object SearchHitFlash {
     const val RELEASE_MS = 120
     const val REST_MS = 80L
     const val WIPES = 5
+    /** Narrow enough for the traveling edge to cross short words visibly. */
+    const val FEATHER = 0.28f
 
     /** Sine-like ease keeps the traveling edge soft at both ends. */
     val EASING = CubicBezierEasing(0.45f, 0f, 0.55f, 1f)

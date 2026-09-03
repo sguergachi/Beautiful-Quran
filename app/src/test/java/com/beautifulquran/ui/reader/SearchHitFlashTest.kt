@@ -13,6 +13,7 @@ class SearchHitFlashTest {
         assertEquals(480L, SearchHitFlash.wipeMs())
         assertEquals(2_720L, SearchHitFlash.totalMs())
         assertTrue(SearchHitFlash.REST_MS >= 60L)
+        assertTrue(SearchHitFlash.FEATHER in 0.2f..0.4f)
         assertTrue(SearchHitFlash.totalMs() < 3_000L)
     }
 
