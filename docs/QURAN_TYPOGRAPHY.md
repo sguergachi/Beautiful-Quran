@@ -381,6 +381,16 @@ paragraph too big for the foot of a page does.
 2. **A chapter opens a new page.** A printed book will burn a leaf — a whole
    blank verso, in a book with spreads — rather than start a chapter halfway
    down one. This is the one page break a reader is meant to notice.
+
+   And the book turns **left to right**, because it is a book of the translation
+   and that is how English is read and bound. Turning it the mushaf's way puts
+   every chapter's divided ending *after* its opening rather than before it, so
+   a reader met a half page each time a chapter began — the pagination correct
+   and the direction reading it backwards. `MushafTurnsRightToLeft` decides it
+   for the leaf, the rule and the folio together, and mirroring the rule is not
+   one flip: two of the dial's walks *relax* their marks apart along it, and a
+   walk that assumes the wrong direction forces every seat past its neighbour
+   and piles the book into half the measure.
 3. **The last page of a chapter is the only short page**, which is where all the
    ragged paper in a book lives — but it is not free to be *any* length, and on
    a phone it is less free than in print. A codex shows a spread, so a very

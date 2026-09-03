@@ -40,6 +40,52 @@ class MushafDialDirectionTest {
     }
 
     @Test
+    fun `the seats climb the rule in a book bound on the left`() {
+        // The failure this exists for: mirroring where marks *draw* while the
+        // walk that relaxes them apart still assumes the mushaf's direction.
+        // It does not mirror the comb — it forces every seat past its neighbour
+        // and piles the whole book into half the rule, which no test of a
+        // single fraction can see.
+        val marks = IntArray(114) { it * 8 + 1 }
+        val seats = mushafDialCombCellSeats(
+            marks = marks,
+            pageCount = 914,
+            insetPx = 10f,
+            widthPx = 1000f,
+            rulePx = 1f,
+            rightToLeft = false,
+        )
+        for (i in 1 until seats.size) {
+            assertTrue(
+                "seat $i at ${seats[i]} must sit right of ${i - 1} at ${seats[i - 1]}",
+                seats[i] > seats[i - 1],
+            )
+        }
+        assertTrue("the first chapter sits at the left", seats.first() < 60f)
+        assertTrue("the last chapter sits at the right", seats.last() > 940f)
+    }
+
+    @Test
+    fun `the seats descend the rule in a mushaf`() {
+        val marks = IntArray(114) { it * 5 + 1 }
+        val seats = mushafDialCombCellSeats(
+            marks = marks,
+            pageCount = 604,
+            insetPx = 10f,
+            widthPx = 1000f,
+            rulePx = 1f,
+            rightToLeft = true,
+        )
+        for (i in 1 until seats.size) {
+            assertTrue(
+                "seat $i at ${seats[i]} must sit left of ${i - 1} at ${seats[i - 1]}",
+                seats[i] < seats[i - 1],
+            )
+        }
+        assertTrue("the first chapter sits at the right", seats.first() > 940f)
+    }
+
+    @Test
     fun `a leaf lands at the same distance from its own end either way`() {
         val run = 1..101
         val fromRight = mushafDialTroughPage(0.25f, run, rightToLeft = true)

@@ -767,20 +767,45 @@ internal fun mushafDialCombCellSeats(
         while (gStart > 0 && marks[gStart - 1] == mark) gStart--
         var gEnd = idx
         while (gEnd + 1 < marks.size && marks[gEnd + 1] == mark) gEnd++
-        if (gEnd > gStart) x += ((gEnd - gStart) / 2f - (idx - gStart)) * rulePx * 3f
+        // Co-located chapters spread about their shared seat, away from the
+        // one before them — which is leftward in a book bound on the right and
+        // rightward in one bound on the left.
+        val forward = if (rightToLeft) -1f else 1f
+        if (gEnd > gStart) {
+            x -= forward * ((gEnd - gStart) / 2f - (idx - gStart)) * rulePx * 3f
+        }
         result[idx] = x.coerceIn(insetPx, widthPx - insetPx)
     }
     val span = (widthPx - 2f * insetPx).coerceAtLeast(0f)
     val minGap = minOf(rulePx * 1.5f, span / (marks.size - 1).coerceAtLeast(1))
-    var prev = widthPx - insetPx + minGap
-    for (i in marks.indices) {
-        result[i] = minOf(result[i], prev - minGap)
-        prev = result[i]
-    }
-    var floor = insetPx
-    for (i in marks.indices.reversed()) {
-        result[i] = maxOf(result[i], floor)
-        floor = result[i] + minGap
+    // Relax the seats apart in reading order, then clamp them back inside the
+    // track from the far end. Both walks run the way the book does: seats
+    // descend the rule in a mushaf and climb it in a book of the translation,
+    // and a walk that assumes the wrong one does not merely mirror the comb —
+    // it forces every seat past its neighbour and piles the whole book into
+    // half the rule.
+    if (rightToLeft) {
+        var prev = widthPx - insetPx + minGap
+        for (i in marks.indices) {
+            result[i] = minOf(result[i], prev - minGap)
+            prev = result[i]
+        }
+        var floor = insetPx
+        for (i in marks.indices.reversed()) {
+            result[i] = maxOf(result[i], floor)
+            floor = result[i] + minGap
+        }
+    } else {
+        var prev = insetPx - minGap
+        for (i in marks.indices) {
+            result[i] = maxOf(result[i], prev + minGap)
+            prev = result[i]
+        }
+        var ceiling = widthPx - insetPx
+        for (i in marks.indices.reversed()) {
+            result[i] = minOf(result[i], ceiling)
+            ceiling = result[i] - minGap
+        }
     }
     return result
 }
@@ -896,7 +921,8 @@ internal fun mushafDialCombDrawnXs(
             while (gEnd + 1 < marks.size && marks[gEnd + 1] == mark) gEnd++
             val gSize = gEnd - gStart + 1
             if (gSize > 1) {
-                x += ((gSize - 1) / 2f - (idx - gStart)) * epsilonPx
+                x -= (if (rightToLeft) -1f else 1f) *
+                    ((gSize - 1) / 2f - (idx - gStart)) * epsilonPx
             }
             result[idx] = x
         }
@@ -928,7 +954,8 @@ internal fun mushafDialCombDrawnXs(
         val gSize = gEnd - gStart + 1
         if (gSize > 1) {
             val posInGroup = idx - gStart
-            trueX += ((gSize - 1) / 2f - posInGroup) * epsilonPx
+            trueX -= (if (rightToLeft) -1f else 1f) *
+                ((gSize - 1) / 2f - posInGroup) * epsilonPx
         }
         val isTailMark = idx >= 24
         val gap = if (idx < marks.lastIndex) (marks[idx + 1] - mark).coerceIn(0, 20) else 1
@@ -950,15 +977,31 @@ internal fun mushafDialCombDrawnXs(
     val minGap = minOf(rulePx * 1.5f, span / (marks.size - 1).coerceAtLeast(1))
     val lo = insetPx
     val hi = widthPx - insetPx
-    var prev = hi + minGap
-    for (i in marks.indices) {
-        result[i] = minOf(result[i].coerceIn(lo, hi), prev - minGap)
-        prev = result[i]
-    }
-    var floor = lo
-    for (i in marks.indices.reversed()) {
-        result[i] = maxOf(result[i], floor)
-        floor = result[i] + minGap
+    // The same two walks as the stable seats, and for the same reason: they run
+    // the way the book does, or every mark is forced past its neighbour and the
+    // comb piles into half the rule. See mushafDialCombCellSeats.
+    if (rightToLeft) {
+        var prev = hi + minGap
+        for (i in marks.indices) {
+            result[i] = minOf(result[i].coerceIn(lo, hi), prev - minGap)
+            prev = result[i]
+        }
+        var floor = lo
+        for (i in marks.indices.reversed()) {
+            result[i] = maxOf(result[i], floor)
+            floor = result[i] + minGap
+        }
+    } else {
+        var prev = lo - minGap
+        for (i in marks.indices) {
+            result[i] = maxOf(result[i].coerceIn(lo, hi), prev + minGap)
+            prev = result[i]
+        }
+        var ceiling = hi
+        for (i in marks.indices.reversed()) {
+            result[i] = minOf(result[i], ceiling)
+            ceiling = result[i] - minGap
+        }
     }
     return result
 }

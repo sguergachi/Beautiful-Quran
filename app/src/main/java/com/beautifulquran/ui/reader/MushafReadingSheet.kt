@@ -116,17 +116,25 @@ private val MushafRuleTailAir = 0.dp
  *
  * They are one thing seen three ways — the paper, its edge side-on, and the
  * number printed on it — so they cannot hold separate opinions. They did, twice
- * in one afternoon: the leaf was turned left to right for the English book
- * while the dial's seats still answered in book order, and then the leaf was
- * turned back while the folio still slid the other way, so the page number
- * travelled against the page carrying it.
+ * in one afternoon, and each time half a turn was worse than none.
  *
- * Turning the English book the way an English book turns is still right, and it
- * is two things rather than this one: flip this, and make [mushafDialAlong]
- * true of the comb's *seats* and trough as well as of where its marks draw.
- * Prove it on the comb, not on the thumb — the thumb looks correct either way.
+ * **False**, because this is a book of the translation: set in English, read
+ * left to right, bound on the left. Turning it the mushaf's way put every
+ * chapter's evenly divided ending *after* its opening instead of before it, so
+ * a reader swiping the way an English reader swipes met a half page every time
+ * a chapter began. The pagination was right and the direction was reading it
+ * backwards.
+ *
+ * Mirroring the rule with it is not one flip, which is what made this hard.
+ * [mushafDialAlong] turns a book fraction into a place on the rule and every
+ * mark, seat, trough and landing asks it — but two of them then *relax* their
+ * results apart, walking the rule and pushing each neighbour clear of the last,
+ * and those walks had the mushaf's direction built into them. Reversed, they do
+ * not mirror the comb: they force every seat past its neighbour and pile the
+ * whole book into half the rule, which is precisely what shipped the first time
+ * and precisely what the thumb cannot show you. Prove it on the comb.
  */
-internal const val MushafTurnsRightToLeft = true
+internal const val MushafTurnsRightToLeft = false
 
 private val MushafDialHeadAir = 8.dp
 
