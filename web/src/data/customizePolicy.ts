@@ -3,6 +3,7 @@ import type {
   Settings,
   VerseNumberScript,
 } from './settings'
+import type { WordSearchSources } from '../domain/WordSearch'
 
 export function applyReadingMode(mode: ReadingMode): Partial<Settings> {
   return { readingMode: mode }
@@ -18,6 +19,22 @@ export function showsPreviewWordGloss(
   showWordGloss: boolean,
 ): boolean {
   return showsWordGlossChrome(mode) && showWordGloss
+}
+
+/** Search exactly the text surfaces the selected reader configuration renders. */
+export function wordSearchSources(settings: Settings): WordSearchSources {
+  if (settings.readingMode === 'english_only') {
+    return { arabic: false, wordGloss: true, transliteration: false, verseTranslation: false }
+  }
+  if (settings.readingMode === 'arabic_only') {
+    return { arabic: true, wordGloss: false, transliteration: false, verseTranslation: false }
+  }
+  return {
+    arabic: true,
+    wordGloss: settings.showWordGloss,
+    transliteration: settings.showTransliteration,
+    verseTranslation: settings.showTranslation,
+  }
 }
 
 export function themeLabel(mode: Settings['themeMode']): string {

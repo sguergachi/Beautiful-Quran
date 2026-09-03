@@ -7,6 +7,27 @@ export const WORD_SEARCH_PREVIEW_LIMIT = 3
 /** Keeps visible concept evidence ahead of any bounded corroboration bonus. */
 const VISIBLE_CONCEPT_EVIDENCE_BONUS = 300
 
+/** Text surfaces currently visible in the reader. Hidden translations must not affect search. */
+export interface WordSearchSources {
+  arabic: boolean
+  wordGloss: boolean
+  transliteration: boolean
+  verseTranslation: boolean
+}
+
+export const ALL_WORD_SEARCH_SOURCES: WordSearchSources = {
+  arabic: true,
+  wordGloss: true,
+  transliteration: true,
+  verseTranslation: true,
+}
+
+export type WordSearchDisplaySource =
+  | 'arabic'
+  | 'word_gloss'
+  | 'transliteration'
+  | 'verse_translation'
+
 export interface WordSearchHit {
   surahId: number
   ayahNumber: number
@@ -21,6 +42,8 @@ export interface WordSearchHit {
   matchLabel?: string | null
   matchTerms?: string[]
   matchReason?: string
+  displayText?: string
+  displaySource?: WordSearchDisplaySource
 }
 
 export interface SurahWordSearchSection {
@@ -270,8 +293,9 @@ export function matchWordSearch(
   maxHits = WORD_SEARCH_MAX_HITS,
   concepts: SearchConcept[] = [],
   thesaurus: Map<string, RelatedSearchTerm[]> = new Map(),
+  sources: WordSearchSources = ALL_WORD_SEARCH_SOURCES,
 ): WordSearchHit[] {
-  const state = createRanking(index, query)
+  const state = createRanking(index, query, sources)
   if (!state || maxHits <= 0) return []
   scanLexical(state, 0, index.length, false)
   scanAyahText(state, false)
@@ -309,11 +333,13 @@ interface RankingState {
   ranked: Map<number, RankedHit>
   firstIndex: Map<number, number>
   matchedRoots: Set<string>
+  sources: WordSearchSources
 }
 
 function createRanking(
   index: WordSearchIndexEntry[],
   query: string,
+  sources: WordSearchSources,
 ): RankingState | null {
   const parsed = parseSearchQuery(query)
   if (parsed.text.length < WORD_SEARCH_MIN_QUERY_LENGTH) return null
@@ -326,6 +352,7 @@ function createRanking(
     ranked: new Map(),
     firstIndex: new Map(),
     matchedRoots: new Set(),
+    sources,
   }
 }
 
@@ -368,21 +395,29 @@ function scanLexical(
   for (let i = from; i < to; i++) {
     const entry = state.index[i]!
     const score = Math.max(
-      state.arabic
+      state.sources.arabic && state.arabic
         ? searchTextRelevance(
             entry.arabicNorm,
             { ...state.parsed, text: state.arabic },
             allowFuzzy,
           )
         : 0,
-      searchTextRelevance(entry.translationLower, state.latin, allowFuzzy),
-      searchTextRelevance(entry.transliterationLower, state.latin, allowFuzzy),
+      state.sources.wordGloss
+        ? searchTextRelevance(entry.translationLower, state.latin, allowFuzzy)
+        : 0,
+      state.sources.transliteration
+        ? searchTextRelevance(entry.transliterationLower, state.latin, allowFuzzy)
+        : 0,
     )
     const correction = allowFuzzy && score > 0
-      ? state.arabic
+      ? state.sources.arabic && state.arabic
         ? fuzzyWordMatch(entry.arabicNorm, state.arabic)
-        : fuzzyWordMatch(entry.translationLower, state.latin.text) ??
-          fuzzyWordMatch(entry.transliterationLower, state.latin.text)
+        : (state.sources.wordGloss
+            ? fuzzyWordMatch(entry.translationLower, state.latin.text)
+            : null) ??
+          (state.sources.transliteration
+            ? fuzzyWordMatch(entry.transliterationLower, state.latin.text)
+            : null)
       : null
     addRanked(
       state,
@@ -412,24 +447,38 @@ function scanAyahText(state: RankingState, allowFuzzy: boolean): void {
       end++
     }
     let glossScore = 0
-    if (/\s/u.test(state.parsed.text)) {
+    if (state.sources.wordGloss && /\s/u.test(state.parsed.text)) {
       glossScore = searchTextRelevance(sameAyahGlossLine(state.index, at), state.latin, allowFuzzy)
     }
+    const transliterationScore = state.sources.transliteration && /\s/u.test(state.parsed.text)
+      ? searchTextRelevance(sameAyahTransliterationLine(state.index, at), state.latin, allowFuzzy)
+      : 0
     const score = Math.max(
-      state.arabic
+      state.sources.arabic && state.arabic
         ? searchTextRelevance(
             normalizeArabicForSearch(anchor.ayahText),
             { ...state.parsed, text: state.arabic },
             allowFuzzy,
           )
         : 0,
-      searchTextRelevance(anchor.ayahTranslation, state.latin, allowFuzzy),
+      state.sources.verseTranslation
+        ? searchTextRelevance(anchor.ayahTranslation, state.latin, allowFuzzy)
+        : 0,
       glossScore,
+      transliterationScore,
     )
     const correction = allowFuzzy && score > 0
-      ? state.arabic
+      ? state.sources.arabic && state.arabic
         ? fuzzyWordMatch(normalizeArabicForSearch(anchor.ayahText), state.arabic)
-        : fuzzyWordMatch(anchor.ayahTranslation.toLowerCase(), state.latin.text)
+        : (state.sources.verseTranslation
+            ? fuzzyWordMatch(anchor.ayahTranslation.toLowerCase(), state.latin.text)
+            : null) ??
+          (state.sources.wordGloss
+            ? fuzzyWordMatch(sameAyahGlossLine(state.index, at).toLowerCase(), state.latin.text)
+            : null) ??
+          (state.sources.transliteration
+            ? fuzzyWordMatch(sameAyahTransliterationLine(state.index, at).toLowerCase(), state.latin.text)
+            : null)
       : null
     addRanked(
       state,
@@ -455,7 +504,7 @@ function scanRoots(state: RankingState, from: number, to: number): void {
         entry.position,
         1_450,
         undefined,
-        [entry.translation],
+        [state.sources.wordGloss ? entry.translation : entry.arabic],
         'Same Arabic root',
       )
     }
@@ -484,8 +533,15 @@ function scanConcepts(
     for (const key of concept.ayahKeys) {
       const indexAt = state.firstIndex.get(key)
       const hasVisibleEvidence = indexAt != null && Math.max(
-        searchTextRelevance(state.index[indexAt]!.ayahTranslation, evidenceQuery, false),
-        searchTextRelevance(sameAyahGlossLine(state.index, indexAt), evidenceQuery, false),
+        state.sources.verseTranslation
+          ? searchTextRelevance(state.index[indexAt]!.ayahTranslation, evidenceQuery, false)
+          : 0,
+        state.sources.wordGloss
+          ? searchTextRelevance(sameAyahGlossLine(state.index, indexAt), evidenceQuery, false)
+          : 0,
+        state.sources.transliteration
+          ? searchTextRelevance(sameAyahTransliterationLine(state.index, indexAt), evidenceQuery, false)
+          : 0,
       ) > 0
       const groundedScore = score + (hasVisibleEvidence ? VISIBLE_CONCEPT_EVIDENCE_BONUS : 0)
       const current = semantic.get(key)
@@ -553,7 +609,7 @@ function scanRelatedWords(
   from: number,
   to: number,
 ): void {
-  if (related.length === 0) return
+  if (related.length === 0 || !state.sources.wordGloss) return
   for (let i = from; i < to; i++) {
     const entry = state.index[i]!
     const match = bestRelated(entry.translationLower, related)
@@ -571,7 +627,7 @@ function scanRelatedWords(
 }
 
 function scanRelatedAyahs(state: RankingState, related: RelatedSearchTerm[]): void {
-  if (related.length === 0) return
+  if (related.length === 0 || (!state.sources.wordGloss && !state.sources.verseTranslation)) return
   let at = 0
   while (at < state.index.length) {
     const anchor = state.index[at]!
@@ -583,8 +639,12 @@ function scanRelatedAyahs(state: RankingState, related: RelatedSearchTerm[]): vo
     ) {
       end++
     }
-    const translation = bestRelated(anchor.ayahTranslation, related)
-    const gloss = bestRelated(sameAyahGlossLine(state.index, at), related)
+    const translation = state.sources.verseTranslation
+      ? bestRelated(anchor.ayahTranslation, related)
+      : null
+    const gloss = state.sources.wordGloss
+      ? bestRelated(sameAyahGlossLine(state.index, at), related)
+      : null
     const match = translation == null || (gloss != null && gloss.score > translation.score)
       ? gloss
       : translation
@@ -623,13 +683,14 @@ function finishRanking(state: RankingState, maxHits: number): WordSearchHit[] {
         base,
         match.matchLabel ?? '',
         match.matchTerms,
+        state.sources,
       )
       const targetAt = match.position > 0
         ? match.indexAt
         : visibleSearchTargetIndex(
             state.index,
             match.indexAt,
-            displayed.ayahTranslation,
+            displayed.displayText ?? displayed.ayahTranslation,
             state.parsed.text,
             match.matchLabel ?? '',
             match.matchTerms,
@@ -642,7 +703,8 @@ function finishRanking(state: RankingState, maxHits: number): WordSearchHit[] {
         matchLabel: match.matchLabel ?? null,
         matchTerms: match.matchTerms,
         matchReason: match.matchReason,
-        ayahTranslation: displayed.ayahTranslation,
+        displayText: displayed.displayText,
+        displaySource: displayed.displaySource,
       }
     })
 }
@@ -708,10 +770,7 @@ function isWithinOneEdit(word: string, query: string): boolean {
   )
 }
 
-/**
- * SI ayah text when it can show the match; otherwise the same-ayah word-gloss
- * line when that can. Falls back to SI when neither hosts a highlight.
- */
+/** Chooses only among text surfaces visible under the active reader settings. */
 function toHitWithDisplayTranslation(
   entry: WordSearchIndexEntry,
   index: WordSearchIndexEntry[],
@@ -720,23 +779,29 @@ function toHitWithDisplayTranslation(
   base: WordSearchHit = toHit(entry),
   semanticLabel = '',
   semanticTerms: string[] = [],
+  sources: WordSearchSources = ALL_WORD_SEARCH_SOURCES,
 ): WordSearchHit {
-  if (
+  const candidates: Array<{ text: string; source: WordSearchDisplaySource }> = []
+  if (sources.verseTranslation) {
+    candidates.push({ text: entry.ayahTranslation, source: 'verse_translation' })
+  }
+  if (sources.wordGloss) {
+    candidates.push({ text: sameAyahGlossLine(index, at), source: 'word_gloss' })
+  }
+  if (sources.transliteration) {
+    candidates.push({ text: sameAyahTransliterationLine(index, at), source: 'transliteration' })
+  }
+  if (sources.arabic) candidates.push({ text: entry.ayahText, source: 'arabic' })
+  const display = candidates.find(({ text, source }) =>
     highlightNeedles(
-      entry.ayahTranslation,
+      text,
       query,
-      entry.translation,
+      source === 'word_gloss' ? entry.translation : '',
       semanticLabel,
       semanticTerms,
-    ).length
-  ) {
-    return base
-  }
-  const glossLine = sameAyahGlossLine(index, at)
-  if (highlightNeedles(glossLine, query, entry.translation, semanticLabel, semanticTerms).length) {
-    return { ...base, ayahTranslation: glossLine }
-  }
-  return base
+    ).length > 0,
+  ) ?? candidates[0] ?? { text: '', source: 'word_gloss' as const }
+  return { ...base, displayText: display.text, displaySource: display.source }
 }
 
 /** Resolves an ayah-level result to the word gloss behind its visible gold term. */
@@ -901,6 +966,28 @@ export function sameAyahGlossLine(
   return parts.join(' ')
 }
 
+/** Space-joined transliteration shown beneath Arabic when that option is enabled. */
+export function sameAyahTransliterationLine(
+  index: WordSearchIndexEntry[],
+  at: number,
+): string {
+  if (at < 0 || at >= index.length) return ''
+  const anchor = index[at]!
+  let lo = at
+  while (
+    lo > 0 &&
+    index[lo - 1]!.surahId === anchor.surahId &&
+    index[lo - 1]!.ayahNumber === anchor.ayahNumber
+  ) lo--
+  let hi = at
+  while (
+    hi + 1 < index.length &&
+    index[hi + 1]!.surahId === anchor.surahId &&
+    index[hi + 1]!.ayahNumber === anchor.ayahNumber
+  ) hi++
+  return index.slice(lo, hi + 1).map((entry) => entry.transliteration.trim()).join(' ').trim()
+}
+
 /** How many index rows to scan before yielding to the event loop. */
 export const WORD_SEARCH_CHUNK = 4_000
 
@@ -916,8 +1003,9 @@ export async function matchWordSearchAsync(
   isCancelled: () => boolean = () => false,
   concepts: SearchConcept[] = [],
   thesaurus: Map<string, RelatedSearchTerm[]> = new Map(),
+  sources: WordSearchSources = ALL_WORD_SEARCH_SOURCES,
 ): Promise<WordSearchHit[]> {
-  const state = createRanking(index, query)
+  const state = createRanking(index, query, sources)
   if (!state || maxHits <= 0) return []
   const scanChunks = async (
     scan: (from: number, to: number) => void,

@@ -18,6 +18,7 @@ import com.beautifulquran.domain.MushafSourceWord
 import com.beautifulquran.domain.WORD_SEARCH_MAX_HITS
 import com.beautifulquran.domain.WordSearchAyahContext
 import com.beautifulquran.domain.WordSearchIndexEntry
+import com.beautifulquran.domain.WordSearchSources
 import com.beautifulquran.domain.buildMushafCatalog
 import com.beautifulquran.domain.isWordSearchQuery
 import com.beautifulquran.domain.matchWordSearch
@@ -334,7 +335,10 @@ class QuranRepository(
      * roots, concepts, and last-resort spelling. Quoted queries stay literal.
      * Blank / too-short / `surah:ayah` queries yield an empty list.
      */
-    suspend fun searchWords(query: String): List<WordSearchHit> = withContext(Dispatchers.IO) {
+    suspend fun searchWords(
+        query: String,
+        sources: WordSearchSources = WordSearchSources(),
+    ): List<WordSearchHit> = withContext(Dispatchers.IO) {
         if (!isWordSearchQuery(query)) return@withContext emptyList()
         val vocabulary = searchConcepts?.vocabulary()
         val context = currentCoroutineContext()
@@ -345,6 +349,7 @@ class QuranRepository(
             vocabulary?.concepts.orEmpty(),
             vocabulary?.thesaurus.orEmpty(),
             checkCancelled = context::ensureActive,
+            sources = sources,
         )
     }
 

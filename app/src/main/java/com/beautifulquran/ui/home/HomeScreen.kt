@@ -65,6 +65,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Dp
@@ -77,10 +78,12 @@ import androidx.compose.ui.res.stringResource
 import com.beautifulquran.R
 import com.beautifulquran.data.model.Surah
 import com.beautifulquran.data.model.SurahWordSearchSection
+import com.beautifulquran.data.model.WordSearchDisplaySource
 import com.beautifulquran.data.model.WordSearchHit
 import com.beautifulquran.data.AyahSelectorSide
 import com.beautifulquran.data.HomeBookmarkStyle
 import com.beautifulquran.domain.WORD_SEARCH_PREVIEW_LIMIT
+import com.beautifulquran.domain.ayahHighlightSpans
 import com.beautifulquran.domain.englishTranslationHighlightSpans
 import com.beautifulquran.domain.parseSearchQuery
 import com.beautifulquran.domain.spellingCorrection
@@ -860,23 +863,32 @@ private fun WordSearchHitRow(
 ) {
     val accents = LocalQuranAccents.current
     val highlightColor = accents.gold
+    val isArabic = hit.displaySource == WordSearchDisplaySource.ARABIC
     val displayQuery = remember(query) { parseSearchQuery(query).text }
     val translation = remember(
-        hit.ayahTranslation,
+        hit.displayText,
         hit.translation,
         hit.matchTerms,
         hit.matchLabel,
         displayQuery,
         highlightColor,
+        hit.displaySource,
+        hit.position,
+        hit.arabic,
     ) {
         buildAnnotatedString {
-            for (span in englishTranslationHighlightSpans(
-                ayahTranslation = hit.ayahTranslation,
-                query = displayQuery,
-                wordGloss = hit.translation,
-                semanticLabel = hit.matchLabel.orEmpty(),
-                semanticTerms = hit.matchTerms,
-            )) {
+            val spans = if (isArabic) {
+                ayahHighlightSpans(hit.displayText, hit.position, hit.arabic)
+            } else {
+                englishTranslationHighlightSpans(
+                    ayahTranslation = hit.displayText,
+                    query = displayQuery,
+                    wordGloss = hit.translation,
+                    semanticLabel = hit.matchLabel.orEmpty(),
+                    semanticTerms = hit.matchTerms,
+                )
+            }
+            for (span in spans) {
                 if (span.highlighted) {
                     withStyle(
                         SpanStyle(
@@ -915,8 +927,14 @@ private fun WordSearchHitRow(
             Spacer(Modifier.height(4.dp))
             Text(
                 text = translation,
-                style = MaterialTheme.typography.bodyLarge,
+                style = if (isArabic) {
+                    ArabicTitleStyle.copy(fontSize = 21.sp, lineHeight = 34.sp)
+                } else {
+                    MaterialTheme.typography.bodyLarge
+                },
                 color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.88f),
+                textAlign = if (isArabic) TextAlign.End else TextAlign.Start,
+                modifier = Modifier.fillMaxWidth(),
                 maxLines = 4,
                 overflow = TextOverflow.Ellipsis,
             )

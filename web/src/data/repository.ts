@@ -440,7 +440,10 @@ export function warmWordSearchIndex(): Promise<WordSearchIndexEntry[]> {
  * `surah:ayah` queries yield an empty list (caller should gate with
  * `shouldRunWordSearch`).
  */
-export function searchWords(query: string): WordSearchHit[] {
+export function searchWords(
+  query: string,
+  sources?: import('../domain/WordSearch').WordSearchSources,
+): WordSearchHit[] {
   if (!shouldRunWordSearch(query)) return []
   return matchWordSearch(
     wordSearchIndexRows(),
@@ -448,6 +451,7 @@ export function searchWords(query: string): WordSearchHit[] {
     WORD_SEARCH_MAX_HITS,
     searchConcepts ?? [],
     searchThesaurus,
+    sources,
   )
 }
 
@@ -458,6 +462,7 @@ export function searchWords(query: string): WordSearchHit[] {
 export async function searchWordsAsync(
   query: string,
   isCancelled: () => boolean = () => false,
+  sources?: import('../domain/WordSearch').WordSearchSources,
 ): Promise<WordSearchHit[]> {
   if (!shouldRunWordSearch(query)) return []
   const [index, concepts] = await Promise.all([warmWordSearchIndex(), warmSearchConcepts()])
@@ -469,6 +474,7 @@ export async function searchWordsAsync(
     isCancelled,
     concepts,
     searchThesaurus,
+    sources,
   )
 }
 

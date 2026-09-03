@@ -1,6 +1,7 @@
 package com.beautifulquran.domain
 
 import com.beautifulquran.data.model.WordSearchHit
+import com.beautifulquran.data.model.WordSearchDisplaySource
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -137,6 +138,43 @@ class WordSearchTest {
         )
         val hit = matchWordSearch(phrase, "\"name of Allah\"").single()
         assertEquals(1, hit.position)
+    }
+
+    @Test
+    fun `search uses only reader-visible text sources`() {
+        val verse = listOf(
+            entry(
+                surahId = 19,
+                ayah = 45,
+                position = 1,
+                arabic = "قَرِينًا",
+                translation = "a companion",
+                transliteration = "qareenan",
+                ayahText = "فَتَكُونَ لِلشَّيْطَانِ وَلِيًّا",
+                ayahTranslation = "so you would be to Satan a companion [in Hellfire]",
+            ),
+        )
+        val glossOnly = WordSearchSources(
+            arabic = false,
+            wordGloss = true,
+            transliteration = false,
+            verseTranslation = false,
+        )
+        val arabicOnly = WordSearchSources(
+            arabic = true,
+            wordGloss = false,
+            transliteration = false,
+            verseTranslation = false,
+        )
+
+        assertTrue(matchWordSearch(verse, "\"Hellfire\"", sources = glossOnly).isEmpty())
+        val glossHit = matchWordSearch(verse, "companion", sources = glossOnly).single()
+        assertEquals("a companion", glossHit.displayText)
+        assertEquals(WordSearchDisplaySource.WORD_GLOSS, glossHit.displaySource)
+        assertTrue(matchWordSearch(verse, "companion", sources = arabicOnly).isEmpty())
+        val arabicHit = matchWordSearch(verse, "قرينا", sources = arabicOnly).single()
+        assertEquals("فَتَكُونَ لِلشَّيْطَانِ وَلِيًّا", arabicHit.displayText)
+        assertEquals(WordSearchDisplaySource.ARABIC, arabicHit.displaySource)
     }
 
     @Test
@@ -527,11 +565,11 @@ class WordSearchTest {
         )
         val hits = matchWordSearch(entries, "rest")
         assertEquals(1, hits.size)
-        assertTrue(hits[0].ayahTranslation.contains("resting", ignoreCase = true))
-        assertTrue(hits[0].ayahTranslation.contains("the earth"))
-        assertTrue(hits[0].ayahTranslation.contains("and the sky"))
+        assertTrue(hits[0].displayText.contains("resting", ignoreCase = true))
+        assertTrue(hits[0].displayText.contains("the earth"))
+        assertTrue(hits[0].displayText.contains("and the sky"))
         val spans = englishTranslationHighlightSpans(
-            hits[0].ayahTranslation,
+            hits[0].displayText,
             "rest",
             hits[0].translation,
         )

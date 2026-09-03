@@ -1,6 +1,7 @@
 package com.beautifulquran.domain
 
 import com.beautifulquran.data.model.SurahWordSearchSection
+import com.beautifulquran.data.model.WordSearchDisplaySource
 import com.beautifulquran.data.model.WordSearchHit
 
 /** Soft cap so a very common English gloss cannot flood the cover sheet. */
@@ -14,6 +15,14 @@ const val WORD_SEARCH_PREVIEW_LIMIT = 3
 
 /** Keeps visible concept evidence ahead of any bounded corroboration bonus. */
 private const val VISIBLE_CONCEPT_EVIDENCE_BONUS = 300
+
+/** Text surfaces currently visible in the reader. Hidden translations must not affect search. */
+data class WordSearchSources(
+    val arabic: Boolean = true,
+    val wordGloss: Boolean = true,
+    val transliteration: Boolean = true,
+    val verseTranslation: Boolean = true,
+)
 
 /**
  * The ayah- and surah-level text every word of one ayah shares.
@@ -83,13 +92,9 @@ fun isWordSearchQuery(query: String): Boolean {
 }
 
 /**
- * Ranks Arabic, English and transliteration matches, related QAC-root words,
- * and QSAC [concepts]. Enclosing the whole query in double quotes keeps only
- * literal whole-word/phrase matches.
- *
- * When the SI ayah translation cannot show the matched English, the hit's
- * [WordSearchHit.ayahTranslation] is the same-ayah word-gloss line instead,
- * so the cover snippet always has the matched term in context.
+ * Ranks the reader-visible [sources], related QAC-root words, and QSAC
+ * [concepts]. Enclosing the whole query in double quotes keeps only literal
+ * whole-word/phrase matches from those visible sources.
  */
 fun matchWordSearch(
     index: List<WordSearchIndexEntry>,
@@ -98,6 +103,7 @@ fun matchWordSearch(
     concepts: List<SearchConcept> = emptyList(),
     thesaurus: Map<String, List<RelatedSearchTerm>> = emptyMap(),
     checkCancelled: () -> Unit = {},
+    sources: WordSearchSources = WordSearchSources(),
 ): List<WordSearchHit> {
     val parsed = parseSearchQuery(query)
     if (parsed.text.length < WORD_SEARCH_MIN_QUERY_LENGTH || maxHits <= 0) return emptyList()
@@ -140,13 +146,17 @@ fun matchWordSearch(
             if ((i and 0xfff) == 0) checkCancelled()
             val entry = index[i]
             val score = maxOf(
-                if (arabic.isEmpty()) 0 else searchTextRelevance(
+                if (!sources.arabic || arabic.isEmpty()) 0 else searchTextRelevance(
                     entry.arabicNorm,
                     parsed.copy(text = arabic),
                     allowFuzzy,
                 ),
-                searchTextRelevance(entry.translationLower, latin, allowFuzzy),
-                searchTextRelevance(entry.transliterationLower, latin, allowFuzzy),
+                if (sources.wordGloss) {
+                    searchTextRelevance(entry.translationLower, latin, allowFuzzy)
+                } else 0,
+                if (sources.transliteration) {
+                    searchTextRelevance(entry.transliterationLower, latin, allowFuzzy)
+                } else 0,
             )
             add(
                 i,
@@ -154,11 +164,14 @@ fun matchWordSearch(
                 score,
                 terms = if (allowFuzzy && score > 0) {
                     listOfNotNull(
-                        if (arabic.isNotEmpty()) {
+                        if (sources.arabic && arabic.isNotEmpty()) {
                             fuzzyWordMatch(entry.arabicNorm, arabic)
                         } else {
-                            fuzzyWordMatch(entry.translationLower, latin.text)
-                                ?: fuzzyWordMatch(entry.transliterationLower, latin.text)
+                            (if (sources.wordGloss) {
+                                fuzzyWordMatch(entry.translationLower, latin.text)
+                            } else null) ?: if (sources.transliteration) {
+                                fuzzyWordMatch(entry.transliterationLower, latin.text)
+                            } else null
                         },
                     )
                 } else {
@@ -180,17 +193,22 @@ fun matchWordSearch(
                 end++
             }
             val score = maxOf(
-                if (arabic.isEmpty()) 0 else searchTextRelevance(
+                if (!sources.arabic || arabic.isEmpty()) 0 else searchTextRelevance(
                     normalizeArabicForSearch(anchor.ayahText),
                     parsed.copy(text = arabic),
                     allowFuzzy,
                 ),
-                searchTextRelevance(anchor.ayahTranslation, latin, allowFuzzy),
-                if (parsed.text.any(Char::isWhitespace)) {
+                if (sources.verseTranslation) {
+                    searchTextRelevance(anchor.ayahTranslation, latin, allowFuzzy)
+                } else 0,
+                if (sources.wordGloss && parsed.text.any(Char::isWhitespace)) {
                     searchTextRelevance(sameAyahGlossLine(index, at), latin, allowFuzzy)
                 } else {
                     0
                 },
+                if (sources.transliteration && parsed.text.any(Char::isWhitespace)) {
+                    searchTextRelevance(sameAyahTransliterationLine(index, at), latin, allowFuzzy)
+                } else 0,
             )
             add(
                 at,
@@ -198,10 +216,16 @@ fun matchWordSearch(
                 score = score,
                 terms = if (allowFuzzy && score > 0) {
                     listOfNotNull(
-                        if (arabic.isNotEmpty()) {
+                        if (sources.arabic && arabic.isNotEmpty()) {
                             fuzzyWordMatch(normalizeArabicForSearch(anchor.ayahText), arabic)
                         } else {
-                            fuzzyWordMatch(anchor.ayahTranslation.lowercase(), latin.text)
+                            (if (sources.verseTranslation) {
+                                fuzzyWordMatch(anchor.ayahTranslation.lowercase(), latin.text)
+                            } else null) ?: (if (sources.wordGloss) {
+                                fuzzyWordMatch(sameAyahGlossLine(index, at).lowercase(), latin.text)
+                            } else null) ?: if (sources.transliteration) {
+                                fuzzyWordMatch(sameAyahTransliterationLine(index, at).lowercase(), latin.text)
+                            } else null
                         },
                     )
                 } else {
@@ -241,8 +265,15 @@ fun matchWordSearch(
             for (key in concept.ayahKeys) {
                 val hasVisibleEvidence = firstIndex[key]?.let { at ->
                     maxOf(
-                        searchTextRelevance(index[at].ayahTranslation, evidenceQuery, allowFuzzy = false),
-                        searchTextRelevance(sameAyahGlossLine(index, at), evidenceQuery, allowFuzzy = false),
+                        if (sources.verseTranslation) {
+                            searchTextRelevance(index[at].ayahTranslation, evidenceQuery, false)
+                        } else 0,
+                        if (sources.wordGloss) {
+                            searchTextRelevance(sameAyahGlossLine(index, at), evidenceQuery, false)
+                        } else 0,
+                        if (sources.transliteration) {
+                            searchTextRelevance(sameAyahTransliterationLine(index, at), evidenceQuery, false)
+                        } else 0,
                     ) > 0
                 } == true
                 val groundedScore = score + if (hasVisibleEvidence) {
@@ -302,18 +333,20 @@ fun matchWordSearch(
     }
 
     fun scanRelated(related: List<RelatedSearchTerm>) {
-        if (related.isEmpty()) return
-        for (i in index.indices) {
-            if ((i and 0xfff) == 0) checkCancelled()
-            val entry = index[i]
-            val match = bestRelated(entry.translationLower, related) ?: continue
-            add(
-                i,
-                entry.position,
-                match.score,
-                terms = match.terms,
-                reason = "Related · ${match.terms.first()}",
-            )
+        if (related.isEmpty() || (!sources.wordGloss && !sources.verseTranslation)) return
+        if (sources.wordGloss) {
+            for (i in index.indices) {
+                if ((i and 0xfff) == 0) checkCancelled()
+                val entry = index[i]
+                val match = bestRelated(entry.translationLower, related) ?: continue
+                add(
+                    i,
+                    entry.position,
+                    match.score,
+                    terms = match.terms,
+                    reason = "Related · ${match.terms.first()}",
+                )
+            }
         }
         var at = 0
         while (at < index.size) {
@@ -325,9 +358,10 @@ fun matchWordSearch(
             ) {
                 end++
             }
-            val translation = bestRelated(anchor.ayahTranslation, related)
-            val gloss = bestRelated(sameAyahGlossLine(index, at), related)
-            val match = listOfNotNull(translation, gloss).maxByOrNull { it.score }
+            val match = listOfNotNull(
+                if (sources.verseTranslation) bestRelated(anchor.ayahTranslation, related) else null,
+                if (sources.wordGloss) bestRelated(sameAyahGlossLine(index, at), related) else null,
+            ).maxByOrNull { it.score }
             if (match != null) {
                 add(
                     at,
@@ -360,7 +394,7 @@ fun matchWordSearch(
                     i,
                     index[i].position,
                     score = 1_450,
-                    terms = listOf(index[i].translation),
+                    terms = listOf(if (sources.wordGloss) index[i].translation else index[i].arabic),
                     reason = "Same Arabic root",
                 )
             }
@@ -383,6 +417,7 @@ fun matchWordSearch(
                 parsed.text,
                 match.matchLabel.orEmpty(),
                 match.matchTerms,
+                sources,
             )
             val targetAt = if (match.position > 0) {
                 match.indexAt
@@ -390,7 +425,7 @@ fun matchWordSearch(
                 visibleSearchTargetIndex(
                     index,
                     match.indexAt,
-                    display,
+                    display.text,
                     parsed.text,
                     match.matchLabel.orEmpty(),
                     match.matchTerms,
@@ -401,7 +436,8 @@ fun matchWordSearch(
                 matchLabel = match.matchLabel,
                 matchTerms = match.matchTerms,
                 matchReason = match.matchReason,
-                ayahTranslation = display,
+                displayText = display.text,
+                displaySource = display.source,
             )
             if (target == null) {
                 base.copy(position = 0, arabic = "", translation = "", transliteration = "")
@@ -473,10 +509,12 @@ private fun isWithinOneEdit(text: String, start: Int, end: Int, query: String): 
     return (first + 2 until wordLength).all { text[start + it] == query[it] }
 }
 
-/**
- * SI ayah text when it can show the match; otherwise the same-ayah word-gloss
- * line when that can. Falls back to SI when neither hosts a highlight.
- */
+internal data class WordSearchSnippet(
+    val text: String,
+    val source: WordSearchDisplaySource,
+)
+
+/** Chooses only among text surfaces visible under the active reader settings. */
 internal fun snippetDisplayText(
     entry: WordSearchIndexEntry,
     index: List<WordSearchIndexEntry>,
@@ -484,31 +522,36 @@ internal fun snippetDisplayText(
     query: String,
     semanticLabel: String = "",
     semanticTerms: List<String> = emptyList(),
-): String {
-    if (
+    sources: WordSearchSources = WordSearchSources(),
+): WordSearchSnippet {
+    val candidates = buildList {
+        if (sources.verseTranslation) {
+            add(WordSearchSnippet(entry.ayahTranslation, WordSearchDisplaySource.VERSE_TRANSLATION))
+        }
+        if (sources.wordGloss) {
+            add(WordSearchSnippet(sameAyahGlossLine(index, at), WordSearchDisplaySource.WORD_GLOSS))
+        }
+        if (sources.transliteration) {
+            add(
+                WordSearchSnippet(
+                    sameAyahTransliterationLine(index, at),
+                    WordSearchDisplaySource.TRANSLITERATION,
+                ),
+            )
+        }
+        if (sources.arabic) {
+            add(WordSearchSnippet(entry.ayahText, WordSearchDisplaySource.ARABIC))
+        }
+    }
+    return candidates.firstOrNull { candidate ->
         highlightNeedles(
-            entry.ayahTranslation,
+            candidate.text,
             query,
-            entry.translation,
+            if (candidate.source == WordSearchDisplaySource.WORD_GLOSS) entry.translation else "",
             semanticLabel,
             semanticTerms = semanticTerms,
         ).isNotEmpty()
-    ) {
-        return entry.ayahTranslation
-    }
-    val glossLine = sameAyahGlossLine(index, at)
-    if (
-        highlightNeedles(
-            glossLine,
-            query,
-            entry.translation,
-            semanticLabel,
-            semanticTerms = semanticTerms,
-        ).isNotEmpty()
-    ) {
-        return glossLine
-    }
-    return entry.ayahTranslation
+    } ?: candidates.firstOrNull() ?: WordSearchSnippet("", WordSearchDisplaySource.WORD_GLOSS)
 }
 
 /** Resolves an ayah-level result to the word gloss behind its visible gold term. */
@@ -651,6 +694,30 @@ internal fun sameAyahGlossLine(index: List<WordSearchIndexEntry>, at: Int): Stri
         }
     }
     return parts.joinToString(" ")
+}
+
+/** Space-joined transliteration shown beneath Arabic when that reader option is enabled. */
+internal fun sameAyahTransliterationLine(index: List<WordSearchIndexEntry>, at: Int): String =
+    sameAyahLine(index, at) { it.transliteration }
+
+private fun sameAyahLine(
+    index: List<WordSearchIndexEntry>,
+    at: Int,
+    text: (WordSearchIndexEntry) -> String,
+): String {
+    if (at !in index.indices) return ""
+    val anchor = index[at]
+    var lo = at
+    while (
+        lo > 0 && index[lo - 1].surahId == anchor.surahId &&
+        index[lo - 1].ayahNumber == anchor.ayahNumber
+    ) lo--
+    var hi = at
+    while (
+        hi + 1 < index.size && index[hi + 1].surahId == anchor.surahId &&
+        index[hi + 1].ayahNumber == anchor.ayahNumber
+    ) hi++
+    return (lo..hi).joinToString(" ") { text(index[it]).trim() }.trim()
 }
 
 /**

@@ -24,6 +24,7 @@ import {
 import { QuranRepository } from '../../data/repository'
 import { VerseBookmarkRibbon } from '../../render/VerseBookmarkRibbon'
 import {
+  ayahHighlightSpans,
   englishTranslationHighlightSpans,
   filterSurahs,
   parseSearchQuery,
@@ -34,6 +35,7 @@ import {
   type SurahWordSearchSection,
   type WordSearchHit,
 } from '../../domain/WordSearch'
+import { wordSearchSources } from '../../data/customizePolicy'
 import { BOOKMARKS_LAYER, type StackLayer } from '../paper/stack'
 
 export function HomeScreen({ stackLayer }: { stackLayer: StackLayer }) {
@@ -105,7 +107,11 @@ export function HomeScreen({ stackLayer }: { stackLayer: StackLayer }) {
     setWordLoading(true)
     let cancelled = false
     const handle = window.setTimeout(() => {
-      void QuranRepository.searchWordsAsync(search, () => cancelled).then((hits) => {
+      void QuranRepository.searchWordsAsync(
+        search,
+        () => cancelled,
+        wordSearchSources(state.settings),
+      ).then((hits) => {
         if (cancelled) return
         setWordHits(hits)
         setWordLoading(false)
@@ -115,7 +121,13 @@ export function HomeScreen({ stackLayer }: { stackLayer: StackLayer }) {
       cancelled = true
       window.clearTimeout(handle)
     }
-  }, [search])
+  }, [
+    search,
+    state.settings.readingMode,
+    state.settings.showWordGloss,
+    state.settings.showTransliteration,
+    state.settings.showTranslation,
+  ])
 
   useEffect(() => {
     if (state.bookmarks.length > previousBookmarkCount.current) {
@@ -590,8 +602,18 @@ function WordSearchSection({
         </span>
       </header>
       <ul className="word-search-hits">
-        {section.hits.map((hit) => (
-          <li key={`${hit.ayahNumber}-${hit.position}`}>
+        {section.hits.map((hit) => {
+          const arabic = hit.displaySource === 'arabic'
+          const spans = arabic
+            ? ayahHighlightSpans(hit.displayText ?? hit.ayahTranslation, hit.position, hit.arabic)
+            : englishTranslationHighlightSpans(
+                hit.displayText ?? hit.ayahTranslation,
+                displayQuery,
+                hit.translation,
+                hit.matchLabel ?? '',
+                hit.matchTerms ?? [],
+              )
+          return <li key={`${hit.ayahNumber}-${hit.position}`}>
             <button
               type="button"
               className="word-search-hit"
@@ -604,14 +626,12 @@ function WordSearchSection({
                 {hit.surahId}:{hit.ayahNumber}
                 {` · ${hit.matchReason ?? 'Text match'}`}
               </span>
-              <span className="word-search-translation">
-                {englishTranslationHighlightSpans(
-                  hit.ayahTranslation,
-                  displayQuery,
-                  hit.translation,
-                  hit.matchLabel ?? '',
-                  hit.matchTerms ?? [],
-                ).map((span, i) =>
+              <span
+                className={`word-search-translation${arabic ? ' is-arabic' : ''}`}
+                lang={arabic ? 'ar' : undefined}
+                dir={arabic ? 'rtl' : undefined}
+              >
+                {spans.map((span, i) =>
                   span.highlighted ? (
                     <mark key={i} className="word-search-mark">
                       {span.text}
@@ -623,7 +643,7 @@ function WordSearchSection({
               </span>
             </button>
           </li>
-        ))}
+        })}
       </ul>
       {section.hiddenCount > 0 ? (
         <button type="button" className="word-search-more" onClick={onToggle}>

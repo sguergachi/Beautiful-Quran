@@ -4,9 +4,12 @@ Home search is one offline ranker shared by Android and web. It searches chapter
 names and `surah:ayah` references, then ranks Quran results using five grounded
 signals rather than a general-purpose language model:
 
-1. **Literal text** — whole word or phrase in Arabic, Saheeh International,
-   word glosses, or transliteration. An exact field match leads an embedded
-   phrase, reordered multi-word coverage, and a plain substring.
+1. **Literal text** — whole word or phrase in the text surfaces enabled by the
+   selected reader view. English-only searches the timed word-gloss prose;
+   Arabic-only and Mushaf search Arabic; bilingual Scroll searches Arabic plus
+   whichever of gloss, transliteration, and full translation are switched on.
+   Hidden text never contributes a result. An exact field match leads an
+   embedded phrase, reordered multi-word coverage, and a plain substring.
 2. **Thesaurus vocabulary** — when fewer than three grounded results exist, a
    compact Open English WordNet graph supplements them with related words that
    actually occur in this Quran. Synonyms lead precise derivational, similar,
@@ -34,16 +37,19 @@ signals rather than a general-purpose language model:
    only when literal, concept, and thesaurus stages all return nothing.
 
 Results are deduplicated per ayah, sorted by descending score, and retain Quranic
-order as the tie-break. The UI then groups that ranked stream by surah. Literal
-word hits preserve their word position for the reader flash. Full-ayah phrase
+order as the tie-break. Changing the reader view immediately reruns an active
+query against its new visible-source policy. The UI then groups that ranked
+stream by surah. Literal word hits preserve their word position for the reader flash. Full-ayah phrase
 and concept hits resolve to a grounded word gloss when the visible evidence has
 one; translation-only auxiliaries such as `could` use the nearest grounded verb.
 Word-position alignment deliberately does not reuse broad search substring
 ranking: it matches whole gloss tokens and simple inflections, so an adjacent
 preposition can never hide inside an unrelated gloss (for example, `in` inside
 `indeed`). The nearby-word fallback is additionally restricted to modal verbs.
-Translator additions with no Quran-word gloss, such as
-`[in Hellfire]` in 19:45, instead wipe the exact canonical-translation term.
+Translator additions with no Quran-word gloss, such as `[in Hellfire]` in
+19:45, are searchable only while the full translation is visible; they never
+leak into English-only gloss results. When visible, they wipe the exact
+canonical-translation term.
 Result snippets color every visible term that helped the result rank: the typed
 text, thesaurus terms such as `peace` and `tranquility`, query-related word
 glosses, and non-filler words from a matched concept label. Overlapping terms
@@ -92,7 +98,7 @@ such as `hearts` is also the word that pulses in the reader.
 
 A pair of straight or typographic double quotes around the complete query
 disables spelling, thesaurus expansion, roots, concepts, token reordering, and
-substring matching.
+substring matching. Literal matching still observes the active reader sources.
 It keeps only a literal whole word or contiguous phrase, ignoring case and
 punctuation boundaries:
 

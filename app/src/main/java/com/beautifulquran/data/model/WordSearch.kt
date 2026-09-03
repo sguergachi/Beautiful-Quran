@@ -1,5 +1,7 @@
 package com.beautifulquran.data.model
 
+enum class WordSearchDisplaySource { ARABIC, WORD_GLOSS, TRANSLITERATION, VERSE_TRANSLATION }
+
 /** One word-level hit from a Quran-wide home search. */
 data class WordSearchHit(
     val surahId: Int,
@@ -18,6 +20,10 @@ data class WordSearchHit(
     val matchTerms: List<String> = emptyList(),
     /** Quiet, user-facing explanation of why this result is relevant. */
     val matchReason: String = "Text match",
+    /** Snippet copied from the reader-visible source selected for this search. */
+    val displayText: String = ayahTranslation,
+    /** Which reader-visible text surface [displayText] contains. */
+    val displaySource: WordSearchDisplaySource = WordSearchDisplaySource.VERSE_TRANSLATION,
 )
 
 /**

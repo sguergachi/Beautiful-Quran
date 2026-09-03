@@ -74,6 +74,44 @@ describe('matchWordSearch', () => {
     expect(hits.every((hit) => hit.matchReason === 'Text match')).toBe(true)
   })
 
+  it('uses only reader-visible text sources', () => {
+    const verse = [{
+      ...entry(
+        19,
+        45,
+        1,
+        'قَرِينًا',
+        'a companion',
+        'qareenan',
+        'فَتَكُونَ لِلشَّيْطَانِ وَلِيًّا',
+      ),
+      ayahTranslation: 'so you would be to Satan a companion [in Hellfire]',
+    }]
+    const glossOnly = {
+      arabic: false,
+      wordGloss: true,
+      transliteration: false,
+      verseTranslation: false,
+    }
+    const arabicOnly = {
+      arabic: true,
+      wordGloss: false,
+      transliteration: false,
+      verseTranslation: false,
+    }
+
+    expect(matchWordSearch(verse, '"Hellfire"', 400, [], new Map(), glossOnly)).toEqual([])
+    expect(matchWordSearch(verse, 'companion', 400, [], new Map(), glossOnly)[0]).toMatchObject({
+      displayText: 'a companion',
+      displaySource: 'word_gloss',
+    })
+    expect(matchWordSearch(verse, 'companion', 400, [], new Map(), arabicOnly)).toEqual([])
+    expect(matchWordSearch(verse, 'قرينا', 400, [], new Map(), arabicOnly)[0]).toMatchObject({
+      displayText: 'فَتَكُونَ لِلشَّيْطَانِ وَلِيًّا',
+      displaySource: 'arabic',
+    })
+  })
+
   it('matches Arabic without diacritics', () => {
     const hits = matchWordSearch(index, 'الرحمن')
     expect(hits.some((h) => h.surahId === 1 && h.position === 3)).toBe(true)
@@ -480,11 +518,11 @@ describe('matchWordSearch gloss-line fallback', () => {
     ].map((e) => ({ ...e, ayahTranslation: si }))
     const hits = matchWordSearch(entries, 'rest')
     expect(hits).toHaveLength(1)
-    expect(hits[0]!.ayahTranslation.toLowerCase()).toContain('resting')
-    expect(hits[0]!.ayahTranslation).toContain('the earth')
-    expect(hits[0]!.ayahTranslation).toContain('and the sky')
+    expect(hits[0]!.displayText!.toLowerCase()).toContain('resting')
+    expect(hits[0]!.displayText).toContain('the earth')
+    expect(hits[0]!.displayText).toContain('and the sky')
     const spans = englishTranslationHighlightSpans(
-      hits[0]!.ayahTranslation,
+      hits[0]!.displayText!,
       'rest',
       hits[0]!.translation,
     )

@@ -4,6 +4,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.media3.common.Player
 import com.beautifulquran.data.QuranRepository
+import com.beautifulquran.data.ReadingLayout
+import com.beautifulquran.data.ReadingMode
+import com.beautifulquran.data.Settings
 import com.beautifulquran.data.SettingsRepository
 import com.beautifulquran.data.model.Surah
 import com.beautifulquran.data.model.SurahWordSearchSection
@@ -13,6 +16,7 @@ import com.beautifulquran.domain.normalizeArabicForSearch
 import com.beautifulquran.domain.parseSearchQuery
 import com.beautifulquran.domain.searchTextRelevance
 import com.beautifulquran.domain.sectionWordSearchHits
+import com.beautifulquran.domain.WordSearchSources
 import com.beautifulquran.playback.PlayerController
 import com.beautifulquran.playback.PlayerUiState
 import kotlinx.coroutines.FlowPreview
@@ -128,6 +132,34 @@ internal fun shouldRunWordSearch(query: String): Boolean {
     return parseAyahReference(query.trim()) == null
 }
 
+/** Search exactly the text surfaces the selected reader configuration renders. */
+internal fun wordSearchSources(settings: Settings): WordSearchSources = when {
+    settings.readingLayout == ReadingLayout.MUSHAF -> WordSearchSources(
+        arabic = true,
+        wordGloss = false,
+        transliteration = false,
+        verseTranslation = false,
+    )
+    settings.readingMode == ReadingMode.ENGLISH_ONLY -> WordSearchSources(
+        arabic = false,
+        wordGloss = true,
+        transliteration = false,
+        verseTranslation = false,
+    )
+    settings.readingMode == ReadingMode.ARABIC_ONLY -> WordSearchSources(
+        arabic = true,
+        wordGloss = false,
+        transliteration = false,
+        verseTranslation = false,
+    )
+    else -> WordSearchSources(
+        arabic = true,
+        wordGloss = settings.showWordGloss,
+        transliteration = settings.showTransliteration,
+        verseTranslation = settings.showTranslation,
+    )
+}
+
 @OptIn(FlowPreview::class)
 class HomeViewModel(
     private val repository: QuranRepository,
@@ -192,16 +224,16 @@ class HomeViewModel(
             reciterNames.value = repository.reciters().associate { it.id to it.name }
         }
         viewModelScope.launch {
-            query
+            combine(query, settings.settings) { q, prefs -> q to wordSearchSources(prefs) }
                 .debounce(120)
-                .collectLatest { q ->
+                .collectLatest { (q, sources) ->
                     if (!shouldRunWordSearch(q)) {
                         wordHits.value = emptyList()
                         wordSearchLoading.value = false
                         return@collectLatest
                     }
                     wordSearchLoading.value = true
-                    wordHits.value = repository.searchWords(q)
+                    wordHits.value = repository.searchWords(q, sources)
                     wordSearchLoading.value = false
                 }
         }
