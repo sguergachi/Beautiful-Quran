@@ -489,8 +489,8 @@ private fun rememberRepeatWash(
 }
 
 /**
- * One-shot search-hit breath: one directional orange wash, followed by
- * full-word ink-strength inhales and exhales. Independent of karaoke
+ * One-shot search-hit locator: five distinct directional orange washes.
+ * Independent of karaoke
  * `ink.repeat` so a real repeat chain is never cancelled or restarted.
  * [identity] restarts it when search moves directly to another word.
  */
@@ -505,24 +505,19 @@ internal fun rememberSearchHitWash(identity: Int?): RepeatWash {
             alpha.snapTo(0f)
             return@LaunchedEffect
         }
-        progress.snapTo(0f)
-        alpha.snapTo(1f)
-        progress.animateTo(
-            1f,
-            tween(SearchHitFlash.SWEEP_MS, easing = SearchHitFlash.EASING),
-        )
-        repeat(SearchHitFlash.PULSES) { breath ->
-            delay(SearchHitFlash.CREST_MS)
-            alpha.animateTo(
-                SearchHitFlash.REST_ALPHA,
-                tween(SearchHitFlash.EXHALE_MS, easing = SearchHitFlash.EASING),
+        repeat(SearchHitFlash.WIPES) { wipe ->
+            progress.snapTo(0f)
+            alpha.snapTo(1f)
+            progress.animateTo(
+                1f,
+                tween(SearchHitFlash.SWEEP_MS, easing = SearchHitFlash.EASING),
             )
-            if (breath < SearchHitFlash.PULSES - 1) {
+            alpha.animateTo(
+                0f,
+                tween(SearchHitFlash.RELEASE_MS, easing = SearchHitFlash.EASING),
+            )
+            if (wipe < SearchHitFlash.WIPES - 1) {
                 delay(SearchHitFlash.REST_MS)
-                alpha.animateTo(
-                    1f,
-                    tween(SearchHitFlash.INHALE_MS, easing = SearchHitFlash.EASING),
-                )
             }
         }
     }

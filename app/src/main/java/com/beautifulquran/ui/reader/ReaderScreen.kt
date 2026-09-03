@@ -1272,7 +1272,7 @@ fun ReaderScreen(
         )
     }
 
-    // Home word-search hit: orange repeat wash (wash in → dissolve × 2) on the
+    // Home word-search hit: repeated orange side wipes on the
     // matched word once the verse is on screen. The wash itself lives in the
     // word unit / Hafs bloom; this effect only gates which word is active.
     var searchFlashAyah by remember { mutableStateOf<Int?>(null) }

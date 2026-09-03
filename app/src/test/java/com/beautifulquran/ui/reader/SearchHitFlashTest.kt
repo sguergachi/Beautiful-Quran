@@ -8,12 +8,12 @@ import org.junit.Test
 class SearchHitFlashTest {
 
     @Test
-    fun `one wash becomes four full-word breaths`() {
-        assertEquals(4, SearchHitFlash.PULSES)
-        assertEquals(870L, SearchHitFlash.breathMs())
-        assertEquals(3_340L, SearchHitFlash.totalMs())
-        assertEquals(0f, SearchHitFlash.REST_ALPHA)
-        assertTrue(SearchHitFlash.totalMs() < 3_500L)
+    fun `five side wipes stay distinct and brief`() {
+        assertEquals(5, SearchHitFlash.WIPES)
+        assertEquals(480L, SearchHitFlash.wipeMs())
+        assertEquals(2_720L, SearchHitFlash.totalMs())
+        assertTrue(SearchHitFlash.REST_MS >= 60L)
+        assertTrue(SearchHitFlash.totalMs() < 3_000L)
     }
 
     @Test

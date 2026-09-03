@@ -516,8 +516,7 @@ export function runGlintFadeOut(
 }
 
 /**
- * Search-hit breath: one directional fill, then the full orange word inhales
- * and exhales without restarting its wash.
+ * Search-hit locator: repeated directional fills with a brief clear interval.
  * Callers pass a dedicated orange overlay (same classes as the karaoke repeat
  * layer) so the mask sizes to the glyphs. Overlay may be unmounted after [onDone].
  */
@@ -525,13 +524,10 @@ export function runSearchHitWash(
   el: HTMLElement,
   rtl: boolean,
   timing: {
-    PULSES: number
+    WIPES: number
     SWEEP_MS: number
-    INHALE_MS: number
-    CREST_MS: number
-    EXHALE_MS: number
+    RELEASE_MS: number
     REST_MS: number
-    REST_ALPHA: number
     EASING: CubicBezierEase
   },
   onDone?: () => void,
@@ -581,30 +577,19 @@ export function runSearchHitWash(
     )
   }
 
-  const breathe = (remaining: number) => {
-    wait(timing.CREST_MS, () => {
-      animateAlpha(1, timing.REST_ALPHA, timing.EXHALE_MS, () => {
-        if (remaining > 1) {
-          wait(timing.REST_MS, () => {
-            animateAlpha(timing.REST_ALPHA, 1, timing.INHALE_MS, () => {
-              breathe(remaining - 1)
-            })
-          })
-        } else {
+  const wipe = (remaining: number) => {
+    cancelCurrent = runRepeatWashIn(el, rtl, timing.SWEEP_MS, () => {
+      animateAlpha(1, 0, timing.RELEASE_MS, () => {
+        if (remaining > 1) wait(timing.REST_MS, () => wipe(remaining - 1))
+        else {
           finish()
           onDone?.()
         }
       })
-    })
+    }, timing.EASING)
   }
 
-  cancelCurrent = runRepeatWashIn(
-    el,
-    rtl,
-    timing.SWEEP_MS,
-    () => breathe(timing.PULSES),
-    timing.EASING,
-  )
+  wipe(timing.WIPES)
 
   return () => {
     cancelled = true
