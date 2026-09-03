@@ -66,9 +66,10 @@ UI. A quiet, regular-weight line above the Quran count says
 or thesaurus results never show an autocorrection notice.
 
 Opening a positioned word hit waits until the reader sheet and its target have
-both settled, then breathes it four times with an eased orange wash, brief
-full-ink crest, and eased release. The scrolling layout waits for its verse
-geometry; Mushaf waits for the requested
+both settled, lays orange through it once with the directional wash, then
+breathes the filled word four times by easing its ink strength between a
+full-ink crest and a quiet orange rest. The scrolling layout waits for its
+verse geometry; Mushaf waits for the requested
 leaf to be visible and never depends on the unmounted scrolling list. The
 orange overlay uses bold English or a tight glyph-shaped ink spread, making the
 filled moment conspicuous without reflowing the verse or reshaping Arabic. If

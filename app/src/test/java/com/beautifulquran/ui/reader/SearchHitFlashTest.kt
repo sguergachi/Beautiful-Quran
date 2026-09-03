@@ -8,11 +8,11 @@ import org.junit.Test
 class SearchHitFlashTest {
 
     @Test
-    fun `four eased breaths keep a compact locator rhythm`() {
-        val cycleMs = SearchHitFlash.cycleMs()
+    fun `one wash becomes four full-word breaths`() {
         assertEquals(4, SearchHitFlash.PULSES)
-        assertEquals(620L, cycleMs)
-        assertEquals(2_600L, SearchHitFlash.totalMs())
+        assertEquals(630L, SearchHitFlash.breathMs())
+        assertEquals(2_660L, SearchHitFlash.totalMs())
+        assertTrue(SearchHitFlash.REST_ALPHA in 0.25f..0.4f)
         assertTrue(SearchHitFlash.totalMs() < 2_700L)
     }
 

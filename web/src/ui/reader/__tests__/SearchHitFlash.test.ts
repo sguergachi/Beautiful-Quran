@@ -1,16 +1,17 @@
 import { describe, expect, it } from 'vitest'
 import {
   SearchHitFlash,
-  searchHitFlashCycleMs,
+  searchHitBreathMs,
   searchHitFlashTotalMs,
 } from '../SearchHitFlash'
 
 describe('SearchHitFlash', () => {
-  it('runs four eased breaths in a compact locator rhythm', () => {
-    const cycle = searchHitFlashCycleMs()
+  it('turns one wash into four full-word breaths', () => {
     expect(SearchHitFlash.PULSES).toBe(4)
-    expect(cycle).toBe(620)
-    expect(searchHitFlashTotalMs()).toBe(2600)
+    expect(searchHitBreathMs()).toBe(630)
+    expect(searchHitFlashTotalMs()).toBe(2660)
+    expect(SearchHitFlash.REST_ALPHA).toBeGreaterThanOrEqual(0.25)
+    expect(SearchHitFlash.REST_ALPHA).toBeLessThanOrEqual(0.4)
     expect(searchHitFlashTotalMs()).toBeLessThan(2700)
   })
 })

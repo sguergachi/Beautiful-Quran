@@ -489,11 +489,10 @@ private fun rememberRepeatWash(
 }
 
 /**
- * One-shot search-hit flash: the same directional orange wash as
- * [rememberRepeatWash], run [SearchHitFlash.PULSES] quick times (wash in →
- * dissolve out). Independent of karaoke `ink.repeat` so a real repeat chain
- * is never cancelled or restarted. [identity] restarts the flash when search
- * moves directly from one word to another.
+ * One-shot search-hit breath: one directional orange wash, followed by
+ * full-word ink-strength inhales and exhales. Independent of karaoke
+ * `ink.repeat` so a real repeat chain is never cancelled or restarted.
+ * [identity] restarts it when search moves directly to another word.
  */
 @Composable
 internal fun rememberSearchHitWash(identity: Int?): RepeatWash {
@@ -506,20 +505,30 @@ internal fun rememberSearchHitWash(identity: Int?): RepeatWash {
             alpha.snapTo(0f)
             return@LaunchedEffect
         }
-        repeat(SearchHitFlash.PULSES) { pulse ->
-            alpha.snapTo(1f)
-            progress.snapTo(0f)
-            progress.animateTo(
-                1f,
-                tween(SearchHitFlash.SWEEP_MS, easing = SearchHitFlash.EASING),
-            )
+        alpha.snapTo(1f)
+        progress.snapTo(0f)
+        progress.animateTo(
+            1f,
+            tween(SearchHitFlash.SWEEP_MS, easing = SearchHitFlash.EASING),
+        )
+        repeat(SearchHitFlash.PULSES) { breath ->
             delay(SearchHitFlash.CREST_MS)
             alpha.animateTo(
-                0f,
-                tween(SearchHitFlash.FADE_OUT_MS, easing = SearchHitFlash.EASING),
+                SearchHitFlash.REST_ALPHA,
+                tween(SearchHitFlash.EXHALE_MS, easing = SearchHitFlash.EASING),
             )
-            if (pulse < SearchHitFlash.PULSES - 1) delay(SearchHitFlash.REST_MS)
+            if (breath < SearchHitFlash.PULSES - 1) {
+                delay(SearchHitFlash.REST_MS)
+                alpha.animateTo(
+                    1f,
+                    tween(SearchHitFlash.INHALE_MS, easing = SearchHitFlash.EASING),
+                )
+            }
         }
+        alpha.animateTo(
+            0f,
+            tween(SearchHitFlash.FINAL_FADE_MS, easing = SearchHitFlash.EASING),
+        )
     }
     return RepeatWash(
         progress = progress.asState(),

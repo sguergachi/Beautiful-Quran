@@ -443,13 +443,12 @@ export function runRepeatFadeOut(
   el: HTMLElement,
   onDone?: () => void,
   durationMs = getTuning().repeatFadeOutMs,
-  ease: CubicBezierEase | ReturnType<typeof sweepEase> = sweepEase(),
 ): () => void {
   applyMask(el, 'none')
   setRepeatWashProgress(el, 1)
   return runWash(
     durationMs,
-    ease,
+    sweepEase(),
     cubicBezierEase,
     (_p, eased) => {
       el.style.opacity = String(1 - eased)
@@ -517,7 +516,8 @@ export function runGlintFadeOut(
 }
 
 /**
- * Search-hit breath: eased wash-in, full-ink crest, eased release, quiet gap.
+ * Search-hit breath: one directional fill, then the full orange word inhales
+ * and exhales without restarting its wash.
  * Callers pass a dedicated orange overlay (same classes as the karaoke repeat
  * layer) so the mask sizes to the glyphs. Overlay may be unmounted after [onDone].
  */
@@ -527,9 +527,12 @@ export function runSearchHitWash(
   timing: {
     PULSES: number
     SWEEP_MS: number
+    INHALE_MS: number
     CREST_MS: number
-    FADE_OUT_MS: number
+    EXHALE_MS: number
     REST_MS: number
+    FINAL_FADE_MS: number
+    REST_ALPHA: number
     EASING: CubicBezierEase
   },
   onDone?: () => void,
@@ -555,37 +558,56 @@ export function runSearchHitWash(
     el.classList.remove('ink-cover-peel')
     el.removeAttribute('data-peel')
     applyMask(el, 'none')
+    clearRepeatWashProgress(el)
   }
 
-  const runPulse = (remaining: number) => {
-    if (cancelled || remaining <= 0) {
-      finish()
-      if (!cancelled) onDone?.()
-      return
-    }
-    cancelCurrent = runRepeatWashIn(
-      el,
-      rtl,
-      timing.SWEEP_MS,
-      () => wait(timing.CREST_MS, () => {
-        cancelCurrent = runRepeatFadeOut(
-          el,
-          () => {
-            if (remaining > 1) {
-              wait(timing.REST_MS, () => runPulse(remaining - 1))
-            } else {
-              runPulse(0)
-            }
-          },
-          timing.FADE_OUT_MS,
-          timing.EASING,
-        )
-      }),
+  const animateAlpha = (
+    from: number,
+    to: number,
+    durationMs: number,
+    next: () => void,
+  ) => {
+    el.style.opacity = String(from)
+    cancelCurrent = runWash(
+      durationMs,
       timing.EASING,
+      cubicBezierEase,
+      (_p, eased) => {
+        el.style.opacity = String(from + (to - from) * eased)
+      },
+      () => {
+        el.style.opacity = String(to)
+        if (!cancelled) next()
+      },
     )
   }
 
-  runPulse(timing.PULSES)
+  const breathe = (remaining: number) => {
+    wait(timing.CREST_MS, () => {
+      animateAlpha(1, timing.REST_ALPHA, timing.EXHALE_MS, () => {
+        if (remaining > 1) {
+          wait(timing.REST_MS, () => {
+            animateAlpha(timing.REST_ALPHA, 1, timing.INHALE_MS, () => {
+              breathe(remaining - 1)
+            })
+          })
+        } else {
+          animateAlpha(timing.REST_ALPHA, 0, timing.FINAL_FADE_MS, () => {
+            finish()
+            onDone?.()
+          })
+        }
+      })
+    })
+  }
+
+  cancelCurrent = runRepeatWashIn(
+    el,
+    rtl,
+    timing.SWEEP_MS,
+    () => breathe(timing.PULSES),
+    timing.EASING,
+  )
 
   return () => {
     cancelled = true
