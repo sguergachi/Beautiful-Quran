@@ -511,9 +511,10 @@ gesture by these rules:
   vertical scroll claims nearly every swipe and page turns feel dead.
 - **Children claim first.** The detector watches the Main pointer pass and
   backs off the instant a child control consumes the gesture, so sliders and
-  scrolling lists keep working inside a sheet. A gesture that opened
-  vertical over a static area can still become a page turn on a clear,
-  sustained horizontal pull.
+  scrolling lists keep working inside a sheet. A second contact also cancels
+  an in-flight sheet pull, so a staggered pinch can never become a page fling.
+  A gesture that opened vertical over a static area can still become a page
+  turn on a clear, sustained horizontal pull.
 - **A short pull resistance** (~14 dp, capped at 4% of the sheet width)
   is subtracted from the drag so the sheet leans before it travels — paper
   has weight — but the sheet starts following the finger almost immediately.
@@ -1252,6 +1253,10 @@ does not repeat section labels above those two navigation rows. Text size,
 transliteration, and ayah translation live in Customize with theme, view,
 layout, numeral scripts, verse annotations, the ayah-selector side, and
 word-by-word English under Arabic.
+On the scrolling reader, pinching the scripture changes text size through the
+same nine stops as Customize and keeps the current verse on its reading line.
+The mushaf does not respond: its hand is a property of the fixed page grid, not
+a reader preference.
 A live miniature at the top is a faded leaf with a gold hairline — Hafs,
 Garamond, gold verse marks, and the folio — so each choice shows what the
 sheet will look like. The leaf stays pinned at the top while the choices

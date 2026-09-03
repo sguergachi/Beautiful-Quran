@@ -227,6 +227,14 @@ class SettingsRepository(context: Context) {
         }
     }
 
+    /** Persists a live reader resize without rewriting every unrelated setting. */
+    fun updateFontScale(fontScale: Float) {
+        val current = _settings.value
+        if (current.fontScale == fontScale) return
+        _settings.value = current.copy(fontScale = fontScale)
+        prefs.edit { putFloat("fontScale", fontScale) }
+    }
+
     /** Whether the reader has explicitly put this contextual lesson away. */
     fun isEducationDismissed(moment: EducationMoment): Boolean =
         prefs.getBoolean(moment.preferenceKey, false)
