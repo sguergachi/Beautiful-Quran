@@ -13,6 +13,10 @@ object SearchHitFlash {
     const val FADE_OUT_MS = 280
     const val PULSES = 4
 
+    /** Tight glyph-following spread that makes the orange fill read heavier. */
+    const val EMPHASIS_GLOW_ALPHA = 0.92f
+    const val EMPHASIS_GLOW_RADIUS = 1.2f
+
     /** One quick directional wash-in + fade-out cycle. */
     fun cycleMs(): Int = SWEEP_MS + FADE_OUT_MS
 

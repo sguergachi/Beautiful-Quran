@@ -363,7 +363,7 @@ export function HafsWord({
           {flashMounted ? (
             <span
               ref={flashRef}
-              className="hafs-repeat-overlay hafs-glyph"
+              className="hafs-repeat-overlay search-hit-pulse hafs-glyph"
               aria-hidden="true"
               style={{ opacity: 0 }}
             >

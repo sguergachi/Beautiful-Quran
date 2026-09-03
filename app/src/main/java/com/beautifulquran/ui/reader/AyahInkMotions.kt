@@ -17,6 +17,7 @@ internal data class AyahInkPack(
     val recessCover: State<Float>,
     val markAlpha: State<Float>,
     val searchHitWash: RepeatWash,
+    val searchHitWordPosition: Int? = null,
     /** A motionless mushaf ayah that still waits beneath the page recess. */
     val wholeAyahRecess: Boolean = false,
 )
@@ -166,5 +167,6 @@ internal fun rememberAyahInkPack(
         recessCover = recessCover,
         markAlpha = rememberAyahMarkAlpha(focused = !dimmed && !enteringFromRecess.value),
         searchHitWash = rememberSearchHitWash(flashWordPosition),
+        searchHitWordPosition = flashWordPosition,
     )
 }

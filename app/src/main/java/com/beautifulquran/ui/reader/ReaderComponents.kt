@@ -1399,10 +1399,12 @@ private fun HighlightLayeredText(
     val repeatInk = LocalQuranAccents.current.repeatInk
     val glintInk = LocalQuranAccents.current.glintInk
     val glimmerInk = if (motion.glintIsRepeat) repeatInk else glintInk ?: repeatInk
+    val searchHitActive = !motion.showRepeatLayer &&
+        searchHitWash != null && searchHitWash.alpha.value > 0f
     // Prefer a live repeat chain; otherwise the one-shot search-hit wash.
     val orangeWash = when {
         motion.showRepeatLayer -> motion.repeatWash
-        searchHitWash != null && searchHitWash.alpha.value > 0f -> searchHitWash
+        searchHitActive -> searchHitWash
         else -> null
     }
     Box(modifier) {
@@ -1444,6 +1446,21 @@ private fun HighlightLayeredText(
                     restingAlpha = 0f,
                     feather = prefix.feather,
                 ),
+            )
+        }
+        if (searchHitActive) {
+            InkOverlayText(
+                text = text,
+                style = style.copy(
+                    shadow = Shadow(
+                        color = repeatInk.copy(alpha = SearchHitFlash.EMPHASIS_GLOW_ALPHA),
+                        blurRadius = with(LocalDensity.current) {
+                            SearchHitFlash.EMPHASIS_GLOW_RADIUS.dp.toPx()
+                        },
+                    ),
+                ),
+                color = repeatInk.copy(alpha = 0.01f),
+                modifier = Modifier.repeatInkLayer(searchHitWash, rtl),
             )
         }
         if (orangeWash != null) {
@@ -1531,7 +1548,7 @@ private fun WordUnit(
                         text = word.translation,
                         fontSize = 12.sp * fontScale,
                         lineHeight = 15.sp * fontScale,
-                        fontWeight = glossWeight,
+                        fontWeight = FontWeight.Bold,
                         color = repeatInk.copy(alpha = InkEngine.tuning.repeatInkAlpha),
                         textAlign = TextAlign.Center,
                         modifier = Modifier
@@ -1739,7 +1756,8 @@ internal fun buildShapedBlooms(
         baseReveal = baseReveal,
     )
     // Home search-hit flash: same ColorReveal wash as the orange repeat
-    // bloom — directional mask + dissolve × 2.
+    // bloom — directional mask + dissolve, with a tight glyph-shaped spread
+    // that reads as heavier ink without reshaping or moving the base text.
     if (flashWordPosition != null && searchHitWash.alpha.value > 0f) {
         val flashIndex = words.indexOfFirst { it.position == flashWordPosition }
         val range = rendered.wordRanges.getOrNull(flashIndex)
@@ -1751,6 +1769,8 @@ internal fun buildShapedBlooms(
                 restingAlpha = 0f,
                 layerAlpha = searchHitWash.alpha.value,
                 colorAlpha = InkEngine.tuning.repeatInkAlpha,
+                glowAlpha = SearchHitFlash.EMPHASIS_GLOW_ALPHA,
+                glowRadius = SearchHitFlash.EMPHASIS_GLOW_RADIUS,
             )
         }
     }

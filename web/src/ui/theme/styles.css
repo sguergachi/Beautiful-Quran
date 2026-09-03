@@ -1850,6 +1850,18 @@ select {
   color: var(--repeat);
 }
 
+/* Search-hit orange is intentionally heavier than recitation's repeat wash.
+   The overlay is absolute, so neither bold English nor the tight glyph stroke
+   can reflow the verse; Arabic keeps its original shaped glyph underneath. */
+.search-hit-pulse {
+  -webkit-text-stroke: 0.025em var(--repeat);
+  paint-order: stroke fill;
+}
+
+.word-repeat-overlay.search-hit-pulse.word-gloss {
+  font-weight: 700;
+}
+
 /* White-gold first-gloss glint (Nightfall + Royal Green) — same geometry
    rules as the orange repeat twin. `--glint` is defined on those themes; the
    transparent fallback keeps a mid-fade overlay invisible if the theme flips. */

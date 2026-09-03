@@ -596,7 +596,7 @@ export function WordUnit({
           {flashMounted ? (
             <span
               ref={flashRef}
-              className={`word-repeat-overlay ${baseClass}`}
+              className={`word-repeat-overlay search-hit-pulse ${baseClass}`}
               aria-hidden="true"
               style={{ opacity: 0 }}
             >
@@ -624,7 +624,7 @@ export function WordUnit({
           {flashMounted ? (
             <span
               ref={glossFlashRef}
-              className="word-repeat-overlay word-gloss"
+              className="word-repeat-overlay search-hit-pulse word-gloss"
               aria-hidden="true"
               style={{ opacity: 0 }}
             >
