@@ -8,10 +8,9 @@ import {
 describe('SearchHitFlash', () => {
   it('turns one wash into four full-word breaths', () => {
     expect(SearchHitFlash.PULSES).toBe(4)
-    expect(searchHitBreathMs()).toBe(630)
-    expect(searchHitFlashTotalMs()).toBe(2660)
-    expect(SearchHitFlash.REST_ALPHA).toBeGreaterThanOrEqual(0.25)
-    expect(SearchHitFlash.REST_ALPHA).toBeLessThanOrEqual(0.4)
-    expect(searchHitFlashTotalMs()).toBeLessThan(2700)
+    expect(searchHitBreathMs()).toBe(870)
+    expect(searchHitFlashTotalMs()).toBe(3340)
+    expect(SearchHitFlash.REST_ALPHA).toBe(0)
+    expect(searchHitFlashTotalMs()).toBeLessThan(3500)
   })
 })

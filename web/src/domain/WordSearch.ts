@@ -774,8 +774,9 @@ function visibleSearchTargetIndex(
     return null
   }
 
+  const needles = highlightNeedles(displayText, query, '', semanticLabel, semanticTerms)
   const terms = [...new Set(
-    highlightNeedles(displayText, query, '', semanticLabel, semanticTerms)
+    needles
       .flatMap((needle) => [needle, ...(needle.match(/[\p{L}\p{N}]+/gu) ?? [])])
       .filter((term) => term.length >= 3 && !HIGHLIGHT_FILLERS.has(term.toLowerCase()))
       .map((term) => term.toLowerCase()),
@@ -799,7 +800,51 @@ function visibleSearchTargetIndex(
       bestScore = score
     }
   }
-  return bestAt
+  if (bestAt != null) return bestAt
+
+  // The canonical translation can add an auxiliary with no one-to-one word
+  // gloss ("could see", "could have taken"). Pulse its nearest grounded verb.
+  for (const term of neighboringVisibleTerms(displayText, needles)) {
+    let target: number | null = null
+    let targetScore = 0
+    for (let i = lo; i <= hi; i++) {
+      const score = searchTextRelevance(
+        index[i]!.translationLower,
+        { text: term, exactOnly: false },
+        false,
+      )
+      if (score > targetScore) {
+        target = i
+        targetScore = score
+      }
+    }
+    if (target != null) return target
+  }
+  return null
+}
+
+/** Nearby content words that can ground a translation-only auxiliary match. */
+function neighboringVisibleTerms(text: string, needles: string[]): string[] {
+  const words = [...text.matchAll(/[\p{L}\p{N}]+/gu)]
+  const match = needles
+    .map((needle) => ({ at: text.toLowerCase().indexOf(needle.toLowerCase()), length: needle.length }))
+    .find(({ at }) => at >= 0)
+  if (!match) return []
+  const first = words.findIndex((word) => word.index + word[0].length > match.at)
+  let last = first
+  while (last + 1 < words.length && words[last + 1]!.index < match.at + match.length) last++
+  if (first < 0 || last < first) return []
+  const terms: string[] = []
+  const radius = Math.min(4, Math.max(words.length - last, first + 1))
+  for (let distance = 1; distance <= radius; distance++) {
+    for (const at of [last + distance, first - distance]) {
+      const term = words[at]?.[0]
+      if (term && term.length >= 2 && !TARGET_CONTEXT_FILLERS.has(term.toLowerCase())) {
+        terms.push(term)
+      }
+    }
+  }
+  return [...new Map(terms.map((term) => [term.toLowerCase(), term])).values()]
 }
 
 /** Space-joined English glosses, coalescing adjacent shared-phrase copies. */
@@ -1107,6 +1152,14 @@ export function highlightNeedle(
 const HIGHLIGHT_FILLERS = new Set([
   'and', 'are', 'for', 'from', 'has', 'have', 'into', 'that', 'the', 'their', 'then',
   'they', 'this', 'those', 'was', 'were', 'will', 'with', 'you', 'your',
+])
+
+const TARGET_CONTEXT_FILLERS = new Set([
+  ...HIGHLIGHT_FILLERS,
+  'but', 'can', 'could', 'had', 'he', 'her', 'him', 'his', 'how', 'if', 'is', 'it',
+  'its', 'may', 'might', 'nor', 'not', 'or', 'shall', 'she', 'should', 'so', 'than',
+  'them', 'there', 'these', 'to', 'we', 'what', 'when', 'where', 'which', 'who',
+  'whom', 'whose', 'why', 'would',
 ])
 
 function highlightAllOccurrences(text: string, needles: string[]): AyahTextSpan[] {

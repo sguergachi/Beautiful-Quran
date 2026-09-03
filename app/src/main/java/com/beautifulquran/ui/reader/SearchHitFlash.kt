@@ -11,16 +11,15 @@ object SearchHitFlash {
     const val START_DELAY_MS = 140L
 
     const val SWEEP_MS = 240
-    const val INHALE_MS = 230
-    const val CREST_MS = 90L
-    const val EXHALE_MS = 260
-    const val REST_MS = 50L
-    const val FINAL_FADE_MS = 180
+    const val INHALE_MS = 320
+    const val CREST_MS = 70L
+    const val EXHALE_MS = 420
+    const val REST_MS = 60L
     const val PULSES = 4
-    const val REST_ALPHA = 0.32f
+    const val REST_ALPHA = 0f
 
-    /** Symmetric ease-in-out keeps each inhale and exhale soft at both ends. */
-    val EASING = CubicBezierEasing(0.37f, 0f, 0.63f, 1f)
+    /** Sine-like ease-in-out keeps each inhale and exhale soft at both ends. */
+    val EASING = CubicBezierEasing(0.45f, 0f, 0.55f, 1f)
 
     /** Tight glyph-following spread that makes the orange fill read heavier. */
     const val EMPHASIS_GLOW_ALPHA = 0.92f
@@ -31,7 +30,7 @@ object SearchHitFlash {
 
     /** Total animation time after [START_DELAY_MS]. */
     fun totalMs(): Long = SWEEP_MS + PULSES * (CREST_MS + EXHALE_MS) +
-        (PULSES - 1) * (REST_MS + INHALE_MS) + FINAL_FADE_MS
+        (PULSES - 1) * (REST_MS + INHALE_MS)
 
     /** The scrolling reader and Mushaf have different focus authorities. */
     internal fun isTargetSettled(

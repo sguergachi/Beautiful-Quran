@@ -293,6 +293,32 @@ class WordSearchTest {
     }
 
     @Test
+    fun `translation-only auxiliary targets the nearby visible gloss`() {
+        val cases = listOf(
+            listOf(
+                entry(2, 17, 16, "فِي", "(so) not", ayahTranslation = "they could not see"),
+                entry(2, 17, 17, "يُبْصِرُونَ", "(do) they see", ayahTranslation = "they could not see"),
+            ) to 17,
+            listOf(
+                entry(2, 20, 16, "ٱللَّهُ", "Allah", ayahTranslation = "He could have taken away their hearing"),
+                entry(2, 20, 17, "لَذَهَبَ", "He would certainly have taken away", ayahTranslation = "He could have taken away their hearing"),
+            ) to 17,
+            listOf(
+                entry(2, 71, 23, "كَادُواْ", "they were near", ayahTranslation = "they could hardly do it"),
+                entry(2, 71, 24, "يَفۡعَلُونَ", "(to) doing (it)", ayahTranslation = "they could hardly do it"),
+            ) to 24,
+            listOf(
+                entry(3, 80, 1, "وَلَا", "And not", ayahTranslation = "Nor could he order you"),
+                entry(3, 80, 2, "يَأۡمُرَكُمۡ", "he will order you", ayahTranslation = "Nor could he order you"),
+            ) to 2,
+        )
+
+        cases.forEach { (auxiliary, expectedPosition) ->
+            assertEquals(expectedPosition, matchWordSearch(auxiliary, "could").single().position)
+        }
+    }
+
+    @Test
     fun `matched Arabic root expands to related word forms`() {
         val rooted = listOf(
             entry(2, 37, 1, "فَتَابَ", "so He turned").copy(root = "توب"),

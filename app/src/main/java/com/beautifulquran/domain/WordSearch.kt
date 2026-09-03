@@ -564,7 +564,47 @@ internal fun visibleSearchTargetIndex(
             bestScore = score
         }
     }
-    return bestAt
+    if (bestAt != null) return bestAt
+
+    // Saheeh International sometimes adds an English auxiliary that has no
+    // one-to-one Quran word gloss ("could see", "could have taken"). Walk
+    // outward from that visible match and pulse its nearest grounded verb.
+    for (term in neighboringVisibleTerms(displayText, needles)) {
+        val target = (lo..hi).maxByOrNull { i ->
+            searchTextRelevance(
+                index[i].translationLower,
+                ParsedSearchQuery(term, exactOnly = false),
+                allowFuzzy = false,
+            )
+        } ?: continue
+        if (
+            searchTextRelevance(
+                index[target].translationLower,
+                ParsedSearchQuery(term, exactOnly = false),
+                allowFuzzy = false,
+            ) > 0
+        ) return target
+    }
+    return null
+}
+
+/** Nearby content words that can ground a translation-only auxiliary match. */
+private fun neighboringVisibleTerms(text: String, needles: List<String>): List<String> {
+    val words = Regex("[\\p{L}\\p{N}]+").findAll(text).toList()
+    val range = needles.firstNotNullOfOrNull { needle ->
+        text.indexOf(needle, ignoreCase = true).takeIf { it >= 0 }?.let { it until it + needle.length }
+    } ?: return emptyList()
+    val first = words.indexOfFirst { it.range.last >= range.first }
+    val last = words.indexOfLast { it.range.first <= range.last }
+    if (first < 0 || last < first) return emptyList()
+    return buildList {
+        for (distance in 1..minOf(4, maxOf(words.size - last, first + 1))) {
+            listOf(last + distance, first - distance).forEach { at ->
+                val term = words.getOrNull(at)?.value ?: return@forEach
+                if (term.length >= 2 && term.lowercase() !in targetContextFillers) add(term)
+            }
+        }
+    }.distinctBy(String::lowercase)
 }
 
 /** Space-joined English glosses, coalescing adjacent shared-phrase copies. */
@@ -785,6 +825,13 @@ internal fun highlightNeedles(
 private val highlightFillers = setOf(
     "and", "are", "for", "from", "has", "have", "into", "that", "the", "their", "then",
     "they", "this", "those", "was", "were", "will", "with", "you", "your",
+)
+
+private val targetContextFillers = highlightFillers + setOf(
+    "but", "can", "could", "had", "he", "her", "him", "his", "how", "if", "is", "it",
+    "its", "may", "might", "nor", "not", "or", "shall", "she", "should", "so", "than",
+    "them", "there", "these", "to", "we", "what", "when", "where", "which", "who",
+    "whom", "whose", "why", "would",
 )
 
 private fun highlightAllOccurrences(text: String, needles: List<String>): List<AyahTextSpan> {

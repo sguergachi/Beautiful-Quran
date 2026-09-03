@@ -531,7 +531,6 @@ export function runSearchHitWash(
     CREST_MS: number
     EXHALE_MS: number
     REST_MS: number
-    FINAL_FADE_MS: number
     REST_ALPHA: number
     EASING: CubicBezierEase
   },
@@ -592,10 +591,8 @@ export function runSearchHitWash(
             })
           })
         } else {
-          animateAlpha(timing.REST_ALPHA, 0, timing.FINAL_FADE_MS, () => {
-            finish()
-            onDone?.()
-          })
+          finish()
+          onDone?.()
         }
       })
     })

@@ -10,10 +10,10 @@ class SearchHitFlashTest {
     @Test
     fun `one wash becomes four full-word breaths`() {
         assertEquals(4, SearchHitFlash.PULSES)
-        assertEquals(630L, SearchHitFlash.breathMs())
-        assertEquals(2_660L, SearchHitFlash.totalMs())
-        assertTrue(SearchHitFlash.REST_ALPHA in 0.25f..0.4f)
-        assertTrue(SearchHitFlash.totalMs() < 2_700L)
+        assertEquals(870L, SearchHitFlash.breathMs())
+        assertEquals(3_340L, SearchHitFlash.totalMs())
+        assertEquals(0f, SearchHitFlash.REST_ALPHA)
+        assertTrue(SearchHitFlash.totalMs() < 3_500L)
     }
 
     @Test

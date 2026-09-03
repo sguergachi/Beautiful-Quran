@@ -264,6 +264,31 @@ describe('matchWordSearch', () => {
     ).toBe(true)
   })
 
+  it('targets a nearby visible gloss for a translation-only auxiliary', () => {
+    const cases: Array<[WordSearchIndexEntry[], number]> = [
+      [[
+        { ...entry(2, 17, 16, 'فِي', '(so) not'), ayahTranslation: 'they could not see' },
+        { ...entry(2, 17, 17, 'يُبْصِرُونَ', '(do) they see'), ayahTranslation: 'they could not see' },
+      ], 17],
+      [[
+        { ...entry(2, 20, 16, 'ٱللَّهُ', 'Allah'), ayahTranslation: 'He could have taken away their hearing' },
+        { ...entry(2, 20, 17, 'لَذَهَبَ', 'He would certainly have taken away'), ayahTranslation: 'He could have taken away their hearing' },
+      ], 17],
+      [[
+        { ...entry(2, 71, 23, 'كَادُواْ', 'they were near'), ayahTranslation: 'they could hardly do it' },
+        { ...entry(2, 71, 24, 'يَفۡعَلُونَ', '(to) doing (it)'), ayahTranslation: 'they could hardly do it' },
+      ], 24],
+      [[
+        { ...entry(3, 80, 1, 'وَلَا', 'And not'), ayahTranslation: 'Nor could he order you' },
+        { ...entry(3, 80, 2, 'يَأۡمُرَكُمۡ', 'he will order you'), ayahTranslation: 'Nor could he order you' },
+      ], 2],
+    ]
+
+    for (const [auxiliary, expectedPosition] of cases) {
+      expect(matchWordSearch(auxiliary, 'could')[0]?.position).toBe(expectedPosition)
+    }
+  })
+
   it('keeps exact matches ahead of fuzzy neighbors', () => {
     const neighbors = [entry(1, 1, 1, 'قَالَ', 'lone'), entry(2, 1, 1, 'حُبّ', 'love')]
     expect(matchWordSearch(neighbors, 'love', 1).map((h) => h.translation)).toEqual(['love'])
