@@ -7,6 +7,8 @@ import com.beautifulquran.data.BookmarkRepository
 import com.beautifulquran.data.AnnotationRepository
 import com.beautifulquran.data.EducationMoment
 import com.beautifulquran.data.QuranRepository
+import com.beautifulquran.data.EnglishBookCache
+import com.beautifulquran.data.QuranDatabase
 import com.beautifulquran.data.SettingsRepository
 import com.beautifulquran.data.model.Reciter
 import com.beautifulquran.data.model.Segment
@@ -264,6 +266,7 @@ class ReaderViewModel(
     val player: PlayerController,
     private val annotations: AnnotationRepository,
     private val outputLatency: AudioOutputLatency,
+    private val englishBookCache: EnglishBookCache,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ReaderUiState())
@@ -299,6 +302,8 @@ class ReaderViewModel(
         rulerFor: ((translation: (Int, Int) -> String) -> EnglishLeafRuler)? = null,
         /** What the ruler was made from: rebuild when the leaf changes size. */
         rulerKey: Any? = null,
+        /** Everything the leaves depend on — see [EnglishBookCache.key]. */
+        cacheKey: String = "",
     ) {
         if (_mushaf.value != null && mushafLeafText == text && mushafRulerKey == rulerKey) return
         // Never fall back. A book already paginated by measuring a leaf is not
@@ -321,10 +326,17 @@ class ReaderViewModel(
                 val verse = { surahId: Int, ayah: Int ->
                     words[quranWordKey(surahId, ayah, 1)].orEmpty()
                 }
-                // A thousand text layouts. Off the main thread, once.
-                val ruler = rulerFor(verse)
-                withContext(Dispatchers.Default) {
-                    buildEnglishBookByLayout(catalog, verse, ruler)
+                val pageOf = { surahId: Int, ayah: Int ->
+                    catalog.pageOf(surahId, ayah)
+                }
+                // A thousand text layouts, and the same answer every time they
+                // are asked — so they are asked once and written down.
+                val cached = withContext(Dispatchers.IO) {
+                    englishBookCache.read(cacheKey, pageOf, verse)
+                }
+                cached ?: withContext(Dispatchers.Default) {
+                    buildEnglishBookByLayout(catalog, verse, rulerFor(verse))
+                        .also { englishBookCache.write(cacheKey, it) }
                 }
             }
             _mushaf.value = MushafUi(catalog, surahs, book, measured = rulerFor != null)
@@ -332,6 +344,22 @@ class ReaderViewModel(
     }
 
     private var mushafRulerKey: Any? = null
+
+    /** Everything the English book's leaves depend on — see [EnglishBookCache]. */
+    fun englishBookCacheKey(
+        wellPx: Float,
+        measurePx: Float,
+        verseNumberScript: Int,
+        hideParentheticals: Boolean,
+        leafText: Int,
+    ): String = englishBookCache.key(
+        wellPx = wellPx,
+        measurePx = measurePx,
+        verseNumberScript = verseNumberScript,
+        hideParentheticals = hideParentheticals,
+        leafText = leafText,
+        database = QuranDatabase.DB_FILE_NAME,
+    )
 
     /**
      * Verse under the reading line (scroll / rail / follow). Used for Assistant

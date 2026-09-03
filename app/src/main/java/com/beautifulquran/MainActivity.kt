@@ -85,6 +85,7 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.text.TextMeasurer
 import com.beautifulquran.ui.reader.englishLeafRuler
+import com.beautifulquran.data.QuranDatabase
 import com.beautifulquran.ui.reader.ReaderViewModel
 import com.beautifulquran.ui.reader.RootReturnTarget
 import com.beautifulquran.ui.rootviewer.RootViewerScreen
@@ -342,6 +343,14 @@ private fun PaperStackApp(
                 settings.verseNumberScript,
                 settings.hideEnglishParentheticals,
             ),
+            cacheKey = app.englishBookCache.key(
+                wellPx = metrics[0],
+                measurePx = metrics[1],
+                verseNumberScript = settings.verseNumberScript.ordinal,
+                hideParentheticals = settings.hideEnglishParentheticals,
+                leafText = settings.englishLeafText.ordinal,
+                database = QuranDatabase.DB_FILE_NAME,
+                ),
         )
     }
     val bookmarkCount by bookmarksViewModel.bookmarkCount.collectAsStateWithLifecycle()

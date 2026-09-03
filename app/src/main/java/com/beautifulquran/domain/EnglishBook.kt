@@ -472,11 +472,9 @@ fun buildEnglishBookByLayout(
         }
     }
 
-    val leaves = ArrayList<EnglishBookLeaf>(1_200)
-    val firstLeafByPage = IntArray(MushafCatalog.MUSHAF_PAGE_COUNT + 1) { -1 }
-    val leafByVerse = HashMap<Long, Int>(8_192)
-    val carriedCuts = HashMap<Long, MutableList<Float>>()
-
+    val out = ArrayList<List<EnglishVerseRun>>(1_200)
+    val pageOfVerse = HashMap<Long, Int>(8_192)
+    order.forEach { pageOfVerse[quranWordKey(it[0], it[1], 1)] = it[2] }
     var at = 0
     var offset = 0
     while (at < order.size) {
@@ -496,7 +494,6 @@ fun buildEnglishBookByLayout(
             take += (ENGLISH_LEAF_CAPACITY_CHARS * ENGLISH_LEAF_OFFER).toInt()
         }
 
-        val index = leaves.size
         val kept = if (cut == null) {
             runs
         } else {
@@ -509,17 +506,7 @@ fun buildEnglishBookByLayout(
                 it[it.lastIndex] = EnglishVerseRun(last.surahId, last.ayah, last.from, to)
             }
         }
-        val pages = ArrayList<Int>(kept.size)
-        kept.forEachIndexed { k, run ->
-            pages += order[at + k][2]
-            if (run.from == 0) leafByVerse.putIfAbsent(quranWordKey(run.surahId, run.ayah, 1), index)
-            if (firstLeafByPage[order[at + k][2]] < 0) firstLeafByPage[order[at + k][2]] = index
-        }
-        leaves += EnglishBookLeaf(
-            page = pages.first(),
-            pages = pages.first()..pages.last(),
-            runs = ArrayList(kept),
-        )
+        out += ArrayList(kept)
 
         val last = kept.last()
         val whole = text(last.surahId, last.ayah)
@@ -529,19 +516,64 @@ fun buildEnglishBookByLayout(
         } else {
             at += kept.size - 1
             offset = last.to
-            if (whole.isNotEmpty()) {
-                carriedCuts.getOrPut(quranWordKey(last.surahId, last.ayah, 1)) { ArrayList(2) }
-                    .add(offset.toFloat() / whole.length)
-            }
         }
     }
+    return englishBookOf(
+        leaves = out,
+        pageOf = { surahId, ayah -> pageOfVerse[quranWordKey(surahId, ayah, 1)] ?: 1 },
+        text = text,
+    )
+}
 
+/**
+ * The book's indexes, from its leaves.
+ *
+ * Which leaf a verse begins on, which leaf a Madinah page opens at, and where a
+ * carried verse is picked up again — every one of them a consequence of the
+ * leaves and nothing else. Kept apart from the pagination so a book read back
+ * from a cache is assembled by exactly the code that assembles a book just
+ * paginated, rather than by a second reading of the same rules.
+ */
+internal fun englishBookOf(
+    leaves: List<List<EnglishVerseRun>>,
+    /** The Madinah page a verse begins on — where the leaf is in the mushaf. */
+    pageOf: (surahId: Int, ayah: Int) -> Int,
+    text: (surahId: Int, ayah: Int) -> String,
+): EnglishBook {
+    val firstLeafByPage = IntArray(MushafCatalog.MUSHAF_PAGE_COUNT + 1) { -1 }
+    val leafByVerse = HashMap<Long, Int>(8_192)
+    val carriedCuts = HashMap<Long, MutableList<Float>>()
+    val out = ArrayList<EnglishBookLeaf>(leaves.size)
+    leaves.forEachIndexed { index, runs ->
+        var firstPage = Int.MAX_VALUE
+        var lastPage = Int.MIN_VALUE
+        runs.forEach { run ->
+            val page = pageOf(run.surahId, run.ayah)
+            if (page < firstPage) firstPage = page
+            if (page > lastPage) lastPage = page
+            if (run.from == 0) leafByVerse.putIfAbsent(quranWordKey(run.surahId, run.ayah, 1), index)
+            if (firstLeafByPage[page] < 0) firstLeafByPage[page] = index
+        }
+        out += EnglishBookLeaf(
+            page = pageOf(runs.first().surahId, runs.first().ayah),
+            pages = firstPage..lastPage,
+            runs = ArrayList(runs),
+        )
+        // A verse the leaf did not finish is picked up on the next one, and the
+        // turn is led from the word before that.
+        val last = runs.last()
+        val whole = text(last.surahId, last.ayah)
+        if (last.to < whole.length && whole.isNotEmpty()) {
+            carriedCuts.getOrPut(quranWordKey(last.surahId, last.ayah, 1)) { ArrayList(2) }
+                .add(last.to.toFloat() / whole.length)
+        }
+    }
     var carried = 0
     for (page in 1..MushafCatalog.MUSHAF_PAGE_COUNT) {
         if (firstLeafByPage[page] < 0) firstLeafByPage[page] = carried else carried = firstLeafByPage[page]
     }
     return EnglishBook(
-        leaves = leaves,
+        leaves = out,
         firstLeafByPage = firstLeafByPage,
         leafByVerse = leafByVerse,
         carriedByVerse = carriedCuts.mapValues { (_, cuts) -> cuts.toFloatArray() },

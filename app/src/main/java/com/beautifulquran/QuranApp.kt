@@ -11,6 +11,7 @@ import com.beautifulquran.data.LexiconDatabase
 import com.beautifulquran.data.LexiconRepository
 import com.beautifulquran.data.QuranDatabase
 import com.beautifulquran.data.QuranRepository
+import com.beautifulquran.data.EnglishBookCache
 import com.beautifulquran.data.SettingsRepository
 import com.beautifulquran.ornamentslab.OrnamentSeedStore
 import com.beautifulquran.playback.AudioOutputLatency
@@ -36,6 +37,9 @@ class QuranApp : Application() {
     lateinit var dictionary: DictionaryRepository
         private set
     lateinit var settings: SettingsRepository
+
+    /** The English book's leaves, kept on disk so they are measured once. */
+    lateinit var englishBookCache: EnglishBookCache
         private set
     lateinit var bookmarks: BookmarkRepository
         private set
@@ -65,6 +69,7 @@ class QuranApp : Application() {
         lexicon = LexiconRepository(LexiconDatabase(this))
         dictionary = DictionaryRepository(DictionaryDatabase(this))
         settings = SettingsRepository(this)
+        englishBookCache = EnglishBookCache(this)
         bookmarks = BookmarkRepository(this)
         annotations = AnnotationRepository(this)
         player = PlayerController(this)

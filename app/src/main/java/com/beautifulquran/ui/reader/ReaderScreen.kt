@@ -335,6 +335,13 @@ fun ReaderScreen(
                 settings.verseNumberScript,
                 settings.hideEnglishParentheticals,
             ),
+            cacheKey = viewModel.englishBookCacheKey(
+                wellPx = well,
+                measurePx = measure,
+                verseNumberScript = settings.verseNumberScript.ordinal,
+                hideParentheticals = settings.hideEnglishParentheticals,
+                leafText = settings.englishLeafText.ordinal,
+            ),
         )
     }
     val mushafCatalog = mushafUi?.catalog
