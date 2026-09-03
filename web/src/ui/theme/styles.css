@@ -901,13 +901,6 @@ select {
   overflow: hidden;
 }
 
-.word-search-translation.is-arabic {
-  font-family: var(--font-arabic);
-  font-size: 1.35rem;
-  line-height: 1.8;
-  text-align: end;
-}
-
 .word-search-mark {
   background: none;
   color: var(--gold);

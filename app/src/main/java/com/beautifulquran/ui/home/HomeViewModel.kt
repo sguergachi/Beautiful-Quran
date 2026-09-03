@@ -5,7 +5,6 @@ import androidx.lifecycle.viewModelScope
 import androidx.media3.common.Player
 import com.beautifulquran.data.QuranRepository
 import com.beautifulquran.data.ReadingLayout
-import com.beautifulquran.data.ReadingMode
 import com.beautifulquran.data.Settings
 import com.beautifulquran.data.SettingsRepository
 import com.beautifulquran.data.model.Surah
@@ -26,6 +25,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -132,31 +132,19 @@ internal fun shouldRunWordSearch(query: String): Boolean {
     return parseAyahReference(query.trim()) == null
 }
 
-/** Search exactly the text surfaces the selected reader configuration renders. */
+/** Search uses the selected layout's English: timed gloss Scroll or flowing Mushaf prose. */
 internal fun wordSearchSources(settings: Settings): WordSearchSources = when {
     settings.readingLayout == ReadingLayout.MUSHAF -> WordSearchSources(
-        arabic = true,
+        arabic = false,
         wordGloss = false,
         transliteration = false,
-        verseTranslation = false,
+        verseTranslation = true,
     )
-    settings.readingMode == ReadingMode.ENGLISH_ONLY -> WordSearchSources(
+    else -> WordSearchSources(
         arabic = false,
         wordGloss = true,
         transliteration = false,
         verseTranslation = false,
-    )
-    settings.readingMode == ReadingMode.ARABIC_ONLY -> WordSearchSources(
-        arabic = true,
-        wordGloss = false,
-        transliteration = false,
-        verseTranslation = false,
-    )
-    else -> WordSearchSources(
-        arabic = true,
-        wordGloss = settings.showWordGloss,
-        transliteration = settings.showTransliteration,
-        verseTranslation = settings.showTranslation,
     )
 }
 
@@ -225,6 +213,7 @@ class HomeViewModel(
         }
         viewModelScope.launch {
             combine(query, settings.settings) { q, prefs -> q to wordSearchSources(prefs) }
+                .distinctUntilChanged()
                 .debounce(120)
                 .collectLatest { (q, sources) ->
                     if (!shouldRunWordSearch(q)) {

@@ -8,7 +8,7 @@ import org.junit.Test
 
 class WordSearchSourcesTest {
     @Test
-    fun `English-only search uses the timed word gloss`() {
+    fun `scroll search uses the timed English word gloss`() {
         assertEquals(
             com.beautifulquran.domain.WordSearchSources(
                 arabic = false,
@@ -16,39 +16,39 @@ class WordSearchSourcesTest {
                 transliteration = false,
                 verseTranslation = false,
             ),
-            wordSearchSources(Settings(readingMode = ReadingMode.ENGLISH_ONLY)),
+            wordSearchSources(Settings()),
         )
     }
 
     @Test
-    fun `mushaf search uses only its Arabic text`() {
+    fun `mushaf search uses only its flowing English translation`() {
         val sources = wordSearchSources(
             Settings(
                 readingLayout = ReadingLayout.MUSHAF,
-                readingMode = ReadingMode.ARABIC_ONLY,
                 showWordGloss = true,
                 showTransliteration = true,
                 showTranslation = true,
             ),
         )
-        assertEquals(true, sources.arabic)
+        assertEquals(false, sources.arabic)
         assertEquals(false, sources.wordGloss)
         assertEquals(false, sources.transliteration)
-        assertEquals(false, sources.verseTranslation)
+        assertEquals(true, sources.verseTranslation)
     }
 
     @Test
-    fun `bilingual search follows its visible optional lines`() {
+    fun `scroll search remains English gloss regardless of reading chrome`() {
         val sources = wordSearchSources(
             Settings(
+                readingMode = ReadingMode.ARABIC_ONLY,
                 showWordGloss = false,
                 showTransliteration = true,
                 showTranslation = true,
             ),
         )
-        assertEquals(true, sources.arabic)
-        assertEquals(false, sources.wordGloss)
-        assertEquals(true, sources.transliteration)
-        assertEquals(true, sources.verseTranslation)
+        assertEquals(false, sources.arabic)
+        assertEquals(true, sources.wordGloss)
+        assertEquals(false, sources.transliteration)
+        assertEquals(false, sources.verseTranslation)
     }
 }

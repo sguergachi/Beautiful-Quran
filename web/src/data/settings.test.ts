@@ -76,27 +76,11 @@ describe('customize reading settings', () => {
   })
 
   it('searches only the selected reader text', () => {
-    expect(wordSearchSources(normalizeSettings({ readingMode: 'english_only' }))).toEqual({
+    expect(wordSearchSources()).toEqual({
       arabic: false,
       wordGloss: true,
       transliteration: false,
       verseTranslation: false,
-    })
-    expect(wordSearchSources(normalizeSettings({ readingMode: 'arabic_only' }))).toEqual({
-      arabic: true,
-      wordGloss: false,
-      transliteration: false,
-      verseTranslation: false,
-    })
-    expect(wordSearchSources(normalizeSettings({
-      showWordGloss: false,
-      showTransliteration: true,
-      showTranslation: true,
-    }))).toEqual({
-      arabic: true,
-      wordGloss: false,
-      transliteration: true,
-      verseTranslation: true,
     })
   })
 

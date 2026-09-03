@@ -21,20 +21,9 @@ export function showsPreviewWordGloss(
   return showsWordGlossChrome(mode) && showWordGloss
 }
 
-/** Search exactly the text surfaces the selected reader configuration renders. */
-export function wordSearchSources(settings: Settings): WordSearchSources {
-  if (settings.readingMode === 'english_only') {
-    return { arabic: false, wordGloss: true, transliteration: false, verseTranslation: false }
-  }
-  if (settings.readingMode === 'arabic_only') {
-    return { arabic: true, wordGloss: false, transliteration: false, verseTranslation: false }
-  }
-  return {
-    arabic: true,
-    wordGloss: settings.showWordGloss,
-    transliteration: settings.showTransliteration,
-    verseTranslation: settings.showTranslation,
-  }
+/** Web is the Scroll reader, so its search always uses the timed English gloss. */
+export function wordSearchSources(): WordSearchSources {
+  return { arabic: false, wordGloss: true, transliteration: false, verseTranslation: false }
 }
 
 export function themeLabel(mode: Settings['themeMode']): string {
