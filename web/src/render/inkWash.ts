@@ -12,7 +12,12 @@
  * for "performance". Quantize + cache mask strings so the hot path stays cheap.
  */
 import { animate, type AnimationPlaybackControls } from 'motion'
-import { cubicBezierEase, paperCoverMaskImage, washMaskImage } from '../ui/theme/Fade'
+import {
+  cubicBezierEase,
+  paperCoverMaskImage,
+  travelingWipeMaskImage,
+  washMaskImage,
+} from '../ui/theme/Fade'
 import { getTuning, glintResonance } from '../ui/reader/InkEngine'
 import { cubicBezierTuple, type CubicBezierEase } from '../ui/motion/easing'
 
@@ -21,6 +26,7 @@ const WASH_STEPS = 48
 
 const washMaskCache = new Map<string, string>()
 const paperMaskCache = new Map<string, string>()
+const travelingWipeMaskCache = new Map<string, string>()
 
 function quantizeProgress(p: number): number {
   if (p >= 1) return 1
@@ -68,6 +74,21 @@ export function cachedPaperCoverMask(
   if (mask == null) {
     mask = paperCoverMaskImage(q, restingAlpha, rtl, feather)
     paperMaskCache.set(key, mask)
+  }
+  return mask
+}
+
+function cachedTravelingWipeMask(
+  progress: number,
+  bandFraction: number,
+  edgeShare: number,
+): string {
+  const q = quantizeProgress(progress)
+  const key = `${q}|${bandFraction}|${edgeShare}`
+  let mask = travelingWipeMaskCache.get(key)
+  if (mask == null) {
+    mask = travelingWipeMaskImage(q, bandFraction, edgeShare)
+    travelingWipeMaskCache.set(key, mask)
   }
   return mask
 }
@@ -320,9 +341,8 @@ export function runRepeatWashIn(
   durationMs: number,
   onDone?: () => void,
   ease: CubicBezierEase | ReturnType<typeof sweepEase> = sweepEase(),
-  feather = getTuning().washFeather,
 ): () => void {
-  return runRepeatWashFrom(el, rtl, 0, durationMs, onDone, ease, feather)
+  return runRepeatWashFrom(el, rtl, 0, durationMs, onDone, ease)
 }
 
 /**
@@ -336,8 +356,8 @@ export function runRepeatWashFrom(
   totalDurationMs: number,
   onDone?: () => void,
   ease: CubicBezierEase | ReturnType<typeof sweepEase> = sweepEase(),
-  feather = getTuning().washFeather,
 ): () => void {
+  const feather = getTuning().washFeather
   const from = Math.min(1, Math.max(0, fromProgress))
   el.style.opacity = '1'
   el.style.removeProperty('transform')
@@ -517,17 +537,18 @@ export function runGlintFadeOut(
 }
 
 /**
- * Search-hit locator: one uninterrupted loop of directional fills.
+ * Search-hit locator: a soft orange window repeatedly travels left-to-right.
  * Callers pass a dedicated orange overlay (same classes as the karaoke repeat
- * layer) so the mask sizes to the glyphs. Overlay may be unmounted after [onDone].
+ * layer) so the mask sizes to the glyphs. Every cycle starts wholly outside
+ * the left edge and ends wholly outside the right before the next one begins.
  */
 export function runSearchHitWash(
   el: HTMLElement,
-  rtl: boolean,
   timing: {
     WIPES: number
     SWEEP_MS: number
-    FEATHER: number
+    BAND_FRACTION: number
+    EDGE_SHARE: number
     EASING: CubicBezierEase
   },
   onDone?: () => void,
@@ -547,14 +568,28 @@ export function runSearchHitWash(
   }
 
   const wipe = (remaining: number) => {
-    cancelCurrent = runRepeatWashIn(el, rtl, timing.SWEEP_MS, () => {
-      if (cancelled) return
-      if (remaining > 1) wipe(remaining - 1)
-      else {
-        finish()
-        onDone?.()
-      }
-    }, timing.EASING, timing.FEATHER)
+    el.style.opacity = '1'
+    applyMask(
+      el,
+      cachedTravelingWipeMask(0, timing.BAND_FRACTION, timing.EDGE_SHARE),
+    )
+    cancelCurrent = runWash(
+      timing.SWEEP_MS,
+      timing.EASING,
+      cubicBezierEase,
+      (_p, eased) => applyMask(
+        el,
+        cachedTravelingWipeMask(eased, timing.BAND_FRACTION, timing.EDGE_SHARE),
+      ),
+      () => {
+        if (cancelled) return
+        if (remaining > 1) wipe(remaining - 1)
+        else {
+          finish()
+          onDone?.()
+        }
+      },
+    )
   }
 
   wipe(timing.WIPES)

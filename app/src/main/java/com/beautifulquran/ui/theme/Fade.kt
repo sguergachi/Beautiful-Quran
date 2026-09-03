@@ -108,6 +108,69 @@ fun Modifier.letterFadeIn(
     }
 }
 
+internal data class TravelingWipeBounds(val start: Float, val end: Float)
+
+/** A soft band that begins wholly left of a word and finishes wholly right. */
+internal fun travelingWipeBounds(
+    progress: Float,
+    width: Float,
+    bandFraction: Float,
+): TravelingWipeBounds {
+    val band = width * bandFraction
+    val start = -band + progress.coerceIn(0f, 1f) * (width + band)
+    return TravelingWipeBounds(start, start + band)
+}
+
+private fun travelingWipeBrush(
+    progress: Float,
+    left: Float,
+    width: Float,
+    bandFraction: Float,
+    edgeShare: Float,
+): Brush {
+    val band = travelingWipeBounds(progress, width, bandFraction)
+    return Brush.horizontalGradient(
+        colorStops = arrayOf(
+            0f to Color.Transparent,
+            edgeShare to Color.White,
+            (1f - edgeShare) to Color.White,
+            1f to Color.Transparent,
+        ),
+        startX = left + band.start,
+        endX = left + band.end,
+    )
+}
+
+/** Complete left-to-right search wipe: enter, cross, and leave the word. */
+fun Modifier.travelingInkWipe(
+    progress: () -> Float,
+    bandFraction: Float,
+    edgeShare: Float,
+): Modifier = drawWithContent {
+    if (size.width <= 0f) return@drawWithContent
+    val bleed = FadeLayerBleed.toPx()
+    drawIntoCanvas { canvas ->
+        canvas.saveLayer(
+            Rect(-bleed, -bleed, size.width + bleed, size.height + bleed),
+            Paint(),
+        )
+    }
+    drawContent()
+    drawRect(
+        brush = travelingWipeBrush(
+            progress = progress(),
+            left = 0f,
+            width = size.width,
+            bandFraction = bandFraction,
+            edgeShare = edgeShare,
+        ),
+        topLeft = Offset(-bleed, -bleed),
+        size = Size(size.width + bleed * 2f, size.height + bleed * 2f),
+        blendMode = BlendMode.DstIn,
+    )
+    drawIntoCanvas { canvas -> canvas.restore() }
+}
+
 /**
  * Draw-phase alpha for word-local text. Unlike a tight graphics layer, this
  * offscreen layer includes enough bleed for Latin serifs and Arabic marks that
@@ -196,6 +259,9 @@ sealed class ShapedWordBloom {
         val glowRadius: Float = 3.5f,
         /** How much of the word the directional mask may reveal. */
         val revealFraction: Float = 1f,
+        /** Non-null turns the accumulating reveal into a left-to-right traveling band. */
+        val travelingBandFraction: Float? = null,
+        val travelingEdgeShare: Float = 0.25f,
     ) : ShapedWordBloom()
 }
 
@@ -435,8 +501,19 @@ fun Modifier.shapedWordBloom(
                             blendMode = BlendMode.SrcIn,
                         )
                     }
-                    if (p < 1f || bloom.revealFraction < 1f) {
-                        val brush = if (rtl) {
+                    if (
+                        bloom.travelingBandFraction != null ||
+                        p < 1f || bloom.revealFraction < 1f
+                    ) {
+                        val brush = bloom.travelingBandFraction?.let { bandFraction ->
+                            travelingWipeBrush(
+                                progress = p,
+                                left = bounds.left,
+                                width = w,
+                                bandFraction = bandFraction,
+                                edgeShare = bloom.travelingEdgeShare,
+                            )
+                        } ?: if (rtl) {
                             Brush.horizontalGradient(
                                 colors = washColors,
                                 startX = bounds.left + (w - head),

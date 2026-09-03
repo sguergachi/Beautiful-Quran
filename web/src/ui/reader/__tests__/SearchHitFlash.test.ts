@@ -6,12 +6,14 @@ import {
 } from '../SearchHitFlash'
 
 describe('SearchHitFlash', () => {
-  it('runs six side wipes as one continuous loop', () => {
-    expect(SearchHitFlash.WIPES).toBe(6)
-    expect(searchHitWipeMs()).toBe(420)
-    expect(searchHitFlashTotalMs()).toBe(2520)
-    expect(SearchHitFlash.FEATHER).toBeGreaterThanOrEqual(0.2)
-    expect(SearchHitFlash.FEATHER).toBeLessThanOrEqual(0.4)
+  it('runs four complete traveling wipes as one continuous loop', () => {
+    expect(SearchHitFlash.WIPES).toBe(4)
+    expect(searchHitWipeMs()).toBe(720)
+    expect(searchHitFlashTotalMs()).toBe(2880)
+    expect(SearchHitFlash.BAND_FRACTION).toBeGreaterThanOrEqual(0.6)
+    expect(SearchHitFlash.BAND_FRACTION).toBeLessThanOrEqual(0.8)
+    expect(SearchHitFlash.EDGE_SHARE).toBeGreaterThanOrEqual(0.15)
+    expect(SearchHitFlash.EDGE_SHARE).toBeLessThanOrEqual(0.3)
     expect(searchHitFlashTotalMs()).toBeLessThan(3000)
   })
 })

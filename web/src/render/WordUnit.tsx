@@ -509,7 +509,6 @@ export function WordUnit({
       cancels.push(
         runSearchHitWash(
           flashRef.current,
-          !englishMode,
           SearchHitFlash,
           doneOne,
         ),
@@ -520,7 +519,6 @@ export function WordUnit({
       cancels.push(
         runSearchHitWash(
           glossFlashRef.current,
-          false,
           SearchHitFlash,
           doneOne,
         ),

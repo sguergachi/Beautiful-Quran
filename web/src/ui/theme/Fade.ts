@@ -65,6 +65,27 @@ export function washMaskImage(
   return `linear-gradient(to right, ${stops.join(', ')})`
 }
 
+export function travelingWipeBounds(
+  progress: number,
+  bandFraction: number,
+): { start: number; end: number } {
+  const band = Math.max(0, bandFraction)
+  const start = -band + Math.min(1, Math.max(0, progress)) * (1 + band)
+  return { start, end: start + band }
+}
+
+/** Soft orange window that enters from the left and exits fully through the right. */
+export function travelingWipeMaskImage(
+  progress: number,
+  bandFraction: number,
+  edgeShare: number,
+): string {
+  const { start, end } = travelingWipeBounds(progress, bandFraction)
+  const edge = bandFraction * edgeShare
+  const pct = (value: number) => `${(value * 100).toFixed(2)}%`
+  return `linear-gradient(to right, transparent ${pct(start)}, black ${pct(start + edge)}, black ${pct(end - edge)}, transparent ${pct(end)})`
+}
+
 /**
  * Paper-cover mask for Arabic-only shaped bloom (Android `shapedWordBloom`
  * InkReveal). Glyphs stay full ink; this masks a paper overlay whose alpha is

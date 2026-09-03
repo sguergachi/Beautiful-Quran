@@ -317,7 +317,6 @@ export function HafsWord({
     if (!flashRef.current) return
     return runSearchHitWash(
       flashRef.current,
-      true,
       SearchHitFlash,
       () => setFlashMounted(false),
     )

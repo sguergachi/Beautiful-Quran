@@ -148,6 +148,7 @@ import com.beautifulquran.ui.theme.ornament.generateChapterOrnament
 import com.beautifulquran.ui.theme.quietClickable
 import com.beautifulquran.ui.theme.shapedWordBloom
 import com.beautifulquran.ui.theme.inkSmootherstep
+import com.beautifulquran.ui.theme.travelingInkWipe
 import com.beautifulquran.ui.theme.verticalFadingEdges
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.StateFlow
@@ -498,7 +499,7 @@ private fun rememberRepeatWash(
 internal fun rememberSearchHitWash(identity: Int?): RepeatWash {
     val progress = remember { Animatable(1f) }
     val alpha = remember { Animatable(0f) }
-    val feather = remember { mutableStateOf<Float?>(SearchHitFlash.FEATHER) }
+    val feather = remember { mutableStateOf<Float?>(null) }
     LaunchedEffect(identity) {
         if (identity == null) {
             progress.snapTo(1f)
@@ -584,6 +585,14 @@ private fun Modifier.repeatInkLayer(
             rtl = rtl,
             restingAlpha = 0f,
             feather = wash.feather.value ?: InkEngine.tuning.washFeather,
+        )
+
+private fun Modifier.searchHitInkLayer(wash: RepeatWash): Modifier =
+    glyphLayerAlpha { wash.alpha.value }
+        .travelingInkWipe(
+            progress = { wash.progress.value },
+            bandFraction = SearchHitFlash.BAND_FRACTION,
+            edgeShare = SearchHitFlash.EDGE_SHARE,
         )
 
 /**
@@ -1398,12 +1407,7 @@ private fun HighlightLayeredText(
     val glimmerInk = if (motion.glintIsRepeat) repeatInk else glintInk ?: repeatInk
     val searchHitActive = !motion.showRepeatLayer &&
         searchHitWash != null && searchHitWash.alpha.value > 0f
-    // Prefer a live repeat chain; otherwise the one-shot search-hit wash.
-    val orangeWash = when {
-        motion.showRepeatLayer -> motion.repeatWash
-        searchHitActive -> searchHitWash
-        else -> null
-    }
+    val orangeWash = motion.repeatWash.takeIf { motion.showRepeatLayer }
     Box(modifier) {
         // A restrained glyph-shaped halo sits behind the ink—no radial field.
         if (glintInk != null && motion.showGlintLayer) {
@@ -1457,7 +1461,13 @@ private fun HighlightLayeredText(
                     ),
                 ),
                 color = repeatInk.copy(alpha = 0.01f),
-                modifier = Modifier.repeatInkLayer(searchHitWash, rtl),
+                modifier = Modifier.searchHitInkLayer(searchHitWash),
+            )
+            InkOverlayText(
+                text = text,
+                style = style,
+                color = repeatInk.copy(alpha = InkEngine.tuning.repeatInkAlpha),
+                modifier = Modifier.searchHitInkLayer(searchHitWash),
             )
         }
         if (orangeWash != null) {
@@ -1550,7 +1560,7 @@ private fun WordUnit(
                         textAlign = TextAlign.Center,
                         modifier = Modifier
                             .matchParentSize()
-                            .repeatInkLayer(searchHitWash, rtl = false),
+                            .searchHitInkLayer(searchHitWash),
                     )
                 }
             }
@@ -1766,9 +1776,10 @@ internal fun buildShapedBlooms(
                 restingAlpha = 0f,
                 layerAlpha = searchHitWash.alpha.value,
                 colorAlpha = InkEngine.tuning.repeatInkAlpha,
-                feather = searchHitWash.feather.value,
                 glowAlpha = SearchHitFlash.EMPHASIS_GLOW_ALPHA,
                 glowRadius = SearchHitFlash.EMPHASIS_GLOW_RADIUS,
+                travelingBandFraction = SearchHitFlash.BAND_FRACTION,
+                travelingEdgeShare = SearchHitFlash.EDGE_SHARE,
             )
         }
     }

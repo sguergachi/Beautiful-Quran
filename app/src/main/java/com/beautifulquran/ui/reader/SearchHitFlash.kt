@@ -10,10 +10,11 @@ object SearchHitFlash {
     /** Pause after the initial ayah focus so the word is on-screen first. */
     const val START_DELAY_MS = 140L
 
-    const val SWEEP_MS = 420
-    const val WIPES = 6
-    /** Narrow enough for the traveling edge to cross short words visibly. */
-    const val FEATHER = 0.28f
+    const val SWEEP_MS = 720
+    const val WIPES = 4
+    /** Orange window width and its soft leading/trailing edges. */
+    const val BAND_FRACTION = 0.72f
+    const val EDGE_SHARE = 0.24f
 
     /** Constant velocity keeps one pass flowing directly into the next. */
     val EASING = LinearEasing

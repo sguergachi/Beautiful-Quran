@@ -49,4 +49,15 @@ class InkWashAlphaTest {
         val last = inkWashAlpha(pos = 1f, progress = 0.4f, restingAlpha = 0.22f)
         assertTrue(first > last)
     }
+
+    @Test
+    fun travelingWipe_entersFromLeftAndLeavesThroughRight() {
+        val entering = travelingWipeBounds(progress = 0f, width = 100f, bandFraction = 0.72f)
+        val crossing = travelingWipeBounds(progress = 0.5f, width = 100f, bandFraction = 0.72f)
+        val leaving = travelingWipeBounds(progress = 1f, width = 100f, bandFraction = 0.72f)
+
+        assertEquals(0f, entering.end, 1e-4f)
+        assertTrue(crossing.start > 0f && crossing.end < 100f)
+        assertEquals(100f, leaving.start, 1e-4f)
+    }
 }
