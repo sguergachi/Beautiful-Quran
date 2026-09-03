@@ -1256,6 +1256,7 @@ private fun Modifier.paperStackDrag(
         var startPosition = position()
         var totalDx = 0f
         var totalDy = 0f
+        var dragInterrupted = false
         velocityTracker.addPosition(down.uptimeMillis, down.position)
 
         while (true) {
@@ -1265,7 +1266,11 @@ private fun Modifier.paperStackDrag(
             // The sheet only claims a gesture after a clear horizontal pull.
             val event = awaitPointerEvent(PointerEventPass.Main)
             val change = event.changes.firstOrNull { it.id == down.id } ?: break
-            if (!horizontalDrag && change.isConsumed) break
+            val pressedPointers = event.changes.count { it.pressed }
+            if (stackDragInterrupted(pressedPointers, change.isConsumed)) {
+                dragInterrupted = horizontalDrag
+                break
+            }
             val delta = change.positionChange()
             totalDx += delta.x
             totalDy += delta.y
@@ -1308,6 +1313,10 @@ private fun Modifier.paperStackDrag(
         }
 
         if (horizontalDrag) {
+            if (dragInterrupted) {
+                onSettle(startLayer)
+                return@awaitEachGesture
+            }
             val dragPages = -resistedSwipeDistance(totalDx, pullResistance) / width
             val draggedPosition = startPosition + dragPages
             val velocityPages = -velocityTracker.calculateVelocity().x / width
@@ -1331,6 +1340,10 @@ private fun Modifier.paperStackDrag(
         }
     }
 }
+
+/** A second contact or a child claim turns an in-flight page pull into a cancellation. */
+internal fun stackDragInterrupted(pressedPointers: Int, primaryConsumed: Boolean): Boolean =
+    pressedPointers > 1 || primaryConsumed
 
 private fun resistedSwipeDistance(distance: Float, resistance: Float): Float = when {
     distance > resistance -> distance - resistance
