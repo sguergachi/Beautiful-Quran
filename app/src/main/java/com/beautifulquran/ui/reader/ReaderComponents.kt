@@ -149,6 +149,7 @@ import com.beautifulquran.ui.theme.quietClickable
 import com.beautifulquran.ui.theme.shapedWordBloom
 import com.beautifulquran.ui.theme.inkSmootherstep
 import com.beautifulquran.ui.theme.verticalFadingEdges
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 
@@ -505,17 +506,19 @@ internal fun rememberSearchHitWash(identity: Int?): RepeatWash {
             alpha.snapTo(0f)
             return@LaunchedEffect
         }
-        repeat(SearchHitFlash.PULSES) {
+        repeat(SearchHitFlash.PULSES) { pulse ->
             alpha.snapTo(1f)
             progress.snapTo(0f)
             progress.animateTo(
                 1f,
-                tween(SearchHitFlash.SWEEP_MS, easing = InkEngine.sweepEasing),
+                tween(SearchHitFlash.SWEEP_MS, easing = SearchHitFlash.EASING),
             )
+            delay(SearchHitFlash.CREST_MS)
             alpha.animateTo(
                 0f,
-                tween(SearchHitFlash.FADE_OUT_MS, easing = InkEngine.sweepEasing),
+                tween(SearchHitFlash.FADE_OUT_MS, easing = SearchHitFlash.EASING),
             )
+            if (pulse < SearchHitFlash.PULSES - 1) delay(SearchHitFlash.REST_MS)
         }
     }
     return RepeatWash(

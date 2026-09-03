@@ -6,11 +6,11 @@ import {
 } from '../SearchHitFlash'
 
 describe('SearchHitFlash', () => {
-  it('runs four quick pulses faster than the old double wash', () => {
+  it('runs four eased breaths in a compact locator rhythm', () => {
     const cycle = searchHitFlashCycleMs()
     expect(SearchHitFlash.PULSES).toBe(4)
-    expect(cycle).toBe(520)
-    expect(searchHitFlashTotalMs()).toBe(cycle * SearchHitFlash.PULSES)
+    expect(cycle).toBe(620)
+    expect(searchHitFlashTotalMs()).toBe(2600)
     expect(searchHitFlashTotalMs()).toBeLessThan(2700)
   })
 })

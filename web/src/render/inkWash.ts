@@ -319,8 +319,9 @@ export function runRepeatWashIn(
   rtl: boolean,
   durationMs: number,
   onDone?: () => void,
+  ease: CubicBezierEase | ReturnType<typeof sweepEase> = sweepEase(),
 ): () => void {
-  return runRepeatWashFrom(el, rtl, 0, durationMs, onDone)
+  return runRepeatWashFrom(el, rtl, 0, durationMs, onDone, ease)
 }
 
 /**
@@ -333,6 +334,7 @@ export function runRepeatWashFrom(
   fromProgress: number,
   totalDurationMs: number,
   onDone?: () => void,
+  ease: CubicBezierEase | ReturnType<typeof sweepEase> = sweepEase(),
 ): () => void {
   const t = getTuning()
   const from = Math.min(1, Math.max(0, fromProgress))
@@ -354,7 +356,7 @@ export function runRepeatWashFrom(
   applyMask(el, cachedWashMask(from, 0, rtl, t.washFeather))
   return runWash(
     remainMs,
-    sweepEase(),
+    ease,
     cubicBezierEase,
     (_p, eased) => {
       const progress = from + eased * (1 - from)
@@ -441,12 +443,13 @@ export function runRepeatFadeOut(
   el: HTMLElement,
   onDone?: () => void,
   durationMs = getTuning().repeatFadeOutMs,
+  ease: CubicBezierEase | ReturnType<typeof sweepEase> = sweepEase(),
 ): () => void {
   applyMask(el, 'none')
   setRepeatWashProgress(el, 1)
   return runWash(
     durationMs,
-    sweepEase(),
+    ease,
     cubicBezierEase,
     (_p, eased) => {
       el.style.opacity = String(1 - eased)
@@ -514,20 +517,37 @@ export function runGlintFadeOut(
 }
 
 /**
- * Search-hit flash: [runRepeatWashIn] then [runRepeatFadeOut], [pulses] times.
+ * Search-hit breath: eased wash-in, full-ink crest, eased release, quiet gap.
  * Callers pass a dedicated orange overlay (same classes as the karaoke repeat
  * layer) so the mask sizes to the glyphs. Overlay may be unmounted after [onDone].
  */
 export function runSearchHitWash(
   el: HTMLElement,
   rtl: boolean,
-  timing: { PULSES: number; SWEEP_MS: number; FADE_OUT_MS: number },
+  timing: {
+    PULSES: number
+    SWEEP_MS: number
+    CREST_MS: number
+    FADE_OUT_MS: number
+    REST_MS: number
+    EASING: CubicBezierEase
+  },
   onDone?: () => void,
 ): () => void {
   let cancelled = false
   let cancelCurrent: (() => void) | null = null
+  let waitTimer: ReturnType<typeof setTimeout> | null = null
+
+  const wait = (durationMs: number, next: () => void) => {
+    waitTimer = setTimeout(() => {
+      waitTimer = null
+      if (!cancelled) next()
+    }, durationMs)
+  }
 
   const finish = () => {
+    if (waitTimer != null) clearTimeout(waitTimer)
+    waitTimer = null
     el.style.opacity = '0'
     el.style.removeProperty('transform')
     el.style.removeProperty('transform-origin')
@@ -543,13 +563,26 @@ export function runSearchHitWash(
       if (!cancelled) onDone?.()
       return
     }
-    cancelCurrent = runRepeatWashIn(el, rtl, timing.SWEEP_MS, () => {
-      if (cancelled) return
-      cancelCurrent = runRepeatFadeOut(el, () => {
-        if (cancelled) return
-        runPulse(remaining - 1)
-      }, timing.FADE_OUT_MS)
-    })
+    cancelCurrent = runRepeatWashIn(
+      el,
+      rtl,
+      timing.SWEEP_MS,
+      () => wait(timing.CREST_MS, () => {
+        cancelCurrent = runRepeatFadeOut(
+          el,
+          () => {
+            if (remaining > 1) {
+              wait(timing.REST_MS, () => runPulse(remaining - 1))
+            } else {
+              runPulse(0)
+            }
+          },
+          timing.FADE_OUT_MS,
+          timing.EASING,
+        )
+      }),
+      timing.EASING,
+    )
   }
 
   runPulse(timing.PULSES)
