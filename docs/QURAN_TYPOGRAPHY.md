@@ -641,6 +641,17 @@ less than was measured, so the lines it was given are the lines it keeps and
 there is nothing to remedy. The rule is the same rule; only its direction
 changed, and the whole apparatus that compensated for it is gone.
 
+**And it maps through where the verse's text begins.** `EnglishLeafVerse.from`
+is where the *fragment* begins; `textFrom` is where its `text` does, and on a
+carried fragment they differ by one — the fragment starts on the space the leaf
+before it broke on, and the text is that trimmed. The ruler measures the leaf's
+composed string and maps a character in it back to an offset in the verse, and
+mapping through `from` put every offset one character early. Backwards, one
+character early is a break that should have stayed put walking back a whole
+word: "and the enduring good deeds" kept its "are" or lost it on the strength of
+it. (Forwards, the same error gained a word instead — which is why it looked
+harmless for as long as the snap went the other way.)
+
 One thing can still overrun and is checked for: a cut landing exactly at a
 verse's end makes the leaf draw that verse's *mark*, which may be sitting on the
 next line. Then the verse does not end here — the word before it is taken and

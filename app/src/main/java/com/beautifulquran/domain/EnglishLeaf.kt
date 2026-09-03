@@ -62,6 +62,19 @@ data class EnglishLeafVerse(
     val from: Int = 0,
     val to: Int = text.length,
     val verseLength: Int = text.length,
+    /**
+     * Where [text] itself begins in the verse.
+     *
+     * [from] is where the *fragment* begins, and the two differ: a carried
+     * fragment starts at the space the leaf before it broke on, and [text] is
+     * that fragment trimmed. One character, and it decides where a cut lands.
+     * The ruler measures the leaf's composed string and maps a character in it
+     * back to an offset in the verse; mapping through [from] rather than this
+     * puts every offset one character early, so a break that should have stayed
+     * put walks back a whole word — "the enduring good deeds" keeps its "are"
+     * or loses it on the strength of it.
+     */
+    val textFrom: Int = from,
 ) {
     /** The mark closes the verse, so only the fragment that ends it carries one. */
     val endsVerse: Boolean get() = to >= verseLength
@@ -277,7 +290,8 @@ fun englishLeaf(
         val from = englishLeafBreak(whole, verseRun.from)
         val to = englishLeafBreak(whole, verseRun.to)
         if (to <= from && whole.isNotEmpty()) return@forEach
-        val text = englishVerseProse(whole.substring(from, to), hideParentheticals)
+        val slice = whole.substring(from, to)
+        val text = englishVerseProse(slice, hideParentheticals)
         if (text.isNotEmpty()) {
             prose += EnglishLeafVerse(
                 surahId = verseRun.surahId,
@@ -286,6 +300,7 @@ fun englishLeaf(
                 from = from,
                 to = to,
                 verseLength = whole.length,
+                textFrom = from + (slice.length - slice.trimStart().length),
             )
         }
     }

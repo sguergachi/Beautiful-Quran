@@ -1336,8 +1336,12 @@ internal fun englishLeafRuler(
                     if (at <= prose.verses[k].range.last + 1) { pick = k; break }
                 }
                 val set = verses[pick]
-                val into = (at - prose.verses[pick].range.first).coerceIn(0, set.to - set.from)
-                var to = (set.from + into).coerceAtMost(set.to)
+                // Map through where the verse's *text* begins, not where its
+                // fragment does: a carried fragment starts on the space the
+                // leaf before it broke on, and the text is that trimmed. One
+                // character out here walks the break back a whole word.
+                val into = (at - prose.verses[pick].range.first).coerceIn(0, set.to - set.textFrom)
+                var to = (set.textFrom + into).coerceAtMost(set.to)
                 // The one thing that can still overrun: a cut landing exactly
                 // at a verse's end makes the leaf draw that verse's *mark*, and
                 // the mark may be sitting on the next line. Then the verse does

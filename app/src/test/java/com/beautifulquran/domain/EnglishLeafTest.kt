@@ -172,6 +172,23 @@ class EnglishLeafTest {
     }
 
     @Test
+    fun `a carried fragment says where its own text begins`() {
+        // The fragment starts on the space the leaf before it broke on; the
+        // text it sets is that trimmed. Mapping a measured character back
+        // through `from` rather than `textFrom` puts every offset one early,
+        // and a break that should have stayed put walks back a whole word.
+        val leaf = englishLeaf(
+            page = 3,
+            runs = listOf(EnglishVerseRun(2, 2, 10, 30)),
+        ) { _, _ -> "0123456789 and the rest of it goes on here" }
+        val verse = leaf.verses.single()
+        assertEquals(10, verse.from)
+        assertEquals(11, verse.textFrom)
+        // And the far end is snapped back off the middle of "goes".
+        assertEquals("and the rest of it", verse.text)
+    }
+
+    @Test
     fun `the break only ever moves back, so a leaf is never handed more`() {
         // The direction is the point. A leaf is measured before it is set, and
         // the offset that comes back is the end of a line the well has room
