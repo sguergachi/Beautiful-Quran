@@ -19,4 +19,11 @@ object SearchHitFlash {
 
     /** Total animation time after [START_DELAY_MS] (both pulses). */
     fun totalMs(): Long = PULSES.toLong() * cycleMs()
+
+    /** The scrolling reader and Mushaf have different focus authorities. */
+    internal fun isTargetSettled(
+        mushafMode: Boolean,
+        scrollingVerseSettled: Boolean,
+        mushafLeafSettled: Boolean,
+    ): Boolean = if (mushafMode) mushafLeafSettled else scrollingVerseSettled
 }

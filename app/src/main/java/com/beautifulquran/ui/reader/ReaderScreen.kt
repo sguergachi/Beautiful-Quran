@@ -213,6 +213,8 @@ fun ReaderScreen(
     startPlaybackRequested: Boolean = false,
     /** 1-based word from a home word-search hit — triggers the orange flash. */
     startWordPosition: Int? = null,
+    /** True only after the reader sheet has finished turning into view. */
+    readerSheetSettled: () -> Boolean = { true },
     viewModel: ReaderViewModel,
     onBack: () -> Unit,
     onOpenSettings: () -> Unit,
@@ -1171,11 +1173,17 @@ fun ReaderScreen(
         }
     }
 
-    // Opening from "Continue listening": settle on the saved ayah once.
-    LaunchedEffect(uiState.content) {
+    // Opening from "Continue listening": settle on the saved ayah once. The
+    // scrolling list does not exist in Mushaf mode; treating it as the focus
+    // authority there left this coroutine waiting on a viewport forever.
+    LaunchedEffect(uiState.content, mushafMode) {
         initialFocusSettled = false
         val content = uiState.content
         if (content != null) {
+            if (mushafMode) {
+                initialFocusSettled = true
+                return@LaunchedEffect
+            }
             if (!didInitialScroll) {
                 didInitialScroll = true
                 // A different verse in this paused playlist was seeded into
@@ -1263,9 +1271,11 @@ fun ReaderScreen(
     // word unit / Hafs bloom; this effect only gates which word is active.
     var searchFlashAyah by remember { mutableStateOf<Int?>(null) }
     var searchFlashWord by remember { mutableStateOf<Int?>(null) }
+    val readerSheetSettledNow = rememberUpdatedState(readerSheetSettled)
     LaunchedEffect(
         uiState.content?.surah?.id,
-        initialFocusSettled,
+        mushafMode,
+        mushafOpeningPage,
         startAyah,
         startWordPosition,
     ) {
@@ -1274,13 +1284,26 @@ fun ReaderScreen(
         val ayah = startAyah
         val word = startWordPosition
         val content = uiState.content
-        if (!initialFocusSettled || ayah == null || word == null || content == null) {
+        if (ayah == null || word == null || content == null) {
             return@LaunchedEffect
         }
         if (content.surah.id != surahId) return@LaunchedEffect
         if (ayah !in 1..content.ayahs.size) return@LaunchedEffect
         val ayahWords = content.ayahs[ayah - 1].words
         if (ayahWords.none { it.position == word }) return@LaunchedEffect
+        val targetPage = mushafOpeningPage
+        if (mushafMode && targetPage == null) return@LaunchedEffect
+        snapshotFlow {
+            SearchHitFlash.isTargetSettled(
+                mushafMode = mushafMode,
+                scrollingVerseSettled = initialFocusSettled,
+                mushafLeafSettled = targetPage != null &&
+                    !mushafPagerState.isScrollInProgress &&
+                    mushafPagerState.layoutInfo.visiblePagesInfo.any { it.index == targetPage },
+            )
+        }.first { it }
+        snapshotFlow { readerSheetSettledNow.value() }.first { it }
+        withFrameNanos { }
         delay(SearchHitFlash.START_DELAY_MS)
         searchFlashAyah = ayah
         searchFlashWord = word

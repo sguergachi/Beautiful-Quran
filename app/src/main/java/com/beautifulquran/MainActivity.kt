@@ -831,6 +831,9 @@ private fun PaperStackApp(
                         startAyah = selectedStartAyah.takeIf { it > 0 },
                         startPlaybackRequested = selectedStartPlayback,
                         startWordPosition = selectedStartWord.takeIf { it > 0 },
+                        readerSheetSettled = {
+                            abs(stackPosition.value - AYAH_LAYER) <= 0.01f
+                        },
                         viewModel = readerViewModel,
                         onBack = { animateTo(COVER_LAYER) },
                         onOpenSettings = { animateTo(SETTINGS_LAYER) },
