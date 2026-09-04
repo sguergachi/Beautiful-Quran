@@ -1281,6 +1281,7 @@ fun ReaderScreen(
     var searchFlashAyah by remember { mutableStateOf<Int?>(null) }
     var searchFlashWord by remember { mutableStateOf<Int?>(null) }
     var searchFlashWords by remember { mutableStateOf(emptySet<Int>()) }
+    var searchFocusActive by remember { mutableStateOf(false) }
     val readerSheetSettledNow = rememberUpdatedState(readerSheetSettled)
     LaunchedEffect(
         uiState.content?.surah?.id,
@@ -1294,6 +1295,7 @@ fun ReaderScreen(
         searchFlashAyah = null
         searchFlashWord = null
         searchFlashWords = emptySet()
+        searchFocusActive = false
         val ayah = startAyah
         val word = startWordPosition
         val content = uiState.content
@@ -1325,7 +1327,10 @@ fun ReaderScreen(
         searchFlashAyah = ayah
         searchFlashWord = word
         searchFlashWords = words
+        searchFocusActive = true
         delay(SearchHitFlash.totalMs())
+        searchFocusActive = false
+        delay(SearchHitFlash.FOCUS_FADE_MS.toLong())
         searchFlashAyah = null
         searchFlashWord = null
         searchFlashWords = emptySet()
@@ -2583,6 +2588,7 @@ fun ReaderScreen(
                         flashAyah = searchFlashAyah,
                         flashWordPosition = searchFlashWord,
                         flashWordPositions = searchFlashWords,
+                        searchFocusActive = searchFocusActive,
                         heldPage = mushafTappedPage,
                         onTappedLeaf = { mushafTappedPage = it },
                         scrubbing = { mushafScrubbing.value },
@@ -2816,7 +2822,7 @@ fun ReaderScreen(
                                 flashWordPositions = searchFlashWords
                                     .takeIf { searchFlashAyah == ayah.number }
                                     .orEmpty(),
-                                searchFocusActive = searchFlashAyah != null,
+                                searchFocusActive = searchFocusActive,
                                 searchFlashText = startSearchText
                                     ?.takeIf {
                                         searchFlashAyah == ayah.number && searchFlashWord == 0

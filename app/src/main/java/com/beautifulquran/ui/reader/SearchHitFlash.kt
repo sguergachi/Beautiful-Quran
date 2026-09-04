@@ -17,6 +17,7 @@ object SearchHitFlash {
     const val EDGE_SHARE = 0.24f
     /** The rest of the chapter yields just enough to make every target legible. */
     const val BACKGROUND_ALPHA = 0.4f
+    const val FOCUS_FADE_MS = 280
 
     /** Constant velocity keeps one pass flowing directly into the next. */
     val EASING = LinearEasing

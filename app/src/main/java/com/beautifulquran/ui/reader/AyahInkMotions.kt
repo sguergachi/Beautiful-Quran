@@ -19,6 +19,7 @@ internal data class AyahInkPack(
     val searchHitWash: RepeatWash,
     val searchHitWordPositions: Set<Int> = emptySet(),
     val searchFocusPositions: Set<Int>? = null,
+    val searchBackgroundAlpha: State<Float>,
     /** A motionless mushaf ayah that still waits beneath the page recess. */
     val wholeAyahRecess: Boolean = false,
 )
@@ -41,6 +42,7 @@ internal fun rememberAyahInkPack(
     flashWordPosition: Int? = null,
     flashWordPositions: Set<Int> = emptySet(),
     searchFocusPositions: Set<Int>? = null,
+    searchFocusActive: Boolean = searchFocusPositions != null,
     /** True while the voice is running: the wet-ink glint dries on a pause. */
     wetInk: Boolean = true,
     /** Mushaf selection enters from the paper cover already on the ayah. */
@@ -166,6 +168,11 @@ internal fun rememberAyahInkPack(
         label = "mushafRecessCover",
     )
     val searchTargets = flashWordPositions + listOfNotNull(flashWordPosition?.takeIf { it > 0 })
+    val searchBackgroundAlpha = animateFloatAsState(
+        targetValue = if (searchFocusActive) SearchHitFlash.BACKGROUND_ALPHA else 1f,
+        animationSpec = tween(SearchHitFlash.FOCUS_FADE_MS, easing = FastOutSlowInEasing),
+        label = "mushafSearchBackgroundAlpha",
+    )
     return AyahInkPack(
         motions = motions,
         recessCover = recessCover,
@@ -175,5 +182,6 @@ internal fun rememberAyahInkPack(
         ),
         searchHitWordPositions = searchTargets,
         searchFocusPositions = searchFocusPositions,
+        searchBackgroundAlpha = searchBackgroundAlpha,
     )
 }

@@ -472,6 +472,7 @@ internal fun MushafPager(
     flashAyah: Int?,
     flashWordPosition: Int?,
     flashWordPositions: Set<Int>,
+    searchFocusActive: Boolean,
     /** True while a hand is physically on the page dial, for the folio fade. */
     scrubbing: () -> Boolean,
     /** True only while a distant dial landing keeps neighbour leaves parked. */
@@ -888,6 +889,7 @@ internal fun MushafPager(
                         flashAyah = flashAyah.takeIf { settled },
                         flashWordPosition = flashWordPosition.takeIf { settled },
                         flashWordPositions = flashWordPositions.takeIf { settled }.orEmpty(),
+                        searchFocusActive = searchFocusActive && settled,
                         onWordClick = leafWordClick,
                         onWordLongClick = leafWordLongClick,
                         onAyahClick = leafAyahClick,
@@ -938,6 +940,7 @@ private fun MushafPageSheet(
     flashAyah: Int?,
     flashWordPosition: Int?,
     flashWordPositions: Set<Int>,
+    searchFocusActive: Boolean,
     onWordClick: (MushafToken) -> Unit,
     onWordLongClick: (MushafToken) -> Unit,
     onAyahClick: (MushafToken) -> Unit,
@@ -1000,6 +1003,7 @@ private fun MushafPageSheet(
             flashAyah = flashAyah,
             flashWordPosition = flashWordPosition,
             flashWordPositions = flashWordPositions,
+            searchFocusActive = searchFocusActive,
             packsState = packsState,
         )
     }
@@ -1244,6 +1248,7 @@ private fun MushafPageInkClocks(
     flashAyah: Int?,
     flashWordPosition: Int?,
     flashWordPositions: Set<Int>,
+    searchFocusActive: Boolean,
     packsState: SnapshotStateMap<Pair<Int, Int>, AyahInkPack>,
 ) {
     val activeWordAyah by remember {
@@ -1288,6 +1293,7 @@ private fun MushafPageInkClocks(
                     flashWordPosition = flashWordPosition?.takeIf { flashHere },
                     flashWordPositions = flashWordPositions.takeIf { flashHere }.orEmpty(),
                     searchFocusPositions = flashWordPositions.takeIf { flashHere },
+                    searchFocusActive = searchFocusActive && flashHere,
                     // Debounced on purpose: a repeat range looping back dips
                     // out of "playing" for a frame, and the ink is not dry
                     // between two laps of the same verse.
@@ -1304,6 +1310,7 @@ private fun MushafPageInkClocks(
                     flashWordPosition = flashWordPosition,
                     flashWordPositions = flashWordPositions,
                     searchFocusPositions = flashWordPositions,
+                    searchFocusActive = searchFocusActive,
                     wetInk = false,
                 )
                 MushafInkPackKind.STATIC -> rememberMushafRecessPack(dimmed = false)
@@ -1366,6 +1373,7 @@ private fun rememberMushafRecessPack(dimmed: Boolean): AyahInkPack {
         recessCover = recessCover,
         markAlpha = markAlpha,
         searchHitWash = idleRepeat,
+        searchBackgroundAlpha = remember { mutableStateOf(1f) },
         wholeAyahRecess = dimmed,
     )
 }

@@ -22,6 +22,7 @@ class SearchHitFlashTest {
         assertTrue(SearchHitFlash.EMPHASIS_GLOW_ALPHA >= 0.9f)
         assertTrue(SearchHitFlash.EMPHASIS_GLOW_RADIUS in 1f..1.5f)
         assertEquals(0.4f, SearchHitFlash.BACKGROUND_ALPHA)
+        assertEquals(280, SearchHitFlash.FOCUS_FADE_MS)
     }
 
     @Test

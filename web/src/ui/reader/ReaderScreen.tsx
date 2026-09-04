@@ -776,6 +776,7 @@ export function ReaderScreen({ stackLayer }: { stackLayer: StackLayer }) {
     ayah: number
     wordPosition: number
     wordPositions: number[]
+    focusActive: boolean
     text?: string
   } | null>(null)
   useEffect(() => {
@@ -796,19 +797,31 @@ export function ReaderScreen({ stackLayer }: { stackLayer: StackLayer }) {
     }
     let cancelled = false
     let clearTimer = 0
+    let fadeTimer = 0
     const startTimer = window.setTimeout(() => {
       if (cancelled) return
-      setFlashTarget({ ayah, wordPosition: word, wordPositions, text: pendingFlash.text })
+      setFlashTarget({
+        ayah,
+        wordPosition: word,
+        wordPositions,
+        focusActive: true,
+        text: pendingFlash.text,
+      })
       clearTimer = window.setTimeout(() => {
         if (cancelled) return
-        setFlashTarget(null)
-        appStore.clearSearchFlash()
+        setFlashTarget((target) => target ? { ...target, focusActive: false } : null)
+        fadeTimer = window.setTimeout(() => {
+          if (cancelled) return
+          setFlashTarget(null)
+          appStore.clearSearchFlash()
+        }, SearchHitFlash.FOCUS_FADE_MS)
       }, searchHitFlashTotalMs())
     }, SearchHitFlash.START_DELAY_MS)
     return () => {
       cancelled = true
       window.clearTimeout(startTimer)
       window.clearTimeout(clearTimer)
+      window.clearTimeout(fadeTimer)
     }
   }, [
     content?.surah.id,
@@ -1390,6 +1403,7 @@ export function ReaderScreen({ stackLayer }: { stackLayer: StackLayer }) {
               ref={scrollRef}
               data-reciting={recitingActive || undefined}
               data-search-flash={flashTarget != null || undefined}
+              data-search-focus-active={flashTarget?.focusActive || undefined}
               data-chapter-advancing={chapterAdvancing || undefined}
               style={{
                 ['--upcoming-alpha' as string]: String(inkTuning.upcomingAlpha),
@@ -1399,6 +1413,7 @@ export function ReaderScreen({ stackLayer }: { stackLayer: StackLayer }) {
                 ['--recess-ms' as string]: `${inkTuning.recessMs}ms`,
                 ['--translit-alpha' as string]: String(TRANSLITERATION_COLOR_ALPHA),
                 ['--search-background-alpha' as string]: String(SearchHitFlash.BACKGROUND_ALPHA),
+                ['--search-focus-fade-ms' as string]: `${SearchHitFlash.FOCUS_FADE_MS}ms`,
               }}
             >
               <header className="surah-header" ref={headerRef}>
@@ -1517,6 +1532,9 @@ export function ReaderScreen({ stackLayer }: { stackLayer: StackLayer }) {
                         flashTarget?.ayah === ayah.number
                           ? flashTarget.wordPositions
                           : NO_SEARCH_FLASH_WORDS
+                      }
+                      searchFocusActive={
+                        flashTarget?.ayah === ayah.number && flashTarget.focusActive
                       }
                       searchFlashText={
                         flashTarget?.ayah === ayah.number

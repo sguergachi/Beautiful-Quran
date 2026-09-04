@@ -2064,30 +2064,54 @@ select {
 /* Search-result focus: keep every orange target at full strength while the
    rest of the chapter recedes behind 60% paper. Arabic is covered rather than
    alpha-dimmed so Quran glyphs and overlapping marks remain opaque. */
-.scroll[data-search-flash='true'] .ayah-block:not([data-search-flash-ayah='true']) .ayah-recess-veil {
+.scroll[data-search-flash='true'] .ayah-recess-veil {
+  transition-duration: var(--search-focus-fade-ms, 280ms);
+}
+
+.scroll[data-search-focus-active='true'] .ayah-block:not([data-search-flash-ayah='true']) .ayah-recess-veil {
   opacity: calc(1 - var(--search-background-alpha, 0.4));
 }
 
 .scroll[data-search-flash='true'] :is(.surah-header, .basmalah-block) {
-  opacity: var(--search-background-alpha, 0.4);
-  transition: opacity var(--recess-ms) var(--recede-ease);
+  transition: opacity var(--search-focus-fade-ms, 280ms) var(--recede-ease);
 }
 
-.word-ink[data-search-recessed='true'],
-.ayah-block[data-search-flash-ayah='true'] :is(.ayah-mark, .ayah-translation[data-search-recessed='true']) {
+.scroll[data-search-focus-active='true'] :is(.surah-header, .basmalah-block) {
   opacity: var(--search-background-alpha, 0.4);
 }
 
-:is(.word-arabic-ink, .hafs-word)[data-search-recessed='true'] .ink-paper-cover {
-  opacity: calc(1 - var(--search-background-alpha, 0.4)) !important;
-  transition: opacity var(--recess-ms) var(--recede-ease) !important;
+.scroll[data-search-flash='true'] .word-ink[data-search-recessed='true'],
+.scroll[data-search-flash='true'] .ayah-block[data-search-flash-ayah='true']
+  :is(.ayah-mark, .ayah-translation[data-search-recessed='true']) {
+  transition: opacity var(--search-focus-fade-ms, 280ms) var(--recede-ease);
+}
+
+.scroll[data-search-focus-active='true'] .word-ink[data-search-recessed='true'],
+.scroll[data-search-focus-active='true'] .ayah-block[data-search-flash-ayah='true']
+  :is(.ayah-mark, .ayah-translation[data-search-recessed='true']) {
+  opacity: var(--search-background-alpha, 0.4);
+}
+
+.scroll[data-search-flash='true']
+  :is(.word-arabic-ink, .hafs-word)[data-search-recessed='true'] .ink-paper-cover {
+  transition: opacity var(--search-focus-fade-ms, 280ms) var(--recede-ease) !important;
   -webkit-mask-image: none !important;
   mask-image: none !important;
 }
 
-.word-arabic-ink[data-search-recessed='true'] :is(.word-gloss, .word-translit) {
+.scroll[data-search-focus-active='true']
+  :is(.word-arabic-ink, .hafs-word)[data-search-recessed='true'] .ink-paper-cover {
+  opacity: calc(1 - var(--search-background-alpha, 0.4)) !important;
+}
+
+.scroll[data-search-flash='true']
+  .word-arabic-ink[data-search-recessed='true'] :is(.word-gloss, .word-translit) {
+  transition: opacity var(--search-focus-fade-ms, 280ms) var(--recede-ease);
+}
+
+.scroll[data-search-focus-active='true']
+  .word-arabic-ink[data-search-recessed='true'] :is(.word-gloss, .word-translit) {
   opacity: var(--search-background-alpha, 0.4) !important;
-  transition: opacity var(--recess-ms) var(--recede-ease);
 }
 
 /* Bookmark ribbons recede with chrome — CSS only, no per-ayah React update. */
