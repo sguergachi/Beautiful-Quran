@@ -1275,7 +1275,7 @@ internal fun MushafPageDial(
     fun showReturnBubble(previousPage: Int, newPage: Int): Job {
         returnJob?.cancel()
         returnEntrance?.cancel()
-        returnWay.value = checkNotNull(mushafReturnWay(newPage, previousPage))
+        returnWay.value = checkNotNull(mushafReturnWay(newPage, previousPage, rightToLeft))
         returnPage.intValue = previousPage
         returnEnabled = true
         val entrance = scope.launch {
@@ -2467,7 +2467,9 @@ internal fun MushafPageDial(
             // Settled keeps this physical direction live after another turn;
             // the stored landing direction covers the seek's first frame.
             @Suppress("DEPRECATION")
-            val returnIcon = when (mushafReturnWay(settled, backPage) ?: returnWay.value) {
+            val returnIcon = when (
+                mushafReturnWay(settled, backPage, rightToLeft) ?: returnWay.value
+            ) {
                 MushafReturnWay.Left -> Icons.Rounded.ArrowBack
                 MushafReturnWay.Right -> Icons.Rounded.ArrowForward
             }

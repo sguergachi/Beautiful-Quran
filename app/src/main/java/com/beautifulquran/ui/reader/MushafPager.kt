@@ -501,12 +501,31 @@ internal fun mushafFollowOwnsVisiblePage(
  */
 internal enum class MushafReturnWay { Left, Right }
 
-internal fun mushafReturnWay(currentPage: Int, playbackPage: Int): MushafReturnWay? =
-    when {
-        playbackPage > currentPage -> MushafReturnWay.Left
-        playbackPage < currentPage -> MushafReturnWay.Right
+/**
+ * Which way the reader would travel to reach the page the voice is on.
+ *
+ * A page number is not a direction: a later leaf lies leftward in a book bound
+ * on the right and rightward in one bound on the left, so the arrow has to be
+ * told which book this is. It was not, and pointed backwards on the English
+ * leaf for as long as that leaf has turned the other way — the last thing on
+ * this page still reading the mushaf's binding out of a page number.
+ *
+ * [rightToLeft] comes from `mushafTurnsRightToLeft`, the one figure the leaf,
+ * the rule and the folio already take it from.
+ */
+internal fun mushafReturnWay(
+    currentPage: Int,
+    playbackPage: Int,
+    rightToLeft: Boolean = true,
+): MushafReturnWay? {
+    val later = if (rightToLeft) MushafReturnWay.Left else MushafReturnWay.Right
+    val earlier = if (rightToLeft) MushafReturnWay.Right else MushafReturnWay.Left
+    return when {
+        playbackPage > currentPage -> later
+        playbackPage < currentPage -> earlier
         else -> null
     }
+}
 
 private const val MushafLeafFadeMs = 220
 

@@ -2565,7 +2565,13 @@ fun ReaderScreen(
                                 else -> null
                             }
                             val way = playbackPage?.let {
-                                mushafReturnWay(mushafPagerState.currentPage, it)
+                                mushafReturnWay(
+                                    mushafPagerState.currentPage,
+                                    it,
+                                    mushafTurnsRightToLeft(
+                                        settings.readingMode == ReadingMode.ENGLISH_ONLY,
+                                    ),
+                                )
                             }
                             FloatingPaperControl(visible = showReturnToAyah && way != null) {
                                 IslamicReturnToAyahButton(
