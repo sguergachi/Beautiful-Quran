@@ -41,6 +41,7 @@ export interface WordSearchHit {
   surahNameArabic: string
   matchLabel?: string | null
   matchTerms?: string[]
+  targetPositions?: number[]
   correctedQuery?: string | null
   matchReason?: string
   displayText?: string
@@ -695,24 +696,34 @@ function finishRanking(state: RankingState, maxHits: number): WordSearchHit[] {
         match.matchTerms,
         state.sources,
       )
-      const targetAt = match.position > 0
-        ? match.indexAt
-        : visibleSearchTargetIndex(
-            state.index,
-            match.indexAt,
-            displayed.displayText ?? displayed.ayahTranslation,
-            state.parsed.text,
-            match.matchLabel ?? '',
-            match.matchTerms,
-          )
+      const targetIndices = [...new Set([
+        ...(match.position > 0 ? [match.indexAt] : []),
+        ...visibleSearchTargetIndices(
+          state.index,
+          match.indexAt,
+          displayed.displayText ?? displayed.ayahTranslation,
+          state.parsed.text,
+          match.matchLabel ?? '',
+          match.matchTerms,
+        ),
+      ])].sort((a, b) => state.index[a]!.position - state.index[b]!.position)
+      const targetAt = targetIndices[0]
       if (targetAt == null) {
-        return { ...displayed, position: 0, arabic: '', translation: '', transliteration: '' }
+        return {
+          ...displayed,
+          position: 0,
+          targetPositions: [],
+          arabic: '',
+          translation: '',
+          transliteration: '',
+        }
       }
       return {
         ...toHit(state.index[targetAt]!),
         matchLabel: match.matchLabel ?? null,
         matchTerms: match.matchTerms,
         correctedQuery: match.correctedQuery,
+        targetPositions: targetIndices.map((i) => state.index[i]!.position),
         matchReason: match.matchReason,
         displayText: displayed.displayText,
         displaySource: displayed.displaySource,
@@ -817,16 +828,16 @@ function toHitWithDisplayTranslation(
   return { ...base, displayText: display.text, displaySource: display.source }
 }
 
-/** Resolves an ayah-level result to the word gloss behind its visible gold term. */
-function visibleSearchTargetIndex(
+/** Every word gloss behind the visible highlighted terms, in Quran order. */
+function visibleSearchTargetIndices(
   index: WordSearchIndexEntry[],
   at: number,
   displayText: string,
   query: string,
   semanticLabel = '',
   semanticTerms: string[] = [],
-): number | null {
-  if (at < 0 || at >= index.length) return null
+): number[] {
+  if (at < 0 || at >= index.length) return []
   const anchor = index[at]!
   let lo = at
   while (
@@ -846,10 +857,8 @@ function visibleSearchTargetIndex(
     .map(normalizeArabicForSearch)
     .filter(Boolean)
   if (arabicTerms.length) {
-    for (let i = lo; i <= hi; i++) {
-      if (arabicTerms.some((term) => index[i]!.arabicNorm.includes(term))) return i
-    }
-    return null
+    return Array.from({ length: hi - lo + 1 }, (_, offset) => lo + offset)
+      .filter((i) => arabicTerms.some((term) => index[i]!.arabicNorm.includes(term)))
   }
 
   const needles = highlightNeedles(displayText, query, '', semanticLabel, semanticTerms)
@@ -859,24 +868,20 @@ function visibleSearchTargetIndex(
       .filter((term) => term.length >= 3 && !HIGHLIGHT_FILLERS.has(term.toLowerCase()))
       .map((term) => term.toLowerCase()),
   )]
-  let bestAt: number | null = null
-  let bestScore = 0
+  const targets: number[] = []
   for (let i = lo; i <= hi; i++) {
     const score = terms.reduce(
       (best, term) => Math.max(best, glossAlignmentRelevance(index[i]!.translationLower, term)),
       0,
     )
-    if (score > bestScore) {
-      bestAt = i
-      bestScore = score
-    }
+    if (score > 0) targets.push(i)
   }
-  if (bestAt != null) return bestAt
+  if (targets.length) return targets
 
   const auxiliaryOnly = needles
     .flatMap((needle) => needle.match(/[\p{L}\p{N}]+/gu) ?? [])
     .every((term) => TRANSLATION_ONLY_AUXILIARIES.has(term.toLowerCase()))
-  if (!auxiliaryOnly) return null
+  if (!auxiliaryOnly) return []
 
   // The canonical translation can add an auxiliary with no one-to-one word
   // gloss ("could see", "could have taken"). Pulse its nearest grounded verb.
@@ -890,9 +895,9 @@ function visibleSearchTargetIndex(
         targetScore = score
       }
     }
-    if (target != null) return target
+    if (target != null) return [target]
   }
-  return null
+  return []
 }
 
 const ALIGNMENT_WORD = /[\p{L}\p{N}]+/gu

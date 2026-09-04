@@ -1401,8 +1401,10 @@ private fun HighlightLayeredText(
     style: TextStyle,
     modifier: Modifier = Modifier,
     searchHitWash: RepeatWash? = null,
+    recessedForSearch: Boolean = false,
 ) {
     val repeatInk = LocalQuranAccents.current.repeatInk
+    val paper = MaterialTheme.colorScheme.background
     val glintInk = LocalQuranAccents.current.glintInk
     val glimmerInk = if (motion.glintIsRepeat) repeatInk else glintInk ?: repeatInk
     val searchHitActive = !motion.showRepeatLayer &&
@@ -1448,6 +1450,14 @@ private fun HighlightLayeredText(
                     feather = prefix.feather,
                 ),
             )
+        }
+        if (recessedForSearch) {
+            Canvas(Modifier.matchParentSize()) {
+                drawRect(
+                    color = paper,
+                    alpha = 1f - SearchHitFlash.BACKGROUND_ALPHA,
+                )
+            }
         }
         if (searchHitActive) {
             InkOverlayText(
@@ -1511,6 +1521,7 @@ private fun WordUnit(
     onClick: (() -> Unit)?,
     onLongClick: (() -> Unit)? = null,
     searchHitWash: RepeatWash? = null,
+    recessedForSearch: Boolean = false,
 ) {
     val repeatInk = LocalQuranAccents.current.repeatInk
     val glossWeight = if (searchHit) FontWeight.Bold else null
@@ -1534,6 +1545,7 @@ private fun WordUnit(
             color = MaterialTheme.colorScheme.onBackground,
             style = ArabicWordStyle.copy(fontSize = ArabicWordStyle.fontSize * fontScale),
             searchHitWash = searchHitWash,
+            recessedForSearch = recessedForSearch,
         )
         if (showGloss) {
             Box {
@@ -1548,7 +1560,13 @@ private fun WordUnit(
                         MaterialTheme.colorScheme.onBackground
                     },
                     textAlign = TextAlign.Center,
-                    modifier = Modifier.glyphLayerAlpha { motion.secondaryAlpha() },
+                    modifier = Modifier.glyphLayerAlpha {
+                        motion.secondaryAlpha() * if (recessedForSearch) {
+                            SearchHitFlash.BACKGROUND_ALPHA
+                        } else {
+                            1f
+                        }
+                    },
                 )
                 if (searchHitWash != null && searchHitWash.alpha.value > 0f) {
                     Text(
@@ -1572,7 +1590,13 @@ private fun WordUnit(
                 lineHeight = 14.sp * fontScale,
                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
                 textAlign = TextAlign.Center,
-                modifier = Modifier.glyphLayerAlpha { motion.secondaryAlpha() },
+                modifier = Modifier.glyphLayerAlpha {
+                    motion.secondaryAlpha() * if (recessedForSearch) {
+                        SearchHitFlash.BACKGROUND_ALPHA
+                    } else {
+                        1f
+                    }
+                },
             )
         }
     }
@@ -1713,8 +1737,9 @@ internal fun buildShapedBlooms(
     glintInk: Color?,
     markAlpha: () -> Float,
     recessCover: () -> Float,
-    flashWordPosition: Int?,
+    flashWordPositions: Set<Int>,
     searchHitWash: RepeatWash,
+    searchFocusPositions: Set<Int>? = null,
     /** Let an outgoing verse's Upcoming words follow [recessCover] instead of
      * snapping straight to the faint floor. Future verses keep the floor. */
     softHandoff: Boolean = false,
@@ -1730,11 +1755,18 @@ internal fun buildShapedBlooms(
     // cover strength — ayah handoff does not change unread ink; only the
     // active word starts its bloom.
     motions.forEachIndexed { index, motion ->
-        val coverAlpha = shapedWordCoverAlpha(
-            state = motion.ink.state,
-            recess = recess,
-            upcomingCover = upcomingCover,
-            softHandoff = softHandoff,
+        val coverAlpha = maxOf(
+            shapedWordCoverAlpha(
+                state = motion.ink.state,
+                recess = recess,
+                upcomingCover = upcomingCover,
+                softHandoff = softHandoff,
+            ),
+            if (searchFocusPositions != null && words[index].position !in searchFocusPositions) {
+                1f - SearchHitFlash.BACKGROUND_ALPHA
+            } else {
+                0f
+            },
         )
         if (coverAlpha <= 0f) return@forEachIndexed
         val range = rendered.wordRanges.getOrNull(index) ?: return@forEachIndexed
@@ -1746,7 +1778,10 @@ internal fun buildShapedBlooms(
     }
     // ﴿N﴾ mark: paper cover of (1 − markAlpha) so it fades up to full gold
     // with the shared ayah-mark animation.
-    val markCover = (1f - markAlpha()).coerceIn(0f, 1f)
+    val markCover = maxOf(
+        (1f - markAlpha()).coerceIn(0f, 1f),
+        if (searchFocusPositions != null) 1f - SearchHitFlash.BACKGROUND_ALPHA else 0f,
+    )
     if (markCover > 0f && !rendered.markRange.isEmpty()) {
         blooms += ShapedWordBloom.UpcomingDim(
             range = rendered.markRange,
@@ -1765,10 +1800,10 @@ internal fun buildShapedBlooms(
     // Home search-hit flash: same ColorReveal wash as the orange repeat
     // bloom — directional mask + dissolve, with a tight glyph-shaped spread
     // that reads as heavier ink without reshaping or moving the base text.
-    if (flashWordPosition != null && searchHitWash.alpha.value > 0f) {
-        val flashIndex = words.indexOfFirst { it.position == flashWordPosition }
-        val range = rendered.wordRanges.getOrNull(flashIndex)
-        if (range != null) {
+    if (searchHitWash.alpha.value > 0f) {
+        words.forEachIndexed { index, word ->
+            val range = rendered.wordRanges.getOrNull(index)
+            if (word.position !in flashWordPositions || range == null) return@forEachIndexed
             blooms += ShapedWordBloom.ColorReveal(
                 range = range,
                 progress = searchHitWash.progress.value,
@@ -1818,8 +1853,9 @@ private fun ResponsiveEnglishAyah(
     fontScale: Float,
     searchQuery: String?,
     hideParentheticals: Boolean,
-    flashWordPosition: Int?,
+    flashWordPositions: Set<Int>,
     searchHitWash: RepeatWash,
+    searchFocusPositions: Set<Int>? = null,
     keepActiveWordInView: Boolean,
     listCoordinates: () -> LayoutCoordinates?,
     onKeepWordInView: OnKeepWordInView?,
@@ -1849,13 +1885,15 @@ private fun ResponsiveEnglishAyah(
             hideParentheticals = hideParentheticals,
         )
     }
-    val visibleFlashWordPosition = remember(ayah, flashWordPosition) {
-        val requestedIndex = ayah.words.indexOfFirst { it.position == flashWordPosition }
-        EnglishTypography.coalescedGlossOwnerIndex(
-            glosses = ayah.words.map { it.translation },
-            arabicWords = ayah.words.map { it.arabic },
-            requestedIndex = requestedIndex,
-        )?.let { ayah.words[it].position }
+    val visibleFlashWordPositions = remember(ayah, flashWordPositions) {
+        flashWordPositions.mapNotNullTo(linkedSetOf()) { position ->
+            val requestedIndex = ayah.words.indexOfFirst { it.position == position }
+            EnglishTypography.coalescedGlossOwnerIndex(
+                glosses = ayah.words.map { it.translation },
+                arabicWords = ayah.words.map { it.arabic },
+                requestedIndex = requestedIndex,
+            )?.let { ayah.words[it].position }
+        }
     }
 
     val rendered = remember(
@@ -1932,8 +1970,11 @@ private fun ResponsiveEnglishAyah(
                         glintInk = glintInk,
                         markAlpha = markAlpha,
                         recessCover = recessCover,
-                        flashWordPosition = visibleFlashWordPosition,
+                        flashWordPositions = visibleFlashWordPositions,
                         searchHitWash = searchHitWash,
+                        searchFocusPositions = searchFocusPositions?.let {
+                            visibleFlashWordPositions
+                        },
                         softHandoff = softHandoff,
                     )
                 },
@@ -2026,8 +2067,9 @@ private fun ResponsiveHafsAyah(
     /** 0..1 opacity for the trailing ﴿N﴾ mark — fades to full when focused. */
     markAlpha: () -> Float,
     fontSize: TextUnit,
-    flashWordPosition: Int? = null,
+    flashWordPositions: Set<Int> = emptySet(),
     searchHitWash: RepeatWash,
+    searchFocusPositions: Set<Int>? = null,
     useArabicIndicDigits: Boolean = true,
     /** When the verse is taller than the viewport, keep the active word in the
      * reading band so large type does not disappear under the player bar. */
@@ -2110,8 +2152,9 @@ private fun ResponsiveHafsAyah(
                         glintInk = glintInk,
                         markAlpha = markAlpha,
                         recessCover = { recessCover.value },
-                        flashWordPosition = flashWordPosition,
+                        flashWordPositions = flashWordPositions,
                         searchHitWash = searchHitWash,
+                        searchFocusPositions = searchFocusPositions,
                         softHandoff = softHandoff,
                         waslInk = palette.fullInkColor,
                     )
@@ -2512,6 +2555,10 @@ fun AyahBlock(
     searchQuery: String? = null,
     /** 1-based word to orange-flash (home search hit); null = no flash. */
     flashWordPosition: Int? = null,
+    /** All word positions that flash together for a multi-term result. */
+    flashWordPositions: Set<Int> = emptySet(),
+    /** True while this search result temporarily recesses the surrounding chapter ink. */
+    searchFocusActive: Boolean = false,
     /** Exact canonical-translation term used when [flashWordPosition] is zero. */
     searchFlashText: String? = null,
     keepActiveWordInView: Boolean = false,
@@ -2566,6 +2613,10 @@ fun AyahBlock(
      * page holds only the verse being written on. */
     recededForAnnotationEdit: Boolean = false,
 ) {
+    val searchTargets = remember(flashWordPosition, flashWordPositions) {
+        flashWordPositions + listOfNotNull(flashWordPosition?.takeIf { it > 0 })
+    }
+    val searchTargetAyah = searchFocusActive && flashWordPosition != null
     fun hits(word: Word) =
         searchQuery != null && word.translation.contains(searchQuery, ignoreCase = true)
     // Non-active ayahs recede while another is being recited. Dim is applied
@@ -2736,7 +2787,9 @@ fun AyahBlock(
             readingMode == ReadingMode.ARABIC_ENGLISH && showGloss,
         wetInk = reciting,
     )
-    val searchHitWash = rememberSearchHitWash(flashWordPosition)
+    val searchHitWash = rememberSearchHitWash(
+        searchTargets.hashCode().takeIf { searchTargets.isNotEmpty() } ?: flashWordPosition,
+    )
     val translationFlashRanges = remember(ayah.translation, searchFlashText, flashWordPosition) {
         if (flashWordPosition == 0) {
             SearchHitFlash.textRanges(ayah.translation, searchFlashText)
@@ -2748,6 +2801,16 @@ fun AyahBlock(
         mutableStateOf<TextLayoutResult?>(null)
     }
     val searchInk = LocalQuranAccents.current.repeatInk
+    val searchPaper = MaterialTheme.colorScheme.background
+    val searchRecessCover = animateFloatAsState(
+        targetValue = if (searchFocusActive && !searchTargetAyah) {
+            1f - SearchHitFlash.BACKGROUND_ALPHA
+        } else {
+            0f
+        },
+        animationSpec = tween(ANNOTATION_FADE_MS, easing = FastOutSlowInEasing),
+        label = "searchAyahRecess",
+    )
     // Arabic-only uses this ayah-level paper cover. Owning its clock here
     // keeps the shaped renderer paint-only.
     val recessCover = animateFloatAsState(
@@ -2807,8 +2870,9 @@ fun AyahBlock(
                     fontScale = fontScale,
                     searchQuery = searchQuery,
                     hideParentheticals = hideEnglishParentheticals,
-                    flashWordPosition = flashWordPosition,
+                    flashWordPositions = searchTargets,
                     searchHitWash = searchHitWash,
+                    searchFocusPositions = searchTargets.takeIf { searchTargetAyah },
                     keepActiveWordInView = keepActiveWordInView,
                     listCoordinates = listCoordinates,
                     onKeepWordInView = onKeepWordInView,
@@ -2827,7 +2891,7 @@ fun AyahBlock(
                         ayah.words.forEachIndexed { index, word ->
                             val motion = motions[index]
                             val isActiveWord = motion.isActive
-                            val flashing = flashWordPosition == word.position
+                            val flashing = word.position in searchTargets
                             WordUnit(
                                 word = word,
                                 motion = motion,
@@ -2841,10 +2905,17 @@ fun AyahBlock(
                                 onClick = onWordClick?.let { handler -> { handler(word) } },
                                 onLongClick = onWordLongClick?.let { handler -> { handler(word) } },
                                 searchHitWash = searchHitWash.takeIf { flashing },
+                                recessedForSearch = searchTargetAyah && !flashing,
                             )
                         }
                         Box(
-                            modifier = Modifier.graphicsLayer { alpha = ayahMarkAlpha.value },
+                            modifier = Modifier.graphicsLayer {
+                                alpha = ayahMarkAlpha.value * if (searchTargetAyah) {
+                                    SearchHitFlash.BACKGROUND_ALPHA
+                                } else {
+                                    1f
+                                }
+                            },
                         ) {
                             ArabicAyahNumberUnit(
                                 ayah.number,
@@ -2865,8 +2936,9 @@ fun AyahBlock(
                         softHandoff = softHandoff,
                         markAlpha = { ayahMarkAlpha.value },
                         fontSize = ArabicWordStyle.fontSize * fontScale * ARABIC_ONLY_HAFS_FONT_MULTIPLIER,
-                        flashWordPosition = flashWordPosition,
+                        flashWordPositions = searchTargets,
                         searchHitWash = searchHitWash,
+                        searchFocusPositions = searchTargets.takeIf { searchTargetAyah },
                         useArabicIndicDigits = useArabicIndicDigits,
                         keepActiveWordInView = keepActiveWordInView,
                         listCoordinates = listCoordinates,
@@ -2895,7 +2967,15 @@ fun AyahBlock(
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.66f),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .graphicsLayer { alpha = translationRecess.value }
+                        .graphicsLayer {
+                            alpha = translationRecess.value * if (
+                                searchTargetAyah && flashWordPosition != 0
+                            ) {
+                                SearchHitFlash.BACKGROUND_ALPHA
+                            } else {
+                                1f
+                            }
+                        }
                         .shapedWordBloom(
                             blooms = {
                                 if (searchHitWash.alpha.value <= 0f) {
@@ -2956,6 +3036,12 @@ fun AyahBlock(
             }
             // Whitespace is the divider.
             Spacer(Modifier.height(if (readingMode == ReadingMode.ENGLISH_ONLY) 18.dp else 26.dp))
+        }
+
+        if (searchRecessCover.value > 0f) {
+            Canvas(Modifier.matchParentSize()) {
+                drawRect(searchPaper, alpha = searchRecessCover.value)
+            }
         }
 
         if (gatherOrdinal != null && bookmarkSide != null) {

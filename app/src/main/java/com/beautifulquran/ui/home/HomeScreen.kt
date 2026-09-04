@@ -114,6 +114,9 @@ fun HomeScreen(
     /** Search hits carry a word position, or zero plus [searchText] when the
      * visible match is a translator addition with no Quran-word position. */
     onOpenSurah: (surahId: Int, ayah: Int?, wordPosition: Int?, searchText: String?) -> Unit,
+    onOpenSearchHit: (hit: WordSearchHit, query: String) -> Unit = { hit, query ->
+        onOpenSurah(hit.surahId, hit.ayahNumber, hit.position, query)
+    },
     onOpenSettings: () -> Unit,
     /** True while the paper stack is on (or near) the chapter list — drives
      *  the floating transport's enter/exit across page turns. */
@@ -387,12 +390,7 @@ fun HomeScreen(
                                         query = uiState.query,
                                         onClick = {
                                             focusManager.clearFocus()
-                                            onOpenSurah(
-                                                hit.surahId,
-                                                hit.ayahNumber,
-                                                hit.position,
-                                                uiState.query,
-                                            )
+                                            onOpenSearchHit(hit, uiState.query)
                                         },
                                     )
                                 }

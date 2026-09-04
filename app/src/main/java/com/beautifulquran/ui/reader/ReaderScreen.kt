@@ -213,6 +213,8 @@ fun ReaderScreen(
     startPlaybackRequested: Boolean = false,
     /** Positive = word hit; zero = translator-only [startSearchText] hit. */
     startWordPosition: Int? = null,
+    /** Every timed word grounded by the selected search result. */
+    startWordPositions: List<Int> = emptyList(),
     startSearchText: String? = null,
     /** True only after the reader sheet has finished turning into view. */
     readerSheetSettled: () -> Boolean = { true },
@@ -1278,6 +1280,7 @@ fun ReaderScreen(
     // word unit / Hafs bloom; this effect only gates which word is active.
     var searchFlashAyah by remember { mutableStateOf<Int?>(null) }
     var searchFlashWord by remember { mutableStateOf<Int?>(null) }
+    var searchFlashWords by remember { mutableStateOf(emptySet<Int>()) }
     val readerSheetSettledNow = rememberUpdatedState(readerSheetSettled)
     LaunchedEffect(
         uiState.content?.surah?.id,
@@ -1285,10 +1288,12 @@ fun ReaderScreen(
         mushafOpeningPage,
         startAyah,
         startWordPosition,
+        startWordPositions,
         startSearchText,
     ) {
         searchFlashAyah = null
         searchFlashWord = null
+        searchFlashWords = emptySet()
         val ayah = startAyah
         val word = startWordPosition
         val content = uiState.content
@@ -1299,6 +1304,9 @@ fun ReaderScreen(
         if (ayah !in 1..content.ayahs.size) return@LaunchedEffect
         val ayahWords = content.ayahs[ayah - 1].words
         if (word > 0 && ayahWords.none { it.position == word }) return@LaunchedEffect
+        val words = (startWordPositions + listOfNotNull(word.takeIf { it > 0 }))
+            .filter { position -> ayahWords.any { it.position == position } }
+            .toSet()
         if (word == 0 && startSearchText.isNullOrBlank()) return@LaunchedEffect
         val targetPage = mushafOpeningPage
         if (mushafMode && targetPage == null) return@LaunchedEffect
@@ -1316,9 +1324,11 @@ fun ReaderScreen(
         delay(SearchHitFlash.START_DELAY_MS)
         searchFlashAyah = ayah
         searchFlashWord = word
+        searchFlashWords = words
         delay(SearchHitFlash.totalMs())
         searchFlashAyah = null
         searchFlashWord = null
+        searchFlashWords = emptySet()
     }
 
     // Reading-mode / display toggles reflow every ayah's height. LazyList keeps
@@ -2572,6 +2582,7 @@ fun ReaderScreen(
                         loadedSurahId = mushafSurahId,
                         flashAyah = searchFlashAyah,
                         flashWordPosition = searchFlashWord,
+                        flashWordPositions = searchFlashWords,
                         heldPage = mushafTappedPage,
                         onTappedLeaf = { mushafTappedPage = it },
                         scrubbing = { mushafScrubbing.value },
@@ -2802,6 +2813,10 @@ fun ReaderScreen(
                                 searchQuery = activeQuery,
                                 flashWordPosition = searchFlashWord
                                     ?.takeIf { searchFlashAyah == ayah.number },
+                                flashWordPositions = searchFlashWords
+                                    .takeIf { searchFlashAyah == ayah.number }
+                                    .orEmpty(),
+                                searchFocusActive = searchFlashAyah != null,
                                 searchFlashText = startSearchText
                                     ?.takeIf {
                                         searchFlashAyah == ayah.number && searchFlashWord == 0

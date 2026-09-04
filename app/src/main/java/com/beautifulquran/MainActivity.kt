@@ -302,6 +302,7 @@ private fun PaperStackApp(
     var selectedStartPlayback by rememberSaveable { mutableStateOf(false) }
     /** Search target: positive = Quran word, zero = exact translator text, negative = none. */
     var selectedStartWord by rememberSaveable { mutableIntStateOf(-1) }
+    var selectedStartWords by rememberSaveable { mutableStateOf(emptyList<Int>()) }
     var selectedSearchText by rememberSaveable { mutableStateOf<String?>(null) }
     var settingsDetail by rememberSaveable(
         stateSaver = Saver<SettingsDetail?, String>(
@@ -508,6 +509,7 @@ private fun PaperStackApp(
         selectedStartAyah = startAyah
         selectedStartPlayback = play
         selectedStartWord = -1
+        selectedStartWords = emptyList()
         selectedSearchText = null
         jumpEpoch++
         readerSession++
@@ -617,6 +619,7 @@ private fun PaperStackApp(
         selectedStartAyah = ayah
         selectedStartPlayback = false
         selectedStartWord = -1
+        selectedStartWords = emptyList()
         selectedSearchText = null
         jumpEpoch++
         readerSession++
@@ -634,6 +637,7 @@ private fun PaperStackApp(
         selectedStartAyah = target.ayah
         selectedStartPlayback = false
         selectedStartWord = -1
+        selectedStartWords = emptyList()
         selectedSearchText = null
         jumpEpoch++
         readerSession++
@@ -756,6 +760,7 @@ private fun PaperStackApp(
                     selectedStartAyah = ayah
                     selectedStartPlayback = false
                     selectedStartWord = -1
+                    selectedStartWords = emptyList()
                     selectedSearchText = null
                     jumpEpoch++
                     readerSession++
@@ -836,6 +841,7 @@ private fun PaperStackApp(
                         startAyah = selectedStartAyah.takeIf { it > 0 },
                         startPlaybackRequested = selectedStartPlayback,
                         startWordPosition = selectedStartWord.takeIf { it >= 0 },
+                        startWordPositions = selectedStartWords,
                         startSearchText = selectedSearchText,
                         readerSheetSettled = {
                             abs(stackPosition.value - AYAH_LAYER) <= 0.01f
@@ -850,6 +856,7 @@ private fun PaperStackApp(
                             selectedStartAyah = 0
                             selectedStartPlayback = false
                             selectedStartWord = -1
+                            selectedStartWords = emptyList()
                             selectedSearchText = null
                         },
                         onOpenPreviousChapter = { prevId ->
@@ -857,6 +864,7 @@ private fun PaperStackApp(
                             selectedStartAyah = 0
                             selectedStartPlayback = false
                             selectedStartWord = -1
+                            selectedStartWords = emptyList()
                             selectedSearchText = null
                         },
                         onAyahSelectorExpandedChange = { ayahSelectorExpanded = it },
@@ -953,7 +961,19 @@ private fun PaperStackApp(
                     selectedStartAyah = ayah ?: 0
                     selectedStartPlayback = false
                     selectedStartWord = wordPosition ?: -1
+                    selectedStartWords = listOfNotNull(wordPosition?.takeIf { it > 0 })
                     selectedSearchText = searchText
+                    readerSession++
+                    animateTo(AYAH_LAYER)
+                },
+                onOpenSearchHit = { hit, query ->
+                    readerViewModel.load(hit.surahId)
+                    selectedSurahId = hit.surahId
+                    selectedStartAyah = hit.ayahNumber
+                    selectedStartPlayback = false
+                    selectedStartWord = hit.position
+                    selectedStartWords = hit.targetPositions
+                    selectedSearchText = query
                     readerSession++
                     animateTo(AYAH_LAYER)
                 },

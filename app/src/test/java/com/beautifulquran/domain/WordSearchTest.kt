@@ -333,12 +333,22 @@ class WordSearchTest {
     @Test
     fun `concept vocabulary targets Fire but never the substring in firewood`() {
         val verses = listOf(
+            entry(32, 20, 1, "عَذَابَ", "the punishment"),
+            entry(32, 20, 2, "ٱلنَّارِ", "the Fire"),
             entry(90, 20, 1, "عَلَيْهِمْ", "Over them"),
             entry(90, 20, 2, "نَارٌ", "Fire"),
             entry(111, 4, 1, "حَمَّالَةَ", "the carrier"),
             entry(111, 4, 2, "ٱلْحَطَبِ", "of firewood"),
         )
         val concepts = listOf(
+            SearchConcept(
+                "Punishments of Hell",
+                listOf("hell punishment"),
+                listOf("fire punishment"),
+                "Afterlife",
+                "Aqeedah",
+                intArrayOf(32_020),
+            ),
             SearchConcept(
                 "Description of Hellfire",
                 listOf("hellfire", "blazing fire"),
@@ -364,12 +374,16 @@ class WordSearchTest {
         )
 
         val hits = matchWordSearch(verses, "hell", concepts = concepts, sources = glossOnly)
+        val punishmentAndFire = hits.single { it.surahId == 32 }
         val fire = hits.single { it.surahId == 90 }
         val firewood = hits.single { it.surahId == 111 }
 
+        assertEquals(listOf(1, 2), punishmentAndFire.targetPositions)
         assertEquals(2, fire.position)
+        assertEquals(listOf(2), fire.targetPositions)
         assertEquals("Fire", fire.translation)
         assertEquals(0, firewood.position)
+        assertTrue(firewood.targetPositions.isEmpty())
         assertEquals(null, spellingCorrection(hits))
         assertEquals(
             listOf("Fire"),

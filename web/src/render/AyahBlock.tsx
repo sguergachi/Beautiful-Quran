@@ -39,6 +39,8 @@ interface Props {
   searchQuery?: string | null
   /** 1-based word to orange-flash (home search hit); null = no flash. */
   flashWordPosition?: number | null
+  /** Every grounded word in this ayah that should share the orange flash. */
+  flashWordPositions?: number[]
   /** Exact canonical-translation term when [flashWordPosition] is zero. */
   searchFlashText?: string | null
   /** Tap a word to start recitation at that word's timing. */
@@ -68,6 +70,7 @@ function AyahBlockInner({
   fontScale,
   searchQuery = null,
   flashWordPosition = null,
+  flashWordPositions = [],
   searchFlashText = null,
   onPlayWord,
   onToggleBookmark,
@@ -86,15 +89,23 @@ function AyahBlockInner({
     ),
     [words],
   )
-  const visibleEnglishFlashPosition = useMemo(() => {
-    const requestedIndex = words.findIndex((word) => word.position === flashWordPosition)
-    const owner = coalescedGlossOwnerIndex(
-      words.map((word) => word.translation),
-      words.map((word) => word.arabic),
-      requestedIndex,
-    )
-    return owner == null ? null : words[owner]!.position
-  }, [words, flashWordPosition])
+  const searchTargets = useMemo(
+    () => new Set([
+      ...flashWordPositions,
+      ...(flashWordPosition != null && flashWordPosition > 0 ? [flashWordPosition] : []),
+    ]),
+    [flashWordPosition, flashWordPositions],
+  )
+  const visibleEnglishFlashPositions = useMemo(() => {
+    const glosses = words.map((word) => word.translation)
+    const arabic = words.map((word) => word.arabic)
+    return new Set([...searchTargets].flatMap((position) => {
+      const requestedIndex = words.findIndex((word) => word.position === position)
+      const owner = coalescedGlossOwnerIndex(glosses, arabic, requestedIndex)
+      return owner == null ? [] : [words[owner]!.position]
+    }))
+  }, [words, searchTargets])
+  const searchFocusActive = flashWordPosition != null
   // Derive ink policy once for the ayah, matching Android AyahBlock. The
   // renderer branches consume these decisions and never reinterpret playback.
   const activeSweepMs = InkEngine.sweepMs(activeWord, speed)
@@ -155,6 +166,7 @@ function AyahBlockInner({
       data-ayah={ayah.number}
       data-ayah-active={isActiveAyah || undefined}
       data-dimmed={dimmed || undefined}
+      data-search-flash-ayah={searchFocusActive || undefined}
       style={{ ['--font-scale' as string]: String(fontScale) }}
       id={`ayah-${ayah.number}`}
       onMouseEnter={() => setHovered(true)}
@@ -185,7 +197,8 @@ function AyahBlockInner({
                 ink={ink}
                 sweepMs={isActive ? activeSweepMs : null}
                 activation={isActive ? (activeWord?.activation ?? 0) : 0}
-                searchFlash={flashWordPosition === w.position}
+                searchFlash={searchTargets.has(w.position)}
+                searchRecessed={searchFocusActive && !searchTargets.has(w.position)}
                 rootRef={isActive ? activeWordRef : undefined}
                 onPlay={() => onPlayWord(ayah.number, w.position)}
                 onHold={() =>
@@ -223,7 +236,11 @@ function AyahBlockInner({
                   showTransliteration={showTransliteration}
                   englishMode={englishOnly}
                   searchHit={hits(w.translation)}
-                  searchFlash={(englishOnly ? visibleEnglishFlashPosition : flashWordPosition) === w.position}
+                  searchFlash={(englishOnly ? visibleEnglishFlashPositions : searchTargets).has(w.position)}
+                  searchRecessed={
+                    searchFocusActive &&
+                    !(englishOnly ? visibleEnglishFlashPositions : searchTargets).has(w.position)
+                  }
                   rootRef={isActive ? activeWordRef : undefined}
                   onPlay={() => onPlayWord(ayah.number, w.position)}
                   onHold={() =>
@@ -251,6 +268,7 @@ function AyahBlockInner({
         <p
           ref={translationRef}
           className="ayah-translation"
+          data-search-recessed={(searchFocusActive && flashWordPosition !== 0) || undefined}
           data-search-hit={translationHit ? 'true' : undefined}
           // Combined alpha documented for tests/devtools; visual recess is CSS.
           style={{
@@ -289,6 +307,7 @@ export const AyahBlock = memo(AyahBlockInner, (prev, next) => {
     prev.fontScale === next.fontScale &&
     prev.searchQuery === next.searchQuery &&
     prev.flashWordPosition === next.flashWordPosition &&
+    prev.flashWordPositions === next.flashWordPositions &&
     prev.searchFlashText === next.searchFlashText
   )
 })

@@ -48,6 +48,8 @@ interface Props {
   searchHit?: boolean
   /** When true, pulse the orange search-hit flash on Arabic + gloss. */
   searchFlash?: boolean
+  /** Temporarily recess this non-target word while a search flash is active. */
+  searchRecessed?: boolean
   /** Optional external ref so the ayah can keep the active word in view. */
   rootRef?: MutableRefObject<HTMLElement | null>
   onPlay: () => void
@@ -111,6 +113,7 @@ export function WordUnit({
   englishMode = false,
   searchHit = false,
   searchFlash = false,
+  searchRecessed = false,
   rootRef: externalRootRef,
   onPlay,
   onHold,
@@ -543,6 +546,7 @@ export function WordUnit({
       }}
       className={englishMode ? 'word-unit word-ink' : 'word-unit word-arabic-ink'}
       data-state={ink.state}
+      data-search-recessed={searchRecessed || undefined}
       style={style}
       {...interaction}
       onContextMenu={onContextMenu}

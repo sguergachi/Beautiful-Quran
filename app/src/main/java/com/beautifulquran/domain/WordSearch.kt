@@ -430,22 +430,23 @@ fun matchWordSearch(
                 match.matchTerms,
                 sources,
             )
-            val targetAt = if (match.position > 0) {
-                match.indexAt
-            } else {
-                visibleSearchTargetIndex(
-                    index,
-                    match.indexAt,
-                    display.text,
-                    parsed.text,
-                    match.matchLabel.orEmpty(),
-                    match.matchTerms,
-                )
-            }
+            val targetIndices = (
+                listOfNotNull(match.indexAt.takeIf { match.position > 0 }) +
+                    visibleSearchTargetIndices(
+                        index,
+                        match.indexAt,
+                        display.text,
+                        parsed.text,
+                        match.matchLabel.orEmpty(),
+                        match.matchTerms,
+                    )
+                ).distinct().sortedBy { index[it].position }
+            val targetAt = targetIndices.firstOrNull()
             val target = targetAt?.let(index::get)
             val base = (target ?: anchor).toHit().copy(
                 matchLabel = match.matchLabel,
                 matchTerms = match.matchTerms,
+                targetPositions = targetIndices.map { index[it].position }.distinct(),
                 correctedQuery = match.correctedQuery,
                 matchReason = match.matchReason,
                 displayText = display.text,
@@ -581,8 +582,25 @@ internal fun visibleSearchTargetIndex(
     query: String,
     semanticLabel: String = "",
     semanticTerms: List<String> = emptyList(),
-): Int? {
-    if (at !in index.indices) return null
+): Int? = visibleSearchTargetIndices(
+    index,
+    at,
+    displayText,
+    query,
+    semanticLabel,
+    semanticTerms,
+).firstOrNull()
+
+/** Every word gloss behind the visible highlighted terms, in Quran order. */
+private fun visibleSearchTargetIndices(
+    index: List<WordSearchIndexEntry>,
+    at: Int,
+    displayText: String,
+    query: String,
+    semanticLabel: String = "",
+    semanticTerms: List<String> = emptyList(),
+): List<Int> {
+    if (at !in index.indices) return emptyList()
     val anchor = index[at]
     var lo = at
     while (
@@ -599,7 +617,7 @@ internal fun visibleSearchTargetIndex(
         .map(::normalizeArabicForSearch)
         .filter(String::isNotEmpty)
     if (arabicTerms.isNotEmpty()) {
-        return (lo..hi).firstOrNull { i ->
+        return (lo..hi).filter { i ->
             arabicTerms.any { term -> index[i].arabicNorm.contains(term) }
         }
     }
@@ -611,23 +629,17 @@ internal fun visibleSearchTargetIndex(
         }
         .filter { it.length >= 3 && it.lowercase() !in highlightFillers }
         .distinctBy(String::lowercase)
-    var bestAt: Int? = null
-    var bestScore = 0
-    for (i in lo..hi) {
-        val score = terms.maxOfOrNull { term ->
+    val targets = (lo..hi).filter { i ->
+        (terms.maxOfOrNull { term ->
             glossAlignmentRelevance(index[i].translationLower, term)
-        } ?: 0
-        if (score > bestScore) {
-            bestAt = i
-            bestScore = score
-        }
+        } ?: 0) > 0
     }
-    if (bestAt != null) return bestAt
+    if (targets.isNotEmpty()) return targets
 
     val auxiliaryOnly = needles
         .flatMap { Regex("[\\p{L}\\p{N}]+").findAll(it).map(MatchResult::value) }
         .all { it.lowercase() in translationOnlyAuxiliaries }
-    if (!auxiliaryOnly) return null
+    if (!auxiliaryOnly) return emptyList()
 
     // Saheeh International sometimes adds an English auxiliary that has no
     // one-to-one Quran word gloss ("could see", "could have taken"). Walk
@@ -636,9 +648,9 @@ internal fun visibleSearchTargetIndex(
         val target = (lo..hi).maxByOrNull { i ->
             glossAlignmentRelevance(index[i].translationLower, term)
         } ?: continue
-        if (glossAlignmentRelevance(index[target].translationLower, term) > 0) return target
+        if (glossAlignmentRelevance(index[target].translationLower, term) > 0) return listOf(target)
     }
-    return null
+    return emptyList()
 }
 
 private val alignmentWordPattern = Regex("[\\p{L}\\p{N}]+")

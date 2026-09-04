@@ -5,6 +5,7 @@ export const SearchHitFlash = {
   WIPES: 4,
   BAND_FRACTION: 0.72,
   EDGE_SHARE: 0.24,
+  BACKGROUND_ALPHA: 0.8,
   EASING: [0, 0, 1, 1] as const,
 } as const
 

@@ -420,6 +420,7 @@ export function HomeScreen({ stackLayer }: { stackLayer: StackLayer }) {
                         hit.ayahNumber,
                         hit.position,
                         search,
+                        hit.targetPositions,
                       )
                     }
                   />

@@ -40,6 +40,8 @@ interface Props {
   activation?: number
   /** When true, pulse the orange search-hit flash on this Arabic word. */
   searchFlash?: boolean
+  /** Temporarily recess this non-target word while a search flash is active. */
+  searchRecessed?: boolean
   rootRef?: MutableRefObject<HTMLElement | null>
   onPlay: () => void
   onHold: () => void
@@ -52,6 +54,7 @@ export function HafsWord({
   sweepMs: activeSweepMs,
   activation = 0,
   searchFlash = false,
+  searchRecessed = false,
   rootRef: externalRootRef,
   onPlay,
   onHold,
@@ -330,6 +333,7 @@ export function HafsWord({
       }}
       className="hafs-word"
       data-state={ink.state}
+      data-search-recessed={searchRecessed || undefined}
       style={{ ['--upcoming-cover' as string]: String(upcomingCover) }}
       {...interaction}
       onContextMenu={onContextMenu}

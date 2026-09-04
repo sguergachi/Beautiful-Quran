@@ -62,6 +62,8 @@ import { resolveTheme } from '../App'
 import type { Word } from '../../data/models'
 import { isKeyboardControl, readerKeyboardAction } from './keyboardNavigation'
 
+const NO_SEARCH_FLASH_WORDS: number[] = []
+
 /** Usable in-surah query — mirrors Android `SurahSearchState.activeQuery`. */
 function activeSearchQuery(active: boolean, query: string): string | null {
   const trimmed = query.trim()
@@ -773,6 +775,7 @@ export function ReaderScreen({ stackLayer }: { stackLayer: StackLayer }) {
   const [flashTarget, setFlashTarget] = useState<{
     ayah: number
     wordPosition: number
+    wordPositions: number[]
     text?: string
   } | null>(null)
   useEffect(() => {
@@ -783,6 +786,9 @@ export function ReaderScreen({ stackLayer }: { stackLayer: StackLayer }) {
     const ayah = pendingFlash.ayah
     const word = pendingFlash.wordPosition
     const ayahRow = content.ayahs.find((a) => a.number === ayah)
+    const wordPositions = pendingFlash.wordPositions.filter((position) =>
+      ayahRow?.words.some((candidate) => candidate.position === position),
+    )
     if (!ayahRow || (word > 0 && !ayahRow.words.some((w) => w.position === word)) ||
       (word === 0 && !pendingFlash.text)) {
       appStore.clearSearchFlash()
@@ -792,7 +798,7 @@ export function ReaderScreen({ stackLayer }: { stackLayer: StackLayer }) {
     let clearTimer = 0
     const startTimer = window.setTimeout(() => {
       if (cancelled) return
-      setFlashTarget({ ayah, wordPosition: word, text: pendingFlash.text })
+      setFlashTarget({ ayah, wordPosition: word, wordPositions, text: pendingFlash.text })
       clearTimer = window.setTimeout(() => {
         if (cancelled) return
         setFlashTarget(null)
@@ -810,6 +816,7 @@ export function ReaderScreen({ stackLayer }: { stackLayer: StackLayer }) {
     initialFocusSettled,
     pendingFlash?.ayah,
     pendingFlash?.wordPosition,
+    pendingFlash?.wordPositions,
     pendingFlash?.text,
   ])
 
@@ -1382,6 +1389,7 @@ export function ReaderScreen({ stackLayer }: { stackLayer: StackLayer }) {
               className="scroll"
               ref={scrollRef}
               data-reciting={recitingActive || undefined}
+              data-search-flash={flashTarget != null || undefined}
               data-chapter-advancing={chapterAdvancing || undefined}
               style={{
                 ['--upcoming-alpha' as string]: String(inkTuning.upcomingAlpha),
@@ -1390,6 +1398,7 @@ export function ReaderScreen({ stackLayer }: { stackLayer: StackLayer }) {
                 ['--ayah-mark-fade-ms' as string]: `${inkTuning.ayahMarkFadeMs}ms`,
                 ['--recess-ms' as string]: `${inkTuning.recessMs}ms`,
                 ['--translit-alpha' as string]: String(TRANSLITERATION_COLOR_ALPHA),
+                ['--search-background-alpha' as string]: String(SearchHitFlash.BACKGROUND_ALPHA),
               }}
             >
               <header className="surah-header" ref={headerRef}>
@@ -1503,6 +1512,11 @@ export function ReaderScreen({ stackLayer }: { stackLayer: StackLayer }) {
                         flashTarget?.ayah === ayah.number
                           ? flashTarget.wordPosition
                           : null
+                      }
+                      flashWordPositions={
+                        flashTarget?.ayah === ayah.number
+                          ? flashTarget.wordPositions
+                          : NO_SEARCH_FLASH_WORDS
                       }
                       searchFlashText={
                         flashTarget?.ayah === ayah.number

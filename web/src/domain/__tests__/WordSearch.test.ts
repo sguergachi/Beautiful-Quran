@@ -305,12 +305,22 @@ describe('matchWordSearch', () => {
 
   it('targets Fire from concept vocabulary but never the substring in firewood', () => {
     const verses = [
+      entry(32, 20, 1, 'عَذَابَ', 'the punishment'),
+      entry(32, 20, 2, 'ٱلنَّارِ', 'the Fire'),
       entry(90, 20, 1, 'عَلَيْهِمْ', 'Over them'),
       entry(90, 20, 2, 'نَارٌ', 'Fire'),
       entry(111, 4, 1, 'حَمَّالَةَ', 'the carrier'),
       entry(111, 4, 2, 'ٱلْحَطَبِ', 'of firewood'),
     ]
     const concepts = [
+      {
+        name: 'Punishments of Hell',
+        primaryTerms: ['hell punishment'],
+        secondaryTerms: ['fire punishment'],
+        category: 'Afterlife',
+        domain: 'Aqeedah',
+        ayahKeys: [32_020],
+      },
       {
         name: 'Description of Hellfire',
         primaryTerms: ['hellfire', 'blazing fire'],
@@ -336,12 +346,16 @@ describe('matchWordSearch', () => {
     }
 
     const hits = matchWordSearch(verses, 'hell', 400, concepts, new Map(), glossOnly)
+    const punishmentAndFire = hits.find((hit) => hit.surahId === 32)!
     const fire = hits.find((hit) => hit.surahId === 90)!
     const firewood = hits.find((hit) => hit.surahId === 111)!
 
+    expect(punishmentAndFire.targetPositions).toEqual([1, 2])
     expect(fire.position).toBe(2)
+    expect(fire.targetPositions).toEqual([2])
     expect(fire.translation).toBe('Fire')
     expect(firewood.position).toBe(0)
+    expect(firewood.targetPositions).toEqual([])
     expect(spellingCorrection(hits)).toBeNull()
     expect(
       englishTranslationHighlightSpans(
