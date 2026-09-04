@@ -114,6 +114,7 @@ fun matchWordSearch(
         val score: Int,
         val matchLabel: String? = null,
         val matchTerms: List<String> = emptyList(),
+        val correctedQuery: String? = null,
         val matchReason: String = "Text match",
     )
 
@@ -126,6 +127,7 @@ fun matchWordSearch(
         score: Int,
         label: String? = null,
         terms: List<String> = emptyList(),
+        correction: String? = null,
         reason: String = "Text match",
     ) {
         if (score <= 0) return
@@ -135,7 +137,16 @@ fun matchWordSearch(
         if (current == null || score > current.score ||
             (score == current.score && position > 0 && current.position == 0)
         ) {
-            ranked[key] = RankedHit(key, indexAt, position, score, label, terms, reason)
+            ranked[key] = RankedHit(
+                key,
+                indexAt,
+                position,
+                score,
+                label,
+                terms,
+                correction,
+                reason,
+            )
         }
     }
 
@@ -158,25 +169,23 @@ fun matchWordSearch(
                     searchTextRelevance(entry.transliterationLower, latin, allowFuzzy)
                 } else 0,
             )
+            val correction = if (allowFuzzy && score > 0) {
+                if (sources.arabic && arabic.isNotEmpty()) {
+                    fuzzyWordMatch(entry.arabicNorm, arabic)
+                } else {
+                    (if (sources.wordGloss) {
+                        fuzzyWordMatch(entry.translationLower, latin.text)
+                    } else null) ?: if (sources.transliteration) {
+                        fuzzyWordMatch(entry.transliterationLower, latin.text)
+                    } else null
+                }
+            } else null
             add(
                 i,
                 entry.position,
                 score,
-                terms = if (allowFuzzy && score > 0) {
-                    listOfNotNull(
-                        if (sources.arabic && arabic.isNotEmpty()) {
-                            fuzzyWordMatch(entry.arabicNorm, arabic)
-                        } else {
-                            (if (sources.wordGloss) {
-                                fuzzyWordMatch(entry.translationLower, latin.text)
-                            } else null) ?: if (sources.transliteration) {
-                                fuzzyWordMatch(entry.transliterationLower, latin.text)
-                            } else null
-                        },
-                    )
-                } else {
-                    emptyList()
-                },
+                terms = listOfNotNull(correction),
+                correction = correction,
                 reason = if (allowFuzzy) "Spelling match" else "Text match",
             )
             if (!parsed.exactOnly && score > 0 && entry.root.isNotEmpty()) matchedRoots += entry.root
@@ -210,27 +219,25 @@ fun matchWordSearch(
                     searchTextRelevance(sameAyahTransliterationLine(index, at), latin, allowFuzzy)
                 } else 0,
             )
+            val correction = if (allowFuzzy && score > 0) {
+                if (sources.arabic && arabic.isNotEmpty()) {
+                    fuzzyWordMatch(normalizeArabicForSearch(anchor.ayahText), arabic)
+                } else {
+                    (if (sources.verseTranslation) {
+                        fuzzyWordMatch(anchor.ayahTranslation.lowercase(), latin.text)
+                    } else null) ?: (if (sources.wordGloss) {
+                        fuzzyWordMatch(sameAyahGlossLine(index, at).lowercase(), latin.text)
+                    } else null) ?: if (sources.transliteration) {
+                        fuzzyWordMatch(sameAyahTransliterationLine(index, at).lowercase(), latin.text)
+                    } else null
+                }
+            } else null
             add(
                 at,
                 position = 0,
                 score = score,
-                terms = if (allowFuzzy && score > 0) {
-                    listOfNotNull(
-                        if (sources.arabic && arabic.isNotEmpty()) {
-                            fuzzyWordMatch(normalizeArabicForSearch(anchor.ayahText), arabic)
-                        } else {
-                            (if (sources.verseTranslation) {
-                                fuzzyWordMatch(anchor.ayahTranslation.lowercase(), latin.text)
-                            } else null) ?: (if (sources.wordGloss) {
-                                fuzzyWordMatch(sameAyahGlossLine(index, at).lowercase(), latin.text)
-                            } else null) ?: if (sources.transliteration) {
-                                fuzzyWordMatch(sameAyahTransliterationLine(index, at).lowercase(), latin.text)
-                            } else null
-                        },
-                    )
-                } else {
-                    emptyList()
-                },
+                terms = listOfNotNull(correction),
+                correction = correction,
                 reason = if (allowFuzzy) "Spelling match" else "Text match",
             )
             at = end
@@ -244,6 +251,7 @@ fun matchWordSearch(
             val bonus: Int,
             val label: String,
             val correction: String?,
+            val terms: List<String>,
         ) {
             val total: Int get() = best + bonus
         }
@@ -261,6 +269,7 @@ fun matchWordSearch(
             } else {
                 null
             }
+            val terms = conceptHighlightTerms(concept)
             val evidenceQuery = ParsedSearchQuery(correction ?: parsed.text, exactOnly = false)
             for (key in concept.ayahKeys) {
                 val hasVisibleEvidence = firstIndex[key]?.let { at ->
@@ -283,7 +292,7 @@ fun matchWordSearch(
                 }
                 val current = semantic[key]
                 semantic[key] = if (current == null) {
-                    SemanticRank(groundedScore, bonus = 0, concept.name, correction)
+                    SemanticRank(groundedScore, bonus = 0, concept.name, correction, terms)
                 } else {
                     SemanticRank(
                         best = maxOf(current.best, groundedScore),
@@ -291,6 +300,7 @@ fun matchWordSearch(
                             .coerceAtMost(250),
                         label = if (groundedScore > current.best) concept.name else current.label,
                         correction = if (groundedScore > current.best) correction else current.correction,
+                        terms = (current.terms + terms).distinctBy(String::lowercase),
                     )
                 }
             }
@@ -302,7 +312,8 @@ fun matchWordSearch(
                     position = 0,
                     score = match.total,
                     label = match.label,
-                    terms = listOfNotNull(match.correction),
+                    terms = listOfNotNull(match.correction) + match.terms,
+                    correction = match.correction,
                     reason = "Concept · ${match.label}",
                 )
             }
@@ -435,6 +446,7 @@ fun matchWordSearch(
             val base = (target ?: anchor).toHit().copy(
                 matchLabel = match.matchLabel,
                 matchTerms = match.matchTerms,
+                correctedQuery = match.correctedQuery,
                 matchReason = match.matchReason,
                 displayText = display.text,
                 displaySource = display.source,
@@ -466,11 +478,18 @@ fun fuzzyWordMatch(text: String, query: String): String? {
 fun fuzzyWordContains(text: String, query: String): Boolean = fuzzyWordMatch(text, query) != null
 
 /** Corrected vocabulary term shown only when spelling fallback won. */
-fun spellingCorrection(hits: Iterable<WordSearchHit>): String? = hits.firstNotNullOfOrNull { hit ->
-    hit.matchTerms.firstOrNull().takeIf {
-        hit.matchReason == "Spelling match" || hit.matchReason.startsWith("Concept ·")
-    }
-}
+fun spellingCorrection(hits: Iterable<WordSearchHit>): String? =
+    hits.firstNotNullOfOrNull(WordSearchHit::correctedQuery)
+
+/** Searchable concept vocabulary carried to the renderer as grounded highlight candidates. */
+private fun conceptHighlightTerms(concept: SearchConcept): List<String> =
+    sequenceOf(concept.name)
+        .plus(concept.primaryTerms)
+        .plus(concept.secondaryTerms)
+        .flatMap { alignmentWordPattern.findAll(it).map(MatchResult::value) }
+        .filter { it.length >= 3 && it.lowercase() !in highlightFillers }
+        .distinctBy(String::lowercase)
+        .toList()
 
 private fun isWithinOneEdit(text: String, start: Int, end: Int, query: String): Boolean {
     val wordLength = end - start
@@ -809,7 +828,7 @@ fun englishTranslationHighlightSpans(
     semanticTerms: List<String> = emptyList(),
 ): List<AyahTextSpan> {
     if (ayahTranslation.isEmpty()) return emptyList()
-    val needles = highlightNeedles(
+    val needles = highlightNeedleSpecs(
         ayahTranslation,
         query.trim(),
         wordGloss.trim(),
@@ -818,9 +837,10 @@ fun englishTranslationHighlightSpans(
     )
     val snippet = windowAroundMatch(
         text = ayahTranslation,
-        needle = needles.firstOrNull(),
+        needle = needles.firstOrNull()?.text,
         wordsBefore = SNIPPET_WORDS_BEFORE,
         wordsAfter = SNIPPET_WORDS_AFTER,
+        wholeWord = needles.firstOrNull()?.wholeWord == true,
     )
     return highlightAllOccurrences(snippet, needles)
 }
@@ -835,9 +855,10 @@ internal fun windowAroundMatch(
     needle: String?,
     wordsBefore: Int = SNIPPET_WORDS_BEFORE,
     wordsAfter: Int = SNIPPET_WORDS_AFTER,
+    wholeWord: Boolean = false,
 ): String {
     if (needle.isNullOrEmpty() || text.isEmpty()) return text
-    val matchStart = text.indexOf(needle, ignoreCase = true)
+    val matchStart = firstOccurrence(text, needle, wholeWord)
     if (matchStart < 0) return text
     val matchEnd = matchStart + needle.length
     val words = Regex("\\S+").findAll(text).toList()
@@ -866,24 +887,47 @@ internal fun highlightNeedles(
     wordGloss: String,
     semanticLabel: String = "",
     semanticTerms: List<String> = emptyList(),
-): List<String> {
-    val needles = linkedMapOf<String, String>()
-    fun add(text: String) {
+): List<String> = highlightNeedleSpecs(
+    haystack,
+    query,
+    wordGloss,
+    semanticLabel,
+    semanticTerms,
+).map(HighlightNeedle::text)
+
+private data class HighlightNeedle(val text: String, val wholeWord: Boolean)
+
+private fun highlightNeedleSpecs(
+    haystack: String,
+    query: String,
+    wordGloss: String,
+    semanticLabel: String,
+    semanticTerms: List<String>,
+): List<HighlightNeedle> {
+    val needles = linkedMapOf<String, HighlightNeedle>()
+    fun add(text: String, wholeWord: Boolean = true) {
         val term = text.trim()
-        if (term.isNotEmpty() && haystack.contains(term, ignoreCase = true)) {
-            needles.putIfAbsent(term.lowercase(), term)
+        if (term.isNotEmpty() && firstOccurrence(haystack, term, wholeWord) >= 0) {
+            needles.putIfAbsent(term.lowercase(), HighlightNeedle(term, wholeWord))
         }
     }
-    if (query.isNotEmpty() && haystack.contains(query, ignoreCase = true)) {
-        add(query)
-    }
+    add(query, wholeWord = false)
     val parsed = parseSearchQuery(query)
     val arabicQuery = normalizeArabicForSearch(query).isNotEmpty()
+    fun visibleTerm(term: String): String? {
+        if (firstOccurrence(haystack, term, wholeWord = true) >= 0) return term
+        val sourceWords = alignmentWordPattern.findAll(term).map(MatchResult::value).toList()
+        if (sourceWords.size != 1) return null
+        val form = alignmentForm(sourceWords.single().lowercase())
+        return alignmentWordPattern.findAll(haystack)
+            .firstOrNull { alignmentForm(it.value.lowercase()) == form }
+            ?.value
+    }
     fun presentTokens(text: String) = text
         .split(Regex("[\\s,;:]+"))
         .map { it.trim().trim('(', ')', '[', ']', '"', '\'') }
         .filter { it.length >= 3 }
-        .filter { haystack.contains(it, ignoreCase = true) }
+        .mapNotNull(::visibleTerm)
 
     val glossTokens = presentTokens(wordGloss).filterNot { it.lowercase() in highlightFillers }
     if (arabicQuery) {
@@ -893,11 +937,24 @@ internal fun highlightNeedles(
             .filter { searchTextRelevance(it, parsed) > 0 }
             .forEach(::add)
     }
-    semanticTerms.forEach(::add)
+    semanticTerms.flatMap(::presentTokens).forEach(::add)
     presentTokens(semanticLabel)
         .filterNot { it.lowercase() in highlightFillers }
         .forEach(::add)
     return needles.values.toList()
+}
+
+private fun firstOccurrence(text: String, term: String, wholeWord: Boolean, startIndex: Int = 0): Int {
+    var at = text.indexOf(term, startIndex, ignoreCase = true)
+    while (at >= 0) {
+        val end = at + term.length
+        if (!wholeWord ||
+            (at == 0 || !text[at - 1].isLetterOrDigit()) &&
+            (end == text.length || !text[end].isLetterOrDigit())
+        ) return at
+        at = text.indexOf(term, at + 1, ignoreCase = true)
+    }
+    return -1
 }
 
 private val highlightFillers = setOf(
@@ -916,14 +973,14 @@ private val translationOnlyAuxiliaries = setOf(
     "can", "could", "may", "might", "shall", "should", "will", "would",
 )
 
-private fun highlightAllOccurrences(text: String, needles: List<String>): List<AyahTextSpan> {
+private fun highlightAllOccurrences(text: String, needles: List<HighlightNeedle>): List<AyahTextSpan> {
     if (needles.isEmpty()) return listOf(AyahTextSpan(text, highlighted = false))
     val ranges = needles.flatMap { needle ->
         buildList {
-            var at = text.indexOf(needle, ignoreCase = true)
+            var at = firstOccurrence(text, needle.text, needle.wholeWord)
             while (at >= 0) {
-                add(at until at + needle.length)
-                at = text.indexOf(needle, at + needle.length, ignoreCase = true)
+                add(at until at + needle.text.length)
+                at = firstOccurrence(text, needle.text, needle.wholeWord, at + needle.text.length)
             }
         }
     }.sortedWith(compareBy<IntRange> { it.first }.thenByDescending { it.last })

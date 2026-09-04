@@ -299,8 +299,68 @@ describe('matchWordSearch', () => {
         hit!.translation,
         hit!.matchLabel ?? '',
         hit!.matchTerms,
-      ).some((span) => span.highlighted && span.text.toLowerCase() === 'heart'),
+      ).some((span) => span.highlighted && span.text.toLowerCase() === 'hearts'),
     ).toBe(true)
+  })
+
+  it('targets Fire from concept vocabulary but never the substring in firewood', () => {
+    const verses = [
+      entry(90, 20, 1, 'عَلَيْهِمْ', 'Over them'),
+      entry(90, 20, 2, 'نَارٌ', 'Fire'),
+      entry(111, 4, 1, 'حَمَّالَةَ', 'the carrier'),
+      entry(111, 4, 2, 'ٱلْحَطَبِ', 'of firewood'),
+    ]
+    const concepts = [
+      {
+        name: 'Description of Hellfire',
+        primaryTerms: ['hellfire', 'blazing fire'],
+        secondaryTerms: ['fire of hell'],
+        category: 'Afterlife',
+        domain: 'Aqeedah',
+        ayahKeys: [90_020],
+      },
+      {
+        name: 'People of the Fire',
+        primaryTerms: ['people of hell'],
+        secondaryTerms: ['dwellers of fire'],
+        category: 'Afterlife',
+        domain: 'Aqeedah',
+        ayahKeys: [111_004],
+      },
+    ]
+    const glossOnly = {
+      arabic: false,
+      wordGloss: true,
+      transliteration: false,
+      verseTranslation: false,
+    }
+
+    const hits = matchWordSearch(verses, 'hell', 400, concepts, new Map(), glossOnly)
+    const fire = hits.find((hit) => hit.surahId === 90)!
+    const firewood = hits.find((hit) => hit.surahId === 111)!
+
+    expect(fire.position).toBe(2)
+    expect(fire.translation).toBe('Fire')
+    expect(firewood.position).toBe(0)
+    expect(spellingCorrection(hits)).toBeNull()
+    expect(
+      englishTranslationHighlightSpans(
+        'The Fire will burn the carrier of firewood',
+        'hell',
+        '',
+        fire.matchLabel ?? '',
+        fire.matchTerms,
+      ).filter((span) => span.highlighted).map((span) => span.text),
+    ).toEqual(['Fire'])
+    expect(
+      englishTranslationHighlightSpans(
+        firewood.displayText!,
+        'hell',
+        '',
+        firewood.matchLabel ?? '',
+        firewood.matchTerms,
+      ).some((span) => span.highlighted),
+    ).toBe(false)
   })
 
   it('targets a nearby visible gloss for a translation-only auxiliary', () => {

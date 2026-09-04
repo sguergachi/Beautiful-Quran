@@ -18,6 +18,8 @@ data class WordSearchHit(
     val matchLabel: String? = null,
     /** Every visible Quran-vocabulary term that helped this result rank. */
     val matchTerms: List<String> = emptyList(),
+    /** Non-null only when last-resort spelling correction actually ran. */
+    val correctedQuery: String? = null,
     /** Quiet, user-facing explanation of why this result is relevant. */
     val matchReason: String = "Text match",
     /** Snippet copied from the reader-visible source selected for this search. */

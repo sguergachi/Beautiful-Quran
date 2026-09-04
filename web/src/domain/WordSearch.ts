@@ -41,6 +41,7 @@ export interface WordSearchHit {
   surahNameArabic: string
   matchLabel?: string | null
   matchTerms?: string[]
+  correctedQuery?: string | null
   matchReason?: string
   displayText?: string
   displaySource?: WordSearchDisplaySource
@@ -322,6 +323,7 @@ interface RankedHit {
   score: number
   matchLabel?: string
   matchTerms: string[]
+  correctedQuery: string | null
   matchReason: string
 }
 
@@ -364,6 +366,7 @@ function addRanked(
   matchLabel?: string,
   matchTerms: string[] = [],
   matchReason = 'Text match',
+  correctedQuery: string | null = null,
 ): void {
   if (score <= 0) return
   const entry = state.index[indexAt]!
@@ -381,6 +384,7 @@ function addRanked(
       score,
       matchLabel,
       matchTerms,
+      correctedQuery,
       matchReason,
     })
   }
@@ -427,6 +431,7 @@ function scanLexical(
       undefined,
       correction ? [correction] : [],
       allowFuzzy ? 'Spelling match' : 'Text match',
+      correction,
     )
     if (!state.parsed.exactOnly && score > 0 && entry.root) state.matchedRoots.add(entry.root)
     const key = entry.surahId * 1_000 + entry.ayahNumber
@@ -488,6 +493,7 @@ function scanAyahText(state: RankingState, allowFuzzy: boolean): void {
       undefined,
       correction ? [correction] : [],
       allowFuzzy ? 'Spelling match' : 'Text match',
+      correction,
     )
     at = end
   }
@@ -519,7 +525,7 @@ function scanConcepts(
   if (state.parsed.exactOnly) return
   const semantic = new Map<
     number,
-    { best: number; bonus: number; label: string; correction: string | null }
+    { best: number; bonus: number; label: string; correction: string | null; terms: string[] }
   >()
   for (const concept of concepts) {
     const score = conceptRelevance(concept, state.parsed, allowFuzzy)
@@ -529,6 +535,7 @@ function scanConcepts(
           .map((term) => fuzzyWordMatch(term.toLowerCase(), state.parsed.text.toLowerCase()))
           .find((term) => term != null) ?? null
       : null
+    const terms = conceptHighlightTerms(concept)
     const evidenceQuery = { text: correction ?? state.parsed.text, exactOnly: false }
     for (const key of concept.ayahKeys) {
       const indexAt = state.firstIndex.get(key)
@@ -548,7 +555,7 @@ function scanConcepts(
       semantic.set(
         key,
         current == null
-          ? { best: groundedScore, bonus: 0, label: concept.name, correction }
+          ? { best: groundedScore, bonus: 0, label: concept.name, correction, terms }
           : {
               best: Math.max(current.best, groundedScore),
               bonus: Math.min(
@@ -557,6 +564,7 @@ function scanConcepts(
               ),
               label: groundedScore > current.best ? concept.name : current.label,
               correction: groundedScore > current.best ? correction : current.correction,
+              terms: [...new Map([...current.terms, ...terms].map((term) => [term.toLowerCase(), term])).values()],
             },
       )
     }
@@ -570,8 +578,9 @@ function scanConcepts(
         0,
         match.best + match.bonus,
         match.label,
-        match.correction ? [match.correction] : [],
+        [...(match.correction ? [match.correction] : []), ...match.terms],
         `Concept · ${match.label}`,
+        match.correction,
       )
     }
   }
@@ -673,6 +682,7 @@ function finishRanking(state: RankingState, maxHits: number): WordSearchHit[] {
         ...toHit(anchor),
         matchLabel: match.matchLabel ?? null,
         matchTerms: match.matchTerms,
+        correctedQuery: match.correctedQuery,
         matchReason: match.matchReason,
       }
       const displayed = toHitWithDisplayTranslation(
@@ -702,6 +712,7 @@ function finishRanking(state: RankingState, maxHits: number): WordSearchHit[] {
         ...toHit(state.index[targetAt]!),
         matchLabel: match.matchLabel ?? null,
         matchTerms: match.matchTerms,
+        correctedQuery: match.correctedQuery,
         matchReason: match.matchReason,
         displayText: displayed.displayText,
         displaySource: displayed.displaySource,
@@ -730,14 +741,16 @@ export function fuzzyWordContains(text: string, query: string): boolean {
 /** Corrected vocabulary term shown only when spelling fallback won. */
 export function spellingCorrection(hits: Iterable<WordSearchHit>): string | null {
   for (const hit of hits) {
-    if (
-      hit.matchTerms?.[0] &&
-      (hit.matchReason === 'Spelling match' || hit.matchReason?.startsWith('Concept ·'))
-    ) {
-      return hit.matchTerms[0]
-    }
+    if (hit.correctedQuery) return hit.correctedQuery
   }
   return null
+}
+
+function conceptHighlightTerms(concept: SearchConcept): string[] {
+  const terms = [concept.name, ...concept.primaryTerms, ...concept.secondaryTerms]
+    .flatMap((text) => text.match(/[\p{L}\p{N}]+/gu) ?? [])
+    .filter((term) => term.length >= 3 && !HIGHLIGHT_FILLERS.has(term.toLowerCase()))
+  return [...new Map(terms.map((term) => [term.toLowerCase(), term])).values()]
 }
 
 function isWithinOneEdit(word: string, query: string): boolean {
@@ -1143,7 +1156,7 @@ export function englishTranslationHighlightSpans(
   semanticTerms: string[] = [],
 ): AyahTextSpan[] {
   if (!ayahTranslation) return []
-  const needles = highlightNeedles(
+  const needles = highlightNeedleSpecs(
     ayahTranslation,
     query.trim(),
     wordGloss.trim(),
@@ -1152,9 +1165,10 @@ export function englishTranslationHighlightSpans(
   )
   const snippet = windowAroundMatch(
     ayahTranslation,
-    needles[0] ?? null,
+    needles[0]?.text ?? null,
     SNIPPET_WORDS_BEFORE,
     SNIPPET_WORDS_AFTER,
+    needles[0]?.wholeWord ?? false,
   )
   return highlightAllOccurrences(snippet, needles)
 }
@@ -1168,9 +1182,10 @@ export function windowAroundMatch(
   needle: string | null,
   wordsBefore = SNIPPET_WORDS_BEFORE,
   wordsAfter = SNIPPET_WORDS_AFTER,
+  wholeWord = false,
 ): string {
   if (!needle || !text) return text
-  const matchStart = text.toLowerCase().indexOf(needle.toLowerCase())
+  const matchStart = firstOccurrence(text, needle, wholeWord)
   if (matchStart < 0) return text
   const matchEnd = matchStart + needle.length
   const words = [...text.matchAll(/\S+/g)]
@@ -1204,42 +1219,78 @@ export function highlightNeedles(
   semanticLabel = '',
   semanticTerms: string[] = [],
 ): string[] {
-  const lowerHaystack = haystack.toLowerCase()
-  const needles = new Map<string, string>()
-  const add = (text: string): void => {
+  return highlightNeedleSpecs(haystack, query, wordGloss, semanticLabel, semanticTerms)
+    .map(({ text }) => text)
+}
+
+interface HighlightNeedle {
+  text: string
+  wholeWord: boolean
+}
+
+function highlightNeedleSpecs(
+  haystack: string,
+  query: string,
+  wordGloss: string,
+  semanticLabel: string,
+  semanticTerms: string[],
+): HighlightNeedle[] {
+  const needles = new Map<string, HighlightNeedle>()
+  const add = (text: string, wholeWord = true): void => {
     const term = text.trim()
-    if (term && lowerHaystack.includes(term.toLowerCase())) {
-      if (!needles.has(term.toLowerCase())) needles.set(term.toLowerCase(), term)
+    if (term && firstOccurrence(haystack, term, wholeWord) >= 0) {
+      if (!needles.has(term.toLowerCase())) needles.set(term.toLowerCase(), { text: term, wholeWord })
     }
   }
-  if (query && lowerHaystack.includes(query.toLowerCase())) {
-    add(query)
-  }
+  add(query, false)
   const parsed = parseSearchQuery(query)
   const arabicQuery = Boolean(normalizeArabicForSearch(query))
+  const visibleTerm = (term: string): string | null => {
+    if (firstOccurrence(haystack, term, true) >= 0) return term
+    const sourceWords = term.match(/[\p{L}\p{N}]+/gu) ?? []
+    if (sourceWords.length !== 1) return null
+    const form = alignmentForm(sourceWords[0]!.toLowerCase())
+    return (haystack.match(/[\p{L}\p{N}]+/gu) ?? [])
+      .find((word) => alignmentForm(word.toLowerCase()) === form) ?? null
+  }
   const presentTokens = (text: string): string[] =>
     text
       .split(/[\s,;:]+/)
       .map((token) => token.trim().replace(/^[([{"']+|[)\]}"']+$/g, ''))
       .filter(
-        (token) =>
-          token.length >= 3 && lowerHaystack.includes(token.toLowerCase()),
+        (token) => token.length >= 3,
       )
+      .map(visibleTerm)
+      .filter((term): term is string => term != null)
 
   const glossTokens = presentTokens(wordGloss)
     .filter((token) => !HIGHLIGHT_FILLERS.has(token.toLowerCase()))
   if (arabicQuery) {
-    glossTokens.forEach(add)
+    glossTokens.forEach((term) => add(term))
   } else {
     glossTokens
       .filter((token) => searchTextRelevance(token, parsed) > 0)
-      .forEach(add)
+      .forEach((term) => add(term))
   }
-  semanticTerms.forEach(add)
+  semanticTerms.flatMap(presentTokens).forEach((term) => add(term))
   presentTokens(semanticLabel)
     .filter((token) => !HIGHLIGHT_FILLERS.has(token.toLowerCase()))
-    .forEach(add)
+    .forEach((term) => add(term))
   return [...needles.values()]
+}
+
+function firstOccurrence(text: string, term: string, wholeWord: boolean, startAt = 0): number {
+  const lowerText = text.toLowerCase()
+  const lowerTerm = term.toLowerCase()
+  let at = lowerText.indexOf(lowerTerm, startAt)
+  while (at >= 0) {
+    const end = at + term.length
+    const before = at > 0 ? text[at - 1]! : ''
+    const after = end < text.length ? text[end]! : ''
+    if (!wholeWord || (!/[\p{L}\p{N}]/u.test(before) && !/[\p{L}\p{N}]/u.test(after))) return at
+    at = lowerText.indexOf(lowerTerm, at + 1)
+  }
+  return -1
 }
 
 /** Backward-compatible first visible term for focused callers. */
@@ -1270,16 +1321,14 @@ const TRANSLATION_ONLY_AUXILIARIES = new Set([
   'can', 'could', 'may', 'might', 'shall', 'should', 'will', 'would',
 ])
 
-function highlightAllOccurrences(text: string, needles: string[]): AyahTextSpan[] {
+function highlightAllOccurrences(text: string, needles: HighlightNeedle[]): AyahTextSpan[] {
   if (needles.length === 0) return [{ text, highlighted: false }]
-  const lowerText = text.toLowerCase()
   const ranges: { start: number; end: number }[] = []
   for (const needle of needles) {
-    const lowerNeedle = needle.toLowerCase()
-    let at = lowerText.indexOf(lowerNeedle)
+    let at = firstOccurrence(text, needle.text, needle.wholeWord)
     while (at >= 0) {
-      ranges.push({ start: at, end: at + needle.length })
-      at = lowerText.indexOf(lowerNeedle, at + needle.length)
+      ranges.push({ start: at, end: at + needle.text.length })
+      at = firstOccurrence(text, needle.text, needle.wholeWord, at + needle.text.length)
     }
   }
   ranges.sort((a, b) => a.start - b.start || b.end - a.end)

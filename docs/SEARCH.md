@@ -51,13 +51,17 @@ Scroll gloss results. When visible, they wipe the exact canonical-translation
 term.
 Result snippets color every visible term that helped the result rank: the typed
 text, thesaurus terms such as `peace` and `tranquility`, query-related word
-glosses, and non-filler words from a matched concept label. Overlapping terms
-resolve to the longest precise phrase, and connective words remain ordinary
-ink. If the canonical translation contains none of those, the result stays
-unaccented (or uses the word-gloss line) rather than coloring a merely similar
-or unrelated word. The gloss fallback coalesces adjacent copies of a shared
-multi-word gloss, matching the reader's English prose instead of showing the
-source phrase once per Arabic word.
+glosses, and non-filler words from the matched concept's label and vocabulary.
+That vocabulary also grounds navigation, so `hell` can resolve a Hellfire
+concept's visible `Fire` gloss and pulse that same word in the reader. Derived
+and concept terms require whole-word or inflection matches: `fire` never colors
+or targets the substring in `firewood`. Only the user's typed text retains
+prefix matching. Overlapping terms resolve to the longest precise phrase, and
+connective words remain ordinary ink. If the selected English source contains
+none of those, the result stays unaccented rather than promising a highlight
+the reader cannot locate. The gloss fallback coalesces adjacent copies of a
+shared multi-word gloss, matching the reader's English prose instead of showing
+the source phrase once per Arabic word.
 
 Clearing a search keeps the field focused and the keyboard available for the
 next query. Back/Escape remains the explicit focus-dismiss action.

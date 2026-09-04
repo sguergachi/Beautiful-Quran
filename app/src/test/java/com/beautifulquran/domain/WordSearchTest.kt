@@ -193,7 +193,7 @@ class WordSearchTest {
         assertTrue(hits.all { it.matchReason == "Concept · Divine Mercy" })
         assertEquals(null, spellingCorrection(hits))
         val corrected = matchWordSearch(index, "clemncy", concepts = listOf(concept))
-        assertTrue(corrected.all { it.matchTerms == listOf("clemency") })
+        assertTrue(corrected.all { it.matchTerms.firstOrNull() == "clemency" })
         assertEquals("clemency", spellingCorrection(corrected))
         val corruption = concept.copy(
             name = "Prohibition of Corruption on Earth",
@@ -326,7 +326,69 @@ class WordSearchTest {
                 hit.translation,
                 hit.matchLabel.orEmpty(),
                 hit.matchTerms,
-            ).any { it.highlighted && it.text.equals("heart", ignoreCase = true) },
+            ).any { it.highlighted && it.text.equals("hearts", ignoreCase = true) },
+        )
+    }
+
+    @Test
+    fun `concept vocabulary targets Fire but never the substring in firewood`() {
+        val verses = listOf(
+            entry(90, 20, 1, "عَلَيْهِمْ", "Over them"),
+            entry(90, 20, 2, "نَارٌ", "Fire"),
+            entry(111, 4, 1, "حَمَّالَةَ", "the carrier"),
+            entry(111, 4, 2, "ٱلْحَطَبِ", "of firewood"),
+        )
+        val concepts = listOf(
+            SearchConcept(
+                "Description of Hellfire",
+                listOf("hellfire", "blazing fire"),
+                listOf("fire of hell"),
+                "Afterlife",
+                "Aqeedah",
+                intArrayOf(90_020),
+            ),
+            SearchConcept(
+                "People of the Fire",
+                listOf("people of hell"),
+                listOf("dwellers of fire"),
+                "Afterlife",
+                "Aqeedah",
+                intArrayOf(111_004),
+            ),
+        )
+        val glossOnly = WordSearchSources(
+            arabic = false,
+            wordGloss = true,
+            transliteration = false,
+            verseTranslation = false,
+        )
+
+        val hits = matchWordSearch(verses, "hell", concepts = concepts, sources = glossOnly)
+        val fire = hits.single { it.surahId == 90 }
+        val firewood = hits.single { it.surahId == 111 }
+
+        assertEquals(2, fire.position)
+        assertEquals("Fire", fire.translation)
+        assertEquals(0, firewood.position)
+        assertEquals(null, spellingCorrection(hits))
+        assertEquals(
+            listOf("Fire"),
+            englishTranslationHighlightSpans(
+                "The Fire will burn the carrier of firewood",
+                "hell",
+                "",
+                fire.matchLabel.orEmpty(),
+                fire.matchTerms,
+            ).filter(AyahTextSpan::highlighted).map(AyahTextSpan::text),
+        )
+        assertTrue(
+            englishTranslationHighlightSpans(
+                firewood.displayText,
+                "hell",
+                "",
+                firewood.matchLabel.orEmpty(),
+                firewood.matchTerms,
+            ).none(AyahTextSpan::highlighted),
         )
     }
 
