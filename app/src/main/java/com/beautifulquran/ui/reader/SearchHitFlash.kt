@@ -1,36 +1,36 @@
 package com.beautifulquran.ui.reader
 
-import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.CubicBezierEasing
 
 /**
- * Timing for the cover-sheet search-hit locator: one uninterrupted loop of
- * narrow directional orange wipes.
+ * Timing for the cover-sheet search-hit locator: the complete orange word
+ * softly inhales and exhales through opacity.
  */
 object SearchHitFlash {
     /** Pause after the initial ayah focus so the word is on-screen first. */
     const val START_DELAY_MS = 140L
 
-    const val SWEEP_MS = 720
-    const val WIPES = 4
-    /** Orange window width and its soft leading/trailing edges. */
-    const val BAND_FRACTION = 0.72f
-    const val EDGE_SHARE = 0.24f
+    const val INHALE_MS = 320
+    const val CREST_MS = 70L
+    const val EXHALE_MS = 420
+    const val REST_MS = 60L
+    const val BREATHS = 4
     /** The rest of the chapter yields just enough to make every target legible. */
     const val BACKGROUND_ALPHA = 0.4f
     const val FOCUS_FADE_MS = 280
 
-    /** Constant velocity keeps one pass flowing directly into the next. */
-    val EASING = LinearEasing
+    /** Sine-like ease-in-out makes each full-word breath expand and release softly. */
+    val EASING = CubicBezierEasing(0.45f, 0f, 0.55f, 1f)
 
     /** Tight glyph-following spread that makes the orange fill read heavier. */
     const val EMPHASIS_GLOW_ALPHA = 0.92f
     const val EMPHASIS_GLOW_RADIUS = 1.2f
 
-    /** One visible side wipe. */
-    fun wipeMs(): Long = SWEEP_MS.toLong()
+    /** One complete inhale, crest, and exhale. */
+    fun breathMs(): Long = INHALE_MS + CREST_MS + EXHALE_MS
 
     /** Total animation time after [START_DELAY_MS]. */
-    fun totalMs(): Long = WIPES * wipeMs()
+    fun totalMs(): Long = BREATHS * breathMs() + (BREATHS - 1) * REST_MS
 
     /** The scrolling reader and Mushaf have different focus authorities. */
     internal fun isTargetSettled(

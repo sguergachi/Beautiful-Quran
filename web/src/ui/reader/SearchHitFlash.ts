@@ -1,21 +1,23 @@
 /** Timing for the reader's orange search-hit wash; mirrors Android. */
 export const SearchHitFlash = {
   START_DELAY_MS: 140,
-  SWEEP_MS: 720,
-  WIPES: 4,
-  BAND_FRACTION: 0.72,
-  EDGE_SHARE: 0.24,
+  INHALE_MS: 320,
+  CREST_MS: 70,
+  EXHALE_MS: 420,
+  REST_MS: 60,
+  BREATHS: 4,
   BACKGROUND_ALPHA: 0.4,
   FOCUS_FADE_MS: 280,
-  EASING: [0, 0, 1, 1] as const,
+  EASING: [0.45, 0, 0.55, 1] as const,
 } as const
 
-export function searchHitWipeMs(): number {
-  return SearchHitFlash.SWEEP_MS
+export function searchHitBreathMs(): number {
+  return SearchHitFlash.INHALE_MS + SearchHitFlash.CREST_MS + SearchHitFlash.EXHALE_MS
 }
 
 export function searchHitFlashTotalMs(): number {
-  return SearchHitFlash.WIPES * searchHitWipeMs()
+  return SearchHitFlash.BREATHS * searchHitBreathMs() +
+    (SearchHitFlash.BREATHS - 1) * SearchHitFlash.REST_MS
 }
 
 /** Exact text ranges for a translator-only hit; prefix matches own the full word. */

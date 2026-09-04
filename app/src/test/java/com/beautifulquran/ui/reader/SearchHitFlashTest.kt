@@ -8,13 +8,12 @@ import org.junit.Test
 class SearchHitFlashTest {
 
     @Test
-    fun `four complete traveling wipes form one continuous loop`() {
-        assertEquals(4, SearchHitFlash.WIPES)
-        assertEquals(720L, SearchHitFlash.wipeMs())
-        assertEquals(2_880L, SearchHitFlash.totalMs())
-        assertTrue(SearchHitFlash.BAND_FRACTION in 0.6f..0.8f)
-        assertTrue(SearchHitFlash.EDGE_SHARE in 0.15f..0.3f)
-        assertTrue(SearchHitFlash.totalMs() < 3_000L)
+    fun `four complete full-word breaths fade in and out`() {
+        assertEquals(4, SearchHitFlash.BREATHS)
+        assertEquals(810L, SearchHitFlash.breathMs())
+        assertEquals(3_420L, SearchHitFlash.totalMs())
+        assertTrue(SearchHitFlash.INHALE_MS < SearchHitFlash.EXHALE_MS)
+        assertTrue(SearchHitFlash.totalMs() < 3_500L)
     }
 
     @Test

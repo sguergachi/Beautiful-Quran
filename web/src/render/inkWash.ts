@@ -15,7 +15,6 @@ import { animate, type AnimationPlaybackControls } from 'motion'
 import {
   cubicBezierEase,
   paperCoverMaskImage,
-  travelingWipeMaskImage,
   washMaskImage,
 } from '../ui/theme/Fade'
 import { getTuning, glintResonance } from '../ui/reader/InkEngine'
@@ -26,7 +25,6 @@ const WASH_STEPS = 48
 
 const washMaskCache = new Map<string, string>()
 const paperMaskCache = new Map<string, string>()
-const travelingWipeMaskCache = new Map<string, string>()
 
 function quantizeProgress(p: number): number {
   if (p >= 1) return 1
@@ -74,21 +72,6 @@ export function cachedPaperCoverMask(
   if (mask == null) {
     mask = paperCoverMaskImage(q, restingAlpha, rtl, feather)
     paperMaskCache.set(key, mask)
-  }
-  return mask
-}
-
-function cachedTravelingWipeMask(
-  progress: number,
-  bandFraction: number,
-  edgeShare: number,
-): string {
-  const q = quantizeProgress(progress)
-  const key = `${q}|${bandFraction}|${edgeShare}`
-  let mask = travelingWipeMaskCache.get(key)
-  if (mask == null) {
-    mask = travelingWipeMaskImage(q, bandFraction, edgeShare)
-    travelingWipeMaskCache.set(key, mask)
   }
   return mask
 }
@@ -537,18 +520,18 @@ export function runGlintFadeOut(
 }
 
 /**
- * Search-hit locator: a soft orange window repeatedly travels left-to-right.
+ * Search-hit locator: the complete orange word softly fades in and out.
  * Callers pass a dedicated orange overlay (same classes as the karaoke repeat
- * layer) so the mask sizes to the glyphs. Every cycle starts wholly outside
- * the left edge and ends wholly outside the right before the next one begins.
+ * layer), so opacity can breathe without changing the measured text.
  */
 export function runSearchHitWash(
   el: HTMLElement,
   timing: {
-    WIPES: number
-    SWEEP_MS: number
-    BAND_FRACTION: number
-    EDGE_SHARE: number
+    BREATHS: number
+    INHALE_MS: number
+    CREST_MS: number
+    EXHALE_MS: number
+    REST_MS: number
     EASING: CubicBezierEase
   },
   onDone?: () => void,
@@ -567,35 +550,46 @@ export function runSearchHitWash(
     clearRepeatWashProgress(el)
   }
 
-  const wipe = (remaining: number) => {
-    el.style.opacity = '1'
-    applyMask(
-      el,
-      cachedTravelingWipeMask(0, timing.BAND_FRACTION, timing.EDGE_SHARE),
-    )
+  let waitTimer: ReturnType<typeof setTimeout> | null = null
+  const wait = (durationMs: number, next: () => void) => {
+    waitTimer = setTimeout(() => {
+      waitTimer = null
+      if (!cancelled) next()
+    }, durationMs)
+  }
+  const fade = (from: number, to: number, durationMs: number, next: () => void) => {
+    el.style.opacity = String(from)
     cancelCurrent = runWash(
-      timing.SWEEP_MS,
+      durationMs,
       timing.EASING,
       cubicBezierEase,
-      (_p, eased) => applyMask(
-        el,
-        cachedTravelingWipeMask(eased, timing.BAND_FRACTION, timing.EDGE_SHARE),
-      ),
+      (_p, eased) => { el.style.opacity = String(from + (to - from) * eased) },
       () => {
-        if (cancelled) return
-        if (remaining > 1) wipe(remaining - 1)
-        else {
-          finish()
-          onDone?.()
-        }
+        el.style.opacity = String(to)
+        if (!cancelled) next()
       },
     )
   }
+  const breathe = (remaining: number) => {
+    fade(0, 1, timing.INHALE_MS, () => {
+      wait(timing.CREST_MS, () => {
+        fade(1, 0, timing.EXHALE_MS, () => {
+          if (remaining > 1) wait(timing.REST_MS, () => breathe(remaining - 1))
+          else {
+            finish()
+            onDone?.()
+          }
+        })
+      })
+    })
+  }
 
-  wipe(timing.WIPES)
+  applyMask(el, 'none')
+  breathe(timing.BREATHS)
 
   return () => {
     cancelled = true
+    if (waitTimer != null) clearTimeout(waitTimer)
     cancelCurrent?.()
     finish()
   }

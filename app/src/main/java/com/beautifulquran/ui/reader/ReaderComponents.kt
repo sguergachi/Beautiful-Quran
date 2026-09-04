@@ -148,7 +148,6 @@ import com.beautifulquran.ui.theme.ornament.generateChapterOrnament
 import com.beautifulquran.ui.theme.quietClickable
 import com.beautifulquran.ui.theme.shapedWordBloom
 import com.beautifulquran.ui.theme.inkSmootherstep
-import com.beautifulquran.ui.theme.travelingInkWipe
 import com.beautifulquran.ui.theme.verticalFadingEdges
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.StateFlow
@@ -490,8 +489,7 @@ private fun rememberRepeatWash(
 }
 
 /**
- * One-shot search-hit locator: five distinct directional orange washes.
- * Independent of karaoke
+ * One-shot search-hit locator: four full-word orange breaths. Independent of karaoke
  * `ink.repeat` so a real repeat chain is never cancelled or restarted.
  * [identity] restarts it when search moves directly to another word.
  */
@@ -506,15 +504,20 @@ internal fun rememberSearchHitWash(identity: Int?): RepeatWash {
             alpha.snapTo(0f)
             return@LaunchedEffect
         }
-        alpha.snapTo(1f)
-        repeat(SearchHitFlash.WIPES) {
-            progress.snapTo(0f)
-            progress.animateTo(
-                1f,
-                tween(SearchHitFlash.SWEEP_MS, easing = SearchHitFlash.EASING),
-            )
-        }
+        progress.snapTo(1f)
         alpha.snapTo(0f)
+        repeat(SearchHitFlash.BREATHS) { breath ->
+            alpha.animateTo(
+                1f,
+                tween(SearchHitFlash.INHALE_MS, easing = SearchHitFlash.EASING),
+            )
+            delay(SearchHitFlash.CREST_MS)
+            alpha.animateTo(
+                0f,
+                tween(SearchHitFlash.EXHALE_MS, easing = SearchHitFlash.EASING),
+            )
+            if (breath < SearchHitFlash.BREATHS - 1) delay(SearchHitFlash.REST_MS)
+        }
     }
     return RepeatWash(
         progress = progress.asState(),
@@ -589,11 +592,6 @@ private fun Modifier.repeatInkLayer(
 
 private fun Modifier.searchHitInkLayer(wash: RepeatWash): Modifier =
     glyphLayerAlpha { wash.alpha.value }
-        .travelingInkWipe(
-            progress = { wash.progress.value },
-            bandFraction = SearchHitFlash.BAND_FRACTION,
-            edgeShare = SearchHitFlash.EDGE_SHARE,
-        )
 
 /**
  * Progress + optional feather locked for one word's letter sweep. [feather]
@@ -1795,24 +1793,21 @@ internal fun buildShapedBlooms(
         waslInk = waslInk,
         baseReveal = baseReveal,
     )
-    // Home search-hit flash: same ColorReveal wash as the orange repeat
-    // bloom — directional mask + dissolve, with a tight glyph-shaped spread
-    // that reads as heavier ink without reshaping or moving the base text.
+    // Home search-hit flash: the complete glyph-shaped orange word breathes
+    // through opacity without reshaping or moving the base text.
     if (searchHitWash.alpha.value > 0f) {
         words.forEachIndexed { index, word ->
             val range = rendered.wordRanges.getOrNull(index)
             if (word.position !in flashWordPositions || range == null) return@forEachIndexed
             blooms += ShapedWordBloom.ColorReveal(
                 range = range,
-                progress = searchHitWash.progress.value,
+                progress = 1f,
                 color = palette.repeatInkColor,
                 restingAlpha = 0f,
                 layerAlpha = searchHitWash.alpha.value,
                 colorAlpha = InkEngine.tuning.repeatInkAlpha,
                 glowAlpha = SearchHitFlash.EMPHASIS_GLOW_ALPHA,
                 glowRadius = SearchHitFlash.EMPHASIS_GLOW_RADIUS,
-                travelingBandFraction = SearchHitFlash.BAND_FRACTION,
-                travelingEdgeShare = SearchHitFlash.EDGE_SHARE,
             )
         }
     }
@@ -2991,14 +2986,12 @@ fun AyahBlock(
                                     translationFlashRanges.map { range ->
                                         ShapedWordBloom.ColorReveal(
                                             range = range,
-                                            progress = searchHitWash.progress.value,
+                                            progress = 1f,
                                             color = searchInk,
                                             layerAlpha = searchHitWash.alpha.value,
                                             colorAlpha = InkEngine.tuning.repeatInkAlpha,
                                             glowAlpha = SearchHitFlash.EMPHASIS_GLOW_ALPHA,
                                             glowRadius = SearchHitFlash.EMPHASIS_GLOW_RADIUS,
-                                            travelingBandFraction = SearchHitFlash.BAND_FRACTION,
-                                            travelingEdgeShare = SearchHitFlash.EDGE_SHARE,
                                         )
                                     }
                                 }

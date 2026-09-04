@@ -82,14 +82,13 @@ UI. A quiet, regular-weight line above the Quran count says
 or thesaurus results never show an autocorrection notice.
 
 Opening a positioned hit waits until the reader sheet and its target have both
-settled, then loops the same soft orange window across every grounded word in
+settled, then breathes the same soft orange fill across every grounded word in
 the ayah. For example, a Hell concept result whose visible evidence is
 `punishment` and `Fire` carries both word positions into the reader rather than
-discarding all but the first. Each window travels from outside the word's left edge,
-across every letter, and fully out through its right edge before starting again.
-Each cycle is one continuous enter → cross → exit motion rather than an
-accumulating fill or a whole-word pulse. While it runs, all non-target chapter
-text eases down to 40% strength and fades back to full when the wipe ends;
+discarding all but the first. Every highlighted word fades in as one complete
+orange shape, briefly crests, fades fully out, then repeats. While it runs, all
+non-target chapter text eases down to 40% strength and fades back to full when
+the breathing locator ends;
 Arabic uses a paper cover rather than glyph alpha, so marks stay clean and
 every orange target remains full-strength. The
 scrolling layout waits for its
