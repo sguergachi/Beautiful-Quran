@@ -407,16 +407,24 @@ paragraph too big for the foot of a page does.
    eye takes in. A phone shows one leaf. A closing page of five lines is four
    fifths of a blank screen, and reads as a fault however correct it is.
 
-   So `englishBalanceChapterTail` *divides* rather than fills: when a chapter's
-   tail comes out under `ENGLISH_LEAF_TAIL_SHARE` of a full leaf, it walks the
-   page before it down a line at a time and keeps the evenest split — the one
-   where the two differ least. Ya-Sin ended on **two** lines, then five when a
-   floor was the whole rule, and is **15 and 14** now.
+   So `englishBalanceChapterTail` runs the page *before* it short and gives the
+   ending the lines. How short is the whole question, and both extremes were
+   tried and were wrong: stopping at a fixed floor of five lines left Ya-Sin
+   ending 22 and 5, still four fifths of a blank screen; dividing the two evenly
+   left Maryam ending 12 and 12, two half-empty leaves in a row — a worse fault
+   than the one it replaced, because it spends a *full* page to fix a short one.
 
-   Over the book: 91 chapters run to more than one leaf, **35 are divided** —
-   Al-Baqarah 23/6 to 15/14, An-Naml 22/**1** to 13/12 — the shortest ending in
-   the Qur'an is now eight lines, and none is under a third of a leaf. It is the
-   one place in this book where filling a page is the wrong thing to do.
+   So: **the least movement that gets the ending to two fifths of a leaf**
+   (`ENGLISH_LEAF_TAIL_SHARE` of `ENGLISH_LEAF_TAIL_OF`). One page stays nearly
+   full, the ending gets enough paper to read as an ending, and no chapter costs
+   two pages to close. Ya-Sin and Maryam both end 19 and 8 where they ended 22
+   and 5.
+
+   Over the book: 91 chapters run to more than one leaf and **37 are adjusted**
+   — Al-A'raf 22/**1** to 15/8, Al-Baqarah 22/4 to 18/8. The shortest chapter
+   ending in the Qur'an is seven lines, and there is no chapter anywhere whose
+   last two pages are *both* under three fifths of a leaf. It is the one place
+   in this book where filling a page is the wrong thing to do.
 4. **Widows and orphans move the break, and nothing else does.**
 
 What is *not* on that list is the sentence. This leaf briefly refused to cut a

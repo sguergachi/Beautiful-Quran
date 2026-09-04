@@ -1,6 +1,5 @@
 package com.beautifulquran.domain
 
-import kotlin.math.abs
 
 /*
  * The English book's leaves.
@@ -468,26 +467,33 @@ fun EnglishLeafRuler.fill(page: Int, runs: List<EnglishVerseRun>): EnglishLeafFi
 class EnglishLeafFill(val lines: Int, val cut: EnglishRulerCut?)
 
 /**
- * When a chapter's last two leaves are divided instead of filled, and how far.
+ * How short a chapter's last leaf may be before its neighbour gives it lines,
+ * and how many it must reach — both as fifths of a full leaf.
  *
  * Every page in this book fills but the last of a chapter, and that one is not
  * free to be any length. A printed book gets away with a very short closing
  * page because you see it beside a full one — a codex shows a spread, and the
  * white is half of what the eye takes in. A phone shows one leaf, so a closing
- * page of five lines is four fifths of a blank screen, and reads as a fault
- * however correct it is.
+ * page of two lines reads as a fault however correct it is.
  *
- * So when a chapter's tail comes out under [ENGLISH_LEAF_TAIL_SHARE] of a full
- * leaf, its last two are *divided* rather than filled: run the page before it
- * short until the two are as near equal as the lines allow. Ya-Sin's ending was
- * two lines, then five when the floor alone was the rule, and is thirteen and
- * fourteen now.
+ * The remedy is to run the page before it short, and the question is *how*
+ * short. Both extremes have been tried and both were wrong:
  *
- * [ENGLISH_LEAF_MIN_TAIL_LINES] stays as the floor beneath that, for the
- * chapters whose last two leaves cannot be divided evenly at all.
+ * - Stopping at a fixed floor of five lines left Ya-Sin ending 22 and 5, which
+ *   is still four fifths of a blank screen.
+ * - Dividing the two evenly left Maryam ending 12 and 12 — two half-empty
+ *   leaves in a row, which is a worse thing than the one it replaced, because
+ *   it spends a *full* page to fix a short one.
+ *
+ * So: the least movement that gets the tail to two fifths of a leaf. One page
+ * stays nearly full, the ending gets enough paper to read as an ending, and no
+ * chapter costs two pages to close.
  */
-const val ENGLISH_LEAF_TAIL_SHARE = 3
+const val ENGLISH_LEAF_TAIL_SHARE = 2
 
+const val ENGLISH_LEAF_TAIL_OF = 5
+
+/** Never fewer than this, whatever a leaf's own line count works out to. */
 const val ENGLISH_LEAF_MIN_TAIL_LINES = 5
 
 /**
@@ -708,17 +714,15 @@ private fun englishBalanceChapterTail(
     val tailLines = ruler.fill(order[tailStart[0]][2], out.last()).lines
     val before = starts[starts.size - 2]
     val beforeLines = ruler.fill(order[before[0]][2], out[out.size - 2]).lines
+    // What a closing page has to reach: two fifths of a full one.
+    val want = maxOf(
+        ENGLISH_LEAF_MIN_TAIL_LINES,
+        beforeLines * ENGLISH_LEAF_TAIL_SHARE / ENGLISH_LEAF_TAIL_OF,
+    )
     // A chapter that ends comfortably is left alone. Only an ending that reads
     // as a blank screen is worth taking a full page apart for.
-    if (tailLines * ENGLISH_LEAF_TAIL_SHARE >= beforeLines) return
-
-    // Every line taken off the fuller page is a line the shorter one gains, so
-    // walk the page before it down and keep the evenest division — the split
-    // where the two leaves differ least.
-    var bestRuns: List<EnglishVerseRun>? = null
-    var bestRest: List<EnglishVerseRun>? = null
-    var bestGap = beforeLines - tailLines
-    for (lines in beforeLines - 1 downTo ENGLISH_LEAF_MIN_TAIL_LINES) {
+    if (tailLines >= want) return
+    for (lines in beforeLines - 1 downTo want) {
         val (runs, runLines) = englishLeafAt(order, text, ruler, before[0], before[1], lines)
         val last = runs.last()
         val whole = text(last.surahId, last.ayah)
@@ -733,18 +737,12 @@ private fun englishBalanceChapterTail(
         val restDone = restLast.to >= text(restLast.surahId, restLast.ayah).length
         val ends = nextAt + rest.size >= order.size || order[nextAt + rest.size][1] == 1
         if (!restDone || !ends) continue
-        if (restLines < ENGLISH_LEAF_MIN_TAIL_LINES) continue
-        val gap = abs(runLines - restLines)
-        if (gap >= bestGap) {
-            // Past the even split: the tail is the fuller page now, and every
-            // further line makes it worse.
-            if (bestRuns != null) break else continue
-        }
-        bestGap = gap
-        bestRuns = runs
-        bestRest = rest
+        // The first split that gets the ending its paper is the least paper
+        // taken from the page before it: walking further only empties that one
+        // to fill this, which is how two half pages in a row happen.
+        if (restLines < want || runLines < want) continue
+        out[out.size - 2] = runs
+        out[out.size - 1] = rest
+        return
     }
-    val runs = bestRuns ?: return
-    out[out.size - 2] = runs
-    out[out.size - 1] = bestRest ?: return
 }
