@@ -678,6 +678,31 @@ Ten consecutive leaves after: every one of them 22 lines with the foot beneath
 it and no unused line, the last line averaging 0.92 of a median line and six of
 the ten within five percent of a full one.
 
+**And the cut is searched for, not inferred.** Say what it is first: *the
+largest prefix of the offer whose leaf, as the book draws it, sets no more lines
+than the well holds.* Every version before this read an offset off the
+candidate — the offer laid out whole — and trusted the leaf to break its lines
+in the same places. Mostly it does. Where it does not, the cut lands a word or
+two inside the last line and the page shows the room, and no amount of patching
+that trust made it safe.
+
+So it is gone. The leaf is drawn, measured, and the answer bisected for over the
+offer's word boundaries — the only places a leaf may break — because the leaf's
+line count rises along them. Nine measurements a leaf. It is the one formulation
+that cannot come out a word short, because a word short is a cut the search
+steps past.
+
+The line count the search aims at is a property of the *well* — its height, the
+leading, a line's ink — not of any text. It used to be read off the candidate's
+own line bottoms, which made the target depend on the page being measured rather
+than the page being filled.
+
+Ten consecutive leaves: the last line averaging **1.00** of a median line, five
+of them longer than the median, and the two shortest (0.85, 0.91) sitting in
+front of a word too long for the room left. The cost is 22 seconds to paginate
+against 50 ms to read it back, once per layout, in the background, with the leaf
+blank rather than rearranging.
+
 **And it measures the leaf it will draw, not the one it read the cut off.**
 Everything before this measures a *candidate*: the offer laid out whole, with
 the cut read off it. The page the book then draws is that prefix — and the two

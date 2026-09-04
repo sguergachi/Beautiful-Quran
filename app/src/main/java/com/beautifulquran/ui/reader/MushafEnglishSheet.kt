@@ -1313,100 +1313,76 @@ internal fun englishLeafRuler(
                 constraints = constraints,
                 density = density,
             )
-            // How many lines the well really holds, by where the lines land
-            // rather than by a pitch and an assumed ink: a line carrying only a
-            // verse mark is set in another face and stands another height, and
-            // that is exactly the line that falls at the foot.
-            var lines = 0
-            while (lines < laid.lineCount && laid.getLineBottom(lines) <= room) lines++
-            if (lines >= laid.lineCount) {
+            // How many lines the well holds. A property of the well, the
+            // leading and a line's ink — not of any particular text, and
+            // deliberately so: it used to be read off the candidate's own line
+            // bottoms, which made the target depend on the page being measured
+            // rather than on the page being filled.
+            val lines = (((room - inkPx) / pitchPx).toInt() + 1).coerceAtLeast(1)
+            if (laid.lineCount <= lines) {
                 EnglishLeafFill(laid.lineCount, null)
             } else {
-                // Snap the cut the way the leaf will. englishLeafBreak moves
-                // an offset back to the last word boundary outside any bracket,
-                // and *back* is what makes this safe: the leaf can only be
-                // handed less than was measured, never more, so the lines it
-                // was given are the lines it keeps.
-                val verses = leaf.verses
-                val at = laid.getLineEnd(lines.coerceAtLeast(1) - 1, visibleEnd = true)
-                var pick = prose.verses.lastIndex
-                for (k in prose.verses.indices) {
-                    if (at <= prose.verses[k].range.last + 1) { pick = k; break }
-                }
-                val set = verses[pick]
-                // Map through where the verse's *text* begins, not where its
-                // fragment does: a carried fragment starts on the space the
-                // leaf before it broke on, and the text is that trimmed. One
-                // character out here walks the break back a whole word.
-                val into = (at - prose.verses[pick].range.first).coerceIn(0, set.to - set.textFrom)
-                var to = (set.textFrom + into).coerceAtMost(set.to)
-                // The one thing that can still overrun: a cut landing exactly
-                // at a verse's end makes the leaf draw that verse's *mark*, and
-                // the mark may be sitting on the next line. Then the verse does
-                // not end here — take the word before it and let the mark go
-                // over the fold with the tail it belongs to.
-                val mark = prose.verses[pick].markRange
-                if (to >= set.to && !mark.isEmpty() &&
-                    laid.getLineForOffset(mark.last) > lines - 1
-                ) {
-                    to = (to - 1).coerceAtLeast(0)
-                }
-                val index = runs.indexOfFirst {
-                    it.surahId == set.surahId && it.ayah == set.ayah
-                }.coerceAtLeast(0)
-                // A leaf must advance. If the well cannot hold even a word of
-                // the verse it opens with, it takes that word anyway rather
-                // than paginating for ever.
-                val floor = if (index == 0) runs[0].from + 1 else runs[index].from
-                val end = englishLeafBreak(translation(set.surahId, set.ayah), to)
-                    .coerceAtLeast(floor)
-                // Measure the leaf that will actually be set.
+                // Then *find* the cut instead of inferring it.
                 //
-                // Everything above measures a *candidate*: the offer laid out
-                // whole, with the cut read off it. The leaf the book will draw
-                // is that prefix, and the two are only the same page while
-                // nothing between them changes a length. They have differed
-                // before — a trim, a snap, a mark drawn on one and not the
-                // other — and the symptom is always the same: the leaf sets
-                // fewer lines than it was given text for and the last of them
-                // ends early with room beside it.
+                // What the cut is: the largest prefix of the offer whose leaf,
+                // as the book will draw it, sets no more than `lines` lines.
+                // Every earlier version read an offset off the candidate — the
+                // offer laid out whole — and trusted the leaf to break its
+                // lines in the same places. Mostly it does. Where it does not,
+                // the cut lands a word or two inside the last line and the page
+                // shows the room, which is the fault that would not go away. No
+                // argument makes that trust safe, so it is gone: the leaf is
+                // drawn, measured, and the answer searched for.
                 //
-                // So set it and count. A leaf short of the lines it was
-                // promised is given the next line's worth; one over is pulled
-                // back. Two rounds settle it, and the whole book is measured
-                // once and written down, so this costs nothing anybody waits
-                // for. See EnglishBookCache.
-                var cut = EnglishRulerCut(index, end)
-                var line = lines - 1
-                repeat(2) {
+                // The search runs over the offer's word boundaries — the only
+                // places a leaf may break — and the leaf's line count rises
+                // along them, so it bisects. Nine measurements a leaf, once for
+                // the whole book, written to disk after (EnglishBookCache).
+                // It is the one formulation that cannot come out a word short,
+                // because a word short is a cut the search steps past.
+                val stops = englishLeafCutStops(runs, translation)
+                var lo = 0
+                var hi = stops.lastIndex
+                while (lo < hi) {
+                    val mid = (lo + hi + 1) / 2
                     val set = englishLeafLineCount(
-                        page, runs, cut, hideParentheticals, translation,
+                        page, runs, stops[mid], hideParentheticals, translation,
                         verseNumberScript, style, constraints, density, measurer,
                     )
-                    if (set == lines || set == 0) return@repeat
-                    line = (line + (lines - set)).coerceIn(0, laid.lineCount - 1)
-                    val moved = laid.getLineEnd(line, visibleEnd = true)
-                    var p = prose.verses.lastIndex
-                    for (k in prose.verses.indices) {
-                        if (moved <= prose.verses[k].range.last + 1) { p = k; break }
-                    }
-                    val v = verses[p]
-                    val inner = (moved - prose.verses[p].range.first).coerceIn(0, v.to - v.textFrom)
-                    val idx = runs.indexOfFirst { it.surahId == v.surahId && it.ayah == v.ayah }
-                        .coerceAtLeast(0)
-                    val bottom = if (idx == 0) runs[0].from + 1 else runs[idx].from
-                    cut = EnglishRulerCut(
-                        idx,
-                        englishLeafBreak(translation(v.surahId, v.ayah), v.textFrom + inner)
-                            .coerceAtLeast(bottom),
-                    )
+                    if (set in 1..lines) lo = mid else hi = mid - 1
                 }
-                EnglishLeafFill(lines, cut)
+                EnglishLeafFill(lines, stops[lo])
             }
         }
     }
 }
 
+
+/**
+ * Every place the leaf may break, in order: the word boundaries of the offer.
+ *
+ * A leaf breaks between words and nowhere else — `englishLeafBreak` sees to
+ * that — so these are the only cuts worth measuring, and the leaf's line count
+ * rises along them, which is what lets the search bisect. Never the very start
+ * of the offer: a leaf that took nothing would never advance.
+ */
+private fun englishLeafCutStops(
+    runs: List<EnglishVerseRun>,
+    translation: (Int, Int) -> String,
+): List<EnglishRulerCut> {
+    val out = ArrayList<EnglishRulerCut>(256)
+    runs.forEachIndexed { index, run ->
+        val whole = translation(run.surahId, run.ayah)
+        var at = whole.indexOf(' ', run.from + 1)
+        while (at >= 0 && at < run.to) {
+            if (at > run.from) out += EnglishRulerCut(index, at)
+            at = whole.indexOf(' ', at + 1)
+        }
+        if (run.to > run.from) out += EnglishRulerCut(index, run.to)
+    }
+    if (out.isEmpty()) out += EnglishRulerCut(runs.lastIndex, runs.last().to)
+    return out
+}
 
 /**
  * How many lines the leaf really sets, cut here — the page the book will draw
