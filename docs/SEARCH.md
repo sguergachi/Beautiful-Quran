@@ -89,7 +89,7 @@ discarding all but the first. Each window travels from outside the word's left e
 across every letter, and fully out through its right edge before starting again.
 Each cycle is one continuous enter → cross → exit motion rather than an
 accumulating fill or a whole-word pulse. While it runs, all non-target chapter
-text recedes to 80% strength; Arabic uses a paper cover rather than glyph alpha,
+text recedes to 40% strength; Arabic uses a paper cover rather than glyph alpha,
 so marks stay clean and every orange target remains full-strength. The
 scrolling layout waits for its
 verse geometry; Mushaf waits for the requested

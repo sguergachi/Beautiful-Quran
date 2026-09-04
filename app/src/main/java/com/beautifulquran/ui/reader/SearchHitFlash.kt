@@ -16,7 +16,7 @@ object SearchHitFlash {
     const val BAND_FRACTION = 0.72f
     const val EDGE_SHARE = 0.24f
     /** The rest of the chapter yields just enough to make every target legible. */
-    const val BACKGROUND_ALPHA = 0.8f
+    const val BACKGROUND_ALPHA = 0.4f
 
     /** Constant velocity keeps one pass flowing directly into the next. */
     val EASING = LinearEasing

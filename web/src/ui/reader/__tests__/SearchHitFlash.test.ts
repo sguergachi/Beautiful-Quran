@@ -15,7 +15,7 @@ describe('SearchHitFlash', () => {
     expect(SearchHitFlash.BAND_FRACTION).toBeLessThanOrEqual(0.8)
     expect(SearchHitFlash.EDGE_SHARE).toBeGreaterThanOrEqual(0.15)
     expect(SearchHitFlash.EDGE_SHARE).toBeLessThanOrEqual(0.3)
-    expect(SearchHitFlash.BACKGROUND_ALPHA).toBe(0.8)
+    expect(SearchHitFlash.BACKGROUND_ALPHA).toBe(0.4)
     expect(searchHitFlashTotalMs()).toBeLessThan(3000)
   })
 

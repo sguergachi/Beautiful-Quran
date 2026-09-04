@@ -21,7 +21,7 @@ class SearchHitFlashTest {
     fun `pulse emphasis is strong but stays tight to the glyph`() {
         assertTrue(SearchHitFlash.EMPHASIS_GLOW_ALPHA >= 0.9f)
         assertTrue(SearchHitFlash.EMPHASIS_GLOW_RADIUS in 1f..1.5f)
-        assertEquals(0.8f, SearchHitFlash.BACKGROUND_ALPHA)
+        assertEquals(0.4f, SearchHitFlash.BACKGROUND_ALPHA)
     }
 
     @Test
