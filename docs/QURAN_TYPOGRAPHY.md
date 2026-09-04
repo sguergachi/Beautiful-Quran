@@ -671,6 +671,26 @@ Ten consecutive leaves after: every one of them 22 lines with the foot beneath
 it and no unused line, the last line averaging 0.92 of a median line and six of
 the ten within five percent of a full one.
 
+**And it measures the leaf it will draw, not the one it read the cut off.**
+Everything before this measures a *candidate*: the offer laid out whole, with
+the cut read off it. The page the book then draws is that prefix — and the two
+are only the same page while nothing between them changes a length. They have
+differed at every stage of this section's history, by a trim, by a snap, by a
+mark drawn on one and not on the other, and the symptom never varied: the leaf
+sets fewer lines than it was given text for, and the last of them ends early
+with room beside it.
+
+So the leaf is set and its lines counted. One short of what it was promised is
+given the next line's worth; one over is pulled back. Two rounds settle it. This
+was tried once before and deleted for costing a second layout of every leaf —
+which was the right call then and is the wrong one now that the whole book is
+measured once and written down (`EnglishBookCache`): 10.4 seconds to paginate
+against 50 ms to read it back, paid once per layout, in the background, with the
+leaf blank rather than rearranging.
+
+Eight consecutive leaves at the reported geometry afterwards: every ordinary one
+between 0.94 and 1.05 of a full last line, where they had run down to 0.61.
+
 One detail is worth naming: **lines are not all the same height.** A line
 carrying only a verse mark is set in another face and stands another height, and
 that is exactly the line that falls at the foot. So the ruler counts by

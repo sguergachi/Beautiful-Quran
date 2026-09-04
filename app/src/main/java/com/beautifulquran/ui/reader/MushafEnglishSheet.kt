@@ -1362,8 +1362,82 @@ internal fun englishLeafRuler(
                 val floor = if (index == 0) runs[0].from + 1 else runs[index].from
                 val end = englishLeafBreak(translation(set.surahId, set.ayah), to)
                     .coerceAtLeast(floor)
-                EnglishLeafFill(lines, EnglishRulerCut(index, end))
+                // Measure the leaf that will actually be set.
+                //
+                // Everything above measures a *candidate*: the offer laid out
+                // whole, with the cut read off it. The leaf the book will draw
+                // is that prefix, and the two are only the same page while
+                // nothing between them changes a length. They have differed
+                // before — a trim, a snap, a mark drawn on one and not the
+                // other — and the symptom is always the same: the leaf sets
+                // fewer lines than it was given text for and the last of them
+                // ends early with room beside it.
+                //
+                // So set it and count. A leaf short of the lines it was
+                // promised is given the next line's worth; one over is pulled
+                // back. Two rounds settle it, and the whole book is measured
+                // once and written down, so this costs nothing anybody waits
+                // for. See EnglishBookCache.
+                var cut = EnglishRulerCut(index, end)
+                var line = lines - 1
+                repeat(2) {
+                    val set = englishLeafLineCount(
+                        page, runs, cut, hideParentheticals, translation,
+                        verseNumberScript, style, constraints, density, measurer,
+                    )
+                    if (set == lines || set == 0) return@repeat
+                    line = (line + (lines - set)).coerceIn(0, laid.lineCount - 1)
+                    val moved = laid.getLineEnd(line, visibleEnd = true)
+                    var p = prose.verses.lastIndex
+                    for (k in prose.verses.indices) {
+                        if (moved <= prose.verses[k].range.last + 1) { p = k; break }
+                    }
+                    val v = verses[p]
+                    val inner = (moved - prose.verses[p].range.first).coerceIn(0, v.to - v.textFrom)
+                    val idx = runs.indexOfFirst { it.surahId == v.surahId && it.ayah == v.ayah }
+                        .coerceAtLeast(0)
+                    val bottom = if (idx == 0) runs[0].from + 1 else runs[idx].from
+                    cut = EnglishRulerCut(
+                        idx,
+                        englishLeafBreak(translation(v.surahId, v.ayah), v.textFrom + inner)
+                            .coerceAtLeast(bottom),
+                    )
+                }
+                EnglishLeafFill(lines, cut)
             }
         }
     }
+}
+
+
+/**
+ * How many lines the leaf really sets, cut here — the page the book will draw
+ * rather than the candidate it was read off. See [englishLeafRuler].
+ */
+private fun englishLeafLineCount(
+    page: Int,
+    runs: List<EnglishVerseRun>,
+    cut: EnglishRulerCut,
+    hideParentheticals: Boolean,
+    translation: (Int, Int) -> String,
+    verseNumberScript: VerseNumberScript,
+    style: TextStyle,
+    constraints: Constraints,
+    density: Density,
+    measurer: TextMeasurer,
+): Int {
+    val kept = runs.subList(0, cut.runIndex + 1).toMutableList()
+    kept[kept.lastIndex] = kept.last().let {
+        EnglishVerseRun(it.surahId, it.ayah, it.from, cut.to)
+    }
+    val prose = englishLeafBlockTexts(
+        leaf = englishLeaf(page, kept, hideParentheticals, translation),
+        openingTokens = emptyMap(),
+        wordEnds = emptyMap(),
+        ink = Color.Black,
+        gold = Color.Black,
+        verseNumberScript = verseNumberScript,
+    ).filterIsInstance<EnglishLeafBlockText.Prose>().firstOrNull() ?: return 0
+    return measurer.measure(prose.text, style, constraints = constraints, density = density)
+        .lineCount
 }
