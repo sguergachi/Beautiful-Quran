@@ -304,6 +304,20 @@ class ReaderViewModel(
         rulerKey: Any? = null,
         /** Everything the leaves depend on — see [EnglishBookCache.key]. */
         cacheKey: String = "",
+        /**
+         * Whether these figures came from a leaf that has actually laid out.
+         *
+         * False at the app's root, which works from figures *remembered* from
+         * some earlier run. Remembered figures are good enough to look a book up
+         * with — the key covers everything the leaves depend on, so a key that
+         * no longer describes this screen simply misses — but they are not good
+         * enough to paginate a book *from*. A book paginated for a leaf a little
+         * larger than the real one hands every leaf more lines than it has, and
+         * the leaf sets fewer and leaves the last one short. So the root may
+         * read and may not measure: on a miss it stands down and the leaf, which
+         * knows its own size, does it.
+         */
+        trusted: Boolean = true,
     ) {
         if (_mushaf.value != null && mushafLeafText == text && mushafRulerKey == rulerKey) return
         // Never fall back. A book already paginated by measuring a leaf is not
@@ -333,6 +347,13 @@ class ReaderViewModel(
                 // are asked — so they are asked once and written down.
                 val cached = withContext(Dispatchers.IO) {
                     englishBookCache.read(cacheKey, pageOf, verse)
+                }
+                if (cached == null && !trusted) {
+                    // Remembered figures, and nothing written down under them.
+                    // Stand down: the leaf will measure itself in a moment and
+                    // ask again with figures that describe this screen.
+                    mushafRulerKey = null
+                    return@launch
                 }
                 cached ?: withContext(Dispatchers.Default) {
                     buildEnglishBookByLayout(catalog, verse, rulerFor(verse))

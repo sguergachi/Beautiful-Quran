@@ -343,6 +343,9 @@ private fun PaperStackApp(
                 settings.verseNumberScript,
                 settings.hideEnglishParentheticals,
             ),
+            // Remembered figures: good enough to look a book up with, not to
+            // paginate one from. See ReaderViewModel.ensureMushaf.
+            trusted = false,
             cacheKey = app.englishBookCache.key(
                 wellPx = metrics[0],
                 measurePx = metrics[1],

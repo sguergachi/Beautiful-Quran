@@ -582,6 +582,16 @@ Nothing in Sad's leaves depends on As-Saffat's, so the chapter being opened can
 be paginated in a handful of layouts and the rest follow behind it, the way a
 reader computes page numbers behind the book you are already reading.
 
+**A book is only ever paginated from figures a live leaf reported.** The
+remembered ones below are good enough to *look a book up* with — the cache key
+covers everything the leaves depend on, so a key that no longer describes this
+screen simply misses — and they are not good enough to paginate a book *from*. A
+book paginated for a leaf a little larger than the real one hands every leaf
+more lines than it has: the leaf sets fewer, and the last one comes out short
+with room beside it, which is the fault that keeps being reported. So the root
+may read and may not measure. On a miss it stands down, and the leaf, which
+knows its own size, does it.
+
 It cannot run before the leaf has a size — so the leaf *remembers its size*.
 `SettingsRepository.rememberLeafMetrics` keeps the well and the measure with the
 window they were laid out in, and `MainActivity` paginates the whole book from
