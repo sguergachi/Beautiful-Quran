@@ -451,50 +451,36 @@ fun interface EnglishLeafRuler {
      * stops. The caller offers more than a leaf can hold; a null cut means it
      * did not, and more should be offered.
      *
-     * [maxLines] is a leaf set deliberately short. A page is otherwise always
-     * filled, but the page that ends a chapter is not free to be any length —
-     * see [ENGLISH_LEAF_MIN_TAIL_LINES] — and the only way to lengthen it is to
-     * run the page before it short.
      */
-    fun fill(page: Int, runs: List<EnglishVerseRun>, maxLines: Int): EnglishLeafFill
+    fun fill(page: Int, runs: List<EnglishVerseRun>): EnglishLeafFill
 }
-
-/** As many lines as the well holds — a leaf that is not being run short. */
-fun EnglishLeafRuler.fill(page: Int, runs: List<EnglishVerseRun>): EnglishLeafFill =
-    fill(page, runs, Int.MAX_VALUE)
 
 /** What a leaf came to: the lines it sets, and where it stopped. */
 class EnglishLeafFill(val lines: Int, val cut: EnglishRulerCut?)
 
 /**
- * How short a chapter's last leaf may be before its neighbour gives it lines,
- * and how many it must reach — both as fifths of a full leaf.
+ * Nothing is held back to make a chapter's ending longer, and this is where the
+ * reasoning for that lives.
  *
- * Every page in this book fills but the last of a chapter, and that one is not
- * free to be any length. A printed book gets away with a very short closing
- * page because you see it beside a full one — a codex shows a spread, and the
- * white is half of what the eye takes in. A phone shows one leaf, so a closing
- * page of two lines reads as a fault however correct it is.
+ * Every page in this book fills. A chapter opens its own leaf, so its last one
+ * is short — that is not a fault, it is the chapter ending, and it is where all
+ * the ragged paper in a book lives. Ya-Sin closing on two lines looked like one,
+ * so the page *before* it was run short and the two divided: first to a floor,
+ * then evenly, then by the least movement that gave the ending two fifths of a
+ * leaf. Every one of those was rejected on sight, and they were right to be.
  *
- * The remedy is to run the page before it short, and the question is *how*
- * short. Both extremes have been tried and both were wrong:
+ * A page that stops with text still to come is a page withholding it. The
+ * reader can see the words are not there and there is no reason for it — the
+ * chapter has not ended, the next leaf simply has the rest. That reads as a
+ * fault every time, and it is one, because it *is* text withheld. A chapter's
+ * last page stopping short reads as an ending, because it is one.
  *
- * - Stopping at a fixed floor of five lines left Ya-Sin ending 22 and 5, which
- *   is still four fifths of a blank screen.
- * - Dividing the two evenly left Maryam ending 12 and 12 — two half-empty
- *   leaves in a row, which is a worse thing than the one it replaced, because
- *   it spends a *full* page to fix a short one.
- *
- * So: the least movement that gets the tail to two fifths of a leaf. One page
- * stays nearly full, the ending gets enough paper to read as an ending, and no
- * chapter costs two pages to close.
+ * So the remedy was worse than what it treated in every form it took, and there
+ * is no version of it that is not: the paper a chapter leaves over has to go
+ * somewhere, and the only place it can go without lying about the text is the
+ * page where the text runs out. Fill every page. Let the chapter end where it
+ * ends.
  */
-const val ENGLISH_LEAF_TAIL_SHARE = 2
-
-const val ENGLISH_LEAF_TAIL_OF = 5
-
-/** Never fewer than this, whatever a leaf's own line count works out to. */
-const val ENGLISH_LEAF_MIN_TAIL_LINES = 5
 
 /**
  * Paginates the book by measuring it, one text layout to the leaf.
@@ -519,16 +505,10 @@ fun buildEnglishBookByLayout(
     val out = ArrayList<List<EnglishVerseRun>>(1_200)
     val pageOfVerse = HashMap<Long, Int>(8_192)
     order.forEach { pageOfVerse[quranWordKey(it[0], it[1], 1)] = it[2] }
-    // Where each leaf of the chapter being set began, so its last two can be
-    // divided again if the chapter ends on almost nothing.
-    val chapterStarts = ArrayList<IntArray>(16)
-    var chapterFrom = 0
     var at = 0
     var offset = 0
     while (at < order.size) {
-        val leaf = englishLeafAt(order, text, ruler, at, offset)
-        val kept = leaf.first
-        chapterStarts += intArrayOf(at, offset)
+        val kept = englishLeafAt(order, text, ruler, at, offset).first
         out += kept
 
         val last = kept.last()
@@ -539,15 +519,6 @@ fun buildEnglishBookByLayout(
         } else {
             at += kept.size - 1
             offset = last.to
-        }
-        // A chapter ends where the next verse is a first one, or where the book
-        // does. Its last two leaves are the only place in this book where
-        // filling a page is the wrong thing to do.
-        val ends = at >= order.size || (offset == 0 && order[at][1] == 1)
-        if (ends) {
-            englishBalanceChapterTail(order, text, ruler, out, chapterStarts, chapterFrom)
-            chapterStarts.clear()
-            chapterFrom = out.size
         }
     }
     return englishBookOf(
@@ -660,7 +631,6 @@ private fun englishLeafAt(
     ruler: EnglishLeafRuler,
     at: Int,
     offset: Int,
-    maxLines: Int = Int.MAX_VALUE,
 ): Pair<List<EnglishVerseRun>, Int> {
     // How much to offer. Enough that the leaf is decided by the layout and not
     // by the end of the offer — and if it was not, the ruler says so and the
@@ -670,7 +640,7 @@ private fun englishLeafAt(
     var fill: EnglishLeafFill
     while (true) {
         runs = englishLeafOffer(order, text, at, offset, take)
-        fill = ruler.fill(order[at][2], runs, maxLines)
+        fill = ruler.fill(order[at][2], runs)
         val exhausted = at + runs.size < order.size &&
             order[at + runs.size][1] != 1   // a chapter opens: the leaf ends anyway
         if (fill.cut != null || !exhausted) break
@@ -687,62 +657,3 @@ private fun englishLeafAt(
     return kept to fill.lines
 }
 
-/**
- * Divides a chapter's last two leaves when it ends on almost nothing.
- *
- * Every other page in this book fills. This one cannot: Ya-Sin came out with a
- * closing leaf carrying two lines, which reads as a fault and not as an ending.
- * The page before it is full, so the only room to give is room taken back — run
- * that page short and the two divide. It is what a compositor does, and it is
- * the one place here where filling a page is wrong.
- *
- * The search is downwards a line at a time from the full page, and it stops at
- * the first split that clears [ENGLISH_LEAF_MIN_TAIL_LINES] on both — or gives
- * up and leaves the chapter as it was, which is what a chapter shorter than two
- * leaves' worth has to do anyway.
- */
-private fun englishBalanceChapterTail(
-    order: List<IntArray>,
-    text: (Int, Int) -> String,
-    ruler: EnglishLeafRuler,
-    out: MutableList<List<EnglishVerseRun>>,
-    starts: List<IntArray>,
-    chapterFrom: Int,
-) {
-    if (starts.size < 2) return
-    val tailStart = starts.last()
-    val tailLines = ruler.fill(order[tailStart[0]][2], out.last()).lines
-    val before = starts[starts.size - 2]
-    val beforeLines = ruler.fill(order[before[0]][2], out[out.size - 2]).lines
-    // What a closing page has to reach: two fifths of a full one.
-    val want = maxOf(
-        ENGLISH_LEAF_MIN_TAIL_LINES,
-        beforeLines * ENGLISH_LEAF_TAIL_SHARE / ENGLISH_LEAF_TAIL_OF,
-    )
-    // A chapter that ends comfortably is left alone. Only an ending that reads
-    // as a blank screen is worth taking a full page apart for.
-    if (tailLines >= want) return
-    for (lines in beforeLines - 1 downTo want) {
-        val (runs, runLines) = englishLeafAt(order, text, ruler, before[0], before[1], lines)
-        val last = runs.last()
-        val whole = text(last.surahId, last.ayah)
-        val done = last.to >= whole.length
-        val nextAt = if (done) before[0] + runs.size else before[0] + runs.size - 1
-        val nextOffset = if (done) 0 else last.to
-        if (nextAt >= order.size) continue
-        val (rest, restLines) = englishLeafAt(order, text, ruler, nextAt, nextOffset)
-        // The remainder has to still be one leaf: a chapter's tail divided into
-        // three is not a division, it is a different pagination.
-        val restLast = rest.last()
-        val restDone = restLast.to >= text(restLast.surahId, restLast.ayah).length
-        val ends = nextAt + rest.size >= order.size || order[nextAt + rest.size][1] == 1
-        if (!restDone || !ends) continue
-        // The first split that gets the ending its paper is the least paper
-        // taken from the page before it: walking further only empties that one
-        // to fill this, which is how two half pages in a row happen.
-        if (restLines < want || runLines < want) continue
-        out[out.size - 2] = runs
-        out[out.size - 1] = rest
-        return
-    }
-}

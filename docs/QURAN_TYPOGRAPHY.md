@@ -407,24 +407,23 @@ paragraph too big for the foot of a page does.
    eye takes in. A phone shows one leaf. A closing page of five lines is four
    fifths of a blank screen, and reads as a fault however correct it is.
 
-   So `englishBalanceChapterTail` runs the page *before* it short and gives the
-   ending the lines. How short is the whole question, and both extremes were
-   tried and were wrong: stopping at a fixed floor of five lines left Ya-Sin
-   ending 22 and 5, still four fifths of a blank screen; dividing the two evenly
-   left Maryam ending 12 and 12, two half-empty leaves in a row — a worse fault
-   than the one it replaced, because it spends a *full* page to fix a short one.
+   **And nothing is held back to make that ending longer.** Ya-Sin closing on
+   two lines looked like a fault, so the page *before* it was run short and the
+   two divided — first to a floor of five lines, then evenly, then by the least
+   movement that gave the ending two fifths of a leaf. All three were rejected
+   on sight, and rightly.
 
-   So: **the least movement that gets the ending to two fifths of a leaf**
-   (`ENGLISH_LEAF_TAIL_SHARE` of `ENGLISH_LEAF_TAIL_OF`). One page stays nearly
-   full, the ending gets enough paper to read as an ending, and no chapter costs
-   two pages to close. Ya-Sin and Maryam both end 19 and 8 where they ended 22
-   and 5.
+   A page that stops with text still to come is a page *withholding* it. The
+   reader can see the words are missing and there is no reason for it: the
+   chapter has not ended, the next leaf simply has the rest. That reads as a
+   fault every time, because it is one. A chapter's last page stopping short
+   reads as an ending, because it is one.
 
-   Over the book: 91 chapters run to more than one leaf and **37 are adjusted**
-   — Al-A'raf 22/**1** to 15/8, Al-Baqarah 22/4 to 18/8. The shortest chapter
-   ending in the Qur'an is seven lines, and there is no chapter anywhere whose
-   last two pages are *both* under three fifths of a leaf. It is the one place
-   in this book where filling a page is the wrong thing to do.
+   So the remedy was worse than what it treated in every form it took, and no
+   version of it is not: the paper a chapter leaves over has to go somewhere,
+   and the only place it can go without lying about the text is the page where
+   the text runs out. **Fill every page. Let the chapter end where it ends.**
+
 4. **Widows and orphans move the break, and nothing else does.**
 
 What is *not* on that list is the sentence. This leaf briefly refused to cut a

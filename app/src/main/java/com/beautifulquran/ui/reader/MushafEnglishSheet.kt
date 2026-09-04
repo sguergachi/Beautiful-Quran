@@ -1287,7 +1287,7 @@ internal fun englishLeafRuler(
     val basmalahPx = englishBasmalahPx(handPx, measurePx, density, measurer)
     val style = with(density) { englishProseStyle(handPx.toSp(), pitchPx.toSp()) }
     val constraints = Constraints(maxWidth = measurePx.toInt().coerceAtLeast(1))
-    return EnglishLeafRuler { page, runs, maxLines ->
+    return EnglishLeafRuler { page, runs ->
         val leaf = englishLeaf(page, runs, hideParentheticals, translation)
         val blocks = englishLeafBlockTexts(
             leaf = leaf,
@@ -1319,8 +1319,6 @@ internal fun englishLeafRuler(
             // that is exactly the line that falls at the foot.
             var lines = 0
             while (lines < laid.lineCount && laid.getLineBottom(lines) <= room) lines++
-            // A leaf run short to divide a chapter's last two pages.
-            lines = lines.coerceAtMost(maxLines)
             if (lines >= laid.lineCount) {
                 EnglishLeafFill(laid.lineCount, null)
             } else {
