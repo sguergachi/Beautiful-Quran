@@ -117,7 +117,6 @@ fun matchWordSearch(
         val correctedQuery: String? = null,
         val matchReason: String = "Text match",
     )
-
     val ranked = HashMap<Int, RankedHit>(512)
     val firstIndex = HashMap<Int, Int>(7_000)
     val matchedRoots = HashSet<String>()
@@ -152,23 +151,31 @@ fun matchWordSearch(
 
     fun scanOriginal(allowFuzzy: Boolean) {
         val arabic = normalizeArabicForSearch(parsed.text)
-        val latin = if (arabic.isEmpty()) parsed else parsed.copy(text = "")
+        val latin = parsed.copy(text = if (arabic.isEmpty()) parsed.text.lowercase() else "")
+        val arabicQuery = parsed.copy(text = arabic)
+        val arabicCache = HashMap<String, Int>()
+        val glossCache = HashMap<String, Int>(24_000)
+        val transliterationCache = HashMap<String, Int>(20_000)
+        fun cached(
+            text: String,
+            query: ParsedSearchQuery,
+            cache: HashMap<String, Int>,
+        ): Int = cache.getOrPut(text) {
+            searchLowerTextRelevance(text, query.text, query.exactOnly, allowFuzzy)
+        }
         for (i in index.indices) {
             if ((i and 0xfff) == 0) checkCancelled()
             val entry = index[i]
-            val score = maxOf(
-                if (!sources.arabic || arabic.isEmpty()) 0 else searchTextRelevance(
-                    entry.arabicNorm,
-                    parsed.copy(text = arabic),
-                    allowFuzzy,
-                ),
-                if (sources.wordGloss) {
-                    searchTextRelevance(entry.translationLower, latin, allowFuzzy)
-                } else 0,
-                if (sources.transliteration) {
-                    searchTextRelevance(entry.transliterationLower, latin, allowFuzzy)
-                } else 0,
-            )
+            val arabicMatch = if (sources.arabic && arabic.isNotEmpty()) {
+                cached(entry.arabicNorm, arabicQuery, arabicCache)
+            } else null
+            val glossMatch = if (sources.wordGloss) {
+                cached(entry.translationLower, latin, glossCache)
+            } else null
+            val transliterationMatch = if (sources.transliteration) {
+                cached(entry.transliterationLower, latin, transliterationCache)
+            } else null
+            val score = maxOf(arabicMatch ?: 0, glossMatch ?: 0, transliterationMatch ?: 0)
             val correction = if (allowFuzzy && score > 0) {
                 if (sources.arabic && arabic.isNotEmpty()) {
                     fuzzyWordMatch(entry.arabicNorm, arabic)
@@ -346,10 +353,15 @@ fun matchWordSearch(
     fun scanRelated(related: List<RelatedSearchTerm>) {
         if (related.isEmpty() || (!sources.wordGloss && !sources.verseTranslation)) return
         if (sources.wordGloss) {
+            val noMatch = RelatedMatch(0, emptyList())
+            val cache = HashMap<String, RelatedMatch>(24_000)
             for (i in index.indices) {
                 if ((i and 0xfff) == 0) checkCancelled()
                 val entry = index[i]
-                val match = bestRelated(entry.translationLower, related) ?: continue
+                val match = cache.getOrPut(entry.translationLower) {
+                    bestRelated(entry.translationLower, related) ?: noMatch
+                }
+                if (match.score <= 0) continue
                 add(
                     i,
                     entry.position,

@@ -261,9 +261,21 @@ ayah (6,236 instances, ~2.3 M characters) instead of per word (~31 M
 characters). Only genuinely per-word fields — the surface form, its normalized
 and lowercased search keys, the gloss — are stored inline.
 
+The ranker still returns every matching occurrence, but query-local score
+caches evaluate each distinct lowercase field only once. The committed corpus
+has 21,947 distinct English glosses across 77,429 word rows, so the common
+Scroll path avoids roughly 55,000 redundant relevance evaluations per stage;
+thesaurus expansions share one cached result per gloss as well. The cache dies
+with the query and does not enlarge the process-lifetime index. Already-folded
+index fields also bypass repeat lowercase conversion in the hot loop.
+
 **Rule for anything added to this index:** if the value is the same for every
 word of a verse, it belongs in the shared context. A single extra ayah-wide
 `String` field on the entry costs ~12× what it looks like it costs.
+
+Run `npm run benchmark:search` from `web/` for the full-corpus exact, concept,
+phrase, typo, quoted, and Mushaf-source timing suite. It reports the median of
+nine warm searches per case so performance work is measured rather than felt.
 
 ### 8. Streaming audio never blocks rendering
 

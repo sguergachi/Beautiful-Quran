@@ -129,12 +129,25 @@ export function searchTextRelevance(
   query: ParsedSearchQuery,
   allowFuzzy = true,
 ): number {
-  const target = text.toLowerCase()
-  const needle = query.text.toLowerCase()
+  return searchLowerTextRelevance(
+    text.toLowerCase(),
+    query.text.toLowerCase(),
+    query.exactOnly,
+    allowFuzzy,
+  )
+}
+
+/** Avoids repeated case-folding for index fields and parsed queries already in lowercase. */
+function searchLowerTextRelevance(
+  target: string,
+  needle: string,
+  exactOnly: boolean,
+  allowFuzzy: boolean,
+): number {
   if (!target || !needle) return 0
   if (target === needle) return 3_200
   if (containsBounded(target, needle)) return 3_000
-  if (query.exactOnly) {
+  if (exactOnly) {
     const phrase = canonicalWords(target).join(' ')
     const canonicalNeedle = canonicalWords(needle).join(' ')
     return canonicalNeedle && containsBounded(phrase, canonicalNeedle) ? 3_000 : 0
@@ -299,17 +312,17 @@ export function matchWordSearch(
 ): WordSearchHit[] {
   const state = createRanking(index, query, sources)
   if (!state || maxHits <= 0) return []
-  scanLexical(state, 0, index.length, false)
+  scanLexical(state, 0, index.length, false, lexicalCaches())
   scanAyahText(state, false)
   scanConcepts(state, concepts, false)
   if (state.ranked.size < 3) {
     const key = thesaurusLookupKey(state.parsed)
     const related = key ? (thesaurus.get(key) ?? []) : []
-    scanRelatedWords(state, related, 0, index.length)
+    scanRelatedWords(state, related, 0, index.length, new Map())
     scanRelatedAyahs(state, related)
   }
   if (state.ranked.size === 0) {
-    scanLexical(state, 0, index.length, true)
+    scanLexical(state, 0, index.length, true, lexicalCaches())
     scanAyahText(state, true)
     scanConcepts(state, concepts, true)
   }
@@ -339,6 +352,18 @@ interface RankingState {
   sources: WordSearchSources
 }
 
+interface LexicalCaches {
+  arabic: Map<string, number>
+  gloss: Map<string, number>
+  transliteration: Map<string, number>
+}
+
+const lexicalCaches = (): LexicalCaches => ({
+  arabic: new Map(),
+  gloss: new Map(),
+  transliteration: new Map(),
+})
+
 function createRanking(
   index: WordSearchIndexEntry[],
   query: string,
@@ -351,7 +376,7 @@ function createRanking(
     index,
     parsed,
     arabic,
-    latin: arabic ? { ...parsed, text: '' } : parsed,
+    latin: arabic ? { ...parsed, text: '' } : { ...parsed, text: parsed.text.toLowerCase() },
     ranked: new Map(),
     firstIndex: new Map(),
     matchedRoots: new Set(),
@@ -396,24 +421,32 @@ function scanLexical(
   from: number,
   to: number,
   allowFuzzy: boolean,
+  caches: LexicalCaches,
 ): void {
+  const arabicQuery = { ...state.parsed, text: state.arabic }
+  const cached = (
+    text: string,
+    query: ParsedSearchQuery,
+    cache: Map<string, number>,
+  ): number => {
+    const previous = cache.get(text)
+    if (previous !== undefined) return previous
+    const score = searchLowerTextRelevance(text, query.text, query.exactOnly, allowFuzzy)
+    cache.set(text, score)
+    return score
+  }
   for (let i = from; i < to; i++) {
     const entry = state.index[i]!
-    const score = Math.max(
-      state.sources.arabic && state.arabic
-        ? searchTextRelevance(
-            entry.arabicNorm,
-            { ...state.parsed, text: state.arabic },
-            allowFuzzy,
-          )
-        : 0,
-      state.sources.wordGloss
-        ? searchTextRelevance(entry.translationLower, state.latin, allowFuzzy)
-        : 0,
-      state.sources.transliteration
-        ? searchTextRelevance(entry.transliterationLower, state.latin, allowFuzzy)
-        : 0,
-    )
+    const arabic = state.sources.arabic && state.arabic
+      ? cached(entry.arabicNorm, arabicQuery, caches.arabic)
+      : null
+    const gloss = state.sources.wordGloss
+      ? cached(entry.translationLower, state.latin, caches.gloss)
+      : null
+    const transliteration = state.sources.transliteration
+      ? cached(entry.transliterationLower, state.latin, caches.transliteration)
+      : null
+    const score = Math.max(arabic ?? 0, gloss ?? 0, transliteration ?? 0)
     const correction = allowFuzzy && score > 0
       ? state.sources.arabic && state.arabic
         ? fuzzyWordMatch(entry.arabicNorm, state.arabic)
@@ -618,11 +651,16 @@ function scanRelatedWords(
   related: RelatedSearchTerm[],
   from: number,
   to: number,
+  cache: Map<string, ReturnType<typeof bestRelated>>,
 ): void {
   if (related.length === 0 || !state.sources.wordGloss) return
   for (let i = from; i < to; i++) {
     const entry = state.index[i]!
-    const match = bestRelated(entry.translationLower, related)
+    let match = cache.get(entry.translationLower)
+    if (match === undefined) {
+      match = bestRelated(entry.translationLower, related)
+      cache.set(entry.translationLower, match)
+    }
     if (!match) continue
     addRanked(
       state,
@@ -1039,19 +1077,22 @@ export async function matchWordSearchAsync(
     return true
   }
 
-  if (!(await scanChunks((from, to) => scanLexical(state, from, to, false)))) return []
+  const exactCaches = lexicalCaches()
+  if (!(await scanChunks((from, to) => scanLexical(state, from, to, false, exactCaches)))) return []
   scanAyahText(state, false)
   scanConcepts(state, concepts, false)
   if (state.ranked.size < 3) {
     const key = thesaurusLookupKey(state.parsed)
     const related = key ? (thesaurus.get(key) ?? []) : []
-    if (!(await scanChunks((from, to) => scanRelatedWords(state, related, from, to)))) {
+    const relatedCache = new Map<string, ReturnType<typeof bestRelated>>()
+    if (!(await scanChunks((from, to) => scanRelatedWords(state, related, from, to, relatedCache)))) {
       return []
     }
     scanRelatedAyahs(state, related)
   }
   if (state.ranked.size === 0) {
-    if (!(await scanChunks((from, to) => scanLexical(state, from, to, true)))) return []
+    const fuzzyCaches = lexicalCaches()
+    if (!(await scanChunks((from, to) => scanLexical(state, from, to, true, fuzzyCaches)))) return []
     scanAyahText(state, true)
     scanConcepts(state, concepts, true)
   }

@@ -73,7 +73,9 @@ the empty state says when no relevant ayah was found. Both apps begin searching
 after a 120 ms pause. The web paints its loading cue, builds a cold index on the
 next task instead of waiting for an idle callback, and then yields between scan
 chunks; Android checks cancellation throughout the scan. Typing therefore
-never waits on an obsolete rank.
+never waits on an obsolete rank. Within each scan, repeated Quran word glosses
+share one relevance calculation for that query while retaining every matching
+ayah and word position; thesaurus expansions use the same optimization.
 
 When spelling fallback wins through either Quran text or concept vocabulary,
 its actual corrected term is carried with the hit rather than inferred by the

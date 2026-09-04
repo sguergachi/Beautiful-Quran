@@ -57,13 +57,24 @@ fun searchTextRelevance(
     text: String,
     query: ParsedSearchQuery,
     allowFuzzy: Boolean = true,
+): Int = searchLowerTextRelevance(
+    text.lowercase(),
+    query.text.lowercase(),
+    query.exactOnly,
+    allowFuzzy,
+)
+
+/** Avoids repeated case-folding for index fields and parsed queries already in lowercase. */
+internal fun searchLowerTextRelevance(
+    target: String,
+    needle: String,
+    exactOnly: Boolean,
+    allowFuzzy: Boolean,
 ): Int {
-    val target = text.lowercase()
-    val needle = query.text.lowercase()
     if (target.isEmpty() || needle.isEmpty()) return 0
     if (target == needle) return 3_200
     if (containsBounded(target, needle)) return 3_000
-    if (query.exactOnly) {
+    if (exactOnly) {
         val phrase = canonicalWords(target).joinToString(" ")
         val canonicalNeedle = canonicalWords(needle).joinToString(" ")
         return if (canonicalNeedle.isNotEmpty() && containsBounded(phrase, canonicalNeedle)) 3_000 else 0

@@ -13,6 +13,7 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "build:pages": "tsc --noEmit && VITE_BASE=/Beautiful-Quran/app/ vite build --outDir ../_site/app --emptyOutDir",
+    "benchmark:search": "vite-node scripts/benchmark-search.ts",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest"
