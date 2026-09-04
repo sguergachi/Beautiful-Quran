@@ -71,6 +71,7 @@ import com.beautifulquran.domain.englishLeafHandPx
 import com.beautifulquran.domain.ENGLISH_LEAF_LEADING_EM
 import com.beautifulquran.domain.EnglishLeafFill
 import com.beautifulquran.domain.EnglishLeafRuler
+import com.beautifulquran.domain.EnglishLeafVerse
 import com.beautifulquran.domain.EnglishRulerCut
 import com.beautifulquran.domain.surahOpensWithBasmalahPreface
 import com.beautifulquran.domain.mushafIsOpeningLeaf
@@ -1340,23 +1341,87 @@ internal fun englishLeafRuler(
                 // the whole book, written to disk after (EnglishBookCache).
                 // It is the one formulation that cannot come out a word short,
                 // because a word short is a cut the search steps past.
+                // The candidate is a poor authority and an excellent guess:
+                // where the leaf and it agree — almost everywhere — its answer
+                // *is* the answer, and where they differ it is a word or two
+                // out. So the search starts there and grows outwards by
+                // doubling until it has straddled the truth, then bisects what
+                // is left. Same answer as searching the whole offer, in three
+                // or four measurements instead of nine.
                 val stops = englishLeafCutStops(runs, translation)
-                var lo = 0
-                var hi = stops.lastIndex
-                while (lo < hi) {
-                    val mid = (lo + hi + 1) / 2
-                    val set = englishLeafLineCount(
-                        page, runs, stops[mid], hideParentheticals, translation,
-                        verseNumberScript, style, constraints, density, measurer,
-                    )
-                    if (set in 1..lines) lo = mid else hi = mid - 1
+                val seed = englishLeafSeedStop(stops, laid, prose, leaf.verses, lines)
+                fun fits(at: Int): Boolean = englishLeafLineCount(
+                    page, runs, stops[at], hideParentheticals, translation,
+                    verseNumberScript, style, constraints, density, measurer,
+                ) in 1..lines
+                // Straddle: `lo` fits, `hi` does not, and the answer is the
+                // last stop before `hi`.
+                var lo: Int
+                var hi: Int
+                if (fits(seed)) {
+                    lo = seed
+                    var step = 1
+                    while (true) {
+                        val probe = seed + step
+                        if (probe > stops.lastIndex) { hi = stops.size; break }
+                        if (fits(probe)) { lo = probe; step *= 2 } else { hi = probe; break }
+                    }
+                } else {
+                    hi = seed
+                    var step = 1
+                    lo = -1
+                    while (true) {
+                        val probe = seed - step
+                        if (probe < 0) break
+                        if (fits(probe)) { lo = probe; break }
+                        hi = probe
+                        step *= 2
+                    }
                 }
-                EnglishLeafFill(lines, stops[lo])
+                while (hi - lo > 1) {
+                    val mid = (lo + hi) / 2
+                    if (fits(mid)) lo = mid else hi = mid
+                }
+                EnglishLeafFill(lines, stops[lo.coerceAtLeast(0)])
             }
         }
     }
 }
 
+
+/**
+ * Where to start looking: the stop nearest the cut the candidate would have
+ * given, found without measuring anything.
+ *
+ * The candidate is the offer laid out whole. Reading a cut off it was the fault
+ * this search exists to remove — but it is wrong by a word or two, not by a
+ * page, so as a *starting* point it saves most of the measuring.
+ */
+private fun englishLeafSeedStop(
+    stops: List<EnglishRulerCut>,
+    laid: TextLayoutResult,
+    prose: EnglishLeafBlockText.Prose,
+    verses: List<EnglishLeafVerse>,
+    lines: Int,
+): Int {
+    val at = laid.getLineEnd(lines.coerceAtLeast(1) - 1, visibleEnd = true)
+    var pick = prose.verses.lastIndex
+    for (k in prose.verses.indices) {
+        if (at <= prose.verses[k].range.last + 1) { pick = k; break }
+    }
+    val set = verses.getOrNull(pick) ?: return stops.lastIndex / 2
+    val into = (at - prose.verses[pick].range.first).coerceIn(0, set.to - set.textFrom)
+    val to = set.textFrom + into
+    // The stops are in reading order, so the nearest is the last one at or
+    // before this verse and offset.
+    var best = 0
+    for (i in stops.indices) {
+        val stop = stops[i]
+        val before = stop.runIndex < pick || (stop.runIndex == pick && stop.to <= to)
+        if (before) best = i else break
+    }
+    return best
+}
 
 /**
  * Every place the leaf may break, in order: the word boundaries of the offer.

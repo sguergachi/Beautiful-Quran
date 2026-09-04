@@ -699,9 +699,16 @@ than the page being filled.
 
 Ten consecutive leaves: the last line averaging **1.00** of a median line, five
 of them longer than the median, and the two shortest (0.85, 0.91) sitting in
-front of a word too long for the room left. The cost is 22 seconds to paginate
-against 50 ms to read it back, once per layout, in the background, with the leaf
-blank rather than rearranging.
+front of a word too long for the room left.
+
+**And the search starts from the candidate.** It is a poor authority and an
+excellent guess: where the leaf and it agree — almost everywhere — its answer
+*is* the answer, and where they differ it is a word or two out, never a page. So
+the search seeds there, doubles outwards until it has straddled the truth, and
+bisects what is left. Three or four measurements a leaf instead of nine, for
+byte-identical leaves: 22 seconds to paginate becomes **10.7**, against 50 ms to
+read it back, once per layout, in the background, with the leaf blank rather
+than rearranging.
 
 **And it measures the leaf it will draw, not the one it read the cut off.**
 Everything before this measures a *candidate*: the offer laid out whole, with
