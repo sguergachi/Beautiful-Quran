@@ -38,7 +38,7 @@ interface Props {
   sweepMs: number | null
   /** Seek-generation so replaying this Active word restarts the wash. */
   activation?: number
-  /** When true, pulse the orange search-hit flash on this Arabic word. */
+  /** When true, breathe the orange search-hit flash on this Arabic word. */
   searchFlash?: boolean
   /** Temporarily recess this non-target word while a search flash is active. */
   searchRecessed?: boolean
@@ -310,7 +310,7 @@ export function HafsWord({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activation, ink.repeat, ink.state, repeatMounted])
 
-  // Search-hit pulse: mount overlay only while flashing.
+  // Search-hit breath: mount overlay only while flashing.
   useLayoutEffect(() => {
     if (!flashMounted) return
     if (!searchFlash) {
@@ -366,7 +366,7 @@ export function HafsWord({
           {flashMounted ? (
             <span
               ref={flashRef}
-              className="hafs-repeat-overlay search-hit-pulse hafs-glyph"
+              className="hafs-repeat-overlay search-hit-breath hafs-glyph"
               aria-hidden="true"
               style={{ opacity: 0 }}
             >

@@ -1853,12 +1853,12 @@ select {
 /* Search-hit orange is intentionally heavier than recitation's repeat wash.
    The overlay is absolute, so neither bold English nor the tight glyph stroke
    can reflow the verse; Arabic keeps its original shaped glyph underneath. */
-.search-hit-pulse {
+.search-hit-breath {
   -webkit-text-stroke: 0.025em var(--repeat);
   paint-order: stroke fill;
 }
 
-.word-repeat-overlay.search-hit-pulse.word-gloss {
+.word-repeat-overlay.search-hit-breath.word-gloss {
   font-weight: 700;
 }
 

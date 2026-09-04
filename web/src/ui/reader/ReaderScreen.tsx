@@ -769,7 +769,7 @@ export function ReaderScreen({ stackLayer }: { stackLayer: StackLayer }) {
     focus.invalidateLayout()
   }, [mountRange.lo, mountRange.hi, content?.surah.id, isTop])
 
-  // Home word-search hit: repeated orange side wipes on the
+  // Home word-search hit: repeated full-word orange breaths on the
   // matched word once the verse is on screen (Android SearchHitFlash).
   const pendingFlash = state.pendingSearchFlash
   const [flashTarget, setFlashTarget] = useState<{

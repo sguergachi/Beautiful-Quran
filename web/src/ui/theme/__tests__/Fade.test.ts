@@ -4,8 +4,6 @@ import {
   inkWashAlpha,
   INK_PROFILE_STOPS,
   paperCoverMaskImage,
-  travelingWipeBounds,
-  travelingWipeMaskImage,
   washMaskImage,
   wholeWordInkAlpha,
 } from '../Fade'
@@ -56,14 +54,5 @@ describe('fade math', () => {
     expect(mask.startsWith('linear-gradient(to right,')).toBe(true)
     // Progress 0 → uniform paper cover of (1 − restingAlpha).
     expect(mask).toContain('rgba(0,0,0,0.7800)')
-  })
-
-  it('traveling wipe enters left and exits right before looping', () => {
-    expect(travelingWipeBounds(0, 0.72)).toEqual({ start: -0.72, end: 0 })
-    const crossing = travelingWipeBounds(0.5, 0.72)
-    expect(crossing.start).toBeGreaterThan(0)
-    expect(crossing.end).toBeLessThan(1)
-    expect(travelingWipeBounds(1, 0.72)).toEqual({ start: 1, end: 1.72 })
-    expect(travelingWipeMaskImage(0.5, 0.72, 0.24)).toContain('linear-gradient')
   })
 })

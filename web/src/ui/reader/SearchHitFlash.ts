@@ -5,7 +5,7 @@ export const SearchHitFlash = {
   CREST_MS: 70,
   EXHALE_MS: 420,
   REST_MS: 60,
-  BREATHS: 4,
+  BREATHS: 3,
   BACKGROUND_ALPHA: 0.4,
   FOCUS_FADE_MS: 280,
   EASING: [0.45, 0, 0.55, 1] as const,

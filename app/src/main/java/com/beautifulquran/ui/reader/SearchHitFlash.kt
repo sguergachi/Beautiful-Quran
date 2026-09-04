@@ -14,7 +14,7 @@ object SearchHitFlash {
     const val CREST_MS = 70L
     const val EXHALE_MS = 420
     const val REST_MS = 60L
-    const val BREATHS = 4
+    const val BREATHS = 3
     /** The rest of the chapter yields just enough to make every target legible. */
     const val BACKGROUND_ALPHA = 0.4f
     const val FOCUS_FADE_MS = 280

@@ -47,13 +47,13 @@ preposition can never hide inside an unrelated gloss (for example, `in` inside
 `indeed`). The nearby-word fallback is additionally restricted to modal verbs.
 Translator additions with no Quran-word gloss, such as `[in Hellfire]` in
 19:45, are searchable only in Mushaf English results; they never leak into
-Scroll gloss results. When visible, they wipe the exact canonical-translation
-term.
+Scroll gloss results. When visible, the breathing locator covers the exact
+canonical-translation term.
 Result snippets color every visible term that helped the result rank: the typed
 text, thesaurus terms such as `peace` and `tranquility`, query-related word
 glosses, and non-filler words from the matched concept's label and vocabulary.
 That vocabulary also grounds navigation, so `hell` can resolve a Hellfire
-concept's visible `Fire` gloss and pulse that same word in the reader. Derived
+concept's visible `Fire` gloss and make that same word breathe in the reader. Derived
 and concept terms require whole-word or inflection matches: `fire` never colors
 or targets the substring in `firewood`. Only the user's typed text retains
 prefix matching. Overlapping terms resolve to the longest precise phrase, and
@@ -86,9 +86,9 @@ settled, then breathes the same soft orange fill across every grounded word in
 the ayah. For example, a Hell concept result whose visible evidence is
 `punishment` and `Fire` carries both word positions into the reader rather than
 discarding all but the first. Every highlighted word fades in as one complete
-orange shape, briefly crests, fades fully out, then repeats. While it runs, all
-non-target chapter text eases down to 40% strength and fades back to full when
-the breathing locator ends;
+orange shape, briefly crests, fades fully out, then repeats three times. While
+it runs, all non-target chapter text eases down to 40% strength and fades back
+to full when the breathing locator ends;
 Arabic uses a paper cover rather than glyph alpha, so marks stay clean and
 every orange target remains full-strength. The
 scrolling layout waits for its
@@ -97,10 +97,10 @@ leaf to be visible and never depends on the unmounted scrolling list. The
 orange overlay uses bold English or a tight glyph-shaped ink spread, making the
 filled moment conspicuous without reflowing the verse or reshaping Arabic. If
 English prose coalesced a gloss shared by several Arabic words, its hidden slot
-redirects to the visible phrase; Arabic layouts still pulse the exact matched
+redirects to the visible phrase; Arabic layouts still breathe over the exact matched
 Arabic word. Ayah-level phrase and concept hits are resolved back to the word
 gloss behind the visible gold term before navigation, so a preview highlight
-such as `hearts` is also the word that pulses in the reader.
+such as `hearts` is also the word that breathes in the reader.
 
 ## Exact quotes
 

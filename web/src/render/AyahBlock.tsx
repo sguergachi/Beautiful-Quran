@@ -41,7 +41,7 @@ interface Props {
   flashWordPosition?: number | null
   /** Every grounded word in this ayah that should share the orange flash. */
   flashWordPositions?: number[]
-  /** True until the wipes finish; false during the surrounding-ink return fade. */
+  /** True until the breaths finish; false during the surrounding-ink return fade. */
   searchFocusActive?: boolean
   /** Exact canonical-translation term when [flashWordPosition] is zero. */
   searchFlashText?: string | null

@@ -7,14 +7,14 @@ import {
 } from '../SearchHitFlash'
 
 describe('SearchHitFlash', () => {
-  it('fades four complete full-word breaths in and out', () => {
-    expect(SearchHitFlash.BREATHS).toBe(4)
+  it('fades three complete full-word breaths in and out', () => {
+    expect(SearchHitFlash.BREATHS).toBe(3)
     expect(searchHitBreathMs()).toBe(810)
-    expect(searchHitFlashTotalMs()).toBe(3420)
+    expect(searchHitFlashTotalMs()).toBe(2550)
     expect(SearchHitFlash.INHALE_MS).toBeLessThan(SearchHitFlash.EXHALE_MS)
     expect(SearchHitFlash.BACKGROUND_ALPHA).toBe(0.4)
     expect(SearchHitFlash.FOCUS_FADE_MS).toBe(280)
-    expect(searchHitFlashTotalMs()).toBeLessThan(3500)
+    expect(searchHitFlashTotalMs()).toBeLessThan(2600)
   })
 
   it('expands a translator-only prefix to the complete visible word', () => {

@@ -489,8 +489,8 @@ private fun rememberRepeatWash(
 }
 
 /**
- * One-shot search-hit locator: four full-word orange breaths. Independent of karaoke
- * `ink.repeat` so a real repeat chain is never cancelled or restarted.
+ * One-shot search-hit locator: three full-word orange breaths. It is independent
+ * of karaoke `ink.repeat`, so a real repeat chain is never cancelled or restarted.
  * [identity] restarts it when search moves directly to another word.
  */
 @Composable
@@ -1389,7 +1389,7 @@ private fun BoxScope.InkOverlayText(
  * orange overlay that sweeps in while the word belongs to a repeat chain and
  * dissolves back out once the chain releases. An optional [searchHitWash]
  * reuses that same overlay ([InkOverlayText] + [repeatInkLayer]) for the home
- * search-hit flash — never a second measured Text that would shift layout. */
+ * search-hit breath — never a second measured Text that would shift layout. */
 @Composable
 private fun HighlightLayeredText(
     text: String,
@@ -1406,8 +1406,9 @@ private fun HighlightLayeredText(
     val paper = MaterialTheme.colorScheme.background
     val glintInk = LocalQuranAccents.current.glintInk
     val glimmerInk = if (motion.glintIsRepeat) repeatInk else glintInk ?: repeatInk
-    val searchHitActive = !motion.showRepeatLayer &&
-        searchHitWash != null && searchHitWash.alpha.value > 0f
+    // Mount for the whole locator lifecycle; alpha is read only by the draw
+    // modifier so breathing does not recompose or remeasure this word.
+    val searchHitActive = !motion.showRepeatLayer && searchHitWash != null
     val orangeWash = motion.repeatWash.takeIf { motion.showRepeatLayer }
     Box(modifier) {
         // A restrained glyph-shaped halo sits behind the ink—no radial field.
@@ -1566,7 +1567,7 @@ private fun WordUnit(
                             if (recessedForSearch) searchBackgroundAlpha() else 1f
                     },
                 )
-                if (searchHitWash != null && searchHitWash.alpha.value > 0f) {
+                if (searchHitWash != null) {
                     Text(
                         text = word.translation,
                         fontSize = 12.sp * fontScale,

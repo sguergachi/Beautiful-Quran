@@ -8,12 +8,12 @@ import org.junit.Test
 class SearchHitFlashTest {
 
     @Test
-    fun `four complete full-word breaths fade in and out`() {
-        assertEquals(4, SearchHitFlash.BREATHS)
+    fun `three complete full-word breaths fade in and out`() {
+        assertEquals(3, SearchHitFlash.BREATHS)
         assertEquals(810L, SearchHitFlash.breathMs())
-        assertEquals(3_420L, SearchHitFlash.totalMs())
+        assertEquals(2_550L, SearchHitFlash.totalMs())
         assertTrue(SearchHitFlash.INHALE_MS < SearchHitFlash.EXHALE_MS)
-        assertTrue(SearchHitFlash.totalMs() < 3_500L)
+        assertTrue(SearchHitFlash.totalMs() < 2_600L)
     }
 
     @Test

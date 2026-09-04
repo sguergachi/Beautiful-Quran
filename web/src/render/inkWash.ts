@@ -585,6 +585,9 @@ export function runSearchHitWash(
   }
 
   applyMask(el, 'none')
+  // Only the few active search overlays get a temporary compositor hint;
+  // finish() removes it as soon as the third breath ends.
+  el.style.willChange = 'opacity'
   breathe(timing.BREATHS)
 
   return () => {

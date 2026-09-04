@@ -46,7 +46,7 @@ interface Props {
   showTransliteration: boolean
   englishMode?: boolean
   searchHit?: boolean
-  /** When true, pulse the orange search-hit flash on Arabic + gloss. */
+  /** When true, breathe the orange search-hit flash on Arabic + gloss. */
   searchFlash?: boolean
   /** Temporarily recess this non-target word while a search flash is active. */
   searchRecessed?: boolean
@@ -494,7 +494,7 @@ export function WordUnit({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activation, ink.repeat, ink.state, repeatMounted, englishMode])
 
-  // Search-hit pulse: mount the twin overlay only while flashing.
+  // Search-hit breath: mount the twin overlay only while flashing.
   useLayoutEffect(() => {
     if (!flashMounted) return
     if (!searchFlash) {
@@ -598,7 +598,7 @@ export function WordUnit({
           {flashMounted ? (
             <span
               ref={flashRef}
-              className={`word-repeat-overlay search-hit-pulse ${baseClass}`}
+              className={`word-repeat-overlay search-hit-breath ${baseClass}`}
               aria-hidden="true"
               style={{ opacity: 0 }}
             >
@@ -626,7 +626,7 @@ export function WordUnit({
           {flashMounted ? (
             <span
               ref={glossFlashRef}
-              className="word-repeat-overlay search-hit-pulse word-gloss"
+              className="word-repeat-overlay search-hit-breath word-gloss"
               aria-hidden="true"
               style={{ opacity: 0 }}
             >
