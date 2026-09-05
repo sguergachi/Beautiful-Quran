@@ -53,6 +53,14 @@ Android / web at runtime
   legacy unauthenticated Quran.com chapter API
        -> fixed 114-chapter word/QCF snapshot
        -> atomic local cache (refresh day 6; unusable after day 7)
+
+After QF approves the Content Sync resource set, the same caches talk to the
+Cloudflare Worker in `worker/` instead of the legacy endpoint. The Worker is
+the only secret holder: it keeps the QF client secret in Cloudflare's secret
+store, caches only the short-lived OAuth token in Worker memory, proxies only
+the fixed Content Sync resource set, and stores no Quran content server-side.
+Each device keeps its own local cache and sync checkpoint. See
+`worker/README.md` for the operator setup and the pre-switch schema check.
 ```
 
 The bundled database contains Quran text, morphology, an open quran-align timing
@@ -131,9 +139,12 @@ flow as an approved QF integration:
 The authenticated Content API documentation uses a client ID and client secret
 and says secrets must remain server-side. Therefore it is not a drop-in URL
 swap for a public Android/browser app. Unless QF supplies a client-safe content
-flow or grants an exception, authenticated Content API use requires a backend.
-The repository intentionally has no placeholder backend and must not pretend
-the unauthenticated endpoint is authenticated.
+flow or grants an exception, authenticated Content API use requires the
+`worker/` proxy: Cloudflare's Git integration deploys it from this repository
+on `master`, and the QF secret is entered only in Cloudflare's secret UI —
+never in Git, CI, Android, or web. The unauthenticated endpoint remains the
+client transport until an approved Prelive sync + snapshot verifies the exact
+record schema and resource IDs (see `worker/README.md`).
 
 ## Work after QF responds
 
@@ -153,9 +164,21 @@ the unauthenticated endpoint is authenticated.
 
 ### If QF requires authenticated server-side access
 
-- [ ] Decide explicitly whether this project will operate a backend. Without
-  one, the authenticated integration cannot ship under the documented secret
-  model.
+- [x] Decided explicitly: the project operates no database-backed backend. The
+  only server-side piece is the free Cloudflare Worker in `worker/` — no QF
+  content stored, no paid hosting. Without it, the authenticated integration
+  cannot ship under the documented secret model.
+- [x] Proxy contract in-repo: fixed Content Sync resource set, short-lived
+  token cached in Worker memory, one 401 retry with a replacement token,
+  origin allowlist, relative-path allowlist, `no-store` responses, and
+  `node --test worker/test/` green in CI.
+- [ ] Operator steps (in Cloudflare, never in this repo): connect the Git
+  integration so `master` deploys the Worker; enter the rotated
+  `QF_CLIENT_ID` / `QF_CLIENT_SECRET` in the Prelive environment secret
+  store; visit `/healthz` and expect `{ "ok": true }` without touching QF.
+- [ ] Capture one approved Prelive sync + snapshot through the Worker and
+  verify its record schema and resource IDs before changing either client
+  mapper; then each client joins the three local resources atomically.
 - [ ] If accepted, document the host and processor, TLS, encryption at rest,
   secret manager, least-privilege access, rate limits, monitoring, backups,
   purge, incident reporting, and privacy-policy changes before traffic begins.

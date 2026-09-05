@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { assetUrl } from '../../assetUrl'
 import { appStore, useAppSelector } from '../../store/appStore'
+import { runtimeMushafCache, type RuntimeCacheStatus } from '../../data/runtimeMushaf'
 import {
   type HomeBookmarkStyle,
   type BrushCircleStyle,
@@ -89,6 +90,20 @@ export function SettingsScreen({
   const [paintToken, setPaintToken] = useState(0)
   const [checkPaintToken, setCheckPaintToken] = useState(0)
   const [checkPreviewOn, setCheckPreviewOn] = useState(true)
+  const [, setCacheClock] = useState(0)
+
+  useEffect(() => {
+    if (!s.developerMode) return
+    const tick = () => setCacheClock((value) => value + 1)
+    const unsubscribes = [
+      runtimeMushafCache?.subscribeDiagnostics(tick),
+    ]
+    const interval = window.setInterval(tick, 60_000)
+    return () => {
+      unsubscribes.forEach((unsubscribe) => unsubscribe?.())
+      window.clearInterval(interval)
+    }
+  }, [s.developerMode])
   /** Bumps when paste/reset/preset loads so Base UI sliders remount with exact values. */
   const [sliderEpoch, setSliderEpoch] = useState(0)
   const [checkSliderEpoch, setCheckSliderEpoch] = useState(0)
@@ -103,6 +118,7 @@ export function SettingsScreen({
   const lastStyleRef = useRef(s.brushCircleStyle)
   const lastShipRef = useRef(SHIPPED_BRUSH_REVISION)
   const lastCheckShipRef = useRef(SHIPPED_CHECK_REVISION)
+  const runtimeCacheStatus = runtimeMushafCache?.status() ?? null
 
   // Reseed when the saved preset changes, or when shipped BASE revision bumps.
   useEffect(() => {
@@ -410,6 +426,27 @@ export function SettingsScreen({
           <section className="settings-section settings-section-developer">
             <h2>Developer</h2>
             <p className="settings-caption">Tools for testing work in progress.</p>
+
+            <div className="settings-dev-block">
+              <p>Quran.com word &amp; QCF cache</p>
+              <p className="settings-caption">
+                {formatRuntimeCache(runtimeCacheStatus)}
+              </p>
+              <button
+                type="button"
+                className="settings-dev-link settings-dev-primary"
+                disabled={!runtimeMushafCache || runtimeCacheStatus?.phase === 'refreshing'}
+                onClick={() => void runtimeMushafCache?.refresh()}
+              >
+                {runtimeCacheStatus?.phase === 'refreshing'
+                  ? 'Updating Quran cache…'
+                  : 'Force seven-day cache update'}
+              </button>
+              <p className="settings-caption">
+                Forces the same atomic update used when the cache is due. The current
+                provider downloads a snapshot; authenticated Content Sync will use its checkpoint.
+              </p>
+            </div>
 
             <div className="settings-dev-block">
               <PaperSwitch
@@ -736,6 +773,48 @@ export function SettingsScreen({
       </div>
     </div>
   )
+}
+
+function formatRuntimeCache(status: RuntimeCacheStatus | null): string {
+  if (!status) return 'Unavailable · Quran content withheld · API calls this launch 0'
+  const now = Date.now()
+  const state = {
+    empty: 'Empty · downloading when online',
+    fresh: `Fresh · refresh ${cacheCountdown(status.refreshAtMs, now)}`,
+    refresh_due: 'Refresh due · retrying in the background',
+    expired: 'Expired · Quran content withheld',
+    refreshing: 'Refreshing in the background',
+    error: 'Refresh failed · retrying when internet returns',
+  }[status.phase]
+  const refreshed = status.lastRefreshApiCalls == null
+    ? 'not recorded'
+    : `${status.lastRefreshApiCalls} calls`
+  const updated = status.updatedAtMs == null ? '' : ` · updated ${cacheAge(status.updatedAtMs, now)}`
+  const expiry = status.expiresAtMs == null
+    ? ''
+    : ` · seven-day limit ${cacheCountdown(status.expiresAtMs, now)}`
+  const error = status.lastError ? ` · last error: ${status.lastError}` : ''
+  return `${state} · last refresh ${refreshed} · this launch ${status.apiCalls} calls${updated}${expiry}${error}`
+}
+
+function cacheAge(atMs: number, nowMs: number): string {
+  const minutes = Math.floor(Math.max(0, nowMs - atMs) / 60_000)
+  const days = Math.floor(minutes / (24 * 60))
+  const hours = Math.floor((minutes % (24 * 60)) / 60)
+  if (days > 0) return `${days}d ${hours}h ago`
+  if (hours > 0) return `${hours}h ago`
+  return `${minutes}m ago`
+}
+
+function cacheCountdown(atMs: number | null, nowMs: number): string {
+  if (atMs == null) return 'when online'
+  if (atMs <= nowMs) return 'now'
+  const minutes = Math.ceil((atMs - nowMs) / 60_000)
+  const days = Math.floor(minutes / (24 * 60))
+  const hours = Math.floor((minutes % (24 * 60)) / 60)
+  if (days > 0) return `in ${days}d ${hours}h`
+  if (hours > 0) return `in ${hours}h`
+  return `in ${minutes}m`
 }
 
 function BackChevron() {

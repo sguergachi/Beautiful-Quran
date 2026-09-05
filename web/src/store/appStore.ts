@@ -12,6 +12,7 @@ import type { ActiveWord, Reciter, Surah, SurahContent, Segment, Word } from '..
 import { dictionaryEntry, type DictionaryEntry } from '../data/dictionary'
 import { lexiconEntry, type LexiconEntry } from '../data/lexicon'
 import { QuranRepository } from '../data/repository'
+import { runtimeMushafCache } from '../data/runtimeMushaf'
 import {
   loadBookmarks,
   loadSettings,
@@ -231,6 +232,34 @@ class AppStore {
   }
 
   constructor() {
+    runtimeMushafCache?.subscribe(() => {
+      QuranRepository.invalidateRuntimeMushafViews()
+      const current = this.state.content
+      if (current) this.set({ content: QuranRepository.surahContent(current.surah.id) })
+    })
+    runtimeMushafCache?.subscribeDiagnostics(() => {
+      if (this.state.ready) return
+      const status = runtimeMushafCache.status()
+      if (status.phase === 'refreshing') {
+        const progress = runtimeMushafCache.downloadProgress()
+        const loadLabel = runtimeMushafCache.haveRequestsSettled() && status.apiCalls > 0
+          ? `Saving Quran pages… ${status.apiCalls} requests complete`
+          : progress != null && progress.completed === progress.total
+            ? 'Checking Quran pages…'
+            : progress
+              ? `Downloading Quran pages… ${progress.completed} of ${progress.total} chapters`
+          : status.apiCalls > 0
+            ? `Downloading Quran pages… ${status.apiCalls} API requests`
+            : 'Preparing Quran pages…'
+        this.set({
+          loadLabel,
+          loadProgress: runtimeMushafCache.haveRequestsSettled() ? 1 : progress?.fraction ?? null,
+        })
+      }
+    })
+    window.addEventListener('online', () => {
+      void runtimeMushafCache?.refreshIfNeeded()
+    })
     player.subscribe((ps) => {
       const prev = this.state.player
       this.state = { ...this.state, player: ps }
@@ -355,6 +384,9 @@ class AppStore {
           this.set({ loadLabel: 'Loading the book…', loadProgress: null })
         }
       })
+      // Direct api.quran.com snapshot aligns onto bundled word rows.
+      this.set({ loadLabel: 'Preparing Quran pages…', loadProgress: null })
+      await runtimeMushafCache.restore()
       const surahs = QuranRepository.surahs()
       const reciters = QuranRepository.reciters()
       this.set({

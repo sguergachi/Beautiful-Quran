@@ -313,6 +313,10 @@ class ReaderViewModel(
         if (rulerFor == null && mushafRulerKey != null && mushafLeafText == text) return
         mushafLeafText = text
         mushafRulerKey = rulerKey
+        // Retained so a runtime word/QCF refresh can repaginate the same book
+        // instead of dropping a measured book back to the character estimate.
+        mushafRulerFor = rulerFor
+        mushafCacheKey = cacheKey
         // Two of these can be in flight at once: the app's root asks on load
         // from remembered figures, and the leaf asks again the moment it knows
         // its own size. They read and paginate off the main thread, so the
@@ -355,6 +359,9 @@ class ReaderViewModel(
 
     private var mushafRulerKey: Any? = null
     private var mushafGeneration = 0
+    private var mushafRulerFor:
+        ((translation: (Int, Int) -> String) -> EnglishLeafRuler)? = null
+    private var mushafCacheKey: String = ""
 
     /** Everything the English book's leaves depend on — see [EnglishBookCache]. */
     fun englishBookCacheKey(
@@ -751,6 +758,25 @@ class ReaderViewModel(
                 if (!sessions.isCurrent(gen, id)) return@collect
                 installTimings(refreshed)
                 _uiState.value = _uiState.value.copy(hasTimings = refreshed.isNotEmpty())
+            }
+        }
+        // Word glosses and QCF layout arrive as one atomic runtime snapshot.
+        viewModelScope.launch {
+            repository.runtimeMushafChanged?.collect {
+                repository.invalidateRuntimeMushafViews()
+                val gen = sessions.generation
+                val id = sessions.surahId.takeIf { it != 0 } ?: return@collect
+                val refreshed = repository.surahContent(id)
+                if (!sessions.isCurrent(gen, id)) return@collect
+                _uiState.value = _uiState.value.copy(content = refreshed)
+                // The book is paginated from the QCF snapshot the refresh
+                // replaced: null it and repaginate the same book (measured
+                // when the leaf had measured it) rather than keep stale pages.
+                _mushaf.value = null
+                mushafRulerKey = null
+                mushafLeafText?.let { text ->
+                    ensureMushaf(text, mushafRulerFor, null, mushafCacheKey)
+                }
             }
         }
     }

@@ -33,6 +33,9 @@ jobs:
       - name: Timing pipeline regressions
         run: python3 tools/test_build_db.py
 
+      - name: QF proxy regressions
+        run: node --test worker/test/*.test.mjs
+
       - name: Accept Android SDK licenses
         run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
 

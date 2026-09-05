@@ -61,6 +61,40 @@ class QfContentCacheDatabase(context: Context) : QfContentSyncStore {
             )
         }
 
+    override fun rows(
+        resource: QfResource,
+        recordType: String,
+        recordKeyPrefix: String?,
+    ): List<QfCacheRow> {
+        val prefixClause = if (recordKeyPrefix == null) "" else "AND record_key LIKE ? "
+        val args = buildList {
+            add(resource.group)
+            add(resource.id.toString())
+            add(recordType)
+            if (recordKeyPrefix != null) add("$recordKeyPrefix%")
+        }.toTypedArray()
+        return db.rawQuery(
+            "SELECT record_key,payload,updated_at FROM cached_rows " +
+                "WHERE resource_group=? AND resource_id=? AND record_type=? " +
+                prefixClause + "ORDER BY record_key",
+            args,
+        ).use { cursor ->
+            buildList {
+                while (cursor.moveToNext()) {
+                    add(
+                        QfCacheRow(
+                            resource = resource,
+                            recordType = recordType,
+                            recordKey = cursor.getString(0),
+                            payload = cursor.getString(1),
+                            updatedAt = cursor.getString(2),
+                        ),
+                    )
+                }
+            }
+        }
+    }
+
     override fun clear() = db.transaction {
         delete("cached_rows", null, null)
         delete("sync_state", null, null)

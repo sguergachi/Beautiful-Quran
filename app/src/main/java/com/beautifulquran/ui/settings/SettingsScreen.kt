@@ -46,6 +46,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -74,9 +75,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.beautifulquran.BuildConfig
+import com.beautifulquran.QuranApp
 import com.beautifulquran.R
 import com.beautifulquran.data.BrushCircleStyle
 import com.beautifulquran.data.HomeBookmarkStyle
+import com.beautifulquran.data.RuntimeCachePhase
+import com.beautifulquran.data.RuntimeMushafCache
 import com.beautifulquran.data.Settings
 import com.beautifulquran.data.ThemeMode
 import com.beautifulquran.playback.RecitationCache
@@ -472,6 +476,10 @@ private fun DeveloperSection(
     SectionLabel("Developer")
     Spacer(Modifier.height(2.dp))
     Caption("Tools for testing work in progress.")
+
+    Spacer(Modifier.height(20.dp))
+    val app = context.applicationContext as QuranApp
+    MushafRuntimeCacheStatus(app.runtimeMushaf)
 
     Spacer(Modifier.height(20.dp))
     ToggleRow(
@@ -1506,6 +1514,92 @@ internal val ThemeMode.label: String
     get() = themeLabel(this)
 
 // ── Quiet typographic helpers ──────────────────────────────────────────────
+
+@Composable
+private fun MushafRuntimeCacheStatus(cache: RuntimeMushafCache?) {
+    Text(
+        text = "Quran.com word & QCF cache",
+        style = MaterialTheme.typography.bodyLarge,
+        color = MaterialTheme.colorScheme.onSurface,
+    )
+    if (cache == null) {
+        Caption("Unavailable · Quran.com-derived fields withheld")
+        return
+    }
+    val diagnostics by cache.diagnostics.collectAsStateWithLifecycle()
+    var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(60_000L)
+            now = System.currentTimeMillis()
+        }
+    }
+    // A refresh can commit after the minute ticker was sampled. Read the cache's
+    // current clock so a brand-new snapshot is never labelled expired.
+    val status = remember(diagnostics, now) { cache.status() }
+    val state = when (status.phase) {
+        RuntimeCachePhase.EMPTY -> "Empty · downloading when online"
+        RuntimeCachePhase.FRESH -> "Fresh · refresh ${cacheCountdown(status.refreshAtMs, now)}"
+        RuntimeCachePhase.REFRESH_DUE -> "Refresh due · retrying in the background"
+        RuntimeCachePhase.EXPIRED -> "Expired · Quran.com-derived fields withheld"
+        RuntimeCachePhase.REFRESHING -> "Refreshing in the background"
+        RuntimeCachePhase.ERROR -> "Refresh failed · retrying when internet returns"
+    }
+    Caption("$state · ${cache.cachedWordCount()} words cached in memory")
+    val lastRefreshUsage = status.lastRefreshApiCalls?.let { "$it calls" } ?: "not recorded"
+    Caption("API usage · last refresh $lastRefreshUsage · this launch ${status.apiCalls} calls")
+    status.updatedAtMs?.let {
+        Caption("Updated ${cacheAge(it, now)} · seven-day limit ${cacheCountdown(status.expiresAtMs, now)}")
+    }
+    status.lastError?.let { Caption("Last error · $it") }
+    Text(
+        text = if (status.phase == RuntimeCachePhase.REFRESHING) {
+            "Updating Quran cache…"
+        } else {
+            "Force seven-day cache update"
+        },
+        style = MaterialTheme.typography.bodyLarge,
+        modifier = Modifier
+            .fillMaxWidth()
+            .quietClickable(
+                enabled = status.phase != RuntimeCachePhase.REFRESHING,
+                role = Role.Button,
+                onClick = cache::refresh,
+            )
+            .padding(vertical = 6.dp),
+        color = MaterialTheme.colorScheme.primary.copy(
+            alpha = if (status.phase == RuntimeCachePhase.REFRESHING) 0.4f else 1f,
+        ),
+    )
+    Caption(
+        "Forces the same atomic update used when the cache is due. The current " +
+            "provider downloads a snapshot; authenticated Content Sync will use its checkpoint.",
+    )
+}
+
+private fun cacheAge(atMs: Long, nowMs: Long): String {
+    val minutes = ((nowMs - atMs).coerceAtLeast(0L)) / 60_000L
+    val days = minutes / (24 * 60)
+    val hours = minutes % (24 * 60) / 60
+    return when {
+        days > 0 -> "${days}d ${hours}h ago"
+        hours > 0 -> "${hours}h ago"
+        else -> "${minutes}m ago"
+    }
+}
+
+private fun cacheCountdown(atMs: Long?, nowMs: Long): String {
+    if (atMs == null) return "when online"
+    val remainingMinutes = ((atMs - nowMs).coerceAtLeast(0L) + 59_999L) / 60_000L
+    val days = remainingMinutes / (24 * 60)
+    val hours = remainingMinutes % (24 * 60) / 60
+    return when {
+        atMs <= nowMs -> "now"
+        days > 0 -> "in ${days}d ${hours}h"
+        hours > 0 -> "in ${hours}h"
+        else -> "in ${remainingMinutes}m"
+    }
+}
 
 /** A section opening: generous air above, then the quiet label. */
 @Composable
