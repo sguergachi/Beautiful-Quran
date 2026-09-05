@@ -8,6 +8,7 @@ import androidx.media3.common.Player
 import com.beautifulquran.QuranApp
 import com.beautifulquran.data.AyahSelectorSide
 import com.beautifulquran.data.ReadingMode
+import com.beautifulquran.ui.settings.applyReadingMode
 import com.beautifulquran.data.ThemeMode
 import com.beautifulquran.data.model.Reciter
 import com.beautifulquran.data.model.Surah
@@ -260,8 +261,11 @@ abstract class BaseQuranAppFunctionService : AppFunctionService() {
         val side = selectorSide?.let(::parseSelectorSide)
         val themeMode = theme?.let(::parseTheme)
         quranApp.settings.update { current ->
-            current.copy(
-                readingMode = mode ?: current.readingMode,
+            // Through the policy, not around it: a printed leaf is one book in
+            // one language, and a bilingual mode has no leaf to be set on.
+            // See MUSHAF_VIEW_MODES.
+            val viewed = mode?.let { applyReadingMode(current, it) } ?: current
+            viewed.copy(
                 fontScale = scale ?: current.fontScale,
                 showWordGloss = showWordGloss ?: current.showWordGloss,
                 showTransliteration = showTransliteration ?: current.showTransliteration,

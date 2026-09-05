@@ -133,9 +133,27 @@ class MushafCatalog internal constructor(
         return firstPageBySurah[surahId].takeIf { it > 0 } ?: 1
     }
 
+    /**
+     * The leaf a reader following the voice belongs on — which is not always
+     * the leaf the word is printed on.
+     *
+     * The English leaf sets a verse whole on the page it *begins* on, because
+     * a sentence cannot be cut at a page break (see `EnglishLeaf.kt`). So while
+     * the voice is inside a verse that straddles a boundary, the page the
+     * reader is looking at is still the verse's opening leaf, and the paper
+     * must not turn out from under a sentence halfway through it. Pass
+     * [wholeVerses] for a layout set that way.
+     */
+    fun readingPageOf(
+        surahId: Int,
+        ayah: Int,
+        position: Int,
+        wholeVerses: Boolean,
+    ): Int = pageOf(surahId, ayah, if (wholeVerses) 1 else position)
+
     fun pageOf(surahId: Int, ayah: Int, position: Int = 1): Int {
-        pageByWord[wordKey(surahId, ayah, position)]?.let { return it }
-        pageByWord[wordKey(surahId, ayah, 1)]?.let { return it }
+        pageByWord[quranWordKey(surahId, ayah, position)]?.let { return it }
+        pageByWord[quranWordKey(surahId, ayah, 1)]?.let { return it }
         return firstPageOf(surahId)
     }
 
@@ -155,7 +173,7 @@ fun buildMushafCatalog(words: List<MushafSourceWord>): MushafCatalog {
         grouped.getOrPut(page) { LinkedHashMap() }
             .getOrPut(line) { mutableListOf() }
             .add(source)
-        pageByWord[wordKey(source.surahId, source.ayah, source.word.position)] = page
+        pageByWord[quranWordKey(source.surahId, source.ayah, source.word.position)] = page
         val first = firstPageBySurah[source.surahId]
         if (first == 0 || page < first) firstPageBySurah[source.surahId] = page
     }
@@ -201,5 +219,10 @@ fun buildMushafCatalog(words: List<MushafSourceWord>): MushafCatalog {
 private fun ayahKey(surahId: Int, ayah: Int): Long =
     (surahId.toLong() shl 32) or ayah.toLong()
 
-private fun wordKey(surahId: Int, ayah: Int, position: Int): Long =
+/**
+ * One word of the Qur'an as a single key. Used by the page index here and by
+ * anything else that has to answer per word without carrying a nested map —
+ * the English leaf's gloss lookup, for one.
+ */
+fun quranWordKey(surahId: Int, ayah: Int, position: Int): Long =
     (surahId.toLong() shl 40) or (ayah.toLong() shl 16) or position.toLong()

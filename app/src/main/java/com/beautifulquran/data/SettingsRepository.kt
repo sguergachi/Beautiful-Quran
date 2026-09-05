@@ -11,11 +11,29 @@ enum class ThemeMode { SYSTEM, LIGHT, DARK, ROYAL_GREEN }
 /** What flows on the sheet: Arabic with English under each word, English only, or Arabic only. */
 enum class ReadingMode { ARABIC_ENGLISH, ENGLISH_ONLY, ARABIC_ONLY }
 
-/** Continuous scroll, or a printed mushaf leaf. Mushaf is Arabic only. */
+/**
+ * Continuous scroll, or a printed leaf. A leaf may be set in the page's own
+ * hand or in English (`domain/EnglishLeaf.kt`) — never bilingual, which is a
+ * scroll idea. See `MUSHAF_VIEW_MODES`.
+ */
 enum class ReadingLayout { SCROLL, MUSHAF }
 
 /** Digit form of the trailing ﴿N﴾ / ﴾N﴿ verse mark. */
 enum class VerseNumberScript { ARABIC, ENGLISH }
+
+/**
+ * Which English the leaf is set from.
+ *
+ * [TRANSLATION] is the published verse translation, which reads as a book but
+ * only lines up with the recitation approximately — Arabic word order is not
+ * English word order, so `EnglishWordAlignment` has to bridge the two and
+ * anchors about 84 % of words. [GLOSS] is the word-by-word crib the scrolling
+ * reader sets, stitched into a line: it reads less well, and every Arabic word
+ * lights exactly its own English, because there is nothing to align.
+ *
+ * A reading preference rather than a right answer, so it is the reader's.
+ */
+enum class EnglishLeafText { TRANSLATION, GLOSS }
 
 /** Folio figures on a mushaf page break: one script, or both. */
 enum class PageNumberScript { BOTH, ARABIC, ENGLISH }
@@ -58,6 +76,8 @@ data class Settings(
     val readingLayout: ReadingLayout = ReadingLayout.SCROLL,
     val verseNumberScript: VerseNumberScript = VerseNumberScript.ARABIC,
     val pageNumberScript: PageNumberScript = PageNumberScript.BOTH,
+    /** Which English the mushaf's English leaf is set from. */
+    val englishLeafText: EnglishLeafText = EnglishLeafText.TRANSLATION,
     val showWordGloss: Boolean = true,
     val showTransliteration: Boolean = false,
     val showTranslation: Boolean = false,
@@ -109,6 +129,26 @@ private fun SharedPreferences.homeBookmarkStyle(): HomeBookmarkStyle =
         HomeBookmarkStyle.TOP_BOUND
     }
 
+/**
+ * What the remembered leaf figures describe.
+ *
+ * A well and a measure are only meaningful against the grid that produced them,
+ * and the grid moves: a foot band, a running head, a fore-edge. A figure kept
+ * from a build whose leaf was a different shape is worse than no figure at all —
+ * it paginates the whole book against a leaf that no longer exists, and the
+ * symptom is a leaf that stops a few words short of its own last line. **Bump
+ * this whenever anything in `MushafGrid`, `MushafLeafBands` or the leaf's
+ * fore-edge changes**, and the next launch measures instead of remembering.
+ *
+ * This is load-bearing. The app's root paginates the whole English book from
+ * these figures before the reader exists, so a stamp that outlives the geometry
+ * it describes hands every leaf more lines than it has and the book comes out
+ * with its last lines short — the one fault this whole layout exists to remove.
+ * The leaf corrects it the moment it lays out and measures something else, but
+ * the reader sees the correction as pages rearranging under them.
+ */
+private const val LEAF_METRICS_VERSION = 3
+
 class SettingsRepository(context: Context) {
 
     private val prefs: SharedPreferences =
@@ -124,6 +164,7 @@ class SettingsRepository(context: Context) {
         readingLayout = prefs.enum("readingLayout", ReadingLayout.SCROLL),
         verseNumberScript = prefs.enum("verseNumberScript", VerseNumberScript.ARABIC),
         pageNumberScript = prefs.enum("pageNumberScript", PageNumberScript.BOTH),
+        englishLeafText = prefs.enum("englishLeafText", EnglishLeafText.TRANSLATION),
         showWordGloss = prefs.getBoolean("showWordGloss", true),
         showTransliteration = prefs.getBoolean("showTransliteration", false),
         showTranslation = prefs.getBoolean("showTranslation", false),
@@ -145,6 +186,44 @@ class SettingsRepository(context: Context) {
      * ayah advance. [update] rewrites every settings key per call, which is
      * needless write amplification for two frequently changing integers.
      */
+    /**
+     * The English leaf's well and measure, as last laid out, with the window
+     * they were laid out in.
+     *
+     * The book is paginated by measuring a leaf ([EnglishLeafRuler]), and a leaf
+     * has no size until it has been composed — so the first time the reader ever
+     * opens, the book has to open on the character estimate and repaginate a
+     * frame later. Only the first time. Remembering the figures means every
+     * launch after it can measure the whole book before anything is opened, and
+     * the reader never sees the estimate at all.
+     *
+     * Kept beside the settings rather than in them: they are a fact about the
+     * screen, not a preference, and they change on nobody's decision. The window
+     * is stored with them because a leaf on a folded phone is not the leaf on an
+     * unfolded one, and a remembered figure that no longer describes the screen
+     * is worse than none.
+     */
+    fun rememberLeafMetrics(wellPx: Float, measurePx: Float, windowWidthPx: Int, windowHeightPx: Int) {
+        if (wellPx <= 0f || measurePx <= 0f) return
+        prefs.edit {
+            putFloat("leafWellPx", wellPx)
+            putFloat("leafMeasurePx", measurePx)
+            putInt("leafWindowW", windowWidthPx)
+            putInt("leafWindowH", windowHeightPx)
+            putInt("leafMetricsVersion", LEAF_METRICS_VERSION)
+        }
+    }
+
+    /** The remembered well and measure, if they still describe this window. */
+    fun leafMetrics(windowWidthPx: Int, windowHeightPx: Int): FloatArray? {
+        if (prefs.getInt("leafMetricsVersion", 0) != LEAF_METRICS_VERSION) return null
+        if (prefs.getInt("leafWindowW", 0) != windowWidthPx) return null
+        if (prefs.getInt("leafWindowH", 0) != windowHeightPx) return null
+        val well = prefs.getFloat("leafWellPx", 0f)
+        val measure = prefs.getFloat("leafMeasurePx", 0f)
+        return if (well > 0f && measure > 0f) floatArrayOf(well, measure) else null
+    }
+
     fun updateListeningPosition(surah: Int, ayah: Int) {
         val current = _settings.value
         if (current.lastSurah == surah && current.lastAyah == ayah) return
@@ -188,6 +267,7 @@ class SettingsRepository(context: Context) {
             putInt("readingLayout", next.readingLayout.ordinal)
             putInt("verseNumberScript", next.verseNumberScript.ordinal)
             putInt("pageNumberScript", next.pageNumberScript.ordinal)
+            putInt("englishLeafText", next.englishLeafText.ordinal)
             putBoolean("showWordGloss", next.showWordGloss)
             putBoolean("showTransliteration", next.showTransliteration)
             putBoolean("showTranslation", next.showTranslation)

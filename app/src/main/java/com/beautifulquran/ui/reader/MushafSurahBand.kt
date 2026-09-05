@@ -1,8 +1,5 @@
 package com.beautifulquran.ui.reader
 
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -17,18 +14,13 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.State
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.CornerRadius
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.luminance
@@ -42,10 +34,12 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.times
 import com.beautifulquran.data.model.Surah
 import com.beautifulquran.ui.theme.GeneratedInkRosette
 import com.beautifulquran.ui.theme.HafsFontFamily
+import com.beautifulquran.ui.theme.SerifFontFamily
 import com.beautifulquran.ui.theme.LocalQuranAccents
 import com.beautifulquran.ui.theme.generatedFieldWeave
 import com.beautifulquran.ui.theme.ornament.chapterOrnamentSeed
@@ -56,6 +50,13 @@ private const val MushafNameLift = 0.30f
 
 /** Corner easing anywhere on the leaf: a hairline, never a curve. */
 private const val MushafPanelCornerPx = 3f
+
+/**
+ * A Latin name set at the Arabic name's size overruns the cartouche: Hafs
+ * writes a chapter's name in three or four letters where the Latin spells it
+ * out. The panel is the same panel, so the writing comes down to fit it.
+ */
+private const val MushafLatinTitleScale = 0.62f
 
 
 
@@ -87,6 +88,13 @@ internal fun MushafSurahTitleBand(
     fontSize: TextUnit,
     bandHeight: Dp,
     modifier: Modifier = Modifier,
+    /**
+     * The English leaf names the chapter in the book's own hand, not in Hafs.
+     * The panel around it is unchanged — one chapter, one ornament, whichever
+     * language the leaf is set in — because the illumination is the book's and
+     * only the writing is the reader's.
+     */
+    latin: Boolean = false,
 ) {
     val accents = LocalQuranAccents.current
     val paper = MaterialTheme.colorScheme.background
@@ -156,7 +164,12 @@ internal fun MushafSurahTitleBand(
             MushafShamsa(ornament, bandHeight, groundAlpha)
             Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
                 MushafTitleCartouche(
-                    name = surah?.nameArabic.orEmpty(),
+                    name = if (latin) {
+                        surah?.nameTransliteration.orEmpty()
+                    } else {
+                        surah?.nameArabic.orEmpty()
+                    },
+                    latin = latin,
                     fontSize = fontSize,
                     height = bandHeight * 0.54f,
                     paper = paper,
@@ -195,13 +208,19 @@ private fun MushafShamsa(
 @Composable
 private fun MushafTitleCartouche(
     name: String,
+    latin: Boolean,
     fontSize: TextUnit,
     height: Dp,
     paper: Color,
     rule: Color,
     ink: Color,
 ) {
-    val nameLift = with(LocalDensity.current) { (fontSize.toPx() * MushafNameLift).toDp() }
+    // The Hafs em box keeps headroom for marks a chapter's name does not
+    // carry, so its ink hangs below the cartouche's centre line and has to be
+    // raised. EB Garamond's box is even about its own baseline and needs none.
+    val nameLift = with(LocalDensity.current) {
+        if (latin) 0.dp else (fontSize.toPx() * MushafNameLift).toDp()
+    }
     Box(contentAlignment = Alignment.Center) {
         Canvas(Modifier.matchParentSize()) {
             // A capsule: the panel is the band, this is what carries the name.
@@ -217,8 +236,9 @@ private fun MushafTitleCartouche(
             // padded. Trimming the leading and centring what is left puts the
             // letters themselves on the panel's centre line.
             style = TextStyle(
-                fontFamily = HafsFontFamily,
-                fontSize = fontSize,
+                fontFamily = if (latin) SerifFontFamily else HafsFontFamily,
+                fontSize = if (latin) fontSize * MushafLatinTitleScale else fontSize,
+                letterSpacing = if (latin) 0.06.em else TextUnit.Unspecified,
                 color = ink,
                 textAlign = TextAlign.Center,
                 platformStyle = PlatformTextStyle(includeFontPadding = false),

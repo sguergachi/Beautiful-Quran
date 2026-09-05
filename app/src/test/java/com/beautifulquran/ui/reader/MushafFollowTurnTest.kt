@@ -337,9 +337,24 @@ class MushafFollowTurnTest {
     @Test
     fun `mushaf return points toward the playing leaf, left or right`() {
         // reverseLayout: later pages sit to the left of the leaf in view.
+        // A mushaf is bound on the right, so a later leaf lies leftward.
         assertEquals(MushafReturnWay.Left, mushafReturnWay(currentPage = 45, playbackPage = 46))
         assertEquals(MushafReturnWay.Right, mushafReturnWay(currentPage = 45, playbackPage = 44))
         assertEquals(null, mushafReturnWay(currentPage = 45, playbackPage = 45))
+        // A book of the translation is bound on the left, and a page number is
+        // not a direction: the same two leaves lie the other way.
+        assertEquals(
+            MushafReturnWay.Right,
+            mushafReturnWay(currentPage = 45, playbackPage = 46, rightToLeft = false),
+        )
+        assertEquals(
+            MushafReturnWay.Left,
+            mushafReturnWay(currentPage = 45, playbackPage = 44, rightToLeft = false),
+        )
+        assertEquals(
+            null,
+            mushafReturnWay(currentPage = 45, playbackPage = 45, rightToLeft = false),
+        )
     }
 
     @Test

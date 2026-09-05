@@ -7,6 +7,7 @@ import com.beautifulquran.data.BookmarkRepository
 import com.beautifulquran.data.AnnotationRepository
 import com.beautifulquran.data.DictionaryDatabase
 import com.beautifulquran.data.DictionaryRepository
+import com.beautifulquran.data.EnglishBookCache
 import com.beautifulquran.data.LexiconDatabase
 import com.beautifulquran.data.LexiconRepository
 import com.beautifulquran.data.QuranDatabase
@@ -37,6 +38,9 @@ class QuranApp : Application() {
     lateinit var dictionary: DictionaryRepository
         private set
     lateinit var settings: SettingsRepository
+
+    /** The English book's leaves, kept on disk so they are measured once. */
+    lateinit var englishBookCache: EnglishBookCache
         private set
     lateinit var bookmarks: BookmarkRepository
         private set
@@ -66,6 +70,7 @@ class QuranApp : Application() {
         lexicon = LexiconRepository(LexiconDatabase(this))
         dictionary = DictionaryRepository(DictionaryDatabase(this))
         settings = SettingsRepository(this)
+        englishBookCache = EnglishBookCache(this)
         bookmarks = BookmarkRepository(this)
         annotations = AnnotationRepository(this)
         player = PlayerController(this)

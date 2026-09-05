@@ -325,6 +325,109 @@ class MushafPageDialTest {
     }
 
     @Test
+    fun `no chapter is skipped, in either book`() {
+        // The promise of the chapter tier: every one of the 114 is reachable.
+        // Nearest-seat selection breaks that quietly whenever two seats crowd
+        // closer together than either stands from its other neighbour — the
+        // chapter between them is never nearest to anything and no finger can
+        // land on it. Walk the rule a pixel at a time, as a finger does, and
+        // every chapter must answer somewhere.
+        //
+        // Both books, because they are not the same rule. The Arabic dial
+        // counts 604 Madinah pages and the English one counts its own leaves,
+        // and the two crowd in different places: the mushaf packs fifteen
+        // chapters into its last nine pages, while the English book gives most
+        // of those a leaf of their own and does its crowding at the head.
+        // These are the real marks off both.
+        val arabic = intArrayOf(
+            1, 2, 50, 77, 106, 128, 151, 177, 187, 208, 221, 235, 249, 255,
+            262, 267, 282, 293, 305, 312, 322, 332, 342, 350, 359, 367, 377,
+            385, 396, 404, 411, 415, 418, 428, 434, 440, 446, 453, 458, 467,
+            477, 483, 489, 496, 499, 502, 507, 511, 515, 518, 520, 523, 526,
+            528, 531, 534, 537, 542, 545, 549, 551, 553, 554, 556, 558, 560,
+            562, 564, 566, 568, 570, 572, 574, 575, 577, 578, 580, 582, 583,
+            585, 586, 587, 587, 589, 590, 591, 591, 592, 593, 594, 595, 595,
+            596, 596, 597, 597, 598, 598, 599, 599, 600, 600, 601, 601, 601,
+            602, 602, 602, 603, 603, 603, 604, 604, 604,
+        )
+        val english = intArrayOf(
+            1, 2, 72, 112, 154, 186, 221, 259, 274, 304, 324, 346, 366, 376,
+            386, 395, 417, 436, 455, 467, 483, 497, 512, 525, 540, 551, 567,
+            581, 597, 609, 619, 625, 630, 646, 656, 665, 674, 686, 696, 709,
+            723, 733, 743, 754, 759, 765, 773, 780, 787, 791, 796, 801, 805,
+            810, 815, 820, 826, 833, 839, 845, 850, 853, 855, 858, 861, 865,
+            868, 872, 876, 880, 883, 886, 890, 893, 897, 900, 904, 907, 910,
+            913, 916, 918, 920, 923, 925, 927, 928, 929, 931, 933, 935, 937,
+            939, 940, 941, 942, 943, 944, 946, 947, 948, 949, 950, 951, 952,
+            953, 954, 955, 956, 957, 958, 959, 960, 961,
+        )
+        for ((marks, count, rightToLeft) in listOf(
+            Triple(arabic, 604, true),
+            Triple(english, 961, false),
+        )) {
+            for (density in listOf(2f, 2.625f, 3.5f)) {
+                for (width in listOf(720f, 1080f, 1440f)) {
+                    val inset = 28f * density
+                    val seats = mushafDialCombCellSeats(
+                        marks, count, inset, width, density, rightToLeft,
+                    )
+                    val reachable = HashSet<Int>()
+                    var x = 0f
+                    while (x <= width) {
+                        reachable += mushafDialChapterAt(
+                            seats,
+                            mushafDialClampToTrack(x, width, inset),
+                        )
+                        x += 1f
+                    }
+                    val skipped = marks.indices.filterNot { it in reachable }
+                    assertTrue(
+                        "chapters ${skipped.map { it + 1 }} cannot be selected " +
+                            "(${width}px, ${density}x, rtl=$rightToLeft)",
+                        skipped.isEmpty(),
+                    )
+
+                    // And the same again as a *drag*, which is how the tier is
+                    // actually used and a stricter question: the reading is
+                    // hysteretic, so it depends on where the hand has been and
+                    // not only on where it is. A window read against the wrong
+                    // direction refuses every ordinary crossing and only yields
+                    // to the jump of two that skips a chapter — the dial then
+                    // shows 1, 3, 5, 7 for a finger crossing 1 to 7, and a
+                    // press-only check like the one above sees nothing wrong.
+                    val hysteresisPx = density * 1.8f
+                    for (fromLeft in listOf(true, false)) {
+                        var last = mushafDialChapterAt(
+                            seats,
+                            mushafDialClampToTrack(if (fromLeft) 0f else width, width, inset),
+                        )
+                        val seen = HashSet<Int>()
+                        seen += last
+                        val steps = (0..width.toInt()).map { if (fromLeft) it else width.toInt() - it }
+                        for (px in steps) {
+                            last = mushafDialStableChapterAt(
+                                seats,
+                                mushafDialClampToTrack(px.toFloat(), width, inset),
+                                last,
+                                hysteresisPx,
+                                atTrackWall = false,
+                            )
+                            seen += last
+                        }
+                        val missed = marks.indices.filterNot { it in seen }
+                        assertTrue(
+                            "dragging ${if (fromLeft) "right" else "left"} skips chapters " +
+                                "${missed.map { it + 1 }} (${width}px, ${density}x, " +
+                                "rtl=$rightToLeft)",
+                            missed.isEmpty(),
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
     fun `every chapter owns a stable cell and every cell is selectable`() {
         // Selection reads stable cells, not the lensed drawing: the cells
         // partition the whole measure, never move under a moving hand, and

@@ -55,6 +55,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.style.LineBreak
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.text.style.TextGeometricTransform
@@ -66,6 +67,7 @@ import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import com.beautifulquran.QuranApp
 import com.beautifulquran.data.AyahSelectorSide
+import com.beautifulquran.data.EnglishLeafText
 import com.beautifulquran.data.PageNumberScript
 import com.beautifulquran.data.ReadingLayout
 import com.beautifulquran.data.ReadingMode
@@ -86,7 +88,6 @@ import com.beautifulquran.ui.reader.MushafQcfFonts
 import com.beautifulquran.ui.reader.PageBreak
 import com.beautifulquran.ui.reader.VERSE_ANNOTATION_INK_ALPHA
 import com.beautifulquran.ui.reader.collapsedStackSpanDp
-import com.beautifulquran.ui.reader.formatAyahNumberMark
 import com.beautifulquran.ui.reader.appendAyahNumberMark
 import com.beautifulquran.ui.reader.mushafCellOrigins
 import com.beautifulquran.ui.reader.mushafLineCells
@@ -206,21 +207,48 @@ internal fun CustomizeScreen(
             },
             onSelect = { layout -> onUpdate { applyReadingLayout(it, layout) } },
         )
-        if (showsScrollChrome(settings.readingLayout)) {
-            Section("View")
+        // A leaf may be set in either language, but never in both — see
+        // MUSHAF_VIEW_MODES.
+        Section("View")
+        InkCircledChoiceRow(
+            entries = if (settings.readingLayout == ReadingLayout.MUSHAF) {
+                MUSHAF_VIEW_MODES
+            } else {
+                VIEW_MODES
+            },
+            selected = settings.readingMode,
+            params = brushParams,
+            paintToken = paintToken,
+            label = { mode ->
+                when (mode) {
+                    ReadingMode.ARABIC_ONLY -> "Arabic"
+                    ReadingMode.ENGLISH_ONLY -> "English"
+                    ReadingMode.ARABIC_ENGLISH -> "Both"
+                }
+            },
+            onSelect = { mode -> onUpdate { applyReadingMode(it, mode) } },
+        )
+
+        // Which English the leaf is set from. Only the English leaf has the
+        // question to answer: the scrolling reader has always set the gloss,
+        // and the Arabic leaf sets no English at all.
+        if (
+            settings.readingLayout == ReadingLayout.MUSHAF &&
+            settings.readingMode == ReadingMode.ENGLISH_ONLY
+        ) {
+            Section("English")
             InkCircledChoiceRow(
-                entries = VIEW_MODES,
-                selected = settings.readingMode,
+                entries = ENGLISH_LEAF_TEXTS,
+                selected = settings.englishLeafText,
                 params = brushParams,
                 paintToken = paintToken,
-                label = { mode ->
-                    when (mode) {
-                        ReadingMode.ARABIC_ONLY -> "Arabic"
-                        ReadingMode.ENGLISH_ONLY -> "English"
-                        ReadingMode.ARABIC_ENGLISH -> "Both"
+                label = { text ->
+                    when (text) {
+                        EnglishLeafText.TRANSLATION -> "Translation"
+                        EnglishLeafText.GLOSS -> "Word by word"
                     }
                 },
-                onSelect = { mode -> onUpdate { applyReadingMode(it, mode) } },
+                onSelect = { text -> onUpdate { it.copy(englishLeafText = text) } },
             )
         }
 
@@ -279,7 +307,7 @@ internal fun CustomizeScreen(
             }
         }
 
-        if (showsScrollChrome(settings.readingLayout)) {
+        if (showsVerseNumberChrome(settings.readingLayout, settings.readingMode)) {
             Section("Verse numbers")
             InkCircledChoiceRow(
                 entries = VerseNumberScript.entries,
@@ -420,10 +448,18 @@ internal fun ReadingPreview(
         CompositionLocalProvider(LocalDensity provides previewDensity) {
             Column(Modifier.matchParentSize().clipToBounds().then(contentPad)) {
                 if (readingLayout == ReadingLayout.MUSHAF) {
-                    PreviewMushafLeaf(
-                        pageNumberScript = pageNumberScript,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
+                    if (readingMode == ReadingMode.ENGLISH_ONLY) {
+                        PreviewEnglishMushafLeaf(
+                            pageNumberScript = pageNumberScript,
+                            arabicMarks = arabicMarks,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    } else {
+                        PreviewMushafLeaf(
+                            pageNumberScript = pageNumberScript,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
                 } else if (englishOnly) {
                     PreviewEnglishLyric(
                         SAMPLE_ENGLISH,
@@ -505,6 +541,27 @@ private const val PreviewMushafPage = 330
 private const val PreviewMushafLineFirst = 1
 private const val PreviewMushafLineLast = 3
 private const val PreviewMushafSurahName = "سُورَةُ الأنبياء"
+private const val PreviewMushafSurahLatin = "Al-Anbya"
+private const val PreviewMushafAyahFirst = 91
+private const val PreviewMushafAyahLast = 92
+
+/** The English leaf sets a smaller hand than the Arabic one — see EnglishLeafFit. */
+private val PreviewEnglishLeafSize = 11.sp
+
+/**
+ * 21:91–92 exactly as `data/quran.db` carries them — the same two verses the
+ * QCF preview sets, so the two languages show the same paper.
+ *
+ * No full stop: the translation does not carry one, and on a printed page the
+ * verse mark is what closes the sentence. The leaf sets the text as it stands.
+ */
+private const val SAMPLE_ENGLISH_LEAF_1 =
+    "And [mention] the one who guarded her chastity, so We blew into her " +
+        "[garment] through Our angel [Gabriel], and We made her and her son a " +
+        "sign for the worlds"
+private const val SAMPLE_ENGLISH_LEAF_2 =
+    "Indeed this, your religion, is one religion, and I am your Lord, so " +
+        "worship Me"
 
 /** Two short verses as three printed lines, scaled to the measure — never gap-stretched. */
 @Composable
@@ -563,6 +620,76 @@ private fun PreviewMushafLeaf(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(PreviewFolioPad),
+        )
+    }
+}
+
+/**
+ * The same leaf, in the reader's own language: two verses set as one justified
+ * paragraph in the book's hand, under the chapter's name in Latin.
+ *
+ * It is the reader's rule in miniature — the sentence is the unit of the
+ * English leaf as the word is of the Arabic one (`domain/EnglishLeaf.kt`) —
+ * and it holds the same three lines' worth of paper so the preview does not
+ * change height when the language does.
+ */
+@Composable
+private fun PreviewEnglishMushafLeaf(
+    pageNumberScript: PageNumberScript,
+    arabicMarks: Boolean,
+    modifier: Modifier,
+) {
+    val gold = LocalQuranAccents.current.gold
+    val ink = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.88f)
+    val text = buildAnnotatedString {
+        listOf(
+            SAMPLE_ENGLISH_LEAF_1 to PreviewMushafAyahFirst,
+            SAMPLE_ENGLISH_LEAF_2 to PreviewMushafAyahLast,
+        ).forEachIndexed { index, (verse, number) ->
+            if (index > 0) append(" ")
+            withStyle(SpanStyle(color = ink)) { append(verse) }
+            append(" ")
+            appendAyahNumberMark(
+                number = number,
+                useArabicIndicDigits = arabicMarks,
+                style = SpanStyle(color = gold, fontSize = PreviewEnglishLeafSize * 17f / 22f),
+                // The leaf is set left to right whichever digits are chosen.
+                ltr = true,
+            )
+        }
+    }
+    Column(modifier = modifier, horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(
+            text = PreviewMushafSurahLatin,
+            fontFamily = TranslationFontFamily,
+            fontSize = 12.sp,
+            letterSpacing = 0.08.em,
+            color = gold.copy(alpha = 0.58f),
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Spacer(Modifier.height(8.dp))
+        // Sized by its own prose, not by a reserved block: the miniature's
+        // height is already locked from outside (PreviewHeightLock), and a
+        // fixed well here left the folio a few pixels of slot, in which its
+        // figures measured to nothing and only the diamond — which draws past
+        // its box — survived.
+        Text(
+            text = text,
+            style = TextStyle(
+                fontFamily = TranslationFontFamily,
+                fontSize = PreviewEnglishLeafSize,
+                lineHeight = 1.5.em,
+                textAlign = TextAlign.Justify,
+                lineBreak = LineBreak.Paragraph,
+            ),
+        )
+        Spacer(Modifier.height(6.dp))
+        MushafFolioMarks(
+            page = PreviewMushafPage,
+            glyphSize = PreviewFolioGlyph,
+            script = pageNumberScript,
+            modifier = Modifier.fillMaxWidth().padding(PreviewFolioPad),
         )
     }
 }

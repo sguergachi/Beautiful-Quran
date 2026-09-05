@@ -86,6 +86,8 @@ tools/detect_audio_onsets.py  Opening-range scanner that regenerates that eviden
 scripts/                Linux emulator setup / run helpers
 docs/                   Architecture, design language, performance, timings docs
 docs/QURAN_TYPOGRAPHY.md  What a mushaf page is: the rules a line is set by
+                        (§13 is the English leaf — the same book in English)
+tools/measure_english_leaves.py  Where the English leaf's fit constants come from
                         …and the GitHub Pages product page (index.html + styles.css)
 docs/ornaments.css      Generated: the product page's ornaments (see below); do not hand-edit
 web/                    Browser port (Vite + React): Focus / Highlight / Ink + paper reader
@@ -101,7 +103,7 @@ Requires **JDK 21**. No Android device/emulator is needed for tests.
 ./gradlew testDebugUnitTest     # unit tests — run these before committing
 ./gradlew assembleDebug         # debug APK
 ./gradlew assembleRelease       # what CI ships (R8-minified; falls back to debug keystore)
-scripts/send_apk_to_phone.sh    # build debug APK and share via KDE Connect (see README)
+scripts/send_apk_to_phone.sh --label "the work"   # name it, share it, delete the last one
 python3 tools/test_build_db.py  # timing pipeline regressions (~1s, no Gradle)
 ```
 
@@ -181,7 +183,10 @@ python3 tools/test_build_db.py  # timing pipeline regressions (~1s, no Gradle)
    flush, the line filled by the letterform rather than the space, the word
    space chosen and not left over, leading set by the ink — with the
    measurements behind each rule. Read it before changing anything about how a
-   line is set.
+   line is set. §13 is the English leaf: the translation set as a book of
+   the meaning, paginated to its own leaves rather than to the mushaf's pages,
+   where a verse is set whole and the ink says only what it can honestly say
+   about where the reciter is.
 5. **Minimal dependencies, by design.** No Hilt (hand-rolled ViewModel factory
    over `QuranApp` singletons), no Room (raw SQLite wrapper in
    `QuranDatabase`), no navigation library (the three sheets are a hand-rolled
@@ -334,10 +339,23 @@ this document combined: `ReaderComponents.kt` (~36k tokens),
 - Finish every requested code change by committing and pushing it. Continue an
   open PR on its actual head branch; if that PR has merged, follow the fresh-PR
   rule below instead.
-- Send a clearly named debug APK to the Pixel 10 after every completed code
-  change. Never send a generic `app-debug.apk` / `app-release.apk` filename,
-  and verify that the transfer actually completed rather than trusting the
-  sender's exit code. If the phone is unreachable, report that plainly.
+- Send a clearly named APK to the Pixel 10 after every completed code change,
+  and **delete the previous one once the new one has gone**. Use
+  `scripts/send_apk_to_phone.sh --label "<the work>"` (add `--release` for a
+  release build): it stages the build under a name made from the work and the
+  commit, verifies the copy, shares it, and then removes every older staged
+  APK. Three rules are baked into it and hold whether or not you use it:
+  - Never send a generic `app-debug.apk` / `app-release.apk`. A phone full of
+    identically-named builds is a phone you cannot test from, and KDE Connect
+    drops a repeat of the same filename to its notification rate limit — so a
+    generic name is a send that silently does not arrive.
+  - Delete the older builds after the new one is away. They are a quarter of a
+    gigabyte each; left to pile up they filled `/tmp`, which truncated a copy
+    mid-send and shipped a broken APK to the phone. Scope any hand-rolled
+    cleanup to files you staged yourself — never a bare `/tmp/*.apk`.
+  - Verify the transfer completed rather than trusting the sender's exit code,
+    and do not connect to port 1739 to "check" — that steals the payload from
+    the phone. If it is unreachable, report that plainly.
 - Update the relevant doc in `docs/` when you change behavior it describes —
   the docs are load-bearing and kept accurate.
 
