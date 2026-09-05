@@ -42,17 +42,21 @@ jobs:
       # still verify the DB asset and run unit tests so PRs stay gated, but they
       # skip the slower release build and must not contend for the shared
       # "latest" tag.
-      - name: Restore release keystore (if configured)
+      - name: Restore release keystore
         if: github.ref == 'refs/heads/master'
         env:
           RELEASE_KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+          RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
+          RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
+          RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
         run: |
-          if [ -n "$RELEASE_KEYSTORE_BASE64" ]; then
-            printf '%s' "$RELEASE_KEYSTORE_BASE64" | base64 -d > release.keystore
-            echo "Release keystore restored."
-          else
-            echo "No RELEASE_KEYSTORE_BASE64 secret; signing with debug keystore."
-          fi
+          for name in RELEASE_KEYSTORE_BASE64 RELEASE_KEYSTORE_PASSWORD RELEASE_KEY_ALIAS RELEASE_KEY_PASSWORD; do
+            if [ -z "${!name}" ]; then
+              echo "Missing required $name secret." >&2
+              exit 1
+            fi
+          done
+          printf '%s' "$RELEASE_KEYSTORE_BASE64" | base64 -d > release.keystore
 
       # Ship the R8-optimized release build: minified, resource-shrunk and
       # non-debuggable — this is what makes it feel native-fast on device.
@@ -63,6 +67,18 @@ jobs:
           RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
           RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
         run: ./gradlew --no-daemon assembleRelease
+
+      - name: Verify APK signer
+        if: github.ref == 'refs/heads/master'
+        run: |
+          apksigner="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner -print | sort -V | tail -n 1)"
+          actual="$("$apksigner" verify --print-certs app/build/outputs/apk/release/app-release.apk \
+            | sed -n 's/^Signer #1 certificate SHA-256 digest: //p')"
+          expected="519ff7bc0c11ff7677c3e8fcdb4a73adacdc325cd4def42549be29219471e8b0"
+          if [ "$actual" != "$expected" ]; then
+            echo "Unexpected APK signing certificate: ${actual:-none}" >&2
+            exit 1
+          fi
 
       - name: Rename APK
         if: github.ref == 'refs/heads/master'
@@ -81,7 +97,7 @@ jobs:
             if gh release create latest BeautifulQuran.apk \
               --prerelease \
               --title "Beautiful Quran — latest build" \
-              --notes "Debug-signed APK built from ${{ github.sha }}. Download on your Android phone and install (allow installs from your browser when prompted)."; then
+              --notes "Release-signed APK built from ${{ github.sha }}. Download on your Android phone and install (allow installs from your browser when prompted)."; then
               exit 0
             fi
             echo "Release publish attempt $attempt failed; retrying…"

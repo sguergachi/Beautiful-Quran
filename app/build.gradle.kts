@@ -9,7 +9,26 @@ plugins {
 /** CI exports unset secrets as empty strings; treat those as absent. */
 fun env(name: String): String? = System.getenv(name)?.takeIf { it.isNotBlank() }
 
-val releaseKeystore = rootProject.file(env("RELEASE_KEYSTORE_FILE") ?: "release.keystore")
+fun findReleaseKeystore(): File {
+    env("RELEASE_KEYSTORE_FILE")?.let { return rootProject.file(it) }
+    rootProject.file("release.keystore").takeIf(File::isFile)?.let { return it }
+
+    // Linked worktrees do not inherit ignored files. Their .git marker points
+    // into <primary>/.git/worktrees/<name>, so look beside that primary repo.
+    val gitDir = rootProject.file(".git")
+        .takeIf(File::isFile)
+        ?.readText()
+        ?.substringAfter("gitdir:", missingDelimiterValue = "")
+        ?.trim()
+        ?.takeIf(String::isNotEmpty)
+        ?.let(rootProject::file)
+    return gitDir?.parentFile?.parentFile?.parentFile
+        ?.resolve("release.keystore")
+        ?.takeIf(File::isFile)
+        ?: rootProject.file("release.keystore")
+}
+
+val releaseKeystore = findReleaseKeystore()
 
 // The mushaf is the QCF V2 page faces or it is nothing: a build that ships
 // without all 604 renders every leaf in the fallback Hafs face, which is the
@@ -48,8 +67,9 @@ android {
             keyAlias = "androiddebugkey"
             keyPassword = "android"
         }
-        // Store keystore; not committed. Credentials can be overridden from
-        // the environment (CI secrets) and default to the local values.
+        // Private release/upload keystore; never committed. On its owner's
+        // machine it signs both variants so locally shared APKs update one
+        // another. Fresh contributors still get the ordinary debug signer.
         create("release") {
             storeFile = releaseKeystore
             storePassword = env("RELEASE_KEYSTORE_PASSWORD") ?: "division"
@@ -60,7 +80,11 @@ android {
 
     buildTypes {
         debug {
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = if (releaseKeystore.isFile) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
+            }
         }
         release {
             isMinifyEnabled = true
@@ -69,11 +93,10 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
             )
-            // Sign with the store keystore when it exists; otherwise fall back
-            // to the debug keystore so CI and fresh clones can still
-            // assembleRelease. Note the two signatures cannot update over each
-            // other on a device — store builds need the real keystore present.
-            signingConfig = if (releaseKeystore.exists()) {
+            // Contributor clones can assemble without the private key. The
+            // publishing workflow separately requires and verifies it, so a
+            // public APK can never silently fall back to debug signing.
+            signingConfig = if (releaseKeystore.isFile) {
                 signingConfigs.getByName("release")
             } else {
                 signingConfigs.getByName("debug")
