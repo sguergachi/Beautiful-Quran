@@ -858,10 +858,23 @@ internal fun mushafDialChapterAtHysteresis(
     val adaptive = (gap * 0.60f).coerceAtLeast(hysteresisPx * 0.85f)
     val mid = (seats[lastIdx] + seats[cur]) / 2f
     val h = minOf(adaptive / 2f, gap / 2f - 1.2f).coerceAtLeast(0f)
+    // Which way along the rule the next chapter lies. In a mushaf the seats
+    // descend — chapter 114 sits at the left end — and in a book of the
+    // translation they climb. The seats themselves say which, so this cannot be
+    // told the wrong one.
+    //
+    // It used to assume they descend. Read against a rule that climbs, the two
+    // tests below are exactly inverted: the hand crosses into the next chapter
+    // and the window refuses it, and the only way past is the jump of two that
+    // skips the window altogether. That is a dial that shows 1, 3, 5, 7 as the
+    // finger crosses 1, 2, 3, 4, 5, 6, 7 — every other chapter unreachable by
+    // dragging, though a press straight onto its cell still finds it.
+    val towardsHigherIndex = if (seats.last() < seats.first()) -1f else 1f
+    val past = (xPx - mid) * towardsHigherIndex
     return if (cur > lastIdx) {
-        if (xPx < mid - h) cur else lastIdx
+        if (past > h) cur else lastIdx
     } else {
-        if (xPx > mid + h) cur else lastIdx
+        if (past < -h) cur else lastIdx
     }
 }
 

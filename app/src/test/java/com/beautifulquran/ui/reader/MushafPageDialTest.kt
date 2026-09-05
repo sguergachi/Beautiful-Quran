@@ -386,6 +386,42 @@ class MushafPageDialTest {
                             "(${width}px, ${density}x, rtl=$rightToLeft)",
                         skipped.isEmpty(),
                     )
+
+                    // And the same again as a *drag*, which is how the tier is
+                    // actually used and a stricter question: the reading is
+                    // hysteretic, so it depends on where the hand has been and
+                    // not only on where it is. A window read against the wrong
+                    // direction refuses every ordinary crossing and only yields
+                    // to the jump of two that skips a chapter — the dial then
+                    // shows 1, 3, 5, 7 for a finger crossing 1 to 7, and a
+                    // press-only check like the one above sees nothing wrong.
+                    val hysteresisPx = density * 1.8f
+                    for (fromLeft in listOf(true, false)) {
+                        var last = mushafDialChapterAt(
+                            seats,
+                            mushafDialClampToTrack(if (fromLeft) 0f else width, width, inset),
+                        )
+                        val seen = HashSet<Int>()
+                        seen += last
+                        val steps = (0..width.toInt()).map { if (fromLeft) it else width.toInt() - it }
+                        for (px in steps) {
+                            last = mushafDialStableChapterAt(
+                                seats,
+                                mushafDialClampToTrack(px.toFloat(), width, inset),
+                                last,
+                                hysteresisPx,
+                                atTrackWall = false,
+                            )
+                            seen += last
+                        }
+                        val missed = marks.indices.filterNot { it in seen }
+                        assertTrue(
+                            "dragging ${if (fromLeft) "right" else "left"} skips chapters " +
+                                "${missed.map { it + 1 }} (${width}px, ${density}x, " +
+                                "rtl=$rightToLeft)",
+                            missed.isEmpty(),
+                        )
+                    }
                 }
             }
         }
