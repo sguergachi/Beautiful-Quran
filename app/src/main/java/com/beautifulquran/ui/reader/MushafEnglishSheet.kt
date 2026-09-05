@@ -1349,7 +1349,7 @@ internal fun englishLeafRuler(
                 // is left. Same answer as searching the whole offer, in three
                 // or four measurements instead of nine.
                 val stops = englishLeafCutStops(runs, translation)
-                val seed = englishLeafSeedStop(stops, laid, prose, leaf.verses, lines)
+                val seed = englishLeafSeedStop(stops, runs, laid, prose, leaf.verses, lines)
                 // Fewer lines than the well holds — *including none*. A leaf
                 // can measure empty: englishLeaf drops a run whose text comes
                 // out blank, which a run that is nothing but a translator's
@@ -1412,28 +1412,37 @@ internal fun englishLeafRuler(
  */
 private fun englishLeafSeedStop(
     stops: List<EnglishRulerCut>,
+    runs: List<EnglishVerseRun>,
     laid: TextLayoutResult,
     prose: EnglishLeafBlockText.Prose,
     verses: List<EnglishLeafVerse>,
     lines: Int,
 ): Int {
+    // Where the last line the well holds ends, in the paragraph's own string.
     val at = laid.getLineEnd(lines.coerceAtLeast(1) - 1, visibleEnd = true)
-    var pick = prose.verses.lastIndex
-    for (k in prose.verses.indices) {
-        if (at <= prose.verses[k].range.last + 1) { pick = k; break }
-    }
-    val set = verses.getOrNull(pick) ?: return stops.lastIndex / 2
-    val into = (at - prose.verses[pick].range.first).coerceIn(0, set.to - set.textFrom)
+    val held = prose.verses.firstOrNull { at <= it.range.last + 1 }
+        ?: prose.verses.lastOrNull()
+        ?: return stops.lastIndex / 2
+    // Named, not counted.
+    //
+    // Three lists describe the same verses here and none of them is indexed
+    // the same way: the offer's runs, the leaf's verses, and the paragraph's.
+    // A run whose text lays out blank — a verse that is nothing but a
+    // translator's aside, with those turned off — is dropped from the leaf and
+    // from the paragraph but is still in the offer, and from there on the
+    // positions are off by one. A verse's own number is the same in all three,
+    // and a leaf holds each verse once, so the number is what to look it up by.
+    val run = runs.indexOfFirst { it.surahId == held.surahId && it.ayah == held.ayah }
+    val set = verses.firstOrNull { it.surahId == held.surahId && it.ayah == held.ayah }
+    if (run < 0 || set == null) return stops.lastIndex / 2
+    val into = (at - held.range.first).coerceIn(0, set.to - set.textFrom)
     val to = set.textFrom + into
     // The stops are in reading order, so the nearest is the last one at or
-    // before this verse and offset. `pick` indexes the block's verses and is
-    // read against the runs' — they line up unless a run laid out empty, and
-    // where they do not this is a worse guess and not a wrong answer: the
-    // search starts further off and takes a measurement or two more.
+    // before this verse and offset.
     var best = 0
     for (i in stops.indices) {
         val stop = stops[i]
-        val before = stop.runIndex < pick || (stop.runIndex == pick && stop.to <= to)
+        val before = stop.runIndex < run || (stop.runIndex == run && stop.to <= to)
         if (before) best = i else break
     }
     return best
