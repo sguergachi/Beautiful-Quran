@@ -74,7 +74,6 @@ import com.beautifulquran.domain.EnglishLeafRuler
 import com.beautifulquran.domain.EnglishLeafVerse
 import com.beautifulquran.domain.EnglishRulerCut
 import com.beautifulquran.domain.surahOpensWithBasmalahPreface
-import com.beautifulquran.domain.mushafIsOpeningLeaf
 import com.beautifulquran.domain.quranWordKey
 import com.beautifulquran.ui.theme.LocalQuranAccents
 import com.beautifulquran.ui.theme.SerifFontFamily
@@ -299,20 +298,16 @@ internal fun MushafEnglishSheet(
                 .padding(horizontal = foreEdge),
             // A leaf whose content will not reach the foot hangs from the
             // head, as a book's last page of a chapter does — the paper simply
-            // runs out under it.
+            // runs out under it. Every leaf, al-Fatihah's included.
             //
-            // Pages 1-2 are the print's exception and stay the exception here
-            // (§1). They are the two lightest leaves in the book by a wide
-            // margin — al-Fatihah, and five verses of al-Baqarah — so even at
-            // the widest leading they fill about a third of the well, and hung
-            // from the head they read as a page that failed rather than a page
-            // that opens a book. Centred, the chapter's panel sits where the
-            // print's own medallion sits.
-            verticalArrangement = if (mushafIsOpeningLeaf(page.page)) {
-                Arrangement.Center
-            } else {
-                Arrangement.Top
-            },
+            // The Arabic pager makes pages 1-2 the exception and centres them,
+            // because the print does: they are framed leaves and the chapter's
+            // medallion sits in the middle of the frame. This leaf copied that
+            // and should not have. Nothing in an English book floats in the
+            // middle of a page — a chapter opens at the head and the text runs
+            // down from there, and a short chapter simply leaves paper under
+            // itself. Centring read as a layout that had not finished.
+            verticalArrangement = Arrangement.Top,
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             blocks.forEach { block ->
