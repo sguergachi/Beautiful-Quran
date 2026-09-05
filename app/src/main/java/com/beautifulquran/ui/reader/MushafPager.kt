@@ -13,7 +13,6 @@ import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.core.LinearOutSlowInEasing
 import kotlinx.coroutines.delay
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PagerState
@@ -29,7 +28,6 @@ import androidx.compose.runtime.State
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
-import androidx.compose.runtime.withFrameNanos
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.snapshots.SnapshotStateMap
@@ -37,7 +35,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.runtime.snapshotFlow
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -55,12 +52,6 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.text.PlatformTextStyle
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.rememberTextMeasurer
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextDirection
-import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.TextUnit
@@ -68,22 +59,16 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import com.beautifulquran.DevProfiling
-import com.beautifulquran.data.PageNumberScript
 import com.beautifulquran.data.VerseNumberScript
 import com.beautifulquran.data.model.Ayah
 import com.beautifulquran.data.model.Surah
 import com.beautifulquran.data.model.SurahContent
-import com.beautifulquran.domain.MUSHAF_LINE_EM
 import com.beautifulquran.domain.MUSHAF_LINE_PITCH_EM
-import com.beautifulquran.domain.MUSHAF_DISPLAY_LINES_PER_PAGE
 import com.beautifulquran.domain.MUSHAF_WORD_GAP_EM
 import com.beautifulquran.domain.mushafDisplayFontPx
 import com.beautifulquran.domain.MushafCatalog
-import com.beautifulquran.domain.MushafLine
 import com.beautifulquran.domain.MushafPage
 import com.beautifulquran.domain.MushafToken
-import com.beautifulquran.domain.BASMALAH_UTHMANI
-import com.beautifulquran.domain.buildMushafQcfLine
 import com.beautifulquran.domain.mushafFontPreloadPages
 import com.beautifulquran.domain.MushafGrid
 import com.beautifulquran.domain.mushafLeafBands
@@ -91,17 +76,13 @@ import com.beautifulquran.domain.MushafType
 import com.beautifulquran.domain.mushafGridSlots
 import com.beautifulquran.domain.mushafIsOpeningLeaf
 import com.beautifulquran.domain.mushafUniformFontPx
-import com.beautifulquran.domain.mushafLineSlotPx
 import com.beautifulquran.domain.qcfTrailingMark
 import com.beautifulquran.domain.qcfWordGlyphs
 import com.beautifulquran.domain.EnglishBook
 import com.beautifulquran.domain.EnglishVerseAlignments
-import com.beautifulquran.domain.englishLeafVerseKeys
 import com.beautifulquran.domain.quranWordKey
 import com.beautifulquran.domain.reflowMushafPage
 import com.beautifulquran.domain.surahOpensWithBasmalahPreface
-import kotlin.math.abs
-import com.beautifulquran.ui.theme.MushafBasmalahFontFamily
 import androidx.compose.foundation.Canvas
 import androidx.core.content.res.ResourcesCompat
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
@@ -111,14 +92,10 @@ import com.beautifulquran.R
 import com.beautifulquran.ui.theme.MUSHAF_BASMALAH_INK_MID_EM
 import com.beautifulquran.ui.theme.MUSHAF_BASMALAH_GLYPH
 import com.beautifulquran.ui.theme.MUSHAF_BASMALAH_HAND_SCALE
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.material3.LocalTextStyle
-import androidx.compose.ui.text.style.LineHeightStyle
 import kotlinx.coroutines.flow.StateFlow
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.animation.core.snap
 import com.beautifulquran.ui.theme.letterFadeIn
-import com.beautifulquran.ui.theme.MushafFontFamily
 import com.beautifulquran.ui.theme.quietClickable
 
 /**

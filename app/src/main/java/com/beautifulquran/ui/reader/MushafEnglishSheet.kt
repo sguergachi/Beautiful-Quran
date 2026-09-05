@@ -73,7 +73,6 @@ import com.beautifulquran.domain.EnglishLeafFill
 import com.beautifulquran.domain.EnglishLeafRuler
 import com.beautifulquran.domain.EnglishLeafVerse
 import com.beautifulquran.domain.EnglishRulerCut
-import com.beautifulquran.domain.surahOpensWithBasmalahPreface
 import com.beautifulquran.domain.mushafLeafBands
 import com.beautifulquran.domain.quranWordKey
 import com.beautifulquran.ui.theme.LocalQuranAccents

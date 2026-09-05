@@ -127,11 +127,6 @@ data class EnglishLeafVerse(
  *   strip neither.
  */
 
-private const val SENTENCE_TERMINATORS = ".!?"
-
-/** Quotes and brackets a terminator may hide behind before the space. */
-private const val SENTENCE_CLOSERS = "\"')]\u2019\u201d"
-
 fun englishLeafBreak(text: String, at: Int): Int {
     if (at <= 0) return 0
     if (at >= text.length) return text.length

@@ -88,7 +88,6 @@ import com.beautifulquran.ui.reader.MushafQcfFonts
 import com.beautifulquran.ui.reader.PageBreak
 import com.beautifulquran.ui.reader.VERSE_ANNOTATION_INK_ALPHA
 import com.beautifulquran.ui.reader.collapsedStackSpanDp
-import com.beautifulquran.ui.reader.formatAyahNumberMark
 import com.beautifulquran.ui.reader.appendAyahNumberMark
 import com.beautifulquran.ui.reader.mushafCellOrigins
 import com.beautifulquran.ui.reader.mushafLineCells

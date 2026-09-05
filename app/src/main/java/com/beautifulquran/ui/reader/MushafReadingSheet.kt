@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -41,16 +40,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -69,12 +64,9 @@ import com.beautifulquran.domain.MushafType
 import kotlin.math.pow
 import com.beautifulquran.playback.PlayerUiState
 import com.beautifulquran.ui.theme.HafsFontFamily
-import com.beautifulquran.ui.theme.LocalQuranAccents
 import com.beautifulquran.ui.theme.ownedQuietClickable
 
 internal val MushafGutterSlot = 44.dp
-/** Running head band — a tap target tall, nothing more. */
-internal val MushafRunningHead = 36.dp
 /**
  * Folio band, with the figure centred in it.
  *
@@ -205,14 +197,6 @@ internal val MushafPageMargin = 4.dp
 private val MushafTransportEdge =
     MushafPageMargin + MushafEdgeGutter + MushafDialEdgeInset - 10.dp
 
-/**
- * Running head to first line of revelation. A head that sits closer than
- * about a line's pitch reads as part of the block instead of standing off it;
- * at 10dp it stood off by half a line while the tail margin ran to a full one.
- */
-internal val MushafTextGutter = 20.dp
-/** Last line to folio. A book's tail margin is the deeper of the two. */
-internal val MushafTailGutter = 14.dp
 /**
  * Book window: the leaf turns above; transport is a quiet line of ink on
  * the paper under the page. No frame — the paper runs to the edges and the
@@ -613,35 +597,6 @@ private fun MushafHeadLabel(
     )
 }
 
-/**
- * Folio: quiet ink on the leaf's centre line. A single script is the
- * number itself; both scripts sit either side of a diamond. Never gold —
- * at 9 sp a gold folio vanishes on cream.
- */
-@Composable
-internal fun MushafPageFolio(
-    page: Int,
-    unit: Dp,
-    glyphSize: TextUnit,
-    script: PageNumberScript = PageNumberScript.BOTH,
-    modifier: Modifier = Modifier,
-) {
-    Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .height(unit * MushafGrid.FOLIO),
-        contentAlignment = Alignment.Center,
-    ) {
-        MushafFolioMarks(
-            page = page,
-            glyphSize = glyphSize,
-            script = script,
-            modifier = Modifier
-                .fillMaxWidth()
-                .wrapContentHeight(align = Alignment.CenterVertically, unbounded = true),
-        )
-    }
-}
 
 /**
  * The folio figures, without the leaf's band. Customize's miniature uses

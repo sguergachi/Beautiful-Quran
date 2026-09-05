@@ -50,7 +50,6 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -93,7 +92,6 @@ import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalView
@@ -119,7 +117,6 @@ import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
-import com.beautifulquran.QuranApp
 import com.beautifulquran.data.AyahSelectorSide
 import com.beautifulquran.data.PageNumberScript
 import com.beautifulquran.data.ReadingMode
@@ -1003,7 +1000,6 @@ internal fun rememberWaslProgress(
 /** Comfortable reading band the active word is kept inside while follow mode
  * scrolls the sheet (see [wordUnitBehavior] / [shapedActiveWordInView]).
  * Shared with [ReaderScreen] so the focus engine's bottom guard matches. */
-internal val ActiveWordTopMargin = 144.dp
 internal val ActiveWordBottomMargin = 132.dp
 private val GlintLayerBleed = 14.dp
 

@@ -589,26 +589,31 @@ Nothing in Sad's leaves depends on As-Saffat's, so the chapter being opened can
 be paginated in a handful of layouts and the rest follow behind it, the way a
 reader computes page numbers behind the book you are already reading.
 
-**A book is only ever paginated from figures a live leaf reported.** The
-remembered ones below are good enough to *look a book up* with — the cache key
-covers everything the leaves depend on, so a key that no longer describes this
-screen simply misses — and they are not good enough to paginate a book *from*. A
-book paginated for a leaf a little larger than the real one hands every leaf
-more lines than it has: the leaf sets fewer, and the last one comes out short
-with room beside it, which is the fault that keeps being reported. So the root
-may read and may not measure. On a miss it stands down, and the leaf, which
-knows its own size, does it.
+**The figures have to be right.** A book paginated for a leaf a little larger
+than the real one hands every leaf more lines than it has: the leaf sets fewer,
+and the last one comes out short with room beside it, which is the fault that
+keeps being reported. Everything below turns on getting the well and the measure
+exactly, before anything is drawn.
 
-It cannot run before the leaf has a size — so the leaf *remembers its size*.
+Two ways to have them, and the book uses both. The leaf *remembers its size* —
 `SettingsRepository.rememberLeafMetrics` keeps the well and the measure with the
-window they were laid out in, and `MainActivity` paginates the whole book from
-them at the root, before the reader exists: a thousand text layouts on a
-background thread while the chapter list is being read. The reader never sees a
-book counted into leaves. Only the first run this app has ever had — or the
-first after the window changes shape — has to open on the estimate and
-repaginate, because that is the one run with nothing remembered, and the window
-is stored beside the figures so a leaf on a folded phone is never mistaken for
-the leaf on an unfolded one.
+window they were laid out in, so a leaf on a folded phone is never mistaken for
+the leaf on an unfolded one. And where nothing is remembered, the figures are
+*worked out*: `MushafBelowLeaf` is everything the reading sheet sets under the
+paper — folio band, dial, transport, the reserved reciter band — and the leaf is
+the window less the system bars less that, which `englishLeafSlotPx` carries the
+rest of the way through the page margin, the grid's bands and the fore-edge. The
+pager calls the same function to size the leaf it draws, so the two cannot drift.
+
+Either way `MainActivity` paginates the whole book at the root, before the
+reader exists: a thousand text layouts on a background thread while the chapter
+list is being read. The reader never sees a book counted into leaves, and never
+waits at the door of the mushaf for one.
+
+Measured on a cleared install: the root predicts a well of 1671px and a measure
+of 942px, and the leaf, composed later, reports 1671 and 942. Which is why
+`LEAF_METRICS_VERSION` and the geometry it stands for are load-bearing — move a
+band without bumping it and the sum is wrong on every launch that trusts it.
 
 Which is what an ebook *is*. A printed book breaks in the same place in every
 copy because every copy is the same size; a book on a screen breaks where that

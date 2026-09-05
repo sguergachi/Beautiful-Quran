@@ -8,9 +8,17 @@ the capacity, and this is the sweep that chooses it.
 
     python3 tools/measure_english_leaves.py
 
-A leaf carries whole verses, because a verse is a sentence and cannot be cut at
-a page break. That is the rule englishLeaf() applies, and it is the rule counted
-here — along with the one break the packing keeps, Al-Fatihah's.
+What this sweep is, and is not. The book no longer paginates by counting
+characters: `englishLeafRuler` measures each leaf as it will actually be drawn
+and the cut is searched for (QURAN_TYPOGRAPHY.md 13.7). The capacity below
+survives as the size of the *offer* handed to that ruler, and as the estimate
+the very first run opens on before any leaf has been composed — so it still
+wants to be about a leaf's worth, and this is still where that figure comes
+from. What it can no longer tell you is where the book breaks.
+
+It counts whole verses to a leaf, which is what the book did when the sweep was
+taken. It cuts mid-verse now, under full ebook rules, so the leaf counts here
+run a little high.
 """
 
 import sqlite3
@@ -24,14 +32,14 @@ LEADING = 1.40   # one figure, for every leaf in the book
 # blank at the foot is simply the share of the capacity the leaf did not use.
 # WELL_LINES is what that well comes to on a phone; it is only here to say the
 # answer in lines, which is the unit a reader sees.
-WELL_LINES = 22.0
-CAPACITY = 900  # what a leaf holds; a page takes as many leaves as it needs
-MARK_CHARS = 3  # ENGLISH_LEAF_MARK_CHARS: the verse mark and its two spaces
-LINE_CHARS = CAPACITY // 22       # ENGLISH_LEAF_LINE_CHARS
+WELL_LINES = 23.0
+CAPACITY = 940  # what a leaf holds; a page takes as many leaves as it needs
+MARK_CHARS = 5  # ENGLISH_LEAF_MARK_CHARS: the verse mark and its two spaces
+LINE_CHARS = CAPACITY // 23       # ENGLISH_LEAF_LINE_CHARS
 SPLIT_HOLE = 3 * LINE_CHARS       # ENGLISH_LEAF_SPLIT_HOLE_CHARS
 MIN_FRAGMENT = 2 * LINE_CHARS     # ENGLISH_LEAF_MIN_FRAGMENT_CHARS
-OPENING_CHARS = 92   # ENGLISH_LEAF_OPENING_CHARS: the panel and its air
-BASMALAH_CHARS = 78  # ENGLISH_LEAF_BASMALAH_CHARS: the preface line and its air
+OPENING_CHARS = 64   # ENGLISH_LEAF_OPENING_CHARS: the panel and its air
+BASMALAH_CHARS = 58  # ENGLISH_LEAF_BASMALAH_CHARS: the preface line and its air
 NO_BASMALAH = (1, 9)  # Al-Fatihah and At-Tawbah open without one
 
 db = sqlite3.connect("data/quran.db")

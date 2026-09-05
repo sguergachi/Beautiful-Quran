@@ -557,9 +557,10 @@ internal fun mushafDialReturnBubbleHit(
     /** Which way the book turns — see [mushafDialAlong]. */
     rightToLeft: Boolean = true,
 ): Boolean {
-    val left = mushafDialReturnBubbleLeft(page, pageCount, widthPx, insetPx, bubbleWidthPx,
-                rightToLeft = rightToLeft,
-            )
+    val left = mushafDialReturnBubbleLeft(
+        page, pageCount, widthPx, insetPx, bubbleWidthPx,
+        rightToLeft = rightToLeft,
+    )
     return xPx in left..(left + bubbleWidthPx)
 }
 
@@ -1049,8 +1050,6 @@ private const val MushafDialRuleWeightPx = 1f
 private const val MushafDialRuleHeldWeightPx = 2f
 /** Paper held back at each end, clear of the system's back-gesture strip. */
 internal val MushafDialEdgeInset = 14.dp
-/** The seat mark's share of the thumb: plainly the same mark, smaller. */
-private const val MushafDialSeatWidth = 0.55f
 /** A chapter opening in the chapter tier. */
 private val MushafDialChapterTick = 5.dp
 /** A leaf in the open trough: taller, because now it is the thing being aimed at. */
@@ -1478,9 +1477,8 @@ internal fun MushafPageDial(
                     tailPushPx = 10.dp.toPx(),
                     epsilonPx = 1.8.dp.toPx(),
                     result = combDrawnXs,
-                
-                rightToLeft = rightToLeft,
-            )
+                    rightToLeft = rightToLeft,
+                )
                 for (idx in chapterMarks.indices) {
                     val mark = chapterMarks[idx]
                     val x = drawnXs[idx]
@@ -1997,9 +1995,8 @@ internal fun MushafPageDial(
                             insetPx,
                             widthPxNow,
                             MushafDialRuleWeightPx * density,
-                        
-                rightToLeft = rightToLeft,
-            )
+                            rightToLeft = rightToLeft,
+                        )
                         // Hysteresis so a hand parked on a 70+ boundary (~7.8px
                         // cells) does not flip HUD every frame from 1-2px sensor
                         // noise — still a 3-4px deliberate move crosses.
@@ -2510,9 +2507,8 @@ internal fun MushafPageDial(
                                 widthPx = widthPx.toFloat(),
                                 insetPx = MushafDialEdgeInset.toPx(),
                                 bubbleWidthPx = MushafDialReturnHitWidth.toPx(),
-                            
-                rightToLeft = rightToLeft,
-            ).roundToInt(),
+                                rightToLeft = rightToLeft,
+                            ).roundToInt(),
                             0,
                         )
                     }
