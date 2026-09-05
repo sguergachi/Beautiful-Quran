@@ -325,13 +325,16 @@ class MushafPageDialTest {
     }
 
     @Test
-    fun `the cells stay under the ticks they are drawn beneath`() {
-        // The floors in the seat walk are cumulative, so a floor set too high
-        // has no slack to spend and drags the whole book against itself: the
-        // cells stop standing under their own ticks and the reader aims at one
-        // chapter and lands on another. This is the guard on that — the seat a
-        // chapter answers to must be near the mark it is drawn at, on every
-        // width, in both directions.
+    fun `no chapter can be skipped and the ticks stand where the finger is read`() {
+        // The promise of the chapter tier: every one of the 114 is reachable.
+        // Nearest-seat selection quietly breaks that whenever two seats crowd
+        // closer together than either stands from its other neighbour — the
+        // chapter between them is never nearest to anything and a dragging
+        // finger steps straight over it. The book crowds badly enough for this
+        // to bite: al-Baqarah opens one leaf after al-Fatihah and fifteen
+        // chapters share the last nine pages. Seated by page, the head of the
+        // rule reads 2, 3, 4, 5, 7, 9, 12 and six, eight, ten and eleven cannot
+        // be landed on at all.
         val marks = intArrayOf(
             1, 2, 50, 77, 106, 128, 151, 177, 187, 208, 221, 235, 249, 255,
             262, 267, 282, 293, 305, 312, 322, 332, 342, 350, 359, 367, 377,
@@ -351,32 +354,47 @@ class MushafPageDialTest {
                     val seats = mushafDialCombCellSeats(
                         marks, pages, inset, width, density, rightToLeft,
                     )
-                    val span = width - 2f * inset
-                    for (i in marks.indices) {
-                        val tick = mushafDialTrackX(
-                            mushafDialAlong(
-                                mushafDialChapterFraction(marks[i].toFloat(), marks, pages),
-                                rightToLeft,
-                            ),
-                            width,
-                            inset,
+                    // Walk the rule a pixel at a time, as a finger does, and
+                    // collect what it would select. Every chapter must appear.
+                    val reachable = HashSet<Int>()
+                    var x = 0f
+                    while (x <= width) {
+                        reachable += mushafDialChapterAt(
+                            seats,
+                            mushafDialClampToTrack(x, width, inset),
                         )
-                        // A twentieth of the rule. An even share of the measure
-                        // put chapter eleven's cell 82px off its tick on a
-                        // 1080px rule, which is a fifth of the head of the book.
+                        x += 1f
+                    }
+                    val skipped = marks.indices.filterNot { it in reachable }
+                    assertTrue(
+                        "chapters ${skipped.map { it + 1 }} cannot be selected " +
+                            "(${width}px, ${density}x, rtl=$rightToLeft)",
+                        skipped.isEmpty(),
+                    )
+                    // And the comb the reader aims at must stand on the same
+                    // spacing the finger is judged against, or every hit is a
+                    // miss by however far the two have drifted apart.
+                    val drawn = mushafDialCombDrawnXs(
+                        marks = marks,
+                        pageCount = pages,
+                        centerX = 0f,
+                        isLensed = false,
+                        combInk = 0f,
+                        insetPx = inset,
+                        widthPx = width,
+                        rulePx = density,
+                        lensSigmaPx = 40f * density,
+                        tailPushPx = 0f,
+                        epsilonPx = 3f * density,
+                        rightToLeft = rightToLeft,
+                    )
+                    for (i in marks.indices) {
                         assertTrue(
-                            "chapter ${i + 1} seat ${seats[i]} strayed from tick $tick " +
-                                "(${width}px, ${density}x, rtl=$rightToLeft)",
-                            abs(seats[i] - tick) <= span / 20f,
+                            "chapter ${i + 1} is drawn at ${drawn[i]} but selected at " +
+                                "${seats[i]} (${width}px, ${density}x, rtl=$rightToLeft)",
+                            abs(drawn[i] - seats[i]) <= (width - 2f * inset) / 40f,
                         )
                     }
-                    // And al-Baqarah, the crowded head's worst case, still owns
-                    // a cell rather than a crack between two others.
-                    val cell = abs(seats[1] - seats[0]) / 2f + abs(seats[2] - seats[1]) / 2f
-                    assertTrue(
-                        "al-Baqarah's cell collapsed to $cell (${width}px, ${density}x)",
-                        cell >= span / 114f,
-                    )
                 }
             }
         }
