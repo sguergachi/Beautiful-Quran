@@ -32,7 +32,12 @@ export function createQfProxy(fetchImpl = fetch) {
         },
         body: 'grant_type=client_credentials&scope=content',
       })
-      if (!response.ok) throw new ProxyFailure(503, 'qf_auth_unavailable')
+      if (!response.ok) {
+        const code = response.status >= 400 && response.status < 500
+          ? `qf_auth_rejected_${response.status}`
+          : 'qf_auth_unavailable'
+        throw new ProxyFailure(503, code)
+      }
       const body = await response.json()
       if (typeof body.access_token !== 'string' || !body.access_token) {
         throw new ProxyFailure(503, 'qf_auth_unavailable')

@@ -51,6 +51,17 @@ test('retries a content request once with a replacement token after 401', async 
   assert.equal(contentRequests, 2)
 })
 
+test('reports a rejected credential request without exposing the response body', async () => {
+  const proxy = createQfProxy(async () => Response.json(
+    { error: 'invalid_client', leaked_detail: 'must not escape' },
+    { status: 401 },
+  ))
+
+  const response = await proxy.fetch(new Request(`https://worker.example${bootstrap}`), env)
+  assert.equal(response.status, 503)
+  assert.deepEqual(await response.json(), { error: { code: 'qf_auth_rejected_401' } })
+})
+
 test('rejects untrusted origins and arbitrary upstream paths without fetching', async () => {
   let calls = 0
   const proxy = createQfProxy(async () => {
