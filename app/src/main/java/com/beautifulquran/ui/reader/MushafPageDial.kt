@@ -1439,9 +1439,12 @@ internal fun MushafPageDial(
             }
 
             // The chapter tier's comb: true hairline at rest. When under the
-            // finger the neighbourhood is lensed — far right 1×, growing to
-            // max by ~ch 25 then plateau — with extra tail boost. Syncs with
-            // the thumb's true seat.
+            // finger the neighbourhood is lensed — 1x out at al-Fatihah,
+            // growing to max by ~ch 25 then plateau — with extra tail boost.
+            // Syncs with the thumb's true seat. That growth follows the finger
+            // into the *book*, which is leftward in a mushaf and rightward in
+            // the English one: the short chapters are at the end either way,
+            // and the end is where the comb needs the room.
             val combInk = lift * (1f - open)
             if (combInk > 0.004f) {
                 val tick = MushafDialChapterTick.toPx()
@@ -1452,7 +1455,7 @@ internal fun MushafPageDial(
                     mushafDialTrackX(mushafDialAlong(mushafDialChapterFraction(page, chapterMarks, pages), rightToLeft), size.width, inset)
                 val centreProgress = if (isLensed) {
                     val centreFrac = mushafDialTrackFraction(centerX, size.width, inset)
-                    (1f - centreFrac).coerceIn(0f, 1f)
+                    mushafDialAlong(centreFrac, rightToLeft).coerceIn(0f, 1f)
                 } else 0f
                 val plateauAt = 0.78f
                 val effProgress = (centreProgress / plateauAt).coerceIn(0f, 1f)
