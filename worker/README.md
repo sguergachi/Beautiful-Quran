@@ -20,8 +20,12 @@ Add these ordinary variables (or rely on their safe defaults):
 
 | Name | Value |
 | --- | --- |
-| `QF_ENV` | `prelive` |
+| `QF_ENV` | `production` |
 | `ALLOWED_ORIGIN` | `https://sguergachi.github.io` |
+
+These non-secret production values are also pinned in `wrangler.jsonc`, so Git
+preview deployments cannot silently fall back to Prelive. Only the credentials
+belong in Cloudflare's secret store.
 
 After Cloudflare deploys `master`, visit `https://<your-worker>/healthz`. A
 successful response is `{ "ok": true, "environment": "prelive" }`. This
