@@ -129,6 +129,10 @@ internal fun MushafEnglishSheet(
     playbackSpeed: Float,
     flashAyah: Int?,
     flashWordPosition: Int?,
+    /** Every word a search grounded, and whether that focus is live — the ink
+     *  clocks are shared with the Arabic leaf and read both. */
+    flashWordPositions: Set<Int>,
+    searchFocusActive: Boolean,
     hideParentheticals: Boolean,
     /** The leaf's well and measure, in px, once it has laid out. */
     onMetrics: (wellPx: Float, measurePx: Float) -> Unit = { _, _ -> },
@@ -209,6 +213,8 @@ internal fun MushafEnglishSheet(
             playbackSpeed = playbackSpeed,
             flashAyah = flashAyah,
             flashWordPosition = flashWordPosition,
+            flashWordPositions = flashWordPositions,
+            searchFocusActive = searchFocusActive,
             packsState = packsState,
         )
     }

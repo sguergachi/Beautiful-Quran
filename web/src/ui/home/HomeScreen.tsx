@@ -26,12 +26,15 @@ import { VerseBookmarkRibbon } from '../../render/VerseBookmarkRibbon'
 import {
   englishTranslationHighlightSpans,
   filterSurahs,
+  parseSearchQuery,
   sectionWordSearchHits,
   shouldRunWordSearch,
+  spellingCorrection,
   WORD_SEARCH_PREVIEW_LIMIT,
   type SurahWordSearchSection,
   type WordSearchHit,
 } from '../../domain/WordSearch'
+import { wordSearchSources } from '../../data/customizePolicy'
 import { BOOKMARKS_LAYER, type StackLayer } from '../paper/stack'
 
 export function HomeScreen({ stackLayer }: { stackLayer: StackLayer }) {
@@ -63,6 +66,7 @@ export function HomeScreen({ stackLayer }: { stackLayer: StackLayer }) {
   // whole paper stack, including the mounted reader under the cover).
   const [search, setSearch] = useState('')
   const [searchFocused, setSearchFocused] = useState(false)
+  const searchInputRef = useRef<HTMLInputElement>(null)
   const searching = search.trim().length > 0
   const { surahs: filtered, ayahTarget } = useMemo(
     () => filterSurahs(state.surahs, search),
@@ -70,6 +74,7 @@ export function HomeScreen({ stackLayer }: { stackLayer: StackLayer }) {
   )
 
   const [wordHits, setWordHits] = useState<WordSearchHit[]>([])
+  const [wordHitsQuery, setWordHitsQuery] = useState('')
   const [wordLoading, setWordLoading] = useState(false)
   const [expandedSurahIds, setExpandedSurahIds] = useState<Set<number>>(
     () => new Set(),
@@ -79,21 +84,41 @@ export function HomeScreen({ stackLayer }: { stackLayer: StackLayer }) {
   const [ribbonUnfurlSignal, setRibbonUnfurlSignal] = useState(0)
 
   useEffect(() => {
+    const dismissSearch = (event: KeyboardEvent) => {
+      if (
+        event.key !== 'Escape' ||
+        document.activeElement?.id !== 'chapter-search'
+      ) return
+      event.preventDefault()
+      event.stopImmediatePropagation()
+      document.getElementById('chapter-search')?.blur()
+    }
+    window.addEventListener('keydown', dismissSearch, true)
+    return () => window.removeEventListener('keydown', dismissSearch, true)
+  }, [])
+
+  useEffect(() => {
     setExpandedSurahIds(new Set())
     if (!shouldRunWordSearch(search)) {
       setWordHits([])
+      setWordHitsQuery('')
       setWordLoading(false)
       return
     }
     setWordLoading(true)
     let cancelled = false
     const handle = window.setTimeout(() => {
-      void QuranRepository.searchWordsAsync(search, () => cancelled).then((hits) => {
+      void QuranRepository.searchWordsAsync(
+        search,
+        () => cancelled,
+        wordSearchSources(),
+      ).then((hits) => {
         if (cancelled) return
         setWordHits(hits)
+        setWordHitsQuery(search)
         setWordLoading(false)
       })
-    }, 160)
+    }, 120)
     return () => {
       cancelled = true
       window.clearTimeout(handle)
@@ -113,10 +138,15 @@ export function HomeScreen({ stackLayer }: { stackLayer: StackLayer }) {
     setRibbonUnfurlSignal((value) => value + 1)
   }, [stackLayer])
 
-  const wordSections = useMemo(
-    () => sectionWordSearchHits(wordHits, expandedSurahIds),
-    [wordHits, expandedSurahIds],
+  const visibleWordHits = useMemo(
+    () => wordHitsQuery === search ? wordHits : [],
+    [search, wordHits, wordHitsQuery],
   )
+  const wordSections = useMemo(
+    () => sectionWordSearchHits(visibleWordHits, expandedSurahIds),
+    [visibleWordHits, expandedSurahIds],
+  )
+  const correctedQuery = useMemo(() => spellingCorrection(visibleWordHits), [visibleWordHits])
 
   const continueSurah =
     !searching && state.settings.lastSurah > 0
@@ -240,18 +270,31 @@ export function HomeScreen({ stackLayer }: { stackLayer: StackLayer }) {
               data-search-focused={searchFocused || undefined}
             >
               <div className="search-row">
-                <div className="home-search">
+                <div
+                  className="home-search"
+                  onFocusCapture={() => {
+                    setSearchFocused(true)
+                    void Promise.all([
+                      QuranRepository.warmWordSearchIndex(),
+                      QuranRepository.warmSearchConcepts(),
+                    ])
+                  }}
+                  onBlurCapture={(event) => {
+                    if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+                      setSearchFocused(false)
+                    }
+                  }}
+                >
                   <SearchIcon />
                   <PaperInput
+                    inputRef={searchInputRef}
                     id="chapter-search"
                     name="chapter-search"
                     type="search"
-                    placeholder="Search surah, word, or 2:255"
+                    placeholder="Search concept, “exact phrase”, or 2:255"
                     value={search}
                     onValueChange={setSearch}
-                    onFocus={() => setSearchFocused(true)}
-                    onBlur={() => setSearchFocused(false)}
-                    aria-label="Search surah, word, or ayah reference"
+                    aria-label="Search concepts, exact phrases, or ayah reference"
                   />
                   {search ? (
                     <button
@@ -260,7 +303,10 @@ export function HomeScreen({ stackLayer }: { stackLayer: StackLayer }) {
                       aria-label="Clear search"
                       // Keep the field focused so the masthead stays receded.
                       onMouseDown={(e) => e.preventDefault()}
-                      onClick={() => setSearch('')}
+                      onClick={() => {
+                        setSearch('')
+                        searchInputRef.current?.focus()
+                      }}
                     >
                       <ClearIcon />
                     </button>
@@ -364,10 +410,15 @@ export function HomeScreen({ stackLayer }: { stackLayer: StackLayer }) {
 
             {showWordSections ? (
               <div className="word-search-results">
+                {correctedQuery ? (
+                  <p className="search-correction">
+                    Searching instead for <span>{correctedQuery}</span>
+                  </p>
+                ) : null}
                 <p className="search-section-label">
                   {wordLoading && wordSections.length === 0
                     ? 'Searching ayahs…'
-                    : 'In the Quran'}
+                    : `In the Quran · ${visibleWordHits.length} relevant ${visibleWordHits.length === 1 ? 'ayah' : 'ayahs'}`}
                 </p>
                 {wordSections.map((section) => (
                   <WordSearchSection
@@ -381,6 +432,8 @@ export function HomeScreen({ stackLayer }: { stackLayer: StackLayer }) {
                         hit.surahId,
                         hit.ayahNumber,
                         hit.position,
+                        search,
+                        hit.targetPositions,
                       )
                     }
                   />
@@ -389,7 +442,7 @@ export function HomeScreen({ stackLayer }: { stackLayer: StackLayer }) {
             ) : null}
 
             {showEmpty ? (
-              <p className="search-empty">No matches</p>
+              <p className="search-empty">No relevant ayahs found</p>
             ) : null}
             </div>
           </div>
@@ -543,6 +596,7 @@ function WordSearchSection({
   onPrepareHit: (hit: WordSearchHit) => void
   onOpenHit: (hit: WordSearchHit) => void
 }) {
+  const displayQuery = parseSearchQuery(query).text
   return (
     <section className="word-search-section">
       <header className="word-search-surah-header">
@@ -555,8 +609,15 @@ function WordSearchSection({
         </span>
       </header>
       <ul className="word-search-hits">
-        {section.hits.map((hit) => (
-          <li key={`${hit.ayahNumber}-${hit.position}`}>
+        {section.hits.map((hit) => {
+          const spans = englishTranslationHighlightSpans(
+            hit.displayText ?? hit.ayahTranslation,
+            displayQuery,
+            hit.translation,
+            hit.matchLabel ?? '',
+            hit.matchTerms ?? [],
+          )
+          return <li key={`${hit.ayahNumber}-${hit.position}`}>
             <button
               type="button"
               className="word-search-hit"
@@ -567,13 +628,10 @@ function WordSearchSection({
             >
               <span className="word-search-ref">
                 {hit.surahId}:{hit.ayahNumber}
+                {` · ${hit.matchReason ?? 'Text match'}`}
               </span>
               <span className="word-search-translation">
-                {englishTranslationHighlightSpans(
-                  hit.ayahTranslation,
-                  query,
-                  hit.translation,
-                ).map((span, i) =>
+                {spans.map((span, i) =>
                   span.highlighted ? (
                     <mark key={i} className="word-search-mark">
                       {span.text}
@@ -585,7 +643,7 @@ function WordSearchSection({
               </span>
             </button>
           </li>
-        ))}
+        })}
       </ul>
       {section.hiddenCount > 0 ? (
         <button type="button" className="word-search-more" onClick={onToggle}>

@@ -59,4 +59,14 @@ class EnglishTypographyTest {
             ),
         )
     }
+
+    @Test
+    fun `shared gloss flash resolves to its visible owner`() {
+        val glosses = listOf("Except", "righteous deeds", "righteous deeds", "then")
+        val arabic = listOf("إِلَّا", "وَعَمِلَ", "صَٰلِحٗا", "فَأُوْلَٰٓئِكَ")
+
+        assertEquals(1, EnglishTypography.coalescedGlossOwnerIndex(glosses, arabic, 2))
+        assertEquals(1, EnglishTypography.coalescedGlossOwnerIndex(glosses, arabic, 1))
+        assertEquals(null, EnglishTypography.coalescedGlossOwnerIndex(glosses, arabic, -1))
+    }
 }

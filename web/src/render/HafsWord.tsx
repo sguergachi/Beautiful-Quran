@@ -24,7 +24,7 @@ import {
   runRepeatFadeOutAsync,
   runRepeatResidualAsync,
   runRepeatWashInAsync,
-  runSearchHitDoubleWash,
+  runSearchHitWash,
   type CancellablePromise,
 } from './inkWash'
 import { SearchHitFlash } from '../ui/reader/SearchHitFlash'
@@ -38,8 +38,10 @@ interface Props {
   sweepMs: number | null
   /** Seek-generation so replaying this Active word restarts the wash. */
   activation?: number
-  /** When true, pulse the orange search-hit flash on this Arabic word. */
+  /** When true, breathe the orange search-hit flash on this Arabic word. */
   searchFlash?: boolean
+  /** Temporarily recess this non-target word while a search flash is active. */
+  searchRecessed?: boolean
   rootRef?: MutableRefObject<HTMLElement | null>
   onPlay: () => void
   onHold: () => void
@@ -52,6 +54,7 @@ export function HafsWord({
   sweepMs: activeSweepMs,
   activation = 0,
   searchFlash = false,
+  searchRecessed = false,
   rootRef: externalRootRef,
   onPlay,
   onHold,
@@ -307,7 +310,7 @@ export function HafsWord({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activation, ink.repeat, ink.state, repeatMounted])
 
-  // Search-hit pulse: mount overlay only while flashing.
+  // Search-hit breath: mount overlay only while flashing.
   useLayoutEffect(() => {
     if (!flashMounted) return
     if (!searchFlash) {
@@ -315,10 +318,9 @@ export function HafsWord({
       return
     }
     if (!flashRef.current) return
-    return runSearchHitDoubleWash(
+    return runSearchHitWash(
       flashRef.current,
-      true,
-      SearchHitFlash.PULSES,
+      SearchHitFlash,
       () => setFlashMounted(false),
     )
   }, [searchFlash, flashMounted])
@@ -331,6 +333,7 @@ export function HafsWord({
       }}
       className="hafs-word"
       data-state={ink.state}
+      data-search-recessed={searchRecessed || undefined}
       style={{ ['--upcoming-cover' as string]: String(upcomingCover) }}
       {...interaction}
       onContextMenu={onContextMenu}
@@ -363,7 +366,7 @@ export function HafsWord({
           {flashMounted ? (
             <span
               ref={flashRef}
-              className="hafs-repeat-overlay hafs-glyph"
+              className="hafs-repeat-overlay search-hit-breath hafs-glyph"
               aria-hidden="true"
               style={{ opacity: 0 }}
             >

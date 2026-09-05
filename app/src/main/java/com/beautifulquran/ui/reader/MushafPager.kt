@@ -344,7 +344,13 @@ internal fun mushafUsesLiveInk(
     pageHasActiveWord: Boolean = false,
 ): Boolean = isSettled || isVoicePage || waitingForVoice || pageHasActiveWord
 
-internal enum class MushafInkPackKind { ACTIVE_WORD, UPCOMING, SEARCH_FLASH, STATIC }
+internal enum class MushafInkPackKind {
+    ACTIVE_WORD,
+    UPCOMING,
+    SEARCH_FLASH,
+    SEARCH_BACKGROUND,
+    STATIC,
+}
 
 /** Which clock pack an ayah owns on the page carrying the voice. */
 internal fun mushafInkPackKind(
@@ -369,6 +375,7 @@ internal fun mushafInkPackKind(
      * disposes the wash Animatable.
      */
     pageHasActiveWord: Boolean = false,
+    hasSearchFocus: Boolean = false,
 ): MushafInkPackKind = when {
     pageOwnsVoice && basmalahActive -> MushafInkPackKind.UPCOMING
     // Own the wash wherever the word is, not only once Media3 or the
@@ -379,6 +386,7 @@ internal fun mushafInkPackKind(
         activeWordAyah == ayah ->
         MushafInkPackKind.ACTIVE_WORD
     hasSearchFlash -> MushafInkPackKind.SEARCH_FLASH
+    hasSearchFocus -> MushafInkPackKind.SEARCH_BACKGROUND
     (pageOwnsVoice || pageHasActiveWord) &&
         (frontierAyah == null || ayah > frontierAyah ||
             ayah == frontierAyah && frontierWaitingForFirstWord) ->
@@ -648,6 +656,8 @@ internal fun MushafPager(
     onTappedLeaf: (Int) -> Unit,
     flashAyah: Int?,
     flashWordPosition: Int?,
+    flashWordPositions: Set<Int>,
+    searchFocusActive: Boolean,
     /** True only while a distant dial landing keeps neighbour leaves parked. */
     parkNeighbours: () -> Boolean,
     onUserTurnedPage: () -> Unit,
@@ -1293,6 +1303,8 @@ internal fun MushafPager(
                             playbackSpeed = playbackSpeed,
                             flashAyah = flashAyah.takeIf { settled },
                             flashWordPosition = flashWordPosition.takeIf { settled },
+                            flashWordPositions = flashWordPositions.takeIf { settled }.orEmpty(),
+                            searchFocusActive = searchFocusActive && settled,
                             hideParentheticals = hideEnglishParentheticals,
                             onMetrics = onLeafMetrics,
                             measured = bookMeasured,
@@ -1322,6 +1334,8 @@ internal fun MushafPager(
                             playbackSpeed = playbackSpeed,
                             flashAyah = flashAyah.takeIf { settled },
                             flashWordPosition = flashWordPosition.takeIf { settled },
+                            flashWordPositions = flashWordPositions.takeIf { settled }.orEmpty(),
+                            searchFocusActive = searchFocusActive && settled,
                             onWordClick = leafWordClick,
                             onWordLongClick = leafWordLongClick,
                             onAyahClick = leafAyahClick,
@@ -1355,6 +1369,8 @@ private fun MushafPageSheet(
     playbackSpeed: Float,
     flashAyah: Int?,
     flashWordPosition: Int?,
+    flashWordPositions: Set<Int>,
+    searchFocusActive: Boolean,
     onWordClick: (MushafToken) -> Unit,
     onWordLongClick: (MushafToken) -> Unit,
     onAyahClick: (MushafToken) -> Unit,
@@ -1416,6 +1432,8 @@ private fun MushafPageSheet(
             playbackSpeed = playbackSpeed,
             flashAyah = flashAyah,
             flashWordPosition = flashWordPosition,
+            flashWordPositions = flashWordPositions,
+            searchFocusActive = searchFocusActive,
             packsState = packsState,
         )
     }
@@ -1657,6 +1675,8 @@ internal fun MushafPageInkClocks(
     playbackSpeed: Float,
     flashAyah: Int?,
     flashWordPosition: Int?,
+    flashWordPositions: Set<Int>,
+    searchFocusActive: Boolean,
     packsState: SnapshotStateMap<Pair<Int, Int>, AyahInkPack>,
 ) {
     val activeWordAyah by remember {
@@ -1681,6 +1701,11 @@ internal fun MushafPageInkClocks(
             }
             val recitingActive = voice.reciting
             val flashHere = flashAyah == ayah.number && flashWordPosition != null
+            val searchFocusPositions = if (searchFocusActive) {
+                flashWordPositions.takeIf { flashHere }.orEmpty()
+            } else {
+                null
+            }
             val kind = mushafInkPackKind(
                 pageOwnsVoice = pageOwnsVoice,
                 ayah = ayah.number,
@@ -1691,6 +1716,7 @@ internal fun MushafPageInkClocks(
                 frontierWaitingForFirstWord = frontierWaitingForFirstWord,
                 waitingForVoice = waitingForVoice,
                 pageHasActiveWord = pageHasActiveWord,
+                hasSearchFocus = searchFocusActive,
             )
             val pack = when (kind) {
                 MushafInkPackKind.ACTIVE_WORD -> rememberAyahInkPack(
@@ -1700,6 +1726,9 @@ internal fun MushafPageInkClocks(
                     isActiveAyah = true,
                     dimmed = false,
                     flashWordPosition = flashWordPosition?.takeIf { flashHere },
+                    flashWordPositions = flashWordPositions.takeIf { flashHere }.orEmpty(),
+                    searchFocusPositions = searchFocusPositions,
+                    searchFocusActive = searchFocusActive,
                     // Debounced on purpose: a repeat range looping back dips
                     // out of "playing" for a frame, and the ink is not dry
                     // between two laps of the same verse.
@@ -1713,6 +1742,19 @@ internal fun MushafPageInkClocks(
                     isActiveAyah = false,
                     dimmed = false,
                     flashWordPosition = flashWordPosition,
+                    flashWordPositions = flashWordPositions,
+                    searchFocusPositions = flashWordPositions,
+                    searchFocusActive = searchFocusActive,
+                    wetInk = false,
+                )
+                MushafInkPackKind.SEARCH_BACKGROUND -> rememberAyahInkPack(
+                    ayah = ayah,
+                    activeWord = null,
+                    playbackSpeed = playbackSpeed,
+                    isActiveAyah = false,
+                    dimmed = false,
+                    searchFocusPositions = emptySet(),
+                    searchFocusActive = true,
                     wetInk = false,
                 )
                 // One branch, deliberately: waiting and settled differ only by
@@ -1789,6 +1831,7 @@ private fun rememberMushafRecessPack(dimmed: Boolean): AyahInkPack {
         recessCover = recessCover,
         markAlpha = markAlpha,
         searchHitWash = idleRepeat,
+        searchBackgroundAlpha = remember { mutableStateOf(1f) },
         wholeAyahRecess = dimmed,
     )
 }

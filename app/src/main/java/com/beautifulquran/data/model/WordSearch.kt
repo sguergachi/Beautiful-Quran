@@ -1,5 +1,7 @@
 package com.beautifulquran.data.model
 
+enum class WordSearchDisplaySource { ARABIC, WORD_GLOSS, TRANSLITERATION, VERSE_TRANSLATION }
+
 /** One word-level hit from a Quran-wide home search. */
 data class WordSearchHit(
     val surahId: Int,
@@ -12,6 +14,20 @@ data class WordSearchHit(
     val ayahTranslation: String,
     val surahNameTransliteration: String,
     val surahNameArabic: String,
+    /** Ontology concept that surfaced an ayah-level semantic result. */
+    val matchLabel: String? = null,
+    /** Every visible Quran-vocabulary term that helped this result rank. */
+    val matchTerms: List<String> = emptyList(),
+    /** Every timed word behind the visible highlighted terms in this ayah. */
+    val targetPositions: List<Int> = emptyList(),
+    /** Non-null only when last-resort spelling correction actually ran. */
+    val correctedQuery: String? = null,
+    /** Quiet, user-facing explanation of why this result is relevant. */
+    val matchReason: String = "Text match",
+    /** Snippet copied from the reader-visible source selected for this search. */
+    val displayText: String = ayahTranslation,
+    /** Which reader-visible text surface [displayText] contains. */
+    val displaySource: WordSearchDisplaySource = WordSearchDisplaySource.VERSE_TRANSLATION,
 )
 
 /**

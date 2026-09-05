@@ -11,6 +11,7 @@ const assets = [
   { name: 'quran.db', label: 'Quran database', required: true },
   { name: 'lexicon.db', label: "Lane's lexicon database", required: false },
   { name: 'dictionary.db', label: 'Wiktionary dictionary database', required: false },
+  { name: 'search_concepts.json', label: 'Quran concept search index', required: true },
 ]
 
 for (const asset of assets) {
