@@ -455,8 +455,8 @@ fun interface EnglishLeafRuler {
     fun fill(page: Int, runs: List<EnglishVerseRun>): EnglishLeafFill
 }
 
-/** What a leaf came to: the lines it sets, and where it stopped. */
-class EnglishLeafFill(val lines: Int, val cut: EnglishRulerCut?)
+/** Where a leaf stopped, or null when all of the offer fitted on it. */
+class EnglishLeafFill(val cut: EnglishRulerCut?)
 
 /**
  * Nothing is held back to make a chapter's ending longer, and this is where the
@@ -508,7 +508,7 @@ fun buildEnglishBookByLayout(
     var at = 0
     var offset = 0
     while (at < order.size) {
-        val kept = englishLeafAt(order, text, ruler, at, offset).first
+        val kept = englishLeafAt(order, text, ruler, at, offset)
         out += kept
 
         val last = kept.last()
@@ -624,14 +624,14 @@ private fun englishLeafOffer(
 }
 
 
-/** One leaf, decided by the ruler: its runs, and the lines it came to. */
+/** One leaf, decided by the ruler. */
 private fun englishLeafAt(
     order: List<IntArray>,
     text: (Int, Int) -> String,
     ruler: EnglishLeafRuler,
     at: Int,
     offset: Int,
-): Pair<List<EnglishVerseRun>, Int> {
+): List<EnglishVerseRun> {
     // How much to offer. Enough that the leaf is decided by the layout and not
     // by the end of the offer — and if it was not, the ruler says so and the
     // offer grows. One round settles almost every leaf in the Qur'an.
@@ -646,7 +646,7 @@ private fun englishLeafAt(
         if (fill.cut != null || !exhausted) break
         take += (ENGLISH_LEAF_CAPACITY_CHARS * ENGLISH_LEAF_OFFER).toInt()
     }
-    val cut = fill.cut ?: return runs to fill.lines
+    val cut = fill.cut ?: return runs
     val kept = runs.subList(0, cut.runIndex + 1).toMutableList()
     val last = kept.last()
     // A leaf must advance. Whatever a ruler answers — and a ruler is a
@@ -654,6 +654,6 @@ private fun englishLeafAt(
     // nothing would paginate for ever.
     val to = if (kept.size == 1) maxOf(cut.to, last.from + 1) else cut.to
     kept[kept.lastIndex] = EnglishVerseRun(last.surahId, last.ayah, last.from, to)
-    return kept to fill.lines
+    return kept
 }
 

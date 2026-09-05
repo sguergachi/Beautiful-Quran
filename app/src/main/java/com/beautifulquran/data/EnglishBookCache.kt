@@ -90,10 +90,13 @@ class EnglishBookCache(context: Context) {
             // use to anybody once it has.
             dir.listFiles()?.forEach { if (it.name != key) it.delete() }
             val tmp = File(dir, "$key.writing")
+            // Take the leaves first: a count written in the header that the
+            // body then disagrees with is a file that reads back short every
+            // launch, which looks exactly like having no cache at all.
+            val leaves = (0 until book.leafCount).mapNotNull { book.leaf(it) }
             DataOutputStream(tmp.outputStream().buffered()).use { out ->
-                out.writeInt(book.leafCount)
-                for (index in 0 until book.leafCount) {
-                    val leaf = book.leaf(index) ?: continue
+                out.writeInt(leaves.size)
+                leaves.forEach { leaf ->
                     out.writeInt(leaf.runs.size)
                     leaf.runs.forEach { run ->
                         out.writeInt(run.surahId)
@@ -110,6 +113,6 @@ class EnglishBookCache(context: Context) {
 
     private companion object {
         /** Bump when the meaning of a written leaf changes. */
-        const val FORMAT = 14
+        const val FORMAT = 15
     }
 }

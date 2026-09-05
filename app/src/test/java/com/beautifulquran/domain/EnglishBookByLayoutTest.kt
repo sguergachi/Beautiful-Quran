@@ -31,22 +31,18 @@ class EnglishBookByLayoutTest {
      * more — the same contract a real layout answers with.
      */
     private fun ruler(holds: Int) = EnglishLeafRuler { _, runs ->
-        // A line of this stand-in holds ten characters.
         var room = holds
-        var used = 0
         for ((k, run) in runs.withIndex()) {
             val len = run.to - run.from
             if (len + 1 <= room) {
                 room -= len + 1
-                used += len + 1
             } else {
                 return@EnglishLeafRuler EnglishLeafFill(
-                    lines = (used + room) / 10,
-                    cut = EnglishRulerCut(k, run.from + room.coerceAtLeast(1)),
+                    EnglishRulerCut(k, run.from + room.coerceAtLeast(1)),
                 )
             }
         }
-        EnglishLeafFill(lines = used / 10, cut = null)
+        EnglishLeafFill(null)
     }
 
     private fun book(vararg pages: Pair<Int, List<Pair<Int, Int>>>, text: (Int, Int) -> String) =
@@ -111,12 +107,24 @@ class EnglishBookByLayoutTest {
     }
 
     @Test
+    fun `a ruler that never cuts still ends the book`() {
+        // Null is the answer that asks for more, and the offer grows until it
+        // runs out of verses. It must run out rather than grow for ever.
+        val b = buildEnglishBookByLayout(
+            buildMushafCatalog(listOf(source(2, 2, 3), source(2, 3, 3))),
+            { _, _ -> "x".repeat(50) },
+            { _, _ -> EnglishLeafFill(null) },
+        )
+        assertEquals(1, b.leaves.size)
+    }
+
+    @Test
     fun `a ruler that says a leaf holds nothing still advances`() {
         // Not a case a well of any size produces, but the book must not hang.
         val b = buildEnglishBookByLayout(
             buildMushafCatalog(listOf(source(2, 2, 3), source(2, 3, 3))),
             { _, _ -> "x".repeat(50) },
-            { _, _ -> EnglishLeafFill(1, EnglishRulerCut(0, 0)) },
+            { _, _ -> EnglishLeafFill(EnglishRulerCut(0, 0)) },
         )
         assertTrue(b.leaves.size in 1..200)
     }

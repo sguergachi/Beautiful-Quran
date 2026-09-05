@@ -1306,7 +1306,7 @@ internal fun englishLeafRuler(
         val prose = blocks.filterIsInstance<EnglishLeafBlockText.Prose>().firstOrNull()
         val room = (wellPx - head).coerceAtLeast(1f)
         if (prose == null) {
-            EnglishLeafFill(0, null)
+            EnglishLeafFill(null)
         } else {
             val laid = measurer.measure(
                 prose.text,
@@ -1321,7 +1321,7 @@ internal fun englishLeafRuler(
             // rather than on the page being filled.
             val lines = (((room - inkPx) / pitchPx).toInt() + 1).coerceAtLeast(1)
             if (laid.lineCount <= lines) {
-                EnglishLeafFill(laid.lineCount, null)
+                EnglishLeafFill(null)
             } else {
                 // Then *find* the cut instead of inferring it.
                 //
@@ -1350,10 +1350,16 @@ internal fun englishLeafRuler(
                 // or four measurements instead of nine.
                 val stops = englishLeafCutStops(runs, translation)
                 val seed = englishLeafSeedStop(stops, laid, prose, leaf.verses, lines)
+                // Fewer lines than the well holds — *including none*. A leaf
+                // can measure empty: englishLeaf drops a run whose text comes
+                // out blank, which a run that is nothing but a translator's
+                // aside does when the reader has asked for those to come off.
+                // Reading that as "too long" would break the monotonicity the
+                // search rests on and could settle it below the answer.
                 fun fits(at: Int): Boolean = englishLeafLineCount(
                     page, runs, stops[at], hideParentheticals, translation,
                     verseNumberScript, style, constraints, density, measurer,
-                ) in 1..lines
+                ) <= lines
                 // Straddle: `lo` fits, `hi` does not, and the answer is the
                 // last stop before `hi`.
                 var lo: Int
@@ -1382,7 +1388,14 @@ internal fun englishLeafRuler(
                     val mid = (lo + hi) / 2
                     if (fits(mid)) lo = mid else hi = mid
                 }
-                EnglishLeafFill(lines, stops[lo.coerceAtLeast(0)])
+                // Every stop fitted, offer and all. The candidate said the
+                // offer overflows and the leaf, drawn, says it does not — they
+                // agree almost everywhere, and here they did not. Answer the
+                // way an unfilled leaf answers, so the caller offers more:
+                // cutting at the offer's end would stop the leaf at a boundary
+                // nothing on the page put there.
+                if (lo >= stops.lastIndex) EnglishLeafFill(null)
+                else EnglishLeafFill(stops[lo.coerceAtLeast(0)])
             }
         }
     }
@@ -1413,7 +1426,10 @@ private fun englishLeafSeedStop(
     val into = (at - prose.verses[pick].range.first).coerceIn(0, set.to - set.textFrom)
     val to = set.textFrom + into
     // The stops are in reading order, so the nearest is the last one at or
-    // before this verse and offset.
+    // before this verse and offset. `pick` indexes the block's verses and is
+    // read against the runs' — they line up unless a run laid out empty, and
+    // where they do not this is a worse guess and not a wrong answer: the
+    // search starts further off and takes a measurement or two more.
     var best = 0
     for (i in stops.indices) {
         val stop = stops[i]

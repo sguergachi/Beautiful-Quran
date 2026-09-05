@@ -327,6 +327,12 @@ class ReaderViewModel(
         if (rulerFor == null && mushafRulerKey != null && mushafLeafText == text) return
         mushafLeafText = text
         mushafRulerKey = rulerKey
+        // Two of these can be in flight at once: the app's root asks on load
+        // from remembered figures, and the leaf asks again the moment it knows
+        // its own size. They read and paginate off the main thread, so the
+        // slower one can finish last — and it must not then install its book,
+        // null out the ruler key, or write its leaves over the live ones.
+        val generation = ++mushafGeneration
         viewModelScope.launch {
             val catalog = repository.mushafCatalog()
             val surahs = repository.surahs().associateBy { it.id }
@@ -348,6 +354,7 @@ class ReaderViewModel(
                 val cached = withContext(Dispatchers.IO) {
                     englishBookCache.read(cacheKey, pageOf, verse)
                 }
+                if (generation != mushafGeneration) return@launch
                 if (cached == null && !trusted) {
                     // Remembered figures, and nothing written down under them.
                     // Stand down: the leaf will measure itself in a moment and
@@ -357,14 +364,18 @@ class ReaderViewModel(
                 }
                 cached ?: withContext(Dispatchers.Default) {
                     buildEnglishBookByLayout(catalog, verse, rulerFor(verse))
-                        .also { englishBookCache.write(cacheKey, it) }
+                }.also {
+                    if (generation != mushafGeneration) return@launch
+                    withContext(Dispatchers.IO) { englishBookCache.write(cacheKey, it) }
                 }
             }
+            if (generation != mushafGeneration) return@launch
             _mushaf.value = MushafUi(catalog, surahs, book, measured = rulerFor != null)
         }
     }
 
     private var mushafRulerKey: Any? = null
+    private var mushafGeneration = 0
 
     /** Everything the English book's leaves depend on — see [EnglishBookCache]. */
     fun englishBookCacheKey(
