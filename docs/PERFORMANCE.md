@@ -250,20 +250,48 @@ janky", first ask: is this the release APK?
 
 ### 7b. The word-search index is a memory budget, not just a cache
 
-Quran-wide word search builds one entry per **word row: 77,429 of them**, held
-for the life of the process from the first ≥2-character cover-sheet query. At
+Quran-wide word search eventually builds one entry per **word row: 77,429 of
+them**, held for the life of the process after search gains focus. At
 that size, per-entry strings are the whole cost, and `Cursor.getString()` hands
 back a *fresh* `String` per row — so binding an ayah's text onto each of its
 words duplicated it ~12×.
 
-Anything ayah-wide therefore lives behind one shared `WordSearchAyahContext` per
-ayah (6,236 instances, ~2.3 M characters) instead of per word (~31 M
-characters). Only genuinely per-word fields — the surface form, its normalized
-and lowercased search keys, the gloss — are stored inline.
+Anything ayah-wide therefore lives behind one shared `WordSearchAyahContext`
+per ayah (6,236 instances) instead of per word. The loader reads those large
+translation/name strings in a separate 6,236-row cursor rather than decoding
+and discarding them on every word row. Product search is English-only, so it
+also does not manufacture Arabic or transliteration search keys that no active
+reader source can use.
+
+Cold first results do not wait for that process-lifetime index. Focus warms a
+179 KB concept-only candidate asset; after the 120 ms typing debounce, Android
+asks SQLite for at most 600 literal or relevant semantic ayahs, materializes
+only their words, and publishes that first rank before loading the complete
+concept/thesaurus/root rank. On the constrained two-core debug emulator this
+measured **525 ms** for `peace` and **876 ms** for the multi-word concept
+`saving money`, from final typed character to visible results and including
+debounce. The complete rank then replaces it. App startup stays free of a
+full-Quran scan.
+
+The candidate query may use the longest token from a phrase even when that
+token is short. This preserves the sub-second first-result path for literal
+phrases such as `if he`; single short tokens still skip the broad SQL fallback.
+
+The ranker still returns every matching occurrence, but query-local score
+caches evaluate each distinct lowercase field only once. The committed corpus
+has 21,947 distinct English glosses across 77,429 word rows, so the common
+Scroll path avoids roughly 55,000 redundant relevance evaluations per stage;
+thesaurus expansions share one cached result per gloss as well. The cache dies
+with the query and does not enlarge the process-lifetime index. Already-folded
+index fields also bypass repeat lowercase conversion in the hot loop.
 
 **Rule for anything added to this index:** if the value is the same for every
 word of a verse, it belongs in the shared context. A single extra ayah-wide
 `String` field on the entry costs ~12× what it looks like it costs.
+
+Run `npm run benchmark:search` from `web/` for the full-corpus exact, concept,
+phrase, typo, quoted, and Mushaf-source timing suite. It reports the median of
+nine warm searches per case so performance work is measured rather than felt.
 
 ### 8. Streaming audio never blocks rendering
 

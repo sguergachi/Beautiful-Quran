@@ -72,9 +72,12 @@ data/lexicon.db         Lane's Lexicon, keyed by QAC root — the Root Viewer's
                         quran.db so timing rebuilds don't rewrite 20 MB of it
 data/dictionary.db      English Wiktionary Arabic (kaikki extract), keyed by QAC
                         lemma — Root Viewer Dictionary section. Lazy, ~1 MB
+data/search_concepts.json  QSAC concepts + focused Open English WordNet links
+                          for offline relevance-ranked search. Committed, ~660 KB
 tools/build_db.py       Data pipeline that generates quran.db (build-time, not app code)
 tools/build_lexicon_db.py  Renders Perseus' TEI edition of Lane into lexicon.db
 tools/build_dictionary_db.py  Filters kaikki Arabic JSONL onto QAC lemmas → dictionary.db
+tools/build_search_concepts.py  Regenerates pinned QSAC + WordNet search data
 tools/timing_overrides/ Local timing-report scratch; CI rejects committed JSON
 tools/timing_patch_cases/ Unit tests for systematic cleaner / span-protect fixes
 tools/timing_repairs/   CTC auto-repairs rebased onto current source timing
@@ -122,6 +125,11 @@ python3 tools/test_build_db.py  # timing pipeline regressions (~1s, no Gradle)
   `python3 tools/build_dictionary_db.py` (caches ~485 MB kaikki Arabic JSONL
   under `tools/.cache/`, emits a ~1 MB QAC-lemma subset). Bump
   `DictionaryDatabase.DB_FILE_NAME` when its content changes.
+- `data/search_concepts.json` is committed and read directly (not extracted or
+  cached under a versioned filename). Rebuild it only with
+  `python3 tools/build_search_concepts.py`; the script verifies its pinned QSAC
+  and WordNet sources plus exact 6,236-ayah coverage. See `docs/SEARCH.md` and
+  the adjacent attribution file.
 - `docs/ornaments.css` and `docs/ornaments/*.svg` are **committed** too: the
   Pages workflow copies `docs/` verbatim, so the product page can't run the
   TypeScript ornament generator itself. `npm run build:ornaments` (from `web/`)
@@ -311,6 +319,7 @@ this document combined: `ReaderComponents.kt` (~36k tokens),
 | `docs/GLIMMER.md` | Nightfall glimmer lifecycle, repeat retriggering, halo rendering, tuning, and visual checks |
 | `docs/ANNOTATIONS.md` | Verse annotations (ḥawāshī) — reader's notes now, scholars' glosses later |
 | `docs/ROOT_VIEWER.md` | Hold-to-reveal root lexicon — concordance counts, ayah jumps, QAC data |
+| `docs/SEARCH.md` | Home search ranking, exact quotes, QAC roots, QSAC concepts, asset rebuild |
 | `docs/SHARE.md` | Gather mode and verse sharing — text + full-ink image shipped; video proposed |
 | `docs/VERSE_ACTIONS.md` | Bookmark · note · share UX — verse-first share plan (designed, not implemented) |
 | `docs/TIMINGS_LAB.md` | In-app timing editor + maintainer apply path (systematic first) |

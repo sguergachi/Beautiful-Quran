@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { lyricizeEnglishGlosses, punctuateEnglishGlosses } from '../EnglishTypography'
+import {
+  coalescedGlossOwnerIndex,
+  lyricizeEnglishGlosses,
+  punctuateEnglishGlosses,
+} from '../EnglishTypography'
 
 describe('punctuateEnglishGlosses', () => {
   it('adds a stop only at the ayah end', () => {
@@ -29,5 +33,13 @@ describe('punctuateEnglishGlosses', () => {
       ['a saying', 'Peace', 'Peace'],
       ['قِيلٰا', 'سَلَـٰمٰا', 'سَلَـٰمٰا'],
     )).toEqual(['a saying', 'Peace', 'Peace.'])
+  })
+
+  it('resolves a shared-gloss flash to its visible owner', () => {
+    const glosses = ['Except', 'righteous deeds', 'righteous deeds', 'then']
+    const arabic = ['إِلَّا', 'وَعَمِلَ', 'صَٰلِحٗا', 'فَأُوْلَٰٓئِكَ']
+    expect(coalescedGlossOwnerIndex(glosses, arabic, 2)).toBe(1)
+    expect(coalescedGlossOwnerIndex(glosses, arabic, 1)).toBe(1)
+    expect(coalescedGlossOwnerIndex(glosses, arabic, -1)).toBeNull()
   })
 })

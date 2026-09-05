@@ -44,4 +44,24 @@ object EnglishTypography {
         }
         return punctuate(if (hideParentheticals) hideParentheticalText(prose) else prose)
     }
+
+    /** Visible owner of a shared gloss when [requestedIndex] was coalesced. */
+    fun coalescedGlossOwnerIndex(
+        glosses: List<String>,
+        arabicWords: List<String>,
+        requestedIndex: Int,
+    ): Int? {
+        require(glosses.size == arabicWords.size) { "glosses and Arabic words must align" }
+        if (requestedIndex !in glosses.indices) return null
+        var owner = requestedIndex
+        while (
+            owner > 0 &&
+            glosses[owner] == glosses[owner - 1] &&
+            normalizeArabicForSearch(arabicWords[owner]) !=
+            normalizeArabicForSearch(arabicWords[owner - 1])
+        ) {
+            owner--
+        }
+        return owner
+    }
 }

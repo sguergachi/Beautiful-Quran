@@ -211,8 +211,13 @@ fun ReaderScreen(
     startAyah: Int?,
     /** True when [startAyah] came from an autoplay intent, not a bare focus selection. */
     startPlaybackRequested: Boolean = false,
-    /** 1-based word from a home word-search hit — triggers the orange flash. */
+    /** Positive = word hit; zero = translator-only [startSearchText] hit. */
     startWordPosition: Int? = null,
+    /** Every timed word grounded by the selected search result. */
+    startWordPositions: List<Int> = emptyList(),
+    startSearchText: String? = null,
+    /** True only after the reader sheet has finished turning into view. */
+    readerSheetSettled: () -> Boolean = { true },
     viewModel: ReaderViewModel,
     onBack: () -> Unit,
     onOpenSettings: () -> Unit,
@@ -279,7 +284,7 @@ fun ReaderScreen(
         val page = catalog.pageOf(
             surahId,
             startAyah?.coerceAtLeast(1) ?: 1,
-            startWordPosition ?: 1,
+            (startWordPosition ?: 1).coerceAtLeast(1),
         )
         (page - 1).coerceIn(0, catalog.pageCount - 1)
     }
@@ -1177,11 +1182,17 @@ fun ReaderScreen(
         }
     }
 
-    // Opening from "Continue listening": settle on the saved ayah once.
-    LaunchedEffect(uiState.content) {
+    // Opening from "Continue listening": settle on the saved ayah once. The
+    // scrolling list does not exist in Mushaf mode; treating it as the focus
+    // authority there left this coroutine waiting on a viewport forever.
+    LaunchedEffect(uiState.content, mushafMode) {
         initialFocusSettled = false
         val content = uiState.content
         if (content != null) {
+            if (mushafMode) {
+                initialFocusSettled = true
+                return@LaunchedEffect
+            }
             if (!didInitialScroll) {
                 didInitialScroll = true
                 // A different verse in this paused playlist was seeded into
@@ -1264,27 +1275,68 @@ fun ReaderScreen(
         )
     }
 
-    // Home word-search hit: orange repeat wash (wash in → dissolve × 2) on the
+    // Home word-search hit: repeated full-word orange breaths on the
     // matched word once the verse is on screen. The wash itself lives in the
     // word unit / Hafs bloom; this effect only gates which word is active.
     var searchFlashAyah by remember { mutableStateOf<Int?>(null) }
     var searchFlashWord by remember { mutableStateOf<Int?>(null) }
-    LaunchedEffect(uiState.content?.surah?.id, startAyah, startWordPosition) {
+    var searchFlashWords by remember { mutableStateOf(emptySet<Int>()) }
+    var searchFocusActive by remember { mutableStateOf(false) }
+    val readerSheetSettledNow = rememberUpdatedState(readerSheetSettled)
+    LaunchedEffect(
+        uiState.content?.surah?.id,
+        mushafMode,
+        mushafOpeningPage,
+        startAyah,
+        startWordPosition,
+        startWordPositions,
+        startSearchText,
+    ) {
         searchFlashAyah = null
         searchFlashWord = null
+        searchFlashWords = emptySet()
+        searchFocusActive = false
         val ayah = startAyah
         val word = startWordPosition
         val content = uiState.content
-        if (ayah == null || word == null || content == null) return@LaunchedEffect
+        if (ayah == null || word == null || content == null) {
+            return@LaunchedEffect
+        }
+        if (content.surah.id != surahId) return@LaunchedEffect
         if (ayah !in 1..content.ayahs.size) return@LaunchedEffect
         val ayahWords = content.ayahs[ayah - 1].words
-        if (ayahWords.none { it.position == word }) return@LaunchedEffect
+        if (word > 0 && ayahWords.none { it.position == word }) return@LaunchedEffect
+        val words = SearchHitFlash.wordTargets(
+            primary = word,
+            requested = startWordPositions,
+            available = ayahWords.mapTo(linkedSetOf()) { it.position },
+            mushafMode = mushafMode,
+        )
+        if (word == 0 && startSearchText.isNullOrBlank()) return@LaunchedEffect
+        val targetPage = mushafOpeningPage
+        if (mushafMode && targetPage == null) return@LaunchedEffect
+        snapshotFlow {
+            SearchHitFlash.isTargetSettled(
+                mushafMode = mushafMode,
+                scrollingVerseSettled = initialFocusSettled,
+                mushafLeafSettled = targetPage != null &&
+                    !mushafPagerState.isScrollInProgress &&
+                    mushafPagerState.layoutInfo.visiblePagesInfo.any { it.index == targetPage },
+            )
+        }.first { it }
+        snapshotFlow { readerSheetSettledNow.value() }.first { it }
+        withFrameNanos { }
         delay(SearchHitFlash.START_DELAY_MS)
         searchFlashAyah = ayah
         searchFlashWord = word
+        searchFlashWords = words
+        searchFocusActive = true
         delay(SearchHitFlash.totalMs())
+        searchFocusActive = false
+        delay(SearchHitFlash.FOCUS_FADE_MS.toLong())
         searchFlashAyah = null
         searchFlashWord = null
+        searchFlashWords = emptySet()
     }
 
     // Reading-mode / display toggles reflow every ayah's height. LazyList keeps
@@ -2538,6 +2590,8 @@ fun ReaderScreen(
                         loadedSurahId = mushafSurahId,
                         flashAyah = searchFlashAyah,
                         flashWordPosition = searchFlashWord,
+                        flashWordPositions = searchFlashWords,
+                        searchFocusActive = searchFocusActive,
                         heldPage = mushafTappedPage,
                         onTappedLeaf = { mushafTappedPage = it },
                         scrubbing = { mushafScrubbing.value },
@@ -2768,6 +2822,14 @@ fun ReaderScreen(
                                 searchQuery = activeQuery,
                                 flashWordPosition = searchFlashWord
                                     ?.takeIf { searchFlashAyah == ayah.number },
+                                flashWordPositions = searchFlashWords
+                                    .takeIf { searchFlashAyah == ayah.number }
+                                    .orEmpty(),
+                                searchFocusActive = searchFocusActive,
+                                searchFlashText = startSearchText
+                                    ?.takeIf {
+                                        searchFlashAyah == ayah.number && searchFlashWord == 0
+                                    },
                                 // Word-level following tracks the karaoke owner,
                                 // not the fade-led focus target — otherwise the
                                 // last word is abandoned during the lead window.

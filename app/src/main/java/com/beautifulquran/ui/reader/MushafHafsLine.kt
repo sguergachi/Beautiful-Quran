@@ -956,8 +956,10 @@ private fun MushafQcfWord(
                     glintInk = glintInk,
                     markAlpha = { pack.markAlpha.value },
                     recessCover = { pack.recessCover.value },
-                    flashWordPosition = null,
+                    flashWordPositions = pack.searchHitWordPositions,
                     searchHitWash = pack.searchHitWash,
+                    searchFocusPositions = pack.searchFocusPositions,
+                    searchBackgroundAlpha = { pack.searchBackgroundAlpha.value },
                     waslInk = palette.fullInkColor,
                     // The reveal is washed onto this word's own layer below,
                     // where it follows the letterform. Paper laid over the line
@@ -1151,8 +1153,10 @@ private fun buildLineBlooms(
                 glintInk = glintInk,
                 markAlpha = { pack.markAlpha.value },
                 recessCover = { pack.recessCover.value },
-                flashWordPosition = null,
+                flashWordPositions = pack.searchHitWordPositions,
                 searchHitWash = pack.searchHitWash,
+                searchFocusPositions = pack.searchFocusPositions,
+                searchBackgroundAlpha = { pack.searchBackgroundAlpha.value },
                 waslInk = palette.fullInkColor,
             ),
         )

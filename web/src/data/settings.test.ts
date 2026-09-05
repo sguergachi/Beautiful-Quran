@@ -4,6 +4,7 @@ import {
   customizeSummary,
   showsPreviewWordGloss,
   showsWordGlossChrome,
+  wordSearchSources,
 } from './customizePolicy'
 import { HOME_BOOKMARK_STYLES, normalizeSettings } from './settings'
 
@@ -72,6 +73,15 @@ describe('customize reading settings', () => {
     expect(showsWordGlossChrome('arabic_only')).toBe(false)
     expect(showsPreviewWordGloss('arabic_english', true)).toBe(true)
     expect(showsPreviewWordGloss('arabic_english', false)).toBe(false)
+  })
+
+  it('searches only the selected reader text', () => {
+    expect(wordSearchSources()).toEqual({
+      arabic: false,
+      wordGloss: true,
+      transliteration: false,
+      verseTranslation: false,
+    })
   })
 
   it('applies every web reading mode', () => {
