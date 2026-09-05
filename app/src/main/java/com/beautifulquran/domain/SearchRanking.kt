@@ -79,7 +79,7 @@ internal fun searchLowerTextRelevance(
         val canonicalNeedle = canonicalWords(needle).joinToString(" ")
         return if (canonicalNeedle.isNotEmpty() && containsBounded(phrase, canonicalNeedle)) 3_000 else 0
     }
-    if (target.contains(needle)) return 2_200
+    if (containsWordPrefix(target, needle)) return 2_200
     val singleWord = needle.all(Char::isLetterOrDigit)
     if (allowFuzzy && singleWord) {
         return if (fuzzyWordContains(target, needle)) 1_600 else 0
@@ -105,6 +105,16 @@ private fun containsBounded(text: String, needle: String): Boolean {
         ) {
             return true
         }
+        at = text.indexOf(needle, at + 1)
+    }
+    return false
+}
+
+/** Typed text may complete a word, but it may not begin inside another word. */
+private fun containsWordPrefix(text: String, needle: String): Boolean {
+    var at = text.indexOf(needle)
+    while (at >= 0) {
+        if (at == 0 || !text[at - 1].isLetterOrDigit()) return true
         at = text.indexOf(needle, at + 1)
     }
     return false

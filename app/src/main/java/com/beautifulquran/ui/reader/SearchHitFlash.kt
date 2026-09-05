@@ -39,6 +39,18 @@ object SearchHitFlash {
         mushafLeafSettled: Boolean,
     ): Boolean = if (mushafMode) mushafLeafSettled else scrollingVerseSettled
 
+    /** Grounded words win; an ungrounded Mushaf translation locates its honest ayah scope. */
+    internal fun wordTargets(
+        primary: Int,
+        requested: Iterable<Int>,
+        available: Set<Int>,
+        mushafMode: Boolean,
+    ): Set<Int> {
+        val grounded = (requested + primary)
+            .filterTo(linkedSetOf()) { it > 0 && it in available }
+        return if (grounded.isEmpty() && primary == 0 && mushafMode) available else grounded
+    }
+
     /** Exact text ranges for a translator-only hit; prefix matches own the full word. */
     internal fun textRanges(text: String, rawQuery: String?): List<IntRange> {
         val query = rawQuery?.trim()?.let { value ->

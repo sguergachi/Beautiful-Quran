@@ -125,6 +125,25 @@ class WordSearchTest {
     }
 
     @Test
+    fun `typed text matches only from a word edge and colors the complete word`() {
+        assertEquals(0, searchTextRelevance("the", ParsedSearchQuery("he", exactOnly = false)))
+        assertTrue(searchTextRelevance("Hellfire", ParsedSearchQuery("hell", false)) > 0)
+        assertEquals(
+            listOf("Hellfire"),
+            englishTranslationHighlightSpans("in Hellfire forever", "hell", "")
+                .filter(AyahTextSpan::highlighted)
+                .map(AyahTextSpan::text),
+        )
+    }
+
+    @Test
+    fun `cold candidate fallback keeps phrases made only of short words`() {
+        assertEquals("if", quickSearchFallbackTerm("if he"))
+        assertEquals("to", quickSearchFallbackTerm("to be"))
+        assertEquals(null, quickSearchFallbackTerm("he"))
+    }
+
+    @Test
     fun `quoted phrase searches full ayah translation`() {
         val phrase = listOf(
             entry(

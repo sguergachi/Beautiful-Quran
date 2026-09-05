@@ -91,6 +91,13 @@ fun isWordSearchQuery(query: String): Boolean {
     return parseSearchQuery(query).text.length >= WORD_SEARCH_MIN_QUERY_LENGTH
 }
 
+/** Candidate term for cold first results; phrases may consist entirely of short words. */
+internal fun quickSearchFallbackTerm(query: String): String? {
+    val words = query.split(Regex("[^\\p{L}\\p{N}]+"))
+        .filter(String::isNotEmpty)
+    return words.maxByOrNull(String::length)?.takeIf { words.size > 1 || it.length >= 4 }
+}
+
 /**
  * Ranks the reader-visible [sources], related QAC-root words, and QSAC
  * [concepts]. Enclosing the whole query in double quotes keeps only literal
@@ -919,7 +926,11 @@ internal fun highlightNeedles(
     semanticTerms,
 ).map(HighlightNeedle::text)
 
-private data class HighlightNeedle(val text: String, val wholeWord: Boolean)
+private data class HighlightNeedle(
+    val text: String,
+    val wholeWord: Boolean,
+    val wordPrefix: Boolean = false,
+)
 
 private fun highlightNeedleSpecs(
     haystack: String,
@@ -929,14 +940,14 @@ private fun highlightNeedleSpecs(
     semanticTerms: List<String>,
 ): List<HighlightNeedle> {
     val needles = linkedMapOf<String, HighlightNeedle>()
-    fun add(text: String, wholeWord: Boolean = true) {
+    fun add(text: String, wholeWord: Boolean = true, wordPrefix: Boolean = false) {
         val term = text.trim()
-        if (term.isNotEmpty() && firstOccurrence(haystack, term, wholeWord) >= 0) {
-            needles.putIfAbsent(term.lowercase(), HighlightNeedle(term, wholeWord))
+        if (term.isNotEmpty() && firstOccurrence(haystack, term, wholeWord, wordPrefix) >= 0) {
+            needles.putIfAbsent(term.lowercase(), HighlightNeedle(term, wholeWord, wordPrefix))
         }
     }
-    add(query, wholeWord = false)
     val parsed = parseSearchQuery(query)
+    add(parsed.text, wholeWord = parsed.exactOnly, wordPrefix = !parsed.exactOnly)
     val arabicQuery = normalizeArabicForSearch(query).isNotEmpty()
     fun visibleTerm(term: String): String? {
         if (firstOccurrence(haystack, term, wholeWord = true) >= 0) return term
@@ -973,13 +984,20 @@ private fun highlightNeedleSpecs(
     return needles.values.toList()
 }
 
-private fun firstOccurrence(text: String, term: String, wholeWord: Boolean, startIndex: Int = 0): Int {
+private fun firstOccurrence(
+    text: String,
+    term: String,
+    wholeWord: Boolean,
+    wordPrefix: Boolean = false,
+    startIndex: Int = 0,
+): Int {
     var at = text.indexOf(term, startIndex, ignoreCase = true)
     while (at >= 0) {
         val end = at + term.length
-        if (!wholeWord ||
-            (at == 0 || !text[at - 1].isLetterOrDigit()) &&
-            (end == text.length || !text[end].isLetterOrDigit())
+        val startsWord = at == 0 || !text[at - 1].isLetterOrDigit()
+        val endsWord = end == text.length || !text[end].isLetterOrDigit()
+        if (wholeWord && startsWord && endsWord || wordPrefix && startsWord ||
+            !wholeWord && !wordPrefix
         ) return at
         at = text.indexOf(term, at + 1, ignoreCase = true)
     }
@@ -1006,10 +1024,20 @@ private fun highlightAllOccurrences(text: String, needles: List<HighlightNeedle>
     if (needles.isEmpty()) return listOf(AyahTextSpan(text, highlighted = false))
     val ranges = needles.flatMap { needle ->
         buildList {
-            var at = firstOccurrence(text, needle.text, needle.wholeWord)
+            var at = firstOccurrence(text, needle.text, needle.wholeWord, needle.wordPrefix)
             while (at >= 0) {
-                add(at until at + needle.text.length)
-                at = firstOccurrence(text, needle.text, needle.wholeWord, at + needle.text.length)
+                var end = at + needle.text.length
+                if (needle.wordPrefix) {
+                    while (end < text.length && text[end].isLetterOrDigit()) end++
+                }
+                add(at until end)
+                at = firstOccurrence(
+                    text,
+                    needle.text,
+                    needle.wholeWord,
+                    needle.wordPrefix,
+                    end,
+                )
             }
         }
     }.sortedWith(compareBy<IntRange> { it.first }.thenByDescending { it.last })

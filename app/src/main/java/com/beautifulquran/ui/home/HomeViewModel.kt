@@ -27,6 +27,7 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -216,6 +217,10 @@ class HomeViewModel(
         viewModelScope.launch {
             combine(query, settings.settings) { q, prefs -> q to wordSearchSources(prefs) }
                 .distinctUntilChanged()
+                .onEach { (q, _) ->
+                    wordHits.value = emptyList()
+                    wordSearchLoading.value = shouldRunWordSearch(q)
+                }
                 .debounce(120)
                 .collectLatest { (q, sources) ->
                     if (!shouldRunWordSearch(q)) {
@@ -225,27 +230,34 @@ class HomeViewModel(
                     }
                     wordSearchLoading.value = true
                     val quickHits = repository.searchWordsQuick(q, sources)
-                    if (quickHits.isNotEmpty()) {
+                    if (quickHits.isNotEmpty() && isCurrentSearch(q, sources)) {
                         wordHits.value = quickHits
                     }
-                    wordHits.value = repository.searchWords(q, sources)
-                    wordSearchLoading.value = false
+                    val completeHits = repository.searchWords(q, sources)
+                    if (isCurrentSearch(q, sources)) {
+                        wordHits.value = completeHits
+                        wordSearchLoading.value = false
+                    }
                 }
         }
     }
 
     fun onQueryChange(value: String) {
-        if (value != query.value) {
+        val changed = value != query.value
+        if (changed) {
             expandedSurahIds.value = emptySet()
         }
         query.value = value
         // Show a quiet loading cue as soon as a word-searchable query is typed,
         // before debounce fires — avoids a blank gap under the surah matches.
         wordSearchLoading.value = shouldRunWordSearch(value)
-        if (!shouldRunWordSearch(value)) {
+        if (changed || !shouldRunWordSearch(value)) {
             wordHits.value = emptyList()
         }
     }
+
+    private fun isCurrentSearch(q: String, sources: WordSearchSources): Boolean =
+        q == query.value && sources == wordSearchSources(settings.settings.value)
 
     /** Uses the pause before typing to prepare the one-time Quran search data. */
     fun onSearchFocused() {

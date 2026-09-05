@@ -273,6 +273,10 @@ measured **525 ms** for `peace` and **876 ms** for the multi-word concept
 debounce. The complete rank then replaces it. App startup stays free of a
 full-Quran scan.
 
+The candidate query may use the longest token from a phrase even when that
+token is short. This preserves the sub-second first-result path for literal
+phrases such as `if he`; single short tokens still skip the broad SQL fallback.
+
 The ranker still returns every matching occurrence, but query-local score
 caches evaluate each distinct lowercase field only once. The committed corpus
 has 21,947 distinct English glosses across 77,429 word rows, so the common

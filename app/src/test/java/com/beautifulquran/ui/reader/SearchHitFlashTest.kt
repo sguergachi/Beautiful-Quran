@@ -33,6 +33,22 @@ class SearchHitFlashTest {
     }
 
     @Test
+    fun `ungrounded Mushaf translation locates the whole ayah without inventing a word`() {
+        assertEquals(
+            setOf(1, 2, 3),
+            SearchHitFlash.wordTargets(0, emptyList(), setOf(1, 2, 3), mushafMode = true),
+        )
+        assertTrue(
+            SearchHitFlash.wordTargets(0, emptyList(), setOf(1, 2, 3), mushafMode = false)
+                .isEmpty(),
+        )
+        assertEquals(
+            setOf(2, 3),
+            SearchHitFlash.wordTargets(2, listOf(3, 99), setOf(1, 2, 3), mushafMode = true),
+        )
+    }
+
+    @Test
     fun `mushaf waits for its leaf and never for the unmounted scrolling list`() {
         assertTrue(
             SearchHitFlash.isTargetSettled(

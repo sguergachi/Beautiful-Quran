@@ -152,7 +152,7 @@ function searchLowerTextRelevance(
     const canonicalNeedle = canonicalWords(needle).join(' ')
     return canonicalNeedle && containsBounded(phrase, canonicalNeedle) ? 3_000 : 0
   }
-  if (target.includes(needle)) return 2_200
+  if (containsWordPrefix(target, needle)) return 2_200
   const singleWord = /^[\p{L}\p{N}]+$/u.test(needle)
   if (allowFuzzy && singleWord) {
     return fuzzyWordContains(target, needle) ? 1_600 : 0
@@ -176,6 +176,16 @@ function containsBounded(text: string, needle: string): boolean {
     const before = at === 0 || !/[\p{L}\p{N}]/u.test(text[at - 1]!)
     const after = end === text.length || !/[\p{L}\p{N}]/u.test(text[end]!)
     if (before && after) return true
+    at = text.indexOf(needle, at + 1)
+  }
+  return false
+}
+
+/** Typed text may complete a word, but it may not begin inside another word. */
+function containsWordPrefix(text: string, needle: string): boolean {
+  let at = text.indexOf(needle)
+  while (at >= 0) {
+    if (at === 0 || !/[\p{L}\p{N}]/u.test(text[at - 1]!)) return true
     at = text.indexOf(needle, at + 1)
   }
   return false
@@ -1272,6 +1282,7 @@ export function highlightNeedles(
 interface HighlightNeedle {
   text: string
   wholeWord: boolean
+  wordPrefix: boolean
 }
 
 function highlightNeedleSpecs(
@@ -1282,14 +1293,16 @@ function highlightNeedleSpecs(
   semanticTerms: string[],
 ): HighlightNeedle[] {
   const needles = new Map<string, HighlightNeedle>()
-  const add = (text: string, wholeWord = true): void => {
+  const add = (text: string, wholeWord = true, wordPrefix = false): void => {
     const term = text.trim()
-    if (term && firstOccurrence(haystack, term, wholeWord) >= 0) {
-      if (!needles.has(term.toLowerCase())) needles.set(term.toLowerCase(), { text: term, wholeWord })
+    if (term && firstOccurrence(haystack, term, wholeWord, wordPrefix) >= 0) {
+      if (!needles.has(term.toLowerCase())) {
+        needles.set(term.toLowerCase(), { text: term, wholeWord, wordPrefix })
+      }
     }
   }
-  add(query, false)
   const parsed = parseSearchQuery(query)
+  add(parsed.text, parsed.exactOnly, !parsed.exactOnly)
   const arabicQuery = Boolean(normalizeArabicForSearch(query))
   const visibleTerm = (term: string): string | null => {
     if (firstOccurrence(haystack, term, true) >= 0) return term
@@ -1331,7 +1344,13 @@ function highlightNeedleSpecs(
   return [...needles.values()]
 }
 
-function firstOccurrence(text: string, term: string, wholeWord: boolean, startAt = 0): number {
+function firstOccurrence(
+  text: string,
+  term: string,
+  wholeWord: boolean,
+  wordPrefix = false,
+  startAt = 0,
+): number {
   const lowerText = text.toLowerCase()
   const lowerTerm = term.toLowerCase()
   let at = lowerText.indexOf(lowerTerm, startAt)
@@ -1339,7 +1358,10 @@ function firstOccurrence(text: string, term: string, wholeWord: boolean, startAt
     const end = at + term.length
     const before = at > 0 ? text[at - 1]! : ''
     const after = end < text.length ? text[end]! : ''
-    if (!wholeWord || (!/[\p{L}\p{N}]/u.test(before) && !/[\p{L}\p{N}]/u.test(after))) return at
+    const startsWord = !/[\p{L}\p{N}]/u.test(before)
+    const endsWord = !/[\p{L}\p{N}]/u.test(after)
+    if ((wholeWord && startsWord && endsWord) || (wordPrefix && startsWord) ||
+      (!wholeWord && !wordPrefix)) return at
     at = lowerText.indexOf(lowerTerm, at + 1)
   }
   return -1
@@ -1377,10 +1399,14 @@ function highlightAllOccurrences(text: string, needles: HighlightNeedle[]): Ayah
   if (needles.length === 0) return [{ text, highlighted: false }]
   const ranges: { start: number; end: number }[] = []
   for (const needle of needles) {
-    let at = firstOccurrence(text, needle.text, needle.wholeWord)
+    let at = firstOccurrence(text, needle.text, needle.wholeWord, needle.wordPrefix)
     while (at >= 0) {
-      ranges.push({ start: at, end: at + needle.text.length })
-      at = firstOccurrence(text, needle.text, needle.wholeWord, at + needle.text.length)
+      let end = at + needle.text.length
+      if (needle.wordPrefix) {
+        while (end < text.length && /[\p{L}\p{N}]/u.test(text[end]!)) end++
+      }
+      ranges.push({ start: at, end })
+      at = firstOccurrence(text, needle.text, needle.wholeWord, needle.wordPrefix, end)
     }
   }
   ranges.sort((a, b) => a.start - b.start || b.end - a.end)

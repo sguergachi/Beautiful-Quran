@@ -12,6 +12,7 @@ import {
   parseAyahReference,
   parseSearchQuery,
   sameAyahGlossLine,
+  searchTextRelevance,
   sectionWordSearchHits,
   shouldRunWordSearch,
   spellingCorrection,
@@ -164,6 +165,16 @@ describe('matchWordSearch', () => {
     expect(matchWordSearch(index, '“merciful”')).toHaveLength(2)
     expect(matchWordSearch(index, '"mercy"')).toEqual([])
     expect(isWordSearchQuery('""')).toBe(false)
+  })
+
+  it('matches typed text only at word edges and colors the complete word', () => {
+    expect(searchTextRelevance('the', { text: 'he', exactOnly: false })).toBe(0)
+    expect(searchTextRelevance('Hellfire', { text: 'hell', exactOnly: false })).toBeGreaterThan(0)
+    expect(
+      englishTranslationHighlightSpans('in Hellfire forever', 'hell', '')
+        .filter((span) => span.highlighted)
+        .map((span) => span.text),
+    ).toEqual(['Hellfire'])
   })
 
   it('searches an exact quoted phrase across the ayah translation', () => {

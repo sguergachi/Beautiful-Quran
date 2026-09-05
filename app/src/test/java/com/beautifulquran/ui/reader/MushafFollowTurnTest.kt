@@ -107,6 +107,22 @@ class MushafFollowTurnTest {
     }
 
     @Test
+    fun `search focus gives every non-target ayah a paper-cover pack`() {
+        assertEquals(
+            MushafInkPackKind.SEARCH_BACKGROUND,
+            mushafInkPackKind(
+                pageOwnsVoice = false,
+                ayah = 2,
+                activeWordAyah = null,
+                frontierAyah = null,
+                basmalahActive = false,
+                hasSearchFlash = false,
+                hasSearchFocus = true,
+            ),
+        )
+    }
+
+    @Test
     fun `active pack cannot flash through an old recess-only layer`() {
         assertEquals(
             InkEngine.State.Upcoming.inkAlpha(),

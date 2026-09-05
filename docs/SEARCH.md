@@ -47,8 +47,9 @@ preposition can never hide inside an unrelated gloss (for example, `in` inside
 `indeed`). The nearby-word fallback is additionally restricted to modal verbs.
 Translator additions with no Quran-word gloss, such as `[in Hellfire]` in
 19:45, are searchable only in Mushaf English results; they never leak into
-Scroll gloss results. When visible, the breathing locator covers the exact
-canonical-translation term.
+Scroll gloss results. Because an Arabic-only Mushaf has no honest word target
+for translator-supplied text, opening one breathes the complete ayah; it never
+pretends that an unrelated Arabic word supplied the addition.
 Result snippets color every visible term that helped the result rank: the typed
 text, thesaurus terms such as `peace` and `tranquility`, query-related word
 glosses, and non-filler words from the matched concept's label and vocabulary.
@@ -56,7 +57,8 @@ That vocabulary also grounds navigation, so `hell` can resolve a Hellfire
 concept's visible `Fire` gloss and make that same word breathe in the reader. Derived
 and concept terms require whole-word or inflection matches: `fire` never colors
 or targets the substring in `firewood`. Only the user's typed text retains
-prefix matching. Overlapping terms resolve to the longest precise phrase.
+word-edge prefix matching, and a prefix colors the complete visible word.
+Overlapping terms resolve to the longest precise phrase.
 Rooted multi-word glosses such as `The patient` remain one visible phrase and
 one animation target; their articles do not spill onto unrelated occurrences
 of `the`. Connective words remain ordinary ink. If the selected English source contains
@@ -73,12 +75,16 @@ The quiet reference line explains each result as `Text match`,
 `Spelling match`. The section heading reports the number of relevant ayahs, and
 the empty state says when no relevant ayah was found. Both apps begin searching
 after a 120 ms pause and begin warming search data when the field gains focus.
+Changing the query or selected source hides the previous result generation
+immediately, so an old ayah can never open under new query text.
 Android warms a compact concept-candidate asset, then materializes only the
 literal or relevant semantic ayahs and paints those results while the complete
 concept, thesaurus, and root rank is still loading; `refining…` makes that
 progressive result explicit. The complete rank replaces it without changing
 the query. This keeps literal, spelling, and multi-word concept results below
-one second without moving a full-Quran scan back into app startup. The web paints
+one second without moving a full-Quran scan back into app startup. Multi-word
+literal phrases still choose a candidate token when every word is short, so
+queries such as `if he` do not fall through to the cold complete scan. The web paints
 its loading cue, builds a cold index on the next task, and yields between scan
 chunks. Android checks cancellation throughout both ranking stages, so typing
 never waits on an obsolete rank. Within each scan, repeated Quran word glosses
@@ -104,7 +110,9 @@ every orange target remains full-strength. The
 scrolling layout waits for its
 verse geometry; Mushaf waits for the requested
 leaf to be visible and never depends on the unmounted scrolling list. The
-orange overlay uses bold English or a tight glyph-shaped ink spread, making the
+Mushaf gives every visible non-target ayah the same shaped paper cover during
+that interval; it does not dim Arabic by changing glyph opacity. The orange
+overlay uses bold English or a tight glyph-shaped ink spread, making the
 filled moment conspicuous without reflowing the verse or reshaping Arabic. If
 English prose coalesced a gloss shared by several Arabic words, its hidden slot
 redirects to the visible phrase; Arabic layouts still breathe over the exact matched

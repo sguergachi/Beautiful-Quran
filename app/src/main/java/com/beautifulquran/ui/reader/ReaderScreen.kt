@@ -1306,9 +1306,12 @@ fun ReaderScreen(
         if (ayah !in 1..content.ayahs.size) return@LaunchedEffect
         val ayahWords = content.ayahs[ayah - 1].words
         if (word > 0 && ayahWords.none { it.position == word }) return@LaunchedEffect
-        val words = (startWordPositions + listOfNotNull(word.takeIf { it > 0 }))
-            .filter { position -> ayahWords.any { it.position == position } }
-            .toSet()
+        val words = SearchHitFlash.wordTargets(
+            primary = word,
+            requested = startWordPositions,
+            available = ayahWords.mapTo(linkedSetOf()) { it.position },
+            mushafMode = mushafMode,
+        )
         if (word == 0 && startSearchText.isNullOrBlank()) return@LaunchedEffect
         val targetPage = mushafOpeningPage
         if (mushafMode && targetPage == null) return@LaunchedEffect

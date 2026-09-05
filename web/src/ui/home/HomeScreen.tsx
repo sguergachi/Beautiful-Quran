@@ -74,6 +74,7 @@ export function HomeScreen({ stackLayer }: { stackLayer: StackLayer }) {
   )
 
   const [wordHits, setWordHits] = useState<WordSearchHit[]>([])
+  const [wordHitsQuery, setWordHitsQuery] = useState('')
   const [wordLoading, setWordLoading] = useState(false)
   const [expandedSurahIds, setExpandedSurahIds] = useState<Set<number>>(
     () => new Set(),
@@ -100,6 +101,7 @@ export function HomeScreen({ stackLayer }: { stackLayer: StackLayer }) {
     setExpandedSurahIds(new Set())
     if (!shouldRunWordSearch(search)) {
       setWordHits([])
+      setWordHitsQuery('')
       setWordLoading(false)
       return
     }
@@ -113,6 +115,7 @@ export function HomeScreen({ stackLayer }: { stackLayer: StackLayer }) {
       ).then((hits) => {
         if (cancelled) return
         setWordHits(hits)
+        setWordHitsQuery(search)
         setWordLoading(false)
       })
     }, 120)
@@ -135,11 +138,15 @@ export function HomeScreen({ stackLayer }: { stackLayer: StackLayer }) {
     setRibbonUnfurlSignal((value) => value + 1)
   }, [stackLayer])
 
-  const wordSections = useMemo(
-    () => sectionWordSearchHits(wordHits, expandedSurahIds),
-    [wordHits, expandedSurahIds],
+  const visibleWordHits = useMemo(
+    () => wordHitsQuery === search ? wordHits : [],
+    [search, wordHits, wordHitsQuery],
   )
-  const correctedQuery = useMemo(() => spellingCorrection(wordHits), [wordHits])
+  const wordSections = useMemo(
+    () => sectionWordSearchHits(visibleWordHits, expandedSurahIds),
+    [visibleWordHits, expandedSurahIds],
+  )
+  const correctedQuery = useMemo(() => spellingCorrection(visibleWordHits), [visibleWordHits])
 
   const continueSurah =
     !searching && state.settings.lastSurah > 0
@@ -411,7 +418,7 @@ export function HomeScreen({ stackLayer }: { stackLayer: StackLayer }) {
                 <p className="search-section-label">
                   {wordLoading && wordSections.length === 0
                     ? 'Searching ayahs…'
-                    : `In the Quran · ${wordHits.length} relevant ${wordHits.length === 1 ? 'ayah' : 'ayahs'}`}
+                    : `In the Quran · ${visibleWordHits.length} relevant ${visibleWordHits.length === 1 ? 'ayah' : 'ayahs'}`}
                 </p>
                 {wordSections.map((section) => (
                   <WordSearchSection

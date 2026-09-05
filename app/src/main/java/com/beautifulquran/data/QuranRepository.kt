@@ -25,6 +25,7 @@ import com.beautifulquran.domain.conceptRelevance
 import com.beautifulquran.domain.isWordSearchQuery
 import com.beautifulquran.domain.matchWordSearch
 import com.beautifulquran.domain.parseSearchQuery
+import com.beautifulquran.domain.quickSearchFallbackTerm
 import com.beautifulquran.timingslab.OverrideEntry
 import com.beautifulquran.timingslab.OverrideKey
 import com.beautifulquran.timingslab.TimingOverrides
@@ -374,9 +375,7 @@ class QuranRepository(
         val quickIndex = withContext(Dispatchers.IO) {
             var keys = literalSearchKeys(literal, sources)
             if (keys.isEmpty()) {
-                val fallback = literal.split(Regex("[^\\p{L}\\p{N}]+"))
-                    .maxByOrNull(String::length)
-                    ?.takeIf { it.length >= 4 }
+                val fallback = quickSearchFallbackTerm(literal)
                     ?: return@withContext emptyList()
                 keys = literalSearchKeys(fallback, sources)
                 if (keys.isEmpty()) keys = literalSearchKeys(fallback.take(3), sources)
