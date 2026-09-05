@@ -503,9 +503,12 @@ current ayah in the new voice when it changes on the settings sheet.
 ## Build & delivery
 
 CI (`.github/workflows/build.yml`) on every push: verify the committed
-`data/quran.db` asset → unit tests. On `master` only, it
-continues with **assembleRelease** (R8-minified, resource-shrunk; see
-docs/PERFORMANCE.md) → upload artifact → publish the APK to the rolling
-`latest` GitHub release. Release builds are signed with the repo's debug
-keystore so sideloaded installs update in place; swap in a real keystore
-before any store release.
+`data/quran.db` asset → unit tests. On `master` only, it restores the private
+release/upload keystore, continues with **assembleRelease** (R8-minified,
+resource-shrunk; see docs/PERFORMANCE.md), verifies the APK's signing
+certificate, then uploads the artifact and publishes it to the rolling
+`latest` GitHub release. Local debug and release APKs use that same keystore
+when present (including from the primary checkout of a linked worktree), so
+directly shared builds update one another; contributor clones without the key
+retain normal debug signing. Google Play Internal App Sharing remains a
+separate channel: Play re-signs every upload with its Google-owned test key.

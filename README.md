@@ -35,9 +35,23 @@ matrix, testing commands, current platform limits, and full-support checklist.
 
 ```bash
 ./gradlew assembleDebug       # Android; copies data/quran.db into generated assets
+./gradlew assembleRelease     # optimized APK used by the GitHub release
 npm --prefix web ci
 npm --prefix web run build    # Web; copies the same database into dist
 ```
+
+Local debug and release APKs use the uncommitted `release.keystore` when it is
+available, including from linked worktrees; otherwise contributor builds use
+the ordinary debug key. The GitHub release never falls back: CI restores the
+same keystore from repository secrets and verifies its certificate before
+publishing. `RELEASE_KEYSTORE_FILE` can point at a key stored elsewhere.
+
+Google Play's Internal App Sharing `.der` file is a public certificate, not a
+private signing key. Play re-signs every uploaded APK with that certificate, so
+it is neither committed nor used by Gradle. An APK installed from a Play
+internal-sharing link must be uninstalled before switching to a directly
+shared local/GitHub APK, because their Google-owned and developer-owned signing
+keys intentionally differ.
 
 ### Send an APK to your phone (KDE Connect)
 
@@ -97,8 +111,6 @@ scripts/build_release_bundle.sh
 
 The script builds `BeautifulQuran-<versionName>.aab` in the repository root and
 verifies that it is signed with the upload certificate expected by Google Play.
-In a linked Git worktree it also checks the primary checkout for
-`release.keystore`; set `RELEASE_KEYSTORE_FILE` to use a key stored elsewhere.
 
 `tools/build_db.py` downloads the Quran text, word-by-word data, and word-level
 audio timings, validates them against each other, and packs them into a single
