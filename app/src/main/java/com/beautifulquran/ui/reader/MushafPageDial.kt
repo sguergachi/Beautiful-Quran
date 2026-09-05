@@ -777,25 +777,12 @@ internal fun mushafDialCombCellSeats(
         result[idx] = x.coerceIn(insetPx, widthPx - insetPx)
     }
     val span = (widthPx - 2f * insetPx).coerceAtLeast(0f)
-    // An even share of the rule, and nothing less.
-    //
-    // Every chapter must be pickable. That is the whole promise of the chapter
-    // tier, and it is a stronger promise than it looks: nearest-seat selection
-    // skips a chapter entirely whenever its neighbours crowd closer to it than
-    // it stands from either of them, and the book crowds badly — al-Baqarah
-    // opens the leaf after al-Fatihah, and fifteen chapters share the last nine
-    // pages. Seated where the pages put them, those chapters own a fraction of
-    // a pixel and a dragging finger steps straight over them: the rule reads
-    // 2, 3, 4, 5, 7, 9, 12 and there is no way to stop on six, eight, ten or
-    // eleven at all.
-    //
-    // So the seats are not where the pages put them. They are an even share of
-    // the measure apart, which is the only spacing under which 114 chapters all
-    // survive nearest-seat on a rule this size — every chapter the same slice,
-    // none of them skippable. Where the book is crowded that is the entire
-    // separation between chapters; where it breathes, the relaxation leaves the
-    // seats alone and they still rise and fall with the pages.
-    val minGap = span / marks.size.coerceAtLeast(1)
+    // Enough to separate two seats, and no more. The floors are cumulative —
+    // the walk reserves one for every chapter after this one — so a floor set
+    // near an even share of the measure leaves no slack anywhere and drags the
+    // whole book against itself. Small, the crowded runs spread and everywhere
+    // else the seats stay where the pages put them.
+    val minGap = minOf(rulePx * 1.5f, span / (marks.size - 1).coerceAtLeast(1))
     // Relax the seats apart in reading order, then clamp them back inside the
     // track from the far end. Both walks run the way the book does: seats
     // descend the rule in a mushaf and climb it in a book of the translation,
@@ -926,14 +913,24 @@ internal fun mushafDialCombDrawnXs(
 ): FloatArray {
     require(result.size == marks.size)
     if (!isLensed || combInk <= 0.004f) {
-        // At rest the comb *is* the selection seats. Not a second computation
-        // that ought to agree with them — the same one, so it cannot fail to.
-        // A tick standing anywhere else is a mark the reader aims at and
-        // misses, and the two drifting quietly apart is exactly how chapter
-        // three came to be drawn at x=188 and select chapter fourteen.
-        mushafDialCombCellSeats(
-            marks, pageCount, insetPx, widthPx, rulePx, rightToLeft,
-        ).copyInto(result)
+        for (idx in marks.indices) {
+            val mark = marks[idx]
+            var x = mushafDialTrackX(
+                mushafDialAlong(mushafDialChapterFraction(mark.toFloat(), marks, pageCount), rightToLeft),
+                widthPx,
+                insetPx,
+            )
+            var gStart = idx
+            while (gStart > 0 && marks[gStart - 1] == mark) gStart--
+            var gEnd = idx
+            while (gEnd + 1 < marks.size && marks[gEnd + 1] == mark) gEnd++
+            val gSize = gEnd - gStart + 1
+            if (gSize > 1) {
+                x -= (if (rightToLeft) -1f else 1f) *
+                    ((gSize - 1) / 2f - (idx - gStart)) * epsilonPx
+            }
+            result[idx] = x
+        }
         return result
     }
     val baseSigmaPx = lensSigmaPx
@@ -942,7 +939,14 @@ internal fun mushafDialCombDrawnXs(
     // capture window collapses to nothing as the lens breathes.
     val epsilonPx = maxOf(epsilonPx, 3f * rulePx)
     val centreFrac = mushafDialTrackFraction(centerX, widthPx, insetPx)
-    val centreProgress = (1f - centreFrac).coerceIn(0f, 1f)
+    // How far into the *book* the finger is, which is not how far along the
+    // rule it is unless the book turns right to left. The lens grows with this:
+    // the deeper into the book, the more crowded the chapters and the more
+    // magnification the comb needs to keep them apart. Read the wrong way round
+    // it does the exact opposite of its job — full magnification out at
+    // al-Fatihah where the chapters are already a page apart, and none at all
+    // in the last juz' where fifteen of them share nine pages.
+    val centreProgress = mushafDialAlong(centreFrac, rightToLeft).coerceIn(0f, 1f)
     val plateauAt = 0.78f
     val effProgress = (centreProgress / plateauAt).coerceIn(0f, 1f)
     val leftPushPx = tailPushPx * combInk * effProgress
@@ -970,7 +974,12 @@ internal fun mushafDialCombDrawnXs(
         val extra = if (isTailMark) (1f - gap / 10f).coerceIn(0f, 1f) * 2.2f * effProgress else 0f
         val densityMag = progBaseMag + extra
         val x0 = mushafDialLensedX(trueX, centerX, sigmaPx, densityMag)
-        result[idx] = x0 + leftPushPx * (if (isTailMark) {
+        // And the push that opens the crowded tail sends it back towards the
+        // emptier middle of the rule, which is up the track in a book bound on
+        // the right and down it in one bound on the left. Signed the one way,
+        // it drove the English tail harder into the end it was piling against.
+        val towardsTheMiddle = if (rightToLeft) 1f else -1f
+        result[idx] = x0 + towardsTheMiddle * leftPushPx * (if (isTailMark) {
             mushafDialFraction(mark.toFloat(), pageCount).coerceIn(0f, 1f)
         } else 0f)
     }
@@ -982,12 +991,7 @@ internal fun mushafDialCombDrawnXs(
     // too narrow for the full gap the spacing yields before the guarantee
     // does: order and separation survive, sized to what the glass allows.
     val span = (widthPx - 2f * insetPx).coerceAtLeast(0f)
-    // The same floor the selection seats use, and it has to be: a tick drawn
-    // where the pages put it, over a cell seated an even share along, is a mark
-    // the reader aims at and misses. Measured, that gap ran to 87px — chapter
-    // three's tick at x=188 selecting chapter fourteen. The comb may lens, and
-    // does; what it may not do is stand somewhere the finger is not read.
-    val minGap = span / marks.size.coerceAtLeast(1)
+    val minGap = minOf(rulePx * 1.5f, span / (marks.size - 1).coerceAtLeast(1))
     val lo = insetPx
     val hi = widthPx - insetPx
     // The same two walks as the stable seats, and for the same reason: they run

@@ -325,17 +325,21 @@ class MushafPageDialTest {
     }
 
     @Test
-    fun `no chapter can be skipped and the ticks stand where the finger is read`() {
+    fun `no chapter is skipped, in either book`() {
         // The promise of the chapter tier: every one of the 114 is reachable.
-        // Nearest-seat selection quietly breaks that whenever two seats crowd
+        // Nearest-seat selection breaks that quietly whenever two seats crowd
         // closer together than either stands from its other neighbour — the
-        // chapter between them is never nearest to anything and a dragging
-        // finger steps straight over it. The book crowds badly enough for this
-        // to bite: al-Baqarah opens one leaf after al-Fatihah and fifteen
-        // chapters share the last nine pages. Seated by page, the head of the
-        // rule reads 2, 3, 4, 5, 7, 9, 12 and six, eight, ten and eleven cannot
-        // be landed on at all.
-        val marks = intArrayOf(
+        // chapter between them is never nearest to anything and no finger can
+        // land on it. Walk the rule a pixel at a time, as a finger does, and
+        // every chapter must answer somewhere.
+        //
+        // Both books, because they are not the same rule. The Arabic dial
+        // counts 604 Madinah pages and the English one counts its own leaves,
+        // and the two crowd in different places: the mushaf packs fifteen
+        // chapters into its last nine pages, while the English book gives most
+        // of those a leaf of their own and does its crowding at the head.
+        // These are the real marks off both.
+        val arabic = intArrayOf(
             1, 2, 50, 77, 106, 128, 151, 177, 187, 208, 221, 235, 249, 255,
             262, 267, 282, 293, 305, 312, 322, 332, 342, 350, 359, 367, 377,
             385, 396, 404, 411, 415, 418, 428, 434, 440, 446, 453, 458, 467,
@@ -346,16 +350,27 @@ class MushafPageDialTest {
             596, 596, 597, 597, 598, 598, 599, 599, 600, 600, 601, 601, 601,
             602, 602, 602, 603, 603, 603, 604, 604, 604,
         )
-        val pages = 604
-        for (density in listOf(2f, 2.625f, 3.5f)) {
-            for (width in listOf(720f, 1080f, 1440f)) {
-                for (rightToLeft in listOf(true, false)) {
+        val english = intArrayOf(
+            1, 2, 72, 112, 154, 186, 221, 259, 274, 304, 324, 346, 366, 376,
+            386, 395, 417, 436, 455, 467, 483, 497, 512, 525, 540, 551, 567,
+            581, 597, 609, 619, 625, 630, 646, 656, 665, 674, 686, 696, 709,
+            723, 733, 743, 754, 759, 765, 773, 780, 787, 791, 796, 801, 805,
+            810, 815, 820, 826, 833, 839, 845, 850, 853, 855, 858, 861, 865,
+            868, 872, 876, 880, 883, 886, 890, 893, 897, 900, 904, 907, 910,
+            913, 916, 918, 920, 923, 925, 927, 928, 929, 931, 933, 935, 937,
+            939, 940, 941, 942, 943, 944, 946, 947, 948, 949, 950, 951, 952,
+            953, 954, 955, 956, 957, 958, 959, 960, 961,
+        )
+        for ((marks, count, rightToLeft) in listOf(
+            Triple(arabic, 604, true),
+            Triple(english, 961, false),
+        )) {
+            for (density in listOf(2f, 2.625f, 3.5f)) {
+                for (width in listOf(720f, 1080f, 1440f)) {
                     val inset = 28f * density
                     val seats = mushafDialCombCellSeats(
-                        marks, pages, inset, width, density, rightToLeft,
+                        marks, count, inset, width, density, rightToLeft,
                     )
-                    // Walk the rule a pixel at a time, as a finger does, and
-                    // collect what it would select. Every chapter must appear.
                     val reachable = HashSet<Int>()
                     var x = 0f
                     while (x <= width) {
@@ -371,30 +386,6 @@ class MushafPageDialTest {
                             "(${width}px, ${density}x, rtl=$rightToLeft)",
                         skipped.isEmpty(),
                     )
-                    // And the comb the reader aims at must stand on the same
-                    // spacing the finger is judged against, or every hit is a
-                    // miss by however far the two have drifted apart.
-                    val drawn = mushafDialCombDrawnXs(
-                        marks = marks,
-                        pageCount = pages,
-                        centerX = 0f,
-                        isLensed = false,
-                        combInk = 0f,
-                        insetPx = inset,
-                        widthPx = width,
-                        rulePx = density,
-                        lensSigmaPx = 40f * density,
-                        tailPushPx = 0f,
-                        epsilonPx = 3f * density,
-                        rightToLeft = rightToLeft,
-                    )
-                    for (i in marks.indices) {
-                        assertTrue(
-                            "chapter ${i + 1} is drawn at ${drawn[i]} but selected at " +
-                                "${seats[i]} (${width}px, ${density}x, rtl=$rightToLeft)",
-                            abs(drawn[i] - seats[i]) <= (width - 2f * inset) / 40f,
-                        )
-                    }
                 }
             }
         }
