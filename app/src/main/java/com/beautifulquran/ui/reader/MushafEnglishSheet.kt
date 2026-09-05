@@ -74,6 +74,7 @@ import com.beautifulquran.domain.EnglishLeafRuler
 import com.beautifulquran.domain.EnglishLeafVerse
 import com.beautifulquran.domain.EnglishRulerCut
 import com.beautifulquran.domain.surahOpensWithBasmalahPreface
+import com.beautifulquran.domain.mushafLeafBands
 import com.beautifulquran.domain.quranWordKey
 import com.beautifulquran.ui.theme.LocalQuranAccents
 import com.beautifulquran.ui.theme.SerifFontFamily
@@ -144,6 +145,9 @@ internal fun MushafEnglishSheet(
     verseNumberScript: VerseNumberScript,
     /** The leaf's fore-edge, shared with the running head and the folio. */
     foreEdge: Dp,
+    /** The leaf's own size — see [englishLeafSlotPx], which is where it is from. */
+    wellPx: Float,
+    measurePx: Float,
     /** What this leaf sets, in the book's order — whole verses and carried ones. */
     leafRuns: List<EnglishVerseRun>,
     /**
@@ -236,17 +240,10 @@ internal fun MushafEnglishSheet(
         if (leaf == null) return@BoxWithConstraints
         val density = LocalDensity.current
         val measurer = rememberTextMeasurer()
-        // A hair off the well: the block is solved to fill this exactly, and
-        // rounding must not put the last line's descenders past the foot.
-        val wellPx = with(density) {
-            (constraints.maxHeight - EnglishLeafFitSlack.roundToPx()).toFloat().coerceAtLeast(1f)
-        }
-        val measurePx = with(density) {
-            (constraints.maxWidth - foreEdge.roundToPx() * 2).toFloat().coerceAtLeast(1f)
-        }
         // The leaf's own size, for the ruler that paginates the book from it.
-        // Reported rather than recomputed: this is the only place that knows
-        // what the sheet actually measures against.
+        // Reported and not recomputed — the figures come from englishLeafSlotPx
+        // and the report is what proves the root predicted them correctly. If
+        // it ever did not, this is the truth and the book is set again from it.
         LaunchedEffect(wellPx, measurePx) { onMetrics(wellPx, measurePx) }
         val palette = rememberWordInkPalette()
         val gold = LocalQuranAccents.current.gold
@@ -360,6 +357,40 @@ internal fun MushafEnglishSheet(
  *
  * A proportion, not a dp, so a tablet gets a tablet's margins.
  */
+/**
+ * The English leaf's well and measure, from the paper it is set on.
+ *
+ * This is the whole chain from a page of the pager down to the two figures the
+ * book is paginated by, and it is a chain of constants — the grid's bands, the
+ * page margin, the fore-edge, the rounding slack. Nothing in it needs a leaf to
+ * have been composed. That matters: the book is paginated by measuring against
+ * these, and a first launch that had to wait for a leaf to exist before it
+ * could learn them was a first launch that paginated with the mushaf already
+ * open and the reader watching.
+ *
+ * [paperWidthPx] and [leafHeightPx] are the page *inside* MushafPageMargin —
+ * the box the running head, the well and the folio all share.
+ *
+ * The one definition. The pager calls it to set the leaf it draws, and the
+ * root calls it to paginate before any of this exists; two of these that
+ * disagree by a pixel are a book paginated for a leaf that never appears.
+ */
+internal fun englishLeafSlotPx(
+    paperWidthPx: Int,
+    leafHeightPx: Int,
+    density: Density,
+): FloatArray = with(density) {
+    val bands = mushafLeafBands(english = true)
+    val unit = bands.unitPx(leafHeightPx.toFloat()).toDp()
+    // A hair off the well: the block is solved to fill this exactly, and
+    // rounding must not put the last line's descenders past the foot.
+    val wellPx = ((unit * bands.well).roundToPx() - EnglishLeafFitSlack.roundToPx())
+        .toFloat().coerceAtLeast(1f)
+    val measurePx = (paperWidthPx - englishLeafForeEdge(paperWidthPx.toDp()).roundToPx() * 2)
+        .toFloat().coerceAtLeast(1f)
+    floatArrayOf(wellPx, measurePx)
+}
+
 internal fun englishLeafForeEdge(leafWidth: Dp): Dp =
     (leafWidth * EnglishLeafForeEdgeFraction).coerceAtLeast(MushafEdgeGutter)
 

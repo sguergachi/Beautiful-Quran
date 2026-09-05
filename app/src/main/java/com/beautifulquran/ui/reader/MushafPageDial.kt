@@ -1016,7 +1016,7 @@ internal fun mushafDialCombDrawnXs(
 }
 
 /** The rule's own band. Ticks stand up inside it; the rule sits near its foot. */
-private val MushafDialSlot = 13.dp
+internal val MushafDialSlot = 13.dp
 /** The rule's line, measured from the top of the band — where it has always sat. */
 private val MushafDialRuleY = 11.5.dp
 private val MushafDialThumbHeight = 3.dp

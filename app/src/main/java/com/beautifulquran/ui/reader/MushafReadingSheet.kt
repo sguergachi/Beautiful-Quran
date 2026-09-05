@@ -144,6 +144,41 @@ internal fun mushafTurnsRightToLeft(english: Boolean): Boolean = !english
 
 private val MushafDialHeadAir = 8.dp
 
+/** The transport's own row of controls, and the air around the block. */
+private val MushafTransportRow = 44.dp
+private val MushafTransportAir = 2.dp
+
+/**
+ * The reciter's name under the transport.
+ *
+ * A band, always reserved, and not the height of a line of text that is there
+ * when a reciter is loaded and gone when one is not. The leaf takes the paper
+ * this does not, so a band that comes and goes moves the well — and the well is
+ * what the whole book is paginated against. It would have repaginated the
+ * Qur'an on the first play.
+ */
+private val MushafReciterBand = 14.dp
+
+/**
+ * Everything the reading sheet sets under the leaf.
+ *
+ * The leaf is what is left over, so this is the leaf: `weight(1f)` is the sheet
+ * height less exactly this. Every term is a constant, which is the point — the
+ * app's root subtracts it from the window to learn the leaf's size before a
+ * leaf has ever been composed, and paginates the English book from that on the
+ * very first launch.
+ *
+ * **Anything added under the leaf belongs in this sum**, and anything here that
+ * is not a constant breaks it. A term that drifts shows as a book paginated for
+ * a leaf a little larger than the one it is drawn on, and its last lines come
+ * up short. The leaf reports what it really measured and the book is set again
+ * if the two disagree, so the cost is a visible repagination, not a wrong book.
+ */
+internal val MushafBelowLeaf: Dp =
+    MushafFolioBand +
+        MushafDialHeadAir + MushafDialSlot + MushafDialBelowGrab + MushafRuleTailAir +
+        MushafTransportAir * 2 + MushafTransportRow + MushafReciterBand
+
 /** Each folio figure's column, equal either side of the centre line. */
 private val MushafFolioColumn = 40.dp
 /** Paper between the two figures. */
@@ -349,13 +384,13 @@ internal fun MushafReadingSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = MushafTransportEdge, vertical = 2.dp),
+                .padding(horizontal = MushafTransportEdge, vertical = MushafTransportAir),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Box(
                 Modifier
                     .fillMaxWidth()
-                    .height(44.dp),
+                    .height(MushafTransportRow),
             ) {
             // Faded to 5% while reciting — and untouchable with it. Alpha
             // alone left an invisible Chapters button under the thumb at the
@@ -382,7 +417,7 @@ internal fun MushafReadingSheet(
             Row(
                 modifier = Modifier
                     .align(Alignment.Center)
-                    .height(44.dp),
+                    .height(MushafTransportRow),
                 horizontalArrangement = Arrangement.Center,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -469,18 +504,25 @@ internal fun MushafReadingSheet(
                 }
             }
             }
-            if (reciterName.isNotEmpty()) {
-                Text(
-                    text = reciterName,
-                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
-                    color = quiet.copy(alpha = 0.7f),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .ownedQuietClickable(role = Role.Button, onClick = onOpenSettings),
-                    textAlign = TextAlign.Center,
-                )
+            // The band stands whether a name is in it or not — see
+            // MushafReciterBand. The leaf is measured against what is left.
+            Box(
+                Modifier.fillMaxWidth().height(MushafReciterBand),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (reciterName.isNotEmpty()) {
+                    Text(
+                        text = reciterName,
+                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+                        color = quiet.copy(alpha = 0.7f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .ownedQuietClickable(role = Role.Button, onClick = onOpenSettings),
+                        textAlign = TextAlign.Center,
+                    )
+                }
             }
         }
     }

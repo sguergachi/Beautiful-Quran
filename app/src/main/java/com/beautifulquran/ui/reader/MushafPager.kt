@@ -1279,6 +1279,14 @@ internal fun MushafPager(
                 } else {
                     MushafEdgeGutter
                 }
+                // The leaf's own size, from the paper it is set on — the same
+                // chain the app's root walks before any of this is composed, so
+                // the book it paginated is the book this leaf draws.
+                val englishSlot = if (english) {
+                    englishLeafSlotPx(constraints.maxWidth, constraints.maxHeight, density)
+                } else {
+                    null
+                }
                 Column(Modifier.fillMaxSize()) {
                     MushafPageHeader(
                         surahNameArabic = surahsById[leafSurahId]?.nameArabic,
@@ -1313,6 +1321,8 @@ internal fun MushafPager(
                             measured = bookMeasured,
                             verseNumberScript = verseNumberScript,
                             foreEdge = foreEdge,
+                            wellPx = englishSlot?.get(0) ?: 1f,
+                            measurePx = englishSlot?.get(1) ?: 1f,
                             leafRuns = leafRuns,
                             leafTokens = leafTokens,
                             alignments = alignments,

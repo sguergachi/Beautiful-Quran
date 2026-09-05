@@ -15,8 +15,12 @@ import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.navigationBarsIgnoringVisibility
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsIgnoringVisibility
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -84,6 +88,9 @@ import androidx.compose.ui.platform.LocalFontFamilyResolver
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.text.TextMeasurer
+import com.beautifulquran.ui.reader.MushafBelowLeaf
+import com.beautifulquran.ui.reader.MushafPageMargin
+import com.beautifulquran.ui.reader.englishLeafSlotPx
 import com.beautifulquran.ui.reader.englishLeafRuler
 import com.beautifulquran.data.QuranDatabase
 import com.beautifulquran.ui.reader.ReaderViewModel
@@ -277,6 +284,7 @@ private const val STACK_PAGE_PULL_RESISTANCE_DP = 14
 private const val STACK_OFFSCREEN_OVERSCAN_DP = 36f
 private val StackMotionEasing = CubicBezierEasing(0.24f, 0.02f, 0.12f, 1f)
 
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 private fun PaperStackApp(
     themeMode: ThemeMode,
@@ -325,13 +333,46 @@ private fun PaperStackApp(
         TextMeasurer(leafResolver, leafDensity, leafLayoutDirection)
     }
     val windowSize = LocalWindowInfo.current.containerSize
+    // The paper the system bars take out of the window. The reader's body pads
+    // by the status bar itself (ReaderScreen's topInset) and the scaffold holds
+    // the navigation bar off the bottom; between them the leaf never sees this
+    // paper, so neither does the figure worked out from it. Both are taken
+    // ignoring visibility — immersive reading hides the status bar, and a leaf
+    // that changed size when it did would repaginate the book mid-recitation.
+    val statusBarTop = WindowInsets.statusBarsIgnoringVisibility
+        .asPaddingValues()
+        .calculateTopPadding()
+    val navigationBarBottom = WindowInsets.navigationBarsIgnoringVisibility
+        .asPaddingValues()
+        .calculateBottomPadding()
     LaunchedEffect(
+        statusBarTop,
+        navigationBarBottom,
         windowSize,
         settings.englishLeafText,
         settings.verseNumberScript,
         settings.hideEnglishParentheticals,
     ) {
+        // Nothing remembered — a first launch, or a window this app has not
+        // been this size in. Work the leaf's size out instead of waiting for a
+        // leaf: MushafBelowLeaf is everything the reading sheet sets under the
+        // paper and the leaf is what is left, so the window and the status bar
+        // are the whole of what is needed. See englishLeafSlotPx, which the
+        // pager calls with the same figures when it finally draws one.
+        val predicted = with(leafDensity) {
+            val paperW = windowSize.width - MushafPageMargin.roundToPx() * 2
+            val leafH = windowSize.height -
+                statusBarTop.roundToPx() -
+                navigationBarBottom.roundToPx() -
+                MushafBelowLeaf.roundToPx()
+            if (paperW > 0 && leafH > 0) {
+                englishLeafSlotPx(paperW, leafH, leafDensity)
+            } else {
+                null
+            }
+        }
         val metrics = app.settings.leafMetrics(windowSize.width, windowSize.height)
+            ?: predicted
             ?: return@LaunchedEffect
         readerViewModel.ensureMushaf(
             text = settings.englishLeafText,
