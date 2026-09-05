@@ -377,6 +377,27 @@ describe('matchWordSearch', () => {
     ).toBe(false)
   })
 
+  it('keeps a rooted phrase on one visible animation target', () => {
+    const rooted = [
+      { ...entry(3, 17, 1, 'ٱلصَّـٰبِرِينَ', 'The patient'), root: 'صبر' },
+      { ...entry(3, 17, 2, 'وَٱلصَّـٰدِقِينَ', 'and the truthful'), root: 'صدق' },
+      { ...entry(3, 17, 3, 'وَٱلۡقَٰنِتِينَ', 'and the obedient'), root: 'قنت' },
+      { ...entry(19, 65, 7, 'وَٱصۡطَبِرۡ', 'and be constant'), root: 'صبر' },
+    ]
+
+    const hit = matchWordSearch(rooted, 'constsnt').find(({ surahId }) => surahId === 3)!
+    const highlighted = englishTranslationHighlightSpans(
+      hit.displayText!,
+      'constsnt',
+      hit.translation,
+      hit.matchLabel ?? '',
+      hit.matchTerms,
+    ).filter(({ highlighted }) => highlighted).map(({ text }) => text)
+
+    expect(hit.targetPositions).toEqual([1])
+    expect(highlighted).toEqual(['The patient'])
+  })
+
   it('targets a nearby visible gloss for a translation-only auxiliary', () => {
     const cases: Array<[WordSearchIndexEntry[], number]> = [
       [[

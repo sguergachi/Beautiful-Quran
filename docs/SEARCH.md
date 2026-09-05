@@ -56,8 +56,10 @@ That vocabulary also grounds navigation, so `hell` can resolve a Hellfire
 concept's visible `Fire` gloss and make that same word breathe in the reader. Derived
 and concept terms require whole-word or inflection matches: `fire` never colors
 or targets the substring in `firewood`. Only the user's typed text retains
-prefix matching. Overlapping terms resolve to the longest precise phrase, and
-connective words remain ordinary ink. If the selected English source contains
+prefix matching. Overlapping terms resolve to the longest precise phrase.
+Rooted multi-word glosses such as `The patient` remain one visible phrase and
+one animation target; their articles do not spill onto unrelated occurrences
+of `the`. Connective words remain ordinary ink. If the selected English source contains
 none of those, the result stays unaccented rather than promising a highlight
 the reader cannot locate. The gloss fallback coalesces adjacent copies of a
 shared multi-word gloss, matching the reader's English prose instead of showing

@@ -961,7 +961,12 @@ private fun highlightNeedleSpecs(
             .filter { searchTextRelevance(it, parsed) > 0 }
             .forEach(::add)
     }
-    semanticTerms.flatMap(::presentTokens).forEach(::add)
+    semanticTerms.forEach { term ->
+        visibleTerm(term)?.let(::add)
+        presentTokens(term)
+            .filterNot { it.lowercase() in highlightFillers }
+            .forEach(::add)
+    }
     presentTokens(semanticLabel)
         .filterNot { it.lowercase() in highlightFillers }
         .forEach(::add)

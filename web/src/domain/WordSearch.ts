@@ -1318,7 +1318,13 @@ function highlightNeedleSpecs(
       .filter((token) => searchTextRelevance(token, parsed) > 0)
       .forEach((term) => add(term))
   }
-  semanticTerms.flatMap(presentTokens).forEach((term) => add(term))
+  semanticTerms.forEach((term) => {
+    const phrase = visibleTerm(term)
+    if (phrase) add(phrase)
+    presentTokens(term)
+      .filter((token) => !HIGHLIGHT_FILLERS.has(token.toLowerCase()))
+      .forEach((token) => add(token))
+  })
   presentTokens(semanticLabel)
     .filter((token) => !HIGHLIGHT_FILLERS.has(token.toLowerCase()))
     .forEach((term) => add(term))

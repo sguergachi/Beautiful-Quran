@@ -471,6 +471,28 @@ class WordSearchTest {
     }
 
     @Test
+    fun `root phrase stays one visible target and animates its owning word`() {
+        val rooted = listOf(
+            entry(3, 17, 1, "ٱلصَّـٰبِرِينَ", "The patient").copy(root = "صبر"),
+            entry(3, 17, 2, "وَٱلصَّـٰدِقِينَ", "and the truthful").copy(root = "صدق"),
+            entry(3, 17, 3, "وَٱلۡقَٰنِتِينَ", "and the obedient").copy(root = "قنت"),
+            entry(19, 65, 7, "وَٱصۡطَبِرۡ", "and be constant").copy(root = "صبر"),
+        )
+
+        val hit = matchWordSearch(rooted, "constsnt").single { it.surahId == 3 }
+        val highlighted = englishTranslationHighlightSpans(
+            hit.displayText,
+            "constsnt",
+            hit.translation,
+            hit.matchLabel.orEmpty(),
+            hit.matchTerms,
+        ).filter(AyahTextSpan::highlighted).map(AyahTextSpan::text)
+
+        assertEquals(listOf(1), hit.targetPositions)
+        assertEquals(listOf("The patient"), highlighted)
+    }
+
+    @Test
     fun `exact matches take precedence over fuzzy neighbors`() {
         val neighbors = listOf(
             entry(1, 1, 1, "قَالَ", "lone"),
