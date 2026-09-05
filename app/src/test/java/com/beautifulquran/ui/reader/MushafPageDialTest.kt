@@ -325,6 +325,64 @@ class MushafPageDialTest {
     }
 
     @Test
+    fun `the cells stay under the ticks they are drawn beneath`() {
+        // The floors in the seat walk are cumulative, so a floor set too high
+        // has no slack to spend and drags the whole book against itself: the
+        // cells stop standing under their own ticks and the reader aims at one
+        // chapter and lands on another. This is the guard on that — the seat a
+        // chapter answers to must be near the mark it is drawn at, on every
+        // width, in both directions.
+        val marks = intArrayOf(
+            1, 2, 50, 77, 106, 128, 151, 177, 187, 208, 221, 235, 249, 255,
+            262, 267, 282, 293, 305, 312, 322, 332, 342, 350, 359, 367, 377,
+            385, 396, 404, 411, 415, 418, 428, 434, 440, 446, 453, 458, 467,
+            477, 483, 489, 496, 499, 502, 507, 511, 515, 518, 520, 523, 526,
+            528, 531, 534, 537, 542, 545, 549, 551, 553, 554, 556, 558, 560,
+            562, 564, 566, 568, 570, 572, 574, 575, 577, 578, 580, 582, 583,
+            585, 586, 587, 587, 589, 590, 591, 591, 592, 593, 594, 595, 595,
+            596, 596, 597, 597, 598, 598, 599, 599, 600, 600, 601, 601, 601,
+            602, 602, 602, 603, 603, 603, 604, 604, 604,
+        )
+        val pages = 604
+        for (density in listOf(2f, 2.625f, 3.5f)) {
+            for (width in listOf(720f, 1080f, 1440f)) {
+                for (rightToLeft in listOf(true, false)) {
+                    val inset = 28f * density
+                    val seats = mushafDialCombCellSeats(
+                        marks, pages, inset, width, density, rightToLeft,
+                    )
+                    val span = width - 2f * inset
+                    for (i in marks.indices) {
+                        val tick = mushafDialTrackX(
+                            mushafDialAlong(
+                                mushafDialChapterFraction(marks[i].toFloat(), marks, pages),
+                                rightToLeft,
+                            ),
+                            width,
+                            inset,
+                        )
+                        // A twentieth of the rule. An even share of the measure
+                        // put chapter eleven's cell 82px off its tick on a
+                        // 1080px rule, which is a fifth of the head of the book.
+                        assertTrue(
+                            "chapter ${i + 1} seat ${seats[i]} strayed from tick $tick " +
+                                "(${width}px, ${density}x, rtl=$rightToLeft)",
+                            abs(seats[i] - tick) <= span / 20f,
+                        )
+                    }
+                    // And al-Baqarah, the crowded head's worst case, still owns
+                    // a cell rather than a crack between two others.
+                    val cell = abs(seats[1] - seats[0]) / 2f + abs(seats[2] - seats[1]) / 2f
+                    assertTrue(
+                        "al-Baqarah's cell collapsed to $cell (${width}px, ${density}x)",
+                        cell >= span / 114f,
+                    )
+                }
+            }
+        }
+    }
+
+    @Test
     fun `every chapter owns a stable cell and every cell is selectable`() {
         // Selection reads stable cells, not the lensed drawing: the cells
         // partition the whole measure, never move under a moving hand, and

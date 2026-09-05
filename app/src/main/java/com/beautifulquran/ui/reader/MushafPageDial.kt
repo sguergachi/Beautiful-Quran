@@ -777,16 +777,28 @@ internal fun mushafDialCombCellSeats(
         result[idx] = x.coerceIn(insetPx, widthPx - insetPx)
     }
     val span = (widthPx - 2f * insetPx).coerceAtLeast(0f)
-    // A cell wide enough to hit. These seats are not the comb — the drawn ticks
-    // keep their own tighter spacing — they are the slices of rule each chapter
-    // alone answers to, and a slice has to be reachable by a finger. Al-Baqarah
-    // opens the leaf after Al-Fatihah, so on page position the two sit within a
-    // pixel of each other and 1.5 rule-widths of relaxation left chapter two a
-    // four-pixel target: present on the comb and impossible to land on. An even
-    // share of the rule is 114 chapters into its measure, and that is the floor
-    // now — crowded runs spread to it, and everywhere the book breathes the
-    // seats stay where the pages put them.
-    val minGap = span / marks.size.coerceAtLeast(1)
+    // A cell wide enough to hit — but not so wide that the seats stop meaning
+    // anything.
+    //
+    // Al-Baqarah opens the leaf after Al-Fatihah, so on page position the two
+    // sit within a pixel of each other and only this floor separates them. It
+    // is tempting to answer that by handing every chapter an even share of the
+    // rule, and that is exactly wrong. The floors are cumulative: the relaxation
+    // reserves one for every chapter after this one, and the tail of the book is
+    // genuinely crowded — fifteen chapters share the last nine pages — so once
+    // the floors sum to the whole measure there is no slack left anywhere and
+    // the walk drags every seat in the book back against its neighbour. Measured
+    // on a 1080px rule with the real chapter pages: at an even share the seats
+    // stand up to 87px from the ticks they are drawn under, so the reader aims
+    // at chapter three and lands on chapter fourteen — and al-Baqarah's own cell
+    // comes out *smaller*, 12px against the 19px it has when the seats are left
+    // where the pages put them. A share past that and the arithmetic inverts:
+    // al-Fatihah's cell goes negative.
+    //
+    // Three quarters of an even share is under that cliff on every width. The
+    // seats stay within ~20px of their ticks, the crowded runs still spread, and
+    // al-Baqarah keeps a cell of 12/19/27px at 720/1080/1440.
+    val minGap = span * CellGapShare / marks.size.coerceAtLeast(1)
     // Relax the seats apart in reading order, then clamp them back inside the
     // track from the far end. Both walks run the way the book does: seats
     // descend the rule in a mushaf and climb it in a book of the translation,
@@ -1043,6 +1055,14 @@ private val MushafDialPageTick = 7.dp
  * loses.
  */
 internal val MushafDialBelowGrab = 8.dp
+
+/**
+ * How much of an even share of the rule a chapter's selection cell claims.
+ *
+ * Below 1 by construction — see the floor in [mushafDialCombCellSeats]. At 1
+ * the floors sum to the whole measure and the seats stop following the pages.
+ */
+private const val CellGapShare = 0.75f
 /** The undo target is generous along the rule while its visible dot stays furniture-sized. */
 private val MushafDialReturnHitWidth = 44.dp
 private val MushafDialReturnDot = 26.dp
