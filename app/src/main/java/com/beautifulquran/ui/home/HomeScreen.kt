@@ -305,7 +305,10 @@ fun HomeScreen(
                                 value = uiState.query,
                                 onValueChange = viewModel::onQueryChange,
                                 placeholder = "Search concept, “exact phrase”, or 2:255",
-                                onFocusChanged = { searchFocused = it },
+                                onFocusChanged = { focused ->
+                                    searchFocused = focused
+                                    if (focused) viewModel.onSearchFocused()
+                                },
                                 modifier = Modifier
                                     .padding(start = HomeStartInset, end = HomeEndInset)
                                     .fillMaxWidth()
@@ -378,7 +381,8 @@ fun HomeScreen(
                                     "Searching ayahs…"
                                 } else {
                                     val count = uiState.wordSections.sumOf { it.totalCount }
-                                    "In the Quran · $count relevant ${if (count == 1) "ayah" else "ayahs"}"
+                                    "In the Quran · $count relevant ${if (count == 1) "ayah" else "ayahs"}" +
+                                        if (uiState.wordSearchLoading) " · refining…" else ""
                                 },
                                 topPadding = if (correctedQuery == null) 8.dp else 2.dp,
                             )

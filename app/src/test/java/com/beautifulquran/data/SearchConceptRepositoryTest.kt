@@ -1,6 +1,7 @@
 package com.beautifulquran.data
 
 import com.beautifulquran.domain.RelatedSearchTerm
+import com.beautifulquran.domain.SearchConcept
 import com.beautifulquran.domain.conceptRelevance
 import com.beautifulquran.domain.parseSearchQuery
 import java.io.File
@@ -28,6 +29,21 @@ class SearchConceptRepositoryTest {
         assertTrue(RelatedSearchTerm("tranquility", 2) in vocabulary.thesaurus.getValue("calm"))
         assertTrue(RelatedSearchTerm("peace", 2) in vocabulary.thesaurus.getValue("calm"))
         assertTrue(RelatedSearchTerm("settled", 1) !in vocabulary.thesaurus.getValue("calm"))
+
+        val candidateConcepts = decodeSearchConcepts(
+            repoFile("data/search_concept_candidates.json").readText(),
+        )
+        fun signatures(items: List<SearchConcept>) = items.map {
+            listOf(
+                it.name,
+                it.primaryTerms,
+                it.secondaryTerms,
+                it.category,
+                it.domain,
+                it.ayahKeys.toList(),
+            )
+        }
+        assertEquals(signatures(concepts), signatures(candidateConcepts))
     }
 
     private fun repoFile(path: String): File {

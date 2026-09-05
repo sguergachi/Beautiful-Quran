@@ -19,6 +19,7 @@ import com.beautifulquran.domain.WordSearchSources
 import com.beautifulquran.playback.PlayerController
 import com.beautifulquran.playback.PlayerUiState
 import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -161,6 +162,7 @@ class HomeViewModel(
     private val wordHits = MutableStateFlow<List<WordSearchHit>>(emptyList())
     private val expandedSurahIds = MutableStateFlow<Set<Int>>(emptySet())
     private val wordSearchLoading = MutableStateFlow(false)
+    private var searchWarmup: Job? = null
 
     val uiState: StateFlow<HomeUiState> =
         combine(
@@ -222,6 +224,10 @@ class HomeViewModel(
                         return@collectLatest
                     }
                     wordSearchLoading.value = true
+                    val quickHits = repository.searchWordsQuick(q, sources)
+                    if (quickHits.isNotEmpty()) {
+                        wordHits.value = quickHits
+                    }
                     wordHits.value = repository.searchWords(q, sources)
                     wordSearchLoading.value = false
                 }
@@ -238,6 +244,13 @@ class HomeViewModel(
         wordSearchLoading.value = shouldRunWordSearch(value)
         if (!shouldRunWordSearch(value)) {
             wordHits.value = emptyList()
+        }
+    }
+
+    /** Uses the pause before typing to prepare the one-time Quran search data. */
+    fun onSearchFocused() {
+        if (searchWarmup == null) {
+            searchWarmup = viewModelScope.launch { repository.warmSearch() }
         }
     }
 

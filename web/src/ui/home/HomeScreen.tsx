@@ -265,7 +265,13 @@ export function HomeScreen({ stackLayer }: { stackLayer: StackLayer }) {
               <div className="search-row">
                 <div
                   className="home-search"
-                  onFocusCapture={() => setSearchFocused(true)}
+                  onFocusCapture={() => {
+                    setSearchFocused(true)
+                    void Promise.all([
+                      QuranRepository.warmWordSearchIndex(),
+                      QuranRepository.warmSearchConcepts(),
+                    ])
+                  }}
                   onBlurCapture={(event) => {
                     if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
                       setSearchFocused(false)

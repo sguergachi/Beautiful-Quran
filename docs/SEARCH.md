@@ -70,9 +70,15 @@ The quiet reference line explains each result as `Text match`,
 `Related · tranquility`, `Concept · Divine Mercy`, `Same Arabic root`, or
 `Spelling match`. The section heading reports the number of relevant ayahs, and
 the empty state says when no relevant ayah was found. Both apps begin searching
-after a 120 ms pause. The web paints its loading cue, builds a cold index on the
-next task instead of waiting for an idle callback, and then yields between scan
-chunks; Android checks cancellation throughout the scan. Typing therefore
+after a 120 ms pause and begin warming search data when the field gains focus.
+Android warms a compact concept-candidate asset, then materializes only the
+literal or relevant semantic ayahs and paints those results while the complete
+concept, thesaurus, and root rank is still loading; `refining…` makes that
+progressive result explicit. The complete rank replaces it without changing
+the query. This keeps literal, spelling, and multi-word concept results below
+one second without moving a full-Quran scan back into app startup. The web paints
+its loading cue, builds a cold index on the next task, and yields between scan
+chunks. Android checks cancellation throughout both ranking stages, so typing
 never waits on an obsolete rank. Within each scan, repeated Quran word glosses
 share one relevance calculation for that query while retaining every matching
 ayah and word position; thesaurus expansions use the same optimization.
@@ -138,9 +144,11 @@ python3 tools/build_search_concepts.py
 ```
 
 The generator rejects unknown tags, duplicate ayahs, either source's hash
-drift, or any ayah-key mismatch with `quran.db`. Android packages the JSON
-directly and decodes it on first search. The web build copies the same canonical
-file and fetches/caches it on first search. Attribution is retained in
+drift, or any ayah-key mismatch with `quran.db`. Android packages the JSON plus
+a generated 179 KB concept-only candidate view; the candidate view starts
+decoding on focus and the complete vocabulary loads only after first results.
+The web build copies the canonical complete file and fetches/caches it on first
+search. Attribution is retained in
 `data/search_concepts.LICENSE.md`.
 
 ## Tests

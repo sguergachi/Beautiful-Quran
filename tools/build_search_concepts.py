@@ -221,6 +221,12 @@ def main() -> None:
     }
     output = ROOT / "data" / "search_concepts.json"
     output.write_text(json.dumps(asset, ensure_ascii=False, separators=(",", ":")) + "\n")
+    candidate_output = ROOT / "data" / "search_concept_candidates.json"
+    candidate_output.write_text(json.dumps(
+        {key: value for key, value in asset.items() if key != "thesaurus"},
+        ensure_ascii=False,
+        separators=(",", ":"),
+    ) + "\n")
     print(
         f"Wrote {output.relative_to(ROOT)}: {len(concepts)} concepts, "
         f"{len(seen)} ayahs, {sum(map(len, assignments.values()))} assignments, "

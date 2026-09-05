@@ -19,36 +19,38 @@ data class SearchVocabulary(
 /** Lazily decodes packaged QSAC concepts and focused WordNet links on first search. */
 class SearchConceptRepository(context: Context) {
     private val assets = context.applicationContext.assets
+    private val conceptLock = Any()
 
     @Volatile
     private var cache: SearchVocabulary? = null
+    @Volatile
+    private var conceptCache: List<SearchConcept>? = null
 
+    @Synchronized
     fun vocabulary(): SearchVocabulary = cache ?: assets.open(ASSET_NAME).bufferedReader().use {
         decodeSearchVocabulary(it.readText())
-    }.also { cache = it }
+    }.also {
+        cache = it
+        conceptCache = it.concepts
+    }
+
+    /** Loads the small concept-only candidate set without waiting for WordNet decoding. */
+    fun concepts(): List<SearchConcept> = cache?.concepts ?: conceptCache ?: synchronized(conceptLock) {
+        cache?.concepts ?: conceptCache ?: assets.open(CANDIDATE_ASSET_NAME).bufferedReader().use {
+            decodeSearchConcepts(it.readText())
+        }.also { if (cache == null) conceptCache = it }
+    }
 
     private companion object {
         const val ASSET_NAME = "search_concepts.json"
+        const val CANDIDATE_ASSET_NAME = "search_concept_candidates.json"
     }
 }
 
 internal fun decodeSearchVocabulary(text: String): SearchVocabulary {
     val asset = Json.decodeFromString<SearchConceptAsset>(text)
-    check(asset.version == 2) { "Unsupported search concept asset ${asset.version}" }
-    check(asset.sourceCommit == QSAC_SOURCE_COMMIT) { "Unexpected QSAC source ${asset.sourceCommit}" }
-    check(asset.thesaurusSha256 == WORDNET_SHA256) {
-        "Unexpected thesaurus source ${asset.thesaurusSha256}"
-    }
-    val concepts = asset.concepts.map { concept ->
-        SearchConcept(
-            name = concept.name,
-            primaryTerms = concept.primary,
-            secondaryTerms = concept.secondary,
-            category = concept.category,
-            domain = concept.domain,
-            ayahKeys = concept.ayahs.toIntArray(),
-        )
-    }
+    validateSearchAsset(asset.version, asset.sourceCommit, asset.thesaurusSha256)
+    val concepts = asset.concepts.toDomain()
     val thesaurus = asset.thesaurus.mapValues { (_, related) ->
         related.map { pair ->
             check(pair.size == 2) { "Invalid thesaurus pair $pair" }
@@ -56,6 +58,29 @@ internal fun decodeSearchVocabulary(text: String): SearchVocabulary {
         }
     }
     return SearchVocabulary(concepts, thesaurus)
+}
+
+internal fun decodeSearchConcepts(text: String): List<SearchConcept> {
+    val asset = Json.decodeFromString<SearchConceptCandidateAsset>(text)
+    validateSearchAsset(asset.version, asset.sourceCommit, asset.thesaurusSha256)
+    return asset.concepts.toDomain()
+}
+
+private fun List<SearchConceptJson>.toDomain(): List<SearchConcept> = map { concept ->
+    SearchConcept(
+        name = concept.name,
+        primaryTerms = concept.primary,
+        secondaryTerms = concept.secondary,
+        category = concept.category,
+        domain = concept.domain,
+        ayahKeys = concept.ayahs.toIntArray(),
+    )
+}
+
+private fun validateSearchAsset(version: Int, sourceCommit: String, thesaurusSha256: String) {
+    check(version == 2) { "Unsupported search concept asset $version" }
+    check(sourceCommit == QSAC_SOURCE_COMMIT) { "Unexpected QSAC source $sourceCommit" }
+    check(thesaurusSha256 == WORDNET_SHA256) { "Unexpected thesaurus source $thesaurusSha256" }
 }
 
 private const val QSAC_SOURCE_COMMIT = "cb3852b127bfdda6668c5eec9e5c1d9cdcde3810"
@@ -70,6 +95,16 @@ private data class SearchConceptAsset(
     val thesaurusSha256: String,
     val concepts: List<SearchConceptJson>,
     val thesaurus: Map<String, List<JsonArray>>,
+)
+
+@Serializable
+private data class SearchConceptCandidateAsset(
+    val version: Int,
+    val source: String,
+    val sourceCommit: String,
+    val thesaurusSource: String,
+    val thesaurusSha256: String,
+    val concepts: List<SearchConceptJson>,
 )
 
 @Serializable
