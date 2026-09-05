@@ -139,6 +139,13 @@ private fun SharedPreferences.homeBookmarkStyle(): HomeBookmarkStyle =
  * symptom is a leaf that stops a few words short of its own last line. **Bump
  * this whenever anything in `MushafGrid`, `MushafLeafBands` or the leaf's
  * fore-edge changes**, and the next launch measures instead of remembering.
+ *
+ * This is load-bearing. The app's root paginates the whole English book from
+ * these figures before the reader exists, so a stamp that outlives the geometry
+ * it describes hands every leaf more lines than it has and the book comes out
+ * with its last lines short — the one fault this whole layout exists to remove.
+ * The leaf corrects it the moment it lays out and measures something else, but
+ * the reader sees the correction as pages rearranging under them.
  */
 private const val LEAF_METRICS_VERSION = 3
 

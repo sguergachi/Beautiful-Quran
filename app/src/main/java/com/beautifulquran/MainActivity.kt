@@ -309,6 +309,15 @@ private fun PaperStackApp(
     // the leaf remembers its well and measure, and every launch after that has
     // them here, at the root, before the reader exists. A thousand text layouts
     // on a background thread while the chapter list is being read.
+    //
+    // These figures are remembered against this exact window size and this
+    // build's LEAF_METRICS_VERSION, and the leaf slot is the same size every
+    // time both of those hold — so they are the figures the leaf is about to
+    // measure, and the book is paginated from them rather than merely looked up
+    // under them. Reading only, which is what this did, meant that any launch
+    // the written book did not survive — a new format, a setting changed, a
+    // fresh install — put the whole pagination back on the door of the mushaf,
+    // where it is a wait the reader watches instead of one nobody sees.
     val leafDensity = LocalDensity.current
     val leafResolver = LocalFontFamilyResolver.current
     val leafLayoutDirection = LocalLayoutDirection.current
@@ -343,9 +352,6 @@ private fun PaperStackApp(
                 settings.verseNumberScript,
                 settings.hideEnglishParentheticals,
             ),
-            // Remembered figures: good enough to look a book up with, not to
-            // paginate one from. See ReaderViewModel.ensureMushaf.
-            trusted = false,
             cacheKey = app.englishBookCache.key(
                 wellPx = metrics[0],
                 measurePx = metrics[1],
