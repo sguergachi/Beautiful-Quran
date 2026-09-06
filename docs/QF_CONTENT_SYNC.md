@@ -191,10 +191,10 @@ record schema and resource IDs (see `worker/README.md`).
   `mushafs`, `word_by_word_translations`, and
   `word_by_word_transliterations`; those snapshots must be joined by stable
   word identity and validated as one complete reader view before publication.
-- [ ] Confirm the approved resource IDs in prelive. The current documentation
-  examples use word-translation resource `85` and production transliteration
-  resource `60`; examples are not approval or a substitute for the response
-  attached to this application.
+- [x] Confirm the production resource IDs from the live resource catalog and
+  authenticated snapshots: English word translation `59`, transliteration
+  `60`, and QCF V2 Mushaf `1`. The documentation's illustrative translation
+  ID `85` is not present in the production snapshot service.
 - [ ] Implement Content Sync bootstrap, relative cursors, snapshots, atomic
   upsert/delete application, opaque checkpoints, `resync_required`, termination
   purge, and seven-day freshness without stacking server and client TTLs.

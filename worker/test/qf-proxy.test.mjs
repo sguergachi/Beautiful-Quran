@@ -8,7 +8,7 @@ const env = {
   QF_ENV: 'prelive',
   ALLOWED_ORIGIN: 'https://sguergachi.github.io',
 }
-const bootstrap = '/api/v4/resources/sync?bootstrap=true&resources=mushafs%3A1%3Bword_by_word_translations%3A85%3Bword_by_word_transliterations%3A60'
+const bootstrap = '/api/v4/resources/sync?bootstrap=true&resources=mushafs%3A1%3Bword_by_word_translations%3A59%3Bword_by_word_transliterations%3A60'
 
 test('proxies only the fixed Content Sync resource set', async () => {
   const calls = []

@@ -1,7 +1,7 @@
-const RESOURCES = 'mushafs:1;word_by_word_translations:85;word_by_word_transliterations:60'
+const RESOURCES = 'mushafs:1;word_by_word_translations:59;word_by_word_transliterations:60'
 const SNAPSHOTS = new Set([
   '/api/v4/resources/snapshots/mushafs/1',
-  '/api/v4/resources/snapshots/word_by_word_translations/85',
+  '/api/v4/resources/snapshots/word_by_word_translations/59',
   '/api/v4/resources/snapshots/word_by_word_transliterations/60',
 ])
 const ALLOWED_SYNC_KEYS = new Set(['bootstrap', 'resources', 'sync_token', 'cursor', 'per_page'])
