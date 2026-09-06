@@ -33,7 +33,8 @@ Requires Node 22+. `npm run dev` and `npm run build` copy the canonical
 `../data/quran.db` into the generated web assets. The database is committed
 once and shared with Android; it contains the reviewed repeat-aware timing
 dataset. The browser automatically fills a separate IndexedDB word/QCF cache
-from the unauthenticated Quran.com API.
+through the authenticated Quran Foundation Content Sync proxy. QF credentials
+remain in Cloudflare and are never included in the web bundle.
 
 ## Architecture
 
@@ -82,6 +83,8 @@ Engines are DOM-free and unit-tested against the Android JVM suites. See
   dual-`<audio>` transport.
 - Repeat-aware timings always come from the bundled database, so chapter open
   and repeat highlighting require no timing network request.
+- The QF word/QCF cache bootstraps once, refreshes from its saved checkpoint
+  after six days, and withholds those fields after seven days until it can sync.
 - Click a word to play from there; right-click / long-press opens the Root Word Viewer.
 - Themes: Paper / Nightfall / Royal green (Settings).
 - Form controls use [Base UI](https://base-ui.com) primitives (`Select`,

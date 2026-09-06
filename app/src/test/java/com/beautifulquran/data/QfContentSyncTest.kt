@@ -25,7 +25,6 @@ class QfContentSyncTest {
                     changes = listOf(QfContentChange.Upsert(row)),
                     nextPagePath = null,
                     nextSyncToken = "next-token",
-                    contentAgeMs = 10L,
                 ),
             ),
             snapshots = listOf(QfSnapshot(resource, listOf(row))),
@@ -35,7 +34,7 @@ class QfContentSyncTest {
 
         assertEquals(listOf(QfSyncRequest.Bootstrap(filter), QfSyncRequest.NextPage("/api/v4/resources/sync?cursor=second")), api.requests)
         assertEquals("next-token", store.savedState?.token)
-        assertEquals(32L, store.savedState?.updatedAtMs)
+        assertEquals(42L, store.savedState?.updatedAtMs)
         assertEquals(listOf(row), store.rows)
     }
 
@@ -90,24 +89,33 @@ class QfContentSyncTest {
     }
 
     @Test
-    fun `invalid provider age never advances checkpoint`() = runBlocking {
+    fun `invalid checkpoint bootstraps and atomically replaces prior rows`() = runBlocking {
         val store = FakeStore(QfSyncState(filter, "old-token", 1L))
-        val api = FakeApi(
-            pages = listOf(
-                QfSyncPage(
-                    emptyList(),
+        store.rows = listOf(row.copy(recordKey = "stale"))
+        val requests = mutableListOf<QfSyncRequest>()
+        val api = object : QfContentSyncApi {
+            override suspend fun sync(request: QfSyncRequest): QfSyncPage {
+                requests += request
+                if (request is QfSyncRequest.Incremental) throw QfResyncRequiredException()
+                return QfSyncPage(
+                    listOf(QfContentChange.Snapshot(resource, "/api/v4/resources/snapshots/recitations/7")),
                     null,
                     "new-token",
-                    QF_MAX_CACHE_AGE_MS + 1,
-                ),
-            ),
-            snapshots = emptyList(),
+                )
+            }
+
+            override suspend fun snapshot(relativePath: String) = QfSnapshot(resource, listOf(row))
+        }
+
+        QfContentSyncer(api, store) { 42L }.sync(filter)
+
+        assertEquals(
+            listOf(QfSyncRequest.Incremental(filter, "old-token"), QfSyncRequest.Bootstrap(filter)),
+            requests,
         )
-
-        runCatching { QfContentSyncer(api, store) { 42L }.sync(filter) }
-
-        assertEquals("old-token", store.savedState?.token)
-        assertEquals(1L, store.savedState?.updatedAtMs)
+        assertEquals("new-token", store.savedState?.token)
+        assertEquals(42L, store.savedState?.updatedAtMs)
+        assertEquals(listOf(row), store.rows)
     }
 
     @Test
@@ -205,6 +213,10 @@ class QfContentSyncTest {
             rows = emptyList()
         }
 
+        override fun deleteResource(resource: QfResource) {
+            rows = rows.filterNot { it.resource == resource }
+        }
+
         override fun apply(
             filter: QfResourceFilter,
             changes: List<QfContentChange>,
@@ -212,8 +224,11 @@ class QfContentSyncTest {
             nextToken: String,
             nowMs: Long,
             lastRefreshApiCalls: Long?,
+            reset: Boolean,
+            validate: () -> Unit,
         ) {
-            val result = rows.toMutableList()
+            val previous = rows
+            val result = if (reset) mutableListOf() else rows.toMutableList()
             val fetched = snapshots.iterator()
             changes.forEach { change ->
                 when (change) {
@@ -236,7 +251,13 @@ class QfContentSyncTest {
                 }
             }
             rows = result
-            savedState = QfSyncState(filter, nextToken, nowMs, lastRefreshApiCalls)
+            try {
+                validate()
+                savedState = QfSyncState(filter, nextToken, nowMs, lastRefreshApiCalls)
+            } catch (error: Exception) {
+                rows = previous
+                throw error
+            }
         }
     }
 }

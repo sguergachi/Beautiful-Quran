@@ -16,7 +16,7 @@ import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class RuntimeMushafCacheTest {
-    private val filter = QfResourceFilter("mushafs:1")
+    private val filter = QF_READER_FILTER
     private val resource = QfResource("mushafs", 1)
     private val row = QfCacheRow(
         resource, "mushaf_word", "5:2:19",
@@ -52,7 +52,8 @@ class RuntimeMushafCacheTest {
 
     @Test
     fun `expired cache is withheld while an offline refresh fails`() = runTest {
-        val store = Store(QfSyncState(filter, "old", 0L), listOf(row))
+        val supplement = row.copy(resource = WORD_SUPPLEMENT_RESOURCE)
+        val store = Store(QfSyncState(filter, "old", 0L), listOf(row, supplement))
         val cache = RuntimeMushafCache(
             failingApi(), store, backgroundScope,
             nowMs = { QF_MAX_CACHE_AGE_MS + 1 }, minimumWords = 1,
@@ -63,6 +64,7 @@ class RuntimeMushafCacheTest {
         assertEquals(RuntimeCachePhase.ERROR, cache.status().phase)
         assertFalse(cache.diagnostics.value.requestsSettled)
         assertNull(cache.word(5, 2, 19))
+        assertFalse(store.hasResource(WORD_SUPPLEMENT_RESOURCE))
     }
 
     @Test
@@ -200,6 +202,27 @@ class RuntimeMushafCacheTest {
     }
 
     @Test
+    fun `revoked QF access purges the readable cache immediately`() = runTest {
+        val store = Store(QfSyncState(filter, "old", 90L), listOf(row))
+        val cache = RuntimeMushafCache(
+            CountingApi { throw QfAccessRevokedException() },
+            store,
+            backgroundScope,
+            nowMs = { 100L },
+            minimumWords = 1,
+        )
+        assertTrue(cache.warm())
+
+        cache.refresh()
+        runCurrent()
+
+        assertNull(cache.word(5, 2, 19))
+        assertFalse(store.hasState())
+        assertFalse(store.hasResource(resource))
+        assertEquals(RuntimeCachePhase.ERROR, cache.status().phase)
+    }
+
+    @Test
     fun `six day timer refreshes a still readable cache`() = runTest {
         val store = Store(QfSyncState(filter, "old", 0L), listOf(row))
         val api = SnapshotApi()
@@ -327,12 +350,17 @@ class RuntimeMushafCacheTest {
         private var rows: List<QfCacheRow> = emptyList(),
     ) : QfContentSyncStore {
         var rowReads = 0
+        fun hasState() = state != null
+        fun hasResource(resource: QfResource) = rows.any { it.resource == resource }
         override fun state(filter: QfResourceFilter) = state?.takeIf { it.filter == filter }
         override fun rows(resource: QfResource, recordType: String, recordKeyPrefix: String?): List<QfCacheRow> {
             rowReads++
             return rows.filter { it.resource == resource && it.recordType == recordType }
         }
         override fun clear() { state = null; rows = emptyList() }
+        override fun deleteResource(resource: QfResource) {
+            rows = rows.filterNot { it.resource == resource }
+        }
         override fun apply(
             filter: QfResourceFilter,
             changes: List<QfContentChange>,
@@ -340,9 +368,18 @@ class RuntimeMushafCacheTest {
             nextToken: String,
             nowMs: Long,
             lastRefreshApiCalls: Long?,
+            reset: Boolean,
+            validate: () -> Unit,
         ) {
+            val previous = rows
             rows = snapshots.single().rows
-            state = QfSyncState(filter, nextToken, nowMs, lastRefreshApiCalls)
+            try {
+                validate()
+                state = QfSyncState(filter, nextToken, nowMs, lastRefreshApiCalls)
+            } catch (error: Exception) {
+                rows = previous
+                throw error
+            }
         }
     }
 }

@@ -119,7 +119,7 @@ class QuranRepository(
      * JVM unit tests that don't ship an override store. */
     private val timingOverrides: TimingOverrides? = null,
     private val searchConcepts: SearchConceptRepository? = null,
-    /** Quran.com word/QCF fields arrive here at runtime; the bundled database
+    /** Authenticated QF word/QCF fields arrive here at runtime; the bundled database
      * carries none of them. Null keeps this class usable from JVM unit tests
      * that don't ship a cache. */
     private val runtimeMushaf: RuntimeMushafCache? = null,

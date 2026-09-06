@@ -115,23 +115,22 @@ In a linked Git worktree it also checks the primary checkout for
 
 `tools/build_db.py` downloads Quran text, morphology, open quran-align timings,
 and QDC repeat topology, then normalizes and validates the result offline. The
-committed asset contains no Quran.com-derived word gloss, transliteration, QCF,
-or page-layout values. Android and web fetch those fields from the
-unauthenticated Quran.com API into a separate seven-day device cache.
+committed asset contains no QF word gloss, transliteration, QCF, or page-layout
+values. Android and web fetch those fields from the authenticated Quran
+Foundation Content API into a separate seven-day device cache.
 Repeat-aware timings are bundled in `quran.db`, work fully offline, and change
 only through a reviewed app release. CI (GitHub Actions) runs unit tests on
 every push; on `master`
 it also assembles the release APK and publishes it to the rolling latest release.
 
-Word/QCF download needs no build variable: released clients call
-`https://api.quran.com` automatically, refresh after six days, and withhold the
-cache after seven. A missing/expired first fill completes behind the locked
-closed-mushaf loading screen with chapter progress, while offline failure falls
-through to the independent reader. The legacy API requires a fixed-corpus
-comparison; Android only mutates cache rows that changed. Authenticated Content
-Sync can use small token-based upsert/delete deltas after bootstrap once QF
-approves an integration and provides a client-safe content path. No QF secret
-is embedded in either client.
+Released clients call the narrow Cloudflare Worker at
+`https://beautiful-quran.sguergachi.workers.dev`; it holds the QF client secret,
+obtains short-lived tokens, and exposes only the approved reader resources.
+The first authenticated Content Sync completes behind the closed-mushaf loading
+screen. Android and web then refresh from an opaque checkpoint after six days,
+apply QF's row deltas atomically, and withhold QF fields after seven days until a
+successful update. No credential is embedded in either client, and the Worker
+stores no Quran content or user data.
 
 ## Run in an Android emulator on Linux
 
@@ -219,14 +218,14 @@ If host Vulkan is broken on your machine, you can still fall back with
 - [docs/GLIMMER.md](docs/GLIMMER.md) — the Nightfall white-gold fresh-ink glimmer, repeat retriggering, halo rendering, tuning, and artifact checks
 - [docs/ROOT_VIEWER.md](docs/ROOT_VIEWER.md) — hold-to-reveal root lexicon: counts, ayah concordance, jump-to-chapter
 - [docs/TIMINGS_LAB.md](docs/TIMINGS_LAB.md) — in-app timing editor (developer mode)
-- [docs/QF_CONTENT_SYNC.md](docs/QF_CONTENT_SYNC.md) — authenticated Quran Foundation Content API migration and offline-sync gate
+- [docs/QF_CONTENT_SYNC.md](docs/QF_CONTENT_SYNC.md) — authenticated Quran Foundation Content Sync architecture and release checklist
 
 ## Data & attribution
 
 | Content | Source | License |
 |---|---|---|
 | Uthmani text + Saheeh Intl. translation | [quran-json](https://github.com/risan/quran-json) (Tanzil / Al Quran Cloud) | free with attribution |
-| Word-by-word gloss + transliteration (runtime cache only) | Quran.com API | governed by provider terms/approval |
+| Word-by-word gloss + transliteration + QCF layout (runtime cache only) | Quran Foundation authenticated Content API | governed by QF Developer Terms |
 | Root / lemma / morphology | [Quranic Arabic Corpus](http://corpus.quran.com) v0.4 | free with attribution + link |
 | Word timing clock/fallback | [cpfair/quran-align](https://github.com/cpfair/quran-align) | CC-BY 4.0 |
 | Bundled repeat topology | [quran.com](https://quran.com) legacy `qdc` audio API, normalized offline | written QF permission requested before release |

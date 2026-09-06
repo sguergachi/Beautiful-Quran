@@ -16,8 +16,9 @@ or on-device audio analysis. The offline build pipeline combines QDC repeat
 topology with quran-align's everyayah audio clock, applies every correction and
 physical gate, and ships changes only through a reviewed app release.
 
-The database deliberately excludes Quran.com word gloss, transliteration, QCF,
-and page-layout fields; those remain in the separate seven-day runtime cache.
+The database deliberately excludes QF word gloss, transliteration, QCF, and
+page-layout fields; authenticated Content Sync keeps those in the separate
+seven-day runtime cache.
 Bundling the QDC-derived topology requires written QF permission before release.
 The code architecture and that permission question are separate.
 

@@ -247,7 +247,7 @@ class AppStore {
           : progress != null && progress.completed === progress.total
             ? 'Checking Quran pages…'
             : progress
-              ? `Downloading Quran pages… ${progress.completed} of ${progress.total} chapters`
+              ? `Downloading Quran pages… ${progress.completed} of ${progress.total} requests`
           : status.apiCalls > 0
             ? `Downloading Quran pages… ${status.apiCalls} API requests`
             : 'Preparing Quran pages…'
@@ -384,7 +384,7 @@ class AppStore {
           this.set({ loadLabel: 'Loading the book…', loadProgress: null })
         }
       })
-      // Direct api.quran.com snapshot aligns onto bundled word rows.
+      // Authenticated QF resources align onto the bundled canonical word rows.
       this.set({ loadLabel: 'Preparing Quran pages…', loadProgress: null })
       await runtimeMushafCache.restore()
       const surahs = QuranRepository.surahs()

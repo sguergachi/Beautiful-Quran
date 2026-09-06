@@ -10,13 +10,14 @@ import com.beautifulquran.data.AnnotationRepository
 import com.beautifulquran.data.DictionaryDatabase
 import com.beautifulquran.data.DictionaryRepository
 import com.beautifulquran.data.EnglishBookCache
-import com.beautifulquran.data.LegacyQuranComMushafApi
 import com.beautifulquran.data.LexiconDatabase
 import com.beautifulquran.data.LexiconRepository
 import com.beautifulquran.data.QfContentCacheDatabase
+import com.beautifulquran.data.QfContentSyncHttpApi
 import com.beautifulquran.data.QuranDatabase
 import com.beautifulquran.data.QuranRepository
 import com.beautifulquran.data.RuntimeMushafCache
+import com.beautifulquran.data.readCanonicalWords
 import com.beautifulquran.data.SearchConceptRepository
 import com.beautifulquran.data.SettingsRepository
 import com.beautifulquran.ornamentslab.OrnamentSeedStore
@@ -69,7 +70,7 @@ class QuranApp : Application() {
     /** Per-reciter tarjīʿ detector knobs — applied after the Ink Lab snapshot. */
     lateinit var tarjiProfiles: ReciterTarjiProfiles
         private set
-    /** Quran.com word/QCF fields live here, never in the bundled database. */
+    /** Authenticated QF word/QCF fields live here, never in the bundled database. */
     var runtimeMushaf: RuntimeMushafCache? = null
         private set
 
@@ -81,9 +82,10 @@ class QuranApp : Application() {
         val database = QuranDatabase(this)
         val store = QfContentCacheDatabase(this)
         runtimeMushaf = RuntimeMushafCache(
-            LegacyQuranComMushafApi(database),
+            QfContentSyncHttpApi(BuildConfig.QF_CONTENT_BASE_URL),
             store,
             appScope,
+            canonicalWords = { readCanonicalWords(database) },
         )
         repository = QuranRepository(
             database,

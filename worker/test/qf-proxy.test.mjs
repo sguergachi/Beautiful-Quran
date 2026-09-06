@@ -51,15 +51,15 @@ test('retries a content request once with a replacement token after 401', async 
   assert.equal(contentRequests, 2)
 })
 
-test('reports a rejected credential request without exposing the response body', async () => {
+test('reports revoked credentials without exposing the response body', async () => {
   const proxy = createQfProxy(async () => Response.json(
     { error: 'invalid_client', leaked_detail: 'must not escape' },
     { status: 401 },
   ))
 
   const response = await proxy.fetch(new Request(`https://worker.example${bootstrap}`), env)
-  assert.equal(response.status, 503)
-  assert.deepEqual(await response.json(), { error: { code: 'qf_auth_rejected_401' } })
+  assert.equal(response.status, 403)
+  assert.deepEqual(await response.json(), { error: { code: 'qf_access_revoked' } })
 })
 
 test('rejects untrusted origins and arbitrary upstream paths without fetching', async () => {
@@ -86,6 +86,45 @@ test('allows only declared resource snapshots', async () => {
   const denied = await proxy.fetch(new Request('https://worker.example/api/v4/resources/snapshots/tafsirs/1'), env)
   assert.equal(allowed.status, 200)
   assert.equal(denied.status, 404)
+})
+
+test('allows only the fixed word supplements', async () => {
+  const proxy = createQfProxy(async (url) => {
+    if (url.includes('/oauth2/token')) return Response.json({ access_token: 'token', expires_in: 3_600 })
+    return Response.json({ verse: { verse_key: '1:1', words: [] } })
+  })
+  const allowed = await proxy.fetch(new Request(
+    'https://worker.example/api/v4/verses/by_key/1:1?words=true&language=en',
+  ), env)
+  const wrongVerse = await proxy.fetch(new Request(
+    'https://worker.example/api/v4/verses/by_key/1:2?words=true&language=en',
+  ), env)
+  const extraQuery = await proxy.fetch(new Request(
+    'https://worker.example/api/v4/verses/by_key/1:1?words=true&language=en&audio=7',
+  ), env)
+  assert.equal(allowed.status, 200)
+  assert.equal(wrongVerse.status, 404)
+  assert.equal(extraQuery.status, 404)
+})
+
+test('preserves the resync-required machine code', async () => {
+  const proxy = createQfProxy(async (url) => {
+    if (url.includes('/oauth2/token')) return Response.json({ access_token: 'token', expires_in: 3_600 })
+    return Response.json({ error: { code: 'resync_required' } }, { status: 410 })
+  })
+  const response = await proxy.fetch(new Request(`https://worker.example${bootstrap}`), env)
+  assert.equal(response.status, 410)
+  assert.deepEqual(await response.json(), { error: { code: 'resync_required' } })
+})
+
+test('turns rejected content access into the cache-purge signal', async () => {
+  const proxy = createQfProxy(async (url) => {
+    if (url.includes('/oauth2/token')) return Response.json({ access_token: 'token', expires_in: 3_600 })
+    return new Response(null, { status: 403 })
+  })
+  const response = await proxy.fetch(new Request(`https://worker.example${bootstrap}`), env)
+  assert.equal(response.status, 403)
+  assert.deepEqual(await response.json(), { error: { code: 'qf_access_revoked' } })
 })
 
 test('rejects ambiguous sync queries before contacting QF', async () => {

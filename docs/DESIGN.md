@@ -945,7 +945,7 @@ three moments:
 (The entrance is also the loading screen on both platforms: the cover is up
 from the first paint while `quran.db` opens and a missing or expired word/QCF
 cache refreshes. A narrow gold rule below the loading text shows determinate
-chapter progress for the first legacy bootstrap and a quiet travelling segment
+request progress for the first authenticated bootstrap and a quiet travelling segment
 when the provider cannot expose a total. The du'a wash and hinge open wait until the book is ready; an
 offline refresh failure releases the cover to the independent reader rather
 than trapping it. Frame insets, corner

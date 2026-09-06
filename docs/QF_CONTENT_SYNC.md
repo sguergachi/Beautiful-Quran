@@ -1,29 +1,22 @@
-# Quran Foundation application and content plan
+# Quran Foundation authenticated content integration
 
 Beautiful Quran is an independent, free, ad-free, open-source Quran reader.
-It has no accounts, analytics, developer-operated backend, or client secrets.
-This document records the exact current data flow, what is already implemented,
-and what requires written Quran Foundation (QF) approval.
-
-A checked engineering item is not evidence of permission. The project must not
-describe its legacy API access as an approved authenticated QF integration.
+Quran Foundation (QF) has issued Production content credentials for the app.
+The credentials live only in Cloudflare's encrypted Worker secret store; they
+must never be added to Git, GitHub Actions, Android, or the web bundle.
 
 Official references:
 
 - [Developer Terms](https://api-docs.quran.foundation/legal/developer-terms/)
 - [Developer Privacy Requirements](https://api-docs.quran.foundation/legal/developer-privacy/)
-- [API quickstart](https://api-docs.quran.foundation/docs/quickstart/)
 - [Manual authentication](https://api-docs.quran.foundation/docs/quickstart/manual-authentication/)
-- [Legacy API migration](https://api-docs.quran.foundation/docs/quickstart/migration/)
-- [Content Sync getting started](https://api-docs.quran.foundation/docs/tutorials/content-sync/getting-started/)
 - [Content Sync client flow](https://api-docs.quran.foundation/docs/tutorials/content-sync/client-flow/)
 - [Offline cache patterns](https://api-docs.quran.foundation/docs/tutorials/content-sync/offline-cache-patterns/)
 
-## Application URLs
+## Public application URLs
 
 | Field | Value |
 |---|---|
-| Project | Beautiful Quran |
 | Client URL | `https://sguergachi.github.io/Beautiful-Quran/` |
 | Logo URL | `https://sguergachi.github.io/Beautiful-Quran/app/apple-touch-icon.png` |
 | Privacy Policy | `https://sguergachi.github.io/Beautiful-Quran/privacy.html` |
@@ -31,181 +24,125 @@ Official references:
 | Source | `https://github.com/sguergachi/Beautiful-Quran` |
 | Contact | `sguergachi@gmail.com` and GitHub Issues |
 
-Suggested application description:
-
-> Beautiful Quran is an offline-first Quran reader whose Arabic words light up
-> in sync with recitation audio. Android and web share one reviewed local
-> database. Word gloss, transliteration, and QCF layout use an atomic client
-> cache that refreshes after six days, expires after seven days, and retries
-> when internet returns. Repeat-aware timings are normalized and verified
-> offline and distributed only through app releases. We request content-only
-> access and written guidance for this no-backend open-source architecture.
-
-## Current data flow
+## Production data flow
 
 ```text
-offline maintainer build
-  quran-align clock + legacy QDC repeat topology
-       -> clean, rebase, repair, validate
-       -> bundled quran.db -> Android + web
+Android / web
+  -> HTTPS to beautiful-quran.sguergachi.workers.dev
+     -> OAuth2 client credentials held only by Cloudflare
+     -> QF authenticated Production Content API
+        -> Content Sync: mushafs:1
+                         word_by_word_translations:59
+                         word_by_word_transliterations:60
+        -> five fixed by-verse transliteration supplements
+  -> atomic device cache + opaque sync checkpoint
 
-Android / web at runtime
-  legacy unauthenticated Quran.com chapter API
-       -> fixed 114-chapter word/QCF snapshot
-       -> atomic local cache (refresh day 6; unusable after day 7)
-
-After QF approves the Content Sync resource set, the same caches talk to the
-Cloudflare Worker in `worker/` instead of the legacy endpoint. The Worker is
-the only secret holder: it keeps the QF client secret in Cloudflare's secret
-store, caches only the short-lived OAuth token in Worker memory, proxies only
-the fixed Content Sync resource set, and stores no Quran content server-side.
-Each device keeps its own local cache and sync checkpoint. See
-`worker/README.md` for the operator setup and the pre-switch schema check.
+offline build
+  -> canonical Quran text + quran-align clock + reviewed repeat topology
+  -> bundled quran.db (no QF word gloss, transliteration, or QCF layout)
 ```
 
-The bundled database contains Quran text, morphology, an open quran-align timing
-clock/fallback, and QDC-derived repeat topology. It contains no Quran.com word
-gloss, transliteration, QCF glyph, page, line, span, or ayah-page values. The
-repeat rows never change between releases and require no client analysis.
+The Worker is a credential boundary, not a content host. It stores no Quran
+content, user data, or device cache. It caches only the short-lived OAuth token
+in memory, retries one rejected token once, streams `no-store` responses, and
+allows only the exact paths above. Browser requests are additionally restricted
+to the GitHub Pages origin. No account, reading position, bookmark, note, search
+query, analytics identifier, or device identifier is sent to the Worker or QF.
 
-The runtime word/QCF request sends no account, secret, reading position,
-bookmark, note, search query, or app-generated user identifier. Standard HTTPS
-connection data is still visible to the service receiving the request.
+The Production transliteration snapshot currently has three missing QCF word
+owners and one triplicated owner. Five small authenticated by-verse responses
+(`1:1`, `2:181`, `8:6`, `9:1`, `36:52`) supply the authoritative values for
+those affected verses. These ordinary API responses are purged if the cache
+passes one week; the three Content Sync resources retain their permitted
+offline-sync state.
 
-## Implemented engineering controls
+## Offline cache contract
 
-- [x] Android and web use the same `quran.db` and the same repeat-aware rows.
-- [x] Raw QDC is never downloaded or repaired on a user's device.
-- [x] A normal `tools/build_db.py` run preserves the reviewed repeat table
-  byte-for-byte. Refreshing QDC requires explicit `--refresh-qdc-timings`; the
-  weaker one-pass build requires explicit `--quran-align-only`.
-- [x] Full-corpus build gates enforce coverage, ordered unique starts,
-  non-overlap, positive spans, audio onset, recording duration, accepted timing
-  deltas, and exact known-repeat fixtures.
-- [x] Hani 5:2 explicitly pins both passes of words 19–22 and the handoff to 23.
-- [x] Database content changes require a version bump and SHA-256 fingerprint.
-- [x] Word/QCF content is stored separately from the committed database on both
-  platforms.
-- [x] The first word/QCF bootstrap validates all 77,429 words and 604 QCF page
-  runs before one atomic commit. The canonical/Quran.com token-boundary
-  mismatches are aligned as groups, so their glosses cannot shift onto later
-  words.
-- [x] The opening cover remains locked while a missing or expired cache is checked,
-  reports chapter progress, warms the complete local database, and then opens.
-- [x] Fresh caches make zero API calls. Refresh starts after six days; content
-  is withheld after seven days; offline failures retry when connectivity returns.
-- [x] A corrupt fresh cache is withheld and replaced in the background instead
-  of remaining unusable until its next scheduled refresh.
-- [x] Runtime cache schema v2 forces one clean bootstrap when token-boundary
-  mapping semantics change; older fresh snapshots are never reinterpreted.
-- [x] Android compares complete legacy snapshots inside one transaction and
-  mutates only added, changed, or removed rows.
-- [x] Developer Mode shows phase, age, next refresh, expiry, last failure, API
-  calls this launch, and calls made by the last successful refresh.
-- [x] Developer Mode can force the same atomic refresh while content is still
-  fresh; the legacy adapter replaces its snapshot today and the authenticated
-  adapter will issue an incremental request from the stored sync checkpoint.
-- [x] A short Android toast appears only after a successful atomic refresh.
-- [x] Privacy Policy, Terms, attribution, project URL, logo, and contact are public.
-- [x] No QF credential or secret exists in Android, web, Git, or CI.
+The implementation follows QF's recommended separate sync-state and cached-row
+tables, with a unique `(resource group, resource ID, record type, record key)`
+identity.
 
-## Approval questions and blockers
+1. A new device bootstraps the exact three-resource filter, follows QF-provided
+   relative cursors, fetches required snapshots, and fetches the five verse
+   supplements.
+2. The client joins QF rows to the 77,429 canonical word positions. Ten known
+   canonical/QCF token-boundary differences are explicit and fail closed if QF
+   changes their topology.
+3. Before publication, the client verifies all canonical words, all 6,236
+   verses, the 604-page QCF layout, and every contiguous page-font codepoint.
+4. Rows, supplements, and the final opaque checkpoint commit atomically. A
+   failed request, parse, validation, or write preserves the previous readable
+   cache and checkpoint.
+5. A normal refresh starts at day six, leaving a retry margin before the
+   seven-day limit. A current cache makes zero requests on launch. Network
+   restoration retries a failed update automatically.
+6. At day seven, QF-derived reader fields are withheld until a successful sync.
+   Non-Content-Sync supplement rows are also removed from persistent storage.
+7. A `410 resync_required` discards no readable data immediately: the client
+   obtains a fresh bootstrap, replaces cached resources inside the commit
+   transaction, validates, and only then advances the checkpoint.
 
-These need written answers before claiming compliance or releasing this data
-flow as an approved QF integration:
+The initial exchange currently uses nine requests: one sync, three snapshots,
+and five supplements. An unchanged refresh uses six: one incremental sync and
+five supplements. QF invalidations add only the affected resource snapshots;
+row changes use QF's native upsert/delete deltas. Developer Mode displays live
+progress, current phase, update/refresh/expiry times, errors, calls this launch,
+and calls made by the last successful refresh. Android shows a toast only after
+the atomic commit succeeds.
 
-1. May Beautiful Quran transform legacy QDC timing responses offline and
-   redistribute the resulting repeat-aware timing rows in its public Git
-   repository, APK, and static web database? This includes storage beyond seven
-   days and updates only through app releases.
-2. If not, may QF provide an approved downloadable/versioned timing snapshot
-   suitable for the same app-release workflow?
-3. Does the approved content product contain all required fields: word gloss,
-   transliteration, QCF V2 glyph/page/line layout, ayah page, and repeat-aware
-   per-word recitation segments for the six mapped reciters?
-4. May this no-backend project continue direct legacy word/QCF requests using
-   the implemented six-day/seven-day cache while migration is arranged?
-5. Is there a supported content authentication method for public Android and
-   browser clients that does not expose a client secret?
-6. Which attribution, branding, and source links does QF require in-app?
-7. Are email and GitHub Issues acceptable public contact methods for an
-   individual open-source maintainer without a business address?
-8. Do QF privacy rules require separate consent for notes/bookmarks that never
-   leave the device, and must Android backup be disabled for those fields?
-9. Separately from API approval, where can the project obtain written
-   redistribution permission or an official license for the bundled KFGQPC
-   Hafs and QCF V2 font files?
+## Implemented compliance controls
 
-The authenticated Content API documentation uses a client ID and client secret
-and says secrets must remain server-side. Therefore it is not a drop-in URL
-swap for a public Android/browser app. Unless QF supplies a client-safe content
-flow or grants an exception, authenticated Content API use requires the
-`worker/` proxy: Cloudflare's Git integration deploys it from this repository
-on `master`, and the QF secret is entered only in Cloudflare's secret UI —
-never in Git, CI, Android, or web. The unauthenticated endpoint remains the
-client transport until an approved Prelive sync + snapshot verifies the exact
-record schema and resource IDs (see `worker/README.md`).
+- [x] Production QF client credentials are stored only as Cloudflare secrets.
+- [x] Clients contain only the public Worker URL and never receive an OAuth
+  access token, client ID, or client secret.
+- [x] Only the minimum `content` scope and a fixed read-only endpoint allowlist
+  are used; there is no QF user login or user-data scope.
+- [x] QF content is displayed only in the reader and is not sold, sublicensed,
+  exposed as raw data, indexed, used for advertising, or used to train models.
+- [x] `quran.db`, the APK, Git source, and the Pages artifact contain no QF word
+  gloss, transliteration, QCF glyph, QCF page/line, span, or ayah-page values.
+- [x] Android stores QF rows in `noBackupFilesDir/qf-content-cache.db`; web uses
+  IndexedDB. Neither cache is committed or included in a release artifact.
+- [x] Content Sync checkpoints, idempotent mutations, relative paths, snapshot
+  replacement, transaction rollback, invalidation, and resync are implemented.
+- [x] Explicit QF access rejection is propagated as a cache-purge signal; both
+  clients delete all retained QF rows and the checkpoint immediately.
+- [x] The six-day refresh and seven-day withholding/purge behavior is automatic.
+- [x] Public Privacy Policy and Terms identify QF and the Cloudflare processor.
+- [x] Worker and client tests verify allowlists, secret non-disclosure, token
+  retry, API-call accounting, offline behavior, atomic rollback, topology, and
+  QCF glyph-run integrity.
 
-## Work after QF responds
+## Release and maintenance checklist
 
-### If QF approves the no-backend architecture
+- [ ] Merge the Worker/client change and verify the stable Production Worker
+  returns `{"ok":true,"environment":"production"}`.
+- [ ] On a clean Android install and clean browser profile, complete one live
+  bootstrap, open representative QCF pages, and verify word gloss and
+  transliteration fidelity. Relaunch and confirm zero API calls.
+- [ ] Force a refresh on each client and confirm the stored checkpoint is used,
+  unchanged content remains readable, and the call counter reports six.
+- [ ] Watch QF's update/deprecation notices and migrate within the announced
+  window. Re-run the full-corpus mapper whenever resource schemas change.
+- [ ] Rotate the Cloudflare secret immediately after any suspected exposure and
+  update the Worker without recording the value in an issue, log, or screenshot.
+- [ ] On voluntary termination, deploy the revocation response before disabling
+  the Worker so installed clients purge their QF caches; access rejection from
+  QF already triggers the same immediate purge automatically.
+- [ ] Retain architecture and redacted operational evidence needed for a QF
+  compliance audit; report any suspected API security incident within 24 hours.
 
-- [ ] Save the written permission and its exact scope with the release records.
-- [ ] Map approved resource IDs and JSON fields using prelive responses.
-- [ ] Replace the legacy word/QCF transport only if QF supplies a client-safe
-  method; keep the existing cache database and atomic sync contract.
-- [ ] Rebuild repeat timings from the approved snapshot, compare every row
-  against the current database, resolve all rejected deltas, bump the DB version
-  and fingerprint, and publish an app update.
-- [ ] Implement any QF-provided version/change check needed between app releases.
-- [ ] Update Privacy, Terms, attribution, provenance, and effective dates with
-  the approved source and exact retention agreement.
-- [ ] Add any required consent/withdrawal and local content-deletion controls.
+## Separate unresolved content questions
 
-### If QF requires authenticated server-side access
+Authenticated word/QCF caching does not resolve two independently sourced
+release questions:
 
-- [x] Decided explicitly: the project operates no database-backed backend. The
-  only server-side piece is the free Cloudflare Worker in `worker/` — no QF
-  content stored, no paid hosting. Without it, the authenticated integration
-  cannot ship under the documented secret model.
-- [x] Proxy contract in-repo: fixed Content Sync resource set, short-lived
-  token cached in Worker memory, one 401 retry with a replacement token,
-  origin allowlist, relative-path allowlist, `no-store` responses, and
-  `node --test worker/test/` green in CI.
-- [ ] Operator steps (in Cloudflare, never in this repo): connect the Git
-  integration so `master` deploys the Worker; enter the rotated
-  `QF_CLIENT_ID` / `QF_CLIENT_SECRET` in the Prelive environment secret
-  store; visit `/healthz` and expect `{ "ok": true }` without touching QF.
-- [ ] Capture one approved Prelive sync + snapshot through the Worker and
-  verify its record schema and resource IDs before changing either client
-  mapper; then each client joins the three local resources atomically.
-- [ ] If accepted, document the host and processor, TLS, encryption at rest,
-  secret manager, least-privilege access, rate limits, monitoring, backups,
-  purge, incident reporting, and privacy-policy changes before traffic begins.
-- [ ] Keep the QF client ID/secret server-side, use only approved content scope,
-  cache access tokens for their lifetime, and retry a `401` at most once after
-  refreshing the token.
-- [ ] Replace the transitional combined `mushafs:1` row mapper with the exact
-  approved multi-resource filter. Current QF documentation separates Mushaf
-  positioned words, word translations, and word transliterations into
-  `mushafs`, `word_by_word_translations`, and
-  `word_by_word_transliterations`; those snapshots must be joined by stable
-  word identity and validated as one complete reader view before publication.
-- [x] Confirm the production resource IDs from the live resource catalog and
-  authenticated snapshots: English word translation `59`, transliteration
-  `60`, and QCF V2 Mushaf `1`. The documentation's illustrative translation
-  ID `85` is not present in the production snapshot service.
-- [ ] Implement Content Sync bootstrap, relative cursors, snapshots, atomic
-  upsert/delete application, opaque checkpoints, `resync_required`, termination
-  purge, and seven-day freshness without stacking server and client TTLs.
-- [ ] Add integration tests against QF prelive for pagination, token rollback,
-  duplicate delivery, invalidation, partial failure, expiry, and revocation.
+1. `quran.db` contains repeat topology derived offline from the legacy QDC audio
+   endpoint and updated only through app releases. Obtain written QF permission
+   to redistribute that derived dataset, or ship the quran-align-only fallback.
+2. Content Sync's offline exception does not license Mushaf font files or page
+   images. Keep or distribute KFGQPC/QCF font assets only under permission from
+   the provider identified by QF's Mushaf Fonts and Images documentation.
 
-## Release decision
-
-Technically, the repository is ready for the proposed offline experience: the
-repeat dataset is bundled and verified, and word/QCF content uses the seven-day
-client cache. Legally/contractually, public redistribution of the QDC-derived
-repeat dataset remains blocked on written QF permission. If permission is denied
-or conditioned on a backend the project will not operate, ship the explicit
-quran-align-only database instead and disable the unsupported fields.
+These questions do not change the authenticated runtime cache architecture, but
+they remain release/compliance gates for the corresponding bundled assets.

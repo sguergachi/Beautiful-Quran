@@ -428,7 +428,7 @@ export function SettingsScreen({
             <p className="settings-caption">Tools for testing work in progress.</p>
 
             <div className="settings-dev-block">
-              <p>Quran.com word &amp; QCF cache</p>
+              <p>Quran Foundation word &amp; QCF cache</p>
               <p className="settings-caption">
                 {formatRuntimeCache(runtimeCacheStatus)}
               </p>
@@ -443,8 +443,8 @@ export function SettingsScreen({
                   : 'Force seven-day cache update'}
               </button>
               <p className="settings-caption">
-                Forces the same atomic update used when the cache is due. The current
-                provider downloads a snapshot; authenticated Content Sync will use its checkpoint.
+                Forces the authenticated Content Sync used when the cache is due.
+                Only QF changes are applied from the saved checkpoint.
               </p>
             </div>
 

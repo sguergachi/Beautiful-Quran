@@ -220,7 +220,7 @@ class MainActivity : ComponentActivity() {
                         mushafProgress != null && mushafProgress.completed == mushafProgress.total ->
                             "Checking Quran pages"
                         mushafProgress != null ->
-                            "Downloading Quran pages · ${mushafProgress.completed} of ${mushafProgress.total} chapters"
+                            "Downloading Quran pages · ${mushafProgress.completed} of ${mushafProgress.total} requests"
                         mushafStatus.apiCalls > 0 ->
                             "Downloading Quran pages · ${mushafStatus.apiCalls} API requests"
                         else -> "Preparing Quran pages"

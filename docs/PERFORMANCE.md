@@ -250,11 +250,9 @@ janky", first ask: is this the release APK?
   process-lifetime word and per-surah lookup maps, so no chapter pays that cost.
   Web's sql.js database already retains the complete fetched buffer. Do not
   create additional per-screen copies of either cache.
-- A provider full snapshot is compared with the Android QF cache in memory and
-  only changed row identities are mutated in the transaction. This preserves
-  atomic replacement semantics without deleting and reinserting 77,429
-  unchanged rows on a legacy six-day comparison; authenticated Content Sync
-  normally supplies the smaller upsert/delete set directly.
+- A QF invalidation snapshot is compared with the Android cache in memory and
+  only changed row identities are mutated in the transaction. Normal refreshes
+  use Content Sync's smaller native upsert/delete set directly.
 - A surah loads with exactly three queries (ayahs, words, timings) — no
   per-ayah round trips. Timings for one reciter+surah arrive as one query of
   compact JSON rows.

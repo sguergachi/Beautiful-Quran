@@ -1,312 +1,230 @@
 import { describe, expect, it } from 'vitest'
 import {
-  RuntimeMushafCache,
   QF_MAX_CACHE_AGE_MS,
   QF_REVALIDATE_AFTER_MS,
-  assertQcfV2Runs,
-  normalizeLegacyMushaf,
+  RuntimeMushafCache,
   type RuntimeMushafStore,
   type StoredMushaf,
 } from './runtimeMushaf'
 
-const record = {
-  record_type: 'mushaf_word' as const,
-  record_key: '5:2:19', surah_id: 5, ayah_number: 2, position: 19,
-  translation_en: 'seeking', transliteration: 'yabtaghūna', qcf_v2: 'x',
-  qcf_page: 106, qcf_line: 12, qcf_span_end: 19, ayah_page: 106,
-}
-
 const canonical = new Map([['5:1', ['يَـٰٓأَيُّهَا', 'ٱلَّذِينَ']]])
-const legacyVerse = {
-  verse_key: '5:1', page_number: 106,
-  words: [
-    { char_type_name: 'word', text_uthmani: 'يَـٰٓأَيُّهَا', code_v2: '\uFC41', page_number: 106, line_number: 8, translation: { text: 'O' }, transliteration: { text: 'yāayyuhā' } },
-    { char_type_name: 'word', text_uthmani: 'ٱلَّذِينَ', code_v2: '\uFC42', page_number: 106, line_number: 8, translation: { text: 'you who' }, transliteration: { text: 'alladhīna' } },
-    { char_type_name: 'end', code_v2: '\uFC43' },
-  ],
-}
+const qcfRecords = [
+  { id: 1, record_type: 'mushaf', pages_count: 1, lines_per_page: 15 },
+  { id: 2, record_type: 'mushaf_page', page_number: 106 },
+  { id: 3, record_type: 'mushaf_word', verse_id: 1, word_id: 10, text: '\uFC41', char_type_name: 'word', page_number: 106, line_number: 8, position_in_verse: 1 },
+  { id: 4, record_type: 'mushaf_word', verse_id: 1, word_id: 11, text: '\uFC42', char_type_name: 'word', page_number: 106, line_number: 8, position_in_verse: 2 },
+  { id: 5, record_type: 'mushaf_word', verse_id: 1, word_id: 12, text: '\uFC43', char_type_name: 'end', page_number: 106, line_number: 8, position_in_verse: 3 },
+]
+const translationRecords = [
+  { id: 10, word_id: 10, text: 'O' },
+  { id: 11, word_id: 11, text: 'you who' },
+]
+const transliterationRecords = [
+  { id: 10, word_id: 10, text: 'yāayyuhā' },
+  { id: 11, word_id: 11, text: 'alladhīna' },
+]
 
 class Store implements RuntimeMushafStore {
   value: StoredMushaf | null = null
   async get() { return this.value }
-  async put(value: StoredMushaf) { this.value = value }
+  async put(value: StoredMushaf) { this.value = structuredClone(value) }
+  async clear() { this.value = null }
 }
 
-function jsonResponse(body: unknown) {
-  return new Response(JSON.stringify(body), {
-    status: 200,
-    headers: { 'content-type': 'application/json' },
-  })
+function response(body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } })
 }
 
-function contentFetcher(calls?: string[]) {
+function fetcher(
+  calls: string[],
+  options: {
+    accessRevoked?: boolean
+    invalidMushaf?: boolean
+    invalidateMushaf?: boolean
+    resyncOnce?: boolean
+  } = {},
+) {
+  let rejected = false
   return async (input: RequestInfo | URL) => {
-    const path = String(input)
-    calls?.push(path)
-    return jsonResponse(path.includes('/snapshots/') ? {
-      schema_version: 1, resource_group: 'mushafs', resource_id: 1, records: [record],
-    } : {
-      sync: {
-        mutations: [{
-          type: 'RESOURCE_CREATE', snapshot_url: '/api/v4/resources/snapshots/mushafs/1',
-        }],
-        next_page_url: null, next_sync_token: 'token', content_age_ms: 0,
-      },
-    })
+    const url = String(input)
+    calls.push(url)
+    if (options.accessRevoked && url.includes('sync_token=')) {
+      return response({ error: { code: 'qf_access_revoked' } }, 403)
+    }
+    if (options.resyncOnce && url.includes('sync_token=') && !rejected) {
+      rejected = true
+      return response({ error: { code: 'resync_required' } }, 410)
+    }
+    if (url.includes('/resources/sync')) {
+      const bootstrap = url.includes('bootstrap=true')
+      return response({ sync: {
+        has_more: false,
+        next_page_url: null,
+        next_sync_token: bootstrap ? 'boot-token' : 'next-token',
+        mutations: bootstrap ? [
+          mutation('mushafs', 1),
+          mutation('word_by_word_translations', 59),
+          mutation('word_by_word_transliterations', 60),
+        ] : options.invalidateMushaf ? [{ ...mutation('mushafs', 1), type: 'RESOURCE_INVALIDATE' }] : [],
+      } })
+    }
+    if (url.includes('/snapshots/mushafs/1')) return response(snapshot(
+      'mushafs', 1, options.invalidMushaf ? qcfRecords.slice(0, -1) : qcfRecords,
+    ))
+    if (url.includes('/snapshots/word_by_word_translations/59')) {
+      return response(snapshot('word_by_word_translations', 59, translationRecords))
+    }
+    if (url.includes('/snapshots/word_by_word_transliterations/60')) {
+      return response(snapshot('word_by_word_transliterations', 60, transliterationRecords))
+    }
+    const verseKey = url.match(/by_key\/(\d+:\d+)/)?.[1]
+    if (verseKey) return response({ verse: {
+      verse_key: verseKey,
+      words: [{ id: 1000 + calls.length, char_type_name: 'word', transliteration: { text: 'safe' } }],
+    } })
+    throw new Error(`Unexpected URL ${url}`)
   }
 }
 
+function mutation(group: string, id: number) {
+  return {
+    type: 'RESOURCE_CREATE', resource_group: group, resource_id: id,
+    snapshot_url: `/api/v4/resources/snapshots/${group}/${id}`,
+  }
+}
+
+function snapshot(group: string, id: number, records: unknown[]) {
+  return { schema_version: 1, resource_group: group, resource_id: id, records }
+}
+
+async function seeded(now = 100) {
+  const store = new Store()
+  const calls: string[] = []
+  const cache = new RuntimeMushafCache(
+    'https://content.example', store, fetcher(calls) as typeof fetch,
+    () => now, 2, () => canonical, [106],
+  )
+  expect(await cache.refresh()).toBe(true)
+  return { store, calls, cache }
+}
+
 describe('RuntimeMushafCache', () => {
-  it('aligns and caches a legacy Quran.com verse without bundled provider fields', () => {
-    const records = normalizeLegacyMushaf(canonical, new Map([[5, [legacyVerse]]]))
+  it('bootstraps three QF resources and publishes one atomic reader view', async () => {
+    const { cache, store, calls } = await seeded()
 
-    expect(records.map((row) => row.record_key)).toEqual(['5:1:1', '5:1:2'])
-    expect(records[1]).toMatchObject({ qcf_v2: '\uFC42 \uFC43', qcf_page: 106, ayah_page: 106 })
-  })
-
-  it('keeps glosses aligned when canonical and provider token boundaries differ', () => {
-    const fusedCanonical = new Map([['36:22', ['وَمَالِيَ', 'لَآ']]])
-    const records = normalizeLegacyMushaf(fusedCanonical, new Map([[36, [{
-      verse_key: '36:22', page_number: 442,
-      words: [
-        { char_type_name: 'word', text_uthmani: 'وَمَا', code_v2: '\uFC41', page_number: 442, line_number: 4, translation: { text: 'And what' }, transliteration: { text: 'wamā' } },
-        { char_type_name: 'word', text_uthmani: 'لِىَ', code_v2: '\uFC42', page_number: 442, line_number: 4, translation: { text: '(is) for me' }, transliteration: { text: 'liya' } },
-        { char_type_name: 'word', text_uthmani: 'لَآ', code_v2: '\uFC43', page_number: 442, line_number: 4, translation: { text: 'not' }, transliteration: { text: 'lā' } },
-      ],
-    }]]]))
-
-    expect(records[0]).toMatchObject({ translation_en: 'And what (is) for me', transliteration: 'wamā liya' })
-    expect(records[1]).toMatchObject({ translation_en: 'not', transliteration: 'lā' })
-  })
-
-  it('rejects a verse_key that only shares a prefix with the requested surah', () => {
-    expect(() => normalizeLegacyMushaf(canonical, new Map([[5, [{
-      ...legacyVerse, verse_key: '50:1',
-    }]]]))).toThrow('Legacy verse key mismatch')
-  })
-
-  it('rejects a glyph outside the page font run', () => {
-    const rows = normalizeLegacyMushaf(canonical, new Map([[5, [legacyVerse]]]))
-    rows[0]!.qcf_v2 = '\uFC42'
-
-    expect(() => assertQcfV2Runs(rows, [106])).toThrow('expected U+FC41')
-  })
-
-  it('withholds a miss then installs one complete atomic snapshot', async () => {
-    const store = new Store()
-    const cache = new RuntimeMushafCache(
-      'https://content.example', store, contentFetcher() as typeof fetch, () => 100, 1,
-    )
-    expect(cache.word(5, 2, 19)).toBeNull()
-    await cache.refresh()
-    expect(cache.word(5, 2, 19)?.translation_en).toBe('seeking')
-    expect(cache.status().apiCalls).toBe(2)
-  })
-
-  it('manual refresh forces the atomic update while cache is fresh', async () => {
-    const store = new Store()
-    store.value = { id: 1, token: 'old', updatedAtMs: 90, records: [record] }
-    const calls: string[] = []
-    const cache = new RuntimeMushafCache(
-      'https://content.example', store, contentFetcher(calls) as typeof fetch, () => 100, 1,
-    )
-
-    await cache.restore()
-    expect(cache.status().apiCalls).toBe(0)
-    expect(await cache.refresh()).toBe(true)
-    expect(cache.status().apiCalls).toBe(2)
-    expect(calls[0]).toContain('sync_token=old')
-    expect(calls[0]).not.toContain('bootstrap=true')
-    expect(store.value?.token).toBe('token')
-    expect(cache.word(5, 2, 19)?.translation_en).toBe('seeking')
-  })
-
-  it('keeps the prior cache when a replacement snapshot is incomplete', async () => {
-    const store = new Store()
-    store.value = { id: 1, token: 'old', updatedAtMs: 90, records: [record] }
-    const fetcher = async (input: RequestInfo | URL) => {
-      const path = String(input)
-      if (path.includes('/snapshots/')) {
-        return jsonResponse({
-          schema_version: 1, resource_group: 'mushafs', resource_id: 1, records: [],
-        })
-      }
-      return jsonResponse({
-        sync: {
-          mutations: [{
-            type: 'RESOURCE_INVALIDATE', snapshot_url: '/api/v4/resources/snapshots/mushafs/1',
-          }],
-          next_page_url: null, next_sync_token: 'new', content_age_ms: 0,
-        },
-      })
-    }
-    const cache = new RuntimeMushafCache(
-      'https://content.example', store, fetcher as typeof fetch, () => 100, 1,
-    )
-
-    await cache.restore()
-    expect(await cache.refresh()).toBe(false)
-    expect(store.value?.token).toBe('old')
-    expect(cache.word(5, 2, 19)?.translation_en).toBe('seeking')
-  })
-
-  it('withholds an expired cache while an offline refresh fails', async () => {
-    const store = new Store()
-    store.value = { id: 1, token: 'old', updatedAtMs: 0, records: [record] }
-    const offline = async () => { throw new Error('offline') }
-    const cache = new RuntimeMushafCache(
-      'https://content.example', store, offline as typeof fetch,
-      () => QF_MAX_CACHE_AGE_MS + 1, 1,
-    )
-
-    await cache.restore()
-    expect(cache.word(5, 2, 19)).toBeNull()
-    expect(await cache.refresh()).toBe(false)
-    expect(cache.word(5, 2, 19)).toBeNull()
-  })
-
-  it('keeps a six day cache readable while an offline refresh fails', async () => {
-    const store = new Store()
-    store.value = { id: 1, token: 'old', updatedAtMs: 0, records: [record] }
-    const offline = async () => { throw new Error('offline') }
-    const cache = new RuntimeMushafCache(
-      'https://content.example', store, offline as typeof fetch,
-      () => QF_REVALIDATE_AFTER_MS + 1, 1,
-    )
-
-    await cache.restore()
-    expect(cache.word(5, 2, 19)?.translation_en).toBe('seeking')
-    expect(await cache.refresh()).toBe(false)
-    expect(cache.word(5, 2, 19)?.translation_en).toBe('seeking')
-  })
-
-  it('calls unauthenticated api.quran.com without CORS-preflight cache headers', async () => {
-    const store = new Store()
-    const calls: { url: string; init?: RequestInit }[] = []
-    const fetcher = async (input: RequestInfo | URL, init?: RequestInit) => {
-      calls.push({ url: String(input), init })
-      return jsonResponse({ verses: [legacyVerse], pagination: { next_page: null } })
-    }
-    const cache = new RuntimeMushafCache(
-      'https://api.quran.com', store, fetcher as typeof fetch, () => 100, 1, () => canonical, [106],
-    )
-
-    expect(cache.word(5, 1, 2)).toBeNull()
-    expect(await cache.refresh()).toBe(true)
-    expect(cache.word(5, 1, 2)).toMatchObject({ qcf_v2: '\uFC42 \uFC43', translation_en: 'you who' })
-    expect(cache.status().apiCalls).toBe(1)
-    expect(calls).toHaveLength(1)
-    expect(calls[0]!.url).toBe(
-      'https://api.quran.com/api/v4/verses/by_chapter/5?words=true&per_page=50&page=1' +
-        '&word_fields=location,line_number,char_type_name,code_v2,text_uthmani,page_number&_=100',
-    )
-    expect(calls[0]!.init?.headers).toEqual({ accept: 'application/json' })
-    expect(calls[0]!.init?.cache).toBeUndefined()
-    expect(JSON.stringify(calls[0]!.init?.headers ?? {})).not.toMatch(/cache-control/i)
-  })
-
-  it('counts every Quran.com page and retries after coming online', async () => {
-    const store = new Store()
-    const twoAyahs = new Map(canonical)
-    twoAyahs.set('5:2', ['ءَامَنُوا۟'])
-    let online = false
-    const fetcher = async (input: RequestInfo | URL) => {
-      if (!online) throw new Error('offline')
-      const page = new URL(String(input)).searchParams.get('page')
-      if (page === '1') {
-        return jsonResponse({ verses: [legacyVerse], pagination: { next_page: 2 } })
-      }
-      return jsonResponse({
-        verses: [{
-          verse_key: '5:2', page_number: 106,
-          words: [
-            { char_type_name: 'word', text_uthmani: 'ءَامَنُوا۟', code_v2: '\uFC44', page_number: 106, line_number: 8, translation: { text: 'believe' }, transliteration: { text: 'āmanū' } },
-            { char_type_name: 'end', code_v2: '\uFC45' },
-          ],
-        }],
-        pagination: { next_page: null },
-      })
-    }
-    const cache = new RuntimeMushafCache(
-      'https://api.quran.com', store, fetcher as typeof fetch, () => 100, 1, () => twoAyahs, [106],
-    )
-
-    expect(await cache.refresh()).toBe(false)
-    expect(cache.status().phase).toBe('error')
-    expect(cache.status().apiCalls).toBe(1)
-    expect(cache.status().lastError).toBe('offline')
-
-    online = true
-    expect(await cache.refreshIfNeeded()).toBe(true)
     expect(cache.word(5, 1, 1)?.translation_en).toBe('O')
     expect(cache.word(5, 1, 2)?.qcf_v2).toBe('\uFC42 \uFC43')
-    expect(cache.word(5, 2, 1)?.qcf_v2).toBe('\uFC44 \uFC45')
-    expect(cache.status().apiCalls).toBe(3)
-    expect(store.value?.token).toBe('legacy-100')
+    expect(store.value?.resources).toHaveLength(4)
+    expect(cache.status().apiCalls).toBe(9)
+    expect(cache.status().lastRefreshApiCalls).toBe(9)
+    expect(calls[0]).toContain('word_by_word_translations%3A59')
   })
 
-  it('does not query bundled rows until restore runs after the database is ready', async () => {
-    const store = new Store()
-    let loaded = 0
-    const loadCanonical = () => {
-      loaded += 1
-      return canonical
-    }
+  it('restores a fresh complete cache with zero API calls', async () => {
+    const first = await seeded()
+    const calls: string[] = []
     const cache = new RuntimeMushafCache(
-      'https://api.quran.com', store,
-      (async () => jsonResponse({ verses: [legacyVerse], pagination: { next_page: null } })) as typeof fetch,
-      () => 100, 1, loadCanonical, [106],
+      'https://content.example', first.store, fetcher(calls) as typeof fetch,
+      () => 101, 2, () => canonical, [106],
     )
 
-    expect(loaded).toBe(0)
-    const restored = cache.restore()
-    expect(loaded).toBe(0)
-    await restored
-    expect(loaded).toBe(1)
+    await cache.restore()
+
+    expect(cache.word(5, 1, 2)?.translation_en).toBe('you who')
+    expect(cache.status().apiCalls).toBe(0)
+    expect(calls).toHaveLength(0)
+  })
+
+  it('uses the checkpoint and makes only six calls when content is unchanged', async () => {
+    const { cache, calls, store } = await seeded()
+    calls.length = 0
+
+    expect(await cache.refresh()).toBe(true)
+
+    expect(calls).toHaveLength(6)
+    expect(calls[0]).toContain('sync_token=boot-token')
+    expect(store.value?.token).toBe('next-token')
+    expect(cache.status().lastRefreshApiCalls).toBe(6)
+  })
+
+  it('bootstraps again when QF rejects an old checkpoint', async () => {
+    const first = await seeded()
+    const calls: string[] = []
+    const cache = new RuntimeMushafCache(
+      'https://content.example', first.store, fetcher(calls, { resyncOnce: true }) as typeof fetch,
+      () => QF_REVALIDATE_AFTER_MS + 101, 2, () => canonical, [106],
+    )
+
+    await cache.restore()
+
+    expect(calls[0]).toContain('sync_token=boot-token')
+    expect(calls.some((url) => url.includes('bootstrap=true'))).toBe(true)
     expect(cache.word(5, 1, 1)?.translation_en).toBe('O')
   })
 
-  it('keeps initial restore pending until a missing cache is installed', async () => {
-    let markStarted!: () => void
-    const started = new Promise<void>((resolve) => { markStarted = resolve })
-    let release!: () => void
-    const fetcher = () => new Promise<Response>((resolve) => {
-      markStarted()
-      release = () => resolve(jsonResponse({ verses: [legacyVerse], pagination: { next_page: null } }))
-    })
+  it('keeps the prior cache when replacement data fails validation', async () => {
+    const first = await seeded()
+    const calls: string[] = []
     const cache = new RuntimeMushafCache(
-      'https://api.quran.com', new Store(), fetcher as typeof fetch,
-      () => 100, 1, () => canonical, [106],
+      'https://content.example', first.store,
+      fetcher(calls, { invalidMushaf: true, invalidateMushaf: true }) as typeof fetch,
+      () => 101, 2, () => canonical, [106],
     )
-    let settled = false
+    await cache.restore()
 
-    const restoring = cache.restore().then(() => { settled = true })
-    await started
-    expect(settled).toBe(false)
-    expect(cache.status().phase).toBe('refreshing')
-    expect(cache.status().apiCalls).toBe(1)
-    expect(cache.haveRequestsSettled()).toBe(false)
-    expect(cache.downloadProgress()).toEqual({ completed: 0, total: 1, fraction: 0 })
-
-    release()
-    await restoring
-    expect(settled).toBe(true)
-    expect(cache.haveRequestsSettled()).toBe(true)
-    expect(cache.downloadProgress()).toEqual({ completed: 1, total: 1, fraction: 1 })
+    expect(await cache.refresh()).toBe(false)
+    expect(first.store.value?.token).toBe('boot-token')
     expect(cache.word(5, 1, 1)?.translation_en).toBe('O')
   })
 
-  it('leaves Content Sync URLs un-bust so a future QF host stays on that protocol', async () => {
-    const urls: string[] = []
-    const fetcher = async (input: RequestInfo | URL) => {
-      urls.push(String(input))
-      return contentFetcher()(input)
-    }
+  it('withholds an expired cache while offline', async () => {
+    const first = await seeded(0)
+    const offline = async () => { throw new Error('offline') }
     const cache = new RuntimeMushafCache(
-      'https://content.example', new Store(), fetcher as typeof fetch, () => 100, 1,
+      'https://content.example', first.store, offline as typeof fetch,
+      () => QF_MAX_CACHE_AGE_MS + 1, 2, () => canonical, [106],
     )
-    await cache.refresh()
-    expect(urls.every((url) => !url.includes('_='))).toBe(true)
-    expect(urls[0]).toContain('/api/v4/resources/sync?bootstrap=true')
+
+    await cache.restore()
+
+    expect(cache.word(5, 1, 1)).toBeNull()
+    expect(cache.status().phase).toBe('error')
+    expect(first.store.value?.records).toHaveLength(0)
+    expect(first.store.value?.resources.some((row) => row.resourceGroup === 'word_supplements')).toBe(false)
+  })
+
+  it('keeps a six-day cache readable when refresh is offline', async () => {
+    const first = await seeded(0)
+    const offline = async () => { throw new Error('offline') }
+    const cache = new RuntimeMushafCache(
+      'https://content.example', first.store, offline as typeof fetch,
+      () => QF_REVALIDATE_AFTER_MS + 1, 2, () => canonical, [106],
+    )
+
+    await cache.restore()
+
+    expect(cache.word(5, 1, 1)?.translation_en).toBe('O')
+    expect(cache.status().phase).toBe('error')
+  })
+
+  it('purges readable QF content when access is revoked', async () => {
+    const first = await seeded()
+    const calls: string[] = []
+    const cache = new RuntimeMushafCache(
+      'https://content.example', first.store, fetcher(calls, { accessRevoked: true }) as typeof fetch,
+      () => QF_REVALIDATE_AFTER_MS + 101, 2, () => canonical, [106],
+    )
+
+    await cache.restore()
+
+    expect(first.store.value).toBeNull()
+    expect(cache.word(5, 1, 1)).toBeNull()
+    expect(cache.status().phase).toBe('error')
+  })
+
+  it('never exposes authentication material in client requests', async () => {
+    const { calls } = await seeded()
+    expect(calls.every((url) => !url.includes('_='))).toBe(true)
+    expect(calls.every((url) => !/client_secret|access_token/i.test(url))).toBe(true)
   })
 })

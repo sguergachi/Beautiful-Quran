@@ -110,7 +110,7 @@ private val ATTRIBUTIONS = """
 Quran text (Uthmani script) and Saheeh International translation via the
 quran-json project, from Tanzil and Al Quran Cloud.
 
-Word-by-word translation and transliteration from the Quran.com dataset.
+Word-by-word translation, transliteration, and QCF layout from Quran Foundation.
 
 Root, lemma, and morphological annotation from the Quranic Arabic Corpus (corpus.quran.com), © Kais Dukes.
 
@@ -1518,12 +1518,12 @@ internal val ThemeMode.label: String
 @Composable
 private fun MushafRuntimeCacheStatus(cache: RuntimeMushafCache?) {
     Text(
-        text = "Quran.com word & QCF cache",
+        text = "Quran Foundation word & QCF cache",
         style = MaterialTheme.typography.bodyLarge,
         color = MaterialTheme.colorScheme.onSurface,
     )
     if (cache == null) {
-        Caption("Unavailable · Quran.com-derived fields withheld")
+        Caption("Unavailable · QF-provided fields withheld")
         return
     }
     val diagnostics by cache.diagnostics.collectAsStateWithLifecycle()
@@ -1541,7 +1541,7 @@ private fun MushafRuntimeCacheStatus(cache: RuntimeMushafCache?) {
         RuntimeCachePhase.EMPTY -> "Empty · downloading when online"
         RuntimeCachePhase.FRESH -> "Fresh · refresh ${cacheCountdown(status.refreshAtMs, now)}"
         RuntimeCachePhase.REFRESH_DUE -> "Refresh due · retrying in the background"
-        RuntimeCachePhase.EXPIRED -> "Expired · Quran.com-derived fields withheld"
+        RuntimeCachePhase.EXPIRED -> "Expired · QF-provided fields withheld"
         RuntimeCachePhase.REFRESHING -> "Refreshing in the background"
         RuntimeCachePhase.ERROR -> "Refresh failed · retrying when internet returns"
     }
@@ -1572,8 +1572,8 @@ private fun MushafRuntimeCacheStatus(cache: RuntimeMushafCache?) {
         ),
     )
     Caption(
-        "Forces the same atomic update used when the cache is due. The current " +
-            "provider downloads a snapshot; authenticated Content Sync will use its checkpoint.",
+        "Forces the authenticated Content Sync used when the cache is due. " +
+            "Only QF changes are applied from the saved checkpoint.",
     )
 }
 

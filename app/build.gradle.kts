@@ -29,6 +29,8 @@ fun findReleaseKeystore(): File {
 }
 
 val releaseKeystore = findReleaseKeystore()
+val qfContentBaseUrl = providers.gradleProperty("qfContentBaseUrl")
+    .getOrElse("https://beautiful-quran.sguergachi.workers.dev")
 
 // The mushaf is the QCF V2 page faces or it is nothing: a build that ships
 // without all 604 renders every leaf in the fallback Hafs face, which is the
@@ -58,6 +60,7 @@ android {
         targetSdk = 37
         versionCode = 8
         versionName = "0.7"
+        buildConfigField("String", "QF_CONTENT_BASE_URL", "\"$qfContentBaseUrl\"")
     }
 
     signingConfigs {

@@ -16,10 +16,10 @@ viewer, and a PWA shell. Production build is published to GitHub Pages at
 below remain the design record and quality bar.
 
 The current data layer mirrors Android: reviewed repeat-aware timings live in
-the shared database, while Quran.com word/QCF fields live in a separate
-IndexedDB cache with six-day revalidation, a seven-day hard freshness limit,
-and automatic retry when the browser comes back online. Developer Mode exposes
-that cache's state, refresh/expiry times, and session API-call count.
+the shared database, while authenticated Quran Foundation word/QCF fields live
+in a separate IndexedDB cache with six-day revalidation, a seven-day hard
+freshness limit, and automatic retry when the browser comes back online.
+Developer Mode exposes that cache's state, refresh/expiry times, and API calls.
 
 The reader also treats its focused ayah as a keyboard cursor: Up/Down move one
 ayah, Page Up/Down move five, Home/End reach chapter bounds, Space toggles

@@ -38,12 +38,12 @@ class QfContentCacheDatabase(context: Context) : QfContentSyncStore {
                 PRIMARY KEY (resource_group, resource_id, record_type, record_key)
             )
         """.trimIndent())
-        // Schema v2 pins canonical/provider token-boundary alignment. Discard
-        // v1 atomically rather than reinterpret a still-fresh bad snapshot.
-        if (version < 2) {
+        // Schema v3 replaces the legacy synthetic snapshot with QF's three
+        // independently versioned resources.
+        if (version < 3) {
             execSQL("DELETE FROM cached_rows")
             execSQL("DELETE FROM sync_state")
-            version = 2
+            version = 3
         }
     }
 
@@ -101,6 +101,11 @@ class QfContentCacheDatabase(context: Context) : QfContentSyncStore {
         Unit
     }
 
+    override fun deleteResource(resource: QfResource) = db.transaction {
+        deleteResourceRows(resource)
+        Unit
+    }
+
     override fun apply(
         filter: QfResourceFilter,
         changes: List<QfContentChange>,
@@ -108,7 +113,10 @@ class QfContentCacheDatabase(context: Context) : QfContentSyncStore {
         nextToken: String,
         nowMs: Long,
         lastRefreshApiCalls: Long?,
+        reset: Boolean,
+        validate: () -> Unit,
     ) = db.transaction {
+        if (reset) delete("cached_rows", null, null)
         val fetchedSnapshots = snapshots.iterator()
         changes.forEach { change ->
             when (change) {
@@ -124,11 +132,12 @@ class QfContentCacheDatabase(context: Context) : QfContentSyncStore {
                     "resource_group = ? AND resource_id = ? AND record_type = ? AND record_key = ?",
                     arrayOf(change.resource.group, change.resource.id.toString(), change.recordType, change.recordKey),
                 )
-                is QfContentChange.DeleteResource -> deleteResource(change.resource)
+                is QfContentChange.DeleteResource -> deleteResourceRows(change.resource)
                 QfContentChange.FreshnessMarker -> Unit
             }
         }
         check(!fetchedSnapshots.hasNext()) { "Unused fetched QF snapshot" }
+        validate()
         replace("sync_state", null, ContentValues().apply {
             put("resource_filter", filter.value)
             put("sync_token", nextToken)
@@ -139,7 +148,7 @@ class QfContentCacheDatabase(context: Context) : QfContentSyncStore {
         Unit
     }
 
-    private fun SQLiteDatabase.deleteResource(resource: QfResource) {
+    private fun SQLiteDatabase.deleteResourceRows(resource: QfResource) {
         delete(
             "cached_rows",
             "resource_group = ? AND resource_id = ?",
@@ -147,7 +156,7 @@ class QfContentCacheDatabase(context: Context) : QfContentSyncStore {
         )
     }
 
-    /** A legacy full comparison must not rewrite 77,429 unchanged rows. */
+    /** An invalidated QF snapshot rewrites only rows whose payload changed. */
     private fun SQLiteDatabase.applySnapshotDelta(snapshot: QfSnapshot) {
         check(snapshot.rows.all { it.resource == snapshot.resource }) {
             "QF snapshot contained a row from another resource"

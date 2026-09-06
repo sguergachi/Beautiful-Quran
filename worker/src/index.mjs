@@ -4,6 +4,7 @@ const SNAPSHOTS = new Set([
   '/api/v4/resources/snapshots/word_by_word_translations/59',
   '/api/v4/resources/snapshots/word_by_word_transliterations/60',
 ])
+const WORD_SUPPLEMENT_VERSES = new Set(['1:1', '2:181', '8:6', '9:1', '36:52'])
 const ALLOWED_SYNC_KEYS = new Set(['bootstrap', 'resources', 'sync_token', 'cursor', 'per_page'])
 
 /**
@@ -33,10 +34,10 @@ export function createQfProxy(fetchImpl = fetch) {
         body: 'grant_type=client_credentials&scope=content',
       })
       if (!response.ok) {
-        const code = response.status >= 400 && response.status < 500
-          ? `qf_auth_rejected_${response.status}`
-          : 'qf_auth_unavailable'
-        throw new ProxyFailure(503, code)
+        if (response.status >= 400 && response.status < 500) {
+          throw new ProxyFailure(403, 'qf_access_revoked')
+        }
+        throw new ProxyFailure(503, 'qf_auth_unavailable')
       }
       const body = await response.json()
       if (typeof body.access_token !== 'string' || !body.access_token) {
@@ -91,7 +92,18 @@ export function createQfProxy(fetchImpl = fetch) {
       if (!path) return failure(404, 'not_found', cors)
       try {
         const upstream = await qfResponse(env, path)
-        if (!upstream.ok) return failure(upstream.status, 'qf_content_unavailable', cors)
+        if (!upstream.ok) {
+          if (upstream.status === 401 || upstream.status === 403) {
+            return failure(403, 'qf_access_revoked', cors)
+          }
+          if (upstream.status === 410) {
+            const body = await upstream.json().catch(() => null)
+            if (body?.error?.code === 'resync_required') {
+              return failure(410, 'resync_required', cors)
+            }
+          }
+          return failure(upstream.status, 'qf_content_unavailable', cors)
+        }
         return new Response(upstream.body, {
           status: upstream.status,
           headers: {
@@ -125,7 +137,13 @@ function allowedContentPath(url) {
     if (resources !== RESOURCES || (bootstrap === 'true') === Boolean(token)) return null
     return url.pathname + url.search
   }
-  if (SNAPSHOTS.has(url.pathname)) return url.pathname + url.search
+  if (SNAPSHOTS.has(url.pathname) && url.searchParams.size === 0) return url.pathname
+  const verse = url.pathname.match(/^\/api\/v4\/verses\/by_key\/(\d{1,3}:\d{1,3})$/)?.[1]
+  if (verse && WORD_SUPPLEMENT_VERSES.has(verse) &&
+      url.searchParams.size === 2 && url.searchParams.get('words') === 'true' &&
+      url.searchParams.get('language') === 'en') {
+    return url.pathname + url.search
+  }
   return null
 }
 

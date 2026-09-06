@@ -30,7 +30,7 @@ data class RuntimeMushafWord(
     val ayahPage: Int,
 )
 
-/** Seven-day local cache for every Quran.com-derived word and QCF field. */
+/** Seven-day local cache for every QF word and QCF field. */
 class RuntimeMushafCache(
     api: QfContentSyncApi,
     private val store: QfContentSyncStore,
@@ -38,17 +38,22 @@ class RuntimeMushafCache(
     private val nowMs: () -> Long = System::currentTimeMillis,
     private val json: Json = Json { ignoreUnknownKeys = true },
     private val minimumWords: Int = 77_429,
+    private val expectedQcfPages: IntRange = 1..604,
+    private val canonicalWords: () -> Map<Int, Map<Int, List<String>>> = { emptyMap() },
 ) {
     private val _diagnostics = MutableStateFlow(RuntimeCacheDiagnostics())
     val diagnostics: StateFlow<RuntimeCacheDiagnostics> = _diagnostics
+    private var validatedWords: ParsedMushaf? = null
     private val syncer = QfContentSyncer(
-        counted(api), store, beforeApply = ::markRequestsSettled, nowMs = nowMs,
+        counted(api), store, beforeApply = ::markRequestsSettled,
+        validate = ::validateAppliedContent, nowMs = nowMs,
     )
     private var syncing = false
     @Volatile private var cachedState: QfSyncState? = null
     @Volatile private var parsedToken: String? = null
     @Volatile private var unreadableToken: String? = null
     @Volatile private var scheduledToken: String? = null
+    @Volatile private var purgedSupplementToken: String? = null
     @Volatile private var blockReadRefresh = false
     private var parsedWords = emptyMap<String, RuntimeMushafWord>()
     private var parsedBySurah = emptyMap<Int, Map<Pair<Int, Int>, RuntimeMushafWord>>()
@@ -108,6 +113,7 @@ class RuntimeMushafCache(
         val state = rememberedState()
         rememberUpdatedAt(state)
         scheduleChecks(state)
+        purgeExpiredSupplement(state)
         val age = state?.let { nowMs() - it.updatedAtMs }
         if (age == null || age !in 0..QF_REVALIDATE_AFTER_MS) refresh()
     }
@@ -124,19 +130,36 @@ class RuntimeMushafCache(
         }
         scope.launch {
             try {
+                validatedWords = null
                 syncer.sync(FILTER) { _diagnostics.value.apiCalls }
-                val state = store.state(FILTER)
+                val state = requireNotNull(store.state(FILTER)) { "QF sync did not save its checkpoint" }
                 cachedState = state
-                parsedToken = null
+                validatedWords?.let { installParsed(state, it) } ?: run {
+                    if (parsedToken != null) parsedToken = state.token
+                }
                 unreadableToken = null
-                _diagnostics.update { it.copy(cachedWords = 0) }
+                purgedSupplementToken = null
                 rememberUpdatedAt(state)
                 scheduleChecks(state)
                 _changes.tryEmit(Unit)
                 _refreshes.tryEmit(Unit)
             } catch (error: Exception) {
+                validatedWords = null
                 blockReadRefresh = true
-                updateResource { it.copy(lastError = error.message ?: error::class.simpleName) }
+                if (error is QfAccessRevokedException) {
+                    store.clear()
+                    cachedState = null
+                    parsedToken = null
+                    unreadableToken = null
+                    parsedWords = emptyMap()
+                    parsedBySurah = emptyMap()
+                    _diagnostics.update { it.copy(cachedWords = 0) }
+                    updateResource { RuntimeCacheResource(lastError = error.message) }
+                    _changes.tryEmit(Unit)
+                } else {
+                    cachedState = store.state(FILTER)
+                    updateResource { it.copy(lastError = error.message ?: error::class.simpleName) }
+                }
             } finally {
                 synchronized(this@RuntimeMushafCache) { syncing = false }
                 updateResource { it.copy(refreshing = false) }
@@ -148,6 +171,7 @@ class RuntimeMushafCache(
         val state = rememberedState()
         rememberUpdatedAt(state)
         val now = nowMs()
+        purgeExpiredSupplement(state)
         if (!blockReadRefresh && (state == null || now - state.updatedAtMs !in 0..QF_REVALIDATE_AFTER_MS)) {
             refresh()
         }
@@ -159,31 +183,65 @@ class RuntimeMushafCache(
     }
 
     private fun install(expected: QfSyncState): Map<String, RuntimeMushafWord>? {
-        val parsed = runCatching {
-            store.rows(RESOURCE, RECORD_TYPE).associate { row ->
-                val word = parseMushafWord(json.parseToJsonElement(row.payload).jsonObject)
-                check(row.recordKey == key(word.surahId, word.ayahNumber, word.position))
-                row.recordKey to word
-            }.also { check(it.size >= minimumWords) }
-        }.getOrElse { error ->
+        val parsed = runCatching(::parseStoredContent).getOrElse { error ->
             unreadableToken = expected.token
             updateResource { it.copy(lastError = error.message ?: error::class.simpleName) }
             refresh()
             return null
         }
-        val bySurah = parsed.values.groupBy { it.surahId }.mapValues { (_, words) ->
-            words.associateBy { word -> word.ayahNumber to word.position }
+        installParsed(expected, parsed)
+        return parsed.byKey
+    }
+
+    private fun validateAppliedContent(changes: List<QfContentChange>) {
+        if (changes.any { it !is QfContentChange.FreshnessMarker }) {
+            validatedWords = parseStoredContent()
         }
+    }
+
+    private fun parseStoredContent(): ParsedMushaf {
+        val wordRows = store.rows(QF_MUSHAF_RESOURCE, RECORD_TYPE)
+        if (wordRows.size >= minimumWords && wordRows.all { it.recordKey.count { character -> character == ':' } == 2 }) {
+            return parsedMushaf(wordRows)
+        }
+        val mushafRows = store.rows(QF_MUSHAF_RESOURCE, "mushaf") +
+            store.rows(QF_MUSHAF_RESOURCE, "mushaf_page") + wordRows
+        val rows = mapQfMushaf(
+            canonicalWords(),
+            mushafRows,
+            store.rows(WORD_TRANSLATION_RESOURCE, "word_translation"),
+            store.rows(WORD_TRANSLITERATION_RESOURCE, "word_transliteration"),
+            store.rows(WORD_SUPPLEMENT_RESOURCE, "word_transliteration"),
+            expectedQcfPages,
+            json,
+        )
+        return parsedMushaf(rows)
+    }
+
+    private fun parsedMushaf(rows: List<QfCacheRow>): ParsedMushaf {
+        val byKey = rows.associate { row ->
+            val word = parseMushafWord(json.parseToJsonElement(row.payload).jsonObject)
+            check(row.recordKey == key(word.surahId, word.ayahNumber, word.position))
+            row.recordKey to word
+        }.also { check(it.size >= minimumWords) }
+        return ParsedMushaf(
+            byKey,
+            byKey.values.groupBy { it.surahId }.mapValues { (_, words) ->
+                words.associateBy { word -> word.ayahNumber to word.position }
+            },
+        )
+    }
+
+    private fun installParsed(expected: QfSyncState, parsed: ParsedMushaf) {
         synchronized(this) {
             if (cachedState?.token != expected.token) {
-                return if (parsedToken == cachedState?.token) parsedWords else null
+                return
             }
-            parsedWords = parsed
-            parsedBySurah = bySurah
+            parsedWords = parsed.byKey
+            parsedBySurah = parsed.bySurah
             parsedToken = expected.token
             unreadableToken = null
-            _diagnostics.update { it.copy(cachedWords = parsed.size) }
-            return parsed
+            _diagnostics.update { it.copy(cachedWords = parsed.byKey.size) }
         }
     }
 
@@ -255,6 +313,7 @@ class RuntimeMushafCache(
             delay((state.updatedAtMs + QF_MAX_CACHE_AGE_MS - now).coerceAtLeast(0) + 1)
             val current = cachedState ?: store.state(FILTER)
             if (current?.token == token && !isQfContentFresh(current.updatedAtMs, nowMs())) {
+                purgeExpiredSupplement(current)
                 parsedToken = null
                 _diagnostics.update { it.copy(cachedWords = 0) }
                 _changes.tryEmit(Unit)
@@ -273,14 +332,28 @@ class RuntimeMushafCache(
         }
     }
 
+    /** Non-Content-Sync verse supplements may be retained for at most one week. */
+    private fun purgeExpiredSupplement(state: QfSyncState?) {
+        if (state == null || isQfContentFresh(state.updatedAtMs, nowMs()) || purgedSupplementToken == state.token) return
+        synchronized(this) {
+            if (purgedSupplementToken == state.token) return
+            purgedSupplementToken = state.token
+        }
+        store.deleteResource(WORD_SUPPLEMENT_RESOURCE)
+    }
+
     private companion object {
         const val MUSHAF_ID = 1
         const val RECORD_TYPE = "mushaf_word"
-        val FILTER = QfResourceFilter("mushafs:1")
-        val RESOURCE = QfResource("mushafs", 1)
+        val FILTER = QF_READER_FILTER
         fun key(surahId: Int, ayah: Int, position: Int) = "$surahId:$ayah:$position"
     }
 }
+
+private data class ParsedMushaf(
+    val byKey: Map<String, RuntimeMushafWord>,
+    val bySurah: Map<Int, Map<Pair<Int, Int>, RuntimeMushafWord>>,
+)
 
 internal fun parseMushafWord(record: JsonObject): RuntimeMushafWord {
     val surah = record.int("surah_id")

@@ -50,27 +50,27 @@ app (runtime)                                           ▼
    no navigation library at all (the four sheets are a hand-rolled paper
    stack in `MainActivity`). Every dependency earns its place.
 
-> **Quran Foundation Content API migration.** The cache architecture is in
-> place, but the provider is not yet an authenticated QF integration. QF
-> credentials cannot be placed in a public client. The remaining approval and
-> integration gates live in [QF_CONTENT_SYNC.md](QF_CONTENT_SYNC.md).
+> **Quran Foundation Content API.** Android and web use authenticated
+> Production Content Sync through a narrow Cloudflare Worker. QF credentials
+> remain server-side; the clients retain only local content and an opaque
+> checkpoint. Operational and remaining content-license gates live in
+> [QF_CONTENT_SYNC.md](QF_CONTENT_SYNC.md).
 
-### Transitional provider boundaries
+### Provider boundaries
 
 ```text
-word/QCF today: Android / web ── direct fixed-corpus GETs ── api.quran.com
-                                      │
-                                      └─ atomic 6-day/7-day device cache
+word/QCF: Android / web ── fixed-path Worker ── authenticated QF Content Sync
+                               │
+                               └─ atomic 6-day/7-day device cache
 
 repeat timing: offline build pipeline ── normalize + verify ── quran.db
                                       └─ Android and web read it locally
 ```
 
-The unauthenticated legacy word/QCF adapter fetches the same fixed 114-chapter
-corpus for every user; it sends no account, secret, reading position, search,
-bookmark, or note data. It validates all 77,429 records and each QCF page-font
-codepoint run before one atomic client-cache replacement. The future QF-shaped
-Content Sync transport remains available behind the same cache interface.
+The Worker sends no account, reading position, search, bookmark, note, or device
+identifier. It exposes only three fixed Content Sync resources and five fixed
+verse supplements. Each client validates all 77,429 records and every QCF
+page-font codepoint run before one atomic cache publication.
 
 Repeat timing never consumes raw QDC or performs audio analysis in a client.
 `tools/build_db.py` runs the canonical cleaner, clock rebase, corrections,
@@ -92,8 +92,8 @@ For word gloss, transliteration, and QCF layout, both clients:
    clients retry automatically when connectivity returns.
    A missing or expired word/QCF cache keeps the cold-start mushaf cover up
    until that first refresh succeeds or fails; a fresh/still-readable cache
-   makes zero API calls. The first legacy bootstrap reports completed chapters
-   against all 114 on the cover's gold progress rule; neither tap, back, nor a
+   makes zero API calls. The first authenticated bootstrap reports completed
+   requests on the cover's gold progress rule; neither tap, back, nor a
    paper-stack swipe can expose an unprepared reader. While the cover remains closed, Android parses all
    77,429 cached QF word rows into its process-lifetime lookup maps and opens
    and verifies the complete bundled SQLite file into its native page cache;
@@ -106,17 +106,14 @@ For word gloss, transliteration, and QCF layout, both clients:
    preserves the prior token and rows. Android's short “Quran cache refreshed”
    system toast is emitted only after that successful atomic commit.
 
-The word/QCF cache uses the same freshness and atomicity contract. Today the
-clients normalize direct legacy `by_chapter` responses into `mushafs:1`; after
-approval the replaceable transport can consume QF Content Sync without changing
-the repositories or cache schema. Android stores rows in `qf-content-cache.db`;
-the browser uses IndexedDB. Neither cache is part of Git, the APK, or the Pages
-artifact. The legacy API has no documented sync cursor, so its six-day network
-comparison still reads the fixed corpus. Android compares that snapshot with
-the cache inside one transaction and mutates only added, changed, or removed
-rows. Authenticated Content Sync uses the saved opaque token and applies its
-native row upserts/deletes directly, giving both a small network delta and a
-small SQLite delta after bootstrap.
+Android stores authenticated rows in `qf-content-cache.db`; the browser uses
+IndexedDB. Neither cache is part of Git, the APK, or the Pages artifact. After
+bootstrap, the saved opaque Content Sync token yields native row upserts/deletes
+or a snapshot only for an invalidated resource. Snapshot replacement, mapping,
+full-corpus validation, and checkpoint advancement share one transaction; a
+failed update leaves the prior readable cache untouched. Five ordinary verse
+supplements correct known transliteration-resource ownership errors and are
+purged from persistent storage if the cache passes one week.
 Developer Mode shows the selected resource's state, next refresh, seven-day
 limit, last failure, and the exact number of API requests made in that process
 or browser session. The cold-start cover reports requests as they start, then
@@ -130,7 +127,7 @@ Sources (all fetched over HTTPS, cached in `tools/.cache/`):
 | Source | Provides | Why this one |
 |---|---|---|
 | `quran-json` (npm) | Uthmani Unicode text, Saheeh International translation, surah metadata | Tanzil-derived, verse-keyed, no auth |
-| Quran.com chapter API (runtime only) | Per-word English gloss, transliteration, QCF V2 layout, page | Normalized and validated directly into the client `mushafs:1` cache; never committed to `quran.db` |
+| Quran Foundation authenticated Content API (runtime only) | Per-word English gloss, transliteration, QCF V2 layout, page | Three Content Sync resources are joined and validated in the device cache; never committed to `quran.db` |
 | `cpfair/quran-align` release zip | Word-level timestamps per reciter, CC-BY 4.0 | The canonical open word-alignment dataset, matched to everyayah.com audio |
 | quran.com legacy `qdc` audio API (offline build input) | **Repeat-aware** word topology for reciters in `QDC_REPEAT_RECITERS` | Normalized, repaired, and bundled in `quran.db`; written redistribution permission pending. See [REPEAT_HIGHLIGHTING.md](REPEAT_HIGHLIGHTING.md) |
 | everyayah MP3 ranges | Leading-silence and duration measurements in `tools/audio_onsets/` | Some individual ayah files begin with silence. The offline scanner holds the first wash until sustained voice without moving valid later word boundaries, and records each file's length as the ceiling no timing row may cross. |
@@ -139,8 +136,9 @@ Sources (all fetched over HTTPS, cached in `tools/.cache/`):
 The **canonical word segmentation** is the space-split of the Uthmani text.
 The other two sources are mapped onto it by position:
 
-- The WBW gloss disagrees on word count for exactly **10 of 6,236 ayahs**
-  (off by one); those are clamped by index and logged.
+- QAC/canonical and QCF disagree on word boundaries for exactly **10 of 6,236
+  ayahs**. Explicit span rules preserve the QCF glyph owner and gloss positions;
+  any topology change fails the cache update instead of shifting later words.
 - Timing files use 0-based word indices; the pipeline converts to 1-based
   positions, drops segments that point at basmalah words prefixed to
   first-ayah audio (`adjust_segments`), clamps overshoot, and **fails the
