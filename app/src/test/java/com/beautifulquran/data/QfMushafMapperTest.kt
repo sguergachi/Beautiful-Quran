@@ -68,7 +68,12 @@ class QfMushafMapperTest {
         )
         val translations = (1..qfCount).map { position ->
             wordText(WORD_TRANSLATION_RESOURCE, "word_translation", position, "t$position")
-        }
+        } + row(
+            WORD_TRANSLATION_RESOURCE,
+            "word_translation",
+            "unused-null",
+            """{"id":9999,"word_id":9999,"text":null}""",
+        )
         val transliterations = (1..qfCount).flatMap { position ->
             val values = if (position == 1 && duplicateFirstTransliteration) listOf("stale", "wrong") else listOf("tr$position")
             values.mapIndexed { index, text ->

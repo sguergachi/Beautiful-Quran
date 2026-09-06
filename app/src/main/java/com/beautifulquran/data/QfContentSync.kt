@@ -1,5 +1,7 @@
 package com.beautifulquran.data
 
+import java.io.File
+
 /** A QF Content Sync resource filter. It must remain identical across syncs. */
 @JvmInline
 value class QfResourceFilter(val value: String) {
@@ -48,7 +50,12 @@ data class QfSyncPage(
     val nextSyncToken: String?,
 )
 
-data class QfSnapshot(val resource: QfResource, val rows: List<QfCacheRow>)
+data class QfSnapshot(
+    val resource: QfResource,
+    val rows: List<QfCacheRow> = emptyList(),
+    /** Large production snapshots are spooled to disk instead of occupying the app heap. */
+    val file: File? = null,
+)
 
 /** Network boundary. Authentication and JSON decoding live behind this interface. */
 interface QfContentSyncApi {
@@ -146,34 +153,38 @@ class QfContentSyncer(
         var finalToken: String? = null
         var pageCount = 0
 
-        while (true) {
-            check(++pageCount <= MAX_SYNC_PAGES) { "Content Sync exceeded page limit" }
-            val page = api.sync(request)
-            changes += page.changes
-            page.changes.filterIsInstance<QfContentChange.Snapshot>().forEach { change ->
-                requireRelativeApiPath(change.relativePath)
-                snapshots += api.snapshot(change.relativePath).also { snapshot ->
-                    require(snapshot.resource == change.resource) { "QF snapshot resource mismatch" }
+        try {
+            while (true) {
+                check(++pageCount <= MAX_SYNC_PAGES) { "Content Sync exceeded page limit" }
+                val page = api.sync(request)
+                changes += page.changes
+                page.changes.filterIsInstance<QfContentChange.Snapshot>().forEach { change ->
+                    requireRelativeApiPath(change.relativePath)
+                    snapshots += api.snapshot(change.relativePath).also { snapshot ->
+                        require(snapshot.resource == change.resource) { "QF snapshot resource mismatch" }
+                    }
                 }
+                val next = page.nextPagePath ?: run {
+                    finalToken = requireNotNull(page.nextSyncToken) { "Final QF sync page has no token" }
+                    break
+                }
+                requireRelativeApiPath(next)
+                request = QfSyncRequest.NextPage(next)
             }
-            val next = page.nextPagePath ?: run {
-                finalToken = requireNotNull(page.nextSyncToken) { "Final QF sync page has no token" }
-                break
-            }
-            requireRelativeApiPath(next)
-            request = QfSyncRequest.NextPage(next)
+            beforeApply()
+            store.apply(
+                filter,
+                changes,
+                snapshots,
+                requireNotNull(finalToken),
+                nowMs(),
+                callsBefore?.let { apiCalls?.invoke()?.minus(it) },
+                reset = firstRequest is QfSyncRequest.Bootstrap,
+                validate = { validate(changes) },
+            )
+        } finally {
+            snapshots.forEach { it.file?.delete() }
         }
-        beforeApply()
-        store.apply(
-            filter,
-            changes,
-            snapshots,
-            requireNotNull(finalToken),
-            nowMs(),
-            callsBefore?.let { apiCalls?.invoke()?.minus(it) },
-            reset = firstRequest is QfSyncRequest.Bootstrap,
-            validate = { validate(changes) },
-        )
     }
 }
 

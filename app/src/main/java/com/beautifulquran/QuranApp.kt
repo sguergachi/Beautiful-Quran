@@ -82,7 +82,7 @@ class QuranApp : Application() {
         val database = QuranDatabase(this)
         val store = QfContentCacheDatabase(this)
         runtimeMushaf = RuntimeMushafCache(
-            QfContentSyncHttpApi(BuildConfig.QF_CONTENT_BASE_URL),
+            QfContentSyncHttpApi(BuildConfig.QF_CONTENT_BASE_URL, cacheDir),
             store,
             appScope,
             canonicalWords = { readCanonicalWords(database) },

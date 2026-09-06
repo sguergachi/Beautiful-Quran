@@ -80,13 +80,53 @@ private fun mapVerse(
     transliterations: Map<Long, List<String>>,
     supplements: Map<Long, String>,
 ): List<QfCacheRow> {
-    val rule = TOPOLOGY_RULES[verse.key]
-    val expectedQfCount = verse.words.size + (rule?.qfCount ?: 1) - (rule?.canonicalCount ?: 1)
-    check(qfWords.size == expectedQfCount) { "QF topology changed for ${verse.key}" }
+    return mapQfVerse(
+        verse.surah,
+        verse.ayah,
+        verse.words.size,
+        qfWords,
+        endGlyph,
+        translations::getValue,
+        { id -> supplements[id] ?: transliterations[id]?.singleOrNull()
+            ?: error("QF transliteration is ambiguous or missing for word $id") },
+    ).map { word ->
+        val key = "${word.surahId}:${word.ayahNumber}:${word.position}"
+        val payload = buildJsonObject {
+            put("record_type", "mushaf_word")
+            put("record_key", key)
+            put("surah_id", word.surahId)
+            put("ayah_number", word.ayahNumber)
+            put("position", word.position)
+            put("translation_en", word.translation)
+            put("transliteration", word.transliteration)
+            put("qcf_v2", word.qcfV2)
+            put("qcf_page", word.qcfPage)
+            put("qcf_line", word.qcfLine)
+            put("qcf_span_end", word.qcfSpanEnd)
+            put("ayah_page", word.ayahPage)
+        }
+        QfCacheRow(QF_MUSHAF_RESOURCE, "mushaf_word", key, payload.toString(), "")
+    }
+}
+
+/** Aligns one bounded verse; callers may stream the full mushaf verse by verse. */
+internal fun mapQfVerse(
+    surah: Int,
+    ayah: Int,
+    canonicalWordCount: Int,
+    qfWords: List<JsonObject>,
+    endGlyph: String,
+    translation: (Long) -> String,
+    transliteration: (Long) -> String,
+): List<RuntimeMushafWord> {
+    val verseKey = "$surah:$ayah"
+    val rule = TOPOLOGY_RULES[verseKey]
+    val expectedQfCount = canonicalWordCount + (rule?.qfCount ?: 1) - (rule?.canonicalCount ?: 1)
+    check(qfWords.size == expectedQfCount) { "QF topology changed for $verseKey" }
     val mapped = mutableMapOf<Int, AlignedQfWord>()
     var canonicalPosition = 1
     var qfPosition = 1
-    while (canonicalPosition <= verse.words.size) {
+    while (canonicalPosition <= canonicalWordCount) {
         val atRule = rule?.takeIf {
             it.canonicalStart == canonicalPosition && it.qfStart == qfPosition
         }
@@ -96,7 +136,7 @@ private fun mapVerse(
         val page = source.first().int("page_number")
         val line = source.first().int("line_number")
         check(source.all { it.int("page_number") == page && it.int("line_number") == line }) {
-            "A joined QF word crosses a line at ${verse.key}"
+            "A joined QF word crosses a line at $verseKey"
         }
         val ids = source.map { it.long("word_id") }
         mapped[canonicalPosition] = AlignedQfWord(
@@ -104,45 +144,31 @@ private fun mapVerse(
             page = page,
             line = line,
             spanEnd = canonicalPosition + canonicalCount - 1,
-            translation = joinQfGloss(ids.map(translations::getValue)),
-            transliteration = joinQfGloss(ids.map { id ->
-                supplements[id] ?: transliterations[id]?.singleOrNull()
-                ?: error("QF transliteration is ambiguous or missing for word $id")
-            }),
+            translation = joinQfGloss(ids.map(translation)),
+            transliteration = joinQfGloss(ids.map(transliteration)),
         )
         canonicalPosition += canonicalCount
         qfPosition += qfCount
     }
-    check(qfPosition == qfWords.size + 1) { "QF topology ended early for ${verse.key}" }
-    val lastOwner = mapped.keys.maxOrNull() ?: error("QF verse ${verse.key} has no words")
+    check(qfPosition == qfWords.size + 1) { "QF topology ended early for $verseKey" }
+    val lastOwner = mapped.keys.maxOrNull() ?: error("QF verse $verseKey has no words")
     mapped[lastOwner] = mapped.getValue(lastOwner).let { it.copy(glyph = "${it.glyph} $endGlyph") }
     val ayahPage = qfWords.first().int("page_number")
 
-    return verse.words.indices.map { index ->
+    return (0 until canonicalWordCount).map { index ->
         val position = index + 1
         val value = mapped[position] ?: AlignedQfWord("", 0, 0, position, "", "")
-        val key = "${verse.key}:$position"
-        val payload = buildJsonObject {
-            put("record_type", "mushaf_word")
-            put("record_key", key)
-            put("surah_id", verse.surah)
-            put("ayah_number", verse.ayah)
-            put("position", position)
-            put("translation_en", value.translation)
-            put("transliteration", value.transliteration)
-            put("qcf_v2", value.glyph)
-            put("qcf_page", value.page)
-            put("qcf_line", value.line)
-            put("qcf_span_end", value.spanEnd)
-            put("ayah_page", ayahPage)
-        }
-        QfCacheRow(QF_MUSHAF_RESOURCE, "mushaf_word", key, payload.toString(), "")
+        RuntimeMushafWord(
+            surah, ayah, position, value.translation, value.transliteration,
+            value.glyph, value.page, value.line, value.spanEnd, ayahPage,
+        )
     }
 }
 
 private fun groupedWordText(rows: List<QfCacheRow>, json: Json): Map<Long, List<String>> =
     rows.map { json.parseToJsonElement(it.payload).jsonObject }
-        .groupBy({ it.long("word_id") }, { it.requiredString("text").trim() })
+        .mapNotNull { row -> row.string("text")?.trim()?.let { row.long("word_id") to it } }
+        .groupBy({ it.first }, { it.second })
 
 private fun uniqueWordText(
     rows: List<QfCacheRow>,
@@ -236,4 +262,4 @@ internal fun readCanonicalWords(database: QuranDatabase): Map<Int, Map<Int, List
     return chapters.mapValues { (_, ayahs) -> ayahs.mapValues { it.value.toList() } }
 }
 
-private const val QCF_V2_FIRST_CODEPOINT = 0xFC41
+internal const val QCF_V2_FIRST_CODEPOINT = 0xFC41

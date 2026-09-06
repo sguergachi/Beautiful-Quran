@@ -1,5 +1,6 @@
 package com.beautifulquran.data
 
+import java.io.File
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -54,6 +55,28 @@ class QfContentSyncTest {
         runCatching { QfContentSyncer(api, store).sync(filter) }
         assertEquals("old-token", store.savedState?.token)
         assertTrue(store.rows.isEmpty())
+    }
+
+    @Test
+    fun `downloaded snapshot file is deleted when a later page fails`() = runBlocking {
+        val file = File.createTempFile("qf-sync-test-", ".json")
+        val api = object : QfContentSyncApi {
+            var page = 0
+            override suspend fun sync(request: QfSyncRequest): QfSyncPage {
+                if (page++ > 0) error("later page failed")
+                return QfSyncPage(
+                    listOf(QfContentChange.Snapshot(resource, "/api/v4/resources/snapshots/recitations/7")),
+                    "/api/v4/resources/sync?cursor=second",
+                    null,
+                )
+            }
+
+            override suspend fun snapshot(relativePath: String) = QfSnapshot(resource, file = file)
+        }
+
+        runCatching { QfContentSyncer(api, FakeStore()).sync(filter) }
+
+        assertFalse(file.exists())
     }
 
     @Test

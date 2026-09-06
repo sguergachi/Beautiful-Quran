@@ -70,9 +70,11 @@ identity.
    changes their topology.
 3. Before publication, the client verifies all canonical words, all 6,236
    verses, the 604-page QCF layout, and every contiguous page-font codepoint.
-4. Rows, supplements, and the final opaque checkpoint commit atomically. A
-   failed request, parse, validation, or write preserves the previous readable
-   cache and checkpoint.
+4. Android spools large snapshots to temporary cache files, parses one record
+   at a time into SQLite, and materializes a typed 77,429-row reader view in the
+   same transaction. The files are deleted after success or failure. Rows,
+   supplements, reader view, and the final opaque checkpoint commit atomically;
+   a failed request, parse, validation, or write preserves the prior cache.
 5. A normal refresh starts at day six, leaving a retry margin before the
    seven-day limit. A current cache makes zero requests on launch. Network
    restoration retries a failed update automatically.
@@ -85,7 +87,8 @@ identity.
 The initial exchange currently uses nine requests: one sync, three snapshots,
 and five supplements. An unchanged refresh uses six: one incremental sync and
 five supplements. QF invalidations add only the affected resource snapshots;
-row changes use QF's native upsert/delete deltas. Developer Mode displays live
+row changes use QF's native upsert/delete deltas. Identical supplement rows are
+detected without rebuilding the reader view. Developer Mode displays live
 progress, current phase, update/refresh/expiry times, errors, calls this launch,
 and calls made by the last successful refresh. Android shows a toast only after
 the atomic commit succeeds.
@@ -117,10 +120,13 @@ the atomic commit succeeds.
 
 - [ ] Merge the Worker/client change and verify the stable Production Worker
   returns `{"ok":true,"environment":"production"}`.
-- [ ] On a clean Android install and clean browser profile, complete one live
-  bootstrap, open representative QCF pages, and verify word gloss and
-  transliteration fidelity. Relaunch and confirm zero API calls.
-- [ ] Force a refresh on each client and confirm the stored checkpoint is used,
+- [x] On a 192 MB-heap clean Android emulator, complete one live Production
+  bootstrap, validate 77,429 words / 6,236 verses / 604 pages, open the reader,
+  then process-cold relaunch in 1.4 seconds with zero API calls.
+- [ ] Repeat the clean-bootstrap and relaunch check in a clean browser profile.
+- [x] Force an Android refresh and confirm the stored checkpoint is used,
+  unchanged content remains readable, and the call counter reports six.
+- [ ] Force a browser refresh and confirm the stored checkpoint is used,
   unchanged content remains readable, and the call counter reports six.
 - [ ] Watch QF's update/deprecation notices and migrate within the announced
   window. Re-run the full-corpus mapper whenever resource schemas change.

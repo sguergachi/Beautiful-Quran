@@ -30,6 +30,15 @@ data class RuntimeMushafWord(
     val ayahPage: Int,
 )
 
+/** SQLite materializes the joined reader view once, inside the sync transaction. */
+internal interface QfRuntimeMushafStore {
+    fun readerWords(): List<RuntimeMushafWord>
+    fun rebuildReaderWords(
+        canonical: Map<Int, Map<Int, List<String>>>,
+        expectedPages: IntRange,
+    )
+}
+
 /** Seven-day local cache for every QF word and QCF field. */
 class RuntimeMushafCache(
     api: QfContentSyncApi,
@@ -195,11 +204,15 @@ class RuntimeMushafCache(
 
     private fun validateAppliedContent(changes: List<QfContentChange>) {
         if (changes.any { it !is QfContentChange.FreshnessMarker }) {
+            (store as? QfRuntimeMushafStore)?.rebuildReaderWords(canonicalWords(), expectedQcfPages)
             validatedWords = parseStoredContent()
         }
     }
 
     private fun parseStoredContent(): ParsedMushaf {
+        (store as? QfRuntimeMushafStore)?.readerWords()?.takeIf { it.size >= minimumWords }?.let {
+            return parsedRuntimeMushaf(it)
+        }
         val wordRows = store.rows(QF_MUSHAF_RESOURCE, RECORD_TYPE)
         if (wordRows.size >= minimumWords && wordRows.all { it.recordKey.count { character -> character == ':' } == 2 }) {
             return parsedMushaf(wordRows)
@@ -219,11 +232,16 @@ class RuntimeMushafCache(
     }
 
     private fun parsedMushaf(rows: List<QfCacheRow>): ParsedMushaf {
-        val byKey = rows.associate { row ->
+        return parsedRuntimeMushaf(rows.map { row ->
             val word = parseMushafWord(json.parseToJsonElement(row.payload).jsonObject)
             check(row.recordKey == key(word.surahId, word.ayahNumber, word.position))
-            row.recordKey to word
-        }.also { check(it.size >= minimumWords) }
+            word
+        })
+    }
+
+    private fun parsedRuntimeMushaf(words: List<RuntimeMushafWord>): ParsedMushaf {
+        val byKey = words.associateBy { key(it.surahId, it.ayahNumber, it.position) }
+            .also { check(it.size >= minimumWords) }
         return ParsedMushaf(
             byKey,
             byKey.values.groupBy { it.surahId }.mapValues { (_, words) ->

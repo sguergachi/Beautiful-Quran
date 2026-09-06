@@ -111,7 +111,10 @@ IndexedDB. Neither cache is part of Git, the APK, or the Pages artifact. After
 bootstrap, the saved opaque Content Sync token yields native row upserts/deletes
 or a snapshot only for an invalidated resource. Snapshot replacement, mapping,
 full-corpus validation, and checkpoint advancement share one transaction; a
-failed update leaves the prior readable cache untouched. Five ordinary verse
+failed update leaves the prior readable cache untouched. Android spools large
+snapshots to temporary files, parses them into SQLite one record at a time, and
+persists a typed reader view for fast later launches; temporary files are
+removed after success or failure. Five ordinary verse
 supplements correct known transliteration-resource ownership errors and are
 purged from persistent storage if the cache passes one week.
 Developer Mode shows the selected resource's state, next refresh, seven-day

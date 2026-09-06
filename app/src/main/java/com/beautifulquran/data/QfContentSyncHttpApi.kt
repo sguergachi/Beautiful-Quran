@@ -1,5 +1,6 @@
 package com.beautifulquran.data
 
+import java.io.File
 import java.net.HttpURLConnection
 import java.net.URI
 import java.net.URL
@@ -22,17 +23,24 @@ import kotlinx.serialization.json.put
 /** Authenticated QF Content Sync, reached only through our secret-holding Worker. */
 class QfContentSyncHttpApi internal constructor(
     baseUrl: String,
+    private val cacheDir: File? = null,
     private val json: Json = Json { ignoreUnknownKeys = true },
     transport: ((String) -> JsonElement)? = null,
 ) : QfContentSyncApi, QfNetworkCallReporter, QfSyncProgressReporter {
     private val baseUrl = baseUrl.removeSuffix("/").also {
         require(URI(it).scheme == "https") { "QF Content API must use HTTPS" }
     }
+    private val customTransport = transport
     private val transport = transport ?: { path -> httpGet(path) }
     @Volatile private var reportNetworkCall: () -> Unit = {}
     @Volatile private var reportProgress: (QfSyncProgress) -> Unit = {}
     private var completedCalls = 0
     private var expectedCalls = 1
+
+    init {
+        cacheDir?.listFiles { file -> file.name.startsWith(SNAPSHOT_FILE_PREFIX) }
+            ?.forEach(File::delete)
+    }
 
     override fun setNetworkCallReporter(reporter: () -> Unit) {
         reportNetworkCall = reporter
@@ -68,9 +76,61 @@ class QfContentSyncHttpApi internal constructor(
 
     override suspend fun snapshot(relativePath: String): QfSnapshot = withContext(Dispatchers.IO) {
         requireRelativeApiPath(relativePath)
-        parseSnapshot(get(relativePath)).also {
+        val snapshot = if (customTransport == null && cacheDir != null) {
+            downloadSnapshot(relativePath)
+        } else {
+            parseSnapshot(get(relativePath))
+        }
+        snapshot.also {
             completedCalls++
             reportProgress(QfSyncProgress(completedCalls.coerceAtMost(expectedCalls), expectedCalls))
+        }
+    }
+
+    private fun downloadSnapshot(path: String): QfSnapshot {
+        val match = SNAPSHOT_PATH.matchEntire(path) ?: error("Unexpected QF snapshot path")
+        val resource = QfResource(match.groupValues[1], match.groupValues[2].toLong())
+        check(resource in READER_RESOURCES) { "Unexpected QF snapshot resource" }
+        reportNetworkCall()
+        val file = File.createTempFile(SNAPSHOT_FILE_PREFIX, ".json", cacheDir)
+        val connection = URL(baseUrl + path).openConnection() as HttpURLConnection
+        try {
+            connection.requestMethod = "GET"
+            connection.connectTimeout = 15_000
+            connection.readTimeout = 180_000
+            connection.useCaches = false
+            connection.setRequestProperty("Accept", "application/json")
+            connection.setRequestProperty("User-Agent", "Beautiful-Quran/0.7")
+            val status = connection.responseCode
+            if (status !in 200..299) {
+                val body = connection.errorStream?.bufferedReader()?.use { it.readText() }.orEmpty()
+                val code = runCatching {
+                    json.parseToJsonElement(body).jsonObject["error"]?.jsonObject
+                        ?.get("code")?.jsonPrimitive?.contentOrNull
+                }.getOrNull()
+                if (status == 410 && code == "resync_required") throw QfResyncRequiredException()
+                if (status == 403 && code == "qf_access_revoked") throw QfAccessRevokedException()
+                error("QF Content API returned $status")
+            }
+            connection.inputStream.use { input ->
+                file.outputStream().buffered().use { output ->
+                    val buffer = ByteArray(32 * 1024)
+                    var total = 0
+                    while (true) {
+                        val count = input.read(buffer)
+                        if (count < 0) break
+                        total += count
+                        check(total <= MAX_RESPONSE_BYTES) { "QF Content API response is too large" }
+                        output.write(buffer, 0, count)
+                    }
+                }
+            }
+            return QfSnapshot(resource, file = file)
+        } catch (error: Exception) {
+            file.delete()
+            throw error
+        } finally {
+            connection.disconnect()
         }
     }
 
@@ -211,6 +271,8 @@ class QfContentSyncHttpApi internal constructor(
 
     private companion object {
         const val MAX_RESPONSE_BYTES = 40 * 1024 * 1024
+        const val SNAPSHOT_FILE_PREFIX = "qf-snapshot-"
+        val SNAPSHOT_PATH = Regex("/api/v4/resources/snapshots/([^/]+)/(\\d+)")
         val SUPPLEMENT_VERSES = listOf("1:1", "2:181", "8:6", "9:1", "36:52")
         val READER_RESOURCES = setOf(
             QF_MUSHAF_RESOURCE,
