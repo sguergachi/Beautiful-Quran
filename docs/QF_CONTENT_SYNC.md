@@ -77,7 +77,9 @@ identity.
    a failed request, parse, validation, or write preserves the prior cache.
 5. A normal refresh starts at day six, leaving a retry margin before the
    seven-day limit. A current cache makes zero requests on launch. Network
-   restoration retries a failed update automatically.
+   restoration retries a failed update automatically. A missing or expired
+   cache also retries transient failures with bounded backoff; the entrance
+   cover cannot open onto an empty Mushaf.
 6. At day seven, QF-derived reader fields are withheld until a successful sync.
    Non-Content-Sync supplement rows are also removed from persistent storage.
 7. A `410 resync_required` discards no readable data immediately: the client

@@ -200,8 +200,7 @@ class MainActivity : ComponentActivity() {
             LaunchedEffect(mushafReady, mushafStatus.updatedAtMs) {
                 mushafMemoryReady = false
                 if (mushafReady) {
-                    app.repository.warmRuntimeMushaf()
-                    mushafMemoryReady = true
+                    mushafMemoryReady = app.repository.warmRuntimeMushaf() == true
                 }
             }
             var databaseReady by remember { mutableStateOf(false) }
@@ -225,6 +224,7 @@ class MainActivity : ComponentActivity() {
                             "Downloading Quran pages · ${mushafStatus.apiCalls} API requests"
                         else -> "Preparing Quran pages"
                     }
+                    RuntimeCachePhase.ERROR -> "Retrying Quran pages"
                     else -> "Preparing Quran pages"
                 }
             }

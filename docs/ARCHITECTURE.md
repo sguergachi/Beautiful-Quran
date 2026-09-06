@@ -91,16 +91,16 @@ For word gloss, transliteration, and QCF layout, both clients:
    current cache makes zero API calls. If a due refresh fails offline, both
    clients retry automatically when connectivity returns.
    A missing or expired word/QCF cache keeps the cold-start mushaf cover up
-   until that first refresh succeeds or fails; a fresh/still-readable cache
-   makes zero API calls. The first authenticated bootstrap reports completed
+   until a refresh succeeds, retrying transient first-load failures with bounded
+   backoff; a fresh/still-readable cache makes zero API calls. The first authenticated bootstrap reports completed
    requests on the cover's gold progress rule; neither tap, back, nor a
    paper-stack swipe can expose an unprepared reader. While the cover remains closed, Android parses all
    77,429 cached QF word rows into its process-lifetime lookup maps and opens
    and verifies the complete bundled SQLite file into its native page cache;
    the first chapter therefore does no deferred cache work. Web already
    retains the complete sql.js database buffer. The cover opens only after
-   local preparation and the runtime-cache decision finish. Offline failure
-   still releases the independent reader.
+   local preparation and the runtime-cache decision finish. A failed due refresh
+   releases the reader only while the previously committed cache remains current.
 3. Validate full-corpus coverage, then commit snapshot rows, source age, and the
    new opaque token atomically. A failed page, partial snapshot, parse, or write
    preserves the prior token and rows. Android's short “Quran cache refreshed”

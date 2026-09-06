@@ -33,7 +33,8 @@ class RuntimeMushafCacheTest {
         assertFalse(runtimeMushafEntranceReady(status(RuntimeCachePhase.REFRESHING), 100L))
         assertFalse(runtimeMushafEntranceReady(status(RuntimeCachePhase.REFRESHING, 0L), QF_MAX_CACHE_AGE_MS + 1))
         assertTrue(runtimeMushafEntranceReady(status(RuntimeCachePhase.REFRESHING, 90L), 100L))
-        assertTrue(runtimeMushafEntranceReady(status(RuntimeCachePhase.ERROR), 100L))
+        assertFalse(runtimeMushafEntranceReady(status(RuntimeCachePhase.ERROR), 100L))
+        assertTrue(runtimeMushafEntranceReady(status(RuntimeCachePhase.ERROR, 90L), 100L))
     }
 
     @Test
@@ -199,6 +200,24 @@ class RuntimeMushafCacheTest {
         cache.refreshIfNeeded()
         runCurrent()
         assertEquals(2, api.syncs)
+    }
+
+    @Test
+    fun `missing cache retries a transient first load failure automatically`() = runTest {
+        val api = CountingApi { error("offline") }
+        val cache = RuntimeMushafCache(
+            api, Store(), backgroundScope,
+            nowMs = { testScheduler.currentTime }, minimumWords = 1,
+        )
+
+        cache.refreshIfNeeded()
+        runCurrent()
+        assertEquals(1, api.syncs)
+
+        advanceTimeBy(5_000)
+        runCurrent()
+        assertEquals(2, api.syncs)
+        assertFalse(runtimeMushafEntranceReady(cache.status(), testScheduler.currentTime))
     }
 
     @Test

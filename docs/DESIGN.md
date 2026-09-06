@@ -947,15 +947,16 @@ from the first paint while `quran.db` opens and a missing or expired word/QCF
 cache refreshes. A narrow gold rule below the loading text shows determinate
 request progress for the first authenticated bootstrap and a quiet travelling segment
 when the provider cannot expose a total. The du'a wash and hinge open wait until the book is ready; an
-offline refresh failure releases the cover to the independent reader rather
-than trapping it. Frame insets, corner
+offline refresh failure releases the cover only when a still-current cache can
+serve the reader. A first install stays closed and retries with bounded backoff
+instead of exposing blank Mushaf pages. Frame insets, corner
 seals, medallion, and type are derived from the live board width × height via
 a 48-unit modular grid (`coverLayout`) so ornaments stay pressed seals — not
 fixed pinpricks — across phone and sheet-column boards.)
 
 A tap anywhere (or back) skips the remaining ceremony at once, then opens as
-soon as the initial content check succeeds or fails offline. A fresh cache never
-adds a wait. The ceremony plays only once per session (`rememberSaveable`), so
+soon as a complete current cache is ready. A fresh cache never adds a wait. The
+ceremony plays only once per session (`rememberSaveable`), so
 rotations and process restores land straight on the sheets. The title letter
 wash runs once on arrival (both Arabic and English from the right); skip
 cancels the in-flight moment without replaying it. The status bar is hidden

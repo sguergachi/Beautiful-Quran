@@ -68,6 +68,8 @@ class RuntimeMushafCache(
     private var parsedBySurah = emptyMap<Int, Map<Pair<Int, Int>, RuntimeMushafWord>>()
     private var refreshJob: Job? = null
     private var expiryJob: Job? = null
+    private var retryJob: Job? = null
+    private var retryAttempt = 0
     private val _changes = MutableSharedFlow<Unit>(
         extraBufferCapacity = 1,
         onBufferOverflow = BufferOverflow.DROP_OLDEST,
@@ -148,6 +150,9 @@ class RuntimeMushafCache(
                 }
                 unreadableToken = null
                 purgedSupplementToken = null
+                retryAttempt = 0
+                retryJob?.cancel()
+                retryJob = null
                 rememberUpdatedAt(state)
                 scheduleChecks(state)
                 _changes.tryEmit(Unit)
@@ -156,6 +161,8 @@ class RuntimeMushafCache(
                 validatedWords = null
                 blockReadRefresh = true
                 if (error is QfAccessRevokedException) {
+                    retryJob?.cancel()
+                    retryJob = null
                     store.clear()
                     cachedState = null
                     parsedToken = null
@@ -168,6 +175,7 @@ class RuntimeMushafCache(
                 } else {
                     cachedState = store.state(FILTER)
                     updateResource { it.copy(lastError = error.message ?: error::class.simpleName) }
+                    if (cachedState == null) scheduleRetry()
                 }
             } finally {
                 synchronized(this@RuntimeMushafCache) { syncing = false }
@@ -350,6 +358,18 @@ class RuntimeMushafCache(
         }
     }
 
+    /** A transient first-load failure must not leave an empty reader until the next process start. */
+    private fun scheduleRetry() {
+        if (retryJob?.isActive == true) return
+        val retryDelay = RETRY_DELAYS_MS[retryAttempt.coerceAtMost(RETRY_DELAYS_MS.lastIndex)]
+        retryAttempt++
+        retryJob = scope.launch {
+            delay(retryDelay)
+            retryJob = null
+            refreshIfNeeded()
+        }
+    }
+
     /** Non-Content-Sync verse supplements may be retained for at most one week. */
     private fun purgeExpiredSupplement(state: QfSyncState?) {
         if (state == null || isQfContentFresh(state.updatedAtMs, nowMs()) || purgedSupplementToken == state.token) return
@@ -363,6 +383,7 @@ class RuntimeMushafCache(
     private companion object {
         const val MUSHAF_ID = 1
         const val RECORD_TYPE = "mushaf_word"
+        val RETRY_DELAYS_MS = longArrayOf(5_000, 15_000, 60_000, 5 * 60_000)
         val FILTER = QF_READER_FILTER
         fun key(surahId: Int, ayah: Int, position: Int) = "$surahId:$ayah:$position"
     }
@@ -405,10 +426,9 @@ internal fun parseMushafWord(record: JsonObject): RuntimeMushafWord {
     )
 }
 
-/** Hold the cold-start cover only for a missing/expired cache that can still refresh. */
+/** The reader may open only when a complete, still-current QF cache exists. */
 internal fun runtimeMushafEntranceReady(status: RuntimeCacheStatus, nowMs: Long): Boolean =
-    status.phase == RuntimeCachePhase.ERROR ||
-        status.updatedAtMs?.let { isQfContentFresh(it, nowMs) } == true
+    status.updatedAtMs?.let { isQfContentFresh(it, nowMs) } == true
 
 private fun JsonObject.int(name: String) =
     get(name)?.jsonPrimitive?.intOrNull ?: error("Mushaf field $name is missing")
