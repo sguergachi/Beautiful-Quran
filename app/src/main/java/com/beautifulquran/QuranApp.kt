@@ -1,6 +1,8 @@
 package com.beautifulquran
 
 import android.app.Application
+import android.net.ConnectivityManager
+import android.net.Network
 import com.beautifulquran.assistant.AssistantAction
 import com.beautifulquran.assistant.VoiceShortcuts
 import com.beautifulquran.data.BookmarkRepository
@@ -10,8 +12,12 @@ import com.beautifulquran.data.DictionaryRepository
 import com.beautifulquran.data.EnglishBookCache
 import com.beautifulquran.data.LexiconDatabase
 import com.beautifulquran.data.LexiconRepository
+import com.beautifulquran.data.QfContentCacheDatabase
+import com.beautifulquran.data.QfContentSyncHttpApi
 import com.beautifulquran.data.QuranDatabase
 import com.beautifulquran.data.QuranRepository
+import com.beautifulquran.data.RuntimeMushafCache
+import com.beautifulquran.data.readCanonicalWords
 import com.beautifulquran.data.SearchConceptRepository
 import com.beautifulquran.data.SettingsRepository
 import com.beautifulquran.ornamentslab.OrnamentSeedStore
@@ -22,6 +28,9 @@ import com.beautifulquran.timingslab.TimingOverrides
 import com.beautifulquran.tarjilab.ReciterTarjiProfiles
 import com.beautifulquran.ui.reader.InkEngine
 import com.beautifulquran.ui.reader.InkLabStore
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableSharedFlow
 
 class QuranApp : Application() {
@@ -61,12 +70,39 @@ class QuranApp : Application() {
     /** Per-reciter tarjīʿ detector knobs — applied after the Ink Lab snapshot. */
     lateinit var tarjiProfiles: ReciterTarjiProfiles
         private set
+    /** Authenticated QF word/QCF fields live here, never in the bundled database. */
+    var runtimeMushaf: RuntimeMushafCache? = null
+        private set
 
     override fun onCreate() {
         super.onCreate()
         DevProfiling.install(this)
         val overrides = TimingOverrides(this)
-        repository = QuranRepository(QuranDatabase(this), overrides, SearchConceptRepository(this))
+        val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        val database = QuranDatabase(this)
+        val store = QfContentCacheDatabase(this)
+        runtimeMushaf = RuntimeMushafCache(
+            QfContentSyncHttpApi(BuildConfig.QF_CONTENT_BASE_URL, cacheDir),
+            store,
+            appScope,
+            canonicalWords = { readCanonicalWords(database) },
+        )
+        repository = QuranRepository(
+            database,
+            overrides,
+            SearchConceptRepository(this),
+            runtimeMushaf,
+        )
+        runtimeMushaf?.refreshIfNeeded()
+        if (runtimeMushaf != null) {
+            getSystemService(ConnectivityManager::class.java).registerDefaultNetworkCallback(
+                object : ConnectivityManager.NetworkCallback() {
+                    override fun onAvailable(network: Network) {
+                        runtimeMushaf?.refreshIfNeeded()
+                    }
+                },
+            )
+        }
         lexicon = LexiconRepository(LexiconDatabase(this))
         dictionary = DictionaryRepository(DictionaryDatabase(this))
         settings = SettingsRepository(this)

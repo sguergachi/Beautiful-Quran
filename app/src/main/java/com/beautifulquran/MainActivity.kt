@@ -2,6 +2,7 @@ package com.beautifulquran
 
 import android.content.Intent
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -65,7 +66,9 @@ import com.beautifulquran.assistant.AssistantIntents
 import com.beautifulquran.assistant.ForegroundAppFunctions
 import com.beautifulquran.data.HomeBookmarkStyle
 import com.beautifulquran.data.ReadingLayout
+import com.beautifulquran.data.RuntimeCachePhase
 import com.beautifulquran.data.ThemeMode
+import com.beautifulquran.data.runtimeMushafEntranceReady
 import com.beautifulquran.ui.AppViewModelFactory
 import com.beautifulquran.ui.PageTurnSounds
 import com.beautifulquran.ornamentslab.OrnamentsLabScreen
@@ -152,8 +155,8 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        // Hold the leather splash until the first Compose frame paints — either
-        // the closed mushaf (cold start) or the sheets (deep-link skip).
+        // Hold the leather splash until the closed mushaf paints, or until a
+        // deep-link launch has both drawn its sheets and warmed the Quran DB.
         var splashPending = true
         installSplashScreen().setKeepOnScreenCondition { splashPending }
         enableEdgeToEdge()
@@ -179,7 +182,52 @@ class MainActivity : ComponentActivity() {
             LaunchedEffect(Unit) {
                 app.assistantActions.collect { pendingAssistantAction.value = it }
             }
+            LaunchedEffect(Unit) {
+                app.runtimeMushaf!!.refreshes.collect {
+                    Toast.makeText(
+                        this@MainActivity,
+                        "Quran cache refreshed",
+                        Toast.LENGTH_SHORT,
+                    ).show()
+                }
+            }
             val settings by app.settings.settings.collectAsStateWithLifecycle()
+            val mushafDiagnostics by app.runtimeMushaf!!.diagnostics.collectAsStateWithLifecycle()
+            val mushafStatus = remember(mushafDiagnostics) { app.runtimeMushaf!!.status() }
+            val mushafReady = runtimeMushafEntranceReady(mushafStatus, System.currentTimeMillis())
+            val mushafProgress = mushafDiagnostics.syncProgress
+            var mushafMemoryReady by remember { mutableStateOf(false) }
+            LaunchedEffect(mushafReady, mushafStatus.updatedAtMs) {
+                mushafMemoryReady = false
+                if (mushafReady) {
+                    mushafMemoryReady = app.repository.warmRuntimeMushaf() == true
+                }
+            }
+            var databaseReady by remember { mutableStateOf(false) }
+            LaunchedEffect(Unit) {
+                app.repository.warmDatabase()
+                databaseReady = true
+            }
+            val contentReady = mushafReady && mushafMemoryReady && databaseReady
+            val contentLoadLabel = when {
+                mushafReady && !mushafMemoryReady -> "Caching Quran pages"
+                mushafReady && !databaseReady -> "Caching Quran database"
+                else -> when (mushafStatus.phase) {
+                    RuntimeCachePhase.REFRESHING -> when {
+                        mushafDiagnostics.requestsSettled && mushafStatus.apiCalls > 0 ->
+                            "Saving Quran pages · ${mushafStatus.apiCalls} requests complete"
+                        mushafProgress != null && mushafProgress.completed == mushafProgress.total ->
+                            "Checking Quran pages"
+                        mushafProgress != null ->
+                            "Downloading Quran pages · ${mushafProgress.completed} of ${mushafProgress.total} requests"
+                        mushafStatus.apiCalls > 0 ->
+                            "Downloading Quran pages · ${mushafStatus.apiCalls} API requests"
+                        else -> "Preparing Quran pages"
+                    }
+                    RuntimeCachePhase.ERROR -> "Retrying Quran pages"
+                    else -> "Preparing Quran pages"
+                }
+            }
             val assistantAction by pendingAssistantAction.collectAsStateWithLifecycle()
             val systemDark = isSystemInDarkTheme()
             val usesNightfall = settings.themeMode == ThemeMode.DARK ||
@@ -195,8 +243,9 @@ class MainActivity : ComponentActivity() {
             LaunchedEffect(assistantAction) {
                 if (assistantAction != null) entranceDone = true
             }
-            // Deep links skip the cover: dismiss splash as soon as sheets draw.
-            if (entranceDone) {
+            // Deep links skip the cover, but the OS splash still owns launch
+            // until both the bundled DB and runtime QF lookup maps are warm.
+            if (entranceDone && contentReady) {
                 SideEffect { splashPending = false }
             }
 
@@ -236,6 +285,12 @@ class MainActivity : ComponentActivity() {
                         EntranceCover(
                             chrome = coverChrome,
                             ornament = coverOrnament,
+                            contentReady = contentReady,
+                            loadLabel = contentLoadLabel,
+                            loadProgress = when {
+                                mushafDiagnostics.requestsSettled -> 1f
+                                else -> mushafProgress?.fraction
+                            },
                             onOpenBegan = {
                                 val sounds = coverSounds
                                     ?: PageTurnSounds(this@MainActivity).also { coverSounds = it }

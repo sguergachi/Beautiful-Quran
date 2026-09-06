@@ -23,11 +23,18 @@ jobs:
           distribution: temurin
           java-version: "21"
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
       - name: Verify bundled Quran database asset
         run: test -s data/quran.db && test -s data/lexicon.db && test -s data/dictionary.db
 
       - name: Timing pipeline regressions
         run: python3 tools/test_build_db.py
+
+      - name: QF proxy regressions
+        run: node --test worker/test/*.test.mjs
 
       - name: Accept Android SDK licenses
         run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true

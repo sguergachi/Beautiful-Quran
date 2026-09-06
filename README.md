@@ -5,13 +5,13 @@ A beautiful, simple Quran reader for Android and the web. Its signature feature 
 illuminates in time with the audio, with its English meaning beneath it.
 
 - 📖 Full Quran, Uthmani script, in the KFGQPC Hafs typeface
-- ✨ Word-by-word highlighting synced to reciters with bundled timing data
+- ✨ Word-by-word highlighting with bundled offline timing fallback
 - 🎙️ 7 reciters, with ayah audio streamed and cached
 - 🈯 Word-by-word English gloss + Saheeh International translation
 - 🔁 Repeat one ayah, the whole surah, or any ayah range you choose
 - 🔍 Search the English translation and word glosses within a surah
 - 🌙 Warm paper light theme and near-black charcoal dark theme
-- 📴 All text and timing data bundled offline; audio streams and caches
+- 📴 All Quran text and repeat-aware timings work offline
 - 🚫 No ads, no accounts, no analytics
 
 ## Install on your phone
@@ -35,7 +35,6 @@ matrix, testing commands, current platform limits, and full-support checklist.
 
 ```bash
 ./gradlew assembleDebug       # Android; copies data/quran.db into generated assets
-./gradlew assembleRelease     # optimized APK used by the GitHub release
 npm --prefix web ci
 npm --prefix web run build    # Web; copies the same database into dist
 ```
@@ -111,11 +110,27 @@ scripts/build_release_bundle.sh
 
 The script builds `BeautifulQuran-<versionName>.aab` in the repository root and
 verifies that it is signed with the upload certificate expected by Google Play.
+In a linked Git worktree it also checks the primary checkout for
+`release.keystore`; set `RELEASE_KEYSTORE_FILE` to use a key stored elsewhere.
 
-`tools/build_db.py` downloads the Quran text, word-by-word data, and word-level
-audio timings, validates them against each other, and packs them into a single
-SQLite asset. CI (GitHub Actions) runs unit tests on every push; on `master`
+`tools/build_db.py` downloads Quran text, morphology, open quran-align timings,
+and QDC repeat topology, then normalizes and validates the result offline. The
+committed asset contains no QF word gloss, transliteration, QCF, or page-layout
+values. Android and web fetch those fields from the authenticated Quran
+Foundation Content API into a separate seven-day device cache.
+Repeat-aware timings are bundled in `quran.db`, work fully offline, and change
+only through a reviewed app release. CI (GitHub Actions) runs unit tests on
+every push; on `master`
 it also assembles the release APK and publishes it to the rolling latest release.
+
+Released clients call the narrow Cloudflare Worker at
+`https://beautiful-quran.sguergachi.workers.dev`; it holds the QF client secret,
+obtains short-lived tokens, and exposes only the approved reader resources.
+The first authenticated Content Sync completes behind the closed-mushaf loading
+screen. Android and web then refresh from an opaque checkpoint after six days,
+apply QF's row deltas atomically, and withhold QF fields after seven days until a
+successful update. No credential is embedded in either client, and the Worker
+stores no Quran content or user data.
 
 ## Run in an Android emulator on Linux
 
@@ -203,16 +218,16 @@ If host Vulkan is broken on your machine, you can still fall back with
 - [docs/GLIMMER.md](docs/GLIMMER.md) — the Nightfall white-gold fresh-ink glimmer, repeat retriggering, halo rendering, tuning, and artifact checks
 - [docs/ROOT_VIEWER.md](docs/ROOT_VIEWER.md) — hold-to-reveal root lexicon: counts, ayah concordance, jump-to-chapter
 - [docs/TIMINGS_LAB.md](docs/TIMINGS_LAB.md) — in-app timing editor (developer mode)
-- [docs/QF_CONTENT_SYNC.md](docs/QF_CONTENT_SYNC.md) — authenticated Quran Foundation Content API migration and offline-sync gate
+- [docs/QF_CONTENT_SYNC.md](docs/QF_CONTENT_SYNC.md) — authenticated Quran Foundation Content Sync architecture and release checklist
 
 ## Data & attribution
 
 | Content | Source | License |
 |---|---|---|
 | Uthmani text + Saheeh Intl. translation | [quran-json](https://github.com/risan/quran-json) (Tanzil / Al Quran Cloud) | free with attribution |
-| Word-by-word gloss + transliteration | Quran.com dataset via npm | free with attribution |
+| Word-by-word gloss + transliteration + QCF layout (runtime cache only) | Quran Foundation authenticated Content API | governed by QF Developer Terms |
 | Root / lemma / morphology | [Quranic Arabic Corpus](http://corpus.quran.com) v0.4 | free with attribution + link |
-| Word timing segments | [cpfair/quran-align](https://github.com/cpfair/quran-align) | CC-BY 4.0 |
-| Repeat-aware timing segments | [quran.com](https://quran.com) `qdc` audio API | free with attribution |
+| Word timing clock/fallback | [cpfair/quran-align](https://github.com/cpfair/quran-align) | CC-BY 4.0 |
+| Bundled repeat topology | [quran.com](https://quran.com) legacy `qdc` audio API, normalized offline | written QF permission requested before release |
 | Recitation audio | [everyayah.com](https://everyayah.com) | free; rights remain with reciters |
-| Arabic typeface | KFGQPC HAFS Uthmanic Script, King Fahd Complex | free redistribution |
+| Arabic typeface | KFGQPC HAFS Uthmanic Script, King Fahd Complex | redistribution permission/official license confirmation pending |

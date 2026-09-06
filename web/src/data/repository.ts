@@ -1,5 +1,6 @@
 import { openDatabase, queryAll, queryOne, type LoadProgress } from './database'
 import { pickLemmaGloss, type GlossVote } from './lemmaGloss'
+import { runtimeMushafCache } from './runtimeMushaf'
 import type {
   Ayah,
   Reciter,
@@ -85,17 +86,19 @@ export function surahContent(surahId: number): SurahContent {
 
   const wordsByAyah = new Map<number, Word[]>()
   queryAll(
-    `SELECT ayah_number, position, arabic, translation_en, transliteration
+    `SELECT ayah_number, position, arabic
      FROM words WHERE surah_id = ? ORDER BY ayah_number, position`,
     [surahId],
     (r) => {
       const ayah = Number(r.ayah_number)
+      const position = Number(r.position)
+      const runtime = runtimeMushafCache?.word(surahId, ayah, position)
       const list = wordsByAyah.get(ayah) ?? []
       list.push({
-        position: Number(r.position),
+        position,
         arabic: String(r.arabic),
-        translation: String(r.translation_en),
-        transliteration: String(r.transliteration),
+        translation: runtime?.translation_en ?? '',
+        transliteration: runtime?.transliteration ?? '',
       })
       wordsByAyah.set(ayah, list)
       return null
@@ -103,7 +106,7 @@ export function surahContent(surahId: number): SurahContent {
   )
 
   const ayahs: Ayah[] = queryAll(
-    'SELECT ayah_number, text_uthmani, translation_en, page FROM ayahs WHERE surah_id = ? ORDER BY ayah_number',
+    'SELECT ayah_number, text_uthmani, translation_en FROM ayahs WHERE surah_id = ? ORDER BY ayah_number',
     [surahId],
     (r) => {
       const n = Number(r.ayah_number)
@@ -112,7 +115,7 @@ export function surahContent(surahId: number): SurahContent {
         number: n,
         text: String(r.text_uthmani),
         translation: String(r.translation_en),
-        page: Number(r.page),
+        page: runtimeMushafCache?.word(surahId, n, 1)?.ayah_page ?? 0,
         words: wordsByAyah.get(n) ?? [],
       }
     },
@@ -238,24 +241,33 @@ export function rootSummary(root: string): RootSummary | null {
       ayahNumber: Number(r.ayah_number),
       position: Number(r.position),
       arabic: String(r.arabic),
-      translation: String(r.translation_en),
+      translation: runtimeMushafCache?.word(
+        Number(r.surah_id), Number(r.ayah_number), Number(r.position),
+      )?.translation_en ?? String(r.translation_en),
       surahNameTransliteration: String(r.name_transliteration),
     }),
   )
 
   // Every rendering of every form under this root: the counts add up to the
-  // form's frequency, and they elect its English gloss.
+  // form's frequency, and they elect its English gloss. Rows come back
+  // ungrouped so each word's gloss can be overlaid from the runtime cache;
+  // pickLemmaGloss pools the single votes by normalized key, which is what
+  // the former GROUP BY translation_en did in SQL.
   const renderings = queryAll(
-    `SELECT m.lemma, m.pos, w.translation_en, COUNT(*) AS occurrence_count
+    `SELECT m.lemma, m.pos, m.surah_id, m.ayah_number, m.position
      FROM word_morphology m
      JOIN words w ON w.surah_id = m.surah_id AND w.ayah_number = m.ayah_number AND w.position = m.position
-     WHERE m.root = ? AND m.lemma <> ''
-     GROUP BY m.lemma, m.pos, w.translation_en`,
+     WHERE m.root = ? AND m.lemma <> ''`,
     [root],
     (r) => ({
       lemma: String(r.lemma),
       pos: String(r.pos),
-      vote: { translation: String(r.translation_en), count: Number(r.occurrence_count) },
+      vote: {
+        translation: runtimeMushafCache?.word(
+          Number(r.surah_id), Number(r.ayah_number), Number(r.position),
+        )?.translation_en ?? '',
+        count: 1,
+      },
     }),
   )
   const forms = new Map<string, { lemma: string; pos: string; votes: GlossVote[] }>()
@@ -322,9 +334,11 @@ function buildWordSearchIndex(): WordSearchIndexEntry[] {
     (r) => {
       const surahId = Number(r.surah_id)
       const ayahNumber = Number(r.ayah_number)
+      const position = Number(r.position)
       const arabic = String(r.arabic)
-      const translation = String(r.translation_en)
-      const transliteration = String(r.transliteration)
+      const runtime = runtimeMushafCache?.word(surahId, ayahNumber, position)
+      const translation = runtime?.translation_en ?? String(r.translation_en)
+      const transliteration = runtime?.transliteration ?? String(r.transliteration)
       const meta = ayahMeta.get(`${surahId}:${ayahNumber}`)
       const names = surahNames.get(surahId)
       index.push({
@@ -412,6 +426,13 @@ function wordSearchIndexRows(): WordSearchIndexEntry[] {
   return wordSearchIndex
 }
 
+/** Drop views that embed runtime word content after an atomic cache update. */
+export function invalidateRuntimeMushafViews(): void {
+  surahContentCache.clear()
+  wordSearchIndex = null
+  wordSearchIndexPromise = null
+}
+
 /**
  * Build the word-search index on demand after the user starts a word query.
  * It is intentionally not warmed at boot: chapter taps take priority over a
@@ -490,6 +511,7 @@ export const QuranRepository = {
   rootSummary,
   searchWords,
   searchWordsAsync,
+  invalidateRuntimeMushafViews,
   warmWordSearchIndex,
   warmSearchConcepts,
 }

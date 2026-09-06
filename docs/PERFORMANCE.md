@@ -243,6 +243,16 @@ janky", first ask: is this the release APK?
 
 - The prepackaged SQLite DB is copied out of assets once, then opened
   read-only; all queries run on `Dispatchers.IO` through suspend functions.
+- During the closed-cover load, Android sizes SQLite's native page-cache ceiling
+  to the database file plus 1 MiB and runs `quick_check`, touching the complete
+  file before opening. The singleton connection retains that cache for the
+  process. It also reads and parses the separate 77,429-row QF cache once into
+  process-lifetime word and per-surah lookup maps, so no chapter pays that cost.
+  Web's sql.js database already retains the complete fetched buffer. Do not
+  create additional per-screen copies of either cache.
+- A QF invalidation snapshot is compared with the Android cache in memory and
+  only changed row identities are mutated in the transaction. Normal refreshes
+  use Content Sync's smaller native upsert/delete set directly.
 - A surah loads with exactly three queries (ayahs, words, timings) — no
   per-ayah round trips. Timings for one reciter+surah arrive as one query of
   compact JSON rows.

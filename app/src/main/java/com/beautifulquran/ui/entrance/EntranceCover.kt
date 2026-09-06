@@ -14,12 +14,14 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.AbsoluteRoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -30,6 +32,7 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameNanos
@@ -38,6 +41,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
@@ -46,8 +50,10 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.progressBarRangeInfo
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontStyle
@@ -76,7 +82,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
-/** The ceremony's three moments. Skipping jumps straight to Opening. */
+/** The ceremony's three moments. Skipping advances to Opening once content is ready. */
 private enum class EntrancePhase { Arriving, Dua, Opening }
 
 /** أعوذ بالله من الشيطان الرجيم — shown in text before the cover opens. */
@@ -136,8 +142,8 @@ private const val COVER_FRAME_SCALE = 1.10f
  * hand. The isti'adha then fades in as text — its Arabic ink washes across
  * the cover — and after a brief hold the board swings open on its left
  * hinge: the free edge comes toward the reader (out of the screen) and
- * travels right→left onto chapter selection. A tap anywhere, or back, opens
- * it at once.
+ * travels right→left onto chapter selection. A tap anywhere, or back, skips
+ * the ceremony but keeps the cover closed until required content is ready.
  *
  * Sits over the whole paper stack and leaves composition via [onFinished].
  * The system splash is the same leather; [chrome] is pre-read from the
@@ -153,6 +159,9 @@ private const val COVER_FRAME_SCALE = 1.10f
 fun EntranceCover(
     chrome: CoverWindowChrome,
     ornament: CoverOrnament,
+    contentReady: Boolean,
+    loadLabel: String,
+    loadProgress: Float?,
     onOpenBegan: () -> Unit,
     onFinished: () -> Unit,
     onReady: () -> Unit = {},
@@ -175,6 +184,7 @@ fun EntranceCover(
     // Caption fades up once the du'a moment begins — driven by phase so
     // composition does not poll the wash Animatable every frame.
     var captionVisible by remember { mutableStateOf(false) }
+    val currentContentReady by rememberUpdatedState(contentReady)
     val splashHandedOff = remember { booleanArrayOf(false) }
     val stackWarmed = remember { booleanArrayOf(false) }
     fun warmStackOnce() {
@@ -251,7 +261,7 @@ fun EntranceCover(
         if (phase != EntrancePhase.Opening) {
             skipRequested = true
             captionVisible = true
-            phase = EntrancePhase.Opening
+            if (contentReady) phase = EntrancePhase.Opening
         }
     }
 
@@ -294,6 +304,7 @@ fun EntranceCover(
         build.snapTo(1f)
         captionVisible = true
         warmStackOnce()
+        snapshotFlow { currentContentReady }.first { it }
         phase = EntrancePhase.Opening
         onOpenBegan()
         turn.animateTo(1f, tween(OPEN_MS, easing = CoverOpenEasing))
@@ -366,7 +377,11 @@ fun EntranceCover(
                     onClick = ::skipToOpening,
                 )
                 .semantics {
-                    contentDescription = "The Noble Quran — touch to open"
+                    contentDescription = if (contentReady) {
+                        "The Noble Quran — touch to open"
+                    } else {
+                        loadLabel
+                    }
                     role = Role.Button
                 },
         ) {
@@ -490,9 +505,61 @@ fun EntranceCover(
                         textAlign = TextAlign.Center,
                         color = CoverParchment.copy(alpha = 0.55f),
                     )
+                    if (!contentReady) {
+                        Spacer(Modifier.height(14.dp))
+                        Text(
+                            text = loadLabel,
+                            style = MaterialTheme.typography.bodySmall,
+                            textAlign = TextAlign.Center,
+                            color = CoverParchment.copy(alpha = 0.55f),
+                        )
+                        Spacer(Modifier.height(9.dp))
+                        CoverLoadProgress(
+                            progress = loadProgress,
+                            motion = sheen.value,
+                            modifier = Modifier.width(156.dp),
+                        )
+                    }
                 }
                 Spacer(Modifier.weight(0.5f))
             }
+        }
+    }
+}
+
+/** A tooled gold rule, not floating Material chrome, for cold-start progress. */
+@Composable
+private fun CoverLoadProgress(
+    progress: Float?,
+    motion: Float,
+    modifier: Modifier = Modifier,
+) {
+    val value = progress?.coerceIn(0f, 1f)
+    Canvas(
+        modifier
+            .height(2.dp)
+            .semantics {
+                progressBarRangeInfo = value?.let {
+                    ProgressBarRangeInfo(it, 0f..1f)
+                } ?: ProgressBarRangeInfo.Indeterminate
+            },
+    ) {
+        val radius = CornerRadius(size.height / 2f)
+        drawRoundRect(CoverParchment.copy(alpha = 0.14f), cornerRadius = radius)
+        if (value != null) {
+            drawRoundRect(
+                CoverAccents.goldBright.copy(alpha = 0.78f),
+                size = size.copy(width = size.width * value),
+                cornerRadius = radius,
+            )
+        } else {
+            val segment = size.width * 0.28f
+            drawRoundRect(
+                CoverAccents.goldBright.copy(alpha = 0.62f),
+                topLeft = Offset((size.width - segment) * motion, 0f),
+                size = size.copy(width = segment),
+                cornerRadius = radius,
+            )
         }
     }
 }

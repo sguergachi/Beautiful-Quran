@@ -43,6 +43,7 @@ from build_db import (  # noqa: E402
     normalize_text,
     offset_for_audio_onset,
     preserve_complete_repeat_topology,
+    parse_alignment_payload,
     preserve_peer_repeats,
     recover_negative_opening,
     refit_displaced_rows,
@@ -59,7 +60,6 @@ from timing_delta import (  # noqa: E402
     read_timing_rows,
     rejected_changes,
 )
-
 CASES_DIR = TOOLS / "timing_patch_cases"
 VERDICTS_DIR = TOOLS / "timing_verdicts"
 PIPELINES = frozenset(
@@ -472,6 +472,20 @@ def audit_bundled_db():
             )
         ):
             bad.append((rid, s, a))
+    provenance = dict(db.execute("SELECT key,value FROM data_provenance"))
+    provider_ok = True
+    if provenance.get("quran_com_content", "").startswith("excluded"):
+        provider_values = db.execute(
+            """
+            SELECT
+              SUM(length(translation_en)), SUM(length(transliteration)),
+              SUM(length(qcf_v2)), SUM(qcf_page), SUM(qcf_line),
+              SUM(CASE WHEN qcf_span_end <> position THEN 1 ELSE 0 END)
+            FROM words
+            """
+        ).fetchone()
+        ayah_pages = db.execute("SELECT SUM(page) FROM ayahs").fetchone()[0]
+        provider_ok = provider_values == (0, 0, 0, 0, 0, 0) and ayah_pages == 0
     row = db.execute(
         "SELECT segments FROM timings WHERE reciter_id=1 "
         "AND surah_id=2 AND ayah_number=214"
@@ -532,6 +546,27 @@ def audit_bundled_db():
         (4, 3, 113): 6_009,
         (4, 4, 88): 5_968,
         (7, 5, 109): 6_636,
+    }
+    # This is the phrase from Hani 5:2 that regressed to one long held word in
+    # quran-v54. Pin both passes so a one-pass fallback can never ship again.
+    exact &= [segment for segment in timings[(7, 5, 2)] if 19 <= segment[0] <= 23] == [
+        [19, 19_670, 20_970],
+        [20, 20_970, 21_600],
+        [21, 21_600, 22_100],
+        [22, 22_100, 23_570],
+        [19, 23_590, 25_300],
+        [20, 25_300, 25_980],
+        [21, 25_980, 26_620],
+        [22, 26_620, 27_890],
+        [23, 27_890, 29_810],
+    ]
+    exact &= dict(db.execute("SELECT key,value FROM data_provenance")) == {
+        "quran_com_content": "excluded from committed database; runtime cache only",
+        "timings": (
+            "QDC-derived repeat timings over everyayah recordings; "
+            "bundled app-release dataset"
+        ),
+        "qdc_delivery": "bundled; updated through app releases",
     }
     # A withheld row is an intentional whole-ayah fallback only when neither
     # source can describe the streamed recording safely. Pin every reciter's
@@ -609,13 +644,16 @@ def audit_bundled_db():
         "OR transliteration != trim(transliteration)"
     ).fetchone()[0]
     exact &= untrimmed == 0
-    # 4:152 — the reported English-only double space between أولئك and سوف.
+    # 4:152 — the public DB strips provider glosses; parity builds still pin
+    # the historical trailing-space regression to its normalized value.
     exact &= db.execute(
         "SELECT translation_en FROM words "
         "WHERE surah_id=4 AND ayah_number=152 AND position=10"
-    ).fetchone() == ("those",)
+    ).fetchone() == (
+        "" if provenance.get("quran_com_content", "").startswith("excluded") else "those",
+    )
     overrides = list((TOOLS / "timing_overrides").glob("*.json"))
-    return not bad and exact and not overrides and db.execute(
+    return not bad and exact and provider_ok and not overrides and db.execute(
         "PRAGMA integrity_check"
     ).fetchone()[0] == "ok"
 
@@ -631,7 +669,7 @@ def check_gloss_normalize():
 
 
 def check_qcf_v2_page_runs():
-    """Every page's glyphs in the bundled DB must be its font's own run.
+    """The public DB must not retain any Quran.com QCF glyph or layout value.
 
     Font QCF2{page} maps U+FC41 onward, one codepoint per glyph, to that page's
     words in reading order. A word labelled with a page whose font does not
@@ -640,26 +678,11 @@ def check_qcf_v2_page_runs():
     in the middle of the line. The check is the whole defect class, so it runs
     over all 604 pages rather than the one that was reported."""
     db = sqlite3.connect(ROOT / "data/quran.db")
-    pages = {}
-    for page, surah, ayah, position, glyphs in db.execute(
-        "SELECT qcf_page,surah_id,ayah_number,position,qcf_v2 FROM words "
-        "WHERE qcf_v2 <> ''"
-    ):
-        pages.setdefault(page, []).append((surah, ayah, position, glyphs))
+    retained = db.execute(
+        "SELECT COUNT(*) FROM words WHERE qcf_v2 <> '' OR qcf_page <> 0 OR qcf_line <> 0"
+    ).fetchone()[0]
     db.close()
-    if sorted(pages) != list(range(1, 605)):
-        return False
-    for page in sorted(pages):
-        codes = [
-            ord(ch)
-            for _s, _a, _p, glyphs in sorted(pages[page])
-            for ch in glyphs
-            if not ch.isspace()
-        ]
-        first = QCF_V2_FIRST_CODEPOINT
-        if codes != list(range(first, first + len(codes))):
-            return False
-    return True
+    return retained == 0
 
 
 def check_qcf_v2_run_assertion():
@@ -759,6 +782,10 @@ def check_recovered_boundary_repairs():
 def check_timing_delta():
     """Fail closed unless every shipped timing delta has current evidence."""
     try:
+        with sqlite3.connect(ROOT / "data" / "quran.db") as current:
+            provenance = dict(current.execute("SELECT key,value FROM data_provenance"))
+        if provenance.get("qdc_delivery") == "quran-align-only audit build":
+            return True, "QDC corpus intentionally excluded; quran-align fallback audited separately"
         base = subprocess.run(
             ["git", "merge-base", "HEAD", "origin/master"],
             cwd=ROOT,
@@ -782,6 +809,20 @@ def check_timing_delta():
     if rejected:
         return False, "; ".join(f"{change['key']}: {reason}" for change, reason in rejected)
     return True, f"{report['summary']['changedRows']} accepted timing DB delta(s)"
+
+
+def check_alignment_payload_parse():
+    rows = [{"surah": 1, "ayah": 1, "segments": [[0, 1, 2, 3]]}]
+    encoded = json.dumps(rows)
+    valid = (
+        parse_alignment_payload(encoded) == rows
+        and parse_alignment_payload(f"Crashed Command ['align']\n{encoded}") == rows
+    )
+    try:
+        parse_alignment_payload(f"unrecognized diagnostic\n{encoded}")
+        return False
+    except json.JSONDecodeError:
+        return valid
 
 
 def main():
@@ -835,6 +876,7 @@ def main():
     audio_onset_ok = check_audio_onset_pipeline()
     completion_ok = check_completion_pipeline()
     gloss_ok = check_gloss_normalize()
+    alignment_payload_ok = check_alignment_payload_parse()
     database_ok = audit_bundled_db()
     qcf_runs_ok = check_qcf_v2_page_runs()
     qcf_assert_ok = check_qcf_v2_run_assertion()
@@ -844,8 +886,12 @@ def main():
     print(f"  {'ok  ' if audio_onset_ok else 'FAIL'} audio evidence and onset checks")
     print(f"  {'ok  ' if completion_ok else 'FAIL'} complete fallback and physics checks")
     print(f"  {'ok  ' if gloss_ok else 'FAIL'} WBW gloss whitespace normalize")
+    print(
+        f"  {'ok  ' if alignment_payload_ok else 'FAIL'} "
+        "quran-align release payload parse"
+    )
     print(f"  {'ok  ' if database_ok else 'FAIL'} bundled timing database invariants")
-    print(f"  {'ok  ' if qcf_runs_ok else 'FAIL'} bundled QCF V2 page/font glyph runs")
+    print(f"  {'ok  ' if qcf_runs_ok else 'FAIL'} public DB excludes QCF V2 fields")
     print(f"  {'ok  ' if qcf_assert_ok else 'FAIL'} QCF V2 run assertion rejects a wrong page")
     print(f"  {'ok  ' if recovered_boundary_ok else 'FAIL'} recovered-row boundary deferral")
     print(f"  {'ok  ' if timing_delta_ok else 'FAIL'} fail-closed timing DB delta gate")
@@ -857,10 +903,12 @@ def main():
         failures.append(("timing finalizer", "completion/fallback checks failed", None))
     if not gloss_ok:
         failures.append(("gloss normalize", "trailing-space strip failed", None))
+    if not alignment_payload_ok:
+        failures.append(("quran-align payload", "release artifact parse failed", None))
     if not database_ok:
         failures.append(("bundled database", "timing audit failed", None))
     if not qcf_runs_ok:
-        failures.append(("bundled QCF V2 layout", "a page carries another page's glyphs", None))
+        failures.append(("public QCF exclusion", "Quran.com QCF data remains in quran.db", None))
     if not qcf_assert_ok:
         failures.append(("QCF V2 run assertion", "a wrong page number was not rejected", None))
     if not recovered_boundary_ok:
@@ -876,7 +924,7 @@ def main():
                 for line in str(detail).splitlines():
                     print(f"    {line}")
         return 1
-    print(f"all {len(cases) + 9} cases pass ({CASES_DIR.relative_to(Path.cwd())})")
+    print(f"all {len(cases) + 10} cases pass ({CASES_DIR.relative_to(Path.cwd())})")
     return 0
 
 

@@ -1,0 +1,10 @@
+{
+  "name": "beautiful-quran",
+  "main": "worker/src/index.mjs",
+  "compatibility_date": "2026-09-05",
+  "workers_dev": true,
+  "vars": {
+    "QF_ENV": "production",
+    "ALLOWED_ORIGIN": "https://sguergachi.github.io"
+  }
+}

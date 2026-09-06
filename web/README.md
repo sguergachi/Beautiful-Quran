@@ -14,6 +14,10 @@ GitHub Actions stages the marketing content from `docs/` and builds the reader
 under `/app/`, then deploys the combined tree as a GitHub Pages artifact. Build
 output is never committed back to `master`.
 
+Repository **Settings → Pages → Build and deployment → Source** must be
+**GitHub Actions**. Selecting the legacy `master /docs` source deploys only the
+marketing files and overwrites `/app/` with a 404.
+
 ## Quick start
 
 ```bash
@@ -25,15 +29,18 @@ npm run build    # static site → dist/
 npm run build:pages  # → ../_site/app (CI does this on master)
 ```
 
-Requires Node 20+. `npm run dev` and `npm run build` copy the canonical
+Requires Node 22+. `npm run dev` and `npm run build` copy the canonical
 `../data/quran.db` into the generated web assets. The database is committed
-once and shared with Android; there is no second data pipeline.
+once and shared with Android; it contains the reviewed repeat-aware timing
+dataset. The browser automatically fills a separate IndexedDB word/QCF cache
+through the authenticated Quran Foundation Content Sync proxy. QF credentials
+remain in Cloudflare and are never included in the web bundle.
 
 ## Architecture
 
 ```
 src/domain/     HighlightEngine, HighlightClock, basmalah and search policy
-src/data/       WASM SQLite (sql.js) over quran.db + settings/bookmarks
+src/data/       WASM SQLite + separate IndexedDB word/QCF cache
 src/playback/   Dual HTMLAudioElement + Cache API prefetch + Media Session + rAF clock
 src/render/     WordUnit / HafsWord / AyahBlock (directional ink + paper-cover bloom)
 src/ui/         paper stack plus Android-mirrored reader/focus/Ink/Fade policy
@@ -74,6 +81,10 @@ Engines are DOM-free and unit-tested against the Android JVM suites. See
   hard abut — no crossfade). Word highlight still uses the same per-ayah
   `positionMs` clock. Developer mode can disable it to A/B the legacy
   dual-`<audio>` transport.
+- Repeat-aware timings always come from the bundled database, so chapter open
+  and repeat highlighting require no timing network request.
+- The QF word/QCF cache bootstraps once, refreshes from its saved checkpoint
+  after six days, and withholds those fields after seven days until it can sync.
 - Click a word to play from there; right-click / long-press opens the Root Word Viewer.
 - Themes: Paper / Nightfall / Royal green (Settings).
 - Form controls use [Base UI](https://base-ui.com) primitives (`Select`,

@@ -20,7 +20,7 @@ object EnglishTypography {
     }
 
     /**
-     * Turns word-card glosses into continuous English prose. Quran.com's data
+     * Turns QF word-card glosses into continuous English prose. The source data
      * repeats one shared phrase on each Arabic word it spans; keep that phrase
      * once, while preserving genuine repetitions of the same Arabic word.
      */
