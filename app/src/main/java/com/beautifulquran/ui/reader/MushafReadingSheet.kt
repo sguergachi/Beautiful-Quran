@@ -56,6 +56,7 @@ import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import androidx.media3.common.Player
 import com.beautifulquran.data.PageNumberScript
+import com.beautifulquran.data.RuntimeCacheStatus
 import com.beautifulquran.domain.MUSHAF_LINE_PITCH_EM
 import kotlin.math.roundToInt
 import com.beautifulquran.domain.MushafGrid
@@ -65,6 +66,7 @@ import kotlin.math.pow
 import com.beautifulquran.playback.PlayerUiState
 import com.beautifulquran.ui.theme.HafsFontFamily
 import com.beautifulquran.ui.theme.ownedQuietClickable
+import com.beautifulquran.ui.theme.quietClickable
 
 internal val MushafGutterSlot = 44.dp
 /**
@@ -694,5 +696,48 @@ private fun GutterIcon(
 ) {
     IconButton(onClick = onClick, enabled = enabled, modifier = modifier.size(40.dp)) {
         Icon(image, contentDescription = label, tint = tint, modifier = Modifier.size(20.dp))
+    }
+}
+
+/**
+ * The blank leaf, with its reason on it. A leaf that never explains a wait
+ * reads as a broken book; a tap retries at once instead of waiting out the
+ * backoff. Ink strengths, never chrome: the line sits in the page.
+ */
+@Composable
+internal fun MushafEmptyLeaf(
+    status: RuntimeCacheStatus,
+    onRetry: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val message = remember(status) { mushafEmptyLeafMessage(status) }
+    val ink = MaterialTheme.colorScheme.onBackground
+    Box(
+        modifier
+            .fillMaxSize()
+            .quietClickable(onClick = onRetry),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (message == null) return@Box
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.padding(horizontal = 32.dp),
+        ) {
+            Text(
+                message.line,
+                style = MaterialTheme.typography.bodyLarge,
+                color = ink.copy(alpha = 0.62f),
+                textAlign = TextAlign.Center,
+            )
+            message.subline?.let {
+                Text(
+                    it,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = ink.copy(alpha = 0.38f),
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(top = 6.dp),
+                )
+            }
+        }
     }
 }

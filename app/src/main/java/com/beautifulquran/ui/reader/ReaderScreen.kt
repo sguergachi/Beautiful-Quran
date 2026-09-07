@@ -1,6 +1,7 @@
 package com.beautifulquran.ui.reader
 
 import com.beautifulquran.DevProfiling
+import com.beautifulquran.QuranApp
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
@@ -276,6 +277,12 @@ fun ReaderScreen(
     var placeUnfurlTarget by remember(surahId) { mutableStateOf<ReadingPlace?>(null) }
     var placeUnfurlToken by remember(surahId) { mutableIntStateOf(0) }
     val mushafUi by viewModel.mushaf.collectAsStateWithLifecycle()
+    // What the blank leaf says while the pages have not arrived. Read here so
+    // the empty leaf always carries its reason — a blank that never explains
+    // itself reads as a broken book.
+    val quranApp = LocalContext.current.applicationContext as QuranApp
+    val mushafCacheDiagnostics by quranApp.runtimeMushaf!!.diagnostics.collectAsStateWithLifecycle()
+    val mushafCacheStatus = remember(mushafCacheDiagnostics) { quranApp.runtimeMushaf!!.status() }
     val mushafMode = settings.readingLayout == ReadingLayout.MUSHAF
     // The English leaf sets a straddling verse whole on the page it begins on,
     // so every "which leaf is the voice on" answer is the verse's opening leaf
@@ -2642,7 +2649,10 @@ fun ReaderScreen(
                         },
                     ) {
                     if (mushafReady == null) {
-                        Box(Modifier.fillMaxSize())
+                        MushafEmptyLeaf(
+                            status = mushafCacheStatus,
+                            onRetry = { quranApp.runtimeMushaf?.refresh() },
+                        )
                     } else {
                     val mushafSurahId = content.surah.id
                     // Deferred: the leaf reads playback where it uses it, so a

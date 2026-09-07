@@ -60,6 +60,8 @@ import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import com.beautifulquran.DevProfiling
 import com.beautifulquran.data.VerseNumberScript
+import com.beautifulquran.data.RuntimeCachePhase
+import com.beautifulquran.data.RuntimeCacheStatus
 import com.beautifulquran.data.model.Ayah
 import com.beautifulquran.data.model.Surah
 import com.beautifulquran.data.model.SurahContent
@@ -346,6 +348,37 @@ internal fun mushafBookLength(book: EnglishBook?, pageCount: Int): Int =
  */
 internal fun mushafLeafIndex(index: Int, leafCount: Int): Int =
     index.coerceIn(0, (leafCount - 1).coerceAtLeast(0))
+
+/** What the blank leaf says while the pages have not arrived, if anything. */
+internal data class MushafEmptyLeafMessage(val line: String, val subline: String?)
+
+/**
+ * The leaf is blank twice: for a breath on first paint with a warm cache
+ * (say nothing), and while the runtime snapshot is still loading or failing
+ * (say so, with the reason small beneath — a blank leaf that never explains
+ * itself reads as a broken book).
+ */
+internal fun mushafEmptyLeafMessage(status: RuntimeCacheStatus): MushafEmptyLeafMessage? =
+    when (status.phase) {
+        RuntimeCachePhase.FRESH -> null
+        RuntimeCachePhase.REFRESHING ->
+            if (status.apiCalls > 0) {
+                MushafEmptyLeafMessage(
+                    "Setting down the pages…",
+                    "${status.apiCalls} requests so far",
+                )
+            } else {
+                MushafEmptyLeafMessage("Preparing the pages…", null)
+            }
+        RuntimeCachePhase.ERROR ->
+            MushafEmptyLeafMessage(
+                "The pages could not be reached",
+                listOfNotNull(status.lastError, "trying again — tap to try now")
+                    .joinToString(" — "),
+            )
+        RuntimeCachePhase.EMPTY, RuntimeCachePhase.REFRESH_DUE, RuntimeCachePhase.EXPIRED ->
+            MushafEmptyLeafMessage("Preparing the pages…", null)
+    }
 
 /** A second page owns clocks only while the voice is crossing onto it. */
 internal fun mushafUsesLiveInk(
