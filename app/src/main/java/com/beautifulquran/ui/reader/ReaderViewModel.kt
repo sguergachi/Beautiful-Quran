@@ -190,14 +190,16 @@ data class MushafUi(
 )
 
 /**
- * The leaf may open only onto a finished book: a set catalog, and — for the
- * English leaf — set leaves. The catalog builds empty-but-non-null until the
- * runtime snapshot loads, so nullness alone cannot gate.
+ * The leaf may open only onto a finished book. The catalog builds
+ * empty-but-non-null until the runtime snapshot loads, so nullness alone
+ * cannot gate. Arabic needs only the catalog; English additionally waits for
+ * the measured book, since a counted book repaginated under the reader is a
+ * page rearranging itself.
  */
 internal fun mushafBookReady(mushaf: MushafUi?, englishOnly: Boolean): Boolean {
     val catalog = mushaf?.catalog ?: return false
     if (catalog.isEmpty()) return false
-    if (englishOnly && mushaf.englishBook.leafCount == 0) return false
+    if (englishOnly && (!mushaf.measured || mushaf.englishBook.leafCount == 0)) return false
     return true
 }
 
@@ -344,6 +346,22 @@ class ReaderViewModel(
                     prose[quranWordKey(surahId, ayah, 1)] ?: 0
                 }
             } else {
+                // The catalog is the Arabic leaf and the cover gate's whole
+                // world, so publish it now with the character estimate: the
+                // thousand-layout measure below must never hold them. The
+                // English leaf waits for measured=true before setting a word,
+                // and the gate holds English until the measured book lands.
+                if (generation == mushafGeneration) {
+                    val prose = repository.englishVerseProse(text)
+                    _mushaf.value = MushafUi(
+                        catalog,
+                        surahs,
+                        buildEnglishBook(catalog) { surahId, ayah ->
+                            prose[quranWordKey(surahId, ayah, 1)] ?: 0
+                        },
+                        measured = false,
+                    )
+                }
                 val words = repository.englishVerseText(text)
                 val verse = { surahId: Int, ayah: Int ->
                     words[quranWordKey(surahId, ayah, 1)].orEmpty()

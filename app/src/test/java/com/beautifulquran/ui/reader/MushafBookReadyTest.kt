@@ -48,8 +48,15 @@ class MushafBookReadyTest {
     }
 
     @Test
+    fun `english waits for the measured book, not the estimate`() {
+        val estimate = MushafUi(catalog, emptyMap(), book, measured = false)
+        assertTrue(mushafBookReady(estimate, englishOnly = false))
+        assertFalse(mushafBookReady(estimate, englishOnly = true))
+    }
+
+    @Test
     fun `set english leaf is ready`() {
-        val mushaf = MushafUi(catalog, emptyMap(), book)
+        val mushaf = MushafUi(catalog, emptyMap(), book, measured = true)
         assertTrue(mushafBookReady(mushaf, englishOnly = false))
         assertTrue(mushafBookReady(mushaf, englishOnly = true))
     }
