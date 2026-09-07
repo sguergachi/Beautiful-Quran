@@ -126,10 +126,20 @@ the atomic commit succeeds.
   bootstrap, validate 77,429 words / 6,236 verses / 604 pages, open the reader,
   then process-cold relaunch in 1.4 seconds with zero API calls.
 - [ ] Repeat the clean-bootstrap and relaunch check in a clean browser profile.
+  Evidence so far (2026-09-07): the production web client module was driven
+  end to end against the deployed Worker with the Pages `Origin` header — clean
+  bootstrap validated 77,429 words / 6,236 verses / 604 pages in 9 calls, and a
+  cold relaunch read the checkpoint with 0 calls. This needed a web mapper fix
+  (untranslated QF rows outside the reader alignment are now skipped, matching
+  Android's long-standing behavior). The literal Pages-origin browser pass still
+  wants a post-merge run: localhost can never clear the Worker's origin gate.
 - [x] Force an Android refresh and confirm the stored checkpoint is used,
   unchanged content remains readable, and the call counter reports six.
 - [ ] Force a browser refresh and confirm the stored checkpoint is used,
   unchanged content remains readable, and the call counter reports six.
+  Evidence so far (2026-09-07): same harness as above — forced refresh of
+  unchanged content used 6 calls with the checkpoint intact. Same Pages-origin
+  caveat as the browser bootstrap item.
 - [ ] Watch QF's update/deprecation notices and migrate within the announced
   window. Re-run the full-corpus mapper whenever resource schemas change.
 - [ ] Rotate the Cloudflare secret immediately after any suspected exposure and

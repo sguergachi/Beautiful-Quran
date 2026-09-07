@@ -20,9 +20,31 @@ describe('normalizeQfMushaf', () => {
     expect(rows[0]?.transliteration).toBe('live tr2')
     expect(rows[1]?.translation_en).toBe('t3')
   })
+
+  it('ignores untranslated rows QF ships outside the reader alignment', () => {
+    const rows = map('2:181', 14, 13, false, [{ word_id: 9001, text: null }, { word_id: 9002 }])
+
+    expect(rows[2]?.translation_en).toBe('t3')
+    expect(rows).toHaveLength(14)
+  })
+
+  it('still fails closed when a referenced word has no translation text', () => {
+    expect(() => map('2:181', 14, 13, false, [], [104])).toThrow('QF translation is missing for word 104')
+  })
 })
 
-function map(verseKey: string, canonicalCount: number, qfCount: number, supplement = false) {
+function map(
+  verseKey: string,
+  canonicalCount: number,
+  qfCount: number,
+  supplement = false,
+  extraTranslations: Record<string, unknown>[] = [],
+  untranslatedIds: number[] = [],
+) {
+  const translations = wordResource('word_by_word_translations', 59, qfCount, 't').records.map((row) => {
+    const record = row as Record<string, unknown>
+    return untranslatedIds.includes(Number(record.word_id)) ? { ...record, text: null } : record
+  })
   const resources: StoredQfResource[] = [
     {
       resourceGroup: 'mushafs', resourceId: 1,
@@ -41,7 +63,7 @@ function map(verseKey: string, canonicalCount: number, qfCount: number, suppleme
         },
       ],
     },
-    wordResource('word_by_word_translations', 59, qfCount, 't'),
+    { resourceGroup: 'word_by_word_translations', resourceId: 59, records: [...translations, ...extraTranslations] },
     wordResource('word_by_word_transliterations', 60, qfCount, 'tr'),
     {
       resourceGroup: 'word_supplements', resourceId: 1,

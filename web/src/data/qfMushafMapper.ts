@@ -155,8 +155,12 @@ function mapVerse(
 function groupedWordText(rows: Record<string, unknown>[]): Map<number, string[]> {
   const values = new Map<number, string[]>()
   for (const row of rows) {
+    // QF ships untranslated rows (text null) for words outside the reader
+    // alignment — Android skips them the same way. Referenced words still fail
+    // closed in requiredMap/single when no text row names their id.
+    if (typeof row.text !== 'string') continue
     const id = integer(row.word_id, 'word_id')
-    values.set(id, (values.get(id) ?? []).concat(string(row.text, 'text').trim()))
+    values.set(id, (values.get(id) ?? []).concat(row.text.trim()))
   }
   return values
 }
