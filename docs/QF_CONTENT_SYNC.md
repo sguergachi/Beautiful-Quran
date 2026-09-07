@@ -95,21 +95,6 @@ progress, current phase, update/refresh/expiry times, errors, calls this launch,
 and calls made by the last successful refresh. Android shows a toast only after
 the atomic commit succeeds.
 
-## Debug cache seed (never shipped)
-
-`python3 tools/seed_qf_cache.py` bakes the live bootstrap (three snapshots,
-five supplements, real sync token) into `app/build/generated/qfSeed/`, which
-only the debug source set mounts as an asset. On first launch with an empty
-cache the app imports the seed through the same transactional `apply()` and
-the same validation as a network sync, then continues with ordinary
-incremental refresh; a missing, stale, or corrupt seed fails closed back to a
-network bootstrap, and a populated cache is never touched.
-
-The output dir is gitignored build output: regenerating it is routine, and no
-seed bytes may be committed or packaged in release builds. The seed IS QF
-content, so baking or sharing it anywhere is redistribution — still gated on
-the written QF permission below, even for debug artifacts.
-
 ## Implemented compliance controls
 
 - [x] Production QF client credentials are stored only as Cloudflare secrets.
@@ -119,10 +104,8 @@ the written QF permission below, even for debug artifacts.
   are used; there is no QF user login or user-data scope.
 - [x] QF content is displayed only in the reader and is not sold, sublicensed,
   exposed as raw data, indexed, used for advertising, or used to train models.
-- [x] `quran.db`, the release APK, Git source, and the Pages artifact contain no
-  QF word gloss, transliteration, QCF glyph, QCF page/line, span, or ayah-page
-  values. Debug builds may carry a locally generated seed (see above) that is
-  never committed or shipped.
+- [x] `quran.db`, the APK, Git source, and the Pages artifact contain no QF word
+  gloss, transliteration, QCF glyph, QCF page/line, span, or ayah-page values.
 - [x] Android stores QF rows in `noBackupFilesDir/qf-content-cache.db`; web uses
   IndexedDB. Neither cache is committed or included in a release artifact.
 - [x] Content Sync checkpoints, idempotent mutations, relative paths, snapshot
