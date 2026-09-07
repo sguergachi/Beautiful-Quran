@@ -306,6 +306,45 @@ class RuntimeMushafCacheTest {
 
     private fun failingApi() = CountingApi { error("offline") }
 
+    @Test
+    fun `baked seed fills the empty cache without network`() = runTest {
+        val store = Store()
+        val api = CountingApi { error("should not fetch") }
+        val cache = RuntimeMushafCache(api, store, backgroundScope, { 100L }, minimumWords = 1)
+        cache.seedApplier = {
+            store.apply(filter, emptyList(), listOf(QfSnapshot(resource, listOf(row))), "seed-token", 90L, null)
+            true
+        }
+
+        cache.refresh()
+        runCurrent()
+
+        assertEquals("seeking", cache.word(5, 2, 19)?.translation)
+        assertEquals(0, api.syncs)
+        assertEquals(RuntimeCachePhase.FRESH, cache.status().phase)
+    }
+
+    @Test
+    fun `throwing seed falls through to a network bootstrap`() = runTest {
+        val store = Store()
+        val api = SnapshotApi()
+        val cache = RuntimeMushafCache(api, store, backgroundScope, { 100L }, minimumWords = 1)
+        cache.seedApplier = { error("bad seed") }
+
+        cache.refresh()
+        runCurrent()
+
+        assertEquals("seeking", cache.word(5, 2, 19)?.translation)
+        assertEquals(1, api.syncs)
+    }
+
+    @Test
+    fun `store reports retained rows without loading them`() {
+        val store = Store(null, listOf(row))
+        assertTrue(store.hasRows(resource, "mushaf_word"))
+        assertFalse(store.hasRows(resource, "missing_type"))
+    }
+
     private inner class SnapshotApi : QfContentSyncApi {
         var syncs = 0
         var lastRequest: QfSyncRequest? = null

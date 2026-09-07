@@ -139,6 +139,14 @@ android {
             qcfAssetsDir.get().asFile.parentFile.absolutePath,
         )
     }
+    sourceSets.named("debug") {
+        // Debug-only QF cache seed baked by tools/seed_qf_cache.py into
+        // build/generated/qfSeed (gitignored, never committed). Release does
+        // not mount this dir, so no QF content can ship in the artifact; when
+        // the dir is empty (seed not generated) the build is unchanged and
+        // the app falls back to a network bootstrap.
+        assets.srcDir(layout.buildDirectory.dir("generated/qfSeed").get().asFile.absolutePath)
+    }
     lint {
         // Media3's @UnstableApi opt-in trips lintVital on release builds; the
         // full lint task still reports it. CI ships release APKs, so keep

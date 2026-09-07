@@ -138,6 +138,12 @@ class QfContentCacheDatabase(context: Context) : QfContentSyncStore, QfRuntimeMu
         Unit
     }
 
+    override fun hasRows(resource: QfResource, recordType: String): Boolean =
+        db.rawQuery(
+            "SELECT 1 FROM cached_rows WHERE resource_group=? AND resource_id=? AND record_type=? LIMIT 1",
+            arrayOf(resource.group, resource.id.toString(), recordType),
+        ).use { it.moveToFirst() }
+
     override fun deleteResource(resource: QfResource) = db.transaction {
         deleteResourceRows(resource)
         Unit

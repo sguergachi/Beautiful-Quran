@@ -14,6 +14,7 @@ import com.beautifulquran.data.LexiconDatabase
 import com.beautifulquran.data.LexiconRepository
 import com.beautifulquran.data.QfContentCacheDatabase
 import com.beautifulquran.data.QfContentSyncHttpApi
+import com.beautifulquran.data.QfSeedApplier
 import com.beautifulquran.data.QuranDatabase
 import com.beautifulquran.data.QuranRepository
 import com.beautifulquran.data.RuntimeMushafCache
@@ -87,6 +88,17 @@ class QuranApp : Application() {
             appScope,
             canonicalWords = { readCanonicalWords(database) },
         )
+        // Baked checkpoint for empty caches. The asset exists only in debug
+        // builds (see app/build.gradle.kts); release builds skip silently.
+        runtimeMushaf?.let { cache ->
+            val seed = QfSeedApplier(
+                this,
+                store,
+                { readCanonicalWords(database) },
+                onValidated = cache::validateAppliedContent,
+            )
+            cache.seedApplier = seed::applyIfEmpty
+        }
         repository = QuranRepository(
             database,
             overrides,

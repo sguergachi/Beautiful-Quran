@@ -1,6 +1,7 @@
 package com.beautifulquran.data
 
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.delay
@@ -78,6 +79,11 @@ class RuntimeMushafCache(
     private val _refreshes = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
     /** Successful cache commits, distinct from expiry-driven reader changes. */
     val refreshes: SharedFlow<Unit> = _refreshes
+    /**
+     * Baked checkpoint applied when the cache holds no mushaf words (debug
+     * builds carry one; release builds do not). Set once by the app root.
+     */
+    internal var seedApplier: (suspend () -> Boolean)? = null
 
     init {
         (api as? QfNetworkCallReporter)?.setNetworkCallReporter(::countApiCall)
@@ -142,7 +148,17 @@ class RuntimeMushafCache(
         scope.launch {
             try {
                 validatedWords = null
-                syncer.sync(FILTER) { _diagnostics.value.apiCalls }
+                // A failing seed must never strand the launch: fall through to
+                // a network bootstrap. Cancellation still propagates.
+                val seeded = try {
+                    seedApplier?.invoke() == true
+                } catch (error: Exception) {
+                    if (error is CancellationException) throw error
+                    false
+                }
+                if (!seeded) {
+                    syncer.sync(FILTER) { _diagnostics.value.apiCalls }
+                }
                 val state = requireNotNull(store.state(FILTER)) { "QF sync did not save its checkpoint" }
                 cachedState = state
                 validatedWords?.let { installParsed(state, it) } ?: run {
@@ -210,7 +226,7 @@ class RuntimeMushafCache(
         return parsed.byKey
     }
 
-    private fun validateAppliedContent(changes: List<QfContentChange>) {
+    internal fun validateAppliedContent(changes: List<QfContentChange>) {
         if (changes.any { it !is QfContentChange.FreshnessMarker }) {
             (store as? QfRuntimeMushafStore)?.rebuildReaderWords(canonicalWords(), expectedQcfPages)
             validatedWords = parseStoredContent()

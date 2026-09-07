@@ -93,6 +93,10 @@ interface QfContentSyncStore {
     /** Deletes all QF content and private sync checkpoints on termination or revocation. */
     fun clear()
 
+    /** True when any row of this type is retained; cheaper than loading them. */
+    fun hasRows(resource: QfResource, recordType: String): Boolean =
+        rows(resource, recordType).isNotEmpty()
+
     /** Deletes one cached resource without changing its Content Sync checkpoint. */
     fun deleteResource(resource: QfResource)
 
