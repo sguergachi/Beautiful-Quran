@@ -227,11 +227,23 @@ class MainActivity : ComponentActivity() {
                         englishOnly = settings.readingMode == ReadingMode.ENGLISH_ONLY,
                     )
             }
-            val contentReady = mushafReady && mushafMemoryReady && databaseReady && mushafBookReady
+            // The splash releases on the bundled database alone — local work,
+            // seconds on any device. The QF fill streams in behind it from
+            // process start and the leaves pick it up live.
+            //
+            // One exception: a mushaf layout that has never held content has
+            // no leaf to show until the first fill lands, so the cover holds
+            // through that single download with live progress, then never
+            // again. A failed first fill releases (ERROR): the app stays
+            // usable and the leaf fills when the retry lands.
+            val mushafFirstFill = settings.readingLayout == ReadingLayout.MUSHAF &&
+                mushafStatus.updatedAtMs == null &&
+                (mushafStatus.phase == RuntimeCachePhase.EMPTY ||
+                    mushafStatus.phase == RuntimeCachePhase.REFRESHING) &&
+                !mushafBookReady
+            val contentReady = databaseReady && !mushafFirstFill
             val contentLoadLabel = when {
-                mushafReady && !mushafMemoryReady -> "Caching Quran pages"
-                mushafReady && !databaseReady -> "Caching Quran database"
-                mushafReady && !mushafBookReady -> "Setting the leaves"
+                !databaseReady -> "Caching Quran database"
                 else -> when (mushafStatus.phase) {
                     RuntimeCachePhase.REFRESHING -> when {
                         mushafDiagnostics.requestsSettled && mushafStatus.apiCalls > 0 ->
