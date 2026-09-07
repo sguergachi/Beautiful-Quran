@@ -66,10 +66,12 @@ import com.beautifulquran.assistant.AssistantIntents
 import com.beautifulquran.assistant.ForegroundAppFunctions
 import com.beautifulquran.data.HomeBookmarkStyle
 import com.beautifulquran.data.ReadingLayout
+import com.beautifulquran.data.ReadingMode
 import com.beautifulquran.data.RuntimeCachePhase
 import com.beautifulquran.data.ThemeMode
 import com.beautifulquran.data.runtimeMushafEntranceReady
 import com.beautifulquran.ui.AppViewModelFactory
+import com.beautifulquran.ui.reader.mushafBookReady
 import com.beautifulquran.ui.PageTurnSounds
 import com.beautifulquran.ornamentslab.OrnamentsLabScreen
 import com.beautifulquran.ornamentslab.OrnamentsLabViewModel
@@ -208,10 +210,28 @@ class MainActivity : ComponentActivity() {
                 app.repository.warmDatabase()
                 databaseReady = true
             }
-            val contentReady = mushafReady && mushafMemoryReady && databaseReady
+            // A mushaf layout opens only onto a finished book — set catalog,
+            // set leaves — so the leaf never paints blank paper waiting for
+            // work the root could have finished first. Scroll layouts skip.
+            // Same activity-owned instance the paper stack reads below.
+            val readerViewModel: ReaderViewModel = viewModel(factory = AppViewModelFactory)
+            val rootMushafUi by readerViewModel.mushaf.collectAsStateWithLifecycle()
+            val mushafBookReady = remember(
+                settings.readingLayout,
+                settings.readingMode,
+                rootMushafUi,
+            ) {
+                settings.readingLayout != ReadingLayout.MUSHAF ||
+                    mushafBookReady(
+                        rootMushafUi,
+                        englishOnly = settings.readingMode == ReadingMode.ENGLISH_ONLY,
+                    )
+            }
+            val contentReady = mushafReady && mushafMemoryReady && databaseReady && mushafBookReady
             val contentLoadLabel = when {
                 mushafReady && !mushafMemoryReady -> "Caching Quran pages"
                 mushafReady && !databaseReady -> "Caching Quran database"
+                mushafReady && !mushafBookReady -> "Setting the leaves"
                 else -> when (mushafStatus.phase) {
                     RuntimeCachePhase.REFRESHING -> when {
                         mushafDiagnostics.requestsSettled && mushafStatus.apiCalls > 0 ->

@@ -126,6 +126,9 @@ class MushafCatalog internal constructor(
 ) {
     val pageCount: Int = MUSHAF_PAGE_COUNT
 
+    /** True until the runtime snapshot it is built from has loaded. */
+    fun isEmpty(): Boolean = pagesByNumber.isEmpty()
+
     fun page(number: Int): MushafPage? = pagesByNumber[number]
 
     fun firstPageOf(surahId: Int): Int {

@@ -189,6 +189,18 @@ data class MushafUi(
     val measured: Boolean = false,
 )
 
+/**
+ * The leaf may open only onto a finished book: a set catalog, and — for the
+ * English leaf — set leaves. The catalog builds empty-but-non-null until the
+ * runtime snapshot loads, so nullness alone cannot gate.
+ */
+internal fun mushafBookReady(mushaf: MushafUi?, englishOnly: Boolean): Boolean {
+    val catalog = mushaf?.catalog ?: return false
+    if (catalog.isEmpty()) return false
+    if (englishOnly && mushaf.englishBook.leafCount == 0) return false
+    return true
+}
+
 data class ReaderUiState(
     val content: SurahContent? = null,
     /** Next surah in order, or null on chapter 114 / while loading. */
