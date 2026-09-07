@@ -41,7 +41,8 @@ class QuranDatabase(private val context: Context) {
 
     private fun ensureExtracted(): File {
         val file = File(context.noBackupFilesDir, DB_FILE_NAME)
-        if (!file.exists()) {
+        if (needsReextract(file.exists(), file.length(), assetLength())) {
+            file.delete()
             file.parentFile?.mkdirs()
             val tmp = File(file.parentFile, "$DB_FILE_NAME.tmp")
             context.assets.open("quran.db").use { input ->
@@ -62,6 +63,14 @@ class QuranDatabase(private val context: Context) {
         return file
     }
 
+    /** Length of the packaged asset when Android can report it without reading it. */
+    private fun assetLength(): Long? = try {
+        context.assets.openFd("quran.db").use { fd -> fd.length.takeIf { it > 0 } }
+    } catch (_: Exception) {
+        // Compressed assets expose no fd length; trust the versioned file.
+        null
+    }
+
     companion object {
         // Bump the suffix whenever the packaged database changes shape
         // (or content — e.g. a new reciter), so updated installs re-extract.
@@ -76,3 +85,16 @@ internal fun quranDatabaseCacheKiB(fileBytes: Long): Long {
     require(fileBytes >= 0)
     return (fileBytes + 1023L) / 1024L + 1024L
 }
+
+/**
+ * Whether the versioned copy must be dropped and extracted again.
+ *
+ * A copy that cannot be the asset it was extracted from is never opened:
+ * SQLite happily opens an empty file, and every query then dies with "no such
+ * table", so the app crash-loops until its data is cleared. Observed twice as
+ * a 0-byte quran-v57.db left behind by an install raced with its own first
+ * launch. Length is a sufficient proxy — the versioned name already pins the
+ * content (see [QuranDatabase.DB_FILE_NAME]).
+ */
+internal fun needsReextract(fileExists: Boolean, fileLength: Long, assetLength: Long?): Boolean =
+    !fileExists || fileLength == 0L || (assetLength != null && fileLength != assetLength)
