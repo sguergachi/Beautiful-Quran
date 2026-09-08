@@ -51,9 +51,9 @@ Root Viewer, and the bookmark ribbon (including its note hold) is inactive.
 The mode owns the tap — interactions are *replaced*, not stacked.
 
 **Mode chrome (visual QA):** gather ordinals live in the gold soak's
-top corner, still in the 38 dp bookmark gutter. 14 sp Garamond Western
-digits, tight ink-brush circle, 14 dp in from the soak rim on both
-the edge and the top so the loop stays on the gold. Not gold, not
+top corner, still in the 38 dp bookmark gutter. 16 sp Bold Garamond
+Western digits, tight ink-brush circle, 14 dp in from the soak rim on
+both the edge and the top so the loop stays on the gold. Not gold, not
 Arabic-Indic. The verse layout does not change.
 Gold soak and gather-bar takeover are shipped — see
 [VERSE_ACTIONS.md](VERSE_ACTIONS.md).

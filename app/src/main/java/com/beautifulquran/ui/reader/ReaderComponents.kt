@@ -3106,7 +3106,7 @@ private fun GatherOrdinalMark(
                     fontFamily = SerifFontFamily,
                     fontSize = GatherOrdinalSp.sp,
                     lineHeight = GatherOrdinalSp.sp,
-                    fontWeight = FontWeight.Normal,
+                    fontWeight = FontWeight.Bold,
                     textAlign = TextAlign.Center,
                     platformStyle = PlatformTextStyle(includeFontPadding = false),
                     lineHeightStyle = LineHeightStyle(

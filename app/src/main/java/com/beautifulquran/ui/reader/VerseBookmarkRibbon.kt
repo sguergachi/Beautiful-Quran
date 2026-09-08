@@ -65,7 +65,7 @@ internal const val BookmarkRibbonWidthDp = 11f
 internal const val BookmarkTopInsetDp = 24f    // align the tip with the verse's first ink line
 internal const val BookmarkNubLengthDp = 14f   // just the swallowtail tip peeking out
 /** Gather ordinal type — fits the 24 dp bookmark-gutter slot. */
-internal const val GatherOrdinalSp = 14f
+internal const val GatherOrdinalSp = 16f
 /** From the ayah box edge to the ordinal slot, inside the fillBox stain. */
 internal const val GatherOrdinalEdgeInsetDp = 14f
 /** Same as the edge inset so the circle sits in the gold's top corner. */

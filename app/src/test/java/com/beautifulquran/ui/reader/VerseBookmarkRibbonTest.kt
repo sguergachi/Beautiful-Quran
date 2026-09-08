@@ -21,7 +21,7 @@ class VerseBookmarkRibbonTest {
 
     @Test
     fun gatherOrdinal_sitsInTheGoldTopCorner() {
-        assertEquals(14f, GatherOrdinalSp)
+        assertEquals(16f, GatherOrdinalSp)
         assertEquals(14f, GatherOrdinalEdgeInsetDp)
         assertEquals(14f, GatherOrdinalTopInsetDp)
         assertEquals(24f, GatherOrdinalSlotWidthDp)
