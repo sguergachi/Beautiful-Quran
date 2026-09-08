@@ -107,6 +107,7 @@ class QfContentSyncHttpApi internal constructor(
             connection.readTimeout = 180_000
             connection.useCaches = false
             connection.setRequestProperty("Accept", "application/json")
+            connection.setRequestProperty("Accept-Encoding", "gzip")
             connection.setRequestProperty("User-Agent", "Beautiful-Quran/0.7")
             val status = connection.responseCode
             if (status !in 200..299) {
@@ -119,14 +120,16 @@ class QfContentSyncHttpApi internal constructor(
             }
             connection.inputStream.use { input ->
                 file.outputStream().buffered().use { output ->
-                    val buffer = ByteArray(32 * 1024)
-                    var total = 0
-                    while (true) {
-                        val count = input.read(buffer)
-                        if (count < 0) break
-                        total += count
-                        check(total <= MAX_RESPONSE_BYTES) { "QF Content API response is too large" }
-                        output.write(buffer, 0, count)
+                    decodeContent(input, connection.contentEncoding).use { decoded ->
+                        val buffer = ByteArray(32 * 1024)
+                        var total = 0
+                        while (true) {
+                            val count = decoded.read(buffer)
+                            if (count < 0) break
+                            total += count
+                            check(total <= MAX_RESPONSE_BYTES) { "QF Content API response is too large" }
+                            output.write(buffer, 0, count)
+                        }
                     }
                 }
             }
@@ -153,19 +156,22 @@ class QfContentSyncHttpApi internal constructor(
             connection.readTimeout = 180_000
             connection.useCaches = false
             connection.setRequestProperty("Accept", "application/json")
+            connection.setRequestProperty("Accept-Encoding", "gzip")
             connection.setRequestProperty("User-Agent", "Beautiful-Quran/0.7")
             val status = connection.responseCode
             val stream = if (status in 200..299) connection.inputStream else connection.errorStream
             val body = stream?.use { input ->
                 val output = java.io.ByteArrayOutputStream()
                 val buffer = ByteArray(32 * 1024)
-                while (true) {
-                    val count = input.read(buffer)
-                    if (count < 0) break
-                    check(output.size() + count <= MAX_RESPONSE_BYTES) {
-                        "QF Content API response is too large"
+                decodeContent(input, connection.contentEncoding.takeIf { status in 200..299 }).use { decoded ->
+                    while (true) {
+                        val count = decoded.read(buffer)
+                        if (count < 0) break
+                        check(output.size() + count <= MAX_RESPONSE_BYTES) {
+                            "QF Content API response is too large"
+                        }
+                        output.write(buffer, 0, count)
                     }
-                    output.write(buffer, 0, count)
                 }
                 output.toString(StandardCharsets.UTF_8)
             }.orEmpty()
@@ -287,6 +293,19 @@ class QfContentSyncHttpApi internal constructor(
             "/api/v4/verses/by_key/$verseKey?words=true&language=en"
     }
 }
+
+/**
+ * Decodes a response body per its Content-Encoding. The snapshots are tens
+ * of megabytes of JSON and compress ~13x over the wire; servers that ignore
+ * the offer come back unencoded and pass through untouched. The size cap
+ * downstream always counts decoded bytes.
+ */
+internal fun decodeContent(input: java.io.InputStream, contentEncoding: String?): java.io.InputStream =
+    if (contentEncoding?.contains("gzip", ignoreCase = true) == true) {
+        java.util.zip.GZIPInputStream(input)
+    } else {
+        input
+    }
 
 internal val QF_MUSHAF_RESOURCE = QfResource("mushafs", 1)
 internal val WORD_TRANSLATION_RESOURCE = QfResource("word_by_word_translations", 59)

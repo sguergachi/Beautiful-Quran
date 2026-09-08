@@ -74,6 +74,23 @@ class QfContentSyncHttpApiTest {
         assertTrue(failure is QfResyncRequiredException)
     }
 
+    @Test
+    fun `gzip bodies decode while plain bodies pass through`() {
+        val payload = """{"sync":{},"records":[1,2,3]}""".repeat(200)
+        val gzipped = java.io.ByteArrayOutputStream().also { raw ->
+            java.util.zip.GZIPOutputStream(raw).bufferedWriter().use { it.write(payload) }
+        }.toByteArray()
+
+        val decoded = decodeContent(gzipped.inputStream(), "gzip").readBytes().toString(Charsets.UTF_8)
+        assertEquals(payload, decoded)
+        assertTrue(gzipped.size * 5 < payload.length)
+
+        val plain = "plain body".byteInputStream()
+        assertEquals("plain body", decodeContent(plain, null).readBytes().toString(Charsets.UTF_8))
+        val identity = "plain body".byteInputStream()
+        assertEquals("plain body", decodeContent(identity, "identity").readBytes().toString(Charsets.UTF_8))
+    }
+
     private fun snapshot(group: String, id: Int, row: String) =
         json("""{"schema_version":1,"resource_group":"$group","resource_id":$id,"records":[$row]}""")
 
