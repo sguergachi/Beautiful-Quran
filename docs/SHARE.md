@@ -28,7 +28,7 @@ Gathering is a **mode of the reader sheet**, not a new sheet. The page keeps
 its layout; it grows ordinals in the margin.
 
 - **Enter** via `ShareViewModel.enterShare(surah, ayah)` (verse-first: that
-  ayah is already `١`; pauses recitation — the mode owns the tap). Tap
+  ayah is already `1`; pauses recitation — the mode owns the tap). Tap
   `﴿N﴾` is the entry ([VERSE_ACTIONS.md](VERSE_ACTIONS.md)). The idle
   player bar does **not** host a Gather control
   ([#519](https://github.com/sguergachi/Beautiful-Quran-/pull/519)).
@@ -44,8 +44,8 @@ its layout; it grows ordinals in the margin.
   `ShareViewModel` (activity scope), so turning to another chapter keeps the
   list intact.
 - **Leave** with system back (drops the selection) or
-  `ShareViewModel.exitGather()`. **Commit** via
-  `onGatherControlClick()` when the list is non-empty (opens Send).
+  `ShareViewModel.exitGather()`. **Commit** from the gather bar:
+  quote = text, image = PNG ([ShareRibbon](../app/src/main/java/com/beautifulquran/ui/share/ShareRibbon.kt)).
 
 While gathering, word taps do not seek, word long-press does not open the
 Root Viewer, and the bookmark ribbon (including its note hold) is inactive.
@@ -56,7 +56,7 @@ bookmark gutter (38 dp the verse already leaves). 14 sp Garamond
 Western digits, tight ink-brush circle, 14 dp in from the soak rim
 so the loop stays on the gold and never enters the Hafs. Not gold,
 not Arabic-Indic. The verse layout does not change.
-Selection wash and gather-bar takeover are planned — see
+Gold soak and gather-bar takeover are shipped — see
 [VERSE_ACTIONS.md](VERSE_ACTIONS.md).
 
 ### Entry redesign
@@ -153,7 +153,7 @@ share/ShareFiles.kt              cacheDir/share + FileProvider URI
 share/ShareImageRenderer.kt      offscreen ComposeView → Bitmap
 share/WashEdgeProbe.kt           soft-edge assertion (JVM-tested)
 ui/share/ShareImageCard.kt       fixed Paper full-ink card
-ui/share/ShareViewModel.kt       selection + prompt + text/image export state
+ui/share/ShareViewModel.kt       selection + text/image export state
 ui/share/ShareHost.kt            BackHandler + InkRevealOverlay + chooser
 ui/share/ShareRibbon.kt          replaces PlayerBar while sharing
 ui/share/ShareComposeSheet.kt    Send page (list + text + image)
@@ -169,7 +169,7 @@ longer hosts Gather (#519). Entry/chrome rework: [VERSE_ACTIONS.md](VERSE_ACTION
 |---|---|---|
 | 1 | Gather mode + text share | **shipped** |
 | 2 | Full-ink image export + FileProvider + wash probe | **shipped** |
-| 2b | Verse-first share UX — four Developer entry designs + gold wash + share ribbon | **in-app A/B** ([VERSE_ACTIONS.md](VERSE_ACTIONS.md)); production still OFF |
+| 2b | Verse-first Mark UX + gold soak + share ribbon | **shipped** ([VERSE_ACTIONS.md](VERSE_ACTIONS.md)) |
 | 3 | Bounded silent ink video | after 2b (or parallel once entry exists) |
 | 4 | Audio staging + mux | after silent video is stable |
 | 5 | Web parity | later |

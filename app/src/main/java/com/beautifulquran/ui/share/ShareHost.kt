@@ -42,7 +42,6 @@ fun ShareHost(
 
     BackHandler(enabled = ui.sendOpen) { viewModel.closeSend() }
     BackHandler(enabled = ui.gathering && !ui.sendOpen) { viewModel.exitGather() }
-    BackHandler(enabled = ui.prompt != null && !ui.gathering) { viewModel.hidePrompt() }
 
     LaunchedEffect(ui.pendingShareText) {
         val text = ui.pendingShareText ?: return@LaunchedEffect

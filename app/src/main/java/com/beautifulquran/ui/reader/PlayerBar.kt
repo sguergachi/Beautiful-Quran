@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.FastForward
 import androidx.compose.material.icons.rounded.FastRewind
@@ -18,7 +17,6 @@ import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Repeat
 import androidx.compose.material.icons.rounded.RepeatOne
-import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -63,12 +61,6 @@ fun PlayerBar(
     onRepeatClick: () -> Unit,
     onSpeed: () -> Unit,
     onReciterClick: () -> Unit,
-    /**
-     * When set, a share glyph sits on the reciter row (trailing, with a
-     * matching start spacer so the name stays centred). One meaning: share
-     * the current verse. Not a gather-mode toggle.
-     */
-    onShare: (() -> Unit)? = null,
 ) {
     val compact = LocalConfiguration.current.screenWidthDp < 340
     Surface(color = MaterialTheme.colorScheme.background) {
@@ -82,9 +74,6 @@ fun PlayerBar(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                if (onShare != null) {
-                    Spacer(Modifier.size(48.dp))
-                }
                 Box(
                     modifier = Modifier.weight(1f),
                     contentAlignment = Alignment.Center,
@@ -101,21 +90,6 @@ fun PlayerBar(
                             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                }
-                if (onShare != null) {
-                    IconButton(
-                        onClick = onShare,
-                        enabled = enabled,
-                        modifier = Modifier
-                            .size(48.dp)
-                            .graphicsLayer { alpha = chromeAlpha() },
-                    ) {
-                        Icon(
-                            Icons.Rounded.Share,
-                            contentDescription = "Share this verse",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
                         )
                     }
                 }

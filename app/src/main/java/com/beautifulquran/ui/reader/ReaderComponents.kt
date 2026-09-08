@@ -42,10 +42,7 @@ import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -2593,11 +2590,8 @@ fun AyahBlock(
      * Non-null only while gather mode has this verse selected.
      */
     gatherOrdinal: Int? = null,
-    /** Write the word Share under this verse (Reveal / Hold). */
-    showShareVerb: Boolean = false,
     onAyahMarkClick: (() -> Unit)? = null,
     onAyahMarkLongClick: (() -> Unit)? = null,
-    onShareVerbClick: (() -> Unit)? = null,
     onWordClick: ((Word) -> Unit)?,
     onWordLongClick: ((Word) -> Unit)? = null,
     onAyahClick: () -> Unit,
@@ -2964,12 +2958,6 @@ fun AyahBlock(
                         ),
                 )
             }
-            if (showShareVerb && onShareVerbClick != null) {
-                ShareInkVerb(
-                    onClick = onShareVerbClick,
-                    modifier = Modifier.padding(top = 8.dp),
-                )
-            }
             // Reciting clears annotation off the sheet so only scripture is
             // left under the voice; it grows back when the voice stops.
             // Editing always wins — writing in progress never vanishes because
@@ -3070,24 +3058,6 @@ fun AyahBlock(
             }
         }
     }
-}
-
-/** Quiet share glyph under the current verse. Furniture, not illumination. */
-@Composable
-private fun ShareInkVerb(
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Icon(
-        Icons.Rounded.Share,
-        contentDescription = "Share",
-        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
-        modifier = modifier
-            .size(40.dp)
-            .quietClickable(onClick = onClick)
-            .padding(8.dp)
-            .semantics { role = Role.Button },
-    )
 }
 
 /**

@@ -57,8 +57,8 @@ import kotlin.math.sin
  * a settling flutter. Retract gathers the strip back into the tip.
  */
 
-/** Wide enough to sit in the ayah block's 28.dp outer margin and stay tappable. */
-internal val BookmarkStripWidth = 44.dp
+/** Matches the bookmark-side verse pad so the strip cannot cover English ﴿N﴾. */
+internal val BookmarkStripWidth = 38.dp
 
 internal const val BookmarkEdgeInsetDp = 8f    // from the block's outer edge
 internal const val BookmarkRibbonWidthDp = 11f

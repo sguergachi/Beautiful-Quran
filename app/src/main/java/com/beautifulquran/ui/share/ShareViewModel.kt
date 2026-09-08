@@ -46,11 +46,6 @@ data class ShareVerseLine(
 data class ShareUiState(
     val gathering: Boolean = false,
     val sendOpen: Boolean = false,
-    /**
-     * Verse whose share prompt is open (colophon / seal / action-line current).
-     * Null while gathering or idle.
-     */
-    val prompt: AyahRef? = null,
     val selection: List<AyahRef> = emptyList(),
     /** 1-based ordinals derived from [selection] — read by ayah blocks only. */
     val ordinals: Map<AyahRef, Int> = emptyMap(),
@@ -89,46 +84,14 @@ class ShareViewModel(
     }
 
     /**
-     * Player-bar Gather control:
-     * - idle → enter gather (pauses recitation; mode owns the tap)
-     * - gathering with an empty list → leave gather
-     * - gathering with verses → open the Send page
-     */
-    fun onGatherControlClick() {
-        val state = _ui.value
-        when {
-            state.sendOpen -> Unit
-            !state.gathering -> enterGather()
-            state.selection.isEmpty() -> exitGather()
-            else -> openSend()
-        }
-    }
-
-    fun enterGather() {
-        if (_ui.value.gathering) return
-        player.pause()
-        _ui.update {
-            it.copy(
-                gathering = true,
-                prompt = null,
-                sendOpen = false,
-                error = null,
-                pendingShareText = null,
-                pendingShareImageUri = null,
-            )
-        }
-    }
-
-    /**
-     * Verse-first enter: that ayah is already selected (`1`), playback paused,
-     * prompt dismissed. Used by every test design's Share verb / lift.
+     * Verse-first enter: that ayah is already selected (`1`), playback paused.
+     * Mark tap uses this when gather is off.
      */
     fun enterShare(surahId: Int, ayah: Int) {
         if (surahId < 1 || ayah < 1) return
         val ref = AyahRef(surahId, ayah)
         if (_ui.value.gathering) {
             if (ref !in _ui.value.selection) toggle(surahId, ayah)
-            hidePrompt()
             return
         }
         player.pause()
@@ -136,7 +99,6 @@ class ShareViewModel(
         _ui.update {
             it.copy(
                 gathering = true,
-                prompt = null,
                 sendOpen = false,
                 selection = selection,
                 ordinals = gatherOrdinals(selection),
@@ -157,14 +119,9 @@ class ShareViewModel(
         )
     }
 
-    fun hidePrompt() {
-        if (_ui.value.prompt == null) return
-        _ui.update { it.copy(prompt = null) }
-    }
-
-    /** Cancel on the share ribbon: leave gather, or dismiss a pre-gather prompt. */
+    /** Cancel on the share ribbon: leave gather. */
     fun onChromeCancel() {
-        if (_ui.value.gathering) exitGather() else hidePrompt()
+        exitGather()
     }
 
     private fun apply(action: ShareUxAction) {
