@@ -33,6 +33,9 @@ does not call QF and never exposes credentials.
 
 Do **not** place either secret in GitHub Actions, repository variables,
 GitHub Pages, Android, or the web bundle. The Worker is the only secret holder.
+Their names are declared as required in `wrangler.jsonc`, so Cloudflare refuses
+to publish a production or preview version that cannot inherit both encrypted
+bindings. The declaration contains no secret values.
 
 ## Client contract
 
