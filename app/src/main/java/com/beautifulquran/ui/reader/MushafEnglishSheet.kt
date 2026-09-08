@@ -1255,13 +1255,22 @@ private fun englishBasmalahHandPx(
         density = density,
     ).size.width
     if (natural <= 0) return handPx
-    val fits = measurePx * EnglishBasmalahMeasureFill / natural
+    // Fit the exact pixel width the line is laid out in: the composable and
+    // englishBasmalahPx both constrain to measurePx.toInt(), so fitting the
+    // float measure could overshoot by that truncation and clip a pixel off
+    // the italic's overhang (maxLines = 1, softWrap = false clips, not wraps).
+    val targetPx = measurePx.toInt().coerceAtLeast(1).toFloat()
+    val fits = targetPx * EnglishBasmalahMeasureFill / natural
     return handPx * fits.coerceIn(EnglishBasmalahMinHand, 1f)
 }
 
 /**
  * How much of the measure the basmalah fills. All of it: the line is sized to
  * sit edge to edge with the chapter's panel above it and the leaf below it.
+ *
+ * One guard stays: the hand never grows past the page's own. On a measure wide
+ * enough that the line already fits at body size, it stands at body size,
+ * centred — a display line set larger than the body is not a heading.
  */
 private const val EnglishBasmalahMeasureFill = 1f
 
