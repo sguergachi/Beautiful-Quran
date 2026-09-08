@@ -80,7 +80,11 @@ function fetcher(
     const verseKey = url.match(/by_key\/(\d+:\d+)/)?.[1]
     if (verseKey) return response({ verse: {
       verse_key: verseKey,
-      words: [{ id: 1000 + calls.length, char_type_name: 'word', transliteration: { text: 'safe' } }],
+      words: [{
+        id: 1000 + Number(verseKey.split(':')[0]) * 1000 + Number(verseKey.split(':')[1]),
+        char_type_name: 'word',
+        transliteration: { text: 'safe' },
+      }],
     } })
     throw new Error(`Unexpected URL ${url}`)
   }
@@ -137,6 +141,8 @@ describe('RuntimeMushafCache', () => {
 
   it('uses the checkpoint and makes only six calls when content is unchanged', async () => {
     const { cache, calls, store } = await seeded()
+    let publications = 0
+    cache.subscribe(() => { publications += 1 })
     calls.length = 0
 
     expect(await cache.refresh()).toBe(true)
@@ -145,6 +151,7 @@ describe('RuntimeMushafCache', () => {
     expect(calls[0]).toContain('sync_token=boot-token')
     expect(store.value?.token).toBe('next-token')
     expect(cache.status().lastRefreshApiCalls).toBe(6)
+    expect(publications).toBe(0)
   })
 
   it('bootstraps again when QF rejects an old checkpoint', async () => {

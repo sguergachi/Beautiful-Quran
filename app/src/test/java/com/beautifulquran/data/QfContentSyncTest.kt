@@ -219,6 +219,28 @@ class QfContentSyncTest {
     }
 
     @Test
+    fun `sync reports whether reader content actually changed`() = runBlocking {
+        val store = FakeStore(QfSyncState(filter, "old", 1L)).also { it.rows = listOf(row) }
+        val unchanged = QfContentSyncer(
+            FakeApi(
+                listOf(QfSyncPage(listOf(QfContentChange.Upsert(row)), null, "same")),
+                emptyList(),
+            ),
+            store,
+        ).sync(filter)
+        val changed = QfContentSyncer(
+            FakeApi(
+                listOf(QfSyncPage(listOf(QfContentChange.Upsert(row.copy(payload = "new"))), null, "changed")),
+                emptyList(),
+            ),
+            store,
+        ).sync(filter)
+
+        assertFalse(unchanged)
+        assertTrue(changed)
+    }
+
+    @Test
     fun `full snapshot computes only changed row mutations`() {
         val removed = row.copy(recordKey = "1:2", payload = "old")
         val changed = row.copy(payload = "new")
@@ -285,7 +307,7 @@ class QfContentSyncTest {
             lastRefreshApiCalls: Long?,
             reset: Boolean,
             validate: () -> Unit,
-        ) {
+        ): Boolean {
             val previous = rows
             val result = if (reset) mutableListOf() else rows.toMutableList()
             val fetched = snapshots.iterator()
@@ -313,6 +335,7 @@ class QfContentSyncTest {
             try {
                 validate()
                 savedState = QfSyncState(filter, nextToken, nowMs, lastRefreshApiCalls)
+                return result != previous
             } catch (error: Exception) {
                 rows = previous
                 throw error

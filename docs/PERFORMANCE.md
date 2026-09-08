@@ -250,9 +250,17 @@ janky", first ask: is this the release APK?
   process-lifetime word and per-surah lookup maps, so no chapter pays that cost.
   Web's sql.js database already retains the complete fetched buffer. Do not
   create additional per-screen copies of either cache.
-- A QF invalidation snapshot is compared with the Android cache in memory and
+- A QF invalidation snapshot is compared with the Android cache and
   only changed row identities are mutated in the transaction. Normal refreshes
-  use Content Sync's smaller native upsert/delete set directly.
+  use Content Sync's smaller native upsert/delete set directly. An unchanged
+  refresh advances freshness without invalidating the process catalog or
+  repaginating English. The English disk-book key includes a digest of its
+  exact prose, so changed QF glosses rebuild once while unchanged ones reuse
+  their measured leaves.
+- First bootstrap streams snapshot records through compiled SQLite statements
+  inside the single publish transaction. Do not replace that path with one
+  `ContentValues`/statement compilation per row: the snapshot is about 250,000
+  rows and the cover must not spend its time allocating wrappers around them.
 - A surah loads with exactly three queries (ayahs, words, timings) — no
   per-ayah round trips. Timings for one reciter+surah arrive as one query of
   compact JSON rows.

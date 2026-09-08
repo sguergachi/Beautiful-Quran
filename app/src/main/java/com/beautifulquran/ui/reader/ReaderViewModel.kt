@@ -8,6 +8,7 @@ import com.beautifulquran.data.AnnotationRepository
 import com.beautifulquran.data.EducationMoment
 import com.beautifulquran.data.QuranRepository
 import com.beautifulquran.data.EnglishBookCache
+import com.beautifulquran.data.englishBookContentKey
 import com.beautifulquran.data.QuranDatabase
 import com.beautifulquran.data.SettingsRepository
 import com.beautifulquran.data.model.Reciter
@@ -363,6 +364,7 @@ class ReaderViewModel(
                     )
                 }
                 val words = repository.englishVerseText(text)
+                val contentCacheKey = englishBookContentKey(cacheKey, words)
                 val verse = { surahId: Int, ayah: Int ->
                     words[quranWordKey(surahId, ayah, 1)].orEmpty()
                 }
@@ -372,14 +374,14 @@ class ReaderViewModel(
                 // A thousand text layouts, and the same answer every time they
                 // are asked — so they are asked once and written down.
                 val cached = withContext(Dispatchers.IO) {
-                    englishBookCache.read(cacheKey, pageOf, verse)
+                    englishBookCache.read(contentCacheKey, pageOf, verse)
                 }
                 if (generation != mushafGeneration) return@launch
                 cached ?: withContext(Dispatchers.Default) {
                     buildEnglishBookByLayout(catalog, verse, rulerFor(verse))
                 }.also {
                     if (generation != mushafGeneration) return@launch
-                    withContext(Dispatchers.IO) { englishBookCache.write(cacheKey, it) }
+                    withContext(Dispatchers.IO) { englishBookCache.write(contentCacheKey, it) }
                 }
             }
             if (generation != mushafGeneration) return@launch

@@ -3,6 +3,7 @@ package com.beautifulquran.data
 import android.content.ContentValues
 import android.content.Context
 import android.database.sqlite.SQLiteDatabase
+import android.database.sqlite.SQLiteStatement
 import android.util.JsonReader
 import java.io.File
 import java.io.FileReader
@@ -262,7 +263,7 @@ class QfContentCacheDatabase(context: Context) : QfContentSyncStore, QfRuntimeMu
         lastRefreshApiCalls: Long?,
         reset: Boolean,
         validate: () -> Unit,
-    ) = db.transaction {
+    ): Boolean = db.transaction {
         var contentChanged = reset
         if (reset) {
             delete("cached_rows", null, null)
@@ -301,7 +302,7 @@ class QfContentCacheDatabase(context: Context) : QfContentSyncStore, QfRuntimeMu
             if (lastRefreshApiCalls == null) putNull("last_refresh_api_calls")
             else put("last_refresh_api_calls", lastRefreshApiCalls)
         })
-        Unit
+        contentChanged
     }
 
     private fun SQLiteDatabase.deleteResourceRows(resource: QfResource): Int =
@@ -339,50 +340,64 @@ class QfContentCacheDatabase(context: Context) : QfContentSyncStore, QfRuntimeMu
         val file = requireNotNull(snapshot.file)
         execSQL("DROP TABLE IF EXISTS temp.qf_incoming_keys")
         execSQL("CREATE TEMP TABLE qf_incoming_keys(record_type TEXT, record_key TEXT, PRIMARY KEY(record_type,record_key))")
+        val insertKey = compileStatement("INSERT OR IGNORE INTO qf_incoming_keys VALUES (?,?)")
+        val insertRow = if (compareExisting) null else compileStatement(
+            "INSERT INTO cached_rows(" +
+                "resource_group,resource_id,record_type,record_key,payload,updated_at," +
+                "verse_id,position_in_verse) VALUES (?,?,?,?,?,?,?,?)",
+        )
         var group: String? = null
         var id: Long? = null
         var schema: Int? = null
         var sawRecords = false
         var changed = false
-        JsonReader(FileReader(file).buffered()).use { reader ->
-            reader.beginObject()
-            while (reader.hasNext()) when (reader.nextName()) {
-                "resource_group" -> group = reader.nextString()
-                "resource_id" -> id = reader.nextLong()
-                "schema_version" -> schema = reader.nextInt()
-                "records" -> {
-                    sawRecords = true
-                    reader.beginArray()
-                    while (reader.hasNext()) {
-                        val payload = reader.readElement() as? JsonObject ?: error("Invalid QF snapshot record")
-                        val type = when (snapshot.resource) {
-                            WORD_TRANSLATION_RESOURCE -> "word_translation"
-                            WORD_TRANSLITERATION_RESOURCE -> "word_transliteration"
-                            else -> payload["record_type"]?.jsonPrimitive?.contentOrNull
-                                ?: error("QF snapshot record type is missing")
+        try {
+            JsonReader(FileReader(file).buffered()).use { reader ->
+                reader.beginObject()
+                while (reader.hasNext()) when (reader.nextName()) {
+                    "resource_group" -> group = reader.nextString()
+                    "resource_id" -> id = reader.nextLong()
+                    "schema_version" -> schema = reader.nextInt()
+                    "records" -> {
+                        sawRecords = true
+                        reader.beginArray()
+                        while (reader.hasNext()) {
+                            val payload = reader.readElement() as? JsonObject
+                                ?: error("Invalid QF snapshot record")
+                            val type = when (snapshot.resource) {
+                                WORD_TRANSLATION_RESOURCE -> "word_translation"
+                                WORD_TRANSLITERATION_RESOURCE -> "word_transliteration"
+                                else -> payload["record_type"]?.jsonPrimitive?.contentOrNull
+                                    ?: error("QF snapshot record type is missing")
+                            }
+                            val key = payload["id"]?.jsonPrimitive?.longOrNull?.toString()
+                                ?: error("QF snapshot record id is missing")
+                            insertKey.clearBindings()
+                            insertKey.bindString(1, type)
+                            insertKey.bindString(2, key)
+                            check(insertKey.executeInsert() != -1L) { "Duplicate QF snapshot row" }
+                            val row = QfCacheRow(
+                                snapshot.resource, type, key, payload.toString(),
+                                payload.string("updated_at").orEmpty(),
+                            )
+                            val verseId = payload.longOrNull("verse_id")
+                            val position = payload.intOrNull("position_in_verse")
+                            changed = if (insertRow == null) {
+                                upsert(row, verseId, position, compareExisting = true) || changed
+                            } else {
+                                insertRow.insert(row, verseId, position)
+                                true
+                            }
                         }
-                        val key = payload["id"]?.jsonPrimitive?.longOrNull?.toString()
-                            ?: error("QF snapshot record id is missing")
-                        check(
-                            insertWithOnConflict(
-                                "qf_incoming_keys", null, ContentValues().apply {
-                                    put("record_type", type)
-                                    put("record_key", key)
-                                }, SQLiteDatabase.CONFLICT_IGNORE,
-                            ) != -1L,
-                        ) { "Duplicate QF snapshot row" }
-                        changed = upsert(
-                            QfCacheRow(snapshot.resource, type, key, payload.toString(), payload.string("updated_at").orEmpty()),
-                            payload.longOrNull("verse_id"),
-                            payload.intOrNull("position_in_verse"),
-                            compareExisting,
-                        ) || changed
+                        reader.endArray()
                     }
-                    reader.endArray()
+                    else -> reader.skipValue()
                 }
-                else -> reader.skipValue()
+                reader.endObject()
             }
-            reader.endObject()
+        } finally {
+            insertKey.close()
+            insertRow?.close()
         }
         check(group == snapshot.resource.group && id == snapshot.resource.id && schema == 1) {
             "QF snapshot metadata mismatch"
@@ -397,6 +412,19 @@ class QfContentCacheDatabase(context: Context) : QfContentSyncStore, QfRuntimeMu
         ) > 0 || changed
         execSQL("DROP TABLE temp.qf_incoming_keys")
         return changed
+    }
+
+    private fun SQLiteStatement.insert(row: QfCacheRow, verseId: Long?, position: Int?) {
+        clearBindings()
+        bindString(1, row.resource.group)
+        bindLong(2, row.resource.id)
+        bindString(3, row.recordType)
+        bindString(4, row.recordKey)
+        bindString(5, row.payload)
+        bindString(6, row.updatedAt)
+        if (verseId == null) bindNull(7) else bindLong(7, verseId)
+        if (position == null) bindNull(8) else bindLong(8, position.toLong())
+        executeInsert()
     }
 
     private fun SQLiteDatabase.rowsForResource(resource: QfResource): List<QfCacheRow> =

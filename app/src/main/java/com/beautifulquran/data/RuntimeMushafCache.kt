@@ -62,7 +62,7 @@ class RuntimeMushafCache(
     @Volatile private var cachedState: QfSyncState? = null
     @Volatile private var parsedToken: String? = null
     @Volatile private var unreadableToken: String? = null
-    @Volatile private var scheduledToken: String? = null
+    @Volatile private var scheduledState: Pair<String, Long>? = null
     @Volatile private var purgedSupplementToken: String? = null
     @Volatile private var blockReadRefresh = false
     private var parsedWords = emptyMap<String, RuntimeMushafWord>()
@@ -121,7 +121,7 @@ class RuntimeMushafCache(
     fun allWords(): Collection<RuntimeMushafWord>? = currentWords()?.values
     internal fun snapshotWords(): Map<String, RuntimeMushafWord>? = currentWords()
 
-    /** Launch / connectivity hook. Never retries a failed refresh from a reader lookup. */
+    /** Launch / connectivity hook. Starts a new bounded retry episode when due. */
     fun refreshIfNeeded() {
         blockReadRefresh = false
         val state = rememberedState()
@@ -139,10 +139,17 @@ class RuntimeMushafCache(
         refresh()
     }
 
-    fun refresh() {
+    fun refresh() = startRefresh(resetBackoff = true)
+
+    private fun startRefresh(resetBackoff: Boolean) {
         synchronized(this) {
             if (syncing) return
             syncing = true
+            if (resetBackoff) {
+                retryJob?.cancel()
+                retryJob = null
+                retryAttempt = 0
+            }
         }
         lastKickMs = nowMs()
         blockReadRefresh = false
@@ -153,7 +160,7 @@ class RuntimeMushafCache(
         scope.launch {
             try {
                 validatedWords = null
-                syncer.sync(FILTER) { _diagnostics.value.apiCalls }
+                val contentChanged = syncer.sync(FILTER) { _diagnostics.value.apiCalls }
                 val state = requireNotNull(store.state(FILTER)) { "QF sync did not save its checkpoint" }
                 cachedState = state
                 validatedWords?.let { installParsed(state, it) } ?: run {
@@ -167,7 +174,7 @@ class RuntimeMushafCache(
                 retryJob = null
                 rememberUpdatedAt(state)
                 scheduleChecks(state)
-                _changes.tryEmit(Unit)
+                if (contentChanged) _changes.tryEmit(Unit)
                 _refreshes.tryEmit(Unit)
             } catch (error: Exception) {
                 validatedWords = null
@@ -187,7 +194,7 @@ class RuntimeMushafCache(
                 } else {
                     cachedState = store.state(FILTER)
                     updateResource { it.copy(lastError = error.message ?: error::class.simpleName) }
-                    if (cachedState == null) scheduleRetry()
+                    scheduleRetry()
                 }
             } finally {
                 synchronized(this@RuntimeMushafCache) { syncing = false }
@@ -202,7 +209,7 @@ class RuntimeMushafCache(
         val now = nowMs()
         purgeExpiredSupplement(state)
         if (!blockReadRefresh && (state == null || now - state.updatedAtMs !in 0..QF_REVALIDATE_AFTER_MS)) {
-            refresh()
+            startRefresh(resetBackoff = false)
         }
         if (!isQfContentFresh(state?.updatedAtMs, now)) return null
         val current = state ?: return null
@@ -347,13 +354,14 @@ class RuntimeMushafCache(
         if (state == null) {
             refreshJob?.cancel()
             expiryJob?.cancel()
-            scheduledToken = null
+            scheduledState = null
             return
         }
-        if (scheduledToken == state.token) return
+        val identity = state.token to state.updatedAtMs
+        if (scheduledState == identity) return
         refreshJob?.cancel()
         expiryJob?.cancel()
-        scheduledToken = state.token
+        scheduledState = identity
         val token = state.token
         val now = nowMs()
         val refreshDelay = state.updatedAtMs + QF_REVALIDATE_AFTER_MS - now
@@ -386,15 +394,16 @@ class RuntimeMushafCache(
         }
     }
 
-    /** A transient first-load failure must not leave an empty reader until the next process start. */
+    /** Bounded transient retry; launch, connectivity, and manual hooks start a new episode. */
     private fun scheduleRetry() {
         if (retryJob?.isActive == true) return
+        if (retryAttempt >= RETRY_DELAYS_MS.size) return
         val retryDelay = RETRY_DELAYS_MS[retryAttempt.coerceAtMost(RETRY_DELAYS_MS.lastIndex)]
         retryAttempt++
         retryJob = scope.launch {
             delay(retryDelay)
             retryJob = null
-            refreshIfNeeded()
+            startRefresh(resetBackoff = false)
         }
     }
 

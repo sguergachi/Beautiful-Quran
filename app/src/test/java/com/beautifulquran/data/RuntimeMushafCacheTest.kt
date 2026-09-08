@@ -221,6 +221,32 @@ class RuntimeMushafCacheTest {
     }
 
     @Test
+    fun `automatic retry is bounded and a connectivity hook starts a new episode`() = runTest {
+        val api = CountingApi { error("offline") }
+        val cache = RuntimeMushafCache(
+            api, Store(), backgroundScope,
+            nowMs = { testScheduler.currentTime }, minimumWords = 1,
+        )
+
+        cache.refreshIfNeeded()
+        runCurrent()
+        RETRY_WINDOW_MS.forEach { delay ->
+            advanceTimeBy(delay)
+            runCurrent()
+        }
+        advanceTimeBy(10 * 60_000L)
+        runCurrent()
+        assertEquals(5, api.syncs)
+
+        cache.refreshIfNeeded()
+        runCurrent()
+        assertEquals(6, api.syncs)
+        advanceTimeBy(5_000L)
+        runCurrent()
+        assertEquals(7, api.syncs)
+    }
+
+    @Test
     fun `revoked QF access purges the readable cache immediately`() = runTest {
         val store = Store(QfSyncState(filter, "old", 90L), listOf(row))
         val cache = RuntimeMushafCache(
@@ -259,6 +285,24 @@ class RuntimeMushafCacheTest {
         runCurrent()
         assertEquals(1, api.syncs)
         assertEquals("seeking", cache.word(5, 2, 19)?.translation)
+    }
+
+    @Test
+    fun `unchanged token still advances every refresh and expiry deadline`() = runTest {
+        val store = Store(QfSyncState(filter, "token", 0L), listOf(row))
+        val api = SnapshotApi()
+        val cache = RuntimeMushafCache(
+            api, store, backgroundScope,
+            nowMs = { testScheduler.currentTime }, minimumWords = 1,
+        )
+
+        cache.refreshIfNeeded()
+        repeat(3) { expectedRefreshes ->
+            advanceTimeBy(QF_REVALIDATE_AFTER_MS)
+            runCurrent()
+            assertEquals(expectedRefreshes + 1, api.syncs)
+            assertEquals("seeking", cache.word(5, 2, 19)?.translation)
+        }
     }
 
     @Test
@@ -320,6 +364,8 @@ class RuntimeMushafCacheTest {
     }
 
     private fun failingApi() = CountingApi { error("offline") }
+
+    private val RETRY_WINDOW_MS = longArrayOf(5_000L, 15_000L, 60_000L, 5 * 60_000L)
 
     @Test
     fun `empty book entry kicks one fill per thirty seconds`() = runTest {
@@ -423,12 +469,13 @@ class RuntimeMushafCacheTest {
             lastRefreshApiCalls: Long?,
             reset: Boolean,
             validate: () -> Unit,
-        ) {
+        ): Boolean {
             val previous = rows
             rows = snapshots.single().rows
             try {
                 validate()
                 state = QfSyncState(filter, nextToken, nowMs, lastRefreshApiCalls)
+                return rows != previous
             } catch (error: Exception) {
                 rows = previous
                 throw error

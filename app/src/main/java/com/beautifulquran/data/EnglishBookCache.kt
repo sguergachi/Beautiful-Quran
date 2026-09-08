@@ -7,6 +7,8 @@ import com.beautifulquran.domain.englishBookOf
 import java.io.DataInputStream
 import java.io.DataOutputStream
 import java.io.File
+import java.nio.charset.StandardCharsets
+import java.security.MessageDigest
 
 /**
  * The English book's leaves, kept on disk.
@@ -72,23 +74,35 @@ class EnglishBookCache(context: Context) {
                 file.delete()
                 return null
             }
+            check(leafCount <= MAX_LEAVES) { "English book cache has too many leaves" }
             val leaves = ArrayList<List<EnglishVerseRun>>(leafCount)
+            var totalRuns = 0
             repeat(leafCount) {
                 val runCount = input.readInt()
+                check(runCount in 1..MAX_RUNS && totalRuns + runCount <= MAX_RUNS) {
+                    "English book cache has an invalid run count"
+                }
+                totalRuns += runCount
                 val runs = ArrayList<EnglishVerseRun>(runCount)
                 repeat(runCount) {
-                    runs += EnglishVerseRun(
-                        surahId = input.readInt(),
-                        ayah = input.readInt(),
-                        from = input.readInt(),
-                        to = input.readInt(),
-                    )
+                    val run = EnglishVerseRun(input.readInt(), input.readInt(), input.readInt(), input.readInt())
+                    check(run.surahId in 1..114 && run.ayah > 0 && run.from >= 0 && run.to > run.from) {
+                        "English book cache has an invalid verse run"
+                    }
+                    check(run.to <= text(run.surahId, run.ayah).length && pageOf(run.surahId, run.ayah) in 1..604) {
+                        "English book cache names text outside the Quran"
+                    }
+                    runs += run
                 }
                 leaves += runs
             }
+            check(input.read() == -1) { "English book cache has trailing bytes" }
             englishBookOf(leaves, pageOf, text)
         }
-    }.getOrNull()
+    }.getOrElse {
+        runCatching { File(dir, key).delete() }
+        null
+    }
 
     /** Writes [book] down under [key], and forgets any book written before it. */
     fun write(key: String, book: EnglishBook) {
@@ -130,5 +144,21 @@ class EnglishBookCache(context: Context) {
     private companion object {
         /** Bump when the meaning of a written leaf changes. */
         const val FORMAT = 15
+        const val MAX_LEAVES = 10_000
+        const val MAX_RUNS = 20_000
     }
+}
+
+/** Adds the exact prose to the pagination identity without putting QF text in a file name. */
+internal fun englishBookContentKey(base: String, verses: Map<Long, String>): String {
+    val digest = MessageDigest.getInstance("SHA-256")
+    verses.toSortedMap().forEach { (key, text) ->
+        digest.update(key.toString().toByteArray(StandardCharsets.UTF_8))
+        digest.update(0)
+        digest.update(text.toByteArray(StandardCharsets.UTF_8))
+        digest.update(0)
+    }
+    return "$base-${digest.digest().joinToString("") { byte ->
+        byte.toUByte().toString(16).padStart(2, '0')
+    }}"
 }

@@ -138,6 +138,8 @@ class QuranRepository(
     fun invalidateRuntimeMushafViews() {
         wordSearchIndex = null
         mushafCatalog = null
+        englishVerseGloss = null
+        englishVerseGlossText = null
         synchronized(leafTranslationCache) { leafTranslationCache.clear() }
     }
 

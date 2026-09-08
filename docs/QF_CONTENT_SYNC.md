@@ -77,9 +77,12 @@ identity.
    a failed request, parse, validation, or write preserves the prior cache.
 5. A normal refresh starts at day six, leaving a retry margin before the
    seven-day limit. A current cache makes zero requests on launch. Network
-   restoration retries a failed update automatically. A missing or expired
-   cache also retries transient failures with bounded backoff; the entrance
-   cover cannot open onto an empty Mushaf.
+   restoration retries a failed update automatically. Every failed update gets
+   four bounded backoff attempts; a later launch, network-restoration event,
+   reader entry, or manual refresh starts a new bounded episode. A successful
+   first fill keeps the entrance cover over the empty Mushaf; a failed fill
+   releases the app so offline scrolling and settings remain usable while the
+   next retry or connectivity event repairs the leaf.
 6. At day seven, QF-derived reader fields are withheld until a successful sync.
    Non-Content-Sync supplement rows are also removed from persistent storage.
 7. A `410 resync_required` discards no readable data immediately: the client
@@ -90,10 +93,14 @@ The initial exchange currently uses nine requests: one sync, three snapshots,
 and five supplements. An unchanged refresh uses six: one incremental sync and
 five supplements. QF invalidations add only the affected resource snapshots;
 row changes use QF's native upsert/delete deltas. Identical supplement rows are
-detected without rebuilding the reader view. Developer Mode displays live
-progress, current phase, update/refresh/expiry times, errors, calls this launch,
-and calls made by the last successful refresh. Android shows a toast only after
-the atomic commit succeeds.
+detected without rebuilding the reader view or repaginating the book. English
+pagination is keyed by an SHA-256 digest of the exact prose, so an actual QF
+gloss change can never reuse page breaks measured for older words. Refresh and
+expiry timers are keyed by both checkpoint and commit time, so even a reused QF
+token advances both deadlines. Developer Mode displays live progress, current
+phase, update/refresh/expiry times, errors, calls this launch, and calls made by
+the last successful refresh. Android shows a toast only after the atomic commit
+succeeds.
 
 ## Implemented compliance controls
 

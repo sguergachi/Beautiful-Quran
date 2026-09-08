@@ -96,7 +96,7 @@ interface QfContentSyncStore {
     /** Deletes one cached resource without changing its Content Sync checkpoint. */
     fun deleteResource(resource: QfResource)
 
-    /** Applies all data and the final checkpoint in one transaction. */
+    /** Applies all data and the final checkpoint in one transaction; returns whether content changed. */
     fun apply(
         filter: QfResourceFilter,
         changes: List<QfContentChange>,
@@ -108,7 +108,7 @@ interface QfContentSyncStore {
         reset: Boolean = false,
         /** Runs against the uncommitted rows; throwing rolls the transaction back. */
         validate: () -> Unit = {},
-    )
+    ): Boolean
 }
 
 /** QF asks clients to discard an unusable checkpoint and bootstrap again. */
@@ -146,16 +146,16 @@ class QfContentSyncer(
     private val validate: (List<QfContentChange>) -> Unit = {},
     private val nowMs: () -> Long = System::currentTimeMillis,
 ) {
-    suspend fun sync(filter: QfResourceFilter, apiCalls: (() -> Long)? = null) {
+    suspend fun sync(filter: QfResourceFilter, apiCalls: (() -> Long)? = null): Boolean {
         val callsBefore = apiCalls?.invoke()
         val initial = store.state(filter)?.let {
             QfSyncRequest.Incremental(filter, it.token)
         } ?: QfSyncRequest.Bootstrap(filter)
         try {
-            exchange(filter, initial, callsBefore, apiCalls)
+            return exchange(filter, initial, callsBefore, apiCalls)
         } catch (_: QfResyncRequiredException) {
             check(initial is QfSyncRequest.Incremental) { "QF rejected a fresh bootstrap" }
-            exchange(filter, QfSyncRequest.Bootstrap(filter), callsBefore, apiCalls)
+            return exchange(filter, QfSyncRequest.Bootstrap(filter), callsBefore, apiCalls)
         }
     }
 
@@ -164,7 +164,7 @@ class QfContentSyncer(
         firstRequest: QfSyncRequest,
         callsBefore: Long?,
         apiCalls: (() -> Long)?,
-    ) {
+    ): Boolean {
         var request = firstRequest
         val changes = mutableListOf<QfContentChange>()
         val snapshots = mutableListOf<QfSnapshot>()
@@ -190,7 +190,7 @@ class QfContentSyncer(
                 request = QfSyncRequest.NextPage(next)
             }
             beforeApply()
-            store.apply(
+            return store.apply(
                 filter,
                 changes,
                 snapshots,

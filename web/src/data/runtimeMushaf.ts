@@ -111,6 +111,8 @@ export class RuntimeMushafCache {
   private byKey = new Map<string, RuntimeMushafWord>()
   private refreshTimer: number | null = null
   private expiryTimer: number | null = null
+  private retryTimer: number | null = null
+  private retryAttempt = 0
 
   constructor(
     baseUrl: string,
@@ -170,13 +172,19 @@ export class RuntimeMushafCache {
         validateCacheState(saved)
         if (fresh(saved.updatedAtMs, this.now())) {
           this.state = validateStored(saved, this.minimumRecords)
-          this.install(saved)
+          this.install(this.state)
         } else {
           this.state = withoutExpiringSupplements(saved)
           await this.store.put(this.state)
         }
       }
-    } catch { /* A corrupt local cache is a miss. */ }
+    } catch {
+      // A corrupt retained object cannot be repaired by an incremental no-op.
+      await this.store.clear().catch(() => undefined)
+      this.state = null
+      this.resource = null
+      this.byKey.clear()
+    }
     this.notifyDiagnostics()
     if (!this.state || !fresh(this.state.updatedAtMs, this.now())) {
       await this.refresh()
@@ -191,8 +199,12 @@ export class RuntimeMushafCache {
       ? Promise.resolve(false) : this.refresh()
   }
 
-  refresh(): Promise<boolean> {
+  refresh(resetBackoff = true): Promise<boolean> {
     if (this.inFlight) return this.inFlight
+    if (resetBackoff) {
+      this.cancelRetry()
+      this.retryAttempt = 0
+    }
     this.blockReadRefresh = false
     this.error = null
     this.requestsSettled = false
@@ -207,7 +219,7 @@ export class RuntimeMushafCache {
         this.resource = null
         this.byKey.clear()
         for (const listener of this.listeners) listener()
-      }
+      } else this.scheduleRetry()
       return false
     }).finally(() => {
       this.inFlight = null
@@ -231,21 +243,30 @@ export class RuntimeMushafCache {
       ? `/api/v4/resources/sync?sync_token=${encodeURIComponent(this.state.token)}&resources=${encodeURIComponent(QF_RESOURCES)}`
       : null
     const bootstrap = `/api/v4/resources/sync?bootstrap=true&resources=${encodeURIComponent(QF_RESOURCES)}`
-    let next: StoredMushaf
+    let result: { next: StoredMushaf; changed: boolean }
     try {
-      next = await this.syncFrom(incremental ?? bootstrap, callsBefore)
+      result = await this.syncFrom(incremental ?? bootstrap, callsBefore)
     } catch (error) {
       if (!(error instanceof ResyncRequired) || !incremental) throw error
-      next = await this.syncFrom(bootstrap, callsBefore)
+      result = await this.syncFrom(bootstrap, callsBefore)
     }
+    const { next, changed } = result
     this.markRequestsSettled()
     await this.store.put(next)
     this.state = next
     this.error = null
-    this.install(next)
+    this.cancelRetry()
+    this.retryAttempt = 0
+    if (!changed) {
+      this.resource = next
+      this.scheduleChecks(next)
+    } else this.install(next)
   }
 
-  private async syncFrom(firstPath: string, callsBefore: number): Promise<StoredMushaf> {
+  private async syncFrom(
+    firstPath: string,
+    callsBefore: number,
+  ): Promise<{ next: StoredMushaf; changed: boolean }> {
     let resources = firstPath.includes('bootstrap=true')
       ? [] : cloneResources(this.state?.resources ?? [])
     let changed = !this.state
@@ -294,19 +315,25 @@ export class RuntimeMushafCache {
       this.notifyDiagnostics()
       return wordSupplements(verseKey, response)
     }))
-    resources = replaceLocalResource(resources, 'word_supplements', 1, supplements.flat())
-    changed = true
+    const supplementRows = supplements.flat()
+    const previousSupplements = resources.find((resource) =>
+      resource.resourceGroup === 'word_supplements' && resource.resourceId === 1)?.records
+    if (!sameRecords(previousSupplements, supplementRows)) changed = true
+    resources = replaceLocalResource(resources, 'word_supplements', 1, supplementRows)
     const records = changed
       ? normalizeQfMushaf(this.loadCanonical(), resources, this.expectedQcfPages)
       : this.state!.records
-    return validateStored({
-      id: 1,
-      token,
-      updatedAtMs: this.now(),
-      lastRefreshApiCalls: this.apiCalls - callsBefore,
-      resources,
-      records,
-    }, this.minimumRecords)
+    return {
+      next: validateStored({
+        id: 1,
+        token,
+        updatedAtMs: this.now(),
+        lastRefreshApiCalls: this.apiCalls - callsBefore,
+        resources,
+        records,
+      }, this.minimumRecords),
+      changed,
+    }
   }
 
   private install(resource: StoredMushaf) {
@@ -334,6 +361,21 @@ export class RuntimeMushafCache {
       for (const listener of this.listeners) listener()
       void this.store.put(expired).then(() => this.refreshIfNeeded())
     }, expiryDelay)
+  }
+
+  private scheduleRetry() {
+    if (typeof window === 'undefined' || this.retryTimer != null ||
+        this.retryAttempt >= RETRY_DELAYS_MS.length) return
+    const delay = RETRY_DELAYS_MS[this.retryAttempt++]!
+    this.retryTimer = window.setTimeout(() => {
+      this.retryTimer = null
+      void this.refresh(false)
+    }, delay)
+  }
+
+  private cancelRetry() {
+    if (typeof window !== 'undefined' && this.retryTimer != null) window.clearTimeout(this.retryTimer)
+    this.retryTimer = null
   }
 
   private async get(path: string): Promise<unknown> {
@@ -416,6 +458,11 @@ function replaceLocalResource(
   return resources.filter((resource) =>
     resource.resourceGroup !== resourceGroup || resource.resourceId !== resourceId)
     .concat({ resourceGroup, resourceId, records })
+}
+
+function sameRecords(first: Record<string, unknown>[] | undefined, second: Record<string, unknown>[]) {
+  return first?.length === second.length &&
+    first.every((record, index) => JSON.stringify(record) === JSON.stringify(second[index]))
 }
 
 function deleteResource(resources: StoredQfResource[], mutation: Record<string, unknown>) {
@@ -556,6 +603,8 @@ function refreshDue(updated: number, now: number) {
   const age = now - updated
   return age < 0 || age > QF_REVALIDATE_AFTER_MS
 }
+
+const RETRY_DELAYS_MS = [5_000, 15_000, 60_000, 5 * 60_000] as const
 
 const QF_CONTENT_BASE_URL = import.meta.env.VITE_QF_CONTENT_BASE_URL ||
   'https://beautiful-quran.sguergachi.workers.dev'
