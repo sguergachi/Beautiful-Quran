@@ -794,54 +794,66 @@ private fun englishBookHandPx(
 }
 
 /**
- * The book's hand: EB Garamond, ragged right, hyphenated.
+ * The book's hand: EB Garamond, justified, hyphenated.
  *
- * **Ragged, not justified.** The mushaf's own rule is that every full line
- * reaches both margins (`QURAN_TYPOGRAPHY.md` §3) — but that is a rule about
- * Arabic, which fills a line by the letterform, and it is the calligrapher's
- * art. Latin has only the word space to fill with, and on a measure of about
- * fifty characters that is not enough of a lever: the spaces open unevenly,
- * the same line's colour changes from one page to the next, and the reader
- * pays for a straight right edge with rivers of white running down the page.
- * An even rag is the more readable page, and on a phone it is not close.
+ * **Justified, because the leaf is a page.** The mushaf's own rule is that
+ * every full line reaches both margins (`QURAN_TYPOGRAPHY.md` §3), and a bound
+ * English Qur'an keeps it — Latin fills by the word space where Arabic fills
+ * by the letterform, but it fills. This was set ragged for a while on the
+ * argument that a fifty-character measure gives the word space too little
+ * lever, and that argument was true *while the leaf could not hyphenate*: with
+ * whole words only, one long word at a line's end is a hole the setter can
+ * only leave open (ragged) or stretch the line around (rivers). Hyphenation
+ * below is that lever, and it is what every printed book on a narrow measure
+ * uses. What ragged cost was the thing the page is for: on the Ta-Ha leaf the
+ * right edge fell short by 53 px on average and 91 px at worst out of 942, and
+ * an edge undulating between an eighteenth and a tenth of the line read as text
+ * weighted to the left of paper it did not fill. Justified, the same leaf's
+ * lines end within 3 px of each other — glyph side bearings, nothing more.
  *
- * **Balanced, not merely high-quality.** A leaf is a page, and a page fills
- * its lines: the breaker equalizes their lengths rather than merely avoiding
- * the worst breaks. Measured on glass it breaks identically to `Paragraph` on
- * the sampled leaves — the holes below are forced at this measure either way
- * — and it states the intent the page is set to.
+ * **High quality, not balanced.** Balanced equalizes line lengths, which under
+ * justification every line already is; the objective that survives is
+ * `Paragraph`'s own — the least stretched spaces taken over the block rather
+ * than the least bad break taken line by line, which is what keeps a narrow
+ * justified measure from paying for the whole paragraph on one loose line.
+ * Measured on glass the two break the sampled leaves in the same places, to
+ * half a pixel of word space; this states what the page is set to.
  *
- * **Hyphenated, at the book's minima.** A long word the rag cannot absorb —
- * *righteousness*, *[fulfillment]*, *obedience* — pushes the words around it
- * into a deep hole at the line's end. With `Hyphens.Auto` the breaker may
- * carry the word over instead — but it breaks *de-scends* after two letters,
- * which no book does, and Compose exposes no minima to stop it with. So the
- * leaf vetoes (`EnglishHyphenation`): every cut the TeX patterns propose with
- * fewer than three letters on either side is joined with a word joiner, and
- * the breaker takes the rest. Measured on glass (Ta-Ha, Baqarah's opening,
- * As-Saffat): the Ta-Ha mean shortfall 53 → 43 px of a 935 px measure with
- * its worst hole filled by a good break (`…and does right-` / `eousness…`),
- * As-Saffat's mean 68 → 64 with `won-der` its only hyphen, Baqarah untouched
- * (its holes are short-word pileups no hyphen reaches), and no bad fragment
- * anywhere — unvetoed hyphenation breaks *Re-pelled* and *de-scends* on the
- * same leaves. Gluing short words to their neighbours was tried twice and
- * reverted twice: the keep-hole stands even hyphenated.
+ * **Hyphenated, at the book's minima.** A long word a line cannot absorb —
+ * *righteousness*, *[fulfillment]*, *obedience* — is what a narrow justified
+ * measure pays for: the words around it stretch to fill the paper it could not
+ * take. With `Hyphens.Auto` the breaker may carry the word over instead — but
+ * it breaks *de-scends* after two letters, which no book does, and Compose
+ * exposes no minima to stop it with. So the leaf vetoes
+ * (`EnglishHyphenation`): every cut the TeX patterns propose with fewer than
+ * three letters on either side is joined with a word joiner, and the breaker
+ * takes the rest. It was measured against the rag it replaced (Ta-Ha's mean
+ * shortfall 53 → 43 px of a 935 px measure, its worst hole filled by a good
+ * break — `…and does right-` / `eousness…`; As-Saffat 68 → 64 with `won-der`
+ * its only hyphen; Baqarah untouched, its holes short-word pileups no hyphen
+ * reaches) and it does the same work here, where the hole is stretch rather
+ * than air. What it cannot reach it cannot reach: on the Ad-Dukhan leaf the
+ * loosest line (`We were to warn [mankind] ⟨3⟩ On that`) still runs three
+ * times the natural word space, because *night* has nowhere to break.
+ * Gluing short words to their neighbours was tried twice and reverted twice.
  *
  * This was load-bearing off until `ShapedWordBloom.ColorReveal` learned the
  * same multi-line wash `InkReveal` already paints: a tinted wash over a
  * broken word used to sweep the width of the whole line from the union bounds
  * of its range. Both washes now advance one head across the fragments in
- * order.
+ * order. The paper masks needed the same lesson twice over once the page was
+ * justified — see `lineSelectionBounds` and `justifyShift`.
  */
 private fun englishProseStyle(fontSize: TextUnit, lineHeight: TextUnit) = TextStyle(
     fontFamily = SerifFontFamily,
     fontSize = fontSize,
     lineHeight = lineHeight,
-    textAlign = TextAlign.Start,
-    // Balanced: a leaf is a page and fills its lines. Measured on glass it
-    // breaks identically to Paragraph on the sampled leaves; it stays for
-    // stating the intent. The evening itself comes from hyphenation below.
-    lineBreak = LineBreak.Paragraph.copy(strategy = LineBreak.Strategy.Balanced),
+    textAlign = TextAlign.Justify,
+    // High quality, not balanced: under justification every line is the same
+    // length by construction, so equalizing lengths optimizes nothing and the
+    // objective that matters is the one Paragraph already carries — the least
+    // stretched spaces over the block as a whole.
+    lineBreak = LineBreak.Paragraph,
     hyphens = Hyphens.Auto,
     // The book face's refinements: kerning and ligatures on, old-style figures
     // so the prose (and its brackets and quotes) sets with an even colour —
@@ -874,9 +886,18 @@ private fun EnglishProseBlock(
     val palette = rememberWordInkPalette()
     var layoutResult by remember { mutableStateOf<TextLayoutResult?>(null) }
     val hitSlopPx = with(LocalDensity.current) { 6.dp.toPx() }
+    val style = englishProseStyle(fontSize, lineHeight)
+    // What the breaker's hyphen costs the line, in this leaf's own hand. The
+    // paper masks over a justified line need it: the hyphen is drawn without
+    // being written, so without it the line's stretch reads too wide. See
+    // Modifier.shapedWordBloom.
+    val measurer = rememberTextMeasurer()
+    val hyphenPx = remember(style) {
+        measurer.measure(AnnotatedString("-"), style).size.width.toFloat()
+    }
     Text(
         text = block.text,
-        style = englishProseStyle(fontSize, lineHeight),
+        style = style,
         modifier = Modifier
             .fillMaxWidth()
             .shapedWordBloom(
@@ -907,10 +928,11 @@ private fun EnglishProseBlock(
                 // text travelled along with the voice. The bands tile the
                 // sentence exactly, so they need no reach to close over it.
                 coverPad = 0.dp,
-                // Ragged: a line is drawn where it was measured, so the paper
-                // masks need no justification correction. See
-                // Modifier.shapedWordBloom.
-                justified = false,
+                // The page is justified, and the paper masks have to be told:
+                // a selection path is measured before the line is stretched to
+                // the measure. See Modifier.shapedWordBloom.
+                justified = true,
+                hyphenPx = hyphenPx,
             )
             .pointerInput(block, layoutResult) {
                 detectTapGestures { tap ->

@@ -12,6 +12,8 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Canvas
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Paint
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathOperation
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.drawscope.clipPath
@@ -248,9 +250,15 @@ fun Modifier.shapedWordBloom(
      * sets ragged or centred text leaves this false and is unaffected.
      */
     justified: Boolean = false,
+    /**
+     * The advance of the hyphen the breaker draws, in the same hand as the text.
+     *
+     * Only a [justified] and hyphenating caller needs it; see [justifyShift].
+     */
+    hyphenPx: Float = 0f,
 ): Modifier {
     val stops = FloatArray(InkProfileStops) { i -> i / (InkProfileStops - 1f) }
-    val lineBoundsCache = LineBoundsCache(justified)
+    val lineBoundsCache = LineBoundsCache(justified, hyphenPx)
     val glyphHaloCache = GlyphHaloCache()
     return drawWithContent {
         drawContent()
@@ -537,7 +545,7 @@ fun Modifier.shapedWordBloom(
  * Bounded by the word count of one ayah and dropped whole when the layout
  * changes identity (font scale, width, text).
  */
-private class LineBoundsCache(private val justified: Boolean) {
+private class LineBoundsCache(private val justified: Boolean, private val hyphenPx: Float) {
     private var layout: TextLayoutResult? = null
     private val byRange = HashMap<Long, List<Rect>>()
 
@@ -548,7 +556,7 @@ private class LineBoundsCache(private val justified: Boolean) {
         }
         val key = (start.toLong() shl 32) or endExclusive.toLong()
         byRange[key]?.let { return it }
-        return computeLineBounds(textLayout, start, endExclusive, justified)
+        return computeLineBounds(textLayout, start, endExclusive, justified, hyphenPx)
             .also { byRange[key] = it }
     }
 }
@@ -630,6 +638,7 @@ private fun computeLineBounds(
     start: Int,
     endExclusive: Int,
     justified: Boolean,
+    hyphenPx: Float,
 ): List<Rect> = buildList {
     val firstLine = textLayout.getLineForOffset(start)
     val lastLine = textLayout.getLineForOffset((endExclusive - 1).coerceAtLeast(start))
@@ -639,13 +648,17 @@ private fun computeLineBounds(
         val lineStart = maxOf(start, layoutStart)
         val lineEnd = minOf(endExclusive, layoutEnd)
         if (lineEnd <= lineStart) continue
-        val selectionBounds = textLayout.getPathForRange(lineStart, lineEnd).getBounds()
+        val selectionBounds = lineSelectionBounds(textLayout, line, lineStart, lineEnd)
         if (!selectionBounds.isEmpty && selectionBounds.width > 0f) {
             val shift = if (justified) {
-                justifyShift(textLayout, line, layoutStart, layoutEnd)
+                justifyShift(textLayout, line, layoutStart, layoutEnd, hyphenPx)
             } else {
                 null
             }
+            // The hyphen the breaker draws belongs to the word it broke, and
+            // to whatever is inked over it — but it is not in the text, so no
+            // range reaches it. The fragment that ends the line takes it on.
+            val hyphen = if (endsHyphenated(textLayout, line, lineEnd)) hyphenPx else 0f
             // Selection paths can stop above a Latin descender at a wrapped
             // range edge. Keep the word-local horizontal bounds, but cover the
             // text layout's full line height so g/j/p/q/y never escape the
@@ -654,13 +667,61 @@ private fun computeLineBounds(
                 Rect(
                     left = selectionBounds.left + (shift?.at(lineStart) ?: 0f),
                     top = textLayout.getLineTop(line),
-                    right = selectionBounds.right + (shift?.at(lineEnd) ?: 0f),
+                    right = selectionBounds.right + (shift?.at(lineEnd) ?: 0f) + hyphen,
                     bottom = textLayout.getLineBottom(line),
                 ),
             )
         }
     }
 }
+
+/**
+ * The part of a range's selection path that is on [line], as a rectangle.
+ *
+ * A hyphenated line breaks inside a word, so its last offset is also the first
+ * offset of the line below — and a selection path taken up to it spills onto
+ * that line, where it starts at the margin. `getBounds()` unions the two, and
+ * the caller reads back a box the width of the whole measure: a paper cover for
+ * the verse *after* a hyphenated break lay over the verse before it as well, so
+ * a fragment of prose was dimmed twice and all but vanished. (Justification did
+ * not cause that — it only hyphenates more lines, so it showed up at once.)
+ *
+ * Keeping only what is inside the line's own band is exact for every case: with
+ * no spill the intersection is the path itself, and a bidi run's extremes stay
+ * wherever the path put them.
+ */
+private fun lineSelectionBounds(
+    textLayout: TextLayoutResult,
+    line: Int,
+    lineStart: Int,
+    lineEnd: Int,
+): Rect {
+    val path = textLayout.getPathForRange(lineStart, lineEnd)
+    // Nothing else can spill, and every word of every Arabic ayah comes through
+    // here — so the whole of the arithmetic below is skipped for all of them.
+    if (!breaksMidWord(textLayout, line, lineEnd)) return path.getBounds()
+    val band = Path().apply {
+        addRect(
+            Rect(
+                left = 0f,
+                top = textLayout.getLineTop(line),
+                right = textLayout.size.width.toFloat(),
+                bottom = textLayout.getLineBottom(line),
+            ),
+        )
+    }
+    return Path().apply { op(path, band, PathOperation.Intersect) }.getBounds()
+}
+
+/**
+ * Whether [line] ends inside a word — where the line below picks it up.
+ *
+ * A line broken at a space ends before it: `getLineEnd(visibleEnd = true)` takes
+ * the space off, so the next line starts later. A line broken inside a word ends
+ * exactly where the next one begins, and [offset] is that seam.
+ */
+private fun breaksMidWord(textLayout: TextLayoutResult, line: Int, offset: Int): Boolean =
+    line + 1 < textLayout.lineCount && textLayout.getLineStart(line + 1) == offset
 
 /**
  * Where a justified line's ink actually sits, against where the selection path
@@ -677,6 +738,15 @@ private fun computeLineBounds(
  * distributed evenly: Android justifies inter-word, dividing the extra width
  * over the line's stretchable spaces. So a character sits right of where the
  * path puts it by one share for every space before it.
+ *
+ * A hyphenated line is the one place the arithmetic needs telling twice. Its
+ * hyphen is drawn, not written: the breaker adds it to the run, so it stands
+ * between the last letter and the margin without being in the text at all. Read
+ * naively, the paper between them is all taken for stretch, every share comes
+ * out a couple of pixels too wide, and the far end of the line drifts far enough
+ * that a verse beginning there showed its first letter at full ink. [hyphenPx]
+ * is that glyph's advance, measured in the leaf's own hand, and taking it off
+ * first leaves the stretch alone. Callers that never hyphenate pass zero.
  */
 private class JustifyShift(private val perSpace: Float, private val spacesBefore: (Int) -> Int) {
     fun at(offset: Int): Float = perSpace * spacesBefore(offset)
@@ -687,6 +757,7 @@ private fun justifyShift(
     line: Int,
     layoutStart: Int,
     layoutEnd: Int,
+    hyphenPx: Float,
 ): JustifyShift? {
     // A paragraph's last line is set flush left and takes no stretch at all;
     // measuring one would read the whole of its ragged edge as stretch.
@@ -694,13 +765,31 @@ private fun justifyShift(
     val text = textLayout.layoutInput.text
     val spaces = countSpaces(text, layoutStart, layoutEnd)
     if (spaces <= 0) return null
-    val natural = textLayout.getPathForRange(layoutStart, layoutEnd).getBounds()
+    // On this line only: a hyphenated line's own end offset also belongs to the
+    // line below, and a path taken to it spills there. Unclipped, the spill made
+    // `natural.right` the whole measure, the stretch came out negative, and the
+    // one line the correction was skipped on was the one whose last word carried
+    // the hyphen. See [lineSelectionBounds].
+    val natural = lineSelectionBounds(textLayout, line, layoutStart, layoutEnd)
     if (natural.isEmpty) return null
-    val stretch = textLayout.getLineRight(line) - natural.right
+    val drawn = if (endsHyphenated(textLayout, line, layoutEnd)) hyphenPx else 0f
+    val stretch = textLayout.getLineRight(line) - drawn - natural.right
     if (stretch <= 0f) return null
     return JustifyShift(stretch / spaces) { offset ->
         countSpaces(text, layoutStart, offset)
     }
+}
+
+/**
+ * Whether the breaker split a word at [offset] and drew a hyphen for it.
+ *
+ * A word that carries its own hyphen (*Ad-Dukhan*) breaks mid-word too and needs
+ * no second one, so a text hyphen already there is not counted twice.
+ */
+private fun endsHyphenated(textLayout: TextLayoutResult, line: Int, offset: Int): Boolean {
+    if (!breaksMidWord(textLayout, line, offset)) return false
+    val text = textLayout.layoutInput.text
+    return offset in 1..text.length && text[offset - 1] != '-'
 }
 
 private fun countSpaces(text: CharSequence, start: Int, endExclusive: Int): Int {

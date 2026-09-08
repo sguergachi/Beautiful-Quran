@@ -859,27 +859,40 @@ percent of type on that leaf alone. That breaks §13.3 knowingly — on 2:282 th
 alternatives are overlapping lines or revelation clipped off the foot, and a page
 set a little small is the only one of the three a reader can still read.
 
-### 13.5 Ragged right, hyphenated at the book's minima
+### 13.5 Justified, hyphenated at the book's minima
 
-`TextAlign.Start` with `LineBreak.Paragraph` balanced to equal lengths, the
-book face's kerning, ligatures and old-style figures — and hyphenation.
+`TextAlign.Justify` with `LineBreak.Paragraph` (its own high-quality strategy),
+the book face's kerning, ligatures and old-style figures — and hyphenation.
 
-The mushaf's own rule is that every full line reaches both margins (rule 3) —
-but that is a rule about Arabic, which fills a line by the letterform, and it
-is the calligrapher's art. Latin has only the word space to fill with, and on
-a measure of about fifty characters that is not enough of a lever: the spaces
-open unevenly, the same line's colour changes from one page to the next, and
-the reader pays for a straight right edge with rivers of white running down
-the page. An even rag is the more readable page, and on a phone it is not
-close.
+The mushaf's own rule is that every full line reaches both margins (rule 3),
+and a bound English Qur'an keeps it. Latin fills by the word space where Arabic
+fills by the letterform — that is the calligrapher's art and this is not it —
+but it fills.
 
-Balanced states the intent — a leaf is a page, and a page fills its lines —
-and measures identically to `Paragraph` on the sampled leaves; the holes it
-leaves are forced at this measure either way. What evens them is hyphenation:
-a long word the rag cannot absorb — *righteousness*, *[fulfillment]*,
-*obedience* — pushes its neighbours into a deep hole at the line's end
-(*…and does* / *righteousness…*, a seventh of the measure empty on the Ta-Ha
-leaf that prompted this).
+**This was set ragged for a while, and the argument for it was true while it
+lasted.** A measure of about fifty characters gives the word space very little
+lever: with whole words only, one long word at a line's end is a hole the setter
+can either leave open (ragged) or stretch the line around (rivers), and neither
+is good. Hyphenation is the missing lever, it is what every printed book on a
+narrow measure uses, and once the leaf had it the argument was spent. What
+ragged cost is the thing the page is for: measured on the Ta-Ha leaf the right
+edge fell short of the measure by 53 px on average and 91 px at worst, out of
+942 — a fortieth to a tenth of the line, undulating down the page, and the leaf
+read as text weighted to the left of paper it did not fill. Justified, the same
+leaf's lines end within 3 px of each other (glyph side bearings), and only the
+paragraph's last line stands where it ends, as a Latin paragraph's does.
+
+Balanced was tried under justification and dropped: it equalizes line lengths,
+which justification has already done, and it breaks the sampled leaves in the
+same places as `Paragraph` to half a pixel of word space. `Paragraph`'s own
+high-quality strategy states the objective that still means something — the
+least stretched spaces over the block, rather than the least bad break taken
+line by line.
+
+What keeps the stretch honest is hyphenation: a long word the line cannot
+absorb — *righteousness*, *[fulfillment]*, *obedience* — is paid for by every
+word space around it (*…and does* / *righteousness…*, a seventh of the measure
+on the Ta-Ha leaf that prompted this).
 
 But the breaker's own hyphenation cannot be told that *de-scends* is not a
 break, and Compose exposes no frequency or fragment control — while self-set
@@ -891,9 +904,11 @@ with a word joiner, and the breaker takes the rest under `Hyphens.Auto`.
 *right-eous-ness* and *pro-tection* carry over; *de-scends*, *Re-pelled* and
 *obe-di-ence*'s middle *di* stay whole.
 
-Measured on device, right-edge shortfall in px of a ~935 px measure — Ta-Ha
-20:81, Baqarah's opening, As-Saffat (juz' 30 is chapter endings, short by
-rule, and excluded):
+Measured on device when the page was still ragged, right-edge shortfall in px
+of a ~935 px measure — Ta-Ha 20:81, Baqarah's opening, As-Saffat (juz' 30 is
+chapter endings, short by rule, and excluded). Justification spends the same
+paper on word spaces instead of leaving it at the line's end, so the numbers
+are now a measure of how much stretch the hyphens take off:
 
 ```
                         max    mean
@@ -930,9 +945,22 @@ across a range's line fragments in order, because the verse wash below needs
 exactly that; the tinted layers were not. ColorReveal paints the same
 reading-order wash now, so anyone hyphenating further (the web leaf still
 sets `hyphens: none` — a hyphenated word would split a per-word wash node the
-old way) must bring the same per-fragment wash there first. Ragged setting
-needs hyphens far less than justification would — the rag still absorbs the
-ordinary long word, and the vetoes keep the extraordinary ones honest.
+old way) must bring the same per-fragment wash there first.
+
+**And the paper masks needed the lesson twice more.** A hyphenated line breaks
+inside a word, so its last offset is also the first offset of the line below,
+and a selection path taken up to it spills onto that line — where it starts at
+the margin. `getBounds()` unions the two and hands back a box the width of the
+measure, so the paper cover for the verse *after* a hyphenated break lay over
+the verse before it as well and that fragment, dimmed twice, all but vanished.
+That was latent from the day hyphenation landed; justification hyphenates more
+lines and it surfaced at once. `lineSelectionBounds` keeps only what is inside
+the line's own band. Then the hyphen itself: it is drawn, not written, so
+`justifyShift` read the paper between the last letter and the margin as stretch,
+made every share a couple of pixels too wide, and a verse beginning late on such
+a line showed its first letter at full ink. The glyph's advance is measured in
+the leaf's own hand, taken off the stretch, and added back to the cover that
+ends the line — the hyphen belongs to the word it broke, and to the ink over it.
 
 ### 13.6 The ink is on the word you are hearing
 
