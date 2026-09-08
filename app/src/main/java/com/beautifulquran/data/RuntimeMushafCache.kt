@@ -1,6 +1,7 @@
 package com.beautifulquran.data
 
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.delay
@@ -65,6 +66,7 @@ class RuntimeMushafCache(
     @Volatile private var purgedSupplementToken: String? = null
     @Volatile private var blockReadRefresh = false
     private var parsedWords = emptyMap<String, RuntimeMushafWord>()
+    private var purgedCorruptRows = false
     private var parsedBySurah = emptyMap<Int, Map<Pair<Int, Int>, RuntimeMushafWord>>()
     private var refreshJob: Job? = null
     private var expiryJob: Job? = null
@@ -160,6 +162,7 @@ class RuntimeMushafCache(
                 unreadableToken = null
                 purgedSupplementToken = null
                 retryAttempt = 0
+                purgedCorruptRows = false
                 retryJob?.cancel()
                 retryJob = null
                 rememberUpdatedAt(state)
@@ -210,6 +213,21 @@ class RuntimeMushafCache(
 
     private fun install(expected: QfSyncState): Map<String, RuntimeMushafWord>? {
         val parsed = runCatching(::parseStoredContent).getOrElse { error ->
+            // Retained rows that fail validation with a fresh checkpoint can
+            // never heal by syncing: the server correctly returns no changes
+            // for them. Purge once per corruption episode so the next refresh
+            // bootstraps clean instead of looping on the same bytes. Transient
+            // SQLite failures never purge, and cancellation propagates.
+            if (error !is android.database.sqlite.SQLiteException &&
+                error !is CancellationException && !purgedCorruptRows
+            ) {
+                purgedCorruptRows = true
+                store.clear()
+                cachedState = null
+                parsedWords = emptyMap()
+                parsedBySurah = emptyMap()
+                _diagnostics.update { it.copy(cachedWords = 0) }
+            }
             unreadableToken = expected.token
             updateResource { it.copy(lastError = error.message ?: error::class.simpleName) }
             refresh()
@@ -276,6 +294,7 @@ class RuntimeMushafCache(
             parsedBySurah = parsed.bySurah
             parsedToken = expected.token
             unreadableToken = null
+            purgedCorruptRows = false
             _diagnostics.update { it.copy(cachedWords = parsed.byKey.size) }
         }
     }

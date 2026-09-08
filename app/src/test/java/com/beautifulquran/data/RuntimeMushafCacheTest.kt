@@ -304,6 +304,21 @@ class RuntimeMushafCacheTest {
         assertEquals(2, store.rowReads)
     }
 
+    @Test
+    fun `corrupt retained rows purge once then bootstrap clean`() = runTest {
+        val bad = row.copy(recordKey = "bogus")
+        val store = Store(QfSyncState(filter, "old", 90L), listOf(bad))
+        val api = SnapshotApi()
+        val cache = RuntimeMushafCache(api, store, backgroundScope, { 100L }, minimumWords = 1)
+
+        assertNull(cache.word(5, 2, 19))
+        runCurrent()
+
+        assertEquals("seeking", cache.word(5, 2, 19)?.translation)
+        assertEquals(1, api.syncs)
+        assertEquals(RuntimeCachePhase.FRESH, cache.status().phase)
+    }
+
     private fun failingApi() = CountingApi { error("offline") }
 
     @Test
