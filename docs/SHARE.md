@@ -33,10 +33,9 @@ its layout; it grows ordinals in the margin.
   player bar does **not** host a Gather control
   ([#519](https://github.com/sguergachi/Beautiful-Quran-/pull/519)).
 - **Pick** by tapping a verse (word or ayah). Its ordinal sits in the
-  bookmark swallowtail nub — same strip, first-line inset, ribbon
-  width, and nub height — in Western digits (1 2 3), Garamond ink.
-  The ribbon is hidden while gathering. Tap again to drop it; the rest
-  renumber.
+  gold soak's top corner, in the existing 38 dp bookmark gutter —
+  Western digits (1 2 3), Garamond ink, tight brush circle. The ribbon
+  is hidden while gathering. Tap again to drop it; the rest renumber.
 - **Order is tap order.** Tapping 2:255, then 112:1, then 2:1 gathers exactly
   that sequence. No ranges, no sorting, no "from / to" pickers. Cap:
   `SHARE_SELECTION_MAX` (20).
@@ -51,11 +50,11 @@ While gathering, word taps do not seek, word long-press does not open the
 Root Viewer, and the bookmark ribbon (including its note hold) is inactive.
 The mode owns the tap — interactions are *replaced*, not stacked.
 
-**Mode chrome (visual QA):** gather ordinals live in the existing
-bookmark gutter (38 dp the verse already leaves). 14 sp Garamond
-Western digits, tight ink-brush circle, 14 dp in from the soak rim
-so the loop stays on the gold and never enters the Hafs. Not gold,
-not Arabic-Indic. The verse layout does not change.
+**Mode chrome (visual QA):** gather ordinals live in the gold soak's
+top corner, still in the 38 dp bookmark gutter. 14 sp Garamond Western
+digits, tight ink-brush circle, 14 dp in from the soak rim on both
+the edge and the top so the loop stays on the gold. Not gold, not
+Arabic-Indic. The verse layout does not change.
 Gold soak and gather-bar takeover are shipped — see
 [VERSE_ACTIONS.md](VERSE_ACTIONS.md).
 

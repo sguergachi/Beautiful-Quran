@@ -3018,6 +3018,7 @@ fun AyahBlock(
                             } else {
                                 0.dp
                             },
+                            top = GatherOrdinalTopInsetDp.dp,
                         )
                         .fillMaxHeight(),
                 )
@@ -3061,9 +3062,9 @@ fun AyahBlock(
 }
 
 /**
- * Western gather ordinal in the existing bookmark gutter (the 38 dp
- * the verse already leaves). A tight ink-brush circle holds the digit.
- * The slot never enters the Hafs. Ink, not gold.
+ * Western gather ordinal in the gold soak's top corner, still in the
+ * 38 dp bookmark gutter the verse already leaves. A tight ink-brush
+ * circle holds the digit. The slot never enters the Hafs. Ink, not gold.
  */
 @Composable
 private fun GatherOrdinalMark(
@@ -3096,7 +3097,6 @@ private fun GatherOrdinalMark(
             contentAlignment = Alignment.Center,
             modifier = Modifier
                 .align(Alignment.TopCenter)
-                .padding(top = BookmarkTopInsetDp.dp)
                 .inkBrushCircleMark(circle, ordinal),
         ) {
             Text(

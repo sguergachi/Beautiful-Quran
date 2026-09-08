@@ -147,8 +147,8 @@ becomes share tools; multi is extension) without taxing bookmark.
 - Selected: a pale gold vellum wash spreads under that ayah (primary
   signal) — same gold token as the ayah marks, fibre on the rim,
   paper gutters so neighbours do not fuse. Western ordinal in Garamond
-  ink, centered in the bookmark swallowtail nub (secondary). Chrome
-  never uses Arabic-Indic digits.
+  ink, top corner of the gold soak, still in the bookmark gutter
+  (secondary). Chrome never uses Arabic-Indic digits.
 - Unselected: wash recedes — that *is* the unselect feedback
 - Ordinals renumber when a verse is dropped
 
