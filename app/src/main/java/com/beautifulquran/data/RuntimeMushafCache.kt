@@ -70,6 +70,7 @@ class RuntimeMushafCache(
     private var expiryJob: Job? = null
     private var retryJob: Job? = null
     private var retryAttempt = 0
+    private var lastKickMs: Long? = null
     private val _changes = MutableSharedFlow<Unit>(
         extraBufferCapacity = 1,
         onBufferOverflow = BufferOverflow.DROP_OLDEST,
@@ -129,11 +130,19 @@ class RuntimeMushafCache(
         if (age == null || age !in 0..QF_REVALIDATE_AFTER_MS) refresh()
     }
 
+    /** Reader entry with an empty book asks for one attempt; at most one per 30 s. */
+    fun refreshForEmptyBook() {
+        val last = lastKickMs
+        if (last != null && nowMs() - last < KICK_THROTTLE_MS) return
+        refresh()
+    }
+
     fun refresh() {
         synchronized(this) {
             if (syncing) return
             syncing = true
         }
+        lastKickMs = nowMs()
         blockReadRefresh = false
         _diagnostics.update { it.copy(requestsSettled = false, syncProgress = null) }
         updateResource {
@@ -383,6 +392,7 @@ class RuntimeMushafCache(
     private companion object {
         const val MUSHAF_ID = 1
         const val RECORD_TYPE = "mushaf_word"
+        const val KICK_THROTTLE_MS = 30_000L
         val RETRY_DELAYS_MS = longArrayOf(5_000, 15_000, 60_000, 5 * 60_000)
         val FILTER = QF_READER_FILTER
         fun key(surahId: Int, ayah: Int, position: Int) = "$surahId:$ayah:$position"

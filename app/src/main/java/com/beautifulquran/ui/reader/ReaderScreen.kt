@@ -1,6 +1,7 @@
 package com.beautifulquran.ui.reader
 
 import com.beautifulquran.DevProfiling
+import com.beautifulquran.QuranApp
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
@@ -125,6 +126,7 @@ import androidx.core.view.WindowInsetsCompat
 import com.beautifulquran.data.AyahSelectorSide
 import com.beautifulquran.data.ReadingLayout
 import com.beautifulquran.data.ReadingMode
+import com.beautifulquran.data.RuntimeCachePhase
 import com.beautifulquran.data.model.Surah
 import com.beautifulquran.domain.EnglishVerseAlignments
 import com.beautifulquran.domain.englishSeekWordPosition
@@ -281,8 +283,22 @@ fun ReaderScreen(
     // so every "which leaf is the voice on" answer is the verse's opening leaf
     // rather than the word's own. See MushafCatalog.readingPageOf.
     val mushafWholeVerses = mushafMode && settings.readingMode == ReadingMode.ENGLISH_ONLY
+    val quranApp = LocalContext.current.applicationContext as QuranApp
     LaunchedEffect(mushafMode) {
-        if (mushafMode) viewModel.ensureMushaf(settings.englishLeafText)
+        if (mushafMode) {
+            viewModel.ensureMushaf(settings.englishLeafText)
+            // Entering the leaf with no book asks for one fill attempt. The
+            // bounded retry stops after minutes; without this kick an empty
+            // book reached outside cold start would sit silent forever. Warm
+            // caches skip: their book builds from retained rows.
+            if (mushafUi?.catalog?.isEmpty() != false) {
+                quranApp.runtimeMushaf?.let { cache ->
+                    if (cache.status().phase != RuntimeCachePhase.FRESH) {
+                        cache.refreshForEmptyBook()
+                    }
+                }
+            }
+        }
     }
     // The English book is paginated by *measuring* each leaf, which cannot be
     // done until the leaf has a size. So the book opens on the character

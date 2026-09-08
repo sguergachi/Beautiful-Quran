@@ -306,6 +306,25 @@ class RuntimeMushafCacheTest {
 
     private fun failingApi() = CountingApi { error("offline") }
 
+    @Test
+    fun `empty book entry kicks one fill per thirty seconds`() = runTest {
+        var now = 0L
+        val store = Store()
+        val api = CountingApi { error("offline") }
+        val cache = RuntimeMushafCache(api, store, backgroundScope, nowMs = { now }, minimumWords = 1)
+
+        cache.refreshForEmptyBook()
+        runCurrent()
+        cache.refreshForEmptyBook()
+        runCurrent()
+        assertEquals(1, api.syncs)
+
+        now += 31_000L
+        cache.refreshForEmptyBook()
+        runCurrent()
+        assertEquals(2, api.syncs)
+    }
+
     private inner class SnapshotApi : QfContentSyncApi {
         var syncs = 0
         var lastRequest: QfSyncRequest? = null
