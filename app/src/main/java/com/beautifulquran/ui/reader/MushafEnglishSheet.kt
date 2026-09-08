@@ -1260,11 +1260,10 @@ private fun englishBasmalahHandPx(
 }
 
 /**
- * How much of the measure the basmalah may fill. Short of all of it: a display
- * line that reaches both margins reads as a line of text that happens to be
- * centred, and the last of the fit is rounding slack the line must not spend.
+ * How much of the measure the basmalah fills. All of it: the line is sized to
+ * sit edge to edge with the chapter's panel above it and the leaf below it.
  */
-private const val EnglishBasmalahMeasureFill = 0.94f
+private const val EnglishBasmalahMeasureFill = 1f
 
 /** Never smaller than this share of the page's hand, whatever the measure. */
 private const val EnglishBasmalahMinHand = 0.62f
