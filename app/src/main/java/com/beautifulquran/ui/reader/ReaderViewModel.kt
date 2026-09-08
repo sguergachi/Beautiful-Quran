@@ -794,19 +794,24 @@ class ReaderViewModel(
         viewModelScope.launch {
             repository.runtimeMushafChanged?.collect {
                 repository.invalidateRuntimeMushafViews()
-                val gen = sessions.generation
-                val id = sessions.surahId.takeIf { it != 0 } ?: return@collect
-                val refreshed = repository.surahContent(id)
-                if (!sessions.isCurrent(gen, id)) return@collect
-                _uiState.value = _uiState.value.copy(content = refreshed)
                 // The book is paginated from the QCF snapshot the refresh
                 // replaced: null it and repaginate the same book (measured
                 // when the leaf had measured it) rather than keep stale pages.
+                // This must not wait behind the surah below: on a fresh
+                // install the fill lands while no chapter is loaded, and
+                // returning early then kept the launch-time empty book
+                // forever — the reader's ruler-less call refuses to replace a
+                // measured book, so nothing ever rebuilt it.
                 _mushaf.value = null
                 mushafRulerKey = null
                 mushafLeafText?.let { text ->
                     ensureMushaf(text, mushafRulerFor, null, mushafCacheKey)
                 }
+                val gen = sessions.generation
+                val id = sessions.surahId.takeIf { it != 0 } ?: return@collect
+                val refreshed = repository.surahContent(id)
+                if (!sessions.isCurrent(gen, id)) return@collect
+                _uiState.value = _uiState.value.copy(content = refreshed)
             }
         }
     }
