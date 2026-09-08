@@ -609,6 +609,28 @@ internal fun mushafDialRelease(
 }
 
 /**
+ * Whether a settled-page change should consume the dial's return roundel.
+ *
+ * A swipe turn is a new search that supersedes the old landing, just like
+ * taking hold of the dial again does — so the roundel must not survive it.
+ * The dial's own landing is the one exception: [dialTarget] names the leaf a
+ * dial release just sought, and the pager's arrival there keeps the bubble.
+ * Any other arrival ([newSettled] != [dialTarget], or no outstanding dial
+ * seek when [dialTarget] is 0) dismisses it. [returnPrevious] is 0 when no
+ * bubble stands, and [oldSettled] == [newSettled] means nothing turned.
+ */
+internal fun mushafDialShouldDismissReturn(
+    returnPrevious: Int,
+    dialTarget: Int,
+    oldSettled: Int,
+    newSettled: Int,
+): Boolean {
+    if (returnPrevious == 0) return false
+    if (newSettled == oldSettled) return false
+    return dialTarget != newSettled
+}
+
+/**
  * The line the label always writes, at the granularity the dial is working at.
  *
  * Chapter tier, the chapter by its number then its name, with the same middle
@@ -1210,6 +1232,11 @@ internal fun MushafPageDial(
     var returnEnabled by remember { mutableStateOf(false) }
     var returnJob by remember { mutableStateOf<Job?>(null) }
     var returnEntrance by remember { mutableStateOf<Job?>(null) }
+    // The leaf a dial release just sought. The pager's arrival there keeps the
+    // return roundel; any other settled change is a swipe turn — a new search
+    // that supersedes the old landing — and consumes it.
+    var dialLandingTarget by remember { mutableIntStateOf(0) }
+    var lastSettledPage by remember { mutableIntStateOf(settled) }
     val warmState = remember { MushafDialWarmState() }
     var widthPx by remember { mutableIntStateOf(0) }
     var hudContentWidthPx by remember { mutableIntStateOf(0) }
@@ -1288,6 +1315,10 @@ internal fun MushafPageDial(
         warmState.landingJob = null
         reportScrub.value(false)
         reportLanding.value(false)
+        // Our own seek: the pager's arrival at the return target is expected,
+        // not a swipe turn, so account for it before the bubble goes.
+        dialLandingTarget = 0
+        lastSettledPage = target
         dismissReturnBubble()
         view.performHapticFeedback(HapticFeedbackConstants.CONTEXT_CLICK)
         seek.value(target)
@@ -1321,6 +1352,21 @@ internal fun MushafPageDial(
             returnPage.intValue = 0
         }
         return entrance
+    }
+
+    // A swipe turn supersedes the old landing, like a fresh dial stroke does:
+    // the pager's arrival anywhere besides the dial's own target consumes the
+    // roundel. Keyed on settled only, so arming the target above does not
+    // itself run this — only the pager's next move does.
+    LaunchedEffect(settled) {
+        val old = lastSettledPage
+        lastSettledPage = settled
+        if (mushafDialShouldDismissReturn(returnPage.intValue, dialLandingTarget, old, settled)) {
+            dialLandingTarget = 0
+            dismissReturnBubble()
+        } else if (dialLandingTarget != 0 && settled == dialLandingTarget) {
+            dialLandingTarget = 0
+        }
     }
 
     fun warmTarget(page: Int, immediate: Boolean = false) {
@@ -2437,6 +2483,7 @@ internal fun MushafPageDial(
                             // chapter's name arriving under the hand.
                             release.surahId?.let { seekSurah.value?.invoke(it) }
                             if (pageChanges) {
+                                dialLandingTarget = landed
                                 val returnEntrance = showReturnBubble(previousPage, landed)
                                 // Give the bubble and retract one draw before
                                 // cold leaf composition joins the next frame.

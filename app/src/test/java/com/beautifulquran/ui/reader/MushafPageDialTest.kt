@@ -103,6 +103,19 @@ class MushafPageDialTest {
     }
 
     @Test
+    fun `a swipe turn consumes the return bubble but the dial landing keeps it`() {
+        // Dial P -> L arms target L: arriving at L keeps the way back.
+        assertFalse(mushafDialShouldDismissReturn(returnPrevious = 100, dialTarget = 120, oldSettled = 100, newSettled = 120))
+        // Swiping on to another leaf is a new search that supersedes it.
+        assertTrue(mushafDialShouldDismissReturn(returnPrevious = 100, dialTarget = 0, oldSettled = 120, newSettled = 121))
+        // Swiping before the landing arrives supersedes it too.
+        assertTrue(mushafDialShouldDismissReturn(returnPrevious = 100, dialTarget = 120, oldSettled = 100, newSettled = 101))
+        // Nothing standing, or nothing turning, dismisses nothing.
+        assertFalse(mushafDialShouldDismissReturn(returnPrevious = 0, dialTarget = 0, oldSettled = 120, newSettled = 121))
+        assertFalse(mushafDialShouldDismissReturn(returnPrevious = 100, dialTarget = 0, oldSettled = 120, newSettled = 120))
+    }
+
+    @Test
     fun `a tap wobble does not become a dial stroke`() {
         val slop = 24f
         assertFalse(mushafDialCommitsMovement(500f, 523f, slop))
