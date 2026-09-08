@@ -54,7 +54,14 @@ class QfContentSyncHttpApi internal constructor(
         completedCalls = 0
         expectedCalls = 1
         reportProgress(QfSyncProgress(0, expectedCalls))
-        val page = parseSyncPage(get(syncPath(request)))
+        // A rejected sync call means its checkpoint never will: resync clean
+        // instead of retrying the same token. Supplement failures below stay
+        // generic backoff territory.
+        val page = try {
+            parseSyncPage(get(syncPath(request)))
+        } catch (error: QfClientErrorException) {
+            throw QfResyncRequiredException()
+        }
         val finalPage = page.nextPagePath == null
         expectedCalls = 1 + page.changes.count { it is QfContentChange.Snapshot } +
             if (finalPage) SUPPLEMENT_VERSES.size else 0
@@ -108,9 +115,7 @@ class QfContentSyncHttpApi internal constructor(
                     json.parseToJsonElement(body).jsonObject["error"]?.jsonObject
                         ?.get("code")?.jsonPrimitive?.contentOrNull
                 }.getOrNull()
-                if (status == 410 && code == "resync_required") throw QfResyncRequiredException()
-                if (status == 403 && code == "qf_access_revoked") throw QfAccessRevokedException()
-                error("QF Content API returned $status")
+                throwSyncHttpError(status, code)
             }
             connection.inputStream.use { input ->
                 file.outputStream().buffered().use { output ->
@@ -168,11 +173,9 @@ class QfContentSyncHttpApi internal constructor(
                     json.parseToJsonElement(body).jsonObject["error"]?.jsonObject
                         ?.get("code")?.jsonPrimitive?.contentOrNull
                 }.getOrNull()
-            if (status == 410 && errorCode == "resync_required") {
-                throw QfResyncRequiredException()
+            if (status !in 200..299) {
+                throwSyncHttpError(status, errorCode)
             }
-            if (status == 403 && errorCode == "qf_access_revoked") throw QfAccessRevokedException()
-            check(status in 200..299) { "QF Content API returned $status" }
             return json.parseToJsonElement(body)
         } finally {
             connection.disconnect()

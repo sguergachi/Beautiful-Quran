@@ -59,6 +59,21 @@ class QfContentSyncHttpApiTest {
         assertTrue(failure?.message?.contains("Unexpected QF resource") == true)
     }
 
+    @Test
+    fun `rejected sync call resyncs instead of retrying its token`() = runBlocking {
+        // The transport stands in for HTTP here: a 404 on the sync call
+        // surfaces as QfClientErrorException, which sync() must translate so
+        // the syncer falls back to a clean bootstrap.
+        val api = QfContentSyncHttpApi("https://content.example", transport = {
+            throw QfClientErrorException(404)
+        })
+
+        val failure = runCatching { api.sync(QfSyncRequest.Bootstrap(QF_READER_FILTER)) }
+            .exceptionOrNull()
+
+        assertTrue(failure is QfResyncRequiredException)
+    }
+
     private fun snapshot(group: String, id: Int, row: String) =
         json("""{"schema_version":1,"resource_group":"$group","resource_id":$id,"records":[$row]}""")
 

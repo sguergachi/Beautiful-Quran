@@ -112,6 +112,42 @@ class QfContentSyncTest {
     }
 
     @Test
+    fun `http failures map to their sync meaning`() {
+        assertFailsWithResync { throwSyncHttpError(410, "qf_content_unavailable") }
+        assertFailsWithResync { throwSyncHttpError(410, "resync_required") }
+        try {
+            throwSyncHttpError(403, "qf_access_revoked")
+            error("expected revocation")
+        } catch (error: QfAccessRevokedException) {
+        }
+        try {
+            throwSyncHttpError(400, "not_found")
+            error("expected client error")
+        } catch (error: QfClientErrorException) {
+            assertEquals(400, error.status)
+        }
+        try {
+            throwSyncHttpError(404, null)
+            error("expected client error")
+        } catch (error: QfClientErrorException) {
+            assertEquals(404, error.status)
+        }
+        try {
+            throwSyncHttpError(503, null)
+            error("expected generic failure")
+        } catch (error: IllegalStateException) {
+        }
+    }
+
+    private fun assertFailsWithResync(block: () -> Nothing) {
+        try {
+            block()
+            error("expected resync")
+        } catch (error: QfResyncRequiredException) {
+        }
+    }
+
+    @Test
     fun `invalid checkpoint bootstraps and atomically replaces prior rows`() = runBlocking {
         val store = FakeStore(QfSyncState(filter, "old-token", 1L))
         store.rows = listOf(row.copy(recordKey = "stale"))

@@ -114,6 +114,24 @@ interface QfContentSyncStore {
 /** QF asks clients to discard an unusable checkpoint and bootstrap again. */
 class QfResyncRequiredException : Exception("QF Content Sync requires a fresh bootstrap")
 
+/** The sync request itself was rejected; the checkpoint behind it is unusable. */
+class QfClientErrorException(val status: Int) : Exception("QF Content API returned $status")
+
+/**
+ * Maps an HTTP failure to its sync meaning. A 410 always discards the
+ * checkpoint — the Worker only forwards QF's own resync code, and any other
+ * 410 still means gone. A rejected sync call (400/404) does the same: the
+ * token or cursor behind it will never succeed, so retrying it is a loop and
+ * only a clean bootstrap can heal. Anything else stays a generic failure for
+ * the backoff retry.
+ */
+internal fun throwSyncHttpError(status: Int, code: String?): Nothing {
+    if (status == 410) throw QfResyncRequiredException()
+    if (status == 403 && code == "qf_access_revoked") throw QfAccessRevokedException()
+    if (status == 400 || status == 404) throw QfClientErrorException(status)
+    error("QF Content API returned $status")
+}
+
 /** Credentials or content access were revoked; retained QF content must be deleted. */
 class QfAccessRevokedException : Exception("QF content access was revoked")
 
