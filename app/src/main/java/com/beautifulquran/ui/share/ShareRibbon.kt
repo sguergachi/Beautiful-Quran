@@ -31,7 +31,9 @@ import com.beautifulquran.ui.theme.quietClickable
  * Replaces the player bar while gathering. Not a copy of play.
  *
  * One row, two jobs, like a running head: leave at the start, send at the
- * end. The count lives on the verses. The empty middle is paper.
+ * end. The count lives on the verses. The empty middle is still empty;
+ * the bar itself is the theme's DeepGreen, so gather is a different
+ * foot of the sheet than play.
  */
 @Composable
 fun ShareRibbon(
@@ -42,12 +44,17 @@ fun ShareRibbon(
     onShareText: () -> Unit,
     onShareImage: () -> Unit,
 ) {
-    val ink = MaterialTheme.colorScheme.onSurfaceVariant
+    val ink = MaterialTheme.colorScheme.onPrimary
     val busy = preparingText || preparingImage
     val canExport = count >= 1 && !busy
     val exportTint = if (canExport) ink else ink.copy(alpha = 0.35f)
 
-    Surface(color = MaterialTheme.colorScheme.background) {
+    Surface(
+        color = MaterialTheme.colorScheme.primary,
+        contentColor = ink,
+        shadowElevation = 0.dp,
+        tonalElevation = 0.dp,
+    ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier

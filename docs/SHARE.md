@@ -155,7 +155,7 @@ share/WashEdgeProbe.kt           soft-edge assertion (JVM-tested)
 ui/share/ShareImageCard.kt       fixed Paper full-ink card
 ui/share/ShareViewModel.kt       selection + text/image export state
 ui/share/ShareHost.kt            BackHandler + InkRevealOverlay + chooser
-ui/share/ShareRibbon.kt          replaces PlayerBar while sharing
+ui/share/ShareRibbon.kt          replaces PlayerBar while sharing (DeepGreen)
 ui/share/ShareComposeSheet.kt    Send page (list + text + image)
 res/xml/share_paths.xml          FileProvider paths
 ```

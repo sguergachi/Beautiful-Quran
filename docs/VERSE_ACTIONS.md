@@ -202,8 +202,9 @@ tick off. Same family as Settings checks and the ayah rail.
 
 The gather bar is not a copy of play. One row, two jobs: Close at the
 start (leave), Text and Image a tight pair at the end (send). The count
-lives on the verses; the empty middle is paper. No Send page on the happy
-path; back leaves gather.
+lives on the verses; the empty middle stays empty. The bar is the theme
+primary (DeepGreen on Paper) — gather's foot of the sheet, not play's
+paper. No Send page on the happy path; back leaves gather.
 
 Policy lives in `share/ShareUx.kt` (pure, JVM-tested). Do not invent
 entry rules in `ReaderScreen`.
