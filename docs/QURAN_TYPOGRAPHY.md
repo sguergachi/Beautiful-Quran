@@ -859,32 +859,80 @@ percent of type on that leaf alone. That breaks §13.3 knowingly — on 2:282 th
 alternatives are overlapping lines or revelation clipped off the foot, and a page
 set a little small is the only one of the three a reader can still read.
 
-### 13.5 Ragged right, and deliberately not hyphenated
+### 13.5 Ragged right, hyphenated at the book's minima
 
-`TextAlign.Start` with `LineBreak.Paragraph`.
+`TextAlign.Start` with `LineBreak.Paragraph` balanced to equal lengths, the
+book face's kerning, ligatures and old-style figures — and hyphenation.
 
 The mushaf's own rule is that every full line reaches both margins (rule 3) —
-but that is a rule about Arabic, which fills a line by the letterform, and it is
-the calligrapher's art. Latin has only the word space to fill with, and on a
-measure of about fifty characters that is not enough of a lever: the spaces open
-unevenly, the same line's colour changes from one page to the next, and the
-reader pays for a straight right edge with rivers of white running down the
-page. An even rag is the more readable page, and on a phone it is not close.
+but that is a rule about Arabic, which fills a line by the letterform, and it
+is the calligrapher's art. Latin has only the word space to fill with, and on
+a measure of about fifty characters that is not enough of a lever: the spaces
+open unevenly, the same line's colour changes from one page to the next, and
+the reader pays for a straight right edge with rivers of white running down
+the page. An even rag is the more readable page, and on a phone it is not
+close.
 
-`LineBreak.Paragraph` stays, and earns more here than it did under
-justification: it breaks the whole block at once rather than greedily line by
-line, which is what makes the rag *even* — the difference between a right edge
-that undulates and one that lurches.
+Balanced states the intent — a leaf is a page, and a page fills its lines —
+and measures identically to `Paragraph` on the sampled leaves; the holes it
+leaves are forced at this measure either way. What evens them is hyphenation:
+a long word the rag cannot absorb — *righteousness*, *[fulfillment]*,
+*obedience* — pushes its neighbours into a deep hole at the line's end
+(*…and does* / *righteousness…*, a seventh of the measure empty on the Ta-Ha
+leaf that prompted this).
 
-Hyphens are off, and this is load-bearing rather than an omission. Hyphenation
-is the one thing that breaks a *word* across two lines, and
-`ShapedWordBloom.ColorReveal` takes the union bounds of a range's glyph path —
-a tinted wash over a broken word would sweep the width of the whole line.
-(`InkReveal` was taught to advance one wash across a range's line fragments in
-order, because the verse wash below needs exactly that; the tinted layers were
-not.) Anyone turning hyphens on must fix ColorReveal the same way first. Ragged
-setting needs them far less anyway — the rag absorbs the long word that
-justification would have had to stretch a line around.
+But the breaker's own hyphenation cannot be told that *de-scends* is not a
+break, and Compose exposes no frequency or fragment control — while self-set
+soft hyphens are ignored with hyphenation off and subsumed with it on. So the
+leaf vetoes instead of proposing (`EnglishHyphenation`): the TeX US-English
+patterns (`HyphenTable`, extracted by `tools/build_hyphen_table.py`) propose
+every cut, each cut with fewer than three letters on either side is joined
+with a word joiner, and the breaker takes the rest under `Hyphens.Auto`.
+*right-eous-ness* and *pro-tection* carry over; *de-scends*, *Re-pelled* and
+*obe-di-ence*'s middle *di* stay whole.
+
+Measured on device, right-edge shortfall in px of a ~935 px measure — Ta-Ha
+20:81, Baqarah's opening, As-Saffat (juz' 30 is chapter endings, short by
+rule, and excluded):
+
+```
+                        max    mean
+    Ta-Ha               134 → 126    53 → 43     …and does right- / eousness…
+    Baqarah             122 → 122    51 → 51     untouched: short-word pileups
+    As-Saffat           153 → 153    68 → 64     …you won- / der… its one hyphen
+```
+
+Good breaks only, and no short end the setting did not already have — while
+unvetoed hyphenation, measured alongside, breaks *Re-pelled* and *de-scends*
+after two letters on the same leaves. The table implementation is checked against its own source: the trie reproduces
+pyphen's raw cuts exactly over 400 corpus words, and the vetoes are locked
+word by word in `EnglishHyphenationTest`.
+
+Two things were tried and reverted, and the leaf records them so nobody
+re-tries them blind:
+
+- **No-break keeps for short words.** Gluing a word of two letters or fewer
+  to its neighbour removes a break the paragraph optimizer was using, and the
+  hole left behind (*…and We made* / *an appointment…*, a quarter of the
+  measure empty) reads worse than the short end removed — with hyphenation
+  behind it no less, because even the hyphenated head (*an appoint-*) will
+  not fit after an already-full line.
+- **The breaker's own hyphenation unvetoed.** It fills the same holes and was
+  measured alongside (worst hole 153 → 104 px on As-Saffat), but it breaks
+  *Re-pelled* and *de-scends* after two letters and strands more short ends
+  doing it. The veto keeps the filling and refuses the fragments.
+
+Hyphenation used to be off here, called load-bearing: a hyphenated word sets
+its fragments on two lines, and `ShapedWordBloom.ColorReveal` took the union
+bounds of the range's glyph path — so a tinted wash over a broken word swept
+the width of the whole line. `InkReveal` was taught to advance one wash
+across a range's line fragments in order, because the verse wash below needs
+exactly that; the tinted layers were not. ColorReveal paints the same
+reading-order wash now, so anyone hyphenating further (the web leaf still
+sets `hyphens: none` — a hyphenated word would split a per-word wash node the
+old way) must bring the same per-fragment wash there first. Ragged setting
+needs hyphens far less than justification would — the rag still absorbs the
+ordinary long word, and the vetoes keep the extraordinary ones honest.
 
 ### 13.6 The ink is on the word you are hearing
 

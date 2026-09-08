@@ -39,6 +39,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.text.style.Hyphens
 import androidx.compose.ui.text.style.LineBreak
 import androidx.compose.ui.text.style.LineHeightStyle
 import androidx.compose.ui.text.style.TextAlign
@@ -793,7 +794,7 @@ private fun englishBookHandPx(
 }
 
 /**
- * The book's hand: EB Garamond, ragged right, unhyphenated.
+ * The book's hand: EB Garamond, ragged right, hyphenated.
  *
  * **Ragged, not justified.** The mushaf's own rule is that every full line
  * reaches both margins (`QURAN_TYPOGRAPHY.md` §3) — but that is a rule about
@@ -804,27 +805,48 @@ private fun englishBookHandPx(
  * pays for a straight right edge with rivers of white running down the page.
  * An even rag is the more readable page, and on a phone it is not close.
  *
- * `LineBreak.Paragraph` stays: it breaks the whole block at once rather than
- * greedily line by line, which is what makes the rag *even* rather than merely
- * ragged — the difference between a right edge that undulates and one that
- * lurches.
+ * **Balanced, not merely high-quality.** A leaf is a page, and a page fills
+ * its lines: the breaker equalizes their lengths rather than merely avoiding
+ * the worst breaks. Measured on glass it breaks identically to `Paragraph` on
+ * the sampled leaves — the holes below are forced at this measure either way
+ * — and it states the intent the page is set to.
  *
- * **Not hyphenated, and this is load-bearing.** Hyphenation breaks a *word*
- * across two lines, and `ShapedWordBloom.ColorReveal` takes the union bounds of
- * a range's glyph path — so a tinted wash over a broken word would sweep the
- * width of the whole line. `InkReveal` handles a multi-line range correctly (it
- * advances one wash across the fragments in order, which is what this page's
- * verse wash needs), but the tinted layers do not. Anyone turning hyphens on
- * must fix ColorReveal the same way first. Ragged setting needs them far less
- * anyway — the rag absorbs the long word that justification would have had to
- * stretch a line around.
+ * **Hyphenated, at the book's minima.** A long word the rag cannot absorb —
+ * *righteousness*, *[fulfillment]*, *obedience* — pushes the words around it
+ * into a deep hole at the line's end. With `Hyphens.Auto` the breaker may
+ * carry the word over instead — but it breaks *de-scends* after two letters,
+ * which no book does, and Compose exposes no minima to stop it with. So the
+ * leaf vetoes (`EnglishHyphenation`): every cut the TeX patterns propose with
+ * fewer than three letters on either side is joined with a word joiner, and
+ * the breaker takes the rest. Measured on glass (Ta-Ha, Baqarah's opening,
+ * As-Saffat): the Ta-Ha mean shortfall 53 → 43 px of a 935 px measure with
+ * its worst hole filled by a good break (`…and does right-` / `eousness…`),
+ * As-Saffat's mean 68 → 64 with `won-der` its only hyphen, Baqarah untouched
+ * (its holes are short-word pileups no hyphen reaches), and no bad fragment
+ * anywhere — unvetoed hyphenation breaks *Re-pelled* and *de-scends* on the
+ * same leaves. Gluing short words to their neighbours was tried twice and
+ * reverted twice: the keep-hole stands even hyphenated.
+ *
+ * This was load-bearing off until `ShapedWordBloom.ColorReveal` learned the
+ * same multi-line wash `InkReveal` already paints: a tinted wash over a
+ * broken word used to sweep the width of the whole line from the union bounds
+ * of its range. Both washes now advance one head across the fragments in
+ * order.
  */
 private fun englishProseStyle(fontSize: TextUnit, lineHeight: TextUnit) = TextStyle(
     fontFamily = SerifFontFamily,
     fontSize = fontSize,
     lineHeight = lineHeight,
     textAlign = TextAlign.Start,
-    lineBreak = LineBreak.Paragraph,
+    // Balanced: a leaf is a page and fills its lines. Measured on glass it
+    // breaks identically to Paragraph on the sampled leaves; it stays for
+    // stating the intent. The evening itself comes from hyphenation below.
+    lineBreak = LineBreak.Paragraph.copy(strategy = LineBreak.Strategy.Balanced),
+    hyphens = Hyphens.Auto,
+    // The book face's refinements: kerning and ligatures on, old-style figures
+    // so the prose (and its brackets and quotes) sets with an even colour —
+    // the same features the web leaf and every other English surface set.
+    fontFeatureSettings = "'kern' 1, 'liga' 1, 'onum' 1",
     platformStyle = PlatformTextStyle(includeFontPadding = false),
     // Trim.Both puts the block's own edges on the grid: the first line starts
     // at its ascent and the last stops at its descender, instead of half a

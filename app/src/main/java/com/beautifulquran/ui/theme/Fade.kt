@@ -375,10 +375,6 @@ fun Modifier.shapedWordBloom(
                     val p = bloom.progress.coerceIn(0f, 1f)
                     val bounds = path.getBounds()
                     if (bounds.isEmpty || bounds.width <= 0f) return@forEach
-                    val w = bounds.width
-                    val edge = (w * (bloom.feather ?: feather)).coerceAtLeast(1f)
-                    val head = p *
-                        (w * bloom.revealFraction.coerceIn(0f, 1f) + edge)
                     val colorBleed = maxOf(
                         bleed,
                         bloom.glowRadius.dp.toPx() * 3f,
@@ -462,34 +458,67 @@ fun Modifier.shapedWordBloom(
                         )
                     }
                     if (p < 1f || bloom.revealFraction < 1f) {
-                        val brush = if (rtl) {
-                            Brush.horizontalGradient(
-                                colors = washColors,
-                                startX = bounds.left + (w - head),
-                                endX = bounds.left + (w - head) + edge,
-                            )
-                        } else {
-                            Brush.horizontalGradient(
-                                colors = washColors,
-                                startX = bounds.left + head - edge,
-                                endX = bounds.left + head,
-                            )
-                        }
+                        // One wash across the whole range, however many lines it
+                        // is set over — the same reading-order travel InkReveal
+                        // uses. A hyphenated word sets its fragments on two
+                        // lines, and the union bounds of that span the width of
+                        // the whole line: sweeping the union lit the gap between
+                        // the fragments and washed both at once. Each line takes
+                        // its own share of the head instead.
+                        val tintBounds = lineBoundsCache.boundsFor(
+                            textLayout,
+                            start,
+                            endExclusive,
+                        )
                         // The wash has to reach as far as the tint did, or
                         // an overhang keeps ink the sweep has not arrived at.
                         val washBleed = if (clipTintToRange) bleed else colorBleed
-                        drawRect(
-                            brush = brush,
-                            topLeft = Offset(
-                                bounds.left - washBleed,
-                                bounds.top - washBleed,
-                            ),
-                            size = Size(
-                                bounds.width + washBleed * 2f,
-                                bounds.height + washBleed * 2f,
-                            ),
-                            blendMode = BlendMode.DstIn,
-                        )
+                        val washCovers = tintBounds.map { lineBox ->
+                            Rect(
+                                left = lineBox.left - washBleed,
+                                top = lineBox.top,
+                                right = lineBox.right + washBleed,
+                                bottom = lineBox.bottom,
+                            )
+                        }
+                        val total = washCovers.sumOf { it.width.toDouble() }
+                            .toFloat().coerceAtLeast(1f)
+                        val lineEdge =
+                            (total * (bloom.feather ?: feather)).coerceAtLeast(1f)
+                        val lineHead = p *
+                            (total * bloom.revealFraction.coerceIn(0f, 1f) + lineEdge)
+                        var travelled = 0f
+                        washCovers.forEach { cover ->
+                            val wLine = cover.width
+                            val local = lineHead - travelled
+                            travelled += wLine
+                            val brush = if (rtl) {
+                                Brush.horizontalGradient(
+                                    colors = washColors,
+                                    startX = cover.right - local,
+                                    endX = cover.right - local + lineEdge,
+                                )
+                            } else {
+                                Brush.horizontalGradient(
+                                    colors = washColors,
+                                    startX = cover.left + local - lineEdge,
+                                    endX = cover.left + local,
+                                )
+                            }
+                            clipRect(
+                                left = cover.left,
+                                top = cover.top,
+                                right = cover.right,
+                                bottom = cover.bottom,
+                            ) {
+                                drawRect(
+                                    brush = brush,
+                                    topLeft = Offset(cover.left, cover.top),
+                                    size = Size(cover.width, cover.height),
+                                    blendMode = BlendMode.DstIn,
+                                )
+                            }
+                        }
                     }
                     drawIntoCanvas { canvas -> canvas.restore() }
                 }

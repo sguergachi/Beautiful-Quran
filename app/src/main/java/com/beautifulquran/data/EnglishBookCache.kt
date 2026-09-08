@@ -112,7 +112,13 @@ class EnglishBookCache(context: Context) {
     }
 
     private companion object {
-        /** Bump when the meaning of a written leaf changes. */
-        const val FORMAT = 15
+        /**
+         * Bump when the meaning of a written leaf changes.
+         *
+         * 16: the prose hyphenates (`Hyphens.Auto`, `LineBreak.Balanced`,
+         * the book face's kern/liga/onum) with unbookish breaks vetoed by a
+         * word joiner (`EnglishHyphenation`) — every leaf breaks somewhere new.
+         */
+        const val FORMAT = 16
     }
 }
