@@ -548,7 +548,27 @@ private fun englishLeafBlockTexts(
                     // carried sentence is numbered where it finishes, as a
                     // paragraph carried over a page is punctuated where it ends.
                     val markRange = if (verse.endsVerse) {
-                        append(" ")
+                        // A narrow no-break space, and both halves of that are
+                        // load-bearing.
+                        //
+                        // *No-break*, because the mark closes the verse before
+                        // it and a closing number that opens a line reads as if
+                        // it introduced the verse below — on this leaf, *the
+                        // Knowing* ending a line and `⟨6⟩ Lord of the heavens`
+                        // beginning the next. Measured over eight leaves the
+                        // free mark opened a line six times in 124; bound, it
+                        // never does. The paragraph optimizer was spending them
+                        // to score the page — three of the six sat under holes
+                        // of 80–101 px the mark would have fitted in.
+                        //
+                        // *Narrow*, because binding makes the word and its mark
+                        // one atom and the rag pays for every pixel of it. A
+                        // reference mark takes a thin space in any case; at a
+                        // word space the same eight leaves lost 11 px of mean
+                        // rag and pushed their worst hole to 188 px, at a thin
+                        // one they lose 9 and their worst hole stays where it
+                        // was (162 → 159).
+                        append("\u202F")
                         val markStart = length
                         appendAyahNumberMark(
                             number = verse.ayah,

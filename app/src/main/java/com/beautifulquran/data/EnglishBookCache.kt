@@ -118,7 +118,13 @@ class EnglishBookCache(context: Context) {
          * 16: the prose hyphenates (`Hyphens.Auto`, `LineBreak.Balanced`,
          * the book face's kern/liga/onum) with unbookish breaks vetoed by a
          * word joiner (`EnglishHyphenation`) — every leaf breaks somewhere new.
+         *
+         * 17: justification. Shipped, then taken back out; the leaf is ragged.
+         *
+         * 18: the verse mark is bound to the word it closes with a narrow
+         * no-break space, so it can no longer open a line. Every leaf that
+         * carried a stranded mark breaks somewhere new.
          */
-        const val FORMAT = 16
+        const val FORMAT = 18
     }
 }

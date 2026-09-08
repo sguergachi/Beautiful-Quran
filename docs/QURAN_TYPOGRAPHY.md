@@ -918,6 +918,39 @@ a request for one of two other things:
 
 It is not a line-breaking problem, and no breaker will fix it.
 
+#### The verse mark never opens a line
+
+The mark closes the verse before it. A closing number that opens a line reads as
+if it introduced the verse below — *the Knowing* ending a line and `⟨6⟩ Lord of
+the heavens` beginning the next, on the Ad-Dukhan leaf. That is not an
+aesthetic complaint: it misattributes the number.
+
+The optimal breaker was spending them to score the page. Measured over eight
+leaves (124 lines), the mark set with an ordinary word space opened a line six
+times, and three of those sat under holes of 80–101 px the mark would have
+fitted in. Bound with a narrow no-break space (U+202F) it never does:
+
+```
+                              mean   worst   lines over    marks opening
+                               rag     rag   1/8 measure         a line
+    word space (free)           61     162      7 of 124              6
+    no-break word space         72     188     13 of 126              1
+    no-break thin space         70     159     11 of 124              0
+```
+
+Binding makes the word and its mark one atom, and the rag pays for every pixel
+of it, so the space is thin as well as unbreakable — which is what a reference
+mark takes in any case. The thin space costs 9 px of mean rag against the free
+mark and leaves the worst hole where it was; the full word space costs 11 and
+pushes the worst hole to 188. Both are within the rag's own noise, and neither
+fixes the left-weighting above — this is a different fault that the same
+measurement turned up.
+
+Note what this is *not*: an attempt to tighten the air around the mark. There is
+none to tighten. Measured on the page, the gap either side of a mark is 12–13 px
+against an ordinary word gap of 12 — the Hafs cups carry no slack, and shrinking
+the mark was never the lever.
+
 Balanced states the intent — a leaf is a page, and a page fills its lines —
 and measures identically to `Paragraph` on the sampled leaves, and within 3 px
 of the best arrangement that exists. What evens the holes it leaves is
