@@ -198,9 +198,15 @@ internal fun formatMushafAyahMark(number: Int): String {
     }
 }
 
-internal fun formatAyahNumberMark(number: Int, useArabicIndicDigits: Boolean): String {
+internal fun formatAyahNumberMark(
+    number: Int,
+    useArabicIndicDigits: Boolean,
+    ltr: Boolean = !useArabicIndicDigits,
+): String {
     val digits = if (useArabicIndicDigits) number.toArabicIndic() else number.toString()
-    val raw = if (useArabicIndicDigits) "﴿$digits﴾" else "\u2066﴾$digits﴿\u2069"
+    // LTR (English lyric) isolates and swaps cups so Bidi_Mirrored FD3E/FD3F
+    // paint toward the digits. Digit script does not change that.
+    val raw = if (ltr) "\u2066﴾$digits﴿\u2069" else "﴿$digits﴾"
     return raw.toCharArray().joinToString("\u2060")
 }
 
@@ -209,10 +215,11 @@ internal fun AnnotatedString.Builder.appendAyahNumberMark(
     number: Int,
     useArabicIndicDigits: Boolean,
     style: SpanStyle,
+    ltr: Boolean = !useArabicIndicDigits,
 ) {
     val start = length
     withStyle(style.copy(fontFamily = HafsFontFamily)) {
-        append(formatAyahNumberMark(number, useArabicIndicDigits))
+        append(formatAyahNumberMark(number, useArabicIndicDigits, ltr = ltr))
     }
     if (!useArabicIndicDigits) {
         val digitStyle = style.copy(fontFamily = TranslationFontFamily)
@@ -250,17 +257,37 @@ internal fun rememberAyahMarkAlpha(focused: Boolean): State<Float> =
         label = "ayahMarkAlpha",
     )
 
+/**
+ * Union of boxes that actually paint. WORD JOINER / LRI / PDI are zero-width
+ * and Compose often reports them at the origin — including them made the
+ * ﴿N﴾ hit box miss the visible cups (English lyric) or swallow the line.
+ */
+internal fun visibleGlyphBounds(boxes: List<Rect>): Rect? =
+    boxes.filter { it.width > 0.5f && it.height > 0.5f }
+        .reduceOrNull { acc, rect -> acc.expandToInclude(rect) }
+
+/**
+ * Logical hit for an inline range. Taps just past the last glyph resolve to
+ * [textLength], which is exclusive of the range's inclusive last index.
+ */
+internal fun tapHitsRange(offset: Int, range: IntRange, textLength: Int): Boolean {
+    if (range.isEmpty()) return false
+    if (offset in range) return true
+    return offset == textLength && range.last == textLength - 1
+}
+
 /** True when [tap] falls inside the glyph bounds of [range], inflated by [hitSlopPx]. */
 private fun TextLayoutResult.rangeContains(
     tap: Offset,
     range: IntRange,
     hitSlopPx: Float,
-): Boolean =
-    range
-        .map { offset -> getBoundingBox(offset) }
-        .reduceOrNull { acc, rect -> acc.expandToInclude(rect) }
-        ?.inflate(hitSlopPx)
-        ?.contains(tap) == true
+): Boolean {
+    if (range.isEmpty()) return false
+    val textLength = layoutInput.text.length
+    if (tapHitsRange(getOffsetForPosition(tap), range, textLength)) return true
+    val boxes = range.map { offset -> getBoundingBox(offset) }
+    return visibleGlyphBounds(boxes)?.inflate(hitSlopPx)?.contains(tap) == true
+}
 
 private fun TextLayoutResult.wordIndexAt(
     tap: Offset,
@@ -1824,6 +1851,7 @@ private fun ResponsiveEnglishAyah(
         lineHeight = 1.5.em,
         letterSpacing = 0.sp,
         textAlign = TextAlign.Start,
+        textDirection = TextDirection.Ltr,
     )
     var layoutResult by remember { mutableStateOf<TextLayoutResult?>(null) }
     val hitSlopPx = with(LocalDensity.current) { 8.dp.toPx() }
@@ -1871,14 +1899,17 @@ private fun ResponsiveEnglishAyah(
                 }
                 ranges += start until length
             }
-            if (length > 0) append(" ")
+            // Glue space belongs to the mark so a tap on the gap before ﴿N﴾
+            // gathers instead of falling through as an ayah miss.
             val markStart = length
+            if (length > 0) append(" ")
             // 17/22 keeps the ornament proportional. Sharing the prose
             // baseline avoids a font-metric paint lift on Android.
             appendAyahNumberMark(
                 number = ayah.number,
                 useArabicIndicDigits = useArabicIndicDigits,
                 style = SpanStyle(color = gold, fontSize = 17.sp * fontScale),
+                ltr = true,
             )
             markRange = markStart until length
         }
@@ -2083,7 +2114,7 @@ private fun ResponsiveHafsAyah(
                 ranges += start until length
                 append(" ")
             }
-            val markStart = length
+            val markStart = if (length > 0) length - 1 else 0
             appendAyahNumberMark(
                 number = ayah.number,
                 useArabicIndicDigits = useArabicIndicDigits,
