@@ -9,7 +9,35 @@ plugins {
 /** CI exports unset secrets as empty strings; treat those as absent. */
 fun env(name: String): String? = System.getenv(name)?.takeIf { it.isNotBlank() }
 
-val releaseKeystore = rootProject.file(env("RELEASE_KEYSTORE_FILE") ?: "release.keystore")
+/**
+ * Store keystore. Linked worktrees do not inherit ignored files, so fall
+ * back to the primary checkout's `release.keystore` — the same lookup
+ * `scripts/build_release_bundle.sh` uses. A missing key still debug-signs
+ * so CI/fresh clones can assembleRelease, but that APK cannot update a
+ * store-signed install.
+ */
+fun resolveReleaseKeystore(): File {
+    env("RELEASE_KEYSTORE_FILE")?.let { path ->
+        val file = File(path)
+        return if (file.isAbsolute) file else rootProject.file(path)
+    }
+    val local = rootProject.file("release.keystore")
+    if (local.exists()) return local
+    val gitCommon = runCatching {
+        val proc = ProcessBuilder(
+            "git",
+            "rev-parse",
+            "--path-format=absolute",
+            "--git-common-dir",
+        ).directory(rootProject.projectDir).start()
+        val text = proc.inputStream.bufferedReader().readText().trim()
+        if (proc.waitFor() == 0 && text.isNotBlank()) File(text) else null
+    }.getOrNull()
+    val primary = gitCommon?.parentFile?.resolve("release.keystore")
+    return if (primary != null && primary.exists()) primary else local
+}
+
+val releaseKeystore = resolveReleaseKeystore()
 
 // The mushaf is the QCF V2 page faces or it is nothing: a build that ships
 // without all 604 renders every leaf in the fallback Hafs face, which is the
