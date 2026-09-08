@@ -63,6 +63,15 @@ class EnglishBookCache(context: Context) {
         if (!file.isFile) return null
         DataInputStream(file.inputStream().buffered()).use { input ->
             val leafCount = input.readInt()
+            // An empty book is never worth keeping: it was measured from an
+            // empty catalog, and reading it back installs a valid-looking
+            // measured book with no leaves — blank pager, held cover, and no
+            // remeasure ever, until app data is wiped. Treat as a miss and
+            // remove the poison so the book rebuilds from live data.
+            if (leafCount <= 0) {
+                file.delete()
+                return null
+            }
             val leaves = ArrayList<List<EnglishVerseRun>>(leafCount)
             repeat(leafCount) {
                 val runCount = input.readInt()
@@ -83,6 +92,13 @@ class EnglishBookCache(context: Context) {
 
     /** Writes [book] down under [key], and forgets any book written before it. */
     fun write(key: String, book: EnglishBook) {
+        // Never persist an empty book: see read. Drop any poison already
+        // stored under this key so it cannot be picked up between here and
+        // the next successful measure.
+        if (book.leafCount == 0) {
+            runCatching { File(dir, key).delete() }
+            return
+        }
         runCatching {
             dir.mkdirs()
             // One book at a time: a leaf's size changes when the phone is
