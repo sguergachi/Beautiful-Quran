@@ -118,14 +118,7 @@ class EnglishBookCache(context: Context) {
          * 16: the prose hyphenates (`Hyphens.Auto`, `LineBreak.Balanced`,
          * the book face's kern/liga/onum) with unbookish breaks vetoed by a
          * word joiner (`EnglishHyphenation`) — every leaf breaks somewhere new.
-         *
-         * 17: the prose is justified and breaks under `LineBreak.Paragraph`'s
-         * own high-quality strategy rather than a balanced one. Justification
-         * cannot move a break, and the two strategies measured identically on
-         * the sampled leaves — but "identical on three leaves" is not a promise
-         * about 604 pages, and a book measured under one breaker and set under
-         * another is exactly what this number is for.
          */
-        const val FORMAT = 17
+        const val FORMAT = 16
     }
 }
