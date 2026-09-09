@@ -1,0 +1,3297 @@
+{
+ "schemaVersion": 1,
+ "note": "Rows the dual-model forced-alignment audit did not clear. Held at the payload the baseline database already ships, so they never enter the timing delta. A hold can only restore a shipped row, never invent one.",
+ "baseline": {
+  "commit": "13372cbb81a12f93ee3d81c0498879853422ad7a"
+ },
+ "rows": [
+  {
+   "reciterId": 1,
+   "reciterSlug": "Alafasy_128kbps",
+   "surahId": 7,
+   "ayah": 95,
+   "reason": "Rebuild replaces the shipped 8,9,8 span-repeat with a 9,9 pair; both models score the candidate worse. Pre-existing drift, unrelated to the false-lead class.",
+   "models": [
+    {
+     "name": "arabic-xlsr-ctc",
+     "baselineScore": -0.528175,
+     "candidateScore": -0.559474
+    },
+    {
+     "name": "mms-uroman-ctc",
+     "baselineScore": -0.065083,
+     "candidateScore": -0.067727
+    }
+   ],
+   "audioOnsetMs": 0,
+   "segments": [
+    [
+     1,
+     70,
+     1570
+    ],
+    [
+     2,
+     1570,
+     2890
+    ],
+    [
+     3,
+     2890,
+     3650
+    ],
+    [
+     4,
+     3650,
+     4940
+    ],
+    [
+     5,
+     4940,
+     5950
+    ],
+    [
+     6,
+     5950,
+     6750
+    ],
+    [
+     7,
+     6750,
+     7510
+    ],
+    [
+     8,
+     7535,
+     8690
+    ],
+    [
+     9,
+     8690,
+     9435
+    ],
+    [
+     8,
+     9435,
+     10495
+    ],
+    [
+     9,
+     10495,
+     10830
+    ],
+    [
+     10,
+     10830,
+     11460
+    ],
+    [
+     11,
+     11460,
+     13990
+    ],
+    [
+     12,
+     13990,
+     17070
+    ],
+    [
+     13,
+     17070,
+     19760
+    ],
+    [
+     14,
+     19760,
+     21310
+    ],
+    [
+     15,
+     21310,
+     23250
+    ],
+    [
+     16,
+     23250,
+     24400
+    ],
+    [
+     17,
+     24400,
+     24930
+    ],
+    [
+     18,
+     24930,
+     28065
+    ]
+   ]
+  },
+  {
+   "reciterId": 1,
+   "reciterSlug": "Alafasy_128kbps",
+   "surahId": 13,
+   "ayah": 14,
+   "reason": "False-lead handoff is acoustically ambiguous: both models prefer the shipped pair. No structural axis separates it from the 169 cleared rows, so it is held rather than excluded by a tuned threshold.",
+   "models": [
+    {
+     "name": "arabic-xlsr-ctc",
+     "baselineScore": -0.405086,
+     "candidateScore": -0.4128
+    },
+    {
+     "name": "mms-uroman-ctc",
+     "baselineScore": -0.030819,
+     "candidateScore": -0.037875
+    }
+   ],
+   "audioOnsetMs": 0,
+   "segments": [
+    [
+     1,
+     395,
+     650
+    ],
+    [
+     2,
+     650,
+     1700
+    ],
+    [
+     3,
+     1700,
+     2900
+    ],
+    [
+     4,
+     2900,
+     4500
+    ],
+    [
+     5,
+     4500,
+     5590
+    ],
+    [
+     6,
+     5590,
+     6890
+    ],
+    [
+     7,
+     6890,
+     8090
+    ],
+    [
+     8,
+     8090,
+     8570
+    ],
+    [
+     9,
+     8570,
+     10470
+    ],
+    [
+     10,
+     10470,
+     11590
+    ],
+    [
+     11,
+     11590,
+     12810
+    ],
+    [
+     12,
+     12810,
+     13680
+    ],
+    [
+     12,
+     13680,
+     15050
+    ],
+    [
+     13,
+     15050,
+     16370
+    ],
+    [
+     14,
+     16370,
+     17560
+    ],
+    [
+     15,
+     17560,
+     17930
+    ],
+    [
+     16,
+     17930,
+     20460
+    ],
+    [
+     17,
+     20460,
+     21580
+    ],
+    [
+     18,
+     21580,
+     22450
+    ],
+    [
+     19,
+     22450,
+     23000
+    ],
+    [
+     20,
+     23000,
+     23430
+    ],
+    [
+     21,
+     23430,
+     25330
+    ],
+    [
+     22,
+     25330,
+     26010
+    ],
+    [
+     23,
+     26010,
+     28410
+    ],
+    [
+     24,
+     28410,
+     29950
+    ],
+    [
+     25,
+     29950,
+     30910
+    ],
+    [
+     26,
+     30910,
+     31390
+    ],
+    [
+     27,
+     31390,
+     33945
+    ]
+   ]
+  },
+  {
+   "reciterId": 1,
+   "reciterSlug": "Alafasy_128kbps",
+   "surahId": 13,
+   "ayah": 25,
+   "reason": "Rebuild moves boundaries away from both models' forced alignment: mean |start residual| 88->90 ms (XLSR), 84->82 ms (MMS/uroman). Pre-existing drift, unrelated to the false-lead class.",
+   "models": [
+    {
+     "name": "arabic-xlsr-ctc",
+     "metric": "meanAbsStartResidualMs",
+     "baselineResidualMs": 88.4,
+     "candidateResidualMs": 90.12,
+     "baselineScore": -88.4,
+     "candidateScore": -90.12
+    },
+    {
+     "name": "mms-uroman-ctc",
+     "metric": "meanAbsStartResidualMs",
+     "baselineResidualMs": 84.32,
+     "candidateResidualMs": 82.28,
+     "baselineScore": -84.32,
+     "candidateScore": -82.28
+    }
+   ],
+   "audioOnsetMs": 0,
+   "segments": [
+    [
+     1,
+     30,
+     1420
+    ],
+    [
+     2,
+     1430,
+     3160
+    ],
+    [
+     3,
+     3170,
+     3960
+    ],
+    [
+     4,
+     3970,
+     4950
+    ],
+    [
+     5,
+     4960,
+     5880
+    ],
+    [
+     6,
+     5890,
+     6590
+    ],
+    [
+     7,
+     7100,
+     8320
+    ],
+    [
+     8,
+     8320,
+     12000
+    ],
+    [
+     8,
+     12000,
+     13540
+    ],
+    [
+     9,
+     13540,
+     15010
+    ],
+    [
+     10,
+     15020,
+     15650
+    ],
+    [
+     11,
+     15660,
+     16630
+    ],
+    [
+     12,
+     16640,
+     18500
+    ],
+    [
+     13,
+     18510,
+     19920
+    ],
+    [
+     14,
+     19930,
+     20410
+    ],
+    [
+     15,
+     20420,
+     22070
+    ],
+    [
+     16,
+     22080,
+     22380
+    ],
+    [
+     17,
+     22390,
+     23310
+    ],
+    [
+     18,
+     23340,
+     26380
+    ],
+    [
+     18,
+     26380,
+     29120
+    ],
+    [
+     19,
+     29120,
+     29750
+    ],
+    [
+     20,
+     29750,
+     31040
+    ],
+    [
+     21,
+     31050,
+     31860
+    ],
+    [
+     22,
+     31870,
+     34110
+    ],
+    [
+     23,
+     34120,
+     37173
+    ]
+   ]
+  },
+  {
+   "reciterId": 1,
+   "reciterSlug": "Alafasy_128kbps",
+   "surahId": 15,
+   "ayah": 7,
+   "reason": "Rebuild moves boundaries away from both models' forced alignment: mean |start residual| 27->104 ms (XLSR), 12->96 ms (MMS/uroman). Pre-existing drift, unrelated to the false-lead class.",
+   "models": [
+    {
+     "name": "arabic-xlsr-ctc",
+     "metric": "meanAbsStartResidualMs",
+     "baselineResidualMs": 27.0,
+     "candidateResidualMs": 104.143,
+     "baselineScore": -27.0,
+     "candidateScore": -104.143
+    },
+    {
+     "name": "mms-uroman-ctc",
+     "metric": "meanAbsStartResidualMs",
+     "baselineResidualMs": 11.571,
+     "candidateResidualMs": 95.571,
+     "baselineScore": -11.571,
+     "candidateScore": -95.571
+    }
+   ],
+   "audioOnsetMs": 0,
+   "segments": [
+    [
+     1,
+     50,
+     820
+    ],
+    [
+     2,
+     820,
+     2070
+    ],
+    [
+     3,
+     2070,
+     5100
+    ],
+    [
+     4,
+     5100,
+     5940
+    ],
+    [
+     5,
+     5940,
+     7050
+    ],
+    [
+     6,
+     7050,
+     7380
+    ],
+    [
+     7,
+     7380,
+     10265
+    ]
+   ]
+  },
+  {
+   "reciterId": 1,
+   "reciterSlug": "Alafasy_128kbps",
+   "surahId": 26,
+   "ayah": 108,
+   "reason": "Rebuild moves boundaries away from both models' forced alignment: mean |start residual| 82->54 ms (XLSR), 49->86 ms (MMS/uroman). Pre-existing drift, unrelated to the false-lead class.",
+   "models": [
+    {
+     "name": "arabic-xlsr-ctc",
+     "metric": "meanAbsStartResidualMs",
+     "baselineResidualMs": 82.333,
+     "candidateResidualMs": 54.0,
+     "baselineScore": -82.333,
+     "candidateScore": -54.0
+    },
+    {
+     "name": "mms-uroman-ctc",
+     "metric": "meanAbsStartResidualMs",
+     "baselineResidualMs": 49.0,
+     "candidateResidualMs": 86.0,
+     "baselineScore": -49.0,
+     "candidateScore": -86.0
+    }
+   ],
+   "audioOnsetMs": 0,
+   "segments": [
+    [
+     1,
+     0,
+     745
+    ],
+    [
+     2,
+     745,
+     1675
+    ],
+    [
+     3,
+     1675,
+     4810
+    ]
+   ]
+  },
+  {
+   "reciterId": 1,
+   "reciterSlug": "Alafasy_128kbps",
+   "surahId": 26,
+   "ayah": 110,
+   "reason": "Rebuild moves boundaries away from both models' forced alignment: mean |start residual| 74->41 ms (XLSR), 54->61 ms (MMS/uroman). Pre-existing drift, unrelated to the false-lead class.",
+   "models": [
+    {
+     "name": "arabic-xlsr-ctc",
+     "metric": "meanAbsStartResidualMs",
+     "baselineResidualMs": 73.667,
+     "candidateResidualMs": 41.333,
+     "baselineScore": -73.667,
+     "candidateScore": -41.333
+    },
+    {
+     "name": "mms-uroman-ctc",
+     "metric": "meanAbsStartResidualMs",
+     "baselineResidualMs": 53.667,
+     "candidateResidualMs": 61.333,
+     "baselineScore": -53.667,
+     "candidateScore": -61.333
+    }
+   ],
+   "audioOnsetMs": 0,
+   "segments": [
+    [
+     1,
+     0,
+     845
+    ],
+    [
+     2,
+     845,
+     1785
+    ],
+    [
+     3,
+     1785,
+     5200
+    ]
+   ]
+  },
+  {
+   "reciterId": 1,
+   "reciterSlug": "Alafasy_128kbps",
+   "surahId": 27,
+   "ayah": 20,
+   "reason": "Rebuild moves boundaries away from both models' forced alignment: mean |start residual| 34->97 ms (XLSR), 58->93 ms (MMS/uroman). Pre-existing drift, unrelated to the false-lead class.",
+   "models": [
+    {
+     "name": "arabic-xlsr-ctc",
+     "metric": "meanAbsStartResidualMs",
+     "baselineResidualMs": 33.909,
+     "candidateResidualMs": 96.818,
+     "baselineScore": -33.909,
+     "candidateScore": -96.818
+    },
+    {
+     "name": "mms-uroman-ctc",
+     "metric": "meanAbsStartResidualMs",
+     "baselineResidualMs": 57.909,
+     "candidateResidualMs": 93.0,
+     "baselineScore": -57.909,
+     "candidateScore": -93.0
+    }
+   ],
+   "audioOnsetMs": 0,
+   "segments": [
+    [
+     1,
+     40,
+     1340
+    ],
+    [
+     2,
+     1340,
+     2330
+    ],
+    [
+     3,
+     2330,
+     3300
+    ],
+    [
+     4,
+     3300,
+     4080
+    ],
+    [
+     5,
+     4080,
+     6070
+    ],
+    [
+     6,
+     6070,
+     6450
+    ],
+    [
+     7,
+     6450,
+     7650
+    ],
+    [
+     8,
+     7650,
+     8040
+    ],
+    [
+     9,
+     8040,
+     8720
+    ],
+    [
+     10,
+     8720,
+     9090
+    ],
+    [
+     11,
+     9090,
+     14095
+    ]
+   ]
+  },
+  {
+   "reciterId": 1,
+   "reciterSlug": "Alafasy_128kbps",
+   "surahId": 33,
+   "ayah": 6,
+   "reason": "False-lead handoff split the witnesses (XLSR marginally prefers the candidate, MMS/uroman the baseline). Ambiguous evidence keeps the source repeat.",
+   "models": [
+    {
+     "name": "arabic-xlsr-ctc",
+     "baselineScore": -0.410655,
+     "candidateScore": -0.409521
+    },
+    {
+     "name": "mms-uroman-ctc",
+     "baselineScore": -0.040236,
+     "candidateScore": -0.044016
+    }
+   ],
+   "audioOnsetMs": 0,
+   "segments": [
+    [
+     1,
+     60,
+     1840
+    ],
+    [
+     2,
+     1840,
+     2620
+    ],
+    [
+     3,
+     2620,
+     4180
+    ],
+    [
+     4,
+     4180,
+     4500
+    ],
+    [
+     5,
+     4500,
+     7140
+    ],
+    [
+     6,
+     7160,
+     10110
+    ],
+    [
+     7,
+     10110,
+     12720
+    ],
+    [
+     8,
+     12750,
+     13330
+    ],
+    [
+     9,
+     13330,
+     14520
+    ],
+    [
+     10,
+     14520,
+     15430
+    ],
+    [
+     11,
+     15430,
+     16170
+    ],
+    [
+     12,
+     16170,
+     17240
+    ],
+    [
+     13,
+     17240,
+     18310
+    ],
+    [
+     14,
+     18310,
+     19180
+    ],
+    [
+     15,
+     19180,
+     19920
+    ],
+    [
+     16,
+     19920,
+     20250
+    ],
+    [
+     17,
+     20250,
+     21670
+    ],
+    [
+     18,
+     21670,
+     23300
+    ],
+    [
+     19,
+     23300,
+     24270
+    ],
+    [
+     19,
+     24270,
+     26880
+    ],
+    [
+     20,
+     26880,
+     27880
+    ],
+    [
+     21,
+     27880,
+     30670
+    ],
+    [
+     22,
+     30670,
+     32620
+    ],
+    [
+     23,
+     32620,
+     35820
+    ],
+    [
+     24,
+     35820,
+     37970
+    ],
+    [
+     25,
+     37970,
+     38520
+    ],
+    [
+     26,
+     38520,
+     39320
+    ],
+    [
+     27,
+     39320,
+     39540
+    ],
+    [
+     28,
+     39540,
+     40510
+    ],
+    [
+     29,
+     40510,
+     42245
+    ]
+   ]
+  },
+  {
+   "reciterId": 1,
+   "reciterSlug": "Alafasy_128kbps",
+   "surahId": 36,
+   "ayah": 22,
+   "reason": "Rebuild moves boundaries away from both models' forced alignment: mean |start residual| 33->93 ms (XLSR), 38->90 ms (MMS/uroman). Pre-existing drift, unrelated to the false-lead class.",
+   "models": [
+    {
+     "name": "arabic-xlsr-ctc",
+     "metric": "meanAbsStartResidualMs",
+     "baselineResidualMs": 32.857,
+     "candidateResidualMs": 93.286,
+     "baselineScore": -32.857,
+     "candidateScore": -93.286
+    },
+    {
+     "name": "mms-uroman-ctc",
+     "metric": "meanAbsStartResidualMs",
+     "baselineResidualMs": 38.0,
+     "candidateResidualMs": 90.429,
+     "baselineScore": -38.0,
+     "candidateScore": -90.429
+    }
+   ],
+   "audioOnsetMs": 0,
+   "segments": [
+    [
+     1,
+     55,
+     1195
+    ],
+    [
+     2,
+     1195,
+     2715
+    ],
+    [
+     3,
+     2715,
+     3495
+    ],
+    [
+     4,
+     3495,
+     4315
+    ],
+    [
+     5,
+     4315,
+     5405
+    ],
+    [
+     6,
+     5405,
+     6465
+    ],
+    [
+     7,
+     6465,
+     10470
+    ]
+   ]
+  },
+  {
+   "reciterId": 1,
+   "reciterSlug": "Alafasy_128kbps",
+   "surahId": 37,
+   "ayah": 164,
+   "reason": "Rebuild moves boundaries away from both models' forced alignment: mean |start residual| 253->315 ms (XLSR), 254->327 ms (MMS/uroman). Pre-existing drift, unrelated to the false-lead class.",
+   "models": [
+    {
+     "name": "arabic-xlsr-ctc",
+     "metric": "meanAbsStartResidualMs",
+     "baselineResidualMs": 253.0,
+     "candidateResidualMs": 315.4,
+     "baselineScore": -253.0,
+     "candidateScore": -315.4
+    },
+    {
+     "name": "mms-uroman-ctc",
+     "metric": "meanAbsStartResidualMs",
+     "baselineResidualMs": 254.2,
+     "candidateResidualMs": 327.4,
+     "baselineScore": -254.2,
+     "candidateScore": -327.4
+    }
+   ],
+   "audioOnsetMs": 0,
+   "segments": [
+    [
+     1,
+     70,
+     3850
+    ],
+    [
+     2,
+     3850,
+     4730
+    ],
+    [
+     3,
+     4730,
+     5320
+    ],
+    [
+     4,
+     5320,
+     6180
+    ],
+    [
+     5,
+     6180,
+     10632
+    ]
+   ]
+  },
+  {
+   "reciterId": 1,
+   "reciterSlug": "Alafasy_128kbps",
+   "surahId": 41,
+   "ayah": 47,
+   "reason": "Rebuild moves boundaries away from both models' forced alignment: mean |start residual| 114->158 ms (XLSR), 113->162 ms (MMS/uroman). Pre-existing drift, unrelated to the false-lead class.",
+   "models": [
+    {
+     "name": "arabic-xlsr-ctc",
+     "metric": "meanAbsStartResidualMs",
+     "baselineResidualMs": 113.704,
+     "candidateResidualMs": 158.37,
+     "baselineScore": -113.704,
+     "candidateScore": -158.37
+    },
+    {
+     "name": "mms-uroman-ctc",
+     "metric": "meanAbsStartResidualMs",
+     "baselineResidualMs": 113.333,
+     "candidateResidualMs": 162.148,
+     "baselineScore": -113.333,
+     "candidateScore": -162.148
+    }
+   ],
+   "audioOnsetMs": 0,
+   "segments": [
+    [
+     1,
+     30,
+     910
+    ],
+    [
+     2,
+     910,
+     1690
+    ],
+    [
+     3,
+     1690,
+     2320
+    ],
+    [
+     4,
+     2320,
+     3890
+    ],
+    [
+     5,
+     3890,
+     4480
+    ],
+    [
+     6,
+     4480,
+     5370
+    ],
+    [
+     7,
+     5370,
+     5790
+    ],
+    [
+     8,
+     5790,
+     7550
+    ],
+    [
+     9,
+     7550,
+     8510
+    ],
+    [
+     10,
+     8510,
+     9960
+    ],
+    [
+     11,
+     9960,
+     10580
+    ],
+    [
+     12,
+     10580,
+     11440
+    ],
+    [
+     13,
+     11440,
+     13010
+    ],
+    [
+     14,
+     13010,
+     13620
+    ],
+    [
+     15,
+     13620,
+     14250
+    ],
+    [
+     16,
+     14250,
+     14920
+    ],
+    [
+     17,
+     14920,
+     15710
+    ],
+    [
+     18,
+     15710,
+     17020
+    ],
+    [
+     19,
+     17050,
+     17970
+    ],
+    [
+     20,
+     17970,
+     19450
+    ],
+    [
+     21,
+     19450,
+     20020
+    ],
+    [
+     22,
+     20020,
+     22780
+    ],
+    [
+     23,
+     22780,
+     25230
+    ],
+    [
+     24,
+     25230,
+     27490
+    ],
+    [
+     25,
+     27490,
+     29340
+    ],
+    [
+     26,
+     29340,
+     30630
+    ],
+    [
+     27,
+     30630,
+     33895
+    ]
+   ]
+  },
+  {
+   "reciterId": 1,
+   "reciterSlug": "Alafasy_128kbps",
+   "surahId": 60,
+   "ayah": 12,
+   "reason": "Rebuild re-invents the flush word-1 pair that invented-flush-restore-class.json collapsed; both models score it worse. Pre-existing drift.",
+   "models": [
+    {
+     "name": "arabic-xlsr-ctc",
+     "baselineScore": -0.506673,
+     "candidateScore": -0.520381
+    },
+    {
+     "name": "mms-uroman-ctc",
+     "baselineScore": -0.036428,
+     "candidateScore": -0.052393
+    }
+   ],
+   "audioOnsetMs": 0,
+   "segments": [
+    [
+     1,
+     0,
+     4390
+    ],
+    [
+     2,
+     4400,
+     4940
+    ],
+    [
+     3,
+     4950,
+     7510
+    ],
+    [
+     4,
+     7520,
+     8780
+    ],
+    [
+     5,
+     8790,
+     10150
+    ],
+    [
+     6,
+     10160,
+     10450
+    ],
+    [
+     7,
+     10460,
+     12150
+    ],
+    [
+     8,
+     12160,
+     12700
+    ],
+    [
+     9,
+     12710,
+     13710
+    ],
+    [
+     10,
+     13720,
+     14640
+    ],
+    [
+     11,
+     14650,
+     15250
+    ],
+    [
+     12,
+     15260,
+     16670
+    ],
+    [
+     13,
+     16680,
+     17710
+    ],
+    [
+     14,
+     17720,
+     18250
+    ],
+    [
+     15,
+     18260,
+     19300
+    ],
+    [
+     16,
+     19310,
+     19810
+    ],
+    [
+     17,
+     19820,
+     20870
+    ],
+    [
+     18,
+     20880,
+     22970
+    ],
+    [
+     19,
+     22980,
+     23490
+    ],
+    [
+     20,
+     23500,
+     24480
+    ],
+    [
+     21,
+     24490,
+     26410
+    ],
+    [
+     22,
+     26420,
+     27870
+    ],
+    [
+     23,
+     27880,
+     28450
+    ],
+    [
+     24,
+     28460,
+     30410
+    ],
+    [
+     25,
+     30420,
+     32650
+    ],
+    [
+     26,
+     32660,
+     33190
+    ],
+    [
+     27,
+     33200,
+     34400
+    ],
+    [
+     28,
+     34410,
+     34840
+    ],
+    [
+     29,
+     34850,
+     36690
+    ],
+    [
+     30,
+     36700,
+     39050
+    ],
+    [
+     31,
+     39060,
+     40140
+    ],
+    [
+     32,
+     40150,
+     41880
+    ],
+    [
+     33,
+     41890,
+     44070
+    ],
+    [
+     34,
+     44080,
+     44960
+    ],
+    [
+     35,
+     44970,
+     45770
+    ],
+    [
+     36,
+     45780,
+     45840
+    ],
+    [
+     37,
+     45840,
+     46800
+    ],
+    [
+     38,
+     46800,
+     50322
+    ]
+   ]
+  },
+  {
+   "reciterId": 1,
+   "reciterSlug": "Alafasy_128kbps",
+   "surahId": 63,
+   "ayah": 10,
+   "reason": "Rebuild unsplits the shipped word-11 pair and re-times the tail; both models score the candidate worse. Pre-existing drift.",
+   "models": [
+    {
+     "name": "arabic-xlsr-ctc",
+     "baselineScore": -0.558099,
+     "candidateScore": -0.592845
+    },
+    {
+     "name": "mms-uroman-ctc",
+     "baselineScore": -0.02491,
+     "candidateScore": -0.035451
+    }
+   ],
+   "audioOnsetMs": 0,
+   "segments": [
+    [
+     1,
+     40,
+     1967
+    ],
+    [
+     2,
+     1967,
+     2417
+    ],
+    [
+     3,
+     2417,
+     3446
+    ],
+    [
+     4,
+     3446,
+     4749
+    ],
+    [
+     5,
+     4749,
+     6901
+    ],
+    [
+     6,
+     6901,
+     7560
+    ],
+    [
+     7,
+     7560,
+     8617
+    ],
+    [
+     8,
+     8617,
+     9482
+    ],
+    [
+     9,
+     9482,
+     10301
+    ],
+    [
+     10,
+     10301,
+     11130
+    ],
+    [
+     11,
+     11149,
+     14809
+    ],
+    [
+     11,
+     14809,
+     15849
+    ],
+    [
+     12,
+     15849,
+     16449
+    ],
+    [
+     13,
+     17144,
+     18890
+    ],
+    [
+     14,
+     18890,
+     21392
+    ],
+    [
+     15,
+     21392,
+     22871
+    ],
+    [
+     16,
+     22871,
+     24293
+    ],
+    [
+     17,
+     24293,
+     25544
+    ],
+    [
+     18,
+     25544,
+     27755
+    ],
+    [
+     19,
+     27755,
+     29127
+    ],
+    [
+     20,
+     29127,
+     29712
+    ],
+    [
+     21,
+     29712,
+     32629
+    ]
+   ]
+  },
+  {
+   "reciterId": 1,
+   "reciterSlug": "Alafasy_128kbps",
+   "surahId": 78,
+   "ayah": 17,
+   "reason": "Rebuild moves boundaries away from both models' forced alignment: mean |start residual| 177->237 ms (XLSR), 133->220 ms (MMS/uroman). Pre-existing drift, unrelated to the false-lead class.",
+   "models": [
+    {
+     "name": "arabic-xlsr-ctc",
+     "metric": "meanAbsStartResidualMs",
+     "baselineResidualMs": 176.8,
+     "candidateResidualMs": 236.8,
+     "baselineScore": -176.8,
+     "candidateScore": -236.8
+    },
+    {
+     "name": "mms-uroman-ctc",
+     "metric": "meanAbsStartResidualMs",
+     "baselineResidualMs": 132.6,
+     "candidateResidualMs": 219.8,
+     "baselineScore": -132.6,
+     "candidateScore": -219.8
+    }
+   ],
+   "audioOnsetMs": 0,
+   "segments": [
+    [
+     1,
+     0,
+     1065
+    ],
+    [
+     2,
+     1065,
+     1825
+    ],
+    [
+     3,
+     1825,
+     2855
+    ],
+    [
+     4,
+     2855,
+     3465
+    ],
+    [
+     5,
+     3465,
+     5570
+    ]
+   ]
+  },
+  {
+   "reciterId": 2,
+   "reciterSlug": "Husary_64kbps",
+   "surahId": 37,
+   "ayah": 164,
+   "reason": "Rebuild moves boundaries away from both models' forced alignment: mean |start residual| 691->2838 ms (XLSR), 674->2861 ms (MMS/uroman). Pre-existing drift, unrelated to the false-lead class.",
+   "models": [
+    {
+     "name": "arabic-xlsr-ctc",
+     "metric": "meanAbsStartResidualMs",
+     "baselineResidualMs": 690.6,
+     "candidateResidualMs": 2837.8,
+     "baselineScore": -690.6,
+     "candidateScore": -2837.8
+    },
+    {
+     "name": "mms-uroman-ctc",
+     "metric": "meanAbsStartResidualMs",
+     "baselineResidualMs": 674.2,
+     "candidateResidualMs": 2861.4,
+     "baselineScore": -674.2,
+     "candidateScore": -2861.4
+    }
+   ],
+   "audioOnsetMs": 0,
+   "segments": [
+    [
+     1,
+     880,
+     6400
+    ],
+    [
+     2,
+     6400,
+     7820
+    ],
+    [
+     3,
+     7820,
+     8890
+    ],
+    [
+     4,
+     8890,
+     11488
+    ],
+    [
+     5,
+     11488,
+     13940
+    ]
+   ]
+  },
+  {
+   "reciterId": 2,
+   "reciterSlug": "Husary_64kbps",
+   "surahId": 42,
+   "ayah": 51,
+   "reason": "Rebuild moves boundaries away from both models' forced alignment: mean |start residual| 165->217 ms (XLSR), 166->227 ms (MMS/uroman). Pre-existing drift, unrelated to the false-lead class.",
+   "models": [
+    {
+     "name": "arabic-xlsr-ctc",
+     "metric": "meanAbsStartResidualMs",
+     "baselineResidualMs": 165.091,
+     "candidateResidualMs": 217.091,
+     "baselineScore": -165.091,
+     "candidateScore": -217.091
+    },
+    {
+     "name": "mms-uroman-ctc",
+     "metric": "meanAbsStartResidualMs",
+     "baselineResidualMs": 166.0,
+     "candidateResidualMs": 227.091,
+     "baselineScore": -166.0,
+     "candidateScore": -227.091
+    }
+   ],
+   "audioOnsetMs": 1582,
+   "segments": [
+    [
+     1,
+     1582,
+     2560
+    ],
+    [
+     2,
+     2560,
+     3460
+    ],
+    [
+     3,
+     3460,
+     5140
+    ],
+    [
+     4,
+     5140,
+     6220
+    ],
+    [
+     5,
+     6220,
+     8220
+    ],
+    [
+     6,
+     8220,
+     10180
+    ],
+    [
+     7,
+     10180,
+     10860
+    ],
+    [
+     8,
+     10860,
+     12200
+    ],
+    [
+     9,
+     12200,
+     12900
+    ],
+    [
+     10,
+     12900,
+     13960
+    ],
+    [
+     11,
+     13960,
+     17500
+    ],
+    [
+     12,
+     17500,
+     17800
+    ],
+    [
+     13,
+     17800,
+     18460
+    ],
+    [
+     14,
+     18460,
+     19800
+    ],
+    [
+     15,
+     19800,
+     22080
+    ],
+    [
+     16,
+     22080,
+     23820
+    ],
+    [
+     17,
+     23820,
+     25960
+    ],
+    [
+     18,
+     25960,
+     26820
+    ],
+    [
+     19,
+     26820,
+     33300
+    ],
+    [
+     20,
+     33300,
+     33980
+    ],
+    [
+     21,
+     33980,
+     35780
+    ],
+    [
+     22,
+     35780,
+     40208
+    ]
+   ]
+  },
+  {
+   "reciterId": 2,
+   "reciterSlug": "Husary_64kbps",
+   "surahId": 56,
+   "ayah": 86,
+   "reason": "Rebuild moves boundaries away from both models' forced alignment: mean |start residual| 130->123 ms (XLSR), 119->128 ms (MMS/uroman). Pre-existing drift, unrelated to the false-lead class.",
+   "models": [
+    {
+     "name": "arabic-xlsr-ctc",
+     "metric": "meanAbsStartResidualMs",
+     "baselineResidualMs": 129.8,
+     "candidateResidualMs": 123.0,
+     "baselineScore": -129.8,
+     "candidateScore": -123.0
+    },
+    {
+     "name": "mms-uroman-ctc",
+     "metric": "meanAbsStartResidualMs",
+     "baselineResidualMs": 119.0,
+     "candidateResidualMs": 128.2,
+     "baselineScore": -119.0,
+     "candidateScore": -128.2
+    }
+   ],
+   "audioOnsetMs": 0,
+   "segments": [
+    [
+     1,
+     1592,
+     4492
+    ],
+    [
+     2,
+     4624,
+     5640
+    ],
+    [
+     3,
+     5640,
+     7622
+    ],
+    [
+     4,
+     7622,
+     8792
+    ],
+    [
+     5,
+     8792,
+     12272
+    ]
+   ]
+  },
+  {
+   "reciterId": 3,
+   "reciterSlug": "Abdul_Basit_Murattal_64kbps",
+   "surahId": 52,
+   "ayah": 2,
+   "reason": "Rebuild moves boundaries away from both models' forced alignment: mean |start residual| 11->14 ms (XLSR), 11->14 ms (MMS/uroman). Pre-existing drift, unrelated to the false-lead class.",
+   "models": [
+    {
+     "name": "arabic-xlsr-ctc",
+     "metric": "meanAbsStartResidualMs",
+     "baselineResidualMs": 11.0,
+     "candidateResidualMs": 14.0,
+     "baselineScore": -11.0,
+     "candidateScore": -14.0
+    },
+    {
+     "name": "mms-uroman-ctc",
+     "metric": "meanAbsStartResidualMs",
+     "baselineResidualMs": 11.0,
+     "candidateResidualMs": 14.0,
+     "baselineScore": -11.0,
+     "candidateScore": -14.0
+    }
+   ],
+   "audioOnsetMs": 339,
+   "segments": [
+    [
+     1,
+     339,
+     2324
+    ],
+    [
+     2,
+     2324,
+     4205
+    ]
+   ]
+  },
+  {
+   "reciterId": 4,
+   "reciterSlug": "Minshawy_Murattal_128kbps",
+   "surahId": 2,
+   "ayah": 250,
+   "reason": "Rebuild moves boundaries away from both models' forced alignment: mean |start residual| 128->132 ms (XLSR), 128->132 ms (MMS/uroman). Pre-existing drift, unrelated to the false-lead class.",
+   "models": [
+    {
+     "name": "arabic-xlsr-ctc",
+     "metric": "meanAbsStartResidualMs",
+     "baselineResidualMs": 128.467,
+     "candidateResidualMs": 132.2,
+     "baselineScore": -128.467,
+     "candidateScore": -132.2
+    },
+    {
+     "name": "mms-uroman-ctc",
+     "metric": "meanAbsStartResidualMs",
+     "baselineResidualMs": 127.933,
+     "candidateResidualMs": 131.667,
+     "baselineScore": -127.933,
+     "candidateScore": -131.667
+    }
+   ],
+   "audioOnsetMs": 568,
+   "segments": [
+    [
+     1,
+     568,
+     2120
+    ],
+    [
+     2,
+     2130,
+     3110
+    ],
+    [
+     3,
+     3120,
+     4600
+    ],
+    [
+     4,
+     4610,
+     6350
+    ],
+    [
+     5,
+     6360,
+     7490
+    ],
+    [
+     6,
+     7500,
+     9740
+    ],
+    [
+     7,
+     9750,
+     10880
+    ],
+    [
+     8,
+     10890,
+     12180
+    ],
+    [
+     9,
+     12190,
+     13000
+    ],
+    [
+     10,
+     13010,
+     15010
+    ],
+    [
+     11,
+     15020,
+     16730
+    ],
+    [
+     12,
+     16740,
+     18700
+    ],
+    [
+     13,
+     18710,
+     19310
+    ],
+    [
+     14,
+     19320,
+     20430
+    ],
+    [
+     15,
+     20440,
+     22310
+    ]
+   ]
+  },
+  {
+   "reciterId": 4,
+   "reciterSlug": "Minshawy_Murattal_128kbps",
+   "surahId": 21,
+   "ayah": 89,
+   "reason": "Rebuild moves boundaries away from both models' forced alignment: mean |start residual| 157->90 ms (XLSR), 118->171 ms (MMS/uroman). Pre-existing drift, unrelated to the false-lead class.",
+   "models": [
+    {
+     "name": "arabic-xlsr-ctc",
+     "metric": "meanAbsStartResidualMs",
+     "baselineResidualMs": 157.364,
+     "candidateResidualMs": 90.364,
+     "baselineScore": -157.364,
+     "candidateScore": -90.364
+    },
+    {
+     "name": "mms-uroman-ctc",
+     "metric": "meanAbsStartResidualMs",
+     "baselineResidualMs": 117.545,
+     "candidateResidualMs": 170.545,
+     "baselineScore": -117.545,
+     "candidateScore": -170.545
+    }
+   ],
+   "audioOnsetMs": 0,
+   "segments": [
+    [
+     1,
+     400,
+     3310
+    ],
+    [
+     2,
+     3320,
+     3680
+    ],
+    [
+     3,
+     3690,
+     4670
+    ],
+    [
+     4,
+     4680,
+     5950
+    ],
+    [
+     5,
+     5960,
+     6670
+    ],
+    [
+     6,
+     6680,
+     7040
+    ],
+    [
+     7,
+     7050,
+     8280
+    ],
+    [
+     8,
+     8290,
+     9110
+    ],
+    [
+     9,
+     9120,
+     11240
+    ],
+    [
+     10,
+     11250,
+     12050
+    ],
+    [
+     11,
+     12060,
+     13820
+    ]
+   ]
+  },
+  {
+   "reciterId": 4,
+   "reciterSlug": "Minshawy_Murattal_128kbps",
+   "surahId": 26,
+   "ayah": 17,
+   "reason": "Rebuild moves boundaries away from both models' forced alignment: mean |start residual| 44->55 ms (XLSR), 72->63 ms (MMS/uroman). Pre-existing drift, unrelated to the false-lead class.",
+   "models": [
+    {
+     "name": "arabic-xlsr-ctc",
+     "metric": "meanAbsStartResidualMs",
+     "baselineResidualMs": 43.6,
+     "candidateResidualMs": 55.0,
+     "baselineScore": -43.6,
+     "candidateScore": -55.0
+    },
+    {
+     "name": "mms-uroman-ctc",
+     "metric": "meanAbsStartResidualMs",
+     "baselineResidualMs": 72.4,
+     "candidateResidualMs": 63.0,
+     "baselineScore": -72.4,
+     "candidateScore": -63.0
+    }
+   ],
+   "audioOnsetMs": 0,
+   "segments": [
+    [
+     1,
+     250,
+     680
+    ],
+    [
+     2,
+     690,
+     1460
+    ],
+    [
+     3,
+     1470,
+     2260
+    ],
+    [
+     4,
+     2270,
+     3530
+    ],
+    [
+     5,
+     3540,
+     6140
+    ]
+   ]
+  },
+  {
+   "reciterId": 4,
+   "reciterSlug": "Minshawy_Murattal_128kbps",
+   "surahId": 26,
+   "ayah": 58,
+   "reason": "Rebuild moves boundaries away from both models' forced alignment: mean |start residual| 116->169 ms (XLSR), 161->214 ms (MMS/uroman). Pre-existing drift, unrelated to the false-lead class.",
+   "models": [
+    {
+     "name": "arabic-xlsr-ctc",
+     "metric": "meanAbsStartResidualMs",
+     "baselineResidualMs": 116.0,
+     "candidateResidualMs": 169.333,
+     "baselineScore": -116.0,
+     "candidateScore": -169.333
+    },
+    {
+     "name": "mms-uroman-ctc",
+     "metric": "meanAbsStartResidualMs",
+     "baselineResidualMs": 161.0,
+     "candidateResidualMs": 214.333,
+     "baselineScore": -161.0,
+     "candidateScore": -214.333
+    }
+   ],
+   "audioOnsetMs": 0,
+   "segments": [
+    [
+     1,
+     270,
+     1790
+    ],
+    [
+     2,
+     1800,
+     3540
+    ],
+    [
+     3,
+     3550,
+     4460
+    ]
+   ]
+  },
+  {
+   "reciterId": 4,
+   "reciterSlug": "Minshawy_Murattal_128kbps",
+   "surahId": 28,
+   "ayah": 32,
+   "reason": "Rebuild moves boundaries away from both models' forced alignment: mean |start residual| 136->175 ms (XLSR), 121->159 ms (MMS/uroman). Pre-existing drift, unrelated to the false-lead class.",
+   "models": [
+    {
+     "name": "arabic-xlsr-ctc",
+     "metric": "meanAbsStartResidualMs",
+     "baselineResidualMs": 135.84,
+     "candidateResidualMs": 174.76,
+     "baselineScore": -135.84,
+     "candidateScore": -174.76
+    },
+    {
+     "name": "mms-uroman-ctc",
+     "metric": "meanAbsStartResidualMs",
+     "baselineResidualMs": 121.44,
+     "candidateResidualMs": 159.4,
+     "baselineScore": -121.44,
+     "candidateScore": -159.4
+    }
+   ],
+   "audioOnsetMs": 0,
+   "segments": [
+    [
+     1,
+     310,
+     1070
+    ],
+    [
+     2,
+     1080,
+     1710
+    ],
+    [
+     3,
+     1720,
+     2180
+    ],
+    [
+     4,
+     2190,
+     2970
+    ],
+    [
+     5,
+     2980,
+     3820
+    ],
+    [
+     6,
+     3830,
+     6310
+    ],
+    [
+     7,
+     6320,
+     6440
+    ],
+    [
+     8,
+     6450,
+     7080
+    ],
+    [
+     9,
+     7090,
+     9310
+    ],
+    [
+     10,
+     9320,
+     10360
+    ],
+    [
+     11,
+     10370,
+     11160
+    ],
+    [
+     12,
+     11170,
+     12210
+    ],
+    [
+     13,
+     12220,
+     12570
+    ],
+    [
+     14,
+     12580,
+     14250
+    ],
+    [
+     15,
+     14600,
+     15540
+    ],
+    [
+     16,
+     15550,
+     16960
+    ],
+    [
+     17,
+     16970,
+     17080
+    ],
+    [
+     18,
+     17090,
+     18210
+    ],
+    [
+     19,
+     18220,
+     18740
+    ],
+    [
+     20,
+     18750,
+     19870
+    ],
+    [
+     21,
+     19880,
+     20750
+    ],
+    [
+     22,
+     20760,
+     22900
+    ],
+    [
+     23,
+     22910,
+     23790
+    ],
+    [
+     24,
+     23800,
+     24980
+    ],
+    [
+     25,
+     24990,
+     26540
+    ]
+   ]
+  },
+  {
+   "reciterId": 4,
+   "reciterSlug": "Minshawy_Murattal_128kbps",
+   "surahId": 37,
+   "ayah": 43,
+   "reason": "Rebuild moves boundaries away from both models' forced alignment: mean |start residual| 42->55 ms (XLSR), 79->66 ms (MMS/uroman). Pre-existing drift, unrelated to the false-lead class.",
+   "models": [
+    {
+     "name": "arabic-xlsr-ctc",
+     "metric": "meanAbsStartResidualMs",
+     "baselineResidualMs": 42.0,
+     "candidateResidualMs": 55.333,
+     "baselineScore": -42.0,
+     "candidateScore": -55.333
+    },
+    {
+     "name": "mms-uroman-ctc",
+     "metric": "meanAbsStartResidualMs",
+     "baselineResidualMs": 79.0,
+     "candidateResidualMs": 65.667,
+     "baselineScore": -79.0,
+     "candidateScore": -65.667
+    }
+   ],
+   "audioOnsetMs": 0,
+   "segments": [
+    [
+     1,
+     300,
+     730
+    ],
+    [
+     2,
+     740,
+     2390
+    ],
+    [
+     3,
+     2400,
+     4100
+    ]
+   ]
+  },
+  {
+   "reciterId": 4,
+   "reciterSlug": "Minshawy_Murattal_128kbps",
+   "surahId": 37,
+   "ayah": 90,
+   "reason": "Rebuild moves boundaries away from both models' forced alignment: mean |start residual| 52->56 ms (XLSR), 99->102 ms (MMS/uroman). Pre-existing drift, unrelated to the false-lead class.",
+   "models": [
+    {
+     "name": "arabic-xlsr-ctc",
+     "metric": "meanAbsStartResidualMs",
+     "baselineResidualMs": 52.333,
+     "candidateResidualMs": 55.667,
+     "baselineScore": -52.333,
+     "candidateScore": -55.667
+    },
+    {
+     "name": "mms-uroman-ctc",
+     "metric": "meanAbsStartResidualMs",
+     "baselineResidualMs": 99.0,
+     "candidateResidualMs": 102.333,
+     "baselineScore": -99.0,
+     "candidateScore": -102.333
+    }
+   ],
+   "audioOnsetMs": 0,
+   "segments": [
+    [
+     1,
+     250,
+     1640
+    ],
+    [
+     2,
+     1650,
+     2440
+    ],
+    [
+     3,
+     2450,
+     3820
+    ]
+   ]
+  },
+  {
+   "reciterId": 4,
+   "reciterSlug": "Minshawy_Murattal_128kbps",
+   "surahId": 37,
+   "ayah": 134,
+   "reason": "Rebuild moves boundaries away from both models' forced alignment: mean |start residual| 67->76 ms (XLSR), 81->116 ms (MMS/uroman). Pre-existing drift, unrelated to the false-lead class.",
+   "models": [
+    {
+     "name": "arabic-xlsr-ctc",
+     "metric": "meanAbsStartResidualMs",
+     "baselineResidualMs": 66.75,
+     "candidateResidualMs": 75.75,
+     "baselineScore": -66.75,
+     "candidateScore": -75.75
+    },
+    {
+     "name": "mms-uroman-ctc",
+     "metric": "meanAbsStartResidualMs",
+     "baselineResidualMs": 81.0,
+     "candidateResidualMs": 116.0,
+     "baselineScore": -81.0,
+     "candidateScore": -116.0
+    }
+   ],
+   "audioOnsetMs": 0,
+   "segments": [
+    [
+     1,
+     200,
+     540
+    ],
+    [
+     2,
+     550,
+     2460
+    ],
+    [
+     3,
+     2470,
+     4590
+    ],
+    [
+     4,
+     4600,
+     6140
+    ]
+   ]
+  },
+  {
+   "reciterId": 4,
+   "reciterSlug": "Minshawy_Murattal_128kbps",
+   "surahId": 40,
+   "ayah": 60,
+   "reason": "Rebuild moves boundaries away from both models' forced alignment: mean |start residual| 69->143 ms (XLSR), 78->136 ms (MMS/uroman). Pre-existing drift, unrelated to the false-lead class.",
+   "models": [
+    {
+     "name": "arabic-xlsr-ctc",
+     "metric": "meanAbsStartResidualMs",
+     "baselineResidualMs": 69.308,
+     "candidateResidualMs": 142.692,
+     "baselineScore": -69.308,
+     "candidateScore": -142.692
+    },
+    {
+     "name": "mms-uroman-ctc",
+     "metric": "meanAbsStartResidualMs",
+     "baselineResidualMs": 78.077,
+     "candidateResidualMs": 135.923,
+     "baselineScore": -78.077,
+     "candidateScore": -135.923
+    }
+   ],
+   "audioOnsetMs": 457,
+   "segments": [
+    [
+     1,
+     457,
+     1200
+    ],
+    [
+     2,
+     1210,
+     2160
+    ],
+    [
+     3,
+     2170,
+     4160
+    ],
+    [
+     4,
+     4170,
+     5030
+    ],
+    [
+     5,
+     5040,
+     6430
+    ],
+    [
+     6,
+     6440,
+     7540
+    ],
+    [
+     7,
+     7550,
+     8490
+    ],
+    [
+     8,
+     8500,
+     9980
+    ],
+    [
+     9,
+     9990,
+     10420
+    ],
+    [
+     10,
+     10430,
+     11670
+    ],
+    [
+     11,
+     11680,
+     13190
+    ],
+    [
+     12,
+     13200,
+     14710
+    ],
+    [
+     13,
+     14720,
+     16080
+    ]
+   ]
+  },
+  {
+   "reciterId": 4,
+   "reciterSlug": "Minshawy_Murattal_128kbps",
+   "surahId": 56,
+   "ayah": 15,
+   "reason": "Rebuild moves boundaries away from both models' forced alignment: mean |start residual| 51->61 ms (XLSR), 57->68 ms (MMS/uroman). Pre-existing drift, unrelated to the false-lead class.",
+   "models": [
+    {
+     "name": "arabic-xlsr-ctc",
+     "metric": "meanAbsStartResidualMs",
+     "baselineResidualMs": 50.667,
+     "candidateResidualMs": 61.333,
+     "baselineScore": -50.667,
+     "candidateScore": -61.333
+    },
+    {
+     "name": "mms-uroman-ctc",
+     "metric": "meanAbsStartResidualMs",
+     "baselineResidualMs": 57.333,
+     "candidateResidualMs": 68.0,
+     "baselineScore": -57.333,
+     "candidateScore": -68.0
+    }
+   ],
+   "audioOnsetMs": 332,
+   "segments": [
+    [
+     1,
+     332,
+     1000
+    ],
+    [
+     2,
+     1010,
+     2530
+    ],
+    [
+     3,
+     2540,
+     3970
+    ]
+   ]
+  },
+  {
+   "reciterId": 4,
+   "reciterSlug": "Minshawy_Murattal_128kbps",
+   "surahId": 82,
+   "ayah": 4,
+   "reason": "Rebuild moves boundaries away from both models' forced alignment: mean |start residual| 87->91 ms (XLSR), 60->64 ms (MMS/uroman). Pre-existing drift, unrelated to the false-lead class.",
+   "models": [
+    {
+     "name": "arabic-xlsr-ctc",
+     "metric": "meanAbsStartResidualMs",
+     "baselineResidualMs": 87.333,
+     "candidateResidualMs": 90.667,
+     "baselineScore": -87.333,
+     "candidateScore": -90.667
+    },
+    {
+     "name": "mms-uroman-ctc",
+     "metric": "meanAbsStartResidualMs",
+     "baselineResidualMs": 60.333,
+     "candidateResidualMs": 63.667,
+     "baselineScore": -60.333,
+     "candidateScore": -63.667
+    }
+   ],
+   "audioOnsetMs": 269,
+   "segments": [
+    [
+     1,
+     269,
+     950
+    ],
+    [
+     2,
+     960,
+     2420
+    ],
+    [
+     3,
+     2430,
+     3790
+    ]
+   ]
+  },
+  {
+   "reciterId": 6,
+   "reciterSlug": "Saood_ash-Shuraym_128kbps",
+   "surahId": 40,
+   "ayah": 64,
+   "reason": "The rebuild's finalizer withholds this row entirely; the baseline still ships a playable one and no audit can score a row that does not exist. Held until a separate review.",
+   "models": [
+    {
+     "name": "arabic-xlsr-ctc",
+     "metric": "viterbiLogProbabilityPerFrame",
+     "baselineScore": -0.556711,
+     "candidateScore": null,
+     "note": "the rebuild ships no row for this ayah, so there is no candidate sequence to score; the baseline row is playable and both models align it"
+    },
+    {
+     "name": "mms-uroman-ctc",
+     "metric": "viterbiLogProbabilityPerFrame",
+     "baselineScore": -0.108806,
+     "candidateScore": null,
+     "note": "the rebuild ships no row for this ayah, so there is no candidate sequence to score; the baseline row is playable and both models align it"
+    }
+   ],
+   "audioOnsetMs": 0,
+   "segments": [
+    [
+     1,
+     0,
+     670
+    ],
+    [
+     2,
+     680,
+     1290
+    ],
+    [
+     3,
+     1300,
+     1800
+    ],
+    [
+     4,
+     1810,
+     2200
+    ],
+    [
+     5,
+     2210,
+     2800
+    ],
+    [
+     6,
+     2810,
+     3390
+    ],
+    [
+     7,
+     3400,
+     5160
+    ],
+    [
+     8,
+     5170,
+     6330
+    ],
+    [
+     9,
+     6340,
+     7670
+    ],
+    [
+     10,
+     7680,
+     8370
+    ],
+    [
+     11,
+     8380,
+     12330
+    ],
+    [
+     12,
+     12340,
+     13430
+    ],
+    [
+     13,
+     13440,
+     13680
+    ],
+    [
+     14,
+     13690,
+     15390
+    ],
+    [
+     15,
+     15400,
+     16290
+    ],
+    [
+     16,
+     16300,
+     16780
+    ],
+    [
+     17,
+     16790,
+     17510
+    ],
+    [
+     18,
+     17520,
+     18510
+    ],
+    [
+     19,
+     18520,
+     19150
+    ],
+    [
+     20,
+     19160,
+     19560
+    ],
+    [
+     21,
+     19570,
+     20770
+    ]
+   ]
+  },
+  {
+   "reciterId": 7,
+   "reciterSlug": "Hani_Rifai_192kbps",
+   "surahId": 2,
+   "ayah": 161,
+   "reason": "Rebuild moves boundaries away from both models' forced alignment: mean |start residual| 51->143 ms (XLSR), 49->137 ms (MMS/uroman). Pre-existing drift, unrelated to the false-lead class.",
+   "models": [
+    {
+     "name": "arabic-xlsr-ctc",
+     "metric": "meanAbsStartResidualMs",
+     "baselineResidualMs": 51.462,
+     "candidateResidualMs": 143.154,
+     "baselineScore": -51.462,
+     "candidateScore": -143.154
+    },
+    {
+     "name": "mms-uroman-ctc",
+     "metric": "meanAbsStartResidualMs",
+     "baselineResidualMs": 48.846,
+     "candidateResidualMs": 137.462,
+     "baselineScore": -48.846,
+     "candidateScore": -137.462
+    }
+   ],
+   "audioOnsetMs": 0,
+   "segments": [
+    [
+     1,
+     1050,
+     1670
+    ],
+    [
+     2,
+     1670,
+     2720
+    ],
+    [
+     3,
+     2720,
+     3730
+    ],
+    [
+     4,
+     3730,
+     4800
+    ],
+    [
+     5,
+     4800,
+     5380
+    ],
+    [
+     6,
+     5380,
+     6750
+    ],
+    [
+     7,
+     6750,
+     10150
+    ],
+    [
+     8,
+     10150,
+     11060
+    ],
+    [
+     9,
+     11060,
+     12020
+    ],
+    [
+     10,
+     12020,
+     12760
+    ],
+    [
+     11,
+     12760,
+     14770
+    ],
+    [
+     12,
+     14770,
+     16380
+    ],
+    [
+     13,
+     16380,
+     18365
+    ]
+   ]
+  },
+  {
+   "reciterId": 7,
+   "reciterSlug": "Hani_Rifai_192kbps",
+   "surahId": 15,
+   "ayah": 7,
+   "reason": "Rebuild moves boundaries away from both models' forced alignment: mean |start residual| 96->181 ms (XLSR), 76->132 ms (MMS/uroman). Pre-existing drift, unrelated to the false-lead class.",
+   "models": [
+    {
+     "name": "arabic-xlsr-ctc",
+     "metric": "meanAbsStartResidualMs",
+     "baselineResidualMs": 96.0,
+     "candidateResidualMs": 180.857,
+     "baselineScore": -96.0,
+     "candidateScore": -180.857
+    },
+    {
+     "name": "mms-uroman-ctc",
+     "metric": "meanAbsStartResidualMs",
+     "baselineResidualMs": 75.857,
+     "candidateResidualMs": 132.143,
+     "baselineScore": -75.857,
+     "candidateScore": -132.143
+    }
+   ],
+   "audioOnsetMs": 0,
+   "segments": [
+    [
+     1,
+     150,
+     1110
+    ],
+    [
+     2,
+     1110,
+     2370
+    ],
+    [
+     3,
+     2370,
+     4890
+    ],
+    [
+     4,
+     4890,
+     5570
+    ],
+    [
+     5,
+     5570,
+     6550
+    ],
+    [
+     6,
+     6550,
+     6870
+    ],
+    [
+     7,
+     6870,
+     9148
+    ]
+   ]
+  },
+  {
+   "reciterId": 7,
+   "reciterSlug": "Hani_Rifai_192kbps",
+   "surahId": 26,
+   "ayah": 144,
+   "reason": "Rebuild moves boundaries away from both models' forced alignment: mean |start residual| 138->142 ms (XLSR), 105->175 ms (MMS/uroman). Pre-existing drift, unrelated to the false-lead class.",
+   "models": [
+    {
+     "name": "arabic-xlsr-ctc",
+     "metric": "meanAbsStartResidualMs",
+     "baselineResidualMs": 138.333,
+     "candidateResidualMs": 141.667,
+     "baselineScore": -138.333,
+     "candidateScore": -141.667
+    },
+    {
+     "name": "mms-uroman-ctc",
+     "metric": "meanAbsStartResidualMs",
+     "baselineResidualMs": 105.0,
+     "candidateResidualMs": 175.0,
+     "baselineScore": -105.0,
+     "candidateScore": -175.0
+    }
+   ],
+   "audioOnsetMs": 0,
+   "segments": [
+    [
+     1,
+     0,
+     870
+    ],
+    [
+     2,
+     870,
+     1720
+    ],
+    [
+     3,
+     1720,
+     3635
+    ]
+   ]
+  },
+  {
+   "reciterId": 7,
+   "reciterSlug": "Hani_Rifai_192kbps",
+   "surahId": 26,
+   "ayah": 203,
+   "reason": "Rebuild moves boundaries away from both models' forced alignment: mean |start residual| 157->116 ms (XLSR), 120->132 ms (MMS/uroman). Pre-existing drift, unrelated to the false-lead class.",
+   "models": [
+    {
+     "name": "arabic-xlsr-ctc",
+     "metric": "meanAbsStartResidualMs",
+     "baselineResidualMs": 157.375,
+     "candidateResidualMs": 115.625,
+     "baselineScore": -157.375,
+     "candidateScore": -115.625
+    },
+    {
+     "name": "mms-uroman-ctc",
+     "metric": "meanAbsStartResidualMs",
+     "baselineResidualMs": 119.875,
+     "candidateResidualMs": 132.375,
+     "baselineScore": -119.875,
+     "candidateScore": -132.375
+    }
+   ],
+   "audioOnsetMs": 0,
+   "segments": [
+    [
+     1,
+     0,
+     1230
+    ],
+    [
+     2,
+     1230,
+     1840
+    ],
+    [
+     3,
+     1840,
+     2540
+    ],
+    [
+     4,
+     2540,
+     4550
+    ],
+    [
+     1,
+     4550,
+     5960
+    ],
+    [
+     2,
+     5960,
+     6380
+    ],
+    [
+     3,
+     6380,
+     7040
+    ],
+    [
+     4,
+     7040,
+     9175
+    ]
+   ]
+  },
+  {
+   "reciterId": 7,
+   "reciterSlug": "Hani_Rifai_192kbps",
+   "surahId": 27,
+   "ayah": 13,
+   "reason": "Rebuild moves boundaries away from both models' forced alignment: mean |start residual| 254->385 ms (XLSR), 145->281 ms (MMS/uroman). Pre-existing drift, unrelated to the false-lead class.",
+   "models": [
+    {
+     "name": "arabic-xlsr-ctc",
+     "metric": "meanAbsStartResidualMs",
+     "baselineResidualMs": 253.625,
+     "candidateResidualMs": 384.875,
+     "baselineScore": -253.625,
+     "candidateScore": -384.875
+    },
+    {
+     "name": "mms-uroman-ctc",
+     "metric": "meanAbsStartResidualMs",
+     "baselineResidualMs": 144.75,
+     "candidateResidualMs": 281.0,
+     "baselineScore": -144.75,
+     "candidateScore": -281.0
+    }
+   ],
+   "audioOnsetMs": 0,
+   "segments": [
+    [
+     1,
+     370,
+     2150
+    ],
+    [
+     2,
+     2150,
+     3990
+    ],
+    [
+     3,
+     3990,
+     5640
+    ],
+    [
+     4,
+     5640,
+     7890
+    ],
+    [
+     5,
+     7890,
+     9850
+    ],
+    [
+     6,
+     9850,
+     10630
+    ],
+    [
+     7,
+     10710,
+     11540
+    ],
+    [
+     8,
+     11540,
+     13575
+    ]
+   ]
+  },
+  {
+   "reciterId": 7,
+   "reciterSlug": "Hani_Rifai_192kbps",
+   "surahId": 27,
+   "ayah": 20,
+   "reason": "Rebuild moves boundaries away from both models' forced alignment: mean |start residual| 46->79 ms (XLSR), 49->88 ms (MMS/uroman). Pre-existing drift, unrelated to the false-lead class.",
+   "models": [
+    {
+     "name": "arabic-xlsr-ctc",
+     "metric": "meanAbsStartResidualMs",
+     "baselineResidualMs": 46.455,
+     "candidateResidualMs": 78.818,
+     "baselineScore": -46.455,
+     "candidateScore": -78.818
+    },
+    {
+     "name": "mms-uroman-ctc",
+     "metric": "meanAbsStartResidualMs",
+     "baselineResidualMs": 48.818,
+     "candidateResidualMs": 88.273,
+     "baselineScore": -48.818,
+     "candidateScore": -88.273
+    }
+   ],
+   "audioOnsetMs": 0,
+   "segments": [
+    [
+     1,
+     50,
+     1260
+    ],
+    [
+     2,
+     1260,
+     2200
+    ],
+    [
+     3,
+     2200,
+     2980
+    ],
+    [
+     4,
+     2980,
+     3950
+    ],
+    [
+     5,
+     3950,
+     4310
+    ],
+    [
+     6,
+     4310,
+     4630
+    ],
+    [
+     7,
+     4630,
+     5670
+    ],
+    [
+     8,
+     5670,
+     6130
+    ],
+    [
+     9,
+     6130,
+     6760
+    ],
+    [
+     10,
+     6760,
+     7100
+    ],
+    [
+     11,
+     7100,
+     10505
+    ]
+   ]
+  },
+  {
+   "reciterId": 7,
+   "reciterSlug": "Hani_Rifai_192kbps",
+   "surahId": 36,
+   "ayah": 22,
+   "reason": "Rebuild moves boundaries away from both models' forced alignment: mean |start residual| 52->631 ms (XLSR), 58->628 ms (MMS/uroman). Pre-existing drift, unrelated to the false-lead class.",
+   "models": [
+    {
+     "name": "arabic-xlsr-ctc",
+     "metric": "meanAbsStartResidualMs",
+     "baselineResidualMs": 51.857,
+     "candidateResidualMs": 631.286,
+     "baselineScore": -51.857,
+     "candidateScore": -631.286
+    },
+    {
+     "name": "mms-uroman-ctc",
+     "metric": "meanAbsStartResidualMs",
+     "baselineResidualMs": 58.429,
+     "candidateResidualMs": 628.429,
+     "baselineScore": -58.429,
+     "candidateScore": -628.429
+    }
+   ],
+   "audioOnsetMs": 0,
+   "segments": [
+    [
+     1,
+     150,
+     1300
+    ],
+    [
+     2,
+     1300,
+     1590
+    ],
+    [
+     3,
+     1590,
+     2350
+    ],
+    [
+     4,
+     2350,
+     3170
+    ],
+    [
+     5,
+     3170,
+     4180
+    ],
+    [
+     6,
+     4180,
+     5140
+    ],
+    [
+     7,
+     5140,
+     6945
+    ]
+   ]
+  },
+  {
+   "reciterId": 7,
+   "reciterSlug": "Hani_Rifai_192kbps",
+   "surahId": 79,
+   "ayah": 39,
+   "reason": "Rebuild moves boundaries away from both models' forced alignment: mean |start residual| 166->66 ms (XLSR), 58->59 ms (MMS/uroman). Pre-existing drift, unrelated to the false-lead class.",
+   "models": [
+    {
+     "name": "arabic-xlsr-ctc",
+     "metric": "meanAbsStartResidualMs",
+     "baselineResidualMs": 166.0,
+     "candidateResidualMs": 66.0,
+     "baselineScore": -166.0,
+     "candidateScore": -66.0
+    },
+    {
+     "name": "mms-uroman-ctc",
+     "metric": "meanAbsStartResidualMs",
+     "baselineResidualMs": 58.5,
+     "candidateResidualMs": 59.0,
+     "baselineScore": -58.5,
+     "candidateScore": -59.0
+    }
+   ],
+   "audioOnsetMs": 0,
+   "segments": [
+    [
+     1,
+     0,
+     1450
+    ],
+    [
+     2,
+     1450,
+     2540
+    ],
+    [
+     3,
+     2540,
+     2880
+    ],
+    [
+     4,
+     2880,
+     4315
+    ]
+   ]
+  },
+  {
+   "reciterId": 7,
+   "reciterSlug": "Hani_Rifai_192kbps",
+   "surahId": 88,
+   "ayah": 25,
+   "reason": "Rebuild moves boundaries away from both models' forced alignment: mean |start residual| 44->156 ms (XLSR), 104->123 ms (MMS/uroman). Pre-existing drift, unrelated to the false-lead class.",
+   "models": [
+    {
+     "name": "arabic-xlsr-ctc",
+     "metric": "meanAbsStartResidualMs",
+     "baselineResidualMs": 44.333,
+     "candidateResidualMs": 156.333,
+     "baselineScore": -44.333,
+     "candidateScore": -156.333
+    },
+    {
+     "name": "mms-uroman-ctc",
+     "metric": "meanAbsStartResidualMs",
+     "baselineResidualMs": 104.333,
+     "candidateResidualMs": 123.0,
+     "baselineScore": -104.333,
+     "candidateScore": -123.0
+    }
+   ],
+   "audioOnsetMs": 0,
+   "segments": [
+    [
+     1,
+     260,
+     1030
+    ],
+    [
+     2,
+     1030,
+     2204
+    ],
+    [
+     3,
+     2204,
+     3532
+    ]
+   ]
+  },
+  {
+   "reciterId": 7,
+   "reciterSlug": "Hani_Rifai_192kbps",
+   "surahId": 102,
+   "ayah": 1,
+   "reason": "Rebuild moves boundaries away from both models' forced alignment: mean |start residual| 99->148 ms (XLSR), 124->188 ms (MMS/uroman). Pre-existing drift, unrelated to the false-lead class.",
+   "models": [
+    {
+     "name": "arabic-xlsr-ctc",
+     "metric": "meanAbsStartResidualMs",
+     "baselineResidualMs": 99.0,
+     "candidateResidualMs": 148.0,
+     "baselineScore": -99.0,
+     "candidateScore": -148.0
+    },
+    {
+     "name": "mms-uroman-ctc",
+     "metric": "meanAbsStartResidualMs",
+     "baselineResidualMs": 123.5,
+     "candidateResidualMs": 188.5,
+     "baselineScore": -123.5,
+     "candidateScore": -188.5
+    }
+   ],
+   "audioOnsetMs": 901,
+   "segments": [
+    [
+     1,
+     901,
+     2270
+    ],
+    [
+     2,
+     2270,
+     3635
+    ]
+   ]
+  }
+ ]
+}
