@@ -2,6 +2,7 @@ package com.beautifulquran.ui.share
 
 import android.app.Activity
 import android.graphics.Bitmap
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.beautifulquran.data.QuranRepository
@@ -10,9 +11,13 @@ import com.beautifulquran.share.AyahRef
 import com.beautifulquran.share.SHARE_SELECTION_MAX
 import com.beautifulquran.share.ShareFiles
 import com.beautifulquran.share.ShareImageRenderer
+import com.beautifulquran.share.ShareUx
+import com.beautifulquran.share.ShareUxAction
 import com.beautifulquran.share.VerseTextComposer
+import com.beautifulquran.share.stitchBitmaps
 import com.beautifulquran.share.gatherOrdinals
 import com.beautifulquran.share.toggleGatheredAyah
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -70,6 +75,7 @@ class ShareViewModel(
     val surahNames: StateFlow<Map<Int, String>> = _surahNames.asStateFlow()
 
     private var previewJob: Job? = null
+    private var textJob: Job? = null
     private var imageJob: Job? = null
 
     init {
@@ -80,28 +86,24 @@ class ShareViewModel(
     }
 
     /**
-     * Player-bar Gather control:
-     * - idle → enter gather (pauses recitation; mode owns the tap)
-     * - gathering with an empty list → leave gather
-     * - gathering with verses → open the Send page
+     * Verse-first enter: that ayah is already selected (`1`), playback paused.
+     * Mark tap uses this when gather is off.
      */
-    fun onGatherControlClick() {
-        val state = _ui.value
-        when {
-            state.sendOpen -> Unit
-            !state.gathering -> enterGather()
-            state.selection.isEmpty() -> exitGather()
-            else -> openSend()
+    fun enterShare(surahId: Int, ayah: Int) {
+        if (surahId < 1 || ayah < 1) return
+        val ref = AyahRef(surahId, ayah)
+        if (_ui.value.gathering) {
+            if (ref !in _ui.value.selection) toggle(surahId, ayah)
+            return
         }
-    }
-
-    fun enterGather() {
-        if (_ui.value.gathering) return
         player.pause()
+        val selection = listOf(ref)
         _ui.update {
             it.copy(
                 gathering = true,
                 sendOpen = false,
+                selection = selection,
+                ordinals = gatherOrdinals(selection),
                 error = null,
                 pendingShareText = null,
                 pendingShareImageUri = null,
@@ -109,9 +111,39 @@ class ShareViewModel(
         }
     }
 
+    fun onMarkTap(surahId: Int, ayah: Int) {
+        if (surahId < 1 || ayah < 1) return
+        apply(
+            ShareUx.onMarkTap(
+                gathering = _ui.value.gathering,
+                ref = AyahRef(surahId, ayah),
+            ),
+        )
+    }
+
+    /** Cancel on the share ribbon: leave gather. */
+    fun onChromeCancel() {
+        exitGather()
+    }
+
+    /** Cover / Bookmarks / Settings — not a mushaf page or chapter turn. */
+    fun onLeaveReaderSheet() {
+        apply(ShareUx.onLeaveReaderSheet(_ui.value.gathering))
+    }
+
+    private fun apply(action: ShareUxAction) {
+        when (action) {
+            is ShareUxAction.EnterShare -> enterShare(action.ref.surahId, action.ref.ayah)
+            is ShareUxAction.ToggleVerse -> toggle(action.ref.surahId, action.ref.ayah)
+            ShareUxAction.ExitShare -> exitGather()
+            ShareUxAction.None -> Unit
+        }
+    }
+
     /** Back while gathering (Send closed): drop the list and leave the mode. */
     fun exitGather() {
         previewJob?.cancel()
+        textJob?.cancel()
         imageJob?.cancel()
         _ui.value = ShareUiState()
     }
@@ -132,6 +164,7 @@ class ShareViewModel(
     /** Back on the Send page: return to gather with the list intact. */
     fun closeSend() {
         previewJob?.cancel()
+        textJob?.cancel()
         imageJob?.cancel()
         _ui.update {
             it.copy(
@@ -177,47 +210,51 @@ class ShareViewModel(
 
     /** Load verse text in selection order and stage plain text for the OS chooser. */
     fun shareAsText(includeTranslation: Boolean = true) {
-        val busy = _ui.value.preparingText || _ui.value.preparingImage
+        if (!_ui.value.gathering) return
+        if (_ui.value.preparingText || _ui.value.preparingImage) return
+        if (_ui.value.selection.isEmpty()) return
+        _ui.update { it.copy(preparingText = true, error = null, pendingShareText = null) }
         val lines = _ui.value.verseLines
-        if (lines.isEmpty() || busy) {
-            if (_ui.value.selection.isEmpty() || busy) return
-            _ui.update {
-                it.copy(preparingText = true, error = null, pendingShareText = null)
-            }
-            viewModelScope.launch {
-                try {
-                    val verses = loadComposerVerses(_ui.value.selection)
-                    if (verses.isEmpty()) {
-                        _ui.update {
-                            it.copy(preparingText = false, error = "Could not load those verses.")
-                        }
-                        return@launch
-                    }
-                    stageShareText(verses, includeTranslation)
-                } catch (e: Exception) {
-                    _ui.update {
-                        it.copy(
-                            preparingText = false,
-                            error = e.message?.takeIf { msg -> msg.isNotBlank() }
-                                ?: "Could not prepare the share.",
-                        )
-                    }
-                }
-            }
+        if (lines.isNotEmpty()) {
+            stageShareText(
+                lines.map {
+                    VerseTextComposer.Verse(
+                        arabic = it.arabic,
+                        translation = it.translation,
+                        surahNameTransliteration = it.surahName,
+                        surahId = it.ref.surahId,
+                        ayah = it.ref.ayah,
+                    )
+                },
+                includeTranslation,
+            )
             return
         }
-        if (busy) return
-        _ui.update { it.copy(preparingText = true, error = null, pendingShareText = null) }
-        val verses = lines.map {
-            VerseTextComposer.Verse(
-                arabic = it.arabic,
-                translation = it.translation,
-                surahNameTransliteration = it.surahName,
-                surahId = it.ref.surahId,
-                ayah = it.ref.ayah,
-            )
+        textJob?.cancel()
+        textJob = viewModelScope.launch {
+            try {
+                val verses = loadComposerVerses(_ui.value.selection)
+                if (!_ui.value.gathering) return@launch
+                if (verses.isEmpty()) {
+                    _ui.update {
+                        it.copy(preparingText = false, error = "Could not load those verses.")
+                    }
+                    return@launch
+                }
+                stageShareText(verses, includeTranslation)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                if (!_ui.value.gathering) return@launch
+                _ui.update {
+                    it.copy(
+                        preparingText = false,
+                        error = e.message?.takeIf { msg -> msg.isNotBlank() }
+                            ?: "Could not prepare the share.",
+                    )
+                }
+            }
         }
-        stageShareText(verses, includeTranslation)
     }
 
     /**
@@ -226,6 +263,7 @@ class ShareViewModel(
      * measure/layout.
      */
     fun shareAsImage(activity: Activity, includeTranslation: Boolean = true) {
+        if (!_ui.value.gathering) return
         if (_ui.value.preparingText || _ui.value.preparingImage) return
         if (_ui.value.selection.isEmpty()) return
         imageJob?.cancel()
@@ -242,21 +280,44 @@ class ShareViewModel(
                 val lines = _ui.value.verseLines.ifEmpty {
                     loadVerseLines(_ui.value.selection)
                 }
+                if (!_ui.value.gathering) return@launch
                 if (lines.isEmpty()) {
                     _ui.update {
                         it.copy(preparingImage = false, error = "Could not load those verses.")
                     }
                     return@launch
                 }
-                bitmap = ShareImageRenderer.render(
-                    activity = activity,
-                    content = {
-                        ShareImageCard(
-                            verses = lines,
+                var versesBmp: Bitmap? = null
+                var footerBmp: Bitmap? = null
+                try {
+                    versesBmp = ShareImageRenderer.renderSegments(
+                        activity = activity,
+                        segmentCount = lines.size,
+                    ) { index ->
+                        ShareImageVerseStrip(
+                            verse = lines[index],
                             includeTranslation = includeTranslation,
+                            padTop = if (index == 0) {
+                                ShareImagePadTop
+                            } else {
+                                ShareImagePadBetween
+                            },
+                            padBottom = if (index == lines.lastIndex) {
+                                0.dp
+                            } else {
+                                ShareImagePadBetween
+                            },
                         )
-                    },
-                )
+                    }
+                    footerBmp = ShareImageRenderer.render(activity) {
+                        ShareImageFooterStrip(shareFooterCopy(lines))
+                    }
+                    bitmap = stitchBitmaps(listOf(versesBmp, footerBmp))
+                } finally {
+                    versesBmp?.recycle()
+                    footerBmp?.recycle()
+                }
+                if (!_ui.value.gathering) return@launch
                 val uri = ShareFiles.writePng(activity.applicationContext, bitmap)
                 _ui.update {
                     it.copy(
@@ -265,11 +326,14 @@ class ShareViewModel(
                         error = null,
                     )
                 }
-            } catch (e: Exception) {
+            } catch (t: CancellationException) {
+                throw t
+            } catch (t: Throwable) {
+                if (!_ui.value.gathering) return@launch
                 _ui.update {
                     it.copy(
                         preparingImage = false,
-                        error = e.message?.takeIf { msg -> msg.isNotBlank() }
+                        error = t.message?.takeIf { msg -> msg.isNotBlank() }
                             ?: "Could not render the image.",
                     )
                 }
@@ -291,6 +355,7 @@ class ShareViewModel(
         verses: List<VerseTextComposer.Verse>,
         includeTranslation: Boolean,
     ) {
+        if (!_ui.value.gathering) return
         val text = VerseTextComposer.compose(verses, includeTranslation)
         _ui.update {
             it.copy(preparingText = false, pendingShareText = text, error = null)

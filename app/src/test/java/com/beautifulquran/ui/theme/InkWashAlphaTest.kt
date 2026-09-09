@@ -1,11 +1,18 @@
 package com.beautifulquran.ui.theme
 
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.BlendMode
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class InkWashAlphaTest {
+
+    @Test
+    fun unreadCoverPunchesGlyphsSoAStainShowsThrough() {
+        assertEquals(BlendMode.DstOut, paperCoverBlendMode(punchToBackdrop = true))
+        assertEquals(BlendMode.SrcOver, paperCoverBlendMode(punchToBackdrop = false))
+    }
 
     @Test
     fun paperCoverBleed_staysInsideItsTextLine() {

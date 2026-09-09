@@ -51,6 +51,7 @@ fun ShareHost(
         }
         context.startActivity(Intent.createChooser(intent, null))
         viewModel.consumePendingShareText()
+        if (!viewModel.ui.value.sendOpen) viewModel.exitGather()
     }
 
     LaunchedEffect(ui.pendingShareImageUri) {
@@ -69,6 +70,7 @@ fun ShareHost(
         }
         context.startActivity(Intent.createChooser(intent, null))
         viewModel.consumePendingShareImage()
+        if (!viewModel.ui.value.sendOpen) viewModel.exitGather()
     }
 
     LaunchedEffect(sendRendered) {

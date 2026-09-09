@@ -31,6 +31,24 @@ test('proxies only the fixed Content Sync resource set', async () => {
   assert.equal(response.headers.get('access-control-allow-origin'), env.ALLOWED_ORIGIN)
 })
 
+test('uses the QF production hosts when configured for production', async () => {
+  const calls = []
+  const proxy = createQfProxy(async (url) => {
+    calls.push(url)
+    return url.includes('/oauth2/token')
+      ? Response.json({ access_token: 'token', expires_in: 3_600 })
+      : Response.json({ sync: { mutations: [], next_sync_token: 'checkpoint' } })
+  })
+
+  const response = await proxy.fetch(
+    new Request(`https://worker.example${bootstrap}`),
+    { ...env, QF_ENV: 'production' },
+  )
+  assert.equal(response.status, 200)
+  assert.equal(calls[0], 'https://oauth2.quran.foundation/oauth2/token')
+  assert.match(calls[1], /^https:\/\/apis\.quran\.foundation\/content\/api\/v4\/resources\/sync/)
+})
+
 test('retries a content request once with a replacement token after 401', async () => {
   let tokenRequests = 0
   let contentRequests = 0

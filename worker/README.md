@@ -33,18 +33,19 @@ does not call QF and never exposes credentials.
 
 Do **not** place either secret in GitHub Actions, repository variables,
 GitHub Pages, Android, or the web bundle. The Worker is the only secret holder.
-Their names are declared as required in `wrangler.jsonc`, so Cloudflare refuses
-to publish a production or preview version that cannot inherit both encrypted
-bindings. The declaration contains no secret values.
+Wrangler preserves existing Worker secrets that are absent from this file when
+it deploys the merged `master` branch. Branch-preview versions are not app
+endpoints and may not inherit those production bindings; never configure a
+client build to use a preview URL.
 
 ## Client contract
 
-Android and web use only authenticated Production endpoints exposed by this
-allowlist: Content Sync for `mushafs:1`, English word translations `59`, and
-word transliterations `60`; those three snapshot routes; and five fixed verse
-lookups used to repair known ambiguities in the transliteration snapshot. The
-clients validate all 77,429 canonical words and every QCF page-font run before
-advancing the opaque sync checkpoint.
+The follow-up Android and web clients will use only authenticated Production
+endpoints exposed by this allowlist: Content Sync for `mushafs:1`, English word
+translations `59`, and word transliterations `60`; those three snapshot
+routes; and five fixed verse lookups used to repair known ambiguities in the
+transliteration snapshot. The clients validate all 77,429 canonical words and
+every QCF page-font run before advancing the opaque sync checkpoint.
 
 The Worker stores no Quran content or client cache. It caches only the
 short-lived OAuth access token in memory, retries one `401`, returns `no-store`,

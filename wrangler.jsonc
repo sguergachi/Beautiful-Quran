@@ -3,9 +3,6 @@
   "main": "worker/src/index.mjs",
   "compatibility_date": "2026-09-05",
   "workers_dev": true,
-  "secrets": {
-    "required": ["QF_CLIENT_ID", "QF_CLIENT_SECRET"]
-  },
   "vars": {
     "QF_ENV": "production",
     "ALLOWED_ORIGIN": "https://sguergachi.github.io"

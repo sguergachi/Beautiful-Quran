@@ -130,8 +130,9 @@ cut out of its centre, pointing in the direction the comb would travel to
 return there. It is the hairline remembering the place, not a floating undo
 message. The roundel remains tappable for five seconds, then shrinks and fades
 into the rule; tapping it returns to that exact leaf and consumes it.
-Taking hold of the dial again also consumes it, because a new search supersedes
-the old landing. The roundel and rule share one gesture owner: a still release
+Taking hold of the dial again also consumes it, and so does turning the leaf
+by hand, because a new search supersedes the old landing. The roundel and rule
+share one gesture owner: a still release
 on the roundel goes back, while movement past touch slop becomes a new dial
 stroke. Its generous tap target must never swallow a drag along the rule.
 
@@ -457,9 +458,15 @@ may use them** — they are not Settings-only, which is where they started.
 
 The ink-spot is a circular drop of ink on vellum: a round pooled
 centre, a fibre rim, and a capillary halo that fades before the box
-edge so nothing clips. It spreads in 170 ms. On Android 13+ the same
-progressive-vellum pigment the contextual guides use (hash, fibre,
-tooth, glaze) *is* the stain; older platforms keep three soft circles.
+edge so nothing clips. It spreads in 170 ms. `fillBox` lays a **pale even gold rounded-rect
+wash** under a verse: modest corner rounding, fibre only on the rim,
+no central pool, so the type stays readable. Size and opacity interpolate
+together — select fades in as it grows, deselect fades out as it recedes.
+Neighbouring soaks keep a paper gutter.
+Recitation wash punches through the blot (unread words fade into the
+stain) instead of painting a cream hole of page paper over it. On
+Android 13+ that GPU field *is* the stain; older platforms keep a
+soft cubic blot.
 
 The circle is a filled calligraphic stroke on an oval centreline: it overshoots
 its own join at both ends and bows outward on entry / inward on exit, so the tips
