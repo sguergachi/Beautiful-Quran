@@ -252,6 +252,7 @@ fun ReaderScreen(
     gathering: Boolean = false,
     /** 1-based ordinal for a gathered verse, or null when not selected. */
     gatherOrdinal: (surahId: Int, ayah: Int) -> Int? = { _, _ -> null },
+    onToggleGatheredAyah: (surahId: Int, ayah: Int) -> Unit = { _, _ -> },
     shareCount: Int = 0,
     preparingShareText: Boolean = false,
     preparingShareImage: Boolean = false,
@@ -3152,39 +3153,61 @@ fun ReaderScreen(
                                     )
                                     onShareMarkTap(ayah.surahId, ayah.number)
                                 },
-                                onWordClick = wordClick@{ word ->
-                                    if (editingAnnotationAyah != 0) return@wordClick
-                                    val segment = viewModel.segmentsFor(ayah.number)
-                                        ?.firstOrNull { it.position == word.position }
-                                    // Mid-verse word play must not verse-home: for tall
-                                    // ayahs that pins the top, un-lays-out the bottom
-                                    // line the reader tapped, and word-band follow cannot
-                                    // measure it — so the page jumps up. Seed follow as
-                                    // already on this ayah so shouldHomeOnto skips once
-                                    // the seek lands. Until then the playback target is
-                                    // still the previous item — do not home onto it.
-                                    lastFollowFocusTarget = ayah.number
-                                    followWasEnabled = true
-                                    pendingWordTapAyah = ayah.number
-                                    dispatch(ReaderInteractionEvent.EnableFollow)
-                                    if (segment != null) {
-                                        viewModel.playFromWord(ayah.number, segment.startMs)
-                                    } else {
+                                onWordClick = if (gathering) {
+                                    {
+                                        view.paperToggleHaptic(
+                                            turningOn = gatheredHere == null,
+                                        )
+                                        onToggleGatheredAyah(ayah.surahId, ayah.number)
+                                    }
+                                } else {
+                                    wordClick@{ word ->
+                                        if (editingAnnotationAyah != 0) return@wordClick
+                                        val segment = viewModel.segmentsFor(ayah.number)
+                                            ?.firstOrNull { it.position == word.position }
+                                        // Mid-verse word play must not verse-home: for tall
+                                        // ayahs that pins the top, un-lays-out the bottom
+                                        // line the reader tapped, and word-band follow cannot
+                                        // measure it — so the page jumps up. Seed follow as
+                                        // already on this ayah so shouldHomeOnto skips once
+                                        // the seek lands. Until then the playback target is
+                                        // still the previous item — do not home onto it.
+                                        lastFollowFocusTarget = ayah.number
+                                        followWasEnabled = true
+                                        pendingWordTapAyah = ayah.number
+                                        dispatch(ReaderInteractionEvent.EnableFollow)
+                                        if (segment != null) {
+                                            viewModel.playFromWord(ayah.number, segment.startMs)
+                                        } else {
+                                            viewModel.playFromAyah(ayah.number)
+                                        }
+                                    }
+                                },
+                                onAyahClick = if (gathering) {
+                                    {
+                                        view.paperToggleHaptic(
+                                            turningOn = gatheredHere == null,
+                                        )
+                                        onToggleGatheredAyah(ayah.surahId, ayah.number)
+                                    }
+                                } else {
+                                    ayahClick@{
+                                        if (editingAnnotationAyah != 0) return@ayahClick
+                                        dispatch(ReaderInteractionEvent.EnableFollow)
                                         viewModel.playFromAyah(ayah.number)
                                     }
                                 },
-                                onAyahClick = ayahClick@{
-                                    if (editingAnnotationAyah != 0) return@ayahClick
-                                    dispatch(ReaderInteractionEvent.EnableFollow)
-                                    viewModel.playFromAyah(ayah.number)
-                                },
-                                onWordLongClick = { word ->
-                                    // Hold opens the Root Word Viewer (or, in
-                                    // developer mode, a chooser that can also
-                                    // open the Timings Lab). MainActivity owns
-                                    // the branch — see docs/ROOT_VIEWER.md.
-                                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                                    onOpenRootViewer(ayah.surahId, ayah.number, word.position)
+                                onWordLongClick = if (gathering) {
+                                    null
+                                } else {
+                                    { word ->
+                                        // Hold opens the Root Word Viewer (or, in
+                                        // developer mode, a chooser that can also
+                                        // open the Timings Lab). MainActivity owns
+                                        // the branch — see docs/ROOT_VIEWER.md.
+                                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                        onOpenRootViewer(ayah.surahId, ayah.number, word.position)
+                                    }
                                 },
                                 // Switched off, annotations are simply not part
                                 // of the page. Notes are currently also bound to

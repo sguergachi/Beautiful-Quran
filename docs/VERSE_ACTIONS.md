@@ -1,8 +1,8 @@
 # Verse actions: bookmark · note · share
 
-**Status: Mark UX is the product.** Tap `﴿N﴾` to gather that verse; tap more
-`﴿N﴾` marks to add or drop them. Export (text/image) is shipped. Icon /
-Reveal / Hold A/B toggles are gone.
+**Status: Mark UX is the product.** Tap `﴿N﴾` to gather that verse; then tap
+anywhere on more verses to add or drop them. Export (text/image) is shipped.
+Icon / Reveal / Hold A/B toggles are gone.
 
 This document records the product decision for how three **different**
 actions on a verse coexist without cluttering reading or violating the
@@ -104,7 +104,7 @@ becomes share tools; multi is extension) without taxing bookmark.
 2. **Note stays a saved-ribbon hold** — optional colophon **Write** later; do
    not require “lift mode” to annotate or give the gold ayah mark a control.
 3. **Share starts with one verse already selected** — gold wash + Western ordinal `1`.
-4. **Multi-select is the same mode** — tap more `﴿N﴾` marks; tap again to unselect.
+4. **Multi-select is the same mode** — tap more verses; tap again to unselect.
 5. **No dual-purpose control** — never one button for enter *and* commit.
 6. **During share, the player bar is replaced** by a gather ribbon, not
    cluttered with transport + share mixed.
@@ -116,7 +116,7 @@ becomes share tools; multi is extension) without taxing bookmark.
 | Bookmark | Tap ribbon |
 | Note | Hold the saved bookmark ribbon → write |
 | Share one | Tap `﴿N﴾` → **Text** *or* **Image** |
-| Share many | Tap `﴿N﴾` → tap more marks (gold soak) → **Text** *or* **Image** |
+| Share many | Tap `﴿N﴾` → tap more verses (gold soak) → **Text** *or* **Image** |
 
 ### Interaction detail
 
@@ -142,8 +142,7 @@ becomes share tools; multi is extension) without taxing bookmark.
 
 **Select / unselect**
 
-- Tap `﴿N﴾` (or the gather ordinal) to toggle membership while in share mode.
-  The verse body does not gather.
+- Tap anywhere on a verse to toggle membership while in share mode.
 - Selected: a pale gold vellum wash spreads under that ayah (primary
   signal) — same gold token as the ayah marks, fibre on the rim,
   paper gutters so neighbours do not fuse. Western ordinal in Garamond
@@ -192,10 +191,10 @@ With G1, the intermediate Send list is **optional**:
 
 ## Entry: Mark UX
 
-Tap `﴿N﴾` to share that verse. While gathering, tap `﴿N﴾` (or the
-gather ordinal) to add or drop it. Word taps still play; word long-press
-stays Root Viewer; notes stay on the bookmark ribbon. Idle transport has
-no Share / Gather control (#519).
+Tap `﴿N﴾` to share that verse. While gathering, tap anywhere on a verse
+to add or drop it. Word long-press stays Root Viewer when idle; notes stay
+on the bookmark ribbon. Idle transport has no Share / Gather control
+(#519).
 
 Marking uses the paper toggle haptic: a confirm click on, a lighter clock
 tick off. Same family as Settings checks and the ayah rail.

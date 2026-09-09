@@ -32,11 +32,11 @@ its layout; it grows ordinals in the margin.
   `﴿N﴾` is the entry ([VERSE_ACTIONS.md](VERSE_ACTIONS.md)). The idle
   player bar does **not** host a Gather control
   ([#519](https://github.com/sguergachi/Beautiful-Quran-/pull/519)).
-- **Pick** by tapping `﴿N﴾` (or the gather ordinal in the gutter). Word
-  and verse-body taps still seek / play. Its ordinal sits in the gold
-  soak's top corner, in the existing 38 dp bookmark gutter — Western
-  digits (1 2 3), Garamond ink, tight brush circle. The ribbon is hidden
-  while gathering. Tap `﴿N﴾` again to drop it; the rest renumber.
+- **Pick** after that by tapping anywhere on a verse (word, body, mark,
+  or gather ordinal). Its ordinal sits in the gold soak's top corner, in
+  the existing 38 dp bookmark gutter — Western digits (1 2 3), Garamond
+  ink, tight brush circle. The ribbon is hidden while gathering. Tap
+  again to drop it; the rest renumber.
 - **Order is tap order.** Tapping 2:255, then 112:1, then 2:1 gathers exactly
   that sequence. No ranges, no sorting, no "from / to" pickers. Cap:
   `SHARE_SELECTION_MAX` (20).
@@ -51,10 +51,10 @@ its layout; it grows ordinals in the margin.
   ([ShareRibbon](../app/src/main/java/com/beautifulquran/ui/share/ShareRibbon.kt)).
   A failed export writes a quiet line in the ribbon's empty middle.
 
-While gathering, only `﴿N﴾` (and the gutter ordinal) add or drop verses.
-Word taps still seek, word long-press still opens the Root Viewer, and the
-bookmark ribbon stays hidden on gathered verses. The number is the share
-control — the verse body stays reading.
+Idle, only `﴿N﴾` enters gather. While gathering, a tap anywhere on a verse
+adds or drops it; word long-press does not open the Root Viewer, and the
+bookmark ribbon (including its note hold) is inactive. The mode owns the
+tap once you are in it.
 
 **Mode chrome (visual QA):** gather ordinals live in the gold soak's
 top corner, still in the 38 dp bookmark gutter. 16 sp Bold Garamond
