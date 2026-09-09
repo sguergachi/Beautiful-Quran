@@ -256,6 +256,7 @@ fun ReaderScreen(
     shareCount: Int = 0,
     preparingShareText: Boolean = false,
     preparingShareImage: Boolean = false,
+    shareError: String? = null,
     onShareMarkTap: (surahId: Int, ayah: Int) -> Unit = { _, _ -> },
     onShareCancel: () -> Unit = {},
     onShareText: () -> Unit = {},
@@ -1830,6 +1831,7 @@ fun ReaderScreen(
                         count = shareCount,
                         preparingText = preparingShareText,
                         preparingImage = preparingShareImage,
+                        error = shareError,
                         onCancel = onShareCancel,
                         onShareText = onShareText,
                         onShareImage = onShareImage,
@@ -3009,11 +3011,6 @@ fun ReaderScreen(
                                     val leadAyah = activeAyahState.value
                                     ayah.number == inkAyah || ayah.number == leadAyah
                                 }
-                            }
-                            // Per-verse derived read so scrolling only recomposes
-                            // the two ayahs whose focus bit flips, not every block.
-                            val bookmarkFocused by remember(ayah.number) {
-                                derivedStateOf { scrolledAyah.value == ayah.number }
                             }
                             val bookmarked = ayah.number in bookmarkedAyahs
                             val bookmarkLessonTarget = bookmarkNoteTipOpen &&

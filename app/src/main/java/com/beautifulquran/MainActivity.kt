@@ -993,6 +993,7 @@ private fun PaperStackApp(
                         shareCount = shareUi.selection.size,
                         preparingShareText = shareUi.preparingText,
                         preparingShareImage = shareUi.preparingImage,
+                        shareError = shareUi.error,
                         onShareMarkTap = shareViewModel::onMarkTap,
                         onShareCancel = shareViewModel::onChromeCancel,
                         onShareText = { shareViewModel.shareAsText() },

@@ -17,6 +17,7 @@ import com.beautifulquran.share.VerseTextComposer
 import com.beautifulquran.share.stitchBitmaps
 import com.beautifulquran.share.gatherOrdinals
 import com.beautifulquran.share.toggleGatheredAyah
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -74,6 +75,7 @@ class ShareViewModel(
     val surahNames: StateFlow<Map<Int, String>> = _surahNames.asStateFlow()
 
     private var previewJob: Job? = null
+    private var textJob: Job? = null
     private var imageJob: Job? = null
 
     init {
@@ -141,6 +143,7 @@ class ShareViewModel(
     /** Back while gathering (Send closed): drop the list and leave the mode. */
     fun exitGather() {
         previewJob?.cancel()
+        textJob?.cancel()
         imageJob?.cancel()
         _ui.value = ShareUiState()
     }
@@ -161,6 +164,7 @@ class ShareViewModel(
     /** Back on the Send page: return to gather with the list intact. */
     fun closeSend() {
         previewJob?.cancel()
+        textJob?.cancel()
         imageJob?.cancel()
         _ui.update {
             it.copy(
@@ -206,47 +210,51 @@ class ShareViewModel(
 
     /** Load verse text in selection order and stage plain text for the OS chooser. */
     fun shareAsText(includeTranslation: Boolean = true) {
-        val busy = _ui.value.preparingText || _ui.value.preparingImage
+        if (!_ui.value.gathering) return
+        if (_ui.value.preparingText || _ui.value.preparingImage) return
+        if (_ui.value.selection.isEmpty()) return
+        _ui.update { it.copy(preparingText = true, error = null, pendingShareText = null) }
         val lines = _ui.value.verseLines
-        if (lines.isEmpty() || busy) {
-            if (_ui.value.selection.isEmpty() || busy) return
-            _ui.update {
-                it.copy(preparingText = true, error = null, pendingShareText = null)
-            }
-            viewModelScope.launch {
-                try {
-                    val verses = loadComposerVerses(_ui.value.selection)
-                    if (verses.isEmpty()) {
-                        _ui.update {
-                            it.copy(preparingText = false, error = "Could not load those verses.")
-                        }
-                        return@launch
-                    }
-                    stageShareText(verses, includeTranslation)
-                } catch (e: Exception) {
-                    _ui.update {
-                        it.copy(
-                            preparingText = false,
-                            error = e.message?.takeIf { msg -> msg.isNotBlank() }
-                                ?: "Could not prepare the share.",
-                        )
-                    }
-                }
-            }
+        if (lines.isNotEmpty()) {
+            stageShareText(
+                lines.map {
+                    VerseTextComposer.Verse(
+                        arabic = it.arabic,
+                        translation = it.translation,
+                        surahNameTransliteration = it.surahName,
+                        surahId = it.ref.surahId,
+                        ayah = it.ref.ayah,
+                    )
+                },
+                includeTranslation,
+            )
             return
         }
-        if (busy) return
-        _ui.update { it.copy(preparingText = true, error = null, pendingShareText = null) }
-        val verses = lines.map {
-            VerseTextComposer.Verse(
-                arabic = it.arabic,
-                translation = it.translation,
-                surahNameTransliteration = it.surahName,
-                surahId = it.ref.surahId,
-                ayah = it.ref.ayah,
-            )
+        textJob?.cancel()
+        textJob = viewModelScope.launch {
+            try {
+                val verses = loadComposerVerses(_ui.value.selection)
+                if (!_ui.value.gathering) return@launch
+                if (verses.isEmpty()) {
+                    _ui.update {
+                        it.copy(preparingText = false, error = "Could not load those verses.")
+                    }
+                    return@launch
+                }
+                stageShareText(verses, includeTranslation)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                if (!_ui.value.gathering) return@launch
+                _ui.update {
+                    it.copy(
+                        preparingText = false,
+                        error = e.message?.takeIf { msg -> msg.isNotBlank() }
+                            ?: "Could not prepare the share.",
+                    )
+                }
+            }
         }
-        stageShareText(verses, includeTranslation)
     }
 
     /**
@@ -255,6 +263,7 @@ class ShareViewModel(
      * measure/layout.
      */
     fun shareAsImage(activity: Activity, includeTranslation: Boolean = true) {
+        if (!_ui.value.gathering) return
         if (_ui.value.preparingText || _ui.value.preparingImage) return
         if (_ui.value.selection.isEmpty()) return
         imageJob?.cancel()
@@ -271,6 +280,7 @@ class ShareViewModel(
                 val lines = _ui.value.verseLines.ifEmpty {
                     loadVerseLines(_ui.value.selection)
                 }
+                if (!_ui.value.gathering) return@launch
                 if (lines.isEmpty()) {
                     _ui.update {
                         it.copy(preparingImage = false, error = "Could not load those verses.")
@@ -307,6 +317,7 @@ class ShareViewModel(
                     versesBmp?.recycle()
                     footerBmp?.recycle()
                 }
+                if (!_ui.value.gathering) return@launch
                 val uri = ShareFiles.writePng(activity.applicationContext, bitmap)
                 _ui.update {
                     it.copy(
@@ -315,7 +326,10 @@ class ShareViewModel(
                         error = null,
                     )
                 }
+            } catch (t: CancellationException) {
+                throw t
             } catch (t: Throwable) {
+                if (!_ui.value.gathering) return@launch
                 _ui.update {
                     it.copy(
                         preparingImage = false,
@@ -341,6 +355,7 @@ class ShareViewModel(
         verses: List<VerseTextComposer.Verse>,
         includeTranslation: Boolean,
     ) {
+        if (!_ui.value.gathering) return
         val text = VerseTextComposer.compose(verses, includeTranslation)
         _ui.update {
             it.copy(preparingText = false, pendingShareText = text, error = null)

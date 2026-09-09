@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.layout.Box
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.FastForward
 import androidx.compose.material.icons.rounded.FastRewind
@@ -70,29 +69,19 @@ fun PlayerBar(
                 .fillMaxWidth()
                 .navigationBarsPadding(),
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth(),
+            TextButton(
+                onClick = onReciterClick,
+                enabled = enabled,
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 2.dp),
+                modifier = Modifier.graphicsLayer { alpha = chromeAlpha() },
             ) {
-                Box(
-                    modifier = Modifier.weight(1f),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    TextButton(
-                        onClick = onReciterClick,
-                        enabled = enabled,
-                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 2.dp),
-                        modifier = Modifier.graphicsLayer { alpha = chromeAlpha() },
-                    ) {
-                        Text(
-                            text = reciterName,
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                }
+                Text(
+                    text = reciterName,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
             }
             Row(
                 verticalAlignment = Alignment.CenterVertically,

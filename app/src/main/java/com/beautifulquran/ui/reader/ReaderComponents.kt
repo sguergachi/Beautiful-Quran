@@ -2079,6 +2079,7 @@ private fun ResponsiveEnglishAyah(
  * [onMiss] (null = ignored). [inertLongPressRange] prevents the trailing ayah
  * mark from borrowing the nearby final word's hold action.
  */
+@Composable
 internal fun Modifier.wordTapTarget(
     words: List<Word>,
     ranges: List<IntRange>,
@@ -2090,50 +2091,63 @@ internal fun Modifier.wordTapTarget(
     onMarkClick: (() -> Unit)? = null,
     onMarkLongClick: (() -> Unit)? = null,
     inertLongPressRange: IntRange = IntRange.EMPTY,
-): Modifier = pointerInput(
-    ranges,
-    words,
-    layoutResult,
-    onWordLongClick,
-    inertLongPressRange,
-    onMarkClick,
-    onMarkLongClick,
-    onWordClick,
-) {
-    detectTapGestures(
-        onTap = { tap ->
-            if (
-                onMarkClick != null &&
-                layoutResult?.rangeContains(tap, inertLongPressRange, hitSlopPx) == true
-            ) {
-                onMarkClick()
-                return@detectTapGestures
-            }
-            val wordIndex = layoutResult?.wordIndexAt(tap, ranges, hitSlopPx) ?: -1
-            if (wordIndex >= 0 && onWordClick != null) {
-                onWordClick(words[wordIndex])
-            } else {
-                onMiss?.invoke()
-            }
-        },
-        onLongPress = if (onWordLongClick == null && onMarkLongClick == null) {
-            null
-        } else {
-            { pos ->
-                if (layoutResult?.rangeContains(pos, inertLongPressRange, hitSlopPx) == true) {
-                    onMarkLongClick?.invoke()
-                } else if (onWordLongClick != null) {
-                    val wordIndex = layoutResult?.wordIndexAt(pos, ranges, hitSlopPx) ?: -1
-                    if (wordIndex >= 0) onWordLongClick(words[wordIndex])
+): Modifier {
+    val onWordClickLatest = rememberUpdatedState(onWordClick)
+    val onWordLongClickLatest = rememberUpdatedState(onWordLongClick)
+    val onMissLatest = rememberUpdatedState(onMiss)
+    val onMarkClickLatest = rememberUpdatedState(onMarkClick)
+    val onMarkLongClickLatest = rememberUpdatedState(onMarkLongClick)
+    return pointerInput(
+        ranges,
+        words,
+        layoutResult,
+        inertLongPressRange,
+        onWordClick != null,
+        onWordLongClick != null,
+        onMarkClick != null,
+        onMarkLongClick != null,
+    ) {
+        detectTapGestures(
+            onTap = { tap ->
+                val markClick = onMarkClickLatest.value
+                if (
+                    markClick != null &&
+                    layoutResult?.rangeContains(tap, inertLongPressRange, hitSlopPx) == true
+                ) {
+                    markClick()
+                    return@detectTapGestures
                 }
-            }
-        },
-    )
+                val wordIndex = layoutResult?.wordIndexAt(tap, ranges, hitSlopPx) ?: -1
+                val wordClick = onWordClickLatest.value
+                if (wordIndex >= 0 && wordClick != null) {
+                    wordClick(words[wordIndex])
+                } else {
+                    onMissLatest.value?.invoke()
+                }
+            },
+            onLongPress = if (onWordLongClick == null && onMarkLongClick == null) {
+                null
+            } else {
+                { pos ->
+                    if (layoutResult?.rangeContains(pos, inertLongPressRange, hitSlopPx) == true) {
+                        onMarkLongClickLatest.value?.invoke()
+                    } else {
+                        val wordLongClick = onWordLongClickLatest.value
+                        if (wordLongClick != null) {
+                            val wordIndex = layoutResult?.wordIndexAt(pos, ranges, hitSlopPx) ?: -1
+                            if (wordIndex >= 0) wordLongClick(words[wordIndex])
+                        }
+                    }
+                }
+            },
+        )
+    }
 }
 
 /** Tap chrome shared by both shaped modes: word-precise when word actions
  * exist, the whole ayah otherwise. The trailing ﴿N﴾ mark can be its own
  * target when [onMarkClick] is set (share entry). */
+@Composable
 private fun Modifier.ayahTapTarget(
     ayah: Ayah,
     rendered: RenderedLineText,
@@ -2713,11 +2727,9 @@ fun AyahBlock(
      */
     gatherOrdinal: Int? = null,
     onAyahMarkClick: (() -> Unit)? = null,
-    onAyahMarkLongClick: (() -> Unit)? = null,
     onWordClick: ((Word) -> Unit)?,
     onWordLongClick: ((Word) -> Unit)? = null,
     onAyahClick: () -> Unit,
-    onAyahLongClick: (() -> Unit)? = null,
     /** Text to display: the saved note when idle, the in-progress draft while editing. */
     annotationText: String? = null,
     /** True while the reader is composing a note on this specific verse. */
@@ -3019,7 +3031,6 @@ fun AyahBlock(
                     onWordClick = onWordClick,
                     onWordLongClick = onWordLongClick,
                     onMarkClick = onAyahMarkClick,
-                    onMarkLongClick = onAyahMarkLongClick,
                     useArabicIndicDigits = useArabicIndicDigits,
                 )
             } else if (readingMode == ReadingMode.ARABIC_ENGLISH && showGloss) {
@@ -3064,7 +3075,6 @@ fun AyahBlock(
                                 fontScale,
                                 useArabicIndicDigits = useArabicIndicDigits,
                                 onClick = onAyahMarkClick,
-                                onLongClick = onAyahMarkLongClick,
                             )
                         }
                     }
@@ -3092,7 +3102,6 @@ fun AyahBlock(
                         onWordClick = onWordClick?.let { handler -> { word -> handler(word) } },
                         onWordLongClick = onWordLongClick?.let { handler -> { word -> handler(word) } },
                         onMarkClick = onAyahMarkClick,
-                        onMarkLongClick = onAyahMarkLongClick,
                     )
                 }
             }
@@ -3144,10 +3153,7 @@ fun AyahBlock(
                             layout = { translationLayout },
                             rtl = false,
                         )
-                        .quietClickable(
-                            onClick = onAyahClick,
-                            onLongClick = onAyahLongClick,
-                        ),
+                        .quietClickable(onClick = onAyahClick),
                     onTextLayout = { translationLayout = it },
                 )
             }

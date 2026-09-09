@@ -44,9 +44,11 @@ its layout; it grows ordinals in the margin.
   mushaf leaf — keeps the list intact. Leaving the reader *sheet* (swipe
   or back to Cover, Bookmarks, or Settings) drops it.
 - **Leave** with system back, the gather-bar close, or swiping the reader
-  sheet away — all call `ShareViewModel.exitGather()`. **Commit** from the
-  gather bar: quote = text, image = PNG
+  sheet away — all call `ShareViewModel.exitGather()`, which also aborts
+  in-flight text/image prepare. **Commit** from the gather bar: quote =
+  text, image = PNG
   ([ShareRibbon](../app/src/main/java/com/beautifulquran/ui/share/ShareRibbon.kt)).
+  A failed export writes a quiet line in the ribbon's empty middle.
 
 While gathering, word taps do not seek, word long-press does not open the
 Root Viewer, and the bookmark ribbon (including its note hold) is inactive.
@@ -78,7 +80,8 @@ It carries:
 1. The gathered verses **in order**, each with ordinal, Arabic preview
    (Hafs), reference, and a gold **×** to remove (no drag-reorder yet).
 2. Outputs: **Share as text** · **Share as image** (video later).
-3. Quiet error line if load/render fails.
+3. Quiet error line if load/render fails (Send page, and the gather
+   ribbon's empty middle on the happy path).
 
 Theme / aspect / reciter toggles and drag-reorder stay deferred.
 

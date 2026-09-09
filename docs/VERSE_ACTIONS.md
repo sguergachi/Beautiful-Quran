@@ -18,8 +18,8 @@ Related: [DESIGN.md](DESIGN.md) (paper rules), [ANNOTATIONS.md](ANNOTATIONS.md)
 | Action | Nature | Multi-verse? | Status today |
 |---|---|---|---|
 | **Bookmark** | Personal mark — ruby ribbon in outer margin | No | Works well (one tap) |
-| **Note** | Write under *this* verse (ḥāshiya) | No | Long-press `﴿N﴾` |
-| **Share** | Export text / image (video later) | Yes — start with one, add more | Gather mode + Send page; entry removed from player bar |
+| **Note** | Write under *this* verse (ḥāshiya) | No | Hold the saved bookmark ribbon |
+| **Share** | Export text / image (video later) | Yes — start with one, add more | Tap `﴿N﴾` → gold soak + DeepGreen ribbon; no Send on the happy path |
 
 They are **not** three buttons on one toolbar. They are three intents with
 different shapes. Unification is **conceptual** (everything is “about this
@@ -114,31 +114,30 @@ becomes share tools; multi is extension) without taxing bookmark.
 | Intent | Steps |
 |---|---|
 | Bookmark | Tap ribbon |
-| Note | Long-press `﴿N﴾` → write |
-| Share one | Tap `﴿N﴾` → **Share** → **Text** *or* **Image** |
-| Share many | Tap `﴿N﴾` → **Share** → tap more (gold wash) → **Text** *or* **Image** |
+| Note | Hold the saved bookmark ribbon → write |
+| Share one | Tap `﴿N﴾` → **Text** *or* **Image** |
+| Share many | Tap `﴿N﴾` → tap more (gold soak) → **Text** *or* **Image** |
 
 ### Interaction detail
 
 **Enter share**
 
-- Primary: short-tap `﴿N﴾` reveals a quiet colophon line under that verse:
-  **Share** (and optionally **Write**). Tapping **Share**:
-  - pauses playback
-  - selects *that* verse (`1` + green vellum ink blot under the ayah)
-  - replaces the player bar with the **share ribbon**
-- Optional power entry: long-press **verse body** (not seal) jumps straight
-  into share-select with that verse checked. Only if body vs seal long-press
-  remains clean in practice.
+- Short-tap `﴿N﴾` pauses playback, selects *that* verse (`1` + pale gold
+  soak under the ayah), and replaces the player bar with the **share ribbon**.
+- Word long-press stays Root Viewer. Notes stay on the bookmark ribbon.
+  There is no colophon and no body-hold entry.
 
 **Share ribbon (replaces PlayerBar while sharing)**
 
 ```text
-  Cancel  ·  N  ·  Text  ·  Image
+  Cancel          Text  Image
 ```
 
-- `Text` / `Image` are faint until `N ≥ 1`, then full gold/ink strength
-- `Cancel` or system back drops selection and restores transport
+- Count lives on the verse ordinals, not the bar. The empty middle stays
+  empty unless export fails, then a quiet ink line sits there.
+- `Text` / `Image` are faint until `N ≥ 1`
+- `Cancel`, system back, or swiping the reader sheet away drops selection
+  and restores transport. Cancel also aborts an in-flight export.
 - Completing share restores transport
 
 **Select / unselect**
@@ -234,16 +233,14 @@ pipeline first.
 
 ## Open questions (non-blocking)
 
-1. Optional body long-press as power entry into share-select?
-2. Colophon under verse: **Share** only, or **Write · Share**?
-3. After first ship, do multi-verse users need a Send review page?
+1. After first ship, do multi-verse users need a Send review page?
 
-Default answers if implementing without further input: (1) no until needed,
-(2) **Share** only, (3) no until proven.
+Shipped answers: no body-hold entry, no colophon, no Send until proven.
 
 ## History
 
 - Gather + text (PR1) and full-ink image (PR2) shipped; see [SHARE.md](SHARE.md)
 - Player-bar Gather removed (#519) as dual-purpose chrome
 - UX review (player takeover, gold wash, fewer steps) → this document
-- Implementation of G1 not yet scheduled
+- Mark UX shipped as G1: tap `﴿N﴾`, gold soak, DeepGreen ribbon, no Send
+  on the happy path, no A/B toggles
