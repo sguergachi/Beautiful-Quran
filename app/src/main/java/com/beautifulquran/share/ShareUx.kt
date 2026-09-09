@@ -19,8 +19,9 @@ object ShareUx {
     fun onMarkTap(gathering: Boolean, ref: AyahRef): ShareUxAction =
         if (gathering) ShareUxAction.ToggleVerse(ref) else ShareUxAction.EnterShare(ref)
 
-    fun onVerseTap(gathering: Boolean, ref: AyahRef): ShareUxAction =
-        if (gathering) ShareUxAction.ToggleVerse(ref) else ShareUxAction.None
+    /** Verse body never gathers — only `﴿N﴾` (and its gather ordinal). */
+    @Suppress("UNUSED_PARAMETER")
+    fun onVerseTap(gathering: Boolean, ref: AyahRef): ShareUxAction = ShareUxAction.None
 
     /**
      * Leaving the reader paper sheet (Cover, Bookmarks, Settings) drops

@@ -60,6 +60,9 @@ import kotlin.math.sin
 /** Matches the bookmark-side verse pad so the strip cannot cover English ﴿N﴾. */
 internal val BookmarkStripWidth = 38.dp
 
+/** Extra tap past the page edge, never into the verse. */
+internal const val BookmarkTapOutsetDp = 16f
+
 internal const val BookmarkEdgeInsetDp = 8f    // from the block's outer edge
 internal const val BookmarkRibbonWidthDp = 11f
 internal const val BookmarkTopInsetDp = 24f    // align the tip with the verse's first ink line
@@ -251,45 +254,34 @@ internal fun VerseBookmarkRibbon(
 
     // Ruby owns the wide gutter target; the passive green cloth places a child
     // guard over only its own pixels below so those touches never reach ruby.
-    val tapModifier = if (interactive) {
-        Modifier.quietClickable(
-            role = Role.Button,
-            onLongClick = onLongClick?.let {
-                {
-                    if (latestChrome() >= 0.1f) latestOnLongClick?.invoke()
+    // Hit area hangs past the page edge (not into the verse) so the nub is
+    // easy to catch without covering English ﴿N﴾.
+    val onRibbonClick: () -> Unit = {
+        if (latestChrome() >= 0.1f) {
+            if (!animateOnTap) {
+                job?.cancel()
+                animating = false
+                scope.launch(start = CoroutineStart.UNDISPATCHED) {
+                    unfurl.snapTo(1f)
+                    sway.snapTo(0f)
                 }
-            },
-            onClick = {
-                if (latestChrome() >= 0.1f) {
-                    if (!animateOnTap) {
-                        job?.cancel()
-                        animating = false
-                        scope.launch(start = CoroutineStart.UNDISPATCHED) {
-                            unfurl.snapTo(1f)
-                            sway.snapTo(0f)
-                        }
-                        latestOnToggle()
-                        view.performHapticFeedback(HapticFeedbackConstants.CONTEXT_CLICK)
-                    } else {
-                        job?.cancel()
-                        animating = true
-                        val nowMarked = latestOnToggle()
-                        view.performHapticFeedback(HapticFeedbackConstants.CONTEXT_CLICK)
-                        val h = stripSize.height.toFloat().coerceAtLeast(1f)
-                        if (nowMarked) playUnfurl(h) else playRetract(h)
-                    }
-                }
-            },
-        )
-    } else {
-        Modifier
+                latestOnToggle()
+                view.performHapticFeedback(HapticFeedbackConstants.CONTEXT_CLICK)
+            } else {
+                job?.cancel()
+                animating = true
+                val nowMarked = latestOnToggle()
+                view.performHapticFeedback(HapticFeedbackConstants.CONTEXT_CLICK)
+                val h = stripSize.height.toFloat().coerceAtLeast(1f)
+                if (nowMarked) playUnfurl(h) else playRetract(h)
+            }
+        }
     }
 
     Box(
         modifier = modifier
             .width(BookmarkStripWidth)
-            .onSizeChanged { stripSize = it }
-            .then(tapModifier),
+            .onSizeChanged { stripSize = it },
     ) {
         Canvas(Modifier.fillMaxSize()) {
             // Read chrome in the draw scope so LazyColumn items invalidate
@@ -443,6 +435,24 @@ internal fun VerseBookmarkRibbon(
                     ),
                 )
             }
+        }
+        if (interactive) {
+            Box(
+                Modifier
+                    .align(if (mirrored) Alignment.CenterEnd else Alignment.CenterStart)
+                    .fillMaxHeight()
+                    .width(BookmarkStripWidth + BookmarkTapOutsetDp.dp)
+                    .offset(x = if (mirrored) BookmarkTapOutsetDp.dp else -BookmarkTapOutsetDp.dp)
+                    .quietClickable(
+                        role = Role.Button,
+                        onLongClick = onLongClick?.let {
+                            {
+                                if (latestChrome() >= 0.1f) latestOnLongClick?.invoke()
+                            }
+                        },
+                        onClick = onRibbonClick,
+                    ),
+            )
         }
         val placeTapGuardWidth = placeRibbonTapGuardWidthDp(
             placeMarked = placeMarked,

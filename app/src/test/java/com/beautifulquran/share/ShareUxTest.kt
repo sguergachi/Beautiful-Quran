@@ -25,12 +25,9 @@ class ShareUxTest {
     }
 
     @Test
-    fun `verse tap only toggles while gathering`() {
+    fun `verse body never gathers`() {
         assertEquals(ShareUxAction.None, ShareUx.onVerseTap(gathering = false, ref = a))
-        assertEquals(
-            ShareUxAction.ToggleVerse(b),
-            ShareUx.onVerseTap(gathering = true, ref = b),
-        )
+        assertEquals(ShareUxAction.None, ShareUx.onVerseTap(gathering = true, ref = b))
     }
 
     @Test

@@ -3197,7 +3197,7 @@ fun AyahBlock(
                 GatherOrdinalMark(
                     ordinal = gatherOrdinal,
                     chromeAlpha = bookmarkChromeAlpha,
-                    onClick = onAyahClick,
+                    onClick = onAyahMarkClick,
                     modifier = Modifier
                         .align(
                             if (bookmarkSide == AyahSelectorSide.RIGHT) {

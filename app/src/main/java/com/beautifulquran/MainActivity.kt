@@ -989,7 +989,6 @@ private fun PaperStackApp(
                         onInkOverlayVisibilityChange = { readerInkOverlayVisible = it },
                         gathering = shareUi.gathering,
                         gatherOrdinal = { sid, a -> shareUi.ordinals[AyahRef(sid, a)] },
-                        onToggleGatheredAyah = shareViewModel::toggle,
                         shareCount = shareUi.selection.size,
                         preparingShareText = shareUi.preparingText,
                         preparingShareImage = shareUi.preparingImage,

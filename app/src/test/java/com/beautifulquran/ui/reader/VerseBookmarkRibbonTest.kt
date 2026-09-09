@@ -27,6 +27,7 @@ class VerseBookmarkRibbonTest {
         assertEquals(24f, GatherOrdinalSlotWidthDp)
         assertEquals(38f, GatherOrdinalEdgeInsetDp + GatherOrdinalSlotWidthDp)
         assertEquals(38f, BookmarkStripWidth.value)
+        assertEquals(54f, BookmarkStripWidth.value + BookmarkTapOutsetDp)
     }
 
     @Test
