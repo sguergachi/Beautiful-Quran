@@ -207,6 +207,13 @@ fun mushafLeafBands(english: Boolean): MushafLeafBands =
  * The two figures of the folio stand a step apart because they are two
  * scripts: a Hafs numeral set at a Latin numeral's size reads smaller than it,
  * and the step is what makes the pair match to the eye rather than on paper.
+ *
+ * The rungs below the revelation are the *intervals*, not the final sizes. The
+ * leaf's furniture — the running head and both folio figures — is set a flat
+ * two points over its rung, because a geometric scale under-serves its own
+ * smallest sizes and small type needs an optical correction to stay legible.
+ * The correction is the same for all three, so the intervals here are
+ * untouched. See `MushafFurnitureBump` and `furnitureStep`.
  */
 object MushafType {
     /** Major third. */
