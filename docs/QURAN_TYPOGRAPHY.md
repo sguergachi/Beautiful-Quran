@@ -346,12 +346,12 @@ ends — a bigger capacity is a smaller hand, and a smaller hand is more
 characters to the line. Because the block goes as `hand²`, **characters to the
 line go as the square root of the capacity**.
 
-1,400 characters sets at about 17 sp on a phone and **53 characters — 10 words
-— to the line**. It was 940, which set at 20.7 sp and 45 characters, and 45 is
+1,250 characters sets at about 18 sp on a phone and **48 characters — 9 words —
+to the line**. It was 940, which set at 20.7 sp and 45 characters, and 45 is
 below the bottom of the band a single column reads in at all. See §13.5: that
 figure is also what made the rag impossible.
 
-The cost is leaves — about 750 against 1,120 — and with the pagination
+The cost is leaves — about 840 against 1,120 — and with the pagination
 continuous the capacity buys nothing but type: the choice is purely how long a
 line the hand wants. `tools/measure_english_leaves.py` prints the pagination
 side of the sweep.
@@ -911,18 +911,33 @@ Lengthening the line shrinks the atom. Swept on device over the Ta-Ha, Baqarah
 and Ad-Dukhan leaves, hand and words counted off the pixels:
 
 ```
-    capacity    hand     words/line   chars/line   rag, mean % of measure
-        940    20.7 sp       8.4          45              6.9%
-      1,200    18.8 sp       8.7          47              6.5%
-      1,400    16.9 sp       9.8          53              4.9%
-      1,600    15.8 sp      10.5          57              6.0%
+    capacity    hand     words/line   chars/line
+        940    20.7 sp       8.4          45     below the readable band
+      1,200    18.8 sp       8.7          47
+      1,250    18.2 sp       8.8          48     set here
+      1,300    17.4 sp       9.5          51
+      1,400    16.9 sp       9.9          53     shipped; read as too small
+      1,600    15.8 sp      10.5          57
 ```
 
-**The rag fell by nearly a third with no line-breaking change at all.** The
-capacity is 1,400: the first setting inside the readable band, the calmest rag
-of the four, and 17 sp of EB Garamond — small x-height for its body — is a
-book's hand and not a large-print one. 1,600 buys four more characters for a
-sixth of the type and did not measure better.
+**The rag falls with the line, with no line-breaking change at all** — at 1,400
+it measured 4.9% against 940's 6.9%, because the break atom shrank with the
+word's share of the measure.
+
+The capacity is **1,250**. 1,400 was set first, on the line alone, and read as
+too small in the hand; 1,250 is where the two complaints meet — 18.2 sp is type
+a reader asked back for, and 48 characters is still inside the band that 45 was
+under. It gives up the last of the rag improvement to get there.
+
+**The measure is fixed, so the line and the type are the same paper twice.**
+Characters to the line go as `1/hand` exactly. There is no setting on a 938 px
+measure that gives both a 19 sp hand and a fifty-character line, and the margin
+is not a way out: the hand and the line both go as the *square root* of the
+measure, so a fore-edge worth taking buys about a percent of each — and the
+English leaf's fore-edge is there because a book with no outer margin reads as
+a printout. The notches are also close together, because capacity is a square
+root: 1,250 → 1,400 is 12% of capacity for 6% of hand. Type that wants to move
+perceptibly has to move by more than one notch.
 
 Leading was tested with it and left at 1.40 em. At 1.46 the words to the line
 did not move, the rag did not improve, and the 1.50 ceiling that cards a short
@@ -1308,7 +1323,7 @@ extra line: the well's share rises from 15 / 17.05 to 15 / 16.30, 4.6 % more
 paper, and 4.6 % of twenty-two lines is one — so `ENGLISH_LEAF_CAPACITY_CHARS`
 goes from 900 to 940 and `ENGLISH_LEAF_LINE_CHARS` divides it by 23 rather than
 22. It is the only change here that a reader will count. (Both figures have
-moved since, to 1,400 and 28, for the reason in §13.5; the arithmetic above is
+moved since, to 1,250 and 26, for the reason in §13.5; the arithmetic above is
 the one that set them at the time.)
 
 The two settings no longer sum to the same figure, which is why each divides by

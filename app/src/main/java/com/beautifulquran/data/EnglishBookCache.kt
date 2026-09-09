@@ -132,7 +132,10 @@ class EnglishBookCache(context: Context) {
          * 20: the leaf carries 1,400 characters instead of 940, so the hand is
          * cut smaller and the line holds 53 characters instead of 45. Every
          * leaf in the book is a different length of text.
+         *
+         * 21: 1,250, giving back some of the hand 20 spent — 18.2 sp and 48
+         * characters to the line. Every leaf moves again.
          */
-        const val FORMAT = 20
+        const val FORMAT = 21
     }
 }

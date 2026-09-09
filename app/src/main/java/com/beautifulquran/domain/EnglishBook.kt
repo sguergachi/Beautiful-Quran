@@ -69,23 +69,38 @@ package com.beautifulquran.domain
  * breaker already sitting on it. Lengthening the line shrinks the atom, and the
  * rag comes down with it without a word of line-breaking code changing.
  *
- * Swept on device over the Ta-Ha, Baqarah and Ad-Dukhan leaves — the hand and
- * the words to the line measured off the pixels, not modelled:
+ * Swept on device over the Ta-Ha and Baqarah leaves — the hand and the words to
+ * the line measured off the pixels, not modelled:
  *
  * ```
- *     capacity    hand    words/line   chars/line   rag, mean % of measure
- *         940    20.7 sp      8.4          45              6.9%
- *       1,200    18.8 sp      8.7          47              6.5%
- *       1,400    16.9 sp      9.8          53              4.9%
- *       1,600    15.8 sp     10.5          57              6.0%
+ *     capacity    hand    words/line   chars/line
+ *         940    20.7 sp      8.4          45      below the readable band
+ *       1,200    18.8 sp      8.7          47
+ *       1,250    18.2 sp      8.8          48      set here
+ *       1,300    17.4 sp      9.5          51
+ *       1,400    16.9 sp      9.9          53      shipped; read as too small
+ *       1,600    15.8 sp     10.5          57
  * ```
  *
- * 1,400. It is the first setting inside the readable band, it measured the
- * calmest rag of the four, and 16.9 sp of EB Garamond — whose x-height is small
- * for its body — is a book's hand rather than a large-print one. 1,600 buys
- * four more characters for a sixth of the type and did not measure better.
+ * **The measure is fixed, so the line and the type are the same paper twice.**
+ * Characters to the line go as `1/hand` exactly, and that is the whole trade —
+ * there is no setting on a 938 px measure that gives both a 19 sp hand and a
+ * fifty-character line, and the margin is not a way out (see
+ * `englishLeafForeEdge`: both the hand and the line go as the *square root* of
+ * the measure, so a fore-edge worth taking buys about a percent of each).
  *
- * The cost is leaves: about 750 of them against 1,120 at 940, and 604 when a
+ * 1,400 was set first, on the line alone, and read as too small in the hand.
+ * 1,250 is where the two complaints meet: 18.2 sp is type a reader asked for
+ * back, and 48 characters is still inside the band that 45 was under. What it
+ * gives up is the last of the rag — the deep holes come back with the shorter
+ * line, because the break atom grows with it (§13.5).
+ *
+ * The notches are close together and the curve is flat here, which is worth
+ * knowing before re-tuning: capacity is a square root, so 1,250 → 1,400 is 12%
+ * of capacity for 6% of hand. If the type wants to move perceptibly it has to
+ * move by more than a notch.
+ *
+ * The cost is leaves: about 840 of them against 1,120 at 940, and 604 when a
  * leaf was a page. What it is *not* paying for is whitespace — the leaves are
  * packed continuously, so the median one reaches 91% of its well whatever the
  * capacity is, and the capacity buys only type.
@@ -94,7 +109,7 @@ package com.beautifulquran.domain
  * capture a leaf and count the words on its lines.
  * `tools/measure_english_leaves.py` prints the pagination side of the sweep.
  */
-const val ENGLISH_LEAF_CAPACITY_CHARS = 1400
+const val ENGLISH_LEAF_CAPACITY_CHARS = 1250
 
 /**
  * What a chapter's opening costs the leaf, in the characters the capacity
@@ -113,13 +128,13 @@ const val ENGLISH_LEAF_CAPACITY_CHARS = 1400
  * line and [EnglishLeafBasmalahAirEm] under it, and on the reference leaf those
  * come to 126 px and 113 px against a line pitch of 80 — 1.58 lines and 1.41,
  * three lines together. A line of this book is [ENGLISH_LEAF_LINE_CHARS], so
- * they are 79 characters and 70.
+ * they are 76 characters and 68.
  *
  * The measurement is in *lines*, and it stays 1.58 and 1.41 when the hand
  * moves: the panel is built from the line's ink and an air in line pitches, so
  * it scales with the type it sits over. Only the conversion moves, because a
  * line holds more characters at a bigger [ENGLISH_LEAF_CAPACITY_CHARS] — these
- * were 64 and 58 when a line held 40.
+ * were 64 and 58 when a line held 40, and 79 and 70 when it held 50.
  *
  * They were 92 and 78 — four and a sixth lines for three — and a chapter's leaf
  * came up an eighth of its well short every time. Half of the excess was a
@@ -130,8 +145,8 @@ const val ENGLISH_LEAF_CAPACITY_CHARS = 1400
  * Re-measure with a device capture after changing the panel, the basmalah or
  * the leading.
  */
-const val ENGLISH_LEAF_OPENING_CHARS = 79
-const val ENGLISH_LEAF_BASMALAH_CHARS = 70
+const val ENGLISH_LEAF_OPENING_CHARS = 76
+const val ENGLISH_LEAF_BASMALAH_CHARS = 68
 
 /** What a verse costs the leaf: its prose, and the opening it may bring. */
 fun englishLeafVerseMass(surahId: Int, ayah: Int, prose: Int): Int = when {
@@ -144,18 +159,19 @@ fun englishLeafVerseMass(surahId: Int, ayah: Int, prose: Int): Int = when {
 /**
  * About what one line of the leaf holds, in the characters the capacity counts.
  *
- * The well comes to 28 lines on a phone, and the hand is solved so that a leaf
- * exactly fills it, so a line is a twenty-eighth of the capacity. It is an
+ * The well comes to 26 lines on a phone, and the hand is solved so that a leaf
+ * exactly fills it, so a line is a twenty-sixth of the capacity. It is an
  * approximation on a tablet, whose well is fewer and longer lines — near enough,
  * because the two rules below only need to know a line from a page.
  *
  * The divisor is the lines a full leaf draws, so it moves with
  * [ENGLISH_LEAF_CAPACITY_CHARS]: a bigger capacity is a smaller hand and more
- * lines in the same well. Counted off device captures, a leaf drew 21 lines at
- * a capacity of 940 and 25 at 1,400 — 23 and 28 for one filled to the foot.
- * Re-count it when the capacity moves.
+ * lines in the same well. Counted off device captures of the same leaf: 21
+ * lines drawn at a capacity of 940, 23 at 1,250, 24 at 1,300, 25 at 1,400 — 23,
+ * 26, 27 and 28 for one filled to the foot. Re-count it when the capacity
+ * moves.
  */
-const val ENGLISH_LEAF_LINE_CHARS = ENGLISH_LEAF_CAPACITY_CHARS / 28
+const val ENGLISH_LEAF_LINE_CHARS = ENGLISH_LEAF_CAPACITY_CHARS / 26
 
 /**
  * How the leaf breaks: it doesn't, except where a book breaks.

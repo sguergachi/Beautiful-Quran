@@ -190,11 +190,12 @@ const val ENGLISH_LEAF_SPECIMEN =
  * mark. A leaf whose leading has closed is the symptom: photograph two leaves
  * and compare their line pitch.
  *
- * The sweep above was taken at a capacity of 940. Re-checked at 1,400 by that
- * same symptom — Ta-Ha, Ad-Dukhan, Baqarah and Al-Kahf leaves captured on
- * device — every line of every leaf came out at a pitch of 62 px, so no leaf
- * asked for more lines than its well had and 1.04 still covers the density
- * estimate at the longer line.
+ * The sweep above was taken at a capacity of 940. Re-checked by that same
+ * symptom at 1,400 (Ta-Ha, Ad-Dukhan, Baqarah and Al-Kahf captured on device,
+ * every line of every leaf at a pitch of 62 px) and again at the 1,250 the book
+ * is set to (Ta-Ha and Baqarah, every line at 67 px). No leaf asked for more
+ * lines than its well had, so 1.04 still covers the density estimate at the
+ * longer line.
  */
 const val ENGLISH_LEAF_REFERENCE_MARGIN = 1.04f
 
