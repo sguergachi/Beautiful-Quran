@@ -32,7 +32,8 @@ data class PageTurnFlip(
  * Stems are cut from CC0 "Book Flip Sounds" by Voltiment555 (opengameart.org),
  * flips 2/8/9. The original tone is kept; a downward expander dries the decay
  * tail so each stem reads close and dry (a closet, not a room) instead of
- * hissing, and stems are peak-normalized rather than loudness-pumped.
+ * hissing. Loudness lives in the samples (6 dB below the peak-normalized
+ * stems) — SoundPool's play() gain is not a reliable cut on device.
  */
 class PageTurnSounds(context: Context) {
 
@@ -193,7 +194,8 @@ class PageTurnSounds(context: Context) {
     }
 
     companion object {
-        private const val VOLUME = 0.09f
+        // Second, device-dependent cut. The samples already carry the 6 dB drop.
+        private const val VOLUME = 0.045f
         // A touch under natural pitch so the cover reads heavier than a page.
         private const val COVER_OPEN_RATE = 0.92f
         private const val START_EPS = 0.03f
