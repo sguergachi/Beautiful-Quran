@@ -109,7 +109,7 @@ package com.beautifulquran.domain
  * capture a leaf and count the words on its lines.
  * `tools/measure_english_leaves.py` prints the pagination side of the sweep.
  */
-const val ENGLISH_LEAF_CAPACITY_CHARS = 1250
+const val ENGLISH_LEAF_CAPACITY_CHARS = 1180
 
 /**
  * What a chapter's opening costs the leaf, in the characters the capacity
@@ -226,6 +226,28 @@ const val ENGLISH_LEAF_LINE_CHARS = ENGLISH_LEAF_CAPACITY_CHARS / 26
  * lands on whichever word straddles the break.
  */
 const val ENGLISH_LEAF_MIN_FRAGMENT_CHARS = 6
+
+/**
+ * The fewest lines a chapter's last leaf may carry: two.
+ *
+ * [ENGLISH_LEAF_MIN_FRAGMENT_CHARS] says the widow rule does not apply to this
+ * book, and mid-chapter that is exactly right — a carried verse is never alone,
+ * because the next verse follows it on the same line and there is no white
+ * beside it to look wrong. It missed one place. **A chapter's last leaf has
+ * white beside it**, all the way to the foot, because the next chapter opens a
+ * leaf of its own (rule 2). A chapter that runs six characters past a leaf
+ * boundary therefore sets those six characters alone on a page of their own,
+ * which is the worst page a book can print.
+ *
+ * Measured over the book at a capacity of 1,250, six chapters did it — 7, 40,
+ * 43, 56, 61 and 88 — and surah 40 was the six-character one.
+ *
+ * So the compositor's own remedy: run the leaf before it short, so the two of
+ * them carry two lines each rather than one carrying a stub. It costs those six
+ * chapters about two lines of white moved one leaf earlier, where it reads as
+ * the end of a chapter rather than as a mistake.
+ */
+const val ENGLISH_LEAF_WIDOW_LINES = 2
 
 /**
  * One verse, or the part of one, that a leaf sets.
@@ -349,9 +371,26 @@ fun buildEnglishBook(
     // Where a carried verse is picked up again, as a fraction of itself.
     val carriedCuts = HashMap<Long, MutableList<Float>>()
 
+    // What each chapter weighs, so the packer can see its own end coming. A
+    // widow is only visible at a chapter's last leaf (ENGLISH_LEAF_WIDOW_LINES)
+    // and the only way to avoid one is to know, while filling the leaf before
+    // it, how much of the chapter is left to place.
+    val chapterMass = HashMap<Int, Int>(120)
+    for (page in 1..MushafCatalog.MUSHAF_PAGE_COUNT) {
+        val keys = catalog.page(page)?.let(::englishLeafVerseKeys).orEmpty()
+        for ((surahId, ayah) in keys) {
+            val opening = if (ayah == 1) englishLeafOpeningChars(surahId) else 0
+            chapterMass[surahId] = (chapterMass[surahId] ?: 0) + opening + prose(surahId, ayah)
+        }
+    }
+    val widowChars = ENGLISH_LEAF_WIDOW_LINES * ENGLISH_LEAF_LINE_CHARS
+
     val run = ArrayList<EnglishVerseRun>(16)
     val runPages = ArrayList<Int>(16)
     var mass = 0
+    // How much of the current chapter has been set, in the same characters.
+    var chapterSet = 0
+    var chapterId = 0
 
     fun close() {
         if (run.isEmpty()) return
@@ -379,10 +418,15 @@ fun buildEnglishBook(
         for ((surahId, ayah) in keys) {
             if (run.isNotEmpty() && englishLeafOpensHere(surahId to ayah)) close()
             // The panel and its basmalah take paper before a word is set.
+            if (surahId != chapterId) {
+                chapterId = surahId
+                chapterSet = 0
+            }
             if (ayah == 1) {
                 // The leaf is always fresh here — a chapter opened it — so the
                 // panel never has to be tested against the room left.
                 mass += englishLeafOpeningChars(surahId)
+                chapterSet += englishLeafOpeningChars(surahId)
                 if (runPages.isEmpty()) runPages += page
             }
             val length = (prose(surahId, ayah) - ENGLISH_LEAF_MARK_CHARS).coerceAtLeast(0)
@@ -394,6 +438,7 @@ fun buildEnglishBook(
                     run += EnglishVerseRun(surahId, ayah, from, length)
                     runPages += page
                     mass += rest + ENGLISH_LEAF_MARK_CHARS
+                    chapterSet += rest + ENGLISH_LEAF_MARK_CHARS
                     break
                 }
                 // Fill the leaf. The break falls where the line falls.
@@ -406,6 +451,18 @@ fun buildEnglishBook(
                 // goes whole to the next leaf, the way a paragraph too big for
                 // the foot of a page does.
                 var cut = left
+                // Don't strand the end of a chapter on a leaf of its own. If
+                // filling this leaf to the brim would leave the chapter with
+                // less than two lines, take less — enough that what is left
+                // over fills two lines on the last leaf. This is the only
+                // place in the book where the break is moved rather than taken
+                // where it falls, and the only place a widow can be seen.
+                val chapterLeft = (chapterMass[surahId] ?: 0) - chapterSet
+                val after = chapterLeft - cut
+                if (after in 1 until widowChars) {
+                    val give = widowChars - after
+                    if (cut - give >= ENGLISH_LEAF_MIN_FRAGMENT_CHARS) cut -= give
+                }
                 val carry = cut >= ENGLISH_LEAF_MIN_FRAGMENT_CHARS
                 if (!carry && run.isNotEmpty()) {
                     // Not a word of room left: the verse opens the next leaf.
@@ -420,6 +477,7 @@ fun buildEnglishBook(
                 val to = if (from + cut >= length) length else from + cut
                 run += EnglishVerseRun(surahId, ayah, from, to)
                 runPages += page
+                chapterSet += to - from
                 from = to
                 if (from >= length) {
                     mass = ENGLISH_LEAF_CAPACITY_CHARS

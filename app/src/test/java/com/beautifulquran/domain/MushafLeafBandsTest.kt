@@ -63,15 +63,22 @@ class MushafLeafBandsTest {
         // gutter gave up (ENGLISH_HEAD_GUTTER) — so the sixteenth row is the
         // thing to assert, not the difference.
         assertTrue(MUSHAF_ARABIC_BANDS.well > MUSHAF_ENGLISH_BANDS.well)
-        assertTrue(MUSHAF_ARABIC_BANDS.headGutter < MUSHAF_ENGLISH_BANDS.headGutter)
+        // The English gutter used to be the wider of the two, on the reasoning
+        // that Latin ink wants more air than the QCF faces' own side bearings.
+        // It is now the tighter one: both leaves spend the gutter on their
+        // text, and they only differ in what it buys. The Arabic leaf buys a
+        // sixteenth row with it; the English hand is solved from the well, so
+        // the English leaf buys type. Neither can spend it twice.
+        assertTrue(MUSHAF_ENGLISH_BANDS.headGutter <= MUSHAF_ARABIC_BANDS.headGutter)
     }
 
     @Test
-    fun `the English gutter is one line of its own prose, not one Arabic unit`() {
-        // The canonical unit is the Arabic line's pitch and this gutter stands
-        // over English prose, whose line is smaller — so a full unit was 1.7
-        // lines of air and read as a hole under the head. Same rule, measured
-        // against the block it separates.
+    fun `the English gutter is spent on type, not on air under the head`() {
+        // A full unit was the Arabic line's pitch standing over English prose,
+        // whose line is smaller — 1.7 lines of air, which read as a hole. It
+        // is now down to the running head's own band: the head's ink fits
+        // inside that band, so what is left is clear air, and every unit not
+        // spent here is set in the block instead.
         assertEquals(ENGLISH_HEAD_GUTTER, MUSHAF_ENGLISH_BANDS.headGutter, 0f)
         assertTrue(MUSHAF_ENGLISH_BANDS.headGutter < MushafGrid.HEAD_GUTTER)
         // Whatever the gutter gave up, the well took: the leaf is the same leaf.

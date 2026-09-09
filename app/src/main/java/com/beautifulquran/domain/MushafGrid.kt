@@ -182,13 +182,23 @@ data class MushafLeafBands(
 /**
  * The English leaf's gutter, in units — one line of the *prose*, not one unit.
  *
- * The unit is the Arabic line's pitch, about 114 px on a phone, and the English
- * prose sets at about 66 px to the line. 66 / 114 is where this comes from, and
- * it is the canonical rule applied to the block the gutter stands over: a
- * line's pitch of air, no more. Re-measure it if the English hand moves far —
- * capture a leaf, divide the prose pitch by the unit.
+ * It was a full unit, which is the *Arabic* line's pitch (about 114 px on a
+ * phone) standing over prose whose line is 66 — 1.7 lines of air, and it read
+ * as a hole under the head. It went to 0.58, one line of the prose it actually
+ * stands over.
+ *
+ * It is now 0.30, which is under that rule, deliberately and on instruction:
+ * the height was wanted for type. The English hand is solved from the well, so
+ * every unit not spent here is set in the block instead. What is left is the
+ * running head's own band over again — and the head's ink fits inside its band
+ * with a couple of pixels to spare, so this is clear air below the letters
+ * rather than a figure that touches the block.
+ *
+ * It cannot go much below this: the head's descenders hang past the band into
+ * this gutter (see `MushafHeadLabel`), and a gutter of nothing would set the
+ * tail of a *y* on the first line of the revelation.
  */
-const val ENGLISH_HEAD_GUTTER = 0.58f
+const val ENGLISH_HEAD_GUTTER = 0.30f
 
 /** One line of prose for a gutter, and the rest of the leaf is well. */
 val MUSHAF_ENGLISH_BANDS = MushafLeafBands(

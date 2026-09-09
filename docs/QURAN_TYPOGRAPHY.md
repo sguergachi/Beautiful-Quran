@@ -346,7 +346,7 @@ ends — a bigger capacity is a smaller hand, and a smaller hand is more
 characters to the line. Because the block goes as `hand²`, **characters to the
 line go as the square root of the capacity**.
 
-1,250 characters sets at about 18 sp on a phone and **48 characters — 9 words —
+1,180 characters sets at about 19 sp on a phone and **46 characters — 9 words —
 to the line**. It was 940, which set at 20.7 sp and 45 characters, and 45 is
 below the bottom of the band a single column reads in at all. See §13.5: that
 figure is also what made the rag impossible.
@@ -914,7 +914,8 @@ and Ad-Dukhan leaves, hand and words counted off the pixels:
     capacity    hand     words/line   chars/line
         940    20.7 sp       8.4          45     below the readable band
       1,200    18.8 sp       8.7          47
-      1,250    18.2 sp       8.8          48     set here
+      1,180    19.0 sp       8.6          46     set here
+      1,250    18.2 sp       8.8          48
       1,300    17.4 sp       9.5          51
       1,400    16.9 sp       9.9          53     shipped; read as too small
       1,600    15.8 sp      10.5          57
@@ -924,10 +925,12 @@ and Ad-Dukhan leaves, hand and words counted off the pixels:
 it measured 4.9% against 940's 6.9%, because the break atom shrank with the
 word's share of the measure.
 
-The capacity is **1,250**. 1,400 was set first, on the line alone, and read as
-too small in the hand; 1,250 is where the two complaints meet — 18.2 sp is type
-a reader asked back for, and 48 characters is still inside the band that 45 was
-under. It gives up the last of the rag improvement to get there.
+The capacity is **1,180**, which is the far end of a walk: 1,400 was set on the
+line alone and read as too small in the hand, 1,250 gave some of it back, and
+1,180 gave the rest — 19 sp of type, paid for with the head gutter (§13.4) and
+with two characters of line. 46 is a character over the floor, and that is the
+whole margin left: this is as large as the hand goes before the line stops
+being readable at all, and the measure is fixed.
 
 **The measure is fixed, so the line and the type are the same paper twice.**
 Characters to the line go as `1/hand` exactly. There is no setting on a 938 px
@@ -1016,6 +1019,28 @@ the margin and moves the right edge. The price is 3 px of mean shortfall and
 eight more deep holes — and that is the right way round. A deep hole is legible
 as a hole; a phantom margin is not legible as anything, it just makes the page
 look pinned to the left.
+
+#### A chapter's last leaf carries two lines, or the break moves
+
+`ENGLISH_LEAF_MIN_FRAGMENT_CHARS` says the widow rule does not apply to this
+book, and mid-chapter it is exactly right: a carried verse is never alone,
+because the rest of it and then the next verse follow it on the same line.
+There is no white beside it to look wrong.
+
+It missed one place. **A chapter's last leaf has white beside it** — all the
+way to the foot, because the next chapter opens a leaf of its own (rule 2). So
+a chapter that runs a few characters past a leaf boundary sets those few
+characters alone on a page, which is the worst page a book can print. Measured
+over the book, six chapters did it, and one of them left **six characters** on a
+leaf of its own.
+
+The remedy is the compositor's: run the leaf before it short, so the two of them
+carry two lines each rather than one carrying a stub. The packer can see it
+coming because it knows what each chapter weighs — if filling a leaf to the brim
+would leave the chapter under two lines, it takes less. This is the only place
+in the book where the break is moved rather than taken where it falls, and it
+costs those six chapters about two lines of white, moved one leaf earlier where
+it reads as a chapter ending instead of a mistake.
 
 #### The verse mark never opens a line
 
