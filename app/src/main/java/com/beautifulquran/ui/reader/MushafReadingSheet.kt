@@ -623,8 +623,19 @@ private fun MushafHeadLabel(
         color = ink.copy(alpha = 0.44f),
         textAlign = align,
         maxLines = 1,
+        // Measured against the paper rather than against its band. The band is
+        // 0.30 of a unit and the head's line box is taller than that, so a Row
+        // of exactly the band's height handed the label a maxHeight it did not
+        // fit in and sheared the descenders off flat — *Maryam* came out as
+        // *Marvam*. The band still spends 0.30 of a unit of the grid, which is
+        // what the grid is for; the glyphs are simply allowed to hang past it
+        // into the head gutter, which is a whole unit of air with nothing in
+        // it. Anything that puts ink in that gutter has to revisit this.
         overflow = TextOverflow.Ellipsis,
-        modifier = modifier,
+        modifier = modifier.wrapContentHeight(
+            align = Alignment.Top,
+            unbounded = true,
+        ),
     )
 }
 
