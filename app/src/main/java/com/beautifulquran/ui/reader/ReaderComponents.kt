@@ -264,6 +264,9 @@ internal fun rememberAyahMarkAlpha(focused: Boolean): State<Float> =
  * and Compose often reports them at the origin — including them made the
  * ﴿N﴾ hit box miss the visible cups (English lyric) or swallow the line.
  */
+/** Disc around the painted `﴿N﴾` — finger-sized, not the rest of the line. */
+internal const val MarkTapMinRadiusDp = 22f
+
 internal fun visibleGlyphBounds(boxes: List<Rect>): Rect? =
     boxes.filter { it.width > 0.5f && it.height > 0.5f }
         .reduceOrNull { acc, rect -> acc.expandToInclude(rect) }
@@ -289,6 +292,38 @@ internal fun TextLayoutResult.rangeContains(
     if (tapHitsRange(getOffsetForPosition(tap), range, textLength)) return true
     val boxes = range.map { offset -> getBoundingBox(offset) }
     return visibleGlyphBounds(boxes)?.inflate(hitSlopPx)?.contains(tap) == true
+}
+
+/**
+ * Gather entry is a disc around the painted `﴿N﴾`, not the rest of the line.
+ * [getOffsetForPosition] maps empty width on the last line onto the mark, so
+ * it must not decide this hit.
+ */
+internal fun markRadiusHits(tap: Offset, bounds: Rect, minRadiusPx: Float): Boolean {
+    val radius = maxOf(bounds.maxDimension / 2f, minRadiusPx)
+    val dx = tap.x - bounds.center.x
+    val dy = tap.y - bounds.center.y
+    return dx * dx + dy * dy <= radius * radius
+}
+
+internal fun TextLayoutResult.markContains(
+    tap: Offset,
+    range: IntRange,
+    minRadiusPx: Float,
+): Boolean {
+    if (range.isEmpty()) return false
+    val text = layoutInput.text
+    val boxes = ArrayList<Rect>(range.count())
+    for (i in range) {
+        if (i !in text.indices) continue
+        val ch = text[i]
+        if (ch.isWhitespace()) continue
+        if (Character.getType(ch) == Character.FORMAT.toInt()) continue
+        val box = getBoundingBox(i)
+        if (box.width > 0.5f && box.height > 0.5f) boxes += box
+    }
+    val bounds = boxes.reduceOrNull { acc, rect -> acc.expandToInclude(rect) } ?: return false
+    return markRadiusHits(tap, bounds, minRadiusPx)
 }
 
 internal fun TextLayoutResult.wordIndexAt(
@@ -1950,6 +1985,7 @@ private fun ResponsiveEnglishAyah(
     )
     var layoutResult by remember { mutableStateOf<TextLayoutResult?>(null) }
     val hitSlopPx = with(LocalDensity.current) { 8.dp.toPx() }
+    val markRadiusPx = with(LocalDensity.current) { MarkTapMinRadiusDp.dp.toPx() }
     val lyricGlosses = remember(ayah, hideParentheticals) {
         EnglishTypography.lyricize(
             glosses = ayah.words.map { it.translation },
@@ -2068,6 +2104,7 @@ private fun ResponsiveEnglishAyah(
                 onWordLongClick = onWordLongClick,
                 onMarkClick = onMarkClick,
                 onMarkLongClick = onMarkLongClick,
+                markRadiusPx = markRadiusPx,
             ),
         onTextLayout = { layoutResult = it },
     )
@@ -2091,6 +2128,7 @@ internal fun Modifier.wordTapTarget(
     onMarkClick: (() -> Unit)? = null,
     onMarkLongClick: (() -> Unit)? = null,
     inertLongPressRange: IntRange = IntRange.EMPTY,
+    markRadiusPx: Float = hitSlopPx,
 ): Modifier {
     val onWordClickLatest = rememberUpdatedState(onWordClick)
     val onWordLongClickLatest = rememberUpdatedState(onWordLongClick)
@@ -2106,13 +2144,14 @@ internal fun Modifier.wordTapTarget(
         onWordLongClick != null,
         onMarkClick != null,
         onMarkLongClick != null,
+        markRadiusPx,
     ) {
         detectTapGestures(
             onTap = { tap ->
                 val markClick = onMarkClickLatest.value
                 if (
                     markClick != null &&
-                    layoutResult?.rangeContains(tap, inertLongPressRange, hitSlopPx) == true
+                    layoutResult?.markContains(tap, inertLongPressRange, markRadiusPx) == true
                 ) {
                     markClick()
                     return@detectTapGestures
@@ -2129,7 +2168,7 @@ internal fun Modifier.wordTapTarget(
                 null
             } else {
                 { pos ->
-                    if (layoutResult?.rangeContains(pos, inertLongPressRange, hitSlopPx) == true) {
+                    if (layoutResult?.markContains(pos, inertLongPressRange, markRadiusPx) == true) {
                         onMarkLongClickLatest.value?.invoke()
                     } else {
                         val wordLongClick = onWordLongClickLatest.value
@@ -2158,6 +2197,7 @@ private fun Modifier.ayahTapTarget(
     onWordLongClick: ((Word) -> Unit)?,
     onMarkClick: (() -> Unit)? = null,
     onMarkLongClick: (() -> Unit)? = null,
+    markRadiusPx: Float = hitSlopPx,
 ): Modifier = then(
     if (onWordClick == null && onMarkClick == null && onMarkLongClick == null) {
         Modifier.quietClickable(onClick = onAyahClick)
@@ -2173,6 +2213,7 @@ private fun Modifier.ayahTapTarget(
             onMarkClick = onMarkClick,
             onMarkLongClick = onMarkLongClick,
             inertLongPressRange = rendered.markRange,
+            markRadiusPx = markRadiusPx,
         )
     },
 )
@@ -2220,6 +2261,7 @@ private fun ResponsiveHafsAyah(
     )
     var layoutResult by remember { mutableStateOf<TextLayoutResult?>(null) }
     val hitSlopPx = with(LocalDensity.current) { 8.dp.toPx() }
+    val markRadiusPx = with(LocalDensity.current) { MarkTapMinRadiusDp.dp.toPx() }
 
     // Full-ink spans only — never bake upcoming/active into the annotated
     // string. Dim, bloom, and orange are draw-phase overlays, so word and
@@ -2298,6 +2340,7 @@ private fun ResponsiveHafsAyah(
                 onWordLongClick = onWordLongClick,
                 onMarkClick = onMarkClick,
                 onMarkLongClick = onMarkLongClick,
+                markRadiusPx = markRadiusPx,
             ),
         onTextLayout = { layoutResult = it },
     )
@@ -2376,8 +2419,8 @@ private fun ArabicAyahNumberUnit(
     }
     Box(
         modifier = Modifier
-            .padding(horizontal = 6.dp)
-            .requiredHeight(arabicLineHeight)
+            .padding(10.dp)
+            .requiredHeight(maxOf(arabicLineHeight, 44.dp))
             .then(
                 if (onClick != null || onLongClick != null) {
                     Modifier.quietClickable(

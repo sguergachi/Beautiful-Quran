@@ -28,8 +28,9 @@ Gathering is a **mode of the reader sheet**, not a new sheet. The page keeps
 its layout; it grows ordinals in the margin.
 
 - **Enter** via `ShareViewModel.enterShare(surah, ayah)` (verse-first: that
-  ayah is already `1`; pauses recitation — the mode owns the tap). Tap
-  `﴿N﴾` is the entry ([VERSE_ACTIONS.md](VERSE_ACTIONS.md)). The idle
+  ayah is already `1`; pauses recitation — the mode owns the tap). A
+  finger-sized disc around the painted `﴿N﴾` is the entry, not the empty
+  rest of the line ([VERSE_ACTIONS.md](VERSE_ACTIONS.md)). The idle
   player bar does **not** host a Gather control
   ([#519](https://github.com/sguergachi/Beautiful-Quran-/pull/519)).
 - **Pick** after that by tapping anywhere on a verse (word, body, mark,

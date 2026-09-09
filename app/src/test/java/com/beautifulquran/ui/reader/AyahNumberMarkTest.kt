@@ -1,5 +1,6 @@
 package com.beautifulquran.ui.reader
 
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -75,8 +76,17 @@ class AyahNumberMarkTest {
         val originJoiner = Rect(0f, 0f, 0f, 0f)
         val bounds = visibleGlyphBounds(listOf(originJoiner, cups, originJoiner))
         assertEquals(cups, bounds)
-        assertTrue(bounds!!.inflate(8f).contains(androidx.compose.ui.geometry.Offset(130f, 18f)))
-        assertFalse(bounds.inflate(8f).contains(androidx.compose.ui.geometry.Offset(2f, 2f)))
+        assertTrue(bounds!!.inflate(8f).contains(Offset(130f, 18f)))
+        assertFalse(bounds.inflate(8f).contains(Offset(2f, 2f)))
+    }
+
+    @Test
+    fun `gather entry is a disc around the painted cups, not the rest of the line`() {
+        val cups = Rect(120f, 8f, 148f, 28f)
+        assertTrue(markRadiusHits(Offset(134f, 18f), cups, minRadiusPx = 22f))
+        assertTrue(markRadiusHits(Offset(134f, 18f + 21f), cups, minRadiusPx = 22f))
+        assertFalse(markRadiusHits(Offset(40f, 18f), cups, minRadiusPx = 22f))
+        assertFalse(markRadiusHits(Offset(2f, 2f), cups, minRadiusPx = 22f))
     }
 
     @Test
