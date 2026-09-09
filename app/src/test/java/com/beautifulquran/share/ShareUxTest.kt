@@ -32,4 +32,10 @@ class ShareUxTest {
             ShareUx.onVerseTap(gathering = true, ref = b),
         )
     }
+
+    @Test
+    fun `leaving the reader sheet exits gather`() {
+        assertEquals(ShareUxAction.ExitShare, ShareUx.onLeaveReaderSheet(gathering = true))
+        assertEquals(ShareUxAction.None, ShareUx.onLeaveReaderSheet(gathering = false))
+    }
 }

@@ -40,11 +40,13 @@ its layout; it grows ordinals in the margin.
   that sequence. No ranges, no sorting, no "from / to" pickers. Cap:
   `SHARE_SELECTION_MAX` (20).
 - **Selection outlives the page.** `List<AyahRef>` is held in
-  `ShareViewModel` (activity scope), so turning to another chapter keeps the
-  list intact.
-- **Leave** with system back (drops the selection) or
-  `ShareViewModel.exitGather()`. **Commit** from the gather bar:
-  quote = text, image = PNG ([ShareRibbon](../app/src/main/java/com/beautifulquran/ui/share/ShareRibbon.kt)).
+  `ShareViewModel` (activity scope), so turning to another chapter — or a
+  mushaf leaf — keeps the list intact. Leaving the reader *sheet* (swipe
+  or back to Cover, Bookmarks, or Settings) drops it.
+- **Leave** with system back, the gather-bar close, or swiping the reader
+  sheet away — all call `ShareViewModel.exitGather()`. **Commit** from the
+  gather bar: quote = text, image = PNG
+  ([ShareRibbon](../app/src/main/java/com/beautifulquran/ui/share/ShareRibbon.kt)).
 
 While gathering, word taps do not seek, word long-press does not open the
 Root Viewer, and the bookmark ribbon (including its note hold) is inactive.
@@ -84,7 +86,8 @@ The only floating surface in the whole flow is Android's own `ACTION_SEND`
 chooser at the last hop. That is the OS, not our paper.
 
 **Back:** Send open → close Send (selection kept, still gathering). Gathering
-with Send closed → drop selection and leave gather mode.
+with Send closed → drop selection and leave gather mode. Swiping the reader
+sheet away does the same.
 
 ## The three outputs
 

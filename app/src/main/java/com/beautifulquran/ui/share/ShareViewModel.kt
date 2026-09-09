@@ -124,10 +124,16 @@ class ShareViewModel(
         exitGather()
     }
 
+    /** Cover / Bookmarks / Settings — not a mushaf page or chapter turn. */
+    fun onLeaveReaderSheet() {
+        apply(ShareUx.onLeaveReaderSheet(_ui.value.gathering))
+    }
+
     private fun apply(action: ShareUxAction) {
         when (action) {
             is ShareUxAction.EnterShare -> enterShare(action.ref.surahId, action.ref.ayah)
             is ShareUxAction.ToggleVerse -> toggle(action.ref.surahId, action.ref.ayah)
+            ShareUxAction.ExitShare -> exitGather()
             ShareUxAction.None -> Unit
         }
     }

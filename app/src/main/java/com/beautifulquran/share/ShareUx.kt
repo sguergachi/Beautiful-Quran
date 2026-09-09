@@ -9,6 +9,7 @@ package com.beautifulquran.share
 sealed class ShareUxAction {
     data class EnterShare(val ref: AyahRef) : ShareUxAction()
     data class ToggleVerse(val ref: AyahRef) : ShareUxAction()
+    data object ExitShare : ShareUxAction()
     data object None : ShareUxAction()
 }
 
@@ -20,4 +21,11 @@ object ShareUx {
 
     fun onVerseTap(gathering: Boolean, ref: AyahRef): ShareUxAction =
         if (gathering) ShareUxAction.ToggleVerse(ref) else ShareUxAction.None
+
+    /**
+     * Leaving the reader paper sheet (Cover, Bookmarks, Settings) drops
+     * gather. Mushaf page turns and chapter turns stay on that sheet.
+     */
+    fun onLeaveReaderSheet(gathering: Boolean): ShareUxAction =
+        if (gathering) ShareUxAction.ExitShare else ShareUxAction.None
 }

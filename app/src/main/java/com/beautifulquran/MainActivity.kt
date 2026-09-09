@@ -380,6 +380,10 @@ private fun PaperStackApp(
         tarjiLabVisible ||
         labRendered || rootRendered || chooserRendered || ornamentsLabRendered || tarjiLabRendered ||
         readerInkOverlayVisible || shareUi.sendOpen || shareSendRendered
+    val readerSheetOpen = selectedSurahId != 0 && settledLayer == AYAH_LAYER
+    LaunchedEffect(readerSheetOpen) {
+        if (!readerSheetOpen) shareViewModel.onLeaveReaderSheet()
+    }
     val mushafPageTurns = settings.readingLayout == ReadingLayout.MUSHAF &&
         selectedSurahId != 0 &&
         settledLayer == AYAH_LAYER
