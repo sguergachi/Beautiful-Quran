@@ -846,11 +846,23 @@ private fun englishBookHandPx(
  * twice) or more words to a line — a smaller hand, or a wider measure. It is
  * not a line-breaking problem.
  *
- * **Balanced, not merely high-quality.** A leaf is a page, and a page fills
- * its lines: the breaker equalizes their lengths rather than merely avoiding
- * the worst breaks. Measured on glass it breaks identically to `Paragraph` on
- * the sampled leaves — the holes above are forced at this measure either way
- * — and it states the intent the page is set to.
+ * **And evening the rag was the wrong thing to want.** The leaf was set
+ * `Balanced` on exactly that reasoning and the reader read the result back
+ * correctly: *the right rag is a straight edge and the text is left heavy*.
+ * It is what an evened rag does. Over eight leaves and 116 lines, `Balanced`
+ * (and `HighQuality`, which breaks identically) put 39% of lines within 20 px
+ * of the mean shortfall and let only 10% reach the margin — so the line ends
+ * pile into one band about a word's width inside the measure, the eye reads
+ * that band as a second margin, and the block hangs to the left of it. A rag
+ * has to be *active* to read as a rag at all.
+ *
+ * **So the leaf breaks greedily.** `LineBreak.Strategy.Simple` fills each
+ * line as far as the next word allows and takes what is left: 20% of lines
+ * reach the margin, the mean cluster falls to 29%, and the right edge moves.
+ * It costs 3 px of mean shortfall (70 → 73 of 942) and eight more deep holes
+ * (11 → 19 past an eighth of the measure). That is the real trade, and it is
+ * the right way round — the deep holes are legible as holes, the phantom
+ * margin was not legible as anything, it just made the page look pinned.
  *
  * **Hyphenated, at the book's minima.** A long word the rag cannot absorb —
  * *righteousness*, *[fulfillment]*, *obedience* — pushes the words around it
@@ -880,10 +892,16 @@ private fun englishProseStyle(fontSize: TextUnit, lineHeight: TextUnit) = TextSt
     fontSize = fontSize,
     lineHeight = lineHeight,
     textAlign = TextAlign.Start,
-    // Balanced: a leaf is a page and fills its lines. Measured on glass it
-    // breaks identically to Paragraph on the sampled leaves, and within 3 px
-    // of the best arrangement that exists; it stays for stating the intent.
-    lineBreak = LineBreak.Paragraph.copy(strategy = LineBreak.Strategy.Balanced),
+    // Greedy, deliberately. Balanced and HighQuality both even the lines out,
+    // and an evened rag is the one thing a rag must not be: 39% of lines
+    // landed within 20 px of the mean and only 10% reached the margin, which
+    // draws a soft second margin a word's width inside the true one and leaves
+    // the block looking pinned to the left. Greedy fills each line as far as
+    // it goes: 20% of lines now reach the margin and the mean cluster falls to
+    // 29%, for 3 px more mean shortfall and eight more deep holes. The holes
+    // are the price of an active rag; the phantom edge was not worth avoiding
+    // them. See docs/QURAN_TYPOGRAPHY.md §13.5.
+    lineBreak = LineBreak.Paragraph.copy(strategy = LineBreak.Strategy.Simple),
     hyphens = Hyphens.Auto,
     // The book face's refinements: kerning and ligatures on, old-style figures
     // so the prose (and its brackets and quotes) sets with an even colour —

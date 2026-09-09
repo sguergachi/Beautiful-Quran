@@ -124,7 +124,11 @@ class EnglishBookCache(context: Context) {
          * 18: the verse mark is bound to the word it closes with a narrow
          * no-break space, so it can no longer open a line. Every leaf that
          * carried a stranded mark breaks somewhere new.
+         *
+         * 19: the prose breaks greedily (`LineBreak.Strategy.Simple`). The
+         * evening strategies drew a phantom second margin; every leaf's lines
+         * end somewhere new.
          */
-        const val FORMAT = 18
+        const val FORMAT = 19
     }
 }

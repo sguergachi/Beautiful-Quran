@@ -861,8 +861,8 @@ set a little small is the only one of the three a reader can still read.
 
 ### 13.5 Ragged right, hyphenated at the book's minima
 
-`TextAlign.Start` with `LineBreak.Paragraph` balanced to equal lengths, the
-book face's kerning, ligatures and old-style figures — and hyphenation.
+`TextAlign.Start` with `LineBreak.Paragraph` broken greedily, the book face's
+kerning, ligatures and old-style figures — and hyphenation.
 
 The mushaf's own rule is that every full line reaches both margins (rule 3) —
 but that is a rule about Arabic, which fills a line by the letterform, and it
@@ -918,6 +918,40 @@ a request for one of two other things:
 
 It is not a line-breaking problem, and no breaker will fix it.
 
+#### And an even rag was the wrong thing to want
+
+The leaf was set `LineBreak.Strategy.Balanced` on exactly the reasoning above —
+a leaf is a page, and a page fills its lines. Shipped, the reader read it back:
+*it feels like the right rag is a straight edge and now the text is left heavy.*
+
+That is what an evened rag does, and it is measurable. Over eight leaves and
+116 lines:
+
+```
+                          mean rag    reach the      within 20 px    deep holes
+                          (of 942)      margin        of the mean    (>1/8)
+    Balanced (shipped)     70 (6.9%)   12 (10%)         45 (39%)         11
+    HighQuality            70 (6.9%)   12 (10%)         45 (39%)         11
+    Simple (greedy)        73 (7.2%)   23 (20%)         34 (29%)         19
+```
+
+Two lines in five ended within 20 px of each other and only one in ten reached
+the true margin, so the line ends piled into a single band about a word's width
+inside the measure. **An even rag is a second margin.** The eye takes the band
+for the edge of the block, the true margin beyond it reads as extra paper on
+the right, and the whole page hangs left — which is exactly the complaint, and
+exactly the opposite of what the setting was chosen to fix.
+
+`HighQuality` is not a middle position: on these leaves it breaks identically
+to `Balanced`, line for line.
+
+**So the leaf breaks greedily.** `Simple` fills each line as far as the next
+word allows and takes whatever is left over, which doubles the lines that reach
+the margin and moves the right edge. The price is 3 px of mean shortfall and
+eight more deep holes — and that is the right way round. A deep hole is legible
+as a hole; a phantom margin is not legible as anything, it just makes the page
+look pinned to the left.
+
 #### The verse mark never opens a line
 
 The mark closes the verse before it. A closing number that opens a line reads as
@@ -951,10 +985,7 @@ none to tighten. Measured on the page, the gap either side of a mark is 12–13 
 against an ordinary word gap of 12 — the Hafs cups carry no slack, and shrinking
 the mark was never the lever.
 
-Balanced states the intent — a leaf is a page, and a page fills its lines —
-and measures identically to `Paragraph` on the sampled leaves, and within 3 px
-of the best arrangement that exists. What evens the holes it leaves is
-hyphenation: a long word the rag cannot absorb — *righteousness*,
+What fills the deep holes greedy breaking leaves is hyphenation: a long word the rag cannot absorb — *righteousness*,
 *[fulfillment]*, *obedience* — pushes its neighbours into a deep hole at the
 line's end (*…and does* / *righteousness…*, a seventh of the measure empty on
 the Ta-Ha leaf that prompted this).
