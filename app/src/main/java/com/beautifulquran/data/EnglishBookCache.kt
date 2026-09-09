@@ -112,7 +112,34 @@ class EnglishBookCache(context: Context) {
     }
 
     private companion object {
-        /** Bump when the meaning of a written leaf changes. */
-        const val FORMAT = 15
+        /**
+         * Bump when the meaning of a written leaf changes.
+         *
+         * 16: the prose hyphenates (`Hyphens.Auto`, `LineBreak.Balanced`,
+         * the book face's kern/liga/onum) with unbookish breaks vetoed by a
+         * word joiner (`EnglishHyphenation`) — every leaf breaks somewhere new.
+         *
+         * 17: justification. Shipped, then taken back out; the leaf is ragged.
+         *
+         * 18: the verse mark is bound to the word it closes with a narrow
+         * no-break space, so it can no longer open a line. Every leaf that
+         * carried a stranded mark breaks somewhere new.
+         *
+         * 19: the prose breaks greedily (`LineBreak.Strategy.Simple`). The
+         * evening strategies drew a phantom second margin; every leaf's lines
+         * end somewhere new.
+         *
+         * 20: the leaf carries 1,400 characters instead of 940, so the hand is
+         * cut smaller and the line holds 53 characters instead of 45. Every
+         * leaf in the book is a different length of text.
+         *
+         * 21: 1,250, giving back some of the hand 20 spent — 18.2 sp and 48
+         * characters to the line. Every leaf moves again.
+         *
+         * 22: the head gutter is one line of prose rather than one Arabic
+         * unit, so the well is taller and the hand solved from it a hair
+         * bigger. The leaf holds a little more.
+         */
+        const val FORMAT = 23
     }
 }

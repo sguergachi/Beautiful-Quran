@@ -340,15 +340,21 @@ chapter's first verse falls on (`EnglishBook.leafOfVerse`), so every stop on it
 still lands where it says. That is `mushafLeafNumber`, and it is the one place
 the English book stops sharing the Arabic one's numbering.
 
-The capacity is chosen for the **line**, not for the page: 900 characters of
-prose sets at about 22 sp on a phone and 46 characters to the line, which is a
-book measure and the size the scrolling reader has always set its English at.
-Half again the type of the page-bound leaf.
+The capacity is chosen for the **line**, not for the page. The hand is cut so a
+leaf of the capacity fills the well, so the two are one number seen from both
+ends — a bigger capacity is a smaller hand, and a smaller hand is more
+characters to the line. Because the block goes as `hand²`, **characters to the
+line go as the square root of the capacity**.
 
-The cost is leaves, and with the pagination continuous the capacity buys nothing
-but type: the choice is purely how long a line the hand wants. Below about 850
-it is shorter than the measure wants and above about 1,000 it is longer.
-`tools/measure_english_leaves.py` prints the sweep.
+1,180 characters sets at about 19 sp on a phone and **46 characters — 9 words —
+to the line**. It was 940, which set at 20.7 sp and 45 characters, and 45 is
+below the bottom of the band a single column reads in at all. See §13.5: that
+figure is also what made the rag impossible.
+
+The cost is leaves — about 840 against 1,120 — and with the pagination
+continuous the capacity buys nothing but type: the choice is purely how long a
+line the hand wants. `tools/measure_english_leaves.py` prints the pagination
+side of the sweep.
 
 **A long verse is carried over, as a book carries a paragraph.**
 
@@ -859,32 +865,289 @@ percent of type on that leaf alone. That breaks §13.3 knowingly — on 2:282 th
 alternatives are overlapping lines or revelation clipped off the foot, and a page
 set a little small is the only one of the three a reader can still read.
 
-### 13.5 Ragged right, and deliberately not hyphenated
+### 13.5 Ragged right, hyphenated at the book's minima
 
-`TextAlign.Start` with `LineBreak.Paragraph`.
+`TextAlign.Start` with `LineBreak.Paragraph` broken greedily, the book face's
+kerning, ligatures and old-style figures — and hyphenation.
 
 The mushaf's own rule is that every full line reaches both margins (rule 3) —
-but that is a rule about Arabic, which fills a line by the letterform, and it is
-the calligrapher's art. Latin has only the word space to fill with, and on a
-measure of about fifty characters that is not enough of a lever: the spaces open
-unevenly, the same line's colour changes from one page to the next, and the
-reader pays for a straight right edge with rivers of white running down the
-page. An even rag is the more readable page, and on a phone it is not close.
+but that is a rule about Arabic, which fills a line by the letterform, and it
+is the calligrapher's art. Latin has only the word space to fill with, and on
+a measure of about fifty characters that is not enough of a lever: the spaces
+open unevenly, the same line's colour changes from one page to the next, and
+the reader pays for a straight right edge with rivers of white running down
+the page.
 
-`LineBreak.Paragraph` stays, and earns more here than it did under
-justification: it breaks the whole block at once rather than greedily line by
-line, which is what makes the rag *even* — the difference between a right edge
-that undulates and one that lurches.
+**Justification was tried here and taken back out.** It does what it promises:
+every line on the Ta-Ha leaf ended within 3 px of the last, glyph side bearings
+and nothing more. It is paid for by the word space — the loosest line on the
+Ad-Dukhan leaf (*We were to warn [mankind] ⟨3⟩ On that*) ran three times the
+natural space to reach the margin, because *night* has nowhere to break. Two
+ink-mask bugs found while it was in are kept; see below.
 
-Hyphens are off, and this is load-bearing rather than an omission. Hyphenation
-is the one thing that breaks a *word* across two lines, and
-`ShapedWordBloom.ColorReveal` takes the union bounds of a range's glyph path —
-a tinted wash over a broken word would sweep the width of the whole line.
-(`InkReveal` was taught to advance one wash across a range's line fragments in
-order, because the verse wash below needs exactly that; the tinted layers were
-not.) Anyone turning hyphens on must fix ColorReveal the same way first. Ragged
-setting needs them far less anyway — the rag absorbs the long word that
-justification would have had to stretch a line around.
+#### The rag was a measure problem, and the measure was too short
+
+Everything below this heading was measured at a capacity of 940 — a leaf that
+set at **20.7 sp and 45 characters, 8.4 words, to the line**. Read it as a
+record of what a line that short does, because the setting that finally fixed
+the rag is not in it: the line got longer.
+
+45 characters is below the bottom of the band a single column of prose is
+readable in at all — Bringhurst's 45–75, best near 66, the classical two and a
+half alphabets. It was reported the way a reader reports it, as *the text feels
+hard to read*, with the diagnosis attached: *look at the number of words per
+line.*
+
+And it is the same fault as the rag, seen from the other side. **A ragged edge
+moves in whole words**, because a whole word is the smallest thing a break can
+add or remove. At 8.4 words to the line a word is 12% of the measure, so the
+right edge could only ever land on one of eight or nine positions and no line
+breaker could do better — which is exactly what the floor measured below says,
+and why it says the fault "is not a line-breaking problem". It was not. It was
+a measure problem, and the whole of the rag work below is a record of pushing
+on the wrong lever.
+
+Lengthening the line shrinks the atom. Swept on device over the Ta-Ha, Baqarah
+and Ad-Dukhan leaves, hand and words counted off the pixels:
+
+```
+    capacity    hand     words/line   chars/line
+        940    20.7 sp       8.4          45     below the readable band
+      1,200    18.8 sp       8.7          47
+      1,180    19.0 sp       8.6          46     set here
+      1,250    18.2 sp       8.8          48
+      1,300    17.4 sp       9.5          51
+      1,400    16.9 sp       9.9          53     shipped; read as too small
+      1,600    15.8 sp      10.5          57
+```
+
+**The rag falls with the line, with no line-breaking change at all** — at 1,400
+it measured 4.9% against 940's 6.9%, because the break atom shrank with the
+word's share of the measure.
+
+The capacity is **1,180**, which is the far end of a walk: 1,400 was set on the
+line alone and read as too small in the hand, 1,250 gave some of it back, and
+1,180 gave the rest — 19 sp of type, paid for with the head gutter (§13.4) and
+with two characters of line. 46 is a character over the floor, and that is the
+whole margin left: this is as large as the hand goes before the line stops
+being readable at all, and the measure is fixed.
+
+**The measure is fixed, so the line and the type are the same paper twice.**
+Characters to the line go as `1/hand` exactly. There is no setting on a 938 px
+measure that gives both a 19 sp hand and a fifty-character line, and the margin
+is not a way out: the hand and the line both go as the *square root* of the
+measure, so a fore-edge worth taking buys about a percent of each — and the
+English leaf's fore-edge is there because a book with no outer margin reads as
+a printout. The notches are also close together, because capacity is a square
+root: 1,250 → 1,400 is 12% of capacity for 6% of hand. Type that wants to move
+perceptibly has to move by more than one notch.
+
+Leading was tested with it and left at 1.40 em. At 1.46 the words to the line
+did not move, the rag did not improve, and the 1.50 ceiling that cards a short
+leaf out to its foot (§13.4) would have had only a quarter of its headroom
+left.
+
+#### How even a rag can be here, measured
+
+The rag reads left-heavy, and it is. On the Ta-Ha leaf the right edge falls
+short of the measure by **57 px on average and 90 px at worst, out of 942** —
+so the optical right margin is about half again the left, and the block sits
+left of the paper it is on.
+
+That is not the breaker's fault, and the floor was measured rather than
+assumed. A minimum-raggedness optimizer was run on the device over the same
+words, into the same number of lines, with the leaf's own vetted hyphenation
+points offered as extra break candidates:
+
+```
+                              mean   worst   spread
+    the breaker (shipped)       57      90       78
+    best arrangement that       50      78       75
+    exists, aimed at any
+    target from 10–190 px
+```
+
+**The lurch is the width of a word.** From a given line start the next
+candidate break is a whole word further on, so achievable line lengths are
+quantized in roughly 70 px steps, and no arrangement of a 942 px measure into
+18 lines lands them all in a narrow band. Aiming the optimizer at a *uniform*
+rag depth rather than a minimal one does not help: the spread never falls
+below 75 px at any target.
+
+Hyphenation is the only thing that subdivides the quantum, and at the book's
+minima this translation offers too few cuts for it to matter — adding every
+vetted cut as a candidate changed the floor by nothing. So an even rag here is
+a request for one of two other things:
+
+- **Looser minima** — two-letter fragments, which is *de-scends*, refused
+  twice on quality and refused again here.
+- **More words to a line** — a smaller hand, or a wider measure. Both are
+  changes to §13.2/§13.3, not to line breaking.
+
+It is not a line-breaking problem, and no breaker will fix it.
+
+#### And an even rag was the wrong thing to want
+
+The leaf was set `LineBreak.Strategy.Balanced` on exactly the reasoning above —
+a leaf is a page, and a page fills its lines. Shipped, the reader read it back:
+*it feels like the right rag is a straight edge and now the text is left heavy.*
+
+That is what an evened rag does, and it is measurable. Over eight leaves and
+116 lines:
+
+```
+                          mean rag    reach the      within 20 px    deep holes
+                          (of 942)      margin        of the mean    (>1/8)
+    Balanced (shipped)     70 (6.9%)   12 (10%)         45 (39%)         11
+    HighQuality            70 (6.9%)   12 (10%)         45 (39%)         11
+    Simple (greedy)        73 (7.2%)   23 (20%)         34 (29%)         19
+```
+
+Two lines in five ended within 20 px of each other and only one in ten reached
+the true margin, so the line ends piled into a single band about a word's width
+inside the measure. **An even rag is a second margin.** The eye takes the band
+for the edge of the block, the true margin beyond it reads as extra paper on
+the right, and the whole page hangs left — which is exactly the complaint, and
+exactly the opposite of what the setting was chosen to fix.
+
+`HighQuality` is not a middle position: on these leaves it breaks identically
+to `Balanced`, line for line.
+
+**So the leaf breaks greedily.** `Simple` fills each line as far as the next
+word allows and takes whatever is left over, which doubles the lines that reach
+the margin and moves the right edge. The price is 3 px of mean shortfall and
+eight more deep holes — and that is the right way round. A deep hole is legible
+as a hole; a phantom margin is not legible as anything, it just makes the page
+look pinned to the left.
+
+#### A chapter's last leaf carries two lines, or the break moves
+
+`ENGLISH_LEAF_MIN_FRAGMENT_CHARS` says the widow rule does not apply to this
+book, and mid-chapter it is exactly right: a carried verse is never alone,
+because the rest of it and then the next verse follow it on the same line.
+There is no white beside it to look wrong.
+
+It missed one place. **A chapter's last leaf has white beside it** — all the
+way to the foot, because the next chapter opens a leaf of its own (rule 2). So
+a chapter that runs a few characters past a leaf boundary sets those few
+characters alone on a page, which is the worst page a book can print. Measured
+over the book, six chapters did it, and one of them left **six characters** on a
+leaf of its own.
+
+The remedy is the compositor's: run the leaf before it short, so the two of them
+carry two lines each rather than one carrying a stub. The packer can see it
+coming because it knows what each chapter weighs — if filling a leaf to the brim
+would leave the chapter under two lines, it takes less. This is the only place
+in the book where the break is moved rather than taken where it falls, and it
+costs those six chapters about two lines of white, moved one leaf earlier where
+it reads as a chapter ending instead of a mistake.
+
+#### The verse mark never opens a line
+
+The mark closes the verse before it. A closing number that opens a line reads as
+if it introduced the verse below — *the Knowing* ending a line and `⟨6⟩ Lord of
+the heavens` beginning the next, on the Ad-Dukhan leaf. That is not an
+aesthetic complaint: it misattributes the number.
+
+The optimal breaker was spending them to score the page. Measured over eight
+leaves (124 lines), the mark set with an ordinary word space opened a line six
+times, and three of those sat under holes of 80–101 px the mark would have
+fitted in. Bound with a narrow no-break space (U+202F) it never does:
+
+```
+                              mean   worst   lines over    marks opening
+                               rag     rag   1/8 measure         a line
+    word space (free)           61     162      7 of 124              6
+    no-break word space         72     188     13 of 126              1
+    no-break thin space         70     159     11 of 124              0
+```
+
+Binding makes the word and its mark one atom, and the rag pays for every pixel
+of it, so the space is thin as well as unbreakable — which is what a reference
+mark takes in any case. The thin space costs 9 px of mean rag against the free
+mark and leaves the worst hole where it was; the full word space costs 11 and
+pushes the worst hole to 188. Both are within the rag's own noise, and neither
+fixes the left-weighting above — this is a different fault that the same
+measurement turned up.
+
+Note what this is *not*: an attempt to tighten the air around the mark. There is
+none to tighten. Measured on the page, the gap either side of a mark is 12–13 px
+against an ordinary word gap of 12 — the Hafs cups carry no slack, and shrinking
+the mark was never the lever.
+
+What fills the deep holes greedy breaking leaves is hyphenation: a long word the rag cannot absorb — *righteousness*,
+*[fulfillment]*, *obedience* — pushes its neighbours into a deep hole at the
+line's end (*…and does* / *righteousness…*, a seventh of the measure empty on
+the Ta-Ha leaf that prompted this).
+
+But the breaker's own hyphenation cannot be told that *de-scends* is not a
+break, and Compose exposes no frequency or fragment control — while self-set
+soft hyphens are ignored with hyphenation off and subsumed with it on. So the
+leaf vetoes instead of proposing (`EnglishHyphenation`): the TeX US-English
+patterns (`HyphenTable`, extracted by `tools/build_hyphen_table.py`) propose
+every cut, each cut with fewer than three letters on either side is joined
+with a word joiner, and the breaker takes the rest under `Hyphens.Auto`.
+*right-eous-ness* and *pro-tection* carry over; *de-scends*, *Re-pelled* and
+*obe-di-ence*'s middle *di* stay whole.
+
+Measured on device, right-edge shortfall in px of a ~935 px measure — Ta-Ha
+20:81, Baqarah's opening, As-Saffat (juz' 30 is chapter endings, short by
+rule, and excluded):
+
+```
+                        max    mean
+    Ta-Ha               134 → 126    53 → 43     …and does right- / eousness…
+    Baqarah             122 → 122    51 → 51     untouched: short-word pileups
+    As-Saffat           153 → 153    68 → 64     …you won- / der… its one hyphen
+```
+
+Good breaks only, and no short end the setting did not already have — while
+unvetoed hyphenation, measured alongside, breaks *Re-pelled* and *de-scends*
+after two letters on the same leaves. The table implementation is checked against its own source: the trie reproduces
+pyphen's raw cuts exactly over 400 corpus words, and the vetoes are locked
+word by word in `EnglishHyphenationTest`.
+
+Two things were tried and reverted, and the leaf records them so nobody
+re-tries them blind:
+
+- **No-break keeps for short words.** Gluing a word of two letters or fewer
+  to its neighbour removes a break the paragraph optimizer was using, and the
+  hole left behind (*…and We made* / *an appointment…*, a quarter of the
+  measure empty) reads worse than the short end removed — with hyphenation
+  behind it no less, because even the hyphenated head (*an appoint-*) will
+  not fit after an already-full line.
+- **The breaker's own hyphenation unvetoed.** It fills the same holes and was
+  measured alongside (worst hole 153 → 104 px on As-Saffat), but it breaks
+  *Re-pelled* and *de-scends* after two letters and strands more short ends
+  doing it. The veto keeps the filling and refuses the fragments.
+
+Hyphenation used to be off here, called load-bearing: a hyphenated word sets
+its fragments on two lines, and `ShapedWordBloom.ColorReveal` took the union
+bounds of the range's glyph path — so a tinted wash over a broken word swept
+the width of the whole line. `InkReveal` was taught to advance one wash
+across a range's line fragments in order, because the verse wash below needs
+exactly that; the tinted layers were not. ColorReveal paints the same
+reading-order wash now, so anyone hyphenating further (the web leaf still
+sets `hyphens: none` — a hyphenated word would split a per-word wash node the
+old way) must bring the same per-fragment wash there first.
+
+**And the paper masks needed the lesson twice more.** A hyphenated line breaks
+inside a word, so its last offset is also the first offset of the line below,
+and a selection path taken up to it spills onto that line — where it starts at
+the margin. `getBounds()` unions the two and hands back a box the width of the
+measure, so the paper cover for the verse *after* a hyphenated break lay over
+the verse before it as well and that fragment, dimmed twice, all but vanished.
+That was latent from the day hyphenation landed and it is a ragged-page bug,
+not a justified one — justification only hyphenated more lines, so it surfaced
+at once. `lineSelectionBounds` keeps only what is inside the line's own band.
+
+Then the hyphen itself, which is drawn without being written: no verse's range
+reaches it, so the cover that ends a hyphenated line stopped one glyph short and
+left the hyphen at full ink over dimmed prose. Its advance is measured in the
+leaf's own hand and added to that cover — the hyphen belongs to the word it
+broke, and to the ink over it. The same figure is subtracted from the stretch in
+`justifyShift`, which is dormant while the page is ragged and correct if it is
+ever justified again.
 
 ### 13.6 The ink is on the word you are hearing
 
@@ -1084,7 +1347,9 @@ type size, since the well's share of the leaf rises from 16 / 17.05 to 16 /
 extra line: the well's share rises from 15 / 17.05 to 15 / 16.30, 4.6 % more
 paper, and 4.6 % of twenty-two lines is one — so `ENGLISH_LEAF_CAPACITY_CHARS`
 goes from 900 to 940 and `ENGLISH_LEAF_LINE_CHARS` divides it by 23 rather than
-22. It is the only change here that a reader will count.
+22. It is the only change here that a reader will count. (Both figures have
+moved since, to 1,250 and 26, for the reason in §13.5; the arithmetic above is
+the one that set them at the time.)
 
 The two settings no longer sum to the same figure, which is why each divides by
 its own `slots` rather than by one shared `SLOTS`. The shared total was always a
