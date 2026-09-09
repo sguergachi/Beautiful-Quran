@@ -68,8 +68,8 @@ internal const val BookmarkNubLengthDp = 14f   // just the swallowtail tip peeki
 internal const val GatherOrdinalSp = 16f
 /** From the ayah box edge to the ordinal slot, inside the fillBox stain. */
 internal const val GatherOrdinalEdgeInsetDp = 14f
-/** Same as the edge inset so the circle sits in the gold's top corner. */
-internal const val GatherOrdinalTopInsetDp = 14f
+/** Tight to the gold's top rim; shorter than the edge inset so it sits in the corner. */
+internal const val GatherOrdinalTopInsetDp = 6f
 /** Width of the ordinal slot: bookmark-side pad (38) minus edge inset. */
 internal const val GatherOrdinalSlotWidthDp = 24f
 private const val TOP_FOLD_DP = 3.5f    // soft fold over the page edge, matching web

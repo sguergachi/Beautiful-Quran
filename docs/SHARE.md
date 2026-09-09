@@ -52,8 +52,8 @@ The mode owns the tap — interactions are *replaced*, not stacked.
 
 **Mode chrome (visual QA):** gather ordinals live in the gold soak's
 top corner, still in the 38 dp bookmark gutter. 16 sp Bold Garamond
-Western digits, tight ink-brush circle, 14 dp in from the soak rim on
-both the edge and the top so the loop stays on the gold. Not gold, not
+Western digits, tight ink-brush circle, 14 dp in from the soak's side
+and 6 dp from its top so the loop sits in the gold corner. Not gold, not
 Arabic-Indic. The verse layout does not change.
 Gold soak and gather-bar takeover are shipped — see
 [VERSE_ACTIONS.md](VERSE_ACTIONS.md).
