@@ -1,10 +1,13 @@
 package com.beautifulquran.ui.reader
 
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import com.beautifulquran.ui.theme.TranslationFontFamily
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class AyahNumberMarkTest {
@@ -15,6 +18,16 @@ class AyahNumberMarkTest {
         assertEquals(
             "﴿${wordJoiner}١${wordJoiner}٢${wordJoiner}﴾",
             formatAyahNumberMark(12, useArabicIndicDigits = true),
+        )
+    }
+
+    @Test
+    fun `Arabic-Indic mark in LTR English still isolates and swaps cups`() {
+        val lri = "\u2066"
+        val pdi = "\u2069"
+        assertEquals(
+            "$lri${wordJoiner}﴾${wordJoiner}١${wordJoiner}٢${wordJoiner}﴿${wordJoiner}$pdi",
+            formatAyahNumberMark(12, useArabicIndicDigits = true, ltr = true),
         )
     }
 
@@ -55,6 +68,37 @@ class AyahNumberMarkTest {
         val mark = formatAyahNumberMark(3, useArabicIndicDigits = false)
         assertFalse(mark.contains("﴾3"))
         assertFalse(mark.contains("3﴿"))
+    }
+
+    @Test
+    fun `mark hit ignores zero-width joiners reported at the origin`() {
+        val cups = Rect(120f, 8f, 148f, 28f)
+        val originJoiner = Rect(0f, 0f, 0f, 0f)
+        val bounds = visibleGlyphBounds(listOf(originJoiner, cups, originJoiner))
+        assertEquals(cups, bounds)
+        assertTrue(bounds!!.inflate(8f).contains(Offset(130f, 18f)))
+        assertFalse(bounds.inflate(8f).contains(Offset(2f, 2f)))
+    }
+
+    @Test
+    fun `gather entry is a disc around the painted cups, not the rest of the line`() {
+        val cups = Rect(120f, 8f, 148f, 28f)
+        val r = MarkTapMinRadiusDp
+        assertTrue(markRadiusHits(Offset(134f, 18f), cups, minRadiusPx = r))
+        assertTrue(markRadiusHits(Offset(134f, 18f + (r - 1f)), cups, minRadiusPx = r))
+        assertFalse(markRadiusHits(Offset(134f, 18f + (r + 1f)), cups, minRadiusPx = r))
+        assertFalse(markRadiusHits(Offset(40f, 18f), cups, minRadiusPx = r))
+        assertFalse(markRadiusHits(Offset(2f, 2f), cups, minRadiusPx = r))
+    }
+
+    @Test
+    fun `tap on the glue space or past the last glyph still hits the mark`() {
+        val mark = 10..16
+        assertTrue(tapHitsRange(offset = 10, range = mark, textLength = 17))
+        assertTrue(tapHitsRange(offset = 16, range = mark, textLength = 17))
+        assertTrue(tapHitsRange(offset = 17, range = mark, textLength = 17))
+        assertFalse(tapHitsRange(offset = 9, range = mark, textLength = 17))
+        assertFalse(tapHitsRange(offset = 0, range = 0..-1, textLength = 17))
     }
 
     @Test

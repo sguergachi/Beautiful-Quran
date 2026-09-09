@@ -39,6 +39,7 @@ import androidx.compose.ui.unit.sp
 import com.beautifulquran.share.AyahRef
 import com.beautifulquran.ui.theme.HafsFontFamily
 import com.beautifulquran.ui.theme.LocalQuranAccents
+import com.beautifulquran.ui.theme.SerifFontFamily
 import com.beautifulquran.ui.theme.quietClickable
 import com.beautifulquran.ui.theme.verticalFadingEdges
 
@@ -200,8 +201,8 @@ private fun GatheredVerseLine(
     ) {
         Text(
             text = ordinal.toString(),
-            style = MaterialTheme.typography.titleMedium,
-            color = gold,
+            style = MaterialTheme.typography.titleMedium.copy(fontFamily = SerifFontFamily),
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.72f),
             modifier = Modifier
                 .padding(end = 14.dp, top = 2.dp)
                 .width(22.dp),

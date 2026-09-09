@@ -37,6 +37,8 @@ import androidx.compose.foundation.layout.requiredHeight
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.wrapContentHeight
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -77,6 +79,7 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.RoundRect
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Paint
 import androidx.compose.ui.graphics.Path
@@ -102,10 +105,12 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.LineHeightStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.text.style.TextOverflow
@@ -118,6 +123,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import com.beautifulquran.data.AyahSelectorSide
+import com.beautifulquran.data.BrushCircleStyle
 import com.beautifulquran.data.PageNumberScript
 import com.beautifulquran.data.ReadingMode
 import com.beautifulquran.data.VerseNumberScript
@@ -135,10 +141,17 @@ import com.beautifulquran.ui.theme.IslamicBackToOriginCapsule
 import com.beautifulquran.ui.theme.LocalQuranAccents
 import com.beautifulquran.ui.theme.ShapedWordBloom
 import com.beautifulquran.ui.theme.ScribeFontFamily
+import com.beautifulquran.ui.theme.SerifFontFamily
 import com.beautifulquran.ui.theme.TranslationFontFamily
 import com.beautifulquran.ui.theme.generatedFieldWeave
 import com.beautifulquran.ui.theme.gilded
 import com.beautifulquran.ui.theme.glyphLayerAlpha
+import com.beautifulquran.ui.theme.InkExpandEasing
+import com.beautifulquran.ui.theme.brushCircleParams
+import com.beautifulquran.ui.theme.inkBrushCircleMark
+import com.beautifulquran.ui.theme.inkBrushCircleTarget
+import com.beautifulquran.ui.theme.inkSpotHighlight
+import com.beautifulquran.ui.theme.rememberInkBrushCircle
 import com.beautifulquran.ui.theme.letterFadeIn
 import com.beautifulquran.ui.theme.ornament.chapterOrnamentSeed
 import com.beautifulquran.ui.theme.ornament.generateChapterOrnament
@@ -205,7 +218,7 @@ internal fun AnnotatedString.Builder.appendAyahNumberMark(
 ) {
     val start = length
     withStyle(style.copy(fontFamily = HafsFontFamily)) {
-        append(formatAyahNumberMark(number, useArabicIndicDigits, ltr))
+        append(formatAyahNumberMark(number, useArabicIndicDigits, ltr = ltr))
     }
     if (!useArabicIndicDigits) {
         val digitStyle = style.copy(fontFamily = TranslationFontFamily)
@@ -246,17 +259,72 @@ internal fun rememberAyahMarkAlpha(focused: Boolean): State<Float> =
         label = "ayahMarkAlpha",
     )
 
+/**
+ * Union of boxes that actually paint. WORD JOINER / LRI / PDI are zero-width
+ * and Compose often reports them at the origin — including them made the
+ * ﴿N﴾ hit box miss the visible cups (English lyric) or swallow the line.
+ */
+/** Disc around the painted `﴿N﴾` — finger-sized, not the rest of the line. */
+internal const val MarkTapMinRadiusDp = 40f
+
+internal fun visibleGlyphBounds(boxes: List<Rect>): Rect? =
+    boxes.filter { it.width > 0.5f && it.height > 0.5f }
+        .reduceOrNull { acc, rect -> acc.expandToInclude(rect) }
+
+/**
+ * Logical hit for an inline range. Taps just past the last glyph resolve to
+ * [textLength], which is exclusive of the range's inclusive last index.
+ */
+internal fun tapHitsRange(offset: Int, range: IntRange, textLength: Int): Boolean {
+    if (range.isEmpty()) return false
+    if (offset in range) return true
+    return offset == textLength && range.last == textLength - 1
+}
+
 /** True when [tap] falls inside the glyph bounds of [range], inflated by [hitSlopPx]. */
 internal fun TextLayoutResult.rangeContains(
     tap: Offset,
     range: IntRange,
     hitSlopPx: Float,
-): Boolean =
-    range
-        .map { offset -> getBoundingBox(offset) }
-        .reduceOrNull { acc, rect -> acc.expandToInclude(rect) }
-        ?.inflate(hitSlopPx)
-        ?.contains(tap) == true
+): Boolean {
+    if (range.isEmpty()) return false
+    val textLength = layoutInput.text.length
+    if (tapHitsRange(getOffsetForPosition(tap), range, textLength)) return true
+    val boxes = range.map { offset -> getBoundingBox(offset) }
+    return visibleGlyphBounds(boxes)?.inflate(hitSlopPx)?.contains(tap) == true
+}
+
+/**
+ * Gather entry is a disc around the painted `﴿N﴾`, not the rest of the line.
+ * [getOffsetForPosition] maps empty width on the last line onto the mark, so
+ * it must not decide this hit.
+ */
+internal fun markRadiusHits(tap: Offset, bounds: Rect, minRadiusPx: Float): Boolean {
+    val radius = maxOf(bounds.maxDimension / 2f, minRadiusPx)
+    val dx = tap.x - bounds.center.x
+    val dy = tap.y - bounds.center.y
+    return dx * dx + dy * dy <= radius * radius
+}
+
+internal fun TextLayoutResult.markContains(
+    tap: Offset,
+    range: IntRange,
+    minRadiusPx: Float,
+): Boolean {
+    if (range.isEmpty()) return false
+    val text = layoutInput.text
+    val boxes = ArrayList<Rect>(range.count())
+    for (i in range) {
+        if (i !in text.indices) continue
+        val ch = text[i]
+        if (ch.isWhitespace()) continue
+        if (Character.getType(ch) == Character.FORMAT.toInt()) continue
+        val box = getBoundingBox(i)
+        if (box.width > 0.5f && box.height > 0.5f) boxes += box
+    }
+    val bounds = boxes.reduceOrNull { acc, rect -> acc.expandToInclude(rect) } ?: return false
+    return markRadiusHits(tap, bounds, minRadiusPx)
+}
 
 internal fun TextLayoutResult.wordIndexAt(
     tap: Offset,
@@ -1898,6 +1966,8 @@ private fun ResponsiveEnglishAyah(
     onAyahClick: () -> Unit,
     onWordClick: ((Word) -> Unit)?,
     onWordLongClick: ((Word) -> Unit)?,
+    onMarkClick: (() -> Unit)? = null,
+    onMarkLongClick: (() -> Unit)? = null,
     useArabicIndicDigits: Boolean = false,
 ) {
     val palette = rememberWordInkPalette()
@@ -1911,9 +1981,11 @@ private fun ResponsiveEnglishAyah(
         lineHeight = 1.5.em,
         letterSpacing = 0.sp,
         textAlign = TextAlign.Start,
+        textDirection = TextDirection.Ltr,
     )
     var layoutResult by remember { mutableStateOf<TextLayoutResult?>(null) }
     val hitSlopPx = with(LocalDensity.current) { 8.dp.toPx() }
+    val markRadiusPx = with(LocalDensity.current) { MarkTapMinRadiusDp.dp.toPx() }
     val lyricGlosses = remember(ayah, hideParentheticals) {
         EnglishTypography.lyricize(
             glosses = ayah.words.map { it.translation },
@@ -1968,14 +2040,17 @@ private fun ResponsiveEnglishAyah(
                 }
                 ranges += start until length
             }
-            if (length > 0) append(" ")
+            // Glue space belongs to the mark so a tap on the gap before ﴿N﴾
+            // gathers instead of falling through as an ayah miss.
             val markStart = length
+            if (length > 0) append(" ")
             // 17/22 keeps the ornament proportional. Sharing the prose
             // baseline avoids a font-metric paint lift on Android.
             appendAyahNumberMark(
                 number = ayah.number,
                 useArabicIndicDigits = useArabicIndicDigits,
                 style = SpanStyle(color = gold, fontSize = 17.sp * fontScale),
+                ltr = true,
             )
             markRange = markStart until length
         }
@@ -2027,6 +2102,9 @@ private fun ResponsiveEnglishAyah(
                 onAyahClick = onAyahClick,
                 onWordClick = onWordClick,
                 onWordLongClick = onWordLongClick,
+                onMarkClick = onMarkClick,
+                onMarkLongClick = onMarkLongClick,
+                markRadiusPx = markRadiusPx,
             ),
         onTextLayout = { layoutResult = it },
     )
@@ -2038,36 +2116,77 @@ private fun ResponsiveEnglishAyah(
  * [onMiss] (null = ignored). [inertLongPressRange] prevents the trailing ayah
  * mark from borrowing the nearby final word's hold action.
  */
+@Composable
 internal fun Modifier.wordTapTarget(
     words: List<Word>,
     ranges: List<IntRange>,
     layoutResult: TextLayoutResult?,
     hitSlopPx: Float,
-    onWordClick: (Word) -> Unit,
+    onWordClick: ((Word) -> Unit)?,
     onWordLongClick: ((Word) -> Unit)? = null,
     onMiss: (() -> Unit)? = null,
+    onMarkClick: (() -> Unit)? = null,
+    onMarkLongClick: (() -> Unit)? = null,
     inertLongPressRange: IntRange = IntRange.EMPTY,
-): Modifier = pointerInput(ranges, words, layoutResult, onWordLongClick, inertLongPressRange) {
-    detectTapGestures(
-        onTap = { tap ->
-            val wordIndex = layoutResult?.wordIndexAt(tap, ranges, hitSlopPx) ?: -1
-            if (wordIndex >= 0) onWordClick(words[wordIndex]) else onMiss?.invoke()
-        },
-        onLongPress = if (onWordLongClick == null) {
-            null
-        } else {
-            { pos ->
-                if (layoutResult?.rangeContains(pos, inertLongPressRange, hitSlopPx) != true) {
-                    val wordIndex = layoutResult?.wordIndexAt(pos, ranges, hitSlopPx) ?: -1
-                    if (wordIndex >= 0) onWordLongClick(words[wordIndex])
+    markRadiusPx: Float = hitSlopPx,
+): Modifier {
+    val onWordClickLatest = rememberUpdatedState(onWordClick)
+    val onWordLongClickLatest = rememberUpdatedState(onWordLongClick)
+    val onMissLatest = rememberUpdatedState(onMiss)
+    val onMarkClickLatest = rememberUpdatedState(onMarkClick)
+    val onMarkLongClickLatest = rememberUpdatedState(onMarkLongClick)
+    return pointerInput(
+        ranges,
+        words,
+        layoutResult,
+        inertLongPressRange,
+        onWordClick != null,
+        onWordLongClick != null,
+        onMarkClick != null,
+        onMarkLongClick != null,
+        markRadiusPx,
+    ) {
+        detectTapGestures(
+            onTap = { tap ->
+                val markClick = onMarkClickLatest.value
+                if (
+                    markClick != null &&
+                    layoutResult?.markContains(tap, inertLongPressRange, markRadiusPx) == true
+                ) {
+                    markClick()
+                    return@detectTapGestures
                 }
-            }
-        },
-    )
+                val wordIndex = layoutResult?.wordIndexAt(tap, ranges, hitSlopPx) ?: -1
+                val wordClick = onWordClickLatest.value
+                if (wordIndex >= 0 && wordClick != null) {
+                    wordClick(words[wordIndex])
+                } else {
+                    onMissLatest.value?.invoke()
+                }
+            },
+            onLongPress = if (onWordLongClick == null && onMarkLongClick == null) {
+                null
+            } else {
+                { pos ->
+                    if (layoutResult?.markContains(pos, inertLongPressRange, markRadiusPx) == true) {
+                        onMarkLongClickLatest.value?.invoke()
+                    } else {
+                        val wordLongClick = onWordLongClickLatest.value
+                        if (wordLongClick != null) {
+                            val wordIndex = layoutResult?.wordIndexAt(pos, ranges, hitSlopPx) ?: -1
+                            if (wordIndex >= 0) wordLongClick(words[wordIndex])
+                        }
+                    }
+                }
+            },
+        )
+    }
 }
 
 /** Tap chrome shared by both shaped modes: word-precise when word actions
- * exist, the whole ayah otherwise. */
+ * exist, the whole ayah otherwise. The trailing ﴿N﴾ mark can be its own
+ * target when [onMarkClick] is set (share entry). */
+@Composable
 private fun Modifier.ayahTapTarget(
     ayah: Ayah,
     rendered: RenderedLineText,
@@ -2076,8 +2195,11 @@ private fun Modifier.ayahTapTarget(
     onAyahClick: () -> Unit,
     onWordClick: ((Word) -> Unit)?,
     onWordLongClick: ((Word) -> Unit)?,
+    onMarkClick: (() -> Unit)? = null,
+    onMarkLongClick: (() -> Unit)? = null,
+    markRadiusPx: Float = hitSlopPx,
 ): Modifier = then(
-    if (onWordClick == null) {
+    if (onWordClick == null && onMarkClick == null && onMarkLongClick == null) {
         Modifier.quietClickable(onClick = onAyahClick)
     } else {
         Modifier.wordTapTarget(
@@ -2088,7 +2210,10 @@ private fun Modifier.ayahTapTarget(
             onWordClick = onWordClick,
             onWordLongClick = onWordLongClick,
             onMiss = onAyahClick,
+            onMarkClick = onMarkClick,
+            onMarkLongClick = onMarkLongClick,
             inertLongPressRange = rendered.markRange,
+            markRadiusPx = markRadiusPx,
         )
     },
 )
@@ -2117,6 +2242,8 @@ private fun ResponsiveHafsAyah(
     onAyahClick: () -> Unit,
     onWordClick: ((Word) -> Unit)?,
     onWordLongClick: ((Word) -> Unit)? = null,
+    onMarkClick: (() -> Unit)? = null,
+    onMarkLongClick: (() -> Unit)? = null,
 ) {
     val palette = rememberWordInkPalette()
     val ayahMarkInk = LocalQuranAccents.current.gold
@@ -2134,6 +2261,7 @@ private fun ResponsiveHafsAyah(
     )
     var layoutResult by remember { mutableStateOf<TextLayoutResult?>(null) }
     val hitSlopPx = with(LocalDensity.current) { 8.dp.toPx() }
+    val markRadiusPx = with(LocalDensity.current) { MarkTapMinRadiusDp.dp.toPx() }
 
     // Full-ink spans only — never bake upcoming/active into the annotated
     // string. Dim, bloom, and orange are draw-phase overlays, so word and
@@ -2153,7 +2281,7 @@ private fun ResponsiveHafsAyah(
                 ranges += start until length
                 append(" ")
             }
-            val markStart = length
+            val markStart = if (length > 0) length - 1 else 0
             appendAyahNumberMark(
                 number = ayah.number,
                 useArabicIndicDigits = useArabicIndicDigits,
@@ -2210,6 +2338,9 @@ private fun ResponsiveHafsAyah(
                 onAyahClick = onAyahClick,
                 onWordClick = onWordClick,
                 onWordLongClick = onWordLongClick,
+                onMarkClick = onMarkClick,
+                onMarkLongClick = onMarkLongClick,
+                markRadiusPx = markRadiusPx,
             ),
         onTextLayout = { layoutResult = it },
     )
@@ -2279,6 +2410,8 @@ private fun ArabicAyahNumberUnit(
     number: Int,
     fontScale: Float,
     useArabicIndicDigits: Boolean = true,
+    onClick: (() -> Unit)? = null,
+    onLongClick: (() -> Unit)? = null,
 ) {
     val density = LocalDensity.current
     val arabicLineHeight = with(density) {
@@ -2286,8 +2419,18 @@ private fun ArabicAyahNumberUnit(
     }
     Box(
         modifier = Modifier
-            .padding(horizontal = 6.dp)
-            .requiredHeight(arabicLineHeight),
+            .padding(16.dp)
+            .requiredHeight(maxOf(arabicLineHeight, 56.dp))
+            .then(
+                if (onClick != null || onLongClick != null) {
+                    Modifier.quietClickable(
+                        onClick = onClick ?: {},
+                        onLongClick = onLongClick,
+                    )
+                } else {
+                    Modifier
+                },
+            ),
         contentAlignment = Alignment.Center,
     ) {
         AyahNumberMark(number, fontScale, useArabicIndicDigits = useArabicIndicDigits)
@@ -2622,10 +2765,11 @@ fun AyahBlock(
     /** Reports the live ribbon's screen position to a contextual reader overlay. */
     onBookmarkRibbonPositioned: ((LayoutCoordinates) -> Unit)? = null,
     /**
-     * 1-based gather ordinal drawn in the outer margin (gold Arabic-Indic).
+     * 1-based gather ordinal drawn in the outer margin (Western digits).
      * Non-null only while gather mode has this verse selected.
      */
     gatherOrdinal: Int? = null,
+    onAyahMarkClick: (() -> Unit)? = null,
     onWordClick: ((Word) -> Unit)?,
     onWordLongClick: ((Word) -> Unit)? = null,
     onAyahClick: () -> Unit,
@@ -2879,6 +3023,14 @@ fun AyahBlock(
         modifier = Modifier
             .fillMaxWidth()
             .graphicsLayer { alpha = blockAlpha.value }
+            .inkSpotHighlight(
+                selected = gatherOrdinal != null,
+                seed = ayah.surahId * 1_000 + ayah.number,
+                color = LocalQuranAccents.current.gold.copy(alpha = 0.26f),
+                fillBox = true,
+                durationMillis = 400,
+                easing = InkExpandEasing,
+            )
             .drawWithContent {
                 drawContent()
                 if (!searchTargetAyah) {
@@ -2921,6 +3073,7 @@ fun AyahBlock(
                     onAyahClick = onAyahClick,
                     onWordClick = onWordClick,
                     onWordLongClick = onWordLongClick,
+                    onMarkClick = onAyahMarkClick,
                     useArabicIndicDigits = useArabicIndicDigits,
                 )
             } else if (readingMode == ReadingMode.ARABIC_ENGLISH && showGloss) {
@@ -2964,6 +3117,7 @@ fun AyahBlock(
                                 ayah.number,
                                 fontScale,
                                 useArabicIndicDigits = useArabicIndicDigits,
+                                onClick = onAyahMarkClick,
                             )
                         }
                     }
@@ -2990,6 +3144,7 @@ fun AyahBlock(
                         onAyahClick = onAyahClick,
                         onWordClick = onWordClick?.let { handler -> { word -> handler(word) } },
                         onWordLongClick = onWordLongClick?.let { handler -> { word -> handler(word) } },
+                        onMarkClick = onAyahMarkClick,
                     )
                 }
             }
@@ -3084,8 +3239,8 @@ fun AyahBlock(
             Box(Modifier.matchParentSize()) {
                 GatherOrdinalMark(
                     ordinal = gatherOrdinal,
-                    side = bookmarkSide,
                     chromeAlpha = bookmarkChromeAlpha,
+                    onClick = onAyahMarkClick,
                     modifier = Modifier
                         .align(
                             if (bookmarkSide == AyahSelectorSide.RIGHT) {
@@ -3094,8 +3249,20 @@ fun AyahBlock(
                                 AbsoluteAlignment.TopLeft
                             },
                         )
-                        // Align with first ink line (ribbon tip uses ~24 dp).
-                        .padding(top = 22.dp),
+                        .padding(
+                            start = if (bookmarkSide == AyahSelectorSide.LEFT) {
+                                GatherOrdinalEdgeInsetDp.dp
+                            } else {
+                                0.dp
+                            },
+                            end = if (bookmarkSide == AyahSelectorSide.RIGHT) {
+                                GatherOrdinalEdgeInsetDp.dp
+                            } else {
+                                0.dp
+                            },
+                            top = GatherOrdinalTopInsetDp.dp,
+                        )
+                        .fillMaxHeight(),
                 )
             }
         } else if (bookmarkSide != null && onToggleBookmark != null) {
@@ -3137,28 +3304,68 @@ fun AyahBlock(
 }
 
 /**
- * Gold Arabic-Indic ordinal in the verse's outer margin while gather mode is
- * active. Replaces the bookmark ribbon for the duration of the mode so the
- * margin never carries two marks. Sized to read as a mark, not decoration.
+ * Western gather ordinal in the gold soak's top corner, still in the
+ * 38 dp bookmark gutter the verse already leaves. A tight ink-brush
+ * circle holds the digit. The slot never enters the Hafs. Ink, not gold.
  */
 @Composable
 private fun GatherOrdinalMark(
     ordinal: Int,
-    side: AyahSelectorSide,
     chromeAlpha: () -> Float,
+    onClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
-    val gold = LocalQuranAccents.current.gold
-    Text(
-        text = ordinal.toArabicIndic(),
-        style = MaterialTheme.typography.headlineSmall,
-        color = gold,
-        textAlign = if (side == AyahSelectorSide.RIGHT) TextAlign.End else TextAlign.Start,
-        modifier = modifier
-            .width(44.dp)
-            .graphicsLayer { alpha = chromeAlpha() }
-            .padding(horizontal = 6.dp),
+    val circle = rememberInkBrushCircle(
+        selectedKey = ordinal,
+        params = brushCircleParams(BrushCircleStyle.BASELINE).copy(
+            padXDp = 3f,
+            padYDp = 2f,
+            bow = 2f,
+        ),
     )
+    Box(
+        modifier = modifier
+            .width(GatherOrdinalSlotWidthDp.dp)
+            .graphicsLayer { alpha = chromeAlpha() }
+            .then(
+                if (onClick != null) {
+                    Modifier.quietClickable(onClick = onClick)
+                } else {
+                    Modifier
+                },
+            ),
+    ) {
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .inkBrushCircleMark(circle, ordinal),
+        ) {
+            Text(
+                text = ordinal.toString(),
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.72f),
+                style = TextStyle(
+                    fontFamily = SerifFontFamily,
+                    fontSize = GatherOrdinalSp.sp,
+                    lineHeight = GatherOrdinalSp.sp,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center,
+                    platformStyle = PlatformTextStyle(includeFontPadding = false),
+                    lineHeightStyle = LineHeightStyle(
+                        alignment = LineHeightStyle.Alignment.Center,
+                        trim = LineHeightStyle.Trim.Both,
+                    ),
+                ),
+                maxLines = 1,
+                softWrap = false,
+                modifier = Modifier
+                    .inkBrushCircleTarget(circle, ordinal)
+                    .padding(horizontal = 1.dp)
+                    .wrapContentWidth(unbounded = true)
+                    .wrapContentHeight(unbounded = true),
+            )
+        }
+    }
 }
 
 /**
