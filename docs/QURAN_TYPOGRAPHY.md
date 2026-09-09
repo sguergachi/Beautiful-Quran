@@ -340,15 +340,21 @@ chapter's first verse falls on (`EnglishBook.leafOfVerse`), so every stop on it
 still lands where it says. That is `mushafLeafNumber`, and it is the one place
 the English book stops sharing the Arabic one's numbering.
 
-The capacity is chosen for the **line**, not for the page: 900 characters of
-prose sets at about 22 sp on a phone and 46 characters to the line, which is a
-book measure and the size the scrolling reader has always set its English at.
-Half again the type of the page-bound leaf.
+The capacity is chosen for the **line**, not for the page. The hand is cut so a
+leaf of the capacity fills the well, so the two are one number seen from both
+ends — a bigger capacity is a smaller hand, and a smaller hand is more
+characters to the line. Because the block goes as `hand²`, **characters to the
+line go as the square root of the capacity**.
 
-The cost is leaves, and with the pagination continuous the capacity buys nothing
-but type: the choice is purely how long a line the hand wants. Below about 850
-it is shorter than the measure wants and above about 1,000 it is longer.
-`tools/measure_english_leaves.py` prints the sweep.
+1,400 characters sets at about 17 sp on a phone and **53 characters — 10 words
+— to the line**. It was 940, which set at 20.7 sp and 45 characters, and 45 is
+below the bottom of the band a single column reads in at all. See §13.5: that
+figure is also what made the rag impossible.
+
+The cost is leaves — about 750 against 1,120 — and with the pagination
+continuous the capacity buys nothing but type: the choice is purely how long a
+line the hand wants. `tools/measure_english_leaves.py` prints the pagination
+side of the sweep.
 
 **A long verse is carried over, as a book carries a paragraph.**
 
@@ -879,6 +885,50 @@ Ad-Dukhan leaf (*We were to warn [mankind] ⟨3⟩ On that*) ran three times the
 natural space to reach the margin, because *night* has nowhere to break. Two
 ink-mask bugs found while it was in are kept; see below.
 
+#### The rag was a measure problem, and the measure was too short
+
+Everything below this heading was measured at a capacity of 940 — a leaf that
+set at **20.7 sp and 45 characters, 8.4 words, to the line**. Read it as a
+record of what a line that short does, because the setting that finally fixed
+the rag is not in it: the line got longer.
+
+45 characters is below the bottom of the band a single column of prose is
+readable in at all — Bringhurst's 45–75, best near 66, the classical two and a
+half alphabets. It was reported the way a reader reports it, as *the text feels
+hard to read*, with the diagnosis attached: *look at the number of words per
+line.*
+
+And it is the same fault as the rag, seen from the other side. **A ragged edge
+moves in whole words**, because a whole word is the smallest thing a break can
+add or remove. At 8.4 words to the line a word is 12% of the measure, so the
+right edge could only ever land on one of eight or nine positions and no line
+breaker could do better — which is exactly what the floor measured below says,
+and why it says the fault "is not a line-breaking problem". It was not. It was
+a measure problem, and the whole of the rag work below is a record of pushing
+on the wrong lever.
+
+Lengthening the line shrinks the atom. Swept on device over the Ta-Ha, Baqarah
+and Ad-Dukhan leaves, hand and words counted off the pixels:
+
+```
+    capacity    hand     words/line   chars/line   rag, mean % of measure
+        940    20.7 sp       8.4          45              6.9%
+      1,200    18.8 sp       8.7          47              6.5%
+      1,400    16.9 sp       9.8          53              4.9%
+      1,600    15.8 sp      10.5          57              6.0%
+```
+
+**The rag fell by nearly a third with no line-breaking change at all.** The
+capacity is 1,400: the first setting inside the readable band, the calmest rag
+of the four, and 17 sp of EB Garamond — small x-height for its body — is a
+book's hand and not a large-print one. 1,600 buys four more characters for a
+sixth of the type and did not measure better.
+
+Leading was tested with it and left at 1.40 em. At 1.46 the words to the line
+did not move, the rag did not improve, and the 1.50 ceiling that cards a short
+leaf out to its foot (§13.4) would have had only a quarter of its headroom
+left.
+
 #### How even a rag can be here, measured
 
 The rag reads left-heavy, and it is. On the Ta-Ha leaf the right edge falls
@@ -1257,7 +1307,9 @@ type size, since the well's share of the leaf rises from 16 / 17.05 to 16 /
 extra line: the well's share rises from 15 / 17.05 to 15 / 16.30, 4.6 % more
 paper, and 4.6 % of twenty-two lines is one — so `ENGLISH_LEAF_CAPACITY_CHARS`
 goes from 900 to 940 and `ENGLISH_LEAF_LINE_CHARS` divides it by 23 rather than
-22. It is the only change here that a reader will count.
+22. It is the only change here that a reader will count. (Both figures have
+moved since, to 1,400 and 28, for the reason in §13.5; the arithmetic above is
+the one that set them at the time.)
 
 The two settings no longer sum to the same figure, which is why each divides by
 its own `slots` rather than by one shared `SLOTS`. The shared total was always a

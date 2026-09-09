@@ -128,7 +128,11 @@ class EnglishBookCache(context: Context) {
          * 19: the prose breaks greedily (`LineBreak.Strategy.Simple`). The
          * evening strategies drew a phantom second margin; every leaf's lines
          * end somewhere new.
+         *
+         * 20: the leaf carries 1,400 characters instead of 940, so the hand is
+         * cut smaller and the line holds 53 characters instead of 45. Every
+         * leaf in the book is a different length of text.
          */
-        const val FORMAT = 19
+        const val FORMAT = 20
     }
 }

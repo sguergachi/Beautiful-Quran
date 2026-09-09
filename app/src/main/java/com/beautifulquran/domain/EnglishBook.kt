@@ -48,21 +48,53 @@ package com.beautifulquran.domain
  * leaf is *paginated* to and the mass the hand is *cut* for, and it has to be
  * both or the two disagree and pages come out over- or under-full.
  *
- * 900 is chosen for the *line*, not for the page. A leaf of this mass sets at
- * about 22 sp on a phone and 46 characters to the line, which is where a serif
- * of EB Garamond's small x-height reads easily in the hand; the scrolling
- * reader has always set its English at 22 sp, and the leaf had drifted to 16.
+ * It is chosen for the *line*, not for the page, because the line is what a
+ * reader reads. The hand is cut so a leaf of this mass fills the well
+ * (`englishBookHandPx`), so capacity and type size are one number seen from two
+ * ends: a bigger capacity is a smaller hand, and a smaller hand is more
+ * characters to the line. The relation is a square root — the block goes as
+ * `hand²` — so **characters to the line go as the square root of the
+ * capacity**.
  *
- * It is not free, and the cost is leaves: about 1,120 of them, against 675 at
- * 1,650 and 604 when a leaf was a page. That is the trade, taken deliberately.
- * What it is *not* paying for any more is whitespace — the leaves are packed
- * continuously, so the median one reaches 91% of its well whatever the capacity
- * is, and the capacity buys only type.
+ * This was 940 and that was too few. A leaf set at 940 comes out at 20.7 sp and
+ * **45 characters — 8.4 words — to the line**, which is below the bottom of the
+ * band a single column of prose is readable in at all (Bringhurst's 45–75, best
+ * near 66; the same figure as the classical two-and-a-half alphabets). It reads
+ * as large print rather than as a book, and it was reported as hard to read.
  *
- * Below about 850 the line is shorter than the hand wants and above about 1,000
- * it is longer. `tools/measure_english_leaves.py` prints the sweep.
+ * It also *was* the rag. A ragged edge is quantized by the break atom, and the
+ * atom is a whole word: at 8.4 words to the line a word is 12% of the measure,
+ * so the right edge could only ever move in steps of an eighth of the line and
+ * no line breaker could calm it — §13.5 measured that floor and found the
+ * breaker already sitting on it. Lengthening the line shrinks the atom, and the
+ * rag comes down with it without a word of line-breaking code changing.
+ *
+ * Swept on device over the Ta-Ha, Baqarah and Ad-Dukhan leaves — the hand and
+ * the words to the line measured off the pixels, not modelled:
+ *
+ * ```
+ *     capacity    hand    words/line   chars/line   rag, mean % of measure
+ *         940    20.7 sp      8.4          45              6.9%
+ *       1,200    18.8 sp      8.7          47              6.5%
+ *       1,400    16.9 sp      9.8          53              4.9%
+ *       1,600    15.8 sp     10.5          57              6.0%
+ * ```
+ *
+ * 1,400. It is the first setting inside the readable band, it measured the
+ * calmest rag of the four, and 16.9 sp of EB Garamond — whose x-height is small
+ * for its body — is a book's hand rather than a large-print one. 1,600 buys
+ * four more characters for a sixth of the type and did not measure better.
+ *
+ * The cost is leaves: about 750 of them against 1,120 at 940, and 604 when a
+ * leaf was a page. What it is *not* paying for is whitespace — the leaves are
+ * packed continuously, so the median one reaches 91% of its well whatever the
+ * capacity is, and the capacity buys only type.
+ *
+ * Re-measure after changing the face, the measure or the leaf's geometry:
+ * capture a leaf and count the words on its lines.
+ * `tools/measure_english_leaves.py` prints the pagination side of the sweep.
  */
-const val ENGLISH_LEAF_CAPACITY_CHARS = 940
+const val ENGLISH_LEAF_CAPACITY_CHARS = 1400
 
 /**
  * What a chapter's opening costs the leaf, in the characters the capacity
@@ -81,7 +113,13 @@ const val ENGLISH_LEAF_CAPACITY_CHARS = 940
  * line and [EnglishLeafBasmalahAirEm] under it, and on the reference leaf those
  * come to 126 px and 113 px against a line pitch of 80 — 1.58 lines and 1.41,
  * three lines together. A line of this book is [ENGLISH_LEAF_LINE_CHARS], so
- * they are 64 characters and 58.
+ * they are 79 characters and 70.
+ *
+ * The measurement is in *lines*, and it stays 1.58 and 1.41 when the hand
+ * moves: the panel is built from the line's ink and an air in line pitches, so
+ * it scales with the type it sits over. Only the conversion moves, because a
+ * line holds more characters at a bigger [ENGLISH_LEAF_CAPACITY_CHARS] — these
+ * were 64 and 58 when a line held 40.
  *
  * They were 92 and 78 — four and a sixth lines for three — and a chapter's leaf
  * came up an eighth of its well short every time. Half of the excess was a
@@ -92,8 +130,8 @@ const val ENGLISH_LEAF_CAPACITY_CHARS = 940
  * Re-measure with a device capture after changing the panel, the basmalah or
  * the leading.
  */
-const val ENGLISH_LEAF_OPENING_CHARS = 64
-const val ENGLISH_LEAF_BASMALAH_CHARS = 58
+const val ENGLISH_LEAF_OPENING_CHARS = 79
+const val ENGLISH_LEAF_BASMALAH_CHARS = 70
 
 /** What a verse costs the leaf: its prose, and the opening it may bring. */
 fun englishLeafVerseMass(surahId: Int, ayah: Int, prose: Int): Int = when {
@@ -106,12 +144,18 @@ fun englishLeafVerseMass(surahId: Int, ayah: Int, prose: Int): Int = when {
 /**
  * About what one line of the leaf holds, in the characters the capacity counts.
  *
- * The well comes to 22 lines on a phone, and the hand is solved so that a leaf
- * exactly fills it, so a line is a twenty-second of the capacity. It is an
+ * The well comes to 28 lines on a phone, and the hand is solved so that a leaf
+ * exactly fills it, so a line is a twenty-eighth of the capacity. It is an
  * approximation on a tablet, whose well is fewer and longer lines — near enough,
  * because the two rules below only need to know a line from a page.
+ *
+ * The divisor is the lines a full leaf draws, so it moves with
+ * [ENGLISH_LEAF_CAPACITY_CHARS]: a bigger capacity is a smaller hand and more
+ * lines in the same well. Counted off device captures, a leaf drew 21 lines at
+ * a capacity of 940 and 25 at 1,400 — 23 and 28 for one filled to the foot.
+ * Re-count it when the capacity moves.
  */
-const val ENGLISH_LEAF_LINE_CHARS = ENGLISH_LEAF_CAPACITY_CHARS / 23
+const val ENGLISH_LEAF_LINE_CHARS = ENGLISH_LEAF_CAPACITY_CHARS / 28
 
 /**
  * How the leaf breaks: it doesn't, except where a book breaks.

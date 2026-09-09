@@ -158,7 +158,8 @@ const val ENGLISH_LEAF_SPECIMEN =
  *
  * It was 1.01, and 1.01 is not enough. Measured on device across five leaves of
  * Ar-Rahman and As-Saffat, with the well at 1,849 px and the book's leading at
- * 80 px — 23.1 lines — a leaf's 940 charged characters wanted **24 and
+ * 80 px — 23.1 lines — a leaf's 940 charged characters (the capacity then)
+ * wanted **24 and
  * sometimes 25** lines. The observed density ran 39.2 to 40.9 charged
  * characters to the line against the 41.1 the margin assumed: optimistic by
  * three percent typically and by five at the worst.
@@ -188,6 +189,12 @@ const val ENGLISH_LEAF_SPECIMEN =
  * Re-measure with a device capture after changing the face, the measure or the
  * mark. A leaf whose leading has closed is the symptom: photograph two leaves
  * and compare their line pitch.
+ *
+ * The sweep above was taken at a capacity of 940. Re-checked at 1,400 by that
+ * same symptom — Ta-Ha, Ad-Dukhan, Baqarah and Al-Kahf leaves captured on
+ * device — every line of every leaf came out at a pitch of 62 px, so no leaf
+ * asked for more lines than its well had and 1.04 still covers the density
+ * estimate at the longer line.
  */
 const val ENGLISH_LEAF_REFERENCE_MARGIN = 1.04f
 

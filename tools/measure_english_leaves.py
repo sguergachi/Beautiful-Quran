@@ -32,10 +32,10 @@ LEADING = 1.40   # one figure, for every leaf in the book
 # blank at the foot is simply the share of the capacity the leaf did not use.
 # WELL_LINES is what that well comes to on a phone; it is only here to say the
 # answer in lines, which is the unit a reader sees.
-WELL_LINES = 23.0
-CAPACITY = 940  # what a leaf holds; a page takes as many leaves as it needs
+WELL_LINES = 28.0
+CAPACITY = 1400  # what a leaf holds; a page takes as many leaves as it needs
 MARK_CHARS = 5  # ENGLISH_LEAF_MARK_CHARS: the verse mark and its two spaces
-LINE_CHARS = CAPACITY // 23       # ENGLISH_LEAF_LINE_CHARS
+LINE_CHARS = CAPACITY // 28       # ENGLISH_LEAF_LINE_CHARS
 SPLIT_HOLE = 3 * LINE_CHARS       # ENGLISH_LEAF_SPLIT_HOLE_CHARS
 MIN_FRAGMENT = 2 * LINE_CHARS     # ENGLISH_LEAF_MIN_FRAGMENT_CHARS
 OPENING_CHARS = 64   # ENGLISH_LEAF_OPENING_CHARS: the panel and its air
