@@ -83,10 +83,12 @@ class AyahNumberMarkTest {
     @Test
     fun `gather entry is a disc around the painted cups, not the rest of the line`() {
         val cups = Rect(120f, 8f, 148f, 28f)
-        assertTrue(markRadiusHits(Offset(134f, 18f), cups, minRadiusPx = 22f))
-        assertTrue(markRadiusHits(Offset(134f, 18f + 21f), cups, minRadiusPx = 22f))
-        assertFalse(markRadiusHits(Offset(40f, 18f), cups, minRadiusPx = 22f))
-        assertFalse(markRadiusHits(Offset(2f, 2f), cups, minRadiusPx = 22f))
+        val r = MarkTapMinRadiusDp
+        assertTrue(markRadiusHits(Offset(134f, 18f), cups, minRadiusPx = r))
+        assertTrue(markRadiusHits(Offset(134f, 18f + (r - 1f)), cups, minRadiusPx = r))
+        assertFalse(markRadiusHits(Offset(134f, 18f + (r + 1f)), cups, minRadiusPx = r))
+        assertFalse(markRadiusHits(Offset(40f, 18f), cups, minRadiusPx = r))
+        assertFalse(markRadiusHits(Offset(2f, 2f), cups, minRadiusPx = r))
     }
 
     @Test

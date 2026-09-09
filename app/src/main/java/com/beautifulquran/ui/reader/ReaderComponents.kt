@@ -265,7 +265,7 @@ internal fun rememberAyahMarkAlpha(focused: Boolean): State<Float> =
  * ﴿N﴾ hit box miss the visible cups (English lyric) or swallow the line.
  */
 /** Disc around the painted `﴿N﴾` — finger-sized, not the rest of the line. */
-internal const val MarkTapMinRadiusDp = 22f
+internal const val MarkTapMinRadiusDp = 40f
 
 internal fun visibleGlyphBounds(boxes: List<Rect>): Rect? =
     boxes.filter { it.width > 0.5f && it.height > 0.5f }
@@ -2419,8 +2419,8 @@ private fun ArabicAyahNumberUnit(
     }
     Box(
         modifier = Modifier
-            .padding(10.dp)
-            .requiredHeight(maxOf(arabicLineHeight, 44.dp))
+            .padding(16.dp)
+            .requiredHeight(maxOf(arabicLineHeight, 56.dp))
             .then(
                 if (onClick != null || onLongClick != null) {
                     Modifier.quietClickable(
