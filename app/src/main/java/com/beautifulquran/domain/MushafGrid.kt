@@ -139,9 +139,23 @@ object MushafGrid {
  *
  * The English leaf has no sixteenth row to buy — its well is continuous prose —
  * and its ink stops exactly at the ascent and the descender, because the block
- * is set `Trim.Both`. A band of nothing there is nothing. So it keeps the
- * canonical gutter, which was sized for exactly this: "a head that sits closer
+ * is set `Trim.Both`. A band of nothing there is nothing. So it keeps a gutter
+ * sized by the rule the canonical one was sized by: "a head that sits closer
  * than about a line's pitch reads as part of the block".
+ *
+ * *Whose* line's pitch is the whole question, and the canonical unit is the
+ * wrong one. The unit is the Arabic leaf's line, and this gutter stands over an
+ * English block whose line is smaller: measured on device the unit runs about
+ * 114 px against the prose's 66. A full unit of gutter is therefore not one
+ * line of air over the block it separates, it is **1.7**, which reads as a hole
+ * under the head rather than as a gutter — and it was reported as one. So the
+ * gutter is [ENGLISH_HEAD_GUTTER]: the same rule, measured against the block it
+ * actually stands over.
+ *
+ * The reclaimed height goes to the well, which is why the well is derived here
+ * rather than declared — the leaf is the same leaf and its bands must still sum
+ * to [MushafGrid.SLOTS]. The English hand is solved from the well, so a taller
+ * well is also very slightly more type; both are what was asked for.
  *
  * Neither carries a folio any more: it stood under the text and has gone to the
  * dial's head air. The tail stayed behind it, because a page has a foot and the
@@ -165,11 +179,25 @@ data class MushafLeafBands(
     fun unitPx(leafHeightPx: Float): Float = (leafHeightPx / slots).coerceAtLeast(1f)
 }
 
-/** The canonical bands: wide gutters, fifteen units of well. */
+/**
+ * The English leaf's gutter, in units — one line of the *prose*, not one unit.
+ *
+ * The unit is the Arabic line's pitch, about 114 px on a phone, and the English
+ * prose sets at about 66 px to the line. 66 / 114 is where this comes from, and
+ * it is the canonical rule applied to the block the gutter stands over: a
+ * line's pitch of air, no more. Re-measure it if the English hand moves far —
+ * capture a leaf, divide the prose pitch by the unit.
+ */
+const val ENGLISH_HEAD_GUTTER = 0.58f
+
+/** One line of prose for a gutter, and the rest of the leaf is well. */
 val MUSHAF_ENGLISH_BANDS = MushafLeafBands(
     runningHead = MushafGrid.RUNNING_HEAD,
-    headGutter = MushafGrid.HEAD_GUTTER,
-    well = MushafGrid.TEXT_LINES.toFloat(),
+    headGutter = ENGLISH_HEAD_GUTTER,
+    // Derived, so the leaf still spends exactly its height: whatever the
+    // gutter gives up, the well takes.
+    well = MushafGrid.SLOTS - MushafGrid.RUNNING_HEAD - ENGLISH_HEAD_GUTTER -
+        MushafGrid.TAIL,
     tail = MushafGrid.TAIL,
 )
 

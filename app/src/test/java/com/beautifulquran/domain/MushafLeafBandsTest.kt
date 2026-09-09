@@ -59,14 +59,28 @@ class MushafLeafBandsTest {
             MUSHAF_ARABIC_BANDS.well,
             0f,
         )
-        assertEquals(MUSHAF_ENGLISH_BANDS.well + 1f, MUSHAF_ARABIC_BANDS.well, 0.0001f)
+        // The English well is no longer a round fifteen — it took what the
+        // gutter gave up (ENGLISH_HEAD_GUTTER) — so the sixteenth row is the
+        // thing to assert, not the difference.
+        assertTrue(MUSHAF_ARABIC_BANDS.well > MUSHAF_ENGLISH_BANDS.well)
         assertTrue(MUSHAF_ARABIC_BANDS.headGutter < MUSHAF_ENGLISH_BANDS.headGutter)
     }
 
     @Test
-    fun `the English leaf keeps the canonical gutter, which was sized for Latin ink`() {
-        assertEquals(MushafGrid.HEAD_GUTTER, MUSHAF_ENGLISH_BANDS.headGutter, 0f)
-        assertEquals(MushafGrid.TEXT_LINES.toFloat(), MUSHAF_ENGLISH_BANDS.well, 0f)
+    fun `the English gutter is one line of its own prose, not one Arabic unit`() {
+        // The canonical unit is the Arabic line's pitch and this gutter stands
+        // over English prose, whose line is smaller — so a full unit was 1.7
+        // lines of air and read as a hole under the head. Same rule, measured
+        // against the block it separates.
+        assertEquals(ENGLISH_HEAD_GUTTER, MUSHAF_ENGLISH_BANDS.headGutter, 0f)
+        assertTrue(MUSHAF_ENGLISH_BANDS.headGutter < MushafGrid.HEAD_GUTTER)
+        // Whatever the gutter gave up, the well took: the leaf is the same leaf.
+        assertEquals(
+            MushafGrid.HEAD_GUTTER - ENGLISH_HEAD_GUTTER,
+            MUSHAF_ENGLISH_BANDS.well - MushafGrid.TEXT_LINES,
+            0.0001f,
+        )
+        assertTrue(MUSHAF_ENGLISH_BANDS.well > MushafGrid.TEXT_LINES)
     }
 
     @Test

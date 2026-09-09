@@ -135,7 +135,11 @@ class EnglishBookCache(context: Context) {
          *
          * 21: 1,250, giving back some of the hand 20 spent — 18.2 sp and 48
          * characters to the line. Every leaf moves again.
+         *
+         * 22: the head gutter is one line of prose rather than one Arabic
+         * unit, so the well is taller and the hand solved from it a hair
+         * bigger. The leaf holds a little more.
          */
-        const val FORMAT = 21
+        const val FORMAT = 22
     }
 }
