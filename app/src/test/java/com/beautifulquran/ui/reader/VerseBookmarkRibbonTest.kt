@@ -20,6 +20,17 @@ class VerseBookmarkRibbonTest {
     }
 
     @Test
+    fun gatherOrdinal_sitsInTheGoldTopCorner() {
+        assertEquals(16f, GatherOrdinalSp)
+        assertEquals(14f, GatherOrdinalEdgeInsetDp)
+        assertEquals(6f, GatherOrdinalTopInsetDp)
+        assertEquals(24f, GatherOrdinalSlotWidthDp)
+        assertEquals(38f, GatherOrdinalEdgeInsetDp + GatherOrdinalSlotWidthDp)
+        assertEquals(38f, BookmarkStripWidth.value)
+        assertEquals(54f, BookmarkStripWidth.value + BookmarkTapOutsetDp)
+    }
+
+    @Test
     fun completedPlaceUnfurl_consumesOnlyItsOwnGeneration() {
         assertEquals(0, remainingUnfurlSignal(current = 3, consumed = 3))
         assertEquals(4, remainingUnfurlSignal(current = 4, consumed = 3))

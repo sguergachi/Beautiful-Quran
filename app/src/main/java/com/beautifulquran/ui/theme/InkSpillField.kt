@@ -346,7 +346,7 @@ private const val VellumFieldFunctions = """
     }
 """
 
-private const val VellumFieldShader = """
+internal const val VellumFieldShader = """
     uniform float2 resolution;
     uniform float2 spotlight;
     uniform float2 bodyCenter;
@@ -394,7 +394,8 @@ private const val VellumFieldShader = """
 /**
  * A circular ink drop on vellum. The silhouette is a circle; fibre and
  * a capillary halo live only in the rim so the box never clips a lobe.
- * [progress] grows the soak.
+ * [progress] grows the soak. [fill] > 0.5 soaks a rounded rectangle
+ * with the guide field's fibre warp — organic, not an oval, not a slab.
  */
 internal const val VellumSpotShader = """
     uniform float2 resolution;
@@ -402,43 +403,85 @@ internal const val VellumSpotShader = """
     uniform float seed;
     uniform float fadeSoftness;
     uniform float vellumGrain;
+    uniform float fill;
     layout(color) uniform half4 inkColor;
 """ + VellumPigmentFunctions + """
     half4 main(float2 fragCoord) {
         float2 res = max(resolution, float2(1.0, 1.0));
-        float reach = 0.5 * min(res.x, res.y);
         float2 origin = fragCoord + float2(seed * 17.0, seed * 11.0);
-        float2 center = 0.5 * res + (float2(
-            hash(float2(seed, 1.3)),
-            hash(float2(seed, 4.7))
-        ) - 0.5) * reach * 0.04;
-        float2 p = (fragCoord - center) / reach;
-        float r = length(p);
-        float ang = atan(p.y, p.x);
         float fibre = brushedPigment(origin);
-        // Rim-only irregularity — the drop stays a circle.
-        float rimWobble = 0.025 * sin(ang * 3.0 + seed)
-            + 0.02 * (fibre - 0.5);
-        float radius = 0.56 + rimWobble;
-        float soak = mix(0.55, 1.0, progress);
-        float edge = r - radius * soak;
-        float body = 1.0 - smoother(clamp(edge / 0.18 + 0.15, 0.0, 1.0));
-        float pool = 1.0 - smoother(clamp(r / 0.34, 0.0, 1.0));
-        float density = body * (0.40 + 0.60 * pool);
-        float halo = exp(-max(edge, 0.0) * 18.0) * 0.38 * progress;
-        density = max(density, halo * (0.35 + 0.65 * fibre));
+        float density;
+        float appear;
+        float r;
+        if (fill > 0.5) {
+            // Pale even rounded-rect. Fibre warps the rim only — a
+            // wash the type can sit on, not a pooled airbrush blob.
+            float2 center = 0.5 * res + (float2(
+                hash(float2(seed, 1.3)),
+                hash(float2(seed, 4.7))
+            ) - 0.5) * res * 0.006;
+            float2 p = fragCoord - center;
+            float2 halfSize = 0.5 * res * mix(0.36, 0.93, progress);
+            float cr = min(halfSize.x, halfSize.y) * 0.12;
+            float2 q = abs(p) - halfSize + cr;
+            float sdf = length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - cr;
+            float clouds = noise(origin * float2(0.006, 0.008)) * 0.65
+                + noise(origin * float2(0.017, 0.021)) * 0.35;
+            float fibres = noise(origin * float2(0.055, 0.071));
+            float texture = (clouds - 0.5) + (fibres - 0.5) * 0.18;
+            float lobes = noise(float2(seed, seed) + fragCoord * 0.018) - 0.5;
+            float rimGate = smoother(clamp(1.0 + sdf / 10.0, 0.0, 1.0));
+            float warp = (texture * 0.028 + (fibre - 0.5) * 0.018 + lobes * 0.016)
+                * min(halfSize.x, halfSize.y) * rimGate;
+            sdf -= warp;
+            float diffusion = 4.5;
+            density = 1.0 / (1.0 + exp(sdf / diffusion));
+            // Kill the long logistic halo so the silhouette stays a rectangle.
+            density *= 1.0 - smoother(clamp((sdf - 6.0) / 5.0, 0.0, 1.0));
+            appear = progress;
+            float2 boxEdge = abs(fragCoord - 0.5 * res) / max(0.5 * res, float2(1.0));
+            r = max(boxEdge.x, boxEdge.y);
+        } else {
+            float circleAxis = 0.5 * min(res.x, res.y);
+            float2 reach = float2(circleAxis);
+            float2 center = 0.5 * res + (float2(
+                hash(float2(seed, 1.3)),
+                hash(float2(seed, 4.7))
+            ) - 0.5) * reach * 0.04;
+            float2 p = (fragCoord - center) / max(reach, float2(1.0));
+            r = length(p);
+            float ang = atan(p.y, p.x);
+            float rimWobble = 0.025 * sin(ang * 3.0 + seed)
+                + 0.02 * (fibre - 0.5);
+            float radius = 0.56 + rimWobble;
+            float soak = mix(0.55, 1.0, progress);
+            float edge = r - radius * soak;
+            float body = 1.0 - smoother(clamp(edge / 0.18 + 0.15, 0.0, 1.0));
+            float pool = 1.0 - smoother(clamp(r / 0.34, 0.0, 1.0));
+            density = body * (0.40 + 0.60 * pool);
+            float halo = exp(-max(edge, 0.0) * 18.0) * 0.38 * progress;
+            density = max(density, halo * (0.35 + 0.65 * fibre));
+            appear = progress;
+        }
         float rim = 4.0 * density * (1.0 - density);
-        float grain = max(vellumGrain, 0.08);
+        // Verse washes keep grain on the rim; a drop may mottle its pool.
+        float grain = mix(max(vellumGrain, 0.08), vellumGrain, fill);
+        float grainAmp = mix(1.6 + 2.2 * rim, 0.35 + 2.4 * rim, fill);
         density = clamp(
-            density * (1.0 + (fibre - 0.5) * grain * (1.6 + 2.2 * rim))
+            density * (1.0 + (fibre - 0.5) * grain * grainAmp)
                 + (hash(floor(origin)) - 0.5) * rim / 200.0,
             0.0,
             1.0
         );
         // Hard zero before the box edge so Compose never shears the drop.
-        density *= 1.0 - smoother(clamp((r - 0.92) / 0.08, 0.0, 1.0));
+        float clipStart = mix(0.92, 0.985, fill);
+        density *= 1.0 - smoother(clamp((r - clipStart) / 0.08, 0.0, 1.0));
         float coverage = vellumCoverage(density);
-        half alpha = inkColor.a * half(coverage * progress);
+        // Circular drops pool in the centre. Verse washes stay even so
+        // the type remains readable.
+        float sourcePool = smoother(clamp((0.55 - r) / 0.55, 0.0, 1.0));
+        coverage = 1.0 - pow(1.0 - coverage, 1.0 + 0.55 * sourcePool * (1.0 - fill));
+        half alpha = inkColor.a * half(coverage * appear);
         return half4(inkColor.rgb * alpha, alpha);
     }
 """

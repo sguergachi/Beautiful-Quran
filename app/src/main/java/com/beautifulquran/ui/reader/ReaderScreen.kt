@@ -128,6 +128,7 @@ import com.beautifulquran.data.ReadingMode
 import com.beautifulquran.data.model.Surah
 import com.beautifulquran.domain.EnglishVerseAlignments
 import com.beautifulquran.domain.englishSeekWordPosition
+import com.beautifulquran.ui.share.ShareRibbon
 import com.beautifulquran.domain.BASMALAH_PLAYLIST_AYAH
 import com.beautifulquran.domain.MushafToken
 import com.beautifulquran.domain.mushafFontPreloadPages
@@ -141,6 +142,7 @@ import com.beautifulquran.ui.theme.InkRevealOverlay
 import com.beautifulquran.ui.theme.absorbPointerEvents
 import com.beautifulquran.ui.theme.contrastingOverlayColorScheme
 import com.beautifulquran.ui.theme.contextualGuideProgressiveBlur
+import com.beautifulquran.ui.theme.paperToggleHaptic
 import com.beautifulquran.ui.theme.verticalFadingEdges
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -251,6 +253,14 @@ fun ReaderScreen(
     /** 1-based ordinal for a gathered verse, or null when not selected. */
     gatherOrdinal: (surahId: Int, ayah: Int) -> Int? = { _, _ -> null },
     onToggleGatheredAyah: (surahId: Int, ayah: Int) -> Unit = { _, _ -> },
+    shareCount: Int = 0,
+    preparingShareText: Boolean = false,
+    preparingShareImage: Boolean = false,
+    shareError: String? = null,
+    onShareMarkTap: (surahId: Int, ayah: Int) -> Unit = { _, _ -> },
+    onShareCancel: () -> Unit = {},
+    onShareText: () -> Unit = {},
+    onShareImage: () -> Unit = {},
 ) {
     LaunchedEffect(surahId) { viewModel.load(surahId) }
     DisposableEffect(onAyahSelectorExpandedChange) {
@@ -1816,36 +1826,48 @@ fun ReaderScreen(
                             .padding(vertical = 6.dp),
                     )
                 }
-                PlayerBar(
-                    state = playerState,
-                    isThisSurahLoaded = isThisSurahPlaying,
-                    enabled = !contextualGuideOpen,
-                    chromeAlpha = { chromeAlpha.value },
-                    reciterName = uiState.currentReciter?.name.orEmpty(),
-                    onPlayPause = {
-                        if (isThisSurahPlaying) {
-                            if (playerState.isPlaying) {
-                                viewModel.player.togglePlayPause()
+                if (gathering) {
+                    ShareRibbon(
+                        count = shareCount,
+                        preparingText = preparingShareText,
+                        preparingImage = preparingShareImage,
+                        error = shareError,
+                        onCancel = onShareCancel,
+                        onShareText = onShareText,
+                        onShareImage = onShareImage,
+                    )
+                } else {
+                    PlayerBar(
+                        state = playerState,
+                        isThisSurahLoaded = isThisSurahPlaying,
+                        enabled = !contextualGuideOpen,
+                        chromeAlpha = { chromeAlpha.value },
+                        reciterName = uiState.currentReciter?.name.orEmpty(),
+                        onPlayPause = {
+                            if (isThisSurahPlaying) {
+                                if (playerState.isPlaying) {
+                                    viewModel.player.togglePlayPause()
+                                } else {
+                                    dispatch(ReaderInteractionEvent.EnableFollow)
+                                    if (requestedJumpAyah > 0) {
+                                        val selectedAyah = selectedPlaybackAyah()
+                                        viewModel.playLoadedFromAyah(selectedAyah)
+                                    } else {
+                                        viewModel.player.togglePlayPause()
+                                    }
+                                }
                             } else {
                                 dispatch(ReaderInteractionEvent.EnableFollow)
-                                if (requestedJumpAyah > 0) {
-                                    val selectedAyah = selectedPlaybackAyah()
-                                    viewModel.playLoadedFromAyah(selectedAyah)
-                                } else {
-                                    viewModel.player.togglePlayPause()
-                                }
+                                viewModel.playFromAyah(selectedPlaybackAyah())
                             }
-                        } else {
-                            dispatch(ReaderInteractionEvent.EnableFollow)
-                            viewModel.playFromAyah(selectedPlaybackAyah())
-                        }
-                    },
-                    onFastBackward = viewModel::fastBackward,
-                    onFastForward = viewModel::fastForward,
-                    onRepeatClick = { showRepeatDialog = true },
-                    onSpeed = viewModel::cycleSpeed,
-                    onReciterClick = onOpenSettings,
-                )
+                        },
+                        onFastBackward = viewModel::fastBackward,
+                        onFastForward = viewModel::fastForward,
+                        onRepeatClick = { showRepeatDialog = true },
+                        onSpeed = viewModel::cycleSpeed,
+                        onReciterClick = onOpenSettings,
+                    )
+                }
             }
         },
     ) { padding ->
@@ -2995,6 +3017,11 @@ fun ReaderScreen(
                                 bookmarkNoteTipSurah == ayah.surahId &&
                                 bookmarkNoteTipAyah == ayah.number
                             val ribbonBookmarked = bookmarked || bookmarkLessonTarget
+                            val gatheredHere = if (gathering) {
+                                gatherOrdinal(ayah.surahId, ayah.number)
+                            } else {
+                                null
+                            }
                             Box(
                                 Modifier.contextualGuideProgressiveBlur(
                                     enabled = settings.developerModeEnabled &&
@@ -3119,13 +3146,20 @@ fun ReaderScreen(
                                 } else {
                                     null
                                 },
-                                gatherOrdinal = if (gathering) {
-                                    gatherOrdinal(ayah.surahId, ayah.number)
-                                } else {
-                                    null
+                                gatherOrdinal = gatheredHere,
+                                onAyahMarkClick = {
+                                    view.paperToggleHaptic(
+                                        turningOn = gatheredHere == null,
+                                    )
+                                    onShareMarkTap(ayah.surahId, ayah.number)
                                 },
                                 onWordClick = if (gathering) {
-                                    { onToggleGatheredAyah(ayah.surahId, ayah.number) }
+                                    {
+                                        view.paperToggleHaptic(
+                                            turningOn = gatheredHere == null,
+                                        )
+                                        onToggleGatheredAyah(ayah.surahId, ayah.number)
+                                    }
                                 } else {
                                     wordClick@{ word ->
                                         if (editingAnnotationAyah != 0) return@wordClick
@@ -3150,7 +3184,12 @@ fun ReaderScreen(
                                     }
                                 },
                                 onAyahClick = if (gathering) {
-                                    { onToggleGatheredAyah(ayah.surahId, ayah.number) }
+                                    {
+                                        view.paperToggleHaptic(
+                                            turningOn = gatheredHere == null,
+                                        )
+                                        onToggleGatheredAyah(ayah.surahId, ayah.number)
+                                    }
                                 } else {
                                     ayahClick@{
                                         if (editingAnnotationAyah != 0) return@ayahClick

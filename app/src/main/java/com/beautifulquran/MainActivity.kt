@@ -296,6 +296,7 @@ private fun PaperStackApp(
     onRecordSystemTrace: () -> Unit,
 ) {
     val app = LocalContext.current.applicationContext as QuranApp
+    val activity = LocalContext.current as? android.app.Activity
     val homeViewModel: HomeViewModel = viewModel(factory = AppViewModelFactory)
     val bookmarksViewModel: BookmarksViewModel = viewModel(factory = AppViewModelFactory)
     val readerViewModel: ReaderViewModel = viewModel(factory = AppViewModelFactory)
@@ -490,6 +491,10 @@ private fun PaperStackApp(
         tarjiLabVisible ||
         labRendered || rootRendered || chooserRendered || ornamentsLabRendered || tarjiLabRendered ||
         readerInkOverlayVisible || shareUi.sendOpen || shareSendRendered
+    val readerSheetOpen = selectedSurahId != 0 && settledLayer == AYAH_LAYER
+    LaunchedEffect(readerSheetOpen) {
+        if (!readerSheetOpen) shareViewModel.onLeaveReaderSheet()
+    }
     val mushafPageTurns = settings.readingLayout == ReadingLayout.MUSHAF &&
         selectedSurahId != 0 &&
         settledLayer == AYAH_LAYER
@@ -985,6 +990,16 @@ private fun PaperStackApp(
                         gathering = shareUi.gathering,
                         gatherOrdinal = { sid, a -> shareUi.ordinals[AyahRef(sid, a)] },
                         onToggleGatheredAyah = shareViewModel::toggle,
+                        shareCount = shareUi.selection.size,
+                        preparingShareText = shareUi.preparingText,
+                        preparingShareImage = shareUi.preparingImage,
+                        shareError = shareUi.error,
+                        onShareMarkTap = shareViewModel::onMarkTap,
+                        onShareCancel = shareViewModel::onChromeCancel,
+                        onShareText = { shareViewModel.shareAsText() },
+                        onShareImage = {
+                            if (activity != null) shareViewModel.shareAsImage(activity)
+                        },
                     )
                 }
 

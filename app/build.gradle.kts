@@ -10,7 +10,10 @@ plugins {
 fun env(name: String): String? = System.getenv(name)?.takeIf { it.isNotBlank() }
 
 fun findReleaseKeystore(): File {
-    env("RELEASE_KEYSTORE_FILE")?.let { return rootProject.file(it) }
+    env("RELEASE_KEYSTORE_FILE")?.let { path ->
+        val file = File(path)
+        return if (file.isAbsolute) file else rootProject.file(path)
+    }
     rootProject.file("release.keystore").takeIf(File::isFile)?.let { return it }
 
     // Linked worktrees do not inherit ignored files. Their .git marker points

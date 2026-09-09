@@ -903,6 +903,7 @@ private fun PreviewEnglishLyric(
                 color = gold,
                 fontSize = PreviewLyricSize * 17f / 22f,
             ),
+            ltr = true,
         )
     }
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
