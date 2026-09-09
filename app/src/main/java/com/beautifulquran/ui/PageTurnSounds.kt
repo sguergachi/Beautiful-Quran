@@ -193,7 +193,7 @@ class PageTurnSounds(context: Context) {
     }
 
     companion object {
-        private const val VOLUME = 0.09f
+        private const val VOLUME = 0.045f
         // A touch under natural pitch so the cover reads heavier than a page.
         private const val COVER_OPEN_RATE = 0.92f
         private const val START_EPS = 0.03f
