@@ -124,6 +124,7 @@ private const val FONT_SCALE_MIN = 0.8f
 private const val FONT_SCALE_MAX = 1.6f
 private const val FONT_SCALE_STOPS = 8 // intervals; nine tappable stops
 private val FONT_SCALE_STEP = (FONT_SCALE_MAX - FONT_SCALE_MIN) / FONT_SCALE_STOPS
+private val PINCH_SCALE_THRESHOLD = FONT_SCALE_STEP * 0.6f
 
 internal enum class SettingsDetail { CUSTOMIZE, DOWNLOADS }
 
@@ -145,6 +146,20 @@ internal fun nudgeFontScale(scale: Float, deltaStops: Int): Float {
         .coerceIn(0, FONT_SCALE_STOPS)
     val next = (current + deltaStops).coerceIn(0, FONT_SCALE_STOPS)
     return FONT_SCALE_MIN + next * FONT_SCALE_STEP
+}
+
+/** Maps a relative pinch to Customize stops with a quiet deadband around each boundary. */
+internal fun pinchFontScale(openingScale: Float, zoom: Float, acceptedScale: Float): Float {
+    if (!zoom.isFinite() || zoom <= 0f) return acceptedScale
+    val pinchedScale = openingScale * zoom
+    var next = acceptedScale
+    while (pinchedScale >= next + PINCH_SCALE_THRESHOLD && next < FONT_SCALE_MAX) {
+        next = nudgeFontScale(next, 1)
+    }
+    while (pinchedScale <= next - PINCH_SCALE_THRESHOLD && next > FONT_SCALE_MIN) {
+        next = nudgeFontScale(next, -1)
+    }
+    return next
 }
 
 /** Settings as its own sheet of paper — a full page, nothing floating, no

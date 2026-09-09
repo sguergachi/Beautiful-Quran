@@ -13,23 +13,38 @@ import com.beautifulquran.data.model.SurahContent
 import com.beautifulquran.data.model.Word
 import com.beautifulquran.data.model.WordMorphology
 import com.beautifulquran.data.model.WordSearchHit
+import com.beautifulquran.domain.ENGLISH_LEAF_MARK_CHARS
+import com.beautifulquran.domain.EnglishTypography
 import com.beautifulquran.domain.MushafCatalog
 import com.beautifulquran.domain.MushafSourceWord
+import com.beautifulquran.domain.SearchConcept
 import com.beautifulquran.domain.WORD_SEARCH_MAX_HITS
 import com.beautifulquran.domain.WordSearchAyahContext
 import com.beautifulquran.domain.WordSearchIndexEntry
+import com.beautifulquran.domain.WordSearchSources
 import com.beautifulquran.domain.buildMushafCatalog
+import com.beautifulquran.domain.conceptRelevance
 import com.beautifulquran.domain.isWordSearchQuery
 import com.beautifulquran.domain.matchWordSearch
-import com.beautifulquran.domain.normalizeArabicForSearch
+import com.beautifulquran.domain.parseSearchQuery
+import com.beautifulquran.domain.quickSearchFallbackTerm
+import com.beautifulquran.domain.quranWordKey
 import com.beautifulquran.timingslab.OverrideEntry
 import com.beautifulquran.timingslab.OverrideKey
 import com.beautifulquran.timingslab.TimingOverrides
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlin.math.abs
+
+/** Leaves whose English text is held resident — the page and its neighbours,
+ * matching the QCF face window. */
+private const val MUSHAF_LEAF_TEXT_CACHE = 12
 
 private fun Segment.shiftBy(ms: Long) = copy(startMs = startMs + ms, endMs = endMs + ms)
 
@@ -103,6 +118,7 @@ class QuranRepository(
      * here instead of the bundled DB row. Null keeps this class usable from
      * JVM unit tests that don't ship an override store. */
     private val timingOverrides: TimingOverrides? = null,
+    private val searchConcepts: SearchConceptRepository? = null,
 ) {
 
     /** Change signal for the Lab's on-device corrections: emits whenever the
@@ -126,6 +142,31 @@ class QuranRepository(
     /** Lazily built once — 604 Madinah pages from qcf_page / qcf_line. */
     @Volatile
     private var mushafCatalog: MushafCatalog? = null
+
+    /** Lazily built once — 6,236 verse lengths, for the English book's leaves. */
+    @Volatile
+    private var englishVerseProse: Map<Long, Int>? = null
+    private var englishVerseGloss: Map<Long, Int>? = null
+    private var englishVerseTextCache: Map<Long, String>? = null
+    private var englishVerseGlossText: Map<Long, String>? = null
+
+    /**
+     * Verse translations for the English leaf, a page at a time.
+     *
+     * Only the chapter the reader opened is loaded ([surahContent]), and a leaf
+     * routinely carries verses of another — juz' 30 puts three chapters on one
+     * page. Held for the whole book these are 6,236 strings retained for the
+     * process lifetime for text no Arabic leaf ever draws, so they are fetched
+     * per page and kept in a window the size of the QCF face cache.
+     */
+    private val leafTranslationCache = object : LinkedHashMap<Int, Map<Long, String>>(
+        /* initialCapacity = */ 16,
+        /* loadFactor = */ 0.75f,
+        /* accessOrder = */ true,
+    ) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<Int, Map<Long, String>>) =
+            size > MUSHAF_LEAF_TEXT_CACHE
+    }
 
     /** Runs [sql] and maps every row with [map] — the shape of every query here. */
     private fun <T> queryList(sql: String, args: Array<String>? = null, map: (Cursor) -> T): List<T> =
@@ -235,6 +276,155 @@ class QuranRepository(
     }
 
     /**
+     * How long every verse's translation is, keyed by [quranWordKey] at
+     * position 1 — what the English book is paginated by.
+     *
+     * Lengths, not text: 6,236 integers rather than 1.4 MB of strings, and the
+     * pagination only ever asks how much paper a verse takes. Held for the
+     * process lifetime because it is the book's own structure and does not
+     * change.
+     */
+    suspend fun englishVerseProse(text: EnglishLeafText): Map<Long, Int> =
+        withContext(Dispatchers.IO) {
+            when (text) {
+                // The text itself, not just its length: the pagination cuts a
+                // carried verse at a sentence end, and only the string knows
+                // where those are.
+                EnglishLeafText.TRANSLATION -> englishVerseProse ?: queryList(
+                    "SELECT surah_id, ayah_number, translation_en FROM ayahs",
+                ) { c ->
+                    quranWordKey(c.getInt(0), c.getInt(1), 1) to measure(c.getString(2))
+                }.toMap().also { englishVerseProse = it }
+
+                // The gloss chain has to be built to be measured — lyricize
+                // drops a phrase repeated across the words it spans, so its
+                // length is not the sum of the glosses. One pass over the word
+                // table, once, behind the same cache as the other.
+                EnglishLeafText.GLOSS -> englishVerseGloss ?: buildMap {
+                    forEachGlossVerse(null) { key, chain -> put(key, measure(chain)) }
+                }.also { englishVerseGloss = it }
+            }
+        }
+
+    /**
+     * The word-by-word gloss of every verse, stitched into a line the way the
+     * scrolling reader stitches it ([EnglishTypography.lyricize]) — every
+     * Arabic word's own English, in the recitation's own order.
+     *
+     * [page] restricts it to the verses that *begin* on one Madinah leaf, the
+     * same rule [mushafPageTranslations] uses; null walks the whole book, which
+     * is what the pagination needs.
+     */
+    private fun forEachGlossVerse(page: Int?, out: (Long, String) -> Unit) {
+        val where = if (page == null) "" else
+            "JOIN words f ON f.surah_id = w.surah_id AND f.ayah_number = w.ayah_number " +
+                "AND f.position = 1 AND f.qcf_page = ?"
+        val rows = queryList(
+            """
+            SELECT w.surah_id, w.ayah_number, w.arabic, w.translation_en
+            FROM words w
+            $where
+            ORDER BY w.surah_id, w.ayah_number, w.position
+            """.trimIndent(),
+            page?.let { arrayOf(it.toString()) },
+        ) { c ->
+            GlossRow(c.getInt(0), c.getInt(1), c.getString(2), c.getString(3))
+        }
+        var surah = -1
+        var ayah = -1
+        val arabic = ArrayList<String>()
+        val gloss = ArrayList<String>()
+        fun flush() {
+            if (surah < 0 || gloss.isEmpty()) return
+            val line = EnglishTypography.lyricize(gloss, arabic)
+                .filter { it.isNotBlank() }
+                .joinToString(" ")
+            out(quranWordKey(surah, ayah, 1), line)
+        }
+        rows.forEach { row ->
+            if (row.surah != surah || row.ayah != ayah) {
+                flush()
+                surah = row.surah
+                ayah = row.ayah
+                arabic.clear()
+                gloss.clear()
+            }
+            arabic += row.arabic
+            gloss += row.gloss
+        }
+        flush()
+    }
+
+    /**
+     * Every verse's English, as the leaf sets it.
+     *
+     * The lengths are enough to *count* a leaf; measuring one needs the words.
+     * 1.4 MB of strings against 6,236 integers, and held for the same reason —
+     * it is the book's own text and does not change.
+     */
+    suspend fun englishVerseText(text: EnglishLeafText): Map<Long, String> =
+        withContext(Dispatchers.IO) {
+            when (text) {
+                EnglishLeafText.TRANSLATION -> englishVerseTextCache ?: queryList(
+                    "SELECT surah_id, ayah_number, translation_en FROM ayahs",
+                ) { c ->
+                    quranWordKey(c.getInt(0), c.getInt(1), 1) to c.getString(2)
+                }.toMap().also { englishVerseTextCache = it }
+
+                EnglishLeafText.GLOSS -> englishVerseGlossText ?: buildMap {
+                    forEachGlossVerse(null) { key, chain -> put(key, chain) }
+                }.also { englishVerseGlossText = it }
+            }
+        }
+
+    /** What one verse's English costs the pagination. */
+    private fun measure(text: String) = text.length + ENGLISH_LEAF_MARK_CHARS
+
+    private class GlossRow(
+        val surah: Int,
+        val ayah: Int,
+        val arabic: String,
+        val gloss: String,
+    )
+
+    /**
+     * The translation of every verse that *begins* on one Madinah page, keyed
+     * by [quranWordKey] at position 1.
+     *
+     * This is what the English leaf is set from, and the join says the rule:
+     * a verse belongs to the leaf its first word falls on, because a sentence
+     * cannot be cut at a page break (see `domain/EnglishLeaf.kt`). At most
+     * forty rows, so the query is small; the window is what keeps a swipe from
+     * going back to SQLite for a leaf the reader has just turned away from and
+     * is about to turn back to.
+     */
+    suspend fun mushafPageTranslations(
+        page: Int,
+        text: EnglishLeafText = EnglishLeafText.TRANSLATION,
+    ): Map<Long, String> =
+        withContext(Dispatchers.IO) {
+            if (text == EnglishLeafText.GLOSS) {
+                return@withContext buildMap { forEachGlossVerse(page) { k, v -> put(k, v) } }
+            }
+            synchronized(leafTranslationCache) { leafTranslationCache[page] }
+                ?.let { return@withContext it }
+            val verses = queryList(
+                """
+                SELECT a.surah_id, a.ayah_number, a.translation_en
+                FROM ayahs a
+                JOIN words w
+                  ON w.surah_id = a.surah_id AND w.ayah_number = a.ayah_number
+                WHERE w.position = 1 AND w.qcf_page = ?
+                """.trimIndent(),
+                arrayOf(page.toString()),
+            ) { c ->
+                quranWordKey(c.getInt(0), c.getInt(1), 1) to c.getString(2)
+            }.toMap()
+            synchronized(leafTranslationCache) { leafTranslationCache[page] = verses }
+            verses
+        }
+
+    /**
      * Resolves user bookmark keys to their immutable Quran text and chapter
      * metadata. Keys are queried in bounded batches to stay below SQLite's
      * bind-argument limit even when a reader has marked hundreds of verses.
@@ -327,61 +517,188 @@ class QuranRepository(
         }
 
     /**
-     * Quran-wide word search for the cover sheet: Arabic (diacritic-insensitive),
-     * English gloss, or transliteration substring. Returns hits in mushaf order.
+     * Ranked Quran-wide search for literal text, semantic vocabulary, related
+     * roots, concepts, and last-resort spelling. Quoted queries stay literal.
      * Blank / too-short / `surah:ayah` queries yield an empty list.
      */
-    suspend fun searchWords(query: String): List<WordSearchHit> = withContext(Dispatchers.IO) {
-        if (!isWordSearchQuery(query)) return@withContext emptyList()
-        matchWordSearch(wordSearchIndex(), query, WORD_SEARCH_MAX_HITS)
+    suspend fun searchWords(
+        query: String,
+        sources: WordSearchSources,
+    ): List<WordSearchHit> {
+        if (!isWordSearchQuery(query)) return emptyList()
+        val (index, vocabulary) = searchData()
+        return withContext(Dispatchers.Default) {
+            val context = currentCoroutineContext()
+            matchWordSearch(
+                index,
+                query,
+                WORD_SEARCH_MAX_HITS,
+                vocabulary?.concepts.orEmpty(),
+                vocabulary?.thesaurus.orEmpty(),
+                checkCancelled = context::ensureActive,
+                sources = sources,
+            )
+        }
     }
 
+    /**
+     * Small literal-first result set shown while the complete semantic index
+     * finishes warming. Only matching ayahs are materialized, so first ink is
+     * independent of the 77k-row full-index cost.
+     */
+    suspend fun searchWordsQuick(
+        query: String,
+        sources: WordSearchSources,
+    ): List<WordSearchHit> {
+        if (!isWordSearchQuery(query)) return emptyList()
+        val parsed = parseSearchQuery(query)
+        val literal = parsed.text.lowercase()
+        val quickIndex = withContext(Dispatchers.IO) {
+            var keys = literalSearchKeys(literal, sources)
+            if (keys.isEmpty()) {
+                val fallback = quickSearchFallbackTerm(literal)
+                    ?: return@withContext emptyList()
+                keys = literalSearchKeys(fallback, sources)
+                if (keys.isEmpty()) keys = literalSearchKeys(fallback.take(3), sources)
+            }
+            if (keys.isEmpty()) return@withContext emptyList()
+            loadWordSearchIndex(keys)
+        }
+        val literalHits = rankQuickIndex(quickIndex, query, sources)
+        if (literalHits.isNotEmpty()) return literalHits
+        val concepts = withContext(Dispatchers.IO) { searchConcepts?.concepts() }.orEmpty()
+        val relevant = concepts.filter { conceptRelevance(it, parsed, allowFuzzy = false) > 0 }
+            .ifEmpty { concepts.filter { conceptRelevance(it, parsed, allowFuzzy = true) > 0 } }
+        val conceptKeys = relevant.asSequence()
+            .flatMap { it.ayahKeys.asSequence() }
+            .distinct()
+            .take(600)
+            .toList()
+            .toIntArray()
+        if (conceptKeys.isEmpty()) return emptyList()
+        val conceptIndex = withContext(Dispatchers.IO) { loadWordSearchIndex(conceptKeys) }
+        return rankQuickIndex(conceptIndex, query, sources, relevant)
+    }
+
+    private suspend fun rankQuickIndex(
+        index: List<WordSearchIndexEntry>,
+        query: String,
+        sources: WordSearchSources,
+        concepts: List<SearchConcept> = emptyList(),
+    ): List<WordSearchHit> {
+        if (index.isEmpty()) return emptyList()
+        return withContext(Dispatchers.Default) {
+            val context = currentCoroutineContext()
+            matchWordSearch(
+                index,
+                query,
+                WORD_SEARCH_MAX_HITS,
+                concepts = concepts,
+                checkCancelled = context::ensureActive,
+                sources = sources,
+            )
+        }
+    }
+
+    /** Warms the compact semantic candidate set without competing with typing. */
+    suspend fun warmSearch() = withContext(Dispatchers.IO) {
+        searchConcepts?.concepts()
+    }
+
+    private suspend fun searchData() = coroutineScope {
+        val index = async(Dispatchers.IO) { wordSearchIndex() }
+        val vocabulary = async(Dispatchers.IO) { searchConcepts?.vocabulary() }
+        index.await() to vocabulary.await()
+    }
+
+    @Synchronized
     private fun wordSearchIndex(): List<WordSearchIndexEntry> {
         wordSearchIndex?.let { return it }
-        // One shared context per ayah rather than per word: `Cursor.getString()`
-        // returns a fresh String for every row, so binding the ayah/surah
-        // columns straight onto each of the 77k word entries duplicated ~31 M
-        // characters (see [WordSearchAyahContext]). The map is local — the
-        // contexts stay alive only through the entries that reference them.
-        val contexts = HashMap<Int, WordSearchAyahContext>(7_000)
+        return loadWordSearchIndex().also {
+            wordSearchIndex = it
+        }
+    }
+
+    private fun literalSearchKeys(term: String, sources: WordSearchSources): IntArray {
+        val escaped = term.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        val selects = buildList {
+            if (sources.wordGloss) {
+                add("SELECT surah_id, ayah_number FROM words WHERE LOWER(translation_en) LIKE ? ESCAPE '\\'")
+            }
+            if (sources.verseTranslation) {
+                add("SELECT surah_id, ayah_number FROM ayahs WHERE LOWER(translation_en) LIKE ? ESCAPE '\\'")
+            }
+        }
+        if (selects.isEmpty()) return intArrayOf()
+        val pattern = "%$escaped%"
+        return queryList(
+            selects.joinToString(" UNION ", postfix = " ORDER BY surah_id, ayah_number LIMIT 600"),
+            Array(selects.size) { pattern },
+        ) { c -> c.getInt(0) * 1_000 + c.getInt(1) }.toIntArray()
+    }
+
+    private fun loadWordSearchIndex(keys: IntArray? = null): List<WordSearchIndexEntry> {
+        val keySet = keys?.joinToString(",")
+        val ayahFilter = keySet?.let { "WHERE a.surah_id * 1000 + a.ayah_number IN ($it)" }.orEmpty()
+        val wordFilter = keySet?.let { "WHERE w.surah_id * 1000 + w.ayah_number IN ($it)" }.orEmpty()
+        // Read ayah-wide strings only 6,236 times. Joining them onto the word
+        // cursor decoded and discarded the same large strings 77,429 times,
+        // making the first search pay for ~31 M transient characters.
+        val contexts = HashMap<Int, WordSearchAyahContext>(keys?.size ?: 7_000)
+        database.db.rawQuery(
+            """
+            SELECT a.surah_id, a.ayah_number, a.translation_en,
+                   s.name_transliteration, s.name_arabic
+            FROM ayahs a
+            JOIN surahs s ON s.id = a.surah_id
+            $ayahFilter
+            ORDER BY a.surah_id, a.ayah_number
+            """.trimIndent(),
+            null,
+        ).use { c ->
+            while (c.moveToNext()) {
+                val surahId = c.getInt(0)
+                val ayahNumber = c.getInt(1)
+                contexts[surahId * 1_000 + ayahNumber] = WordSearchAyahContext(
+                    ayahText = "",
+                    ayahTranslation = c.getString(2),
+                    surahNameTransliteration = c.getString(3),
+                    surahNameArabic = c.getString(4),
+                )
+            }
+        }
         val built = queryList(
             """
-            SELECT w.surah_id, w.ayah_number, w.position, w.arabic, w.translation_en, w.transliteration,
-                   a.text_uthmani, a.translation_en,
-                   s.name_transliteration, s.name_arabic
+            SELECT w.surah_id, w.ayah_number, w.position, w.arabic, w.translation_en,
+                   COALESCE(m.root, '')
             FROM words w
-            JOIN ayahs a
-              ON a.surah_id = w.surah_id AND a.ayah_number = w.ayah_number
-            JOIN surahs s ON s.id = w.surah_id
+            LEFT JOIN word_morphology m
+              ON m.surah_id = w.surah_id AND m.ayah_number = w.ayah_number AND m.position = w.position
+            $wordFilter
             ORDER BY w.surah_id, w.ayah_number, w.position
             """.trimIndent(),
+            null,
         ) { c ->
             val surahId = c.getInt(0)
             val ayahNumber = c.getInt(1)
             val arabic = c.getString(3)
             val translation = c.getString(4)
-            val transliteration = c.getString(5)
             WordSearchIndexEntry(
                 surahId = surahId,
                 ayahNumber = ayahNumber,
                 position = c.getInt(2),
                 arabic = arabic,
-                arabicNorm = normalizeArabicForSearch(arabic),
+                arabicNorm = "",
                 translation = translation,
                 translationLower = translation.lowercase(),
-                transliteration = transliteration,
-                transliterationLower = transliteration.lowercase(),
-                context = contexts.getOrPut(surahId * 1_000 + ayahNumber) {
-                    WordSearchAyahContext(
-                        ayahText = c.getString(6),
-                        ayahTranslation = c.getString(7),
-                        surahNameTransliteration = c.getString(8),
-                        surahNameArabic = c.getString(9),
-                    )
+                transliteration = "",
+                transliterationLower = "",
+                root = c.getString(5),
+                context = checkNotNull(contexts[surahId * 1_000 + ayahNumber]) {
+                    "Missing search context for $surahId:$ayahNumber"
                 },
             )
         }
-        wordSearchIndex = built
         return built
     }
 

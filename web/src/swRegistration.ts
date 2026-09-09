@@ -27,7 +27,11 @@ export function registerServiceWorker(): void {
 
 /** Ask the active worker to cache assets the boot path already downloaded. */
 function warmCriticalAssets(reg: ServiceWorkerRegistration): void {
-  const urls = [assetUrl('quran.db'), assetUrl('sql-wasm-browser.wasm')]
+  const urls = [
+    assetUrl('quran.db'),
+    assetUrl('search_concepts.json'),
+    assetUrl('sql-wasm-browser.wasm'),
+  ]
   const post = (sw: ServiceWorker) => {
     sw.postMessage({ type: 'WARM_ASSETS', urls })
   }

@@ -246,6 +246,12 @@ ReaderFocusController ── holds the LazyListState; the sole writer to it
   ayah rather than the fade-led visual target; when that ayah is now taller
   than the viewport, recovery goes directly to its active word instead of first
   pinning line one.
+- Pinching the scrolling reader moves its font scale through the same persisted
+  0.8×–1.6× stops as Customize. The two-pointer detector consumes only after a
+  second contact arrives, cancels any page-stack pull, and applies hysteresis
+  around each stop so hand jitter cannot repeatedly reflow the page. One-finger
+  scrolling and word gestures remain alone; the fixed-grid mushaf intentionally
+  does not resize.
 - Word-level follow is the engine's *secondary* constraint: while follow is on,
   each active word reports its list-viewport bounds and
   `ReaderFocusController.keepWordInView` applies a **bottom-only** reading-band
@@ -424,12 +430,15 @@ horizontal page turn — draggable, fling-able, with page-turn audio
   the seek lands. Scroll and mushaf hand one another their visible ayah/leaf
   when the reading layout changes.
 - `home/HomeScreen` — surah list with search (surah names / `surah:ayah`
-  references, plus Quran-wide word hits sectioned by surah with truncated
-  expand-in-place lists), a continue-listening card, and a floating playback
+  references, plus relevance-ranked literal, QAC-root, QSAC concept, and
+  Open English WordNet semantic hits; spelling correction is a last resort,
+  and enclosing a query in quotes keeps it literal). Results remain
+  sectioned by surah with truncated expand-in-place lists. See
+  [SEARCH.md](SEARCH.md). The sheet also holds a continue-listening card and a floating playback
   control (paper-native transport) while a verse is loaded in the session;
-  opening a word hit flashes that Arabic (and English gloss) word twice with
-  the orange repeat wash (directional wash in, dissolve out) on the reader. The reader's
-  embedded `PlayerBar` takes over once that sheet is open.
+  opening a word hit flashes that Arabic (and English gloss) word four quick
+  times with the orange repeat wash (directional wash in, dissolve out) on the
+  reader. The reader's embedded `PlayerBar` takes over once that sheet is open.
 - `reader/ReaderScreen` — the follow-along view. Scroll layout is
   `SurahHeader` + one `AyahBlock` per ayah in a `LazyColumn`. Mushaf layout
   is `MushafPager` (604 Madinah pages, same ink). `AyahBlock` renders
@@ -494,9 +503,12 @@ current ayah in the new voice when it changes on the settings sheet.
 ## Build & delivery
 
 CI (`.github/workflows/build.yml`) on every push: verify the committed
-`data/quran.db` asset → unit tests. On `master` only, it
-continues with **assembleRelease** (R8-minified, resource-shrunk; see
-docs/PERFORMANCE.md) → upload artifact → publish the APK to the rolling
-`latest` GitHub release. Release builds are signed with the repo's debug
-keystore so sideloaded installs update in place; swap in a real keystore
-before any store release.
+`data/quran.db` asset → unit tests. On `master` only, it restores the private
+release/upload keystore, continues with **assembleRelease** (R8-minified,
+resource-shrunk; see docs/PERFORMANCE.md), verifies the APK's signing
+certificate, then uploads the artifact and publishes it to the rolling
+`latest` GitHub release. Local debug and release APKs use that same keystore
+when present (including from the primary checkout of a linked worktree), so
+directly shared builds update one another; contributor clones without the key
+retain normal debug signing. Google Play Internal App Sharing remains a
+separate channel: Play re-signs every upload with its Google-owned test key.

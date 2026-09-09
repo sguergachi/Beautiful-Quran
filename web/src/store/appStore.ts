@@ -130,7 +130,12 @@ export interface AppState {
    * Pending home word-search flash — set by [openSurah] with a word position,
    * consumed by the reader after focus settles.
    */
-  pendingSearchFlash: { ayah: number; wordPosition: number } | null
+  pendingSearchFlash: {
+    ayah: number
+    wordPosition: number
+    wordPositions: number[]
+    text?: string
+  } | null
 }
 
 type Listener = () => void
@@ -441,7 +446,13 @@ class AppStore {
     QuranRepository.surahContent(surahId)
   }
 
-  openSurah(surahId: number, ayah = 1, wordPosition?: number) {
+  openSurah(
+    surahId: number,
+    ayah = 1,
+    wordPosition?: number,
+    searchText?: string,
+    wordPositions: number[] = [],
+  ) {
     const reciter =
       this.state.reciters.find((r) => r.id === this.state.settings.reciterId) ??
       this.state.reciters[0]
@@ -451,10 +462,18 @@ class AppStore {
     // the user actually plays a verse (see [rememberListened]).
     const openAyah = Math.max(1, ayah)
     const readerOpenRevision = this.state.readerOpenRevision + 1
-    const flashWord =
-      wordPosition != null && wordPosition > 0 ? wordPosition : null
-    const flash =
-      flashWord != null ? { ayah: openAyah, wordPosition: flashWord } : null
+    const flashWord = wordPosition != null && wordPosition >= 0 ? wordPosition : null
+    const flash = flashWord != null
+      ? {
+          ayah: openAyah,
+          wordPosition: flashWord,
+          wordPositions: [...new Set([
+            ...wordPositions.filter((position) => position > 0),
+            ...(flashWord > 0 ? [flashWord] : []),
+          ])],
+          text: searchText,
+        }
+      : null
     // Navigating away from the lexicon never resumes the pre-open session.
     const rootViewerClosing = this.state.rootViewer != null
     if (rootViewerClosing) {

@@ -180,6 +180,32 @@ for exactly this reason (`surah_name`, `basmallah`, `ayah`).
 
 **We follow it.** The band and the basmalah are centred; ayah lines are flush.
 
+**And the panel is ruled to one line's ink, not to one line's slot.** A slot is
+a line's ink and the leading around it. Ruling the panel to the whole slot —
+0.94 of it, so three percent of air a side — left it hard against its
+neighbours: measured on the last leaf of the Qur'an, where three chapters open,
+the line above each panel closed to 10–16 px of air while the basmalah below
+stood at 23. Cramped, and visibly tighter on one side than the other.
+
+Ruled to the ink alone (`MushafPanelBand` = 0.72) the slot's own leading becomes
+the panel's air, half above and half below, equal by construction: 23–29 px
+above and 36 px below on the same leaf, and what is left is glyph slack — the
+line above may end on a descender or an ayah mark where the basmalah below does
+not. Against a token gap that slack was the whole difference; against a seventh
+of a line it is not something the eye picks out.
+
+The name comes down with the band (`MushafPanelType` = 0.95, under the page's
+own hand rather than the step above it the deeper band could carry), because the
+cartouche is a quarter shallower and a name set larger than its band stops
+fitting inside it.
+
+Nothing else moves. The slot is the same slot, so an opening still costs the
+grid one line and the hand is still the one hand of all 604 pages (§2); only the
+rules inside the slot come in. This is the same law the English leaf sets the
+same panel by — see §13.7, which rules its band to one line's *measured* ink and
+centres it in a box of that plus `EnglishLeafPanelAir` on each side. One panel,
+one grammar, whichever language the leaf is set in.
+
 ## 11. The basmalah is written in the page's own hand
 
 It is not body text and not a stand-in from another face: the QCF set carries it
@@ -198,6 +224,935 @@ finding aid, not illumination, and takes ink at low strength — gold on cream
 has too little contrast to read.
 
 **We follow it.** See `LocalQuranAccents.gold` and the running head's ink.
+
+---
+
+## 13. The English leaf
+
+The same book, in the reader's language. Rules 1–12 are about the Arabic page;
+this section is the whole of what changes when the leaf is set in English, and
+nothing here overrides them — the Arabic leaf is unaffected.
+
+*Code: `domain/EnglishLeaf.kt` (what a leaf carries), `domain/EnglishLeafFit.kt`
+(what it is set in), `ui/reader/MushafEnglishSheet.kt` (how it is drawn).
+Measurements: `tools/measure_english_leaves.py`.*
+
+### 13.1 The book paginates itself
+
+The translation has no pagination of its own — no printing of it breaks where
+every other printing breaks. It borrowed the mushaf's for a while: an English
+leaf carried the verses that **began** on the Arabic leaf of the same number, so
+page 255 in English opened where page 255 opened.
+
+**That boundary is gone, and it was the whitespace.** A borrowed boundary is
+still a boundary: every Madinah page ended on a remainder, and once the type was
+large enough that a page took two or three leaves, roughly half of every leaf in
+the book *was* a remainder. Measured, 365 of 1,254 leaves came out under 70%
+full — a reader met a third of a blank page every other turn. The verses are
+now packed continuously, straight through the Arabic page breaks, and the same
+type gives 1,145 leaves at 91% full with 77 short ones instead of 365.
+
+What is still true, and is what the leaf actually rests on: a verse is a
+sentence, and a sentence cannot be cut at whatever word the calligrapher reached
+at the foot of *his* page. Verses are set whole across the Arabic break, in the
+mushaf's own order, so the English runs continuously with nothing repeated and
+nothing dropped. At the English book's own break it is different — that break is
+the book's to place, and §13.4 places it.
+
+Al-Fatihah is the one break the packing keeps — it opens the book on a leaf of
+its own, as it stands on a page of its own in every mushaf. Every other chapter
+runs on, its panel set inside the leaf where it falls, which is how a printed
+translation sets them; starting all 114 on a fresh leaf would leave 39 of them
+under a third full.
+
+**The two layouts are still one book, through the verse rather than the page.**
+`EnglishBook.leafOfVerse` is exact for all 6,236 verses, so the running head,
+the juzʾ, the dial, the reciter's own place on the paper and a reader who
+changes language all land on the words they were on. Each leaf records the
+Madinah page it *opens* on, and that is what the head and the juzʾ are read
+from.
+
+One rule the rest of the reader still has to honour: while the voice is inside a
+straddling verse, the leaf the reader is on is the verse's *opening* page, not
+the page that word is printed on. That is `MushafCatalog.readingPageOf`, and it
+is also why the English leaf does not lead-turn (rule 13.6).
+
+### 13.2 The text is the translation, not the gloss
+
+The scrolling reader's English is quran.com's word-by-word gloss, lyricized —
+an interlinear aid, and it reads as one ("Indeed this (is) your religion
+religion one"). A page of that is a crib. The leaf is a book, so it is set from
+the verse translation.
+
+### 13.3 One hand for the whole book, solved from the measure
+
+Rule 2 again, by a different route. The Arabic hand comes from the fixed 16.4 em
+line; the Latin one comes from the classical measure — a book line holds around
+forty-five characters. The hand is the size at which a leaf's worth of prose
+exactly fills the well, and it is *measured* rather than modelled: a reference
+block of exactly a leaf's mass (`englishLeafReferenceBlock`) is laid out at a
+probe size in the face, measure, rag and line-breaking it will really be drawn
+in — real prose of this translation, 74:29-36, whose characters per word and
+spread of word lengths are the closest of any run in the Qur'an to the whole of
+it — and
+
+```
+    H = probe · √( well / measured )
+```
+
+because a block's height goes as the square of the hand — it holds `1/k` more
+characters to the line *and* each line stands `k` taller. One step lands it; the
+caller takes a second for the rounding that discrete line counts leave behind.
+
+It takes no page: the type depends on the leaf's geometry and the face, and on
+nothing the page happens to carry.
+
+### 13.4 One hand, one leading — and the leaf is not the page
+
+While the page boundary came from the Arabic leaf, a page's mass was fixed at
+somewhere between 1,055 and 1,997 characters. Something had to absorb a range of
+nearly two to one, and there were only four candidates: the type, the leading,
+the foot, or the number of leaves. Three of them were tried:
+
+- **The type gave**, a few percent on the heaviest leaves. That is the one thing
+  §13.3 forbids and the first thing a reader notices.
+- **The leading gave**, opening and closing between 1.20 and 2.00 em so every
+  leaf filled. A page set at 2.00 em then turned into one set at 1.20 — the same
+  book in two different hands' worth of air, and a reader turning pages sees a
+  change in line spacing long before they notice a page that ends early.
+- **The foot gave**: one hand, one leading, and a leaf ended where its content
+  ended. Consistent, and it left the median leaf 68% full and the type dictated
+  by the heaviest page in the book, which is to say every page was set for the
+  worst one.
+
+**It is the leaf count**, and then §13.1 removed the boundary that made it a
+range at all. A leaf holds `ENGLISH_LEAF_CAPACITY_CHARS` = 900 characters and is
+filled to it — about 1,145 leaves for the book. Every leaf still records the
+Madinah page it opens on, so the juzʾ, the running head and the reciter's own
+place on the paper go on meaning exactly what they meant.
+
+What the leaf does take over is the **count**. The folio and the page dial
+number *leaves*, not Madinah pages, because those are what a reader turns and
+lands on — a folio that repeated itself twice a page would be a lie about where
+they are, and a dial with 604 stops for 1,390 leaves could not land on most of
+them. The dial's chapter comb is rebuilt the same way, from the leaf each
+chapter's first verse falls on (`EnglishBook.leafOfVerse`), so every stop on it
+still lands where it says. That is `mushafLeafNumber`, and it is the one place
+the English book stops sharing the Arabic one's numbering.
+
+The capacity is chosen for the **line**, not for the page: 900 characters of
+prose sets at about 22 sp on a phone and 46 characters to the line, which is a
+book measure and the size the scrolling reader has always set its English at.
+Half again the type of the page-bound leaf.
+
+The cost is leaves, and with the pagination continuous the capacity buys nothing
+but type: the choice is purely how long a line the hand wants. Below about 850
+it is shorter than the measure wants and above about 1,000 it is longer.
+`tools/measure_english_leaves.py` prints the sweep.
+
+**A long verse is carried over, as a book carries a paragraph.**
+
+A leaf ends when the next verse will not go on it, and a verse averages three
+lines, so the foot of the page was blank by up to that much: **2.7 lines out of
+22 on average and 7.4 at the ninety-fifth percentile**, 379 leaves more than
+three lines short, 12% of the book's paper. Capacity does not touch it (the
+sweep is flat), and neither does breaking the book optimally rather than
+greedily — a Knuth-Plass pass over the slack redistributes it (p95 7.4 → 6.2)
+without reducing it, because the total is fixed by the verses.
+
+The only thing that removes it is the thing a printed book does: carry the
+sentence over. The verse continues at the head of the next leaf and is numbered
+where it finishes, and neither half repeats or drops a word.
+
+**And the cut is always the end of a sentence.** A page break inside one is the
+one thing a book does not do to prose it can help: the reader carries half a
+thought over the fold and reassembles it on the other side. So the book cuts at
+the last sentence end that fits the room left (`englishSentenceCut`), not the
+last word — 2:96 leaves the leaf on *"…more than those who associate others with
+Allah."* and the next opens on *"One of them wishes…"*. A verse with no sentence
+end in reach is not cut at all: it goes whole on the next leaf, the way a
+paragraph too big for the foot of a page does.
+
+**The rules a book actually keeps.** They are short, and this book keeps them:
+
+1. **The page fills.** The type page is a fixed rectangle and text fills it;
+   every page carries the same number of lines. Everything else is an exception
+   to this one.
+2. **A chapter opens a new page.** A printed book will burn a leaf — a whole
+   blank verso, in a book with spreads — rather than start a chapter halfway
+   down one. This is the one page break a reader is meant to notice.
+
+   And the book turns **the way its own hand is read**. A mushaf is bound on the
+   right; a book of the translation is set in English, read left to right and
+   bound on the left. Turning the English leaf the mushaf's way puts every
+   chapter's divided ending *after* its opening rather than before it, so a
+   reader met a half page each time a chapter began — the pagination correct and
+   the direction reading it backwards.
+
+   `mushafTurnsRightToLeft(english)` decides it for the leaf, the rule and the
+   folio together, from one value of `english`: which hand *this leaf* is set
+   in, not whether an English book exists — it exists in both settings. Two
+   definitions that agree until they do not is how these came apart twice.
+
+   Mirroring the rule is not one flip. Two of the dial's walks *relax* their
+   marks apart along it, and a walk that assumes the wrong direction does not
+   mirror the comb — it forces every seat past its neighbour and piles the whole
+   book into half the measure. Verified on the comb in both settings: in English
+   the rule reads chapter 8 at its left and 98 at its right; in the mushaf it
+   reads 97 at the left and 7 at the right.
+3. **The last page of a chapter is the only short page**, which is where all the
+   ragged paper in a book lives — but it is not free to be *any* length, and on
+   a phone it is less free than in print. A codex shows a spread, so a very
+   short closing page sits beside a full one and the white is half of what the
+   eye takes in. A phone shows one leaf. A closing page of five lines is four
+   fifths of a blank screen, and reads as a fault however correct it is.
+
+   **And nothing is held back to make that ending longer.** Ya-Sin closing on
+   two lines looked like a fault, so the page *before* it was run short and the
+   two divided — first to a floor of five lines, then evenly, then by the least
+   movement that gave the ending two fifths of a leaf. All three were rejected
+   on sight, and rightly.
+
+   A page that stops with text still to come is a page *withholding* it. The
+   reader can see the words are missing and there is no reason for it: the
+   chapter has not ended, the next leaf simply has the rest. That reads as a
+   fault every time, because it is one. A chapter's last page stopping short
+   reads as an ending, because it is one.
+
+   So the remedy was worse than what it treated in every form it took, and no
+   version of it is not: the paper a chapter leaves over has to go somewhere,
+   and the only place it can go without lying about the text is the page where
+   the text runs out. **Fill every page. Let the chapter end where it ends.**
+
+4. **Widows and orphans move the break, and nothing else does.**
+
+What is *not* on that list is the sentence. This leaf briefly refused to cut a
+verse anywhere but at a full stop, reasoning that a listener should not carry
+half a thought over a page turn. It is a real argument for a page being recited
+aloud, but it is not what a book does: a paragraph runs straight over the break,
+mid-clause, and the break is meant to be *invisible* — the eye carries on.
+Holding out for a full stop left the foot of an ordinary leaf blank by 1.47
+lines and 3.94 at the ninety-fifth percentile, paper spent on a fault the reader
+was never going to see.
+
+So the break falls where the line falls. `englishLeafBreak` still moves it off
+the middle of a word, because this book does not hyphenate — a word break, not a
+sentence break, and it costs at most a word.
+
+**And the widow rule does not apply here either.** A *widow* is a paragraph's
+last line alone at the head of a page with white beside it — and a carried verse
+is never alone: the rest of it is followed on the same line by the next verse,
+and the next, for twenty-three lines. There is no white beside it to look wrong.
+Keeping the rule anyway refused a good cut on 239 leaves and held 5,253
+characters off the paper, twenty-two leaves' worth, leaving an ordinary leaf
+0.27 of a line short where without it the figure is 0.01. So
+`ENGLISH_LEAF_MIN_FRAGMENT_CHARS` is a *word*, and that is arithmetic rather
+than typography: a cut of nothing sets an empty run and never advances.
+
+Measured over the book, with the chapter rule in force:
+
+```
+                            leaves   carries   mean blank   p95
+    ordinary leaves            884       624       0.01     0.10
+    chapter-final leaves       114         —      11.50       —
+    ----                     -----
+    whole book                 998
+```
+
+Which is the shape a book has: 884 leaves full to the character, and
+every ragged foot in the Qur'an gathered onto the 114 leaves where a chapter
+ends and the white reads as an ending. Against the sentence rule it replaced —
+1,055 leaves at 1.47 lines blank *each* — it is 57 fewer leaves, and the waste
+on the pages a reader spends their time on is gone rather than reduced.
+
+**And the mark had to be priced.** The capacity is a mass of *specimen* prose
+and the specimen carries no verse marks, so the hand is cut against text that
+has none. A leaf of the same charged mass therefore fits only if what its marks
+really take is covered by `ENGLISH_LEAF_REFERENCE_MARGIN`:
+
+```
+    marks × (real cost − charge)  ≤  capacity × (margin − 1)  =  9.4
+    charge 3:   marks × 1.61      ≤  9.4    →   six marks, and no more
+```
+
+The book averages **6.2 marks to a leaf**, so about half of it was over the
+line. An over-full leaf does not spill — it closes its leading and squeezes one
+more line in, which is the one thing a single leading exists to prevent. The
+leaf that made this visible is in As-Saffat, whose verses are short: nineteen
+marks, twenty-four lines where the well holds twenty-three, set measurably
+tighter than the leaf before it, and the twenty-fourth line holding the single
+word "which".
+
+The real cost is measured off that photograph. The mark's gold is the only gold
+on the page, so it isolates by hue: 76 px on every one of the nineteen, and 96
+with a space either side. The same photograph gives the advance — total ink
+across the twenty-four lines, less the marks, over the 883 characters of
+translation — at 20.84 px. So a mark costs **4.61 characters** and is charged 5,
+at which the term goes negative and the question stops being asked. It had been
+6, then 2.8, then 3; 3 is the one a leaf could not survive.
+
+**The margin had to be swept.** Pricing the mark was necessary and not
+sufficient: with it corrected the leaves still wanted 24 lines, because the
+specimen the hand is cut against is one unbroken run of prose and a leaf is the
+same translation broken by marks, brackets and quotation, which does not pack as
+tightly. `ENGLISH_LEAF_REFERENCE_MARGIN` is that difference and it is the *only*
+knob that moves it — the capacity cancels, since the reference block is itself
+the capacity, so a smaller capacity merely buys a larger hand and the leaf keeps
+the same share of the well. Swept on device, three builds, eight leaves each:
+
+```
+    1.01    24-25 lines wanted of 23.1    leading closes to 77, and to 74
+    1.04    23 lines of 23.4, pitch 79    one leaf in six still closes it
+    1.05    22 lines of 23.7, pitch 78    none close it
+    1.06    22 lines of 23.7, pitch 78    none close it
+```
+
+1.04, because the leaf a reader complains about is the one with white on it, and
+above 1.04 every leaf in the book gives up most of a line to buy out the last
+leaf in six. What is left is a leading 2.5 % tight on that sixth leaf — the
+residue of a character estimate, which does not come out with a constant.
+
+**And the leading cards out, as well as closing.** None of the above makes the
+estimate exact, and it cannot be made exact: the margin has to cover the *worst*
+leaf or that leaf overflows, so the typical leaf comes out short by the spread
+between worst and typical — a line and a half of twenty-three, measured on
+device. That is the white a reader actually reports.
+
+`englishLeafFittedLeadingEm` already had the lever. It solved the leading
+against the well in one direction only, closing a leaf that ran past the foot on
+the argument that a page a hair tighter than its neighbours is a page nobody
+notices. True, and the page a line and a half *short* of its foot is one every
+reader notices. So it now solves in both directions, between
+`ENGLISH_LEAF_MIN_LEADING_EM` and `ENGLISH_LEAF_MAX_LEADING_EM` — a compositor
+setting a page short cards it out, adding a little lead between the lines until
+the block sits flush, and that is exactly this. A leaf wanting *more* than the
+maximum is not a nearly-full page: it is a chapter ending, which is supposed to
+stop short, and those keep the book's own leading rather than being stretched
+halfway to the foot, which would read as a mistake instead of as an ending.
+
+Measured across eight consecutive leaves of Al-Baqarah, the last line's top:
+
+```
+    before carding    1989  1989  1989  1990  2006  2039
+    after carding     2011  2033  2033  2034  2034  2050
+```
+
+Every leaf flush at the foot, within half a line of each other. The price is the
+leading: a leaf that holds 23 lines cards to a pitch of 81 px and one that holds
+24 closes to 77, so adjacent leaves can differ by 2.5 %. That is the trade the
+estimate forces — one leading and a ragged foot, or a flush foot and a leading
+that moves — and between them the flush foot is the one a reader is asking for.
+
+**So the estimate is gone.** `buildEnglishBookByLayout` paginates the book by
+*measuring* it: `EnglishLeafRuler` is handed half again as much text as a leaf
+can hold, lays it out at the book's own hand, leading and measure — the same
+`englishProseStyle` the leaf is drawn in, the same marks in the same size — and
+says where the well is full. One text layout to a leaf, about a thousand for the
+Qur'an, once, off the main thread.
+
+**And a thousand text layouts is not free.** Timed on a device it was **15.4
+seconds**, which is not a cost, it is a wait. Two things in it were paying for
+nothing:
+
+- **The offer.** The ruler was handed a fixed two dozen verses, so it laid out
+  three and a half thousand characters to decide a leaf that holds a thousand,
+  and laying out text is the whole expense here. It takes a third more than a
+  leaf holds now (`ENGLISH_LEAF_OFFER`), and asks for more only when the layout
+  says the offer rather than the well decided the leaf. 15.4 s to 10.2 s.
+- **A guard that had never fired.** The ruler checked its own cut by setting the
+  leaf again and counting its lines — a second layout of every leaf in the book,
+  for a correction that never once applied. It cannot: the cut is the end of a
+  line the leaf itself laid out, and everything after it is a mapping back
+  through ranges the same leaf recorded. 10.2 s to **4.8 s**.
+
+**And then it is written down.** The pagination is a pure function of the leaf's
+size, the hand, the translation and two settings — given the same answers it
+breaks in the same places every time — so it is computed once and kept, and
+`EnglishBookCache` is that. It is what every ebook reader does: a pagination
+cached against the layout it was computed for, thrown away and redone when the
+layout moves, which is why they open instantly and repaginate visibly when you
+change the type size. Measured on device: **5,143 ms to paginate, 50 ms to read
+back**, and the leaves are the same leaves — 22 lines at a pitch of 77 either
+way.
+
+The key is everything the leaves depend on, the database's own file name
+included, because the translation is in it and a leaf is a length of
+translation. Anything that can move the leaves and is *not* in the key is a book
+breaking in the wrong places, so the format carries a version to throw the lot
+away with. Only one book is kept: a leaf's size changes when a phone is folded
+or the type resized, and yesterday's leaves are of no use to anyone once it has.
+
+Three times faster, and — before the cache — still a wait. The answer to the rest is the one an ebook
+gives, and this book is already shaped for it: **a chapter opens a leaf**, so the
+114 chapters are 114 independent paginations — the spine items of an EPUB.
+Nothing in Sad's leaves depends on As-Saffat's, so the chapter being opened can
+be paginated in a handful of layouts and the rest follow behind it, the way a
+reader computes page numbers behind the book you are already reading.
+
+**The figures have to be right.** A book paginated for a leaf a little larger
+than the real one hands every leaf more lines than it has: the leaf sets fewer,
+and the last one comes out short with room beside it, which is the fault that
+keeps being reported. Everything below turns on getting the well and the measure
+exactly, before anything is drawn.
+
+Two ways to have them, and the book uses both. The leaf *remembers its size* —
+`SettingsRepository.rememberLeafMetrics` keeps the well and the measure with the
+window they were laid out in, so a leaf on a folded phone is never mistaken for
+the leaf on an unfolded one. And where nothing is remembered, the figures are
+*worked out*: `MushafBelowLeaf` is everything the reading sheet sets under the
+paper — folio band, dial, transport, the reserved reciter band — and the leaf is
+the window less the system bars less that, which `englishLeafSlotPx` carries the
+rest of the way through the page margin, the grid's bands and the fore-edge. The
+pager calls the same function to size the leaf it draws, so the two cannot drift.
+
+Either way `MainActivity` paginates the whole book at the root, before the
+reader exists: a thousand text layouts on a background thread while the chapter
+list is being read. The reader never sees a book counted into leaves, and never
+waits at the door of the mushaf for one.
+
+Measured on a cleared install: the root predicts a well of 1671px and a measure
+of 942px, and the leaf, composed later, reports 1671 and 942. Which is why
+`LEAF_METRICS_VERSION` and the geometry it stands for are load-bearing — move a
+band without bumping it and the sum is wrong on every launch that trusts it.
+
+Which is what an ebook *is*. A printed book breaks in the same place in every
+copy because every copy is the same size; a book on a screen breaks where that
+screen breaks it, and remembers the screen.
+
+**And the leaf does not ink until its leaves are the right ones.** `MushafUi`
+carries whether the book was measured or counted, and the English sheet fades in
+on it. The leaf still *lays out* while it is false — that is how the well and
+the measure become known at all, and the book cannot be measured until they are
+— it simply sets no words. A page that arrives a moment late is a page; a page
+that rearranges itself under the reader a moment after it opens is a fault, and
+it is the one thing nobody fails to notice. Measured on device: opening the
+mushaf with the figures remembered goes list → two frames of transition → 22
+lines, and every frame after is the same 22. On the one launch that has nothing
+remembered the leaf stands blank for about a second and then inks, already
+right.
+
+**And the ruler measures the leaf, not a copy of it.** The first one built its
+own string from the raw translation and measured that. It is the obvious way to
+write it and it is wrong, because the leaf's string is not the raw translation:
+`englishLeaf` closes whitespace, trims, drops the translator's asides where the
+reader has asked for that, snaps its offsets off the middle of words with
+`englishLeafBreak`, and sets a verse's mark only on the run that *ends* it. A
+ruler that rebuilds that is a second implementation of the leaf, and the two
+drift precisely where drift is invisible in a test and obvious on a page: the
+cut lands mid-line and the leaf's last line comes out half empty.
+
+So the ruler is handed `EnglishVerseRun`s and builds the candidate leaf through
+exactly the code that draws one — `englishLeaf` then `englishLeafBlockTexts` —
+and maps the layout's line end back through the leaf's own recorded ranges. No
+arithmetic of its own in between. The contract returns null for "the offer all
+fitted", and the pagination widens the offer rather than ending a leaf short,
+so no leaf is ever decided by how much text it happened to be shown.
+
+**And the cut only ever moves back.** `englishLeafBreak` takes the offset the
+ruler measured and moves it to a word boundary outside any bracket — the reader
+may have asked for the translator's asides to come off, and half a bracket on
+each leaf would strip neither. It used to move *forward*, and that one word of
+direction was the cause of every short last line in this section's history.
+
+A leaf is measured before it is set, and the offset that comes back is the end
+of a line the well has room for. Snapping forward hands the leaf words nobody
+measured: they wrap to a line it does not have, and *every* remedy costs a whole
+line — the ruler backs off and the page ends a line early, or it does not and
+the page overflows and closes its leading. Snapping back can only hand the leaf
+less than was measured, so the lines it was given are the lines it keeps and
+there is nothing to remedy. The rule is the same rule; only its direction
+changed, and the whole apparatus that compensated for it is gone.
+
+**And it maps through where the verse's text begins.** `EnglishLeafVerse.from`
+is where the *fragment* begins; `textFrom` is where its `text` does, and on a
+carried fragment they differ by one — the fragment starts on the space the leaf
+before it broke on, and the text is that trimmed. The ruler measures the leaf's
+composed string and maps a character in it back to an offset in the verse, and
+mapping through `from` put every offset one character early. Backwards, one
+character early is a break that should have stayed put walking back a whole
+word: "and the enduring good deeds" kept its "are" or lost it on the strength of
+it. (Forwards, the same error gained a word instead — which is why it looked
+harmless for as long as the snap went the other way.)
+
+One thing can still overrun and is checked for: a cut landing exactly at a
+verse's end makes the leaf draw that verse's *mark*, which may be sitting on the
+next line. Then the verse does not end here — the word before it is taken and
+the mark goes over the fold with the tail it belongs to.
+
+Ten consecutive leaves after: every one of them 22 lines with the foot beneath
+it and no unused line, the last line averaging 0.92 of a median line and six of
+the ten within five percent of a full one.
+
+**And the cut is searched for, not inferred.** Say what it is first: *the
+largest prefix of the offer whose leaf, as the book draws it, sets no more lines
+than the well holds.* Every version before this read an offset off the
+candidate — the offer laid out whole — and trusted the leaf to break its lines
+in the same places. Mostly it does. Where it does not, the cut lands a word or
+two inside the last line and the page shows the room, and no amount of patching
+that trust made it safe.
+
+So it is gone. The leaf is drawn, measured, and the answer bisected for over the
+offer's word boundaries — the only places a leaf may break — because the leaf's
+line count rises along them. Nine measurements a leaf. It is the one formulation
+that cannot come out a word short, because a word short is a cut the search
+steps past.
+
+The line count the search aims at is a property of the *well* — its height, the
+leading, a line's ink — not of any text. It used to be read off the candidate's
+own line bottoms, which made the target depend on the page being measured rather
+than the page being filled.
+
+Ten consecutive leaves: the last line averaging **1.00** of a median line, five
+of them longer than the median, and the two shortest (0.85, 0.91) sitting in
+front of a word too long for the room left.
+
+**And the search starts from the candidate.** It is a poor authority and an
+excellent guess: where the leaf and it agree — almost everywhere — its answer
+*is* the answer, and where they differ it is a word or two out, never a page. So
+the search seeds there, doubles outwards until it has straddled the truth, and
+bisects what is left. Three or four measurements a leaf instead of nine, for
+byte-identical leaves: 22 seconds to paginate becomes **10.7**, against 50 ms to
+read it back, once per layout, in the background, with the leaf blank rather
+than rearranging.
+
+**And it measures the leaf it will draw, not the one it read the cut off.**
+Everything before this measures a *candidate*: the offer laid out whole, with
+the cut read off it. The page the book then draws is that prefix — and the two
+are only the same page while nothing between them changes a length. They have
+differed at every stage of this section's history, by a trim, by a snap, by a
+mark drawn on one and not on the other, and the symptom never varied: the leaf
+sets fewer lines than it was given text for, and the last of them ends early
+with room beside it.
+
+So the leaf is set and its lines counted. One short of what it was promised is
+given the next line's worth; one over is pulled back. Two rounds settle it. This
+was tried once before and deleted for costing a second layout of every leaf —
+which was the right call then and is the wrong one now that the whole book is
+measured once and written down (`EnglishBookCache`): 10.4 seconds to paginate
+against 50 ms to read it back, paid once per layout, in the background, with the
+leaf blank rather than rearranging.
+
+Eight consecutive leaves at the reported geometry afterwards: every ordinary one
+between 0.94 and 1.05 of a full last line, where they had run down to 0.61.
+
+One detail is worth naming: **lines are not all the same height.** A line
+carrying only a verse mark is set in another face and stands another height, and
+that is exactly the line that falls at the foot. So the ruler counts by
+`getLineBottom` — where the lines actually land — rather than by a pitch and an
+assumed ink.
+
+Measured over ten consecutive leaves of Al-Baqarah: **every leaf exactly 23
+lines, standing 1,765 px of a 1,778 px well, on a leading of 1.4107 against the
+book's 1.40** — carded by eight tenths of a percent, which is the whole of what
+is left. And the last line is a last line: 72 % to 92 % of the median line's
+ink, which is ordinary rag, where the leaf that prompted this ran to 55 %.
+
+It is not done to save a line. Cutting a verse costs the reader the end of a
+thought to a page turn, so it is done only where leaving it whole would waste
+`ENGLISH_LEAF_SPLIT_HOLE_CHARS` — **three lines or more** — which needs a verse
+of at least five lines, the top sixth of the book by length. And never within
+`ENGLISH_LEAF_MIN_FRAGMENT_CHARS` of either end: one line of a sentence stranded
+at a foot or left at a head is a widow, so the break moves back up the verse
+until both halves clear two lines, or the verse is not cut at all.
+
+| | whole verses | carried |
+|---|---|---|
+| leaves | 1,118 | **1,041** |
+| blank lines, mean | 2.66 | **1.21** |
+| blank lines, p95 | 7.4 | **2.8** |
+| leaves more than 3 short | 379 | **30** |
+| verses cut, of 6,236 | 0 | **302** |
+
+It also retires the one leaf the book could not set: 2:282 is 1,333 characters
+and now runs across two leaves at the book's own hand and leading, instead of
+alone on one with the leading closed to fit it.
+
+**The turn onto the second half is led, like any other.** A page turned exactly
+when the first word overleaf is spoken is always late — the reader is still
+looking at the word being said, and the paper only starts moving once the voice
+has left. So the turn begins inside the word *before* the cut, `MushafTurnLeadMs`
+= 500 ms early, which is the same lead the Arabic leaf takes at a page boundary.
+The English leaf could not take that lead before: its last printed word is
+usually mid-sentence, because a verse straddling the Arabic break is set whole,
+and leading on it would turn the paper away from the sentence being read. The
+book's own cut is the opposite case — the leaf really does stop mid-sentence
+there — so it is exactly where the lead belongs. See `mushafLeadCarriedTurn`.
+
+**A carried verse is on two leaves, and the reciter is on one of them.** The ink
+and the page turn ask which leaf the voice is on, and answering "the leaf the
+verse began on" left the leaf holding the tail recessed and silent for as long
+as the first half took to recite — its own words being said aloud with no wash
+on them, and a tap on it looking like it had done nothing.
+`EnglishBook.leafOfVerse` therefore takes how far through the verse the voice
+has come: at 0 it is the leaf the verse opens on, which is what a deep link, the
+dial and the chapter comb want, and past a cut it is the leaf that picks the
+verse up.
+
+The offsets are estimates — the pagination counts characters, not glyphs — so
+the leaf snaps them to a word boundary as it sets them (`englishLeafBreak`).
+It only ever moves forward and is a pure function of the text, so the leaf that
+ends at an offset and the leaf that begins there land on the same character
+without either knowing about the other. It never stops inside brackets either:
+the reader may have asked for the translator's asides to come off, those are
+stripped per half, and half a bracket on each leaf would strip from neither.
+
+**The constants are fitted, not guessed.** Eleven real leaves were rendered on
+device and their line counts solved for what the layout actually does:
+
+| | guessed | fitted |
+|---|---|---|
+| characters to the line | — | **39.3** |
+| a verse mark, in characters | 6 | **2.8** |
+| reference block, against a leaf | ×1.05 | **×1.06** |
+
+The mark is set a size down and its cups are narrow, so charging it 6 characters
+spent a third of a line per leaf on paper that was there all along. And the
+reference block is one unbroken run of prose where a leaf is not: the specimen
+sets 41.6 characters to the line and the book sets 39.3, so the block has to be
+6% longer than the leaf it stands for. At 1.05 it was not, the hand came out
+small, and 108 leaves ran past their well and closed their leading to hide it.
+
+**Leaves are filled, not evened.** Verses go on the leaf until the next one will
+not fit, and then the next leaf starts — the compositor's order, and the reason
+no leaf is ever handed out over its capacity.
+
+**An opening is charged the paper it takes — and only that.** The capacity is a
+mass of *prose*, and a chapter opening sets none: it sets a panel, the air on
+either side of it, and a basmalah. Left uncounted that is paper the pagination
+believes is free, and the last leaf of the Qur'an, which opened four chapters
+before chapters took leaves of their own, spent fifteen of its lines before a
+word of translation was set on it; the leading closed to pay and the lines ran
+into one another.
+
+The charge is *measured*, off a device capture of an opening leaf, and this is
+the one number in the pagination that a simulation cannot check — the model
+believes the leaf is full either way, so the error is only ever visible on
+glass. On the reference leaf, at a line pitch of 80 px:
+
+```
+                          measured   charged        was
+    panel slot             126 px     1.58 lines    2.25 lines  (92 ch)
+    basmalah slot          113 px     1.41 lines    1.91 lines  (78 ch)
+    ----                   ------     ----------    ----------
+                           239 px     2.99 lines    4.16 lines
+```
+
+So `ENGLISH_LEAF_OPENING_CHARS` = 64 and `ENGLISH_LEAF_BASMALAH_CHARS` = 58.
+They were 92 and 78 — four and a sixth lines charged for three — and every
+chapter's leaf came up an eighth of its well short. Half of the excess was a
+charge for "the ragged end of the paragraph above", real when a panel could
+land halfway down a leaf and a charge for nothing the day chapters started
+opening leaves of their own. Sad is the case to look at: it used to stop
+mid-verse at *"about My message. Rather,"* with two and a half lines of white
+under it, and now carries 38:1–8 whole and fills to the foot.
+
+**One leaf is over capacity and always will be.** 2:282 is a single sentence of
+1,333 characters, half as long again as a leaf holds.
+
+**The rescue, in order.** The leaf is measured as it will be drawn, and if the
+block would run past the foot its leading closes — only on that leaf, only by
+the overflow. The leading stops at `ENGLISH_LEAF_MIN_LEADING_EM` = 1.15, because
+unbounded it will close as far as the arithmetic asks and a page whose ascenders
+touch the descenders above them is not a tight page but an unreadable one. What
+the floor cannot take, the hand does: `englishLeafOverflowHandPx` gives up a few
+percent of type on that leaf alone. That breaks §13.3 knowingly — on 2:282 the
+alternatives are overlapping lines or revelation clipped off the foot, and a page
+set a little small is the only one of the three a reader can still read.
+
+### 13.5 Ragged right, and deliberately not hyphenated
+
+`TextAlign.Start` with `LineBreak.Paragraph`.
+
+The mushaf's own rule is that every full line reaches both margins (rule 3) —
+but that is a rule about Arabic, which fills a line by the letterform, and it is
+the calligrapher's art. Latin has only the word space to fill with, and on a
+measure of about fifty characters that is not enough of a lever: the spaces open
+unevenly, the same line's colour changes from one page to the next, and the
+reader pays for a straight right edge with rivers of white running down the
+page. An even rag is the more readable page, and on a phone it is not close.
+
+`LineBreak.Paragraph` stays, and earns more here than it did under
+justification: it breaks the whole block at once rather than greedily line by
+line, which is what makes the rag *even* — the difference between a right edge
+that undulates and one that lurches.
+
+Hyphens are off, and this is load-bearing rather than an omission. Hyphenation
+is the one thing that breaks a *word* across two lines, and
+`ShapedWordBloom.ColorReveal` takes the union bounds of a range's glyph path —
+a tinted wash over a broken word would sweep the width of the whole line.
+(`InkReveal` was taught to advance one wash across a range's line fragments in
+order, because the verse wash below needs exactly that; the tinted layers were
+not.) Anyone turning hyphens on must fix ColorReveal the same way first. Ragged
+setting needs them far less anyway — the rag absorbs the long word that
+justification would have had to stretch a line around.
+
+### 13.6 The ink is on the word you are hearing
+
+The reciter's timings name Arabic words, and this page prints none of them. For
+a while the leaf refused to bridge that and washed by proportion — word three of
+seven meant three sevenths of the characters. It is a true statement about where
+the voice is, and it is not what a reader hears: the reciter says ٱلْكِتَٰبُ and
+the ink is somewhere in the middle of "about which".
+
+The link is recoverable. Every Arabic word carries its own gloss — the
+interlinear crib the scrolling reader lyricizes — and the translation is a
+translation of the same sentence, so the two share most of their content words.
+`EnglishWordAlignment` aligns the gloss stream to the translation and hands back
+the share of the sentence each Arabic word ends at. Over all 6,236 verses **84 %
+of Arabic words land on a lexical anchor**; an unanchored run is spread between
+the anchors around it, which is the old proportion applied locally, so the map is
+never worse than what it replaces and with no anchors at all it *is* that.
+
+Three rules make it usable:
+
+- **Monotone.** Arabic is not English word order — لَا رَيْبَ فِيهِ is "no doubt
+  in it", and Sahih International sets "about which there is no doubt". A
+  faithful alignment would run backwards there, and the wash cannot: laid ink
+  never lifts (`docs/INK_ENGINE.md`). So the alignment is constrained to advance
+  and a reordered clause is absorbed by sliding a word or two.
+- **Snapped to word ends.** An interpolated boundary lands wherever the
+  arithmetic put it, and "slumbe|r" is not a place ink rests. Boundaries that
+  collapse onto each other are correct: the English has no separate words for
+  that Arabic one.
+- **One map for everything.** The wash, the tap, and the leaf a carried verse's
+  voice is on all read it (`EnglishVerseAlignments`, solved per verse on first
+  ask). If the page turn read the cut with a different map than the ink, it
+  would turn away from a wash still running.
+
+Measured on 2:2 (Alafasy) with the app playing: tap "no" and the reciter starts
+at 1,776 ms against لَا's 1,760; "doubt" → 2,142 against رَيْبَ's 2,140;
+"guidance" → 4,989 against هُدًى's 4,970; "the Book" → 862 against ٱلْكِتَٰبُ's
+860. And the wash holds nearly still for the 2.26 s the reciter spends on فِيهِ,
+whose English is the three characters ", a", then crosses " guidance" in the
+0.3 s of هُدًى — which is the shape of the recitation, not of the sentence.
+
+Verses still to come wait under the same recess as the Arabic leaf's; verses
+already read hold their ink; the packs are the very same `AyahInkPack`.
+
+**And it blooms one word at a time, which is the whole point.** The scrolling
+reader gives the word being said an `InkReveal` over its own glyphs, on its own
+letter sweep, with the engine's own feather; the words behind it hold full ink
+and draw nothing; the words ahead sit under paper. That is this app's ink. The
+leaf could not copy it while it had no alignment, so it swept one continuous
+front across the sentence instead — and a front crossing a paragraph is not a
+word blooming, however narrow its edge is made. Two attempts at the edge width
+(a line of the page, then 1.6 word-widths of the sentence) both missed for the
+same reason: the shape was wrong, not the size.
+
+With an alignment it is a direct copy, because the states are contiguous —
+everything before the word being said is read, everything after is not. So the
+sentence is drawn as three bands rather than one bloom per word
+(`englishWashBands`): the read band, the word being said, and the band still to
+come. Same picture as fifty per-word blooms, at three. The bloom's range *is* a
+word now, so it takes `Tuning.washFeather` unmodified, exactly as the scrolling
+reader does.
+
+**Bands that abut must not reach past their boxes.** A paper cover is drawn
+`PaperCoverPad` (4 dp) wider than its own line box, to catch ink that overhangs
+it. That is right where a bloom covers a word with whitespace either side, as
+in the scrolling reader: the reach lands on the space and nothing shows. These
+bands touch, so the reach put paper over the same strip of prose twice, and an
+8 dp notch of half-erased text travelled along with the voice — the shimmer at
+the wash's edge. The leaf passes `coverPad = 0`; the bands tile the sentence
+exactly, so they have nothing to close over. Their edges are also kept out of
+the middle of a word (`englishBandEdge`), because two abutting covers meeting
+inside a letter is a hard cut down it — the alignment's own boundaries are word
+ends already, but a carried verse or one with its asides hidden is a shorter
+string than the shares were measured against.
+
+The three bands also give the recess its place. **A verse seeked into rises out
+of the paper rather than appearing on it:** tapping the middle of a sentence
+makes everything before the tap already read, and drawing that at full strength
+on the next frame made the sentence flash on. The cover rides the read band and
+lifts over `Tuning.recessMs`, which is precisely what the Arabic leaf does with
+its already-read words; the word being said never carries it, because it is
+revealed by its own bloom. Measured on device: a mid-sentence tap that used to
+complete in a single frame takes ~370 ms of rise.
+
+**But it reads the plain clock out of them, not the paced one.** The word's own
+share comes from `InkMotion.plainSweepProgress` — linear across the word's
+karaoke hold — and never from `sweepProgress`, which carries the two corrections
+that make the Arabic wash right and the English one wrong: the tajweed letter
+map (`TajweedPacing.Curve`) and the wasl carry-in. Both are statements about
+where inside an Arabic *word* the time is going. A word holding a madd spends
+about half its dwell parked on one letter (`Hold.waqfShare` is 0.55, `creep`
+0.08), and mid-ayah words run ~1 s: drawn on English prose that is half a second
+of a sentence frozen where nobody is holding anything, then a sprint to catch
+up, which is exactly what "the ink is behind the voice" looks like. The
+scrolling reader's English mode refuses the same curve at the source
+(`rememberInkMotions(pacing = null)`); the mushaf cannot, because one pack draws
+both leaves — so the correction is refused at the *reader*, which is why the
+plain clock exists.
+
+The chapter-opening basmalah takes the same rule twice over
+(`BasmalahWash.plainProgress`). Its calligraphy wash is doubly Arabic: tajweed
+inside each word, and word *bands* measured off the artwork, where the kashida
+gives بِسۡمِ over half the width for a half-second syllable. Laid over "In the
+name of Allah, the Entirely Merciful, the Especially Merciful" that inks past
+the middle of the line while the voice is still on the first word. The prose
+line gets even quarters — one per word — crossed linearly, and its own feather
+cap (`BasmalahWash.PLAIN_MAX_FEATHER`) so the last quarter stays untouched until
+its turn.
+
+**Which English, though, is the reader's to choose.** The leaf is set from the
+published translation by default, and `Settings.englishLeafText` will set it
+from the word-by-word gloss instead — the same text the scrolling reader has
+always shown. The two are not the same trade. The translation reads as a book
+and lines up with the recitation only through the alignment above; the gloss
+reads as a crib and lines up exactly, because every Arabic word carries its own
+English and there is nothing to align. Someone listening to learn the Arabic
+wants the second; someone listening to follow the meaning wants the first.
+
+The pagination follows the choice: the two texts are different lengths, so
+`EnglishBook` is rebuilt when it changes and the leaves fall differently.
+
+**A tap reads the same map backwards.** It says *where* in the sentence, and
+`englishSeekWordPosition` answers with the word whose share of the sentence
+covers that point — tap "the Book" and the reciter says ٱلْكِتَٰبُ. Without an
+alignment it falls back to plain proportion, which is near but not exact. What
+both replaced was worse than approximate: every tap restarted the verse, so a
+reader who wanted the last clause of a thirty-second verse heard the whole of it
+again.
+
+**The orange repeat rides the same map.** A word the reciter goes back over is
+tinted on its own English, one `ColorReveal` per word of the chain, on that
+word's own repeat clock — the occurrence being spoken sweeps its orange on, the
+ones before it hold theirs, and they release together when the chain completes.
+That is the scrolling reader's construction unchanged. The leaf carried no
+repeat while it had no alignment, for the honest reason that a repeat is a
+statement about one Arabic word and there was no word here to say it of; the
+alignment answers that. A repeated word takes the orange *instead of* the
+first-pass wash, as it does everywhere else — running both over the same span
+would wash it white and tint it at once.
+
+The wet-ink glint stays off. It is the sheen on ink being laid this instant,
+and a span of prose is too big a thing to glisten.
+
+It does lead-turn, but only at its own cut (§13.4). The Arabic lead is measured
+from the last word *printed* on the page, which is routinely mid-sentence on a
+leaf that set that sentence whole; the book's own cut is the one place the leaf
+really does stop mid-sentence, so that is where the lead belongs.
+
+### 13.7 The grid
+
+The leaf is one grid, and everything on it lands on the grid.
+
+**Vertically**, each setting divides the leaf into three bands and
+`MushafLeafBands` holds it to its own total — the bands must sum to `slots`, or
+the last line runs off the paper at one end and a strip of nothing is
+unaccounted for at the other. They spend the leaf differently because their ink
+does:
+
+```
+                head   gutter   well   foot   = slots
+    Arabic      0.30     0.50     16     0.55    17.35
+    English     0.30     1.00     15     0.55    16.85
+```
+
+The Arabic leaf spends almost nothing on the gutter and buys a sixteenth row of
+revelation with it. It can, because the QCF faces mark 1.37 em above the
+baseline and 0.75 below, so a band of nearly nothing still leaves visible air —
+and every unit not spent on furniture is type size (§2). The English leaf has no
+sixteenth row to buy, and its ink stops *exactly* at the ascent and the
+descender, so it keeps the canonical gutter, which was sized for precisely this:
+a head that sits closer than about a line's pitch reads as part of the block.
+
+**The folio does not stand under the text; the foot does.** There used to be a
+tail and a folio band —
+0.35 of a unit of paper and 0.40 for the figure, three quarters of a line spent
+below the last line of every leaf in the book — and both have gone. The folio
+now stands in the air the dial already kept above its rule (`MushafDialHeadAir`,
+24 dp of pure padding, now 8), which puts the figure lower on the screen, in a
+band it shares with the transport. That is where a folio belongs on a device:
+the page number is furniture of the frame, not of the paper, and the reader's
+thumb is already down there.
+
+The tail came back, and it took the leaf being *measured* to show why it had to.
+While the pagination counted characters into a leaf it always left a line or so
+unspent, and that unspent line was doing the work of a foot margin without
+anyone having asked it to. The ruler took the accident away and the last line's
+descenders came down to 2,076 px on a device whose folio begins its ink at
+2,064: the page number was being set into the text. So 0.55 of a unit, a real
+band rather than a slack — the leaf grows by it, so the type comes down about
+three percent and the well holds the same lines, each a little longer. It is not
+the head's 1.30, because the folio and the dial stand below it with air of their
+own; measured after, the foot runs 84 to 95 px on every leaf.
+
+The leaf keeps the rest of the three quarters of a line. On the Arabic hand it goes into
+type size, since the well's share of the leaf rises from 16 / 17.05 to 16 /
+16.80. On the English hand, whose type is solved from the well, it is a whole
+extra line: the well's share rises from 15 / 17.05 to 15 / 16.30, 4.6 % more
+paper, and 4.6 % of twenty-two lines is one — so `ENGLISH_LEAF_CAPACITY_CHARS`
+goes from 900 to 940 and `ENGLISH_LEAF_LINE_CHARS` divides it by 23 rather than
+22. It is the only change here that a reader will count.
+
+The two settings no longer sum to the same figure, which is why each divides by
+its own `slots` rather than by one shared `SLOTS`. The shared total was always a
+convenience: what a leaf must not do is spend more height than it has, and its
+own sum is the thing that says whether it does.
+
+That last point is why the block is set `LineHeightStyle.Trim.Both`. Untrimmed,
+a line box carries half its leading above the first ascent and half below the
+last descender — and since the leading is the thing that varies from leaf to
+leaf (§13.4), so did that half. Measured on device, the first line of a leaf set
+at 2.00 em sat 7 dp lower than the first line of one set at 1.30 em: the head
+gutter the grid promised was not the paper the reader saw. Trimmed, the block's
+own edges are the ink, and the first line and the last land on the same paper on
+every leaf in the book. It also makes the block's height exactly `(n − 1)`
+pitches plus one line's ink, which is what the leading is solved from.
+
+**Horizontally**, there is one measure, and the running head and the folio are
+set to it. They are furniture *of the text block*, not of the paper: standing
+them at their own inset put the head a finger's width outside the block it
+names. The Arabic leaf's measure keeps its bare 10 dp fore-edge, because every
+unit of paper it does not spend is type size and the QCF measure is what caps
+that type. The English leaf's is 5.5% of the leaf — the hand is solved from the
+measure there, so paper given to the margin comes back as a shorter, more
+readable line rather than as smaller type, and a book with no outer margin reads
+as a printout.
+
+**The chapter's panel is one line of the page, with a line's air around it.**
+The band is one line's own type box, so it stands exactly as deep as a line of
+the revelation; on each side of it sits about one of the page's interlines, so
+the whole slot comes to around a line and a half.
+
+Both halves are measured rather than chosen as a fraction, because a fraction
+was what got it wrong. The prose block is set `Trim.Both`, so its last line
+stops at the descender and contributes no trailing white of its own —
+everything separating the panel from the text has to come out of the panel's
+own slot. Sized as a share of the band, that came to 14 px above and 20 px
+below on a page whose lines sit 27 px apart: tighter than the text it divides,
+and visibly tighter on one side than the other. Built from the line's ink and
+the page's interline it measures 24 px above and 29 px below against a 23–25 px
+interline, and what is left is glyph slack — the line above may have no
+descender, the line below may open on a capital rather than an ascender.
+
+Half a pitch a side reads better still and is not worth its price: on a leaf of
+juzʾ 30 with two chapters opening on it, it took the page's own interline from
+27 px down to 20 to pay for itself, which is the rest of the page giving up its
+air so the panel can have some.
+
+The panel therefore rides the leading, and is a little deeper on an open leaf
+than on a close-set one. That is right rather than a fault — the eye reads the
+panel against the lines it sits *among*, not against a panel on some other leaf
+it saw ten minutes ago. (Set to a fixed number of ems it was constant across the
+book and a line and a half deep on a page set at one line, which read as a plate
+dropped onto the paper.)
+
+**The basmalah under it is one line.** Set at the page's own hand it takes two
+on a phone measure, and a basmalah broken across a line-end is not a display
+line — it is a paragraph of one sentence sitting where a heading should be. So
+it is set to the measure: the hand comes down until the line fits, which is the
+Latin form of §4's "a line that will not fit is made to fit", by the only lever
+this script gives. It is still one size for the whole book, because the measure
+does not change from leaf to leaf, and a display line set smaller than the body
+is what a printed translation does with it anyway. Its slot is measured too, and
+all of its air falls below it — centred, half of it landed above instead, under
+the chapter's panel.
+
+Everything else is unchanged: the page dial, the chapter ornament, the fore-edge
+fade, and the right-to-left page turn. It is the same book — only the writing is
+the reader's.
 
 ---
 

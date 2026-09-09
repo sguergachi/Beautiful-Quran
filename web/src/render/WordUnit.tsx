@@ -26,7 +26,7 @@ import {
   runRepeatFadeOutAsync,
   runRepeatResidualAsync,
   runRepeatWashInAsync,
-  runSearchHitDoubleWash,
+  runSearchHitWash,
   type CancellablePromise,
 } from './inkWash'
 import { SearchHitFlash } from '../ui/reader/SearchHitFlash'
@@ -46,8 +46,10 @@ interface Props {
   showTransliteration: boolean
   englishMode?: boolean
   searchHit?: boolean
-  /** When true, pulse the orange search-hit flash on Arabic + gloss. */
+  /** When true, breathe the orange search-hit flash on Arabic + gloss. */
   searchFlash?: boolean
+  /** Temporarily recess this non-target word while a search flash is active. */
+  searchRecessed?: boolean
   /** Optional external ref so the ayah can keep the active word in view. */
   rootRef?: MutableRefObject<HTMLElement | null>
   onPlay: () => void
@@ -111,6 +113,7 @@ export function WordUnit({
   englishMode = false,
   searchHit = false,
   searchFlash = false,
+  searchRecessed = false,
   rootRef: externalRootRef,
   onPlay,
   onHold,
@@ -491,7 +494,7 @@ export function WordUnit({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activation, ink.repeat, ink.state, repeatMounted, englishMode])
 
-  // Search-hit pulse: mount the twin overlay only while flashing.
+  // Search-hit breath: mount the twin overlay only while flashing.
   useLayoutEffect(() => {
     if (!flashMounted) return
     if (!searchFlash) {
@@ -507,10 +510,9 @@ export function WordUnit({
     if (flashRef.current) {
       pending++
       cancels.push(
-        runSearchHitDoubleWash(
+        runSearchHitWash(
           flashRef.current,
-          !englishMode,
-          SearchHitFlash.PULSES,
+          SearchHitFlash,
           doneOne,
         ),
       )
@@ -518,10 +520,9 @@ export function WordUnit({
     if (glossFlashRef.current) {
       pending++
       cancels.push(
-        runSearchHitDoubleWash(
+        runSearchHitWash(
           glossFlashRef.current,
-          false,
-          SearchHitFlash.PULSES,
+          SearchHitFlash,
           doneOne,
         ),
       )
@@ -545,6 +546,7 @@ export function WordUnit({
       }}
       className={englishMode ? 'word-unit word-ink' : 'word-unit word-arabic-ink'}
       data-state={ink.state}
+      data-search-recessed={searchRecessed || undefined}
       style={style}
       {...interaction}
       onContextMenu={onContextMenu}
@@ -596,7 +598,7 @@ export function WordUnit({
           {flashMounted ? (
             <span
               ref={flashRef}
-              className={`word-repeat-overlay ${baseClass}`}
+              className={`word-repeat-overlay search-hit-breath ${baseClass}`}
               aria-hidden="true"
               style={{ opacity: 0 }}
             >
@@ -624,7 +626,7 @@ export function WordUnit({
           {flashMounted ? (
             <span
               ref={glossFlashRef}
-              className="word-repeat-overlay word-gloss"
+              className="word-repeat-overlay search-hit-breath word-gloss"
               aria-hidden="true"
               style={{ opacity: 0 }}
             >

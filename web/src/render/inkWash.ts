@@ -12,7 +12,11 @@
  * for "performance". Quantize + cache mask strings so the hot path stays cheap.
  */
 import { animate, type AnimationPlaybackControls } from 'motion'
-import { cubicBezierEase, paperCoverMaskImage, washMaskImage } from '../ui/theme/Fade'
+import {
+  cubicBezierEase,
+  paperCoverMaskImage,
+  washMaskImage,
+} from '../ui/theme/Fade'
 import { getTuning, glintResonance } from '../ui/reader/InkEngine'
 import { cubicBezierTuple, type CubicBezierEase } from '../ui/motion/easing'
 
@@ -319,8 +323,9 @@ export function runRepeatWashIn(
   rtl: boolean,
   durationMs: number,
   onDone?: () => void,
+  ease: CubicBezierEase | ReturnType<typeof sweepEase> = sweepEase(),
 ): () => void {
-  return runRepeatWashFrom(el, rtl, 0, durationMs, onDone)
+  return runRepeatWashFrom(el, rtl, 0, durationMs, onDone, ease)
 }
 
 /**
@@ -333,8 +338,9 @@ export function runRepeatWashFrom(
   fromProgress: number,
   totalDurationMs: number,
   onDone?: () => void,
+  ease: CubicBezierEase | ReturnType<typeof sweepEase> = sweepEase(),
 ): () => void {
-  const t = getTuning()
+  const feather = getTuning().washFeather
   const from = Math.min(1, Math.max(0, fromProgress))
   el.style.opacity = '1'
   el.style.removeProperty('transform')
@@ -351,15 +357,15 @@ export function runRepeatWashFrom(
 
   const remainMs = Math.max(1, (1 - from) * totalDurationMs)
   setRepeatWashProgress(el, from)
-  applyMask(el, cachedWashMask(from, 0, rtl, t.washFeather))
+  applyMask(el, cachedWashMask(from, 0, rtl, feather))
   return runWash(
     remainMs,
-    sweepEase(),
+    ease,
     cubicBezierEase,
     (_p, eased) => {
       const progress = from + eased * (1 - from)
       setRepeatWashProgress(el, progress)
-      applyMask(el, cachedWashMask(progress, 0, rtl, t.washFeather))
+      applyMask(el, cachedWashMask(progress, 0, rtl, feather))
     },
     () => {
       setRepeatWashProgress(el, 1)
@@ -440,12 +446,12 @@ export function runRepeatFadeOutAsync(el: HTMLElement): CancellablePromise {
 export function runRepeatFadeOut(
   el: HTMLElement,
   onDone?: () => void,
+  durationMs = getTuning().repeatFadeOutMs,
 ): () => void {
-  const t = getTuning()
   applyMask(el, 'none')
   setRepeatWashProgress(el, 1)
   return runWash(
-    t.repeatFadeOutMs,
+    durationMs,
     sweepEase(),
     cubicBezierEase,
     (_p, eased) => {
@@ -514,17 +520,22 @@ export function runGlintFadeOut(
 }
 
 /**
- * Search-hit flash: [runRepeatWashIn] then [runRepeatFadeOut], [pulses] times.
+ * Search-hit locator: the complete orange word softly fades in and out.
  * Callers pass a dedicated orange overlay (same classes as the karaoke repeat
- * layer) so the mask sizes to the glyphs. Overlay may be unmounted after [onDone].
+ * layer), so opacity can breathe without changing the measured text.
  */
-export function runSearchHitDoubleWash(
+export function runSearchHitWash(
   el: HTMLElement,
-  rtl: boolean,
-  pulses: number,
+  timing: {
+    BREATHS: number
+    INHALE_MS: number
+    CREST_MS: number
+    EXHALE_MS: number
+    REST_MS: number
+    EASING: CubicBezierEase
+  },
   onDone?: () => void,
 ): () => void {
-  const t = getTuning()
   let cancelled = false
   let cancelCurrent: (() => void) | null = null
 
@@ -536,27 +547,52 @@ export function runSearchHitDoubleWash(
     el.classList.remove('ink-cover-peel')
     el.removeAttribute('data-peel')
     applyMask(el, 'none')
+    clearRepeatWashProgress(el)
   }
 
-  const runPulse = (remaining: number) => {
-    if (cancelled || remaining <= 0) {
-      finish()
-      if (!cancelled) onDone?.()
-      return
-    }
-    cancelCurrent = runRepeatWashIn(el, rtl, t.repeatSweepMs, () => {
-      if (cancelled) return
-      cancelCurrent = runRepeatFadeOut(el, () => {
-        if (cancelled) return
-        runPulse(remaining - 1)
+  let waitTimer: ReturnType<typeof setTimeout> | null = null
+  const wait = (durationMs: number, next: () => void) => {
+    waitTimer = setTimeout(() => {
+      waitTimer = null
+      if (!cancelled) next()
+    }, durationMs)
+  }
+  const fade = (from: number, to: number, durationMs: number, next: () => void) => {
+    el.style.opacity = String(from)
+    cancelCurrent = runWash(
+      durationMs,
+      timing.EASING,
+      cubicBezierEase,
+      (_p, eased) => { el.style.opacity = String(from + (to - from) * eased) },
+      () => {
+        el.style.opacity = String(to)
+        if (!cancelled) next()
+      },
+    )
+  }
+  const breathe = (remaining: number) => {
+    fade(0, 1, timing.INHALE_MS, () => {
+      wait(timing.CREST_MS, () => {
+        fade(1, 0, timing.EXHALE_MS, () => {
+          if (remaining > 1) wait(timing.REST_MS, () => breathe(remaining - 1))
+          else {
+            finish()
+            onDone?.()
+          }
+        })
       })
     })
   }
 
-  runPulse(pulses)
+  applyMask(el, 'none')
+  // Only the few active search overlays get a temporary compositor hint;
+  // finish() removes it as soon as the third breath ends.
+  el.style.willChange = 'opacity'
+  breathe(timing.BREATHS)
 
   return () => {
     cancelled = true
+    if (waitTimer != null) clearTimeout(waitTimer)
     cancelCurrent?.()
     finish()
   }

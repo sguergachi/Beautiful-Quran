@@ -1,5 +1,6 @@
 package com.beautifulquran.ui.home
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
@@ -7,6 +8,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.waitForUpOrCancellation
@@ -41,7 +43,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -71,7 +72,6 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlin.math.roundToInt
-import kotlinx.coroutines.flow.drop
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.res.stringResource
 import com.beautifulquran.R
@@ -82,6 +82,8 @@ import com.beautifulquran.data.AyahSelectorSide
 import com.beautifulquran.data.HomeBookmarkStyle
 import com.beautifulquran.domain.WORD_SEARCH_PREVIEW_LIMIT
 import com.beautifulquran.domain.englishTranslationHighlightSpans
+import com.beautifulquran.domain.parseSearchQuery
+import com.beautifulquran.domain.spellingCorrection
 import com.beautifulquran.ui.reader.VerseBookmarkRibbon
 import com.beautifulquran.ui.reader.remainingUnfurlSignal
 import com.beautifulquran.ui.theme.ArabicTitleStyle
@@ -93,9 +95,6 @@ import com.beautifulquran.ui.theme.verticalFadingEdges
 /** The search field leads the scrolling document beneath the fixed masthead. */
 private const val SEARCH_ITEM_INDEX = 0
 
-/** How far (px) the list must scroll past the lifted search before a scroll counts as "dismiss". */
-private const val DISMISS_SCROLL_THRESHOLD_PX = 24
-
 private val HomeRibbonLane = 28.dp
 private val HomeRibbonWidth = 13.dp
 private val HomeRibbonGutter = (HomeRibbonLane - HomeRibbonWidth) / 2f
@@ -106,13 +105,18 @@ private val HomeRowRibbonGutter = (HomeNumberColumn - HomeRibbonWidth) / 2f
 private val HomeColumnGap = 4.dp
 private val HomeArabicOpticalInset = 4.dp
 private val TopBoundRibbonHeight = 96.dp
+private val SearchBottomBreath = 12.dp
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun HomeScreen(
     viewModel: HomeViewModel,
-    /** [wordPosition] is set when opening from a Quran-wide word hit so the
-     *  reader can flash that word; null for surah / reference / continue. */
-    onOpenSurah: (surahId: Int, ayah: Int?, wordPosition: Int?) -> Unit,
+    /** Search hits carry a word position, or zero plus [searchText] when the
+     * visible match is a translator addition with no Quran-word position. */
+    onOpenSurah: (surahId: Int, ayah: Int?, wordPosition: Int?, searchText: String?) -> Unit,
+    onOpenSearchHit: (hit: WordSearchHit, query: String) -> Unit = { hit, query ->
+        onOpenSurah(hit.surahId, hit.ayahNumber, hit.position, query)
+    },
     onOpenSettings: () -> Unit,
     /** True while the paper stack is on (or near) the chapter list — drives
      *  the floating transport's enter/exit across page turns. */
@@ -150,7 +154,7 @@ fun HomeScreen(
     val searchPaneVisible = searchFocused && uiState.query.isEmpty()
     val density = LocalDensity.current
     val imeBottom = WindowInsets.ime.getBottom(density).toFloat()
-    val searchPaneTopGap = 10.dp
+    val searchPaneTopGap = SearchBottomBreath
     val searchPaneBottomGap = 10.dp
     val searchPaneTopGapPx = with(density) { searchPaneTopGap.toPx() }
     val searchPaneBottomGapPx = with(density) { searchPaneBottomGap.toPx() }
@@ -177,6 +181,7 @@ fun HomeScreen(
         uiState.surahs.isEmpty() &&
         uiState.wordSections.isEmpty() &&
         !uiState.wordSearchLoading
+    val correctedQuery = spellingCorrection(uiState.wordSections.flatMap { it.hits })
     var previousBookmarkCount by remember { mutableIntStateOf(bookmarkCount) }
     var ribbonUnfurlPending by remember { mutableStateOf(false) }
     var ribbonUnfurlEpoch by remember { mutableIntStateOf(0) }
@@ -211,26 +216,14 @@ fun HomeScreen(
         }
     }
 
-    // Keep the focused search at the top of its scrolling document. A
-    // deliberate list scroll then dismisses it, hiding the keyboard and dials.
-    // Search result changes themselves never steal focus.
+    // Lift the focused search to the top of its scrolling document. The field
+    // stays focused while results move beneath it; Back owns dismissal.
     LaunchedEffect(searchFocused) {
         if (!searchFocused) return@LaunchedEffect
         listState.animateScrollToItem(SEARCH_ITEM_INDEX)
-        snapshotFlow {
-            Triple(
-                listState.isScrollInProgress,
-                listState.firstVisibleItemIndex,
-                listState.firstVisibleItemScrollOffset,
-            )
-        }
-            .drop(1)
-            .collect { (isScrolling, index, offset) ->
-                if (isScrolling && (index != SEARCH_ITEM_INDEX || offset > DISMISS_SCROLL_THRESHOLD_PX)) {
-                    focusManager.clearFocus()
-                }
-            }
     }
+
+    BackHandler(enabled = searchFocused) { focusManager.clearFocus() }
 
     Scaffold(containerColor = MaterialTheme.colorScheme.background) { padding ->
         Box(
@@ -297,33 +290,44 @@ fun HomeScreen(
                         bottom = listBottomPadding,
                     ),
                 ) {
+                    stickyHeader(key = "search") {
+                        Column(
+                            Modifier
+                                .fillMaxWidth()
+                                .background(MaterialTheme.colorScheme.background),
+                        ) {
+                            // Small top breath when the masthead is gone so the
+                            // field is not hard against the status-bar padding.
+                            if (searchFocused) {
+                                Spacer(Modifier.height(8.dp))
+                            }
+                            PaperSearchField(
+                                value = uiState.query,
+                                onValueChange = viewModel::onQueryChange,
+                                placeholder = "Search concept, “exact phrase”, or 2:255",
+                                onFocusChanged = { focused ->
+                                    searchFocused = focused
+                                    if (focused) viewModel.onSearchFocused()
+                                },
+                                modifier = Modifier
+                                    .padding(start = HomeStartInset, end = HomeEndInset)
+                                    .fillMaxWidth()
+                                    .onGloballyPositioned {
+                                        searchBottom = it.boundsInWindow().bottom
+                                        searchBounds = it.boundsInRoot()
+                                    },
+                            )
+                            Spacer(Modifier.height(SearchBottomBreath))
+                        }
+                    }
             item(key = "chapter-page") {
                 Box(Modifier.fillMaxWidth()) {
                     Column(Modifier.fillMaxWidth()) {
-                        // Small top breath when the masthead is gone so the
-                        // field is not hard against the status-bar padding.
-                        if (searchFocused) {
-                            Spacer(Modifier.height(8.dp))
-                        }
-                        PaperSearchField(
-                            value = uiState.query,
-                            onValueChange = viewModel::onQueryChange,
-                            placeholder = "Search surah, word, or 2:255",
-                            onFocusChanged = { searchFocused = it },
-                            modifier = Modifier
-                                .padding(start = HomeStartInset, end = HomeEndInset)
-                                .fillMaxWidth()
-                                .onGloballyPositioned {
-                                    searchBottom = it.boundsInWindow().bottom
-                                    searchBounds = it.boundsInRoot()
-                                },
-                        )
-
                         if (!searching) {
                             uiState.continueTarget?.let { target ->
                                 ContinueRow(
                                     target = target,
-                                    onClick = { onOpenSurah(target.surah.id, target.ayah, null) },
+                                    onClick = { onOpenSurah(target.surah.id, target.ayah, null, null) },
                                 )
                             }
                         }
@@ -362,18 +366,25 @@ fun HomeScreen(
                                             ?.takeIf { it.surah.id == surah.id }
                                             ?.ayah,
                                         null,
+                                        null,
                                     )
                                 },
                             )
                         }
 
                         if (showWordSections) {
+                            if (correctedQuery != null) {
+                                SearchCorrectionLabel(correctedQuery)
+                            }
                             SearchSectionLabel(
                                 text = if (uiState.wordSearchLoading && uiState.wordSections.isEmpty()) {
                                     "Searching ayahs…"
                                 } else {
-                                    "In the Quran"
+                                    val count = uiState.wordSections.sumOf { it.totalCount }
+                                    "In the Quran · $count relevant ${if (count == 1) "ayah" else "ayahs"}" +
+                                        if (uiState.wordSearchLoading) " · refining…" else ""
                                 },
+                                topPadding = if (correctedQuery == null) 8.dp else 2.dp,
                             )
                             uiState.wordSections.forEach { section ->
                                 WordSearchSurahHeader(section = section)
@@ -383,7 +394,7 @@ fun HomeScreen(
                                         query = uiState.query,
                                         onClick = {
                                             focusManager.clearFocus()
-                                            onOpenSurah(hit.surahId, hit.ayahNumber, hit.position)
+                                            onOpenSearchHit(hit, uiState.query)
                                         },
                                     )
                                 }
@@ -405,7 +416,7 @@ fun HomeScreen(
 
                         if (showEmpty) {
                             Text(
-                                text = "No matches",
+                                text = "No relevant ayahs found",
                                 style = MaterialTheme.typography.bodyLarge,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f),
                                 modifier = Modifier
@@ -441,7 +452,7 @@ fun HomeScreen(
                 visible = searchPaneVisible,
                 onOpen = { surahId, ayah ->
                     focusManager.clearFocus()
-                    onOpenSurah(surahId, ayah, null)
+                    onOpenSurah(surahId, ayah, null, null)
                 },
                 modifier = Modifier
                     .align(Alignment.TopCenter)
@@ -467,7 +478,7 @@ fun HomeScreen(
                 onOpenNowPlaying = {
                     val target = floatingPlayback ?: return@FloatingPlaybackControl
                     focusManager.clearFocus()
-                    onOpenSurah(target.surah.id, target.ayah, null)
+                    onOpenSurah(target.surah.id, target.ayah, null, null)
                 },
                 onReciterClick = onOpenSettings,
                 onPlayPause = viewModel::togglePlayPause,
@@ -756,7 +767,7 @@ internal fun shouldUnfurlReadingPlaceRibbon(
 ): Boolean = pendingReturn && chapterRibbonReady && currentPlacePresent
 
 @Composable
-private fun SearchSectionLabel(text: String) {
+private fun SearchSectionLabel(text: String, topPadding: Dp = 8.dp) {
     Text(
         text = text,
         style = MaterialTheme.typography.labelLarge,
@@ -766,8 +777,31 @@ private fun SearchSectionLabel(text: String) {
             .padding(
                 start = HomeStartInset,
                 end = HomeEndInset,
-                top = 8.dp,
+                top = topPadding,
                 bottom = 4.dp,
+            ),
+    )
+}
+
+@Composable
+private fun SearchCorrectionLabel(correctedQuery: String) {
+    val accents = LocalQuranAccents.current
+    Text(
+        text = buildAnnotatedString {
+            append("Searching instead for ")
+            withStyle(SpanStyle(color = accents.gold.copy(alpha = 0.8f))) {
+                append(correctedQuery)
+            }
+        },
+        style = MaterialTheme.typography.labelLarge,
+        fontWeight = FontWeight.Normal,
+        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(
+                start = HomeStartInset,
+                end = HomeEndInset,
+                top = 8.dp,
             ),
     )
 }
@@ -828,12 +862,22 @@ private fun WordSearchHitRow(
 ) {
     val accents = LocalQuranAccents.current
     val highlightColor = accents.gold
-    val translation = remember(hit.ayahTranslation, hit.translation, query, highlightColor) {
+    val displayQuery = remember(query) { parseSearchQuery(query).text }
+    val translation = remember(
+        hit.displayText,
+        hit.translation,
+        hit.matchTerms,
+        hit.matchLabel,
+        displayQuery,
+        highlightColor,
+    ) {
         buildAnnotatedString {
             for (span in englishTranslationHighlightSpans(
-                ayahTranslation = hit.ayahTranslation,
-                query = query,
+                ayahTranslation = hit.displayText,
+                query = displayQuery,
                 wordGloss = hit.translation,
+                semanticLabel = hit.matchLabel.orEmpty(),
+                semanticTerms = hit.matchTerms,
             )) {
                 if (span.highlighted) {
                     withStyle(
@@ -862,7 +906,10 @@ private fun WordSearchHitRow(
             ),
     ) {
         Text(
-            text = "${hit.surahId}:${hit.ayahNumber}",
+            text = buildString {
+                append("${hit.surahId}:${hit.ayahNumber}")
+                append(" · ${hit.matchReason}")
+            },
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f),
         )

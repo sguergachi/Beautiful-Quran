@@ -35,27 +35,53 @@ matrix, testing commands, current platform limits, and full-support checklist.
 
 ```bash
 ./gradlew assembleDebug       # Android; copies data/quran.db into generated assets
+./gradlew assembleRelease     # optimized APK used by the GitHub release
 npm --prefix web ci
 npm --prefix web run build    # Web; copies the same database into dist
 ```
 
-### Send a debug APK to your phone (KDE Connect)
+Local debug and release APKs use the uncommitted `release.keystore` when it is
+available, including from linked worktrees; otherwise contributor builds use
+the ordinary debug key. The GitHub release never falls back: CI restores the
+same keystore from repository secrets and verifies its certificate before
+publishing. `RELEASE_KEYSTORE_FILE` can point at a key stored elsewhere.
+
+Google Play's Internal App Sharing `.der` file is a public certificate, not a
+private signing key. Play re-signs every uploaded APK with that certificate, so
+it is neither committed nor used by Gradle. An APK installed from a Play
+internal-sharing link must be uninstalled before switching to a directly
+shared local/GitHub APK, because their Google-owned and developer-owned signing
+keys intentionally differ.
+
+### Send an APK to your phone (KDE Connect)
 
 Paired phone + reachable KDE Connect (app open, same LAN or Bluetooth):
 
 ```bash
-scripts/send_apk_to_phone.sh
+scripts/send_apk_to_phone.sh --label "what this build is"
 ```
 
-That builds `app/build/outputs/apk/debug/app-debug.apk` and runs
-`kdeconnect-cli --share` to the first reachable device. Accept the file on
-the phone.
+That builds the APK, stages it under a name made from your label and the
+commit — `Beautiful-Quran-what-this-build-is-a1b2c3d4-debug.apk` — shares it
+to the first reachable device, and then **deletes the older staged builds**.
+Accept the file on the phone.
+
+Both halves matter. The phone never gets a generic `app-debug.apk`, because a
+phone full of identically-named builds is one you cannot test from and KDE
+Connect drops repeat sends of the same filename; and the previous builds go,
+because at a quarter of a gigabyte each they fill `/tmp` and a full `/tmp`
+truncates the next copy mid-send.
 
 ```bash
-scripts/send_apk_to_phone.sh --skip-build --name "Pixel 10"
+scripts/send_apk_to_phone.sh --release --label "chapter panel"
+scripts/send_apk_to_phone.sh --skip-build --name "Pixel 10" --label "wash fix"
 scripts/send_apk_to_phone.sh --wait          # poll up to 5 minutes
+scripts/send_apk_to_phone.sh --keep-old      # keep the previous builds
 kdeconnect-cli -a                            # list reachable phones
 ```
+
+Staged builds live in `$TMPDIR/beautiful-quran-apks` (override with
+`BQ_APK_STAGE`); cleanup only ever touches that directory.
 
 If `kdeconnect-cli -l` shows the phone as paired but `-a` is empty, unlock
 the phone, open KDE Connect, and join this machine's LAN. This desktop is
@@ -85,8 +111,6 @@ scripts/build_release_bundle.sh
 
 The script builds `BeautifulQuran-<versionName>.aab` in the repository root and
 verifies that it is signed with the upload certificate expected by Google Play.
-In a linked Git worktree it also checks the primary checkout for
-`release.keystore`; set `RELEASE_KEYSTORE_FILE` to use a key stored elsewhere.
 
 `tools/build_db.py` downloads the Quran text, word-by-word data, and word-level
 audio timings, validates them against each other, and packs them into a single

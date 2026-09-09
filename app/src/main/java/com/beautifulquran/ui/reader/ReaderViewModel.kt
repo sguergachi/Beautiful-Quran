@@ -7,6 +7,8 @@ import com.beautifulquran.data.BookmarkRepository
 import com.beautifulquran.data.AnnotationRepository
 import com.beautifulquran.data.EducationMoment
 import com.beautifulquran.data.QuranRepository
+import com.beautifulquran.data.EnglishBookCache
+import com.beautifulquran.data.QuranDatabase
 import com.beautifulquran.data.SettingsRepository
 import com.beautifulquran.data.model.Reciter
 import com.beautifulquran.data.model.Segment
@@ -15,7 +17,13 @@ import com.beautifulquran.data.model.SurahContent
 import com.beautifulquran.domain.BASMALAH_PLAYLIST_AYAH
 import com.beautifulquran.domain.HighlightClock
 import com.beautifulquran.domain.HighlightEngine
+import com.beautifulquran.domain.EnglishBook
 import com.beautifulquran.domain.MushafCatalog
+import com.beautifulquran.data.EnglishLeafText
+import com.beautifulquran.domain.EnglishLeafRuler
+import com.beautifulquran.domain.buildEnglishBookByLayout
+import com.beautifulquran.domain.buildEnglishBook
+import com.beautifulquran.domain.quranWordKey
 import com.beautifulquran.domain.OutputLatency
 import com.beautifulquran.domain.SURAH_FATIHA
 import com.beautifulquran.domain.surahOpensWithBasmalahPreface
@@ -25,6 +33,7 @@ import com.beautifulquran.playback.PlayerController
 import com.beautifulquran.playback.PlayerUiState
 import com.beautifulquran.playback.TarjiBacklogAnchor
 import kotlin.math.abs
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -40,6 +49,7 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /** The word currently being recited: ayah number + 1-based word position.
  * [durationMs] is how long the reciter dwells on it (at 1× speed) and paces
@@ -111,6 +121,14 @@ internal fun resolveActiveWord(
     }
 }
 
+/**
+ * One tick of the basmalah lead-in's wash, read for both renderings of it: the
+ * Naskh calligraphy and the English leaf's prose line. They differ only in the
+ * two claims about Arabic letterforms — artwork word bands and tajweed pacing —
+ * which the prose line has no letters to carry.
+ */
+private data class BasmalahInk(val calligraphy: Float, val prose: Float)
+
 /** Reuses the immutable UI snapshot while the 33 ms poll stays in one word. */
 internal class ActiveWordPollCache {
     private var info: HighlightEngine.ActiveInfo? = null
@@ -156,6 +174,19 @@ internal class ActiveWordPollCache {
 data class MushafUi(
     val catalog: MushafCatalog,
     val surahsById: Map<Int, Surah>,
+    /** The English book's leaves — a Madinah page may take more than one. */
+    val englishBook: EnglishBook,
+    /**
+     * True when the leaves were decided by *measuring* a leaf rather than by
+     * counting characters into one ([EnglishLeafRuler]).
+     *
+     * The English leaf does not set a word until this is true. A book counted
+     * into leaves and then repaginated is a page that rearranges itself under
+     * the reader a moment after it opens, which is worse than a page that takes
+     * a moment to arrive — nobody minds waiting for a page and everybody
+     * notices one moving.
+     */
+    val measured: Boolean = false,
 )
 
 data class ReaderUiState(
@@ -235,6 +266,7 @@ class ReaderViewModel(
     val player: PlayerController,
     private val annotations: AnnotationRepository,
     private val outputLatency: AudioOutputLatency,
+    private val englishBookCache: EnglishBookCache,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ReaderUiState())
@@ -243,14 +275,102 @@ class ReaderViewModel(
     private val _mushaf = MutableStateFlow<MushafUi?>(null)
     val mushaf: StateFlow<MushafUi?> = _mushaf
 
-    fun ensureMushaf() {
-        if (_mushaf.value != null) return
+    /**
+     * The verses that begin on one mushaf leaf — what the English leaf is set
+     * from. A page at a time, and windowed in the repository.
+     */
+    suspend fun leafText(page: Int, text: EnglishLeafText): Map<Long, String> =
+        repository.mushafPageTranslations(page, text)
+
+    /** Which English the book in [_mushaf] was paginated for. */
+    private var mushafLeafText: EnglishLeafText? = null
+
+    /**
+     * [text] is which English the leaf is set from, and the book has to be
+     * rebuilt when it changes: the gloss chain and the published translation
+     * are different lengths, so they do not break into the same leaves.
+     */
+    fun ensureMushaf(
+        text: EnglishLeafText,
+        /**
+         * The leaf, once it knows its own size. Given one, the book is
+         * paginated by *measuring* each leaf rather than counting characters
+         * into it — see [EnglishLeafRuler]. Null until the reader has laid out
+         * once, so the book opens on the estimate and is repaginated a frame
+         * later, the way an ebook repaginates when you turn a phone.
+         */
+        rulerFor: ((translation: (Int, Int) -> String) -> EnglishLeafRuler)? = null,
+        /** What the ruler was made from: rebuild when the leaf changes size. */
+        rulerKey: Any? = null,
+        /** Everything the leaves depend on — see [EnglishBookCache.key]. */
+        cacheKey: String = "",
+    ) {
+        if (_mushaf.value != null && mushafLeafText == text && mushafRulerKey == rulerKey) return
+        // Never fall back. A book already paginated by measuring a leaf is not
+        // replaced by one counting characters into it — the reader opens the
+        // mushaf after the app has loaded, and its own first call carries no
+        // ruler.
+        if (rulerFor == null && mushafRulerKey != null && mushafLeafText == text) return
+        mushafLeafText = text
+        mushafRulerKey = rulerKey
+        // Two of these can be in flight at once: the app's root asks on load
+        // from remembered figures, and the leaf asks again the moment it knows
+        // its own size. They read and paginate off the main thread, so the
+        // slower one can finish last — and it must not then install its book,
+        // null out the ruler key, or write its leaves over the live ones.
+        val generation = ++mushafGeneration
         viewModelScope.launch {
             val catalog = repository.mushafCatalog()
             val surahs = repository.surahs().associateBy { it.id }
-            _mushaf.value = MushafUi(catalog, surahs)
+            val book = if (rulerFor == null) {
+                val prose = repository.englishVerseProse(text)
+                buildEnglishBook(catalog) { surahId, ayah ->
+                    prose[quranWordKey(surahId, ayah, 1)] ?: 0
+                }
+            } else {
+                val words = repository.englishVerseText(text)
+                val verse = { surahId: Int, ayah: Int ->
+                    words[quranWordKey(surahId, ayah, 1)].orEmpty()
+                }
+                val pageOf = { surahId: Int, ayah: Int ->
+                    catalog.pageOf(surahId, ayah)
+                }
+                // A thousand text layouts, and the same answer every time they
+                // are asked — so they are asked once and written down.
+                val cached = withContext(Dispatchers.IO) {
+                    englishBookCache.read(cacheKey, pageOf, verse)
+                }
+                if (generation != mushafGeneration) return@launch
+                cached ?: withContext(Dispatchers.Default) {
+                    buildEnglishBookByLayout(catalog, verse, rulerFor(verse))
+                }.also {
+                    if (generation != mushafGeneration) return@launch
+                    withContext(Dispatchers.IO) { englishBookCache.write(cacheKey, it) }
+                }
+            }
+            if (generation != mushafGeneration) return@launch
+            _mushaf.value = MushafUi(catalog, surahs, book, measured = rulerFor != null)
         }
     }
+
+    private var mushafRulerKey: Any? = null
+    private var mushafGeneration = 0
+
+    /** Everything the English book's leaves depend on — see [EnglishBookCache]. */
+    fun englishBookCacheKey(
+        wellPx: Float,
+        measurePx: Float,
+        verseNumberScript: Int,
+        hideParentheticals: Boolean,
+        leafText: Int,
+    ): String = englishBookCache.key(
+        wellPx = wellPx,
+        measurePx = measurePx,
+        verseNumberScript = verseNumberScript,
+        hideParentheticals = hideParentheticals,
+        leafText = leafText,
+        database = QuranDatabase.DB_FILE_NAME,
+    )
 
     /**
      * Verse under the reading line (scroll / rail / follow). Used for Assistant
@@ -510,29 +630,52 @@ class ReaderViewModel(
     }
 
     /**
+     * The basmalah lead-in's wash, sampled once for both the renderings that
+     * want it. Two flows off one poll: the position is read on the ear clock,
+     * and reading it twice per tick would be two different moments.
+     */
+    private val basmalahInk: StateFlow<BasmalahInk?> =
+        pollingWhileLoaded(key = { it.ayah }) { ayah ->
+            if (ayah != BASMALAH_PLAYLIST_AYAH) return@pollingWhileLoaded null
+            val timed = timings[BASMALAH_PLAYLIST_AYAH]
+            // The real media duration once known: it is both the fallback ramp's
+            // span and the ceiling the paced wash is fitted inside (a source row
+            // that overruns its own MP3 must still finish). Until then the timing
+            // span, so the wash still advances on the first ticks.
+            val duration = player.durationMs
+            val endMs = when {
+                duration > 0L -> duration
+                timed != null -> timed.last().endMs
+                else -> 0L
+            }
+            // The pure ear clock: this consumer must not arm the ink clock's
+            // "accept next sample" latch on the ink poll's behalf.
+            val heardMs = heardPositionMs()
+            BasmalahInk(
+                calligraphy = InkEngine.prefaceWashProgress(heardMs, endMs, timed),
+                prose = InkEngine.prefaceProseWashProgress(heardMs, endMs, timed),
+            )
+        }
+
+    /**
      * Calligraphy wash 0..1 while the basmalah lead-in plays: locked to the
      * clip's own word timings and paced by tajweed inside each word's band of
      * artwork, falling back to a plain clip ramp when those timings are missing
      * (see [InkEngine.prefaceWashProgress] /
      * [com.beautifulquran.domain.BasmalahWash]). Null when not on the lead-in.
      */
-    val basmalahWashProgress: StateFlow<Float?> = pollingWhileLoaded(key = { it.ayah }) { ayah ->
-        if (ayah != BASMALAH_PLAYLIST_AYAH) return@pollingWhileLoaded null
-        val timed = timings[BASMALAH_PLAYLIST_AYAH]
-        // The real media duration once known: it is both the fallback ramp's
-        // span and the ceiling the paced wash is fitted inside (a source row
-        // that overruns its own MP3 must still finish). Until then the timing
-        // span, so the wash still advances on the first ticks.
-        val duration = player.durationMs
-        val endMs = when {
-            duration > 0L -> duration
-            timed != null -> timed.last().endMs
-            else -> 0L
-        }
-        // The pure ear clock: this consumer must not arm the ink clock's
-        // "accept next sample" latch on the ink poll's behalf.
-        InkEngine.prefaceWashProgress(heardPositionMs(), endMs, timed)
-    }
+    val basmalahWashProgress: StateFlow<Float?> = basmalahInk
+        .map { it?.calligraphy }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(1_000), null)
+
+    /**
+     * The same wash for the English leaf's display line, which has no Arabic
+     * letterforms under it: even word bands, no tajweed
+     * ([InkEngine.prefaceProseWashProgress]).
+     */
+    val englishBasmalahWashProgress: StateFlow<Float?> = basmalahInk
+        .map { it?.prose }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(1_000), null)
 
     /** Advances the lit ayah to the next one during the final
      * [InkEngine.fadeLeadMs] of the current ayah's *recitation*, so its fade-in

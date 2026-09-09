@@ -26,9 +26,19 @@ class CustomizePolicyTest {
     }
 
     @Test
-    fun `mushaf forces Arabic-only view`() {
+    fun `entering mushaf from English keeps the reader in English`() {
         val next = applyReadingLayout(
             Settings().copy(readingMode = ReadingMode.ENGLISH_ONLY),
+            ReadingLayout.MUSHAF,
+        )
+        assertEquals(ReadingLayout.MUSHAF, next.readingLayout)
+        assertEquals(ReadingMode.ENGLISH_ONLY, next.readingMode)
+    }
+
+    @Test
+    fun `entering mushaf from bilingual lands on Arabic - a leaf is one language`() {
+        val next = applyReadingLayout(
+            Settings().copy(readingMode = ReadingMode.ARABIC_ENGLISH),
             ReadingLayout.MUSHAF,
         )
         assertEquals(ReadingLayout.MUSHAF, next.readingLayout)
@@ -36,13 +46,29 @@ class CustomizePolicyTest {
     }
 
     @Test
-    fun `view mode cannot leave Arabic while mushaf is on`() {
+    fun `a leaf may be set in either language, and in nothing else`() {
         val mushaf = Settings().copy(
             readingLayout = ReadingLayout.MUSHAF,
             readingMode = ReadingMode.ARABIC_ONLY,
         )
-        assertEquals(mushaf, applyReadingMode(mushaf, ReadingMode.ENGLISH_ONLY))
+        assertEquals(
+            ReadingMode.ENGLISH_ONLY,
+            applyReadingMode(mushaf, ReadingMode.ENGLISH_ONLY).readingMode,
+        )
         assertEquals(mushaf, applyReadingMode(mushaf, ReadingMode.ARABIC_ENGLISH))
+        assertEquals(
+            listOf(ReadingMode.ARABIC_ONLY, ReadingMode.ENGLISH_ONLY),
+            MUSHAF_VIEW_MODES,
+        )
+    }
+
+    @Test
+    fun `verse marks are offered wherever the reader can see Western digits`() {
+        // The Arabic leaf's marks are drawn by the page face and cannot be
+        // restyled; the English leaf's are set in the running prose.
+        assertFalse(showsVerseNumberChrome(ReadingLayout.MUSHAF, ReadingMode.ARABIC_ONLY))
+        assertTrue(showsVerseNumberChrome(ReadingLayout.MUSHAF, ReadingMode.ENGLISH_ONLY))
+        assertTrue(showsVerseNumberChrome(ReadingLayout.SCROLL, ReadingMode.ARABIC_ONLY))
     }
 
     @Test
@@ -107,7 +133,7 @@ class CustomizePolicyTest {
             customizeSummary(Settings()),
         )
         assertEquals(
-            "Mushaf · Nightfall",
+            "Mushaf · Arabic · Nightfall",
             customizeSummary(
                 Settings().copy(
                     readingLayout = ReadingLayout.MUSHAF,

@@ -7,15 +7,20 @@ import org.junit.Test
 class MushafGridTest {
 
     @Test
-    fun `fifteen of the leaf's units are revelation and the chrome takes the rest`() {
-        assertEquals(16.75f, MushafGrid.SLOTS, 0.001f)
+    fun `fifteen of the leaf's units are revelation and the furniture takes the rest`() {
+        assertEquals(16.85f, MushafGrid.SLOTS, 0.001f)
         assertEquals(15, MushafGrid.TEXT_LINES)
-        // The head and its gutter stand clear without spending a second line.
+        // The head and its gutter stand clear without spending a second line,
+        // and the foot is paper under the last line — the folio itself stands
+        // below the leaf, in the dial's own band.
         assertEquals(
             MushafGrid.SLOTS - MushafGrid.TEXT_LINES,
-            MushafGrid.RUNNING_HEAD + MushafGrid.HEAD_GUTTER + MushafGrid.TAIL + MushafGrid.FOLIO,
+            MushafGrid.RUNNING_HEAD + MushafGrid.HEAD_GUTTER + MushafGrid.TAIL,
             0.001f,
         )
+        // A page has a foot, and it is smaller than its head: the folio and the
+        // dial stand under it and carry air of their own.
+        assertTrue(MushafGrid.TAIL < MushafGrid.RUNNING_HEAD + MushafGrid.HEAD_GUTTER)
     }
 
     @Test
@@ -27,7 +32,6 @@ class MushafGridTest {
             MushafGrid.HEAD_GUTTER,
             MushafGrid.TEXT_LINES.toFloat(),
             MushafGrid.TAIL,
-            MushafGrid.FOLIO,
         )
         assertEquals(leaf, bands.sum() * unit, 0.5f)
         assertEquals(MushafGrid.textWellPx(leaf), unit * 15, 0.01f)
@@ -38,15 +42,21 @@ class MushafGridTest {
         val glyph = 57f
         // A chapter's name is written in the same hand as the revelation.
         assertEquals(glyph, MushafType.stepPx(glyph, MushafType.TITLE), 0.01f)
-        // The folio's figure is three steps down, wayfinding four.
+        // The running head and the folio's Arabic figure share the third step
+        // down; the Latin numeral glossing that figure is a fourth.
         assertEquals(
             glyph / (1.25f * 1.25f * 1.25f),
             MushafType.stepPx(glyph, MushafType.FOLIO_FIGURE),
             0.01f,
         )
         assertEquals(
-            glyph / (1.25f * 1.25f * 1.25f * 1.25f),
+            glyph / (1.25f * 1.25f * 1.25f),
             MushafType.stepPx(glyph, MushafType.HEAD),
+            0.01f,
+        )
+        assertEquals(
+            glyph / (1.25f * 1.25f * 1.25f * 1.25f),
+            MushafType.stepPx(glyph, MushafType.FOLIO_GLOSS),
             0.01f,
         )
         // Each step is the same interval as the last: that is what makes it a
@@ -54,9 +64,10 @@ class MushafGridTest {
         val a = MushafType.stepPx(glyph, -1) / MushafType.stepPx(glyph, 0)
         val b = MushafType.stepPx(glyph, -2) / MushafType.stepPx(glyph, -1)
         assertEquals(a, b, 0.0001f)
-        // The running head is the smallest hand on the leaf.
+        // The Latin gloss is the smallest hand on the leaf, and stands a step
+        // under the Arabic figure it glosses.
         assertTrue(
-            MushafType.stepPx(glyph, MushafType.HEAD) <
+            MushafType.stepPx(glyph, MushafType.FOLIO_GLOSS) <
                 MushafType.stepPx(glyph, MushafType.FOLIO_FIGURE),
         )
     }

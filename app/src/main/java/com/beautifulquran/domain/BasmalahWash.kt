@@ -55,6 +55,14 @@ object BasmalahWash {
     }
 
     /**
+     * Even quarters: one band per word. The map a *line of prose* asks for,
+     * where nothing about the Arabic letterforms is on the paper — see
+     * [plainProgress].
+     */
+    private val EVEN_BANDS: FloatArray =
+        FloatArray(WORD_LEFT_EDGE_X.size) { (it + 1).toFloat() / WORD_LEFT_EDGE_X.size }
+
+    /**
      * Widest wash feather this artwork can carry, as a fraction of its width.
      *
      * `letterFadeIn` runs its gradient one feather *ahead* of the solid front,
@@ -68,7 +76,14 @@ object BasmalahWash {
      * touch of the far end exactly where ٱلرَّحِيمِ begins, so no part of the
      * calligraphy is even faintly washed before its word's turn.
      */
-    val MAX_FEATHER: Float = 1f / WORD_END_PROGRESS[WORD_END_PROGRESS.size - 2] - 1f
+    val MAX_FEATHER: Float = maxFeather(WORD_END_PROGRESS)
+
+    /** The same guard for [plainProgress]'s even quarters. */
+    val PLAIN_MAX_FEATHER: Float = maxFeather(EVEN_BANDS)
+
+    /** Widest feather that leaves the last band untouched until its turn. */
+    private fun maxFeather(bandEnds: FloatArray): Float =
+        1f / bandEnds[bandEnds.size - 2] - 1f
 
     /**
      * Wash progress 0..1 at [positionMs] of the lead-in clip, or null when
@@ -92,6 +107,39 @@ object BasmalahWash {
         segments: List<Segment>,
         clipDurationMs: Long = 0L,
         hold: TajweedPacing.Hold? = TajweedPacing.Hold(maddAaridWaqf = true),
+    ): Float? = washProgress(positionMs, segments, clipDurationMs, hold, WORD_END_PROGRESS)
+
+    /**
+     * The same voice lock for a rendering of the basmalah that is **not** the
+     * calligraphy: the English display line of the English leaf.
+     *
+     * Both corrections [progress] makes are corrections about Arabic letters.
+     * [WORD_END_PROGRESS] is where each word's *glyphs* sit in the artwork —
+     * بِسۡمِ owns over half the width for a half-second syllable — and the
+     * tajweed curve parks the edge on the letter the reciter is sustaining.
+     * Laid over "In the name of Allah, the Entirely Merciful, the Especially
+     * Merciful" they are simply false: half that sentence would be inked while
+     * the voice is still on "bismi", and the edge would stall in the middle of
+     * a phrase that nobody is holding.
+     *
+     * So the prose line takes the plain statement the English verses take
+     * (`englishVerseReadProgress`): each of the four words owns a quarter of
+     * the sentence, crossed linearly over the time the voice spends on it.
+     * Null on the same rows [progress] refuses, for the same plain-ramp
+     * fallback.
+     */
+    fun plainProgress(
+        positionMs: Long,
+        segments: List<Segment>,
+        clipDurationMs: Long = 0L,
+    ): Float? = washProgress(positionMs, segments, clipDurationMs, hold = null, bandEnds = EVEN_BANDS)
+
+    private fun washProgress(
+        positionMs: Long,
+        segments: List<Segment>,
+        clipDurationMs: Long,
+        hold: TajweedPacing.Hold?,
+        bandEnds: FloatArray,
     ): Float? {
         if (!timesTheWholeBasmalah(segments)) return null
         val rowMs = onRowClock(positionMs, segments, clipDurationMs)
@@ -104,8 +152,8 @@ object BasmalahWash {
 
         val isCloser = index == segments.lastIndex
         val segment = segments[index]
-        val bandStart = if (index == 0) 0f else WORD_END_PROGRESS[index - 1]
-        val bandEnd = WORD_END_PROGRESS[index]
+        val bandStart = if (index == 0) 0f else bandEnds[index - 1]
+        val bandEnd = bandEnds[index]
         // Karaoke hold: a word owns the gap until the next word starts, so the
         // ink settles into its band rather than stalling short of it. The
         // closing word owns the rest of the clip.

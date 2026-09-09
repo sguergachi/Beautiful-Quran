@@ -130,8 +130,9 @@ cut out of its centre, pointing in the direction the comb would travel to
 return there. It is the hairline remembering the place, not a floating undo
 message. The roundel remains tappable for five seconds, then shrinks and fades
 into the rule; tapping it returns to that exact leaf and consumes it.
-Taking hold of the dial again also consumes it, because a new search supersedes
-the old landing. The roundel and rule share one gesture owner: a still release
+Taking hold of the dial again also consumes it, and so does turning the leaf
+by hand, because a new search supersedes the old landing. The roundel and rule
+share one gesture owner: a still release
 on the roundel goes back, while movement past touch slop becomes a new dial
 stroke. Its generous tap target must never swallow a drag along the rule.
 
@@ -517,9 +518,10 @@ gesture by these rules:
   vertical scroll claims nearly every swipe and page turns feel dead.
 - **Children claim first.** The detector watches the Main pointer pass and
   backs off the instant a child control consumes the gesture, so sliders and
-  scrolling lists keep working inside a sheet. A gesture that opened
-  vertical over a static area can still become a page turn on a clear,
-  sustained horizontal pull.
+  scrolling lists keep working inside a sheet. A second contact also cancels
+  an in-flight sheet pull, so a staggered pinch can never become a page fling.
+  A gesture that opened vertical over a static area can still become a page
+  turn on a clear, sustained horizontal pull.
 - **A short pull resistance** (~14 dp, capped at 4% of the sheet width)
   is subtracted from the drag so the sheet leans before it travels — paper
   has weight — but the sheet starts following the finger almost immediately.
@@ -1134,6 +1136,21 @@ number lane must not read as an empty decorative gutter.
 
 The Android and web search pills own an even 16 dp/px internal inset on both
 ends; icon and text spacing is independent of the chapter-number grid.
+The pill is the fixed head of the chapter document: chapters and results move
+beneath it while it remains available at the top of the scrollport. Scrolling
+does not dismiss its focus. Its opaque paper head keeps 12 dp/px of breathing
+room below the pill so moving results never crowd its edge. Android Back, or
+Escape on web, first dismisses the keyboard/focus while preserving the query
+and its results; only a later Back action may leave the sheet.
+Search results keep relevance in the existing paper hierarchy. The quiet
+metadata line explains why each result appeared (`7:154 · Text match`,
+`9:26 · Related · tranquility`, or `2:83 · Concept · Kindness to Parents`),
+while the section line gives the relevant-ayah count. These never become
+badges, chips, cards, confidence meters, or second headings. Every visible word
+that genuinely earned a result may take the gold accent; connective or merely
+similar words remain ordinary ink. Literal word hits still open with the word
+flash; ayah-level concept and quoted-phrase hits open the verse without
+inventing an Arabic word to highlight.
 Continue listening is the one full-bleed row in the scrolling chapter
 document: its quiet green wash and tap target reach both sheet edges, while
 its bilingual text remains on the same inner English and Arabic rails as the
@@ -1258,6 +1275,10 @@ does not repeat section labels above those two navigation rows. Text size,
 transliteration, and ayah translation live in Customize with theme, view,
 layout, numeral scripts, verse annotations, the ayah-selector side, and
 word-by-word English under Arabic.
+On the scrolling reader, pinching the scripture changes text size through the
+same nine stops as Customize and keeps the current verse on its reading line.
+The mushaf does not respond: its hand is a property of the fixed page grid, not
+a reader preference.
 A live miniature at the top is a faded leaf with a gold hairline — Hafs,
 Garamond, gold verse marks, and the folio — so each choice shows what the
 sheet will look like. The leaf stays pinned at the top while the choices

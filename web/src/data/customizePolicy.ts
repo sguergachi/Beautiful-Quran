@@ -3,6 +3,7 @@ import type {
   Settings,
   VerseNumberScript,
 } from './settings'
+import type { WordSearchSources } from '../domain/WordSearch'
 
 export function applyReadingMode(mode: ReadingMode): Partial<Settings> {
   return { readingMode: mode }
@@ -18,6 +19,11 @@ export function showsPreviewWordGloss(
   showWordGloss: boolean,
 ): boolean {
   return showsWordGlossChrome(mode) && showWordGloss
+}
+
+/** Web is the Scroll reader, so its search always uses the timed English gloss. */
+export function wordSearchSources(): WordSearchSources {
+  return { arabic: false, wordGloss: true, transliteration: false, verseTranslation: false }
 }
 
 export function themeLabel(mode: Settings['themeMode']): string {

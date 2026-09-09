@@ -21,6 +21,11 @@ class BasmalahWashTest {
         BasmalahWash.progress(positionMs, segments)
             ?: error("expected a paced wash for $segments")
 
+    /** The English leaf's line: even word bands, no tajweed. */
+    private fun plain(positionMs: Long, segments: List<Segment> = alafasy): Float =
+        BasmalahWash.plainProgress(positionMs, segments)
+            ?: error("expected a plain wash for $segments")
+
     @Test
     fun `the four words tile the artwork left to right in reading order`() {
         assertEquals(BasmalahWash.WORDS.size, BasmalahWash.WORD_END_PROGRESS.size)
@@ -31,6 +36,56 @@ class BasmalahWashTest {
             previous = end
         }
         assertEquals(1f, BasmalahWash.WORD_END_PROGRESS.last(), 1e-6f)
+    }
+
+    @Test
+    fun `the prose line takes even quarters, one per word`() {
+        // Alafasy: بِسۡمِ runs 60..610, so its whole band is the sentence's
+        // first quarter — not the half of the artwork its kashida covers.
+        assertEquals(0f, plain(60), 1e-6f)
+        assertEquals(0.125f, plain(335), 0.002f)
+        assertEquals(0.25f, plain(610), 1e-6f)
+        assertEquals(0.5f, plain(1439), 1e-6f)
+        assertEquals(0.75f, plain(2532), 1e-6f)
+    }
+
+    @Test
+    fun `the prose line crosses its band at one speed, the calligraphy does not`() {
+        // ٱلرَّحِيمِ, the closing madd: the calligraphy sprints its run-up and
+        // then parks on the letter the stop lengthens. A line of English prose
+        // has no letter anyone is holding, so equal time is equal distance.
+        val start = 2532L
+        val end = 5870L
+        val quarters = (1..4).map { start + (end - start) * it / 4 }
+        val proseSteps = quarters.map { plain(it) }.zipWithNext { a, b -> b - a }
+        val firstStep = plain(quarters[0]) - plain(start)
+        for (step in proseSteps) {
+            assertEquals("prose must cross its quarter evenly", firstStep, step, 0.002f)
+        }
+        val pacedSteps = quarters.map { at(it) }.zipWithNext { a, b -> b - a }
+        assertTrue(
+            "the paced wash must not be even: ${pacedSteps.joinToString()}",
+            pacedSteps.max() > pacedSteps.min() * 3f,
+        )
+    }
+
+    @Test
+    fun `the prose feather leaves the last quarter untouched until its turn`() {
+        // Same guard as MAX_FEATHER, for even bands: the gradient runs one
+        // feather ahead of the front, so the far end is first touched at
+        // 1 / (1 + feather) — which must be no earlier than 3/4.
+        assertEquals(0.75f, 1f / (1f + BasmalahWash.PLAIN_MAX_FEATHER), 1e-6f)
+    }
+
+    @Test
+    fun `the prose line refuses the rows the calligraphy refuses`() {
+        val repeated = listOf(
+            Segment(1, 0, 100),
+            Segment(1, 100, 200),
+            Segment(3, 200, 300),
+            Segment(4, 300, 400),
+        )
+        assertNull(BasmalahWash.plainProgress(150, repeated))
     }
 
     @Test

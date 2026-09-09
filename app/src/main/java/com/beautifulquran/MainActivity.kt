@@ -15,8 +15,12 @@ import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.navigationBarsIgnoringVisibility
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsIgnoringVisibility
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -79,6 +83,16 @@ import com.beautifulquran.ui.home.HomeViewModel
 import com.beautifulquran.ui.reader.BackToOriginPill
 import com.beautifulquran.ui.reader.ReaderPlaybackSnapshot
 import com.beautifulquran.ui.reader.ReaderScreen
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalFontFamilyResolver
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.platform.LocalWindowInfo
+import androidx.compose.ui.text.TextMeasurer
+import com.beautifulquran.ui.reader.MushafBelowLeaf
+import com.beautifulquran.ui.reader.MushafPageMargin
+import com.beautifulquran.ui.reader.englishLeafSlotPx
+import com.beautifulquran.ui.reader.englishLeafRuler
+import com.beautifulquran.data.QuranDatabase
 import com.beautifulquran.ui.reader.ReaderViewModel
 import com.beautifulquran.ui.reader.RootReturnTarget
 import com.beautifulquran.ui.rootviewer.RootViewerScreen
@@ -270,6 +284,7 @@ private const val STACK_PAGE_PULL_RESISTANCE_DP = 14
 private const val STACK_OFFSCREEN_OVERSCAN_DP = 36f
 private val StackMotionEasing = CubicBezierEasing(0.24f, 0.02f, 0.12f, 1f)
 
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 private fun PaperStackApp(
     themeMode: ThemeMode,
@@ -295,14 +310,110 @@ private fun PaperStackApp(
     val settingsInkPreview = remember {
         SettingsInkPreviewState(settings.brushCircleStyle)
     }
+    // Paginate the English book before anything is opened.
+    //
+    // It is paginated by *measuring* a leaf, and a leaf has no size until it has
+    // been composed — so the first time this app is ever run it has to open on
+    // the character estimate and repaginate a frame later. Only the first time:
+    // the leaf remembers its well and measure, and every launch after that has
+    // them here, at the root, before the reader exists. A thousand text layouts
+    // on a background thread while the chapter list is being read.
+    //
+    // These figures are remembered against this exact window size and this
+    // build's LEAF_METRICS_VERSION, and the leaf slot is the same size every
+    // time both of those hold — so they are the figures the leaf is about to
+    // measure, and the book is paginated from them rather than merely looked up
+    // under them. Reading only, which is what this did, meant that any launch
+    // the written book did not survive — a new format, a setting changed, a
+    // fresh install — put the whole pagination back on the door of the mushaf,
+    // where it is a wait the reader watches instead of one nobody sees.
+    val leafDensity = LocalDensity.current
+    val leafResolver = LocalFontFamilyResolver.current
+    val leafLayoutDirection = LocalLayoutDirection.current
+    val leafMeasurer = remember(leafResolver, leafDensity, leafLayoutDirection) {
+        TextMeasurer(leafResolver, leafDensity, leafLayoutDirection)
+    }
+    val windowSize = LocalWindowInfo.current.containerSize
+    // The paper the system bars take out of the window. The reader's body pads
+    // by the status bar itself (ReaderScreen's topInset) and the scaffold holds
+    // the navigation bar off the bottom; between them the leaf never sees this
+    // paper, so neither does the figure worked out from it. Both are taken
+    // ignoring visibility — immersive reading hides the status bar, and a leaf
+    // that changed size when it did would repaginate the book mid-recitation.
+    val statusBarTop = WindowInsets.statusBarsIgnoringVisibility
+        .asPaddingValues()
+        .calculateTopPadding()
+    val navigationBarBottom = WindowInsets.navigationBarsIgnoringVisibility
+        .asPaddingValues()
+        .calculateBottomPadding()
+    LaunchedEffect(
+        statusBarTop,
+        navigationBarBottom,
+        windowSize,
+        settings.englishLeafText,
+        settings.verseNumberScript,
+        settings.hideEnglishParentheticals,
+    ) {
+        // Nothing remembered — a first launch, or a window this app has not
+        // been this size in. Work the leaf's size out instead of waiting for a
+        // leaf: MushafBelowLeaf is everything the reading sheet sets under the
+        // paper and the leaf is what is left, so the window and the status bar
+        // are the whole of what is needed. See englishLeafSlotPx, which the
+        // pager calls with the same figures when it finally draws one.
+        val predicted = with(leafDensity) {
+            val paperW = windowSize.width - MushafPageMargin.roundToPx() * 2
+            val leafH = windowSize.height -
+                statusBarTop.roundToPx() -
+                navigationBarBottom.roundToPx() -
+                MushafBelowLeaf.roundToPx()
+            if (paperW > 0 && leafH > 0) {
+                englishLeafSlotPx(paperW, leafH, leafDensity)
+            } else {
+                null
+            }
+        }
+        val metrics = app.settings.leafMetrics(windowSize.width, windowSize.height)
+            ?: predicted
+            ?: return@LaunchedEffect
+        readerViewModel.ensureMushaf(
+            text = settings.englishLeafText,
+            rulerFor = { translation ->
+                englishLeafRuler(
+                    wellPx = metrics[0],
+                    measurePx = metrics[1],
+                    density = leafDensity,
+                    measurer = leafMeasurer,
+                    verseNumberScript = settings.verseNumberScript,
+                    hideParentheticals = settings.hideEnglishParentheticals,
+                    translation = translation,
+                )
+            },
+            rulerKey = listOf(
+                metrics[0],
+                metrics[1],
+                settings.verseNumberScript,
+                settings.hideEnglishParentheticals,
+            ),
+            cacheKey = app.englishBookCache.key(
+                wellPx = metrics[0],
+                measurePx = metrics[1],
+                verseNumberScript = settings.verseNumberScript.ordinal,
+                hideParentheticals = settings.hideEnglishParentheticals,
+                leafText = settings.englishLeafText.ordinal,
+                database = QuranDatabase.DB_FILE_NAME,
+                ),
+        )
+    }
     val bookmarkCount by bookmarksViewModel.bookmarkCount.collectAsStateWithLifecycle()
     val shareUi by shareViewModel.ui.collectAsStateWithLifecycle()
 
     var selectedSurahId by rememberSaveable { mutableIntStateOf(0) }
     var selectedStartAyah by rememberSaveable { mutableIntStateOf(0) }
     var selectedStartPlayback by rememberSaveable { mutableStateOf(false) }
-    /** 1-based word position from a home word-search hit; 0 means no flash. */
-    var selectedStartWord by rememberSaveable { mutableIntStateOf(0) }
+    /** Search target: positive = Quran word, zero = exact translator text, negative = none. */
+    var selectedStartWord by rememberSaveable { mutableIntStateOf(-1) }
+    var selectedStartWords by rememberSaveable { mutableStateOf(emptyList<Int>()) }
+    var selectedSearchText by rememberSaveable { mutableStateOf<String?>(null) }
     var settingsDetail by rememberSaveable(
         stateSaver = Saver<SettingsDetail?, String>(
             save = { it?.name },
@@ -511,7 +622,9 @@ private fun PaperStackApp(
         selectedSurahId = surahId
         selectedStartAyah = startAyah
         selectedStartPlayback = play
-        selectedStartWord = 0
+        selectedStartWord = -1
+        selectedStartWords = emptyList()
+        selectedSearchText = null
         jumpEpoch++
         readerSession++
         animateTo(AYAH_LAYER)
@@ -619,7 +732,9 @@ private fun PaperStackApp(
         selectedSurahId = surahId
         selectedStartAyah = ayah
         selectedStartPlayback = false
-        selectedStartWord = 0
+        selectedStartWord = -1
+        selectedStartWords = emptyList()
+        selectedSearchText = null
         jumpEpoch++
         readerSession++
         animateTo(AYAH_LAYER)
@@ -635,7 +750,9 @@ private fun PaperStackApp(
         selectedSurahId = target.surahId
         selectedStartAyah = target.ayah
         selectedStartPlayback = false
-        selectedStartWord = 0
+        selectedStartWord = -1
+        selectedStartWords = emptyList()
+        selectedSearchText = null
         jumpEpoch++
         readerSession++
         animateTo(AYAH_LAYER)
@@ -756,7 +873,9 @@ private fun PaperStackApp(
                     selectedSurahId = surahId
                     selectedStartAyah = ayah
                     selectedStartPlayback = false
-                    selectedStartWord = 0
+                    selectedStartWord = -1
+                    selectedStartWords = emptyList()
+                    selectedSearchText = null
                     jumpEpoch++
                     readerSession++
                     animateTo(AYAH_LAYER)
@@ -835,7 +954,12 @@ private fun PaperStackApp(
                         surahId = selectedSurahId,
                         startAyah = selectedStartAyah.takeIf { it > 0 },
                         startPlaybackRequested = selectedStartPlayback,
-                        startWordPosition = selectedStartWord.takeIf { it > 0 },
+                        startWordPosition = selectedStartWord.takeIf { it >= 0 },
+                        startWordPositions = selectedStartWords,
+                        startSearchText = selectedSearchText,
+                        readerSheetSettled = {
+                            abs(stackPosition.value - AYAH_LAYER) <= 0.01f
+                        },
                         viewModel = readerViewModel,
                         onBack = { animateTo(COVER_LAYER) },
                         onOpenSettings = { animateTo(SETTINGS_LAYER) },
@@ -845,13 +969,17 @@ private fun PaperStackApp(
                             selectedSurahId = nextId
                             selectedStartAyah = 0
                             selectedStartPlayback = false
-                            selectedStartWord = 0
+                            selectedStartWord = -1
+                            selectedStartWords = emptyList()
+                            selectedSearchText = null
                         },
                         onOpenPreviousChapter = { prevId ->
                             selectedSurahId = prevId
                             selectedStartAyah = 0
                             selectedStartPlayback = false
-                            selectedStartWord = 0
+                            selectedStartWord = -1
+                            selectedStartWords = emptyList()
+                            selectedSearchText = null
                         },
                         onAyahSelectorExpandedChange = { ayahSelectorExpanded = it },
                         onOpenRootViewer = { sid, a, word -> onWordLongPress(sid, a, word) },
@@ -950,12 +1078,25 @@ private fun PaperStackApp(
         ) {
             HomeScreen(
                 viewModel = homeViewModel,
-                onOpenSurah = { surahId, ayah, wordPosition ->
+                onOpenSurah = { surahId, ayah, wordPosition, searchText ->
                     readerViewModel.load(surahId)
                     selectedSurahId = surahId
                     selectedStartAyah = ayah ?: 0
                     selectedStartPlayback = false
-                    selectedStartWord = wordPosition ?: 0
+                    selectedStartWord = wordPosition ?: -1
+                    selectedStartWords = listOfNotNull(wordPosition?.takeIf { it > 0 })
+                    selectedSearchText = searchText
+                    readerSession++
+                    animateTo(AYAH_LAYER)
+                },
+                onOpenSearchHit = { hit, query ->
+                    readerViewModel.load(hit.surahId)
+                    selectedSurahId = hit.surahId
+                    selectedStartAyah = hit.ayahNumber
+                    selectedStartPlayback = false
+                    selectedStartWord = hit.position
+                    selectedStartWords = hit.targetPositions
+                    selectedSearchText = query
                     readerSession++
                     animateTo(AYAH_LAYER)
                 },
@@ -1267,6 +1408,7 @@ private fun Modifier.paperStackDrag(
         var startPosition = position()
         var totalDx = 0f
         var totalDy = 0f
+        var dragInterrupted = false
         velocityTracker.addPosition(down.uptimeMillis, down.position)
 
         while (true) {
@@ -1276,7 +1418,11 @@ private fun Modifier.paperStackDrag(
             // The sheet only claims a gesture after a clear horizontal pull.
             val event = awaitPointerEvent(PointerEventPass.Main)
             val change = event.changes.firstOrNull { it.id == down.id } ?: break
-            if (!horizontalDrag && change.isConsumed) break
+            val pressedPointers = event.changes.count { it.pressed }
+            if (stackDragInterrupted(pressedPointers, change.isConsumed)) {
+                dragInterrupted = horizontalDrag
+                break
+            }
             val delta = change.positionChange()
             totalDx += delta.x
             totalDy += delta.y
@@ -1319,6 +1465,10 @@ private fun Modifier.paperStackDrag(
         }
 
         if (horizontalDrag) {
+            if (dragInterrupted) {
+                onSettle(startLayer)
+                return@awaitEachGesture
+            }
             val dragPages = -resistedSwipeDistance(totalDx, pullResistance) / width
             val draggedPosition = startPosition + dragPages
             val velocityPages = -velocityTracker.calculateVelocity().x / width
@@ -1342,6 +1492,10 @@ private fun Modifier.paperStackDrag(
         }
     }
 }
+
+/** A second contact or a child claim turns an in-flight page pull into a cancellation. */
+internal fun stackDragInterrupted(pressedPointers: Int, primaryConsumed: Boolean): Boolean =
+    pressedPointers > 1 || primaryConsumed
 
 private fun resistedSwipeDistance(distance: Float, resistance: Float): Float = when {
     distance > resistance -> distance - resistance

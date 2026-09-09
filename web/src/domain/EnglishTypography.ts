@@ -27,3 +27,22 @@ export function lyricizeEnglishGlosses(
       : gloss
   )))
 }
+
+/** Visible owner of a shared gloss when `requestedIndex` was coalesced. */
+export function coalescedGlossOwnerIndex(
+  glosses: readonly string[],
+  arabicWords: readonly string[],
+  requestedIndex: number,
+): number | null {
+  if (glosses.length !== arabicWords.length) throw new Error('glosses and Arabic words must align')
+  if (requestedIndex < 0 || requestedIndex >= glosses.length) return null
+  let owner = requestedIndex
+  while (
+    owner > 0 &&
+    glosses[owner] === glosses[owner - 1] &&
+    normalizeArabicForSearch(arabicWords[owner]!) !== normalizeArabicForSearch(arabicWords[owner - 1]!)
+  ) {
+    owner--
+  }
+  return owner
+}

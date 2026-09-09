@@ -33,6 +33,7 @@ object AppViewModelFactory : ViewModelProvider.Factory {
                     app.player,
                     app.annotations,
                     app.outputLatency,
+                    app.englishBookCache,
                 ) as T
             modelClass.isAssignableFrom(SettingsViewModel::class.java) ->
                 SettingsViewModel(app.repository, app.settings, app.tarjiProfiles) as T

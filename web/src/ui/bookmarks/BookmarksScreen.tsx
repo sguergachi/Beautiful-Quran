@@ -20,6 +20,7 @@ type BookmarkKey = `${number}:${number}`
 export function BookmarksScreen({ stackLayer }: { stackLayer: StackLayer }) {
   const bookmarks = useAppSelector((s) => s.bookmarks)
   const [query, setQuery] = useState('')
+  const queryInputRef = useRef<HTMLInputElement>(null)
   const [pendingRemoval, setPendingRemoval] = useState<BookmarkKey | null>(null)
   const [expandedSurahs, setExpandedSurahs] = useState<Set<number>>(new Set())
   const [collapsedSurahs, setCollapsedSurahs] = useState<Set<number>>(new Set())
@@ -77,6 +78,7 @@ export function BookmarksScreen({ stackLayer }: { stackLayer: StackLayer }) {
           <div className="home-search">
             <SearchGlyph />
             <PaperInput
+              inputRef={queryInputRef}
               type="search"
               name="bookmark-search"
               placeholder="Search bookmarks, text, or 2:255"
@@ -89,7 +91,11 @@ export function BookmarksScreen({ stackLayer }: { stackLayer: StackLayer }) {
                 type="button"
                 className="home-search-clear"
                 aria-label="Clear bookmark search"
-                onClick={() => changeQuery('')}
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => {
+                  changeQuery('')
+                  queryInputRef.current?.focus()
+                }}
               >
                 <ClearGlyph />
               </button>

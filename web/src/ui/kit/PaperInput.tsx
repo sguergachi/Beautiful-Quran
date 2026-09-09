@@ -1,4 +1,4 @@
-import type { FocusEvent, KeyboardEvent } from 'react'
+import type { FocusEvent, KeyboardEvent, Ref } from 'react'
 import { Input } from '@base-ui/react/input'
 
 type Props = {
@@ -14,6 +14,7 @@ type Props = {
   onKeyDown?: (e: KeyboardEvent<HTMLInputElement>) => void
   onFocus?: (e: FocusEvent<HTMLInputElement>) => void
   onBlur?: (e: FocusEvent<HTMLInputElement>) => void
+  inputRef?: Ref<HTMLInputElement>
 }
 
 /** Paper-styled Base UI Input — underline field, no box chrome. */
@@ -29,10 +30,12 @@ export function PaperInput({
   onKeyDown,
   onFocus,
   onBlur,
+  inputRef,
   'aria-label': ariaLabel,
 }: Props) {
   return (
     <Input
+      ref={inputRef}
       id={id}
       name={name}
       type={type}

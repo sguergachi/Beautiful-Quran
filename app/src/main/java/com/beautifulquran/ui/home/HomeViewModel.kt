@@ -4,21 +4,30 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.media3.common.Player
 import com.beautifulquran.data.QuranRepository
+import com.beautifulquran.data.ReadingLayout
+import com.beautifulquran.data.Settings
 import com.beautifulquran.data.SettingsRepository
 import com.beautifulquran.data.model.Surah
 import com.beautifulquran.data.model.SurahWordSearchSection
 import com.beautifulquran.data.model.WordSearchHit
 import com.beautifulquran.domain.isWordSearchQuery
+import com.beautifulquran.domain.normalizeArabicForSearch
+import com.beautifulquran.domain.parseSearchQuery
+import com.beautifulquran.domain.searchTextRelevance
 import com.beautifulquran.domain.sectionWordSearchHits
+import com.beautifulquran.domain.WordSearchSources
 import com.beautifulquran.playback.PlayerController
 import com.beautifulquran.playback.PlayerUiState
 import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -77,7 +86,8 @@ internal data class SurahFilterResult(val surahs: List<Surah>, val ayahTarget: I
 /** The home search: blank shows everything; a `surah:ayah` reference resolves
  * to that one surah (empty when out of range); anything else matches names
  * (transliteration/translation case-insensitively, Arabic exactly) or the
- * bare surah number. */
+ * bare surah number. Text matches are relevance-ranked; quotes disable fuzzy
+ * matching just as they do for Quran-wide results. */
 internal fun filterSurahs(surahs: List<Surah>, query: String): SurahFilterResult {
     val reference = parseAyahReference(query)
     return when {
@@ -96,14 +106,23 @@ internal fun filterSurahs(surahs: List<Surah>, query: String): SurahFilterResult
             // Match on the trimmed query so stray leading/trailing whitespace
             // (common from keyboard autocomplete) never hides an otherwise
             // matching surah name or number.
-            val trimmed = query.trim()
+            val parsed = parseSearchQuery(query)
+            val arabic = normalizeArabicForSearch(parsed.text)
             SurahFilterResult(
-                surahs.filter {
-                    it.nameTransliteration.contains(trimmed, ignoreCase = true) ||
-                        it.nameTranslation.contains(trimmed, ignoreCase = true) ||
-                        it.nameArabic.contains(trimmed) ||
-                        it.id.toString() == trimmed
-                },
+                surahs.mapNotNull { surah ->
+                    val score = maxOf(
+                        searchTextRelevance(surah.nameTransliteration, parsed),
+                        searchTextRelevance(surah.nameTranslation, parsed),
+                        if (arabic.isEmpty()) 0 else searchTextRelevance(
+                            normalizeArabicForSearch(surah.nameArabic),
+                            parsed.copy(text = arabic),
+                        ),
+                        if (surah.id.toString() == parsed.text) 3_200 else 0,
+                    )
+                    score.takeIf { it > 0 }?.let { surah to it }
+                }.sortedWith(
+                    compareByDescending<Pair<Surah, Int>> { it.second }.thenBy { it.first.id },
+                ).map { it.first },
             )
         }
     }
@@ -113,6 +132,22 @@ internal fun filterSurahs(surahs: List<Surah>, query: String): SurahFilterResult
 internal fun shouldRunWordSearch(query: String): Boolean {
     if (!isWordSearchQuery(query)) return false
     return parseAyahReference(query.trim()) == null
+}
+
+/** Search uses the selected layout's English: timed gloss Scroll or flowing Mushaf prose. */
+internal fun wordSearchSources(settings: Settings): WordSearchSources = when {
+    settings.readingLayout == ReadingLayout.MUSHAF -> WordSearchSources(
+        arabic = false,
+        wordGloss = false,
+        transliteration = false,
+        verseTranslation = true,
+    )
+    else -> WordSearchSources(
+        arabic = false,
+        wordGloss = true,
+        transliteration = false,
+        verseTranslation = false,
+    )
 }
 
 @OptIn(FlowPreview::class)
@@ -128,6 +163,7 @@ class HomeViewModel(
     private val wordHits = MutableStateFlow<List<WordSearchHit>>(emptyList())
     private val expandedSurahIds = MutableStateFlow<Set<Int>>(emptySet())
     private val wordSearchLoading = MutableStateFlow(false)
+    private var searchWarmup: Job? = null
 
     val uiState: StateFlow<HomeUiState> =
         combine(
@@ -179,31 +215,54 @@ class HomeViewModel(
             reciterNames.value = repository.reciters().associate { it.id to it.name }
         }
         viewModelScope.launch {
-            query
-                .debounce(220)
-                .collectLatest { q ->
+            combine(query, settings.settings) { q, prefs -> q to wordSearchSources(prefs) }
+                .distinctUntilChanged()
+                .onEach { (q, _) ->
+                    wordHits.value = emptyList()
+                    wordSearchLoading.value = shouldRunWordSearch(q)
+                }
+                .debounce(120)
+                .collectLatest { (q, sources) ->
                     if (!shouldRunWordSearch(q)) {
                         wordHits.value = emptyList()
                         wordSearchLoading.value = false
                         return@collectLatest
                     }
                     wordSearchLoading.value = true
-                    wordHits.value = repository.searchWords(q)
-                    wordSearchLoading.value = false
+                    val quickHits = repository.searchWordsQuick(q, sources)
+                    if (quickHits.isNotEmpty() && isCurrentSearch(q, sources)) {
+                        wordHits.value = quickHits
+                    }
+                    val completeHits = repository.searchWords(q, sources)
+                    if (isCurrentSearch(q, sources)) {
+                        wordHits.value = completeHits
+                        wordSearchLoading.value = false
+                    }
                 }
         }
     }
 
     fun onQueryChange(value: String) {
-        if (value != query.value) {
+        val changed = value != query.value
+        if (changed) {
             expandedSurahIds.value = emptySet()
         }
         query.value = value
         // Show a quiet loading cue as soon as a word-searchable query is typed,
         // before debounce fires — avoids a blank gap under the surah matches.
         wordSearchLoading.value = shouldRunWordSearch(value)
-        if (!shouldRunWordSearch(value)) {
+        if (changed || !shouldRunWordSearch(value)) {
             wordHits.value = emptyList()
+        }
+    }
+
+    private fun isCurrentSearch(q: String, sources: WordSearchSources): Boolean =
+        q == query.value && sources == wordSearchSources(settings.settings.value)
+
+    /** Uses the pause before typing to prepare the one-time Quran search data. */
+    fun onSearchFocused() {
+        if (searchWarmup == null) {
+            searchWarmup = viewModelScope.launch { repository.warmSearch() }
         }
     }
 

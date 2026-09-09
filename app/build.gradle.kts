@@ -9,35 +9,29 @@ plugins {
 /** CI exports unset secrets as empty strings; treat those as absent. */
 fun env(name: String): String? = System.getenv(name)?.takeIf { it.isNotBlank() }
 
-/**
- * Store keystore. Linked worktrees do not inherit ignored files, so fall
- * back to the primary checkout's `release.keystore` — the same lookup
- * `scripts/build_release_bundle.sh` uses. A missing key still debug-signs
- * so CI/fresh clones can assembleRelease, but that APK cannot update a
- * store-signed install.
- */
-fun resolveReleaseKeystore(): File {
+fun findReleaseKeystore(): File {
     env("RELEASE_KEYSTORE_FILE")?.let { path ->
         val file = File(path)
         return if (file.isAbsolute) file else rootProject.file(path)
     }
-    val local = rootProject.file("release.keystore")
-    if (local.exists()) return local
-    val gitCommon = runCatching {
-        val proc = ProcessBuilder(
-            "git",
-            "rev-parse",
-            "--path-format=absolute",
-            "--git-common-dir",
-        ).directory(rootProject.projectDir).start()
-        val text = proc.inputStream.bufferedReader().readText().trim()
-        if (proc.waitFor() == 0 && text.isNotBlank()) File(text) else null
-    }.getOrNull()
-    val primary = gitCommon?.parentFile?.resolve("release.keystore")
-    return if (primary != null && primary.exists()) primary else local
+    rootProject.file("release.keystore").takeIf(File::isFile)?.let { return it }
+
+    // Linked worktrees do not inherit ignored files. Their .git marker points
+    // into <primary>/.git/worktrees/<name>, so look beside that primary repo.
+    val gitDir = rootProject.file(".git")
+        .takeIf(File::isFile)
+        ?.readText()
+        ?.substringAfter("gitdir:", missingDelimiterValue = "")
+        ?.trim()
+        ?.takeIf(String::isNotEmpty)
+        ?.let(rootProject::file)
+    return gitDir?.parentFile?.parentFile?.parentFile
+        ?.resolve("release.keystore")
+        ?.takeIf(File::isFile)
+        ?: rootProject.file("release.keystore")
 }
 
-val releaseKeystore = resolveReleaseKeystore()
+val releaseKeystore = findReleaseKeystore()
 
 // The mushaf is the QCF V2 page faces or it is nothing: a build that ships
 // without all 604 renders every leaf in the fallback Hafs face, which is the
@@ -76,8 +70,9 @@ android {
             keyAlias = "androiddebugkey"
             keyPassword = "android"
         }
-        // Store keystore; not committed. Credentials can be overridden from
-        // the environment (CI secrets) and default to the local values.
+        // Private release/upload keystore; never committed. On its owner's
+        // machine it signs both variants so locally shared APKs update one
+        // another. Fresh contributors still get the ordinary debug signer.
         create("release") {
             storeFile = releaseKeystore
             storePassword = env("RELEASE_KEYSTORE_PASSWORD") ?: "division"
@@ -88,7 +83,11 @@ android {
 
     buildTypes {
         debug {
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = if (releaseKeystore.isFile) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
+            }
         }
         release {
             isMinifyEnabled = true
@@ -97,11 +96,10 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
             )
-            // Sign with the store keystore when it exists; otherwise fall back
-            // to the debug keystore so CI and fresh clones can still
-            // assembleRelease. Note the two signatures cannot update over each
-            // other on a device — store builds need the real keystore present.
-            signingConfig = if (releaseKeystore.exists()) {
+            // Contributor clones can assemble without the private key. The
+            // publishing workflow separately requires and verifies it, so a
+            // public APK can never silently fall back to debug signing.
+            signingConfig = if (releaseKeystore.isFile) {
                 signingConfigs.getByName("release")
             } else {
                 signingConfigs.getByName("debug")
@@ -167,12 +165,16 @@ val syncQuranDbAsset by tasks.registering(Sync::class) {
     val dbAsset = rootProject.layout.projectDirectory.file("data/quran.db")
     val lexiconAsset = rootProject.layout.projectDirectory.file("data/lexicon.db")
     val dictionaryAsset = rootProject.layout.projectDirectory.file("data/dictionary.db")
+    val searchConceptAsset = rootProject.layout.projectDirectory.file("data/search_concepts.json")
+    val searchCandidateAsset = rootProject.layout.projectDirectory.file("data/search_concept_candidates.json")
     from(dbAsset)
     // Lane / Wiktionary ship as .sqlite, not .db, so they fall outside
     // `noCompress` above and travel deflated. The *Database classes copy them
     // out of assets, where AssetManager inflates them.
     from(lexiconAsset) { rename { "lexicon.sqlite" } }
     from(dictionaryAsset) { rename { "dictionary.sqlite" } }
+    from(searchConceptAsset)
+    from(searchCandidateAsset)
     into(layout.buildDirectory.dir("generated/quranAssets"))
 
     doLast {
@@ -192,6 +194,18 @@ val syncQuranDbAsset by tasks.registering(Sync::class) {
             throw GradleException(
                 "Missing canonical dictionary database: ${dictionaryAsset.asFile}. " +
                     "Run `python3 tools/build_dictionary_db.py` from the repo root before building locally.",
+            )
+        }
+        if (!searchConceptAsset.asFile.isFile) {
+            throw GradleException(
+                "Missing search concept index: ${searchConceptAsset.asFile}. " +
+                    "Run `python3 tools/build_search_concepts.py` from the repo root.",
+            )
+        }
+        if (!searchCandidateAsset.asFile.isFile) {
+            throw GradleException(
+                "Missing fast search concept index: ${searchCandidateAsset.asFile}. " +
+                    "Run `python3 tools/build_search_concepts.py` from the repo root.",
             )
         }
     }
@@ -265,6 +279,8 @@ tasks.withType<Test>().configureEach {
         "quran.db", "quran.db.sha256",
         "lexicon.db", "lexicon.db.sha256",
         "dictionary.db", "dictionary.db.sha256",
+        "search_concepts.json",
+        "search_concept_candidates.json",
     )
         .forEach { asset ->
             inputs.file(rootProject.layout.projectDirectory.file("data/$asset"))

@@ -1,0 +1,145 @@
+package com.beautifulquran.ui.reader
+
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+/**
+ * The English leaf blooms one word at a time, as the scrolling reader does. The
+ * three bands are how a sentence says which word that is — see
+ * `englishVerseBlooms`.
+ */
+class EnglishWashBandsTest {
+
+    /** A sentence occupying characters 10..109 of the paragraph. */
+    private val sentence = 10..109
+
+    @Test
+    fun `the bands tile the sentence with no gap and no overlap`() {
+        val bands = englishWashBands(sentence, from = 0.3f, to = 0.4f, unread = 0.4f)
+        assertEquals(10 until 40, bands.read)
+        assertEquals(40 until 50, bands.saying)
+        assertEquals(50..109, bands.ahead)
+        // Every character of the sentence is in exactly one band.
+        val covered = bands.read.toList() + bands.saying.toList() +
+            bands.retained.toList() + bands.ahead.toList()
+        assertEquals(sentence.toList(), covered)
+    }
+
+    @Test
+    fun `the first word opens the sentence and the last closes it`() {
+        val opening = englishWashBands(sentence, from = 0f, to = 0.1f, unread = 0.1f)
+        assertTrue(opening.read.isEmpty())
+        assertEquals(10 until 20, opening.saying)
+
+        val closing = englishWashBands(sentence, from = 0.9f, to = 1f, unread = 1f)
+        assertEquals(100..109, closing.saying)
+        assertTrue(closing.ahead.isEmpty())
+    }
+
+    @Test
+    fun `a word with no English of its own blooms nothing`() {
+        // The alignment collapses two Arabic words onto one English span where
+        // the translation has no separate words for them. The second gets an
+        // empty middle band — nothing to bloom — and the split stays put.
+        val bands = englishWashBands(sentence, from = 0.5f, to = 0.5f, unread = 0.5f)
+        assertTrue(bands.saying.isEmpty())
+        assertEquals(10 until 60, bands.read)
+        assertEquals(60..109, bands.ahead)
+    }
+
+    @Test
+    fun `the half of a carried verse the voice is not on needs no special case`() {
+        // Fragment progress clamps, so a voice before this leaf's half comes
+        // out all ahead, and a voice past it comes out all read.
+        val before = englishWashBands(sentence, from = 0f, to = 0f, unread = 0f)
+        assertTrue(before.read.isEmpty())
+        assertTrue(before.saying.isEmpty())
+        assertEquals(sentence, before.ahead)
+
+        val after = englishWashBands(sentence, from = 1f, to = 1f, unread = 1f)
+        assertEquals(sentence, after.read)
+        assertTrue(after.saying.isEmpty())
+        assertTrue(after.ahead.isEmpty())
+    }
+
+    @Test
+    fun `bands never run backwards, whatever they are handed`() {
+        val bands = englishWashBands(sentence, from = 0.8f, to = 0.2f, unread = 0.2f)
+        assertTrue("saying must not start before it ends", bands.saying.isEmpty())
+        assertEquals(10 until 90, bands.read)
+        assertEquals(90..109, bands.ahead)
+        // Out of range fractions are clamped rather than read off the end.
+        val wild = englishWashBands(sentence, from = -3f, to = 9f, unread = 9f)
+        assertTrue(wild.read.isEmpty())
+        assertEquals(sentence, wild.saying)
+        assertTrue(wild.ahead.isEmpty())
+    }
+
+    @Test
+    fun `a band edge is never left in the middle of a word`() {
+        // The bands abut, so an edge inside a word is a hard cut down a letter.
+        val prose = "one two three four five six seven eight nine ten"
+        val whole = prose.indices.first..prose.indices.last
+        for (cut in 1 until prose.length) {
+            val bands = englishWashBands(
+                range = whole,
+                from = cut.toFloat() / prose.length,
+                to = 1f,
+                unread = 1f,
+                text = prose,
+            )
+            val edge = bands.saying.first
+            if (edge <= 0 || edge > prose.lastIndex) continue
+            assertTrue(
+                "edge $edge splits '${prose.substring(edge - 1, edge + 1)}'",
+                !prose[edge - 1].isLetter() || !prose[edge].isLetter(),
+            )
+        }
+    }
+
+    @Test
+    fun `an edge already between words is left where it is`() {
+        val prose = "one two three"
+        val whole = prose.indices.first..prose.indices.last
+        // Character 3 is the space after "one".
+        val bands = englishWashBands(whole, 3f / prose.length, 1f, 1f, prose)
+        assertEquals(0 until 3, bands.read)
+        assertEquals("one", prose.substring(bands.read))
+    }
+
+    @Test
+    fun `a reciter going back over a phrase does not take its ink away`() {
+        // The voice is at 0.3, but it has already said as far as 0.7 once —
+        // so only what is past 0.7 is paper. Everything between the word being
+        // said and there keeps the ink it was given.
+        val bands = englishWashBands(sentence, from = 0.3f, to = 0.4f, unread = 0.7f)
+        assertEquals(10 until 40, bands.read)
+        assertEquals(40 until 50, bands.saying)
+        assertEquals(50 until 80, bands.retained)
+        assertEquals(80..109, bands.ahead)
+    }
+
+    @Test
+    fun `at the voice's own furthest point nothing is retained`() {
+        // Which is nearly always: the band exists only for a backtrack.
+        val bands = englishWashBands(sentence, from = 0.3f, to = 0.4f, unread = 0.4f)
+        assertTrue(bands.retained.isEmpty())
+        assertEquals(50..109, bands.ahead)
+    }
+
+    @Test
+    fun `an unread mark before the voice cannot pull the paper backwards`() {
+        val bands = englishWashBands(sentence, from = 0.3f, to = 0.4f, unread = 0.1f)
+        assertTrue(bands.retained.isEmpty())
+        assertEquals(50..109, bands.ahead)
+    }
+
+    @Test
+    fun `an empty sentence has no bands to draw`() {
+        val bands = englishWashBands(IntRange.EMPTY, from = 0f, to = 1f, unread = 1f)
+        assertTrue(bands.read.isEmpty())
+        assertTrue(bands.saying.isEmpty())
+        assertTrue(bands.ahead.isEmpty())
+    }
+}
