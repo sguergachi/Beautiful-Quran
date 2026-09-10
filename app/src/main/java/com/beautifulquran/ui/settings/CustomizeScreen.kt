@@ -55,7 +55,6 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.style.LineBreak
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.text.style.TextGeometricTransform
@@ -78,6 +77,8 @@ import com.beautifulquran.domain.MUSHAF_LINE_PITCH_EM
 import com.beautifulquran.domain.MUSHAF_WORD_GAP_EM
 import com.beautifulquran.domain.MushafLine
 import com.beautifulquran.domain.MushafPage
+import com.beautifulquran.domain.ENGLISH_LEAF_LEADING_EM
+import com.beautifulquran.domain.juzOf
 import com.beautifulquran.domain.mushafLineFit
 import com.beautifulquran.domain.qcfTrailingMark
 import com.beautifulquran.domain.qcfWordGlyphs
@@ -86,6 +87,7 @@ import com.beautifulquran.ui.reader.MushafFolioMarks
 import com.beautifulquran.ui.reader.MushafCell
 import com.beautifulquran.ui.reader.MushafQcfFonts
 import com.beautifulquran.ui.reader.PageBreak
+import com.beautifulquran.ui.reader.englishProseStyle
 import com.beautifulquran.ui.reader.VERSE_ANNOTATION_INK_ALPHA
 import com.beautifulquran.ui.reader.collapsedStackSpanDp
 import com.beautifulquran.ui.reader.appendAyahNumberMark
@@ -542,11 +544,19 @@ private const val PreviewMushafLineFirst = 1
 private const val PreviewMushafLineLast = 3
 private const val PreviewMushafSurahName = "سُورَةُ الأنبياء"
 private const val PreviewMushafSurahLatin = "Al-Anbya"
+private const val PreviewMushafSurahId = 21
 private const val PreviewMushafAyahFirst = 91
-private const val PreviewMushafAyahLast = 92
+private const val PreviewMushafAyahLast = 93
 
 /** The English leaf sets a smaller hand than the Arabic one — see EnglishLeafFit. */
-private val PreviewEnglishLeafSize = 11.sp
+// The miniature is a scale model, so its hand follows its measure. The preview
+// card is ~0.9 of the reader's own measure, and the leaf sets ~53 characters to
+// the line; at 11.sp this block ran to ~75, which is not a page anyone is shown
+// — it read as dense grey and, as reported, simply too small to see.
+private val PreviewEnglishLeafSize = 15.sp
+
+/** The running head's label, a step under the prose as it is on the leaf. */
+private val PreviewLeafHeadSize = 9.sp
 
 /**
  * 21:91–92 exactly as `data/quran.db` carries them — the same two verses the
@@ -562,6 +572,12 @@ private const val SAMPLE_ENGLISH_LEAF_1 =
 private const val SAMPLE_ENGLISH_LEAF_2 =
     "Indeed this, your religion, is one religion, and I am your Lord, so " +
         "worship Me"
+// A third verse so the miniature's well is full, as a leaf's is. Two verses
+// left the folio floating under a hand's width of blank paper, which is the
+// one thing a set page never looks like.
+private const val SAMPLE_ENGLISH_LEAF_3 =
+    "And [yet] they divided their affair among themselves, [but] all to Us " +
+        "will return"
 
 /** Two short verses as three printed lines, scaled to the measure — never gap-stretched. */
 @Composable
@@ -644,7 +660,8 @@ private fun PreviewEnglishMushafLeaf(
     val text = buildAnnotatedString {
         listOf(
             SAMPLE_ENGLISH_LEAF_1 to PreviewMushafAyahFirst,
-            SAMPLE_ENGLISH_LEAF_2 to PreviewMushafAyahLast,
+            SAMPLE_ENGLISH_LEAF_2 to PreviewMushafAyahFirst + 1,
+            SAMPLE_ENGLISH_LEAF_3 to PreviewMushafAyahLast,
         ).forEachIndexed { index, (verse, number) ->
             if (index > 0) append(" ")
             withStyle(SpanStyle(color = ink)) { append(verse) }
@@ -658,30 +675,28 @@ private fun PreviewEnglishMushafLeaf(
             )
         }
     }
-    Column(modifier = modifier, horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(
-            text = PreviewMushafSurahLatin,
-            fontFamily = TranslationFontFamily,
-            fontSize = 12.sp,
-            letterSpacing = 0.08.em,
-            color = gold.copy(alpha = 0.58f),
-            textAlign = TextAlign.Center,
-            modifier = Modifier.fillMaxWidth(),
-        )
+    Column(modifier = modifier) {
+        // The leaf's own running head: the part at the spine, the chapter at
+        // the fore-edge (MushafReadingSheet). A centred gold caption was the
+        // wrong furniture in the wrong place — this page is mid-chapter, where
+        // the reader sees a head, not an opening band.
+        PreviewLeafRunningHead()
         Spacer(Modifier.height(8.dp))
         // Sized by its own prose, not by a reserved block: the miniature's
         // height is already locked from outside (PreviewHeightLock), and a
         // fixed well here left the folio a few pixels of slot, in which its
         // figures measured to nothing and only the diamond — which draws past
         // its box — survived.
+        //
+        // The style is the leaf's own [englishProseStyle], not a copy of it.
+        // The copy had drifted into justified, unhyphenated text set on 1.5 em
+        // — three things the leaf is not — so the miniature advertised a page
+        // the reader would never be shown.
         Text(
             text = text,
-            style = TextStyle(
-                fontFamily = TranslationFontFamily,
+            style = englishProseStyle(
                 fontSize = PreviewEnglishLeafSize,
-                lineHeight = 1.5.em,
-                textAlign = TextAlign.Justify,
-                lineBreak = LineBreak.Paragraph,
+                lineHeight = PreviewEnglishLeafSize * ENGLISH_LEAF_LEADING_EM,
             ),
         )
         Spacer(Modifier.height(6.dp))
@@ -690,6 +705,36 @@ private fun PreviewEnglishMushafLeaf(
             glyphSize = PreviewFolioGlyph,
             script = pageNumberScript,
             modifier = Modifier.fillMaxWidth().padding(PreviewFolioPad),
+        )
+    }
+}
+
+/**
+ * The leaf's running head, miniature: part at the spine, chapter at the
+ * fore-edge, in the same label the reader sees over every mushaf page.
+ */
+@Composable
+private fun PreviewLeafRunningHead() {
+    val ink = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.44f)
+    val style = MaterialTheme.typography.labelSmall.copy(
+        fontSize = PreviewLeafHeadSize,
+        letterSpacing = 0.10.em,
+    )
+    Row(Modifier.fillMaxWidth()) {
+        Text(
+            text = "Part ${juzOf(PreviewMushafSurahId, PreviewMushafAyahFirst)}",
+            style = style,
+            color = ink,
+            maxLines = 1,
+            modifier = Modifier.weight(1f),
+        )
+        Text(
+            text = PreviewMushafSurahLatin,
+            style = style,
+            color = ink,
+            textAlign = TextAlign.End,
+            maxLines = 1,
+            modifier = Modifier.weight(1f),
         )
     }
 }
