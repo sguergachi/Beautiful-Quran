@@ -5,14 +5,10 @@
     <string name="alpha_tag_description">Alpha, still in development</string>
     <string name="appfunctions_description">Control Quran reading and recitation hands-free</string>
 
-    <!-- Launcher / App Actions shortcuts -->
+    <!-- Launcher long-press shortcuts -->
     <string name="shortcut_continue_short">Continue</string>
     <string name="shortcut_continue_long">Continue last read verse</string>
     <string name="shortcut_bookmarks_short">Bookmarks</string>
     <string name="shortcut_bookmarks_long">Open saved verses</string>
-    <string name="shortcut_save_bookmark_short">Save bookmark</string>
-    <string name="shortcut_save_bookmark_long">Bookmark the current verse</string>
-    <string name="shortcut_verse_short">Verse</string>
-    <string name="shortcut_verse_long">Open a verse</string>
     <string name="search_hint">Chapter or verse</string>
 </resources>
