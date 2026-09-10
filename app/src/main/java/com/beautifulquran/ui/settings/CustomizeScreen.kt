@@ -127,7 +127,16 @@ private const val CustomizeInkMs = 200
 private const val CustomizeInkOutMs = 110
 
 @Composable
-private fun CustomizeReveal(visible: Boolean, content: @Composable () -> Unit) {
+private fun CustomizeReveal(
+    visible: Boolean,
+    // The reveal has to carry its parent's rhythm, because the rows it wraps
+    // become children of the Column below rather than of the group they were
+    // written into: a bare Column here silently flattened the 12 dp between
+    // Transliteration and Ayah translation, which is the very gap b6a7f944
+    // added the group to fix.
+    verticalArrangement: Arrangement.Vertical = Arrangement.Top,
+    content: @Composable () -> Unit,
+) {
     AnimatedVisibility(
         visible = visible,
         enter = expandVertically(
@@ -143,7 +152,7 @@ private fun CustomizeReveal(visible: Boolean, content: @Composable () -> Unit) {
             shrinkTowards = Alignment.Top,
         ),
     ) {
-        Column { content() }
+        Column(verticalArrangement = verticalArrangement) { content() }
     }
 }
 
@@ -319,6 +328,7 @@ internal fun CustomizeScreen(
                 CustomizeReveal(
                     settings.readingLayout == ReadingLayout.SCROLL &&
                         settings.readingMode == ReadingMode.ARABIC_ENGLISH,
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     ToggleRow(
                         label = "Transliteration",
@@ -587,10 +597,26 @@ internal fun ReadingPreview(
 private val PreviewQcfSize = 20.sp
 /** Page hand for the miniature folio, so the figures read at ~10 sp. */
 private val PreviewFolioGlyph = 22.sp
-/** 21:91–92 occupy three exclusive Madinah lines (page 330, lines 1–3). */
+/**
+ * 21:91–93 occupy four exclusive Madinah lines (page 330, lines 1–4).
+ *
+ * Both miniatures must set the same paper — switching View is meant to show
+ * one page in either language, not two different pages — so this range and
+ * [PreviewMushafAyahFirst]..[PreviewMushafAyahLast] are one fact. Lines 1–3
+ * stop inside 21:92, which is why the English leaf's third verse needed a
+ * fourth line here rather than a shorter English sample.
+ */
 private const val PreviewMushafPage = 330
 private const val PreviewMushafLineFirst = 1
-private const val PreviewMushafLineLast = 3
+private const val PreviewMushafLineLast = 4
+
+/**
+ * How many lines the miniature draws, and the count its reserved blank must
+ * match. Derived, never written twice: a literal `3` here outlived the range
+ * it described and silently emptied the leaf when the range grew.
+ */
+private const val PreviewMushafLineCount =
+    PreviewMushafLineLast - PreviewMushafLineFirst + 1
 private const val PreviewMushafSurahName = "سُورَةُ الأنبياء"
 private const val PreviewMushafSurahLatin = "Al-Anbya"
 private const val PreviewMushafSurahId = 21
@@ -668,7 +694,7 @@ private fun PreviewMushafLeaf(
             modifier = Modifier.fillMaxWidth(),
         )
         Spacer(Modifier.height(8.dp))
-        if (lines.size == 3 && face != null && typeface != null) {
+        if (lines.size == PreviewMushafLineCount && face != null && typeface != null) {
             CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
                 PreviewQcfLines(lines = lines, face = face, typeface = typeface)
             }
@@ -676,7 +702,7 @@ private fun PreviewMushafLeaf(
             val line = with(LocalDensity.current) {
                 (PreviewQcfSize * MUSHAF_LINE_PITCH_EM).toDp()
             }
-            Spacer(Modifier.height(line * 3))
+            Spacer(Modifier.height(line * PreviewMushafLineCount))
         }
         MushafFolioMarks(
             page = PreviewMushafPage,
@@ -690,13 +716,15 @@ private fun PreviewMushafLeaf(
 }
 
 /**
- * The same leaf, in the reader's own language: two verses set as one justified
- * paragraph in the book's hand, under the chapter's name in Latin.
+ * The same leaf, in the reader's own language: the page's three verses set as
+ * one ragged, hyphenated paragraph in the book's hand, under the leaf's own
+ * running head.
  *
  * It is the reader's rule in miniature — the sentence is the unit of the
  * English leaf as the word is of the Arabic one (`domain/EnglishLeaf.kt`) —
- * and it holds the same three lines' worth of paper so the preview does not
- * change height when the language does.
+ * and it sets the same verses as [PreviewMushafLeaf], so switching View shows
+ * one page in either language. Both are held in [PreviewHeightLock], so the
+ * card does not change height when the language does.
  */
 @Composable
 private fun PreviewEnglishMushafLeaf(
@@ -714,7 +742,10 @@ private fun PreviewEnglishMushafLeaf(
         ).forEachIndexed { index, (verse, number) ->
             if (index > 0) append(" ")
             withStyle(SpanStyle(color = ink)) { append(verse) }
-            append(" ")
+            // A narrow no-break space, as the leaf sets it: the mark belongs to
+            // the verse it closes and must never open a line
+            // (MushafEnglishSheet, "one atom").
+            append("\u202F")
             appendAyahNumberMark(
                 number = number,
                 useArabicIndicDigits = arabicMarks,
@@ -1029,6 +1060,18 @@ private fun PreviewHeightLock(contentPad: Modifier) {
     Column(Modifier.alpha(0f).then(contentPad)) {
         PreviewMushafLeaf(
             pageNumberScript = PageNumberScript.BOTH,
+            modifier = Modifier.fillMaxWidth(),
+        )
+    }
+    // The English leaf has to be measured too, not assumed shorter than the
+    // Arabic one. The Arabic leaf scales its hand to the measure, so it gets
+    // *shorter* as the card narrows, while English prose only wraps to more
+    // lines — on a narrow phone the folio would have been clipped away by
+    // clipToBounds, taking the page-number preview with it.
+    Column(Modifier.alpha(0f).then(contentPad)) {
+        PreviewEnglishMushafLeaf(
+            pageNumberScript = PageNumberScript.BOTH,
+            arabicMarks = true,
             modifier = Modifier.fillMaxWidth(),
         )
     }
