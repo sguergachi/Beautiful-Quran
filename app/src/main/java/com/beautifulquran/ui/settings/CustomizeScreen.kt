@@ -617,7 +617,6 @@ private const val PreviewMushafLineLast = 4
  */
 private const val PreviewMushafLineCount =
     PreviewMushafLineLast - PreviewMushafLineFirst + 1
-private const val PreviewMushafSurahName = "سُورَةُ الأنبياء"
 private const val PreviewMushafSurahLatin = "Al-Anbya"
 private const val PreviewMushafSurahId = 21
 private const val PreviewMushafAyahFirst = 91
@@ -654,7 +653,10 @@ private const val SAMPLE_ENGLISH_LEAF_3 =
     "And [yet] they divided their affair among themselves, [but] all to Us " +
         "will return"
 
-/** Two short verses as three printed lines, scaled to the measure — never gap-stretched. */
+/**
+ * Page 330's first four lines, under the same running head the English
+ * miniature uses — never gap-stretched, scaled to the measure.
+ */
 @Composable
 private fun PreviewMushafLeaf(
     pageNumberScript: PageNumberScript,
@@ -675,24 +677,13 @@ private fun PreviewMushafLeaf(
     }
     val face = qcfFace?.family
     val typeface = qcfFace?.typeface
-    val gold = LocalQuranAccents.current.gold
     val lines = remember(page) {
         page?.lines.orEmpty().filter {
             it.number in PreviewMushafLineFirst..PreviewMushafLineLast
         }
     }
-    Column(
-        modifier = modifier,
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Text(
-            text = PreviewMushafSurahName,
-            fontFamily = HafsFontFamily,
-            fontSize = 13.sp,
-            color = gold.copy(alpha = 0.58f),
-            textAlign = TextAlign.Center,
-            modifier = Modifier.fillMaxWidth(),
-        )
+    Column(modifier = modifier) {
+        PreviewLeafRunningHead()
         Spacer(Modifier.height(8.dp))
         if (lines.size == PreviewMushafLineCount && face != null && typeface != null) {
             CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
@@ -756,10 +747,6 @@ private fun PreviewEnglishMushafLeaf(
         }
     }
     Column(modifier = modifier) {
-        // The leaf's own running head: the part at the spine, the chapter at
-        // the fore-edge (MushafReadingSheet). A centred gold caption was the
-        // wrong furniture in the wrong place — this page is mid-chapter, where
-        // the reader sees a head, not an opening band.
         PreviewLeafRunningHead()
         Spacer(Modifier.height(8.dp))
         // Sized by its own prose, not by a reserved block: the miniature's
@@ -792,6 +779,11 @@ private fun PreviewEnglishMushafLeaf(
 /**
  * The leaf's running head, miniature: part at the spine, chapter at the
  * fore-edge, in the same label the reader sees over every mushaf page.
+ *
+ * A centred gold caption was the wrong furniture in the wrong place —
+ * page 330 is mid-chapter, where the reader sees a head, not an opening
+ * band. Both language miniatures share this so switching View does not
+ * change the header.
  */
 @Composable
 private fun PreviewLeafRunningHead() {
