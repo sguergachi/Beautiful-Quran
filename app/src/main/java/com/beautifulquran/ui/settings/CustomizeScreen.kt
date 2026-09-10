@@ -1,5 +1,12 @@
 package com.beautifulquran.ui.settings
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -55,7 +62,6 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.style.LineBreak
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.text.style.TextGeometricTransform
@@ -78,6 +84,8 @@ import com.beautifulquran.domain.MUSHAF_LINE_PITCH_EM
 import com.beautifulquran.domain.MUSHAF_WORD_GAP_EM
 import com.beautifulquran.domain.MushafLine
 import com.beautifulquran.domain.MushafPage
+import com.beautifulquran.domain.ENGLISH_LEAF_LEADING_EM
+import com.beautifulquran.domain.juzOf
 import com.beautifulquran.domain.mushafLineFit
 import com.beautifulquran.domain.qcfTrailingMark
 import com.beautifulquran.domain.qcfWordGlyphs
@@ -86,6 +94,7 @@ import com.beautifulquran.ui.reader.MushafFolioMarks
 import com.beautifulquran.ui.reader.MushafCell
 import com.beautifulquran.ui.reader.MushafQcfFonts
 import com.beautifulquran.ui.reader.PageBreak
+import com.beautifulquran.ui.reader.englishProseStyle
 import com.beautifulquran.ui.reader.VERSE_ANNOTATION_INK_ALPHA
 import com.beautifulquran.ui.reader.collapsedStackSpanDp
 import com.beautifulquran.ui.reader.appendAyahNumberMark
@@ -99,12 +108,53 @@ import com.beautifulquran.ui.theme.BrushCheckParams
 import com.beautifulquran.ui.theme.BrushCircleParams
 import com.beautifulquran.ui.theme.HafsFontFamily
 import com.beautifulquran.ui.theme.InkCircledChoiceRow
+import com.beautifulquran.ui.theme.InkExpandEasing
 import com.beautifulquran.ui.theme.LocalQuranAccents
 import com.beautifulquran.ui.theme.TranslationFontFamily
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import com.beautifulquran.ui.theme.shippedCheckParams
 import com.beautifulquran.ui.theme.verticalFadingEdges
+
+// A control joining or leaving the sheet. The paper opens the room first and
+// the ink arrives into it; on the way out the ink goes first and the paper
+// closes after, so nothing is ever seen being crushed. Fade and slide only,
+// inside the 400 ms the sheet allows (docs/DESIGN.md "Motion") — the rows
+// below ride the same expansion, which is what shows where the field came
+// from.
+private const val CustomizePaperMs = 300
+private const val CustomizeInkMs = 200
+private const val CustomizeInkOutMs = 110
+
+@Composable
+private fun CustomizeReveal(
+    visible: Boolean,
+    // The reveal has to carry its parent's rhythm, because the rows it wraps
+    // become children of the Column below rather than of the group they were
+    // written into: a bare Column here silently flattened the 12 dp between
+    // Transliteration and Ayah translation, which is the very gap b6a7f944
+    // added the group to fix.
+    verticalArrangement: Arrangement.Vertical = Arrangement.Top,
+    content: @Composable () -> Unit,
+) {
+    AnimatedVisibility(
+        visible = visible,
+        enter = expandVertically(
+            animationSpec = tween(CustomizePaperMs, easing = InkExpandEasing),
+            expandFrom = Alignment.Top,
+        ) + fadeIn(tween(CustomizeInkMs, delayMillis = CustomizePaperMs - CustomizeInkMs)),
+        exit = fadeOut(tween(CustomizeInkOutMs)) + shrinkVertically(
+            animationSpec = tween(
+                CustomizePaperMs - CustomizeInkOutMs,
+                delayMillis = CustomizeInkOutMs,
+                easing = FastOutSlowInEasing,
+            ),
+            shrinkTowards = Alignment.Top,
+        ),
+    ) {
+        Column(verticalArrangement = verticalArrangement) { content() }
+    }
+}
 
 private val VIEW_MODES = listOf(
     ReadingMode.ARABIC_ONLY,
@@ -207,6 +257,22 @@ internal fun CustomizeScreen(
             },
             onSelect = { layout -> onUpdate { applyReadingLayout(it, layout) } },
         )
+        // Above View, with Layout: these two set the shape of the page, and
+        // the hand is read off the preview the same way the layout is. The
+        // dial sat below View and below the English choice, which put the
+        // one control the reader is most likely to reach for behind the ones
+        // they set once.
+        //
+        // The mushaf leaf sets its own hand from the page grid — the text
+        // dial is a scroll-layout control and has nothing to turn there.
+        CustomizeReveal(showsScrollChrome(settings.readingLayout)) {
+            Section("Text size")
+            TextSizeControl(
+                scale = settings.fontScale,
+                onScale = { value -> onUpdate { it.copy(fontScale = value) } },
+            )
+        }
+
         // A leaf may be set in either language, but never in both — see
         // MUSHAF_VIEW_MODES.
         Section("View")
@@ -232,9 +298,9 @@ internal fun CustomizeScreen(
         // Which English the leaf is set from. Only the English leaf has the
         // question to answer: the scrolling reader has always set the gloss,
         // and the Arabic leaf sets no English at all.
-        if (
+        CustomizeReveal(
             settings.readingLayout == ReadingLayout.MUSHAF &&
-            settings.readingMode == ReadingMode.ENGLISH_ONLY
+                settings.readingMode == ReadingMode.ENGLISH_ONLY,
         ) {
             Section("English")
             InkCircledChoiceRow(
@@ -252,26 +318,17 @@ internal fun CustomizeScreen(
             )
         }
 
-        // The mushaf leaf sets its own hand from the page grid — the text
-        // dial is a scroll-layout control and has nothing to turn there.
-        if (showsScrollChrome(settings.readingLayout)) {
-            Section("Text size")
-            TextSizeControl(
-                scale = settings.fontScale,
-                onScale = { value -> onUpdate { it.copy(fontScale = value) } },
-            )
-        }
-
         // The scroll layout's toggles share one vertical rhythm: a single
         // 20dp stand-off before the group, then even 12dp between rows —
         // the old layout gapped 20dp before some rows and nothing between
         // Transliteration and Ayah translation.
-        if (showsScrollChrome(settings.readingLayout)) {
+        CustomizeReveal(showsScrollChrome(settings.readingLayout)) {
             Spacer(Modifier.height(20.dp))
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                if (
+                CustomizeReveal(
                     settings.readingLayout == ReadingLayout.SCROLL &&
-                    settings.readingMode == ReadingMode.ARABIC_ENGLISH
+                        settings.readingMode == ReadingMode.ARABIC_ENGLISH,
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     ToggleRow(
                         label = "Transliteration",
@@ -288,7 +345,9 @@ internal fun CustomizeScreen(
                         checkPaintToken = checkPaintToken,
                     )
                 }
-                if (showsWordGlossChrome(settings.readingLayout, settings.readingMode)) {
+                CustomizeReveal(
+                    showsWordGlossChrome(settings.readingLayout, settings.readingMode),
+                ) {
                     ToggleRow(
                         label = "Word-by-word translation",
                         checked = settings.showWordGloss,
@@ -307,7 +366,9 @@ internal fun CustomizeScreen(
             }
         }
 
-        if (showsVerseNumberChrome(settings.readingLayout, settings.readingMode)) {
+        CustomizeReveal(
+            showsVerseNumberChrome(settings.readingLayout, settings.readingMode),
+        ) {
             Section("Verse numbers")
             InkCircledChoiceRow(
                 entries = VerseNumberScript.entries,
@@ -340,7 +401,7 @@ internal fun CustomizeScreen(
             onSelect = { script -> onUpdate { it.copy(pageNumberScript = script) } },
         )
 
-        if (showsScrollChrome(settings.readingLayout)) {
+        CustomizeReveal(showsScrollChrome(settings.readingLayout)) {
             Section("Ayah selector")
             InkCircledChoiceRow(
                 entries = AyahSelectorSide.entries,
@@ -536,17 +597,40 @@ internal fun ReadingPreview(
 private val PreviewQcfSize = 20.sp
 /** Page hand for the miniature folio, so the figures read at ~10 sp. */
 private val PreviewFolioGlyph = 22.sp
-/** 21:91–92 occupy three exclusive Madinah lines (page 330, lines 1–3). */
+/**
+ * 21:91–93 occupy four exclusive Madinah lines (page 330, lines 1–4).
+ *
+ * Both miniatures must set the same paper — switching View is meant to show
+ * one page in either language, not two different pages — so this range and
+ * [PreviewMushafAyahFirst]..[PreviewMushafAyahLast] are one fact. Lines 1–3
+ * stop inside 21:92, which is why the English leaf's third verse needed a
+ * fourth line here rather than a shorter English sample.
+ */
 private const val PreviewMushafPage = 330
 private const val PreviewMushafLineFirst = 1
-private const val PreviewMushafLineLast = 3
-private const val PreviewMushafSurahName = "سُورَةُ الأنبياء"
+private const val PreviewMushafLineLast = 4
+
+/**
+ * How many lines the miniature draws, and the count its reserved blank must
+ * match. Derived, never written twice: a literal `3` here outlived the range
+ * it described and silently emptied the leaf when the range grew.
+ */
+private const val PreviewMushafLineCount =
+    PreviewMushafLineLast - PreviewMushafLineFirst + 1
 private const val PreviewMushafSurahLatin = "Al-Anbya"
+private const val PreviewMushafSurahId = 21
 private const val PreviewMushafAyahFirst = 91
-private const val PreviewMushafAyahLast = 92
+private const val PreviewMushafAyahLast = 93
 
 /** The English leaf sets a smaller hand than the Arabic one — see EnglishLeafFit. */
-private val PreviewEnglishLeafSize = 11.sp
+// The miniature is a scale model, so its hand follows its measure. The preview
+// card is ~0.9 of the reader's own measure, and the leaf sets ~53 characters to
+// the line; at 11.sp this block ran to ~75, which is not a page anyone is shown
+// — it read as dense grey and, as reported, simply too small to see.
+private val PreviewEnglishLeafSize = 15.sp
+
+/** The running head's label, a step under the prose as it is on the leaf. */
+private val PreviewLeafHeadSize = 9.sp
 
 /**
  * 21:91–92 exactly as `data/quran.db` carries them — the same two verses the
@@ -562,8 +646,17 @@ private const val SAMPLE_ENGLISH_LEAF_1 =
 private const val SAMPLE_ENGLISH_LEAF_2 =
     "Indeed this, your religion, is one religion, and I am your Lord, so " +
         "worship Me"
+// A third verse so the miniature's well is full, as a leaf's is. Two verses
+// left the folio floating under a hand's width of blank paper, which is the
+// one thing a set page never looks like.
+private const val SAMPLE_ENGLISH_LEAF_3 =
+    "And [yet] they divided their affair among themselves, [but] all to Us " +
+        "will return"
 
-/** Two short verses as three printed lines, scaled to the measure — never gap-stretched. */
+/**
+ * Page 330's first four lines, under the same running head the English
+ * miniature uses — never gap-stretched, scaled to the measure.
+ */
 @Composable
 private fun PreviewMushafLeaf(
     pageNumberScript: PageNumberScript,
@@ -584,26 +677,15 @@ private fun PreviewMushafLeaf(
     }
     val face = qcfFace?.family
     val typeface = qcfFace?.typeface
-    val gold = LocalQuranAccents.current.gold
     val lines = remember(page) {
         page?.lines.orEmpty().filter {
             it.number in PreviewMushafLineFirst..PreviewMushafLineLast
         }
     }
-    Column(
-        modifier = modifier,
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Text(
-            text = PreviewMushafSurahName,
-            fontFamily = HafsFontFamily,
-            fontSize = 13.sp,
-            color = gold.copy(alpha = 0.58f),
-            textAlign = TextAlign.Center,
-            modifier = Modifier.fillMaxWidth(),
-        )
+    Column(modifier = modifier) {
+        PreviewLeafRunningHead()
         Spacer(Modifier.height(8.dp))
-        if (lines.size == 3 && face != null && typeface != null) {
+        if (lines.size == PreviewMushafLineCount && face != null && typeface != null) {
             CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
                 PreviewQcfLines(lines = lines, face = face, typeface = typeface)
             }
@@ -611,7 +693,7 @@ private fun PreviewMushafLeaf(
             val line = with(LocalDensity.current) {
                 (PreviewQcfSize * MUSHAF_LINE_PITCH_EM).toDp()
             }
-            Spacer(Modifier.height(line * 3))
+            Spacer(Modifier.height(line * PreviewMushafLineCount))
         }
         MushafFolioMarks(
             page = PreviewMushafPage,
@@ -625,13 +707,15 @@ private fun PreviewMushafLeaf(
 }
 
 /**
- * The same leaf, in the reader's own language: two verses set as one justified
- * paragraph in the book's hand, under the chapter's name in Latin.
+ * The same leaf, in the reader's own language: the page's three verses set as
+ * one ragged, hyphenated paragraph in the book's hand, under the leaf's own
+ * running head.
  *
  * It is the reader's rule in miniature — the sentence is the unit of the
  * English leaf as the word is of the Arabic one (`domain/EnglishLeaf.kt`) —
- * and it holds the same three lines' worth of paper so the preview does not
- * change height when the language does.
+ * and it sets the same verses as [PreviewMushafLeaf], so switching View shows
+ * one page in either language. Both are held in [PreviewHeightLock], so the
+ * card does not change height when the language does.
  */
 @Composable
 private fun PreviewEnglishMushafLeaf(
@@ -644,11 +728,15 @@ private fun PreviewEnglishMushafLeaf(
     val text = buildAnnotatedString {
         listOf(
             SAMPLE_ENGLISH_LEAF_1 to PreviewMushafAyahFirst,
-            SAMPLE_ENGLISH_LEAF_2 to PreviewMushafAyahLast,
+            SAMPLE_ENGLISH_LEAF_2 to PreviewMushafAyahFirst + 1,
+            SAMPLE_ENGLISH_LEAF_3 to PreviewMushafAyahLast,
         ).forEachIndexed { index, (verse, number) ->
             if (index > 0) append(" ")
             withStyle(SpanStyle(color = ink)) { append(verse) }
-            append(" ")
+            // A narrow no-break space, as the leaf sets it: the mark belongs to
+            // the verse it closes and must never open a line
+            // (MushafEnglishSheet, "one atom").
+            append("\u202F")
             appendAyahNumberMark(
                 number = number,
                 useArabicIndicDigits = arabicMarks,
@@ -658,30 +746,24 @@ private fun PreviewEnglishMushafLeaf(
             )
         }
     }
-    Column(modifier = modifier, horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(
-            text = PreviewMushafSurahLatin,
-            fontFamily = TranslationFontFamily,
-            fontSize = 12.sp,
-            letterSpacing = 0.08.em,
-            color = gold.copy(alpha = 0.58f),
-            textAlign = TextAlign.Center,
-            modifier = Modifier.fillMaxWidth(),
-        )
+    Column(modifier = modifier) {
+        PreviewLeafRunningHead()
         Spacer(Modifier.height(8.dp))
         // Sized by its own prose, not by a reserved block: the miniature's
         // height is already locked from outside (PreviewHeightLock), and a
         // fixed well here left the folio a few pixels of slot, in which its
         // figures measured to nothing and only the diamond — which draws past
         // its box — survived.
+        //
+        // The style is the leaf's own [englishProseStyle], not a copy of it.
+        // The copy had drifted into justified, unhyphenated text set on 1.5 em
+        // — three things the leaf is not — so the miniature advertised a page
+        // the reader would never be shown.
         Text(
             text = text,
-            style = TextStyle(
-                fontFamily = TranslationFontFamily,
+            style = englishProseStyle(
                 fontSize = PreviewEnglishLeafSize,
-                lineHeight = 1.5.em,
-                textAlign = TextAlign.Justify,
-                lineBreak = LineBreak.Paragraph,
+                lineHeight = PreviewEnglishLeafSize * ENGLISH_LEAF_LEADING_EM,
             ),
         )
         Spacer(Modifier.height(6.dp))
@@ -690,6 +772,41 @@ private fun PreviewEnglishMushafLeaf(
             glyphSize = PreviewFolioGlyph,
             script = pageNumberScript,
             modifier = Modifier.fillMaxWidth().padding(PreviewFolioPad),
+        )
+    }
+}
+
+/**
+ * The leaf's running head, miniature: part at the spine, chapter at the
+ * fore-edge, in the same label the reader sees over every mushaf page.
+ *
+ * A centred gold caption was the wrong furniture in the wrong place —
+ * page 330 is mid-chapter, where the reader sees a head, not an opening
+ * band. Both language miniatures share this so switching View does not
+ * change the header.
+ */
+@Composable
+private fun PreviewLeafRunningHead() {
+    val ink = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.44f)
+    val style = MaterialTheme.typography.labelSmall.copy(
+        fontSize = PreviewLeafHeadSize,
+        letterSpacing = 0.10.em,
+    )
+    Row(Modifier.fillMaxWidth()) {
+        Text(
+            text = "Part ${juzOf(PreviewMushafSurahId, PreviewMushafAyahFirst)}",
+            style = style,
+            color = ink,
+            maxLines = 1,
+            modifier = Modifier.weight(1f),
+        )
+        Text(
+            text = PreviewMushafSurahLatin,
+            style = style,
+            color = ink,
+            textAlign = TextAlign.End,
+            maxLines = 1,
+            modifier = Modifier.weight(1f),
         )
     }
 }
@@ -935,6 +1052,18 @@ private fun PreviewHeightLock(contentPad: Modifier) {
     Column(Modifier.alpha(0f).then(contentPad)) {
         PreviewMushafLeaf(
             pageNumberScript = PageNumberScript.BOTH,
+            modifier = Modifier.fillMaxWidth(),
+        )
+    }
+    // The English leaf has to be measured too, not assumed shorter than the
+    // Arabic one. The Arabic leaf scales its hand to the measure, so it gets
+    // *shorter* as the card narrows, while English prose only wraps to more
+    // lines — on a narrow phone the folio would have been clipped away by
+    // clipToBounds, taking the page-number preview with it.
+    Column(Modifier.alpha(0f).then(contentPad)) {
+        PreviewEnglishMushafLeaf(
+            pageNumberScript = PageNumberScript.BOTH,
+            arabicMarks = true,
             modifier = Modifier.fillMaxWidth(),
         )
     }

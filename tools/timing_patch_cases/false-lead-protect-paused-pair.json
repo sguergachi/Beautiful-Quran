@@ -1,0 +1,28 @@
+{
+  "id": "false-lead-protect-paused-pair",
+  "label": "a pause between the halves protects the pair whatever the aligner says",
+  "refs": [
+    "CTC_REPEAT_MIN_PAUSE_MS — the same pause CTC requires to emit a repeat",
+    "qdc tiles an ayah gaplessly, so a gap is never a labelling artifact"
+  ],
+  "pipeline": "false_same_position_lead",
+  "notes": "The lead is only ever created by qdc having to label a gapless stretch of audio, so the class cannot produce a pair with silence between its halves. Here the aligner would otherwise vote false lead — it opens word 5 at 5900, well past the pair's start — but the 500 ms hole between the halves is exactly the evidence of a second utterance, and it wins. Synthetic numbers: this is the fence, not a corpus row.",
+  "expected_leads": [],
+  "input_segments": [
+    [4, 3000, 4000],
+    [5, 4000, 5400],
+    [5, 5900, 7000],
+    [6, 7000, 8000]
+  ],
+  "repair_segments": [
+    [4, 3000, 4000],
+    [5, 4000, 7000],
+    [6, 7000, 8000]
+  ],
+  "reference_segments": [
+    [4, 3010, 5890],
+    [5, 5900, 6990],
+    [6, 7000, 8010]
+  ],
+  "expected_positions": [4, 5, 5, 6]
+}

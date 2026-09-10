@@ -54,6 +54,11 @@ CORRECTIONS_DIR = Path(__file__).resolve().parent / "timing_corrections"
 # tools/detect_audio_onsets.py. The finalizer applies them after every topology
 # source so the opening wash always uses the row that actually ships.
 AUDIO_ONSETS_DIR = Path(__file__).resolve().parent / "audio_onsets"
+# Rows the dual-model forced-alignment audit refused to clear; see
+# apply_audit_holds and tools/timing_verdicts/README.md.
+AUDIT_HOLDS_FILE = (
+    Path(__file__).resolve().parent / "timing_holds" / "audit-held-rows.json"
+)
 MAX_AUDIO_ONSET_MS = 7_900
 # Matching quran-align boundaries are independent witnesses of one per-ayah
 # clock translation, so they cluster tightly when the witness is sound. Past a
@@ -518,6 +523,18 @@ FLUSH_RESTORE_KEEP_INVENTED = frozenset({
     (7, 18, 20), (7, 89, 16),
 })
 
+# Peer protection restores a same-position pair only while an independent
+# witness still allows it to be two utterances. Quran-align is monotonic, so it
+# cannot show the repeat itself, but it does say where the word BEGINS, and it
+# was aligned against the very MP3 we stream. When it agrees with qdc's first
+# occurrence it corroborates the pair (Hani 4:4 lands within 30 ms); when it
+# instead puts the onset a full inter-utterance pause later, qdc's first
+# occurrence is the PREVIOUS word's tail, mislabelled — a false lead, not a
+# re-say. Measured over the corpus the two shapes are cleanly bimodal: 310
+# pairs agree within 150 ms, 208 disagree by 430 ms or more, and only 15 land
+# in between. See docs/REPEAT_HIGHLIGHTING.md "False same-position lead".
+PEER_ONSET_CORROBORATION_MS = CTC_REPEAT_MIN_PAUSE_MS
+
 QDC_SPIKE_JUMP = 3  # a forward jump this large that instantly retreats is noise
 # Positions in a backtrack run within this distance count as one contiguous
 # span-repeat (allows one dropped word inside a real re-say, e.g. 9,10,12,13).
@@ -765,18 +782,113 @@ def collapse_invented_flush_repeats(current, repaired, only_positions=None):
     return out
 
 
-def preserve_peer_repeats(current, repaired):
+def false_same_position_leads(current, repaired, reference):
+    """Same-position pairs the independent aligner refuses to call a re-say.
+
+    Peer protection asks "are both halves substantial?", which is a question
+    about qdc's own labels, so it cannot tell a real re-say from qdc handing
+    the previous word's tail to the next word. Quran-align answers the part
+    that matters — where the word BEGINS — from an alignment of the same MP3:
+
+    * it corroborates the pair when its onset sits on the first occurrence
+      (Hani 4:4 فَكُلُوهُ: qdc 13220, align 13250), and
+    * it denies the pair when the onset instead sits on the second occurrence
+      a whole ``PEER_ONSET_CORROBORATION_MS`` or more later, with the previous
+      word still running through the lead (Alafasy 19:48 عَسَىٰٓ: qdc labels
+      9040–10640 as أَلَّآ, align keeps عَسَىٰٓ there and opens أَلَّآ at 10650).
+
+    Both witnesses must agree before a pair is discarded: the repair has to
+    have heard one utterance too, and it must be an ``unsplit`` — the one kind
+    that edits qdc's own segments in place, so the source onset it reports is
+    still the onset in the repaired row. A pair that is not flush is left
+    alone whatever the witnesses say: qdc tiles an ayah gaplessly, so a pause
+    between the halves cannot be a labelling artifact and is the same evidence
+    of a second utterance CTC itself requires.
+
+    Returns ``[(position, lead start, true onset), ...]`` — the lead's own
+    start, not just its position, because a row may carry that position again
+    elsewhere and only this occurrence is the false one.
+    """
+    if not reference:
+        return []
+    reference_start = {}
+    reference_end = {}
+    for pos, start, end in reference:
+        reference_start.setdefault(pos, start)
+        reference_end[pos] = end
+    repaired_count = {}
+    for pos, _, _ in repaired:
+        repaired_count[pos] = repaired_count.get(pos, 0) + 1
+    leads = []
+    for i in range(1, len(current) - 1):
+        lead, real = current[i], current[i + 1]
+        position = lead[0]
+        if real[0] != position:
+            continue
+        if real[1] - lead[2] >= CTC_REPEAT_MIN_PAUSE_MS:
+            continue  # the halves are separated by a real pause: a re-say
+        if is_split_fragment(lead[2] - lead[1], real[2] - real[1]):
+            continue  # the cleaner owns mid-word splits
+        if repaired_count.get(position) != 1:
+            continue  # the repair still hears two utterances here
+        onset = reference_start.get(position)
+        previous_end = reference_end.get(position - 1)
+        if onset is None or previous_end is None:
+            continue  # no witness for this word or the one that would own it
+        if onset - lead[1] < PEER_ONSET_CORROBORATION_MS:
+            continue  # align puts the word right where the pair starts
+        if abs(onset - real[1]) >= abs(onset - lead[1]):
+            continue  # align does not place the onset on the second occurrence
+        if previous_end < lead[1]:
+            continue  # the previous word is not still sounding through the lead
+        leads.append((position, lead[1], real[1]))
+    return leads
+
+
+def hand_lead_to_previous_word(segs, leads):
+    """Return the false lead's interval to the word still sounding through it.
+
+    The mirror of [discard_false_same_position_lead], applied from evidence
+    rather than from a hand-written verdict: the word starts at its witnessed
+    onset and the preceding word keeps the time it was actually reciting.
+    Each lead is matched back to the exact span the repair merged it into —
+    same position, same start — so a row that repeats that position elsewhere
+    (a span-repeat, or a stray the cleaner left) is never touched. A lead that
+    cannot be matched is dropped rather than guessed at.
+    """
+    out = [list(seg) for seg in segs]
+    for position, lead_start, onset in leads:
+        matches = [
+            i
+            for i in range(1, len(out))
+            if out[i][0] == position
+            and out[i][1] == lead_start
+            and out[i][2] > onset
+            and out[i - 1][1] < onset
+        ]
+        if len(matches) != 1:
+            continue  # ambiguous or already re-timed: leave the row alone
+        i = matches[0]
+        out[i - 1][2] = onset
+        out[i][1] = onset
+    return out
+
+
+def preserve_peer_repeats(current, repaired, unwitnessed=()):
     """Keep substantial same-word re-says while applying unrelated repairs.
 
     Whole-row CTC evidence can fix a missing word elsewhere while presenting a
     repeated word only once. Match repaired occurrences to the nearest source
     occurrences, then restore only the unmatched peer utterances. Split
-    fragments are deliberately excluded because the cleaner owns those.
+    fragments are deliberately excluded because the cleaner owns those, and so
+    are ``unwitnessed`` positions — the pairs an independent aligner has
+    positively identified as false leads (see [false_same_position_leads]).
     """
     peer_positions = {
         current[i][0]
         for i in range(len(current) - 1)
         if current[i][0] == current[i + 1][0]
+        and current[i][0] not in unwitnessed
         and not is_split_fragment(
             current[i][2] - current[i][1],
             current[i + 1][2] - current[i + 1][1],
@@ -1575,6 +1687,8 @@ def apply_timing_repairs(
     only_kinds=None,
     skip_missing_boundary_keys=None,
     word_text=None,
+    references=None,
+    file_clock_keys=None,
 ):
     """Apply auto-generated CTC-arbitrated repairs (tools/timing_repairs/*.json)
     on top of the current source rows. Structural differences and their
@@ -1582,10 +1696,14 @@ def apply_timing_repairs(
     timing so stale full-row patches cannot overwrite unrelated improvements.
     Repairs that erase an existing multi-position span-repeat are skipped.
     Substantial same-position re-says are restored per position, so an
-    unrelated repair can still land without flattening a genuine repeat."""
+    unrelated repair can still land without flattening a genuine repeat —
+    unless quran-align witnesses that pair as a false lead, which only its
+    own rebased rows can be asked about."""
     clock_offsets = clock_offsets or {}
     durations = durations or {}
     word_text = word_text or {}
+    references = references or {}
+    file_clock_keys = file_clock_keys or set()
     skip_missing_boundary_keys = skip_missing_boundary_keys or set()
     slug_by_id = {r[0]: r[1] for r in RECITERS}
     by_key = {(rid, sid, ay): segs for (rid, sid, ay, segs) in timing_rows}
@@ -1601,6 +1719,7 @@ def apply_timing_repairs(
     clock_rejected = 0
     clock_untranslated = 0
     flush_collapsed = 0
+    false_leads = 0
     for path in files:
         try:
             payload = json.loads(path.read_text(encoding="utf-8"))
@@ -1691,8 +1810,23 @@ def apply_timing_repairs(
                 # The translation collapsed the row; the source timings stand.
                 clock_rejected += 1
                 continue
-            merged, protected = preserve_peer_repeats(current, merged)
+            # Only a row rebased onto the everyayah clock can be compared with
+            # quran-align; an abstained row is still on the source clock, where
+            # the two sets of boundaries mean different instants.
+            leads = (
+                false_same_position_leads(
+                    current, merged, references.get(key)
+                )
+                if kind == "unsplit" and key in file_clock_keys
+                else []
+            )
+            merged, protected = preserve_peer_repeats(
+                current, merged, unwitnessed={lead[0] for lead in leads}
+            )
             peer_protected += protected
+            if leads:
+                merged = hand_lead_to_previous_word(merged, leads)
+                false_leads += len(leads)
             if merged != translate_segments(segs, offset):
                 rebased += 1
             by_key[key] = json.dumps(merged, separators=(",", ":"))
@@ -1705,7 +1839,8 @@ def apply_timing_repairs(
         f"{peer_protected} peer repeat(s) preserved, "
         f"{clock_rejected} unsafe-clock skipped, "
         f"{clock_untranslated} kept on the file clock, "
-        f"{flush_collapsed} invented flush restore(s) collapsed — {by_kind}"
+        f"{flush_collapsed} invented flush restore(s) collapsed, "
+        f"{false_leads} false same-position lead(s) returned — {by_kind}"
     )
     return new_rows
 
@@ -1892,6 +2027,58 @@ def preserve_complete_repeat_topology(segs, n_words, onset_ms, duration_ms):
     ):
         return None
     return normalize_timing_row(segs, onset_ms, duration_ms)
+
+
+def apply_audit_holds(timing_rows, onsets, holds_path=AUDIT_HOLDS_FILE):
+    """Hold rows the dual-model forced-alignment audit refused to clear.
+
+    The delta gate is fail-closed: a rebuilt row ships only when Arabic XLSR
+    **and** MMS/uroman both score its candidate at least as well as the row we
+    already ship (tools/timing_verdicts/README.md). A handful of rows fail that
+    bar — the models are not persuaded, so the previously-evidenced row stands.
+
+    This is a *hold*, not an override: it can only restore a payload the
+    baseline database already shipped, never invent timings. The delta gate
+    proves that — a held row that did not match the baseline byte-for-byte
+    would still appear in the delta and still need its own verdict.
+    """
+    if not holds_path.is_file():
+        return timing_rows, onsets, 0
+    try:
+        payload = json.loads(holds_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as e:
+        print(f"  !! cannot parse {holds_path.name}: {e}", file=sys.stderr)
+        sys.exit(1)
+    held = {}
+    for row in payload.get("rows") or []:
+        key = (int(row["reciterId"]), int(row["surahId"]), int(row["ayah"]))
+        if not row.get("reason"):
+            print(f"  !! {holds_path.name}: {key} needs a reason", file=sys.stderr)
+            sys.exit(1)
+        held[key] = row
+    if not held:
+        return timing_rows, onsets, 0
+    onsets = dict(onsets)
+    out = []
+    seen = set()
+    for rid, sid, ay, segs in timing_rows:
+        key = (rid, sid, ay)
+        row = held.get(key)
+        if row is None:
+            out.append((rid, sid, ay, segs))
+            continue
+        seen.add(key)
+        if row.get("segments") is None:
+            continue  # the baseline shipped no row for this ayah either
+        out.append((rid, sid, ay, json.dumps(row["segments"], separators=(",", ":"))))
+        onsets[key] = int(row.get("audioOnsetMs", 0))
+    for key, row in sorted(held.items()):
+        if key in seen or row.get("segments") is None:
+            continue
+        # The rebuild dropped a row the baseline still ships: restore it.
+        out.append((key[0], key[1], key[2], json.dumps(row["segments"], separators=(",", ":"))))
+        onsets[key] = int(row.get("audioOnsetMs", 0))
+    return sorted(out), onsets, len(held)
 
 
 def finalize_timing_rows(
@@ -2566,6 +2753,8 @@ def main():
             audio_durations,
             skip_missing_boundary_keys=deferred_boundary_keys,
             word_text=word_text,
+            references=alignment_references,
+            file_clock_keys=file_clock_rows,
         )
 
         print("[overrides] applying tools/timing_overrides/*.json")
@@ -2620,6 +2809,9 @@ def main():
             audio_onsets,
             file_clock_rows,
         )
+        timing_rows, audio_onsets, held = apply_audit_holds(timing_rows, audio_onsets)
+        if held:
+            print(f"[audit holds] {held} row(s) held at the evidenced baseline")
 
     OUT.parent.mkdir(parents=True, exist_ok=True)
     if OUT.exists():

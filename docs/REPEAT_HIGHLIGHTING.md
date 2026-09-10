@@ -363,6 +363,57 @@ are **not audible repeats**. Artifact classes scrubbed in `clean_qdc_artifacts`
 > *dwarfed* by its neighbour, so it can never touch two peer utterances however
 > the absolute floor is tuned.
 
+### False same-position lead
+
+The duration test above asks whether both halves are full utterances. That is a
+question about qdc's *labels*, and there is one shape it cannot answer: qdc
+tiles an ayah gaplessly, so every stretch of audio must carry some word's index
+— including the tail of a long vowel. When a reciter holds a madd, the aligner
+sometimes closes the word early and gives the held vowel to the **next** word,
+which then appears twice, both halves substantial:
+
+```
+Alafasy 19:48   عَسَىٰٓ أَلَّآ أَكُونَ
+qdc   … [9, 8510, 9040]  [10, 9040, 10640]  [10, 10640, 12710] …
+                ^ عَسَىٰٓ cut at 530 ms   ^ its madd, labelled أَلَّآ
+```
+
+Both halves clear the fragment gate (1600 + 2070 ms), so `preserve_peer_repeats`
+restored the pair over CTC's `unsplit` and the reader washed أَلَّآ orange as a
+re-say the reciter never made. This was the class behind issues **#721** and
+**#748**.
+
+The witness that settles it is **quran-align**: it is monotonic, so it cannot
+show a repeat, but it does say where each word *begins*, from an alignment of
+the very MP3 we stream. That turns the question into one it can answer:
+
+| quran-align's onset for the word | reading | action |
+|---|---|---|
+| on the **first** occurrence (Hani 4:4: qdc 13220, align 13250) | it spans both utterances because it is monotonic — corroboration | keep the pair |
+| on the **second**, ≥ `PEER_ONSET_CORROBORATION_MS` later, with the previous word still running through the lead (Alafasy 19:48: align opens أَلَّآ at 10650 and keeps عَسَىٰٓ to 10640) | qdc's first occurrence is the previous word's tail | give the lead back to the previous word |
+
+Measured across the corpus the two shapes are cleanly bimodal — 310 pairs agree
+within 150 ms, 208 disagree by ≥ 430 ms, only 15 land in between — so the exact
+threshold is not load-bearing. `false_same_position_leads` requires **both**
+witnesses (CTC must also have heard one utterance, via an `unsplit` repair, the
+one kind that edits qdc's segments in place) and abstains whenever quran-align
+is missing or the row never rebased onto the everyayah clock. A pair whose
+halves are separated by ≥ `CTC_REPEAT_MIN_PAUSE_MS` is never touched: qdc tiles
+gaplessly, so a hole between the halves cannot be a labelling artifact and is
+the same evidence of a second utterance CTC itself requires.
+
+The class fix retired the hand-written `discard_false_same_position_lead`
+verdict for Hani 66:6 — the rule reproduces that row byte-for-byte from
+evidence. Locked by `tools/timing_patch_cases/false-lead-*.json`.
+
+> **Why the previous word, not a gap.** The Timings Lab expresses the fix by
+> deleting the false segment, which leaves a hole. The audio has no hole: the
+> reciter is still sounding the previous word through that interval. Six other
+> reciters agree — before the fix the previous word ran at **0.60×** the
+> cross-reciter median length for that same word in 160 of 170 rows, and
+> **1.21×** after. Being robbed of its tail is exactly what that signature
+> means.
+
 Each rule has a paired survival fixture. Real repeats need not revisit the
 previous high-water tip, and substantial same-word peers survive even with a
 zero gap. The ear-verified repeats (Mishary 2:14, Hani 2:38's

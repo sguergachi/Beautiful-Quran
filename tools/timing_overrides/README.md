@@ -32,6 +32,7 @@ bug until proven otherwise — not an override.
 | Irreducible verified topology ambiguity | narrow operation in `tools/timing_corrections/` | `pipeline: timing_correction` case |
 | Drop repair flattening a real multi-word re-say | `apply_timing_repairs` span-protect | `pipeline: erases_span_repeat` case |
 | Repair flattening a peer re-say while fixing elsewhere | per-position `preserve_peer_repeats` | `pipeline: preserve_peer_repeats` case |
+| Peer pair is the previous word's held tail (false lead) | `false_same_position_leads` in `apply_timing_repairs` | `pipeline: false_same_position_lead` case |
 | Restore invents a flush same-word pair | `collapse_invented_flush_repeats` | `pipeline: invented_flush_restore` case |
 | Repeat-vs-split / CTC disagreement | `tools/timing_repairs/` generator | case in `~/qasr` + rebuild repairs |
 | Boundary nudge without a topology change | weighted source evidence + repair generator | focused regression case |

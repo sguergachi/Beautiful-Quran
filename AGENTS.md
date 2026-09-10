@@ -241,6 +241,7 @@ close a `Timings patch — …` GitHub issue, **do this checklist in order**:
 | Topology cannot distinguish a false loop from a real repeat | narrow typed operation in `tools/timing_corrections/` | `pipeline: "timing_correction"` case |
    | Repair flattens a multi-word re-say that cleaned qdc still has | `apply_timing_repairs` span-protect (`erases_span_repeat`) | `pipeline: "erases_span_repeat"` case |
 | Repair erases a peer same-word re-say while fixing elsewhere | per-position `preserve_peer_repeats` | `pipeline: "preserve_peer_repeats"` case |
+| Same-position pair is really the previous word's held tail (qdc tiles gaplessly, so a madd gets the next word's index) | `false_same_position_leads` + `hand_lead_to_previous_word`, gated on quran-align's onset | `pipeline: "false_same_position_lead"` case |
 | Restore invents a flush same-word pair (gap < 300 ms) | `collapse_invented_flush_repeats` in `apply_timing_repairs` | `pipeline: "invented_flush_restore"` case |
 | qdc has 1..n+1 because QAC glued ما (وَمَالِيَ) | `fold_qdc_fused_ma` in `adjust_qdc_segments` | `pipeline: "adjust_qdc_segments"` case |
 | CTC repeat-vs-split / restore / drop quality | regenerate `tools/timing_repairs/` (`~/qasr`) | generator tests + rebuild |
@@ -249,6 +250,11 @@ close a `Timings patch — …` GitHub issue, **do this checklist in order**:
 | Missing positions, unsafe clock, or marks outside the MP3 | fix the source/class; `finalize_timing_rows` completes, falls back, or withholds | completion/physics checks in `tools/test_build_db.py` |
 4. **Implement the class fix** + add the patch case (input = broken shape,
    expected = Lab/ear topology). Run `python3 tools/test_build_db.py`.
+4b. **Evidence**: a changed row ships only with a dual-model verdict in
+   `tools/timing_verdicts/` (topology → Viterbi log-prob on the changed
+   occurrence sequence; boundary → mean |start residual|, because the Viterbi
+   score cannot see a boundary move). Rows the models reject go in
+   `tools/timing_holds/audit-held-rows.json` and stay at the baseline.
 5. **Rebuild**: `python3 tools/build_db.py`, bump `DB_FILE_NAME`, commit DB +
    cases. A rebuild usually improves rows besides yours, and the fail-closed
    delta gate withholds every one of them. Transplanting only your rows is the

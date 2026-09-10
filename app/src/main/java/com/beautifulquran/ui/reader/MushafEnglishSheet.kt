@@ -887,7 +887,7 @@ private fun englishBookHandPx(
  * order. The paper masks had two more lessons to learn from the hyphen —
  * see `lineSelectionBounds` and `justifyShift`.
  */
-private fun englishProseStyle(fontSize: TextUnit, lineHeight: TextUnit) = TextStyle(
+internal fun englishProseStyle(fontSize: TextUnit, lineHeight: TextUnit) = TextStyle(
     fontFamily = SerifFontFamily,
     fontSize = fontSize,
     lineHeight = lineHeight,

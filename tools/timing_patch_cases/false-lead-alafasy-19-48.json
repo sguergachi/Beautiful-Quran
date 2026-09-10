@@ -1,0 +1,112 @@
+{
+  "id": "false-lead-alafasy-19-48",
+  "label": "Alafasy 19:48 أَلَّآ is a false lead; عَسَىٰٓ owns its madd",
+  "refs": [
+    "GitHub issue #748",
+    "Timings Lab Google/Pixel 10 v0.7",
+    "quran-align: word 9 = 8470-10640, word 10 opens at 10650",
+    "waveform: 9.0-10.6 s is continuously voiced (no pause before أَلَّآ)"
+  ],
+  "pipeline": "false_same_position_lead",
+  "notes": "qdc tiles the ayah with no gaps, so عَسَىٰٓ's madd munfasil had to be labelled something and it was given to the next word as a second أَلَّآ. Both halves are substantial (1600+2070 ms), so peer protection restored the pair over CTC's unsplit and the reader washed أَلَّآ twice. quran-align opens أَلَّآ at 10650, a full inter-utterance pause after the pair starts, with عَسَىٰٓ still running through the lead — so the lead goes back to word 9.",
+  "expected_leads": [
+    [
+      10,
+      9040,
+      10640
+    ]
+  ],
+  "input_segments": [
+    [
+      8,
+      7600,
+      8510
+    ],
+    [
+      9,
+      8510,
+      9040
+    ],
+    [
+      10,
+      9040,
+      10640
+    ],
+    [
+      10,
+      10640,
+      12710
+    ],
+    [
+      11,
+      12710,
+      14060
+    ]
+  ],
+  "repair_segments": [
+    [
+      8,
+      7600,
+      8510
+    ],
+    [
+      9,
+      8510,
+      9040
+    ],
+    [
+      10,
+      9040,
+      12710
+    ],
+    [
+      11,
+      12710,
+      14060
+    ]
+  ],
+  "reference_segments": [
+    [
+      8,
+      7610,
+      8460
+    ],
+    [
+      9,
+      8470,
+      10640
+    ],
+    [
+      10,
+      10650,
+      13130
+    ],
+    [
+      11,
+      13140,
+      14040
+    ]
+  ],
+  "expected_segments": [
+    [
+      8,
+      7600,
+      8510
+    ],
+    [
+      9,
+      8510,
+      10640
+    ],
+    [
+      10,
+      10640,
+      12710
+    ],
+    [
+      11,
+      12710,
+      14060
+    ]
+  ]
+}
