@@ -209,6 +209,22 @@ internal fun CustomizeScreen(
             },
             onSelect = { layout -> onUpdate { applyReadingLayout(it, layout) } },
         )
+        // Above View, with Layout: these two set the shape of the page, and
+        // the hand is read off the preview the same way the layout is. The
+        // dial sat below View and below the English choice, which put the
+        // one control the reader is most likely to reach for behind the ones
+        // they set once.
+        //
+        // The mushaf leaf sets its own hand from the page grid — the text
+        // dial is a scroll-layout control and has nothing to turn there.
+        if (showsScrollChrome(settings.readingLayout)) {
+            Section("Text size")
+            TextSizeControl(
+                scale = settings.fontScale,
+                onScale = { value -> onUpdate { it.copy(fontScale = value) } },
+            )
+        }
+
         // A leaf may be set in either language, but never in both — see
         // MUSHAF_VIEW_MODES.
         Section("View")
@@ -251,16 +267,6 @@ internal fun CustomizeScreen(
                     }
                 },
                 onSelect = { text -> onUpdate { it.copy(englishLeafText = text) } },
-            )
-        }
-
-        // The mushaf leaf sets its own hand from the page grid — the text
-        // dial is a scroll-layout control and has nothing to turn there.
-        if (showsScrollChrome(settings.readingLayout)) {
-            Section("Text size")
-            TextSizeControl(
-                scale = settings.fontScale,
-                onScale = { value -> onUpdate { it.copy(fontScale = value) } },
             )
         }
 
