@@ -3715,6 +3715,7 @@ fun NextChapterFooter(
     sheen: State<Float>,
     onOpen: () -> Unit,
     enabled: Boolean = true,
+    modifier: Modifier = Modifier,
     pullProgress: Float = 0f,
     headerMorph: Float = 0f,
     openingAlpha: Float = 1f,
@@ -3724,12 +3725,10 @@ fun NextChapterFooter(
     val morph = FastOutSlowInEasing.transform(headerMorph.coerceIn(0f, 1f))
     val invite = (1f - morph).coerceIn(0f, 1f)
     val openA = openingAlpha.coerceIn(0f, 1f)
-    val rosetteScale = 40f / 52f + (1f - 40f / 52f) * morph
-    val rosetteAlpha = (0.88f + 0.12f * morph) * openA
 
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
     ) {
         // Fixed-height invitation chrome — alpha only, no layout thrash.
         Column(
@@ -3757,9 +3756,7 @@ fun NextChapterFooter(
             revelationPlace = revelationPlace,
             ayahCount = ayahCount,
             sheen = sheen,
-            compactBottom = false,
-            rosetteScale = rosetteScale,
-            rosetteAlpha = rosetteAlpha,
+            compactBottom = surahOpensWithBasmalahPreface(chapterNumber),
             modifier = Modifier
                 .graphicsLayer { alpha = openA }
                 .then(

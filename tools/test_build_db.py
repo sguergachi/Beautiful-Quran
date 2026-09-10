@@ -39,7 +39,10 @@ from build_db import (  # noqa: E402
     finalize_timing_rows,
     load_audio_durations,
     load_audio_onsets,
+    apply_audit_holds,
     discard_false_same_position_lead,
+    false_same_position_leads,
+    hand_lead_to_previous_word,
     normalize_text,
     offset_for_audio_onset,
     preserve_complete_repeat_topology,
@@ -70,6 +73,7 @@ PIPELINES = frozenset(
         "clock_shifted_repair",
         "complete_repeat_topology",
         "erases_span_repeat",
+        "false_same_position_lead",
         "invented_flush_restore",
         "leading_silence_offset",
         "preserve_peer_repeats",
@@ -235,6 +239,24 @@ def run_pipeline(case, segs):
     if pipeline == "preserve_peer_repeats":
         repaired, _ = preserve_peer_repeats(segs, resolve_repair(case))
         return repaired
+    if pipeline == "false_same_position_lead":
+        reference = case.get("reference_segments")
+        if reference is None:
+            raise SystemExit(f"{case.get('_path')}: need reference_segments")
+        repaired = resolve_repair(case)
+        leads = false_same_position_leads(segs, repaired, reference)
+        expected_leads = case.get("expected_leads")
+        if expected_leads is not None and [
+            list(lead) for lead in leads
+        ] != expected_leads:
+            raise SystemExit(
+                f"{case.get('_path')}: leads {[list(l) for l in leads]} "
+                f"!= expected {expected_leads}"
+            )
+        kept, _ = preserve_peer_repeats(
+            segs, repaired, unwitnessed={lead[0] for lead in leads}
+        )
+        return hand_lead_to_previous_word(kept, leads)
     if pipeline == "qdc_clock_rebase":
         reference = case.get("reference_segments")
         if reference is None:
@@ -534,10 +556,15 @@ def audit_bundled_db():
         [7, 5_970, 6_710],
         [8, 6_710, 7_540],
     ]
+    # The onset (1951 ms) still clamps word 1 alone and does not translate the
+    # row (#626). Words 2-3 moved +100 ms in quran-v54 when the database was
+    # rebuilt from its own pipeline: an evidenced boundary improvement, not an
+    # onset delay — mean |start residual| falls 331 ms -> 248 ms against both
+    # forced aligners (tools/timing_verdicts/v54-pipeline-resync.json).
     exact &= timings[(7, 4, 148)][:3] == [
-        [1, 1_951, 4_690],
-        [2, 4_690, 5_410],
-        [3, 5_410, 6_290],
+        [1, 1_951, 4_790],
+        [2, 4_790, 5_510],
+        [3, 5_510, 6_390],
     ]
     exact &= {
         key: timings[key][0][1]
@@ -727,6 +754,59 @@ def check_qcf_v2_run_assertion():
     return all(checks)
 
 
+def check_audit_holds():
+    """A hold may only restore a row the baseline ships, never invent one."""
+    from build_db import AUDIT_HOLDS_FILE
+
+    # 1. Every committed hold must match the merge-base database byte for byte.
+    #    That is what keeps a hold out of the timing delta entirely: it cannot
+    #    smuggle a new payload past the dual-model gate.
+    parity = True
+    if AUDIT_HOLDS_FILE.is_file():
+        payload = json.loads(AUDIT_HOLDS_FILE.read_text(encoding="utf-8"))
+        base = subprocess.run(
+            ["git", "merge-base", "HEAD", "origin/master"],
+            cwd=ROOT, text=True, capture_output=True, check=True,
+        ).stdout.strip()
+        baseline = read_git_timing_rows(base)
+        for row in payload.get("rows") or []:
+            key = (row["reciterSlug"], row["surahId"], row["ayah"])
+            shipped = baseline.get(key)
+            if shipped is None:
+                parity = False
+                break
+            if (row["segments"] != shipped["segments"]
+                    or row["audioOnsetMs"] != shipped["audioOnsetMs"]):
+                parity = False
+                break
+            if not row.get("reason") or not row.get("models"):
+                parity = False
+                break
+
+    # 2. The mechanism restores a changed row and re-adds a dropped one.
+    with tempfile.TemporaryDirectory() as tmp:
+        holds = Path(tmp) / "audit-held-rows.json"
+        holds.write_text(json.dumps({"rows": [
+            {"reciterId": 1, "reciterSlug": "Alafasy_128kbps", "surahId": 1,
+             "ayah": 1, "reason": "test", "audioOnsetMs": 7,
+             "segments": [[1, 0, 100]]},
+            {"reciterId": 2, "reciterSlug": "Husary_64kbps", "surahId": 1,
+             "ayah": 2, "reason": "test", "audioOnsetMs": 0,
+             "segments": [[1, 0, 50]]},
+        ]}))
+        rows = [(1, 1, 1, json.dumps([[1, 0, 999]])), (3, 1, 3, json.dumps([[1, 0, 5]]))]
+        out, onsets, held = apply_audit_holds(rows, {(1, 1, 1): 0}, holds)
+        restored = dict(((r, s, a), segs) for r, s, a, segs in out)
+        mechanism = (
+            held == 2
+            and json.loads(restored[(1, 1, 1)]) == [[1, 0, 100]]
+            and onsets[(1, 1, 1)] == 7
+            and json.loads(restored[(2, 1, 2)]) == [[1, 0, 50]]   # dropped row re-added
+            and json.loads(restored[(3, 1, 3)]) == [[1, 0, 5]]    # untouched
+        )
+    return parity and mechanism
+
+
 def check_recovered_boundary_repairs():
     """A missing row defers only its boundary repair until coverage recovers."""
     edits = {
@@ -859,6 +939,7 @@ def main():
         if pipeline in {
             "boundary_repair",
             "erases_span_repeat",
+            "false_same_position_lead",
             "preserve_peer_repeats",
             "rebase_timing_repair",
         }:
@@ -881,6 +962,7 @@ def main():
     qcf_runs_ok = check_qcf_v2_page_runs()
     qcf_assert_ok = check_qcf_v2_run_assertion()
     recovered_boundary_ok = check_recovered_boundary_repairs()
+    audit_holds_ok = check_audit_holds()
     timing_delta_ok, timing_delta_detail = check_timing_delta()
     print(f"  {'ok  ' if confidence_ok else 'FAIL'} weighted 2:214 confidence checks")
     print(f"  {'ok  ' if audio_onset_ok else 'FAIL'} audio evidence and onset checks")
@@ -894,6 +976,7 @@ def main():
     print(f"  {'ok  ' if qcf_runs_ok else 'FAIL'} public DB excludes QCF V2 fields")
     print(f"  {'ok  ' if qcf_assert_ok else 'FAIL'} QCF V2 run assertion rejects a wrong page")
     print(f"  {'ok  ' if recovered_boundary_ok else 'FAIL'} recovered-row boundary deferral")
+    print(f"  {'ok  ' if audit_holds_ok else 'FAIL'} audit holds restore only baseline rows")
     print(f"  {'ok  ' if timing_delta_ok else 'FAIL'} fail-closed timing DB delta gate")
     if not confidence_ok:
         failures.append(("weighted confidence", "2:214 checks failed", None))
@@ -913,6 +996,8 @@ def main():
         failures.append(("QCF V2 run assertion", "a wrong page number was not rejected", None))
     if not recovered_boundary_ok:
         failures.append(("recovered-row boundary deferral", "repair ordering failed", None))
+    if not audit_holds_ok:
+        failures.append(("audit holds", "a hold does not match the baseline row", None))
     if not timing_delta_ok:
         failures.append(("timing DB delta gate", timing_delta_detail, None))
     print()

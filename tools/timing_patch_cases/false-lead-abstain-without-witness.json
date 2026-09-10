@@ -1,0 +1,57 @@
+{
+  "id": "false-lead-abstain-without-witness",
+  "label": "no aligner witness means the pair keeps today's protection",
+  "refs": [
+    "As-Sudais ships no parseable quran-align row (upstream align crash)",
+    "62 corpus pairs reach peer protection with no reference"
+  ],
+  "pipeline": "false_same_position_lead",
+  "notes": "The rule only discards a pair on positive evidence. With no reference row — As-Sudais, or any ayah quran-align could not align — the lead is unwitnessed and must stay protected rather than be guessed away. The same abstention covers a row that never rebased onto the everyayah clock, where the two sources' boundaries mean different instants.",
+  "expected_leads": [],
+  "input_segments": [
+    [
+      4,
+      3000,
+      4000
+    ],
+    [
+      5,
+      4000,
+      5600
+    ],
+    [
+      5,
+      5600,
+      7000
+    ],
+    [
+      6,
+      7000,
+      8000
+    ]
+  ],
+  "repair_segments": [
+    [
+      4,
+      3000,
+      4000
+    ],
+    [
+      5,
+      4000,
+      7000
+    ],
+    [
+      6,
+      7000,
+      8000
+    ]
+  ],
+  "reference_segments": [],
+  "expected_positions": [
+    4,
+    5,
+    5,
+    6
+  ]
+}

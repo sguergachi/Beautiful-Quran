@@ -612,12 +612,7 @@ fun ReaderScreen(
     var chapterAdvancing by remember { mutableStateOf(false) }
     val headerMorph = remember { Animatable(0f) }
     val flyProgress = remember { Animatable(0f) }
-    /** Flyer opacity — fades out on handoff so removal is never a snap. */
-    val flyerAlpha = remember { Animatable(1f) }
-    /** In-list opening fade while the flyer carries the medallion/title. */
-    val openingInListAlpha = remember { Animatable(1f) }
-    /** Real SurahHeader fade-in under the departing flyer. */
-    val realHeaderAlpha = remember { Animatable(1f) }
+    /** The sole visible opening while travelling from the footer to the header. */
     var flyingHeader by remember { mutableStateOf<FlyingChapterHeader?>(null) }
     /** Latest opening-block root Y from the footer (for the fly animation). */
     var footerOpeningRootY by remember { mutableFloatStateOf(Float.NaN) }
@@ -652,6 +647,7 @@ fun ReaderScreen(
     var gestureBeganAtChapterBottom by remember { mutableStateOf(false) }
     /** 0 = idle/settled; 1 = current page fully exited downward (prev advance). */
     val previousPageExit = remember { Animatable(0f) }
+    var previousExiting by remember { mutableStateOf(false) }
     /** Rubber-band lift captured at previous-advance release. */
     var previousExitStartRubberPx by remember { mutableFloatStateOf(0f) }
     /** 0 = new previous chapter entering from above; 1 = settled. */
@@ -1962,27 +1958,29 @@ fun ReaderScreen(
         val previousPullRubberMaxPx = with(density) { 156.dp.toPx() }
         val previousExitScrollPx = with(density) { 360.dp.toPx() }
         // Header travel into place — enough to read as a settle, not a leap.
-        val previousEnterScrollPx = with(density) { 120.dp.toPx() }
+        val previousEnterScrollPx = with(density) { 48.dp.toPx() }
 
         fun advanceToPreviousChapter(prevId: Int) {
             if (chapterAdvancing) return
-            val prev = uiState.previousSurah?.takeIf { it.id == prevId } ?: return
+            if (uiState.previousSurah?.id != prevId) return
+            chapterAdvancing = true
             scope.launch {
                 val pullAtRelease = previousChapterPull.coerceIn(0f, 1f)
                 val rubberAtRelease =
-                    previousPullRubberMaxPx * sin(pullAtRelease * PI.toFloat() * 0.5f)
+                    previousChapterPullOffset(pullAtRelease, previousPullRubberMaxPx)
 
-                chapterAdvancing = true
                 previousChapterPullArmed = false
                 dispatch(ReaderInteractionEvent.ChapterAdvanceStarted)
                 previousExitStartRubberPx = rubberAtRelease
                 previousPageExit.snapTo(0f)
                 previousPageEnter.snapTo(1f)
-                // Hand lift to exit anim so the page never snaps back up.
+                // The exit owns the held pose even before its first animation frame.
+                previousExiting = true
                 previousChapterPull = 0f
 
                 val prepared = viewModel.materialize(prevId)
                 if (prepared == null) {
+                    previousExiting = false
                     chapterAdvancing = false
                     return@launch
                 }
@@ -1991,15 +1989,13 @@ fun ReaderScreen(
                 previousPageExit.animateTo(
                     targetValue = 1f,
                     animationSpec = tween(
-                        durationMillis = 480,
+                        durationMillis = 300,
                         easing = chapterAdvanceEasing,
                     ),
                 )
 
-                // 2) Install previous chapter at its header; verses stay parked
-                //    above until the header has settled.
+                // Install under the fully faded exit before starting the arrival.
                 previousPageEnter.snapTo(0f)
-                previousPageExit.snapTo(0f)
                 verseEnterFromAbove = true
                 verseRevealForSurah = prevId
                 verseReveal.snapTo(0f)
@@ -2008,37 +2004,40 @@ fun ReaderScreen(
                 withFrameNanos { }
                 withFrameNanos { }
 
+                previousExiting = false
+                previousPageExit.snapTo(0f)
+                // Header and verses arrive together, with a small verse offset.
+                val revealJob = launch {
+                    if (verseRevealForSurah == prevId) {
+                        verseReveal.animateTo(1f, tween(360, easing = chapterAdvanceEasing))
+                    }
+                }
                 // 3) Previous header fades and eases downward into place.
                 previousPageEnter.animateTo(
                     targetValue = 1f,
                     animationSpec = tween(
-                        durationMillis = 560,
+                        durationMillis = 360,
                         easing = chapterAdvanceEasing,
                     ),
                 )
 
-                // 4) Then verses fade and settle downward under the header.
-                if (verseRevealForSurah == prevId) {
-                    verseReveal.animateTo(
-                        targetValue = 1f,
-                        animationSpec = tween(
-                            durationMillis = 640,
-                            easing = chapterAdvanceEasing,
-                        ),
-                    )
-                }
+                revealJob.join()
                 if (verseRevealForSurah == prevId) {
                     verseRevealForSurah = 0
                 }
                 verseEnterFromAbove = false
-                chapterAdvancing = false
                 onOpenPreviousChapter(prevId)
+                withFrameNanos { }
+                withFrameNanos { }
+                chapterAdvancing = false
             }
         }
 
         fun advanceToNextChapter(nextId: Int) {
             if (chapterAdvancing) return
             val next = uiState.nextSurah?.takeIf { it.id == nextId } ?: return
+            // Pointer release and pre-fling may arrive before the next frame.
+            chapterAdvancing = true
             scope.launch {
                 // Pin the top-nav title while we still have the previous surah
                 // (user is usually past the header at the chapter end).
@@ -2067,7 +2066,6 @@ fun ReaderScreen(
                         (padding.calculateTopPadding() + 32.dp).toPx()
                     }
 
-                chapterAdvancing = true
                 // Keep pull at release for one more frame so the list doesn't
                 // drop; fly takes over translation via startLiftPx.
                 nextChapterPullArmed = false
@@ -2077,9 +2075,6 @@ fun ReaderScreen(
                 sheenFollowScroll = false
                 sheenAnim.snapTo(scrollSheenValue())
                 headerMorph.snapTo(morphAtRelease)
-                flyerAlpha.snapTo(1f)
-                openingInListAlpha.snapTo(1f)
-                realHeaderAlpha.snapTo(1f)
 
                 val prepared = viewModel.materialize(nextId)
                 if (prepared == null) {
@@ -2099,17 +2094,9 @@ fun ReaderScreen(
                         startLiftPx = rubberAtRelease,
                     )
                     flyProgress.snapTo(0f)
-                    flyerAlpha.snapTo(1f)
                     // Now safe to clear pull: advance lift owns list translation.
                     nextChapterPull = 0f
-                    // Soft handoff into the flyer: fade the in-list opening and
-                    // invitation chrome while the flyer slides up.
-                    launch {
-                        openingInListAlpha.animateTo(
-                            0f,
-                            tween(200, easing = chapterAdvanceEasing),
-                        )
-                    }
+                    // The overlay takes sole ownership in this composition.
                     launch {
                         headerMorph.animateTo(
                             1f,
@@ -2122,7 +2109,7 @@ fun ReaderScreen(
                     flyProgress.animateTo(
                         targetValue = 1f,
                         animationSpec = tween(
-                            durationMillis = 780,
+                            durationMillis = 480,
                             easing = chapterAdvanceEasing,
                         ),
                     )
@@ -2135,43 +2122,29 @@ fun ReaderScreen(
                     )
                 }
 
-                // Handoff under the flying opening (covers the list remount).
-                // Weave + medallion ownership switch to the settled header (full
-                // strength, never dual-stacked). Only titles crossfade with
-                // complementary alphas: flyer = t, real = 1 − t.
-                // List translation must already be 0 so scroll lands the real
-                // header exactly under the flyer (skip previous-chapter item).
+                // Keep the entire opening on the overlay until the real header
+                // has laid out at the same position. Crossfading identical ink
+                // dips its opacity (two half-alpha layers only cover 75%).
                 verseEnterFromAbove = false
                 verseRevealForSurah = nextId
                 verseReveal.snapTo(0f)
-                realHeaderAlpha.snapTo(1f)
-                // Flyer still at full chrome; complementary real chrome starts at 0.
-                flyerAlpha.snapTo(1f)
                 viewModel.installPrepared(prepared)
                 listState.scrollToItem(0)
                 // Two frames so the new LazyColumn lays out at scroll 0 under
-                // the still-visible flyer before the chrome crossfade.
+                // the still-visible flyer before transferring ownership.
                 withFrameNanos { }
                 withFrameNanos { }
-                if (flyingHeader != null) {
-                    // Linear so flyer + real chrome sum to 1 throughout.
-                    flyerAlpha.animateTo(
-                        0f,
-                        tween(320, easing = LinearEasing),
-                    )
-                    withFrameNanos { }
-                }
                 flyingHeader = null
                 // Reset flyer animatables only after the overlay has left the tree.
                 withFrameNanos { }
                 flyProgress.snapTo(0f)
-                flyerAlpha.snapTo(1f)
-                openingInListAlpha.snapTo(1f)
                 headerMorph.snapTo(0f)
-                chapterAdvancing = false
-                // Sync the sheet id after the dissolve so surahId/startAyah
+                // Sync the sheet id under the entrance hold so surahId/startAyah
                 // prop changes cannot interrupt the handoff composition.
                 onOpenNextChapter(nextId)
+                withFrameNanos { }
+                withFrameNanos { }
+                chapterAdvancing = false
                 // Top-nav pin has finished fading (or was never set).
                 pinnedTopNavTitle = null
 
@@ -2184,7 +2157,7 @@ fun ReaderScreen(
                 verseReveal.animateTo(
                     targetValue = 1f,
                     animationSpec = tween(
-                        durationMillis = 640,
+                        durationMillis = 360,
                         easing = chapterAdvanceEasing,
                     ),
                 )
@@ -2447,42 +2420,23 @@ fun ReaderScreen(
             // Read Animatable in this composition so morph frames recompose the list.
             val headerMorphNow = headerMorph.value
             val footerMorph = maxOf(headerMorphNow, nextChapterPull * 0.4f)
-            val flyProgressNow = flyProgress.value
-            val flyerAlphaNow = flyerAlpha.value
-            val openingInListAlphaNow = openingInListAlpha.value
-            val realHeaderAlphaNow = realHeaderAlpha.value
             val flying = flyingHeader
-            val verseRevealNow = verseReveal.value
             val verseRisePx = with(density) { 40.dp.toPx() }
             val verseFromAbove = verseEnterFromAbove
-            // Soft fade: hold ink low early, then wash in (reads more as a fade
-            // than a linear opacity ramp tied 1:1 to the motion).
-            val verseFadeAlpha = run {
-                val t = verseRevealNow.coerceIn(0f, 1f)
-                val u = ((t - 0.08f) / 0.92f).coerceIn(0f, 1f)
-                u * u * (3f - 2f * u)
+            // Deferred reads keep verse motion out of composition/layout.
+            val verseFadeAlpha = { chapterVerseAlpha(verseReveal.value) }
+            val verseRevealY = {
+                (if (verseFromAbove) -1f else 1f) *
+                    (1f - verseReveal.value) * verseRisePx
             }
-            // Next-chapter: park below and rise. Previous-chapter: park above
-            // and settle downward after the header lands.
-            val verseRevealY =
-                if (verseFromAbove) {
-                    -(1f - verseRevealNow) * verseRisePx
-                } else {
-                    (1f - verseRevealNow) * verseRisePx
-                }
             // Elastic overscroll rubber-band (bottom next / top previous).
             val nextPullRubberPx = run {
                 val t = nextChapterPull.coerceIn(0f, 1f)
                 val eased = sin(t * PI.toFloat() * 0.5f)
                 pullRubberMaxPx * eased
             }
-            val previousPullRubberPx = run {
-                val t = previousChapterPull.coerceIn(0f, 1f)
-                // Near-linear rubber so the revealed band tracks the finger
-                // without jumping ahead of the list edge.
-                val eased = t * (2f - t) // ease-out quad
-                previousPullRubberMaxPx * eased
-            }
+            val previousPullRubberPx =
+                previousChapterPullOffset(previousChapterPull, previousPullRubberMaxPx)
             val previousPageExitNow = previousPageExit.value
             val previousPageEnterNow = previousPageEnter.value
             // Enough travel to clear a full phone page of verse ink (next-fly).
@@ -2499,7 +2453,7 @@ fun ReaderScreen(
             }
             val previous = uiState.previousSurah
             val revealPx = when {
-                previousPageExitNow > 0f ->
+                previousExiting ->
                     previousExitStartRubberPx +
                         (previousExitScrollPx - previousExitStartRubberPx) *
                         previousPageExitNow.coerceIn(0f, 1f)
@@ -2538,13 +2492,16 @@ fun ReaderScreen(
                         if (revealPx > 1f) {
                             PreviousChapterPullChrome(
                                 nameTransliteration = previous.nameTransliteration,
-                                pullProgress = if (previousPageExitNow > 0f) 1f else pullT,
+                                pullProgress = if (previousExiting) 1f else pullT,
                                 onOpen = { advanceToPreviousChapter(previous.id) },
                                 enabled = !chapterAdvancing && pullT > 0.35f,
                                 modifier = Modifier
                                     .align(Alignment.TopCenter)
                                     .widthIn(max = 680.dp)
-                                    .fillMaxWidth(),
+                                    .fillMaxWidth()
+                                    .graphicsLayer {
+                                        alpha = if (previousExiting) 1f - previousPageExit.value else 1f
+                                    },
                             )
                         }
                     }
@@ -2875,19 +2832,21 @@ fun ReaderScreen(
                         .fillMaxWidth()
                         .background(paper)
                         .graphicsLayer {
+                            alpha = 1f
+                            translationY = 0f
                             val fly = flying
                             when {
                                 fly != null && content.surah.id != fly.surah.id -> {
-                                    // Front-load: outgoing page fully gone ~28% into
-                                    // the fly (~220ms of the 780ms slide).
-                                    val exitT = (flyProgressNow / 0.28f).coerceIn(0f, 1f)
+                                    // Let the outgoing ink travel with the opening
+                                    // before giving the incoming chapter its space.
+                                    val exitT = (flyProgress.value / 0.65f).coerceIn(0f, 1f)
                                     val e = 1f - (1f - exitT) * (1f - exitT)
                                     alpha = 1f - e
                                     val lift = fly.startLiftPx +
                                         (nextExitScrollPx - fly.startLiftPx) * e
                                     translationY = -lift
                                 }
-                                previousPageExitNow > 0f -> {
+                                previousExiting -> {
                                     // Slot already grew via revealPx; only fade out.
                                     val e = previousPageExitNow.coerceIn(0f, 1f)
                                     val u = e * e * (3f - 2f * e)
@@ -2972,8 +2931,7 @@ fun ReaderScreen(
                 ) { index ->
                     when (val item = readerItems[index]) {
                         LazyItem.Header -> {
-                            // Weave + medallion stay full-strength on this header
-                            // during handoff; only titles complementary-crossfade.
+                            // One owner for all opening ink, including the weave.
                             val handoffUnderFlyer =
                                 flying != null && content.surah.id == flying.surah.id
                             ChapterOpening(
@@ -2984,20 +2942,16 @@ fun ReaderScreen(
                                 revelationPlace = content.surah.revelationPlace,
                                 ayahCount = content.surah.ayahCount,
                                 sheen = sheen,
-                                showFieldWeave = true,
-                                showRosette = true,
-                                contentAlpha = if (handoffUnderFlyer) {
-                                    (1f - flyerAlphaNow).coerceIn(0f, 1f)
-                                } else {
-                                    realHeaderAlphaNow
+                                modifier = Modifier.graphicsLayer {
+                                    alpha = if (handoffUnderFlyer) 0f else 1f
                                 },
                             )
                         }
                         LazyItem.Basmalah -> {
                             Box(
                                 Modifier.graphicsLayer {
-                                    translationY = verseRevealY
-                                    alpha = verseFadeAlpha
+                                    translationY = verseRevealY()
+                                    alpha = verseFadeAlpha()
                                 },
                             ) {
                                 BasmalahBlock(
@@ -3058,8 +3012,8 @@ fun ReaderScreen(
                                         Offset(1f, 0f)
                                     },
                                 ) {
-                                    translationY = verseRevealY
-                                    alpha = verseFadeAlpha
+                                    translationY = verseRevealY()
+                                    alpha = verseFadeAlpha()
                                 },
                             ) {
                             AyahBlock(
@@ -3287,8 +3241,8 @@ fun ReaderScreen(
                         is LazyItem.PageDivider -> {
                             Box(
                                 Modifier.graphicsLayer {
-                                    translationY = verseRevealY
-                                    alpha = verseFadeAlpha
+                                    translationY = verseRevealY()
+                                    alpha = verseFadeAlpha()
                                 },
                             ) {
                                 PageBreak(
@@ -3309,10 +3263,14 @@ fun ReaderScreen(
                                     ayahCount = next.ayahCount,
                                     sheen = sheen,
                                     onOpen = { advanceToNextChapter(next.id) },
+                                    modifier = Modifier.graphicsLayer {
+                                        translationY = verseRevealY()
+                                        alpha = verseFadeAlpha()
+                                    },
                                     enabled = !chapterAdvancing,
                                     pullProgress = nextChapterPull,
                                     headerMorph = footerMorph,
-                                    openingAlpha = openingInListAlphaNow,
+                                    openingAlpha = if (flying != null) 0f else 1f,
                                     onOpeningPositioned = { coords ->
                                         footerOpeningRootY = coords.positionInRoot().y
                                     },
@@ -3325,19 +3283,17 @@ fun ReaderScreen(
             } // Column pull viewport (below top bar)
             // Flying next-chapter opening: continuous slide from footer → header.
             if (flying != null) {
-                val yInBox = flying.startYInRoot +
-                    (flying.endYInRoot - flying.startYInRoot) * flyProgressNow -
-                    readerRootY
-                // Weave + medallion ride the flyer until the settled header owns
-                // them (same surah id after install) — one of each at full strength.
-                val flyerOwnsEmbellishment = content.surah.id != flying.surah.id
                 Box(
                     Modifier
                         .align(Alignment.TopCenter)
                         .widthIn(max = 680.dp)
                         .fillMaxWidth()
                         .zIndex(2f)
-                        .graphicsLayer { translationY = yInBox },
+                        .graphicsLayer {
+                            translationY = flying.startYInRoot +
+                                (flying.endYInRoot - flying.startYInRoot) * flyProgress.value -
+                                readerRootY
+                        },
                 ) {
                     ChapterOpening(
                         chapterNumber = flying.surah.id,
@@ -3352,10 +3308,6 @@ fun ReaderScreen(
                         compactBottom = surahOpensWithBasmalahPreface(flying.surah.id),
                         rosetteScale = 1f,
                         rosetteAlpha = 1f,
-                        showFieldWeave = flyerOwnsEmbellishment,
-                        showRosette = flyerOwnsEmbellishment,
-                        // Titles only — complementary with settled header (1 − t).
-                        contentAlpha = flyerAlphaNow,
                     )
                 }
             }

@@ -571,6 +571,37 @@ internal fun MushafPageHeader(
 }
 
 /** One end of the running head: a single line of wayfinding. */
+/**
+ * What the leaf's furniture takes over the scale, in sp.
+ *
+ * [MushafType] is a geometric scale — one ratio, one anchor — and a geometric
+ * scale under-serves its own smallest rungs. That is not a flaw in the ratio,
+ * it is why type families are cut in optical sizes at all: a face set small
+ * needs to be relatively larger than the geometry says to hold its colour and
+ * stay legible. On this leaf the two smallest rungs come out at about 10 sp for
+ * the running head and the folio's Arabic figure and 8 sp for the Latin numeral
+ * beside it, and at that size wayfinding is a squint.
+ *
+ * So the furniture takes a flat two points over its rung. Flat, and not a rung:
+ * a rung is +25% and would scale with the device, so on a tablet it would be
+ * five points where a phone got two — and the interval between the head, the
+ * figure and the gloss is the thing the scale exists to keep. Adding the same
+ * absolute correction to all three moves them together and leaves every
+ * interval where it was.
+ *
+ * The Customize miniature takes it too, through the shared composables, and is
+ * still faithful: it previews at 22 sp against the leaf's ~20 sp, so the two sit
+ * on the same correction rather than on two different ones.
+ */
+private const val MushafFurnitureBump = 2f
+
+/**
+ * A furniture size: [steps] down the leaf's scale from the page's hand, plus
+ * the optical correction. [this] must be an sp size — every caller's is.
+ */
+private fun TextUnit.furnitureStep(steps: Int): TextUnit =
+    (value * MushafType.RATIO.pow(steps) + MushafFurnitureBump).sp
+
 @Composable
 private fun MushafHeadLabel(
     text: String,
@@ -586,14 +617,25 @@ private fun MushafHeadLabel(
     Text(
         text = text,
         style = MaterialTheme.typography.labelSmall.copy(
-            fontSize = glyphSize * MushafType.RATIO.pow(MushafType.HEAD),
+            fontSize = glyphSize.furnitureStep(MushafType.HEAD),
             letterSpacing = 0.10.em,
         ),
         color = ink.copy(alpha = 0.44f),
         textAlign = align,
         maxLines = 1,
+        // Measured against the paper rather than against its band. The band is
+        // 0.30 of a unit and the head's line box is taller than that, so a Row
+        // of exactly the band's height handed the label a maxHeight it did not
+        // fit in and sheared the descenders off flat — *Maryam* came out as
+        // *Marvam*. The band still spends 0.30 of a unit of the grid, which is
+        // what the grid is for; the glyphs are simply allowed to hang past it
+        // into the head gutter, which is a whole unit of air with nothing in
+        // it. Anything that puts ink in that gutter has to revisit this.
         overflow = TextOverflow.Ellipsis,
-        modifier = modifier,
+        modifier = modifier.wrapContentHeight(
+            align = Alignment.Top,
+            unbounded = true,
+        ),
     )
 }
 
@@ -616,11 +658,11 @@ internal fun MushafFolioMarks(
     val ink = MaterialTheme.colorScheme.onBackground
     val folio = mushafFolioLayout(page, script)
     val westernStyle = MaterialTheme.typography.labelSmall.copy(
-        fontSize = glyphSize * MushafType.RATIO.pow(MushafType.FOLIO_GLOSS),
+        fontSize = glyphSize.furnitureStep(MushafType.FOLIO_GLOSS),
         letterSpacing = 0.14.em,
     )
     val westernColor = ink.copy(alpha = 0.50f)
-    val arabicSize = glyphSize * MushafType.RATIO.pow(MushafType.FOLIO_FIGURE)
+    val arabicSize = glyphSize.furnitureStep(MushafType.FOLIO_FIGURE)
     val arabicColor = ink.copy(alpha = 0.54f)
     Row(
         modifier = modifier,

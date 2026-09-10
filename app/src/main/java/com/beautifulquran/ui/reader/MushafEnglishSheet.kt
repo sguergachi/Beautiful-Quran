@@ -39,6 +39,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.text.style.Hyphens
 import androidx.compose.ui.text.style.LineBreak
 import androidx.compose.ui.text.style.LineHeightStyle
 import androidx.compose.ui.text.style.TextAlign
@@ -547,7 +548,27 @@ private fun englishLeafBlockTexts(
                     // carried sentence is numbered where it finishes, as a
                     // paragraph carried over a page is punctuated where it ends.
                     val markRange = if (verse.endsVerse) {
-                        append(" ")
+                        // A narrow no-break space, and both halves of that are
+                        // load-bearing.
+                        //
+                        // *No-break*, because the mark closes the verse before
+                        // it and a closing number that opens a line reads as if
+                        // it introduced the verse below — on this leaf, *the
+                        // Knowing* ending a line and `⟨6⟩ Lord of the heavens`
+                        // beginning the next. Measured over eight leaves the
+                        // free mark opened a line six times in 124; bound, it
+                        // never does. The paragraph optimizer was spending them
+                        // to score the page — three of the six sat under holes
+                        // of 80–101 px the mark would have fitted in.
+                        //
+                        // *Narrow*, because binding makes the word and its mark
+                        // one atom and the rag pays for every pixel of it. A
+                        // reference mark takes a thin space in any case; at a
+                        // word space the same eight leaves lost 11 px of mean
+                        // rag and pushed their worst hole to 188 px, at a thin
+                        // one they lose 9 and their worst hole stays where it
+                        // was (162 → 159).
+                        append("\u202F")
                         val markStart = length
                         appendAyahNumberMark(
                             number = verse.ayah,
@@ -793,7 +814,7 @@ private fun englishBookHandPx(
 }
 
 /**
- * The book's hand: EB Garamond, ragged right, unhyphenated.
+ * The book's hand: EB Garamond, ragged right, hyphenated.
  *
  * **Ragged, not justified.** The mushaf's own rule is that every full line
  * reaches both margins (`QURAN_TYPOGRAPHY.md` §3) — but that is a rule about
@@ -801,30 +822,91 @@ private fun englishBookHandPx(
  * art. Latin has only the word space to fill with, and on a measure of about
  * fifty characters that is not enough of a lever: the spaces open unevenly,
  * the same line's colour changes from one page to the next, and the reader
- * pays for a straight right edge with rivers of white running down the page.
- * An even rag is the more readable page, and on a phone it is not close.
+ * pays for a straight right edge with rivers of white. Justification was
+ * tried on this leaf and taken back out: it does make both margins straight
+ * — every line within 3 px of the last — but the loosest line on the
+ * Ad-Dukhan leaf (`We were to warn [mankind] ⟨3⟩ On that`) ran three times
+ * the natural word space to buy it, because *night* has nowhere to break.
  *
- * `LineBreak.Paragraph` stays: it breaks the whole block at once rather than
- * greedily line by line, which is what makes the rag *even* rather than merely
- * ragged — the difference between a right edge that undulates and one that
- * lurches.
+ * **How even the rag can be, measured.** The rag looks left-heavy and it is:
+ * on the Ta-Ha leaf the right edge falls short of the measure by 57 px on
+ * average and 90 px at worst, out of 942, so the optical right margin is half
+ * again the left. That is very close to the floor, and the floor was measured
+ * rather than assumed — a minimum-raggedness optimizer run over the same
+ * words, into the same number of lines, with this leaf's own vetted
+ * hyphenation points as extra break candidates, reaches mean 50 and worst 78,
+ * and aimed at any target rag depth from 10 px to 190 px it never gets the
+ * spread below 75 px against the breaker's 78. The lurch is the width of a
+ * word: from a given line start the next candidate is a whole word further
+ * on, so the achievable line lengths are quantized in ~70 px steps and no
+ * arrangement of them lands them all in a narrow band. Hyphenation is the
+ * only thing that subdivides that quantum, and at the book's minima this
+ * translation offers too few cuts to matter. Anyone who wants an even rag
+ * here is asking for either looser minima (which is *de-scends*, refused
+ * twice) or more words to a line — a smaller hand, or a wider measure. It is
+ * not a line-breaking problem.
  *
- * **Not hyphenated, and this is load-bearing.** Hyphenation breaks a *word*
- * across two lines, and `ShapedWordBloom.ColorReveal` takes the union bounds of
- * a range's glyph path — so a tinted wash over a broken word would sweep the
- * width of the whole line. `InkReveal` handles a multi-line range correctly (it
- * advances one wash across the fragments in order, which is what this page's
- * verse wash needs), but the tinted layers do not. Anyone turning hyphens on
- * must fix ColorReveal the same way first. Ragged setting needs them far less
- * anyway — the rag absorbs the long word that justification would have had to
- * stretch a line around.
+ * **And evening the rag was the wrong thing to want.** The leaf was set
+ * `Balanced` on exactly that reasoning and the reader read the result back
+ * correctly: *the right rag is a straight edge and the text is left heavy*.
+ * It is what an evened rag does. Over eight leaves and 116 lines, `Balanced`
+ * (and `HighQuality`, which breaks identically) put 39% of lines within 20 px
+ * of the mean shortfall and let only 10% reach the margin — so the line ends
+ * pile into one band about a word's width inside the measure, the eye reads
+ * that band as a second margin, and the block hangs to the left of it. A rag
+ * has to be *active* to read as a rag at all.
+ *
+ * **So the leaf breaks greedily.** `LineBreak.Strategy.Simple` fills each
+ * line as far as the next word allows and takes what is left: 20% of lines
+ * reach the margin, the mean cluster falls to 29%, and the right edge moves.
+ * It costs 3 px of mean shortfall (70 → 73 of 942) and eight more deep holes
+ * (11 → 19 past an eighth of the measure). That is the real trade, and it is
+ * the right way round — the deep holes are legible as holes, the phantom
+ * margin was not legible as anything, it just made the page look pinned.
+ *
+ * **Hyphenated, at the book's minima.** A long word the rag cannot absorb —
+ * *righteousness*, *[fulfillment]*, *obedience* — pushes the words around it
+ * into a deep hole at the line's end. With `Hyphens.Auto` the breaker may
+ * carry the word over instead — but it breaks *de-scends* after two letters,
+ * which no book does, and Compose exposes no minima to stop it with. So the
+ * leaf vetoes (`EnglishHyphenation`): every cut the TeX patterns propose with
+ * fewer than three letters on either side is joined with a word joiner, and
+ * the breaker takes the rest. Measured on glass (Ta-Ha, Baqarah's opening,
+ * As-Saffat): the Ta-Ha mean shortfall 53 → 43 px of a 935 px measure with
+ * its worst hole filled by a good break (`…and does right-` / `eousness…`),
+ * As-Saffat's mean 68 → 64 with `won-der` its only hyphen, Baqarah untouched
+ * (its holes are short-word pileups no hyphen reaches), and no bad fragment
+ * anywhere — unvetoed hyphenation breaks *Re-pelled* and *de-scends* on the
+ * same leaves. Gluing short words to their neighbours was tried twice and
+ * reverted twice: the keep-hole stands even hyphenated.
+ *
+ * This was load-bearing off until `ShapedWordBloom.ColorReveal` learned the
+ * same multi-line wash `InkReveal` already paints: a tinted wash over a
+ * broken word used to sweep the width of the whole line from the union bounds
+ * of its range. Both washes now advance one head across the fragments in
+ * order. The paper masks had two more lessons to learn from the hyphen —
+ * see `lineSelectionBounds` and `justifyShift`.
  */
-private fun englishProseStyle(fontSize: TextUnit, lineHeight: TextUnit) = TextStyle(
+internal fun englishProseStyle(fontSize: TextUnit, lineHeight: TextUnit) = TextStyle(
     fontFamily = SerifFontFamily,
     fontSize = fontSize,
     lineHeight = lineHeight,
     textAlign = TextAlign.Start,
-    lineBreak = LineBreak.Paragraph,
+    // Greedy, deliberately. Balanced and HighQuality both even the lines out,
+    // and an evened rag is the one thing a rag must not be: 39% of lines
+    // landed within 20 px of the mean and only 10% reached the margin, which
+    // draws a soft second margin a word's width inside the true one and leaves
+    // the block looking pinned to the left. Greedy fills each line as far as
+    // it goes: 20% of lines now reach the margin and the mean cluster falls to
+    // 29%, for 3 px more mean shortfall and eight more deep holes. The holes
+    // are the price of an active rag; the phantom edge was not worth avoiding
+    // them. See docs/QURAN_TYPOGRAPHY.md §13.5.
+    lineBreak = LineBreak.Paragraph.copy(strategy = LineBreak.Strategy.Simple),
+    hyphens = Hyphens.Auto,
+    // The book face's refinements: kerning and ligatures on, old-style figures
+    // so the prose (and its brackets and quotes) sets with an even colour —
+    // the same features the web leaf and every other English surface set.
+    fontFeatureSettings = "'kern' 1, 'liga' 1, 'onum' 1",
     platformStyle = PlatformTextStyle(includeFontPadding = false),
     // Trim.Both puts the block's own edges on the grid: the first line starts
     // at its ascent and the last stops at its descender, instead of half a
@@ -852,9 +934,18 @@ private fun EnglishProseBlock(
     val palette = rememberWordInkPalette()
     var layoutResult by remember { mutableStateOf<TextLayoutResult?>(null) }
     val hitSlopPx = with(LocalDensity.current) { 6.dp.toPx() }
+    val style = englishProseStyle(fontSize, lineHeight)
+    // What the breaker's hyphen costs the line, in this leaf's own hand. The
+    // paper masks need it: the hyphen is drawn without being written, so no
+    // verse's range reaches it and the cover that ends a hyphenated line would
+    // leave it at full ink over dimmed prose. See Modifier.shapedWordBloom.
+    val measurer = rememberTextMeasurer()
+    val hyphenPx = remember(style) {
+        measurer.measure(AnnotatedString("-"), style).size.width.toFloat()
+    }
     Text(
         text = block.text,
-        style = englishProseStyle(fontSize, lineHeight),
+        style = style,
         modifier = Modifier
             .fillMaxWidth()
             .shapedWordBloom(
@@ -886,9 +977,11 @@ private fun EnglishProseBlock(
                 // sentence exactly, so they need no reach to close over it.
                 coverPad = 0.dp,
                 // Ragged: a line is drawn where it was measured, so the paper
-                // masks need no justification correction. See
+                // masks need no justification correction. They do need the
+                // hyphen, which is drawn where nothing was measured. See
                 // Modifier.shapedWordBloom.
                 justified = false,
+                hyphenPx = hyphenPx,
             )
             .pointerInput(block, layoutResult) {
                 detectTapGestures { tap ->

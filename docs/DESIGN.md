@@ -537,6 +537,16 @@ pull from the boundary (or tap its explicit control) to change chapters. Pull
 progress follows the finger in both directions, remains cancellable even after
 filling completely, and commits only when released while still fully filled.
 
+On release, the next opening carries its exact footer geometry into the header
+in 480 ms. It has one paint owner throughout: the footer yields immediately
+to the travelling opening, and the laid-out header takes over atomically.
+Crossfading two copies of the same ink causes an opacity dip, even with
+complementary alphas. The medallion has the same size and strength at both ends.
+Outgoing verses accompany the travel; incoming verses settle over 360 ms.
+Previous-chapter release preserves the held pull even while content prepares,
+then uses a 300 ms exit and a shared 360 ms header/verse arrival. Navigation
+updates stay inside the entrance hold so they cannot trigger a second fade.
+
 ## The ink bleed
 
 When the app must present something the system would normally raise as a
@@ -976,7 +986,7 @@ weight.
 ## Motion
 
 - Everything ≤ 400 ms except the deliberate slow moves: chrome recede
-  (520 ms), verse ink recess (400 ms), ayah dim (600 ms), and the
+  (520 ms), chapter-opening travel (480 ms), verse ink recess (400 ms), ayah dim (600 ms), and the
   hand-initiated ayah-jump scroll
   (≈280 ms nearby → a full **1000 ms** for a ~200-verse jump — a fast
   decelerating rush across a distance-scaled stretch of verses, truncated
@@ -986,6 +996,13 @@ weight.
   unfurls with a gravity drop, a soft overshoot, and a settling flutter — the
   only physical *object* on the sheet rather than ink in it, and the only
   motion allowed a touch of whimsy.
+- On the Customize sheet, a control that joins or leaves the page is not
+  swapped in place: the paper opens the room first and the ink arrives into it
+  (`expandVertically` from the top, then a fade), and on the way out the ink
+  goes first and the paper closes after, so nothing is ever seen being crushed.
+  The rows below ride the same expansion, which is what shows the reader where
+  the field came from. 300 ms in, 300 ms out — fade and slide only, no scale.
+  See `CustomizeReveal`.
 - Auto-scroll keeps the active ayah in the upper third and yields instantly
   to the reader's hand; the return-to-ayah roundel (gilt corolla + painted
   qalam arrow) offers the way back. In the scrolling reader it points up or

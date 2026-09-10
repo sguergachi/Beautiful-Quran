@@ -139,9 +139,23 @@ object MushafGrid {
  *
  * The English leaf has no sixteenth row to buy — its well is continuous prose —
  * and its ink stops exactly at the ascent and the descender, because the block
- * is set `Trim.Both`. A band of nothing there is nothing. So it keeps the
- * canonical gutter, which was sized for exactly this: "a head that sits closer
+ * is set `Trim.Both`. A band of nothing there is nothing. So it keeps a gutter
+ * sized by the rule the canonical one was sized by: "a head that sits closer
  * than about a line's pitch reads as part of the block".
+ *
+ * *Whose* line's pitch is the whole question, and the canonical unit is the
+ * wrong one. The unit is the Arabic leaf's line, and this gutter stands over an
+ * English block whose line is smaller: measured on device the unit runs about
+ * 114 px against the prose's 66. A full unit of gutter is therefore not one
+ * line of air over the block it separates, it is **1.7**, which reads as a hole
+ * under the head rather than as a gutter — and it was reported as one. So the
+ * gutter is [ENGLISH_HEAD_GUTTER]: the same rule, measured against the block it
+ * actually stands over.
+ *
+ * The reclaimed height goes to the well, which is why the well is derived here
+ * rather than declared — the leaf is the same leaf and its bands must still sum
+ * to [MushafGrid.SLOTS]. The English hand is solved from the well, so a taller
+ * well is also very slightly more type; both are what was asked for.
  *
  * Neither carries a folio any more: it stood under the text and has gone to the
  * dial's head air. The tail stayed behind it, because a page has a foot and the
@@ -165,11 +179,35 @@ data class MushafLeafBands(
     fun unitPx(leafHeightPx: Float): Float = (leafHeightPx / slots).coerceAtLeast(1f)
 }
 
-/** The canonical bands: wide gutters, fifteen units of well. */
+/**
+ * The English leaf's gutter, in units — one line of the *prose*, not one unit.
+ *
+ * It was a full unit, which is the *Arabic* line's pitch (about 114 px on a
+ * phone) standing over prose whose line is 66 — 1.7 lines of air, and it read
+ * as a hole under the head. It went to 0.58, one line of the prose it actually
+ * stands over.
+ *
+ * It is now 0.30, which is under that rule, deliberately and on instruction:
+ * the height was wanted for type. The English hand is solved from the well, so
+ * every unit not spent here is set in the block instead. What is left is the
+ * running head's own band over again — and the head's ink fits inside its band
+ * with a couple of pixels to spare, so this is clear air below the letters
+ * rather than a figure that touches the block.
+ *
+ * It cannot go much below this: the head's descenders hang past the band into
+ * this gutter (see `MushafHeadLabel`), and a gutter of nothing would set the
+ * tail of a *y* on the first line of the revelation.
+ */
+const val ENGLISH_HEAD_GUTTER = 0.30f
+
+/** One line of prose for a gutter, and the rest of the leaf is well. */
 val MUSHAF_ENGLISH_BANDS = MushafLeafBands(
     runningHead = MushafGrid.RUNNING_HEAD,
-    headGutter = MushafGrid.HEAD_GUTTER,
-    well = MushafGrid.TEXT_LINES.toFloat(),
+    headGutter = ENGLISH_HEAD_GUTTER,
+    // Derived, so the leaf still spends exactly its height: whatever the
+    // gutter gives up, the well takes.
+    well = MushafGrid.SLOTS - MushafGrid.RUNNING_HEAD - ENGLISH_HEAD_GUTTER -
+        MushafGrid.TAIL,
     tail = MushafGrid.TAIL,
 )
 
@@ -207,6 +245,13 @@ fun mushafLeafBands(english: Boolean): MushafLeafBands =
  * The two figures of the folio stand a step apart because they are two
  * scripts: a Hafs numeral set at a Latin numeral's size reads smaller than it,
  * and the step is what makes the pair match to the eye rather than on paper.
+ *
+ * The rungs below the revelation are the *intervals*, not the final sizes. The
+ * leaf's furniture — the running head and both folio figures — is set a flat
+ * two points over its rung, because a geometric scale under-serves its own
+ * smallest sizes and small type needs an optical correction to stay legible.
+ * The correction is the same for all three, so the intervals here are
+ * untouched. See `MushafFurnitureBump` and `furnitureStep`.
  */
 object MushafType {
     /** Major third. */

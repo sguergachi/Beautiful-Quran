@@ -59,14 +59,35 @@ class MushafLeafBandsTest {
             MUSHAF_ARABIC_BANDS.well,
             0f,
         )
-        assertEquals(MUSHAF_ENGLISH_BANDS.well + 1f, MUSHAF_ARABIC_BANDS.well, 0.0001f)
-        assertTrue(MUSHAF_ARABIC_BANDS.headGutter < MUSHAF_ENGLISH_BANDS.headGutter)
+        // The English well is no longer a round fifteen — it took what the
+        // gutter gave up (ENGLISH_HEAD_GUTTER) — so the sixteenth row is the
+        // thing to assert, not the difference.
+        assertTrue(MUSHAF_ARABIC_BANDS.well > MUSHAF_ENGLISH_BANDS.well)
+        // The English gutter used to be the wider of the two, on the reasoning
+        // that Latin ink wants more air than the QCF faces' own side bearings.
+        // It is now the tighter one: both leaves spend the gutter on their
+        // text, and they only differ in what it buys. The Arabic leaf buys a
+        // sixteenth row with it; the English hand is solved from the well, so
+        // the English leaf buys type. Neither can spend it twice.
+        assertTrue(MUSHAF_ENGLISH_BANDS.headGutter <= MUSHAF_ARABIC_BANDS.headGutter)
     }
 
     @Test
-    fun `the English leaf keeps the canonical gutter, which was sized for Latin ink`() {
-        assertEquals(MushafGrid.HEAD_GUTTER, MUSHAF_ENGLISH_BANDS.headGutter, 0f)
-        assertEquals(MushafGrid.TEXT_LINES.toFloat(), MUSHAF_ENGLISH_BANDS.well, 0f)
+    fun `the English gutter is spent on type, not on air under the head`() {
+        // A full unit was the Arabic line's pitch standing over English prose,
+        // whose line is smaller — 1.7 lines of air, which read as a hole. It
+        // is now down to the running head's own band: the head's ink fits
+        // inside that band, so what is left is clear air, and every unit not
+        // spent here is set in the block instead.
+        assertEquals(ENGLISH_HEAD_GUTTER, MUSHAF_ENGLISH_BANDS.headGutter, 0f)
+        assertTrue(MUSHAF_ENGLISH_BANDS.headGutter < MushafGrid.HEAD_GUTTER)
+        // Whatever the gutter gave up, the well took: the leaf is the same leaf.
+        assertEquals(
+            MushafGrid.HEAD_GUTTER - ENGLISH_HEAD_GUTTER,
+            MUSHAF_ENGLISH_BANDS.well - MushafGrid.TEXT_LINES,
+            0.0001f,
+        )
+        assertTrue(MUSHAF_ENGLISH_BANDS.well > MushafGrid.TEXT_LINES)
     }
 
     @Test

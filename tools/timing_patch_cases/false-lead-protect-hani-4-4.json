@@ -1,0 +1,73 @@
+{
+  "id": "false-lead-protect-hani-4-4",
+  "label": "Hani 4:4 فَكُلُوهُ keeps its re-say: quran-align corroborates the onset",
+  "refs": [
+    "unsplit-protect-hani-4-4",
+    "quran-align: word 12 = 13250-16030, i.e. it opens on the FIRST occurrence"
+  ],
+  "pipeline": "false_same_position_lead",
+  "notes": "The fence for the whole class. CTC unsplits this row too, but quran-align opens فَكُلُوهُ at 13250 — 30 ms from where qdc's pair starts — and simply spans both utterances because it is monotonic. An aligner that agrees on the onset is corroboration, not contradiction, so peer protection still fires and the repeat survives.",
+  "expected_leads": [],
+  "input_segments": [
+    [
+      11,
+      12080,
+      13200
+    ],
+    [
+      12,
+      13200,
+      14910
+    ],
+    [
+      12,
+      14910,
+      16030
+    ],
+    [
+      13,
+      16030,
+      17570
+    ]
+  ],
+  "repair_segments": [
+    [
+      11,
+      12080,
+      13200
+    ],
+    [
+      12,
+      13200,
+      16030
+    ],
+    [
+      13,
+      16030,
+      17570
+    ]
+  ],
+  "reference_segments": [
+    [
+      11,
+      12150,
+      13240
+    ],
+    [
+      12,
+      13250,
+      16030
+    ],
+    [
+      13,
+      16040,
+      17290
+    ]
+  ],
+  "expected_positions": [
+    11,
+    12,
+    12,
+    13
+  ]
+}

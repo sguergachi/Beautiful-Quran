@@ -315,7 +315,10 @@ private fun englishVerseProse(text: String, hideParentheticals: Boolean): String
     } else {
         text
     }
-    return shown.replace(WHITESPACE_RUN, " ").trim()
+    // The vetoed cuts: bad hyphen breaks joined before the breaker sees the
+    // text. The ruler composes through this same function, so the pagination
+    // measures exactly what the leaf draws.
+    return EnglishHyphenation.setProse(shown.replace(WHITESPACE_RUN, " ").trim())
 }
 
 private val WHITESPACE_RUN = Regex("\\s+")

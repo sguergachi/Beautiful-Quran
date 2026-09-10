@@ -1,0 +1,111 @@
+{
+  "id": "false-lead-hani-66-6",
+  "label": "Hani 66:6 لَّا false lead is found from evidence, not a hand verdict",
+  "refs": [
+    "GitHub issue #721",
+    "false-peer-split-hani-66-6 (the hand-written verdict this replaces)",
+    "quran-align: word 14 = 19130-21290, word 15 opens at 21300"
+  ],
+  "pipeline": "false_same_position_lead",
+  "notes": "The same class as Alafasy 19:48, and previously the one entry in tools/timing_corrections/Hani_Rifai_192kbps.json. The class rule reaches the identical row — شداد keeps the interval it is still reciting and one لَّا survives — so the typed correction is retired. Word 7 نارا,نارا stays a real re-say: it is not in the repair's merged set.",
+  "expected_leads": [
+    [
+      15,
+      19700,
+      20700
+    ]
+  ],
+  "input_segments": [
+    [
+      13,
+      17730,
+      19150
+    ],
+    [
+      14,
+      19150,
+      19700
+    ],
+    [
+      15,
+      19700,
+      20700
+    ],
+    [
+      15,
+      20700,
+      21780
+    ],
+    [
+      16,
+      21780,
+      22800
+    ]
+  ],
+  "repair_segments": [
+    [
+      13,
+      17730,
+      19150
+    ],
+    [
+      14,
+      19150,
+      19700
+    ],
+    [
+      15,
+      19700,
+      21780
+    ],
+    [
+      16,
+      21780,
+      22800
+    ]
+  ],
+  "reference_segments": [
+    [
+      13,
+      17680,
+      19120
+    ],
+    [
+      14,
+      19130,
+      21290
+    ],
+    [
+      15,
+      21300,
+      21710
+    ],
+    [
+      16,
+      21720,
+      22980
+    ]
+  ],
+  "expected_segments": [
+    [
+      13,
+      17730,
+      19150
+    ],
+    [
+      14,
+      19150,
+      20700
+    ],
+    [
+      15,
+      20700,
+      21780
+    ],
+    [
+      16,
+      21780,
+      22800
+    ]
+  ]
+}
