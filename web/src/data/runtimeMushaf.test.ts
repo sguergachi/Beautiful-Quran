@@ -113,6 +113,67 @@ async function seeded(now = 100) {
 }
 
 describe('RuntimeMushafCache', () => {
+  it.each([400, 404, 410])('bootstraps after checkpoint HTTP %s even without a JSON error body', async (status) => {
+    const first = await seeded()
+    const calls: string[] = []
+    const normal = fetcher(calls)
+    const cache = new RuntimeMushafCache(
+      'https://content.example', first.store, (async (input: RequestInfo | URL) => {
+        if (String(input).includes('sync_token=')) {
+          calls.push(String(input))
+          return new Response('Checkpoint rejected', { status })
+        }
+        return normal(input)
+      }) as typeof fetch,
+      () => 101, 2, () => canonical, [106],
+    )
+    await cache.restore()
+    expect(await cache.refresh()).toBe(true)
+    expect(calls.filter(url => url.includes('bootstrap=true'))).toHaveLength(1)
+    expect(cache.word(5, 1, 1)?.translation_en).toBe('O')
+  })
+
+  it.each(['snapshot', 'supplement'])('does not bootstrap on a %s HTTP 404', async (failedRequest) => {
+    const first = await seeded()
+    const before = structuredClone(first.store.value)
+    const calls: string[] = []
+    const normal = fetcher(calls, { invalidateMushaf: true })
+    const cache = new RuntimeMushafCache(
+      'https://content.example', first.store, (async (input: RequestInfo | URL) => {
+        const url = String(input)
+        if (url.includes(failedRequest === 'snapshot' ? '/snapshots/' : '/by_key/')) {
+          calls.push(url)
+          return response({ error: 'missing' }, 404)
+        }
+        return normal(input)
+      }) as typeof fetch,
+      () => 101, 2, () => canonical, [106],
+    )
+    await cache.restore()
+    expect(await cache.refresh()).toBe(false)
+    expect(calls.some(url => url.includes('bootstrap=true'))).toBe(false)
+    expect(first.store.value).toEqual(before)
+    expect(cache.word(5, 1, 1)?.translation_en).toBe('O')
+  })
+
+  it('preserves the cache if both checkpoint and bootstrap are rejected, without looping', async () => {
+    const first = await seeded()
+    const before = structuredClone(first.store.value)
+    const calls: string[] = []
+    const cache = new RuntimeMushafCache(
+      'https://content.example', first.store, (async (input: RequestInfo | URL) => {
+        calls.push(String(input))
+        return response({ error: 'rejected' }, 400)
+      }) as typeof fetch,
+      () => 101, 2, () => canonical, [106],
+    )
+    await cache.restore()
+    expect(await cache.refresh()).toBe(false)
+    expect(calls).toHaveLength(2)
+    expect(first.store.value).toEqual(before)
+    expect(cache.word(5, 1, 1)?.translation_en).toBe('O')
+  })
+
   it('bootstraps three QF resources and publishes one atomic reader view', async () => {
     const { cache, store, calls } = await seeded()
 

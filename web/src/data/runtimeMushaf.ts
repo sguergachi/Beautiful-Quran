@@ -392,10 +392,13 @@ export class RuntimeMushafCache {
     }
     const body = await response.text()
     if (body.length > MAX_RESPONSE_CHARS) throw new Error('Content API response exceeded size limit')
-    const parsed = JSON.parse(body) as unknown
-    if (response.status === 410 && object(object(parsed).error).code === 'resync_required') {
+    // Only sync checkpoint failures trigger bootstrap; snapshot/supplement
+    // failures must retain the prior cache and use ordinary retry backoff.
+    const syncRequest = path.split('?')[0] === '/api/v4/resources/sync'
+    if (syncRequest && [400, 404, 410].includes(response.status)) {
       throw new ResyncRequired()
     }
+    const parsed = JSON.parse(body) as unknown
     if (response.status === 403 && object(object(parsed).error).code === 'qf_access_revoked') {
       throw new AccessRevoked('QF content access was revoked')
     }

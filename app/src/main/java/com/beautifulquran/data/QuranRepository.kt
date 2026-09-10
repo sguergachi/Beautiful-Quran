@@ -134,13 +134,15 @@ class QuranRepository(
     /** Emits whenever the runtime word/QCF snapshot is replaced. */
     val runtimeMushafChanged get() = runtimeMushaf?.changes
 
+    private val runtimeViews = CacheGeneration()
+
     /** Drop derived views after a runtime refresh so they rebuild from it. */
-    fun invalidateRuntimeMushafViews() {
+    fun invalidateRuntimeMushafViews() = runtimeViews.invalidate {
         wordSearchIndex = null
         mushafCatalog = null
         englishVerseGloss = null
         englishVerseGlossText = null
-        synchronized(leafTranslationCache) { leafTranslationCache.clear() }
+        leafTranslationCache.clear()
     }
 
     // @Volatile: read/written from Dispatchers.IO workers. Worst case without
@@ -274,12 +276,11 @@ class QuranRepository(
      * tools/verify_mushaf_lines.py orders the same way.
      */
     suspend fun mushafCatalog(): MushafCatalog = withContext(Dispatchers.IO) {
-        val runtime = runtimeMushaf?.allWords()
-        if (runtime == null) {
-            mushafCatalog = null
+        if (runtimeMushaf?.allWords() == null) {
             return@withContext buildMushafCatalog(emptyList())
         }
-        mushafCatalog ?: run {
+        runtimeViews.getOrBuild({ mushafCatalog }, { if (!it.isEmpty()) mushafCatalog = it }) {
+            val runtime = runtimeMushaf.allWords().orEmpty()
             val arabic = queryList(
                 """
                 SELECT surah_id, ayah_number, position, arabic
@@ -309,7 +310,7 @@ class QuranRepository(
                     ),
                 )
             }
-            buildMushafCatalog(sources).also { mushafCatalog = it }
+            buildMushafCatalog(sources)
         }
     }
 
@@ -338,9 +339,11 @@ class QuranRepository(
                 // drops a phrase repeated across the words it spans, so its
                 // length is not the sum of the glosses. One pass over the word
                 // table, once, behind the same cache as the other.
-                EnglishLeafText.GLOSS -> englishVerseGloss ?: buildMap {
-                    forEachGlossVerse(null) { key, chain -> put(key, measure(chain)) }
-                }.also { englishVerseGloss = it }
+                EnglishLeafText.GLOSS -> runtimeViews.getOrBuild(
+                    { englishVerseGloss }, { englishVerseGloss = it },
+                ) {
+                    buildMap { forEachGlossVerse(null) { key, chain -> put(key, measure(chain)) } }
+                }
             }
         }
 
@@ -423,9 +426,11 @@ class QuranRepository(
                     quranWordKey(c.getInt(0), c.getInt(1), 1) to c.getString(2)
                 }.toMap().also { englishVerseTextCache = it }
 
-                EnglishLeafText.GLOSS -> englishVerseGlossText ?: buildMap {
-                    forEachGlossVerse(null) { key, chain -> put(key, chain) }
-                }.also { englishVerseGlossText = it }
+                EnglishLeafText.GLOSS -> runtimeViews.getOrBuild(
+                    { englishVerseGlossText }, { englishVerseGlossText = it },
+                ) {
+                    buildMap { forEachGlossVerse(null) { key, chain -> put(key, chain) } }
+                }
             }
         }
 
@@ -458,44 +463,45 @@ class QuranRepository(
             if (text == EnglishLeafText.GLOSS) {
                 return@withContext buildMap { forEachGlossVerse(page) { k, v -> put(k, v) } }
             }
-            synchronized(leafTranslationCache) { leafTranslationCache[page] }
-                ?.let { return@withContext it }
-            // A verse belongs to the leaf its first word falls on, and that
-            // page membership lives in the runtime QCF snapshot: the bundled
-            // qcf_page column is withheld. Fall back to the legacy join only
-            // when no snapshot is fresh (a bundling test database).
-            val runtime = runtimeMushaf?.snapshotWords().orEmpty()
-            val verses = if (runtime.isEmpty()) {
-                queryList(
-                    """
-                    SELECT a.surah_id, a.ayah_number, a.translation_en
-                    FROM ayahs a
-                    JOIN words w
-                      ON w.surah_id = a.surah_id AND w.ayah_number = a.ayah_number
-                    WHERE w.position = 1 AND w.qcf_page = ?
-                    """.trimIndent(),
-                    arrayOf(page.toString()),
-                ) { c ->
-                    quranWordKey(c.getInt(0), c.getInt(1), 1) to c.getString(2)
-                }.toMap()
-            } else {
-                val begun = runtime.values.asSequence()
-                    .filter { it.position == 1 && it.qcfPage == page }
-                    .map { it.surahId to it.ayahNumber }
-                    .toList()
-                if (begun.isEmpty()) emptyMap() else queryList(
-                    """
-                    SELECT a.surah_id, a.ayah_number, a.translation_en
-                    FROM ayahs a
-                    WHERE (a.surah_id, a.ayah_number) IN (${begun.joinToString(",") { "(?,?)" }})
-                    """.trimIndent(),
-                    begun.flatMap { listOf(it.first.toString(), it.second.toString()) }.toTypedArray(),
-                ) { c ->
-                    quranWordKey(c.getInt(0), c.getInt(1), 1) to c.getString(2)
-                }.toMap()
+            runtimeViews.getOrBuild(
+                { leafTranslationCache[page] }, { leafTranslationCache[page] = it },
+            ) {
+                // A verse belongs to the leaf its first word falls on, and that
+                // page membership lives in the runtime QCF snapshot: the bundled
+                // qcf_page column is withheld. Fall back to the legacy join only
+                // when no snapshot is fresh (a bundling test database).
+                val runtime = runtimeMushaf?.snapshotWords().orEmpty()
+                val verses = if (runtime.isEmpty()) {
+                    queryList(
+                        """
+                        SELECT a.surah_id, a.ayah_number, a.translation_en
+                        FROM ayahs a
+                        JOIN words w
+                          ON w.surah_id = a.surah_id AND w.ayah_number = a.ayah_number
+                        WHERE w.position = 1 AND w.qcf_page = ?
+                        """.trimIndent(),
+                        arrayOf(page.toString()),
+                    ) { c ->
+                        quranWordKey(c.getInt(0), c.getInt(1), 1) to c.getString(2)
+                    }.toMap()
+                } else {
+                    val begun = runtime.values.asSequence()
+                        .filter { it.position == 1 && it.qcfPage == page }
+                        .map { it.surahId to it.ayahNumber }
+                        .toList()
+                    if (begun.isEmpty()) emptyMap() else queryList(
+                        """
+                        SELECT a.surah_id, a.ayah_number, a.translation_en
+                        FROM ayahs a
+                        WHERE (a.surah_id, a.ayah_number) IN (${begun.joinToString(",") { "(?,?)" }})
+                        """.trimIndent(),
+                        begun.flatMap { listOf(it.first.toString(), it.second.toString()) }.toTypedArray(),
+                    ) { c ->
+                        quranWordKey(c.getInt(0), c.getInt(1), 1) to c.getString(2)
+                    }.toMap()
+                }
+                verses
             }
-            synchronized(leafTranslationCache) { leafTranslationCache[page] = verses }
-            verses
         }
 
     /**
@@ -687,12 +693,9 @@ class QuranRepository(
     }
 
     @Synchronized
-    private fun wordSearchIndex(): List<WordSearchIndexEntry> {
-        wordSearchIndex?.let { return it }
-        return loadWordSearchIndex().also {
-            wordSearchIndex = it
-        }
-    }
+    private fun wordSearchIndex(): List<WordSearchIndexEntry> = runtimeViews.getOrBuild(
+        { wordSearchIndex }, { wordSearchIndex = it }, { loadWordSearchIndex() },
+    )
 
     private fun literalSearchKeys(term: String, sources: WordSearchSources): IntArray {
         val escaped = term.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")

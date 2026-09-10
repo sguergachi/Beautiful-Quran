@@ -85,9 +85,14 @@ identity.
    next retry or connectivity event repairs the leaf.
 6. At day seven, QF-derived reader fields are withheld until a successful sync.
    Non-Content-Sync supplement rows are also removed from persistent storage.
-7. A `410 resync_required` discards no readable data immediately: the client
+7. A rejected sync checkpoint (HTTP 400, 404, or 410) discards no readable data immediately: the client
    obtains a fresh bootstrap, replaces cached resources inside the commit
    transaction, validates, and only then advances the checkpoint.
+   Snapshot and supplement failures use ordinary backoff, not bootstrap.
+8. Android derived views (Mushaf catalog, search index, English glosses and
+   page translations) share an invalidation generation. Builds run outside
+   the publication lock; if a refresh overtakes a build, its result is discarded
+   and rebuilt before it can be returned or cached.
 
 The initial exchange currently uses nine requests: one sync, three snapshots,
 and five supplements. An unchanged refresh uses six: one incremental sync and
