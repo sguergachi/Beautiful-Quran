@@ -537,6 +537,16 @@ pull from the boundary (or tap its explicit control) to change chapters. Pull
 progress follows the finger in both directions, remains cancellable even after
 filling completely, and commits only when released while still fully filled.
 
+On release, the next opening carries its exact footer geometry into the header
+in 480 ms. It has one paint owner throughout: the footer yields immediately
+to the travelling opening, and the laid-out header takes over atomically.
+Crossfading two copies of the same ink causes an opacity dip, even with
+complementary alphas. The medallion has the same size and strength at both ends.
+Outgoing verses accompany the travel; incoming verses settle over 360 ms.
+Previous-chapter release preserves the held pull even while content prepares,
+then uses a 300 ms exit and a shared 360 ms header/verse arrival. Navigation
+updates stay inside the entrance hold so they cannot trigger a second fade.
+
 ## The ink bleed
 
 When the app must present something the system would normally raise as a
@@ -970,7 +980,7 @@ weight.
 ## Motion
 
 - Everything ≤ 400 ms except the deliberate slow moves: chrome recede
-  (520 ms), verse ink recess (400 ms), ayah dim (600 ms), and the
+  (520 ms), chapter-opening travel (480 ms), verse ink recess (400 ms), ayah dim (600 ms), and the
   hand-initiated ayah-jump scroll
   (≈280 ms nearby → a full **1000 ms** for a ~200-verse jump — a fast
   decelerating rush across a distance-scaled stretch of verses, truncated
