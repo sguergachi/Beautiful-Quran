@@ -249,30 +249,52 @@ resolves the *focused* ayah rather than the last-read one. That distinction is
 the whole point of the seven `scope=activity` functions and `adb` cannot
 observe it.
 
-#### Emulator pitfall: a dead `surfaceflinger` looks like a dead AppFunctions
+#### Emulator pitfall: `Broken pipe (32)` means "still booting"
 
-`Failure calling service …: Broken pipe (32)` is the symptom to know. On
-`cmd app_function` it reads like an AppFunctions fault, but it shows up on
-`cmd package` and `cmd activity` in the same breath, and a failure that broad
-means `system_server` died — never that our metadata is wrong. Two causes were
-seen on the `android-37/google_apis/x86_64` image on 2026-09-10; check both
-before suspecting the app:
+Installing this APK before the emulator has finished booting fails with
+`Failure calling service package: Broken pipe (32)`. On `cmd app_function` the
+same message reads like an AppFunctions fault; it is not, and neither is it a
+graphics or memory failure. **Always gate on `sys.boot_completed` before
+installing**, and note that `adb wait-for-device` does *not* do this — it
+returns as soon as adb registers the device, minutes before the framework is
+ready:
 
-- **Host memory exhaustion.** The likelier cause, and the one that hides.
-  Several emulators plus a Gradle build will fill 31GB, after which installing
-  the ~260MB APK fails with the broken pipe and the Kotlin daemon dies beside
-  it (`Using fallback strategy: Compile without Kotlin daemon` is the tell).
-  Check `free -g` and `ps -o etime,rss -p $(pgrep -d, -f qemu-system)` for
-  emulators left running from earlier sessions before debugging anything else.
-- **The emulator's graphics stack.** Booting an AVD under a renderer other than
-  the one its saved snapshot was written with logs
-  `Change of GLES renderer detected` and `Failed to load snapshot`, then aborts
-  `surfaceflinger` inside `mapper.ranchu.so`. Under
-  `-gpu swiftshader_indirect` the renderer instead aborts on
-  `Assertion failed: !rcEnc->featureInfo()->hasReadColorBufferDma`.
+```bash
+until [ "$(adb shell getprop sys.boot_completed | tr -d '\r')" = "1" ]; do
+  sleep 5
+done
+adb install -r -t app/build/outputs/apk/release/app-release.apk
+```
 
-`adb` reports only the broken pipe in every case, so read
-`.android-emulator-<avd>.log` and `free -g` rather than the `adb` output.
+The message depends on APK size, which is what makes this hard to see: an
+86MB APK gets the honest `Error: device is still booting`, while this app's
+~260MB APK gets only the broken pipe. Verified on 2026-09-10 by installing
+both into the same half-booted emulator.
+
+Two other faults were seen the same day and are *not* the cause of the above,
+though both produce alarming logs — do not spend time on them until the boot
+gate passes:
+
+- Host memory exhaustion. Several emulators plus a Gradle build fill 31GB, and
+  the Kotlin daemon dies (`Using fallback strategy: Compile without Kotlin
+  daemon`). Check `free -g` and `ps -o etime,rss -p $(pgrep -d, -f qemu-system)`
+  for emulators left running by earlier sessions.
+- Renderer aborts: `Change of GLES renderer detected` then a `surfaceflinger`
+  abort in `mapper.ranchu.so` when the snapshot was written under a different
+  renderer, or `Assertion failed: !rcEnc->featureInfo()->hasReadColorBufferDma`
+  under `-gpu swiftshader_indirect`.
+
+An AVD that never reaches `sys.boot_completed=1`, or floods the log with
+`Failed to find ColorBuffer`, is corrupt — force-killing the emulator does that.
+Build a throwaway AVD from the same image rather than debugging it:
+
+```bash
+avdmanager create avd -n BQ_API37_verify \
+  -k "system-images;android-37.0;google_apis;x86_64" -d pixel_7
+```
+
+A fresh AVD had its `package` service up in 45 seconds and logged zero
+ColorBuffer errors, where the reused one never came up at all.
 
 Use `scripts/run_android_app.sh` rather than a hand-rolled `emulator` command.
 It resolves `DISPLAY` and `XAUTHORITY`, probes the host Vulkan driver, and
