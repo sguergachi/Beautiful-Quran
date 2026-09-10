@@ -1,5 +1,12 @@
 package com.beautifulquran.ui.settings
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -101,12 +108,44 @@ import com.beautifulquran.ui.theme.BrushCheckParams
 import com.beautifulquran.ui.theme.BrushCircleParams
 import com.beautifulquran.ui.theme.HafsFontFamily
 import com.beautifulquran.ui.theme.InkCircledChoiceRow
+import com.beautifulquran.ui.theme.InkExpandEasing
 import com.beautifulquran.ui.theme.LocalQuranAccents
 import com.beautifulquran.ui.theme.TranslationFontFamily
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import com.beautifulquran.ui.theme.shippedCheckParams
 import com.beautifulquran.ui.theme.verticalFadingEdges
+
+// A control joining or leaving the sheet. The paper opens the room first and
+// the ink arrives into it; on the way out the ink goes first and the paper
+// closes after, so nothing is ever seen being crushed. Fade and slide only,
+// inside the 400 ms the sheet allows (docs/DESIGN.md "Motion") — the rows
+// below ride the same expansion, which is what shows where the field came
+// from.
+private const val CustomizePaperMs = 300
+private const val CustomizeInkMs = 200
+private const val CustomizeInkOutMs = 110
+
+@Composable
+private fun CustomizeReveal(visible: Boolean, content: @Composable () -> Unit) {
+    AnimatedVisibility(
+        visible = visible,
+        enter = expandVertically(
+            animationSpec = tween(CustomizePaperMs, easing = InkExpandEasing),
+            expandFrom = Alignment.Top,
+        ) + fadeIn(tween(CustomizeInkMs, delayMillis = CustomizePaperMs - CustomizeInkMs)),
+        exit = fadeOut(tween(CustomizeInkOutMs)) + shrinkVertically(
+            animationSpec = tween(
+                CustomizePaperMs - CustomizeInkOutMs,
+                delayMillis = CustomizeInkOutMs,
+                easing = FastOutSlowInEasing,
+            ),
+            shrinkTowards = Alignment.Top,
+        ),
+    ) {
+        Column { content() }
+    }
+}
 
 private val VIEW_MODES = listOf(
     ReadingMode.ARABIC_ONLY,
@@ -217,7 +256,7 @@ internal fun CustomizeScreen(
         //
         // The mushaf leaf sets its own hand from the page grid — the text
         // dial is a scroll-layout control and has nothing to turn there.
-        if (showsScrollChrome(settings.readingLayout)) {
+        CustomizeReveal(showsScrollChrome(settings.readingLayout)) {
             Section("Text size")
             TextSizeControl(
                 scale = settings.fontScale,
@@ -250,9 +289,9 @@ internal fun CustomizeScreen(
         // Which English the leaf is set from. Only the English leaf has the
         // question to answer: the scrolling reader has always set the gloss,
         // and the Arabic leaf sets no English at all.
-        if (
+        CustomizeReveal(
             settings.readingLayout == ReadingLayout.MUSHAF &&
-            settings.readingMode == ReadingMode.ENGLISH_ONLY
+                settings.readingMode == ReadingMode.ENGLISH_ONLY,
         ) {
             Section("English")
             InkCircledChoiceRow(
@@ -274,12 +313,12 @@ internal fun CustomizeScreen(
         // 20dp stand-off before the group, then even 12dp between rows —
         // the old layout gapped 20dp before some rows and nothing between
         // Transliteration and Ayah translation.
-        if (showsScrollChrome(settings.readingLayout)) {
+        CustomizeReveal(showsScrollChrome(settings.readingLayout)) {
             Spacer(Modifier.height(20.dp))
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                if (
+                CustomizeReveal(
                     settings.readingLayout == ReadingLayout.SCROLL &&
-                    settings.readingMode == ReadingMode.ARABIC_ENGLISH
+                        settings.readingMode == ReadingMode.ARABIC_ENGLISH,
                 ) {
                     ToggleRow(
                         label = "Transliteration",
@@ -296,7 +335,9 @@ internal fun CustomizeScreen(
                         checkPaintToken = checkPaintToken,
                     )
                 }
-                if (showsWordGlossChrome(settings.readingLayout, settings.readingMode)) {
+                CustomizeReveal(
+                    showsWordGlossChrome(settings.readingLayout, settings.readingMode),
+                ) {
                     ToggleRow(
                         label = "Word-by-word translation",
                         checked = settings.showWordGloss,
@@ -315,7 +356,9 @@ internal fun CustomizeScreen(
             }
         }
 
-        if (showsVerseNumberChrome(settings.readingLayout, settings.readingMode)) {
+        CustomizeReveal(
+            showsVerseNumberChrome(settings.readingLayout, settings.readingMode),
+        ) {
             Section("Verse numbers")
             InkCircledChoiceRow(
                 entries = VerseNumberScript.entries,
@@ -348,7 +391,7 @@ internal fun CustomizeScreen(
             onSelect = { script -> onUpdate { it.copy(pageNumberScript = script) } },
         )
 
-        if (showsScrollChrome(settings.readingLayout)) {
+        CustomizeReveal(showsScrollChrome(settings.readingLayout)) {
             Section("Ayah selector")
             InkCircledChoiceRow(
                 entries = AyahSelectorSide.entries,

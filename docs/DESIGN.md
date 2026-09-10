@@ -980,6 +980,13 @@ weight.
   unfurls with a gravity drop, a soft overshoot, and a settling flutter — the
   only physical *object* on the sheet rather than ink in it, and the only
   motion allowed a touch of whimsy.
+- On the Customize sheet, a control that joins or leaves the page is not
+  swapped in place: the paper opens the room first and the ink arrives into it
+  (`expandVertically` from the top, then a fade), and on the way out the ink
+  goes first and the paper closes after, so nothing is ever seen being crushed.
+  The rows below ride the same expansion, which is what shows the reader where
+  the field came from. 300 ms in, 300 ms out — fade and slide only, no scale.
+  See `CustomizeReveal`.
 - Auto-scroll keeps the active ayah in the upper third and yields instantly
   to the reader's hand; the return-to-ayah roundel (gilt corolla + painted
   qalam arrow) offers the way back. In the scrolling reader it points up or
