@@ -271,18 +271,29 @@ The message depends on APK size, which is what makes this hard to see: an
 ~260MB APK gets only the broken pipe. Verified on 2026-09-10 by installing
 both into the same half-booted emulator.
 
-Two other faults were seen the same day and are *not* the cause of the above,
-though both produce alarming logs — do not spend time on them until the boot
-gate passes:
+Two other faults were seen the same day. Neither explains a *pre-boot* broken
+pipe, so check the boot gate first, but both are real and the second one is
+what finally defeated this verification:
 
 - Host memory exhaustion. Several emulators plus a Gradle build fill 31GB, and
   the Kotlin daemon dies (`Using fallback strategy: Compile without Kotlin
   daemon`). Check `free -g` and `ps -o etime,rss -p $(pgrep -d, -f qemu-system)`
   for emulators left running by earlier sessions.
-- Renderer aborts: `Change of GLES renderer detected` then a `surfaceflinger`
-  abort in `mapper.ranchu.so` when the snapshot was written under a different
-  renderer, or `Assertion failed: !rcEnc->featureInfo()->hasReadColorBufferDma`
-  under `-gpu swiftshader_indirect`.
+- **`surfaceflinger` dies under the weight of the install.** On a *clean* AVD,
+  with `sys.boot_completed=1` and the host otherwise idle, installing the
+  ~260MB APK still took the framework down: `SurfaceControl.nativeCreate` →
+  `DEAD_OBJECT` → SystemUI crash → `system_server` restart, after which
+  `cmd package` reports `Can't find service: package`. Snapshot/renderer
+  mismatches produce related aborts (`Change of GLES renderer detected`, or
+  `Assertion failed: !rcEnc->featureInfo()->hasReadColorBufferDma` under
+  `-gpu swiftshader_indirect`).
+
+**Do not verify AppFunctions registration on an emulator.** Six attempts across
+four AVD/renderer configurations on 2026-09-10 never got this APK installed on
+`android-37.0/google_apis/x86_64`; the graphics stack cannot survive an install
+this size. Use a physical Android 17 device, where the same check is one command
+and a few seconds — and which is the only place a real Gemini can be tested
+anyway.
 
 An AVD that never reaches `sys.boot_completed=1`, or floods the log with
 `Failed to find ColorBuffer`, is corrupt — force-killing the emulator does that.
