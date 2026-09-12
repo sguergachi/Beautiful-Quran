@@ -89,6 +89,7 @@ import com.beautifulquran.ui.reader.remainingUnfurlSignal
 import com.beautifulquran.ui.theme.ArabicTitleStyle
 import com.beautifulquran.ui.theme.LocalQuranAccents
 import com.beautifulquran.ui.theme.PaperSearchField
+import com.beautifulquran.ui.theme.paperBottomFeather
 import com.beautifulquran.ui.theme.quietClickable
 import com.beautifulquran.ui.theme.verticalFadingEdges
 
@@ -106,6 +107,7 @@ private val HomeColumnGap = 4.dp
 private val HomeArabicOpticalInset = 4.dp
 private val TopBoundRibbonHeight = 96.dp
 private val SearchBottomBreath = 12.dp
+private val SearchBottomFeather = 24.dp
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -291,34 +293,42 @@ fun HomeScreen(
                     ),
                 ) {
                     stickyHeader(key = "search") {
-                        Column(
-                            Modifier
-                                .fillMaxWidth()
-                                .background(MaterialTheme.colorScheme.background),
-                        ) {
-                            // Small top breath when the masthead is gone so the
-                            // field is not hard against the status-bar padding.
-                            if (searchFocused) {
-                                Spacer(Modifier.height(8.dp))
-                            }
-                            PaperSearchField(
-                                value = uiState.query,
-                                onValueChange = viewModel::onQueryChange,
-                                placeholder = "Search concept, “exact phrase”, or 2:255",
-                                contentDescription = "Search",
-                                onFocusChanged = { focused ->
-                                    searchFocused = focused
-                                    if (focused) viewModel.onSearchFocused()
-                                },
-                                modifier = Modifier
-                                    .padding(start = HomeStartInset, end = HomeEndInset)
+                        val paper = MaterialTheme.colorScheme.background
+                        Column(Modifier.fillMaxWidth()) {
+                            Column(
+                                Modifier
                                     .fillMaxWidth()
-                                    .onGloballyPositioned {
-                                        searchBottom = it.boundsInWindow().bottom
-                                        searchBounds = it.boundsInRoot()
+                                    .background(paper),
+                            ) {
+                                // Small top breath when the masthead is gone so the
+                                // field is not hard against the status-bar padding.
+                                if (searchFocused) {
+                                    Spacer(Modifier.height(8.dp))
+                                }
+                                PaperSearchField(
+                                    value = uiState.query,
+                                    onValueChange = viewModel::onQueryChange,
+                                    placeholder = "Search concept, “exact phrase”, or 2:255",
+                                    contentDescription = "Search",
+                                    onFocusChanged = { focused ->
+                                        searchFocused = focused
+                                        if (focused) viewModel.onSearchFocused()
                                     },
+                                    modifier = Modifier
+                                        .padding(start = HomeStartInset, end = HomeEndInset)
+                                        .fillMaxWidth()
+                                        .onGloballyPositioned {
+                                            searchBottom = it.boundsInWindow().bottom
+                                            searchBounds = it.boundsInRoot()
+                                        },
+                                )
+                            }
+                            Spacer(
+                                Modifier
+                                    .fillMaxWidth()
+                                    .height(SearchBottomFeather)
+                                    .paperBottomFeather(paper),
                             )
-                            Spacer(Modifier.height(SearchBottomBreath))
                         }
                     }
             item(key = "chapter-page") {

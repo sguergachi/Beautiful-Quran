@@ -474,10 +474,17 @@ select {
   position: sticky;
   top: 0;
   z-index: 3;
-  padding-bottom: 12px;
+  padding-bottom: 24px;
   padding-right: 0;
   padding-left: 0;
-  background: var(--paper);
+  /* Opaque paper through the field, then a dissolve so chapters feather
+     under the sticky bar instead of hitting a hard edge. */
+  background: linear-gradient(
+    to bottom,
+    var(--paper) 0,
+    var(--paper) calc(100% - 24px),
+    transparent 100%
+  );
 }
 
 .home-bookmark-ribbon {

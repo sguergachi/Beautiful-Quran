@@ -3,6 +3,7 @@ package com.beautifulquran.ui.theme
 import android.graphics.Bitmap
 import android.graphics.BlurMaskFilter
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
@@ -954,4 +955,17 @@ fun Modifier.verticalFadingEdges(
             size = Size(size.width, bottomPx),
         )
     }
+}
+
+/**
+ * Paper dissolving off the bottom of a sticky band. Size the receiver to the
+ * feather height; scrolling content passing under it feathers instead of
+ * hitting a hard edge. Cheap gradient overlay — no offscreen layer.
+ */
+fun Modifier.paperBottomFeather(color: Color): Modifier = drawBehind {
+    drawRect(
+        brush = Brush.verticalGradient(
+            colors = listOf(color, color.copy(alpha = 0f)),
+        ),
+    )
 }
