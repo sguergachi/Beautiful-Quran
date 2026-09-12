@@ -15,6 +15,7 @@ import {
   dialDeltaFromPointerDy,
   dialFromTickY,
   dialFromTrackY,
+  dialOnCollapsedActivate,
   focusRadiusForHeight,
   isMajorAyah,
   MOBILE_RAIL_MEDIA,
@@ -167,6 +168,10 @@ export const AyahSelectorRail = forwardRef<AyahSelectorRailHandle, Props>(
     const hoverRef = useRef(false)
     const draggingRef = useRef(false)
     const draggedRef = useRef(false)
+    /** This gesture opened the collapsed (centered) stack — pin reading ayah. */
+    const openedFromCollapsedRef = useRef(false)
+    /** Finger/cursor on the collapsed stack owns the reading ayah; move = scrub. */
+    const pinReadingPosRef = useRef(false)
     const lastClientYRef = useRef<number | null>(null)
     const rafRef = useRef(0)
     const expandTargetRef = useRef(0)
@@ -416,6 +421,10 @@ export const AyahSelectorRail = forwardRef<AyahSelectorRailHandle, Props>(
     // after collapse finishes so the wheel does not lose the pointer mid-fade.
     if (open) setHitExpanded(true)
     if (open !== wasOpen) onExpandedChangeRef.current?.(open)
+    if (!open) {
+      pinReadingPosRef.current = false
+      openedFromCollapsedRef.current = false
+    }
 
     const reducedMotion =
       typeof window !== 'undefined' &&
@@ -506,7 +515,13 @@ export const AyahSelectorRail = forwardRef<AyahSelectorRailHandle, Props>(
     hoverRef.current = true
     lastClientYRef.current = e.clientY
     if (!draggingRef.current) {
-      followDialToClientY(e.clientY)
+      if (expandTargetRef.current < 0.5) {
+        openedFromCollapsedRef.current = true
+        pinReadingPosRef.current = true
+        commitDial(dialOnCollapsedActivate(readingPos(), ayahCount))
+      } else if (!pinReadingPosRef.current) {
+        followDialToClientY(e.clientY)
+      }
     }
     setExpanded(true)
   }
@@ -530,7 +545,9 @@ export const AyahSelectorRail = forwardRef<AyahSelectorRailHandle, Props>(
     lastClientYRef.current = e.clientY
     e.currentTarget.setPointerCapture(e.pointerId)
     if (expandTargetRef.current < 0.5) {
-      dialRef.current = readingPos()
+      openedFromCollapsedRef.current = true
+      pinReadingPosRef.current = true
+      dialRef.current = dialOnCollapsedActivate(readingPos(), ayahCount)
     }
     setExpanded(true)
     schedulePaint()
@@ -538,7 +555,7 @@ export const AyahSelectorRail = forwardRef<AyahSelectorRailHandle, Props>(
 
   const onPointerMove = (e: ReactPointerEvent<HTMLDivElement>) => {
     if (receded) return
-    if (draggingRef.current) {
+    if (draggingRef.current || pinReadingPosRef.current) {
       scrubDialByClientY(e.clientY, true)
       return
     }
@@ -553,22 +570,33 @@ export const AyahSelectorRail = forwardRef<AyahSelectorRailHandle, Props>(
     if (e.currentTarget.hasPointerCapture(e.pointerId)) {
       e.currentTarget.releasePointerCapture(e.pointerId)
     }
-    // No-drag tap/click: select the tick under the pointer (visible label),
-    // not an absolute track fraction — that was skipping past the exact ayah.
-    if (!draggedRef.current) {
-      snapDialToTickUnderPointer(e.clientY)
+    const openedFromCollapsed = openedFromCollapsedRef.current
+    openedFromCollapsedRef.current = false
+    const wasDragged = draggedRef.current
+    // Collapsed-stack press: the contact Y is the rail midline, not a tick.
+    // Keep the reading ayah. An already-open wheel still snaps to the tick
+    // under the pointer (visible label), not an absolute track fraction.
+    if (!wasDragged) {
+      if (!openedFromCollapsed) {
+        snapDialToTickUnderPointer(e.clientY)
+      }
     } else {
       scrubDialByClientY(e.clientY, false)
     }
     lastClientYRef.current = null
     const ayah = Math.min(ayahCount, Math.max(1, Math.round(dialRef.current)))
-    // Hand-initiated jump — FocusEngine planJump + home-scroll, not a scrub.
-    onJump(ayah)
+    // Android tap-to-open stays on the reading ayah and does not jump.
+    // Mouse click still commits (hover already showed the dial).
+    if (wasDragged || e.pointerType === 'mouse' || !openedFromCollapsed) {
+      onJump(ayah)
+    }
     // Keep expanded while still hovering (mouse); collapse on touch lift.
     if (e.pointerType !== 'mouse' || !hoverRef.current) {
       hoverRef.current = false
       setAriaAyah(ayah)
       setExpanded(false)
+    } else {
+      setAriaAyah(ayah)
     }
   }
 
