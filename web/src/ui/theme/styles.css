@@ -484,10 +484,10 @@ select {
   position: sticky;
   top: 0;
   z-index: 3;
-  padding-bottom: 24px;
+  padding-bottom: 12px;
   padding-right: 0;
   padding-left: 0;
-  /* Solid paper through the field and the 24px breath under it. The
+  /* Solid paper through the field and the 12px breath under it. The
      dissolve lives on ::after, below that margin — not through the pill. */
   background: var(--paper);
   isolation: isolate;

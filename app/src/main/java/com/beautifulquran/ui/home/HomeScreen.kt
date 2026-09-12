@@ -106,7 +106,7 @@ private val HomeRowRibbonGutter = (HomeNumberColumn - HomeRibbonWidth) / 2f
 private val HomeColumnGap = 4.dp
 private val HomeArabicOpticalInset = 4.dp
 private val TopBoundRibbonHeight = 96.dp
-private val SearchBottomBreath = 24.dp
+private val SearchBottomBreath = 12.dp
 private val SearchBottomFeather = 24.dp
 
 @OptIn(ExperimentalFoundationApi::class)
