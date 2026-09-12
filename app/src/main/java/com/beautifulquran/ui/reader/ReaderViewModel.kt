@@ -9,6 +9,7 @@ import com.beautifulquran.data.EducationMoment
 import com.beautifulquran.data.QuranRepository
 import com.beautifulquran.DevProfiling
 import com.beautifulquran.data.EnglishBookCache
+import com.beautifulquran.data.englishBookContentKey
 import com.beautifulquran.data.QuranDatabase
 import com.beautifulquran.data.SettingsRepository
 import com.beautifulquran.data.model.Reciter
@@ -192,6 +193,20 @@ data class MushafUi(
     val measured: Boolean = false,
 )
 
+/**
+ * The leaf may open only onto a finished book. The catalog builds
+ * empty-but-non-null until the runtime snapshot loads, so nullness alone
+ * cannot gate. Arabic needs only the catalog; English additionally waits for
+ * the measured book, since a counted book repaginated under the reader is a
+ * page rearranging itself.
+ */
+internal fun mushafBookReady(mushaf: MushafUi?, englishOnly: Boolean): Boolean {
+    val catalog = mushaf?.catalog ?: return false
+    if (catalog.isEmpty()) return false
+    if (englishOnly && (!mushaf.measured || mushaf.englishBook.leafCount == 0)) return false
+    return true
+}
+
 data class ReaderUiState(
     val content: SurahContent? = null,
     /** Next surah in order, or null on chapter 114 / while loading. */
@@ -316,6 +331,10 @@ class ReaderViewModel(
         if (rulerFor == null && mushafRulerKey != null && mushafLeafText == text) return
         mushafLeafText = text
         mushafRulerKey = rulerKey
+        // Retained so a runtime word/QCF refresh can repaginate the same book
+        // instead of dropping a measured book back to the character estimate.
+        mushafRulerFor = rulerFor
+        mushafCacheKey = cacheKey
         // Two of these can be in flight at once: the app's root asks on load
         // from remembered figures, and the leaf asks again the moment it knows
         // its own size. They read and paginate off the main thread, so the
@@ -332,7 +351,24 @@ class ReaderViewModel(
                     prose[quranWordKey(surahId, ayah, 1)] ?: 0
                 }
             } else {
+                // The catalog is the Arabic leaf and the cover gate's whole
+                // world, so publish it now with the character estimate: the
+                // thousand-layout measure below must never hold them. The
+                // English leaf waits for measured=true before setting a word,
+                // and the gate holds English until the measured book lands.
+                if (generation == mushafGeneration) {
+                    val prose = repository.englishVerseProse(text)
+                    _mushaf.value = MushafUi(
+                        catalog,
+                        surahs,
+                        buildEnglishBook(catalog) { surahId, ayah ->
+                            prose[quranWordKey(surahId, ayah, 1)] ?: 0
+                        },
+                        measured = false,
+                    )
+                }
                 val words = repository.englishVerseText(text)
+                val contentCacheKey = englishBookContentKey(cacheKey, words)
                 val verse = { surahId: Int, ayah: Int ->
                     words[quranWordKey(surahId, ayah, 1)].orEmpty()
                 }
@@ -343,7 +379,7 @@ class ReaderViewModel(
                 // are asked — so they are asked once and written down.
                 val cached = withContext(Dispatchers.IO) {
                     DevProfiling.trace("englishBookCacheRead") {
-                        englishBookCache.read(cacheKey, pageOf, verse)
+                        englishBookCache.read(contentCacheKey, pageOf, verse)
                     }
                 }
                 if (generation != mushafGeneration) return@launch
@@ -361,7 +397,7 @@ class ReaderViewModel(
                     if (generation != mushafGeneration) return@launch
                     withContext(Dispatchers.IO) {
                         DevProfiling.trace("englishBookCacheWrite") {
-                            englishBookCache.write(cacheKey, it)
+                            englishBookCache.write(contentCacheKey, it)
                         }
                     }
                 }
@@ -373,6 +409,9 @@ class ReaderViewModel(
 
     private var mushafRulerKey: Any? = null
     private var mushafGeneration = 0
+    private var mushafRulerFor:
+        ((translation: (Int, Int) -> String) -> EnglishLeafRuler)? = null
+    private var mushafCacheKey: String = ""
     private var mushafJob: Job? = null
 
     /** Everything the English book's leaves depend on — see [EnglishBookCache]. */
@@ -770,6 +809,30 @@ class ReaderViewModel(
                 if (!sessions.isCurrent(gen, id)) return@collect
                 installTimings(refreshed)
                 _uiState.value = _uiState.value.copy(hasTimings = refreshed.isNotEmpty())
+            }
+        }
+        // Word glosses and QCF layout arrive as one atomic runtime snapshot.
+        viewModelScope.launch {
+            repository.runtimeMushafChanged?.collect {
+                repository.invalidateRuntimeMushafViews()
+                // The book is paginated from the QCF snapshot the refresh
+                // replaced: null it and repaginate the same book (measured
+                // when the leaf had measured it) rather than keep stale pages.
+                // This must not wait behind the surah below: on a fresh
+                // install the fill lands while no chapter is loaded, and
+                // returning early then kept the launch-time empty book
+                // forever — the reader's ruler-less call refuses to replace a
+                // measured book, so nothing ever rebuilt it.
+                _mushaf.value = null
+                mushafRulerKey = null
+                mushafLeafText?.let { text ->
+                    ensureMushaf(text, mushafRulerFor, null, mushafCacheKey)
+                }
+                val gen = sessions.generation
+                val id = sessions.surahId.takeIf { it != 0 } ?: return@collect
+                val refreshed = repository.surahContent(id)
+                if (!sessions.isCurrent(gen, id)) return@collect
+                _uiState.value = _uiState.value.copy(content = refreshed)
             }
         }
     }

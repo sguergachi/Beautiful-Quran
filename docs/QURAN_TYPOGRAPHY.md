@@ -279,7 +279,7 @@ is also why the English leaf does not lead-turn (rule 13.6).
 
 ### 13.2 The text is the translation, not the gloss
 
-The scrolling reader's English is quran.com's word-by-word gloss, lyricized —
+The scrolling reader's English is QF's authenticated word-by-word gloss, lyricized —
 an interlinear aid, and it reads as one ("Indeed this (is) your religion
 religion one"). A page of that is a crib. The leaf is a book, so it is set from
 the verse translation.

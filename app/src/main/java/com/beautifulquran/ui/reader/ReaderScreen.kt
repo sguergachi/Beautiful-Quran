@@ -1,6 +1,7 @@
 package com.beautifulquran.ui.reader
 
 import com.beautifulquran.DevProfiling
+import com.beautifulquran.QuranApp
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
@@ -125,6 +126,7 @@ import androidx.core.view.WindowInsetsCompat
 import com.beautifulquran.data.AyahSelectorSide
 import com.beautifulquran.data.ReadingLayout
 import com.beautifulquran.data.ReadingMode
+import com.beautifulquran.data.RuntimeCachePhase
 import com.beautifulquran.data.model.Surah
 import com.beautifulquran.domain.EnglishVerseAlignments
 import com.beautifulquran.domain.englishSeekWordPosition
@@ -291,8 +293,22 @@ fun ReaderScreen(
     // so every "which leaf is the voice on" answer is the verse's opening leaf
     // rather than the word's own. See MushafCatalog.readingPageOf.
     val mushafWholeVerses = mushafMode && settings.readingMode == ReadingMode.ENGLISH_ONLY
+    val quranApp = LocalContext.current.applicationContext as QuranApp
     LaunchedEffect(mushafMode) {
-        if (mushafMode) viewModel.ensureMushaf(settings.englishLeafText)
+        if (mushafMode) {
+            viewModel.ensureMushaf(settings.englishLeafText)
+            // Entering the leaf with no book asks for one fill attempt. The
+            // bounded retry stops after minutes; without this kick an empty
+            // book reached outside cold start would sit silent forever. Warm
+            // caches skip: their book builds from retained rows.
+            if (mushafUi?.catalog?.isEmpty() != false) {
+                quranApp.runtimeMushaf?.let { cache ->
+                    if (cache.status().phase != RuntimeCachePhase.FRESH) {
+                        cache.refreshForEmptyBook()
+                    }
+                }
+            }
+        }
     }
     // The English book is paginated by *measuring* each leaf, which cannot be
     // done until the leaf has a size. So the book opens on the character
@@ -397,7 +413,7 @@ fun ReaderScreen(
         val book = englishBook
         val leaves: Int = book?.leafCount ?: catalog.pageCount
         val leaf: Int = book?.leafOfVerse(surahId, ayah, page) ?: (page - 1)
-        leaf.coerceIn(0, (leaves - 1).coerceAtLeast(0))
+        mushafLeafIndex(leaf, leaves)
     }
     // Keyed on whether there is a catalog at all, so the state is built once
     // and built knowing where the book opens.
@@ -434,7 +450,7 @@ fun ReaderScreen(
         // The dial hands back what it counts: a leaf in English, a page in
         // Arabic.
         val landing = if (englishBook != null) target - 1 else pageLeaf(target)
-        mushafPagerState.scrollToPage(landing.coerceIn(0, leaves - 1))
+        mushafPagerState.scrollToPage(mushafLeafIndex(landing, leaves))
         mushafSeekPage = null
     }
     // Later navigation only: a chapter opened from the index while the reader
@@ -957,8 +973,10 @@ fun ReaderScreen(
         if (mushafMode && catalog != null) {
             val leaves = englishBook?.leafCount ?: catalog.pageCount
             val onPage = catalog.pageOf(renderedSurahId, target, 1)
-            val page = (englishBook?.leafOfVerse(renderedSurahId, target, onPage) ?: (onPage - 1))
-                .coerceIn(0, leaves - 1)
+            val page = mushafLeafIndex(
+                englishBook?.leafOfVerse(renderedSurahId, target, onPage) ?: (onPage - 1),
+                leaves,
+            )
             withContext(Dispatchers.Default) {
                 MushafQcfFonts.preload(
                     activityContext,
@@ -1199,8 +1217,11 @@ fun ReaderScreen(
             }
             val leaves = englishBook?.leafCount ?: catalog.pageCount
             val targetAyah = word?.ayah ?: activeAyah ?: lastScrollAyah
-            val page = (englishBook?.leafOfVerse(renderedSurahId, targetAyah, targetPage)
-                ?: (targetPage - 1)).coerceIn(0, leaves - 1)
+            val page = mushafLeafIndex(
+                englishBook?.leafOfVerse(renderedSurahId, targetAyah, targetPage)
+                    ?: (targetPage - 1),
+                leaves,
+            )
             withContext(Dispatchers.Default) {
                 MushafQcfFonts.preload(
                     activityContext,

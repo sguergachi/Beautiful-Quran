@@ -2,6 +2,7 @@ package com.beautifulquran
 
 import android.content.Intent
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -65,8 +66,12 @@ import com.beautifulquran.assistant.AssistantIntents
 import com.beautifulquran.assistant.ForegroundAppFunctions
 import com.beautifulquran.data.HomeBookmarkStyle
 import com.beautifulquran.data.ReadingLayout
+import com.beautifulquran.data.ReadingMode
+import com.beautifulquran.data.RuntimeCachePhase
 import com.beautifulquran.data.ThemeMode
+import com.beautifulquran.data.runtimeMushafEntranceReady
 import com.beautifulquran.ui.AppViewModelFactory
+import com.beautifulquran.ui.reader.mushafBookReady
 import com.beautifulquran.ui.PageTurnSounds
 import com.beautifulquran.ornamentslab.OrnamentsLabScreen
 import com.beautifulquran.ornamentslab.OrnamentsLabViewModel
@@ -152,8 +157,8 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        // Hold the leather splash until the first Compose frame paints — either
-        // the closed mushaf (cold start) or the sheets (deep-link skip).
+        // Hold the leather splash until the closed mushaf paints, or until a
+        // deep-link launch has both drawn its sheets and warmed the Quran DB.
         var splashPending = true
         installSplashScreen().setKeepOnScreenCondition { splashPending }
         enableEdgeToEdge()
@@ -179,7 +184,80 @@ class MainActivity : ComponentActivity() {
             LaunchedEffect(Unit) {
                 app.assistantActions.collect { pendingAssistantAction.value = it }
             }
+            LaunchedEffect(Unit) {
+                app.runtimeMushaf!!.refreshes.collect {
+                    Toast.makeText(
+                        this@MainActivity,
+                        "Quran cache refreshed",
+                        Toast.LENGTH_SHORT,
+                    ).show()
+                }
+            }
             val settings by app.settings.settings.collectAsStateWithLifecycle()
+            val mushafDiagnostics by app.runtimeMushaf!!.diagnostics.collectAsStateWithLifecycle()
+            val mushafStatus = remember(mushafDiagnostics) { app.runtimeMushaf!!.status() }
+            val mushafReady = runtimeMushafEntranceReady(mushafStatus, System.currentTimeMillis())
+            val mushafProgress = mushafDiagnostics.syncProgress
+            LaunchedEffect(mushafReady, mushafStatus.updatedAtMs) {
+                if (mushafReady) {
+                    app.repository.warmRuntimeMushaf()
+                }
+            }
+            var databaseReady by remember { mutableStateOf(false) }
+            LaunchedEffect(Unit) {
+                app.repository.warmDatabase()
+                databaseReady = true
+            }
+            // A mushaf layout opens only onto a finished book — set catalog,
+            // set leaves — so the leaf never paints blank paper waiting for
+            // work the root could have finished first. Scroll layouts skip.
+            // Same activity-owned instance the paper stack reads below.
+            val readerViewModel: ReaderViewModel = viewModel(factory = AppViewModelFactory)
+            val rootMushafUi by readerViewModel.mushaf.collectAsStateWithLifecycle()
+            val mushafBookReady = remember(
+                settings.readingLayout,
+                settings.readingMode,
+                rootMushafUi,
+            ) {
+                settings.readingLayout != ReadingLayout.MUSHAF ||
+                    mushafBookReady(
+                        rootMushafUi,
+                        englishOnly = settings.readingMode == ReadingMode.ENGLISH_ONLY,
+                    )
+            }
+            // The splash releases on the bundled database alone — local work,
+            // seconds on any device. The QF fill streams in behind it from
+            // process start and the leaves pick it up live.
+            //
+            // One exception: a mushaf layout that has never held content has
+            // no leaf to show until the first fill lands, so the cover holds
+            // through that single download with live progress, then never
+            // again. A failed first fill releases (ERROR): the app stays
+            // usable and the leaf fills when the retry lands.
+            val mushafFirstFill = settings.readingLayout == ReadingLayout.MUSHAF &&
+                mushafStatus.updatedAtMs == null &&
+                (mushafStatus.phase == RuntimeCachePhase.EMPTY ||
+                    mushafStatus.phase == RuntimeCachePhase.REFRESHING) &&
+                !mushafBookReady
+            val contentReady = databaseReady && !mushafFirstFill
+            val contentLoadLabel = when {
+                !databaseReady -> "Caching Quran database"
+                else -> when (mushafStatus.phase) {
+                    RuntimeCachePhase.REFRESHING -> when {
+                        mushafDiagnostics.requestsSettled && mushafStatus.apiCalls > 0 ->
+                            "Saving Quran pages · ${mushafStatus.apiCalls} requests complete"
+                        mushafProgress != null && mushafProgress.completed == mushafProgress.total ->
+                            "Checking Quran pages"
+                        mushafProgress != null ->
+                            "Downloading Quran pages · ${mushafProgress.completed} of ${mushafProgress.total} requests"
+                        mushafStatus.apiCalls > 0 ->
+                            "Downloading Quran pages · ${mushafStatus.apiCalls} API requests"
+                        else -> "Preparing Quran pages"
+                    }
+                    RuntimeCachePhase.ERROR -> "Retrying Quran pages"
+                    else -> "Preparing Quran pages"
+                }
+            }
             val assistantAction by pendingAssistantAction.collectAsStateWithLifecycle()
             val systemDark = isSystemInDarkTheme()
             val usesNightfall = settings.themeMode == ThemeMode.DARK ||
@@ -195,8 +273,9 @@ class MainActivity : ComponentActivity() {
             LaunchedEffect(assistantAction) {
                 if (assistantAction != null) entranceDone = true
             }
-            // Deep links skip the cover: dismiss splash as soon as sheets draw.
-            if (entranceDone) {
+            // Deep links skip the cover, but the OS splash still owns launch
+            // until the bundled DB is warm and a required first fill settles.
+            if (entranceDone && contentReady) {
                 SideEffect { splashPending = false }
             }
 
@@ -236,6 +315,12 @@ class MainActivity : ComponentActivity() {
                         EntranceCover(
                             chrome = coverChrome,
                             ornament = coverOrnament,
+                            contentReady = contentReady,
+                            loadLabel = contentLoadLabel,
+                            loadProgress = when {
+                                mushafDiagnostics.requestsSettled -> 1f
+                                else -> mushafProgress?.fraction
+                            },
                             onOpenBegan = {
                                 val sounds = coverSounds
                                     ?: PageTurnSounds(this@MainActivity).also { coverSounds = it }
