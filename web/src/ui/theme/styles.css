@@ -470,12 +470,19 @@ select {
   min-height: 100%;
 }
 
+/* Home's dissolve is the search bar's ::after, not the sheet's top fade —
+   that overlay sat on the field. Bottom sheet fade still applies. */
+.sheet[data-name='home'] .edge-fade::before {
+  content: none;
+}
+
+.sheet[data-name='home'] .scroll {
+  padding-top: 0;
+}
+
 .home-scroll-page > .search-row {
   position: sticky;
-  /* `top: 0` sticks to the content box, below `.scroll`'s fade padding, so
-     chapters appeared in the gap above the field. Offset by that padding
-     so the stuck bar sits under the masthead. */
-  top: calc(-1 * var(--edge-fade, 1.75rem));
+  top: 0;
   z-index: 3;
   padding-bottom: 24px;
   padding-right: 0;
