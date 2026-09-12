@@ -932,6 +932,8 @@ private fun EnglishProseBlock(
     onVerseSeek: (surahId: Int, ayah: Int, through: Float) -> Unit,
 ) {
     val palette = rememberWordInkPalette()
+    // Null on Paper, which does not define the accent and so does not glimmer.
+    val glintInk = LocalQuranAccents.current.glintInk
     var layoutResult by remember { mutableStateOf<TextLayoutResult?>(null) }
     val hitSlopPx = with(LocalDensity.current) { 6.dp.toPx() }
     val style = englishProseStyle(fontSize, lineHeight)
@@ -958,6 +960,7 @@ private fun EnglishProseBlock(
                                 verse = verse,
                                 pack = packs[verse.surahId to verse.ayah],
                                 palette = palette,
+                                glintInk = glintInk,
                                 text = block.text,
                             )
                         }
@@ -1033,6 +1036,8 @@ private fun englishVerseBlooms(
     verse: EnglishProseVerse,
     pack: AyahInkPack?,
     palette: WordInkPalette,
+    /** Fresh-ink sheen; null on themes without it. See [addEnglishInkLayerBlooms]. */
+    glintInk: Color?,
     /** The paragraph, so a band's edge can be kept out of the middle of a word. */
     text: CharSequence,
 ): List<ShapedWordBloom> {
@@ -1094,7 +1099,9 @@ private fun englishVerseBlooms(
         }
         if (!bands.ahead.isEmpty()) blooms += cover(bands.ahead, paper, waiting)
     }
-    if (ends != null) blooms.addEnglishRepeatBlooms(verse, motions, ends, palette, text)
+    if (ends != null) {
+        blooms.addEnglishInkLayerBlooms(verse, motions, ends, palette, glintInk, text)
+    }
     val markCover = (1f - pack.markAlpha.value).coerceIn(0f, 1f)
     if (markCover > 0f && !verse.markRange.isEmpty()) {
         blooms += cover(verse.markRange, paper, markCover)
@@ -1103,8 +1110,8 @@ private fun englishVerseBlooms(
 }
 
 /**
- * The orange the reciter leaves on a word they went back over, on this leaf's
- * English of it.
+ * The tinted layers one word of the leaf's English wears: the orange of a
+ * repeat, and the fresh-ink glimmer above it.
  *
  * The leaf used to carry no repeat, and the reason was sound while it lasted:
  * a repeat is a statement about one Arabic word, and the leaf had no way to
@@ -1119,16 +1126,37 @@ private fun englishVerseBlooms(
  * completes. The chain is a handful of words, and with the leaf's covers
  * abutting rather than reaching (`coverPad = 0`) the spans tile without
  * double-tinting at the seams.
+ *
+ * The **glimmer** had never been said here at all. It is a statement about the
+ * word being recited, and it needed the same alignment the repeat needed before
+ * the leaf could place it; with that in hand it is the layer the scrolling
+ * reader and the Arabic leaf already draw, on this leaf's English of the word.
+ * See `docs/GLIMMER.md` — the word-side gate is being Active (plus its
+ * `glintFadeMs` dry-down), and the theme side is [glintInk] existing at all.
+ *
+ * The first-pass sheen rides `plainSweepProgress` with the engine's own
+ * feather, because that is the wash it is a sheen *on*: this leaf deliberately
+ * drops tajweed pacing, which places ink on Arabic letters, and there are none
+ * here. A repeat's glimmer rides the repeat wash instead, as it does everywhere
+ * else, and takes the terracotta with it.
+ *
+ * Both layers are drawn per word in one pass so a word that carries both pays
+ * for its span once, and so the sheen stays above the orange rather than under
+ * it.
  */
-private fun MutableList<ShapedWordBloom>.addEnglishRepeatBlooms(
+private fun MutableList<ShapedWordBloom>.addEnglishInkLayerBlooms(
     verse: EnglishProseVerse,
     motions: List<InkMotion>,
     ends: FloatArray,
     palette: WordInkPalette,
+    glintInk: Color?,
     text: CharSequence,
 ) {
     motions.forEachIndexed { index, motion ->
-        if (motion.repeatAlpha <= 0f) return@forEachIndexed
+        val repeating = motion.repeatAlpha > 0f
+        val glinting = glintInk != null && motion.showGlintLayer &&
+            motion.glintLayerAlpha > 0f
+        if (!repeating && !glinting) return@forEachIndexed
         val span = englishWashBands(
             range = verse.range,
             from = verse.fragmentProgress(if (index == 0) 0f else ends[index - 1]),
@@ -1137,17 +1165,45 @@ private fun MutableList<ShapedWordBloom>.addEnglishRepeatBlooms(
             text = text,
         ).saying
         if (span.isEmpty()) return@forEachIndexed
-        add(
-            ShapedWordBloom.ColorReveal(
-                range = span,
-                progress = motion.repeatProgress,
-                color = palette.repeatInkColor,
-                restingAlpha = 0f,
-                layerAlpha = motion.repeatAlpha,
-                feather = motion.repeatFeather,
-                colorAlpha = InkEngine.tuning.repeatInkAlpha,
-            ),
-        )
+        if (repeating) {
+            add(
+                ShapedWordBloom.ColorReveal(
+                    range = span,
+                    progress = motion.repeatProgress,
+                    color = palette.repeatInkColor,
+                    restingAlpha = 0f,
+                    layerAlpha = motion.repeatAlpha,
+                    feather = motion.repeatFeather,
+                    colorAlpha = InkEngine.tuning.repeatInkAlpha,
+                ),
+            )
+        }
+        if (glinting && glintInk != null) {
+            val onRepeat = motion.glintIsRepeat
+            add(
+                ShapedWordBloom.ColorReveal(
+                    range = span,
+                    progress = if (onRepeat) {
+                        motion.repeatProgress
+                    } else {
+                        motion.plainSweepProgress.coerceIn(0f, 1f)
+                    },
+                    color = if (onRepeat) palette.repeatInkColor else glintInk,
+                    restingAlpha = 0f,
+                    layerAlpha = motion.glintLayerAlpha,
+                    feather = if (onRepeat) motion.repeatFeather else null,
+                    colorAlpha = motion.glintTintColorAlpha(
+                        if (onRepeat) {
+                            InkEngine.tuning.repeatInkAlpha
+                        } else {
+                            InkEngine.tuning.glintTintAlpha
+                        },
+                    ),
+                    glowAlpha = motion.glintGlowColorAlpha(InkEngine.tuning.glintGlowAlpha),
+                    glowRadius = InkEngine.tuning.glintGlowRadius,
+                ),
+            )
+        }
     }
 }
 
