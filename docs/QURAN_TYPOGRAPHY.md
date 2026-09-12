@@ -575,9 +575,8 @@ nothing:
 size, the hand, the translation and two settings — given the same answers it
 breaks in the same places every time — so it is computed once and kept, and
 `EnglishBookCache` is that. It is what every ebook reader does: a pagination
-cached against the layout it was computed for, thrown away and redone when the
-layout moves, which is why they open instantly and repaginate visibly when you
-change the type size. Measured on device: **5,143 ms to paginate, 50 ms to read
+cached against the layout it was computed for, read back when that layout
+returns, and recomputed for a layout not yet measured. Earlier device measurements: **5,143 ms to paginate, 50 ms to read
 back**, and the leaves are the same leaves — 22 lines at a pitch of 77 either
 way.
 
@@ -585,8 +584,9 @@ The key is everything the leaves depend on, the database's own file name
 included, because the translation is in it and a leaf is a length of
 translation. Anything that can move the leaves and is *not* in the key is a book
 breaking in the wrong places, so the format carries a version to throw the lot
-away with. Only one book is kept: a leaf's size changes when a phone is folded
-or the type resized, and yesterday's leaves are of no use to anyone once it has.
+away with. Four recent configurations are kept, so returning to a previous
+translation or leaf size can reuse its measured book. Writes are atomic and
+pruning preserves the newest write; the page-setting rules are unchanged.
 
 Three times faster, and — before the cache — still a wait. The answer to the rest is the one an ebook
 gives, and this book is already shaped for it: **a chapter opens a leaf**, so the

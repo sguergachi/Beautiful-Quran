@@ -1,6 +1,7 @@
 package com.beautifulquran.data
 
 import android.database.Cursor
+import com.beautifulquran.DevProfiling
 import com.beautifulquran.data.model.Ayah
 import com.beautifulquran.data.model.BookmarkedAyah
 import com.beautifulquran.data.model.Reciter
@@ -529,15 +530,17 @@ class QuranRepository(
         val (index, vocabulary) = searchData()
         return withContext(Dispatchers.Default) {
             val context = currentCoroutineContext()
-            matchWordSearch(
-                index,
-                query,
-                WORD_SEARCH_MAX_HITS,
-                vocabulary?.concepts.orEmpty(),
-                vocabulary?.thesaurus.orEmpty(),
-                checkCancelled = context::ensureActive,
-                sources = sources,
-            )
+            DevProfiling.trace("searchRankFull") {
+                matchWordSearch(
+                    index,
+                    query,
+                    WORD_SEARCH_MAX_HITS,
+                    vocabulary?.concepts.orEmpty(),
+                    vocabulary?.thesaurus.orEmpty(),
+                    checkCancelled = context::ensureActive,
+                    sources = sources,
+                )
+            }
         }
     }
 
@@ -589,14 +592,16 @@ class QuranRepository(
         if (index.isEmpty()) return emptyList()
         return withContext(Dispatchers.Default) {
             val context = currentCoroutineContext()
-            matchWordSearch(
-                index,
-                query,
-                WORD_SEARCH_MAX_HITS,
-                concepts = concepts,
-                checkCancelled = context::ensureActive,
-                sources = sources,
-            )
+            DevProfiling.trace("searchRankQuick") {
+                matchWordSearch(
+                    index,
+                    query,
+                    WORD_SEARCH_MAX_HITS,
+                    concepts = concepts,
+                    checkCancelled = context::ensureActive,
+                    sources = sources,
+                )
+            }
         }
     }
 
@@ -637,10 +642,12 @@ class QuranRepository(
         ) { c -> c.getInt(0) * 1_000 + c.getInt(1) }.toIntArray()
     }
 
-    private fun loadWordSearchIndex(keys: IntArray? = null): List<WordSearchIndexEntry> {
-        val keySet = keys?.joinToString(",")
-        val ayahFilter = keySet?.let { "WHERE a.surah_id * 1000 + a.ayah_number IN ($it)" }.orEmpty()
-        val wordFilter = keySet?.let { "WHERE w.surah_id * 1000 + w.ayah_number IN ($it)" }.orEmpty()
+    private fun loadWordSearchIndex(keys: IntArray? = null): List<WordSearchIndexEntry> = DevProfiling.trace(
+        if (keys == null) "wordSearchIndexFull" else "wordSearchIndexKeys",
+    ) {
+        if (keys != null && keys.isEmpty()) return@trace emptyList()
+        val ayahFilter = keys?.let { wordSearchAyahFilter("a", it) }.orEmpty()
+        val wordFilter = keys?.let { wordSearchAyahFilter("w", it) }.orEmpty()
         // Read ayah-wide strings only 6,236 times. Joining them onto the word
         // cursor decoded and discarded the same large strings 77,429 times,
         // making the first search pay for ~31 M transient characters.
@@ -699,7 +706,7 @@ class QuranRepository(
                 },
             )
         }
-        return built
+        built
     }
 
     /** Root concordance: count + every occurrence in Quranic order, joined

@@ -69,9 +69,9 @@ class QuranApp : Application() {
         repository = QuranRepository(QuranDatabase(this), overrides, SearchConceptRepository(this))
         lexicon = LexiconRepository(LexiconDatabase(this))
         dictionary = DictionaryRepository(DictionaryDatabase(this))
-        settings = SettingsRepository(this)
+        settings = DevProfiling.trace("settingsInit") { SettingsRepository(this) }
         englishBookCache = EnglishBookCache(this)
-        bookmarks = BookmarkRepository(this)
+        bookmarks = DevProfiling.trace("bookmarksInit") { BookmarkRepository(this) }
         annotations = AnnotationRepository(this)
         player = PlayerController(this)
         outputLatency = AudioOutputLatency(this)

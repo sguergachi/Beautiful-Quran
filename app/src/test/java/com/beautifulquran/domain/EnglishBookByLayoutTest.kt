@@ -3,6 +3,10 @@ package com.beautifulquran.domain
 import com.beautifulquran.data.model.Word
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import org.junit.Assert.assertThrows
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.ensureActive
+import java.util.concurrent.CancellationException
 import org.junit.Test
 
 /**
@@ -116,6 +120,58 @@ class EnglishBookByLayoutTest {
             { _, _ -> EnglishLeafFill(null) },
         )
         assertEquals(1, b.leaves.size)
+    }
+
+    @Test
+    fun `already-cancelled pagination never asks the ruler`() {
+        val job = Job().apply { cancel() }
+        var fills = 0
+        assertThrows(CancellationException::class.java) {
+            buildEnglishBookByLayout(
+                buildMushafCatalog(listOf(source(2, 2, 3))),
+                { _, _ -> "x".repeat(50) },
+                { _, _ -> fills++; EnglishLeafFill(null) },
+                checkCancelled = job::ensureActive,
+            )
+        }
+        assertEquals(0, fills)
+    }
+
+    @Test
+    fun `scope cancellation stops measurements without returning a partial book`() {
+        val job = Job()
+        var fills = 0
+        assertThrows(CancellationException::class.java) {
+            buildEnglishBookByLayout(
+                buildMushafCatalog((2..80).map { source(2, it, 3) }),
+                { _, _ -> "0123456789" },
+                { _, runs ->
+                    if (++fills == 3) job.cancel()
+                    ruler(holds = 100).fill(3, runs)
+                },
+                checkCancelled = job::ensureActive,
+            )
+        }
+        assertEquals(3, fills)
+    }
+
+    @Test
+    fun `cancellation also stops a growing offer before its next measurement`() {
+        val job = Job()
+        var fills = 0
+        assertThrows(CancellationException::class.java) {
+            buildEnglishBookByLayout(
+                buildMushafCatalog((2..80).map { source(2, it, 3) }),
+                { _, _ -> "x".repeat(500) },
+                { _, _ ->
+                    fills++
+                    job.cancel()
+                    EnglishLeafFill(null)
+                },
+                checkCancelled = job::ensureActive,
+            )
+        }
+        assertEquals(1, fills)
     }
 
     @Test

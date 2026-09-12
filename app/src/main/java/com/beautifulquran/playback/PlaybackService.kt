@@ -62,6 +62,7 @@ class PlaybackService : MediaLibraryService() {
             RecitationCache.listen(this),
             upstream,
             getSystemService()!!,
+            RecitationCache.keep(this),
         )
         this.prefetcher = prefetcher
 
