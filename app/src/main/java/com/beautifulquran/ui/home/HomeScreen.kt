@@ -305,6 +305,7 @@ fun HomeScreen(
                                 value = uiState.query,
                                 onValueChange = viewModel::onQueryChange,
                                 placeholder = "Search concept, “exact phrase”, or 2:255",
+                                contentDescription = "Search",
                                 onFocusChanged = { focused ->
                                     searchFocused = focused
                                     if (focused) viewModel.onSearchFocused()

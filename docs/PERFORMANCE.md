@@ -138,7 +138,13 @@ both allocation and downstream emission happen only at real ink boundaries
 ExoPlayer's `PreloadConfiguration` buffers ~5 s of the *next* ayah in the
 playlist (Media3 1.10), cutting inter-ayah join latency. `AudioPrefetcher`
 still warms a few ayahs beyond that on any network, and the whole surah on
-unmetered Wi‑Fi, writing into the same 1 GB LRU cache the player reads.
+unmetered Wi‑Fi, writing into the same 1 GB LRU listen cache the player
+reads. Fully kept downloads (the non-evicting keep tree) are skipped — they
+are already on disk, and refetching them into listen was wasted network.
+`Job.cancel` does not stop Media3's blocking `CacheWriter.cache()`; the
+prefetcher cancels the active writers on supersession and release, with the
+same register-under-lock race RecitationDownloads uses. No extra network
+framework.
 
 ### 4. Edge fades without offscreen compositing
 
@@ -247,6 +253,16 @@ janky", first ask: is this the release APK?
   per-ayah round trips. Timings for one reciter+surah arrive as one query of
   compact JSON rows.
 - Surah and reciter lists are cached in memory after first read.
+- The English book's measured leaves stay on disk under
+  `EnglishBookCache`. Four most-recently-read configs are retained so
+  flipping translation, gloss, or type size does not remeasure; in-progress
+  writes publish atomically and failed writes remove their own temporary
+  files. Successful writes also reclaim temporary files abandoned for a day.
+  Access/pruning is serialized; the just-written book is retained even when
+  timestamps tie. `ensureMushaf` cancels superseded work, and the pure packer's
+  `checkCancelled` callback checks the coroutine before each layout attempt.
+  This also stops work on ViewModel teardown. Generation gates still protect
+  publication and writes.
 
 ### 7b. The word-search index is a memory budget, not just a cache
 
@@ -267,8 +283,15 @@ Cold first results do not wait for that process-lifetime index. Focus warms a
 179 KB concept-only candidate asset; after the 120 ms typing debounce, Android
 asks SQLite for at most 600 literal or relevant semantic ayahs, materializes
 only their words, and publishes that first rank before loading the complete
-concept/thesaurus/root rank. On the constrained two-core debug emulator this
-measured **525 ms** for `peace` and **876 ms** for the multi-word concept
+concept/thesaurus/root rank. Those 600 keys used to be applied as
+`surah_id * 1000 + ayah_number IN (…)` which cannot use `idx_words_ayah` or
+the ayahs primary key and scans all 77,429 word rows. The filter is now
+grouped by the indexed columns (`surah_id = ? AND ayah_number IN (…)`). Host
+SQLite on this repository (not a phone): five keys `2001,2255,2282,36001,112001`
+returned 184 word rows either way; `EXPLAIN QUERY PLAN` went from `SCAN words`
+to `SEARCH … idx_words_ayah`. Earlier measurements of the literal-first
+pipeline, before this indexed-filter change, on the constrained two-core
+debug emulator were **525 ms** for `peace` and **876 ms** for the multi-word concept
 `saving money`, from final typed character to visible results and including
 debounce. The complete rank then replaces it. App startup stays free of a
 full-Quran scan.
@@ -311,7 +334,9 @@ first chapter sheet so it does not crowd the primary DEX.
 The committed rules are a conservative seed because this repository's headless
 emulator renderer terminates during instrumentation. The `:baselineprofile`
 module is the source of truth for regenerating both profiles from real critical
-user journeys on stable hardware. See [Profiling](PROFILING.md).
+user journeys on stable hardware. Reader interaction journeys (long-ayah
+recitation, mushaf page turn, distant dial jump, cold search) live there too
+and must pick Scroll vs Mushaf explicitly. See [Profiling](PROFILING.md).
 
 ## Deliberate trade-offs
 
@@ -329,6 +354,17 @@ Investigate in measured order. Each trades memory, shaping correctness, or
 animation appearance for speed, so none should change without a representative
 device trace and a pixel/motion comparison.
 
+**Measure first — not a license to redesign.** Per-frame bloom list
+allocation and cold-start SharedPreferences reads were recorded as things to
+*attribute* on a device. They are not a brief to change ink rendering or to
+defer `QuranApp` initialization. Debug `DevProfiling.trace`
+sections name synchronous work (`settingsInit`,
+`bookmarksInit`, `quranDbExtract`, `searchRankQuick`, `searchRankFull`,
+`wordSearchIndexKeys`, `wordSearchIndexFull`, `englishBookCacheRead`,
+`englishBookLayout`, `englishBookCacheWrite`). Sections begin and end on the
+same thread without suspension, and compile to no-ops in release.
+Until a physical trace shows a stall, leave the wash and startup order alone.
+
 - Cold-start main-thread disk I/O: `SettingsRepository` and `BookmarkRepository`
   are constructed in `QuranApp.onCreate()`, and their initial `read()` does
   synchronous `SharedPreferences` reads. Trace it before changing anything —
@@ -340,12 +376,14 @@ device trace and a pixel/motion comparison.
   cover frames (`onWarmStack`). Cover-open `PageTurnSounds` is created lazily
   at warm/open, not on first paint. Leather fill uses `drawWithCache`.
 - Allocation inside per-frame custom draw lambdas — especially temporary bloom
-  lists and gradient construction.
+  lists and gradient construction. Do not replace the directional feathered
+  wash or dim Hafs via glyph alpha to make this cheaper.
 - The number and retained memory of per-word graphics layers in gloss mode.
 - Long-ayah text shaping / prefetch on first exposure.
 - Replace the conservative seed Baseline/Startup rules with output captured on
   a stable physical Android 17 device, then retain them only if Macrobenchmark
-  confirms an improvement.
+  confirms an improvement. Do not regenerate the committed seed from an
+  emulator.
 - Per-word `contentType` hints if word counts per screen grow (e.g. a future
   mushaf mode).
 - Gapless surah-file playback (single MediaItem + absolute-offset segments)

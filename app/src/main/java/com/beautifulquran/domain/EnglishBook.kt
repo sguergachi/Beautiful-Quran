@@ -612,7 +612,10 @@ fun buildEnglishBookByLayout(
     /** The verse's English, whole. */
     text: (surahId: Int, ayah: Int) -> String,
     ruler: EnglishLeafRuler,
+    /** Throws when the caller cancels; leaves the layout independent of coroutines. */
+    checkCancelled: () -> Unit = {},
 ): EnglishBook {
+    checkCancelled()
     val order = ArrayList<IntArray>(6_300)
     for (page in 1..MushafCatalog.MUSHAF_PAGE_COUNT) {
         catalog.page(page)?.let(::englishLeafVerseKeys)?.forEach { (surahId, ayah) ->
@@ -626,7 +629,8 @@ fun buildEnglishBookByLayout(
     var at = 0
     var offset = 0
     while (at < order.size) {
-        val kept = englishLeafAt(order, text, ruler, at, offset)
+        checkCancelled()
+        val kept = englishLeafAt(order, text, ruler, at, offset, checkCancelled)
         out += kept
 
         val last = kept.last()
@@ -749,6 +753,7 @@ private fun englishLeafAt(
     ruler: EnglishLeafRuler,
     at: Int,
     offset: Int,
+    checkCancelled: () -> Unit,
 ): List<EnglishVerseRun> {
     // How much to offer. Enough that the leaf is decided by the layout and not
     // by the end of the offer — and if it was not, the ruler says so and the
@@ -757,6 +762,7 @@ private fun englishLeafAt(
     var runs: List<EnglishVerseRun>
     var fill: EnglishLeafFill
     while (true) {
+        checkCancelled()
         runs = englishLeafOffer(order, text, at, offset, take)
         fill = ruler.fill(order[at][2], runs)
         val exhausted = at + runs.size < order.size &&
