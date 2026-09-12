@@ -3031,7 +3031,7 @@ fun AyahBlock(
                 seed = ayah.surahId * 1_000 + ayah.number,
                 color = LocalQuranAccents.current.gold.copy(alpha = 0.26f),
                 fillBox = true,
-                durationMillis = 400,
+                durationMillis = 250,
                 // InkExpandEasing lands 71% through the soak by 20% of its
                 // clock. This surface needs the full requested spread time.
                 easing = LinearEasing,
