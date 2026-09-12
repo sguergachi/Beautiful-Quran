@@ -3261,16 +3261,16 @@ fun AyahBlock(
                         )
                         .padding(
                             start = if (bookmarkSide == AyahSelectorSide.LEFT) {
-                                GatherOrdinalEdgeInsetDp.dp
+                                GatherOrdinalSoakInset
                             } else {
                                 0.dp
                             },
                             end = if (bookmarkSide == AyahSelectorSide.RIGHT) {
-                                GatherOrdinalEdgeInsetDp.dp
+                                GatherOrdinalSoakInset
                             } else {
                                 0.dp
                             },
-                            top = GatherOrdinalTopInsetDp.dp,
+                            top = GatherOrdinalSoakInset,
                         )
                         .fillMaxHeight(),
                 )
@@ -3335,7 +3335,7 @@ private fun GatherOrdinalMark(
     )
     Box(
         modifier = modifier
-            .width(GatherOrdinalSlotWidthDp.dp)
+            .width(GatherOrdinalSlotWidth)
             .graphicsLayer { alpha = chromeAlpha() }
             .then(
                 if (onClick != null) {

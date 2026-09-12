@@ -36,6 +36,7 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import com.beautifulquran.data.AyahSelectorSide
 import com.beautifulquran.ui.theme.LocalQuranAccents
+import com.beautifulquran.ui.theme.VerseSoakRimInset
 import com.beautifulquran.ui.theme.absorbPointerEvents
 import com.beautifulquran.ui.theme.quietClickable
 import kotlinx.coroutines.CoroutineStart
@@ -67,14 +68,14 @@ internal const val BookmarkEdgeInsetDp = 8f    // from the block's outer edge
 internal const val BookmarkRibbonWidthDp = 11f
 internal const val BookmarkTopInsetDp = 24f    // align the tip with the verse's first ink line
 internal const val BookmarkNubLengthDp = 14f   // just the swallowtail tip peeking out
-/** Gather ordinal type — fits the 24 dp bookmark-gutter slot. */
+/** Gather ordinal type — fits the reserved bookmark-gutter slot. */
 internal const val GatherOrdinalSp = 16f
-/** From the ayah box edge to the ordinal slot, inside the fillBox stain. */
-internal const val GatherOrdinalEdgeInsetDp = 14f
-/** Tight to the gold's top rim; shorter than the edge inset so it sits in the corner. */
-internal const val GatherOrdinalTopInsetDp = 6f
-/** Width of the ordinal slot: bookmark-side pad (38) minus edge inset. */
-internal const val GatherOrdinalSlotWidthDp = 24f
+/** Fixed air from the gather soak's shader edge, not from the ayah box. */
+internal const val GatherOrdinalSoakMarginDp = 6f
+/** The shader's fixed rim plus [GatherOrdinalSoakMarginDp]. */
+internal val GatherOrdinalSoakInset = VerseSoakRimInset + GatherOrdinalSoakMarginDp.dp
+/** Remaining bookmark lane, so the ordinal never changes the verse measure. */
+internal val GatherOrdinalSlotWidth = BookmarkStripWidth - GatherOrdinalSoakInset
 private const val TOP_FOLD_DP = 3.5f    // soft fold over the page edge, matching web
 private const val BOTTOM_GAP_DP = 48f   // leave air above the next verse's tip
 private const val NOTCH_DP = 5.5f

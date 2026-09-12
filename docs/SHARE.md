@@ -59,9 +59,10 @@ tap once you are in it.
 
 **Mode chrome (visual QA):** gather ordinals live in the gold soak's
 top corner, still in the 38 dp bookmark gutter. 16 sp Bold Garamond
-Western digits, tight ink-brush circle, 14 dp in from the soak's side
-and 6 dp from its top so the loop sits in the gold corner. Not gold, not
-Arabic-Indic. The verse layout does not change.
+Western digits, tight ink-brush circle, 6 dp inside the shader rim on its
+top and outer edge (15 dp from the ayah box) so the loop stays in the gold
+corner at every verse height. Not gold, not Arabic-Indic. The verse layout
+does not change.
 Gold soak and gather-bar takeover are shipped — see
 [VERSE_ACTIONS.md](VERSE_ACTIONS.md).
 
