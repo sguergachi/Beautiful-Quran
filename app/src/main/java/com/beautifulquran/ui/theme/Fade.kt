@@ -174,6 +174,18 @@ sealed class ShapedWordBloom {
         override val range: IntRange,
         val paper: Color,
         val coverAlpha: Float,
+        /**
+         * Overrides the modifier's `coverPad` for this cover alone.
+         *
+         * The pad exists so a *word's* mask reaches the glyph overhang its box
+         * does not contain, and its neighbours are words that redraw over
+         * anything it laps. The ﴿N﴾ mark is the one cover with nothing to
+         * redraw after it: it fades on its own clock while the ink either side
+         * of it holds still, so the reach pulled 4 dp of a held word's tail
+         * down and back up with the number. Zero here keeps the mark's fade to
+         * the mark.
+         */
+        val pad: Dp? = null,
     ) : ShapedWordBloom()
 
     /** First-pass ink: punch over full-ink glyphs, wash from
@@ -321,7 +333,7 @@ fun Modifier.shapedWordBloom(
                     // Bleed only horizontally: vertical padding lets an
                     // unread line's paper mask climb into the preceding line
                     // and fade a read word's descender (g/j/p/q/y).
-                    val pad = coverPad.toPx()
+                    val pad = (bloom.pad ?: coverPad).toPx()
                     lineBounds.forEach { bounds ->
                         val cover = linePaperCoverBounds(bounds, pad)
                         clipRect(
