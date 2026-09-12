@@ -734,7 +734,7 @@ class ReaderViewModel(
             // The ear clock, not the raw playhead: [endMs] is a segment time,
             // and the ink it is supposed to lead is latency-corrected. Reading
             // player.positionMs here made the effective lead fadeLeadMs + route
-            // latency (880 ms instead of 700 ms on A2DP), shifting whenever the
+            // latency (680 ms instead of 500 ms on A2DP), shifting whenever the
             // listener changed audio output.
             positionMs = heardPositionMs(),
             endMs = endMs,

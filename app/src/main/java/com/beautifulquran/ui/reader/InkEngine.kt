@@ -326,8 +326,8 @@ object InkEngine {
 
     /** Shipped defaults for highlight sync (lab knobs start here). */
     const val DEFAULT_HIGHLIGHT_LEAD_MS = 0
-    const val DEFAULT_FADE_LEAD_MS = 700
-    const val DEFAULT_SCROLL_LEAD_MS = 200
+    const val DEFAULT_FADE_LEAD_MS = 500
+    const val DEFAULT_SCROLL_LEAD_MS = 400
 
     /**
      * Attach [store] and restore any saved lab numbers. Call once from
@@ -402,7 +402,7 @@ object InkEngine {
      * So the reciting word's own state follows [activeWord], not the fade-led
      * focus: while this ayah owns the active word, its words light and hold
      * (Active / Recited by high-water) regardless of [isActiveAyah] — otherwise
-     * a sustained final letter drops out of its paced hold 700 ms early. Only
+     * a sustained final letter drops out of its paced hold 500 ms early. Only
      * once [activeWord] is null (this ayah is not the one reciting) does the
      * focus bit decide between the faint Upcoming wait and resting Plain ink.
      */

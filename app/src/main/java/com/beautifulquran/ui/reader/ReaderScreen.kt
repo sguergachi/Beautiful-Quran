@@ -696,7 +696,7 @@ fun ReaderScreen(
             playedHere = false
         }
     }
-    // Lead-adjusted: crosses to the next ayah ~700ms before the current one's
+    // Lead-adjusted: crosses to the next ayah ~500ms before the current one's
     // audio ends, so the block fade to the next ayah starts a touch early.
     val activeAyahState = viewModel.activeAyah.collectAsStateWithLifecycle()
     val activeBasmalah by viewModel.activeBasmalah.collectAsStateWithLifecycle()

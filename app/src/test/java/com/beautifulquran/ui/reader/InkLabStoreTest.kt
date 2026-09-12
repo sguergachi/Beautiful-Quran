@@ -35,9 +35,9 @@ class InkLabStoreTest {
         assertEquals(ink, InkLabSnapshot().toTuning())
         assertEquals(guide, InkLabSnapshot().toContextualGuideTuning())
         assertEquals(0, InkEngine.DEFAULT_HIGHLIGHT_LEAD_MS)
-        assertEquals(700, InkEngine.DEFAULT_FADE_LEAD_MS)
+        assertEquals(500, InkEngine.DEFAULT_FADE_LEAD_MS)
         // The camera's lead is its own number, not a copy of the ink's.
-        assertEquals(200, InkEngine.DEFAULT_SCROLL_LEAD_MS)
+        assertEquals(400, InkEngine.DEFAULT_SCROLL_LEAD_MS)
         assertNull(InkLabSnapshot().outputLatencyOverrideMs)
     }
 
