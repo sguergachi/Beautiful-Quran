@@ -2,6 +2,7 @@ package com.beautifulquran.data
 
 import android.content.Context
 import android.database.sqlite.SQLiteDatabase
+import com.beautifulquran.DevProfiling
 import java.io.File
 
 /**
@@ -39,7 +40,7 @@ class QuranDatabase(private val context: Context) {
         }
     }
 
-    private fun ensureExtracted(): File {
+    private fun ensureExtracted(): File = DevProfiling.trace("quranDbExtract") {
         val file = File(context.noBackupFilesDir, DB_FILE_NAME)
         if (needsReextract(file.exists(), file.length(), assetLength())) {
             file.delete()
@@ -60,7 +61,7 @@ class QuranDatabase(private val context: Context) {
                 ?.listFiles { f -> f.name.startsWith("quran-v") && f.name != DB_FILE_NAME }
                 ?.forEach { it.delete() }
         }
-        return file
+        file
     }
 
     /** Length of the packaged asset when Android can report it without reading it. */

@@ -6,7 +6,7 @@ import android.net.Uri
 
 /**
  * Actions the reader can fulfill from Android intents, deep links, launcher
- * shortcuts, system search, or Google App Actions.
+ * shortcuts, system search, media voice search, or a Gemini AppFunction.
  */
 sealed class AssistantAction {
     /**
@@ -97,14 +97,13 @@ object AssistantIntents {
         intent.dataString?.let { parseDeepLink(it) }?.let { return it }
         parseFeature(intent.getStringExtra(EXTRA_FEATURE))?.let { return it }
 
-        // Free-form candidates: App Actions GET_THING, SEARCH, custom extras.
+        // Free-form candidates: system SEARCH and custom extras.
         sequenceOf(
             intent.getStringExtra(EXTRA_QUERY),
             intent.getStringExtra(SearchManager.QUERY),
             intent.getStringExtra(Intent.EXTRA_TEXT),
             intent.getStringExtra("query"),
             intent.getStringExtra("name"),
-            intent.getStringExtra("thing.name"),
         ).mapNotNull { it?.takeIf(String::isNotBlank) }
             .forEach { candidate ->
                 parseSpokenCommand(candidate)?.let { return it }

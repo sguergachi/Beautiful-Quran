@@ -21,18 +21,18 @@ import java.security.MessageDigest
  * every time.
  *
  * So it is written down. This is what every ebook reader does — a pagination
- * cached against the layout it was computed for, thrown away and redone when
- * the layout moves — and it is why they open instantly and repaginate visibly
- * when you change the type size.
+ * cached against the layout it was computed for. A handful of recent configs
+ * stay on disk so flipping translation, gloss, or type size does not remeasure;
+ * older ones are forgotten.
  *
  * [key] is everything the pagination depends on. Anything not in it that can
  * change the leaves is a bug that shows as a book breaking in the wrong places,
  * so it carries a format version too: bump [FORMAT] when the leaves' meaning
  * changes, and the next launch measures instead of reading.
  */
-class EnglishBookCache(context: Context) {
+class EnglishBookCache internal constructor(private val dir: File) {
 
-    private val dir = File(context.cacheDir, "english-book")
+    constructor(context: Context) : this(File(context.cacheDir, "english-book"))
 
     /**
      * Everything the leaves depend on. The database's own file name is in here
@@ -56,6 +56,7 @@ class EnglishBookCache(context: Context) {
     ).joinToString("-")
 
     /** The book written down under [key], or null when there is none to read. */
+    @Synchronized
     fun read(
         key: String,
         pageOf: (surahId: Int, ayah: Int) -> Int,
@@ -98,13 +99,22 @@ class EnglishBookCache(context: Context) {
             }
             check(input.read() == -1) { "English book cache has trailing bytes" }
             englishBookOf(leaves, pageOf, text)
+        }.also {
+            // Access recency so flipping translation/gloss/size keeps this key.
+            file.setLastModified(System.currentTimeMillis())
         }
     }.getOrElse {
         runCatching { File(dir, key).delete() }
         null
     }
 
-    /** Writes [book] down under [key], and forgets any book written before it. */
+    /**
+     * Writes [book] down under [key], keeping a small recency-bounded set of
+     * other configs so switching translation, gloss, or type size back and
+     * forth does not remeasure. Access and pruning share the same lock so an
+     * older eviction decision cannot remove a freshly replaced book.
+     */
+    @Synchronized
     fun write(key: String, book: EnglishBook) {
         // Never persist an empty book: see read. Drop any poison already
         // stored under this key so it cannot be picked up between here and
@@ -115,33 +125,51 @@ class EnglishBookCache(context: Context) {
         }
         runCatching {
             dir.mkdirs()
-            // One book at a time: a leaf's size changes when the phone is
-            // folded or the type is resized, and yesterday's leaves are of no
-            // use to anybody once it has.
-            dir.listFiles()?.forEach { if (it.name != key) it.delete() }
-            val tmp = File(dir, "$key.writing")
-            // Take the leaves first: a count written in the header that the
-            // body then disagrees with is a file that reads back short every
-            // launch, which looks exactly like having no cache at all.
-            val leaves = (0 until book.leafCount).mapNotNull { book.leaf(it) }
-            DataOutputStream(tmp.outputStream().buffered()).use { out ->
-                out.writeInt(leaves.size)
-                leaves.forEach { leaf ->
-                    out.writeInt(leaf.runs.size)
-                    leaf.runs.forEach { run ->
-                        out.writeInt(run.surahId)
-                        out.writeInt(run.ayah)
-                        out.writeInt(run.from)
-                        out.writeInt(run.to)
+            val tmp = File.createTempFile("book-", ".writing", dir)
+            try {
+                // Take the leaves first: a count written in the header that the
+                // body then disagrees with is a file that reads back short every
+                // launch, which looks exactly like having no cache at all.
+                val leaves = (0 until book.leafCount).mapNotNull { book.leaf(it) }
+                DataOutputStream(tmp.outputStream().buffered()).use { out ->
+                    out.writeInt(leaves.size)
+                    leaves.forEach { leaf ->
+                        out.writeInt(leaf.runs.size)
+                        leaf.runs.forEach { run ->
+                            out.writeInt(run.surahId)
+                            out.writeInt(run.ayah)
+                            out.writeInt(run.from)
+                            out.writeInt(run.to)
+                        }
                     }
                 }
+                // Rename last, so a book half written is a book that never existed.
+                val target = File(dir, key)
+                check(tmp.renameTo(target)) { "Could not publish English book" }
+                prune(target)
+            } finally {
+                tmp.delete()
             }
-            // Rename last, so a book half written is a book that never existed.
-            tmp.renameTo(File(dir, key))
         }
     }
 
-    private companion object {
+    private fun prune(keep: File) {
+        val files = dir.listFiles()?.filter { it.isFile } ?: return
+        // A killed process cannot run finally. Leave recent temporary files
+        // alone, but reclaim abandoned ones on a later successful write.
+        val abandonedBefore = System.currentTimeMillis() - 86_400_000L
+        files.filter { it.name.endsWith(".writing") && it.lastModified() < abandonedBefore }
+            .forEach { it.delete() }
+        val others = files.filter { it != keep && !it.name.endsWith(".writing") }
+        // Explicitly protect this write even when filesystem timestamps tie.
+        others.sortedByDescending { it.lastModified() }
+            .drop(RETAINED_BOOKS - 1)
+            .forEach { it.delete() }
+    }
+
+    internal companion object {
+        /** Recent configs kept so Customize back-and-forth does not remeasure. */
+        const val RETAINED_BOOKS = 4
         /**
          * Bump when the meaning of a written leaf changes.
          *

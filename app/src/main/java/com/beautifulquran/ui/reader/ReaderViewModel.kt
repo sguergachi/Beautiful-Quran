@@ -7,6 +7,7 @@ import com.beautifulquran.data.BookmarkRepository
 import com.beautifulquran.data.AnnotationRepository
 import com.beautifulquran.data.EducationMoment
 import com.beautifulquran.data.QuranRepository
+import com.beautifulquran.DevProfiling
 import com.beautifulquran.data.EnglishBookCache
 import com.beautifulquran.data.englishBookContentKey
 import com.beautifulquran.data.QuranDatabase
@@ -50,6 +51,8 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 
 /** The word currently being recited: ayah number + 1-based word position.
@@ -338,7 +341,8 @@ class ReaderViewModel(
         // slower one can finish last — and it must not then install its book,
         // null out the ruler key, or write its leaves over the live ones.
         val generation = ++mushafGeneration
-        viewModelScope.launch {
+        mushafJob?.cancel()
+        mushafJob = viewModelScope.launch {
             val catalog = repository.mushafCatalog()
             val surahs = repository.surahs().associateBy { it.id }
             val book = if (rulerFor == null) {
@@ -374,14 +378,28 @@ class ReaderViewModel(
                 // A thousand text layouts, and the same answer every time they
                 // are asked — so they are asked once and written down.
                 val cached = withContext(Dispatchers.IO) {
-                    englishBookCache.read(contentCacheKey, pageOf, verse)
+                    DevProfiling.trace("englishBookCacheRead") {
+                        englishBookCache.read(contentCacheKey, pageOf, verse)
+                    }
                 }
                 if (generation != mushafGeneration) return@launch
                 cached ?: withContext(Dispatchers.Default) {
-                    buildEnglishBookByLayout(catalog, verse, rulerFor(verse))
+                    val context = currentCoroutineContext()
+                    DevProfiling.trace("englishBookLayout") {
+                        buildEnglishBookByLayout(
+                            catalog,
+                            verse,
+                            rulerFor(verse),
+                            checkCancelled = context::ensureActive,
+                        )
+                    }
                 }.also {
                     if (generation != mushafGeneration) return@launch
-                    withContext(Dispatchers.IO) { englishBookCache.write(contentCacheKey, it) }
+                    withContext(Dispatchers.IO) {
+                        DevProfiling.trace("englishBookCacheWrite") {
+                            englishBookCache.write(contentCacheKey, it)
+                        }
+                    }
                 }
             }
             if (generation != mushafGeneration) return@launch
@@ -394,6 +412,7 @@ class ReaderViewModel(
     private var mushafRulerFor:
         ((translation: (Int, Int) -> String) -> EnglishLeafRuler)? = null
     private var mushafCacheKey: String = ""
+    private var mushafJob: Job? = null
 
     /** Everything the English book's leaves depend on — see [EnglishBookCache]. */
     fun englishBookCacheKey(

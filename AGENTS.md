@@ -314,7 +314,7 @@ this document combined: `ReaderComponents.kt` (~36k tokens),
 | Doc | Read it when |
 |---|---|
 | `docs/ARCHITECTURE.md` | First stop for any change — pipeline, sync engine, modules, conventions |
-| `docs/ASSISTANT.md` | Android voice work — media hooks, App Actions, Gemini AppFunctions, testing, and release gates |
+| `docs/ASSISTANT.md` | Android voice work — media hooks, deep links, Gemini AppFunctions, testing without preview access, and release gates |
 | `docs/COMPLEXITY.md` | Before any refactor — complexity rules, current hotspots, open decompositions, and the invariants a refactor must preserve |
 | `docs/quality-reviews/` | Multi-agent Android quality audits (summary + Grok/Codex; Claude when available) |
 | `docs/quality-reviews/AGENT_REVIEWS.md` | **How to run real Codex (`gpt-5.6-sol`) and Claude Opus reviews** — CLI flags, gotchas; do not fake them with Grok |

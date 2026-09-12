@@ -1,170 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Launcher long-press shortcuts + App Actions / custom intents.
+  Launcher long-press shortcuts. Each one is an ordinary VIEW deep link, so it
+  works the moment the APK is installed — no registration anywhere.
 
-  Deep links work immediately. Custom intents + BIIs need Play App Actions
-  review (or the App Actions test-tool preview) for cold-start voice.
+  This file used to also declare Google Assistant App Actions (BII and custom
+  `<capability>` elements, with query patterns in `res/values/arrays.xml`).
+  Google removed Assistant from Android on 2026-09-04, which removed the voice
+  entry point those capabilities existed to serve; they were dropped rather than
+  left as dead metadata. Gemini reaches the same actions through AppFunctions —
+  see `assistant/QuranAppFunctions.kt` and `docs/ASSISTANT.md`.
 -->
-<shortcuts xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto">
-
-    <capability android:name="actions.intent.GET_THING">
-        <intent
-            android:action="android.intent.action.VIEW"
-            android:targetPackage="com.beautifulquran"
-            android:targetClass="com.beautifulquran.MainActivity">
-            <parameter
-                android:name="thing.name"
-                android:key="q" />
-        </intent>
-    </capability>
-
-    <capability android:name="actions.intent.OPEN_APP_FEATURE">
-        <intent
-            android:action="android.intent.action.VIEW"
-            android:targetPackage="com.beautifulquran"
-            android:targetClass="com.beautifulquran.MainActivity">
-            <parameter
-                android:name="feature"
-                android:key="feature" />
-            <extra
-                android:key="requiredForegroundActivity"
-                android:value="com.beautifulquran/com.beautifulquran.MainActivity" />
-        </intent>
-        <intent
-            android:action="android.intent.action.VIEW"
-            android:targetPackage="com.beautifulquran"
-            android:targetClass="com.beautifulquran.MainActivity">
-            <parameter
-                android:name="feature"
-                android:key="feature" />
-        </intent>
-    </capability>
-
-    <!-- App Actions turn Assistant requests into ordinary Android deep links. -->
-    <capability
-        android:name="custom.actions.intent.OPEN_CHAPTER"
-        app:queryPatterns="@array/assistant_open_chapter_queries">
-        <!-- Put the most-specific fulfillment first; Assistant uses the first
-             intent whose required parameters are present. -->
-        <intent>
-            <url-template android:value="beautifulquran://verse/{surah}/{ayah}" />
-            <parameter
-                android:name="surah"
-                android:key="surah"
-                android:mimeType="https://schema.org/Number"
-                android:required="true" />
-            <parameter
-                android:name="ayah"
-                android:key="ayah"
-                android:mimeType="https://schema.org/Number"
-                android:required="true" />
-            <extra
-                android:key="requiredForegroundActivity"
-                android:value="com.beautifulquran/com.beautifulquran.MainActivity" />
-        </intent>
-        <intent>
-            <url-template android:value="beautifulquran://verse/{surah}" />
-            <parameter
-                android:name="surah"
-                android:key="surah"
-                android:mimeType="https://schema.org/Number"
-                android:required="true" />
-            <extra
-                android:key="requiredForegroundActivity"
-                android:value="com.beautifulquran/com.beautifulquran.MainActivity" />
-        </intent>
-        <intent>
-            <url-template android:value="beautifulquran://verse/{surah}/{ayah}" />
-            <parameter
-                android:name="surah"
-                android:key="surah"
-                android:mimeType="https://schema.org/Number"
-                android:required="true" />
-            <parameter
-                android:name="ayah"
-                android:key="ayah"
-                android:mimeType="https://schema.org/Number"
-                android:required="true" />
-        </intent>
-        <intent>
-            <url-template android:value="beautifulquran://verse/{surah}" />
-            <parameter
-                android:name="surah"
-                android:key="surah"
-                android:mimeType="https://schema.org/Number"
-                android:required="true" />
-        </intent>
-        <intent android:data="beautifulquran://continue" />
-    </capability>
-
-    <capability
-        android:name="custom.actions.intent.PLAY_CHAPTER"
-        app:queryPatterns="@array/assistant_play_chapter_queries">
-        <intent>
-            <url-template android:value="beautifulquran://verse/{surah}/{ayah}?play=true" />
-            <parameter
-                android:name="surah"
-                android:key="surah"
-                android:mimeType="https://schema.org/Number"
-                android:required="true" />
-            <parameter
-                android:name="ayah"
-                android:key="ayah"
-                android:mimeType="https://schema.org/Number"
-                android:required="true" />
-            <extra
-                android:key="requiredForegroundActivity"
-                android:value="com.beautifulquran/com.beautifulquran.MainActivity" />
-        </intent>
-        <intent>
-            <url-template android:value="beautifulquran://verse/{surah}?play=true" />
-            <parameter
-                android:name="surah"
-                android:key="surah"
-                android:mimeType="https://schema.org/Number"
-                android:required="true" />
-            <extra
-                android:key="requiredForegroundActivity"
-                android:value="com.beautifulquran/com.beautifulquran.MainActivity" />
-        </intent>
-        <intent>
-            <url-template android:value="beautifulquran://verse/{surah}/{ayah}?play=true" />
-            <parameter
-                android:name="surah"
-                android:key="surah"
-                android:mimeType="https://schema.org/Number"
-                android:required="true" />
-            <parameter
-                android:name="ayah"
-                android:key="ayah"
-                android:mimeType="https://schema.org/Number"
-                android:required="true" />
-        </intent>
-        <intent>
-            <url-template android:value="beautifulquran://verse/{surah}?play=true" />
-            <parameter
-                android:name="surah"
-                android:key="surah"
-                android:mimeType="https://schema.org/Number"
-                android:required="true" />
-        </intent>
-        <intent android:data="beautifulquran://continue?play=true" />
-    </capability>
-
-    <capability
-        android:name="custom.actions.intent.BOOKMARK_VERSE"
-        app:queryPatterns="@array/assistant_bookmark_queries">
-        <intent
-            android:data="beautifulquran://bookmark/save">
-            <!-- Lets "bookmark this" resolve against Beautiful Quran while
-                 its reader is the activity already in the foreground. -->
-            <extra
-                android:key="requiredForegroundActivity"
-                android:value="com.beautifulquran/com.beautifulquran.MainActivity" />
-        </intent>
-        <intent android:data="beautifulquran://bookmark/save" />
-    </capability>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
 
     <shortcut
         android:shortcutId="continue"
@@ -177,11 +23,6 @@
             android:targetPackage="com.beautifulquran"
             android:targetClass="com.beautifulquran.MainActivity"
             android:data="beautifulquran://continue" />
-        <capability-binding android:key="actions.intent.OPEN_APP_FEATURE">
-            <parameter-binding
-                android:key="feature"
-                android:value="@array/assistant_continue_synonyms" />
-        </capability-binding>
     </shortcut>
 
     <shortcut
@@ -195,39 +36,5 @@
             android:targetPackage="com.beautifulquran"
             android:targetClass="com.beautifulquran.MainActivity"
             android:data="beautifulquran://bookmarks" />
-        <capability-binding android:key="actions.intent.OPEN_APP_FEATURE">
-            <parameter-binding
-                android:key="feature"
-                android:value="@array/assistant_bookmarks_synonyms" />
-        </capability-binding>
-    </shortcut>
-
-    <shortcut
-        android:shortcutId="save_bookmark"
-        android:enabled="false"
-        android:shortcutShortLabel="@string/shortcut_save_bookmark_short"
-        android:shortcutLongLabel="@string/shortcut_save_bookmark_long">
-        <intent
-            android:action="android.intent.action.VIEW"
-            android:targetPackage="com.beautifulquran"
-            android:targetClass="com.beautifulquran.MainActivity"
-            android:data="beautifulquran://bookmark/save" />
-        <capability-binding android:key="actions.intent.OPEN_APP_FEATURE">
-            <parameter-binding
-                android:key="feature"
-                android:value="@array/assistant_save_bookmark_synonyms" />
-        </capability-binding>
-    </shortcut>
-
-    <shortcut
-        android:shortcutId="verse"
-        android:enabled="false"
-        android:shortcutShortLabel="@string/shortcut_verse_short"
-        android:shortcutLongLabel="@string/shortcut_verse_long">
-        <capability-binding android:key="actions.intent.OPEN_APP_FEATURE">
-            <parameter-binding
-                android:key="feature"
-                android:value="@array/assistant_verse_synonyms" />
-        </capability-binding>
     </shortcut>
 </shortcuts>
