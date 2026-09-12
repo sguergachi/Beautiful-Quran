@@ -74,6 +74,18 @@ export function dialFromTrackY(
   return 1 + clamped * (ayahCount - 1)
 }
 
+/**
+ * Pressing the collapsed dash stack must keep the reading ayah.
+ *
+ * The stack is vertically centered on the edge, so a press Y mapped through
+ * [dialFromTrackY] is the rail midline — always near the middle verse of a
+ * long surah. Opening pins [readingPos] to the finger; movement then scrubs.
+ */
+export function dialOnCollapsedActivate(readingPos: number, ayahCount: number): number {
+  if (ayahCount <= 1) return 1
+  return Math.min(ayahCount, Math.max(1, readingPos))
+}
+
 /** Y of a dial position inside the rail track (inverse of dialFromTrackY). */
 export function trackYFromDial(
   dial: number,
