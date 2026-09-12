@@ -1,5 +1,7 @@
 package com.beautifulquran.domain
 
+import kotlin.math.roundToInt
+
 /*
  * The English leaf: the same Madinah page, set as a page of a book.
  *
@@ -75,17 +77,102 @@ data class EnglishLeafVerse(
      * or loses it on the strength of it.
      */
     val textFrom: Int = from,
+    /**
+     * The whole verse [text] was set from, and whether its bracketed asides
+     * were taken off on the way. Null where the caller has no source, and the
+     * ink falls back to plain proportion.
+     *
+     * The alignment names offsets in *this* string, and [text] is not it: the
+     * hyphenation vetoes thread invisible word joiners through it, whitespace
+     * is closed up, and the asides may be gone. Scaling a share of the source
+     * onto [text] let the difference pile up along the sentence — on Al-Mulk's
+     * second verse "created" inked as `creat` and "death" as `ed death`, and on
+     * a long verse the band ran a word or two behind the voice. Letters are the
+     * one thing all three leave alone, so offsets are carried across by
+     * counting them. See [textOffsetOf].
+     */
+    val source: String? = null,
+    val hideParentheticals: Boolean = false,
 ) {
     /** The mark closes the verse, so only the fragment that ends it carries one. */
     val endsVerse: Boolean get() = to >= verseLength
 
+    /** For each letter of [text], the offset just past it. */
+    private val textLetterEnds: IntArray by lazy {
+        val ends = IntArray(text.count { it.isLetter() })
+        var n = 0
+        text.forEachIndexed { i, c -> if (c.isLetter()) ends[n++] = i + 1 }
+        ends
+    }
+
+    /**
+     * For each letter of [source] from [textFrom] that [text] prints, the offset
+     * just past it — the asides' letters are skipped when they were hidden, by
+     * the same bracket rules `hideParentheticalText` applies.
+     */
+    private val sourceLetterEnds: IntArray by lazy {
+        val src = source ?: return@lazy IntArray(0)
+        val ends = ArrayList<Int>(text.length)
+        var parens = 0
+        var squares = 0
+        for (i in textFrom.coerceIn(0, src.length) until to.coerceIn(0, src.length)) {
+            val c = src[i]
+            if (hideParentheticals) {
+                when (c) {
+                    '(' -> parens++
+                    ')' -> if (parens > 0) parens--
+                    '[' -> squares++
+                    ']' -> if (squares > 0) squares--
+                }
+                if (parens > 0 || squares > 0) continue
+            }
+            if (c.isLetter()) ends += i + 1
+        }
+        ends.toIntArray()
+    }
+
+    /** Whether [source] and [text] agree letter for letter, so offsets map exactly. */
+    private val lettersMap: Boolean by lazy {
+        source != null && sourceLetterEnds.size == textLetterEnds.size
+    }
+
+    /**
+     * Where an offset of the whole verse stands in [text]: just past the last
+     * letter before it. A word end of the verse lands on the same word's end
+     * here, whatever joiners or closed-up space lie between.
+     */
+    fun textOffsetOf(sourceOffset: Int): Int {
+        if (!lettersMap) {
+            return (fragmentProgress(sourceOffset.toFloat() / verseLength.coerceAtLeast(1)) *
+                text.length).roundToInt()
+        }
+        val letters = countAtOrBelow(sourceLetterEnds, sourceOffset)
+        return if (letters == 0) 0 else textLetterEnds[letters - 1]
+    }
+
+    /**
+     * The share of [text] at which the reciter stands, given the share of the
+     * *verse* — [fragmentProgress], carried across by letters rather than by
+     * proportion. What the ink crosses the leaf's sentence on.
+     */
+    fun fragmentInkProgress(verseProgress: Float): Float {
+        if (!lettersMap || text.isEmpty()) return fragmentProgress(verseProgress)
+        val offset = (verseProgress.coerceIn(0f, 1f) * verseLength).roundToInt()
+        return (textOffsetOf(offset).toFloat() / text.length).coerceIn(0f, 1f)
+    }
+
     /**
      * The share of the *verse* that a point [at] characters into this fragment
-     * stands at — the inverse of [fragmentProgress], and what a tap uses to
+     * stands at — the inverse of [fragmentInkProgress], and what a tap uses to
      * ask the reciter to start somewhere other than the verse's first word.
      */
     fun verseFractionAt(at: Int, length: Int): Float {
         if (verseLength <= 0) return 0f
+        if (lettersMap) {
+            val letters = countAtOrBelow(textLetterEnds, at)
+            val offset = if (letters == 0) textFrom else sourceLetterEnds[letters - 1]
+            return (offset.toFloat() / verseLength).coerceIn(0f, 1f)
+        }
         val within = if (length <= 0) 0f else (at.toFloat() / length).coerceIn(0f, 1f)
         return ((from + within * (to - from)) / verseLength).coerceIn(0f, 1f)
     }
@@ -99,6 +186,17 @@ data class EnglishLeafVerse(
         if (span <= 0f) return verseProgress
         return ((verseProgress * verseLength - from) / span).coerceIn(0f, 1f)
     }
+}
+
+/** How many of the ascending [ends] are at or below [offset]. */
+private fun countAtOrBelow(ends: IntArray, offset: Int): Int {
+    var lo = 0
+    var hi = ends.size
+    while (lo < hi) {
+        val mid = (lo + hi) ushr 1
+        if (ends[mid] <= offset) lo = mid + 1 else hi = mid
+    }
+    return lo
 }
 
 /**
@@ -296,6 +394,8 @@ fun englishLeaf(
                 to = to,
                 verseLength = whole.length,
                 textFrom = from + (slice.length - slice.trimStart().length),
+                source = whole,
+                hideParentheticals = hideParentheticals,
             )
         }
     }

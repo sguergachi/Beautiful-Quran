@@ -503,8 +503,10 @@ internal data class EnglishProseVerse(
     /** The verse's first word on the page — what a tap plays from. */
     val token: MushafToken?,
     /**
-     * Where the reciter is inside *this* fragment, given where they are inside
-     * the verse. Identity for a verse the leaf sets whole.
+     * Where the reciter is inside *this* fragment's printed text, given where
+     * they are inside the verse — carried across by letters, not proportion
+     * (`EnglishLeafVerse.fragmentInkProgress`), so a band edge lands on the
+     * word it names however many joiners the hyphenation threaded in.
      */
     val fragmentProgress: (Float) -> Float = { it },
     /**
@@ -590,7 +592,7 @@ private fun englishLeafBlockTexts(
                         range = range,
                         markRange = markRange,
                         token = openingTokens[verse.surahId to verse.ayah],
-                        fragmentProgress = verse::fragmentProgress,
+                        fragmentProgress = verse::fragmentInkProgress,
                         verseFractionAt = { at ->
                             verse.verseFractionAt(at, verse.text.length)
                         },
