@@ -14,22 +14,30 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.isSpecified
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.ShaderBrush
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import kotlin.math.PI
+import kotlin.math.abs
 import kotlin.math.cos
+import kotlin.math.hypot
 import kotlin.math.sin
 
 /**
@@ -49,9 +57,11 @@ import kotlin.math.sin
  * splash a different grain. The stain lands and spreads in 170 ms.
  *
  * [fillBox] lays a pale even rounded-rect wash — fibre on the rim
- * only — so verse type stays readable. Size and opacity both follow
- * [progress]: select fades in as it grows, deselect fades out as it
- * recedes. Tool-strip drops still land mid-size.
+ * only — so verse type stays readable. The wash does not scale up from
+ * the middle: ink runs out from wherever the finger went down and soaks
+ * the block, a capillary front with a fibre edge. Opacity follows
+ * [progress], so deselect fades out as the ink draws back to the finger.
+ * Tool-strip drops still land mid-size.
  */
 @Composable
 fun Modifier.inkSpotHighlight(
@@ -71,7 +81,26 @@ fun Modifier.inkSpotHighlight(
     val brush = remember(shader) { shader?.let { ShaderBrush(it) } }
     val tuning = ContextualGuideStyle.tuning
     val fill = if (fillBox) 1f else 0f
-    return drawBehind {
+    // Where the ink starts. Written from the pointer watcher below and
+    // read only in the draw phase, so a tap costs a redraw, never a
+    // recomposition (docs/PERFORMANCE.md).
+    val spreadSource = remember { mutableStateOf(Offset.Unspecified) }
+    val watchFinger = if (fillBox) {
+        Modifier.pointerInput(Unit) {
+            awaitPointerEventScope {
+                while (true) {
+                    // The Initial pass only observes. The verse's own tap
+                    // handling still sees the gesture and consumes it.
+                    val event = awaitPointerEvent(PointerEventPass.Initial)
+                    val down = event.changes.firstOrNull { it.pressed && !it.previousPressed }
+                    if (down != null) spreadSource.value = down.position
+                }
+            }
+        }
+    } else {
+        Modifier
+    }
+    return watchFinger.drawBehind {
         if (progress <= 0.01f) return@drawBehind
         if (shader != null && brush != null) {
             shader.setFloatUniform("resolution", size.width, size.height)
@@ -81,6 +110,8 @@ fun Modifier.inkSpotHighlight(
             shader.setFloatUniform("vellumGrain", tuning.vellumGrain)
             shader.setFloatUniform("fill", fill)
             shader.setFloatUniform("rimInset", VerseSoakRimInset.toPx())
+            val source = verseSoakSource(spreadSource.value, size)
+            shader.setFloatUniform("spreadSource", source.x, source.y)
             shader.setColorUniform(
                 "inkColor",
                 android.graphics.Color.valueOf(
@@ -101,16 +132,22 @@ fun Modifier.inkSpotHighlight(
                 val half = verseSoakHalfSize(
                     width = size.width,
                     height = size.height,
-                    progress = progress,
                     rimInset = VerseSoakRimInset.toPx(),
                 )
+                val source = verseSoakSource(spreadSource.value, size)
+                val reach = verseSoakReach(half, source, center)
+                val front = verseSoakFront(reach, progress)
                 val cr = minOf(half.width, half.height) * 0.12f
-                drawRoundRect(
-                    color.copy(alpha = inkSpotAppear(progress) * color.alpha),
-                    topLeft = Offset(cx - half.width, cy - half.height),
-                    size = Size(half.width * 2f, half.height * 2f),
-                    cornerRadius = CornerRadius(cr, cr),
-                )
+                // No shader here, so the front is a plain clip: the wash
+                // still arrives from the finger rather than the middle.
+                clipPath(Path().apply { addOval(Rect(source, front)) }) {
+                    drawRoundRect(
+                        color.copy(alpha = inkSpotAppear(progress) * color.alpha),
+                        topLeft = Offset(cx - half.width, cy - half.height),
+                        size = Size(half.width * 2f, half.height * 2f),
+                        cornerRadius = CornerRadius(cr, cr),
+                    )
+                }
             } else {
                 val reach = minOf(size.width, size.height) * 0.5f
                 drawCircle(color.copy(alpha = 0.06f * progress), radius = reach * 0.92f, center = center)
@@ -226,11 +263,10 @@ internal fun inkSpotAppear(progress: Float): Float = progress.coerceIn(0f, 1f)
  */
 internal val VerseSoakRimInset = 9.dp
 
-/** Where the wash opens, as a fraction of the block, before it grows. */
-internal const val VerseSoakStart = 0.36f
-
 /**
- * Half-extents of the verse soak's rounded rectangle, in pixels.
+ * Half-extents of the verse soak's rounded rectangle, in pixels. This is
+ * the silhouette at every [progress] — the animation is the ink front
+ * crossing it, not the rectangle growing.
  *
  * The wash used to land at 93% of the block in **both** axes. That reads
  * right on a short verse and fails on a long one: the rim inset was a
@@ -245,19 +281,47 @@ internal const val VerseSoakStart = 0.36f
 internal fun verseSoakHalfSize(
     width: Float,
     height: Float,
-    progress: Float,
     rimInset: Float,
 ): Size {
     val halfWidth = width * 0.5f
     val halfHeight = height * 0.5f
-    val grownWidth = maxOf(halfWidth - rimInset, halfWidth * 0.5f)
-    val grownHeight = maxOf(halfHeight - rimInset, halfHeight * 0.5f)
-    val t = progress.coerceIn(0f, 1f)
     return Size(
-        halfWidth * VerseSoakStart + (grownWidth - halfWidth * VerseSoakStart) * t,
-        halfHeight * VerseSoakStart + (grownHeight - halfHeight * VerseSoakStart) * t,
+        maxOf(halfWidth - rimInset, halfWidth * 0.5f),
+        maxOf(halfHeight - rimInset, halfHeight * 0.5f),
     )
 }
+
+/** The finger, or the middle of the block when nothing was tapped. */
+internal fun verseSoakSource(tap: Offset, size: Size): Offset =
+    if (tap.isSpecified) {
+        Offset(tap.x.coerceIn(0f, size.width), tap.y.coerceIn(0f, size.height))
+    } else {
+        Offset(size.width * 0.5f, size.height * 0.5f)
+    }
+
+/** Distance from [source] to the soak rectangle's farthest corner. */
+internal fun verseSoakReach(halfSize: Size, source: Offset, center: Offset): Float {
+    val dx = abs(source.x - center.x) + halfSize.width
+    val dy = abs(source.y - center.y) + halfSize.height
+    return maxOf(hypot(dx, dy), 1f)
+}
+
+/** Width of the front's soft, fibre-warped edge. */
+internal fun verseSoakFeather(reach: Float): Float = maxOf(reach * 0.14f, 14f)
+
+/**
+ * How far the ink has run from the finger at [progress].
+ *
+ * It overshoots the farthest corner by two feathers, because the front
+ * wanders by up to 0.8 of a feather in any direction: without the
+ * overshoot a tap in one corner would leave the opposite corner dry at
+ * rest, and the soak has to be the whole verse when it settles.
+ */
+internal fun verseSoakFront(
+    reach: Float,
+    progress: Float,
+    feather: Float = verseSoakFeather(reach),
+): Float = progress.coerceIn(0f, 1f) * (reach + 2f * feather)
 
 /** Closed cubic blot. [scale] > 1 draws the fainter outer soak. */
 fun inkSpotPath(
