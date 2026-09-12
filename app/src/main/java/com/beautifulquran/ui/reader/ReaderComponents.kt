@@ -3032,7 +3032,7 @@ fun AyahBlock(
                 seed = ayah.surahId * 1_000 + ayah.number,
                 color = LocalQuranAccents.current.gold.copy(alpha = 0.26f),
                 fillBox = true,
-                durationMillis = 400,
+                durationMillis = 600,
                 easing = InkExpandEasing,
             )
             // The shaped text owns word-precise reading taps. Once gathering,
