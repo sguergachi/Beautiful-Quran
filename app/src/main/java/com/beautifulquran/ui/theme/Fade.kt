@@ -442,6 +442,10 @@ fun Modifier.shapedWordBloom(
                             start = start,
                             endExclusive = endExclusive,
                             radiusPx = bloom.glowRadius.dp.toPx(),
+                            // Same fence as the tint: where the node holds one
+                            // word, the selection path is not its silhouette.
+                            clipPath = path.takeIf { clipTintToRange },
+                            overhangPx = bleed,
                         )
                         if (halo != null) {
                             val glowPaint = android.graphics.Paint(
@@ -681,6 +685,7 @@ private class GlyphHaloCache {
         val start: Int,
         val endExclusive: Int,
         val radiusBits: Int,
+        val clipped: Boolean,
     )
 
     data class Halo(
@@ -695,22 +700,46 @@ private class GlyphHaloCache {
             size > 8
     }
 
+    /**
+     * [clipPath] is the range's selection path where words share one layout: it
+     * is the only thing holding this word's light off the word beside it, and
+     * the neighbour redraws over anything it laps.
+     *
+     * Null where the node holds a single word, as on the mushaf leaf. A QCF
+     * glyph inks past its advance — a tail sweeping under the word before it, a
+     * mark riding high — and the selection stops at that advance, so masking
+     * the halo with it cut the tail and the mark out of the light and left a
+     * straight edge down the side of the glow. `docs/GLIMMER.md` forbids
+     * exactly that box edge, and it is the same reason the tint is unclipped
+     * there (see [Modifier.shapedWordBloom]). Unclipped, the mask is the node's
+     * own drawing widened by [overhangPx] for the ink that leaves its box.
+     */
     fun haloFor(
         textLayout: TextLayoutResult,
         start: Int,
         endExclusive: Int,
         radiusPx: Float,
+        clipPath: Path?,
+        overhangPx: Float,
     ): Halo? {
         if (radiusPx <= 0f) return null
         if (layout !== textLayout) {
             layout = textLayout
             byRange.clear()
         }
-        val key = Key(start, endExclusive, radiusPx.toBits())
+        val key = Key(start, endExclusive, radiusPx.toBits(), clipPath != null)
         byRange[key]?.let { return it }
 
-        val path = textLayout.getPathForRange(start, endExclusive)
-        val bounds = path.getBounds()
+        val bounds = if (clipPath != null) {
+            clipPath.getBounds()
+        } else {
+            Rect(
+                -overhangPx,
+                -overhangPx,
+                textLayout.size.width + overhangPx,
+                textLayout.size.height + overhangPx,
+            )
+        }
         if (bounds.isEmpty || bounds.width <= 0f || bounds.height <= 0f) return null
         val left = floor(bounds.left).toInt()
         val top = floor(bounds.top).toInt()
@@ -719,7 +748,7 @@ private class GlyphHaloCache {
         val glyphs = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
         val glyphCanvas = Canvas(android.graphics.Canvas(glyphs))
         glyphCanvas.translate(-left.toFloat(), -top.toFloat())
-        glyphCanvas.clipPath(path)
+        if (clipPath != null) glyphCanvas.clipPath(clipPath)
         textLayout.multiParagraph.paint(glyphCanvas)
 
         val offset = IntArray(2)
