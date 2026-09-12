@@ -470,6 +470,16 @@ select {
   min-height: 100%;
 }
 
+/* Home's dissolve is the search bar's ::after, not the sheet's top fade —
+   that overlay sat on the field. Bottom sheet fade still applies. */
+.sheet[data-name='home'] .edge-fade::before {
+  content: none;
+}
+
+.sheet[data-name='home'] .scroll {
+  padding-top: 0;
+}
+
 .home-scroll-page > .search-row {
   position: sticky;
   top: 0;
@@ -477,7 +487,24 @@ select {
   padding-bottom: 12px;
   padding-right: 0;
   padding-left: 0;
+  /* Same in-flow reserve as Android's 24dp feather spacer so the first
+     row sits clear of the dissolve at rest. ::after stays out of flow. */
+  margin-bottom: 1.5rem;
+  /* Solid paper through the field and the 12px breath under it. The
+     dissolve lives on ::after, below that margin — not through the pill. */
   background: var(--paper);
+  isolation: isolate;
+}
+
+.home-scroll-page > .search-row::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  height: 1.5rem;
+  pointer-events: none;
+  background: linear-gradient(to bottom, var(--paper), transparent);
 }
 
 .home-bookmark-ribbon {
@@ -531,7 +558,8 @@ select {
 }
 
 .home-scroll-page[data-search-focused='true'] > .search-row {
-  padding-top: 0.5rem;
+  /* Header collapse drops safe-area padding; keep the field below the notch. */
+  padding-top: max(0.5rem, env(safe-area-inset-top, 0px));
 }
 
 .home-header h1 {

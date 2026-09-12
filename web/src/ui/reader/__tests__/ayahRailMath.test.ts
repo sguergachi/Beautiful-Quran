@@ -6,6 +6,7 @@ import {
   dialDeltaFromPointerDy,
   dialFromTickY,
   dialFromTrackY,
+  dialOnCollapsedActivate,
   focusRadiusForHeight,
   isMajorAyah,
   railCollapsedBarRect,
@@ -85,6 +86,17 @@ describe('wheel scrub (tick spacing)', () => {
     expect(dialDeltaFromPointerDy(-tick, tick)).toBeCloseTo(1, 5)
     expect(dialDeltaFromPointerDy(tick, tick)).toBeCloseTo(-1, 5)
     expect(dialDeltaFromPointerDy(-tick * 2.5, tick)).toBeCloseTo(2.5, 5)
+  })
+
+  it('opening the centered collapsed stack keeps the reading ayah', () => {
+    // The stack lives at the rail midline. Absolute Y mapping of that press
+    // is the middle of Al-Baqarah, not the verse being read.
+    const height = 800
+    const ayahCount = 286
+    expect(Math.round(dialFromTrackY(height / 2, height, ayahCount))).toBeGreaterThan(100)
+    expect(dialOnCollapsedActivate(7, ayahCount)).toBe(7)
+    expect(dialOnCollapsedActivate(286, ayahCount)).toBe(286)
+    expect(dialOnCollapsedActivate(1, 1)).toBe(1)
   })
 
   it('selects the visible tick under the pointer, not an absolute track fraction', () => {
