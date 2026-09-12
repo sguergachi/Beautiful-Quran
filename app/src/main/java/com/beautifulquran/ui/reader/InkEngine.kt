@@ -268,6 +268,26 @@ object InkEngine {
             persistLab()
         }
 
+    /**
+     * How early the *camera* moves to the next ayah before the last word ends
+     * (ms).
+     *
+     * Separate from [fadeLeadMs] on purpose. That one prepares the next
+     * verse's ink — its focus, its recess lifting — and moving the page on it
+     * was explicitly refused, because ink arriving early is a promise and the
+     * page arriving early is a reader looking at a verse nobody is saying yet.
+     * They are different judgements about the same handoff, so they get
+     * different numbers, and this one is audition-first: raise it until the
+     * scroll leads the voice by as much as reads right.
+     */
+    private var scrollLeadState by mutableStateOf(DEFAULT_SCROLL_LEAD_MS)
+    var scrollLeadMs: Int
+        get() = scrollLeadState
+        set(value) {
+            scrollLeadState = value
+            persistLab()
+        }
+
     /** How early the next ayah prepares before the last word ends (ms). */
     private var fadeLeadState by mutableStateOf(DEFAULT_FADE_LEAD_MS)
     var fadeLeadMs: Int
@@ -307,6 +327,7 @@ object InkEngine {
     /** Shipped defaults for highlight sync (lab knobs start here). */
     const val DEFAULT_HIGHLIGHT_LEAD_MS = 0
     const val DEFAULT_FADE_LEAD_MS = 500
+    const val DEFAULT_SCROLL_LEAD_MS = 400
 
     /**
      * Attach [store] and restore any saved lab numbers. Call once from
@@ -332,6 +353,7 @@ object InkEngine {
             ContextualGuideStyle.tuning = snapshot.toContextualGuideTuning()
             highlightLeadState = snapshot.highlightLeadMs
             fadeLeadState = snapshot.fadeLeadMs
+            scrollLeadState = snapshot.scrollLeadMs
             outputLatencyOverrideState = snapshot.outputLatencyOverrideMs
             pushTarjiTuning(tuningState)
         } finally {
@@ -353,6 +375,7 @@ object InkEngine {
             ContextualGuideStyle.tuning = ContextualGuideTuning()
             highlightLeadState = DEFAULT_HIGHLIGHT_LEAD_MS
             fadeLeadState = DEFAULT_FADE_LEAD_MS
+            scrollLeadState = DEFAULT_SCROLL_LEAD_MS
             outputLatencyOverrideState = null
             pushTarjiTuning(tuningState)
         } finally {

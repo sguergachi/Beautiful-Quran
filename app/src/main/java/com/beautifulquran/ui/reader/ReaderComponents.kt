@@ -1893,6 +1893,8 @@ internal fun buildShapedBlooms(
             range = rendered.markRange,
             paper = palette.paperColor,
             coverAlpha = markCover,
+            // The mark fades alone, so its cover may not reach. See the field.
+            pad = 0.dp,
         )
     }
     blooms.addShapedInkMotionBlooms(

@@ -101,6 +101,7 @@ data class InkLabSnapshot(
     val guideVerticalTaper: Float = 0.24f,
     val highlightLeadMs: Int = InkEngine.DEFAULT_HIGHLIGHT_LEAD_MS,
     val fadeLeadMs: Int = InkEngine.DEFAULT_FADE_LEAD_MS,
+    val scrollLeadMs: Int = InkEngine.DEFAULT_SCROLL_LEAD_MS,
     /** Null means auto route preset; omitted on old saves → null. */
     val outputLatencyOverrideMs: Int? = null,
 ) {
@@ -174,6 +175,7 @@ data class InkLabSnapshot(
             guide: ContextualGuideTuning = InkEngine.contextualGuideTuning,
             highlightLeadMs: Int = InkEngine.highlightLeadMs,
             fadeLeadMs: Int = InkEngine.fadeLeadMs,
+            scrollLeadMs: Int = InkEngine.scrollLeadMs,
             outputLatencyOverrideMs: Int? = InkEngine.outputLatencyOverrideMs,
         ): InkLabSnapshot = InkLabSnapshot(
             upcomingAlpha = tuning.upcomingAlpha,
@@ -226,6 +228,7 @@ data class InkLabSnapshot(
             guideVerticalTaper = guide.verticalTaper,
             highlightLeadMs = highlightLeadMs,
             fadeLeadMs = fadeLeadMs,
+            scrollLeadMs = scrollLeadMs,
             outputLatencyOverrideMs = outputLatencyOverrideMs,
         )
 

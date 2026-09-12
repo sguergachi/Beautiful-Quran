@@ -439,7 +439,9 @@ tween-vs-snap rules, sweep entry and residual rules, repeat wash timing, the
   snapshot-backed (`mutableStateOf`), so release builds read constants while
   the Ink Lab can retune a live session.
 - **Sync knobs, deliberately outside `Tuning`**: `highlightLeadMs` (default 0),
-  `fadeLeadMs` (default 500) and `outputLatencyOverrideMs` (null = use the route
+  `fadeLeadMs` (default 500), `scrollLeadMs` (default 400 — the camera's own
+  lead, deliberately separate from the ink's; see `FocusEngine.playbackFocusTarget`)
+  and `outputLatencyOverrideMs` (null = use the route
   preset). These move *when* things fire rather than how the ink feels, so they
   stay out of the data class that **Copy values** transcribes — but they persist
   with it via `InkLabStore`. `fadeLeadMs` is how far the ayah focus/recess target

@@ -935,12 +935,17 @@ fun ReaderScreen(
     // whether it is taller than the screen — the return-to-verse control reads
     // the former, the word-level follow gate reads the latter. Both watch
     // layoutInfo, so they recompute only when their answer actually changes.
-    // The camera follows the media item, not the fade-led ink target: lifting
-    // the next ayah's recess early must not move the page before its audio.
+    // The camera still does not take the *ink* lead — lifting the next ayah's
+    // recess early is a promise about ink, not a reason to move the page — but
+    // it takes a lead of its own, so the paper can start travelling while the
+    // closing word is being held rather than only once the next file opens.
+    // Two numbers for one handoff, on purpose: see [InkEngine.scrollLeadMs].
     // During the basmalah lead-in the target is ayah 0 (its dedicated item).
     val listeningAyah = playerState.nowPlaying?.ayah
+    val scrollLeadAyah by viewModel.scrollFocusAyah.collectAsStateWithLifecycle()
     val playbackFocusTarget = FocusEngine.playbackFocusTarget(
-        playingAyah = listeningAyah?.takeIf { it >= 1 && isThisSurahPlaying },
+        playingAyah = (scrollLeadAyah ?: listeningAyah)
+            ?.takeIf { it >= 1 && isThisSurahPlaying },
         activeBasmalah = isThisSurahPlaying && activeBasmalah == true,
     )
     val activeAyahPlacement = remember(playbackFocusTarget) {

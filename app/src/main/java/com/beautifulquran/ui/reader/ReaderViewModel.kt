@@ -640,6 +640,20 @@ class ReaderViewModel(
     }
 
     /**
+     * Where the *camera* should be. The playing ayah, advanced
+     * [InkEngine.scrollLeadMs] before its last word ends.
+     *
+     * Deliberately its own flow rather than a reuse of [activeAyah]: the ink
+     * lead and the camera lead are different judgements about the same
+     * handoff (see [InkEngine.scrollLeadMs]), and Continue Listening must keep
+     * reading the raw media item, since a lead is a verse the listener has not
+     * reached yet.
+     */
+    val scrollFocusAyah: StateFlow<Int?> = pollingWhileLoaded(key = { it.ayah }) { ayah ->
+        if (ayah == BASMALAH_PLAYLIST_AYAH) null else ayahWithScrollLead(ayah)
+    }
+
+    /**
      * True while the dedicated basmalah lead-in clip is the current media item
      * on a preface surah. Drives Active ink on the header calligraphy.
      */
@@ -700,7 +714,13 @@ class ReaderViewModel(
      * [InkEngine.fadeLeadMs] of the current ayah's *recitation*, so its fade-in
      * leads the last word (including a waqf hold) rather than trailing encoded
      * silence on the media file. Only while playing. */
-    private fun ayahWithFadeLead(ayah: Int): Int {
+    /** [ayahWithFadeLead] on the camera's own number. */
+    private fun ayahWithScrollLead(ayah: Int): Int =
+        ayahWithLead(ayah, InkEngine.scrollLeadMs.toLong())
+
+    private fun ayahWithFadeLead(ayah: Int): Int = ayahWithLead(ayah, InkEngine.fadeLeadMs.toLong())
+
+    private fun ayahWithLead(ayah: Int, leadMs: Long): Int {
         val ayahCount = _uiState.value.content?.surah?.ayahCount ?: return ayah
         // Prefer last word end so lead fires during the closing hold, not after
         // it in file-trailing silence (where activeWord is already null and the
@@ -718,7 +738,7 @@ class ReaderViewModel(
             // listener changed audio output.
             positionMs = heardPositionMs(),
             endMs = endMs,
-            leadMs = InkEngine.fadeLeadMs.toLong(),
+            leadMs = leadMs,
             ayahCount = ayahCount,
             repeatRangeLast = player.state.value.repeatRange?.last,
         )
