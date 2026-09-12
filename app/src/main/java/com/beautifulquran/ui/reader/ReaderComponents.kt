@@ -2771,6 +2771,8 @@ fun AyahBlock(
      * Non-null only while gather mode has this verse selected.
      */
     gatherOrdinal: Int? = null,
+    /** When true, the whole verse block toggles selection, not only its ink. */
+    gathering: Boolean = false,
     onAyahMarkClick: (() -> Unit)? = null,
     onWordClick: ((Word) -> Unit)?,
     onWordLongClick: ((Word) -> Unit)? = null,
@@ -3032,6 +3034,12 @@ fun AyahBlock(
                 fillBox = true,
                 durationMillis = 400,
                 easing = InkExpandEasing,
+            )
+            // The shaped text owns word-precise reading taps. Once gathering,
+            // the whole verse block is the target — including its paper around
+            // the ink — as the gather contract promises.
+            .then(
+                if (gathering) Modifier.quietClickable(onClick = onAyahClick) else Modifier,
             )
             .drawWithContent {
                 drawContent()
