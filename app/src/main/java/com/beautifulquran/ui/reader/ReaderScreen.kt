@@ -3106,6 +3106,7 @@ fun ReaderScreen(
                                     null
                                 },
                                 gatherOrdinal = gatheredHere,
+                                gathering = gathering,
                                 onAyahMarkClick = {
                                     view.paperToggleHaptic(
                                         turningOn = gatheredHere == null,
