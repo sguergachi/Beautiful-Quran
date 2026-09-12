@@ -56,12 +56,53 @@ class InkSpotTest {
         assertTrue(VellumSpotShader.contains("1.0 / (1.0 + exp(sdf / diffusion))"))
         assertTrue(VellumSpotShader.contains("rimGate"))
         assertTrue(VellumSpotShader.contains("sourcePool * (1.0 - fill)"))
-        assertTrue(VellumSpotShader.contains("mix(0.36, 0.93, progress)"))
+        assertTrue(VellumSpotShader.contains("mix(fullHalf * 0.36, grown, progress)"))
+        assertTrue(VellumSpotShader.contains("uniform float rimInset"))
+        assertFalse(
+            "a proportional rim inset grows with the verse's height",
+            VellumSpotShader.contains("0.5 * res * mix("),
+        )
         assertFalse(VellumSpotShader.contains("midpoint - r + warp"))
         assertFalse(
             "verse soak opacity must track progress, not snap on in the first fifth",
             VellumSpotShader.contains("progress * 5.0"),
         )
+    }
+
+    @Test
+    fun `verse soak reaches the whole block at any text size`() {
+        // Same verse, set small and set large: the block grows taller, and
+        // the wash must still reach within one fixed rim of its edges.
+        val rim = 25f
+        val short = verseSoakHalfSize(width = 1000f, height = 400f, progress = 1f, rimInset = rim)
+        val tall = verseSoakHalfSize(width = 1000f, height = 2600f, progress = 1f, rimInset = rim)
+        assertEquals(400f / 2f - rim, short.height, 0.01f)
+        assertEquals(2600f / 2f - rim, tall.height, 0.01f)
+        assertEquals(1000f / 2f - rim, tall.width, 0.01f)
+        // The uncovered band at the top is the same either way — it does
+        // not scale, which is the whole point.
+        val shortGap = 400f / 2f - short.height
+        val tallGap = 2600f / 2f - tall.height
+        assertEquals(shortGap, tallGap, 0.01f)
+    }
+
+    @Test
+    fun `verse soak opens small and grows into the block`() {
+        val seed = verseSoakHalfSize(1000f, 2600f, progress = 0f, rimInset = 25f)
+        val full = verseSoakHalfSize(1000f, 2600f, progress = 1f, rimInset = 25f)
+        assertEquals(2600f * 0.5f * 0.36f, seed.height, 0.01f)
+        assertTrue(full.height > seed.height)
+        val mid = verseSoakHalfSize(1000f, 2600f, progress = 0.5f, rimInset = 25f)
+        assertTrue(mid.height > seed.height && mid.height < full.height)
+    }
+
+    @Test
+    fun `a one-line verse cannot invert under the rim inset`() {
+        // Rim wider than the block itself: keep at least half, never a
+        // negative or zero-height wash.
+        val tiny = verseSoakHalfSize(width = 300f, height = 40f, progress = 1f, rimInset = 60f)
+        assertEquals(20f * 0.5f, tiny.height, 0.01f)
+        assertTrue(tiny.width > 0f)
     }
 
     @Test

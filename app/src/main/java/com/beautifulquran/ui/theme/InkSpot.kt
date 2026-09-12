@@ -80,6 +80,7 @@ fun Modifier.inkSpotHighlight(
             shader.setFloatUniform("fadeSoftness", tuning.fadeSoftness)
             shader.setFloatUniform("vellumGrain", tuning.vellumGrain)
             shader.setFloatUniform("fill", fill)
+            shader.setFloatUniform("rimInset", VerseSoakRimInset.toPx())
             shader.setColorUniform(
                 "inkColor",
                 android.graphics.Color.valueOf(
@@ -97,13 +98,17 @@ fun Modifier.inkSpotHighlight(
             val cy = size.height * 0.5f
             val center = Offset(cx, cy)
             if (fillBox) {
-                val rx = cx * (0.36f + 0.57f * progress)
-                val ry = cy * (0.36f + 0.57f * progress)
-                val cr = minOf(rx, ry) * 0.12f
+                val half = verseSoakHalfSize(
+                    width = size.width,
+                    height = size.height,
+                    progress = progress,
+                    rimInset = VerseSoakRimInset.toPx(),
+                )
+                val cr = minOf(half.width, half.height) * 0.12f
                 drawRoundRect(
                     color.copy(alpha = inkSpotAppear(progress) * color.alpha),
-                    topLeft = Offset(cx - rx, cy - ry),
-                    size = Size(rx * 2f, ry * 2f),
+                    topLeft = Offset(cx - half.width, cy - half.height),
+                    size = Size(half.width * 2f, half.height * 2f),
                     cornerRadius = CornerRadius(cr, cr),
                 )
             } else {
@@ -212,6 +217,47 @@ fun <T> InkSpotChoiceRow(
 
 /** Pigment follows [progress] so select fades in and deselect fades out. */
 internal fun inkSpotAppear(progress: Float): Float = progress.coerceIn(0f, 1f)
+
+/**
+ * Pixel margin the verse soak reserves for its warped, diffused rim, so
+ * the organic edge is never cut square by the draw rect. At the usual
+ * reader density this is the same room the old 93% ceiling left across
+ * the width of a verse — it is now the room left on every side.
+ */
+internal val VerseSoakRimInset = 9.dp
+
+/** Where the wash opens, as a fraction of the block, before it grows. */
+internal const val VerseSoakStart = 0.36f
+
+/**
+ * Half-extents of the verse soak's rounded rectangle, in pixels.
+ *
+ * The wash used to land at 93% of the block in **both** axes. That reads
+ * right on a short verse and fails on a long one: the rim inset was a
+ * fraction, so raising the reader's text size made the block taller and
+ * grew the inset with it, until it exceeded the block's own 14dp padding
+ * and the first and last lines of a gathered verse sat outside their own
+ * highlight. The margin is a fixed [rimInset] instead, which is what the
+ * rim actually needs, so coverage no longer depends on how tall the verse
+ * is set. [rimInset] is capped at half the block so a one-line verse
+ * cannot invert.
+ */
+internal fun verseSoakHalfSize(
+    width: Float,
+    height: Float,
+    progress: Float,
+    rimInset: Float,
+): Size {
+    val halfWidth = width * 0.5f
+    val halfHeight = height * 0.5f
+    val grownWidth = maxOf(halfWidth - rimInset, halfWidth * 0.5f)
+    val grownHeight = maxOf(halfHeight - rimInset, halfHeight * 0.5f)
+    val t = progress.coerceIn(0f, 1f)
+    return Size(
+        halfWidth * VerseSoakStart + (grownWidth - halfWidth * VerseSoakStart) * t,
+        halfHeight * VerseSoakStart + (grownHeight - halfHeight * VerseSoakStart) * t,
+    )
+}
 
 /** Closed cubic blot. [scale] > 1 draws the fainter outer soak. */
 fun inkSpotPath(

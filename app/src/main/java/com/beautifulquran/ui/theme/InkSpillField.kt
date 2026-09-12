@@ -404,6 +404,7 @@ internal const val VellumSpotShader = """
     uniform float fadeSoftness;
     uniform float vellumGrain;
     uniform float fill;
+    uniform float rimInset;
     layout(color) uniform half4 inkColor;
 """ + VellumPigmentFunctions + """
     half4 main(float2 fragCoord) {
@@ -421,7 +422,13 @@ internal const val VellumSpotShader = """
                 hash(float2(seed, 4.7))
             ) - 0.5) * res * 0.006;
             float2 p = fragCoord - center;
-            float2 halfSize = 0.5 * res * mix(0.36, 0.93, progress);
+            // The rim margin is a fixed [rimInset] of pixels, never a
+            // fraction of the box — see verseSoakHalfSize for why a
+            // proportional ceiling left tall verses short of their own
+            // first and last lines.
+            float2 fullHalf = 0.5 * res;
+            float2 grown = max(fullHalf - float2(rimInset), fullHalf * 0.5);
+            float2 halfSize = mix(fullHalf * 0.36, grown, progress);
             float cr = min(halfSize.x, halfSize.y) * 0.12;
             float2 q = abs(p) - halfSize + cr;
             float sdf = length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - cr;
