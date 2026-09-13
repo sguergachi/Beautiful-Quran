@@ -152,6 +152,9 @@ fun Modifier.glyphLayerAlpha(alpha: () -> Float): Modifier = drawWithContent {
  * Constraints that ruled out earlier approaches:
  * - Per-glyph [SpanStyle]s flip Uthmanic Hafs joining (#133).
  * - A separate overlay [Text] of one word re-shapes in isolation (no fade).
+ *   [ColorReveal]'s mask is a lone layout too ([WordInkCache]), but built from
+ *   the line's own text spans and style and trusted only when its advance
+ *   matches the line's; it only lays tint and glow over glyphs the line drew.
  * - [drawText] with a [Color] argument does **not** override existing
  *   [SpanStyle] colours — painting over a transparent active span stays
  *   invisible until the word becomes recited.
