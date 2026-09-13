@@ -23,6 +23,7 @@ import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.drawText
+import androidx.compose.ui.text.style.ResolvedTextDirection
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import kotlin.math.ceil
@@ -637,89 +638,24 @@ private class GlyphPathCache {
         val key = (start.toLong() shl 32) or endExclusive.toLong()
         byRange[key]?.let { return it }
         val path = textLayout.getPathForRange(start, endExclusive)
-        val wordBounds = path.getBounds()
-        reachIntoGaps(textLayout, start, endExclusive, wordBounds, path)
+        trailingGapReach(textLayout, start, endExclusive)?.let { path.addRect(it) }
         return Shaped(path, path.getBounds()).also { byRange[key] = it }
     }
 
     /**
-     * Widens a word's selection path by half of the word gap on each side of it.
-     *
-     * The path is the tint's clip where words share one layout, and a selection
-     * stops at the word's advance — but a Hafs glyph inks past it: the tail of a
-     * final و or ن sweeps out into the space beside the word. Clipped at the
-     * advance, that tail kept its plain ink and the orange ended on a straight
-     * edge across the stroke. Half the gap is the tail's to take and none of it
-     * is the neighbour's advance, so the clip still holds the tint off the word
-     * beside it. A gap that wraps to another line is left alone: its box is on
-     * a different line from the word.
+     * The word gap after a right-to-left word, as a rect on the word's own line
+     * — or null. See [trailingWordGap] for which gaps qualify and why.
      */
-    private fun reachIntoGaps(
-        textLayout: TextLayoutResult,
-        start: Int,
-        endExclusive: Int,
-        wordBounds: Rect,
-        path: Path,
-    ) {
-        if (wordBounds.isEmpty) return
-        val text = textLayout.layoutInput.text
-        var before = start
-        while (before > 0 && text[before - 1].isWhitespace()) before--
-        var after = endExclusive
-        while (after < text.length && text[after].isWhitespace()) after++
-        if (start > 0 && before < start) {
-            addHalfGap(textLayout, before, start, edge = start, path)
-        }
-        if (endExclusive > start && after > endExclusive) {
-            addHalfGap(textLayout, endExclusive, after, edge = endExclusive - 1, path)
-        }
-    }
-
-    /**
-     * [edge] is the word's own character beside the gap. The gap is taken only
-     * when all of it is visible on that character's line: the space a line
-     * wraps on is not a gap between two words on the paper, and its selection
-     * box reaches into the next line — taking half of it lit the glimmer over
-     * words a line below the one being said.
-     */
-    private fun addHalfGap(
-        textLayout: TextLayoutResult,
-        gapStart: Int,
-        gapEnd: Int,
-        edge: Int,
-        path: Path,
-    ) {
-        val line = textLayout.getLineForOffset(edge)
-        if (textLayout.getLineForOffset(gapStart) != line) return
-        if (textLayout.getLineForOffset(gapEnd - 1) != line) return
-        // A gap the line wraps on hangs past the line's visible end.
-        if (gapEnd > textLayout.getLineEnd(line, visibleEnd = true)) return
-        if (gapStart < textLayout.getLineStart(line)) return
-        // Neither side of it may be a line's edge: a word must stand beyond it.
-        if (gapEnd >= textLayout.layoutInput.text.length) return
-        if (textLayout.getLineForOffset(gapEnd) != line) return
-        if (gapStart == 0 || textLayout.getLineForOffset(gapStart - 1) != line) return
-        val left = minOf(
-            textLayout.getHorizontalPosition(gapStart, usePrimaryDirection = true),
-            textLayout.getHorizontalPosition(gapEnd, usePrimaryDirection = true),
-        )
-        val right = maxOf(
-            textLayout.getHorizontalPosition(gapStart, usePrimaryDirection = true),
-            textLayout.getHorizontalPosition(gapEnd, usePrimaryDirection = true),
-        )
-        if (right - left <= 0f) return
-        val top = textLayout.getLineTop(line)
-        val bottom = textLayout.getLineBottom(line)
-        val half = (right - left) / 2f
-        // The half of the gap that touches this word's own character.
-        val edgeBox = textLayout.getBoundingBox(edge)
-        val edgeCenter = (edgeBox.left + edgeBox.right) / 2f
-        val reach = if (edgeCenter >= right) {
-            Rect(right - half, top, right, bottom)
-        } else {
-            Rect(left, top, left + half, bottom)
-        }
-        path.addRect(reach)
+    private fun trailingGapReach(textLayout: TextLayoutResult, start: Int, endExclusive: Int): Rect? {
+        if (textLayout.getParagraphDirection(start) != ResolvedTextDirection.Rtl) return null
+        val gap = trailingWordGap(textLayout.layoutInput.text, start, endExclusive) {
+            textLayout.getLineForOffset(it)
+        } ?: return null
+        val line = textLayout.getLineForOffset(gap.first)
+        val a = textLayout.getHorizontalPosition(gap.first, usePrimaryDirection = true)
+        val b = textLayout.getHorizontalPosition(gap.last + 1, usePrimaryDirection = true)
+        if (a == b) return null
+        return Rect(minOf(a, b), textLayout.getLineTop(line), maxOf(a, b), textLayout.getLineBottom(line))
     }
 }
 

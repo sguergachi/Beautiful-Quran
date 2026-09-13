@@ -133,7 +133,8 @@ data class EnglishLeafVerse(
 
     /** Whether [source] and [text] agree letter for letter, so offsets map exactly. */
     private val lettersMap: Boolean by lazy {
-        source != null && sourceLetterEnds.size == textLetterEnds.size
+        source != null && sourceLetterEnds.isNotEmpty() &&
+            sourceLetterEnds.size == textLetterEnds.size
     }
 
     /**
@@ -142,12 +143,28 @@ data class EnglishLeafVerse(
      * here, whatever joiners or closed-up space lie between.
      */
     fun textOffsetOf(sourceOffset: Int): Int {
-        if (!lettersMap) {
+        val src = source
+        if (!lettersMap || src == null) {
             return (fragmentProgress(sourceOffset.toFloat() / verseLength.coerceAtLeast(1)) *
                 text.length).roundToInt()
         }
         val letters = countAtOrBelow(sourceLetterEnds, sourceOffset)
-        return if (letters == 0) 0 else textLetterEnds[letters - 1]
+        if (letters == 0) return 0
+        // Every letter said: what is left is the sentence's closing stop, quote
+        // or bracket, and it is the last word's. Stopping at the letter left
+        // `earth.` its full stop in the unread band after the verse was done.
+        if (letters == sourceLetterEnds.size) return text.length
+        // An apostrophe closes the word it follows — the alignment's words
+        // carry theirs (`believers'`), so the band does too.
+        var end = textLetterEnds[letters - 1]
+        var at = sourceLetterEnds[letters - 1]
+        while (at < sourceOffset && at < src.length && src[at].isApostrophe() &&
+            end < text.length && text[end].isApostrophe()
+        ) {
+            at++
+            end++
+        }
+        return end
     }
 
     /**
@@ -187,6 +204,8 @@ data class EnglishLeafVerse(
         return ((verseProgress * verseLength - from) / span).coerceIn(0f, 1f)
     }
 }
+
+private fun Char.isApostrophe() = this == '\'' || this == '’'
 
 /** How many of the ascending [ends] are at or below [offset]. */
 private fun countAtOrBelow(ends: IntArray, offset: Int): Int {

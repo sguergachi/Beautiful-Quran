@@ -283,6 +283,20 @@ class EnglishLeafTest {
     }
 
     @Test
+    fun `the closing stop and quote are the last word's`() {
+        // Stopping at the last letter left them in the unread band for good.
+        val verse = setVerse("They said, \"We believe.\"")
+        assertEquals(1f, verse.fragmentInkProgress(1f), 0f)
+    }
+
+    @Test
+    fun `an apostrophe inks with the word it closes`() {
+        val source = "the believers' reward is with their Lord"
+        val end = source.indexOf("believers'") + "believers'".length
+        assertEquals(source.substring(0, end), setVerse(source).inkedThrough(source, end))
+    }
+
+    @Test
     fun `the reading page of a straddling verse is the leaf it began on`() {
         val catalog = buildMushafCatalog(
             listOf(
