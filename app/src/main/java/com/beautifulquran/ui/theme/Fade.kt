@@ -667,28 +667,57 @@ private class GlyphPathCache {
         while (before > 0 && text[before - 1].isWhitespace()) before--
         var after = endExclusive
         while (after < text.length && text[after].isWhitespace()) after++
-        if (before < start) addHalfGap(textLayout, before, start, wordBounds, path)
-        if (after > endExclusive) addHalfGap(textLayout, endExclusive, after, wordBounds, path)
+        if (start > 0 && before < start) {
+            addHalfGap(textLayout, before, start, edge = start, path)
+        }
+        if (endExclusive > start && after > endExclusive) {
+            addHalfGap(textLayout, endExclusive, after, edge = endExclusive - 1, path)
+        }
     }
 
+    /**
+     * [edge] is the word's own character beside the gap. The gap is taken only
+     * when all of it is visible on that character's line: the space a line
+     * wraps on is not a gap between two words on the paper, and its selection
+     * box reaches into the next line — taking half of it lit the glimmer over
+     * words a line below the one being said.
+     */
     private fun addHalfGap(
         textLayout: TextLayoutResult,
         gapStart: Int,
         gapEnd: Int,
-        wordBounds: Rect,
+        edge: Int,
         path: Path,
     ) {
-        val gap = textLayout.getPathForRange(gapStart, gapEnd).getBounds()
-        if (gap.isEmpty || gap.width <= 0f) return
-        // Only a gap on the word's own line.
-        if (gap.top >= wordBounds.bottom || gap.bottom <= wordBounds.top) return
-        val half = gap.width / 2f
-        val nearLeft = kotlin.math.abs(gap.right - wordBounds.left) <=
-            kotlin.math.abs(gap.left - wordBounds.right)
-        val reach = if (nearLeft) {
-            Rect(gap.right - half, gap.top, gap.right, gap.bottom)
+        val line = textLayout.getLineForOffset(edge)
+        if (textLayout.getLineForOffset(gapStart) != line) return
+        if (textLayout.getLineForOffset(gapEnd - 1) != line) return
+        // A gap the line wraps on hangs past the line's visible end.
+        if (gapEnd > textLayout.getLineEnd(line, visibleEnd = true)) return
+        if (gapStart < textLayout.getLineStart(line)) return
+        // Neither side of it may be a line's edge: a word must stand beyond it.
+        if (gapEnd >= textLayout.layoutInput.text.length) return
+        if (textLayout.getLineForOffset(gapEnd) != line) return
+        if (gapStart == 0 || textLayout.getLineForOffset(gapStart - 1) != line) return
+        val left = minOf(
+            textLayout.getHorizontalPosition(gapStart, usePrimaryDirection = true),
+            textLayout.getHorizontalPosition(gapEnd, usePrimaryDirection = true),
+        )
+        val right = maxOf(
+            textLayout.getHorizontalPosition(gapStart, usePrimaryDirection = true),
+            textLayout.getHorizontalPosition(gapEnd, usePrimaryDirection = true),
+        )
+        if (right - left <= 0f) return
+        val top = textLayout.getLineTop(line)
+        val bottom = textLayout.getLineBottom(line)
+        val half = (right - left) / 2f
+        // The half of the gap that touches this word's own character.
+        val edgeBox = textLayout.getBoundingBox(edge)
+        val edgeCenter = (edgeBox.left + edgeBox.right) / 2f
+        val reach = if (edgeCenter >= right) {
+            Rect(right - half, top, right, bottom)
         } else {
-            Rect(gap.left, gap.top, gap.left + half, gap.bottom)
+            Rect(left, top, left + half, bottom)
         }
         path.addRect(reach)
     }
