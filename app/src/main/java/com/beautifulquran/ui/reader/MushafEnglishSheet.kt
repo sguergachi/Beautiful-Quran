@@ -43,6 +43,7 @@ import androidx.compose.ui.text.style.Hyphens
 import androidx.compose.ui.text.style.LineBreak
 import androidx.compose.ui.text.style.LineHeightStyle
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Density
@@ -950,6 +951,14 @@ private fun EnglishProseBlock(
     Text(
         text = block.text,
         style = style,
+        // Never clip. The leading is solved to fill the well exactly, and the
+        // pitch's px→sp rounding across a full leaf can leave the block a few
+        // pixels taller than the room the column has left. Text's default Clip
+        // then cut at its own box, which on the last line sits just under the
+        // baseline — the foot line lost the feet of its y, p and q. The
+        // pagination decides what the leaf holds; this only lets the last
+        // line's descenders draw into the fit slack beneath it.
+        overflow = TextOverflow.Visible,
         modifier = Modifier
             .fillMaxWidth()
             .shapedWordBloom(

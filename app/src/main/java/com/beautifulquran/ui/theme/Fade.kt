@@ -637,7 +637,60 @@ private class GlyphPathCache {
         val key = (start.toLong() shl 32) or endExclusive.toLong()
         byRange[key]?.let { return it }
         val path = textLayout.getPathForRange(start, endExclusive)
+        val wordBounds = path.getBounds()
+        reachIntoGaps(textLayout, start, endExclusive, wordBounds, path)
         return Shaped(path, path.getBounds()).also { byRange[key] = it }
+    }
+
+    /**
+     * Widens a word's selection path by half of the word gap on each side of it.
+     *
+     * The path is the tint's clip where words share one layout, and a selection
+     * stops at the word's advance — but a Hafs glyph inks past it: the tail of a
+     * final و or ن sweeps out into the space beside the word. Clipped at the
+     * advance, that tail kept its plain ink and the orange ended on a straight
+     * edge across the stroke. Half the gap is the tail's to take and none of it
+     * is the neighbour's advance, so the clip still holds the tint off the word
+     * beside it. A gap that wraps to another line is left alone: its box is on
+     * a different line from the word.
+     */
+    private fun reachIntoGaps(
+        textLayout: TextLayoutResult,
+        start: Int,
+        endExclusive: Int,
+        wordBounds: Rect,
+        path: Path,
+    ) {
+        if (wordBounds.isEmpty) return
+        val text = textLayout.layoutInput.text
+        var before = start
+        while (before > 0 && text[before - 1].isWhitespace()) before--
+        var after = endExclusive
+        while (after < text.length && text[after].isWhitespace()) after++
+        if (before < start) addHalfGap(textLayout, before, start, wordBounds, path)
+        if (after > endExclusive) addHalfGap(textLayout, endExclusive, after, wordBounds, path)
+    }
+
+    private fun addHalfGap(
+        textLayout: TextLayoutResult,
+        gapStart: Int,
+        gapEnd: Int,
+        wordBounds: Rect,
+        path: Path,
+    ) {
+        val gap = textLayout.getPathForRange(gapStart, gapEnd).getBounds()
+        if (gap.isEmpty || gap.width <= 0f) return
+        // Only a gap on the word's own line.
+        if (gap.top >= wordBounds.bottom || gap.bottom <= wordBounds.top) return
+        val half = gap.width / 2f
+        val nearLeft = kotlin.math.abs(gap.right - wordBounds.left) <=
+            kotlin.math.abs(gap.left - wordBounds.right)
+        val reach = if (nearLeft) {
+            Rect(gap.right - half, gap.top, gap.right, gap.bottom)
+        } else {
+            Rect(gap.left, gap.top, gap.left + half, gap.bottom)
+        }
+        path.addRect(reach)
     }
 }
 
