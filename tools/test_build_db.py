@@ -195,7 +195,15 @@ def run_pipeline(case, segs):
         offset = case.get("clock_offset_ms")
         if offset is None:
             raise SystemExit(f"{case.get('_path')}: need clock_offset_ms")
-        return apply_clocked_timing_repair(segs, resolve_repair(case), offset)
+        repair_has_file_clock = case.get("repair_file_clock", False)
+        return apply_clocked_timing_repair(
+            segs,
+            resolve_repair(case),
+            0 if repair_has_file_clock else offset,
+            rebase=(
+                not repair_has_file_clock or case.get("current_file_clock", False)
+            ),
+        )
     if pipeline == "complete_repeat_topology":
         n_words = case.get("n_words")
         duration = case.get("audio_duration_ms")

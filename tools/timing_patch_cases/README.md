@@ -72,6 +72,8 @@ a case under this directory.
 | `repair_positions` / `repair_segments` | for repair pipelines | candidate repair row |
 | `occurrence` | for `boundary_repair` | 1-based repeated occurrence to replace without changing its peer |
 | `clock_offset_ms` | for `clock_shifted_repair` | source-to-MP3 translation applied before merge |
+| `repair_file_clock` | optional for `clock_shifted_repair` | keep an explicitly MP3-clocked repair whole instead of rebasing it onto a foreign source clock |
+| `current_file_clock` | with `repair_file_clock` | rebase when both the source and repair already share the MP3 clock |
 | `expected_erases` | for `erases_span_repeat` | bool — must the guard refuse this repair? |
 | `correction_positions` | for `timing_correction` | positions named by the typed operation |
 | `audio_onset_ms` | for `leading_silence_offset` | measured first sustained voice onset |
