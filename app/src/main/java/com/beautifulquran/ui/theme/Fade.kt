@@ -23,9 +23,13 @@ import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.drawText
+import androidx.compose.ui.text.TextMeasurer
+import androidx.compose.ui.text.style.TextIndent
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import kotlin.math.ceil
+import kotlin.math.abs
 import kotlin.math.floor
 
 /**
@@ -148,6 +152,9 @@ fun Modifier.glyphLayerAlpha(alpha: () -> Float): Modifier = drawWithContent {
  * Constraints that ruled out earlier approaches:
  * - Per-glyph [SpanStyle]s flip Uthmanic Hafs joining (#133).
  * - A separate overlay [Text] of one word re-shapes in isolation (no fade).
+ *   [ColorReveal]'s mask is a lone layout too ([WordInkCache]), but built from
+ *   the line's own text spans and style and trusted only when its advance
+ *   matches the line's; it only lays tint and glow over glyphs the line drew.
  * - [drawText] with a [Color] argument does **not** override existing
  *   [SpanStyle] colours — painting over a transparent active span stays
  *   invisible until the word becomes recited.
@@ -254,8 +261,10 @@ fun Modifier.shapedWordBloom(
      *
      * [TextLayoutResult.getPathForRange] encloses the *selection*, not the
      * letterforms: it stops at the word's advance and its line box. Where a
-     * line's words share one [Text] that clip is what keeps the orange off the
-     * word beside it, and the neighbour redraws over anything it laps.
+     * line's words share one [Text] (true), the tint is masked by the word
+     * drawn alone instead ([WordInkCache]), which keeps the orange off the word
+     * beside it without cutting its own overhang; the selection clip is only
+     * the fallback where the word cannot be drawn alone.
      *
      * On the mushaf leaf each word is its own node, and a QCF glyph inks past
      * its advance — a tail sweeping under the word before it, a mark riding
@@ -287,6 +296,7 @@ fun Modifier.shapedWordBloom(
     val lineBoundsCache = LineBoundsCache(justified, hyphenPx)
     val glyphHaloCache = GlyphHaloCache()
     val glyphPathCache = GlyphPathCache()
+    val wordInkCache = WordInkCache()
     val washBrushCache = WashBrushCache(rtl, stops)
     return drawWithContent {
         val bloomList = blooms()
@@ -424,10 +434,27 @@ fun Modifier.shapedWordBloom(
                     // Re-draw the same shaped glyphs, tint them orange with
                     // SrcIn (keeps harf shapes), then DstIn-wash like letterFadeIn.
                     // The glyph path is needed here and nowhere else.
-                    val shaped = glyphPathCache.shapedFor(textLayout, start, endExclusive)
-                    val path = shaped.path
+                    // Where words share the layout, the word's own ink is the
+                    // mask ([WordInkCache]); the selection clip only where that
+                    // cannot be had.
+                    val ink = if (clipTintToRange) {
+                        wordInkCache.inkFor(
+                            textLayout,
+                            start,
+                            endExclusive,
+                            lineBoundsCache.boundsFor(textLayout, start, endExclusive),
+                        )
+                    } else {
+                        null
+                    }
+                    val clipped = clipTintToRange && ink == null
+                    val shaped = if (ink == null) {
+                        glyphPathCache.shapedFor(textLayout, start, endExclusive)
+                    } else {
+                        null
+                    }
                     val p = bloom.progress.coerceIn(0f, 1f)
-                    val bounds = shaped.bounds
+                    val bounds = ink?.box ?: shaped!!.bounds
                     if (bounds.isEmpty || bounds.width <= 0f) return@forEach
                     val colorBleed = maxOf(
                         bleed,
@@ -457,8 +484,9 @@ fun Modifier.shapedWordBloom(
                             radiusPx = bloom.glowRadius.dp.toPx(),
                             // Same fence as the tint: where the node holds one
                             // word, the selection path is not its silhouette.
-                            clipPath = path.takeIf { clipTintToRange },
+                            clipPath = shaped?.path?.takeIf { clipped },
                             overhangPx = bleed,
+                            ink = ink,
                         )
                         if (halo != null) {
                             val glowPaint = android.graphics.Paint(
@@ -480,8 +508,8 @@ fun Modifier.shapedWordBloom(
                         alpha = bloom.layerAlpha.coerceIn(0f, 1f) *
                             bloom.colorAlpha.coerceIn(0f, 1f),
                     )
-                    if (clipTintToRange) {
-                        clipPath(path) {
+                    if (clipped) {
+                        clipPath(shaped!!.path) {
                             drawText(textLayoutResult = textLayout)
                             drawRect(
                                 color = tint,
@@ -495,7 +523,13 @@ fun Modifier.shapedWordBloom(
                         // actually inks: SrcIn writes only where the redrawn
                         // glyphs are, so the letterform is the mask and the
                         // overhang colours with the stroke it belongs to.
-                        drawText(textLayoutResult = textLayout)
+                        if (ink != null) {
+                            translate(left = ink.offset.x, top = ink.offset.y) {
+                                drawText(textLayoutResult = ink.layout)
+                            }
+                        } else {
+                            drawText(textLayoutResult = textLayout)
+                        }
                         drawRect(
                             color = tint,
                             topLeft = Offset(
@@ -524,7 +558,7 @@ fun Modifier.shapedWordBloom(
                         )
                         // The wash has to reach as far as the tint did, or
                         // an overhang keeps ink the sweep has not arrived at.
-                        val washBleed = if (clipTintToRange) bleed else colorBleed
+                        val washBleed = if (clipped) bleed else colorBleed
                         var total = 0f
                         for (i in tintBounds.indices) {
                             total += tintBounds[i].width + washBleed * 2f
@@ -642,6 +676,97 @@ private class GlyphPathCache {
 }
 
 /**
+ * One word's ink on its own: the word laid out alone in the line's hand, and
+ * where to draw it so it lands exactly on the word the line printed.
+ *
+ * Where a line's words share one [Text], the tint and the glow cannot be
+ * masked by redrawing the whole layout: whatever mask keeps the orange off the
+ * neighbours is a box, and a Hafs glyph does not stay in its box. A final و or
+ * ن sweeps into the gap after its word; the wasla over the next word's ٱ rides
+ * back into the same gap. Clipped at the advance, the tail kept its plain ink
+ * along a straight edge; clipped at the gap, the neighbour's wasla took the
+ * glimmer. Drawn alone, the word *is* the mask — every stroke it inks and
+ * nothing of anyone else's.
+ *
+ * The word is shaped alone, which is the same shaping: Arabic joins and
+ * positions marks within a word, never across the space. Null when that cannot
+ * be trusted — a range over two lines, one holding an inline placeholder, or
+ * one whose lone advance does not match the line's (a justified space inside
+ * it) — and the caller falls back to the selection clip.
+ */
+private class WordInkCache {
+    class WordInk(val layout: TextLayoutResult, val offset: Offset, val box: Rect)
+
+    private var layout: TextLayoutResult? = null
+    private var measurer: TextMeasurer? = null
+    private val byRange = object : LinkedHashMap<Long, WordInk?>(8, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<Long, WordInk?>?): Boolean =
+            size > 16
+    }
+
+    /** [lineBoxes] are the range's line boxes, shifted for justification. */
+    fun inkFor(
+        textLayout: TextLayoutResult,
+        start: Int,
+        endExclusive: Int,
+        lineBoxes: List<Rect>,
+    ): WordInk? {
+        if (layout !== textLayout) {
+            layout = textLayout
+            measurer = null
+            byRange.clear()
+        }
+        val key = (start.toLong() shl 32) or endExclusive.toLong()
+        if (byRange.containsKey(key)) return byRange[key]
+        return measure(textLayout, start, endExclusive, lineBoxes).also { byRange[key] = it }
+    }
+
+    private fun measure(
+        textLayout: TextLayoutResult,
+        start: Int,
+        endExclusive: Int,
+        lineBoxes: List<Rect>,
+    ): WordInk? {
+        val box = lineBoxes.singleOrNull() ?: return null
+        val line = textLayout.getLineForOffset(start)
+        if (textLayout.getLineForOffset(endExclusive - 1) != line) return null
+        val input = textLayout.layoutInput
+        if (input.placeholders.any { it.start < endExclusive && it.end > start }) return null
+        val textMeasurer = measurer ?: TextMeasurer(
+            defaultFontFamilyResolver = input.fontFamilyResolver,
+            defaultDensity = input.density,
+            defaultLayoutDirection = input.layoutDirection,
+            cacheSize = 0,
+        ).also { measurer = it }
+        val word = textMeasurer.measure(
+            text = input.text.subSequence(start, endExclusive),
+            style = input.style.copy(textIndent = TextIndent.None),
+            overflow = TextOverflow.Visible,
+            softWrap = false,
+            maxLines = 1,
+            layoutDirection = input.layoutDirection,
+            density = input.density,
+            fontFamilyResolver = input.fontFamilyResolver,
+            skipCache = true,
+        )
+        val a = word.getHorizontalPosition(0, usePrimaryDirection = true)
+        val b = word.getHorizontalPosition(endExclusive - start, usePrimaryDirection = true)
+        if (abs(abs(b - a) - box.width) > WordInkAdvanceSlackPx) return null
+        return WordInk(
+            layout = word,
+            offset = Offset(
+                x = box.left - minOf(a, b),
+                y = textLayout.getLineBaseline(line) - word.firstBaseline,
+            ),
+            box = box,
+        )
+    }
+}
+
+/** How far a word's lone advance may differ from the line's before it is not trusted. */
+private const val WordInkAdvanceSlackPx = 1f
+
+/**
  * Directional wash ramps, built once and reused across draw frames.
  *
  * A wash head moves every frame, and expressing that as the gradient's own
@@ -734,16 +859,24 @@ private class GlyphHaloCache {
         radiusPx: Float,
         clipPath: Path?,
         overhangPx: Float,
+        ink: WordInkCache.WordInk? = null,
     ): Halo? {
         if (radiusPx <= 0f) return null
         if (layout !== textLayout) {
             layout = textLayout
             byRange.clear()
         }
-        val key = Key(start, endExclusive, radiusPx.toBits(), clipPath != null)
+        val key = Key(start, endExclusive, radiusPx.toBits(), clipPath != null || ink != null)
         byRange[key]?.let { return it }
 
-        val bounds = if (clipPath != null) {
+        val bounds = if (ink != null) {
+            Rect(
+                ink.box.left - overhangPx,
+                ink.box.top - overhangPx,
+                ink.box.right + overhangPx,
+                ink.box.bottom + overhangPx,
+            )
+        } else if (clipPath != null) {
             clipPath.getBounds()
         } else {
             Rect(
@@ -761,8 +894,13 @@ private class GlyphHaloCache {
         val glyphs = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
         val glyphCanvas = Canvas(android.graphics.Canvas(glyphs))
         glyphCanvas.translate(-left.toFloat(), -top.toFloat())
-        if (clipPath != null) glyphCanvas.clipPath(clipPath)
-        textLayout.multiParagraph.paint(glyphCanvas)
+        if (ink != null) {
+            glyphCanvas.translate(ink.offset.x, ink.offset.y)
+            ink.layout.multiParagraph.paint(glyphCanvas)
+        } else {
+            if (clipPath != null) glyphCanvas.clipPath(clipPath)
+            textLayout.multiParagraph.paint(glyphCanvas)
+        }
 
         val offset = IntArray(2)
         val blurred = glyphs.extractAlpha(
