@@ -287,6 +287,17 @@ model constrained by V1.5's smaller laws: use each source only for what it can
 prove, align against the audio that actually plays, and abstain rather than
 manufacture precision.
 
+### Fused-token phrase restores
+
+The repair CTC can omit a space while still preserving the spoken letters. A
+one-token/one-word aligner used to truncate such repeats: Alafasy 20:58 decoded
+the second `فَٱجۡعَلۡ بَيۡنَنَا` as `فجعلبيننا`, assigned the whole token to
+`بَيۡنَنَا`, and shipped `[4,5,5]` instead of `[4,5,4,5]`. The generator now
+splits only the exact `A, B, fused(A+B)` alignment at the current high-water
+mark, and only when the token matches the joined canonical words unambiguously
+better than `B` alone. Those gates are load-bearing: ordinary first-pass joined
+speech and later rewinds cannot create a repeat.
+
 ## False repeats: the qdc artifacts we scrub
 
 The raw qdc segments are aligner output, and some of their apparent backtracks

@@ -1,0 +1,36 @@
+{
+  "id": "fused-repeat-alafasy-20-58",
+  "label": "Alafasy 20:58 fused CTC token restores both words of the repeated phrase",
+  "refs": ["ear report", "timing_repairs/README.md fused CTC phrase tokens"],
+  "pipeline": "clock_shifted_repair",
+  "clock_offset_ms": 0,
+  "repair_file_clock": true,
+  "notes": "XLSR emitted the second فَٱجۡعَلۡ بَيۡنَنَا as one token, which the old one-token/one-word aligner assigned wholly to position 5. The generator now splits only an unambiguous fused pair wholly behind the high-water mark.",
+  "input_segments": [
+    [3, 3960, 4980],
+    [4, 4980, 5800],
+    [5, 5800, 7300],
+    [5, 7300, 9120],
+    [6, 9120, 10120],
+    [7, 10120, 11140]
+  ],
+  "repair_segments": [
+    [3, 3960, 4980],
+    [4, 4980, 5800],
+    [5, 5800, 7300],
+    [4, 7300, 8080],
+    [5, 8080, 9120],
+    [6, 9120, 10120],
+    [7, 10120, 11140]
+  ],
+  "expected_positions": [3, 4, 5, 4, 5, 6, 7],
+  "expected_segments": [
+    [3, 3960, 4980],
+    [4, 4980, 5800],
+    [5, 5800, 7300],
+    [4, 7300, 8080],
+    [5, 8080, 9120],
+    [6, 9120, 10120],
+    [7, 10120, 11140]
+  ]
+}

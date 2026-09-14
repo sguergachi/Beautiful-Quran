@@ -516,7 +516,7 @@ CTC_REPEAT_MIN_PAUSE_MS = 300
 # the model that invented the split, so it is not allowed to keep one.
 # Reciter id, surah, ayah. MMS 2026-08-18 against everyayah audio.
 FLUSH_RESTORE_KEEP_INVENTED = frozenset({
-    (1, 7, 39), (1, 7, 158), (1, 13, 25), (1, 20, 58), (1, 23, 50), (1, 25, 9),
+    (1, 7, 39), (1, 7, 158), (1, 13, 25), (1, 23, 50), (1, 25, 9),
     (1, 34, 6), (1, 66, 12),
     (5, 5, 45), (5, 9, 33), (5, 10, 6), (5, 10, 57), (5, 34, 36),
     (5, 39, 54), (5, 45, 18),
@@ -1527,10 +1527,20 @@ def sanitize_timing_row(segs):
     return out if valid else None
 
 
-def apply_clocked_timing_repair(current, repaired, clock_offset):
+def apply_clocked_timing_repair(
+    current, repaired, clock_offset, repair_has_file_clock=False
+):
     """Merge one structural repair on the current clock, failing open safely."""
-    translated = translate_segments(repaired, clock_offset)
-    merged = rebase_timing_repair(current, translated) if current else translated
+    translated = (
+        repaired
+        if repair_has_file_clock
+        else translate_segments(repaired, clock_offset)
+    )
+    merged = (
+        translated
+        if repair_has_file_clock or not current
+        else rebase_timing_repair(current, translated)
+    )
     return sanitize_timing_row(merged) or current
 
 
@@ -1798,7 +1808,17 @@ def apply_timing_repairs(
                     # Invented flush was the only structural change; keep qdc.
                     continue
             duration = durations.get(key)
-            merged = apply_clocked_timing_repair(current, segs, offset)
+            repair_clock = edit.get("clock")
+            if repair_clock not in (None, "file"):
+                raise RuntimeError(f"Unknown timing repair clock {repair_clock!r} for {key}")
+            merged = apply_clocked_timing_repair(
+                current,
+                segs,
+                offset,
+                repair_has_file_clock=(
+                    repair_clock == "file" and key not in file_clock_keys
+                ),
+            )
             if offset and not fits_audio(merged, duration):
                 # This repair was already written on the file clock: translating
                 # it would run the ayah past the end of its own recording.
