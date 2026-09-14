@@ -1527,19 +1527,13 @@ def sanitize_timing_row(segs):
     return out if valid else None
 
 
-def apply_clocked_timing_repair(
-    current, repaired, clock_offset, repair_has_file_clock=False
-):
+def apply_clocked_timing_repair(current, repaired, clock_offset, rebase=True):
     """Merge one structural repair on the current clock, failing open safely."""
-    translated = (
-        repaired
-        if repair_has_file_clock
-        else translate_segments(repaired, clock_offset)
-    )
+    translated = translate_segments(repaired, clock_offset)
     merged = (
-        translated
-        if repair_has_file_clock or not current
-        else rebase_timing_repair(current, translated)
+        rebase_timing_repair(current, translated)
+        if current and rebase
+        else translated
     )
     return sanitize_timing_row(merged) or current
 
@@ -1811,13 +1805,12 @@ def apply_timing_repairs(
             repair_clock = edit.get("clock")
             if repair_clock not in (None, "file"):
                 raise RuntimeError(f"Unknown timing repair clock {repair_clock!r} for {key}")
+            repair_has_file_clock = repair_clock == "file"
             merged = apply_clocked_timing_repair(
                 current,
                 segs,
-                offset,
-                repair_has_file_clock=(
-                    repair_clock == "file" and key not in file_clock_keys
-                ),
+                0 if repair_has_file_clock else offset,
+                rebase=not repair_has_file_clock or key in file_clock_keys,
             )
             if offset and not fits_audio(merged, duration):
                 # This repair was already written on the file clock: translating
