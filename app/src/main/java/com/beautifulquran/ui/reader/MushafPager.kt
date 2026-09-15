@@ -336,6 +336,17 @@ private fun SurahContent.wordsIn(ayah: Int?): Int =
 internal fun mushafBookLength(book: EnglishBook?, pageCount: Int): Int =
     book?.leafCount ?: pageCount
 
+/**
+ * Clamp a leaf index into a book that may still be empty.
+ *
+ * Before the runtime QCF snapshot loads, the catalog is empty and the English
+ * book built from it has no leaves — and `coerceIn(0, leafCount - 1)` throws
+ * on the empty range. The sheet is up immediately with blank paper until the
+ * pages arrive, so every homing effect clamps through here instead.
+ */
+internal fun mushafLeafIndex(index: Int, leafCount: Int): Int =
+    index.coerceIn(0, (leafCount - 1).coerceAtLeast(0))
+
 /** A second page owns clocks only while the voice is crossing onto it. */
 internal fun mushafUsesLiveInk(
     isSettled: Boolean,
@@ -790,7 +801,7 @@ internal fun MushafPager(
                 ) {
                     return@collect
                 }
-                val index = (page - 1).coerceIn(0, pagerState.pageCount - 1)
+                val index = mushafLeafIndex(page - 1, pagerState.pageCount)
                 if (pagerState.currentPage != index) {
                     if (!mushafFollowOwnsVisiblePage(pagerState.currentPage, followPage)) {
                         return@collect
@@ -853,7 +864,7 @@ internal fun MushafPager(
                         leafNow = page,
                         wordEnds = alignmentsNow.value.of(followAyah),
                     ) ?: return@collect
-                    val leadIndex = (lead - 1).coerceIn(0, pagerState.pageCount - 1)
+                    val leadIndex = mushafLeafIndex(lead - 1, pagerState.pageCount)
                     // Cover the incoming leaf before the paper moves, so the
                     // turn reveals Upcoming paper rather than a finished page.
                     waitingPage = lead

@@ -176,7 +176,7 @@ export function EntranceCover({
   const canOpen = ready && !error
   const showLoading = !ready && !error
   const showProgress =
-    showLoading && loadProgress != null && loadProgress >= 0 && loadProgress < 1
+    showLoading && loadProgress != null && loadProgress >= 0 && loadProgress <= 1
 
   // Modular cover grid from the live board size (width × height).
   useLayoutEffect(() => {

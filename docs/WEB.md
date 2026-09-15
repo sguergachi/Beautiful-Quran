@@ -15,6 +15,12 @@ viewer, and a PWA shell. Production build is published to GitHub Pages at
 `web/README.md` for run instructions. The sections
 below remain the design record and quality bar.
 
+The current data layer mirrors Android: reviewed repeat-aware timings live in
+the shared database, while authenticated Quran Foundation word/QCF fields live
+in a separate IndexedDB cache with six-day revalidation, a seven-day hard
+freshness limit, and automatic retry when the browser comes back online.
+Developer Mode exposes that cache's state, refresh/expiry times, and API calls.
+
 The reader also treats its focused ayah as a keyboard cursor: Up/Down move one
 ayah, Page Up/Down move five, Home/End reach chapter bounds, Space toggles
 playback, `/` opens in-surah search, and `B` toggles the focused bookmark.
@@ -27,7 +33,8 @@ chords.
 
 Ship a browser app that feels like the Android reader: one sheet of paper,
 words written onto the page in time with the reciter, butter-smooth scroll
-and ink — offline-first, no accounts, no backend.
+and ink — offline-first, no accounts or client secrets, with only a narrow
+optional timing-content backend.
 
 ## 2. What already exists (do not reinvent)
 
@@ -54,7 +61,7 @@ tools/build_db.py  ──►  quran.db  (shared asset; optional web export step)
                               │
 web/                          ▼
   domain/          HighlightEngine / HighlightClock + domain policy
-  data/            WASM SQLite wrapper + typed queries (same schema)
+  data/            WASM SQLite + typed queries + separate IndexedDB word/QCF cache
   playback/        Gapless-5 (default) / dual-`<audio>` fallback + Media Session + Cache API LRU
   ui/reader/       InkEngine + focus engine/controller + reader state policy
   ui/theme/        shared fade math; DOM masks remain render adapters
@@ -87,7 +94,7 @@ a browser. Controllers and renderers are the only DOM-touching layers.
 | Virtualization | Custom or `@tanstack/react-virtual` | Surah lists + ayah lists must virtualize |
 | Fonts | Bundle Hafs + EB Garamond + Cormorant from `app/src/main/res/font/` | No Google Fonts dependency for scripture |
 | Tests | Vitest for engines; Playwright smoke for reader | Engines = JVM parity; UI = few critical paths |
-| Hosting | Static (GitHub Pages / Cloudflare Pages) | No backend; PWA service worker for shell + DB + audio cache |
+| Hosting | Static GitHub Pages + narrow timing facade | PWA shell/DB/audio remain offline; facade URL is a build-time public variable |
 
 **Rejected for v1:** Next.js/SSR (no SEO need for a reader PWA), Room-like
 ORMs, a custom glyph text engine, QCF V2 page fonts (103 MB split archives —
@@ -201,6 +208,8 @@ Renderers consume these; they do not re-derive curves.
   This keeps the main-thread sql.js work from freezing the cover or paper
   peel. Timings remain lazy and hydrate after the reader's first frame.
 - **Do not** add data-repair logic in the web app (Android invariant #2).
+- The shared DB contains the same reviewed repeat-aware timing rows Android
+  uses. Opening a chapter performs no timing API request.
 
 Optional later optimization (not required for v1): export per-surah JSON
 shards for faster first paint. Only if 27 MB WASM open proves too slow on
@@ -354,23 +363,16 @@ the complete layer and visual-verification contract.
 
 Three sheets, hand-rolled paper stack (no router chrome):
 
-1. **Home** — surah list, Quran-wide search ranked across literal phrases,
-   related QAC roots, focused WordNet thesaurus links, last-resort one-edit
-   spelling, and the packaged QSAC concept
-   vocabulary; enclosing a query in quotes keeps it literal. Results are
-   sectioned by surah with truncated expand-in-place lists. It also carries
-   `surah:ayah` references, continue-listening, and a floating playback control
-   while a verse is loaded (chapter ·
+1. **Home** — surah list, Quran-wide word search (sectioned by surah with
+   truncated expand-in-place lists), `surah:ayah` references, continue-
+   listening, floating playback control while a verse is loaded (chapter ·
    ayah label, transport, quiet Close that stops the session — Android
    parity). The control spans the full chapter sheet width while its ink and
-   transport remain centred. Opening a word hit flashes that Arabic (and
-   English gloss) word four quick times with the orange repeat wash
-   (directional wash in, dissolve out).
+   transport remain centred. Opening a word hit flashes that Arabic (and English gloss) word
+   twice with the orange repeat wash (directional wash in, dissolve out).
    Word search keeps the query in local home state (no global store fan-out),
    builds its slim in-memory index on demand (never during chapter browsing),
-   and scans cooperatively with cancellation so typing stays responsive. The
-   560 KB search-vocabulary index loads only on first search and is then
-   service-worker cached for offline use; see [SEARCH.md](SEARCH.md).
+   and scans cooperatively with cancellation so typing stays responsive.
    Its fixed masthead, 30 px gilded Settings rosette, rounded search field,
    full-width continue wash, and compact 28 / 26 / 4 px chapter grid mirror
    the Android Home sheet while the whole composition remains centred at a
@@ -489,7 +491,7 @@ sans.
 - Root Word Viewer (ink bleed) + corpus-backed morphology, lemma-frequency
   analyses, and per-chapter concordance lists truncated to five references
   until expanded.
-- PWA installability; offline shell + DB + audio cache.
+- PWA installability; offline shell + DB + audio + word/QCF cache.
 - Optional Ink Lab (developer unlock).
 
 ### Phase 5 — Parity polish / cut line
@@ -582,7 +584,8 @@ A phase is done only when:
 3. Highlight is timed, animated, word-by-word (no static fallback shipped).
 4. Scroll + ink stay smooth on a mid-tier phone browser (manual or
    Playwright trace).
-5. Offline: after first load, text+timings work without network; audio
+5. Offline: after first load, text + quran-align timings work without network;
+   a still-current repeat snapshot is also local, and audio
    works from cache when previously heard.
 6. Relevant docs updated (`docs/WEB.md` status, `AGENTS.md` repo map).
 
@@ -597,6 +600,7 @@ A phase is done only when:
 | Font licensing / size | Bundle existing app fonts; subset Latin if needed; Hafs full |
 | Drift from Android engines | Shared test vectors; when Android engine changes, update web twin in same PR when possible |
 | Marketing opacity wash confusion | Product code lives under `web/src/render`; leave `docs/ink-fade.js` as site-only |
+| Timing facade unavailable or revoked | Never block the reader; use bundled quran-align and reject runtime rows after seven days |
 
 ## 15. Decision checklist (approve before coding)
 
