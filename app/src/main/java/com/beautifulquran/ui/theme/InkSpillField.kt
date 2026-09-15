@@ -404,6 +404,8 @@ internal const val VellumSpotShader = """
     uniform float fadeSoftness;
     uniform float vellumGrain;
     uniform float fill;
+    uniform float rimInset;
+    uniform float2 spreadSource;
     layout(color) uniform half4 inkColor;
 """ + VellumPigmentFunctions + """
     half4 main(float2 fragCoord) {
@@ -421,7 +423,13 @@ internal const val VellumSpotShader = """
                 hash(float2(seed, 4.7))
             ) - 0.5) * res * 0.006;
             float2 p = fragCoord - center;
-            float2 halfSize = 0.5 * res * mix(0.36, 0.93, progress);
+            // The silhouette does not scale — the rounded rect is always
+            // the whole verse block less one fixed [rimInset] of rim. The
+            // rim margin is pixels, never a fraction: see verseSoakHalfSize
+            // for why a proportional ceiling left tall verses short of
+            // their own first and last lines.
+            float2 fullHalf = 0.5 * res;
+            float2 halfSize = max(fullHalf - float2(rimInset), fullHalf * 0.5);
             float cr = min(halfSize.x, halfSize.y) * 0.12;
             float2 q = abs(p) - halfSize + cr;
             float sdf = length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - cr;
@@ -438,6 +446,31 @@ internal const val VellumSpotShader = """
             density = 1.0 / (1.0 + exp(sdf / diffusion));
             // Kill the long logistic halo so the silhouette stays a rectangle.
             density *= 1.0 - smoother(clamp((sdf - 6.0) / 5.0, 0.0, 1.0));
+            // Ink runs out from the finger. A capillary front travels from
+            // [spreadSource] and wets the verse on its way; the paper does
+            // not scale up from the middle. The front wanders by a fibre
+            // of its own feather, so no direction soaks in a clean arc.
+            float2 fromSource2 = fragCoord - spreadSource;
+            float2 far = abs(spreadSource - center) + halfSize;
+            float reach = max(length(far), 1.0);
+            float feather = max(reach * 0.14, 14.0);
+            float runAngle = atan(fromSource2.y, fromSource2.x);
+            float fingers = noise(
+                float2(cos(runAngle), sin(runAngle)) * 5.0 + float2(seed, seed)
+            ) * 0.7 + noise(origin * float2(0.011, 0.013)) * 0.3;
+            // Overshoot by two feathers so progress 1 wets the last corner
+            // whatever direction the wander took — the soak at rest is the
+            // whole block, never a disc that stopped short.
+            float front = progress * (reach + 2.0 * feather)
+                + (fingers - 0.5) * feather * 1.6;
+            float travelled = length(fromSource2);
+            float wet = 1.0 - smoother(clamp((travelled - front) / feather, 0.0, 1.0));
+            // Pigment piles up at the running edge, so the spread reads
+            // while the pool is still filling, then settles flat.
+            float wetEdge = 1.0 - smoother(
+                clamp(abs(travelled - front) / (feather * 0.9), 0.0, 1.0)
+            );
+            density = min(density * wet * (1.0 + 0.5 * wetEdge * (1.0 - progress)), 1.0);
             appear = progress;
             float2 boxEdge = abs(fragCoord - 0.5 * res) / max(0.5 * res, float2(1.0));
             r = max(boxEdge.x, boxEdge.y);

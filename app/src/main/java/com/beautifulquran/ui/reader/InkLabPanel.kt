@@ -435,6 +435,18 @@ fun InkLabPanel(
                         ) {
                             InkEngine.fadeLeadMs = it.roundToInt()
                         }
+                        TuningSlider(
+                            "Scroll lead ms",
+                            InkEngine.scrollLeadMs.toFloat(),
+                            0f..1200f,
+                            integer = true,
+                        ) {
+                            InkEngine.scrollLeadMs = it.roundToInt()
+                        }
+                        LabCaption(
+                            "Camera only: how early the page moves to the next verse. " +
+                                "Independent of the fade lead below.",
+                        )
                         LabCaption(
                             "Ayah handoff only: next verse focus/recess before last word ends. " +
                                 "Does not move word washes.",
@@ -582,6 +594,7 @@ internal fun formatHighlightCopy(): String = buildString {
     appendLine("// Highlight sync (Ink Lab → Highlight) — persisted with lab numbers")
     appendLine("InkEngine.highlightLeadMs = ${InkEngine.highlightLeadMs}")
     appendLine("InkEngine.fadeLeadMs = ${InkEngine.fadeLeadMs}")
+    appendLine("InkEngine.scrollLeadMs = ${InkEngine.scrollLeadMs}")
     val lag = InkEngine.outputLatencyOverrideMs
     append(
         if (lag == null) {

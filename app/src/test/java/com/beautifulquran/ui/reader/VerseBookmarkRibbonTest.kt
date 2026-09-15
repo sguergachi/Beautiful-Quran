@@ -22,10 +22,10 @@ class VerseBookmarkRibbonTest {
     @Test
     fun gatherOrdinal_sitsInTheGoldTopCorner() {
         assertEquals(16f, GatherOrdinalSp)
-        assertEquals(14f, GatherOrdinalEdgeInsetDp)
-        assertEquals(6f, GatherOrdinalTopInsetDp)
-        assertEquals(24f, GatherOrdinalSlotWidthDp)
-        assertEquals(38f, GatherOrdinalEdgeInsetDp + GatherOrdinalSlotWidthDp)
+        assertEquals(6f, GatherOrdinalSoakMarginDp)
+        assertEquals(15f, GatherOrdinalSoakInset.value)
+        assertEquals(23f, GatherOrdinalSlotWidth.value)
+        assertEquals(38f, GatherOrdinalSoakInset.value + GatherOrdinalSlotWidth.value)
         assertEquals(38f, BookmarkStripWidth.value)
         assertEquals(54f, BookmarkStripWidth.value + BookmarkTapOutsetDp)
     }

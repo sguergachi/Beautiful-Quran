@@ -146,7 +146,6 @@ import com.beautifulquran.ui.theme.TranslationFontFamily
 import com.beautifulquran.ui.theme.generatedFieldWeave
 import com.beautifulquran.ui.theme.gilded
 import com.beautifulquran.ui.theme.glyphLayerAlpha
-import com.beautifulquran.ui.theme.InkExpandEasing
 import com.beautifulquran.ui.theme.brushCircleParams
 import com.beautifulquran.ui.theme.inkBrushCircleMark
 import com.beautifulquran.ui.theme.inkBrushCircleTarget
@@ -1893,6 +1892,8 @@ internal fun buildShapedBlooms(
             range = rendered.markRange,
             paper = palette.paperColor,
             coverAlpha = markCover,
+            // The mark fades alone, so its cover may not reach. See the field.
+            pad = 0.dp,
         )
     }
     blooms.addShapedInkMotionBlooms(
@@ -2769,6 +2770,8 @@ fun AyahBlock(
      * Non-null only while gather mode has this verse selected.
      */
     gatherOrdinal: Int? = null,
+    /** When true, the whole verse block toggles selection, not only its ink. */
+    gathering: Boolean = false,
     onAyahMarkClick: (() -> Unit)? = null,
     onWordClick: ((Word) -> Unit)?,
     onWordLongClick: ((Word) -> Unit)? = null,
@@ -3028,8 +3031,16 @@ fun AyahBlock(
                 seed = ayah.surahId * 1_000 + ayah.number,
                 color = LocalQuranAccents.current.gold.copy(alpha = 0.26f),
                 fillBox = true,
-                durationMillis = 400,
-                easing = InkExpandEasing,
+                durationMillis = 250,
+                // InkExpandEasing lands 71% through the soak by 20% of its
+                // clock. This surface needs the full requested spread time.
+                easing = LinearEasing,
+            )
+            // The shaped text owns word-precise reading taps. Once gathering,
+            // the whole verse block is the target — including its paper around
+            // the ink — as the gather contract promises.
+            .then(
+                if (gathering) Modifier.quietClickable(onClick = onAyahClick) else Modifier,
             )
             .drawWithContent {
                 drawContent()
@@ -3251,16 +3262,16 @@ fun AyahBlock(
                         )
                         .padding(
                             start = if (bookmarkSide == AyahSelectorSide.LEFT) {
-                                GatherOrdinalEdgeInsetDp.dp
+                                GatherOrdinalSoakInset
                             } else {
                                 0.dp
                             },
                             end = if (bookmarkSide == AyahSelectorSide.RIGHT) {
-                                GatherOrdinalEdgeInsetDp.dp
+                                GatherOrdinalSoakInset
                             } else {
                                 0.dp
                             },
-                            top = GatherOrdinalTopInsetDp.dp,
+                            top = GatherOrdinalSoakInset,
                         )
                         .fillMaxHeight(),
                 )
@@ -3325,7 +3336,7 @@ private fun GatherOrdinalMark(
     )
     Box(
         modifier = modifier
-            .width(GatherOrdinalSlotWidthDp.dp)
+            .width(GatherOrdinalSlotWidth)
             .graphicsLayer { alpha = chromeAlpha() }
             .then(
                 if (onClick != null) {

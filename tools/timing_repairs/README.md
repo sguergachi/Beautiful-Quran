@@ -79,6 +79,24 @@ Each condition exists because dropping it caused a real regression:
   and on a 3-letter word both fragments pass (2) by coincidence — but they look
   nothing like each other.
 
+### Fused CTC phrase tokens
+
+CTC can also remove a space inside a re-recited phrase. In Alafasy **20:58** it
+emits the second `فَٱجۡعَلۡ بَيۡنَنَا` as one `فجعلبيننا` token; the old
+one-token/one-word alignment assigned the whole interval to word 5 and restored
+only half the phrase. The generator splits such a token only in the exact
+`A, B, fused(A+B)` alignment, at the current high-water mark, and when its
+joined spelling is an unambiguous, materially better match for both canonical
+words. Thus the rule completes an immediately witnessed re-say without turning
+ordinary fused first-pass speech or a later rewind into new topology.
+The generator cases pin 20:58 at repeat positions `[4,5]`; the committed
+`fused-repeat-alafasy-20-58.json` case pins application of that repair.
+
+CTC-derived `restore` and `drop` repairs declare `"clock": "file"`, because
+their boundaries were measured directly against the packaged EveryAyah MP3.
+When qdc could not be placed on that file clock, application keeps the repair
+whole instead of splicing good CTC boundaries into an unrelated source clock.
+
 `~/qasr/test_align.py` pins all of these as regression cases. Run it before
 regenerating any repair file; aggregate repair counts alone will not reveal a
 broken discriminator.

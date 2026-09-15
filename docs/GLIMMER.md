@@ -277,6 +277,16 @@ so a draw frame only recolours one small bitmap while the glimmer animates.
 The extracted mask includes the blur's own expansion, preventing the halo from
 clipping into a rectangle even at the Ink Lab's maximum radius.
 
+The selection clip is what holds one word's light off the word beside it, and
+it is correct only where words share a line's layout. On the **mushaf leaf**
+each word is its own node, and a QCF glyph inks past its advance — a tail
+sweeping under the word before it, a mark riding high. The selection stops at
+that advance, so masking the halo with it cut the tail and the mark out of the
+light and left a straight edge down the side of the glow: the box edge this
+document forbids. Per-word nodes therefore pass no clip path, and the mask is
+the node's own drawing widened for its overhang. It is the same fence the tint
+already follows (`clipTintToRange`), for the same reason.
+
 Never replace the shaped path with a word-sized radial field or alpha-dim the
 Hafs glyphs. Arabic glyphs stay opaque; the established paper-cover wash remains
 responsible for reveal fidelity.

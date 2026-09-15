@@ -4,6 +4,7 @@ import com.beautifulquran.data.model.Word
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import kotlin.math.roundToInt
 import org.junit.Test
 
 class EnglishLeafTest {
@@ -228,6 +229,71 @@ class EnglishLeafTest {
         val verse = EnglishLeafVerse(2, 5, "all of it")
         assertEquals(0.4f, verse.fragmentProgress(0.4f), 0.001f)
         assertTrue(verse.endsVerse)
+    }
+
+    /** One verse set as the leaf sets it, from its whole source. */
+    private fun setVerse(source: String, hideParentheticals: Boolean = false): EnglishLeafVerse =
+        englishLeaf(
+            page = 1,
+            runs = listOf(EnglishVerseRun(67, 2, from = 0, to = Int.MAX_VALUE)),
+            hideParentheticals = hideParentheticals,
+        ) { _, _ -> source }.verses.single()
+
+    /** The printed text up to where a share of the verse lands, joiners dropped. */
+    private fun EnglishLeafVerse.inkedThrough(source: String, sourceEnd: Int): String {
+        val at = (fragmentInkProgress(sourceEnd.toFloat() / source.length) * text.length)
+            .roundToInt()
+        return text.substring(0, at).replace("⁠", "")
+    }
+
+    @Test
+    fun `the ink lands on the word the alignment names despite the hyphenation joiners`() {
+        // 67:2. The vetoes thread invisible joiners through the printed words,
+        // and scaling the source's share onto that longer string inked
+        // "created" as "creat" and "death" as "ed death".
+        val source = "[He] who created death and life to test you [as to] which of you is " +
+            "best in deed - and He is the Exalted in Might, the Forgiving"
+        val verse = setVerse(source)
+        assertTrue("fixture needs joiners to mean anything", "⁠" in verse.text)
+        for (word in listOf("created", "death", "which of you", "Exalted in Might")) {
+            val end = source.indexOf(word) + word.length
+            assertEquals(source.substring(0, end), verse.inkedThrough(source, end))
+        }
+        assertEquals(1f, verse.fragmentInkProgress(1f), 0f)
+    }
+
+    @Test
+    fun `hidden asides do not shift the ink along the sentence`() {
+        val source = "[He] who created death and life to test you [as to] which of you is best"
+        val verse = setVerse(source, hideParentheticals = true)
+        val end = source.indexOf("which of you") + "which of you".length
+        assertEquals("who created death and life to test you which of you",
+            verse.inkedThrough(source, end))
+    }
+
+    @Test
+    fun `a tap reads the same map back`() {
+        val source = "[He] who created death and life to test you [as to] which of you is " +
+            "best in deed - and He is the Exalted in Might, the Forgiving"
+        val verse = setVerse(source)
+        val end = source.indexOf("Exalted") + "Exalted".length
+        val at = (verse.fragmentInkProgress(end.toFloat() / source.length) * verse.text.length)
+            .roundToInt()
+        assertEquals(end.toFloat() / source.length, verse.verseFractionAt(at, verse.text.length), 1e-6f)
+    }
+
+    @Test
+    fun `the closing stop and quote are the last word's`() {
+        // Stopping at the last letter left them in the unread band for good.
+        val verse = setVerse("They said, \"We believe.\"")
+        assertEquals(1f, verse.fragmentInkProgress(1f), 0f)
+    }
+
+    @Test
+    fun `an apostrophe inks with the word it closes`() {
+        val source = "the believers' reward is with their Lord"
+        val end = source.indexOf("believers'") + "believers'".length
+        assertEquals(source.substring(0, end), setVerse(source).inkedThrough(source, end))
     }
 
     @Test

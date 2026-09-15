@@ -1,0 +1,38 @@
+{
+ "schemaVersion": 1,
+ "baseline": {
+  "commit": "a342a6d00c95d8e4ef2ca2957e6c28b5ad913d9b",
+  "databaseSha256": "14da9f94834061eeef93872d52ac39d1f20e812a077d360e8204dc6d1635f7cd"
+ },
+ "verdicts": {
+  "Alafasy_128kbps:20:58": {
+   "verdict": "accept",
+   "kinds": [
+    "topology"
+   ],
+   "baselinePayloadHash": "01e9048e4666f494de0a7be52535c276cee93373fd81a7231da27c079376e5df",
+   "candidatePayloadHash": "22aa507780c8f3d52339db9bd0f371ac4f6e7e7552df4b7c0edea2cdcb5f9127",
+   "evidence": {
+    "kind": "dual_model_topology",
+    "artifact": "tools/timing_verdicts/fused-ctc-phrase-repeat-class.json",
+    "summary": "The Arabic CTC transcript contains a fused second فاجعل بيننا, not a second بيننا alone. Both independent forced aligners prefer the complete [4,5] phrase repeat; their second-pass starts are 7,305/8,126 ms, corroborating the retained 7,300/8,080 ms boundaries.",
+    "audioSha256": "e1741fdaced5445f19936a551e4bc612fdfbde4531146f9d4e5b5d29cdbe7790",
+    "waveformVeto": false,
+    "models": [
+     {
+      "name": "arabic-xlsr-ctc",
+      "metric": "viterbiLogProbabilityPerFrame",
+      "baselineScore": -0.6173520073216623,
+      "candidateScore": -0.5703367862401832
+     },
+     {
+      "name": "mms-uroman-ctc",
+      "metric": "viterbiLogProbabilityPerFrame",
+      "baselineScore": -0.07017063320619274,
+      "candidateScore": -0.060190554314258835
+     }
+    ]
+   }
+  }
+ }
+}

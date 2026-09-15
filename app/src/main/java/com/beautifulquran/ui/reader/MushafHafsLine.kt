@@ -184,14 +184,16 @@ internal fun MushafHafsLine(
                 else -> buildMushafLine(line, palette.fullInkColor, ayahMarkInk, fontSize, gapSp)
             }
         }
+        // Fixed by the line and its ranges, so they are built once rather
+        // than per token on every frame of the wash. See [LineBloomSlice].
+        val slices = remember(line, rendered) { lineBloomSlices(line, rendered) }
         val blooms = {
             if (!liveInk) {
                 emptyList()
             } else {
                 buildLineBlooms(
-                    line = line,
+                    slices = slices,
                     packs = packs,
-                    rendered = rendered,
                     palette = palette,
                     glintInk = glintInk,
                 )
@@ -874,6 +876,8 @@ private fun MushafQcfWord(
             markRange = 0..-1,
         )
     }
+    // Single-element and fixed for this node: only the motion changes per frame.
+    val wordAsList = remember(token.word) { listOf(token.word) }
     var layoutResult by remember { mutableStateOf<TextLayoutResult?>(null) }
     val packKey = remember(token.surahId, token.ayah) { token.surahId to token.ayah }
     val packState = remember(packs, packKey) { derivedStateOf { packs[packKey] } }
@@ -950,7 +954,7 @@ private fun MushafQcfWord(
             } else {
                 buildShapedBlooms(
                     motions = listOf(motion),
-                    words = listOf(token.word),
+                    words = wordAsList,
                     rendered = rendered,
                     palette = palette,
                     glintInk = glintInk,
@@ -1115,40 +1119,67 @@ private fun buildMushafLine(
     return RenderedLineText(text = text, wordRanges = ranges, markRange = 0..-1)
 }
 
-private fun buildLineBlooms(
+/**
+ * The parts of one token's bloom that the line fixes and a frame cannot change:
+ * its range, the one-word view of the line's layout, and the single-element
+ * word list [buildShapedBlooms] takes.
+ *
+ * Rebuilt inside the draw lambda they were four objects per token on every
+ * frame of the wash — for a whole line of words whose geometry had not moved
+ * since the leaf was laid out.
+ */
+private class LineBloomSlice(
+    val token: MushafToken,
+    val range: IntRange,
+    val rendered: RenderedLineText,
+    val words: List<com.beautifulquran.data.model.Word>,
+)
+
+private fun lineBloomSlices(
     line: MushafLine,
-    packs: SnapshotStateMap<Pair<Int, Int>, AyahInkPack>,
     rendered: RenderedLineText,
+): List<LineBloomSlice> = line.tokens.mapIndexedNotNull { tokenIndex, token ->
+    val range = rendered.wordRanges.getOrNull(tokenIndex) ?: return@mapIndexedNotNull null
+    LineBloomSlice(
+        token = token,
+        range = range,
+        rendered = RenderedLineText(
+            text = rendered.text,
+            wordRanges = listOf(range),
+            markRange = 0..-1,
+        ),
+        words = listOf(token.word),
+    )
+}
+
+private fun buildLineBlooms(
+    slices: List<LineBloomSlice>,
+    packs: SnapshotStateMap<Pair<Int, Int>, AyahInkPack>,
     palette: WordInkPalette,
     glintInk: androidx.compose.ui.graphics.Color?,
 ) = buildList {
-    line.tokens.forEachIndexed { tokenIndex, token ->
-        val pack = packs[token.surahId to token.ayah] ?: return@forEachIndexed
-        val range = rendered.wordRanges.getOrNull(tokenIndex) ?: return@forEachIndexed
+    slices.forEach { slice ->
+        val token = slice.token
+        val pack = packs[token.surahId to token.ayah] ?: return@forEach
         val motion = pack.motions.getOrNull(token.word.position - 1)
         if (motion == null) {
             val cover = pack.recessCover.value
             if (cover > 0f) {
                 add(
                     ShapedWordBloom.UpcomingDim(
-                        range = range,
+                        range = slice.range,
                         paper = palette.paperColor,
                         coverAlpha = cover,
                     ),
                 )
             }
-            return@forEachIndexed
+            return@forEach
         }
-        val slice = RenderedLineText(
-            text = rendered.text,
-            wordRanges = listOf(range),
-            markRange = 0..-1,
-        )
         addAll(
             buildShapedBlooms(
                 motions = listOf(motion),
-                words = listOf(token.word),
-                rendered = slice,
+                words = slice.words,
+                rendered = slice.rendered,
                 palette = palette,
                 glintInk = glintInk,
                 markAlpha = { pack.markAlpha.value },

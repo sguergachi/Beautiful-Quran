@@ -43,10 +43,15 @@ object FocusEngine {
     const val CHAPTER_TOP_FOCUS_AYAH: Int = BASMALAH_PLAYLIST_AYAH
 
     /**
-     * Resolve what lyric-follow / return-to-verse should home onto from the
-     * media item actually playing. This deliberately does not accept the
-     * fade-led ink target: preparing the next ayah's ink must not move the
-     * reader before its audio begins. Basmalah lead-in wins over a null verse.
+     * Resolve what lyric-follow / return-to-verse should home onto.
+     *
+     * This still does not accept the *fade-led* ink target: preparing the next
+     * ayah's ink is a statement about ink, and hanging the page on it moved the
+     * reader by whatever number happened to look right for a recess. The camera
+     * carries its own lead instead ([InkEngine.scrollLeadMs]), applied by the
+     * caller, so the two can be judged — and tuned — separately.
+     *
+     * Basmalah lead-in wins over a null verse.
      */
     fun playbackFocusTarget(playingAyah: Int?, activeBasmalah: Boolean): Int? =
         if (activeBasmalah) CHAPTER_TOP_FOCUS_AYAH else playingAyah

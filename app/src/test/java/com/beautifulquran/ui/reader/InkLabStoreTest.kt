@@ -36,6 +36,8 @@ class InkLabStoreTest {
         assertEquals(guide, InkLabSnapshot().toContextualGuideTuning())
         assertEquals(0, InkEngine.DEFAULT_HIGHLIGHT_LEAD_MS)
         assertEquals(500, InkEngine.DEFAULT_FADE_LEAD_MS)
+        // The camera's lead is its own number, not a copy of the ink's.
+        assertEquals(400, InkEngine.DEFAULT_SCROLL_LEAD_MS)
         assertNull(InkLabSnapshot().outputLatencyOverrideMs)
     }
 
@@ -50,6 +52,7 @@ class InkLabStoreTest {
             holdGhunnah = true,
             highlightLeadMs = 900,
             fadeLeadMs = 333,
+            scrollLeadMs = 444,
             outputLatencyOverrideMs = 180,
         )
         val restored = InkLabSnapshot.decode(InkLabSnapshot.encode(original))
@@ -73,6 +76,8 @@ class InkLabStoreTest {
         assertEquals(700, snap.inkFadeMs)
         assertEquals(InkEngine.DEFAULT_HIGHLIGHT_LEAD_MS, snap.highlightLeadMs)
         assertEquals(InkEngine.DEFAULT_FADE_LEAD_MS, snap.fadeLeadMs)
+        // A save written before the camera had its own lead picks the default.
+        assertEquals(InkEngine.DEFAULT_SCROLL_LEAD_MS, snap.scrollLeadMs)
         assertNull(snap.outputLatencyOverrideMs)
         // Untouched Tuning fields still match a fresh Tuning().
         val defaults = InkEngine.Tuning()
