@@ -7,6 +7,8 @@ import com.beautifulquran.domain.englishBookOf
 import java.io.DataInputStream
 import java.io.DataOutputStream
 import java.io.File
+import java.nio.charset.StandardCharsets
+import java.security.MessageDigest
 
 /**
  * The English book's leaves, kept on disk.
@@ -64,26 +66,47 @@ class EnglishBookCache internal constructor(private val dir: File) {
         if (!file.isFile) return null
         DataInputStream(file.inputStream().buffered()).use { input ->
             val leafCount = input.readInt()
+            // An empty book is never worth keeping: it was measured from an
+            // empty catalog, and reading it back installs a valid-looking
+            // measured book with no leaves — blank pager, held cover, and no
+            // remeasure ever, until app data is wiped. Treat as a miss and
+            // remove the poison so the book rebuilds from live data.
+            if (leafCount <= 0) {
+                file.delete()
+                return null
+            }
+            check(leafCount <= MAX_LEAVES) { "English book cache has too many leaves" }
             val leaves = ArrayList<List<EnglishVerseRun>>(leafCount)
+            var totalRuns = 0
             repeat(leafCount) {
                 val runCount = input.readInt()
+                check(runCount in 1..MAX_RUNS && totalRuns + runCount <= MAX_RUNS) {
+                    "English book cache has an invalid run count"
+                }
+                totalRuns += runCount
                 val runs = ArrayList<EnglishVerseRun>(runCount)
                 repeat(runCount) {
-                    runs += EnglishVerseRun(
-                        surahId = input.readInt(),
-                        ayah = input.readInt(),
-                        from = input.readInt(),
-                        to = input.readInt(),
-                    )
+                    val run = EnglishVerseRun(input.readInt(), input.readInt(), input.readInt(), input.readInt())
+                    check(run.surahId in 1..114 && run.ayah > 0 && run.from >= 0 && run.to > run.from) {
+                        "English book cache has an invalid verse run"
+                    }
+                    check(run.to <= text(run.surahId, run.ayah).length && pageOf(run.surahId, run.ayah) in 1..604) {
+                        "English book cache names text outside the Quran"
+                    }
+                    runs += run
                 }
                 leaves += runs
             }
+            check(input.read() == -1) { "English book cache has trailing bytes" }
             englishBookOf(leaves, pageOf, text)
         }.also {
             // Access recency so flipping translation/gloss/size keeps this key.
             file.setLastModified(System.currentTimeMillis())
         }
-    }.getOrNull()
+    }.getOrElse {
+        runCatching { File(dir, key).delete() }
+        null
+    }
 
     /**
      * Writes [book] down under [key], keeping a small recency-bounded set of
@@ -93,6 +116,13 @@ class EnglishBookCache internal constructor(private val dir: File) {
      */
     @Synchronized
     fun write(key: String, book: EnglishBook) {
+        // Never persist an empty book: see read. Drop any poison already
+        // stored under this key so it cannot be picked up between here and
+        // the next successful measure.
+        if (book.leafCount == 0) {
+            runCatching { File(dir, key).delete() }
+            return
+        }
         runCatching {
             dir.mkdirs()
             val tmp = File.createTempFile("book-", ".writing", dir)
@@ -169,5 +199,21 @@ class EnglishBookCache internal constructor(private val dir: File) {
          * bigger. The leaf holds a little more.
          */
         const val FORMAT = 23
+        const val MAX_LEAVES = 10_000
+        const val MAX_RUNS = 20_000
     }
+}
+
+/** Adds the exact prose to the pagination identity without putting QF text in a file name. */
+internal fun englishBookContentKey(base: String, verses: Map<Long, String>): String {
+    val digest = MessageDigest.getInstance("SHA-256")
+    verses.toSortedMap().forEach { (key, text) ->
+        digest.update(key.toString().toByteArray(StandardCharsets.UTF_8))
+        digest.update(0)
+        digest.update(text.toByteArray(StandardCharsets.UTF_8))
+        digest.update(0)
+    }
+    return "$base-${digest.digest().joinToString("") { byte ->
+        byte.toUByte().toString(16).padStart(2, '0')
+    }}"
 }
