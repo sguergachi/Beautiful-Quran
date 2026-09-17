@@ -451,6 +451,7 @@ may use them** — they are not Settings-only, which is where they started.
 | Pick one of several longer options, stacked | `InkCircledChoiceColumn` |
 | On / off | `InkCheck` — an empty ring that a brush check paints into |
 | A quiet "this one" dot | `InkDisc` |
+| A reciter / voice | `InkNuqta` — a qalam-cut Arabic dot whose wet ink spreads to its outline |
 | Circle something that is *not* a plain text choice | `rememberInkBrushCircle` + `Modifier.inkBrushCircleTarget` / `Modifier.inkBrushCircleMark` |
 | A short tool or icon strip | `InkSpotChoiceRow` / `InkSpotChoice` — circular vellum ink-drop. Effect alone: `Modifier.inkSpotHighlight` |
 | Raw geometry (custom canvases) | `inkBrushCirclePath`, `inkBrushCheckPath` |
@@ -469,6 +470,11 @@ Recitation wash punches through the blot (unread words fade into the
 stain) instead of painting a cream hole of page paper over it. On
 Android 13+ that GPU field *is* the stain; older platforms keep a
 soft cubic blot.
+
+The reciter mark is a calligraphic **nuqta**, not a geometric radio diamond.
+Its four sides bow slightly like a full-width qalam impression. Selection sends
+a translucent wet edge ahead of denser pigment, both clipped by that hand-cut
+outline so the spread settles as one Arabic dot and never grows into a halo.
 
 The circle is a filled calligraphic stroke on an oval centreline: it overshoots
 its own join at both ends and bows outward on entry / inward on exit, so the tips
