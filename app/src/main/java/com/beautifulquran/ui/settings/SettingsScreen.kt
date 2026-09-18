@@ -42,6 +42,7 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -93,6 +94,10 @@ import com.beautifulquran.ui.theme.BrushCircleParams
 import com.beautifulquran.ui.theme.DisclosureChevron
 import com.beautifulquran.ui.theme.InkCheck
 import com.beautifulquran.ui.theme.InkNuqta
+import com.beautifulquran.ui.theme.LocalNuqtaParams
+import com.beautifulquran.ui.theme.NuqtaParams
+import com.beautifulquran.ui.theme.SHIPPED_NUQTA_REVISION
+import com.beautifulquran.ui.theme.ShippedNuqtaParams
 import com.beautifulquran.ui.theme.SHIPPED_BRUSH_REVISION
 import com.beautifulquran.ui.theme.SHIPPED_CHECK_REVISION
 import com.beautifulquran.ui.theme.brushCircleParams
@@ -138,6 +143,7 @@ internal class SettingsInkPreviewState(initialStyle: BrushCircleStyle) {
     var checkParams by mutableStateOf(shippedCheckParams())
     var paintToken by mutableIntStateOf(0)
     var checkPaintToken by mutableIntStateOf(0)
+    var nuqtaParams by mutableStateOf(ShippedNuqtaParams)
 }
 
 /**
@@ -202,6 +208,7 @@ internal fun SettingsScreen(
     var lastBrushStyle by remember { mutableStateOf(settings.brushCircleStyle) }
     var lastShipRev by remember { mutableIntStateOf(SHIPPED_BRUSH_REVISION) }
     var lastCheckShipRev by remember { mutableIntStateOf(SHIPPED_CHECK_REVISION) }
+    var lastNuqtaShipRev by remember { mutableIntStateOf(SHIPPED_NUQTA_REVISION) }
 
     LaunchedEffect(settings.brushCircleStyle, SHIPPED_BRUSH_REVISION) {
         val styleChanged = lastBrushStyle != settings.brushCircleStyle
@@ -228,6 +235,12 @@ internal fun SettingsScreen(
         inkPreview.checkPaintToken++
     }
 
+    LaunchedEffect(SHIPPED_NUQTA_REVISION) {
+        if (lastNuqtaShipRev == SHIPPED_NUQTA_REVISION) return@LaunchedEffect
+        lastNuqtaShipRev = SHIPPED_NUQTA_REVISION
+        inkPreview.nuqtaParams = ShippedNuqtaParams
+    }
+
     if (developerTapCount > 0) {
         LaunchedEffect(developerTapCount) {
             delay(1500L)
@@ -241,6 +254,7 @@ internal fun SettingsScreen(
         }
     }
 
+    CompositionLocalProvider(LocalNuqtaParams provides inkPreview.nuqtaParams) {
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -401,6 +415,8 @@ internal fun SettingsScreen(
                             copyNote = "Applied check params"
                         }
                     },
+                    nuqtaParams = inkPreview.nuqtaParams,
+                    onNuqtaParams = { inkPreview.nuqtaParams = it },
                     onOpenTimingsLab = onOpenTimingsLab,
                     onOpenTarjiLab = onOpenTarjiLab,
                     onOpenOrnamentsLab = onOpenOrnamentsLab,
@@ -436,6 +452,7 @@ internal fun SettingsScreen(
             Spacer(Modifier.height(48.dp))
         }
     }
+    }
 }
 
 /** Testing tools for development builds; controls here may change or vanish. */
@@ -457,6 +474,8 @@ private fun DeveloperSection(
     onCopyCheckValues: () -> Unit,
     onPasteCheckValues: (String) -> Unit,
     onPasteCheckFromClipboard: () -> Unit,
+    nuqtaParams: NuqtaParams,
+    onNuqtaParams: (NuqtaParams) -> Unit,
     onOpenTimingsLab: () -> Unit,
     onOpenTarjiLab: () -> Unit,
     onOpenOrnamentsLab: () -> Unit,
@@ -785,6 +804,9 @@ private fun DeveloperSection(
     if (copyNote != null) {
         Caption(copyNote)
     }
+
+    Spacer(Modifier.height(22.dp))
+    NuqtaLab(params = nuqtaParams, onChange = onNuqtaParams)
 
     Spacer(Modifier.height(20.dp))
     Text(
@@ -1203,7 +1225,7 @@ private fun BrushLabSliders(
 }
 
 @Composable
-private fun BrushTuningSlider(
+internal fun BrushTuningSlider(
     label: String,
     value: Float,
     range: ClosedFloatingPointRange<Float>,

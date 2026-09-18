@@ -119,6 +119,7 @@ import com.beautifulquran.tarjilab.TarjiLabViewModel
 import com.beautifulquran.ui.theme.BeautifulQuranTheme
 import com.beautifulquran.ui.theme.FloatingPaperControl
 import com.beautifulquran.ui.theme.InkRevealOverlay
+import com.beautifulquran.ui.theme.LocalNuqtaParams
 import com.beautifulquran.ui.theme.LocalQuranAccents
 import com.beautifulquran.ui.theme.TimingsLabAccents
 import com.beautifulquran.ui.theme.absorbPointerEvents
@@ -1310,15 +1311,18 @@ private fun CustomizeSheet(
     onBack: () -> Unit,
 ) {
     val settings by viewModel.settings.settings.collectAsStateWithLifecycle()
-    CustomizeScreen(
-        settings = settings,
-        brushParams = inkPreview.brushParams,
-        paintToken = inkPreview.paintToken,
-        checkParams = inkPreview.checkParams,
-        checkPaintToken = inkPreview.checkPaintToken,
-        onBack = onBack,
-        onUpdate = { transform -> viewModel.settings.update(transform) },
-    )
+    // The developer nuqta lab reaches Customize's choice rows too.
+    CompositionLocalProvider(LocalNuqtaParams provides inkPreview.nuqtaParams) {
+        CustomizeScreen(
+            settings = settings,
+            brushParams = inkPreview.brushParams,
+            paintToken = inkPreview.paintToken,
+            checkParams = inkPreview.checkParams,
+            checkPaintToken = inkPreview.checkPaintToken,
+            onBack = onBack,
+            onUpdate = { transform -> viewModel.settings.update(transform) },
+        )
+    }
 }
 
 @Composable

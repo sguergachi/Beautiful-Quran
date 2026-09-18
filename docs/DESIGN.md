@@ -480,6 +480,15 @@ Letting go lifts the pigment as a whole (220 ms, accelerating); the spread
 never runs backwards. `InkNuqtaTest` locks the layer ordering and the
 quick-wet / soft-settle shape.
 
+Every number of the nuqta — its cut (size, side bow, outline weight and ink),
+the spread and lift clocks and curves, and each layer's start, arrival, curve,
+reach, alpha and pooling offset — lives in `NuqtaParams` (web: `NuqtaParams` in
+`kit/nuqta.ts`, flattened to the same keys). Settings → Developer's **Nuqta
+radio dot** lab slides all of them live across the Settings and Customize
+sheets (via `LocalNuqtaParams` / `NuqtaParamsContext`), and its Copy / Paste
+text moves between platforms. Ship a tuning by editing the defaults on both
+platforms and bumping `SHIPPED_NUQTA_REVISION`.
+
 The circle is a filled calligraphic stroke on an oval centreline: it overshoots
 its own join at both ends and bows outward on entry / inward on exit, so the tips
 cross like a real hand's loop instead of closing into a ring. Pressure varies
