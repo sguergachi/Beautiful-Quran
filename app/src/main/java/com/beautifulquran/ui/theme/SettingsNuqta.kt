@@ -12,7 +12,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
@@ -33,7 +33,8 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.distinctUntilChanged
 
 /**
  * How far the paper stack has turned from the sheet beneath Settings toward
@@ -45,11 +46,12 @@ val LocalSettingsApproach = staticCompositionLocalOf<() -> Float> { { 0f } }
 /** Lets the settings button start its nuqta the instant it is tapped. */
 @Stable
 class SettingsNuqtaState {
-    internal var drops by mutableIntStateOf(0)
+    /** Tapped, and the turn it starts has not yet moved the stack. */
+    internal var pressed by mutableStateOf(false)
 
     /** Touch the pen down: the nuqta spreads on its own select clock. */
     fun drop() {
-        drops++
+        pressed = true
     }
 }
 
@@ -57,12 +59,12 @@ class SettingsNuqtaState {
 fun rememberSettingsNuqtaState(): SettingsNuqtaState = remember { SettingsNuqtaState() }
 
 /**
- * The settings glyph with a nuqta of ink behind it. The drop soaks outward
- * in step with the page turn toward Settings — a swipe spreads it live, full
- * by [SettingsNuqtaFullAt] of the turn and stretching like a rubber band
- * beyond it, and turning back lifts it — so the reader sees where the turn will land. A tap
- * ([SettingsNuqtaState.drop]) spreads it on the same clock as a chosen row.
- * The glyph takes the contrasting colour only where the ink covers it.
+ * The settings glyph with a nuqta of ink behind it, so the reader sees where
+ * a page turn will land. The moment the stack starts to turn toward Settings
+ * — a swipe or a tap ([SettingsNuqtaState.drop]) — the drop spreads on the
+ * same clock as a chosen row. From there the drag stretches it like a rubber
+ * band, and once the turn falls back the ink lifts. The glyph takes the
+ * contrasting colour only where the ink covers it.
  */
 @Composable
 fun SettingsNuqtaIcon(
@@ -74,19 +76,28 @@ fun SettingsNuqtaIcon(
     params: NuqtaParams = LocalNuqtaParams.current,
 ) {
     val approach = LocalSettingsApproach.current
-    val tap = remember { Animatable(0f) }
-    LaunchedEffect(state.drops) {
-        if (state.drops == 0) return@LaunchedEffect
-        tap.snapTo(0f)
-        tap.animateTo(1f, tween(params.spreadMs, easing = LinearEasing))
-        // Hold the drop until the turn settles. On Settings the turn itself
-        // keeps it spread; if the turn fell back, lift it like a let-go choice.
-        val settled = snapshotFlow { approach() }.first { it >= 0.999f || it <= 0.001f }
-        if (settled >= 0.999f) {
-            tap.snapTo(0f)
-        } else {
-            tap.animateTo(0f, tween(params.liftMs, easing = params.lift.easing()))
+    val spread = remember { Animatable(0f) }
+    val presence = remember { Animatable(0f) }
+    LaunchedEffect(approach, state) {
+        // Once the turn is moving it carries the ink; the tap is spent.
+        snapshotFlow { approach() > SettingsTurnEpsilon }.collect { turning ->
+            if (turning) state.pressed = false
         }
+    }
+    LaunchedEffect(approach, state, params) {
+        snapshotFlow { approach() > SettingsTurnEpsilon || state.pressed }
+            .distinctUntilChanged()
+            .collectLatest { inked ->
+                if (inked) {
+                    // Re-chosen mid-lift: start a fresh drop rather than reviving
+                    // the half-dried one.
+                    if (presence.value < 1f) spread.snapTo(0f)
+                    presence.snapTo(1f)
+                    spread.animateTo(1f, tween(params.spreadMs, easing = LinearEasing))
+                } else {
+                    presence.animateTo(0f, tween(params.liftMs, easing = params.lift.easing()))
+                }
+            }
     }
     val fingers = remember(params.seed) { nuqtaFingers(params.seed) }
     val painter = rememberVectorPainter(Icons.Rounded.Tune)
@@ -98,9 +109,8 @@ fun SettingsNuqtaIcon(
             .size(iconSize * SettingsNuqtaScale)
             .semantics { if (contentDescription != null) this.contentDescription = contentDescription },
     ) {
-        // The drop is fully spread well before the turn's midpoint, so the
-        // whole nuqta reads while the reader can still decide.
-        val t = maxOf((approach() / SettingsNuqtaFullAt).coerceIn(0f, 1f), tap.value)
+        val t = spread.value
+        val lift = presence.value
         val glyphPx = iconSize.toPx()
         fun glyph(color: Color) = translate(
             left = (size.width - glyphPx) / 2f,
@@ -108,12 +118,12 @@ fun SettingsNuqtaIcon(
         ) {
             with(painter) { draw(Size(glyphPx, glyphPx), colorFilter = ColorFilter.tint(color)) }
         }
-        if (t <= 0f) {
+        if (t <= 0f || lift <= 0f) {
             glyph(tint)
             return@Canvas
         }
         val swell = 1f + settingsNuqtaStretch(approach())
-        scale(swell) { drawInkNuqta(t, 1f, params, fingers, ink, Color.Transparent) }
+        scale(swell) { drawInkNuqta(t, lift, params, fingers, ink, Color.Transparent) }
         glyph(tint)
         // Where the ink lies, the glyph turns to paper exactly as far as the
         // ink under it is dense: a contrasting copy, masked by the same drop.
@@ -124,7 +134,7 @@ fun SettingsNuqtaIcon(
             // The mask is its own layer so that, composited DstIn, its bare
             // paper clears the copy too — not only where ink was drawn.
             canvas.saveLayer(bounds, Paint().apply { blendMode = BlendMode.DstIn })
-            scale(swell) { drawInkNuqta(t, 1f, params, fingers, Color.Black, Color.Transparent) }
+            scale(swell) { drawInkNuqta(t, lift, params, fingers, Color.Black, Color.Transparent) }
             canvas.restore()
             canvas.restore()
         }
@@ -134,23 +144,21 @@ fun SettingsNuqtaIcon(
 /** The nuqta's size as a multiple of the glyph it sits behind. */
 private const val SettingsNuqtaScale = 1.6f
 
-/** The share of the turn toward Settings at which the nuqta is fully spread. */
-private const val SettingsNuqtaFullAt = 1f / 3f
+/** How far the stack must move before it counts as turning toward Settings. */
+private const val SettingsTurnEpsilon = 0.001f
 
 /** The swell the rubber band tends toward if the turn could run on forever. */
 private const val SettingsNuqtaStretchLimit = 0.8f
 
 /** How stiff the band is: its pull, per share of the turn, as it starts to stretch. */
-private const val SettingsNuqtaStretchStiffness = 1.5f
+private const val SettingsNuqtaStretchStiffness = 1f
 
 /**
- * The swell past full size at [approach]. Past full spread the drop is a
- * rubber band: it keeps growing all the way through the turn, but each step
- * of the drag buys less than the one before, like tension building before
- * it snaps back. Growth starts gently, at about the rate the spread itself
- * was slowing to, and never plateaus.
+ * The swell past full size at [approach]. The drop is a rubber band: it
+ * grows with the drag all the way to Settings, but each step buys less than
+ * the one before, like tension building before it snaps back.
  */
 internal fun settingsNuqtaStretch(approach: Float): Float {
-    val over = (approach - SettingsNuqtaFullAt).coerceAtLeast(0f)
+    val over = approach.coerceIn(0f, 1f)
     return SettingsNuqtaStretchLimit * (1f - 1f / (1f + SettingsNuqtaStretchStiffness * over))
 }
