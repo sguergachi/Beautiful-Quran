@@ -18,11 +18,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.Paint
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.drawscope.translate
-import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -56,6 +60,7 @@ fun rememberSettingsNuqtaState(): SettingsNuqtaState = remember { SettingsNuqtaS
  * in step with the page turn toward Settings — a swipe spreads it live, and
  * turning back lifts it — so the reader sees where the turn will land. A tap
  * ([SettingsNuqtaState.drop]) spreads it on the same clock as a chosen row.
+ * The glyph takes the contrasting colour only where the ink covers it.
  */
 @Composable
 fun SettingsNuqtaIcon(
@@ -92,15 +97,31 @@ fun SettingsNuqtaIcon(
             .semantics { if (contentDescription != null) this.contentDescription = contentDescription },
     ) {
         val t = maxOf(approach().coerceIn(0f, 1f), tap.value)
-        if (t > 0f) drawInkNuqta(t, 1f, params, fingers, ink, Color.Transparent)
-        // The glyph turns to paper as the ink under it deepens.
-        val glyph = lerp(tint, inked, ((t - 0.3f) / 0.5f).coerceIn(0f, 1f).let { it * it * (3f - 2f * it) })
         val glyphPx = iconSize.toPx()
-        translate(
+        fun glyph(color: Color) = translate(
             left = (size.width - glyphPx) / 2f,
             top = (size.height - glyphPx) / 2f,
         ) {
-            with(painter) { draw(Size(glyphPx, glyphPx), colorFilter = ColorFilter.tint(glyph)) }
+            with(painter) { draw(Size(glyphPx, glyphPx), colorFilter = ColorFilter.tint(color)) }
+        }
+        if (t <= 0f) {
+            glyph(tint)
+            return@Canvas
+        }
+        drawInkNuqta(t, 1f, params, fingers, ink, Color.Transparent)
+        glyph(tint)
+        // Where the ink lies, the glyph turns to paper exactly as far as the
+        // ink under it is dense: a contrasting copy, masked by the same drop.
+        drawIntoCanvas { canvas ->
+            val bounds = Rect(Offset.Zero, size)
+            canvas.saveLayer(bounds, Paint())
+            glyph(inked)
+            // The mask is its own layer so that, composited DstIn, its bare
+            // paper clears the copy too — not only where ink was drawn.
+            canvas.saveLayer(bounds, Paint().apply { blendMode = BlendMode.DstIn })
+            drawInkNuqta(t, 1f, params, fingers, Color.Black, Color.Transparent)
+            canvas.restore()
+            canvas.restore()
         }
     }
 }
