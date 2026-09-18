@@ -60,6 +60,7 @@ from build_db import (  # noqa: E402
 import detect_audio_onsets as onset_detector  # noqa: E402
 from timing_delta import (  # noqa: E402
     build_delta,
+    load_corpus_bootstraps,
     load_verdict_ledger,
     read_git_timing_rows,
     read_timing_rows,
@@ -67,6 +68,7 @@ from timing_delta import (  # noqa: E402
 )
 CASES_DIR = TOOLS / "timing_patch_cases"
 VERDICTS_DIR = TOOLS / "timing_verdicts"
+TIMING_SOURCES_DIR = TOOLS / "timing_sources"
 PIPELINES = frozenset(
     {
         "adjust_qdc_segments",
@@ -620,6 +622,12 @@ def audit_bundled_db():
         },
         6: {(12, 50), (12, 75), (12, 76), (91, 15)},
         7: set(),
+        9: set(),
+        14: set(),
+        16: set(),
+        17: set(),
+        18: set(),
+        19: set(),
     }
     exact &= all(
         set(counts) - {(s, a) for rid_, s, a in timings if rid_ == rid}
@@ -704,7 +712,11 @@ def check_reciter_catalog():
         timing_rows = list(db.execute(
             "SELECT reciter_id,surah_id,ayah_number,segments FROM timings"
         ))
-    return actual == declared_reciter_rows(timing_rows) and len(actual) == len(RECITERS)
+    return (
+        actual == declared_reciter_rows(timing_rows)
+        and len(actual) == len(RECITERS)
+        and all(row[4] == 1 for row in actual)
+    )
 
 
 def check_gloss_normalize():
@@ -905,7 +917,12 @@ def check_timing_delta():
         report = build_delta(
             read_git_timing_rows(base), read_timing_rows(ROOT / "data" / "quran.db"), ledger
         )
-        rejected = rejected_changes(report["changes"])
+        bootstraps = [
+            entry
+            for path in sorted(TIMING_SOURCES_DIR.glob("*-corpora.json"))
+            for entry in load_corpus_bootstraps(path)
+        ]
+        rejected = rejected_changes(report["changes"], bootstraps)
     except (OSError, subprocess.CalledProcessError, ValueError, sqlite3.Error) as exc:
         return False, str(exc)
     if rejected:

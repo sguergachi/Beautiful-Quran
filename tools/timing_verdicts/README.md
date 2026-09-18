@@ -26,6 +26,12 @@ This enforces *no known regression*, not an impossible claim of absolute
 acoustic certainty. Ambiguous candidate changes retain the baseline until a
 separate, reproducible review supplies the missing evidence.
 
+An entirely new reciter uses the separate `tools/timing_sources/` corpus gate.
+That gate accepts only added rows, requires the complete expected row count,
+and binds every row key and payload hash to pinned source archives. It cannot
+approve a timestamp or topology change to a voice that already ships; those
+remain subject to the per-row evidence above.
+
 ## When the evidence says no
 
 The gate is fail-closed, so a rejected row must not ship — but the pipeline is

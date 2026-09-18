@@ -134,9 +134,9 @@ internal fun ReciterChoiceRow(
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = textAlpha),
             )
-            if (!reciter.hasTimings) {
+            if (reciter.style != "Murattal") {
                 Text(
-                    text = "No word highlighting",
+                    text = reciter.style,
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
                 )

@@ -6,7 +6,7 @@ illuminates in time with the audio, with its English meaning beneath it.
 
 - 📖 Full Quran, Uthmani script, in the KFGQPC Hafs typeface
 - ✨ Word-by-word highlighting with bundled offline timing fallback
-- 🎙️ 15 reciters, with ayah audio streamed and cached
+- 🎙️ 13 fully highlighted recitations, with ayah audio streamed and cached
 - 🈯 Word-by-word English gloss + Saheeh International translation
 - 🔁 Repeat one ayah, the whole surah, or any ayah range you choose
 - 🔍 Search the English translation and word glosses within a surah
@@ -228,6 +228,7 @@ If host Vulkan is broken on your machine, you can still fall back with
 | Word-by-word gloss + transliteration + QCF layout (runtime cache only) | Quran Foundation authenticated Content API | governed by QF Developer Terms |
 | Root / lemma / morphology | [Quranic Arabic Corpus](http://corpus.quran.com) v0.4 | free with attribution + link |
 | Word timing clock/fallback | [cpfair/quran-align](https://github.com/cpfair/quran-align) | CC-BY 4.0 |
+| Yasser Al-Dosari word timings | [Qur'anic Universal Audio](https://github.com/Wider-Community/quranic-universal-audio) | CC-BY 4.0 |
 | Bundled repeat topology | [quran.com](https://quran.com) legacy `qdc` audio API, normalized offline | written QF permission requested before release |
 | Recitation audio | [everyayah.com](https://everyayah.com) | free; rights remain with reciters |
 | Arabic typeface | KFGQPC HAFS Uthmanic Script, King Fahd Complex | redistribution permission/official license confirmation pending |
