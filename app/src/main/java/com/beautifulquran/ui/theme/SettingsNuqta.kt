@@ -2,6 +2,8 @@ package com.beautifulquran.ui.theme
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.size
@@ -26,12 +28,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.Paint
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
 
 /**
@@ -58,8 +62,8 @@ fun rememberSettingsNuqtaState(): SettingsNuqtaState = remember { SettingsNuqtaS
 /**
  * The settings glyph with a nuqta of ink behind it. The drop soaks outward
  * in step with the page turn toward Settings — a swipe spreads it live, full
- * by [SettingsNuqtaFullAt] of the turn, and turning back lifts it — so the
- * reader sees where the turn will land. A tap
+ * by [SettingsNuqtaFullAt] of the turn and swelling elastically beyond it,
+ * and turning back lifts it — so the reader sees where the turn will land. A tap
  * ([SettingsNuqtaState.drop]) spreads it on the same clock as a chosen row.
  * The glyph takes the contrasting colour only where the ink covers it.
  */
@@ -87,6 +91,14 @@ fun SettingsNuqtaIcon(
             tap.animateTo(0f, tween(params.liftMs, easing = params.lift.easing()))
         }
     }
+    // Past full spread the drop keeps swelling a little on a loose spring:
+    // the page is past its point of no return and will finish the turn.
+    val stretch = remember { Animatable(0f) }
+    LaunchedEffect(approach) {
+        snapshotFlow { settingsNuqtaStretch(approach()) }.collectLatest { target ->
+            stretch.animateTo(target, spring(dampingRatio = 0.4f, stiffness = Spring.StiffnessMediumLow))
+        }
+    }
     val fingers = remember(params.seed) { nuqtaFingers(params.seed) }
     val painter = rememberVectorPainter(Icons.Rounded.Tune)
     val ink = MaterialTheme.colorScheme.primary
@@ -111,7 +123,8 @@ fun SettingsNuqtaIcon(
             glyph(tint)
             return@Canvas
         }
-        drawInkNuqta(t, 1f, params, fingers, ink, Color.Transparent)
+        val swell = 1f + stretch.value
+        scale(swell) { drawInkNuqta(t, 1f, params, fingers, ink, Color.Transparent) }
         glyph(tint)
         // Where the ink lies, the glyph turns to paper exactly as far as the
         // ink under it is dense: a contrasting copy, masked by the same drop.
@@ -122,7 +135,7 @@ fun SettingsNuqtaIcon(
             // The mask is its own layer so that, composited DstIn, its bare
             // paper clears the copy too — not only where ink was drawn.
             canvas.saveLayer(bounds, Paint().apply { blendMode = BlendMode.DstIn })
-            drawInkNuqta(t, 1f, params, fingers, Color.Black, Color.Transparent)
+            scale(swell) { drawInkNuqta(t, 1f, params, fingers, Color.Black, Color.Transparent) }
             canvas.restore()
             canvas.restore()
         }
@@ -134,3 +147,15 @@ private const val SettingsNuqtaScale = 1.6f
 
 /** The share of the turn toward Settings at which the nuqta is fully spread. */
 private const val SettingsNuqtaFullAt = 0.4f
+
+/** How far past full size the drop swells once the turn runs beyond full spread. */
+private const val SettingsNuqtaMaxStretch = 0.16f
+
+/** The share of the turn, after full spread, over which the swell arrives. */
+private const val SettingsNuqtaStretchSpan = 0.3f
+
+/** The swell past full size at [approach], easing out into its limit. */
+internal fun settingsNuqtaStretch(approach: Float): Float {
+    val over = ((approach - SettingsNuqtaFullAt) / SettingsNuqtaStretchSpan).coerceIn(0f, 1f)
+    return SettingsNuqtaMaxStretch * (1f - (1f - over).let { it * it * it })
+}
