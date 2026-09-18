@@ -673,11 +673,7 @@ private fun ContinueRow(target: ContinueTarget, onClick: () -> Unit) {
             .fillMaxWidth()
             .padding(top = 18.dp)
             .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f))
-            .continueInkWash(
-                ink,
-                color = MaterialTheme.colorScheme.primary,
-                paper = MaterialTheme.colorScheme.background,
-            )
+            .continueInkWash(ink, color = MaterialTheme.colorScheme.primary)
             .quietClickable(interactionSource = ink.interactions) {
                 ink.tapped = true
                 // Let the ink's first frame land before the reader is built.

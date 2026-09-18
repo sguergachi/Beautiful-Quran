@@ -24,11 +24,12 @@ import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Paint
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
-import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.unit.dp
 import com.beautifulquran.ui.theme.LocalNuqtaParams
 import com.beautifulquran.ui.theme.NuqtaParams
 import com.beautifulquran.ui.theme.drawInkWashCoats
@@ -51,8 +52,9 @@ val LocalReaderApproach = staticCompositionLocalOf<() -> Float> { { 0f } }
  * Ink that floods the continue row the moment the chapter list starts to turn
  * into the reader it continues. The wash plays out on its own clock whatever
  * the drag does. It stays wet under the reader, and whenever the chapter list
- * settles again — a turn let go short, or a return from the reader — it dries
- * out of the row coat by coat.
+ * settles again — a turn let go short, or a return from the reader — it wipes
+ * back out of the row toward where it landed. The ink stays dense as it
+ * withdraws, so every word is plainly on ink or on paper, never half-way.
  */
 @Stable
 internal class ContinueInk(val params: NuqtaParams) {
@@ -62,6 +64,7 @@ internal class ContinueInk(val params: NuqtaParams) {
 
     /** The wash's own clock, 0..1, before easing. */
     private var clock = 0f
+    /** How far the wash has wiped back out of the row, 0..1, eased. */
     val dry = Animatable(0f)
 
     /** Tapped, and the turn it starts has not yet landed. */
@@ -133,7 +136,7 @@ internal fun rememberContinueInk(): ContinueInk {
                 }
                 ContinueTurn.Resting -> {
                     if (ink.spread > 0f) {
-                        ink.dry.animateTo(1f, tween(ContinueInkDryMs, easing = LinearEasing))
+                        ink.dry.animateTo(1f, tween(ContinueInkDryMs, easing = ContinueInkWipeEasing))
                         ink.clear()
                         ink.dry.snapTo(0f)
                     }
@@ -145,8 +148,8 @@ internal fun rememberContinueInk(): ContinueInk {
 }
 
 /** The wash itself, drawn behind the row, landing at its right (Arabic) end. */
-internal fun Modifier.continueInkWash(ink: ContinueInk, color: Color, paper: Color): Modifier =
-    clipToBounds().drawBehind { drawContinueInk(ink, lerp(color, lerp(color, paper, 0.55f), ink.dry.value)) }
+internal fun Modifier.continueInkWash(ink: ContinueInk, color: Color): Modifier =
+    clipToBounds().drawBehind { drawContinueInk(ink, color) }
 
 /**
  * For a copy of the row's content in colours that read on the ink: shows it
@@ -168,15 +171,38 @@ internal fun Modifier.continueInkMask(ink: ContinueInk): Modifier = drawWithCont
 
 private fun DrawScope.drawContinueInk(ink: ContinueInk, color: Color) {
     val origin = Offset(size.width, size.height / 2f)
-    drawInkWashCoats(
+    fun wash() = drawInkWashCoats(
         t = ink.spread,
-        dry = ink.dry.value,
+        dry = 0f,
         params = ink.params,
         fingers = ink.fingers,
         ink = color,
         origin = origin,
         full = inkWashReachToCover(hypot(size.width, size.height / 2f)),
     )
+    val wipe = ink.dry.value
+    if (wipe <= 0f) {
+        wash()
+        return
+    }
+    // Wiping back: a soft edge sweeps from the row's far end toward where the
+    // ink landed, and only what lies behind it keeps its ink.
+    val feather = ContinueInkWipeFeather.toPx()
+    val edge = -feather + (size.width + 2f * feather) * wipe
+    drawIntoCanvas { canvas ->
+        canvas.saveLayer(Rect(Offset.Zero, size), Paint())
+        wash()
+        drawRect(
+            brush = Brush.horizontalGradient(
+                0f to Color.Transparent,
+                1f to Color.Black,
+                startX = edge - feather,
+                endX = edge + feather,
+            ),
+            blendMode = BlendMode.DstIn,
+        )
+        canvas.restore()
+    }
 }
 
 /** The wash's own clock, from the turn starting to the row fully inked. */
@@ -193,8 +219,14 @@ private const val ContinueTurnEpsilon = 0.001f
 /** The most a single frame may advance the wash's clock. */
 private const val ContinueInkMaxFrameMs = 20f
 
-/** A turn let go dries out of the row over this long, coat by coat. */
-private const val ContinueInkDryMs = 500
+/** The wash wipes back out of the row over this long. */
+private const val ContinueInkDryMs = 420
+
+/** The wipe gathers, crosses the words briskly, and settles into the Arabic end. */
+private val ContinueInkWipeEasing = CubicBezierEasing(0.4f, 0f, 0.2f, 1f)
+
+/** Half the width of the wipe's soft edge. */
+private val ContinueInkWipeFeather = 14.dp
 
 /** Turned again mid-dry, the colour floods back over this long. */
 private const val ContinueInkRewetMs = 180
