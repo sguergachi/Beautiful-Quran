@@ -33,6 +33,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import kotlin.math.roundToInt
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
 
@@ -63,7 +64,8 @@ fun rememberSettingsNuqtaState(): SettingsNuqtaState = remember { SettingsNuqtaS
  * a page turn will land. The moment the stack starts to turn toward Settings
  * — a swipe or a tap ([SettingsNuqtaState.drop]) — the drop spreads on the
  * same clock as a chosen row. From there the drag stretches it like a rubber
- * band, and once the turn falls back the ink lifts. The glyph takes the
+ * band, and if the turn falls back short of Settings the ink dries back
+ * the way it came. The glyph takes the
  * contrasting colour only where the ink covers it.
  */
 @Composable
@@ -89,13 +91,25 @@ fun SettingsNuqtaIcon(
             .distinctUntilChanged()
             .collectLatest { inked ->
                 if (inked) {
-                    // Re-chosen mid-lift: start a fresh drop rather than reviving
-                    // the half-dried one.
-                    if (presence.value < 1f) spread.snapTo(0f)
+                    // Turned again while it dries: the ink re-wets from
+                    // where it has shrunk to.
                     presence.snapTo(1f)
-                    spread.animateTo(1f, tween(params.spreadMs, easing = LinearEasing))
+                    spread.animateTo(
+                        1f,
+                        tween(
+                            (params.spreadMs * (1f - spread.value)).roundToInt(),
+                            easing = LinearEasing,
+                        ),
+                    )
                 } else {
-                    presence.animateTo(0f, tween(params.liftMs, easing = params.lift.easing()))
+                    // A turn let go short of Settings dries back: the clock
+                    // runs in reverse, so the edge draws in toward where the
+                    // drop landed, paling to a wet fringe as it goes.
+                    spread.animateTo(
+                        0f,
+                        tween((params.spreadMs * spread.value).roundToInt(), easing = LinearEasing),
+                    )
+                    presence.snapTo(0f)
                 }
             }
     }
