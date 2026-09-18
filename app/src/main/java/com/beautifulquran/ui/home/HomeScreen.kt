@@ -60,6 +60,7 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.SpanStyle
@@ -660,13 +661,43 @@ private fun SavedPassagesRow(
 
 @Composable
 private fun ContinueRow(target: ContinueTarget, onClick: () -> Unit) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
+    // Turning into the reader floods the row with ink; its words take the
+    // paper colour only where the ink lies.
+    val ink = rememberContinueInk()
+    Box(
         modifier = Modifier
             .fillMaxWidth()
             .padding(top = 18.dp)
             .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f))
-            .quietClickable(onClick = onClick)
+            .continueInkWash(
+                ink,
+                color = MaterialTheme.colorScheme.primary,
+                paper = MaterialTheme.colorScheme.background,
+            )
+            .quietClickable(onClick = onClick),
+    ) {
+        ContinueRowContent(target, onInk = false)
+        ContinueRowContent(
+            target,
+            onInk = true,
+            modifier = Modifier
+                .clearAndSetSemantics {}
+                .continueInkMask(ink),
+        )
+    }
+}
+
+@Composable
+private fun ContinueRowContent(
+    target: ContinueTarget,
+    onInk: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    val colors = MaterialTheme.colorScheme
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = modifier
+            .fillMaxWidth()
             .padding(vertical = 18.dp),
     ) {
         Spacer(Modifier.width(HomeStartInset + HomeNumberColumn))
@@ -675,13 +706,13 @@ private fun ContinueRow(target: ContinueTarget, onClick: () -> Unit) {
             Text(
                 text = "Continue listening",
                 style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.75f),
+                color = if (onInk) colors.onPrimary.copy(alpha = 0.8f) else colors.primary.copy(alpha = 0.75f),
             )
             Spacer(Modifier.height(2.dp))
             Text(
                 text = "${target.surah.nameTransliteration} · Ayah ${target.ayah}",
                 style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurface,
+                color = if (onInk) colors.onPrimary else colors.onSurface,
             )
         }
         Spacer(Modifier.width(16.dp))
@@ -689,7 +720,7 @@ private fun ContinueRow(target: ContinueTarget, onClick: () -> Unit) {
             text = target.surah.nameArabic,
             style = ArabicTitleStyle,
             fontSize = 24.sp,
-            color = MaterialTheme.colorScheme.primary,
+            color = if (onInk) colors.onPrimary else colors.primary,
             modifier = Modifier.padding(end = HomeEndInset + HomeArabicOpticalInset),
         )
     }

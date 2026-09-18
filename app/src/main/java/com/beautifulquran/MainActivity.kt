@@ -85,6 +85,7 @@ import com.beautifulquran.ui.home.FloatingPlaybackCoverVisibleMaxPage
 import com.beautifulquran.ui.home.FloatingPlaybackListClearance
 import com.beautifulquran.ui.home.HomeScreen
 import com.beautifulquran.ui.home.HomeViewModel
+import com.beautifulquran.ui.home.LocalReaderApproach
 import com.beautifulquran.ui.reader.BackToOriginPill
 import com.beautifulquran.ui.reader.ReaderPlaybackSnapshot
 import com.beautifulquran.ui.reader.ReaderScreen
@@ -574,6 +575,11 @@ private fun PaperStackApp(
     // The settings button's nuqta spreads with the turn from the sheet just
     // beneath Settings, whichever sheet that is.
     var stackDragging by remember { mutableStateOf(false) }
+    // The continue row inks as the chapter list turns into the open reader.
+    val readerApproach = remember(stackPosition, selectedSurahId != 0) {
+        val readerOpen = selectedSurahId != 0
+        { if (readerOpen) (stackPosition.value - COVER_LAYER).coerceIn(0f, 1f) else 0f }
+    }
     val settingsApproach = remember(stackPosition, settingsLayer) {
         SettingsApproach(
             progress = { (stackPosition.value - (settingsLayer - 1)).coerceIn(0f, 1f) },
@@ -1194,7 +1200,10 @@ private fun PaperStackApp(
             settingsLayer = settingsLayer,
             modifier = Modifier.zIndex(2f),
         ) {
-            CompositionLocalProvider(LocalSettingsApproach provides settingsApproach) {
+            CompositionLocalProvider(
+                LocalSettingsApproach provides settingsApproach,
+                LocalReaderApproach provides readerApproach,
+            ) {
                 HomeScreen(
                     viewModel = homeViewModel,
                     onOpenSurah = { surahId, ayah, wordPosition, searchText ->
