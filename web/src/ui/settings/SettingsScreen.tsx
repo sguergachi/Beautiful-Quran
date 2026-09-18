@@ -8,6 +8,7 @@ import {
 } from '../../data/settings'
 import { customizeSummary } from '../../data/customizePolicy'
 import { CustomizeScreen } from './CustomizeScreen'
+import { NuqtaLab } from './NuqtaLab'
 import { settingsLayerFor, type StackLayer } from '../paper/stack'
 import {
   BRUSH_CHECK_KNOB_SLIDERS,
@@ -37,6 +38,7 @@ import { DisclosureChevron } from '../kit/DisclosureChevron'
 import { InkCheckMark } from '../kit/InkCheckMark'
 import { PaperChoiceList } from '../kit/PaperChoiceList'
 import { PaperSlider } from '../kit/PaperSlider'
+import { NuqtaParamsContext, SHIPPED_NUQTA, type NuqtaParams } from '../kit/nuqta'
 import { PaperSwitch } from '../kit/PaperSwitch'
 import { rearmEducation } from '../../data/education'
 
@@ -89,6 +91,7 @@ export function SettingsScreen({
   }))
   const [paintToken, setPaintToken] = useState(0)
   const [checkPaintToken, setCheckPaintToken] = useState(0)
+  const [nuqtaParams, setNuqtaParams] = useState<NuqtaParams>(() => ({ ...SHIPPED_NUQTA }))
   const [checkPreviewOn, setCheckPreviewOn] = useState(true)
   const [, setCacheClock] = useState(0)
 
@@ -338,6 +341,7 @@ export function SettingsScreen({
       data-depth={depth}
       data-active={isTop}
     >
+      <NuqtaParamsContext.Provider value={nuqtaParams}>
       <div className="settings">
         {customizeOpen ? (
           <CustomizeScreen
@@ -745,6 +749,8 @@ export function SettingsScreen({
                 </p>
               ) : null}
             </div>
+
+            <NuqtaLab params={nuqtaParams} onChange={setNuqtaParams} />
           </section>
         ) : null}
 
@@ -771,6 +777,7 @@ export function SettingsScreen({
           </>
         )}
       </div>
+      </NuqtaParamsContext.Provider>
     </div>
   )
 }

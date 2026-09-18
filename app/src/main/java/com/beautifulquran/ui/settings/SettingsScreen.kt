@@ -1,10 +1,6 @@
 package com.beautifulquran.ui.settings
 
-import android.content.ClipData
-import android.content.ClipboardManager
-import android.content.Context
 import android.os.Build
-import android.util.Log
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -35,13 +31,13 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.PlayArrow
-import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -92,7 +88,10 @@ import com.beautifulquran.ui.theme.BrushCheckParams
 import com.beautifulquran.ui.theme.BrushCircleParams
 import com.beautifulquran.ui.theme.DisclosureChevron
 import com.beautifulquran.ui.theme.InkCheck
-import com.beautifulquran.ui.theme.InkDisc
+import com.beautifulquran.ui.theme.InkNuqta
+import com.beautifulquran.ui.theme.LocalNuqtaParams
+import com.beautifulquran.ui.theme.SHIPPED_NUQTA_REVISION
+import com.beautifulquran.ui.theme.ShippedNuqtaParams
 import com.beautifulquran.ui.theme.SHIPPED_BRUSH_REVISION
 import com.beautifulquran.ui.theme.SHIPPED_CHECK_REVISION
 import com.beautifulquran.ui.theme.brushCircleParams
@@ -130,7 +129,7 @@ private const val FONT_SCALE_STOPS = 8 // intervals; nine tappable stops
 private val FONT_SCALE_STEP = (FONT_SCALE_MAX - FONT_SCALE_MIN) / FONT_SCALE_STOPS
 private val PINCH_SCALE_THRESHOLD = FONT_SCALE_STEP * 0.6f
 
-internal enum class SettingsDetail { CUSTOMIZE, DOWNLOADS }
+internal enum class SettingsDetail { CUSTOMIZE, DOWNLOADS, COMPONENT_KIT }
 
 /** Session-only brush lab state shared by Settings and its Customize leaf. */
 internal class SettingsInkPreviewState(initialStyle: BrushCircleStyle) {
@@ -138,6 +137,7 @@ internal class SettingsInkPreviewState(initialStyle: BrushCircleStyle) {
     var checkParams by mutableStateOf(shippedCheckParams())
     var paintToken by mutableIntStateOf(0)
     var checkPaintToken by mutableIntStateOf(0)
+    var nuqtaParams by mutableStateOf(ShippedNuqtaParams)
 }
 
 /**
@@ -175,6 +175,7 @@ internal fun SettingsScreen(
     onBack: () -> Unit,
     onOpenCustomize: () -> Unit = {},
     onOpenDownloads: () -> Unit = {},
+    onOpenComponentKit: () -> Unit = {},
     onOpenTimingsLab: () -> Unit = {},
     onOpenTarjiLab: () -> Unit = {},
     onOpenOrnamentsLab: () -> Unit = {},
@@ -192,16 +193,15 @@ internal fun SettingsScreen(
     }
 
     var developerTapCount by remember { mutableStateOf(0) }
-    val brushParams = inkPreview.brushParams
     val checkParams = inkPreview.checkParams
     val checkPaintToken = inkPreview.checkPaintToken
-    var copyNote by remember { mutableStateOf<String?>(null) }
     // Only reseed when the preset or shipped BASE revision actually changes —
     // never wipe a live paste / slider edit on unrelated recomposition.
     // Ship bumps always load baseline (not Hairline's bodyAmp 0.12, etc.).
     var lastBrushStyle by remember { mutableStateOf(settings.brushCircleStyle) }
     var lastShipRev by remember { mutableIntStateOf(SHIPPED_BRUSH_REVISION) }
     var lastCheckShipRev by remember { mutableIntStateOf(SHIPPED_CHECK_REVISION) }
+    var lastNuqtaShipRev by remember { mutableIntStateOf(SHIPPED_NUQTA_REVISION) }
 
     LaunchedEffect(settings.brushCircleStyle, SHIPPED_BRUSH_REVISION) {
         val styleChanged = lastBrushStyle != settings.brushCircleStyle
@@ -228,19 +228,20 @@ internal fun SettingsScreen(
         inkPreview.checkPaintToken++
     }
 
+    LaunchedEffect(SHIPPED_NUQTA_REVISION) {
+        if (lastNuqtaShipRev == SHIPPED_NUQTA_REVISION) return@LaunchedEffect
+        lastNuqtaShipRev = SHIPPED_NUQTA_REVISION
+        inkPreview.nuqtaParams = ShippedNuqtaParams
+    }
+
     if (developerTapCount > 0) {
         LaunchedEffect(developerTapCount) {
             delay(1500L)
             developerTapCount = 0
         }
     }
-    if (copyNote != null) {
-        LaunchedEffect(copyNote) {
-            delay(2000L)
-            copyNote = null
-        }
-    }
 
+    CompositionLocalProvider(LocalNuqtaParams provides inkPreview.nuqtaParams) {
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -319,88 +320,9 @@ internal fun SettingsScreen(
                 DeveloperSection(
                     viewModel = viewModel,
                     settings = settings,
-                    brushParams = brushParams,
-                    onBrushParams = {
-                        inkPreview.brushParams = it
-                        inkPreview.paintToken++
-                    },
                     checkParams = checkParams,
                     checkPaintToken = checkPaintToken,
-                    onCheckParams = {
-                        inkPreview.checkParams = it
-                        inkPreview.checkPaintToken++
-                    },
-                    onReplayPaint = { inkPreview.paintToken++ },
-                    onReplayCheckPaint = { inkPreview.checkPaintToken++ },
-                    copyNote = copyNote,
-                    onCopyValues = {
-                        val text = formatBrushParamsCopy(brushParams)
-                        val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                        cm.setPrimaryClip(ClipData.newPlainText("brush circle params", text))
-                        Log.d("BrushLab", text)
-                        copyNote = "Copied TS + Kotlin params"
-                    },
-                    onPasteValues = { raw ->
-                        val parsed = parseBrushParamsFromText(raw, brushParams)
-                        if (parsed == null) {
-                            copyNote = "No brush knobs found in paste"
-                        } else {
-                            inkPreview.brushParams = parsed
-                            inkPreview.paintToken++
-                            copyNote = "Applied pasted params"
-                        }
-                    },
-                    onPasteFromClipboard = {
-                        val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                        val raw = cm.primaryClip
-                            ?.takeIf { it.itemCount > 0 }
-                            ?.getItemAt(0)
-                            ?.coerceToText(context)
-                            ?.toString()
-                            .orEmpty()
-                        val parsed = parseBrushParamsFromText(raw, brushParams)
-                        if (parsed == null) {
-                            copyNote = "No brush knobs found in clipboard"
-                        } else {
-                            inkPreview.brushParams = parsed
-                            inkPreview.paintToken++
-                            copyNote = "Applied pasted params"
-                        }
-                    },
-                    onCopyCheckValues = {
-                        val text = formatBrushCheckCopy(checkParams)
-                        val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                        cm.setPrimaryClip(ClipData.newPlainText("brush check params", text))
-                        Log.d("BrushLab", text)
-                        copyNote = "Copied check params"
-                    },
-                    onPasteCheckValues = { raw ->
-                        val parsed = parseBrushCheckFromText(raw, checkParams)
-                        if (parsed == null) {
-                            copyNote = "No check knobs found in paste"
-                        } else {
-                            inkPreview.checkParams = parsed
-                            inkPreview.checkPaintToken++
-                            copyNote = "Applied check params"
-                        }
-                    },
-                    onPasteCheckFromClipboard = {
-                        val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                        val raw = cm.primaryClip
-                            ?.takeIf { it.itemCount > 0 }
-                            ?.getItemAt(0)
-                            ?.coerceToText(context)
-                            ?.toString()
-                            .orEmpty()
-                        val parsed = parseBrushCheckFromText(raw, checkParams)
-                        if (parsed == null) {
-                            copyNote = "No check knobs found in clipboard"
-                        } else {
-                            inkPreview.checkParams = parsed
-                            inkPreview.checkPaintToken++
-                            copyNote = "Applied check params"
-                        }
-                    },
+                    onOpenComponentKit = onOpenComponentKit,
                     onOpenTimingsLab = onOpenTimingsLab,
                     onOpenTarjiLab = onOpenTarjiLab,
                     onOpenOrnamentsLab = onOpenOrnamentsLab,
@@ -436,6 +358,7 @@ internal fun SettingsScreen(
             Spacer(Modifier.height(48.dp))
         }
     }
+    }
 }
 
 /** Testing tools for development builds; controls here may change or vanish. */
@@ -443,20 +366,9 @@ internal fun SettingsScreen(
 private fun DeveloperSection(
     viewModel: SettingsViewModel,
     settings: Settings,
-    brushParams: BrushCircleParams,
-    onBrushParams: (BrushCircleParams) -> Unit,
     checkParams: BrushCheckParams,
     checkPaintToken: Int,
-    onCheckParams: (BrushCheckParams) -> Unit,
-    onReplayPaint: () -> Unit,
-    onReplayCheckPaint: () -> Unit,
-    copyNote: String?,
-    onCopyValues: () -> Unit,
-    onPasteValues: (String) -> Unit,
-    onPasteFromClipboard: () -> Unit,
-    onCopyCheckValues: () -> Unit,
-    onPasteCheckValues: (String) -> Unit,
-    onPasteCheckFromClipboard: () -> Unit,
+    onOpenComponentKit: () -> Unit,
     onOpenTimingsLab: () -> Unit,
     onOpenTarjiLab: () -> Unit,
     onOpenOrnamentsLab: () -> Unit,
@@ -466,8 +378,6 @@ private fun DeveloperSection(
     // Created on first audition tap: a SoundPool with nine loaded samples is
     // too heavy to spin up just because the settings sheet composed.
     var sounds by remember { mutableStateOf<PageTurnSounds?>(null) }
-    var presetsOpen by remember { mutableStateOf(false) }
-    var pasteText by remember { mutableStateOf("") }
     var educationRearmed by remember { mutableStateOf(false) }
     DisposableEffect(Unit) {
         onDispose { sounds?.release() }
@@ -604,187 +514,15 @@ private fun DeveloperSection(
 
     Spacer(Modifier.height(20.dp))
     Text(
-        "Selector brush circle",
+        text = "Component kit",
         style = MaterialTheme.typography.bodyLarge,
-        color = MaterialTheme.colorScheme.onSurface,
-    )
-    Spacer(Modifier.height(4.dp))
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .fillMaxWidth()
-            .quietClickable { presetsOpen = !presetsOpen }
+            .quietClickable(onClick = onOpenComponentKit)
             .padding(vertical = 6.dp),
-    ) {
-        Text(
-            text = "Presets",
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.primary,
-        )
-        Spacer(Modifier.width(4.dp))
-        DisclosureChevron(expanded = presetsOpen)
-        Spacer(Modifier.size(12.dp))
-        Text(
-            text = brushCircleParams(settings.brushCircleStyle).label,
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-        )
-    }
-    if (presetsOpen) {
-        BrushCircleStyle.entries.forEach { style ->
-            SelectRow(
-                label = brushCircleParams(style).label,
-                selected = settings.brushCircleStyle == style,
-                onClick = {
-                    viewModel.settings.update { it.copy(brushCircleStyle = style) }
-                    onBrushParams(brushCircleParams(style))
-                },
-            )
-        }
-    }
-    Spacer(Modifier.height(8.dp))
-    BrushLabSliders(params = brushParams, onChange = onBrushParams)
-
-    Spacer(Modifier.height(22.dp))
-    Text(
-        "Ink check mark",
-        style = MaterialTheme.typography.bodyLarge,
-        color = MaterialTheme.colorScheme.onSurface,
+        color = MaterialTheme.colorScheme.primary,
     )
-    Spacer(Modifier.height(6.dp))
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier
-            .fillMaxWidth()
-            .quietClickable {
-                // Toggle preview by flipping a local... use paint replay via onReplayCheckPaint
-                onReplayCheckPaint()
-            }
-            .padding(vertical = 6.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-    ) {
-        Text(
-            text = "Preview — see toggles above",
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.primary,
-        )
-        InkCheck(checked = true, params = checkParams, paintToken = checkPaintToken)
-    }
-    CheckLabSliders(params = checkParams, onChange = onCheckParams)
-    Spacer(Modifier.height(6.dp))
-    Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
-        Text(
-            text = "Reset check",
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier
-                .quietClickable { onCheckParams(shippedCheckParams()) }
-                .padding(vertical = 6.dp),
-        )
-        Text(
-            text = "Replay paint",
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier
-                .quietClickable(onClick = onReplayCheckPaint)
-                .padding(vertical = 6.dp),
-        )
-        Text(
-            text = "Copy check",
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier
-                .quietClickable(onClick = onCopyCheckValues)
-                .padding(vertical = 6.dp),
-        )
-        Text(
-            text = "Paste check",
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier
-                .quietClickable(onClick = onPasteCheckFromClipboard)
-                .padding(vertical = 6.dp),
-        )
-    }
-    Spacer(Modifier.height(6.dp))
-    Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
-        Text(
-            text = "Reset to preset",
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier
-                .quietClickable {
-                    onBrushParams(brushCircleParams(settings.brushCircleStyle))
-                }
-                .padding(vertical = 6.dp),
-        )
-        Text(
-            text = "Replay paint",
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier
-                .quietClickable(onClick = onReplayPaint)
-                .padding(vertical = 6.dp),
-        )
-        Text(
-            text = "Copy values",
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier
-                .quietClickable(onClick = onCopyValues)
-                .padding(vertical = 6.dp),
-        )
-        Text(
-            text = "Paste values",
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier
-                .quietClickable(onClick = onPasteFromClipboard)
-                .padding(vertical = 6.dp),
-        )
-    }
-    Spacer(Modifier.height(8.dp))
-    BasicTextField(
-        value = pasteText,
-        onValueChange = { pasteText = it },
-        textStyle = MaterialTheme.typography.bodySmall.copy(
-            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.85f),
-            fontFamily = MaterialTheme.typography.bodySmall.fontFamily,
-        ),
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 6.dp),
-        decorationBox = { inner ->
-            Column {
-                if (pasteText.isEmpty()) {
-                    Text(
-                        text = "Paste saved brush params here (TS or Kotlin)…",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                    )
-                }
-                inner()
-            }
-        },
-    )
-    Text(
-        text = "Apply paste",
-        style = MaterialTheme.typography.labelLarge,
-        color = if (pasteText.isBlank()) {
-            MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)
-        } else {
-            MaterialTheme.colorScheme.primary
-        },
-        modifier = Modifier
-            .quietClickable(enabled = pasteText.isNotBlank()) {
-                onPasteValues(pasteText)
-                pasteText = ""
-            }
-            .padding(vertical = 6.dp),
-    )
-    if (copyNote != null) {
-        Caption(copyNote)
-    }
+    Caption("Tune the nuqta, ink check and brush circle live, one component per page.")
 
     Spacer(Modifier.height(20.dp))
     Text(
@@ -935,9 +673,9 @@ private fun NavigateRow(
     }
 }
 
-/** A single-choice row: a green ink disc leads the label, ink strength carries
- * the selection, and an optional trailing ornament (theme swatches) sits at the
- * edge. No radio, no ripple. */
+/** A single-choice row: a calligraphic nuqta leads the label, ink strength
+ * carries the selection, and an optional trailing ornament (theme swatches)
+ * sits at the edge. No radio, no ripple. */
 @Composable
 internal fun SelectRow(
     label: String,
@@ -958,7 +696,7 @@ internal fun SelectRow(
             }
             .padding(vertical = 8.dp),
     ) {
-        InkDisc(selected = selected)
+        InkNuqta(selected = selected)
         Spacer(Modifier.size(16.dp))
         Column(Modifier.weight(1f)) {
             Text(
@@ -1017,7 +755,7 @@ internal fun ToggleRow(
 
 
 @Composable
-private fun CheckLabSliders(
+internal fun CheckLabSliders(
     params: BrushCheckParams,
     onChange: (BrushCheckParams) -> Unit,
 ) {
@@ -1099,7 +837,7 @@ private fun CheckLabSliders(
 }
 
 @Composable
-private fun BrushLabSliders(
+internal fun BrushLabSliders(
     params: BrushCircleParams,
     onChange: (BrushCircleParams) -> Unit,
 ) {
@@ -1203,7 +941,7 @@ private fun BrushLabSliders(
 }
 
 @Composable
-private fun BrushTuningSlider(
+internal fun BrushTuningSlider(
     label: String,
     value: Float,
     range: ClosedFloatingPointRange<Float>,
@@ -1242,7 +980,7 @@ private fun BrushTuningSlider(
     }
 }
 
-private fun formatBrushCheckCopy(p: BrushCheckParams): String {
+internal fun formatBrushCheckCopy(p: BrushCheckParams): String {
     fun f(v: Float, digits: Int): String {
         val s = "%.${digits}f".format(v).trimEnd('0').trimEnd('.')
         return s.ifEmpty { "0" }
@@ -1289,7 +1027,7 @@ BrushCheckParams(
 """.trimIndent()
 }
 
-private fun parseBrushCheckFromText(text: String, base: BrushCheckParams): BrushCheckParams? {
+internal fun parseBrushCheckFromText(text: String, base: BrushCheckParams): BrushCheckParams? {
     val ts = Regex("""\{[\s\S]*?\}""").find(text)?.value
     val kotlin = Regex("""BrushCheckParams\s*\([\s\S]*?\)""").find(text)?.value
     val source = ts ?: kotlin ?: text
@@ -1325,7 +1063,7 @@ private fun parseBrushCheckFromText(text: String, base: BrushCheckParams): Brush
     return if (hits > 0) next else null
 }
 
-private fun formatBrushParamsCopy(p: BrushCircleParams): String {
+internal fun formatBrushParamsCopy(p: BrushCircleParams): String {
     fun f(v: Float, digits: Int): String {
         val s = "%.${digits}f".format(v).trimEnd('0').trimEnd('.')
         return s.ifEmpty { "0" }
@@ -1381,7 +1119,7 @@ BrushCircleParams(
  * shipped baseline then overlays found knobs so paste is not tainted by stale
  * lab state. Returns null if nothing numeric was found.
  */
-private fun parseBrushParamsFromText(text: String, base: BrushCircleParams): BrushCircleParams? {
+internal fun parseBrushParamsFromText(text: String, base: BrushCircleParams): BrushCircleParams? {
     // Prefer TS object; fall back to Kotlin constructor; else whole text.
     val ts = Regex("""\{[\s\S]*?\}""").find(text)?.value
     val kotlin = Regex("""BrushCircleParams\s*\([\s\S]*?\)""").find(text)?.value
