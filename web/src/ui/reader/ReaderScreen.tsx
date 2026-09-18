@@ -1435,7 +1435,10 @@ export function ReaderScreen({ stackLayer }: { stackLayer: StackLayer }) {
                   className="basmalah-block reader-verse-rise"
                   data-ayah="0"
                   data-ayah-active={state.activeBasmalah || undefined}
-                  style={verseRiseStyle}
+                  style={{
+                    ...verseRiseStyle,
+                    ['--font-scale' as string]: String(state.settings.fontScale),
+                  }}
                 >
                   <BasmalahCalligraphy
                     className="basmalah"

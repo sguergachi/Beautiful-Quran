@@ -2965,6 +2965,7 @@ fun ReaderScreen(
                                 BasmalahBlock(
                                     active = isThisSurahPlaying && activeBasmalah == true,
                                     dimmed = recitingActive && activeBasmalah != true,
+                                    fontScale = settings.fontScale,
                                     washProgress = viewModel.basmalahWashProgress,
                                     onClick = {
                                         dispatch(ReaderInteractionEvent.EnableFollow)
