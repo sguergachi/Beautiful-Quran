@@ -1493,11 +1493,12 @@ select {
 .basmalah-block .basmalah-calligraphy {
   margin-top: 0;
   /*
-   * 11.82 em of verse text: the artwork's alif (32.7 of 608 units) stands as
-   * tall as Hafs' alif (0.636 em). Android BASMALAH_WIDTH_EM has the measurement.
-   * + the 0.75rem side padding; never wider than the column.
+   * 9.13 em of verse text: the artwork's nuqta (√area 5.46 of 608 units)
+   * matches Hafs' nuqta (0.082 em), so both are written with one pen. Android
+   * BASMALAH_WIDTH_EM has the measurement. + the 0.75rem side padding; never
+   * wider than the column.
    */
-  width: min(100%, calc(var(--word-arabic-size) * 11.82 + 1.5rem));
+  width: min(100%, calc(var(--word-arabic-size) * 9.13 + 1.5rem));
 }
 
 .basmalah,

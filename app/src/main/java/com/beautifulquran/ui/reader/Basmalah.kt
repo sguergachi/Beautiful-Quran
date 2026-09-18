@@ -41,20 +41,21 @@ fun surahOpensWithBasmalahPreface(surahId: Int): Boolean =
     domainSurahOpensWithBasmalahPreface(surahId)
 
 /**
- * Width of the basmalah artwork, in ems of the verse text beside it, so its
- * strokes stand at the same height as the recited verses at every text scale.
+ * Width of the basmalah artwork, in ems of the verse text beside it, so it is
+ * written with the same pen as the recited verses at every text scale.
  *
- * Measured on the alif — the calligrapher's own unit of proportion:
- * - `basmalah_naskh` (viewport 608 wide): the three free-standing alifs of
- *   ٱلله / ٱلرحمن / ٱلرحيم are 32.6, 32.7 and 32.8 units tall → 32.7.
- * - `hafs_uthmanic.ttf` (2048 upm): `uni0627` spans −6.1…1296 → 0.636 em.
+ * Measured on the nuqta — the calligrapher's unit, the square the pen leaves:
+ * - `basmalah_naskh` (viewport 608 wide): the dots of ب and ي are each
+ *   6.4 × 7.0 units, √area 5.46.
+ * - `hafs_uthmanic.ttf`: the dots of ب / ن / ف have √area 0.082 em.
  *
- * 608 × 0.636 / 32.7 = 11.82 em. Cross-checked on a device capture at 1×,
- * where the basmalah's alifs drew 44 px against the verses' 45–47 px. Re-measure
- * if either the artwork or the verse face changes (web mirrors this in
+ * 608 × 0.082 / 5.46 = 9.13 em. Not the alif: this hand's alifs are short for
+ * its pen, so matching alif height (11.82 em) left it a 1.4–1.7× heavier stroke
+ * than the verses on device and it read as larger text. Re-measure if either
+ * the artwork or the verse face changes (web mirrors this in
  * `.basmalah-calligraphy`).
  */
-const val BASMALAH_WIDTH_EM = 11.82f
+const val BASMALAH_WIDTH_EM = 9.13f
 
 /** Side margin inside the calligraphy's own tap target. */
 private val BasmalahInset = 12.dp
