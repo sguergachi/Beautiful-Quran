@@ -6,11 +6,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
@@ -31,8 +27,11 @@ import com.beautifulquran.ui.theme.drawInkWashCoats
 import com.beautifulquran.ui.theme.inkCoatFingers
 import com.beautifulquran.ui.theme.inkWashReachToCover
 import kotlin.math.hypot
+import kotlin.math.roundToInt
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.launch
 
 /**
  * How far the paper stack has turned from the chapter list into the open
@@ -42,21 +41,23 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 val LocalReaderApproach = staticCompositionLocalOf<() -> Float> { { 0f } }
 
 /**
- * Ink that floods the continue row as the chapter list turns into the reader
- * it continues. The wash follows the turn and never recedes during it; a turn
- * let go short of the reader dries it out coat by coat, and one that lands
- * clears it unseen under the reader.
+ * Ink that floods the continue row the moment the chapter list starts to turn
+ * into the reader it continues. The wash plays out on its own clock whatever
+ * the drag does; a turn let go short of the reader dries it out coat by coat,
+ * and one that lands clears it unseen under the reader.
  */
 @Stable
 internal class ContinueInk(val params: NuqtaParams) {
     /** How far the wash has spread, 0..1. */
-    var spread by mutableFloatStateOf(0f)
+    val spread = Animatable(0f)
     val dry = Animatable(0f)
 
     /** Only a turn that starts on the chapter list inks the row. */
-    var armed by mutableStateOf(true)
+    var armed = true
     val fingers = inkCoatFingers(params)
 }
+
+private enum class ContinueTurn { Resting, Turning, Landed }
 
 @Composable
 internal fun rememberContinueInk(): ContinueInk {
@@ -64,31 +65,43 @@ internal fun rememberContinueInk(): ContinueInk {
     val ink = remember(params) { ContinueInk(params) }
     val approach = LocalReaderApproach.current
     LaunchedEffect(ink, approach) {
-        snapshotFlow { approach() }.collect { p ->
+        snapshotFlow {
+            val p = approach()
             when {
-                p >= 1f - ContinueTurnEpsilon -> {
+                p >= 1f - ContinueTurnEpsilon -> ContinueTurn.Landed
+                p > ContinueTurnEpsilon -> ContinueTurn.Turning
+                else -> ContinueTurn.Resting
+            }
+        }.distinctUntilChanged().collectLatest { turn ->
+            when (turn) {
+                ContinueTurn.Turning -> if (ink.armed) coroutineScope {
+                    // The wash plays out on its own clock; turned again
+                    // mid-dry, the colour floods back as it carries on.
+                    launch { ink.dry.animateTo(0f, tween(ContinueInkRewetMs, easing = LinearEasing)) }
+                    ink.spread.animateTo(
+                        1f,
+                        tween(
+                            (ContinueInkSpreadMs * (1f - ink.spread.value)).roundToInt(),
+                            easing = LinearEasing,
+                        ),
+                    )
+                }
+                ContinueTurn.Landed -> {
                     // Landed in the reader: the row is under it, clear it.
                     ink.armed = false
-                    ink.spread = 0f
+                    ink.spread.snapTo(0f)
+                    ink.dry.snapTo(0f)
                 }
-                p <= ContinueTurnEpsilon -> ink.armed = true
-                ink.armed -> ink.spread = maxOf(ink.spread, (p / ContinueInkFullAt).coerceAtMost(1f))
+                ContinueTurn.Resting -> {
+                    ink.armed = true
+                    if (ink.spread.value > 0f) {
+                        ink.dry.animateTo(1f, tween(ContinueInkDryMs, easing = LinearEasing))
+                        ink.spread.snapTo(0f)
+                        ink.dry.snapTo(0f)
+                    }
+                }
             }
         }
-    }
-    LaunchedEffect(ink, approach) {
-        snapshotFlow { approach() <= ContinueTurnEpsilon && ink.spread > 0f }
-            .distinctUntilChanged()
-            .collectLatest { letGo ->
-                if (letGo) {
-                    ink.dry.animateTo(1f, tween(ContinueInkDryMs, easing = LinearEasing))
-                    ink.spread = 0f
-                    ink.dry.snapTo(0f)
-                } else if (ink.dry.value > 0f) {
-                    // Turned again mid-dry: the colour floods back.
-                    ink.dry.animateTo(0f, tween(ContinueInkRewetMs, easing = LinearEasing))
-                }
-            }
     }
     return ink
 }
@@ -102,7 +115,7 @@ internal fun Modifier.continueInkWash(ink: ContinueInk, color: Color, paper: Col
  * only where the wash lies, and exactly as strongly as the wash is dense.
  */
 internal fun Modifier.continueInkMask(ink: ContinueInk): Modifier = drawWithContent {
-    if (ink.spread <= 0f) return@drawWithContent
+    if (ink.spread.value <= 0f) return@drawWithContent
     drawIntoCanvas { canvas ->
         val bounds = Rect(Offset.Zero, size)
         canvas.saveLayer(bounds, Paint())
@@ -118,7 +131,7 @@ internal fun Modifier.continueInkMask(ink: ContinueInk): Modifier = drawWithCont
 private fun DrawScope.drawContinueInk(ink: ContinueInk, color: Color) {
     val origin = Offset(size.width, size.height / 2f)
     drawInkWashCoats(
-        t = ink.spread,
+        t = ink.spread.value,
         dry = ink.dry.value,
         params = ink.params,
         fingers = ink.fingers,
@@ -128,8 +141,8 @@ private fun DrawScope.drawContinueInk(ink: ContinueInk, color: Color) {
     )
 }
 
-/** The share of the turn into the reader by which the row is fully inked. */
-private const val ContinueInkFullAt = 0.5f
+/** The wash's own clock, from the turn starting to the row fully inked. */
+private const val ContinueInkSpreadMs = 700
 
 private const val ContinueTurnEpsilon = 0.001f
 
