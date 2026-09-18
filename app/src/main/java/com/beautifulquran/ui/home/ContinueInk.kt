@@ -1,6 +1,7 @@
 package com.beautifulquran.ui.home
 
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
@@ -82,7 +83,7 @@ internal fun rememberContinueInk(): ContinueInk {
                         1f,
                         tween(
                             (ContinueInkSpreadMs * (1f - ink.spread.value)).roundToInt(),
-                            easing = LinearEasing,
+                            easing = ContinueInkEasing,
                         ),
                     )
                 }
@@ -142,7 +143,13 @@ private fun DrawScope.drawContinueInk(ink: ContinueInk, color: Color) {
 }
 
 /** The wash's own clock, from the turn starting to the row fully inked. */
-private const val ContinueInkSpreadMs = 700
+private const val ContinueInkSpreadMs = 420
+
+/**
+ * The wash floods out fast and eases long into the row's far end: a soft
+ * start so it never pops, then most of the row in the first third.
+ */
+private val ContinueInkEasing = CubicBezierEasing(0.3f, 0f, 0.2f, 1f)
 
 private const val ContinueTurnEpsilon = 0.001f
 
