@@ -50,8 +50,9 @@ val LocalReaderApproach = staticCompositionLocalOf<() -> Float> { { 0f } }
 /**
  * Ink that floods the continue row the moment the chapter list starts to turn
  * into the reader it continues. The wash plays out on its own clock whatever
- * the drag does; a turn let go short of the reader dries it out coat by coat,
- * and one that lands clears it unseen under the reader.
+ * the drag does. It stays wet under the reader, and whenever the chapter list
+ * settles again — a turn let go short, or a return from the reader — it dries
+ * out of the row coat by coat.
  */
 @Stable
 internal class ContinueInk(val params: NuqtaParams) {
@@ -62,9 +63,6 @@ internal class ContinueInk(val params: NuqtaParams) {
     /** The wash's own clock, 0..1, before easing. */
     private var clock = 0f
     val dry = Animatable(0f)
-
-    /** Only a turn that starts on the chapter list inks the row. */
-    var armed = true
 
     /** Tapped, and the turn it starts has not yet landed. */
     var tapped by mutableStateOf(false)
@@ -88,6 +86,12 @@ internal class ContinueInk(val params: NuqtaParams) {
                 spread = ContinueInkEasing.transform(clock)
             }
         }
+    }
+
+    /** Fully inked at once, for a row under the reader. */
+    fun fill() {
+        clock = 1f
+        spread = 1f
     }
 
     fun clear() {
@@ -114,21 +118,20 @@ internal fun rememberContinueInk(): ContinueInk {
             }
         }.distinctUntilChanged().collectLatest { turn ->
             when (turn) {
-                ContinueTurn.Turning -> if (ink.armed) coroutineScope {
+                ContinueTurn.Turning -> coroutineScope {
                     // The wash plays out on its own clock; turned again
                     // mid-dry, the colour floods back as it carries on.
                     launch { ink.dry.animateTo(0f, tween(ContinueInkRewetMs, easing = LinearEasing)) }
                     ink.flood()
                 }
                 ContinueTurn.Landed -> {
-                    // Landed in the reader: the row is under it, clear it.
-                    ink.armed = false
+                    // Under the reader the row stays wet, so turning back
+                    // uncovers it inked and it dries as the list settles.
                     ink.tapped = false
-                    ink.clear()
+                    ink.fill()
                     ink.dry.snapTo(0f)
                 }
                 ContinueTurn.Resting -> {
-                    ink.armed = true
                     if (ink.spread > 0f) {
                         ink.dry.animateTo(1f, tween(ContinueInkDryMs, easing = LinearEasing))
                         ink.clear()
