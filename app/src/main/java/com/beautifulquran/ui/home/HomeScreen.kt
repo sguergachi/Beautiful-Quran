@@ -45,7 +45,9 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -73,6 +75,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlin.math.roundToInt
+import kotlinx.coroutines.launch
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.res.stringResource
 import com.beautifulquran.R
@@ -664,6 +667,7 @@ private fun ContinueRow(target: ContinueTarget, onClick: () -> Unit) {
     // Turning into the reader floods the row with ink; its words take the
     // paper colour only where the ink lies.
     val ink = rememberContinueInk()
+    val scope = rememberCoroutineScope()
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -674,7 +678,14 @@ private fun ContinueRow(target: ContinueTarget, onClick: () -> Unit) {
                 color = MaterialTheme.colorScheme.primary,
                 paper = MaterialTheme.colorScheme.background,
             )
-            .quietClickable(onClick = onClick),
+            .quietClickable(interactionSource = ink.interactions) {
+                ink.tapped = true
+                // Let the ink's first frame land before the reader is built.
+                scope.launch {
+                    withFrameNanos { }
+                    onClick()
+                }
+            },
     ) {
         ContinueRowContent(target, onInk = false)
         ContinueRowContent(

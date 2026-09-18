@@ -363,6 +363,9 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+/** A settings turn that never moves, for a sheet not beneath Settings. */
+private val SettingsApproachAtRest = SettingsApproach(progress = { 0f }, dragging = { false }, commitAt = 1f)
+
 private const val BOOKMARKS_LAYER = -1
 private const val COVER_LAYER = 0
 private const val AYAH_LAYER = 1
@@ -1201,7 +1204,13 @@ private fun PaperStackApp(
             modifier = Modifier.zIndex(2f),
         ) {
             CompositionLocalProvider(
-                LocalSettingsApproach provides settingsApproach,
+                // The cover lies beneath Settings only while no reader is
+                // open; otherwise the reader's turns are not the cover's.
+                LocalSettingsApproach provides if (selectedSurahId == 0) {
+                    settingsApproach
+                } else {
+                    SettingsApproachAtRest
+                },
                 LocalReaderApproach provides readerApproach,
             ) {
                 HomeScreen(
