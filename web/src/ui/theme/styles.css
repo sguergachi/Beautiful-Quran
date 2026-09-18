@@ -2730,7 +2730,7 @@ select {
 
 /* —— Settings ——
  * Android SettingsScreen parity: full sheet of paper, uppercase section
- * labels, ink-disc selects, A—track—A text size, colophon at the foot.
+ * labels, nuqta selects, A—track—A text size, colophon at the foot.
  */
 .settings {
   padding: 0.5rem var(--sheet-pad) 3rem;
@@ -3340,9 +3340,9 @@ select {
   }
 }
 
-/* Vertical choice list — Android SelectRow + InkDisc.
- * Green filled disc when chosen; hollow ring at rest. Selection is carried by
- * label ink strength (alpha), never accent-on-label. */
+/* Vertical choice list — Android SelectRow + InkNuqta.
+ * A calligraphic nuqta fills with ink when chosen; faint outline at rest.
+ * Selection is carried by label ink strength (alpha), never accent-on-label. */
 .paper-choice-list {
   display: flex;
   flex-direction: column;
@@ -3358,42 +3358,25 @@ select {
   cursor: pointer;
 }
 
-/* 18dp ink disc */
-.paper-choice-radio,
-.ink-disc {
-  position: relative;
+/* Qalam nuqta (Android InkNuqta). The drop is drawn per frame by
+ * PaperChoiceList from kit/nuqta.ts; only colour lives here. */
+.ink-nuqta {
   flex-shrink: 0;
-  width: 1.125rem;
-  height: 1.125rem;
-  border-radius: 50%;
-  box-shadow: inset 0 0 0 1.4px color-mix(in srgb, var(--ink) 28%, transparent);
   display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  transition: box-shadow 200ms ease;
 }
 
-.paper-choice-radio[data-checked],
-.ink-disc[data-checked] {
-  box-shadow: inset 0 0 0 1.4px transparent;
+.ink-nuqta-mark {
+  overflow: visible;
 }
 
-.paper-choice-indicator,
-.ink-disc-fill {
-  width: 0;
-  height: 0;
-  border-radius: 50%;
-  background: var(--accent);
-  transition:
-    width 200ms ease,
-    height 200ms ease;
+.ink-nuqta-stop {
+  stop-color: var(--accent);
 }
 
-.paper-choice-radio[data-checked] .paper-choice-indicator,
-.ink-disc[data-checked] .ink-disc-fill {
-  /* Fill almost to the rim (Android: (r − 2dp) * fill). */
-  width: 0.85rem;
-  height: 0.85rem;
+.ink-nuqta-outline {
+  fill: none;
+  stroke: var(--ink);
+  stroke-linejoin: round;
 }
 
 .paper-choice-radio:focus-visible {

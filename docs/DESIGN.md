@@ -450,7 +450,7 @@ may use them** — they are not Settings-only, which is where they started.
 | Pick one of a few short options, side by side | `InkCircledChoiceRow` |
 | Pick one of several longer options, stacked | `InkCircledChoiceColumn` |
 | On / off | `InkCheck` — an empty ring that a brush check paints into |
-| A quiet "this one" dot | `InkDisc` |
+| One of a stacked list of rows (reciter, theme, display…) | `SelectRow` → `InkNuqta` — a qalam-cut Arabic dot whose wet ink spreads to its outline (web: `PaperChoiceList`) |
 | Circle something that is *not* a plain text choice | `rememberInkBrushCircle` + `Modifier.inkBrushCircleTarget` / `Modifier.inkBrushCircleMark` |
 | A short tool or icon strip | `InkSpotChoiceRow` / `InkSpotChoice` — circular vellum ink-drop. Effect alone: `Modifier.inkSpotHighlight` |
 | Raw geometry (custom canvases) | `inkBrushCirclePath`, `inkBrushCheckPath` |
@@ -470,6 +470,31 @@ stain) instead of painting a cream hole of page paper over it. On
 Android 13+ that GPU field *is* the stain; older platforms keep a
 soft cubic blot.
 
+Every stacked single choice leads with a calligraphic **nuqta**, never a round
+radio or a geometric diamond. Its four sides bow slightly like a full-width
+qalam impression. Selection is **one drop of ink**, never stacked rings or a
+fill-then-darken sequence: the pen lands slightly off centre, the drop runs out
+quickly and creeps slowly into the corners (`1 − (1 − t)^k`), and it runs
+further along some fibres than others, so its edge is ragged until it meets
+the outline. Density is spatial, not a global fade: the landing point deepens
+first, a dense core soaks outward behind a pale running front, and the front
+ends in a feathered wet fringe. The outline stains only where the ink has
+reached it, with the same density as the ink beside it. Letting go lifts the
+pigment as a whole (accelerating); the spread never runs backwards.
+`InkNuqtaTest` locks this: the drop only grows, is ragged mid-spread and whole
+at the settle, is densest where it landed (no ring), and ends solid over the
+whole cut.
+
+Every number of the nuqta — its cut (size, side bow, outline weight and ink),
+the spread and lift clocks, the drop (landing point, reach, fibre runs, edge
+grain, paper seed) and the ink (landing and soaked density, soak lag, wet
+fringe) — lives in `NuqtaParams` (web: `NuqtaParams` in
+`kit/nuqta.ts`, flattened to the same keys). The **Component kit** (below)
+slides all of them live across the Settings and Customize sheets (via
+`LocalNuqtaParams` / `NuqtaParamsContext`), and its Copy / Paste text moves
+between platforms (web still tunes it inline in Settings → Developer). Ship a tuning by editing the defaults on both
+platforms and bumping `SHIPPED_NUQTA_REVISION`.
+
 The circle is a filled calligraphic stroke on an oval centreline: it overshoots
 its own join at both ends and bows outward on entry / inward on exit, so the tips
 cross like a real hand's loop instead of closing into a ring. Pressure varies
@@ -477,9 +502,18 @@ along the stroke (`attack`, `releaseStart`, `bodyAmp`), and it **paints itself**
 over `paintMs` rather than appearing.
 
 `BrushCircleParams` / `BrushCheckParams` carry the knobs. Callers that don't care
-get the shipped baseline by default; only Settings → Developer's brush lab passes
-its own, and `SHIPPED_BRUSH_REVISION` / `SHIPPED_CHECK_REVISION` force the lab to
-reseed when a baseline changes.
+get the shipped baseline by default; only the Component kit passes its own, and
+`SHIPPED_BRUSH_REVISION` / `SHIPPED_CHECK_REVISION` force it to reseed when a
+baseline changes.
+
+**Component kit** (Settings → Developer → Component kit, Android;
+`ui/settings/ComponentKitScreen.kt`) is where these marks are tuned: one
+component per page — nuqta, ink check, brush circle — with the mark held in a
+preview that stays put while its dials scroll beneath it. Swipe sideways (or
+tap the dots) for the next or previous component; the stack's page-turn swipe
+is off while the kit is open, so it leaves by Back. Edits are session-only and
+reach the real Settings / Customize controls live. A new tunable component
+earns a page here: add a `KitComponent`, a preview and its dials.
 
 **The two platforms are locked to each other by test, not by good intentions.**
 `BrushMarksTest` pins all 16 circle knobs, all 15 check knobs and both shipped
