@@ -124,15 +124,15 @@ data class NuqtaCurve(val x1: Float, val y1: Float, val x2: Float, val y2: Float
 @Immutable
 data class NuqtaParams(
     // ---- the cut
-    val sizeDp: Float = 20f,
+    val sizeDp: Float = 23f,
     /** How far the four sides bow out from straight; 1 is the shipped cut. */
     val bow: Float = 1f,
     val strokeDp: Float = 1.15f,
-    val restingOutlineAlpha: Float = 0.46f,
-    val selectedOutlineAlpha: Float = 0.82f,
+    val restingOutlineAlpha: Float = 0.63f,
+    val selectedOutlineAlpha: Float = 1f,
     // ---- the clock
     /** One drop, touch to settle. */
-    val spreadMs: Int = 800,
+    val spreadMs: Int = 405,
     /**
      * How hard the front decelerates: `1 − (1 − t)^k`. Higher runs out faster
      * and creeps longer, like capillary spread through paper.
@@ -162,7 +162,7 @@ data class NuqtaParams(
     /** How pale the pigment is at the running front. */
     val wetAlpha: Float = 0.28f,
     /** How dense it is once soaked in. */
-    val inkAlpha: Float = 0.96f,
+    val inkAlpha: Float = 0.9f,
     /**
      * How far behind the front the dense core soaks outward, as a share of
      * the clock. The drop darkens from where it landed, never all at once.
@@ -178,7 +178,7 @@ data class NuqtaParams(
 val ShippedNuqtaParams = NuqtaParams()
 
 /** Forces the developer nuqta lab to reseed when the shipped values change. */
-const val SHIPPED_NUQTA_REVISION = 3
+const val SHIPPED_NUQTA_REVISION = 4
 
 /** The nuqta every [InkNuqta] draws unless told otherwise. */
 val LocalNuqtaParams = staticCompositionLocalOf { ShippedNuqtaParams }

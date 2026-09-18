@@ -35,12 +35,12 @@ export type NuqtaKnobKey = keyof NuqtaParams
 
 /** The shipped nuqta — Android `ShippedNuqtaParams`. */
 export const SHIPPED_NUQTA: NuqtaParams = {
-  sizeDp: 20,
+  sizeDp: 23,
   bow: 1,
   strokeDp: 1.15,
-  restingOutlineAlpha: 0.46,
-  selectedOutlineAlpha: 0.82,
-  spreadMs: 800,
+  restingOutlineAlpha: 0.63,
+  selectedOutlineAlpha: 1,
+  spreadMs: 405,
   spreadSharpness: 1.6,
   liftMs: 220,
   liftX1: 0.4,
@@ -54,7 +54,7 @@ export const SHIPPED_NUQTA: NuqtaParams = {
   grain: 0.06,
   seed: 7,
   wetAlpha: 0.28,
-  inkAlpha: 0.96,
+  inkAlpha: 0.9,
   soakDelay: 0.22,
   feather: 0.3,
   fringeAlpha: 0.2,
