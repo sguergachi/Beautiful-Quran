@@ -95,7 +95,7 @@ fun rememberSettingsNuqtaState(): SettingsNuqtaState = remember { SettingsNuqtaS
  * drag passes the point where letting go completes the turn, the drop
  * bounces up a stage with a haptic tick. Holding the button shows the band
  * at its fullest. If the press or turn falls back short of Settings the ink
- * dries back the way it came. The glyph takes the contrasting colour only
+ * dries in place, its layers fading one after another. The glyph takes the contrasting colour only
  * where the ink covers it.
  */
 @Composable
@@ -149,24 +149,24 @@ fun SettingsNuqtaIcon(
             .distinctUntilChanged()
             .collectLatest { inked ->
                 if (inked) {
-                    // Turned again while it dries: the ink re-wets from
-                    // where it has shrunk to, and its colour floods back.
-                    val ms = (params.spreadMs * (1f - spread.value)).roundToInt()
+                    if (presence.value <= 0f) spread.snapTo(0f)
+                    // Turned again while it dries: the colour floods back into
+                    // the drop as it is, and it carries on spreading.
                     coroutineScope {
-                        launch { presence.animateTo(1f, tween(ms, easing = LinearEasing)) }
-                        spread.animateTo(1f, tween(ms, easing = LinearEasing))
+                        launch {
+                            presence.animateTo(1f, tween(SettingsNuqtaRewetMs, easing = LinearEasing))
+                        }
+                        spread.animateTo(
+                            1f,
+                            tween((params.spreadMs * (1f - spread.value)).roundToInt(), easing = LinearEasing),
+                        )
                     }
                 } else {
-                    // A turn let go short of Settings dries back: the clock
-                    // runs in reverse, so the edge draws in toward where the
-                    // drop landed, while the coat thins — lighter and more
-                    // transparent — gathering pace as the paper drinks it.
-                    val ms = (params.spreadMs * spread.value).roundToInt()
-                    coroutineScope {
-                        launch { presence.animateTo(0f, tween(ms, easing = params.lift.easing())) }
-                        spread.animateTo(0f, tween(ms, easing = LinearEasing))
-                    }
-                    presence.snapTo(0f)
+                    // A press or turn let go short of Settings dries in place:
+                    // the drop keeps its shape while its layers fade one after
+                    // another, the coat paling toward the paper as it goes.
+                    presence.animateTo(0f, tween(SettingsNuqtaDryMs, easing = LinearEasing))
+                    spread.snapTo(0f)
                 }
             }
     }
@@ -198,7 +198,7 @@ fun SettingsNuqtaIcon(
             SettingsNuqtaStageSwell * stage.value
         // A drying coat is a thinner one: its pigment pales toward the paper.
         val coat = lerp(ink, lerp(ink, paper, SettingsNuqtaDriedTint), 1f - lift)
-        scale(swell) { drawInkNuqta(t, lift, params, fingers, coat, Color.Transparent) }
+        scale(swell) { drawInkNuqta(t, 1f, params, fingers, coat, Color.Transparent, dry = 1f - lift) }
         glyph(tint)
         // Where the ink lies, the glyph turns to paper exactly as far as the
         // ink under it is dense: a contrasting copy, masked by the same drop.
@@ -209,7 +209,9 @@ fun SettingsNuqtaIcon(
             // The mask is its own layer so that, composited DstIn, its bare
             // paper clears the copy too — not only where ink was drawn.
             canvas.saveLayer(bounds, Paint().apply { blendMode = BlendMode.DstIn })
-            scale(swell) { drawInkNuqta(t, lift, params, fingers, Color.Black, Color.Transparent) }
+            scale(swell) {
+                drawInkNuqta(t, 1f, params, fingers, Color.Black, Color.Transparent, dry = 1f - lift)
+            }
             canvas.restore()
             canvas.restore()
         }
@@ -218,6 +220,12 @@ fun SettingsNuqtaIcon(
 
 /** The nuqta's size as a multiple of the glyph it sits behind. */
 private const val SettingsNuqtaScale = 1.6f
+
+/** A drop let go dries in place over this long, layer by layer. */
+private const val SettingsNuqtaDryMs = 560
+
+/** Turned again mid-dry, the colour floods back over this long. */
+private const val SettingsNuqtaRewetMs = 180
 
 /** How far toward the paper the last of a drying coat has paled. */
 private const val SettingsNuqtaDriedTint = 0.55f

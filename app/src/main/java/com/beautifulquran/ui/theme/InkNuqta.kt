@@ -76,7 +76,8 @@ fun InkNuqta(
 /**
  * One nuqta at clock [t] with [lift] of its pigment left, filling this draw
  * scope. [restingInk] is the hairline outline the drop has not yet reached;
- * pass [Color.Transparent] for a mark that is only ever ink.
+ * pass [Color.Transparent] for a mark that is only ever ink. [dry] (0..1)
+ * lets the drop dry in place, layer by layer — see [nuqtaDryStops].
  */
 internal fun DrawScope.drawInkNuqta(
     t: Float,
@@ -85,6 +86,7 @@ internal fun DrawScope.drawInkNuqta(
     fingers: FloatArray,
     ink: Color,
     restingInk: Color,
+    dry: Float = 0f,
 ) {
     val outline = inkNuqtaPath(size.minDimension, params.bow)
     val outlineStroke = Stroke(width = params.strokeDp.dp.toPx(), join = StrokeJoin.Round)
@@ -103,6 +105,7 @@ internal fun DrawScope.drawInkNuqta(
     val edge = radii.max()
     val drop = nuqtaDropPath(origin, full, radii)
     val stops = nuqtaInkStops(t, params, edge)
+    if (dry > 0f) nuqtaDryStops(stops, dry)
     // One density field paints both the ink and the outline it stains, so
     // the outline is only ever as dark as the ink beside it.
     fun inkField(strength: Float) = Brush.radialGradient(
@@ -238,6 +241,23 @@ internal fun nuqtaInkStops(t: Float, p: NuqtaParams, edge: Float): FloatArray {
         1f, landed * front * p.fringeAlpha,
     )
 }
+
+/**
+ * Dries the ink stops from [nuqtaInkStops] in place, [dry] 0..1: the drop
+ * keeps its shape while its layers fade one after another — the dense pool
+ * where it landed thins first, then the body, and the wet fringe at the edge
+ * lingers last, the way pigment is last to leave the rim of a drying drop.
+ */
+internal fun nuqtaDryStops(stops: FloatArray, dry: Float) {
+    fun smooth(x: Float) = x.coerceIn(0f, 1f).let { it * it * (3f - 2f * it) }
+    for (k in 0 until NuqtaInkStopCount) {
+        val start = NuqtaDryLayerStagger * k
+        stops[k * 2 + 1] *= 1f - smooth((dry - start) / (1f - NuqtaDryLayerStagger * (NuqtaInkStopCount - 1)))
+    }
+}
+
+/** How far behind the layer inside it each layer of a drying drop starts to fade. */
+private const val NuqtaDryLayerStagger = 0.15f
 
 /**
  * A fixed fibre pattern for [seed]: per direction, a coarse run-speed bias
