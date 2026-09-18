@@ -1485,11 +1485,19 @@ select {
   display: flex;
   justify-content: center;
   padding: 1.25rem 1.5rem 1.75rem;
+  /* Same verse size as .ayah-block, so the artwork can match its strokes. */
+  --word-arabic-size: calc(1.8rem * var(--font-scale, 1));
 }
 
 .basmalah-block .basmalah,
 .basmalah-block .basmalah-calligraphy {
   margin-top: 0;
+  /*
+   * 11.82 em of verse text: the artwork's alif (32.7 of 608 units) stands as
+   * tall as Hafs' alif (0.636 em). Android BASMALAH_WIDTH_EM has the measurement.
+   * + the 0.75rem side padding; never wider than the column.
+   */
+  width: min(100%, calc(var(--word-arabic-size) * 11.82 + 1.5rem));
 }
 
 .basmalah,
@@ -4640,6 +4648,10 @@ select {
 
   .ayah-block {
     padding-inline: 2.85rem;
+    --word-arabic-size: calc(1.65rem * var(--font-scale, 1));
+  }
+
+  .basmalah-block {
     --word-arabic-size: calc(1.65rem * var(--font-scale, 1));
   }
 
