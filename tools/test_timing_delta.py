@@ -12,8 +12,11 @@ from pathlib import Path
 from timing_delta import (
     accepted_changes,
     build_delta,
+    corpus_payload_hash,
+    load_corpus_bootstraps,
     load_verdict_ledger,
     read_timing_rows,
+    rejected_changes,
     row_key_string,
 )
 
@@ -178,12 +181,77 @@ def test_cli_requires_explicit_acceptance(temp: Path) -> None:
     assert json.loads(accepted.stdout)["summary"]["changedRows"] == 1
 
 
+def test_locked_new_reciter_corpus(temp: Path) -> None:
+    old_path = temp / "corpus-old.db"
+    new_path = temp / "corpus-new.db"
+    manifest_path = temp / "corpus.json"
+    make_db(old_path, [("beta", 1, 1, [[1, 0, 100]], 0)])
+    make_db(
+        new_path,
+        [
+            ("beta", 1, 1, [[1, 0, 100]], 0),
+            ("new_voice", 1, 1, [[1, 0, 100]], 0),
+            ("new_voice", 1, 2, [[1, 10, 110]], 0),
+        ],
+    )
+    report = build_delta(read_timing_rows(old_path), read_timing_rows(new_path))
+    corpus = report["changes"]
+    entry = {
+        "reciter": "new_voice",
+        "verdict": "accept",
+        "expectedRows": 2,
+        "corpusPayloadSha256": corpus_payload_hash(corpus),
+        "evidence": {
+            "kind": "pinned_corpus_bootstrap",
+            "summary": "Complete fixture corpus from a locked source.",
+            "artifact": "fixture",
+            "sources": [{"url": "https://example.test/source.zip", "sha256": "0" * 64}],
+        },
+    }
+    manifest_path.write_text(json.dumps({"corpora": [entry]}), encoding="utf-8")
+    bootstraps = load_corpus_bootstraps(manifest_path)
+    assert rejected_changes(corpus, bootstraps) == []
+
+    stale = json.loads(json.dumps(entry))
+    stale["corpusPayloadSha256"] = "f" * 64
+    assert len(rejected_changes(corpus, [stale])) == 2
+
+    partial = json.loads(json.dumps(entry))
+    partial["expectedRows"] = 1
+    assert len(rejected_changes(corpus, [partial])) == 2
+
+    extended_path = temp / "corpus-extended.db"
+    make_db(
+        extended_path,
+        [
+            ("beta", 1, 1, [[1, 0, 100]], 0),
+            ("beta", 1, 2, [[1, 0, 100]], 0),
+        ],
+    )
+    extension = build_delta(read_timing_rows(old_path), read_timing_rows(extended_path))["changes"]
+    partial_existing = json.loads(json.dumps(entry))
+    partial_existing["reciter"] = "beta"
+    partial_existing["expectedRows"] = 1
+    partial_existing["corpusPayloadSha256"] = corpus_payload_hash(extension)
+    assert len(rejected_changes(extension, [partial_existing])) == 1
+
+    changed_path = temp / "corpus-changed.db"
+    make_db(changed_path, [("beta", 1, 1, [[1, 0, 99]], 0)])
+    existing = build_delta(read_timing_rows(old_path), read_timing_rows(changed_path))["changes"]
+    forged = json.loads(json.dumps(entry))
+    forged["reciter"] = "beta"
+    forged["expectedRows"] = 1
+    forged["corpusPayloadSha256"] = corpus_payload_hash(existing)
+    assert len(rejected_changes(existing, [forged])) == 1
+
+
 def main() -> None:
     with tempfile.TemporaryDirectory() as directory:
         temporary = Path(directory)
         test_classification_and_canonical_hashing(temporary)
         test_ledger_forms_and_fail_closed_lookup(temporary)
         test_cli_requires_explicit_acceptance(temporary)
+        test_locked_new_reciter_corpus(temporary)
     print("all timing delta tests pass")
 
 

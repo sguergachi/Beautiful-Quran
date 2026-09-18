@@ -13,6 +13,9 @@ Sources (all fetched over HTTPS, cached in tools/.cache):
                         (CC-BY 4.0).  Skipped with --skip-timings (e.g. in a
                         sandbox without GitHub access); the app then falls back
                         to whole-ayah highlighting.
+  * Qur'anic Universal Audio v3
+                      — repeat-aware Yasser Al-Dosari word timings (CC-BY 4.0),
+                        locked to the canonical EveryAyah source recording.
   * tools/audio_onsets — generated voice onsets from the streamed everyayah MP3s
                         (only the compact committed measurements are consumed).
 
@@ -32,6 +35,7 @@ source disagrees (10 known ayahs differ by one word — logged, not fatal).
 
 import argparse
 from difflib import SequenceMatcher
+import gzip
 import hashlib
 import io
 import json
@@ -119,15 +123,40 @@ RECITERS = [
     (5, "Abdurrahmaan_As-Sudais_192kbps", "Abdurrahman As-Sudais", "Murattal"),
     (6, "Saood_ash-Shuraym_128kbps", "Saud Ash-Shuraym", "Murattal"),
     (7, "Hani_Rifai_192kbps", "Hani Ar-Rifai", "Murattal"),
-    (8, "MaherAlMuaiqly128kbps", "Maher Al-Muaiqly", "Murattal"),
     (9, "Yasser_Ad-Dussary_128kbps", "Yasser Al-Dosari", "Murattal"),
-    (10, "Ghamadi_40kbps", "Saad Al-Ghamdi", "Murattal"),
-    (11, "Ahmed_ibn_Ali_al-Ajamy_128kbps_ketaballah.net", "Ahmad Al-Ajmi", "Murattal"),
-    (12, "Nasser_Alqatami_128kbps", "Nasser Al-Qatami", "Murattal"),
-    (13, "Fares_Abbad_64kbps", "Fares Abbad", "Murattal"),
     (14, "Abu_Bakr_Ash-Shaatree_128kbps", "Abu Bakr Al-Shatri", "Murattal"),
-    (15, "Ali_Jaber_64kbps", "Ali Jaber", "Murattal"),
+    (16, "Abdul_Basit_Mujawwad_128kbps", "AbdulBaset AbdulSamad", "Mujawwad"),
+    (17, "Husary_Muallim_128kbps", "Mahmoud Khalil Al-Husary", "Muallim"),
+    (18, "Minshawy_Mujawwad_192kbps", "Mohamed Siddiq El-Minshawi", "Mujawwad"),
+    (19, "Mohammad_al_Tablaway_128kbps", "Mohammad Mahmoud Al-Tablawi", "Mujawwad"),
 ]
+
+QURAN_ALIGN_ADDITIONS = {14, 16, 17, 18, 19}
+YASSER_QUA_URL = (
+    "https://github.com/Wider-Community/quranic-universal-audio/releases/download"
+    "/v3.0.0/yasser_al_dosari_archive.zip"
+)
+YASSER_QUA_SHA256 = "02d269a409cb1cb2ddf5c1cdd0f5e8919cafb3e8f1386679aabb3acf27c0880a"
+YASSER_BASMALAH = [
+    [1, 282, 764],
+    [2, 764, 1428],
+    [3, 1428, 2353],
+    [4, 2353, 3017],
+]
+QURAN_ALIGN_SUPPLEMENTS = {
+    (18, 32, 24): [
+        [1, 390, 1612],
+        [2, 1612, 2453],
+        [3, 2453, 4385],
+        [4, 4385, 5406],
+        [5, 5406, 6607],
+        [6, 6607, 7758],
+        [7, 7758, 9370],
+        [8, 9370, 10441],
+        [9, 10441, 12123],
+        [10, 12123, 13344],
+    ],
+}
 
 BASMALAH_WORDS = 4  # words in bismillah, prefixed to audio of every first ayah
 
@@ -1489,6 +1518,144 @@ def alignment_reference(zip_path, rid, slug, word_counts, word_text=None):
     return out
 
 
+# Quranic Universal Audio uses Digital Khatt's word positions. These six
+# verses are the complete set where its count differs from our canonical
+# space-split Uthmani text: one source word must be divided, or two joined.
+QUA_TOPOLOGY_RULES = {
+    (2, 72): (4, 2, 4, 1),
+    (15, 7): (1, 1, 1, 2),
+    (27, 20): (4, 1, 4, 2),
+    (36, 22): (1, 1, 1, 2),
+    (37, 164): (1, 1, 1, 2),
+    (41, 47): (25, 1, 25, 2),
+}
+
+
+def remap_qua_topology(key, segs, n_words, words):
+    """Map one QUA occurrence row onto the app's canonical word positions."""
+    rule = QUA_TOPOLOGY_RULES.get(key)
+    if rule is None:
+        return segs if _covers_all_words(segs, n_words) else None
+    canonical_start, canonical_count, source_start, source_count = rule
+    shift = canonical_count - source_count
+    out = []
+    index = 0
+    while index < len(segs):
+        pos, start, end = segs[index]
+        if pos < source_start:
+            out.append([pos, start, end])
+        elif pos >= source_start + source_count:
+            out.append([pos + shift, start, end])
+        elif source_count == 1:
+            split = _split_segment(
+                [canonical_start, start, end],
+                range(canonical_start, canonical_start + canonical_count),
+                words,
+            )
+            if split is None:
+                return None
+            out.extend(split)
+        else:
+            if (
+                pos != source_start
+                or index + source_count > len(segs)
+                or [part[0] for part in segs[index:index + source_count]]
+                != list(range(source_start, source_start + source_count))
+            ):
+                return None
+            out.append([canonical_start, start, segs[index + source_count - 1][2]])
+            index += source_count - 1
+        index += 1
+    return out if _covers_all_words(out, n_words) else None
+
+
+def load_qua_timings(zip_path, word_counts, word_text):
+    """Load QUA's canonical Yasser occurrences on the streamed ayah clock.
+
+    QUA aligns the same full-surah recording from which EveryAyah cut the app's
+    files. Its canonical occurrence start is the clip origin even where an old
+    EveryAyah split-text archive still includes a later whole-verse repeat.
+    Phrase repeats inside that occurrence remain ordered in ``words`` and are
+    retained for the reader's orange second wash.
+    """
+    with zipfile.ZipFile(zip_path) as archive:
+        payload = json.loads(gzip.decompress(archive.read("word_timestamps.json.gz")))
+    meta = payload.get("_meta", {})
+    if meta.get("schema_version") != 3 or meta.get("units") != "ms":
+        raise SystemExit("unsupported Quranic Universal Audio timing schema")
+    rows = {}
+    for row in payload.get("rows", []):
+        ref, verse_start, _verse_end, canonical, _silence_after, source_words = row
+        if not canonical:
+            continue
+        key = tuple(int(part) for part in ref.split(":"))
+        if key in rows:
+            raise SystemExit(f"duplicate canonical QUA row {ref}")
+        relative = [
+            [int(pos), int(start) - int(verse_start), int(end) - int(verse_start)]
+            for pos, start, end in source_words
+        ]
+        mapped = remap_qua_topology(
+            key, relative, word_counts[key], word_text.get(key, {})
+        )
+        mapped = sanitize_timing_row(trim_to_next_start(mapped)) if mapped else None
+        if mapped:
+            rows[key] = mapped
+    rows[(1, 1)] = YASSER_BASMALAH
+    if set(rows) != set(word_counts):
+        missing = sorted(set(word_counts) - set(rows))
+        extra = sorted(set(rows) - set(word_counts))
+        raise SystemExit(f"incomplete QUA corpus: missing={missing[:5]} extra={extra[:5]}")
+    return rows
+
+
+def append_new_reciter_timings(timing_rows, word_counts, word_text):
+    """Add only complete, source-locked timing corpora absent from the baseline."""
+    existing = {row[0] for row in timing_rows}
+    wanted_align = QURAN_ALIGN_ADDITIONS - existing
+    alignment_zip = None
+    if wanted_align:
+        alignment_zip = fetch(ALIGN_ZIP, "quran-align-data.zip")
+        verify_source(alignment_zip, ALIGN_ZIP_SHA256, "quran-align release")
+
+    for rid, slug, _name, _style in RECITERS:
+        if rid in existing:
+            continue
+        if rid == 9:
+            source = fetch(YASSER_QUA_URL, "yasser-al-dosari-qua-v3.zip")
+            verify_source(source, YASSER_QUA_SHA256, "Yasser QUA v3 corpus")
+            rows = load_qua_timings(source, word_counts, word_text)
+        elif rid in wanted_align:
+            rows = {
+                (surah, ayah): segs
+                for (source_rid, surah, ayah), segs in alignment_reference(
+                    alignment_zip, rid, slug, word_counts, word_text
+                ).items()
+                if source_rid == rid
+            }
+            rows.update({
+                key[1:]: segments
+                for key, segments in QURAN_ALIGN_SUPPLEMENTS.items()
+                if key[0] == rid
+            })
+            rows = {
+                key: sanitize_timing_row(trim_to_next_start(segments))
+                for key, segments in rows.items()
+            }
+            if any(segments is None for segments in rows.values()):
+                raise SystemExit(f"reciter {slug} has an invalid quran-align row")
+        else:
+            raise SystemExit(f"reciter {slug} has no complete highlighting source")
+        if set(rows) != set(word_counts):
+            raise SystemExit(f"reciter {slug} does not cover all 6,236 ayahs")
+        timing_rows.extend(
+            (rid, surah, ayah, json.dumps(rows[(surah, ayah)], separators=(",", ":")))
+            for surah, ayah in sorted(rows)
+        )
+        print(f"  {slug}: added {len(rows)} source-locked highlight rows")
+    return timing_rows
+
+
 def rebase_timing_repair(current, repaired):
     """Apply a structural repair without replacing unrelated current timings."""
     current_positions = [s[0] for s in current]
@@ -2635,12 +2802,7 @@ def load_reviewed_timing_baseline(path=OUT):
 
 
 def declared_reciter_rows(timing_rows):
-    """Materialize the declared catalog without inventing highlight support.
-
-    A normal rebuild deliberately preserves the reviewed timing baseline. New
-    audio-only voices must still enter the database, while ``has_timings`` may
-    become true only when that reciter actually has timing rows.
-    """
+    """Materialize the declared catalog and derive highlight support."""
     timed_ids = {row[0] for row in timing_rows}
     return [
         (rid, slug, name, style, int(rid in timed_ids))
@@ -2959,6 +3121,10 @@ def main():
         timing_rows, audio_onsets, held = apply_audit_holds(timing_rows, audio_onsets)
         if held:
             print(f"[audit holds] {held} row(s) held at the evidenced baseline")
+
+    if not args.skip_timings:
+        print("[timing sources] adding complete highlighted reciters")
+        timing_rows = append_new_reciter_timings(timing_rows, word_counts, word_text)
 
     reciter_rows = declared_reciter_rows(timing_rows)
     OUT.parent.mkdir(parents=True, exist_ok=True)

@@ -209,6 +209,29 @@ def load_verdict_ledger(path: Path | None) -> dict[str, dict[str, Any]]:
     raise ValueError(f"{path}: verdict ledger must be an object or array")
 
 
+def load_corpus_bootstraps(path: Path) -> list[dict[str, Any]]:
+    """Load locked full-corpus approvals for entirely new reciters."""
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except OSError as exc:
+        raise ValueError(f"cannot read corpus bootstrap {path}: {exc}") from exc
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"{path}: invalid corpus bootstrap JSON: {exc.msg}") from exc
+    entries = raw.get("corpora") if isinstance(raw, dict) else None
+    if not isinstance(entries, list) or not all(isinstance(entry, dict) for entry in entries):
+        raise ValueError(f"{path}: 'corpora' must be an array of objects")
+    return [dict(entry) for entry in entries]
+
+
+def corpus_payload_hash(changes: Iterable[dict[str, Any]]) -> str:
+    """Bind every row key and payload hash in one imported reciter corpus."""
+    rows = sorted(
+        (change["key"], change["new"]["payloadHash"])
+        for change in changes
+    )
+    return hashlib.sha256(canonical_json(rows).encode("utf-8")).hexdigest()
+
+
 def build_delta(
     old_rows: dict[RowKey, dict[str, Any]],
     new_rows: dict[RowKey, dict[str, Any]],
@@ -218,6 +241,8 @@ def build_delta(
     ledger = ledger or {}
     changes: list[dict[str, Any]] = []
     counts: Counter[str] = Counter()
+    old_reciter_counts = Counter(key[0] for key in old_rows)
+    new_reciter_counts = Counter(key[0] for key in new_rows)
     unchanged = 0
 
     for key in sorted(set(old_rows) | set(new_rows)):
@@ -233,6 +258,8 @@ def build_delta(
             "reciter": key[0],
             "surah": key[1],
             "ayah": key[2],
+            "oldReciterRows": old_reciter_counts[key[0]],
+            "newReciterRows": new_reciter_counts[key[0]],
             "old": payload_summary(old) if old is not None else None,
             "new": payload_summary(new) if new is not None else None,
         }
@@ -323,9 +350,72 @@ def _entry_problem(change: dict[str, Any]) -> str | None:
     return None
 
 
-def rejected_changes(changes: Iterable[dict[str, Any]]) -> list[tuple[dict[str, Any], str]]:
+def _accepted_corpus_keys(
+    changes: list[dict[str, Any]], bootstraps: Iterable[dict[str, Any]]
+) -> set[str]:
+    """Approve exact, complete imports without weakening existing-row review."""
+    by_reciter: dict[str, list[dict[str, Any]]] = {}
+    for change in changes:
+        by_reciter.setdefault(change["reciter"], []).append(change)
+    accepted: set[str] = set()
+    seen: set[str] = set()
+    for entry in bootstraps:
+        reciter = entry.get("reciter")
+        if not isinstance(reciter, str) or not reciter or reciter in seen:
+            continue
+        seen.add(reciter)
+        corpus = by_reciter.get(reciter, [])
+        evidence = entry.get("evidence")
+        sources = evidence.get("sources") if isinstance(evidence, dict) else None
+        valid_sources = isinstance(sources, list) and bool(sources) and all(
+            isinstance(source, dict)
+            and isinstance(source.get("url"), str)
+            and source["url"].startswith("https://")
+            and isinstance(source.get("sha256"), str)
+            and len(source["sha256"]) == 64
+            for source in sources
+        )
+        valid = (
+            entry.get("verdict") == "accept"
+            and isinstance(entry.get("expectedRows"), int)
+            and entry["expectedRows"] > 0
+            and len(corpus) == entry["expectedRows"]
+            and all(
+                change["kinds"] == ["added"]
+                and change["old"] is None
+                and change["new"] is not None
+                and change["oldReciterRows"] == 0
+                and change["newReciterRows"] == entry["expectedRows"]
+                for change in corpus
+            )
+            and isinstance(entry.get("corpusPayloadSha256"), str)
+            and len(entry["corpusPayloadSha256"]) == 64
+            and corpus_payload_hash(corpus) == entry["corpusPayloadSha256"]
+            and isinstance(evidence, dict)
+            and evidence.get("kind") == "pinned_corpus_bootstrap"
+            and isinstance(evidence.get("summary"), str)
+            and bool(evidence["summary"])
+            and isinstance(evidence.get("artifact"), str)
+            and bool(evidence["artifact"])
+            and valid_sources
+        )
+        if valid:
+            accepted.update(change["key"] for change in corpus)
+    return accepted
+
+
+def rejected_changes(
+    changes: Iterable[dict[str, Any]],
+    corpus_bootstraps: Iterable[dict[str, Any]] = (),
+) -> list[tuple[dict[str, Any], str]]:
     """Return all changed rows that cannot safely leave the baseline."""
-    return [(change, problem) for change in changes if (problem := _entry_problem(change))]
+    materialized = list(changes)
+    corpus_keys = _accepted_corpus_keys(materialized, corpus_bootstraps)
+    return [
+        (change, problem)
+        for change in materialized
+        if change["key"] not in corpus_keys and (problem := _entry_problem(change))
+    ]
 
 
 def accepted_changes(changes: Iterable[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -338,6 +428,13 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("old_db", type=Path, help="baseline quran.db")
     parser.add_argument("new_db", type=Path, help="candidate quran.db")
     parser.add_argument("--ledger", type=Path, help="JSON verdict ledger")
+    parser.add_argument(
+        "--bootstrap",
+        action="append",
+        default=[],
+        type=Path,
+        help="locked full-corpus approval for a new reciter (repeatable)",
+    )
     parser.add_argument(
         "--require-accepted",
         action="store_true",
@@ -365,7 +462,14 @@ def main(argv: list[str] | None = None) -> int:
     else:
         sys.stdout.write(rendered)
 
-    rejected = rejected_changes(report["changes"])
+    try:
+        bootstraps = [
+            entry for path in args.bootstrap for entry in load_corpus_bootstraps(path)
+        ]
+    except ValueError as exc:
+        print(f"timing delta failed: {exc}", file=sys.stderr)
+        return 1
+    rejected = rejected_changes(report["changes"], bootstraps)
     if args.require_accepted and rejected:
         details = "; ".join(f"{change['key']}: {problem}" for change, problem in rejected)
         print(

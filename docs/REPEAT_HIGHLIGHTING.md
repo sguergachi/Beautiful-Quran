@@ -119,13 +119,16 @@ ear-verified (Mishary 2:14, Hani 2:16); **verify the rest before enabling.**
 | Mishary Alafasy (murattal) | 7 | ✅ enabled, ear-verified |
 | Hani ar-Rifai | 5 | ✅ enabled, ear-verified |
 | Al-Husary (murattal) | 6 | ✅ enabled (not ear-verified) |
-| Al-Husary — **Muallim** (teaching) | 12 | yes (dense; not yet imported) |
+| Al-Husary — **Muallim** (teaching) | 12 | voice ships; qdc repeats not yet imported |
 | AbdulBaset (murattal) | 2 | ✅ enabled (not ear-verified) |
 | Minshawi (murattal) | 9 | ✅ enabled (not ear-verified) |
-| Minshawi (mujawwad) | 8 | yes (very dense) |
+| Minshawi (mujawwad) | 8 | voice ships; dense qdc repeats not yet imported |
 | As-Sudais | 3 | ✅ enabled (not ear-verified) |
 | Ash-Shuraym | 10 | no (one-pass) |
-| AbdulBaset (mujawwad) | 1 | no (one-pass) |
+| AbdulBaset (mujawwad) | 1 | voice ships; qdc is one-pass |
+
+Yasser Al-Dosari is separate from this qdc table: his shipped QUA v3 source
+already preserves phrase repeats inside the canonical EveryAyah occurrence.
 
 ## How a repeat is detected
 
