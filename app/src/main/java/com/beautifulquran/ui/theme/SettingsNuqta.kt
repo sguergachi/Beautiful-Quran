@@ -57,8 +57,9 @@ fun rememberSettingsNuqtaState(): SettingsNuqtaState = remember { SettingsNuqtaS
 
 /**
  * The settings glyph with a nuqta of ink behind it. The drop soaks outward
- * in step with the page turn toward Settings — a swipe spreads it live, and
- * turning back lifts it — so the reader sees where the turn will land. A tap
+ * in step with the page turn toward Settings — a swipe spreads it live, full
+ * by [SettingsNuqtaFullAt] of the turn, and turning back lifts it — so the
+ * reader sees where the turn will land. A tap
  * ([SettingsNuqtaState.drop]) spreads it on the same clock as a chosen row.
  * The glyph takes the contrasting colour only where the ink covers it.
  */
@@ -96,7 +97,9 @@ fun SettingsNuqtaIcon(
             .size(iconSize * SettingsNuqtaScale)
             .semantics { if (contentDescription != null) this.contentDescription = contentDescription },
     ) {
-        val t = maxOf(approach().coerceIn(0f, 1f), tap.value)
+        // The drop is fully spread well before the turn's midpoint, so the
+        // whole nuqta reads while the reader can still decide.
+        val t = maxOf((approach() / SettingsNuqtaFullAt).coerceIn(0f, 1f), tap.value)
         val glyphPx = iconSize.toPx()
         fun glyph(color: Color) = translate(
             left = (size.width - glyphPx) / 2f,
@@ -128,3 +131,6 @@ fun SettingsNuqtaIcon(
 
 /** The nuqta's size as a multiple of the glyph it sits behind. */
 private const val SettingsNuqtaScale = 1.6f
+
+/** The share of the turn toward Settings at which the nuqta is fully spread. */
+private const val SettingsNuqtaFullAt = 0.4f
