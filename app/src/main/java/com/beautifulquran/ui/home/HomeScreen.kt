@@ -1,5 +1,7 @@
 package com.beautifulquran.ui.home
 
+import com.beautifulquran.ui.theme.SettingsNuqtaIcon
+import com.beautifulquran.ui.theme.rememberSettingsNuqtaState
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
@@ -33,7 +35,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -516,6 +517,7 @@ fun HomeScreen(
 private fun HomeHeader(
     onOpenSettings: () -> Unit,
 ) {
+    val settingsNuqta = rememberSettingsNuqtaState()
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
@@ -546,14 +548,16 @@ private fun HomeHeader(
                 // The title sits 7 dp below the masthead's overall center.
                 .offset(y = 7.dp)
                 .clip(CircleShape)
-                .quietClickable(role = Role.Button, onClick = onOpenSettings)
+                .quietClickable(role = Role.Button) {
+                    settingsNuqta.drop()
+                    onOpenSettings()
+                }
                 .semantics { contentDescription = "Open settings" },
         ) {
-            Icon(
-                imageVector = Icons.Rounded.Tune,
+            SettingsNuqtaIcon(
+                state = settingsNuqta,
                 contentDescription = "Open settings",
                 tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
-                modifier = Modifier.size(26.dp),
             )
         }
     }

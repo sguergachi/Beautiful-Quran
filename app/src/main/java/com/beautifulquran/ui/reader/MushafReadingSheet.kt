@@ -1,5 +1,7 @@
 package com.beautifulquran.ui.reader
 
+import com.beautifulquran.ui.theme.SettingsNuqtaIcon
+import com.beautifulquran.ui.theme.rememberSettingsNuqtaState
 import androidx.compose.foundation.Canvas
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
@@ -26,7 +28,6 @@ import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Repeat
 import androidx.compose.material.icons.rounded.RepeatOne
-import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -389,14 +390,22 @@ internal fun MushafReadingSheet(
                     tint = quiet,
                     modifier = Modifier.align(Alignment.CenterStart),
                 )
-                GutterIcon(
-                    onClick = onOpenSettings,
+                val settingsNuqta = rememberSettingsNuqtaState()
+                IconButton(
+                    onClick = {
+                        settingsNuqta.drop()
+                        onOpenSettings()
+                    },
                     enabled = secondaryEnabled,
-                    image = Icons.Rounded.Tune,
-                    label = "Settings",
-                    tint = quiet,
-                    modifier = Modifier.align(Alignment.CenterEnd),
-                )
+                    modifier = Modifier.align(Alignment.CenterEnd).size(40.dp),
+                ) {
+                    SettingsNuqtaIcon(
+                        state = settingsNuqta,
+                        contentDescription = "Settings",
+                        tint = quiet,
+                        iconSize = 20.dp,
+                    )
+                }
             }
             Row(
                 modifier = Modifier

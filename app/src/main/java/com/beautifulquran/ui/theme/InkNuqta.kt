@@ -17,8 +17,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.ClipOp
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.unit.dp
@@ -67,50 +69,64 @@ fun InkNuqta(
     val restingInk = MaterialTheme.colorScheme.outline
 
     Canvas(modifier.size(params.sizeDp.dp)) {
-        val outline = inkNuqtaPath(size.minDimension, params.bow)
-        val outlineStroke = Stroke(width = params.strokeDp.dp.toPx(), join = StrokeJoin.Round)
-        val resting = restingInk.copy(alpha = params.restingOutlineAlpha)
-        val t = spread.value
-        val lift = presence.value
+        drawInkNuqta(spread.value, presence.value, params, fingers, ink, restingInk)
+    }
+}
 
-        if (lift <= 0f || t <= 0f) {
-            drawPath(outline, resting, style = outlineStroke)
-            return@Canvas
-        }
-        val origin = Offset(
-            size.width * 0.5f + params.originDx.dp.toPx(),
-            size.height * 0.5f + params.originDy.dp.toPx(),
+/**
+ * One nuqta at clock [t] with [lift] of its pigment left, filling this draw
+ * scope. [restingInk] is the hairline outline the drop has not yet reached;
+ * pass [Color.Transparent] for a mark that is only ever ink.
+ */
+internal fun DrawScope.drawInkNuqta(
+    t: Float,
+    lift: Float,
+    params: NuqtaParams,
+    fingers: FloatArray,
+    ink: Color,
+    restingInk: Color,
+) {
+    val outline = inkNuqtaPath(size.minDimension, params.bow)
+    val outlineStroke = Stroke(width = params.strokeDp.dp.toPx(), join = StrokeJoin.Round)
+    val resting = if (restingInk.alpha == 0f) restingInk else restingInk.copy(alpha = params.restingOutlineAlpha)
+
+    if (lift <= 0f || t <= 0f) {
+        drawPath(outline, resting, style = outlineStroke)
+        return
+    }
+    val origin = Offset(
+        size.width * 0.5f + params.originDx.dp.toPx(),
+        size.height * 0.5f + params.originDy.dp.toPx(),
+    )
+    val full = size.minDimension * 0.7f * params.reach
+    val radii = nuqtaDropRadii(t, params, fingers)
+    val edge = radii.max()
+    val drop = nuqtaDropPath(origin, full, radii)
+    val stops = nuqtaInkStops(t, params, edge)
+    // One density field paints both the ink and the outline it stains, so
+    // the outline is only ever as dark as the ink beside it.
+    fun inkField(strength: Float) = Brush.radialGradient(
+        *Array(NuqtaInkStopCount) { k ->
+            stops[k * 2] to ink.copy(alpha = (lift * stops[k * 2 + 1] * strength).coerceIn(0f, 1f))
+        },
+        center = origin,
+        radius = (full * edge).coerceAtLeast(0.5f),
+    )
+    clipPath(outline) {
+        drawPath(path = drop, brush = inkField(1f))
+    }
+    // The outline takes the ink only where the drop has reached it; the
+    // rest keeps its resting hairline.
+    clipPath(drop, ClipOp.Difference) {
+        drawPath(outline, resting, style = outlineStroke)
+    }
+    clipPath(drop) {
+        drawPath(outline, resting.copy(alpha = resting.alpha * (1f - lift)), style = outlineStroke)
+        drawPath(
+            outline,
+            inkField(params.selectedOutlineAlpha / params.inkAlpha.coerceAtLeast(0.05f)),
+            style = outlineStroke,
         )
-        val full = size.minDimension * 0.7f * params.reach
-        val radii = nuqtaDropRadii(t, params, fingers)
-        val edge = radii.max()
-        val drop = nuqtaDropPath(origin, full, radii)
-        val stops = nuqtaInkStops(t, params, edge)
-        // One density field paints both the ink and the outline it stains, so
-        // the outline is only ever as dark as the ink beside it.
-        fun inkField(strength: Float) = Brush.radialGradient(
-            *Array(NuqtaInkStopCount) { k ->
-                stops[k * 2] to ink.copy(alpha = (lift * stops[k * 2 + 1] * strength).coerceIn(0f, 1f))
-            },
-            center = origin,
-            radius = (full * edge).coerceAtLeast(0.5f),
-        )
-        clipPath(outline) {
-            drawPath(path = drop, brush = inkField(1f))
-        }
-        // The outline takes the ink only where the drop has reached it; the
-        // rest keeps its resting hairline.
-        clipPath(drop, ClipOp.Difference) {
-            drawPath(outline, resting, style = outlineStroke)
-        }
-        clipPath(drop) {
-            drawPath(outline, resting.copy(alpha = resting.alpha * (1f - lift)), style = outlineStroke)
-            drawPath(
-                outline,
-                inkField(params.selectedOutlineAlpha / params.inkAlpha.coerceAtLeast(0.05f)),
-                style = outlineStroke,
-            )
-        }
     }
 }
 

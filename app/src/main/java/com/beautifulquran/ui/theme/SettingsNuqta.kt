@@ -1,0 +1,109 @@
+package com.beautifulquran.ui.theme
+
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Tune
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.Stable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.graphics.vector.rememberVectorPainter
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.flow.first
+
+/**
+ * How far the paper stack has turned from the sheet beneath Settings toward
+ * Settings itself, 0..1. Read it only while drawing: it changes every frame
+ * of a swipe.
+ */
+val LocalSettingsApproach = staticCompositionLocalOf<() -> Float> { { 0f } }
+
+/** Lets the settings button start its nuqta the instant it is tapped. */
+@Stable
+class SettingsNuqtaState {
+    internal var drops by mutableIntStateOf(0)
+
+    /** Touch the pen down: the nuqta spreads on its own select clock. */
+    fun drop() {
+        drops++
+    }
+}
+
+@Composable
+fun rememberSettingsNuqtaState(): SettingsNuqtaState = remember { SettingsNuqtaState() }
+
+/**
+ * The settings glyph with a nuqta of ink behind it. The drop soaks outward
+ * in step with the page turn toward Settings — a swipe spreads it live, and
+ * turning back lifts it — so the reader sees where the turn will land. A tap
+ * ([SettingsNuqtaState.drop]) spreads it on the same clock as a chosen row.
+ */
+@Composable
+fun SettingsNuqtaIcon(
+    state: SettingsNuqtaState,
+    contentDescription: String?,
+    tint: Color,
+    modifier: Modifier = Modifier,
+    iconSize: Dp = 26.dp,
+    params: NuqtaParams = LocalNuqtaParams.current,
+) {
+    val approach = LocalSettingsApproach.current
+    val tap = remember { Animatable(0f) }
+    LaunchedEffect(state.drops) {
+        if (state.drops == 0) return@LaunchedEffect
+        tap.snapTo(0f)
+        tap.animateTo(1f, tween(params.spreadMs, easing = LinearEasing))
+        // Hold the drop until the turn settles. On Settings the turn itself
+        // keeps it spread; if the turn fell back, lift it like a let-go choice.
+        val settled = snapshotFlow { approach() }.first { it >= 0.999f || it <= 0.001f }
+        if (settled >= 0.999f) {
+            tap.snapTo(0f)
+        } else {
+            tap.animateTo(0f, tween(params.liftMs, easing = params.lift.easing()))
+        }
+    }
+    val fingers = remember(params.seed) { nuqtaFingers(params.seed) }
+    val painter = rememberVectorPainter(Icons.Rounded.Tune)
+    val ink = MaterialTheme.colorScheme.primary
+    val inked = MaterialTheme.colorScheme.onPrimary
+
+    Canvas(
+        modifier
+            .size(iconSize * SettingsNuqtaScale)
+            .semantics { if (contentDescription != null) this.contentDescription = contentDescription },
+    ) {
+        val t = maxOf(approach().coerceIn(0f, 1f), tap.value)
+        if (t > 0f) drawInkNuqta(t, 1f, params, fingers, ink, Color.Transparent)
+        // The glyph turns to paper as the ink under it deepens.
+        val glyph = lerp(tint, inked, ((t - 0.3f) / 0.5f).coerceIn(0f, 1f).let { it * it * (3f - 2f * it) })
+        val glyphPx = iconSize.toPx()
+        translate(
+            left = (size.width - glyphPx) / 2f,
+            top = (size.height - glyphPx) / 2f,
+        ) {
+            with(painter) { draw(Size(glyphPx, glyphPx), colorFilter = ColorFilter.tint(glyph)) }
+        }
+    }
+}
+
+/** The nuqta's size as a multiple of the glyph it sits behind. */
+private const val SettingsNuqtaScale = 1.6f
