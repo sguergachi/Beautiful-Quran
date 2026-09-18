@@ -2,10 +2,7 @@ package com.beautifulquran.ui.home
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.CubicBezierEasing
-import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
@@ -36,6 +33,7 @@ import com.beautifulquran.ui.theme.drawInkWashCoats
 import com.beautifulquran.ui.theme.inkCoatFingers
 import com.beautifulquran.ui.theme.inkWashReachToCover
 import kotlin.math.hypot
+import kotlin.math.roundToInt
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -70,8 +68,6 @@ internal class ContinueInk(val params: NuqtaParams) {
     /** Tapped, and the turn it starts has not yet landed. */
     var tapped by mutableStateOf(false)
 
-    /** The row's presses: touching it starts the ink before the turn does. */
-    val interactions = MutableInteractionSource()
     val fingers = inkCoatFingers(params)
 
     /**
@@ -110,21 +106,27 @@ internal fun rememberContinueInk(): ContinueInk {
     val params = LocalNuqtaParams.current
     val ink = remember(params) { ContinueInk(params) }
     val approach = LocalReaderApproach.current
-    val held by ink.interactions.collectIsPressedAsState()
     LaunchedEffect(ink, approach) {
         snapshotFlow {
             val p = approach()
             when {
                 p >= 1f - ContinueTurnEpsilon -> ContinueTurn.Landed
-                p > ContinueTurnEpsilon || held || ink.tapped -> ContinueTurn.Turning
+                p > ContinueTurnEpsilon || ink.tapped -> ContinueTurn.Turning
                 else -> ContinueTurn.Resting
             }
         }.distinctUntilChanged().collectLatest { turn ->
             when (turn) {
                 ContinueTurn.Turning -> coroutineScope {
-                    // The wash plays out on its own clock; turned again
-                    // mid-dry, the colour floods back as it carries on.
-                    launch { ink.dry.animateTo(0f, tween(ContinueInkRewetMs, easing = LinearEasing)) }
+                    // The wash plays out on its own clock. Turned again
+                    // mid-wipe, the wipe runs back from where it stands, as
+                    // fast as it came, while the flood carries on — every
+                    // interruption picks up the ink exactly as it is.
+                    launch {
+                        ink.dry.animateTo(
+                            0f,
+                            tween((ContinueInkDryMs * ink.dry.value).roundToInt(), easing = ContinueInkRewetEasing),
+                        )
+                    }
                     ink.flood()
                 }
                 ContinueTurn.Landed -> {
@@ -136,7 +138,13 @@ internal fun rememberContinueInk(): ContinueInk {
                 }
                 ContinueTurn.Resting -> {
                     if (ink.spread > 0f) {
-                        ink.dry.animateTo(1f, tween(ContinueInkDryMs, easing = ContinueInkWipeEasing))
+                        // A wipe interrupted and resumed covers only what is
+                        // left of it, in its share of the time.
+                        val wipeEasing = if (ink.dry.value > 0f) ContinueInkRewetEasing else ContinueInkWipeEasing
+                        ink.dry.animateTo(
+                            1f,
+                            tween((ContinueInkDryMs * (1f - ink.dry.value)).roundToInt(), easing = wipeEasing),
+                        )
                         ink.clear()
                         ink.dry.snapTo(0f)
                     }
@@ -228,5 +236,8 @@ private val ContinueInkWipeEasing = CubicBezierEasing(0.4f, 0f, 0.2f, 1f)
 /** Half the width of the wipe's soft edge. */
 private val ContinueInkWipeFeather = 14.dp
 
-/** Turned again mid-dry, the colour floods back over this long. */
-private const val ContinueInkRewetMs = 180
+/**
+ * For a wipe picking up mid-way, in either direction: it is already moving,
+ * so it starts at speed and settles, never pausing to gather.
+ */
+private val ContinueInkRewetEasing = CubicBezierEasing(0f, 0f, 0.2f, 1f)
