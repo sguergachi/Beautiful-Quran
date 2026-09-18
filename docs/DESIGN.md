@@ -472,17 +472,23 @@ soft cubic blot.
 
 Every stacked single choice leads with a calligraphic **nuqta**, never a round
 radio or a geometric diamond. Its four sides bow slightly like a full-width
-qalam impression. Selection is one continuous ink action on a single 640 ms
-clock: a translucent wet edge leaps out on touch, the body wicks after it, and
-the dense pool creeps into the corners and settles with no bounce — all clipped
-by that hand-cut outline so the spread ends as one Arabic dot, never a halo.
-Letting go lifts the pigment as a whole (220 ms, accelerating); the spread
-never runs backwards. `InkNuqtaTest` locks the layer ordering and the
-quick-wet / soft-settle shape.
+qalam impression. Selection is **one drop of ink**, never stacked rings or a
+fill-then-darken sequence: the pen lands slightly off centre, the drop runs out
+quickly and creeps slowly into the corners (`1 − (1 − t)^k`), and it runs
+further along some fibres than others, so its edge is ragged until it meets
+the outline. Density is spatial, not a global fade: the landing point deepens
+first, a dense core soaks outward behind a pale running front, and the front
+ends in a feathered wet fringe. The outline stains only where the ink has
+reached it, with the same density as the ink beside it. Letting go lifts the
+pigment as a whole (accelerating); the spread never runs backwards.
+`InkNuqtaTest` locks this: the drop only grows, is ragged mid-spread and whole
+at the settle, is densest where it landed (no ring), and ends solid over the
+whole cut.
 
 Every number of the nuqta — its cut (size, side bow, outline weight and ink),
-the spread and lift clocks and curves, and each layer's start, arrival, curve,
-reach, alpha and pooling offset — lives in `NuqtaParams` (web: `NuqtaParams` in
+the spread and lift clocks, the drop (landing point, reach, fibre runs, edge
+grain, paper seed) and the ink (landing and soaked density, soak lag, wet
+fringe) — lives in `NuqtaParams` (web: `NuqtaParams` in
 `kit/nuqta.ts`, flattened to the same keys). Settings → Developer's **Nuqta
 radio dot** lab slides all of them live across the Settings and Customize
 sheets (via `LocalNuqtaParams` / `NuqtaParamsContext`), and its Copy / Paste

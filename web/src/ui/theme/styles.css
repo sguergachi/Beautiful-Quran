@@ -3358,80 +3358,25 @@ select {
   cursor: pointer;
 }
 
-/* Qalam nuqta (Android InkNuqta). One ink action on a single spread clock:
- * the wet edge leaps out, the body wicks after it, the dense pool creeps into
- * the corners and settles. Unchecking lifts all pigment together and only then
- * resets the spread, so the ink never runs backwards. Every value below is a
- * knob: `nuqtaStyleVars` (kit/nuqta.ts) sets them on the list; the fallbacks
- * are the shipped nuqta. */
+/* Qalam nuqta (Android InkNuqta). The drop is drawn per frame by
+ * PaperChoiceList from kit/nuqta.ts; only colour lives here. */
 .ink-nuqta {
   flex-shrink: 0;
-  width: var(--nq-size, 1.25rem);
-  height: var(--nq-size, 1.25rem);
   display: inline-flex;
 }
 
 .ink-nuqta-mark {
-  width: 100%;
-  height: 100%;
   overflow: visible;
 }
 
-.ink-nuqta-mark circle {
-  fill: var(--accent);
-  transform: scale(0);
-  transform-box: fill-box;
-  transform-origin: center;
-  opacity: 0;
-  transition:
-    opacity var(--nq-lift, 220ms) var(--nq-lift-ease, cubic-bezier(0.4, 0, 1, 1)),
-    transform 0s var(--nq-lift, 220ms);
+.ink-nuqta-stop {
+  stop-color: var(--accent);
 }
 
 .ink-nuqta-outline {
   fill: none;
-  stroke: color-mix(in srgb, var(--ink) var(--nq-rest, 30%), transparent);
+  stroke: var(--ink);
   stroke-linejoin: round;
-  transition: stroke var(--nq-lift, 220ms) ease;
-}
-
-.ink-nuqta[data-checked] .ink-nuqta-outline {
-  stroke: color-mix(in srgb, var(--accent) var(--nq-chosen, 82%), transparent);
-}
-
-.ink-nuqta[data-checked] circle {
-  transform: scale(1);
-}
-
-.ink-nuqta[data-checked] .ink-nuqta-wet {
-  opacity: var(--nq-wet-alpha, 0.16);
-  transition:
-    opacity var(--nq-spread, 640ms) ease-out var(--nq-wet-delay, 0ms),
-    transform var(--nq-wet-dur, 352ms) var(--nq-wet-ease, cubic-bezier(0.1, 0.75, 0.3, 1))
-      var(--nq-wet-delay, 0ms);
-}
-
-.ink-nuqta[data-checked] .ink-nuqta-body {
-  opacity: var(--nq-body-alpha, 0.55);
-  transition:
-    opacity 60ms linear var(--nq-body-delay, 51ms),
-    transform var(--nq-body-dur, 474ms) var(--nq-body-ease, cubic-bezier(0.25, 0.6, 0.3, 1))
-      var(--nq-body-delay, 51ms);
-}
-
-.ink-nuqta[data-checked] .ink-nuqta-pool {
-  opacity: var(--nq-pool-alpha, 0.96);
-  transition:
-    opacity 60ms linear var(--nq-pool-delay, 115ms),
-    transform var(--nq-pool-dur, 525ms) var(--nq-pool-ease, cubic-bezier(0.3, 0.35, 0.15, 1))
-      var(--nq-pool-delay, 115ms);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .ink-nuqta-mark circle,
-  .ink-nuqta[data-checked] circle {
-    transition: opacity 120ms linear;
-  }
 }
 
 .paper-choice-radio:focus-visible {

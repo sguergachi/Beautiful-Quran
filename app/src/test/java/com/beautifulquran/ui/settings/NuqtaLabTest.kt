@@ -30,10 +30,13 @@ class NuqtaLabTest {
             sizeDp = 24f,
             bow = 1.4f,
             spreadMs = 900,
-            liftMs = 300,
+            spreadSharpness = 4.5f,
             lift = NuqtaCurve(0.2f, 0.1f, 0.9f, 1f),
-            wet = ShippedNuqtaParams.wet.copy(start = 0.05f, radius = 1.3f, dxDp = -1.5f),
-            pool = ShippedNuqtaParams.pool.copy(alpha = 0.8f, curve = NuqtaCurve(0.4f, 0.2f, 0.1f, 1f)),
+            originDx = -1.5f,
+            fingers = 0.6f,
+            seed = 12,
+            wetAlpha = 0.2f,
+            fringeAlpha = 0.4f,
         )
         val pasted = parseNuqtaFromText(formatNuqtaCopy(tuned), ShippedNuqtaParams)
         knobs.forEach { knob ->

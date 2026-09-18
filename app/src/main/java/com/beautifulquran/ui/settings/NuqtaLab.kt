@@ -22,7 +22,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.beautifulquran.ui.theme.NuqtaCurve
-import com.beautifulquran.ui.theme.NuqtaLayerParams
 import com.beautifulquran.ui.theme.NuqtaParams
 import com.beautifulquran.ui.theme.ShippedNuqtaParams
 import com.beautifulquran.ui.theme.quietClickable
@@ -58,54 +57,65 @@ private fun curveKnobs(
     NuqtaKnob("${prefix}Y2", "Curve y2", -0.5f..1.5f, 2, { get(it).y2 }) { p, v -> set(p, get(p).copy(y2 = v)) },
 )
 
-private fun layerKnobs(
-    prefix: String,
-    get: (NuqtaParams) -> NuqtaLayerParams,
-    set: (NuqtaParams, NuqtaLayerParams) -> NuqtaParams,
-): List<NuqtaKnob> = listOf(
-    NuqtaKnob("${prefix}Start", "Starts at", 0f..0.9f, 2, { get(it).start }) { p, v -> set(p, get(p).copy(start = v)) },
-    NuqtaKnob("${prefix}End", "Arrives at", 0.1f..1f, 2, { get(it).end }) { p, v -> set(p, get(p).copy(end = v)) },
-) + curveKnobs(
-    prefix,
-    get = { get(it).curve },
-    set = { p, c -> set(p, get(p).copy(curve = c)) },
-) + listOf(
-    NuqtaKnob("${prefix}Radius", "Reach", 0.2f..1.6f, 2, { get(it).radius }) { p, v -> set(p, get(p).copy(radius = v)) },
-    NuqtaKnob("${prefix}Alpha", "Alpha", 0f..1f, 2, { get(it).alpha }) { p, v -> set(p, get(p).copy(alpha = v)) },
-    NuqtaKnob("${prefix}Dx", "Pool x (dp)", -4f..4f, 1, { get(it).dxDp }) { p, v -> set(p, get(p).copy(dxDp = v)) },
-    NuqtaKnob("${prefix}Dy", "Pool y (dp)", -4f..4f, 1, { get(it).dyDp }) { p, v -> set(p, get(p).copy(dyDp = v)) },
-)
+private fun knob(
+    key: String,
+    label: String,
+    range: ClosedFloatingPointRange<Float>,
+    digits: Int,
+    get: (NuqtaParams) -> Float,
+    set: (NuqtaParams, Float) -> NuqtaParams,
+) = NuqtaKnob(key, label, range, digits, get, set)
 
 internal val NuqtaKnobGroups: List<NuqtaKnobGroup> = listOf(
     NuqtaKnobGroup(
         "Cut",
         listOf(
-            NuqtaKnob("sizeDp", "Size (dp)", 14f..32f, 0, { it.sizeDp }) { p, v -> p.copy(sizeDp = v) },
-            NuqtaKnob("bow", "Side bow", 0f..2.5f, 2, { it.bow }) { p, v -> p.copy(bow = v) },
-            NuqtaKnob("strokeDp", "Outline (dp)", 0.4f..2.5f, 2, { it.strokeDp }) { p, v -> p.copy(strokeDp = v) },
-            NuqtaKnob("restingOutlineAlpha", "Resting ink", 0f..1f, 2, { it.restingOutlineAlpha }) { p, v ->
+            knob("sizeDp", "Size (dp)", 14f..32f, 0, { it.sizeDp }) { p, v -> p.copy(sizeDp = v) },
+            knob("bow", "Side bow", 0f..2.5f, 2, { it.bow }) { p, v -> p.copy(bow = v) },
+            knob("strokeDp", "Outline (dp)", 0.4f..2.5f, 2, { it.strokeDp }) { p, v -> p.copy(strokeDp = v) },
+            knob("restingOutlineAlpha", "Resting ink", 0f..1f, 2, { it.restingOutlineAlpha }) { p, v ->
                 p.copy(restingOutlineAlpha = v)
             },
-            NuqtaKnob("selectedOutlineAlpha", "Chosen ink", 0f..1f, 2, { it.selectedOutlineAlpha }) { p, v ->
+            knob("selectedOutlineAlpha", "Chosen ink", 0f..1f, 2, { it.selectedOutlineAlpha }) { p, v ->
                 p.copy(selectedOutlineAlpha = v)
             },
         ),
     ),
     NuqtaKnobGroup(
-        "Spread & lift",
+        "Clock",
         listOf(
-            NuqtaKnob("spreadMs", "Spread ms", 120f..2000f, 0, { it.spreadMs.toFloat() }) { p, v ->
+            knob("spreadMs", "Spread ms", 120f..2000f, 0, { it.spreadMs.toFloat() }) { p, v ->
                 p.copy(spreadMs = v.roundToInt())
             },
-            NuqtaKnob("wetDryBack", "Wet dry-back", 0f..1f, 2, { it.wetDryBack }) { p, v -> p.copy(wetDryBack = v) },
-            NuqtaKnob("liftMs", "Lift ms", 0f..800f, 0, { it.liftMs.toFloat() }) { p, v ->
+            knob("spreadSharpness", "Run-out", 1f..8f, 1, { it.spreadSharpness }) { p, v ->
+                p.copy(spreadSharpness = v)
+            },
+            knob("liftMs", "Lift ms", 0f..800f, 0, { it.liftMs.toFloat() }) { p, v ->
                 p.copy(liftMs = v.roundToInt())
             },
         ) + curveKnobs("lift", get = { it.lift }, set = { p, c -> p.copy(lift = c) }),
     ),
-    NuqtaKnobGroup("Wet edge", layerKnobs("wet", get = { it.wet }, set = { p, l -> p.copy(wet = l) })),
-    NuqtaKnobGroup("Body", layerKnobs("body", get = { it.body }, set = { p, l -> p.copy(body = l) })),
-    NuqtaKnobGroup("Pool", layerKnobs("pool", get = { it.pool }, set = { p, l -> p.copy(pool = l) })),
+    NuqtaKnobGroup(
+        "Drop",
+        listOf(
+            knob("originDx", "Lands x (dp)", -4f..4f, 1, { it.originDx }) { p, v -> p.copy(originDx = v) },
+            knob("originDy", "Lands y (dp)", -4f..4f, 1, { it.originDy }) { p, v -> p.copy(originDy = v) },
+            knob("reach", "Reach", 0.6f..1.8f, 2, { it.reach }) { p, v -> p.copy(reach = v) },
+            knob("fingers", "Fibre runs", 0f..1.2f, 2, { it.fingers }) { p, v -> p.copy(fingers = v) },
+            knob("grain", "Edge grain", 0f..0.3f, 2, { it.grain }) { p, v -> p.copy(grain = v) },
+            knob("seed", "Paper seed", 0f..64f, 0, { it.seed.toFloat() }) { p, v -> p.copy(seed = v.roundToInt()) },
+        ),
+    ),
+    NuqtaKnobGroup(
+        "Ink",
+        listOf(
+            knob("wetAlpha", "Lands at", 0f..1f, 2, { it.wetAlpha }) { p, v -> p.copy(wetAlpha = v) },
+            knob("inkAlpha", "Soaks to", 0f..1f, 2, { it.inkAlpha }) { p, v -> p.copy(inkAlpha = v) },
+            knob("soakDelay", "Soak delay", 0f..0.9f, 2, { it.soakDelay }) { p, v -> p.copy(soakDelay = v) },
+            knob("feather", "Wet fringe", 0f..0.9f, 2, { it.feather }) { p, v -> p.copy(feather = v) },
+            knob("fringeAlpha", "Fringe ink", 0f..1f, 2, { it.fringeAlpha }) { p, v -> p.copy(fringeAlpha = v) },
+        ),
+    ),
 )
 
 private val NuqtaKnobsByKey: Map<String, NuqtaKnob> =

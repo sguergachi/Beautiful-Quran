@@ -1,4 +1,4 @@
-import { createContext, type CSSProperties } from 'react'
+import { createContext } from 'react'
 
 /**
  * Every knob of the nuqta radio dot — Android `NuqtaParams`, flattened. Keys
@@ -12,16 +12,25 @@ export type NuqtaParams = {
   restingOutlineAlpha: number
   selectedOutlineAlpha: number
   spreadMs: number
-  wetDryBack: number
+  spreadSharpness: number
   liftMs: number
   liftX1: number
   liftY1: number
   liftX2: number
   liftY2: number
-} & Record<`${NuqtaLayer}${NuqtaLayerKnob}`, number>
+  originDx: number
+  originDy: number
+  reach: number
+  fingers: number
+  grain: number
+  seed: number
+  wetAlpha: number
+  inkAlpha: number
+  soakDelay: number
+  feather: number
+  fringeAlpha: number
+}
 
-export type NuqtaLayer = 'wet' | 'body' | 'pool'
-type NuqtaLayerKnob = 'Start' | 'End' | 'X1' | 'Y1' | 'X2' | 'Y2' | 'Radius' | 'Alpha' | 'Dx' | 'Dy'
 export type NuqtaKnobKey = keyof NuqtaParams
 
 /** The shipped nuqta — Android `ShippedNuqtaParams`. */
@@ -31,66 +40,30 @@ export const SHIPPED_NUQTA: NuqtaParams = {
   strokeDp: 1.15,
   restingOutlineAlpha: 0.46,
   selectedOutlineAlpha: 0.82,
-  spreadMs: 640,
-  wetDryBack: 0.33,
+  spreadMs: 800,
+  spreadSharpness: 1.6,
   liftMs: 220,
   liftX1: 0.4,
   liftY1: 0,
   liftX2: 1,
   liftY2: 1,
-  wetStart: 0,
-  wetEnd: 0.55,
-  wetX1: 0.1,
-  wetY1: 0.75,
-  wetX2: 0.3,
-  wetY2: 1,
-  wetRadius: 1.12,
-  wetAlpha: 0.24,
-  wetDx: 0,
-  wetDy: 0,
-  bodyStart: 0.08,
-  bodyEnd: 0.82,
-  bodyX1: 0.25,
-  bodyY1: 0.6,
-  bodyX2: 0.3,
-  bodyY2: 1,
-  bodyRadius: 0.98,
-  bodyAlpha: 0.55,
-  bodyDx: 1.1,
-  bodyDy: -0.7,
-  poolStart: 0.18,
-  poolEnd: 1,
-  poolX1: 0.3,
-  poolY1: 0.35,
-  poolX2: 0.15,
-  poolY2: 1,
-  poolRadius: 0.84,
-  poolAlpha: 0.96,
-  poolDx: -0.6,
-  poolDy: 0.8,
+  originDx: -0.6,
+  originDy: 0.5,
+  reach: 0.76,
+  fingers: 0.42,
+  grain: 0.06,
+  seed: 7,
+  wetAlpha: 0.28,
+  inkAlpha: 0.96,
+  soakDelay: 0.22,
+  feather: 0.3,
+  fringeAlpha: 0.2,
 }
 
 /** What every nuqta draws; only Settings → Developer's nuqta lab overrides it. */
 export const NuqtaParamsContext = createContext<NuqtaParams>(SHIPPED_NUQTA)
 
 type Knob = { key: NuqtaKnobKey; label: string; min: number; max: number; digits: number }
-
-const curve = (p: 'lift' | NuqtaLayer): Knob[] => [
-  { key: `${p}X1`, label: 'Curve x1', min: 0, max: 1, digits: 2 },
-  { key: `${p}Y1`, label: 'Curve y1', min: -0.5, max: 1.5, digits: 2 },
-  { key: `${p}X2`, label: 'Curve x2', min: 0, max: 1, digits: 2 },
-  { key: `${p}Y2`, label: 'Curve y2', min: -0.5, max: 1.5, digits: 2 },
-]
-
-const layer = (p: NuqtaLayer): Knob[] => [
-  { key: `${p}Start`, label: 'Starts at', min: 0, max: 0.9, digits: 2 },
-  { key: `${p}End`, label: 'Arrives at', min: 0.1, max: 1, digits: 2 },
-  ...curve(p),
-  { key: `${p}Radius`, label: 'Reach', min: 0.2, max: 1.6, digits: 2 },
-  { key: `${p}Alpha`, label: 'Alpha', min: 0, max: 1, digits: 2 },
-  { key: `${p}Dx`, label: 'Pool x (dp)', min: -4, max: 4, digits: 1 },
-  { key: `${p}Dy`, label: 'Pool y (dp)', min: -4, max: 4, digits: 1 },
-]
 
 /** Android `NuqtaKnobGroups`, same order, ranges and keys. */
 export const NUQTA_KNOB_GROUPS: { title: string; knobs: Knob[] }[] = [
@@ -105,17 +78,38 @@ export const NUQTA_KNOB_GROUPS: { title: string; knobs: Knob[] }[] = [
     ],
   },
   {
-    title: 'Spread & lift',
+    title: 'Clock',
     knobs: [
       { key: 'spreadMs', label: 'Spread ms', min: 120, max: 2000, digits: 0 },
-      { key: 'wetDryBack', label: 'Wet dry-back', min: 0, max: 1, digits: 2 },
+      { key: 'spreadSharpness', label: 'Run-out', min: 1, max: 8, digits: 1 },
       { key: 'liftMs', label: 'Lift ms', min: 0, max: 800, digits: 0 },
-      ...curve('lift'),
+      { key: 'liftX1', label: 'Curve x1', min: 0, max: 1, digits: 2 },
+      { key: 'liftY1', label: 'Curve y1', min: -0.5, max: 1.5, digits: 2 },
+      { key: 'liftX2', label: 'Curve x2', min: 0, max: 1, digits: 2 },
+      { key: 'liftY2', label: 'Curve y2', min: -0.5, max: 1.5, digits: 2 },
     ],
   },
-  { title: 'Wet edge', knobs: layer('wet') },
-  { title: 'Body', knobs: layer('body') },
-  { title: 'Pool', knobs: layer('pool') },
+  {
+    title: 'Drop',
+    knobs: [
+      { key: 'originDx', label: 'Lands x (dp)', min: -4, max: 4, digits: 1 },
+      { key: 'originDy', label: 'Lands y (dp)', min: -4, max: 4, digits: 1 },
+      { key: 'reach', label: 'Reach', min: 0.6, max: 1.8, digits: 2 },
+      { key: 'fingers', label: 'Fibre runs', min: 0, max: 1, digits: 2 },
+      { key: 'grain', label: 'Edge grain', min: 0, max: 0.3, digits: 2 },
+      { key: 'seed', label: 'Paper seed', min: 0, max: 64, digits: 0 },
+    ],
+  },
+  {
+    title: 'Ink',
+    knobs: [
+      { key: 'wetAlpha', label: 'Lands at', min: 0, max: 1, digits: 2 },
+      { key: 'inkAlpha', label: 'Soaks to', min: 0, max: 1, digits: 2 },
+      { key: 'soakDelay', label: 'Soak delay', min: 0, max: 0.9, digits: 2 },
+      { key: 'feather', label: 'Wet fringe', min: 0, max: 0.9, digits: 2 },
+      { key: 'fringeAlpha', label: 'Fringe ink', min: 0, max: 1, digits: 2 },
+    ],
+  },
 ]
 
 const KNOBS = new Map(NUQTA_KNOB_GROUPS.flatMap((g) => g.knobs).map((k) => [k.key, k]))
@@ -152,7 +146,7 @@ export function parseNuqtaFromText(text: string, base: NuqtaParams): NuqtaParams
     if (!KNOBS.has(key)) continue
     const n = Number(m[2])
     if (!Number.isFinite(n)) continue
-    next[key] = key === 'spreadMs' || key === 'liftMs' ? Math.round(n) : n
+    next[key] = KNOBS.get(key)?.digits === 0 && key !== 'sizeDp' ? Math.round(n) : n
     hits++
   }
   return hits > 0 ? next : null
@@ -187,30 +181,98 @@ export function nuqtaPath(size: number, bow: number): string {
   return `${d}Z`
 }
 
+/** Directions the drop's edge is sampled in — Android `NuqtaDropSamples`. */
+export const NUQTA_DROP_SAMPLES = 40
+
+/** How far the front has run, 0..1, at clock [t]: `1 − (1 − t)^sharpness`. */
+export function nuqtaFront(t: number, sharpness: number): number {
+  return 1 - (1 - Math.min(Math.max(t, 0), 1)) ** sharpness
+}
+
+/** The wet fringe's share of the drop's radius at [t]; it dries as the drop settles. */
+export function nuqtaFeather(t: number, p: NuqtaParams): number {
+  return Math.min(Math.max(p.feather * (1 - 0.85 * nuqtaFront(t, p.spreadSharpness)), 0), 1)
+}
+
+/** Gradient stops in [nuqtaInkStops]: landing point, core, fringe, tip. */
+export const NUQTA_INK_STOP_COUNT = 4
+
 /**
- * The CSS custom properties `.ink-nuqta` in styles.css animates by. Android
- * eases each layer over its own [start, end] share of one spread clock; CSS
- * gets the same thing as a delay plus a duration on that layer's transition.
+ * Android `nuqtaInkStops`: ink density across the drop at [t], as
+ * (offset, alpha) pairs from where it landed out to its edge. A dense core
+ * soaks outward `soakDelay` behind a pale running front whose tip is a
+ * feathered fringe; the front darkens too as the drop settles, so the nuqta
+ * ends solid. [edge] is the drop's farthest reach, as a share of full.
  */
-export function nuqtaStyleVars(p: NuqtaParams): CSSProperties {
-  const vars: Record<string, string> = {
-    '--nq-size': `${p.sizeDp / 16}rem`,
-    '--nq-rest': `${Math.round(p.restingOutlineAlpha * 65)}%`,
-    '--nq-chosen': `${Math.round(p.selectedOutlineAlpha * 100)}%`,
-    '--nq-spread': `${p.spreadMs}ms`,
-    '--nq-lift': `${p.liftMs}ms`,
-    '--nq-lift-ease': `cubic-bezier(${p.liftX1}, ${p.liftY1}, ${p.liftX2}, ${p.liftY2})`,
+export function nuqtaInkStops(t: number, p: NuqtaParams, edge: number): number[] {
+  const clamp = (x: number, lo = 0, hi = 1) => Math.min(Math.max(x, lo), hi)
+  const smooth = (x: number) => {
+    const c = clamp(x)
+    return c * c * (3 - 2 * c)
   }
-  for (const l of ['wet', 'body', 'pool'] as const) {
-    const start = p[`${l}Start`]
-    const span = Math.max(p[`${l}End`] - start, 0.001)
-    vars[`--nq-${l}-delay`] = `${Math.round(start * p.spreadMs)}ms`
-    vars[`--nq-${l}-dur`] = `${Math.round(span * p.spreadMs)}ms`
-    vars[`--nq-${l}-ease`] =
-      `cubic-bezier(${p[`${l}X1`]}, ${p[`${l}Y1`]}, ${p[`${l}X2`]}, ${p[`${l}Y2`]})`
-    // The wet edge settles at its dried-back strength (Android fades it live).
-    const alpha = p[`${l}Alpha`] * (l === 'wet' ? 1 - p.wetDryBack : 1)
-    vars[`--nq-${l}-alpha`] = `${alpha}`
+  const landed = clamp(t / 0.05)
+  const lagT = clamp((t - p.soakDelay) / Math.max(1 - p.soakDelay, 1e-3))
+  const feather = nuqtaFeather(t, p)
+  const core = clamp(nuqtaFront(lagT, p.spreadSharpness) / Math.max(edge, 1e-3), 0, 1 - feather)
+  const front = p.wetAlpha + (p.inkAlpha - p.wetAlpha) * smooth(lagT)
+  const centre = p.wetAlpha + (p.inkAlpha - p.wetAlpha) * smooth(t / Math.max(p.soakDelay, 1e-3))
+  return [
+    0, landed * centre,
+    core, landed * centre,
+    1 - feather, landed * front,
+    1, landed * front * p.fringeAlpha,
+  ]
+}
+
+/**
+ * Android `nuqtaFingers`: per direction, a coarse run-speed bias in −1..1
+ * (first half) and a fine grain in −1..1 (second half). Integer hashing
+ * matches Kotlin's 32-bit overflow so both platforms draw the same paper.
+ */
+export function nuqtaFingers(seed: number): Float32Array {
+  const phase = (k: number) => {
+    let h = (Math.imul(seed, 374761393) + Math.imul(k, 668265263)) | 0
+    h = Math.imul(h ^ (h >>> 13), 1274126177)
+    return (((h ^ (h >>> 16)) & 0xffff) / 65535) * 2 * Math.PI
   }
-  return vars as CSSProperties
+  const n = NUQTA_DROP_SAMPLES
+  const out = new Float32Array(n * 2)
+  for (const layer of [0, 1]) {
+    const ks = layer === 0 ? [2, 3, 4, 5] : [9, 10, 11, 12, 13]
+    const values = Array.from({ length: n }, (_, i) => {
+      const a = (i * 2 * Math.PI) / n
+      return ks.reduce((sum, k) => sum + Math.sin(k * a + phase(k + layer * 31)) / k, 0)
+    })
+    const peak = Math.max(...values.map(Math.abs), 1e-6)
+    values.forEach((v, i) => (out[layer * n + i] = v / peak))
+  }
+  return out
+}
+
+/** The drop's edge at [t], per direction, as a share of its full radius. */
+export function nuqtaDropRadii(t: number, p: NuqtaParams, fingers: Float32Array): number[] {
+  const n = NUQTA_DROP_SAMPLES
+  const front = nuqtaFront(t, p.spreadSharpness)
+  return Array.from({ length: n }, (_, i) => {
+    // Fast fibres lead and slow ones lag by a bounded share of the drop,
+    // and every direction arrives at the settle together.
+    const dir = front * (1 + Math.min(Math.max(p.fingers, 0), 1) * fingers[i] * (1 - front))
+    return dir * (1 + p.grain * fingers[n + i] * (1 - dir))
+  })
+}
+
+/** A smooth closed curve through the drop's edge samples. */
+export function nuqtaDropPath(ox: number, oy: number, full: number, radii: number[]): string {
+  const n = radii.length
+  const pts = radii.map((r, i) => {
+    const a = (i * 2 * Math.PI) / n
+    return [ox + Math.cos(a) * r * full, oy + Math.sin(a) * r * full]
+  })
+  const f = (v: number) => v.toFixed(3)
+  const mid = (a: number[], b: number[]) => `${f((a[0] + b[0]) / 2)} ${f((a[1] + b[1]) / 2)}`
+  let d = `M${mid(pts[n - 1], pts[0])}`
+  for (let i = 0; i < n; i++) {
+    d += `Q${f(pts[i][0])} ${f(pts[i][1])} ${mid(pts[i], pts[(i + 1) % n])}`
+  }
+  return `${d}Z`
 }
