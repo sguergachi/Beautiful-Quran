@@ -2,6 +2,8 @@ package com.beautifulquran.ui.theme
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -32,6 +34,7 @@ import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
@@ -42,12 +45,24 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 
-/**
- * How far the paper stack has turned from the sheet beneath Settings toward
- * Settings itself, 0..1. Read it only while drawing: it changes every frame
- * of a swipe.
- */
-val LocalSettingsApproach = staticCompositionLocalOf<() -> Float> { { 0f } }
+/** The paper stack's turn toward Settings, as the settings nuqta reads it. */
+@Stable
+class SettingsApproach(
+    /**
+     * How far the stack has turned from the sheet beneath Settings toward
+     * Settings itself, 0..1. Read it only while drawing or in snapshot flows:
+     * it changes every frame of a swipe.
+     */
+    val progress: () -> Float,
+    /** Whether a finger is dragging the stack right now. */
+    val dragging: () -> Boolean,
+    /** The share of a drag past which letting go completes the turn. */
+    val commitAt: Float,
+)
+
+val LocalSettingsApproach = staticCompositionLocalOf {
+    SettingsApproach(progress = { 0f }, dragging = { false }, commitAt = 1f)
+}
 
 /**
  * Lets the settings button ink its nuqta while it is held — pass
@@ -58,7 +73,7 @@ class SettingsNuqtaState {
     /** The button's presses: holding it inks the nuqta as its pressed state. */
     val interactions = MutableInteractionSource()
 
-    /** Tapped, and the turn it starts has not yet moved the stack. */
+    /** Tapped, and the turn it starts has not yet settled. */
     internal var pressed by mutableStateOf(false)
 
     /** Touch the pen down: the nuqta spreads on its own select clock. */
@@ -74,11 +89,14 @@ fun rememberSettingsNuqtaState(): SettingsNuqtaState = remember { SettingsNuqtaS
  * The settings glyph with a nuqta of ink behind it, so the reader sees where
  * a page turn will land. The moment the button is held, or the stack starts
  * to turn toward Settings — a swipe or a tap ([SettingsNuqtaState.drop]) —
- * the drop spreads on the
- * same clock as a chosen row. From there the drag stretches it like a rubber
- * band, and if the press or turn falls back short of Settings the ink
- * dries back the way it came. The glyph takes the
- * contrasting colour only where the ink covers it.
+ * the drop spreads on the same clock as a chosen row.
+ *
+ * The drag then stretches it like a rubber band in two stages: once the
+ * drag passes the point where letting go completes the turn, the drop
+ * bounces up a stage with a haptic tick. Holding the button shows the band
+ * at its fullest. If the press or turn falls back short of Settings the ink
+ * dries back the way it came. The glyph takes the contrasting colour only
+ * where the ink covers it.
  */
 @Composable
 fun SettingsNuqtaIcon(
@@ -89,17 +107,44 @@ fun SettingsNuqtaIcon(
     iconSize: Dp = 26.dp,
     params: NuqtaParams = LocalNuqtaParams.current,
 ) {
-    val approach = LocalSettingsApproach.current
+    val turn = LocalSettingsApproach.current
+    val approach = turn.progress
     val held by state.interactions.collectIsPressedAsState()
+    val view = LocalView.current
     val spread = remember { Animatable(0f) }
     val presence = remember { Animatable(0f) }
-    LaunchedEffect(approach, state) {
-        // Once the turn is moving it carries the ink; the tap is spent.
-        snapshotFlow { approach() > SettingsTurnEpsilon }.collect { turning ->
-            if (turning) state.pressed = false
+    // The band's second stage, on a bouncy spring: 0 before the commit
+    // point, 1 past it.
+    val stage = remember { Animatable(0f) }
+    // Holding the button pulls the band to its fullest.
+    val pull = remember { Animatable(0f) }
+    LaunchedEffect(turn, state) {
+        // A tap's turn carries the ink until it lands on Settings, or until
+        // a finger takes the page over.
+        snapshotFlow { approach() >= 1f - SettingsTurnEpsilon || turn.dragging() }.collect { done ->
+            if (done) state.pressed = false
         }
     }
-    LaunchedEffect(approach, state, params) {
+    LaunchedEffect(turn, state) {
+        snapshotFlow { held || state.pressed || approach() >= turn.commitAt }
+            .distinctUntilChanged()
+            .collectLatest { committed ->
+                if (committed && turn.dragging()) view.paperSelectHaptic()
+                stage.animateTo(
+                    if (committed) 1f else 0f,
+                    spring(dampingRatio = 0.38f, stiffness = Spring.StiffnessMedium),
+                )
+            }
+    }
+    LaunchedEffect(state) {
+        snapshotFlow { held }.collectLatest { holding ->
+            pull.animateTo(
+                if (holding) settingsNuqtaStretch(1f) else 0f,
+                spring(dampingRatio = 0.5f, stiffness = Spring.StiffnessMediumLow),
+            )
+        }
+    }
+    LaunchedEffect(turn, state, params) {
         snapshotFlow { approach() > SettingsTurnEpsilon || state.pressed || held }
             .distinctUntilChanged()
             .collectLatest { inked ->
@@ -149,7 +194,8 @@ fun SettingsNuqtaIcon(
             glyph(tint)
             return@Canvas
         }
-        val swell = 1f + settingsNuqtaStretch(approach())
+        val swell = 1f + maxOf(settingsNuqtaStretch(approach()), pull.value) +
+            SettingsNuqtaStageSwell * stage.value
         // A drying coat is a thinner one: its pigment pales toward the paper.
         val coat = lerp(ink, lerp(ink, paper, SettingsNuqtaDriedTint), 1f - lift)
         scale(swell) { drawInkNuqta(t, lift, params, fingers, coat, Color.Transparent) }
@@ -175,6 +221,9 @@ private const val SettingsNuqtaScale = 1.6f
 
 /** How far toward the paper the last of a drying coat has paled. */
 private const val SettingsNuqtaDriedTint = 0.55f
+
+/** The extra swell the band bounces up by as the drag passes the commit point. */
+private const val SettingsNuqtaStageSwell = 0.14f
 
 /** How far the stack must move before it counts as turning toward Settings. */
 private const val SettingsTurnEpsilon = 0.001f

@@ -122,6 +122,7 @@ import com.beautifulquran.ui.theme.FloatingPaperControl
 import com.beautifulquran.ui.theme.InkRevealOverlay
 import com.beautifulquran.ui.theme.LocalNuqtaParams
 import com.beautifulquran.ui.theme.LocalSettingsApproach
+import com.beautifulquran.ui.theme.SettingsApproach
 import com.beautifulquran.ui.theme.LocalQuranAccents
 import com.beautifulquran.ui.theme.TimingsLabAccents
 import com.beautifulquran.ui.theme.absorbPointerEvents
@@ -572,8 +573,13 @@ private fun PaperStackApp(
     val settingsLayer = if (selectedSurahId == 0) AYAH_LAYER else SETTINGS_LAYER
     // The settings button's nuqta spreads with the turn from the sheet just
     // beneath Settings, whichever sheet that is.
+    var stackDragging by remember { mutableStateOf(false) }
     val settingsApproach = remember(stackPosition, settingsLayer) {
-        { (stackPosition.value - (settingsLayer - 1)).coerceIn(0f, 1f) }
+        SettingsApproach(
+            progress = { (stackPosition.value - (settingsLayer - 1)).coerceIn(0f, 1f) },
+            dragging = { stackDragging },
+            commitAt = STACK_PAGE_TURN_THRESHOLD,
+        )
     }
     // The stack's top sheet, read live: a detail page (Customize, Downloads)
     // raises the ceiling the moment it is asked for — a captured value would
@@ -929,6 +935,7 @@ private fun PaperStackApp(
                 gesturesBlocked = { stackGesturesBlocked.value },
                 onDragStart = {
                     dragStartPosition = stackPosition.value
+                    stackDragging = true
                 },
                 onDrag = { deltaPages ->
                     // A single gesture may advance at most one layer, so a hard swipe
@@ -949,6 +956,7 @@ private fun PaperStackApp(
                     }
                 },
                 onSettle = { target ->
+                    stackDragging = false
                     dragSnapJob?.cancel()
                     animateTo(target)
                 },
