@@ -33,7 +33,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -547,7 +546,7 @@ private fun HomeHeader(
                 .size(48.dp)
                 // The title sits 7 dp below the masthead's overall center.
                 .offset(y = 7.dp)
-                .clip(CircleShape)
+                // Unclipped: the settings nuqta swells past this box.
                 .quietClickable(role = Role.Button) {
                     settingsNuqta.drop()
                     onOpenSettings()

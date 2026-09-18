@@ -1,5 +1,7 @@
 package com.beautifulquran.ui.reader
 
+import androidx.compose.ui.semantics.Role
+import com.beautifulquran.ui.theme.quietClickable
 import com.beautifulquran.ui.theme.SettingsNuqtaIcon
 import com.beautifulquran.ui.theme.rememberSettingsNuqtaState
 import com.beautifulquran.DevProfiling
@@ -1810,12 +1812,16 @@ fun ReaderScreen(
                             Spacer(Modifier.width(48.dp))
                         }
                         val settingsNuqta = rememberSettingsNuqtaState()
-                        IconButton(
-                            onClick = {
-                                settingsNuqta.drop()
-                                onOpenSettings()
-                            },
-                            enabled = !recitingActive,
+                        // Not an IconButton: its clip would cut off the
+                        // nuqta's swell.
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier
+                                .size(48.dp)
+                                .quietClickable(enabled = !recitingActive, role = Role.Button) {
+                                    settingsNuqta.drop()
+                                    onOpenSettings()
+                                },
                         ) {
                             SettingsNuqtaIcon(
                                 state = settingsNuqta,

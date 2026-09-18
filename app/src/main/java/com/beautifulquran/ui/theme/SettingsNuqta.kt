@@ -96,7 +96,7 @@ fun SettingsNuqtaIcon(
     val stretch = remember { Animatable(0f) }
     LaunchedEffect(approach) {
         snapshotFlow { settingsNuqtaStretch(approach()) }.collectLatest { target ->
-            stretch.animateTo(target, spring(dampingRatio = 0.4f, stiffness = Spring.StiffnessMediumLow))
+            stretch.animateTo(target, spring(dampingRatio = 0.32f, stiffness = Spring.StiffnessMediumLow))
         }
     }
     val fingers = remember(params.seed) { nuqtaFingers(params.seed) }
@@ -149,7 +149,7 @@ private const val SettingsNuqtaScale = 1.6f
 private const val SettingsNuqtaFullAt = 0.4f
 
 /** How far past full size the drop swells once the turn runs beyond full spread. */
-private const val SettingsNuqtaMaxStretch = 0.16f
+private const val SettingsNuqtaMaxStretch = 0.38f
 
 /** The share of the turn, after full spread, over which the swell arrives. */
 private const val SettingsNuqtaStretchSpan = 0.3f

@@ -1,5 +1,6 @@
 package com.beautifulquran.ui.reader
 
+import com.beautifulquran.ui.theme.quietClickable
 import com.beautifulquran.ui.theme.SettingsNuqtaIcon
 import com.beautifulquran.ui.theme.rememberSettingsNuqtaState
 import androidx.compose.foundation.Canvas
@@ -391,13 +392,16 @@ internal fun MushafReadingSheet(
                     modifier = Modifier.align(Alignment.CenterStart),
                 )
                 val settingsNuqta = rememberSettingsNuqtaState()
-                IconButton(
-                    onClick = {
-                        settingsNuqta.drop()
-                        onOpenSettings()
-                    },
-                    enabled = secondaryEnabled,
-                    modifier = Modifier.align(Alignment.CenterEnd).size(40.dp),
+                // Not an IconButton: its clip would cut off the nuqta's swell.
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier
+                        .align(Alignment.CenterEnd)
+                        .size(40.dp)
+                        .quietClickable(enabled = secondaryEnabled, role = Role.Button) {
+                            settingsNuqta.drop()
+                            onOpenSettings()
+                        },
                 ) {
                     SettingsNuqtaIcon(
                         state = settingsNuqta,
