@@ -220,7 +220,7 @@ fun SettingsNuqtaIcon(
 private const val SettingsNuqtaScale = 1.6f
 
 /** A drop let go dries in place over this long, coat by coat. */
-private const val SettingsNuqtaDryMs = 900
+private const val SettingsNuqtaDryMs = 500
 
 /** Turned again mid-dry, the colour floods back over this long. */
 private const val SettingsNuqtaRewetMs = 180

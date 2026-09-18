@@ -194,7 +194,7 @@ private const val ContinueTurnEpsilon = 0.001f
 private const val ContinueInkMaxFrameMs = 20f
 
 /** A turn let go dries out of the row over this long, coat by coat. */
-private const val ContinueInkDryMs = 900
+private const val ContinueInkDryMs = 500
 
 /** Turned again mid-dry, the colour floods back over this long. */
 private const val ContinueInkRewetMs = 180
