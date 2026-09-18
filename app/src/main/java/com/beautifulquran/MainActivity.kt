@@ -123,7 +123,8 @@ import com.beautifulquran.ui.theme.FloatingPaperControl
 import com.beautifulquran.ui.theme.InkRevealOverlay
 import com.beautifulquran.ui.theme.LocalNuqtaParams
 import com.beautifulquran.ui.theme.LocalSettingsApproach
-import com.beautifulquran.ui.theme.SettingsApproach
+import com.beautifulquran.ui.theme.SheetApproach
+import com.beautifulquran.ui.theme.SheetApproachAtRest
 import com.beautifulquran.ui.theme.LocalQuranAccents
 import com.beautifulquran.ui.theme.TimingsLabAccents
 import com.beautifulquran.ui.theme.absorbPointerEvents
@@ -363,9 +364,6 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-/** A settings turn that never moves, for a sheet not beneath Settings. */
-private val SettingsApproachAtRest = SettingsApproach(progress = { 0f }, dragging = { false }, commitAt = 1f)
-
 private const val BOOKMARKS_LAYER = -1
 private const val COVER_LAYER = 0
 private const val AYAH_LAYER = 1
@@ -579,16 +577,24 @@ private fun PaperStackApp(
     // beneath Settings, whichever sheet that is.
     var stackDragging by remember { mutableStateOf(false) }
     // The continue row inks as the chapter list turns into the open reader.
-    val readerApproach = remember(stackPosition, selectedSurahId != 0) {
-        val readerOpen = selectedSurahId != 0
-        { if (readerOpen) (stackPosition.value - COVER_LAYER).coerceIn(0f, 1f) else 0f }
-    }
     val settingsApproach = remember(stackPosition, settingsLayer) {
-        SettingsApproach(
+        SheetApproach(
             progress = { (stackPosition.value - (settingsLayer - 1)).coerceIn(0f, 1f) },
             dragging = { stackDragging },
             commitAt = STACK_PAGE_TURN_THRESHOLD,
         )
+    }
+    // The continue row inks as the chapter list turns into the open reader.
+    val readerApproach = remember(stackPosition, selectedSurahId != 0) {
+        if (selectedSurahId == 0) {
+            SheetApproachAtRest
+        } else {
+            SheetApproach(
+                progress = { (stackPosition.value - COVER_LAYER).coerceIn(0f, 1f) },
+                dragging = { stackDragging },
+                commitAt = STACK_PAGE_TURN_THRESHOLD,
+            )
+        }
     }
     // The stack's top sheet, read live: a detail page (Customize, Downloads)
     // raises the ceiling the moment it is asked for — a captured value would
@@ -1209,7 +1215,7 @@ private fun PaperStackApp(
                 LocalSettingsApproach provides if (selectedSurahId == 0) {
                     settingsApproach
                 } else {
-                    SettingsApproachAtRest
+                    SheetApproachAtRest
                 },
                 LocalReaderApproach provides readerApproach,
             ) {

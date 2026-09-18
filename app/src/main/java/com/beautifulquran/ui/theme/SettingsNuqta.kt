@@ -45,13 +45,13 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 
-/** The paper stack's turn toward Settings, as the settings nuqta reads it. */
+/** The paper stack's turn from one sheet onto the next, as ink that marks it reads it. */
 @Stable
-class SettingsApproach(
+class SheetApproach(
     /**
-     * How far the stack has turned from the sheet beneath Settings toward
-     * Settings itself, 0..1. Read it only while drawing or in snapshot flows:
-     * it changes every frame of a swipe.
+     * How far the stack has turned from the sheet beneath toward the next,
+     * 0..1. Read it only while drawing or in snapshot flows: it changes every
+     * frame of a swipe.
      */
     val progress: () -> Float,
     /** Whether a finger is dragging the stack right now. */
@@ -60,9 +60,11 @@ class SettingsApproach(
     val commitAt: Float,
 )
 
-val LocalSettingsApproach = staticCompositionLocalOf {
-    SettingsApproach(progress = { 0f }, dragging = { false }, commitAt = 1f)
-}
+/** A turn that never moves, for a sheet with nothing to turn to. */
+val SheetApproachAtRest = SheetApproach(progress = { 0f }, dragging = { false }, commitAt = 1f)
+
+/** The turn onto Settings from the sheet beneath it. */
+val LocalSettingsApproach = staticCompositionLocalOf { SheetApproachAtRest }
 
 /**
  * Lets the settings button ink its nuqta while it is held — pass

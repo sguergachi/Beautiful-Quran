@@ -672,6 +672,7 @@ private fun ContinueRow(target: ContinueTarget, onClick: () -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .padding(top = 18.dp)
+            .continueInkBounce(ink)
             .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f))
             .continueInkWash(
                 ink,
