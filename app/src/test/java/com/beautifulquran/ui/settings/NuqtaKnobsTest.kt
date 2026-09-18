@@ -7,7 +7,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-class NuqtaLabTest {
+class NuqtaKnobsTest {
 
     private val knobs = NuqtaKnobGroups.flatMap { it.knobs }
 

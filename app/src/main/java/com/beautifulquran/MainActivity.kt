@@ -105,6 +105,7 @@ import com.beautifulquran.ui.rootviewer.RootViewerViewModel
 import com.beautifulquran.ui.rootviewer.WordHoldChooser
 import com.beautifulquran.ui.settings.CustomizeScreen
 import com.beautifulquran.ui.settings.DownloadManagerPage
+import com.beautifulquran.ui.settings.ComponentKitScreen
 import com.beautifulquran.ui.settings.SettingsDetail
 import com.beautifulquran.ui.settings.SettingsInkPreviewState
 import com.beautifulquran.ui.settings.SettingsScreen
@@ -584,8 +585,13 @@ private fun PaperStackApp(
     val mushafPageTurns = settings.readingLayout == ReadingLayout.MUSHAF &&
         selectedSurahId != 0 &&
         settledLayer == AYAH_LAYER
+    // The component kit swipes between components itself; the page turn
+    // would fight it, so the kit leaves by its Back chevron or system Back.
+    val componentKitOpen = settingsDetail == SettingsDetail.COMPONENT_KIT &&
+        settledLayer == settingsLayer + 1
     val stackGesturesBlocked = rememberUpdatedState(
-        ayahSelectorExpanded || overlayBlocking || entranceVisible || mushafPageTurns,
+        ayahSelectorExpanded || overlayBlocking || entranceVisible || mushafPageTurns ||
+            componentKitOpen,
     )
     val rootReturnVisible = rootReturnTarget != null && !overlayBlocking
     val onRootReturnUserMovedLatest = rememberUpdatedState {
@@ -990,6 +996,10 @@ private fun PaperStackApp(
                     settingsDetail = SettingsDetail.DOWNLOADS
                     animateTo(settingsLayer + 1)
                 },
+                onOpenComponentKit = {
+                    settingsDetail = SettingsDetail.COMPONENT_KIT
+                    animateTo(settingsLayer + 1)
+                },
                 onOpenTimingsLab = { openTimingsLab() },
                 onOpenTarjiLab = { openTarjiLab() },
                 onOpenOrnamentsLab = { openOrnamentsLab() },
@@ -1017,6 +1027,11 @@ private fun PaperStackApp(
                     )
                     SettingsDetail.DOWNLOADS -> DownloadsSheet(
                         viewModel = settingsViewModel,
+                        onBack = { animateTo(settingsLayer) },
+                    )
+                    SettingsDetail.COMPONENT_KIT -> ComponentKitScreen(
+                        viewModel = settingsViewModel,
+                        inkPreview = settingsInkPreview,
                         onBack = { animateTo(settingsLayer) },
                     )
                     null -> {}

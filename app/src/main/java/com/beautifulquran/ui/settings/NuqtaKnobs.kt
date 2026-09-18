@@ -1,35 +1,11 @@
 package com.beautifulquran.ui.settings
 
-import android.content.ClipData
-import android.content.ClipboardManager
-import android.content.Context
-import android.util.Log
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.unit.dp
 import com.beautifulquran.ui.theme.NuqtaCurve
 import com.beautifulquran.ui.theme.NuqtaParams
-import com.beautifulquran.ui.theme.ShippedNuqtaParams
-import com.beautifulquran.ui.theme.quietClickable
-import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
 
 /**
- * One tunable number of the nuqta. The same list drives the lab's sliders, its
+ * One tunable number of the nuqta. The same list drives the kit's sliders, its
  * copy output and its paste parser, so the three can never disagree — and the
  * keys match web `nuqta.ts`, so a snippet copied on one platform pastes on the
  * other.
@@ -121,7 +97,7 @@ internal val NuqtaKnobGroups: List<NuqtaKnobGroup> = listOf(
 private val NuqtaKnobsByKey: Map<String, NuqtaKnob> =
     NuqtaKnobGroups.flatMap { it.knobs }.associateBy { it.key }
 
-private fun formatKnob(knob: NuqtaKnob, value: Float): String {
+internal fun formatNuqtaKnob(knob: NuqtaKnob, value: Float): String {
     if (knob.digits == 0) return value.roundToInt().toString()
     val s = "%.${knob.digits}f".format(value).trimEnd('0').trimEnd('.')
     return if (s.isEmpty() || s == "-0") "0" else s
@@ -134,7 +110,7 @@ internal fun formatNuqtaCopy(p: NuqtaParams): String = buildString {
     appendLine("{")
     NuqtaKnobGroups.forEach { group ->
         appendLine("  // ${group.title}")
-        group.knobs.forEach { knob -> appendLine("  ${knob.key}: ${formatKnob(knob, knob.get(p))},") }
+        group.knobs.forEach { knob -> appendLine("  ${knob.key}: ${formatNuqtaKnob(knob, knob.get(p))},") }
     }
     append("}")
 }
@@ -154,98 +130,4 @@ internal fun parseNuqtaFromText(text: String, base: NuqtaParams): NuqtaParams? {
         hits++
     }
     return if (hits > 0) next else null
-}
-
-/**
- * Developer lab for the nuqta radio dot. Edits are session-only and reach every
- * nuqta on the Settings and Customize sheets live, so the real lists are the
- * preview; the two rows here just give a place to flick back and forth.
- */
-@Composable
-internal fun NuqtaLab(
-    params: NuqtaParams,
-    onChange: (NuqtaParams) -> Unit,
-) {
-    val context = LocalContext.current
-    var demoChoice by remember { mutableIntStateOf(0) }
-    var note by remember { mutableStateOf<String?>(null) }
-    if (note != null) {
-        LaunchedEffect(note) {
-            delay(2000L)
-            note = null
-        }
-    }
-    val onNote: (String) -> Unit = { note = it }
-
-    Text(
-        "Nuqta radio dot",
-        style = MaterialTheme.typography.bodyLarge,
-        color = MaterialTheme.colorScheme.onSurface,
-    )
-    Caption("Every single-choice row on these sheets follows these knobs live.")
-    Spacer(Modifier.height(6.dp))
-    listOf("First choice", "Second choice").forEachIndexed { index, label ->
-        SelectRow(label = label, selected = demoChoice == index, onClick = { demoChoice = index })
-    }
-
-    NuqtaKnobGroups.forEach { group ->
-        Spacer(Modifier.height(10.dp))
-        Text(
-            text = group.title,
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        group.knobs.forEach { knob ->
-            BrushTuningSlider(
-                label = knob.label,
-                value = knob.get(params),
-                range = knob.range,
-                integer = knob.digits == 0,
-                formatValue = { formatKnob(knob, it) },
-                onChange = { onChange(knob.set(params, it)) },
-            )
-        }
-    }
-
-    Spacer(Modifier.height(6.dp))
-    Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
-        LabAction("Reset nuqta") { onChange(ShippedNuqtaParams) }
-        LabAction("Replay") { demoChoice = 1 - demoChoice }
-        LabAction("Copy nuqta") {
-            val text = formatNuqtaCopy(params)
-            val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-            cm.setPrimaryClip(ClipData.newPlainText("nuqta params", text))
-            Log.d("NuqtaLab", text)
-            onNote("Copied nuqta params")
-        }
-        LabAction("Paste nuqta") {
-            val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-            val raw = cm.primaryClip
-                ?.takeIf { it.itemCount > 0 }
-                ?.getItemAt(0)
-                ?.coerceToText(context)
-                ?.toString()
-                .orEmpty()
-            val parsed = parseNuqtaFromText(raw, params)
-            if (parsed == null) {
-                onNote("No nuqta knobs found in clipboard")
-            } else {
-                onChange(parsed)
-                onNote("Applied nuqta params")
-            }
-        }
-    }
-    note?.let { Caption(it) }
-}
-
-@Composable
-private fun LabAction(text: String, onClick: () -> Unit) {
-    Text(
-        text = text,
-        style = MaterialTheme.typography.labelLarge,
-        color = MaterialTheme.colorScheme.primary,
-        modifier = Modifier
-            .quietClickable(onClick = onClick)
-            .padding(vertical = 6.dp),
-    )
 }

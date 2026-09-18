@@ -489,10 +489,10 @@ Every number of the nuqta — its cut (size, side bow, outline weight and ink),
 the spread and lift clocks, the drop (landing point, reach, fibre runs, edge
 grain, paper seed) and the ink (landing and soaked density, soak lag, wet
 fringe) — lives in `NuqtaParams` (web: `NuqtaParams` in
-`kit/nuqta.ts`, flattened to the same keys). Settings → Developer's **Nuqta
-radio dot** lab slides all of them live across the Settings and Customize
-sheets (via `LocalNuqtaParams` / `NuqtaParamsContext`), and its Copy / Paste
-text moves between platforms. Ship a tuning by editing the defaults on both
+`kit/nuqta.ts`, flattened to the same keys). The **Component kit** (below)
+slides all of them live across the Settings and Customize sheets (via
+`LocalNuqtaParams` / `NuqtaParamsContext`), and its Copy / Paste text moves
+between platforms (web still tunes it inline in Settings → Developer). Ship a tuning by editing the defaults on both
 platforms and bumping `SHIPPED_NUQTA_REVISION`.
 
 The circle is a filled calligraphic stroke on an oval centreline: it overshoots
@@ -502,9 +502,18 @@ along the stroke (`attack`, `releaseStart`, `bodyAmp`), and it **paints itself**
 over `paintMs` rather than appearing.
 
 `BrushCircleParams` / `BrushCheckParams` carry the knobs. Callers that don't care
-get the shipped baseline by default; only Settings → Developer's brush lab passes
-its own, and `SHIPPED_BRUSH_REVISION` / `SHIPPED_CHECK_REVISION` force the lab to
-reseed when a baseline changes.
+get the shipped baseline by default; only the Component kit passes its own, and
+`SHIPPED_BRUSH_REVISION` / `SHIPPED_CHECK_REVISION` force it to reseed when a
+baseline changes.
+
+**Component kit** (Settings → Developer → Component kit, Android;
+`ui/settings/ComponentKitScreen.kt`) is where these marks are tuned: one
+component per page — nuqta, ink check, brush circle — with the mark held in a
+preview that stays put while its dials scroll beneath it. Swipe sideways (or
+tap the dots) for the next or previous component; the stack's page-turn swipe
+is off while the kit is open, so it leaves by Back. Edits are session-only and
+reach the real Settings / Customize controls live. A new tunable component
+earns a page here: add a `KitComponent`, a preview and its dials.
 
 **The two platforms are locked to each other by test, not by good intentions.**
 `BrushMarksTest` pins all 16 circle knobs, all 15 check knobs and both shipped
