@@ -28,14 +28,17 @@ import androidx.compose.ui.graphics.Paint
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import kotlin.math.roundToInt
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.launch
 
 /**
  * How far the paper stack has turned from the sheet beneath Settings toward
@@ -92,23 +95,22 @@ fun SettingsNuqtaIcon(
             .collectLatest { inked ->
                 if (inked) {
                     // Turned again while it dries: the ink re-wets from
-                    // where it has shrunk to.
-                    presence.snapTo(1f)
-                    spread.animateTo(
-                        1f,
-                        tween(
-                            (params.spreadMs * (1f - spread.value)).roundToInt(),
-                            easing = LinearEasing,
-                        ),
-                    )
+                    // where it has shrunk to, and its colour floods back.
+                    val ms = (params.spreadMs * (1f - spread.value)).roundToInt()
+                    coroutineScope {
+                        launch { presence.animateTo(1f, tween(ms, easing = LinearEasing)) }
+                        spread.animateTo(1f, tween(ms, easing = LinearEasing))
+                    }
                 } else {
                     // A turn let go short of Settings dries back: the clock
                     // runs in reverse, so the edge draws in toward where the
-                    // drop landed, paling to a wet fringe as it goes.
-                    spread.animateTo(
-                        0f,
-                        tween((params.spreadMs * spread.value).roundToInt(), easing = LinearEasing),
-                    )
+                    // drop landed, while the coat thins — lighter and more
+                    // transparent — gathering pace as the paper drinks it.
+                    val ms = (params.spreadMs * spread.value).roundToInt()
+                    coroutineScope {
+                        launch { presence.animateTo(0f, tween(ms, easing = params.lift.easing())) }
+                        spread.animateTo(0f, tween(ms, easing = LinearEasing))
+                    }
                     presence.snapTo(0f)
                 }
             }
@@ -116,6 +118,7 @@ fun SettingsNuqtaIcon(
     val fingers = remember(params.seed) { nuqtaFingers(params.seed) }
     val painter = rememberVectorPainter(Icons.Rounded.Tune)
     val ink = MaterialTheme.colorScheme.primary
+    val paper = MaterialTheme.colorScheme.background
     val inked = MaterialTheme.colorScheme.onPrimary
 
     Canvas(
@@ -137,7 +140,9 @@ fun SettingsNuqtaIcon(
             return@Canvas
         }
         val swell = 1f + settingsNuqtaStretch(approach())
-        scale(swell) { drawInkNuqta(t, lift, params, fingers, ink, Color.Transparent) }
+        // A drying coat is a thinner one: its pigment pales toward the paper.
+        val coat = lerp(ink, lerp(ink, paper, SettingsNuqtaDriedTint), 1f - lift)
+        scale(swell) { drawInkNuqta(t, lift, params, fingers, coat, Color.Transparent) }
         glyph(tint)
         // Where the ink lies, the glyph turns to paper exactly as far as the
         // ink under it is dense: a contrasting copy, masked by the same drop.
@@ -157,6 +162,9 @@ fun SettingsNuqtaIcon(
 
 /** The nuqta's size as a multiple of the glyph it sits behind. */
 private const val SettingsNuqtaScale = 1.6f
+
+/** How far toward the paper the last of a drying coat has paled. */
+private const val SettingsNuqtaDriedTint = 0.55f
 
 /** How far the stack must move before it counts as turning toward Settings. */
 private const val SettingsTurnEpsilon = 0.001f
