@@ -2,8 +2,6 @@ package com.beautifulquran.ui.theme
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.size
@@ -35,7 +33,6 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
 
 /**
@@ -62,8 +59,8 @@ fun rememberSettingsNuqtaState(): SettingsNuqtaState = remember { SettingsNuqtaS
 /**
  * The settings glyph with a nuqta of ink behind it. The drop soaks outward
  * in step with the page turn toward Settings — a swipe spreads it live, full
- * by [SettingsNuqtaFullAt] of the turn and swelling elastically beyond it,
- * and turning back lifts it — so the reader sees where the turn will land. A tap
+ * by [SettingsNuqtaFullAt] of the turn and stretching like a rubber band
+ * beyond it, and turning back lifts it — so the reader sees where the turn will land. A tap
  * ([SettingsNuqtaState.drop]) spreads it on the same clock as a chosen row.
  * The glyph takes the contrasting colour only where the ink covers it.
  */
@@ -91,14 +88,6 @@ fun SettingsNuqtaIcon(
             tap.animateTo(0f, tween(params.liftMs, easing = params.lift.easing()))
         }
     }
-    // Past full spread the drop keeps swelling a little on a loose spring:
-    // the page is past its point of no return and will finish the turn.
-    val stretch = remember { Animatable(0f) }
-    LaunchedEffect(approach) {
-        snapshotFlow { settingsNuqtaStretch(approach()) }.collectLatest { target ->
-            stretch.animateTo(target, spring(dampingRatio = 0.32f, stiffness = Spring.StiffnessMediumLow))
-        }
-    }
     val fingers = remember(params.seed) { nuqtaFingers(params.seed) }
     val painter = rememberVectorPainter(Icons.Rounded.Tune)
     val ink = MaterialTheme.colorScheme.primary
@@ -123,7 +112,7 @@ fun SettingsNuqtaIcon(
             glyph(tint)
             return@Canvas
         }
-        val swell = 1f + stretch.value
+        val swell = 1f + settingsNuqtaStretch(approach())
         scale(swell) { drawInkNuqta(t, 1f, params, fingers, ink, Color.Transparent) }
         glyph(tint)
         // Where the ink lies, the glyph turns to paper exactly as far as the
@@ -146,16 +135,22 @@ fun SettingsNuqtaIcon(
 private const val SettingsNuqtaScale = 1.6f
 
 /** The share of the turn toward Settings at which the nuqta is fully spread. */
-private const val SettingsNuqtaFullAt = 0.4f
+private const val SettingsNuqtaFullAt = 1f / 3f
 
-/** How far past full size the drop swells once the turn runs beyond full spread. */
-private const val SettingsNuqtaMaxStretch = 0.38f
+/** The swell the rubber band tends toward if the turn could run on forever. */
+private const val SettingsNuqtaStretchLimit = 0.8f
 
-/** The share of the turn, after full spread, over which the swell arrives. */
-private const val SettingsNuqtaStretchSpan = 0.3f
+/** How stiff the band is: its pull, per share of the turn, as it starts to stretch. */
+private const val SettingsNuqtaStretchStiffness = 1.5f
 
-/** The swell past full size at [approach], easing out into its limit. */
+/**
+ * The swell past full size at [approach]. Past full spread the drop is a
+ * rubber band: it keeps growing all the way through the turn, but each step
+ * of the drag buys less than the one before, like tension building before
+ * it snaps back. Growth starts gently, at about the rate the spread itself
+ * was slowing to, and never plateaus.
+ */
 internal fun settingsNuqtaStretch(approach: Float): Float {
-    val over = ((approach - SettingsNuqtaFullAt) / SettingsNuqtaStretchSpan).coerceIn(0f, 1f)
-    return SettingsNuqtaMaxStretch * (1f - (1f - over).let { it * it * it })
+    val over = (approach - SettingsNuqtaFullAt).coerceAtLeast(0f)
+    return SettingsNuqtaStretchLimit * (1f - 1f / (1f + SettingsNuqtaStretchStiffness * over))
 }
