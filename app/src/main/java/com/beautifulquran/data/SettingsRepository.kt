@@ -63,6 +63,9 @@ enum class ColorSystem { LADDER, LEGACY }
 /** Developer-selectable bookmark treatment on the Chapters sheet. */
 enum class HomeBookmarkStyle { TOP_BOUND, SAVED_PASSAGES }
 
+/** The original catalog stays on the main Settings leaf after upgrading. */
+internal val DEFAULT_FAVORITE_RECITER_IDS = (1..7).toSet()
+
 /** One-shot, dismissible lessons that teach a gesture in its own UI context. */
 enum class EducationMoment(val preferenceKey: String) {
     BOOKMARK_NOTE("educationBookmarkNoteV1"),
@@ -90,6 +93,7 @@ enum class BrushCircleStyle {
 
 data class Settings(
     val reciterId: Int = 1,
+    val favoriteReciterIds: Set<Int> = DEFAULT_FAVORITE_RECITER_IDS,
     val fontScale: Float = 1f,
     val readingMode: ReadingMode = ReadingMode.ARABIC_ENGLISH,
     val readingLayout: ReadingLayout = ReadingLayout.SCROLL,
@@ -151,6 +155,10 @@ private fun SharedPreferences.homeBookmarkStyle(): HomeBookmarkStyle =
         HomeBookmarkStyle.TOP_BOUND
     }
 
+/** Missing means a pre-favorites install; an explicitly empty set stays empty. */
+internal fun decodeFavoriteReciterIds(stored: Set<String>?): Set<Int> =
+    stored?.mapNotNull(String::toIntOrNull)?.toSet() ?: DEFAULT_FAVORITE_RECITER_IDS
+
 /**
  * What the remembered leaf figures describe.
  *
@@ -181,6 +189,9 @@ class SettingsRepository(context: Context) {
 
     private fun read() = Settings(
         reciterId = prefs.getInt("reciterId", 1),
+        favoriteReciterIds = decodeFavoriteReciterIds(
+            prefs.getStringSet("favoriteReciterIds", null),
+        ),
         fontScale = prefs.getFloat("fontScale", 1f),
         readingMode = prefs.enum("readingMode", ReadingMode.ARABIC_ENGLISH),
         readingLayout = prefs.enum("readingLayout", ReadingLayout.SCROLL),
@@ -285,6 +296,10 @@ class SettingsRepository(context: Context) {
         _settings.value = next
         prefs.edit {
             putInt("reciterId", next.reciterId)
+            putStringSet(
+                "favoriteReciterIds",
+                next.favoriteReciterIds.map(Int::toString).toSet(),
+            )
             putFloat("fontScale", next.fontScale)
             putInt("readingMode", next.readingMode.ordinal)
             putInt("readingLayout", next.readingLayout.ordinal)
