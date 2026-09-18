@@ -25,6 +25,7 @@ sys.path.insert(0, str(TOOLS))
 from build_db import (  # noqa: E402
     AUDIO_ONSETS_DIR,
     QCF_V2_FIRST_CODEPOINT,
+    RECITERS,
     adjust_qdc_segments,
     apply_boundary_repair,
     apply_clocked_timing_repair,
@@ -41,6 +42,7 @@ from build_db import (  # noqa: E402
     load_audio_onsets,
     apply_audit_holds,
     discard_false_same_position_lead,
+    declared_reciter_rows,
     false_same_position_leads,
     hand_lead_to_previous_word,
     normalize_text,
@@ -58,6 +60,7 @@ from build_db import (  # noqa: E402
 import detect_audio_onsets as onset_detector  # noqa: E402
 from timing_delta import (  # noqa: E402
     build_delta,
+    load_corpus_bootstraps,
     load_verdict_ledger,
     read_git_timing_rows,
     read_timing_rows,
@@ -65,6 +68,7 @@ from timing_delta import (  # noqa: E402
 )
 CASES_DIR = TOOLS / "timing_patch_cases"
 VERDICTS_DIR = TOOLS / "timing_verdicts"
+TIMING_SOURCES_DIR = TOOLS / "timing_sources"
 PIPELINES = frozenset(
     {
         "adjust_qdc_segments",
@@ -618,6 +622,12 @@ def audit_bundled_db():
         },
         6: {(12, 50), (12, 75), (12, 76), (91, 15)},
         7: set(),
+        9: set(),
+        14: set(),
+        16: set(),
+        17: set(),
+        18: set(),
+        19: set(),
     }
     exact &= all(
         set(counts) - {(s, a) for rid_, s, a in timings if rid_ == rid}
@@ -691,6 +701,22 @@ def audit_bundled_db():
     return not bad and exact and provider_ok and not overrides and db.execute(
         "PRAGMA integrity_check"
     ).fetchone()[0] == "ok"
+
+
+def check_reciter_catalog():
+    """The packaged catalog matches declarations and derives timing support."""
+    with sqlite3.connect(ROOT / "data/quran.db") as db:
+        actual = list(db.execute(
+            "SELECT id,slug,name,style,has_timings FROM reciters ORDER BY id"
+        ))
+        timing_rows = list(db.execute(
+            "SELECT reciter_id,surah_id,ayah_number,segments FROM timings"
+        ))
+    return (
+        actual == declared_reciter_rows(timing_rows)
+        and len(actual) == len(RECITERS)
+        and all(row[4] == 1 for row in actual)
+    )
 
 
 def check_gloss_normalize():
@@ -891,7 +917,12 @@ def check_timing_delta():
         report = build_delta(
             read_git_timing_rows(base), read_timing_rows(ROOT / "data" / "quran.db"), ledger
         )
-        rejected = rejected_changes(report["changes"])
+        bootstraps = [
+            entry
+            for path in sorted(TIMING_SOURCES_DIR.glob("*-corpora.json"))
+            for entry in load_corpus_bootstraps(path)
+        ]
+        rejected = rejected_changes(report["changes"], bootstraps)
     except (OSError, subprocess.CalledProcessError, ValueError, sqlite3.Error) as exc:
         return False, str(exc)
     if rejected:
@@ -967,6 +998,7 @@ def main():
     gloss_ok = check_gloss_normalize()
     alignment_payload_ok = check_alignment_payload_parse()
     database_ok = audit_bundled_db()
+    reciter_catalog_ok = check_reciter_catalog()
     qcf_runs_ok = check_qcf_v2_page_runs()
     qcf_assert_ok = check_qcf_v2_run_assertion()
     recovered_boundary_ok = check_recovered_boundary_repairs()
@@ -981,6 +1013,7 @@ def main():
         "quran-align release payload parse"
     )
     print(f"  {'ok  ' if database_ok else 'FAIL'} bundled timing database invariants")
+    print(f"  {'ok  ' if reciter_catalog_ok else 'FAIL'} declared reciter catalog")
     print(f"  {'ok  ' if qcf_runs_ok else 'FAIL'} public DB excludes QCF V2 fields")
     print(f"  {'ok  ' if qcf_assert_ok else 'FAIL'} QCF V2 run assertion rejects a wrong page")
     print(f"  {'ok  ' if recovered_boundary_ok else 'FAIL'} recovered-row boundary deferral")
@@ -998,6 +1031,8 @@ def main():
         failures.append(("quran-align payload", "release artifact parse failed", None))
     if not database_ok:
         failures.append(("bundled database", "timing audit failed", None))
+    if not reciter_catalog_ok:
+        failures.append(("reciter catalog", "database does not match declarations", None))
     if not qcf_runs_ok:
         failures.append(("public QCF exclusion", "Quran.com QCF data remains in quran.db", None))
     if not qcf_assert_ok:
@@ -1017,7 +1052,7 @@ def main():
                 for line in str(detail).splitlines():
                     print(f"    {line}")
         return 1
-    print(f"all {len(cases) + 10} cases pass ({CASES_DIR.relative_to(Path.cwd())})")
+    print(f"all {len(cases) + 11} cases pass ({CASES_DIR.relative_to(Path.cwd())})")
     return 0
 
 

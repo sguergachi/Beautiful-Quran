@@ -105,6 +105,7 @@ import com.beautifulquran.ui.rootviewer.RootViewerViewModel
 import com.beautifulquran.ui.rootviewer.WordHoldChooser
 import com.beautifulquran.ui.settings.CustomizeScreen
 import com.beautifulquran.ui.settings.DownloadManagerPage
+import com.beautifulquran.ui.settings.RecitersPage
 import com.beautifulquran.ui.settings.ComponentKitScreen
 import com.beautifulquran.ui.settings.SettingsDetail
 import com.beautifulquran.ui.settings.SettingsInkPreviewState
@@ -988,6 +989,10 @@ private fun PaperStackApp(
                 onBack = {
                     animateTo(if (selectedSurahId == 0) COVER_LAYER else AYAH_LAYER)
                 },
+                onOpenReciters = {
+                    settingsDetail = SettingsDetail.RECITERS
+                    animateTo(settingsLayer + 1)
+                },
                 onOpenCustomize = {
                     settingsDetail = SettingsDetail.CUSTOMIZE
                     animateTo(settingsLayer + 1)
@@ -1017,6 +1022,10 @@ private fun PaperStackApp(
                 modifier = Modifier.zIndex(-0.5f),
             ) {
                 when (settingsDetail) {
+                    SettingsDetail.RECITERS -> RecitersSheet(
+                        viewModel = settingsViewModel,
+                        onBack = { animateTo(settingsLayer) },
+                    )
                     SettingsDetail.CUSTOMIZE -> CustomizeSheet(
                         viewModel = settingsViewModel,
                         inkPreview = settingsInkPreview,
@@ -1317,6 +1326,23 @@ private fun PaperStackApp(
         }
     }
 
+}
+
+@Composable
+private fun RecitersSheet(
+    viewModel: com.beautifulquran.ui.settings.SettingsViewModel,
+    onBack: () -> Unit,
+) {
+    val settings by viewModel.settings.settings.collectAsStateWithLifecycle()
+    val reciters by viewModel.reciters.collectAsStateWithLifecycle()
+    RecitersPage(
+        reciters = reciters,
+        selectedReciterId = settings.reciterId,
+        favoriteReciterIds = settings.favoriteReciterIds,
+        onSelect = viewModel::selectReciter,
+        onToggleFavorite = viewModel::toggleFavorite,
+        onBack = onBack,
+    )
 }
 
 @Composable
