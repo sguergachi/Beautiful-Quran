@@ -35,6 +35,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.boundsInParent
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -543,6 +544,56 @@ fun InkDisc(selected: Boolean) {
             radius = (r - 2.dp.toPx()) * fill,
             center = c,
         )
+    }
+}
+
+/**
+ * A qalam's nuqta: the slanted dot used to measure Arabic letterforms. Its
+ * outline rests on the paper, then ink soaks outward from the nib contact when
+ * selected. Reciter choices use this instead of a radio-like round disc.
+ */
+@Composable
+fun InkNuqta(selected: Boolean) {
+    val fill by animateFloatAsState(
+        targetValue = if (selected) 1f else 0f,
+        animationSpec = tween(
+            durationMillis = if (selected) 420 else 220,
+            easing = FastOutSlowInEasing,
+        ),
+        label = "nuqtaFill",
+    )
+    val accent = MaterialTheme.colorScheme.primary
+    val outline = MaterialTheme.colorScheme.outline
+    Canvas(Modifier.size(19.dp)) {
+        val dot = Path().apply {
+            moveTo(size.width * 0.58f, size.height * 0.08f)
+            lineTo(size.width * 0.94f, size.height * 0.40f)
+            lineTo(size.width * 0.42f, size.height * 0.92f)
+            lineTo(size.width * 0.06f, size.height * 0.59f)
+            close()
+        }
+        drawPath(
+            path = dot,
+            color = outline.copy(alpha = 0.48f - fill * 0.16f),
+            style = Stroke(width = 1.25.dp.toPx()),
+        )
+        if (fill > 0f) {
+            clipPath(dot) {
+                val reach = size.minDimension * (0.08f + 0.79f * fill)
+                drawCircle(
+                    color = accent.copy(alpha = 0.9f),
+                    radius = reach,
+                    center = Offset(size.width * 0.37f, size.height * 0.67f),
+                )
+                // A quieter second bloom keeps the wet edge from reading as a
+                // mechanically perfect radial wipe.
+                drawCircle(
+                    color = accent.copy(alpha = 0.24f * fill),
+                    radius = reach * 0.72f,
+                    center = Offset(size.width * 0.67f, size.height * 0.34f),
+                )
+            }
+        }
     }
 }
 

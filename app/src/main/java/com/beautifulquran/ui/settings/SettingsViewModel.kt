@@ -33,4 +33,17 @@ class SettingsViewModel(
         settings.update { it.copy(reciterId = reciter.id) }
         tarjiProfiles?.applyToEngine(reciter.id)
     }
+
+    fun toggleFavorite(reciter: Reciter) {
+        settings.update { current ->
+            val favorites = current.favoriteReciterIds
+            current.copy(
+                favoriteReciterIds = if (reciter.id in favorites) {
+                    favorites - reciter.id
+                } else {
+                    favorites + reciter.id
+                },
+            )
+        }
+    }
 }

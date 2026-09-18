@@ -88,4 +88,11 @@ class EnumForOrdinalTest {
             enumForOrdinal(BrushCircleStyle.entries, 99, BrushCircleStyle.BASELINE),
         )
     }
+
+    @Test
+    fun `reciter favorites migrate the original catalog only when missing`() {
+        assertEquals(DEFAULT_FAVORITE_RECITER_IDS, decodeFavoriteReciterIds(null))
+        assertEquals(emptySet<Int>(), decodeFavoriteReciterIds(emptySet()))
+        assertEquals(setOf(2, 9), decodeFavoriteReciterIds(setOf("2", "9", "old")))
+    }
 }

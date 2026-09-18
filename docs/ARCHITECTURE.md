@@ -136,6 +136,14 @@ Sources (all fetched over HTTPS, cached in `tools/.cache/`):
 | everyayah MP3 ranges | Leading-silence and duration measurements in `tools/audio_onsets/` | Some individual ayah files begin with silence. The offline scanner holds the first wash until sustained voice without moving valid later word boundaries, and records each file's length as the ceiling no timing row may cross. |
 | Quranic Arabic Corpus (QAC) v0.4 | Per-word root, lemma, POS, morphology; root concordance | Standard open Quranic morphology / root dictionary. Powers the [Root Word Viewer](ROOT_VIEWER.md) |
 
+`RECITERS` in `build_db.py` is the canonical audio catalog. The 2026 expansion
+keeps every complete EveryAyah voice that also appears in the leading cohort of
+TVQuran's most-listened chart or Quranify's Top Reciters, plus Quran.com's
+catalog and repeated user requests as a cross-check. The result is 15 reciters.
+`has_timings` is derived from real timing rows, so the eight added audio-only
+voices say **No word highlighting** instead of implying sync data they do not
+have.
+
 The **canonical word segmentation** is the space-split of the Uthmani text.
 The other two sources are mapped onto it by position:
 
@@ -511,9 +519,12 @@ horizontal page turn — draggable, fling-able, with page-turn audio
   bottom. Floating Back-to / return-to-ayah ornaments share
   `FloatingPaperControl` (enter/exit + bottom inset) with the cover float. All scrolling and verse-position logic routes through the
   focus engine (`reader/focus/`, see below).
-- `settings/SettingsScreen` — reciter plus two detail leaves in the app's
-  physical paper stack, Customize and Download manager, reached by tap or
-  horizontal page turn.
+- `settings/SettingsScreen` — favorite reciters plus three detail leaves in the
+  app's physical paper stack: the full Reciters catalog, Customize, and Download
+  manager, reached by tap or horizontal page turn. The catalog independently
+  selects a voice with a calligraphic qalam nuqta and gilds favorites; removing
+  a favorite removes it only from the main Settings leaf, never from the full
+  catalog.
   Customize owns text size, translation visibility, view, layout, verse and
   page numbers, theme, annotations, ayah-selector side, word-by-word gloss,
   with a pinned faded-leaf preview, a full-bleed paper dissolve under it,
