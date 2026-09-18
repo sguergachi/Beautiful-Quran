@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useId, type ReactNode } from 'react'
 import { Radio } from '@base-ui/react/radio'
 import { RadioGroup } from '@base-ui/react/radio-group'
 import { paperSelectHaptic } from './paperHaptics'
@@ -20,8 +20,8 @@ type Props<T extends string> = {
 }
 
 /**
- * Vertical ink choice list — Android `SelectRow` parity. A green ink disc leads
- * each row; selection is carried by ink strength (alpha), not accent color on
+ * Vertical ink choice list — Android `SelectRow` parity. A calligraphic nuqta
+ * leads each row; selection is carried by ink strength (alpha), not accent color on
  * the label. No floating popup, no Material radio chrome.
  */
 export function PaperChoiceList<T extends string>({
@@ -48,8 +48,8 @@ export function PaperChoiceList<T extends string>({
             key={opt.value}
             className={`paper-choice-row${selected ? ' is-selected' : ''}`}
           >
-            <Radio.Root value={opt.value} className="paper-choice-radio ink-disc">
-              <Radio.Indicator className="paper-choice-indicator ink-disc-fill" />
+            <Radio.Root value={opt.value} className="paper-choice-radio ink-nuqta">
+              <InkNuqta />
             </Radio.Root>
             <span className="paper-choice-copy">
               <span className="paper-choice-label">{opt.label}</span>
@@ -66,3 +66,29 @@ export function PaperChoiceList<T extends string>({
     </RadioGroup>
   )
 }
+
+/**
+ * Android `InkNuqta`: a qalam-cut Arabic dot. The wet edge, body and dense pool
+ * spread on one staggered clock when the parent radio is `[data-checked]`
+ * (timings live with `.ink-nuqta` in styles.css); unchecking lifts the ink.
+ */
+function InkNuqta() {
+  const clip = useId()
+  return (
+    <svg className="ink-nuqta-mark" viewBox="0 0 20 20" aria-hidden="true">
+      <clipPath id={clip}>
+        <path d={NUQTA_PATH} />
+      </clipPath>
+      <g clipPath={`url(#${clip})`}>
+        <circle className="ink-nuqta-wet" cx="10" cy="10" r="15.68" />
+        <circle className="ink-nuqta-body" cx="11.1" cy="9.3" r="13.72" />
+        <circle className="ink-nuqta-pool" cx="9.4" cy="10.8" r="11.76" />
+      </g>
+      <path className="ink-nuqta-outline" d={NUQTA_PATH} />
+    </svg>
+  )
+}
+
+/** Android `inkNuqtaPath(20f)`: the lightly bowed rhombus of one qalam touch. */
+const NUQTA_PATH =
+  'M9.8 1.8Q13.8 3.2 18.2 8.6Q17.2 13.2 10.6 18.2Q6.2 16.8 1.8 11.6Q2.8 6.6 9.8 1.8Z'

@@ -518,34 +518,6 @@ fun InkCheck(
     }
 }
 
-/**
- * The plain selection mark: an accent disc that inks in when chosen and settles
- * to a faint hollow ring when not — one vocabulary for every choice.
- */
-@Composable
-fun InkDisc(selected: Boolean) {
-    val fill by animateFloatAsState(if (selected) 1f else 0f, label = "discFill")
-    val accent = MaterialTheme.colorScheme.primary
-    val outline = MaterialTheme.colorScheme.outline
-    Canvas(Modifier.size(18.dp)) {
-        val c = Offset(size.width / 2f, size.height / 2f)
-        val r = size.minDimension / 2f
-        // Faint resting ring, fading out as the fill arrives.
-        drawCircle(
-            color = outline.copy(alpha = 0.5f * (1f - fill)),
-            radius = r - 1.2.dp.toPx(),
-            center = c,
-            style = Stroke(width = 1.4.dp.toPx()),
-        )
-        // Accent disc, inked in on selection.
-        drawCircle(
-            color = accent.copy(alpha = fill),
-            radius = (r - 2.dp.toPx()) * fill,
-            center = c,
-        )
-    }
-}
-
 // ------------------------------------------------------------ path primitives
 
 /**

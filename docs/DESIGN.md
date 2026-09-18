@@ -450,8 +450,7 @@ may use them** — they are not Settings-only, which is where they started.
 | Pick one of a few short options, side by side | `InkCircledChoiceRow` |
 | Pick one of several longer options, stacked | `InkCircledChoiceColumn` |
 | On / off | `InkCheck` — an empty ring that a brush check paints into |
-| A quiet "this one" dot | `InkDisc` |
-| A reciter / voice | `InkNuqta` — a qalam-cut Arabic dot whose wet ink spreads to its outline |
+| One of a stacked list of rows (reciter, theme, display…) | `SelectRow` → `InkNuqta` — a qalam-cut Arabic dot whose wet ink spreads to its outline (web: `PaperChoiceList`) |
 | Circle something that is *not* a plain text choice | `rememberInkBrushCircle` + `Modifier.inkBrushCircleTarget` / `Modifier.inkBrushCircleMark` |
 | A short tool or icon strip | `InkSpotChoiceRow` / `InkSpotChoice` — circular vellum ink-drop. Effect alone: `Modifier.inkSpotHighlight` |
 | Raw geometry (custom canvases) | `inkBrushCirclePath`, `inkBrushCheckPath` |
@@ -471,10 +470,15 @@ stain) instead of painting a cream hole of page paper over it. On
 Android 13+ that GPU field *is* the stain; older platforms keep a
 soft cubic blot.
 
-The reciter mark is a calligraphic **nuqta**, not a geometric radio diamond.
-Its four sides bow slightly like a full-width qalam impression. Selection sends
-a translucent wet edge ahead of denser pigment, both clipped by that hand-cut
-outline so the spread settles as one Arabic dot and never grows into a halo.
+Every stacked single choice leads with a calligraphic **nuqta**, never a round
+radio or a geometric diamond. Its four sides bow slightly like a full-width
+qalam impression. Selection is one continuous ink action on a single 640 ms
+clock: a translucent wet edge leaps out on touch, the body wicks after it, and
+the dense pool creeps into the corners and settles with no bounce — all clipped
+by that hand-cut outline so the spread ends as one Arabic dot, never a halo.
+Letting go lifts the pigment as a whole (220 ms, accelerating); the spread
+never runs backwards. `InkNuqtaTest` locks the layer ordering and the
+quick-wet / soft-settle shape.
 
 The circle is a filled calligraphic stroke on an oval centreline: it overshoots
 its own join at both ends and bows outward on entry / inward on exit, so the tips

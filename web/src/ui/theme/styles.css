@@ -2730,7 +2730,7 @@ select {
 
 /* —— Settings ——
  * Android SettingsScreen parity: full sheet of paper, uppercase section
- * labels, ink-disc selects, A—track—A text size, colophon at the foot.
+ * labels, nuqta selects, A—track—A text size, colophon at the foot.
  */
 .settings {
   padding: 0.5rem var(--sheet-pad) 3rem;
@@ -3340,9 +3340,9 @@ select {
   }
 }
 
-/* Vertical choice list — Android SelectRow + InkDisc.
- * Green filled disc when chosen; hollow ring at rest. Selection is carried by
- * label ink strength (alpha), never accent-on-label. */
+/* Vertical choice list — Android SelectRow + InkNuqta.
+ * A calligraphic nuqta fills with ink when chosen; faint outline at rest.
+ * Selection is carried by label ink strength (alpha), never accent-on-label. */
 .paper-choice-list {
   display: flex;
   flex-direction: column;
@@ -3358,42 +3358,76 @@ select {
   cursor: pointer;
 }
 
-/* 18dp ink disc */
-.paper-choice-radio,
-.ink-disc {
-  position: relative;
+/* 20dp qalam nuqta (Android InkNuqta). One 640ms ink action: the wet edge
+ * leaps out, the body wicks after it, the dense pool creeps into the corners
+ * and settles. Unchecking lifts all pigment together (220ms) and only then
+ * resets the spread, so the ink never runs backwards. */
+.ink-nuqta {
   flex-shrink: 0;
-  width: 1.125rem;
-  height: 1.125rem;
-  border-radius: 50%;
-  box-shadow: inset 0 0 0 1.4px color-mix(in srgb, var(--ink) 28%, transparent);
+  width: 1.25rem;
+  height: 1.25rem;
   display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  transition: box-shadow 200ms ease;
 }
 
-.paper-choice-radio[data-checked],
-.ink-disc[data-checked] {
-  box-shadow: inset 0 0 0 1.4px transparent;
+.ink-nuqta-mark {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
 }
 
-.paper-choice-indicator,
-.ink-disc-fill {
-  width: 0;
-  height: 0;
-  border-radius: 50%;
-  background: var(--accent);
+.ink-nuqta-mark circle {
+  fill: var(--accent);
+  transform: scale(0);
+  transform-box: fill-box;
+  transform-origin: center;
+  opacity: 0;
   transition:
-    width 200ms ease,
-    height 200ms ease;
+    opacity 220ms cubic-bezier(0.4, 0, 1, 1),
+    transform 0s 220ms;
 }
 
-.paper-choice-radio[data-checked] .paper-choice-indicator,
-.ink-disc[data-checked] .ink-disc-fill {
-  /* Fill almost to the rim (Android: (r − 2dp) * fill). */
-  width: 0.85rem;
-  height: 0.85rem;
+.ink-nuqta-outline {
+  fill: none;
+  stroke: color-mix(in srgb, var(--ink) 30%, transparent);
+  stroke-width: 1.15;
+  stroke-linejoin: round;
+  transition: stroke 220ms ease;
+}
+
+.ink-nuqta[data-checked] .ink-nuqta-outline {
+  stroke: color-mix(in srgb, var(--accent) 82%, transparent);
+}
+
+.ink-nuqta[data-checked] circle {
+  transform: scale(1);
+}
+
+.ink-nuqta[data-checked] .ink-nuqta-wet {
+  opacity: 0.16;
+  transition:
+    opacity 640ms ease-out,
+    transform 352ms cubic-bezier(0.1, 0.75, 0.3, 1);
+}
+
+.ink-nuqta[data-checked] .ink-nuqta-body {
+  opacity: 0.55;
+  transition:
+    opacity 60ms linear 51ms,
+    transform 474ms cubic-bezier(0.25, 0.6, 0.3, 1) 51ms;
+}
+
+.ink-nuqta[data-checked] .ink-nuqta-pool {
+  opacity: 0.96;
+  transition:
+    opacity 60ms linear 115ms,
+    transform 525ms cubic-bezier(0.3, 0.35, 0.15, 1) 115ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ink-nuqta-mark circle,
+  .ink-nuqta[data-checked] circle {
+    transition: opacity 120ms linear;
+  }
 }
 
 .paper-choice-radio:focus-visible {

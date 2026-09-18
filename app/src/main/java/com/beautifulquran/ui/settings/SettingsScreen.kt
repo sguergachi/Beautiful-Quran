@@ -92,7 +92,6 @@ import com.beautifulquran.ui.theme.BrushCheckParams
 import com.beautifulquran.ui.theme.BrushCircleParams
 import com.beautifulquran.ui.theme.DisclosureChevron
 import com.beautifulquran.ui.theme.InkCheck
-import com.beautifulquran.ui.theme.InkDisc
 import com.beautifulquran.ui.theme.InkNuqta
 import com.beautifulquran.ui.theme.SHIPPED_BRUSH_REVISION
 import com.beautifulquran.ui.theme.SHIPPED_CHECK_REVISION
@@ -282,7 +281,6 @@ internal fun SettingsScreen(
                     note = if (!reciter.hasTimings) "No word highlighting" else null,
                     selected = reciter.id == settings.reciterId,
                     onClick = { viewModel.selectReciter(reciter) },
-                    selectionMark = { InkNuqta(selected = it) },
                 )
             }
 
@@ -937,9 +935,9 @@ private fun NavigateRow(
     }
 }
 
-/** A single-choice row: an ink mark leads the label, ink strength carries the
- * selection, and an optional trailing ornament (theme swatches) sits at the
- * edge. No radio, no ripple. */
+/** A single-choice row: a calligraphic nuqta leads the label, ink strength
+ * carries the selection, and an optional trailing ornament (theme swatches)
+ * sits at the edge. No radio, no ripple. */
 @Composable
 internal fun SelectRow(
     label: String,
@@ -947,7 +945,6 @@ internal fun SelectRow(
     onClick: () -> Unit,
     note: String? = null,
     trailing: @Composable (() -> Unit)? = null,
-    selectionMark: @Composable (Boolean) -> Unit = { InkDisc(selected = it) },
 ) {
     val view = LocalView.current
     val textAlpha by animateFloatAsState(if (selected) 1f else 0.55f, label = "selectInk")
@@ -961,7 +958,7 @@ internal fun SelectRow(
             }
             .padding(vertical = 8.dp),
     ) {
-        selectionMark(selected)
+        InkNuqta(selected = selected)
         Spacer(Modifier.size(16.dp))
         Column(Modifier.weight(1f)) {
             Text(
