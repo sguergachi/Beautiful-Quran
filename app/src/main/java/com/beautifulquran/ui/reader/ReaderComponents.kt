@@ -3536,6 +3536,7 @@ fun SurahHeader(
 fun BasmalahBlock(
     active: Boolean,
     dimmed: Boolean,
+    fontScale: Float,
     washProgress: StateFlow<Float?>? = null,
     onClick: (() -> Unit)? = null,
 ) {
@@ -3548,6 +3549,7 @@ fun BasmalahBlock(
         BasmalahCalligraphy(
             active = active,
             dimmed = dimmed,
+            fontScale = fontScale,
             washProgress = washProgress,
             onClick = onClick,
         )

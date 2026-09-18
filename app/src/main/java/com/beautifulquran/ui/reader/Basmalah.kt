@@ -7,6 +7,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -15,6 +16,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -22,6 +24,7 @@ import com.beautifulquran.R
 import com.beautifulquran.domain.BASMALAH_UTHMANI as DomainBasmalahUthmani
 import com.beautifulquran.domain.SURAH_WITHOUT_BASMALAH as DomainSurahWithoutBasmalah
 import com.beautifulquran.domain.surahOpensWithBasmalahPreface as domainSurahOpensWithBasmalahPreface
+import com.beautifulquran.ui.theme.ArabicWordStyle
 import com.beautifulquran.ui.theme.letterFadeIn
 import com.beautifulquran.ui.theme.quietClickable
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -36,6 +39,26 @@ const val SURAH_WITHOUT_BASMALAH = DomainSurahWithoutBasmalah
 /** Re-export for reader UI and existing tests. */
 fun surahOpensWithBasmalahPreface(surahId: Int): Boolean =
     domainSurahOpensWithBasmalahPreface(surahId)
+
+/**
+ * Width of the basmalah artwork, in ems of the verse text beside it, so it is
+ * written with the same pen as the recited verses at every text scale.
+ *
+ * Measured on the nuqta — the calligrapher's unit, the square the pen leaves:
+ * - `basmalah_naskh` (viewport 608 wide): the dots of ب and ي are each
+ *   6.4 × 7.0 units, √area 5.46.
+ * - `hafs_uthmanic.ttf`: the dots of ب / ن / ف have √area 0.082 em.
+ *
+ * 608 × 0.082 / 5.46 = 9.13 em. Not the alif: this hand's alifs are short for
+ * its pen, so matching alif height (11.82 em) left it a 1.4–1.7× heavier stroke
+ * than the verses on device and it read as larger text. Re-measure if either
+ * the artwork or the verse face changes (web mirrors this in
+ * `.basmalah-calligraphy`).
+ */
+const val BASMALAH_WIDTH_EM = 9.13f
+
+/** Side margin inside the calligraphy's own tap target. */
+private val BasmalahInset = 12.dp
 
 /**
  * Traditional Naskh manuscript calligraphy of the basmalah — a VectorDrawable
@@ -55,6 +78,8 @@ fun BasmalahCalligraphy(
     modifier: Modifier = Modifier,
     active: Boolean = false,
     dimmed: Boolean = false,
+    /** The reader's text scale; sizes the artwork to the verses ([BASMALAH_WIDTH_EM]). */
+    fontScale: Float = 1f,
     /** Lead-in wash 0..1 from [ReaderViewModel.basmalahWashProgress]. */
     washProgress: StateFlow<Float?>? = null,
     onClick: (() -> Unit)? = null,
@@ -73,15 +98,20 @@ fun BasmalahCalligraphy(
     val washState = (washProgress ?: idleWash).collectAsStateWithLifecycle()
 
     val ink = MaterialTheme.colorScheme.onSurface
+    val artWidth = with(LocalDensity.current) {
+        (ArabicWordStyle.fontSize * fontScale * BASMALAH_WIDTH_EM).toDp()
+    }
     Image(
         painter = painterResource(R.drawable.basmalah_naskh),
         contentDescription = BASMALAH_UTHMANI,
         colorFilter = ColorFilter.tint(ink),
         contentScale = ContentScale.FillWidth,
         modifier = modifier
+            // Never wider than the column: at large scales it fills the line.
+            .widthIn(max = artWidth + BasmalahInset * 2)
             .then(if (onClick != null) Modifier.quietClickable(onClick = onClick) else Modifier)
             .fillMaxWidth()
-            .padding(horizontal = 12.dp)
+            .padding(horizontal = BasmalahInset)
             .then(
                 if (active) {
                     Modifier.letterFadeIn(
