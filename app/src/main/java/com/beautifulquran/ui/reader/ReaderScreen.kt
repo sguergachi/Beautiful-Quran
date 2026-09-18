@@ -1818,7 +1818,11 @@ fun ReaderScreen(
                             contentAlignment = Alignment.Center,
                             modifier = Modifier
                                 .size(48.dp)
-                                .quietClickable(enabled = !recitingActive, role = Role.Button) {
+                                .quietClickable(
+                                    enabled = !recitingActive,
+                                    role = Role.Button,
+                                    interactionSource = settingsNuqta.interactions,
+                                ) {
                                     settingsNuqta.drop()
                                     onOpenSettings()
                                 },

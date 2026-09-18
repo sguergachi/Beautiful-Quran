@@ -398,7 +398,11 @@ internal fun MushafReadingSheet(
                     modifier = Modifier
                         .align(Alignment.CenterEnd)
                         .size(40.dp)
-                        .quietClickable(enabled = secondaryEnabled, role = Role.Button) {
+                        .quietClickable(
+                            enabled = secondaryEnabled,
+                            role = Role.Button,
+                            interactionSource = settingsNuqta.interactions,
+                        ) {
                             settingsNuqta.drop()
                             onOpenSettings()
                         },

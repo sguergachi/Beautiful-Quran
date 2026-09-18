@@ -547,7 +547,7 @@ private fun HomeHeader(
                 // The title sits 7 dp below the masthead's overall center.
                 .offset(y = 7.dp)
                 // Unclipped: the settings nuqta swells past this box.
-                .quietClickable(role = Role.Button) {
+                .quietClickable(role = Role.Button, interactionSource = settingsNuqta.interactions) {
                     settingsNuqta.drop()
                     onOpenSettings()
                 }

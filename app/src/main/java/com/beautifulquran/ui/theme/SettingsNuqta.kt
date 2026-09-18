@@ -4,6 +4,8 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Tune
@@ -47,9 +49,15 @@ import kotlinx.coroutines.launch
  */
 val LocalSettingsApproach = staticCompositionLocalOf<() -> Float> { { 0f } }
 
-/** Lets the settings button start its nuqta the instant it is tapped. */
+/**
+ * Lets the settings button ink its nuqta while it is held — pass
+ * [interactions] to its clickable — and the instant it is tapped.
+ */
 @Stable
 class SettingsNuqtaState {
+    /** The button's presses: holding it inks the nuqta as its pressed state. */
+    val interactions = MutableInteractionSource()
+
     /** Tapped, and the turn it starts has not yet moved the stack. */
     internal var pressed by mutableStateOf(false)
 
@@ -64,11 +72,12 @@ fun rememberSettingsNuqtaState(): SettingsNuqtaState = remember { SettingsNuqtaS
 
 /**
  * The settings glyph with a nuqta of ink behind it, so the reader sees where
- * a page turn will land. The moment the stack starts to turn toward Settings
- * — a swipe or a tap ([SettingsNuqtaState.drop]) — the drop spreads on the
+ * a page turn will land. The moment the button is held, or the stack starts
+ * to turn toward Settings — a swipe or a tap ([SettingsNuqtaState.drop]) —
+ * the drop spreads on the
  * same clock as a chosen row. From there the drag stretches it like a rubber
- * band, and if the turn falls back short of Settings the ink dries back
- * the way it came. The glyph takes the
+ * band, and if the press or turn falls back short of Settings the ink
+ * dries back the way it came. The glyph takes the
  * contrasting colour only where the ink covers it.
  */
 @Composable
@@ -81,6 +90,7 @@ fun SettingsNuqtaIcon(
     params: NuqtaParams = LocalNuqtaParams.current,
 ) {
     val approach = LocalSettingsApproach.current
+    val held by state.interactions.collectIsPressedAsState()
     val spread = remember { Animatable(0f) }
     val presence = remember { Animatable(0f) }
     LaunchedEffect(approach, state) {
@@ -90,7 +100,7 @@ fun SettingsNuqtaIcon(
         }
     }
     LaunchedEffect(approach, state, params) {
-        snapshotFlow { approach() > SettingsTurnEpsilon || state.pressed }
+        snapshotFlow { approach() > SettingsTurnEpsilon || state.pressed || held }
             .distinctUntilChanged()
             .collectLatest { inked ->
                 if (inked) {
