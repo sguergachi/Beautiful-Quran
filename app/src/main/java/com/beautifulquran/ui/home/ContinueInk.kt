@@ -3,8 +3,6 @@ package com.beautifulquran.ui.home
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -30,24 +28,24 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Paint
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
-import androidx.compose.ui.platform.LocalView
 import com.beautifulquran.ui.theme.LocalNuqtaParams
 import com.beautifulquran.ui.theme.NuqtaParams
-import com.beautifulquran.ui.theme.SheetApproachAtRest
 import com.beautifulquran.ui.theme.drawInkWashCoats
 import com.beautifulquran.ui.theme.inkCoatFingers
 import com.beautifulquran.ui.theme.inkWashReachToCover
-import com.beautifulquran.ui.theme.paperSelectHaptic
 import kotlin.math.hypot
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 
-/** The turn from the chapter list into the open reader; at rest when none is open. */
-val LocalReaderApproach = staticCompositionLocalOf { SheetApproachAtRest }
+/**
+ * How far the paper stack has turned from the chapter list into the open
+ * reader, 0..1 — 0 when no reader is open to turn to. Read it only while
+ * drawing or in snapshot flows: it changes every frame of a swipe.
+ */
+val LocalReaderApproach = staticCompositionLocalOf<() -> Float> { { 0f } }
 
 /**
  * Ink that floods the continue row the moment the chapter list starts to turn
@@ -65,9 +63,6 @@ internal class ContinueInk(val params: NuqtaParams) {
     /** The wash's own clock, 0..1, before easing. */
     private var clock = 0f
     val dry = Animatable(0f)
-
-    /** The row's pop as a drag commits to the reader: its swell past full size. */
-    val bounce = Animatable(0f)
 
     /** Tapped, and the turn it starts has not yet landed. */
     var tapped by mutableStateOf(false)
@@ -111,27 +106,9 @@ private enum class ContinueTurn { Resting, Turning, Landed }
 internal fun rememberContinueInk(): ContinueInk {
     val params = LocalNuqtaParams.current
     val ink = remember(params) { ContinueInk(params) }
-    val turn = LocalReaderApproach.current
-    val approach = turn.progress
+    val approach = LocalReaderApproach.current
     val held by ink.interactions.collectIsPressedAsState()
-    val view = LocalView.current
-    LaunchedEffect(ink, turn) {
-        // Past the point where letting go opens the reader, a drag gets the
-        // same tick as the settings nuqta's second stage, and the row pops.
-        snapshotFlow { approach() >= turn.commitAt }
-            .distinctUntilChanged()
-            .collectLatest { committed ->
-                if (committed && turn.dragging()) {
-                    view.paperSelectHaptic()
-                    ink.bounce.animateTo(
-                        0f,
-                        spring(dampingRatio = 0.35f, stiffness = Spring.StiffnessMedium),
-                        initialVelocity = ContinueInkBounceKick,
-                    )
-                }
-            }
-    }
-    LaunchedEffect(ink, turn) {
+    LaunchedEffect(ink, approach) {
         snapshotFlow {
             val p = approach()
             when {
@@ -165,13 +142,6 @@ internal fun rememberContinueInk(): ContinueInk {
         }
     }
     return ink
-}
-
-/** The row's pop as a drag commits to the reader. */
-internal fun Modifier.continueInkBounce(ink: ContinueInk): Modifier = graphicsLayer {
-    val s = 1f + ink.bounce.value
-    scaleX = s
-    scaleY = s
 }
 
 /** The wash itself, drawn behind the row, landing at its right (Arabic) end. */
@@ -219,9 +189,6 @@ private const val ContinueInkSpreadMs = 420
 private val ContinueInkEasing = CubicBezierEasing(0.3f, 0f, 0.2f, 1f)
 
 private const val ContinueTurnEpsilon = 0.001f
-
-/** The pop's kick, in swell per second; it peaks near a 3% swell. */
-private const val ContinueInkBounceKick = 1f
 
 /** The most a single frame may advance the wash's clock. */
 private const val ContinueInkMaxFrameMs = 20f
