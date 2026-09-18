@@ -119,6 +119,14 @@ RECITERS = [
     (5, "Abdurrahmaan_As-Sudais_192kbps", "Abdurrahman As-Sudais", "Murattal"),
     (6, "Saood_ash-Shuraym_128kbps", "Saud Ash-Shuraym", "Murattal"),
     (7, "Hani_Rifai_192kbps", "Hani Ar-Rifai", "Murattal"),
+    (8, "MaherAlMuaiqly128kbps", "Maher Al-Muaiqly", "Murattal"),
+    (9, "Yasser_Ad-Dussary_128kbps", "Yasser Al-Dosari", "Murattal"),
+    (10, "Ghamadi_40kbps", "Saad Al-Ghamdi", "Murattal"),
+    (11, "Ahmed_ibn_Ali_al-Ajamy_128kbps_ketaballah.net", "Ahmad Al-Ajmi", "Murattal"),
+    (12, "Nasser_Alqatami_128kbps", "Nasser Al-Qatami", "Murattal"),
+    (13, "Fares_Abbad_64kbps", "Fares Abbad", "Murattal"),
+    (14, "Abu_Bakr_Ash-Shaatree_128kbps", "Abu Bakr Al-Shatri", "Murattal"),
+    (15, "Ali_Jaber_64kbps", "Ali Jaber", "Murattal"),
 ]
 
 BASMALAH_WORDS = 4  # words in bismillah, prefixed to audio of every first ayah
@@ -2626,6 +2634,20 @@ def load_reviewed_timing_baseline(path=OUT):
         db.close()
 
 
+def declared_reciter_rows(timing_rows):
+    """Materialize the declared catalog without inventing highlight support.
+
+    A normal rebuild deliberately preserves the reviewed timing baseline. New
+    audio-only voices must still enter the database, while ``has_timings`` may
+    become true only when that reciter actually has timing rows.
+    """
+    timed_ids = {row[0] for row in timing_rows}
+    return [
+        (rid, slug, name, style, int(rid in timed_ids))
+        for rid, slug, name, style in RECITERS
+    ]
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--skip-timings", action="store_true")
@@ -2938,6 +2960,7 @@ def main():
         if held:
             print(f"[audit holds] {held} row(s) held at the evidenced baseline")
 
+    reciter_rows = declared_reciter_rows(timing_rows)
     OUT.parent.mkdir(parents=True, exist_ok=True)
     if OUT.exists():
         OUT.unlink()

@@ -25,6 +25,7 @@ sys.path.insert(0, str(TOOLS))
 from build_db import (  # noqa: E402
     AUDIO_ONSETS_DIR,
     QCF_V2_FIRST_CODEPOINT,
+    RECITERS,
     adjust_qdc_segments,
     apply_boundary_repair,
     apply_clocked_timing_repair,
@@ -41,6 +42,7 @@ from build_db import (  # noqa: E402
     load_audio_onsets,
     apply_audit_holds,
     discard_false_same_position_lead,
+    declared_reciter_rows,
     false_same_position_leads,
     hand_lead_to_previous_word,
     normalize_text,
@@ -693,6 +695,18 @@ def audit_bundled_db():
     ).fetchone()[0] == "ok"
 
 
+def check_reciter_catalog():
+    """The packaged catalog matches declarations and derives timing support."""
+    with sqlite3.connect(ROOT / "data/quran.db") as db:
+        actual = list(db.execute(
+            "SELECT id,slug,name,style,has_timings FROM reciters ORDER BY id"
+        ))
+        timing_rows = list(db.execute(
+            "SELECT reciter_id,surah_id,ayah_number,segments FROM timings"
+        ))
+    return actual == declared_reciter_rows(timing_rows) and len(actual) == len(RECITERS)
+
+
 def check_gloss_normalize():
     """load_wbw runs glosses through normalize_text — lock the 4:152 shape."""
     return (
@@ -967,6 +981,7 @@ def main():
     gloss_ok = check_gloss_normalize()
     alignment_payload_ok = check_alignment_payload_parse()
     database_ok = audit_bundled_db()
+    reciter_catalog_ok = check_reciter_catalog()
     qcf_runs_ok = check_qcf_v2_page_runs()
     qcf_assert_ok = check_qcf_v2_run_assertion()
     recovered_boundary_ok = check_recovered_boundary_repairs()
@@ -981,6 +996,7 @@ def main():
         "quran-align release payload parse"
     )
     print(f"  {'ok  ' if database_ok else 'FAIL'} bundled timing database invariants")
+    print(f"  {'ok  ' if reciter_catalog_ok else 'FAIL'} declared reciter catalog")
     print(f"  {'ok  ' if qcf_runs_ok else 'FAIL'} public DB excludes QCF V2 fields")
     print(f"  {'ok  ' if qcf_assert_ok else 'FAIL'} QCF V2 run assertion rejects a wrong page")
     print(f"  {'ok  ' if recovered_boundary_ok else 'FAIL'} recovered-row boundary deferral")
@@ -998,6 +1014,8 @@ def main():
         failures.append(("quran-align payload", "release artifact parse failed", None))
     if not database_ok:
         failures.append(("bundled database", "timing audit failed", None))
+    if not reciter_catalog_ok:
+        failures.append(("reciter catalog", "database does not match declarations", None))
     if not qcf_runs_ok:
         failures.append(("public QCF exclusion", "Quran.com QCF data remains in quran.db", None))
     if not qcf_assert_ok:
@@ -1017,7 +1035,7 @@ def main():
                 for line in str(detail).splitlines():
                     print(f"    {line}")
         return 1
-    print(f"all {len(cases) + 10} cases pass ({CASES_DIR.relative_to(Path.cwd())})")
+    print(f"all {len(cases) + 11} cases pass ({CASES_DIR.relative_to(Path.cwd())})")
     return 0
 
 

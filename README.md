@@ -6,7 +6,7 @@ illuminates in time with the audio, with its English meaning beneath it.
 
 - 📖 Full Quran, Uthmani script, in the KFGQPC Hafs typeface
 - ✨ Word-by-word highlighting with bundled offline timing fallback
-- 🎙️ 7 reciters, with ayah audio streamed and cached
+- 🎙️ 15 reciters, with ayah audio streamed and cached
 - 🈯 Word-by-word English gloss + Saheeh International translation
 - 🔁 Repeat one ayah, the whole surah, or any ayah range you choose
 - 🔍 Search the English translation and word glosses within a surah
